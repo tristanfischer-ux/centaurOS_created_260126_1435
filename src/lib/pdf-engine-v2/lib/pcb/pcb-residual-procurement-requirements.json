@@ -38,6 +38,7 @@
       "packageConstraints": "Through-hole, 2-position, 3.5 mm pitch, approximately 7 x 7 mm frozen land pattern.",
       "environmentLifecycle": "At least -20 to +105 C local rating, UL94V-0, minimum 100 wire insertions, agency-recognised terminal system.",
       "evidence": ["Frozen NinjaPCR uses SCREW-TERMINAL-GREEN(2P-3.5) with H2-3.5-7.0X7.0MM.", "Thermal contract requires 12 V heater/Peltier power."],
+      "candidateAssessments": [],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Freeze TEC/heater continuous and peak current plus wire gauge before selecting an exact terminal MPN." }
     },
     {
@@ -49,7 +50,17 @@
       "interface": "Polarised aluminium SMD capacitor directly across supply and ground.",
       "packageConstraints": "Frozen CAP_SMD_AL_D125 land pattern; exact can diameter/height and polarity marking must match.",
       "environmentLifecycle": "105 C rated; procurement target at least 2,000 h at 105 C with calculated mission-life derating.",
-      "evidence": ["Frozen NinjaPCR C3 is CAP_SMDAL_1000UF_25V on CAP_SMD_AL_D125.", "No released manufacturer ordering code or ripple/life rating is present."],
+      "evidence": ["Frozen NinjaPCR C3 is CAP_SMDAL_1000UF_25V on CAP_SMD_AL_D125.", "Panasonic EEVFK1E102Q exactly matches 1000 uF, 25 V and the 12.5 x 13.5 mm polar SMD envelope, but the design has no calculated capacitor RMS ripple requirement."],
+      "candidateAssessments": [{
+        "manufacturer": "Panasonic Industry",
+        "partNumber": "EEVFK1E102Q",
+        "ratings": "1000 uF; 25 V; +/-20%; 1.1 Arms at 100 kHz; 60 mOhm impedance at 100 kHz; -55 to +105 C; 5000 h at 105 C",
+        "package": "Polar radial-can SMD, 12.5 mm diameter x 13.5 mm body length",
+        "pinout": "Two polarised terminals, positive and negative; body stripe identifies negative",
+        "source": "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-smd/models/EEVFK1E102Q",
+        "decision": "rejected_pending_requirement",
+        "reason": "The exact 1.1 Arms rating cannot be compared with an absent worst-case TEC-PWM capacitor ripple current."
+      }],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Measure/derive RMS ripple and enclosure temperature, then select an exact 1000 uF 25 V D12.5 SMD aluminium part." }
     },
     {
@@ -62,6 +73,7 @@
       "packageConstraints": "0603 SMD with unambiguous cathode marking and machine-vision polarity.",
       "environmentLifecycle": "-40 to +85 C minimum, RoHS, active lifecycle, intensity derated for enclosure optics.",
       "evidence": ["Generated role is a generic 0603 LED.", "Frozen NinjaPCR does not provide an exact indicator ordering code."],
+      "candidateAssessments": [],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Assign colour/state and enclosure optical requirement before choosing the LED and resistor MPNs." }
     },
     {
@@ -73,7 +85,29 @@
       "interface": "3.3 V logic control, 12 V power, two-wire TEC output, hardware safe-off.",
       "packageConstraints": "A complete bridge topology, not one placeholder IC; power packages require exposed copper/heatsinking and serviceable relay/MOSFET footprints.",
       "environmentLifecycle": "Component junction range at least -40 to +125 C; relay/contact solution, if used, must meet thermal-cycle endurance.",
-      "evidence": ["Frozen NinjaPCR uses NEC EP2/ACTP212 relay topology plus IRLB3813PBF power MOSFET.", "The selected TEC current is absent from the frozen contract."],
+      "evidence": ["Frozen NinjaPCR v2.3 names Panasonic ACTP212 and Infineon IRLB3813PBF in its relay/MOSFET polarity-control topology.", "The selected TEC current, gate-drive loss, switching duty and thermal path are absent from the frozen contract, so two exact constituents do not resolve the complete bridge role."],
+      "candidateAssessments": [
+        {
+          "manufacturer": "Panasonic Industry",
+          "partNumber": "ACTP212",
+          "ratings": "12 V coil; 83.3 mA; 144 ohm; twin Form C; NO 30 A at 14 VDC; NC 10 A at 14 VDC; -40 to +85 C",
+          "package": "Sealed 17.4 x 14 x 13.5 mm through-hole PCB relay, eight pins",
+          "pinout": "Frozen gold symbol: pins 1/2 switched-load commons, 3 shared NC feed, 4 shared NO feed, 5/6 coil 1, 7/8 coil 2; bottom view",
+          "source": "https://www.industrypanasonic.com/datasheet/industrypanasonic/ACTP512.pdf",
+          "decision": "rejected_as_partial_topology",
+          "reason": "ACTP212 controls polarity but is not the complete switched TEC current path."
+        },
+        {
+          "manufacturer": "Infineon Technologies",
+          "partNumber": "IRLB3813PBF",
+          "ratings": "30 V VDS; package-limited 120 A continuous; 1.95 mOhm max at VGS=10 V; 2.60 mOhm max at VGS=4.5 V; -55 to +175 C",
+          "package": "TO-220AB through-hole, three leads plus drain tab",
+          "pinout": "1 Gate, 2 Drain, 3 Source; tab Drain",
+          "source": "https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlb3813-datasheet-en.pdf",
+          "decision": "rejected_as_partial_topology",
+          "reason": "IRLB3813PBF is one low-side switch; the TEC current, gate drive, heatsink and complete bridge parts remain undefined."
+        }
+      ],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Select the TEC and derive current/reversal duty before resolving every bridge MOSFET, relay, gate, clamp and connector MPN." }
     },
     {
@@ -85,7 +119,17 @@
       "interface": "12V, GND, 3V3; enable/power-good optional only if architecture uses them.",
       "packageConstraints": "SMD regulator with manufacturer land pattern and thermal vias where required.",
       "environmentLifecycle": "-40 to +85 C ambient minimum; active lifecycle; derated input rating at least 15 V.",
-      "evidence": ["Frozen NinjaPCR labels REG1 CJT1117-3.3-SOT223 on the 12 V supply region.", "JSCJ CJT1117B-3.3 is 1 A/SOT-223 but thermal adequacy for Wi-Fi peak load is not proven."],
+      "evidence": ["Frozen NinjaPCR labels REG1 CJT1117-3.3-SOT223 on the 12 V supply region.", "JSCJ manufacturer data and LCSC C164899 identify exact procurement code CJT1117B-3.3-G, but 12 V to 3.3 V at 500 mA dissipates 4.35 W before tolerance and cannot be accepted without measured load and a thermal solution."],
+      "candidateAssessments": [{
+        "manufacturer": "Jiangsu Changjing Electronics Technology",
+        "partNumber": "CJT1117B-3.3-G",
+        "ratings": "3.3 V; 1 A; 15 V recommended input maximum; 1.3 V max dropout at 1 A; 100 C/W junction-to-ambient; -25 to +125 C junction",
+        "package": "SOT-223, three leads plus output tab",
+        "pinout": "1 GND, 2 OUTPUT, 3 INPUT; tab OUTPUT",
+        "source": "https://www.jscj-elec.com/gallery/file/CJT1117B-XXX%20SOT-223%20V1.pdf",
+        "decision": "rejected_thermal",
+        "reason": "The exact gold-family LDO would dissipate 4.35 W at the requirement's 500 mA transient point and has no proven PCB thermal path."
+      }],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Measure the 3V3 load profile and thermal environment; then select a thermally closed 12 V-capable regulator rather than copying the gold LDO blindly." }
     },
     {
@@ -98,6 +142,7 @@
       "packageConstraints": "Four-terminal current-sense package preferred; 0603 placeholder is prohibited until dissipation proves it adequate.",
       "environmentLifecycle": "-55 to +155 C element rating preferred; pulse-load curve and long-term drift required.",
       "evidence": ["Generated role has only a generic 0603 placeholder.", "No shunt value, sense topology or current limit exists in the frozen NinjaPCR evidence."],
+      "candidateAssessments": [],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Freeze Imax, permitted burden voltage, amplifier topology and fault bandwidth before calculating and sourcing the shunt." }
     },
     {
@@ -109,7 +154,8 @@
       "interface": "3.3 V UART/programming header with explicit board TX/RX naming.",
       "packageConstraints": "Keyed or polarity-marked 1x4 connector; pitch/orientation must match the released programmer cable.",
       "environmentLifecycle": "At least 50 service mating cycles; active connector family and cable availability.",
-      "evidence": ["Frozen NinjaPCR exposes TXD and RXD nets.", "Offline output incorrectly duplicated USB D- labels and supplies no exact header code."],
+      "evidence": ["Frozen NinjaPCR v2.3 exposes SERIAL4 as generic PINHD-1X4 on frozen 1X04, carrying TXD, RXD, GND and 3V3/reference nets.", "The gold schematic provides no manufacturer or ordering code, connector gender contract or released cable orientation."],
+      "candidateAssessments": [],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Identify the released programming header footprint and cable orientation before selecting an exact connector MPN." }
     },
     {
@@ -122,6 +168,7 @@
       "packageConstraints": "Mechanically retained thermal cutoff; generic 1206 electrical fuse is not acceptable.",
       "environmentLifecycle": "Safety certification, declared ageing drift, and lot traceability required; one-shot cutoff must be service-replaceable.",
       "evidence": ["Thermal-controller phenotype explicitly requires enforce_thermal_cutoff.", "Gold and contract do not provide opening temperature or interrupted current."],
+      "candidateAssessments": [],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Freeze protocol Tmax, hazardous-temperature limit, runaway curve and load current before selecting a certified cutoff." }
     },
     {
@@ -134,6 +181,7 @@
       "packageConstraints": "Touch-safe connector and safety-rated relay/switch footprint with creepage appropriate to 12 V high current.",
       "environmentLifecycle": "Declared electrical/mechanical operations and safety certification; replaceable wear component.",
       "evidence": ["Generated placeholder is a small tactile switch with no load rating.", "Thermal architecture requires an independent safe-off path."],
+      "candidateAssessments": [],
       "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Choose logic-kill versus load-break architecture and derive current, transient and required safety category." }
     },
     {

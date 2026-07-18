@@ -4,6 +4,8 @@
  * manufacturer datasheet identifies both the ordering-code package and pinout.
  */
 
+import { resolve } from 'node:path'
+
 import { resolveKicadFootprint } from './pcb-kicad-library'
 
 import type {
@@ -20,6 +22,8 @@ interface CuratedManufacturerSymbol {
   pins: readonly PcbPinSpec[]
   provenance: string
 }
+
+const CURATED_FOOTPRINTS_ROOT = resolve(__dirname, 'footprints')
 
 export interface VerifiedCuratedManufacturerIdentity {
   status: 'verified'
@@ -50,6 +54,64 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
       { number: '3', name: 'K1/A2', kind: 'passive' },
     ],
     provenance: 'Slkor BAS70-04 manufacturer data distributed as LCSC C609810: dual series Schottky in SOT-23, pins 1=A1, 2=K2, 3=K1/A2; frozen Rodeostat D1/D2 identify BAS70-04, C609810 and Package_TO_SOT_SMD:SOT-23 at revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd; https://www.lcsc.com/product-detail/C609810.html',
+  },
+  {
+    manufacturer: 'Panasonic Industry',
+    partNumber: 'EEVFK1E102Q',
+    symbolId: 'Forge_Manufacturer:EEVFK1E102Q',
+    footprint: {
+      library: 'Forge_Manufacturer',
+      footprint: 'Panasonic_EEVFK1E102Q',
+    },
+    pins: [
+      { number: '1', name: '+', kind: 'passive' },
+      { number: '2', name: '-', kind: 'passive' },
+    ],
+    provenance: 'Panasonic EEVFK1E102Q product record: polar two-terminal 1000 uF 25 V SMD can, 12.5 x 13.5 mm; frozen NinjaPCR CAP_SMD_AL_D125 establishes the matching land geometry; https://industrial.panasonic.com/ww/products/pt/aluminum-cap-smd/models/EEVFK1E102Q',
+  },
+  {
+    manufacturer: 'Panasonic Industry',
+    partNumber: 'ACTP212',
+    symbolId: 'Forge_Manufacturer:ACTP212',
+    footprint: { library: 'Forge_Manufacturer', footprint: 'Panasonic_ACTP212' },
+    pins: [
+      { number: '1', name: 'COM1', kind: 'passive' },
+      { number: '2', name: 'COM2', kind: 'passive' },
+      { number: '3', name: 'NC1+NC2', kind: 'passive' },
+      { number: '4', name: 'NO1+NO2', kind: 'passive' },
+      { number: '5', name: 'COIL1+', kind: 'passive' },
+      { number: '6', name: 'COIL1-', kind: 'passive' },
+      { number: '7', name: 'COIL2+', kind: 'passive' },
+      { number: '8', name: 'COIL2-', kind: 'passive' },
+    ],
+    provenance: 'Panasonic CT Relay Power Type ASCTB229E bottom-view eight-pin drawing plus frozen NinjaPCR v2.3 ACTP212 symbol/net map: 1/2 switched-load commons, 3/4 shared NC/NO feeds, 5/6 and 7/8 coils; https://www.industrypanasonic.com/datasheet/industrypanasonic/ACTP512.pdf',
+  },
+  {
+    manufacturer: 'Infineon Technologies',
+    partNumber: 'IRLB3813PBF',
+    symbolId: 'Forge_Manufacturer:IRLB3813PBF',
+    footprint: { library: 'Package_TO_SOT_THT', footprint: 'TO-220-3_Vertical' },
+    pins: [
+      { number: '1', name: 'G', kind: 'input' },
+      { number: '2', name: 'D', kind: 'passive' },
+      { number: '3', name: 'S', kind: 'passive' },
+    ],
+    provenance: 'Infineon IRLB3813PbF data sheet TO-220AB lead assignment: 1=Gate, 2=Drain, 3=Source, tab=Drain; https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlb3813-datasheet-en.pdf',
+  },
+  {
+    manufacturer: 'Jiangsu Changjing Electronics Technology',
+    partNumber: 'CJT1117B-3.3-G',
+    symbolId: 'Forge_Manufacturer:CJT1117B-3.3-G',
+    footprint: {
+      library: 'Package_TO_SOT_SMD',
+      footprint: 'SOT-223-3_TabPin2',
+    },
+    pins: [
+      { number: '1', name: 'GND', kind: 'power_in' },
+      { number: '2', name: 'OUTPUT', kind: 'power_out' },
+      { number: '3', name: 'INPUT', kind: 'power_in' },
+    ],
+    provenance: 'JSCJ CJT1117B manufacturer data: SOT-223 pin 1=ADJ/GND, 2=OUTPUT and tab, 3=INPUT; fixed 3.3 V ordering code CJT1117B-3.3-G distributed as LCSC C164899; https://www.jscj-elec.com/gallery/file/CJT1117B-XXX%20SOT-223%20V1.pdf',
   },
   {
     manufacturer: 'Microchip Technology',
@@ -161,6 +223,7 @@ export function resolveCuratedManufacturerIdentity(
     }
   }
   const footprint = resolveKicadFootprint(footprintsRoot, symbol.footprint)
+    ?? resolveKicadFootprint(CURATED_FOOTPRINTS_ROOT, symbol.footprint)
   if (!footprint) {
     return {
       status: 'unsupported',
