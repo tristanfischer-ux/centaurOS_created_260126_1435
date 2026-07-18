@@ -20,6 +20,15 @@
 
 import type { PcbStageResult } from './pcb-stage'
 
+/**
+ * Minimum fraction of the design's own claimed electronic parts that a bespoke board
+ * must actually place as footprints before a DRC-clean pipeline may be called a real
+ * board (rather than a token board that routes a sparse netlist). 0.8 = the board must
+ * implement ≥80% of the claimed parts. Tuned against the 2026-07-18 token boards
+ * (rodeostat 8/14≈57%, opendrop 10/16≈63% — both must fire).
+ */
+export const PCB_MIN_FOOTPRINT_COVERAGE = 0.8
+
 export interface PcbGateResult {
   /** False when the gate has nothing to say about this design (no PCB content,
    *  or a COTS/none disposition that never needed a bespoke pipeline run). */
@@ -69,6 +78,30 @@ export function evaluatePcbGate(pcb: PcbStageResult | null | undefined): PcbGate
   }
 
   if (pipeline.ok === true) {
+    // HONESTY: a DRC-clean, routed, Gerber-complete pipeline proves the TOOLCHAIN ran —
+    // NOT that the board implements the instrument (Cursor PCB audit + Tristan 2026-07-18:
+    // the accepted boards are ~2/10 token boards — 8/14 & 10/16 footprints vs claimed
+    // electronic parts, 0 vias, 0 copper zones, mostly TBD MPNs — yet all reported
+    // 'clean_board'). 'clean_board' was scoring the wrong thing. A bespoke board whose
+    // footprint COVERAGE of the design's own claimed electronic parts is materially
+    // incomplete is a token board, not a shippable PCBA → the gate fires.
+    const expected = Number(pcb.electronicPartCount ?? 0)
+    const placed = Number(pipeline.components ?? 0)
+    const coverage = expected > 0 ? placed / expected : 1
+    if (expected >= 4 && coverage < PCB_MIN_FOOTPRINT_COVERAGE) {
+      return {
+        applicable: true,
+        fires: true,
+        reason: 'clean_toolchain_but_incomplete_board',
+        details: [
+          `footprint coverage ${placed}/${expected} = ${(coverage * 100).toFixed(0)}% ` +
+            `(< ${(PCB_MIN_FOOTPRINT_COVERAGE * 100).toFixed(0)}% required) — the board does ` +
+            `not place most of the design's own claimed electronic parts`,
+          'DRC-clean on a sparse netlist proves the toolchain ran, not that the board ' +
+            'implements the instrument (token board)',
+        ],
+      }
+    }
     return { applicable: true, fires: false, reason: 'clean_board', details: [] }
   }
 
@@ -116,6 +149,7 @@ if (require.main === module) {
       stageReached: 'export',
       routed: true,
       drc: { ran: true, violations: 0 },
+      components: 5,   // all 5 claimed parts placed → complete board
       errors: [],
     },
   }
@@ -130,17 +164,34 @@ if (require.main === module) {
     },
   }
   const cots: PcbStageResult = { ...clean, disposition: 'cots-modules', pipeline: undefined }
+  // Token board: DRC-clean pipeline but only 8/14 claimed parts placed (the 2026-07-18
+  // rodeostat shape) — must FIRE the completeness check even though pipeline.ok=true.
+  const token: PcbStageResult = {
+    ...clean,
+    electronicPartCount: 14,
+    pipeline: { ...clean.pipeline!, ok: true, components: 8 },
+  }
+  // A complete board (14/14 placed) must still PASS.
+  const complete: PcbStageResult = {
+    ...clean,
+    electronicPartCount: 14,
+    pipeline: { ...clean.pipeline!, ok: true, components: 14 },
+  }
 
   const rClean = evaluatePcbGate(clean)
   const rFailed = evaluatePcbGate(failed)
   const rCots = evaluatePcbGate(cots)
   const rNone = evaluatePcbGate(null)
+  const rToken = evaluatePcbGate(token)
+  const rComplete = evaluatePcbGate(complete)
 
   const ok =
     rClean.applicable === true && rClean.fires === false &&
     rFailed.applicable === true && rFailed.fires === true &&
     rCots.applicable === false && rCots.fires === false &&
-    rNone.applicable === false && rNone.fires === false
+    rNone.applicable === false && rNone.fires === false &&
+    rToken.fires === true && rToken.reason === 'clean_toolchain_but_incomplete_board' &&
+    rComplete.fires === false
 
   console.log(JSON.stringify({ rClean, rFailed, rCots, rNone }, null, 2))
   console.log(ok ? 'PCB GATE proveCatch: PASS' : 'PCB GATE proveCatch: FAIL')
