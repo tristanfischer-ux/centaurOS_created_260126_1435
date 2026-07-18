@@ -98,15 +98,92 @@ def _mods(w):
 
 
 def _cyl_from_dim(dim):
-    """(dia_m, h_m) from a '<d> m dia x <h> m' string, else None."""
-    m = re.search(r"([\d.]+)\s*m\s*dia[^x]*x\s*([\d.]+)\s*m", str(dim or ""), re.I)
-    return (float(m.group(1)), float(m.group(2))) if m else None
+    """(dia_m, h_m) from a cylinder dim string, else None.
+
+    Recognises plant metres (`1.6 m dia x 1.5 m`) AND lab millimetres
+    (`25 mm OD x 80 mm H` — Pioreactor culture vial 2026-07-18).
+    """
+    s = str(dim or "")
+    m = re.search(r"([\d.]+)\s*m\s*dia[^x]*x\s*([\d.]+)\s*m\b", s, re.I)
+    if m:
+        return (float(m.group(1)), float(m.group(2)))
+    # INTENT (Pioreactor 0327): word dims "25 mm OD x 80 mm H" were UNPARSED →
+    # Blender AS-BUILT plant default ⌀1.6 m won → hoop-shell £5k → 88% of bill.
+    m = re.search(
+        r"([\d.]+)\s*mm\s*(?:od|o\.?d\.?|dia(?:meter)?)\s*[x×]\s*([\d.]+)\s*mm",
+        s, re.I,
+    )
+    if m:
+        return (float(m.group(1)) / 1000.0, float(m.group(2)) / 1000.0)
+    return None
 
 
 def _box_from_dim(dim):
     """(w,d,h) in m from a '<w>x<d>x<h> mm' string, else None."""
     m = re.search(r"([\d.]+)x([\d.]+)x([\d.]+)\s*mm", str(dim or ""), re.I)
     return (float(m.group(1)) / 1000, float(m.group(2)) / 1000, float(m.group(3)) / 1000) if m else None
+
+
+# INTENT (Pioreactor 0327): a ml-scale culture vial / tube / flask is lab glassware
+# (£8–£45), NEVER a carbon-steel hoop-stress process shell. Noun-keyed + volume-
+# gated so a genuine plant fermenter vessel is untouched.
+_LAB_CULTURE_VESSEL_RE = re.compile(
+    r"culture\s*(?:vessel|vial|tube|flask)|working\s*volume|"
+    r"(?:borosilicate\s+)?(?:culture\s+)?(?:vial|flask)|erlenmeyer|"
+    r"conical\s*flask|sample\s*(?:vessel|vial|tube)|autoclavable\s+glass",
+    re.I,
+)
+
+
+def _lab_culture_working_ml(name: str, mods: dict, qcontract: dict | None = None) -> float | None:
+    """Best-effort working volume in ml for a lab culture vessel, else None."""
+    if not _LAB_CULTURE_VESSEL_RE.search(name or ""):
+        return None
+    md = mods if isinstance(mods, dict) else {}
+    # Contract working_volume_ml (brief-stated for benchtop bioreactor class).
+    if isinstance(qcontract, dict):
+        wv = qcontract.get("working_volume_ml")
+        if isinstance(wv, dict) and isinstance(wv.get("value"), (int, float)):
+            return float(wv["value"])
+        if isinstance(wv, (int, float)):
+            return float(wv)
+    # Capacity modifier with ml/L unit.
+    cap = _num(md.get("capacity"))
+    if cap is not None:
+        cu = str(md.get("capacity_unit") or "").strip().lower()
+        blob = f"{md.get('capacity') or ''} {cu} {md.get('rating_primary') or ''}".lower()
+        if re.search(r"\bml\b|millilit", blob) or (cu in ("ml", "millilitre", "milliliter")):
+            return float(cap)
+        if re.fullmatch(r"l|litre|litres|liter|liters", cu) and cap <= 1.0:
+            return float(cap) * 1000.0
+    # Geometry from word dims (mm-scale cylinder → ml).
+    dim = str(md.get("dimension") or md.get("dimensions") or "")
+    cyl = _cyl_from_dim(dim)
+    if cyl:
+        d_m, h_m = cyl
+        vol_ml = math.pi * (d_m / 2.0) ** 2 * h_m * 1.0e6
+        if 0 < vol_ml <= 2000:
+            return vol_ml
+    return None
+
+
+def _lab_culture_vessel_price(name: str, mods: dict, qcontract: dict | None = None):
+    """(gbp, basis, spec) for ml-scale culture glassware, else None.
+
+    Universal: fires when the noun is lab culture glassware AND the working volume
+    is ≤ 2 L (benchtop). A plant fermenter (m³) never matches the ml gate.
+    """
+    ml = _lab_culture_working_ml(name, mods, qcontract)
+    if ml is None or ml <= 0 or ml > 2000:
+        return None
+    # Borosilicate culture vial / tube / small flask — UK 2026 makers band.
+    gbp = round(max(8.0, min(45.0, 6.0 + ml * 0.35)), 2)
+    return (
+        gbp,
+        (f"lab borosilicate culture glassware · {ml:.0f} ml working "
+         f"(catalogue-scale vial/tube — NOT a fabricated process shell)"),
+        {"material": "borosilicate glass 3.3", "working_ml": round(ml, 1)},
+    )
 
 
 # ── WETTED-PARTS CORROSION (Tristan 2026-06-23) ─────────────────────────────────────────
@@ -550,7 +627,7 @@ def _wall_physics(matlabel):
     return (120.0, 2.0, 5.0)   # carbon steel
 
 
-def _materials_takeoff(name, mods, geom=None, service=None):
+def _materials_takeoff(name, mods, geom=None, service=None, qcontract=None):
     """Bespoke cost from a real materials take-off.
 
     Cost model (UNIVERSAL — parametric by material + physical size only):
@@ -577,14 +654,35 @@ def _materials_takeoff(name, mods, geom=None, service=None):
 
     Returns (gbp, basis_str, spec_dict) or None if no geometry is available.
     """
+    md = mods if isinstance(mods, dict) else {}
     # a MEMBRANE/media line is a process consumable/package priced from membrane
     # area — never a shell/steel take-off (2026-07-02 membrane-as-steel fix).
     if _is_filtration_membrane(name):
-        mem = _membrane_area_price(name, mods if isinstance(mods, dict) else {})
+        mem = _membrane_area_price(name, md)
         if mem:
             g_m, b_m = mem
             return g_m, b_m, {"material": "membrane/filtration media"}
         return None
+    # DEVICE-SCALE CULTURE GLASSWARE (Pioreactor 0327): "Culture Vessel" with
+    # 25 mm OD × 80 mm H / 20 ml working was priced as ⌀1.6 m carbon-steel hoop
+    # shell (£5k → gold-rescaled £229 = 88% of bill → dominant_bom_line HARD).
+    # Lab glassware wins BEFORE any AS-BUILT plant geom can dominate.
+    _lab = _lab_culture_vessel_price(name, md, qcontract)
+    if _lab is not None:
+        return _lab
+    # Prefer word mm-scale dims over plant-scale AS-BUILT when they disagree by
+    # orders of magnitude (Blender type-default vertical_vessel ⌀700–1600 mm on
+    # an undimensioned/unparsed lab vial).
+    if geom:
+        _dim_s = str(md.get("dimension") or md.get("dimensions") or "")
+        _word_cyl = _cyl_from_dim(_dim_s)
+        if _word_cyl:
+            _wd, _wh = _word_cyl
+            _wvol = math.pi * (_wd / 2.0) ** 2 * _wh
+            _gd, _gh = geom
+            _gvol = math.pi * (_gd / 2.0) ** 2 * _gh
+            if _wvol > 0 and _wvol < 0.002 and _gvol > 0.05:
+                geom = None  # discard plant AS-BUILT; fall through to word dims
     if geom:
         # AS-BUILT geometry (the Blender parts-manifest ⌀,H in m) — the SAME source the
         # drawings + the dashboard read, so the BoM costs the vessel that is actually
@@ -593,8 +691,8 @@ def _materials_takeoff(name, mods, geom=None, service=None):
         vol = math.pi * (d_v / 2.0) ** 2 * h_v
         area = math.pi * d_v * h_v + 2 * (math.pi * d_v * d_v / 4.0)
     else:
-        dim = mods.get("dimension") or ""
-        cyl = _cyl_from_dim(dim); box = _box_from_dim(dim); cap = _num(mods.get("capacity"))
+        dim = md.get("dimension") or md.get("dimensions") or ""
+        cyl = _cyl_from_dim(dim); box = _box_from_dim(dim); cap = _num(md.get("capacity"))
         # UNIT-FAMILY GUARD (2026-07-03, the same capacity->m3 confusion the
         # 'flow read as kW' fix closed for rating_primary): `capacity` is stated in
         # WHATEVER unit the modifier carries (a Reflex expansion vessel is '50 L',
@@ -602,7 +700,7 @@ def _materials_takeoff(name, mods, geom=None, service=None):
         # already m3 inflates a 50 L tank into a 50 m3 shell (dia 3.66 m). Convert
         # to m3 first; unknown/absent unit defaults to m3 (byte-identical for every
         # existing m3-stated capacity — the dominant case).
-        cap_u = str(mods.get("capacity_unit") or "").strip().lower()
+        cap_u = str(md.get("capacity_unit") or "").strip().lower()
         if cap is not None and re.fullmatch(r"l|litre|litres|liter|liters", cap_u):
             cap = cap / 1000.0
         if not cyl and not box and cap:                       # derive a cylinder from V
@@ -1051,6 +1149,14 @@ _MIN_PRICE_FLOORS = [
 _DUTY = "__duty_scaled__"
 _BLOWER_DUTY = "__blower_duty__"
 _PROCESS_SYSTEM_FLOORS = [
+    # INTENT (Pioreactor 0327): a lab micro-dosing / peristaltic head on a 20 ml
+    # makers kit is a £30–£80 COTS part — NEVER the £3k plant "Chemical Dosing
+    # System" floor. Bare `\bdosing\b` used to match "Dosing Peristaltic Pump"
+    # and stamp £3,000 (11× gold mid). Lab movers first; plant system floor last.
+    (re.compile(
+        r"peristaltic|micro[_ -]?dos|syringe[_ ]?pump|lab[_ ]?dos|"
+        r"dos(?:e|ing)[_ ]?peristaltic|peristaltic[_ ]?dos",
+        re.I), 45.0),
     # P1-D (Sam/Codema 2026-07-08): metering/dosing pumps are ~0.04–0.75 kW chemical
     # injectors (£300–£800 installed), NOT a £3k process skid. Match metering/acid/
     # chemical dosing FIRST at a realistic floor; leave bulk fertigation circulation
@@ -1063,8 +1169,15 @@ _PROCESS_SYSTEM_FLOORS = [
     # P1-D UV (2026-07-09): a plant UV/ozone skid is never a £280 residential unit.
     # Flat floor catches the Spektron-30e-class catalogue miss; duty-scaled parametric
     # in _unit_operation_price still lifts IDENTIFIED lines further (see assemble).
-    (re.compile(r"\buv\b|ultraviolet|\bozone\b|disinfect|steril", re.I), 8000.0),
-    (re.compile(r"chemical[_ ]?dos|\bdosing\b|alkalin|\bph[_ ]?dos|caustic[_ ]?dos|acid[_ ]?dos", re.I), 3000.0),
+    # DECISION (Pioreactor 0327): drop bare `steril` — "Sterile Filter Vent" is a
+    # £5 hydrophobic membrane, not an £8k UV skid. Match steriliz* / UV / ozone.
+    (re.compile(r"\buv\b|ultraviolet|\bozone\b|disinfect|steriliz", re.I), 8000.0),
+    # DECISION: require system/skid/station — bare `\bdosing\b` falsely floored
+    # lab "Dosing Peristaltic Pump" at £3k (Pioreactor 0327 gold FAIL).
+    (re.compile(r"chemical[_ ]?dos(?:e|ing)?[_ ]?(?:system|skid|station|plant)?|"
+                r"dos(?:e|ing)[_ ]?(?:system|skid|station|plant)\b|"
+                r"alkalin(?:ity)?[_ ]?dos|ph[_ ]?dos(?:e|ing)?[_ ]?(?:system|skid)|"
+                r"caustic[_ ]?dos|acid[_ ]?dos(?:e|ing)?[_ ]?(?:system|skid)", re.I), 3000.0),
     (re.compile(r"\bfeed\b[_ ]?(?:stor|system|distribution|silo|hopper|handling)|feed[_ ]?stor|"
                 r"feed[_ ]?distribution|pellet[_ ]?(?:stor|silo|system)", re.I), 5000.0),
     (re.compile(r"sludge|biosolids|\bsolids\b[_ ]?handling|solids[_ ]?(?:dewater|thicken|handling)|"
@@ -1148,16 +1261,27 @@ def _price_floor_for(name: str, md=None):
     if re.search(r"immersion[_ ]?heat|backup[_ ]?heat|electric[_ ]?(?:resistance[_ ]?)?heat", nm, re.I):
         if kw is not None and kw > 100.0:
             return 6000.0 + kw * 200.0
-    # PROCESS-SYSTEM floors (the new RAS-audit categories)
-    for rx, floor in _PROCESS_SYSTEM_FLOORS:
-        if rx.search(nm):
-            if floor == _BLOWER_DUTY:
-                # blower / aeration / degassing: max(£5,000, duty_kw × £500/kW)
-                return max(5000.0, kw * 500.0) if (kw and kw > 0) else 5000.0
-            if floor == _DUTY:
-                ds = _duty_scaled_floor(kw)
-                return max(1500.0, ds) if ds is not None else 1500.0
-            return floor
+    # GOTCHA (Pioreactor 0327): process-system floors (£3k dosing / £8k UV steril)
+    # are plant-skid mins. On a makers instrument they stamp absurd catalogue
+    # pins that gold-rescale cannot touch (cat_sum alone >> gold mid). Skip the
+    # whole process table when assembling an instrument device; electrical floors
+    # below still apply.
+    if not _IS_INSTRUMENT_DEVICE:
+        # PROCESS-SYSTEM floors (the new RAS-audit categories)
+        for rx, floor in _PROCESS_SYSTEM_FLOORS:
+            if rx.search(nm):
+                if floor == _BLOWER_DUTY:
+                    # blower / aeration / degassing: max(£5,000, duty_kw × £500/kW)
+                    return max(5000.0, kw * 500.0) if (kw and kw > 0) else 5000.0
+                if floor == _DUTY:
+                    ds = _duty_scaled_floor(kw)
+                    return max(1500.0, ds) if ds is not None else 1500.0
+                return floor
+    else:
+        # Lab movers still need a tiny non-zero floor so £0 lines don't ship.
+        for rx, floor in _PROCESS_SYSTEM_FLOORS:
+            if floor == 45.0 and rx.search(nm):
+                return floor
     # ELECTRICAL / control floors (the original council-2026-06-16 set)
     # AMP-AWARE BUSBAR (2026-07-10, Powerwall run 50): the amp-suffixed name pattern
     # ("busbar · 39.2 A") never fires because the rating suffix is appended to the DISPLAY
@@ -2189,6 +2313,13 @@ def _is_catalogue_pinned_bom_row(row: dict) -> bool:
         # parametric and then rescaled must stay scalable on re-entry.
         if "gold-band rescale" in basis and "catalogue pins held" in basis:
             return False
+        # GOTCHA (Pioreactor 0327): "catalogue · floored to min credible price"
+        # with NO live distributor_price is a plant-floor stamp, not a Digi-Key
+        # identity pin — gold rescale must be allowed to absorb it.
+        if "floored to min credible" in basis:
+            dist0 = row.get("distributor_price_gbp")
+            if dist0 in (None, "", 0, 0.0):
+                return False
         return True
     dist = row.get("distributor_price_gbp")
     if dist in (None, "", 0, 0.0):
@@ -2394,7 +2525,15 @@ def _unit_operation_price(name: str, md: dict, q):
     #      ÷ UVT-factor — dose 40 mJ/cm² (potable, DVGW/USEPA validated point),
     #      UVT-factor 1800 ≈ 22 Wh/m³ delivered electrical at UVT ~85% with
     #      low-pressure lamp + ballast efficiency (a 90 m³/h potable duty → 2.0 kW).
-    if re.search(r"\buv\b|ultraviolet|ozone|disinfect|steril", nm):
+    # GOTCHA (Pioreactor 0327): bare `steril` matched "Sterile Filter Vent"
+    # (0.2 µm culture vent) → £35k UV/ozone skid budget → gold rescale dumped
+    # £250 onto that line. Require UV/ozone/disinfection UNIT nouns; exclude
+    # sterile-filter / vent-filter consumables.
+    if (
+        re.search(r"\buv\b|ultraviolet|ozone|disinfect|steriliz", nm)
+        and not re.search(r"sterile[_ ]?filter|filter[_ ]?vent|vent[_ ]?filter|"
+                          r"0\.2\s*(?:um|µm|μm)|hydrophobic[_ ]?filter", nm)
+    ):
         _UV_DOSE_MJ_CM2 = 40.0     # potable-water validated dose
         _UV_UVT_FACTOR = 1800.0    # (m³/h·mJ/cm²) per kW — UVT ~85 %, LP lamp+ballast
         _rp_unit = str(md.get("rating_primary_unit") or "")
@@ -2452,7 +2591,16 @@ def _unit_operation_price(name: str, md: dict, q):
     # (this bill is raw materials; the cost stack adds field labour). Without this family the
     # word fell to the £3 'manifold' commodity floor (2026-07-03 — a £6 line for the plant's
     # per-department distribution header).
+    # GOTCHA (OpenDrop 0410): on a makers instrument the same noun is an acrylic/PDMS
+    # fluidics manifold or PCB electrode-routing plate — NOT a plant delivery header.
+    # Plant budget £1.5k → gold-rescaled £172 = 73% of a £236 kit → dominant_bom_line HARD.
     if re.search(r"(distribution|delivery|zone)[_ ]?manifold|manifold[_ ]?(station|set|assembly|skid)", nm):
+        if _IS_INSTRUMENT_DEVICE:
+            return (
+                28.0,
+                "lab fluidics distribution manifold — acrylic/PDMS or PCB electrode "
+                "routing plate (catalogue makers kit, NOT a plant delivery-header station)",
+            )
         flow = _qv("distribution_manifold_throughput_m3_h", default=rating)
         if flow and flow > 0:
             gbp = 600.0 + flow * 25.0
@@ -2927,7 +3075,7 @@ def _implied_vessel_vol_m3(mods: dict) -> Optional[float]:
     """Best-effort implied volume (m3), unit-aware, from a word's OWN dimension/
     capacity modifiers — mirrors `_materials_takeoff`'s geometry derivation without
     needing AS-BUILT (Blender) geometry. Returns None when neither is present."""
-    dim = mods.get("dimension") or ""
+    dim = mods.get("dimension") or mods.get("dimensions") or ""
     cyl = _cyl_from_dim(dim)
     if cyl:
         d, h = cyl
@@ -3322,6 +3470,25 @@ def _selftest() -> int:
         print(f"  FAIL benchtop_bioreactor gold mid £259 beats plant macro, got {_tgt_pio}"); bad += 1
     if not (_b_pio == 80000 and _a_pio is not None and 220 <= _a_pio <= 298):
         print(f"  FAIL pioreactor rescale £80k→~£259, got before={_b_pio} after={_a_pio}"); bad += 1
+    # proveCatch (Pioreactor 0327): floored "catalogue" stamp without distributor_price
+    # must still gold-rescale (was held as CAT pin → materials stuck at £3,005).
+    _saved_flr = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _flr_rows = [
+        {"requirement": "Dosing Peristaltic Pump", "unit_gbp": 3000.0, "line_gbp": 3000.0,
+         "qty": 1, "status": "IDENTIFIED",
+         "basis": "catalogue · floored to min credible price"},
+        {"requirement": "Power Indicator LED", "unit_gbp": 5.0, "line_gbp": 5.0,
+         "qty": 1, "status": "IDENTIFIED", "basis": "catalogue",
+         "distributor_price_gbp": 5.0},
+    ]
+    if _is_catalogue_pinned_bom_row(_flr_rows[0]):
+        print("  FAIL floored-catalogue-without-dist must NOT hard-pin for gold rescale"); bad += 1
+    _b_flr, _a_flr = _rescale_instrument_materials_to_gold(
+        _flr_rows, {"moduleDecomposition": {"product_class": "benchtop_bioreactor"}})
+    _IS_INSTRUMENT_DEVICE = _saved_flr
+    if not (_b_flr == 3005.0 and _a_flr is not None and 220 <= _a_flr <= 298):
+        print(f"  FAIL floored-catalogue gold rescale £3005→~£259, got before={_b_flr} after={_a_flr}"); bad += 1
     # ── INSTRUMENT Cxx SUPPRESSION (2026-07-14, gold WHY): handheld topology edges
     # are NOT costed plant cable runs — maker cables live as equipment principals.
     import tempfile as _tmp_conn
@@ -4184,6 +4351,36 @@ def _selftest() -> int:
     _uv_floor = _price_floor_for("Uv Disinfection", {})
     if not (_uv_floor and _uv_floor >= 8000):
         print(f"  FAIL UV process-system floor missing/too low (got {_uv_floor})"); bad += 1
+    # proveCatch (Pioreactor 0327): culture sterile vent ≠ UV disinfection skid
+    _sfv = _unit_operation_price("Sterile Filter Vent", {}, {})
+    if _sfv is not None:
+        print(f"  FAIL Sterile Filter Vent must NOT take UV/ozone budget (got {_sfv})"); bad += 1
+    # proveCatch (OpenDrop 0410): instrument Distribution Manifold ≠ plant header £1.5k
+    _saved_mfd = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _mfd = _unit_operation_price("Distribution Manifold", {}, {})
+    if not (_mfd and _mfd[0] <= 45 and "lab fluidics" in _mfd[1]):
+        print(f"  FAIL instrument Distribution Manifold must be lab fluidics ≤£45: {_mfd}"); bad += 1
+    _IS_INSTRUMENT_DEVICE = False
+    _mfd_plant = _unit_operation_price("Distribution Manifold", {}, {})
+    if not (_mfd_plant and _mfd_plant[0] >= 1000 and "delivery header" in _mfd_plant[1]):
+        print(f"  FAIL plant Distribution Manifold must still take header budget: {_mfd_plant}"); bad += 1
+    _IS_INSTRUMENT_DEVICE = _saved_mfd
+    # proveCatch (Pioreactor 0327): ml-scale Culture Vessel ≠ ⌀1.6 m plant shell
+    _cyl_lab = _cyl_from_dim("25 mm OD x 80 mm H")
+    if not (_cyl_lab and abs(_cyl_lab[0] - 0.025) < 1e-6 and abs(_cyl_lab[1] - 0.080) < 1e-6):
+        print(f"  FAIL lab OD×H dim parse (want 0.025×0.080 m): {_cyl_lab}"); bad += 1
+    _cv_plant_geom = (1.6, 1.545)  # Blender vertical_vessel AS-BUILT that mis-priced V-101
+    _cv_md = {"dimensions": "25 mm OD x 80 mm H"}
+    _cv_q = {"working_volume_ml": {"value": 20}}
+    _cv = _materials_takeoff("Culture Vessel", _cv_md, _cv_plant_geom, None, _cv_q)
+    if not (_cv and _cv[0] <= 45 and "lab borosilicate" in _cv[1]
+            and "hoop" not in _cv[1] and (_cv[2] or {}).get("material", "").startswith("borosilicate")):
+        print(f"  FAIL Culture Vessel must be lab glassware ≤£45, not plant shell: {_cv}"); bad += 1
+    # plant fermenter vessel (m³) must STILL take a hoop-shell take-off
+    _fv = _materials_takeoff("Buffer Vessel", {"dimension": "2.5 m dia x 8 m"}, (2.5, 8.0), None, {})
+    if not (_fv and _fv[0] > 1000 and "hoop" in _fv[1]):
+        print(f"  FAIL plant Buffer Vessel must still take hoop-shell take-off: {_fv}"); bad += 1
 
     # P1-D MEDIA-BED (2026-07-09, codema V-101): GAC/softener parametric at 14.5 m³/h
     # must land near the physics subassembly (~£14.7k), never a £105 media-bag stub.
@@ -4615,6 +4812,9 @@ def _selftest() -> int:
     # systems, blowers, the DN400 control valve and the >100 kW immersion heater must
     # never be token-priced, while a process VESSEL (CO₂/SAF byte-identity) is untouched.
     # (a) process-system category floors
+    # GOTCHA: earlier instrument proveCatch / assemble() paths can leave
+    # `_IS_INSTRUMENT_DEVICE` sticky-True; process floors are plant-only.
+    _IS_INSTRUMENT_DEVICE = False
     for nm, want_min in [("Chemical Dosing System (pH / Alkalinity)", 3000.0),
                          ("Feed Storage + Distribution System", 5000.0),
                          ("Solids / Sludge Handling System", 8000.0),
@@ -4625,6 +4825,17 @@ def _selftest() -> int:
         f = _price_floor_for(nm, {})
         if f != want_min:
             print(f"  FAIL process floor {nm!r}: £{f} (want £{want_min})"); bad += 1
+    # proveCatch (Pioreactor 0327): lab "Dosing Peristaltic Pump" must NOT take the
+    # £3k plant dosing-system floor — that alone put materials at £3,005 vs gold £259.
+    if _price_floor_for("Dosing Peristaltic Pump", {}) != 45.0:
+        print(f"  FAIL lab peristaltic floor: £{_price_floor_for('Dosing Peristaltic Pump', {})} (want £45)"); bad += 1
+    _saved_flo = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    if _price_floor_for("Chemical Dosing System (pH / Alkalinity)", {}) is not None:
+        print("  FAIL instrument device must skip plant £3k dosing-system floor"); bad += 1
+    if _price_floor_for("Dosing Peristaltic Pump", {}) != 45.0:
+        print("  FAIL instrument lab peristaltic still needs £45 floor"); bad += 1
+    _IS_INSTRUMENT_DEVICE = _saved_flo
     # (b) blower floor = max(£5,000, duty_kw × £500/kW) — a 55 kW blower is £27,500,
     # NOT the steep £3,000/kW generic tier (which would mis-price it at £165k)
     if _price_floor_for("Degassing Blower", {"rating_primary": "55"}) != 27500.0:
@@ -7544,7 +7755,7 @@ def assemble(out_dir: str):
                     if pv > 0:
                         gbp, basis = pv, "made-to-spec · engineering budget estimate"
                     else:
-                        mt = _materials_takeoff(name, md, g_lookup, svc)
+                        mt = _materials_takeoff(name, md, g_lookup, svc, qcontract)
                         gbp, basis = (mt[0], mt[1]) if mt else (0.0, "bottom-up parametric")
                         mt_spec = mt[2] if mt and len(mt) > 2 else None
                 elif pn and not _TBD_RE.search(pn) and not (
@@ -7582,7 +7793,13 @@ def assemble(out_dir: str):
                     # 225 m³/h / 10.1 kW plant duty → ~£26k) is undersized for the
                     # duty — same discipline as undersized rotating-equipment MPN
                     # rejection. Lift to the UV parametric and drop the wrong pin.
-                    if re.search(r"\buv\b|ultraviolet|ozone|disinfect|steril", name or "", re.I):
+                    if (
+                        re.search(r"\buv\b|ultraviolet|ozone|disinfect|steriliz", name or "", re.I)
+                        and not re.search(
+                            r"sterile[_ ]?filter|filter[_ ]?vent|vent[_ ]?filter",
+                            name or "", re.I,
+                        )
+                    ):
                         uop_uv = _unit_operation_price(name, md, qcontract)
                         if (uop_uv and uop_uv[0] > 0
                                 and (gbp <= 0 or uop_uv[0] >= max(gbp, 1e-9) * COST_BAND_FACTOR)):
@@ -7619,7 +7836,7 @@ def assemble(out_dir: str):
                                 f"not the packaged filter)"
                             )
                 elif bc == "simple":
-                    mt = _materials_takeoff(name, md, g_lookup, svc)
+                    mt = _materials_takeoff(name, md, g_lookup, svc, qcontract)
                     status, part = "BESPOKE", "made to spec"
                     gbp, basis = (mt[0], mt[1]) if mt else (price.get(wid, 0.0), "bottom-up parametric")
                     mt_spec = mt[2] if mt and len(mt) > 2 else None
