@@ -12,8 +12,8 @@
     "resolvedIdentityCount": 5,
     "reclassifiedNonComponentCount": 16,
     "remainingUnresolvedFittedComponents": 29,
-    "remainingMissingMpn": 22,
-    "remainingMissingSymbolPinout": 7,
+    "remainingMissingMpn": 29,
+    "remainingMissingSymbolPinout": 0,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
   },
@@ -265,7 +265,7 @@
             "missing": ["necessity on Eye-Spy board", "colour", "forward voltage/current", "series resistor"],
             "evidence": ["Frozen Eye-Spy BOM contains no fitted indicator LED; generated MPN 4-2489541-7 is not evidenced for this role."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "4-2489541-7 is DB-verified but has no LED symbol/pinout mapping and is not role-compatible evidence." },
+          "missingEvidence": { "kind": "mpn", "details": "4-2489541-7 is rejected: forge-truth identifies a 110 V DC panel indicator, while no authoritative PCB package/terminal geometry or Eye-Spy role evidence exists. A real board LED MPN is still missing." },
           "sourceCandidate": {
             "identity": "TE Connectivity 4-2489541-7",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -290,7 +290,7 @@
             "missing": ["rail monitored", "colour", "forward voltage/current", "series resistor"],
             "evidence": ["Offline report names 4-2489541-7 without role-compatible manufacturer evidence."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "The DB-verified ordering code lacks a curated LED symbol/pinout and appears role-incompatible." },
+          "missingEvidence": { "kind": "mpn", "details": "4-2489541-7 is rejected as a 110 V DC panel indicator with no authoritative PCB package/terminal geometry. The monitored-rail LED and resistor MPNs remain missing." },
           "sourceCandidate": {
             "identity": "TE Connectivity 4-2489541-7",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -335,7 +335,7 @@
             "missing": ["rail monitored", "colour", "forward voltage/current", "series resistor"],
             "evidence": ["Frozen OpenDrop schematic has generic LEDs, but generated MPN 4-2489541-7 is not source-backed as an LED."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "4-2489541-7 is DB-verified but lacks a role-compatible LED symbol/pinout mapping." },
+          "missingEvidence": { "kind": "mpn", "details": "4-2489541-7 is rejected as a 110 V DC panel indicator with no authoritative PCB package/terminal geometry or OpenDrop board-role evidence. A source-backed board LED MPN remains missing." },
           "sourceCandidate": {
             "identity": "TE Connectivity 4-2489541-7",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -400,7 +400,7 @@
           "exactAction": {
             "action": "map_symbol_pinout",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Verify the candidate meets derived input/load/thermal requirements.", "Map the manufacturer pinout to an exact local symbol and SOT-23-5 footprint.", "Pass full pin/pad parity."]
+            "acceptance": ["Verify the candidate meets derived input/load/thermal requirements.", "Map the manufacturer pinout to an exact local symbol and 3-lead SOT-23 footprint.", "Pass full pin/pad parity."]
           }
         },
         {
@@ -490,12 +490,12 @@
             "missing": ["12 V compatibility", "load current", "dropout/headroom", "thermal dissipation"],
             "evidence": ["Offline report records MCP1700T-3302E/TT; a 12 V input would exceed this LDO family and must be reconciled."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "MCP1700T-3302E/TT lacks a curated complete symbol/pinout, and input compatibility is unproven." },
+          "missingEvidence": { "kind": "mpn", "details": "MCP1700T-3302E/TT now has a manufacturer-backed 3-pin SOT-23 mapping, but is rejected because its 6 V maximum input cannot accept NinjaPCR's 12 V rail. A compliant regulator MPN remains missing." },
           "sourceCandidate": {
             "identity": "Microchip Technology MCP1700T-3302E/TT",
             "evidenceLevel": "manufacturer_ordering_code",
             "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "candidate_only"
+            "disposition": "reject_for_target_role"
           },
           "exactAction": {
             "action": "derive_and_source",
@@ -1105,7 +1105,7 @@
             "missing": ["ADC ownership", "resolution/rate", "input range", "noise/leakage", "reference"],
             "evidence": ["Offline candidate NAU7802 is sourced from NinjaPCR, not proven by Rodeostat gold."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "NAU7802SGI lacks a complete local symbol and is not role-proven for Rodeostat." },
+          "missingEvidence": { "kind": "mpn", "details": "NAU7802SGI now has a manufacturer-backed SOP-16 mapping but is rejected as a bridge/strain-gauge ADC with no Rodeostat electrochemical-conversion role evidence. The actual ADC identity remains missing." },
           "sourceCandidate": {
             "identity": "Nuvoton NAU7802SGI",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1175,7 +1175,7 @@
             "missing": ["whether ADC exists", "quantity measured", "range/resolution/rate", "HV isolation"],
             "evidence": ["NAU7802 is a NinjaPCR thermal ADC candidate and is not evidenced by OpenDrop V4."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "NAU7802SGI lacks a complete local symbol and is role-incompatible with the current gold evidence." },
+          "missingEvidence": { "kind": "mpn", "details": "NAU7802SGI now has a manufacturer-backed SOP-16 mapping but is rejected as a bridge/strain-gauge ADC absent from OpenDrop's HV feedback path. The actual monitoring component identity remains missing." },
           "sourceCandidate": {
             "identity": "Nuvoton NAU7802SGI",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1200,7 +1200,7 @@
             "missing": ["whether TIA exists", "measured current range", "bias/noise/bandwidth", "HV isolation"],
             "evidence": ["Gold-gap audit identifies the generated potentiostat analog template as wrong for OpenDrop."]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "OPA334AIDBVR lacks a complete local symbol and is not source-backed for OpenDrop." },
+          "missingEvidence": { "kind": "mpn", "details": "OPA334AIDBVR now has the correct manufacturer-backed 6-pin SOT-23 DBV mapping, but is rejected because OpenDrop has no source-backed potentiostat TIA role. The actual HV feedback component identity remains missing." },
           "sourceCandidate": {
             "identity": "Texas Instruments OPA334AIDBVR",
             "evidenceLevel": "manufacturer_ordering_code",

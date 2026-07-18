@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Five identities were subsequently resolved and 16 roles were proven to be non-components. The active residual is therefore **29 unresolved fitted components**: **22 missing MPN** and **7 missing symbol/pinout**.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Five identities were subsequently resolved and 16 roles were proven to be non-components. The active residual is therefore **29 unresolved fitted components**: **29 missing MPN** and **0 missing symbol/pinout**. The seven former symbol gaps were closed by three authoritative manufacturer mappings and one explicit unsupported-part rejection; none was falsely promoted into an incompatible role.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -74,16 +74,16 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **NinjaPCR · `thermal_controller` · `status_led_word`** — Ratings: colour, forward voltage/current, intensity and resistor unknown. Gap: **MPN**. Action: define indication/current, ingest an orderable LED, calculate resistor, map polarity/footprint.
 
 <a id="pioreactor-od_optics-power_indicator_led_word"></a>
-- **Pioreactor · `od_optics` · `power_indicator_led_word`** — Ratings: need, colour/current and resistor unknown. Gap: **symbol/pinout** for `4-2489541-7`, which has no role-compatible LED evidence; frozen Eye-Spy BOM has no indicator LED. Action: remove unless required; never map this code as an LED without manufacturer proof.
+- **Pioreactor · `od_optics` · `power_indicator_led_word`** — Ratings: need, colour/current and resistor unknown. Gap: **MPN**. `4-2489541-7` is rejected: forge-truth identifies a 110 V DC panel indicator, no authoritative PCB package/terminal geometry was found, and frozen Eye-Spy has no indicator LED. Action: remove unless required; otherwise source a real board LED and resistor.
 
 <a id="rodeostat-analog_afe-power_indicator_led_word"></a>
-- **Rodeostat · `analog_afe` · `power_indicator_led_word`** — Ratings: monitored rail, colour/current and resistor unknown. Gap: **symbol/pinout** for role-incompatible `4-2489541-7`. Action: derive the indication and ingest a real LED/resistor pair.
+- **Rodeostat · `analog_afe` · `power_indicator_led_word`** — Ratings: monitored rail, colour/current and resistor unknown. Gap: **MPN**. The unsupported 110 V panel indicator `4-2489541-7` is rejected. Action: derive the indication and ingest a real board LED/resistor pair.
 
 <a id="rodeostat-analog_afe-status_indicator_word"></a>
 - **Rodeostat · `analog_afe` · `status_indicator_word`** — Ratings: state, colour/current and resistor unknown. Gap: **MPN**. Action: define state semantics, ingest LED/resistor with datasheets, map polarity.
 
 <a id="opendrop-hv_controller_main-power_indicator_led_word"></a>
-- **OpenDrop · `hv_controller_main` · `power_indicator_led_word`** — Ratings: LV/HV rail, colour/current and resistor unknown. Gap: **symbol/pinout** for role-incompatible `4-2489541-7`. Action: derive the rail indication and source the released or a datasheet-backed LED.
+- **OpenDrop · `hv_controller_main` · `power_indicator_led_word`** — Ratings: LV/HV rail, colour/current and resistor unknown. Gap: **MPN**. The unsupported 110 V panel indicator `4-2489541-7` is rejected. Action: derive the rail indication and source the released or a datasheet-backed board LED.
 
 <a id="opendrop-hv_controller_main-status_indicator_word"></a>
 - **OpenDrop · `hv_controller_main` · `status_indicator_word`** — Ratings: state, colour/current and resistor unknown. Gap: **MPN**. Gold candidate: V4 `LED1`–`LED3` prove positions only, not identity. Action: map state to firmware/electrical behavior, then ingest an exact LED/resistor.
@@ -103,7 +103,7 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **NinjaPCR · `thermal_controller` · `h_bridge_tec_driver_word`** — Ratings: bidirectional 12 V TEC role known; current, RDS(on), gate drive and thermal limits unknown. Gap: **MPN**. Gold candidate: released relay/MOSFET Peltier stage (role only). Action: derive TEC power stage, then ingest every exact switch/driver/protection part.
 
 <a id="ninjapcr-thermal_controller-dc_dc_regulator_word"></a>
-- **NinjaPCR · `thermal_controller` · `dc_dc_regulator_word`** — Ratings: candidate implies 3.3 V; 12 V compatibility, load and thermal margin unknown. Gap: **symbol/pinout** for `MCP1700T-3302E/TT`. Action: derive the actual input node; reject it if directly fed from 12 V, otherwise map full identity.
+- **NinjaPCR · `thermal_controller` · `dc_dc_regulator_word`** — Ratings: candidate implies 3.3 V; load and thermal margin unknown. Gap: **MPN**. Microchip DS20001826F closes `MCP1700T-3302E/TT` as 3-pin SOT-23 (1 GND, 2 VOUT, 3 VIN), but its 6 V maximum rejects direct use on NinjaPCR's 12 V rail. Action: derive the actual node and source a compliant regulator.
 
 <a id="ninjapcr-thermal_controller-current_sense_shunt_word"></a>
 - **NinjaPCR · `thermal_controller` · `current_sense_shunt_word`** — Ratings: current, resistance, power, tolerance/TCR and Kelvin need unknown. Gap: **MPN**. Action: calculate from full-scale current and permitted loss, then ingest an exact shunt.
@@ -191,7 +191,7 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Rodeostat · `analog_afe` · `dac_output_stage_word`** — **Resolved:** frozen U11/U13 nets and BOM LCSC C7433 identify TI `OP07CDR` for bipolar DAC shift/scale; forge-truth confirms the identity and complete OP07 SOIC-8 pinout/footprint parity passes.
 
 <a id="rodeostat-analog_afe-adc_input_stage_word"></a>
-- **Rodeostat · `analog_afe` · `adc_input_stage_word`** — Ratings: measurement role known; ADC ownership, resolution/rate, range/noise and reference unknown. Gap: **symbol/pinout** for `NAU7802SGI`, which is NinjaPCR-derived and not Rodeostat-proven. Action: trace real conversion path; remove NAU7802 unless evidence supports it.
+- **Rodeostat · `analog_afe` · `adc_input_stage_word`** — Ratings: measurement role known; ADC ownership, resolution/rate, range/noise and reference unknown. Gap: **MPN**. Nuvoton Rev2.6 closes `NAU7802SGI` as a 16-pin SOP bridge/strain-gauge ADC, but that function is not Rodeostat role evidence. Action: trace and source the real conversion path.
 
 <a id="rodeostat-analog_afe-current_measurement_tia_word"></a>
 - **Rodeostat · `analog_afe` · `current_measurement_tia_word`** — **Resolved:** frozen U9 directly joins `WRK_ELECT` to the selectable-gain TIA network; BOM LCSC C6961 identifies ST `TL072CDT`, and forge-truth plus complete TL072 SOIC-8 pinout/footprint parity pass.
@@ -200,10 +200,10 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **OpenDrop · `hv_controller_main` · `dac_output_stage_word`** — Ratings and need unknown. Gap: **MPN**; audit identifies this as foreign potentiostat-template residue. Action: remove unless real MAX1771/HV feedback source proves a DAC stage.
 
 <a id="opendrop-hv_controller_main-adc_input_stage_word"></a>
-- **OpenDrop · `hv_controller_main` · `adc_input_stage_word`** — Ratings and measured quantity unknown. Gap: **symbol/pinout** for role-incompatible `NAU7802SGI`. Action: remove thermal ADC template; trace and source actual HV monitoring.
+- **OpenDrop · `hv_controller_main` · `adc_input_stage_word`** — Ratings and measured quantity unknown. Gap: **MPN**. The fully mapped `NAU7802SGI` is rejected because its bridge-sensor function is absent from OpenDrop's HV feedback path. Action: remove the foreign ADC template; trace and source actual HV monitoring.
 
 <a id="opendrop-hv_controller_main-current_measurement_tia_word"></a>
-- **OpenDrop · `hv_controller_main` · `current_measurement_tia_word`** — Ratings and need unknown. Gap: **symbol/pinout** for role-incompatible `OPA334AIDBVR`. Action: remove potentiostat TIA template and derive actual HV feedback/sense circuitry.
+- **OpenDrop · `hv_controller_main` · `current_measurement_tia_word`** — Ratings and need unknown. Gap: **MPN**. TI SBOS213D corrects `OPA334AIDBVR` to six-pin SOT-23 DBV with shutdown; it is rejected because OpenDrop has no source-backed potentiostat TIA role. Action: remove the template and derive actual HV feedback/sense circuitry.
 
 ## wet_actuation_drive
 

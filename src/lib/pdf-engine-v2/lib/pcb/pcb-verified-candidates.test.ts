@@ -321,6 +321,45 @@ describe('verified function-keyed PCB candidates', () => {
       expectedSymbol: 'Connector:USB_C_Receptacle',
       expectedFootprint: 'USB_C_Receptacle_Amphenol_12401610E4-2A',
     },
+    {
+      request: {
+        wordId: 'dc_dc_regulator_word',
+        nameHuman: '3.3 V low-current instrument rail regulator',
+        characterId: 'dc_dc_regulator',
+        functionClass: 'regulator',
+        requiredRatings: { voltageV: 5, currentA: 0.2 },
+      },
+      manufacturer: 'Microchip Technology',
+      partNumber: 'MCP1700T-3302E/TT',
+      expectedSymbol: 'Forge_Manufacturer:MCP1700T-3302E-TT',
+      expectedFootprint: 'SOT-23',
+    },
+    {
+      request: {
+        wordId: 'load_cell_bridge_adc_word',
+        nameHuman: 'Load cell bridge sensor ADC',
+        characterId: 'load_cell_bridge_adc',
+        functionClass: 'sensor_ic',
+        requiredRatings: { voltageV: 5 },
+      },
+      manufacturer: 'Nuvoton Technology Corporation',
+      partNumber: 'NAU7802SGI',
+      expectedSymbol: 'Forge_Manufacturer:NAU7802SGI',
+      expectedFootprint: 'SOIC-16_3.9x9.9mm_P1.27mm',
+    },
+    {
+      request: {
+        wordId: 'zero_drift_shutdown_op_amp_word',
+        nameHuman: 'Zero-drift shutdown operational amplifier',
+        characterId: 'zero_drift_shutdown_op_amp',
+        functionClass: 'op_amp',
+        requiredRatings: { voltageV: 5 },
+      },
+      manufacturer: 'Texas Instruments',
+      partNumber: 'OPA334AIDBVR',
+      expectedSymbol: 'Forge_Manufacturer:OPA334AIDBVR',
+      expectedFootprint: 'SOT-23-6',
+    },
   ] as const)(
     'promotes frozen-gold $partNumber through exact local symbol and footprint parity',
     ({
@@ -352,6 +391,35 @@ describe('verified function-keyed PCB candidates', () => {
       })
     },
   )
+
+  it('does not promote NAU7802 or OPA334 for generic foreign ADC/TIA roles', () => {
+    const lookup = (
+      manufacturer: string | null,
+      mpn: string,
+    ): DbCascadeResult => ({
+      ...CACHE_HIT,
+      result: {
+        ...CACHE_HIT.result!,
+        mpn,
+        manufacturer: manufacturer ?? '',
+        description: mpn,
+      },
+    })
+
+    expect(resolveVerifiedFunctionCandidate({
+      wordId: 'adc_input_stage_word',
+      nameHuman: 'Generic electrochemical ADC input stage',
+      characterId: 'adc_input_stage',
+      functionClass: 'sensor_ic',
+    }, lookup)).toBeNull()
+
+    expect(resolveVerifiedFunctionCandidate({
+      wordId: 'current_measurement_tia_word',
+      nameHuman: 'Generic high-voltage current measurement TIA',
+      characterId: 'current_measurement_tia',
+      functionClass: 'op_amp',
+    }, lookup)?.partNumber).not.toBe('OPA334AIDBVR')
+  })
 
   it('does not repurpose the four-pin JST host interconnect as USB power entry', () => {
     const lookup = (): DbCascadeResult => ({

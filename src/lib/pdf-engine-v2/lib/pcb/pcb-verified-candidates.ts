@@ -13,6 +13,10 @@ import {
   resolveKicadFootprint,
   resolveKicadSymbol,
 } from './pcb-kicad-library'
+import {
+  hasCuratedManufacturerPinout,
+  resolveCuratedManufacturerIdentity,
+} from './pcb-manufacturer-pinouts'
 import { evaluatePcbComponentResolution } from './pcb-component-resolution'
 
 import type {
@@ -124,15 +128,16 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'TI DGS-10 pinout; local KiCad Analog_ADC:ADS1114IDGS with Package_SO:TSSOP-10_3x3mm_P0.5mm',
   },
   {
-    roleTest: /analog[_ -]?to[_ -]?digital|(^|[_ -])adc($|[_ -])|thermal[_ -]?(?:adc|measurement)/i,
+    roleTest: /(?:load[_ -]?cell|strain[_ -]?gauge|weigh(?:t|ing)?[_ -]?scale|bridge[_ -]?sensor)[_ -]?(?:adc|converter|measurement)?/i,
     functionClass: 'sensor_ic',
     manufacturer: 'Nuvoton Technology Corporation',
     partNumber: 'NAU7802SGI',
     footprint: { library: 'Package_SO', footprint: 'SOIC-16_3.9x9.9mm_P1.27mm' },
     symbol: { library: 'Sensor_Weight', symbol: 'NAU7802' },
     ratings: { voltageV: 5.5 },
-    packageEvidence: 'forge-truth cache: NAU7802SGI, 24-bit ADC, 16-SOP',
-    referenceEvidence: 'NinjaPCR frozen schematic, revision 181768d6ec068a6dd68593042167699285744768',
+    packageEvidence: 'Nuvoton NAU7802SGI: 24-bit bridge-sensor ADC in 16-pin SOP, 150 mil',
+    referenceEvidence: 'Nuvoton NAU7802SGI product page and NAU7802 Data Sheet Rev2.6',
+    pinoutEvidence: 'Nuvoton SOP-16 pins 1-16; curated local Forge_Manufacturer:NAU7802SGI with Package_SO:SOIC-16_3.9x9.9mm_P1.27mm',
   },
   {
     roleTest: /dac[_ -]?(?:output|conditioning)|bipolar[_ -]?dac/i,
@@ -159,15 +164,16 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'ST SO-8 pinout 1=OUT1, 2=IN1-, 3=IN1+, 4=VCC-, 5=IN2+, 6=IN2-, 7=OUT2, 8=VCC+; local KiCad Amplifier_Operational:TL072 with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
   },
   {
-    roleTest: /current[_ -]?measurement[_ -]?tia|(^|[_ -])tia($|[_ -])|signal[_ -]?conditioner|op[_ -]?amp/i,
+    roleTest: /opa334|zero[_ -]?drift[_ -]?(?:shutdown[_ -]?)?(?:op[_ -]?amp|amplifier)/i,
     functionClass: 'op_amp',
     manufacturer: 'Texas Instruments',
     partNumber: 'OPA334AIDBVR',
-    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23-5' },
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23-6' },
     symbol: { library: 'Amplifier_Operational', symbol: 'OPA334' },
     ratings: { voltageV: 5.5 },
-    packageEvidence: 'forge-truth distributor cache: OPA334AIDBVR, SOT-23-5',
-    referenceEvidence: 'Rodeostat frozen role manifest, revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd',
+    packageEvidence: 'TI OPA334AIDBVR: shutdown version in 6-pin SOT-23 DBV',
+    referenceEvidence: 'Texas Instruments OPA334 Data Sheet SBOS213D and active OPA334AIDBVR product record',
+    pinoutEvidence: 'TI DBV-6 pins 1=OUT, 2=V-, 3=+IN, 4=-IN, 5=ENABLE, 6=V+; curated local Forge_Manufacturer:OPA334AIDBVR with Package_TO_SOT_SMD:SOT-23-6',
   },
   {
     roleTest: /(?:stir|pump|brushed[_ -]?dc|motor)[_ -]?(?:channel|driver)|motor[_ -]?driver/i,
@@ -416,18 +422,42 @@ export function resolveVerifiedComponentIdentity(
   const blockedByRating = ratingBlocker(rule, request.requiredRatings)
   if (blockedByRating) return { status: 'unresolved', reason: blockedByRating }
 
-  const symbol = resolveKicadSymbol(roots.symbolsRoot, rule.symbol)
-  if (!symbol) {
-    return {
-      status: 'unresolved',
-      reason: `${rule.partNumber} has no complete local KiCad symbol ${rule.symbol.library}:${rule.symbol.symbol}`,
-    }
+  const hasCuratedPinout = hasCuratedManufacturerPinout(
+    rule.manufacturer,
+    rule.partNumber,
+  )
+  const curated = hasCuratedPinout
+    ? resolveCuratedManufacturerIdentity(
+      rule.manufacturer,
+      rule.partNumber,
+      roots.footprintsRoot,
+    )
+    : null
+  if (curated?.status === 'unsupported') {
+    return { status: 'unresolved', reason: curated.reason }
   }
-  const footprint = resolveKicadFootprint(roots.footprintsRoot, rule.footprint)
+  const librarySymbol = curated
+    ? null
+    : resolveKicadSymbol(roots.symbolsRoot, rule.symbol)
+  const footprint = curated?.footprint
+    ?? resolveKicadFootprint(roots.footprintsRoot, rule.footprint)
   if (!footprint) {
     return {
       status: 'unresolved',
       reason: `${rule.partNumber} has no exact local KiCad footprint ${rule.footprint.library}:${rule.footprint.footprint}`,
+    }
+  }
+  const symbol = curated
+    ? {
+      symbolId: curated.symbolId,
+      footprintId: `${rule.footprint.library}:${rule.footprint.footprint}`,
+      pins: curated.pins,
+    }
+    : librarySymbol
+  if (!symbol) {
+    return {
+      status: 'unresolved',
+      reason: `${rule.partNumber} has no complete local KiCad symbol ${rule.symbol.library}:${rule.symbol.symbol}`,
     }
   }
   const expectedFootprintId = `${rule.footprint.library}:${rule.footprint.footprint}`

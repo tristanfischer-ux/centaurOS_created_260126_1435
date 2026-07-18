@@ -23,7 +23,7 @@ interface PcbVerifiedCandidate {
   componentClass: string
   function: string
   package: string
-  ratings: Record<string, string | number>
+  ratings: Record<string, string | number | boolean>
   sourceUrl: string
   sourceCommit: string
   evidence: string
@@ -97,6 +97,55 @@ export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
     sourceUrl: 'https://www.ti.com/lit/ds/symlink/ads1114.pdf',
     sourceCommit: 'ca40a91e728801b139b1086853f7cf74ce76def9',
     evidence: 'TI SBAS444E lists ADS1114IDGSR in 10-pin VSSOP; frozen Eye-Spy BOM and U2 schematic property give the exact ordering code and DGS footprint.',
+  },
+  {
+    partName: 'MCP1700 fixed 3.3 V low-quiescent-current LDO',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP1700T-3302E/TT',
+    componentClass: 'regulator',
+    function: '3.3 V low-current linear regulation from a supply no higher than 6 V',
+    package: '3-lead SOT-23 (TT), tape and reel',
+    ratings: {
+      inputVoltageV: '2.3 to 6.0',
+      outputVoltageV: 3.3,
+      outputCurrentA: 0.25,
+      pinCount: 3,
+    },
+    sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/MCP1700-Data-Sheet-20001826F.pdf',
+    sourceCommit: 'd43f46aafa1b722fe2f7a42cd1e026712acfe4b5',
+    evidence: 'Microchip DS20001826F identifies MCP1700T-3302E/TT as 3.3 V in three-lead SOT-23 and defines pins 1 GND, 2 VOUT, 3 VIN; its 6 V maximum rejects direct use on a 12 V rail.',
+  },
+  {
+    partName: 'NAU7802 24-bit bridge-sensor ADC',
+    manufacturer: 'Nuvoton Technology Corporation',
+    partNumber: 'NAU7802SGI',
+    componentClass: 'sensor_ic',
+    function: 'high-resolution low-rate differential bridge and strain-gauge conversion',
+    package: 'SOP-16, 150 mil',
+    ratings: {
+      supplyVoltageV: '2.7 to 5.5',
+      resolutionBits: 24,
+      pinCount: 16,
+    },
+    sourceUrl: 'https://www.nuvoton.com/export/resource-files/en-us--DS_NAU7802_DataSheet_EN_Rev2.6.pdf',
+    sourceCommit: 'd43f46aafa1b722fe2f7a42cd1e026712acfe4b5',
+    evidence: 'Nuvoton NAU7802 Rev2.6 defines the complete SOP-16 pinout and the NAU7802SGI product record identifies SOP-16; this bridge ADC is not evidence for generic electrochemical or high-voltage ADC roles.',
+  },
+  {
+    partName: 'OPA334 zero-drift operational amplifier with shutdown',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'OPA334AIDBVR',
+    componentClass: 'op_amp',
+    function: 'single-supply zero-drift amplification with logic-controlled shutdown',
+    package: 'SOT-23 (DBV), 6 pins, tape and reel',
+    ratings: {
+      supplyVoltageV: '2.7 to 5.5',
+      pinCount: 6,
+      shutdown: true,
+    },
+    sourceUrl: 'https://www.ti.com/lit/ds/symlink/opa334.pdf',
+    sourceCommit: 'd43f46aafa1b722fe2f7a42cd1e026712acfe4b5',
+    evidence: 'TI SBOS213D identifies OPA334AIDBVR as the shutdown version in six-pin SOT-23 DBV and defines pins 1 OUT, 2 V-, 3 +IN, 4 -IN, 5 ENABLE, 6 V+; the prior SOT-23-5 mapping was false.',
   },
   {
     partName: 'KK 254 three-circuit vertical friction-lock header',

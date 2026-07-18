@@ -15,11 +15,12 @@ See `src/__tests__/chain-must-be-db-only.test.ts` for the enforcement regression
 
 **Frequency:** On demand after manufacturer and frozen-reference verification
 
-**Quota usage:** Three OpenAI embedding calls when embedding columns and a key are available
+**Quota usage:** Ten OpenAI embedding calls when embedding columns and a key are available
 
-**What it does:** Idempotently writes the exact `OP07CDR`, `TL072CDT`, and
-`12401610E4#2A` manufacturer-backed identities, including package, function,
-ratings, source URL, and frozen source commit. It never runs in the design chain.
+**What it does:** Idempotently writes ten exact manufacturer-backed identities,
+including `MCP1700T-3302E/TT`, `NAU7802SGI`, and the correctly six-pin
+`OPA334AIDBVR`, with package, function, ratings, source URL, and frozen source
+commit. It never runs in the design chain.
 
 **Usage:**
 ```bash

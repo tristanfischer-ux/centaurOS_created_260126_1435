@@ -203,16 +203,15 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       hv_controller_main: 10,
     })
     expect(gapCounts).toEqual({
-      mpn: 22,
-      symbol_pinout: 7,
+      mpn: 29,
     })
     expect(punchlist.summary).toEqual({
       baselineUnresolvedFittedComponents: 50,
       resolvedIdentityCount: 5,
       reclassifiedNonComponentCount: 16,
       remainingUnresolvedFittedComponents: 29,
-      remainingMissingMpn: 22,
-      remainingMissingSymbolPinout: 7,
+      remainingMissingMpn: 29,
+      remainingMissingSymbolPinout: 0,
       targetBoards: 8,
       productsWithFittedBoards: 5,
     })
@@ -270,8 +269,8 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
     expect(markdown).toContain('29 unresolved fitted components')
-    expect(markdown).toContain('22 missing MPN')
-    expect(markdown).toContain('7 missing symbol/pinout')
+    expect(markdown).toContain('29 missing MPN')
+    expect(markdown).toContain('0 missing symbol/pinout')
     expect(markdown).toContain('16 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
       expect(markdown).toContain(group.universalFunctionRole)

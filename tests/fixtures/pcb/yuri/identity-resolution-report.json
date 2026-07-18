@@ -165,8 +165,8 @@
     "unresolvedIdentityCount": 29,
     "resolvedDelta": 5,
     "reclassifiedNonComponentCount": 16,
-    "missingMpn": 22,
-    "missingSymbolPinout": 7
+    "missingMpn": 29,
+    "missingSymbolPinout": 0
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
@@ -181,7 +181,8 @@
     "This is an offline identity delta against the frozen 50-item report; no terminal-owned chain or fabrication pipeline was rerun.",
     "The newly mapped identities were promoted only after the off-chain ingest added exact manufacturer-backed rows to forge-truth and the DB-only resolver plus local KiCad parity checks passed.",
     "The former Colorimeter regulator and BM04 connector closures were withdrawn because the frozen source board contains no regulator and uses generic BOOMELE four-pin connector footprints rather than JST BM04.",
-    "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range.",
+    "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range; the exact MCP1700 symbol is now closed but a compliant replacement MPN is still required.",
+    "Manufacturer pinouts close NAU7802SGI and OPA334AIDBVR symbol uncertainty, but both remain rejected for the cited Rodeostat/OpenDrop roles; 4-2489541-7 remains unsupported because no authoritative PCB package/terminal geometry was found.",
     "No candidate without an exact manufacturer ordering code, compatible ratings, package, and symbol/pinout source was promoted.",
     "Sixteen roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
   ]

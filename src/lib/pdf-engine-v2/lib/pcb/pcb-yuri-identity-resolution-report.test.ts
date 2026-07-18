@@ -213,8 +213,8 @@ describe('offline seven-product PCB identity resolution report', () => {
       unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 5 - 16,
       resolvedDelta: 5,
       reclassifiedNonComponentCount: 16,
-      missingMpn: 22,
-      missingSymbolPinout: 7,
+      missingMpn: 29,
+      missingSymbolPinout: 0,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([
       expect.stringContaining('no terminal-owned chain'),
