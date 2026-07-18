@@ -223,6 +223,8 @@ already_at_bar() {
   local label="$1" form="$2" key="$3" d n=0 ships floor
   while IFS= read -r d; do
     [[ -z "$d" ]] && continue
+    # GOTCHA: *-KILLED* / SCORED dirs waste minutes on gold/glance and never bar.
+    [[ "$d" == *KILLED* || "$d" == *SCORED* || "$d" == *FAILED* ]] && continue
     dir_settled "$d" || continue
     n=$((n + 1))
     # Cheap pre-filter: only call check_bar (gold/glance/log) when scorecard
@@ -256,7 +258,7 @@ PY
       fi
     fi
     (( n >= 8 )) && break
-  done < <(ls -td "$ROOT"/out/${label}-2026[0-9]* 2>/dev/null | grep -v SCORED || true)
+  done < <(ls -td "$ROOT"/out/${label}-2026[0-9]* 2>/dev/null | grep -vE 'SCORED|KILLED|FAILED' || true)
   return 1
 }
 

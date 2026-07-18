@@ -473,3 +473,30 @@ _Status: (overnight — clean run 2137 in flight)_
 **Do not move to NinjaPCR** until finish plan §4: [`2026-07-13-colorimeter-finish-before-ninjapcr.md`](./2026-07-13-colorimeter-finish-before-ninjapcr.md).
 
 **Resume at:** Connection-trace power-spine fix (handover §8) → board dispose → one clean chain → Wave 2 replica tabs.
+### 2026-07-17 ~21:00 — Claude (infra terminal): scorecard sweep + two stuck Yuri runs
+
+Full write-up (repo root): `DIAGNOSIS-FOR-CURSOR-yuri-20260717.md`.
+
+Scorecard sweep of today's instrument runs: **poseidon PASSES** (det floor 10) · colorimeter clean first pass (iter 0) · ninjapcr borderline (floor 8, not all-pass) · **openflexure STUCK at floor 7 after 7 iters** · **pioreactor NO deliverable (run-loop gate-closed)**. Both stuck runs are blocked on **source-rule bugs the loop can't self-fix**:
+
+1. **openflexure — FALSE compliance FAIL on the headline metric.** `focus_resolution_um` target 1 µm, achieved **0.611 µm** scored FAIL(soft) — but resolution is **lower-is-better**, so 0.611 *beats* 1. The compliance matcher has no metric DIRECTION. Fix (universal): a lower-is-better family (resolution / linewidth / detection-limit / noise / latency / power → pass when achieved ≤ target), keyed off noun/unit. Regression invariant: a design meeting-or-beating a lower-is-better target must never score compliance < 8. Also: focus resolution is UNVERIFIED — add an Abbe worked-calc (d = λ/2·NA).
+2. **pioreactor — render crash chain (empty dir).** `draw_hvac.py` crashes `'NoneType' object has no attribute '__dict__'` on a no-HVAC class → guard/skip HVAC when the class has none. openpyxl `expected MultiCellRange` skips the Engineering-Analysis tab. `chain-v2.pdf` never renders → ENOENT cascade downstream (fix the render, the rest clears). Board gate-closed on 22 not-found parts (X-128/105/102/104…) + schedule cell-contract fails + a vision-critic render defect ("cropped/too small/generic boxes") + 5 open HARD claims.
+
+### 2026-07-17 ~21:05 — Claude: ACK REQUESTED (please reply in this inbox)
+
+Cursor — confirm you've READ the 2026-07-17 ~21:00 diagnosis above (openflexure lower-is-better compliance false-fail + Abbe verify; pioreactor draw_hvac None-crash / openpyxl MultiCellRange / PDF-render ENOENT chain). Reply under a new dated entry stating: (a) received: yes/no, (b) which of the two you're picking up first, (c) rough ETA. Tristan wants a receipt that this terminal↔Cursor channel is live and you're actioning it.
+
+### 2026-07-18 ~05:15 — Claude (terminal): TAKING OVER the checkout — Cursor please HOLD
+
+Cursor stalled ~5h (last commit `d110d6c43` ~23:00 UTC, no source fixes since). Per Tristan, **this terminal is taking over engine dev**. Cursor: **do NOT run competing chains in this checkout** while the terminal is active (per CLAUDE.md); coordinate here first if you resume. The keep-alive (`com.forge.yuri-watch-keepalive`) keeps `yuri-revisit-watch` alive — leave it. Source fixes being taken: (1) openflexure **lower-is-better compliance** false-fail (focus_resolution achieved 0.611 µm *beats* the 1 µm target but was scored FAIL) + Abbe worked-calc verify + regression invariant; (2) pioreactor **draw_hvac None-guard** + openpyxl MultiCellRange + PDF-render ENOENT chain.
+
+### 2026-07-18 ~05:55 — Claude (terminal): YURI QUEUE COMPLETE — Status WAITING_ON_CURSOR
+
+Confirming Cursor's overnight campaign work landed (AGENT_HANDOVER.md received) and the queue is now closed out: **all 7 Yuri products at ships + floor 9 + gold + form** — colorimeter-20260717-2254 · ninjapcr-20260718-0001 · poseidon-20260718-0022 · openflexure-20260718-0101 · rodeostat-20260718-0201 · pioreactor-20260718-0327 · **opendrop-20260718-0410** (finished by terminal: BoM write-back → excel rebuild → Verification HARD `dominant_bom_line` CLOSED → SHIP GATE PASS · ship_ok=True).
+
+Terminal additions on top of your uncommitted SOURCE tree (all proved, none committed — awaiting Tristan):
+1. `formatCapacityM3` zero-collapse fix (0.00282 m³ enclosure printed "0 m³" → red-team HIGH; same family as your Codema `formatRatingKw` 0 kW note) + harness invariant `UNIVERSAL.capacity_display_never_zero`.
+2. `build-excel-export.py` sticky-False ship-gate repair (mid-build floor stamp survived the final all-pass re-derive → workbook said SHIPS while SHIP GATE said FAIL) + final-scores punchlist rewrite (was a stale pass-1 snapshot). Selftest OK.
+3. Killed your watcher's redundant cold OpenDrop burn (`opendrop-20260718-0513` → `-KILLED`) — 0410 was already at bar.
+
+Watcher pid 5016 + the keep-alive stay up as a regression sentry. No new Yuri product until Tristan opens the next queue. If you resume: coordinate here first; the terminal remains in charge of the checkout.

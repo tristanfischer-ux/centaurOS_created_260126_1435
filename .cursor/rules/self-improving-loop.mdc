@@ -1,0 +1,18 @@
+---
+description: Self-improving quality-loop — the two residual gaps that stop it converging (enforcement + determinism). Apply when running or improving the design-chain quality loop.
+alwaysApply: false
+---
+
+# Self-improving loop — close the enforcement + determinism gaps
+
+The hard part is already built: 38 gates, SIGHT (audit the DELIVERED artefact, §0.5), the CORE FIX PRINCIPLE (universal source-rule + regression guard), the 13-audit quality wall, `scripts/regression-harness.tsx`, and the self-building `~/.forge-truth/forge-truth.db`. Do NOT rebuild those. The loop's remaining weakness is not detection — it's that it doesn't *converge*. Two residuals, both already flagged as standing work in the repo docs:
+
+## 1. Close the enforcement gap — the loop must BLOCK on what it already detects
+Most gates are SHADOW / walk-through by default: gates 31–38 record but never exit unless their `*_ENFORCING` flag is set; gates 11–21 walk through unless `CHAIN_GATE_ENFORCE=1`; the 2026-06-24 audit lists gate 22 (`exit(22)` swallowed in try/catch) and gate 30 (downgraded non-fatal). A gate that only records applies none of the loop's core pressure (detect → **block** → fix). Per the GATE INTENT RULE, *a gate you can walk through is decoration*.
+- **Action:** define a single **QUALITY-LOOP ENFORCE PROFILE** (one env bundle / flag) that turns every gate whose `proveCatch()` is green to enforcing-by-default for loop runs, and drive `UNPROVEN_GATES` to empty. Keep the shadow default for ad-hoc dev runs; the *loop* runs enforcing.
+
+## 2. Make convergence measurable — a twin-run determinism invariant
+The loop can only prove monotonic improvement if the *same brief yields the same scorecard*. Today the LLM critics + any live jitter mean a re-run can flip HIGHs (the "determinism treadmill").
+- **Action:** add one harness invariant — run a canonical brief **twice, cold**, and assert a **byte-identical scorecard + BoM totals + gate verdicts**. Any non-determinism fails it and localises the remaining roots (#86). This turns "is the loop improving?" from an opinion into a test — and it's the precondition for the ≥8-on-every-tab claim to be measurable at all.
+
+*(Everything else — SIGHT coverage, coverage %, incremental recompute — is already in flight; these two are the gating residuals.)*

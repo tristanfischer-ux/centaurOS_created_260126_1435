@@ -3,7 +3,7 @@
 **Date:** 2026-07-18 ~05:20 BST  
 **Branch:** `oxccu-efuel` (tracking `origin/oxccu-efuel`; large **uncommitted** SOURCE working tree)  
 **Task:** Get every unfinished Yuri makers-kit product to **ships + floor ≥9 + gold materials ±15% + form_id match + glance PASS**  
-**Status:** ✅ **COMPLETE — 7/7 DONE** (2026-07-18 ~05:50, Claude terminal): OpenDrop finished via the Priority-1 excel heal — BoM write-back (manifold £28, Σ £236.08, top line 21%) → excel rebuild → Verification HARD `dominant_bom_line` CLOSED → ships True · floor 9 · gold PASS · form `lab_electronics` · SHIP GATE PASS. Terminal extras: `formatCapacityM3` zero-collapse fix + harness invariant; `build-excel-export.py` sticky-False ship-gate repair + final punchlist rewrite; redundant cold burn `opendrop-20260718-0513` killed (`-KILLED`). See CURSOR-HARNESS-INBOX.md 2026-07-18 ~05:55. SOURCE tree still uncommitted — awaiting Tristan.  
+**Status:** Partially complete — **6/7 DONE**; **OpenDrop one excel rebuild away** (SOURCE fix already in tree + state BoM healed)  
 **Directive from Tristan:** “fix all the issues. don’t stop.” Handing terminal to another model mid-queue.
 
 **Dated copy:** keep this file as the live root handover; older colorimeter takeover docs under `docs/plans/*HANDOVER*` / `docs/plans/2026-07-13-CURSOR-TAKEOVER-colorimeter.md` are **stale** for this campaign.

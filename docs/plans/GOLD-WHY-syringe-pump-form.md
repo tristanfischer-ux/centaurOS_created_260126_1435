@@ -19,11 +19,28 @@
 
 ## Coded surfaces
 
-1. `instrument_form_grammar.py` — `is_syringe_pump_form`, bay geometry, checklist
+1. `instrument_form_grammar.py` — `is_syringe_pump_form`, bay geometry, checklist, `FORM_FAMILIES`
 2. `build_universal_scene.py` — open multi-channel layout (no sealed crate)
-3. `form_converge_loop.py` — Blender-only iterate → deterministic SIGHT checklist
-4. `product-classifier.ts` / engineering-contract — class + `channel_count` (already)
-5. Vision critic — syringe-pump form rubric (mechanism visible)
+3. `form_converge_loop.py` — Blender-only iterate → checklist + **form_render_glance**
+4. `form_render_glance.py` — layer-3 PNG twinship (blue carriage / rails / HMI / harness chroma); adversarial `--selftest`
+5. `product-classifier.ts` / engineering-contract — class + `channel_count` (already)
+6. Vision critic — syringe-pump form rubric (mechanism visible)
+7. Encode backlog — `docs/plans/UNIVERSAL-ENCODE-CHECKLIST-2026-07-16.md`
+
+## proveCatch map (GOLD-WHY row → guard id)
+
+| GOLD-WHY row | Guard / proveCatch id | Where |
+|---|---|---|
+| N parallel bays | `syringe_pump_checklist_ok` missing channel stems | `instrument_form_grammar._selftest` |
+| Stepper + lead screw + rails | checklist stems `stepper`/`leadscrew`/`rail_` | same |
+| Carriage + plunger clamp | `carriage` + `clamp_plunger` stems | same |
+| V-cradle + thumb clamp | `cradle` + `clamp_barrel` | same |
+| OPEN array ≠ sealed cube | `form_render_glance` `CRATE_WALLS` on `syringe_crate` synthetic | `form_render_glance._selftest` |
+| Bright carriage contrast | `NO_ACCENT_CARRIAGE` / blue_accent floor | same + live gold PASS |
+| Control console + tipped HMI | `NO_HMI_FACE` on `syringe_no_hmi` synthetic | same |
+| Harness braid readable | `NO_HARNESS_CHROMA` | same |
+| Inspect ≠ product hero | `INSPECT_CAM` on `inspect-iso.png` | same (§3.4) |
+| Container lie on wall/device | `form_factor_honesty` wall+container | `render_view_contract._selftest` |
 
 ## Fast loop (do NOT run the full chain)
 
