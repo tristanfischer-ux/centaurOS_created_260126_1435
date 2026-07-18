@@ -364,6 +364,193 @@ def compose_form(state: dict) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 5. GEOMETRY PLAN — turn the form-proof into concrete role placements in an envelope.
+# This is the bridge from proof → CAD: a pure, testable plan (positions/sizes in mm),
+# consumed by the Blender placer. It GENERALISES the per-product signature geometry:
+# the same axis→layout rules place ANY medium's roles, so an unseen archetype gets a
+# coherent placement, not a box. All mm, origin at envelope centre, z up from base_z.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class Placement:
+    name: str
+    shape: str                 # box / cylinder / grid / vial / open-frame
+    center_mm: tuple[float, float, float]
+    size_mm: tuple[float, float, float]
+    on_exterior: bool          # visible on the sealed product view (the signature)
+
+
+# Axis → how the role stack lays out in the (W, D, H) envelope. Each returns a dict
+# role → (center, size, exterior). Universal: keyed on the primary axis, not the product.
+def _plan_planar_array(roles, W, D, H, bz):
+    """electric_field: electrode GRID on the deck top; cartridge above it; drivers in base."""
+    top = bz + H
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "grid" in r:
+            out[r] = ((0, 0, top + 1.0), (W * 0.66, D * 0.62, 1.4), True)     # pad matrix on deck
+        elif "cartridge" in r:
+            out[r] = ((0, 0, top + 3.0), (W * 0.5, D * 0.5, 2.0), True)
+        elif "hv" in r:
+            out[r] = ((W * 0.3, 0, bz + H * 0.4), (W * 0.2, D * 0.3, H * 0.4), False)
+        else:  # controller deck
+            out[r] = ((-W * 0.28, 0, top + 1.2), (W * 0.16, D * 0.28, 2.4), True)
+    return out
+
+
+def _plan_external_cell(roles, W, D, H, bz):
+    """electric_current: colour-coded electrode LEADS on the front face; board in base."""
+    fy = -D / 2
+    out = {}
+    leads = [rv for rv in roles if "lead" in rv.role]
+    for i, rv in enumerate(leads):
+        lx = (i - (len(leads) - 1) / 2) * W * 0.2
+        out[rv.role] = ((lx, fy - 8, bz + H * 0.5), (8, 16, 8), True)
+    for rv in roles:
+        if "board" in rv.role or "afe" in rv.role:
+            out[rv.role] = ((0, 0, bz + H * 0.3), (W * 0.7, D * 0.6, H * 0.2), False)
+        elif "port" in rv.role:
+            out[rv.role] = ((W * 0.34, fy - 3, bz + H * 0.5), (12, 8, 6), True)
+    return out
+
+
+def _plan_vertical_wet_stack(roles, W, D, H, bz):
+    """culture_fluid: electronics base → stir/heat → VIAL protruding up → OD sensors → cap."""
+    top = bz + H
+    vial_h = max(H * 0.8, 30.0)
+    vr = min(W, D) * 0.11
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "vial" in r:
+            out[r] = ((0, 0, top + vial_h * 0.5), (vr * 2, vr * 2, vial_h), True)   # shape=vial
+        elif "od" in r:
+            out[r] = ((-(vr + 6), 0, top + vial_h * 0.4), (8, 11, 12), True)
+        elif "cap" in r:
+            out[r] = ((0, 0, top + vial_h + 4), (vr * 2.2, vr * 2.2, 6), True)
+        elif "stir" in r:
+            out[r] = ((0, 0, bz + H * 0.35), (W * 0.3, D * 0.3, H * 0.3), False)
+        else:  # electronics base
+            out[r] = ((0, 0, bz + H * 0.5), (W, D, H), True)
+    return out
+
+
+def _plan_linear_through(roles, W, D, H, bz):
+    """light: source→sample(cuvette cube)→detector along the deck; HMI deck on the left."""
+    top = bz + H
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "cuvette" in r or "sample" in r:
+            out[r] = ((W * 0.28, 0, top + H * 0.6), (W * 0.34, D * 0.7, H * 1.2), True)  # near-cubic
+        elif "source" in r:
+            out[r] = ((W * 0.05, -D * 0.2, top + H * 0.6), (10, 6, 10), True)
+        elif "detector" in r:
+            out[r] = ((W * 0.5, 0, top + H * 0.6), (10, 10, 10), False)
+        else:  # hmi deck
+            out[r] = ((-W * 0.25, 0, top + 1.0), (W * 0.4, D * 0.7, 3.0), True)
+    return out
+
+
+def _plan_block(roles, W, D, H, bz):
+    """heat: heated sample block centre, hinged lid over it, heatsink+controller in base."""
+    top = bz + H
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "block" in r:
+            out[r] = ((0, 0, top - H * 0.1), (W * 0.5, D * 0.5, H * 0.3), True)
+        elif "lid" in r:
+            out[r] = ((0, -D * 0.1, top + H * 0.15), (W * 0.6, D * 0.5, H * 0.1), True)
+        elif "heatsink" in r:
+            out[r] = ((0, D * 0.2, bz + H * 0.3), (W * 0.5, D * 0.2, H * 0.4), False)
+        else:  # controller
+            out[r] = ((0, 0, bz + H * 0.2), (W * 0.6, D * 0.5, H * 0.15), False)
+    return out
+
+
+def _plan_repeated_linear(roles, W, D, H, bz, n):
+    """linear_displacement: N parallel bays (stepper→screw→carriage→cradle) + side console."""
+    out = {}
+    n = max(1, n)
+    for i in range(n):
+        bx = (i - (n - 1) / 2) * W / (n + 1)
+        for rv in roles:
+            r = rv.role
+            if "console" in r:
+                continue
+            key = f"{r}_{i}" if n > 1 else r
+            if "stepper" in r:
+                out[key] = ((bx, D * 0.3, bz + H * 0.5), (W / (n + 2), D * 0.2, H * 0.5), True)
+            elif "leadscrew" in r:
+                out[key] = ((bx, 0, bz + H * 0.5), (4, D * 0.5, 4), True)
+            elif "carriage" in r:
+                out[key] = ((bx, 0, bz + H * 0.55), (W / (n + 2), D * 0.15, H * 0.3), True)
+            elif "cradle" in r:
+                out[key] = ((bx, -D * 0.3, bz + H * 0.5), (W / (n + 2), D * 0.2, H * 0.4), True)
+    for rv in roles:
+        if "console" in rv.role:
+            out[rv.role] = ((W * 0.5, 0, bz + H * 0.5), (W * 0.2, D * 0.4, H * 0.6), True)
+    return out
+
+
+def _plan_optical_column(roles, W, D, H, bz):
+    """image_plane: flexure body base, stage on top, objective below stage, condenser above."""
+    top = bz + H
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "stage" in r:
+            out[r] = ((0, 0, top), (W * 0.5, D * 0.5, H * 0.06), True)
+        elif "objective" in r:
+            out[r] = ((0, 0, top - H * 0.25), (10, 10, H * 0.4), True)
+        elif "condenser" in r:
+            out[r] = ((0, 0, top + H * 0.35), (12, 12, H * 0.3), True)
+        elif "actuator" in r:
+            out[r] = ((W * 0.35, 0, bz + H * 0.5), (W * 0.12, D * 0.2, H * 0.5), True)
+        else:  # flexure body
+            out[r] = ((0, 0, bz + H * 0.5), (W, D, H), True)
+    return out
+
+
+def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
+                          base_z_mm: float = 0.0) -> dict:
+    """form-proof → concrete Placement list for an envelope. Universal: the primary axis
+    picks the layout; ANY medium's roles get coherent placement. Returns {ok, placements}
+    or {ok:False, reason} (never a silent box)."""
+    proof = compose_form(state)
+    if not proof.get("ok"):
+        return {"schema": "geometry-plan/v1", "ok": False, "reason": proof.get("reason")}
+    c = derive_functional_form(state)
+    W, D, H = envelope_mm
+    axis = c.primary_axis
+    dispatch = {
+        "planar-array": lambda: _plan_planar_array(c.role_volumes, W, D, H, base_z_mm),
+        "external-cell": lambda: _plan_external_cell(c.role_volumes, W, D, H, base_z_mm),
+        "vertical-wet-stack": lambda: _plan_vertical_wet_stack(c.role_volumes, W, D, H, base_z_mm),
+        "linear-through": lambda: _plan_linear_through(c.role_volumes, W, D, H, base_z_mm),
+        "block": lambda: _plan_block(c.role_volumes, W, D, H, base_z_mm),
+        "repeated-linear": lambda: _plan_repeated_linear(c.role_volumes, W, D, H, base_z_mm, c.repeated_count),
+        "optical-column": lambda: _plan_optical_column(c.role_volumes, W, D, H, base_z_mm),
+    }.get(axis)
+    if not dispatch:
+        return {"schema": "geometry-plan/v1", "ok": False, "reason": f"NO_LAYOUT_FOR_AXIS_{axis}"}
+    raw = dispatch()
+    shape_of = {rv.role: rv.geometry_family for rv in c.role_volumes}
+    placements = []
+    for name, (ctr, sz, ext) in raw.items():
+        base_role = name.rsplit("_", 1)[0] if name[-1:].isdigit() else name
+        placements.append(Placement(
+            name=name, shape=shape_of.get(base_role, shape_of.get(name, "box")),
+            center_mm=tuple(round(float(x), 2) for x in ctr),
+            size_mm=tuple(round(float(x), 2) for x in sz), on_exterior=ext))
+    return {"schema": "geometry-plan/v1", "ok": True, "axis": axis,
+            "working_medium": c.working_medium,
+            "placements": [asdict(p) for p in placements]}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # proveCatch fixtures (Cursor directive): EWOD first, + generic-box / missing-grid /
 # wrong-transport must FAIL.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -425,6 +612,30 @@ def _selftest() -> int:
     a1 = compose_form(_synthetic_state(working_volume_ml=20))
     a2 = compose_form(_synthetic_state(working_volume_ml=20))
     check("deterministic (byte-identical proof)", json.dumps(a1) == json.dumps(a2))
+
+    # GEOMETRY PLAN — the form-proof composes into concrete placements (universal layout).
+    env = (100.0, 80.0, 30.0)
+    gp_ewod = compose_geometry_plan(_synthetic_state(electrode_count=64), env)
+    check("EWOD geometry plan ok", gp_ewod.get("ok") is True)
+    _ewod_names = [p["name"] for p in gp_ewod.get("placements", [])]
+    check("EWOD plan places an electrode grid on the exterior",
+          any("grid" in p["name"] and p["on_exterior"] and p["shape"] == "grid"
+              for p in gp_ewod.get("placements", [])))
+    gp_bio = compose_geometry_plan(_synthetic_state(working_volume_ml=20), env)
+    _vial = next((p for p in gp_bio.get("placements", []) if "vial" in p["name"]), None)
+    check("culture plan: vial is a vial shape protruding above the base",
+          _vial is not None and _vial["shape"] == "vial"
+          and _vial["center_mm"][2] > env[2])   # vial centre above envelope top
+    gp_pump = compose_geometry_plan(_synthetic_state(channel_count=3), env)
+    check("syringe plan repeats bays by channel_count (3× cradles)",
+          sum(1 for p in gp_pump.get("placements", []) if "cradle" in p["name"]) == 3)
+    # generic box: no medium → no geometry plan (never a silent box)
+    gp_gen = compose_geometry_plan(_synthetic_state(mass_kg=2), env)
+    check("generic geometry plan FAILS (no medium)", gp_gen.get("ok") is False)
+    # determinism on the plan too
+    check("geometry plan deterministic",
+          json.dumps(compose_geometry_plan(_synthetic_state(electrode_count=64), env))
+          == json.dumps(gp_ewod))
 
     print("functional_form selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
