@@ -16464,7 +16464,8 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                            bespoke_missing: bool, fitness_score: float,
                            n_electronic_gap: int,
                            n_on_board: int = 0,
-                           n_electronic_design: int = 0) -> Tuple[str, str]:
+                           n_electronic_design: int = 0,
+                           n_electronic_full: int = 0) -> Tuple[str, str]:
     """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
     board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
     unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
@@ -16482,7 +16483,25 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                "the pipeline's own hygiene checks (DRC / routed / Gerbers / pipeline.ok) "
                "did not all pass")
         return "FAIL", why
-    # SCOPE GATE: on-board ≪ design electronic count → DRAFT (never FAB-READY).
+    # HONEST COVERAGE GATE (Tristan/Cursor 2026-07-18): the FAB-READY scope must be measured
+    # against the design's FULL claimed electronic part count — NOT a self-defined on-board
+    # scope that shrinks to whatever the generator decided to place (the Goodhart that let
+    # rodeostat 8/14 and opendrop 10/16 read FAB-READY by offloading the rest 'off-board').
+    # A bespoke board that places < 80% of the design's electronics is a token board OR the
+    # design is really COTS-heavy — either way NOT FAB-READY: fix the board to cover the
+    # design, or correct the disposition to cots-modules if the off-board parts are genuine
+    # COTS modules. (The on-board-scope figure is kept for the message context only.)
+    _full = n_electronic_full or n_electronic_design
+    if _full >= 4 and n_on_board < 0.8 * _full:
+        return (
+            "ENGINEERING DRAFT",
+            f"clean hygiene on a TOKEN board — only {n_on_board} of {_full} claimed design "
+            f"electronic parts are placed as footprints ({n_on_board / _full * 100:.0f}% "
+            f"coverage, < 80% required). Either the board must implement the design, or (if "
+            f"the rest are genuine COTS modules) the disposition should be cots-modules, not "
+            f"bespoke — a partial custom board is not a shippable product PCBA",
+        )
+    # Legacy scope gate (kept as a floor for the self-defined on-board scope too).
     if (
         n_electronic_design >= 8
         and n_on_board >= 0
@@ -17085,7 +17104,8 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         n_on_board_scope = n_electronic_design - _n_off
     readiness, readiness_why = _pcb_readiness_verdict(
         pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
-        n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope)
+        n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope,
+        n_electronic_full=n_electronic_design)
 
     hygiene_components: List[Tuple[str, float, float]] = [
         ("DRC clean (0 violations)", 1 if drc_ok else 0, 1),
