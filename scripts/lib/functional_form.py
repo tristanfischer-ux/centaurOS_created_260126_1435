@@ -116,6 +116,24 @@ def _derive_working_medium(state: dict) -> tuple[Optional[str], str]:
     rpm = _q(state, "rotor_speed_rpm") or _q(state, "rpm_max") or _q(state, "spin_speed_rpm")
     if rpm is not None and float(rpm) > 0:
         return "rotation", f"rotor_speed_rpm={rpm} (a spinning rotor separates by centrifugal force)"
+    # NEW MEDIA (fast universality loop, 2026-07-18) — each closes a gap the diverse-archetype
+    # sweep surfaced. Keyed on the functional signal, never a product name.
+    for sig, med, why in (
+        ("gantry_axes", "gantry", "a moving head on a Cartesian frame"),
+        ("orbital_speed_rpm", "orbital", "a platform on an orbital drive"),
+        ("stir_speed_rpm", "magnetic", "a rotating magnet couples to a stir bar"),
+        ("ultrasonic_freq_khz", "acoustic", "a transducer drives ultrasonic energy into a bath"),
+        ("readability_mg", "gravimetric", "a load cell under a weighing pan in a draft shield"),
+        ("vacuum_mbar", "vacuum", "a pump evacuates a chamber/port"),
+        ("chamber_pressure_bar", "pressure", "a sealed vessel holds steam under pressure"),
+        ("run_voltage_v", "electrophoresis", "a DC field drives migration through a gel tank"),
+        ("pulse_voltage_v", "electrophoresis", "an HV pulse across an electrode cell"),
+        ("chamber_volume_l", "thermal_volume", "a heated/controlled chamber holds a working volume"),
+        ("bath_volume_l", "thermal_volume", "a heated bath holds a working volume"),
+    ):
+        v = _q(state, sig)
+        if v is not None and float(v) > 0:
+            return med, f"{sig}={v} ({why})"
     ec = _q(state, "electrode_count")
     if ec is not None and float(ec) >= 8:
         return "electric_field", f"electrode_count={ec} (planar droplet actuation array)"
@@ -253,6 +271,115 @@ _MEDIUM_FORM_RULE: dict[str, dict[str, Any]] = {
                   ("lid", "box", True, True, "top")],
         "relations": [("rotor", "supported_by", "motor_base", False),
                       ("lid", "hinged", "motor_base", False)],
+    },
+    # ── NEW MEDIA batch (fast universality sweep, 2026-07-18) — each closes a gap the
+    # 36-archetype Yuri sweep surfaced. Most use the generic "on-base" layout (chassis +
+    # signature features seated on it, touching); pressure vessels use a cylinder body. ──
+    "magnetic": {
+        "axis": "on-base", "interface": "stir-plate", "openness": "sample-open",
+        "operator_view": "top", "access": "top", "hazard": "hot-surface",
+        "chassis": "plate_body",
+        "roles": [("plate_body", "box", True, False, "base"),
+                  ("stir_zone", "cylinder", True, True, "top"),
+                  ("control_knob", "cylinder", True, True, "top"),
+                  ("beaker", "cylinder", True, True, "top")],
+        "relations": [("stir_zone", "fastened", "plate_body", False),
+                      ("control_knob", "fastened", "plate_body", False),
+                      ("beaker", "nested_accessory", "stir_zone", True)],
+    },
+    "orbital": {
+        "axis": "on-base", "interface": "shake-platform", "openness": "sample-open",
+        "operator_view": "top", "access": "top", "hazard": None,
+        "chassis": "drive_base",
+        "roles": [("drive_base", "box", True, False, "base"),
+                  ("platform", "box", True, True, "top"),
+                  ("tube_clamp", "box", True, True, "top")],
+        "relations": [("platform", "supported_by", "drive_base", False),
+                      ("tube_clamp", "fastened", "platform", False)],
+    },
+    "acoustic": {
+        "axis": "on-base", "interface": "ultrasonic-bath", "openness": "sample-open",
+        "operator_view": "top", "access": "top", "hazard": "ultrasound",
+        "chassis": "tank_body",
+        "roles": [("tank_body", "box", True, False, "base"),
+                  ("transducer", "box", True, True, "top"),
+                  ("lid", "box", True, True, "top")],
+        "relations": [("transducer", "fastened", "tank_body", False),
+                      ("lid", "hinged", "tank_body", False)],
+    },
+    "gravimetric": {
+        "axis": "on-base", "interface": "weighing-pan", "openness": "sample-open",
+        "operator_view": "front", "access": "top", "hazard": None,
+        "chassis": "balance_base",
+        "roles": [("balance_base", "box", True, False, "base"),
+                  ("weighing_pan", "cylinder", True, True, "top"),
+                  ("draft_shield", "box", True, True, "top"),
+                  ("display", "box", True, True, "front")],
+        "relations": [("weighing_pan", "supported_by", "balance_base", False),
+                      ("draft_shield", "fastened", "balance_base", False),
+                      ("display", "fastened", "balance_base", False)],
+    },
+    "vacuum": {
+        "axis": "on-base", "interface": "vacuum-port", "openness": "sealed",
+        "operator_view": "front", "access": "front", "hazard": None,
+        "chassis": "pump_body",
+        "roles": [("pump_body", "box", True, False, "base"),
+                  ("motor", "cylinder", True, False, "top"),
+                  ("vacuum_port", "box", True, True, "front"),
+                  ("gauge", "cylinder", True, True, "top")],
+        "relations": [("motor", "fastened", "pump_body", False),
+                      ("vacuum_port", "fastened", "pump_body", False),
+                      ("gauge", "fastened", "pump_body", False)],
+    },
+    "electrophoresis": {
+        "axis": "on-base", "interface": "gel-tank", "openness": "sample-open",
+        "operator_view": "top", "access": "top", "hazard": "high-voltage",
+        "chassis": "tank_body",
+        "roles": [("tank_body", "box", True, False, "base"),
+                  ("gel_tray", "box", True, True, "top"),
+                  ("anode", "cylinder", True, True, "top"),
+                  ("cathode", "cylinder", True, True, "top"),
+                  ("lid", "box", True, True, "top")],
+        "relations": [("gel_tray", "supported_by", "tank_body", False),
+                      ("anode", "fastened", "tank_body", False),
+                      ("cathode", "fastened", "tank_body", False),
+                      ("lid", "nested_accessory", "tank_body", True)],
+    },
+    "thermal_volume": {
+        "axis": "on-base", "interface": "chamber-door", "openness": "sample-open",
+        "operator_view": "front", "access": "front", "hazard": "hot-surface",
+        "chassis": "chamber_body",
+        "roles": [("chamber_body", "box", True, False, "base"),
+                  ("door", "box", True, True, "front"),
+                  ("shelf", "box", True, True, "top"),
+                  ("controller", "box", True, True, "front")],
+        "relations": [("door", "hinged", "chamber_body", False),
+                      ("shelf", "fastened", "chamber_body", False),
+                      ("controller", "fastened", "chamber_body", False)],
+    },
+    "gantry": {
+        "axis": "on-base", "interface": "moving-head", "openness": "mechanism-open",
+        "operator_view": "top", "access": "front", "hazard": None,
+        "chassis": "frame",
+        "roles": [("frame", "box", True, False, "base"),
+                  ("bed", "box", True, True, "top"),
+                  ("x_gantry", "box", True, True, "top"),
+                  ("moving_head", "box", True, True, "top")],
+        "relations": [("bed", "fastened", "frame", False),
+                      ("x_gantry", "supported_by", "frame", False),
+                      ("moving_head", "sliding", "x_gantry", False)],
+    },
+    "pressure": {
+        "axis": "pressure-vessel", "interface": "clamped-lid", "openness": "sealed",
+        "operator_view": "top", "access": "top", "hazard": "pressure-steam",
+        "chassis": "vessel_body",
+        "roles": [("vessel_body", "cylinder", True, False, "base"),
+                  ("clamp_lid", "cylinder", True, True, "top"),
+                  ("pressure_gauge", "cylinder", True, True, "top"),
+                  ("relief_valve", "cylinder", True, True, "top")],
+        "relations": [("clamp_lid", "fastened", "vessel_body", False),
+                      ("pressure_gauge", "fastened", "vessel_body", False),
+                      ("relief_valve", "fastened", "vessel_body", False)],
     },
     "image_plane": {
         "axis": "optical-column", "interface": "stage-slide", "openness": "mechanism-open",
@@ -660,6 +787,54 @@ def _plan_repeated_linear(roles, W, D, H, bz, n):
     return out
 
 
+def _plan_on_base(roles, W, D, H, bz):
+    """GENERIC universal layout: the chassis (axis_position 'base') is the full-footprint
+    body; every other structural role is seated ON its top (bottom touching) spread across
+    x, or on the front face; accessories nest on top. Guarantees one connected component.
+    Covers most new media (magnetic/orbital/acoustic/gravimetric/vacuum/electrophoresis/
+    thermal_volume/gantry). Not gold-perfect per family — the fast-loop 'sensible + connected'
+    baseline; per-family shape polish comes later."""
+    body_h = max(H, 12.0)
+    top = bz + body_h
+    fy = -D / 2
+    base = next((rv.role for rv in roles if rv.axis_position == "base"), None)
+    tops = [rv for rv in roles if rv.role != base and rv.axis_position != "front"]
+    fronts = [rv for rv in roles if rv.axis_position == "front"]
+    out = {}
+    if base:
+        out[base] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)
+    nt = max(1, len(tops))
+    for i, rv in enumerate(tops):
+        rx = (i - (nt - 1) / 2.0) * (W / (nt + 0.6))
+        rh = body_h * 0.55
+        sz = (W / (nt + 1.2), D * 0.5, rh)
+        out[rv.role] = ((rx, 0, top + rh * 0.5), sz, rv.must_be_visible)
+    for j, rv in enumerate(fronts):
+        rx = (j - (len(fronts) - 1) / 2.0) * W * 0.3
+        out[rv.role] = ((rx, fy - 2, bz + body_h * 0.5), (W * 0.2, 6, body_h * 0.4), True)
+    return out
+
+
+def _plan_pressure(roles, W, D, H, bz):
+    """pressure-vessel: a cylindrical body with a clamped lid on top + gauge/valve on the
+    lid — the autoclave/pressure-cooker morphology. All seated on the vessel (touching)."""
+    body_h = max(H, 20.0)
+    r = min(W, D) * 0.45
+    top = bz + body_h
+    out = {}
+    for rv in roles:
+        role = rv.role
+        if "vessel" in role:
+            out[role] = ((0, 0, bz + body_h * 0.5), (r * 2, r * 2, body_h), True)
+        elif "lid" in role:
+            out[role] = ((0, 0, top + 4), (r * 2.05, r * 2.05, 10), True)     # clamped on top
+        elif "gauge" in role:
+            out[role] = ((r * 0.4, 0, top + 12), (8, 8, 10), True)            # on the lid
+        else:  # relief valve
+            out[role] = ((-r * 0.4, 0, top + 12), (6, 6, 12), True)
+    return out
+
+
 def _plan_rotary(roles, W, D, H, bz):
     """rotation: motor_base IS the body; the slotted ROTOR disk seated ON its top (touching);
     a hinged lid overlapping the rotor. Universal — added via the fast loop, same contact rule."""
@@ -787,6 +962,8 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
         "repeated-linear": lambda: _plan_repeated_linear(c.role_volumes, W, D, H, base_z_mm, c.repeated_count),
         "optical-column": lambda: _plan_optical_column(c.role_volumes, W, D, H, base_z_mm),
         "rotary-stack": lambda: _plan_rotary(c.role_volumes, W, D, H, base_z_mm),
+        "on-base": lambda: _plan_on_base(c.role_volumes, W, D, H, base_z_mm),
+        "pressure-vessel": lambda: _plan_pressure(c.role_volumes, W, D, H, base_z_mm),
     }.get(axis)
     if not dispatch:
         return {"schema": "geometry-plan/v1", "ok": False, "reason": f"NO_LAYOUT_FOR_AXIS_{axis}"}
