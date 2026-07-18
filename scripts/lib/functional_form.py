@@ -113,6 +113,9 @@ def _q(state: dict, key: str):
 def _derive_working_medium(state: dict) -> tuple[Optional[str], str]:
     """Map contract SIGNALS → working medium. Ordered so a specific signal wins.
     Returns (medium, basis-string). product_class is a LAST-resort hint only."""
+    rpm = _q(state, "rotor_speed_rpm") or _q(state, "rpm_max") or _q(state, "spin_speed_rpm")
+    if rpm is not None and float(rpm) > 0:
+        return "rotation", f"rotor_speed_rpm={rpm} (a spinning rotor separates by centrifugal force)"
     ec = _q(state, "electrode_count")
     if ec is not None and float(ec) >= 8:
         return "electric_field", f"electrode_count={ec} (planar droplet actuation array)"
@@ -239,6 +242,17 @@ _MEDIUM_FORM_RULE: dict[str, dict[str, Any]] = {
                       ("carriage", "sliding", "leadscrew", False),
                       ("syringe_cradle", "fastened", "stepper", False),
                       ("console", "electrical_cable", "stepper", False)],
+    },
+    "rotation": {   # ADDED via the fast universality loop (2026-07-18) — a NEVER-SEEN
+        # archetype (microcentrifuge) surfaced this gap; one medium+rule+layout closes it.
+        "axis": "rotary-stack", "interface": "rotor-slots", "openness": "sample-open",
+        "operator_view": "top", "access": "top", "hazard": "spinning-rotor",
+        "chassis": "motor_base",
+        "roles": [("motor_base", "box", True, False, "base"),
+                  ("rotor", "cylinder", True, True, "sample"),
+                  ("lid", "box", True, True, "top")],
+        "relations": [("rotor", "supported_by", "motor_base", False),
+                      ("lid", "hinged", "motor_base", False)],
     },
     "image_plane": {
         "axis": "optical-column", "interface": "stage-slide", "openness": "mechanism-open",
@@ -419,7 +433,7 @@ def cull_infeasible(candidates: list[Arrangement], c: FunctionalFormContract) ->
         "cuvette": "sample_cuvette", "tube-wells": "sample_block",
         "electrode-grid+cartridge": "electrode_grid", "electrode-leads": "electrode_lead",
         "culture-vial": "culture_vial", "syringe-cradle": "syringe_cradle",
-        "stage-slide": "stage",
+        "stage-slide": "stage", "rotor-slots": "rotor",
     }.get(c.sample_interface or "", "")
     foreign = {
         "electric_field": {"manifold", "valve", "pipe", "pump_head", "cuvette"},
@@ -646,6 +660,24 @@ def _plan_repeated_linear(roles, W, D, H, bz, n):
     return out
 
 
+def _plan_rotary(roles, W, D, H, bz):
+    """rotation: motor_base IS the body; the slotted ROTOR disk seated ON its top (touching);
+    a hinged lid overlapping the rotor. Universal — added via the fast loop, same contact rule."""
+    body_h = max(H, 12.0)
+    top = bz + body_h
+    rr = min(W, D) * 0.40
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "rotor" in r:
+            out[r] = ((0, 0, top - 5), (rr * 2, rr * 2, 8), True)        # rotor RECESSED in the chamber
+        elif "lid" in r:
+            out[r] = ((0, 0, top + 4), (W * 0.96, D * 0.96, 8), True)    # lid RESTS on the body rim
+        else:  # motor_base = base body
+            out[r] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)
+    return out
+
+
 def _plan_optical_column(roles, W, D, H, bz):
     """image_plane: flexure body base, stage on top, objective below stage, condenser above."""
     top = bz + H
@@ -754,6 +786,7 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
         "block": lambda: _plan_block(c.role_volumes, W, D, H, base_z_mm),
         "repeated-linear": lambda: _plan_repeated_linear(c.role_volumes, W, D, H, base_z_mm, c.repeated_count),
         "optical-column": lambda: _plan_optical_column(c.role_volumes, W, D, H, base_z_mm),
+        "rotary-stack": lambda: _plan_rotary(c.role_volumes, W, D, H, base_z_mm),
     }.get(axis)
     if not dispatch:
         return {"schema": "geometry-plan/v1", "ok": False, "reason": f"NO_LAYOUT_FOR_AXIS_{axis}"}
