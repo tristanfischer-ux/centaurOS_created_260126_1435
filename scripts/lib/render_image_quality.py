@@ -50,19 +50,21 @@ def evaluate_image(
 
     # INTENT (NinjaPCR 2302): height_occupancy 0.445 printed as "0.45 below 0.45"
     # because the message rounded to 2dp while the compare used raw floats.
-    # DECISION: gate on the same 2dp rounding the message shows — a value that
+    # DECISION: gate on the same rounding the message shows — a value that
     # displays as meeting the floor must pass (float dust must not fail a ship).
-    def _below_floor(value: float, floor: float) -> bool:
-        return round(value, 2) < round(floor, 2)
+    # GOTCHA (OpenFlexure 2026-07-18): edge density 0.00196 printed as
+    # "0.0020 below 0.0020" with a raw `<` compare — same dust class at 4dp.
+    def _below_floor(value: float, floor: float, *, ndigits: int) -> bool:
+        return round(value, ndigits) < round(floor, ndigits)
 
     reasons = []
-    if edge_density < min_edge_density:
+    if _below_floor(edge_density, min_edge_density, ndigits=4):
         reasons.append(
             f"edge density {edge_density:.4f} below {min_edge_density:.4f}")
-    if _below_floor(width_occupancy, min_width_occupancy):
+    if _below_floor(width_occupancy, min_width_occupancy, ndigits=2):
         reasons.append(
             f"width occupancy {width_occupancy:.2f} below {min_width_occupancy:.2f}")
-    if _below_floor(height_occupancy, min_height_occupancy):
+    if _below_floor(height_occupancy, min_height_occupancy, ndigits=2):
         reasons.append(
             f"height occupancy {height_occupancy:.2f} below {min_height_occupancy:.2f}")
     return ImageQualityResult(

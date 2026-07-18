@@ -132,16 +132,16 @@ _SKIP_NODE_RE = re.compile(
 # (32 > 18) even after the Power story was correct.
 _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
     r"wifi|wi[- ]?fi|flash\s*storage|firmware\s*(?:storage|watchdog)|debug\s*uart|"
-    r"debug\s*interface|usb\s*(?:data|interface|power)|polyfuse|bulk\s*capacitor|"
+    r"debug\s*(?:interface|header)|usb\s*(?:data|interface|power)|polyfuse|bulk\s*capacitor|"
     r"board\s*level\s*decoupling|decoupling|status\s*led|"
     r"current\s*sense|snubber|h[- ]?bridge|mosfet|dc\s*dc\s*regulator|"
-    r"low\s*noise\s*regulator|\bldo\b|linear\s*regulator|"
+    r"low\s*noise\s*(?:regulator|op\s*amp)|\bldo\b|linear\s*regulator|"
     r"ferrite|emc\s*bead|esd\s*protection|"
     r"i2c\s*level\s*shifter|input\s*protection|control\s*switch|"
     r"fan\s*(?:tach|failure)|overtemp|thermal\s*fuse|estop|e[- ]?stop|"
     r"power\s*kill|protective\s*earth|\bpe\b|block\s*temperature|"
     r"temperature\s*sensor|sample\s*block\s*mount|tube\s*access|"
-    r"lid\s*assembly(?!\s*heater)|host\s*interface|force\s*limit|"
+    r"lid\s*assembly(?!\s*heater)|host\s*(?:interface|protocol|gui)|force\s*limit|"
     r"home\s*reference|endstop|mains\s*fuse|overcurrent|"
     r"status\s*indicator|low\s*battery\s*indicator|power\s*indicator(?:\s*led)?|"
     r"battery\s*included|host\s*power\s*rail|run\s*start|user\s*facing|foot\s*pad|"
@@ -149,7 +149,26 @@ _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
     r"mounting\s*bezel|actuation\s*kinematics|maintenance\s*service|"
     r"access\s*panel|stage\s*limit|stall\s*sense|motor\s*current\s*limit|"
     r"debug\s*interface|level\s*shifter|i2c\s*level|"
-    r"blm\d+|ferrite\s*bead",
+    r"blm\d+|ferrite\s*bead|"
+    # INTENT (Rodeostat 0201): AFE/mixed-signal peripherals blew PCB column to
+    # depth 22 (>10). Keep Analog Front End + MCU + USB power + shell; absorb
+    # DAC/ADC/TIA/buffer/calibration/standoff litter into the compute/AFE story.
+    r"precision\s*voltage\s*reference|dac\s*output|adc\s*input|"
+    r"current\s*measurement\s*tia|reference\s*input\s*buffer|"
+    r"voltage\s*sense\s*path|calibration\s*(?:reference|prompt)|"
+    r"reverse\s*polarity|pcb\s*mounting\s*standoff|cable\s*strain|"
+    r"front\s*panel\s*connector|fastener\s*set|wet\s*bench\s*creepage|"
+    r"current\s*limit\s*polyfuse|safety\s*label|optical\s*detector|"
+    # INTENT (Pioreactor 0250): heatsink-fan SUB_ASSEMBLY litter + culture kit
+    # accessories blew max_col_depth to 20. Keep Vessel / MCU / TEC / Pump /
+    # Enclosure / OD pair; absorb fan anatomy + vial fixtures into those.
+    r"fan\s*housing|venturi|\bimpeller\b|\bec\s*motor|speed\s*controller|"
+    r"guard\s*/\s*grille|mounting\s*frame|thermal\s*insulation|"
+    r"thermal\s*interface|stir\s*tachometer|media\s*tubing|vial\s*holder|"
+    r"sterile\s*filter|\bnameplate\b|actuation\s*kinematics|"
+    r"host\s*protocol|debug\s*header|firmware\s*storage|galvanic\s*isolat|"
+    r"input\s*protection|magnetic\s*stirrer|cartridge\s*heater|"
+    r"heatsink\s*fan|sensor\s*cable",
     re.I,
 )
 # GOTCHA (colorimeter 1236): "Host Power Rail On Compute Ui" / "Input Protection On
@@ -160,7 +179,8 @@ _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
 # Named MCU boards ARE the compute principal (catalogue pin, not a generic noun).
 _COMPUTE_PRINCIPAL_NAME_RE = re.compile(
     r"^(?:compute\s*ui(?:\s*module)?|main\s*controller(?:\s*mcu)?|"
-    r"microcontroller|\bmcu\b|processor(?:\s*board)?|"
+    r"microcontroller(?:\s*mcu)?|\bmcu\b|processor(?:\s*board)?|"
+    r"analog\s*front\s*end|"
     r"(?:adafruit\s+)?feather(?:\s+\w+)*|"
     r"arduino(?:\s+\w+)*|"
     r"(?:raspberry\s*pi\s+)?pico(?:\s+\w+)*|"

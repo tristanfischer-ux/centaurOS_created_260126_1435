@@ -344,9 +344,19 @@ def is_fluid_less_instrument(state: dict) -> bool:
 
     Mirrors the Excel VERIFIED-NA predicate in build-excel-export.py so the
     drawing set and the workbook cannot disagree.
+
+    GOTCHA (Pioreactor 0327): a 20 ml culture kit authors a real
+    `dosing_pump → culture_vessel` fluid_loop for media tubing. That is
+    on-device silicone hose — NOT a plant process train. Unlocking
+    `_PACK_HANDHELD_FLUID` (P&ID/SLD/panel) floored Drawings + Verification
+    while Rodeostat/Poseidon correctly ship Assembly+Interconnect only.
+    Device-scale enclosures (<1 m³) stay fluid-less for the drawing pack.
     """
     if not bool(state.get("isInstrumentDevice")):
         return False
+    enc = _quantity_value(state, "enclosure_volume_m3")
+    if enc is not None and 0 < enc < 1.0:
+        return True
     topo = (
         ((state.get("orchestratorContract") or {}).get("topology"))
         or ((state.get("engineeringContract") or {}).get("topology"))
@@ -571,6 +581,15 @@ def _selftest() -> None:
         "topology": [{"from": "a", "to": "b", "mechanism": "fluid_loop"}]}}
     assert not is_fluid_less_instrument(_hh_fluid)
     assert "pid" in pack_drawings(_hh_fluid)
+    # proveCatch (Pioreactor 0327): device-scale + micro dosing fluid_loop stays
+    # Assembly+Interconnect — must NOT unlock plant P&ID/SLD pack.
+    _hh_lab = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"from_part": "dosing_pump", "to_part": "culture_vessel",
+                      "mechanism": "fluid_loop"}],
+        "quantities": {"enclosure_volume_m3": {"value": 0.004}}}}
+    assert is_fluid_less_instrument(_hh_lab)
+    assert "pid" not in pack_drawings(_hh_lab)
+    assert "panel-schedule" not in pack_drawings(_hh_lab)
     _cab = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 0.13}}}
     assert drawing_form_factor(_cab) == "sealed_cabinet"
     assert "interconnect" not in pack_drawings(_cab)

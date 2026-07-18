@@ -1542,6 +1542,18 @@ def parse_dimension(dim_value):
         return {"kind": "cyl", "dia_mm": float(m.group(1)) * 1000,
                 "len_mm": float(m.group(2)) * 1000}
 
+    # INTENT (Pioreactor 0327): lab vial dims "25 mm OD x 80 mm H" were UNPARSED →
+    # Culture Vessel fell to TYPE_DEFAULTS vertical_vessel ⌀700–1600 mm (plant) →
+    # BoM hoop-shell £5k. Millimetre OD×H / dia×H must parse as a cylinder.
+    m = re.search(
+        r"(-?\d+(?:\.\d+)?)\s*mm\s*(?:od|o\.?d\.?|dia(?:meter)?)\s*x\s*"
+        r"(-?\d+(?:\.\d+)?)\s*mm(?:\s*h(?:eight)?)?",
+        s,
+    )
+    if m:
+        return {"kind": "cyl", "dia_mm": float(m.group(1)),
+                "len_mm": float(m.group(2))}
+
     # "<dia> m dia"  / "<dia> m stack dia"  (single diameter only)
     m = re.search(r"(-?\d+(?:\.\d+)?)\s*m\s*(?:stack\s*)?dia", s)
     if m:
@@ -1832,6 +1844,10 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"display|screen|oled|lcd|readout", (58.0, 34.0, 6.0)),
         (r"button|switch|keypad|user\s*input", (14.0, 14.0, 9.0)),
         (r"cuvette|sample\s*(?:holder|cell|chamber)", (32.0, 28.0, 42.0)),
+        # INTENT (Pioreactor 0327): culture vial / vessel is ~25×80 mm glassware,
+        # NEVER the plant vertical_vessel type-default (⌀700–1600 mm).
+        (r"culture\s*(?:vessel|vial|tube|flask)|working\s*volume|"
+         r"erlenmeyer|conical\s*flask", (25.0, 25.0, 80.0)),
         # Lab-microscope nouns BEFORE bare `optic` (which matches inside "objective").
         (r"\brms\b|objective", (30.0, 30.0, 42.0)),
         (r"webcam|pi\s*camera|camera\s*sensor|grade\s*camera", (25.0, 24.0, 14.0)),
@@ -1856,6 +1872,17 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"detector|photodiode|photo\s*sensor", (30.0, 22.0, 8.0)),
         (r"microcontroller|mcu|processor|firmware|logic\s*board|main\s*board|"
          r"feather|arduino|pico|esp32|teensy|rp2040", (42.0, 34.0, 5.0)),
+        # INTENT (Rodeostat 0201): AFE / ADC / DAC / UI / standoff must NOT share
+        # one fallback {24×18×8} — that 6-name litter capped Renders/Assembly at 6.
+        (r"analog\s*front\s*end|\bafe\b", (28.0, 20.0, 4.0)),
+        (r"adc\s*input|input\s*stage", (22.0, 14.0, 3.5)),
+        (r"dac\s*output|output\s*stage", (20.0, 12.0, 3.5)),
+        (r"run\s*start\s*control|start\s*control", (16.0, 10.0, 6.0)),
+        (r"pcb\s*mounting\s*standoff|standoff", (8.0, 8.0, 12.0)),
+        (r"calibration\s*prompt|prompt\s*ui", (30.0, 18.0, 2.5)),
+        (r"voltage\s*reference|precision\s*voltage", (6.0, 4.0, 2.0)),
+        (r"current\s*measurement|\btia\b", (10.0, 6.0, 2.0)),
+        (r"galvanic\s*isolat", (12.0, 8.0, 3.0)),
         (r"driver|regulator|ldo|dc\s*dc|charge|pmic|power\s*management|"
          r"board\s*level\s*decoupling|decoupling|bulk\s*cap", (18.0, 14.0, 5.0)),
         (r"battery|cell\s*pack|li\s*po|rechargeable", (58.0, 38.0, 9.0)),
@@ -12420,6 +12447,10 @@ _IS_SYRINGE_PUMP_FORM = False
 _SYRINGE_PUMP_CHANNEL_COUNT = 4
 # OPEN flexure-stage lab microscope — cream FDM body + stage + actuators (not sealed cube).
 _IS_LAB_MICROSCOPE_FORM = False
+# Sealed photometer (cuvette optical bench) — NOT the default for every instrument.
+_IS_OPTICAL_HANDHELD_FORM = False
+# USB/AFE/EWOD/culture sealed box — PCB-first, never cuvette story.
+_IS_LAB_ELECTRONICS_FORM = False
 # Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
 _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
@@ -12439,6 +12470,7 @@ def _sealed_enclosure_env_mm(state, quantities):
     global _IS_THERMOCYCLER_FORM, _THERMOCYCLER_TUBE_COUNT
     global _IS_SYRINGE_PUMP_FORM, _SYRINGE_PUMP_CHANNEL_COUNT
     global _IS_LAB_MICROSCOPE_FORM
+    global _IS_OPTICAL_HANDHELD_FORM, _IS_LAB_ELECTRONICS_FORM
     pc = product_class_of(state) if isinstance(state, dict) else ""
     # Part-name evidence when class slug is thin / missing (needed before plantish).
     part_blob = ""
@@ -12462,12 +12494,23 @@ def _sealed_enclosure_env_mm(state, quantities):
     # same enclosure+not-plantish gate. Intermediate chain rewrites have
     # historically dropped `isInstrumentDevice` from state.json while still
     # carrying enclosure_volume_m3 < 1 — Blender then rendered a BESS stack.
-    _plantish = (not _form_instrument) and bool(re.search(
+    # GOTCHA (Pioreactor 0121): bare `reactor` matched `benchtop_bioreactor`
+    # substring → plantish → BESS-style sealed stack. Use `\breactor\b` + the
+    # same instrument-form allowlist as serial-design-chain-v2.tsx.
+    _instrument_allow = bool(re.search(
+        r"syringe[_ -]?pump|thermo[_ -]?cycler|thermal[_ -]?cycler|\bpcr\b|"
+        r"colorimeter|colourimeter|spectrophotometer|optical[_ -]?instrument|"
+        r"optical[_ -]?handheld|lab[_ -]?microscope|openflexure|flexure[_ -]?stage|"
+        r"benchtop[_ -]?bioreactor|pioreactor|turbidostat|chemostat|"
+        r"potentiostat|rodeostat|digital[_ -]?microfluidics|opendrop",
+        pc or "", re.I))
+    _plantish = (not _form_instrument) and (not _instrument_allow) and bool(re.search(
         r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
-        r"switchgear|plant|reactor|boiler|hvac|chiller|"
+        r"switchgear|plant|\breactor\b|boiler|hvac|chiller|"
         r"water[_ -]?treatment|circulation[_ -]?pump|process[_ -]?pump", pc or ""))
     _flag = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
-    _IS_INSTRUMENT_DEVICE = _flag or _form_instrument or (0 < float(vol) < 1.0 and not _plantish)
+    _IS_INSTRUMENT_DEVICE = _flag or _form_instrument or _instrument_allow or (
+        0 < float(vol) < 1.0 and not _plantish)
     if _IS_INSTRUMENT_DEVICE and not _flag:
         print(f"[univ][sealed] isInstrumentDevice derived from enclosure "
               f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
@@ -12492,6 +12535,22 @@ def _sealed_enclosure_env_mm(state, quantities):
             part_blob=part_blob,
             is_instrument=_IS_INSTRUMENT_DEVICE,
         )) if callable(_lm_detect) else False
+    )
+    _oh_detect = getattr(ifg, "is_optical_handheld_form", None)
+    _IS_OPTICAL_HANDHELD_FORM = (
+        bool(_oh_detect(
+            product_class=pc or "",
+            part_blob=part_blob,
+            is_instrument=_IS_INSTRUMENT_DEVICE,
+        )) if callable(_oh_detect) else False
+    )
+    _le_detect = getattr(ifg, "is_lab_electronics_form", None)
+    _IS_LAB_ELECTRONICS_FORM = (
+        bool(_le_detect(
+            product_class=pc or "",
+            part_blob=part_blob,
+            is_instrument=_IS_INSTRUMENT_DEVICE,
+        )) if callable(_le_detect) else False
     )
     _tc = qval(quantities, "tube_count", None)
     if _tc is not None and float(_tc) > 0:
@@ -12738,6 +12797,28 @@ def _selftest_thermocycler_exterior_keep() -> None:
     assert not _thermocycler_exterior_keep_visible("u_se_cutaway_cue_ui_pcb")
     assert not _thermocycler_exterior_keep_visible("u_wire_pwr_1")
     assert "04-product-exterior" in sealed_exterior_view_names(True)
+
+
+def _selftest_instrument_mesh_keep_prefixes() -> None:
+    """proveCatch: OPEN form meshes survive clutter-suppress (tc/lm/sp).
+
+    Adversarial: a keep-list with only story/product/tc prefixes would hide
+    u_se_lm_body / u_se_sp_base and ship an empty sealed crate on any path that
+    does not re-unhide form meshes.
+    """
+    for pfx in ("u_se_tc_", "u_se_lm_", "u_se_sp_"):
+        assert pfx in _INSTRUMENT_MESH_KEEP_PREFIXES, (
+            f"clutter-suppress must keep {pfx}* OPEN form meshes")
+    assert any(
+        "u_se_lm_body".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
+    ), "lab_microscope body must match a keep prefix"
+    assert any(
+        "u_se_sp_base".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
+    ), "syringe_pump base must match a keep prefix"
+    assert not any(
+        "u_power_distribution_slab".startswith(p)
+        for p in _INSTRUMENT_MESH_KEEP_PREFIXES
+    ), "plant zone slabs must still be suppressible"
 
 
 def _prepare_sealed_product_view(view_name, entering):
@@ -14102,8 +14183,9 @@ def _place_instrument_interior_layout(
 
     GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
     FLOW: thermocycler/PCR → tip-back lid layout; syringe_pump → OPEN linear
-    dosing array; lab_microscope → OPEN flexure stage; else optical bench.
-    Wrong family would be a sealed cube.
+    dosing array; lab_microscope → OPEN flexure stage; lab_electronics →
+    PCB/AFE box; optical_handheld → optical bench. Never default all
+    isInstrumentDevice to cuvette meshes (Rodeostat 0201).
     """
     if _IS_SYRINGE_PUMP_FORM:
         return _place_syringe_pump_layout(W, D, H, base_z, tt, story_mod, MO)
@@ -14111,6 +14193,9 @@ def _place_instrument_interior_layout(
         return _place_lab_microscope_layout(W, D, H, base_z, tt, story_mod, MO)
     if _IS_THERMOCYCLER_FORM:
         return _place_thermocycler_interior_layout(W, D, H, base_z, tt, story_mod, MO)
+    if _IS_LAB_ELECTRONICS_FORM or not _IS_OPTICAL_HANDHELD_FORM:
+        return _place_lab_electronics_interior_layout(
+            W, D, H, base_z, tt, story_mod, MO)
 
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
@@ -14471,6 +14556,166 @@ def _place_instrument_interior_layout(
             Path(_out).joinpath("form-meshes.json").write_text(
                 json.dumps(
                     {"form": "optical_handheld", "form_id": "optical_handheld",
+                     "meshes": _names},
+                    indent=2,
+                )
+            )
+    except Exception as _dump_exc:
+        print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
+    return form
+
+
+def _place_lab_electronics_interior_layout(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    story_mod: str,
+    MO: dict,
+) -> dict:
+    """PCB-first sealed instrument interior — no cuvette / optical bench.
+
+    INTENT (Rodeostat 0201 / Pioreactor / OpenDrop): potentiostat and sibling
+    USB lab boxes fell through to the colorimeter optical story (LED → cuvette
+    → photodiode). Form rule = main PCB + AFE chips + USB/BNC face + coin cell.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    pcb_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_INSTRUMENT_PCB, "m_se_le_pcb")
+    chip_mat = fl.make_mat(
+        "m_se_le_chip", fl._to_linear((0.10, 0.10, 0.12)), metallic=0.25, roughness=0.45)
+    bat_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_COIN_CELL, "m_se_le_cell")
+    conn_mat = fl.make_mat(
+        "m_se_le_conn", fl._to_linear((0.55, 0.55, 0.58)), metallic=0.55, roughness=0.35)
+    usb_mat = fl.make_mat(
+        "m_se_le_usb", fl._to_linear((0.12, 0.12, 0.14)), metallic=0.4, roughness=0.4)
+
+    n_story = 0
+    n_plain_box = 0
+    n_authentic = 0
+
+    def _count(obj, kind: str, mesh_count: int = 1) -> None:
+        nonlocal n_story, n_plain_box, n_authentic
+        n_story += mesh_count
+        if kind == "box":
+            n_plain_box += mesh_count
+        else:
+            n_authentic += mesh_count
+
+    # Main FR4 board fills most of the footprint.
+    pcb_w, pcb_d, pcb_t = W * 0.72, D * 0.62, max(1.2, min(2.0, H * 0.08))
+    pcb_z = base_z + H * 0.28
+    try:
+        _pcb = _import_family_cad(
+            "instrument_pcb",
+            "u_se_le_pcb",
+            (0.0, 0.0, pcb_z),
+            (pcb_w, pcb_d, pcb_t),
+            (0.0, 0.0, 0.0),
+            pcb_mat,
+            story_mod,
+            MO,
+        )
+    except Exception:
+        _pcb = None
+    if _pcb is None:
+        _pcb = fl.add_box(
+            "u_se_le_pcb",
+            _mm3((0.0, 0.0, pcb_z)),
+            _mm3((pcb_w, pcb_d, pcb_t)),
+            pcb_mat, module=story_mod, module_objects=MO)
+        _pcb.dimensions = _mm3((pcb_w, pcb_d, pcb_t))
+        _count(_pcb, "box")
+    else:
+        _count(_pcb, "cad")
+
+    # AFE / MCU chips proud of the board.
+    for _ci, (_cx, _cy) in enumerate(((-pcb_w * 0.22, 0.0), (pcb_w * 0.18, pcb_d * 0.12),
+                                      (pcb_w * 0.18, -pcb_d * 0.14))):
+        _chip = fl.add_box(
+            f"u_se_le_chip_{_ci}",
+            _mm3((_cx, _cy, pcb_z + pcb_t * 0.5 + 1.2)),
+            _mm3((max(6.0, pcb_w * 0.18), max(5.0, pcb_d * 0.16), 2.2)),
+            chip_mat, module=story_mod, module_objects=MO)
+        _chip.dimensions = _mm3((max(6.0, pcb_w * 0.18), max(5.0, pcb_d * 0.16), 2.2))
+        _count(_chip, "box")
+
+    # Front-face USB + dual BNC (electrode / cell) — product language for AFE boxes.
+    _usb = fl.add_box(
+        "u_se_le_usb",
+        _mm3((-W * 0.22, -D / 2 + tt + 3.0, base_z + H * 0.45)),
+        _mm3((12.0, 8.0, 5.0)),
+        usb_mat, module=story_mod, module_objects=MO)
+    _usb.dimensions = _mm3((12.0, 8.0, 5.0))
+    _count(_usb, "box")
+    for _bi, _bx in enumerate((-W * 0.02, W * 0.18)):
+        _bnc = fl.add_cyl(
+            f"u_se_le_bnc_{_bi}",
+            _mm3((_bx, -D / 2 + tt + 4.0, base_z + H * 0.55)),
+            3.5 * fl.MM, 10.0 * fl.MM, conn_mat,
+            module=story_mod, module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0),
+        )
+        _count(_bnc, "auth")
+
+    # Coin cell / backup under the board edge.
+    try:
+        _cell = _import_family_cad(
+            "coin_cell",
+            "u_se_le_cell",
+            (W * 0.28, D * 0.18, base_z + H * 0.22),
+            (ifg.INTERIOR_COIN_CELL_R_MM * 2, ifg.INTERIOR_COIN_CELL_R_MM * 2,
+             ifg.INTERIOR_COIN_CELL_H_MM),
+            (math.radians(90), 0.0, 0.0),
+            bat_mat,
+            story_mod,
+            MO,
+        )
+    except Exception:
+        _cell = None
+    if _cell is None:
+        _cell = fl.add_cyl(
+            "u_se_le_cell",
+            _mm3((W * 0.28, D * 0.18, base_z + H * 0.22)),
+            ifg.INTERIOR_COIN_CELL_R_MM * fl.MM,
+            ifg.INTERIOR_COIN_CELL_H_MM * fl.MM,
+            bat_mat,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0),
+        )
+        _count(_cell, "auth")
+    else:
+        _count(_cell, "cad")
+
+    stats = {
+        "n_story": n_story,
+        "n_plain_box": n_plain_box,
+        "n_authentic": n_authentic,
+    }
+    form = {"interior_authenticity": stats, "form_id": "lab_electronics"}
+    print(
+        f"[univ][sealed] lab_electronics interior: PCB/AFE/USB/BNC "
+        f"({n_story} meshes, plain_box={n_plain_box}, authentic={n_authentic}) "
+        f"— NOT optical bench"
+    )
+    try:
+        _out = os.environ.get("BLENDER_OUT_DIR") or ""
+        if _out and hasattr(bpy, "data"):
+            _names = sorted(
+                o.name for o in bpy.data.objects
+                if getattr(o, "type", None) == "MESH"
+                and (
+                    o.name.startswith("u_se_le_")
+                    or o.name.startswith("u_se_exterior_")
+                    or o.name.startswith("u_se_product_")
+                )
+            )
+            Path(_out).joinpath("form-meshes.json").write_text(
+                json.dumps(
+                    {"form": "lab_electronics", "form_id": "lab_electronics",
                      "meshes": _names},
                     indent=2,
                 )
@@ -15516,6 +15761,12 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
     # under u_se_tc_* — without this prefix clutter-suppress hide_render'd all 17
     # story meshes and the hero shipped as an empty wood box with an open lid.
     "u_se_tc_",
+    # INTENT (OpenFlexure / Poseidon 2026-07-18): OPEN mechanism forms live under
+    # u_se_lm_* / u_se_sp_*. Exterior views re-unhide them, but cutaway/hero and
+    # any path that skips the form-specific unhide would otherwise ship an empty
+    # sealed crate (same failure class as the thermocycler keep-prefix gap).
+    "u_se_lm_",
+    "u_se_sp_",
     "u_se_exterior_detail_",
     "u_se_cutaway_cue_",
     "u_skid_encl_",
@@ -23062,23 +23313,53 @@ def main():
             # (2026-07-12). Match _sealed_product_camera_specs: fit max(h_eff, w/1.5,
             # d/1.5) with the render's 1.5:1 aspect; raise the look-at for the device
             # so the protruding cuvette port stays in frame.
+            # INTENT (OpenFlexure 0101): OPEN forms (lab_microscope / syringe_pump)
+            # must NOT inherit sealed-optical 1.92× h_eff + dist×1.16 — that left
+            # 00-hero at height occupancy 0.30 (render_view_quality FAIL). Use the
+            # same form-keyed cam pack as 04–07 product shots.
             _fa = 1.5
-            _h_eff = _sh * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
-            _cf = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
+            _open_hero = bool(_IS_LAB_MICROSCOPE_FORM or _IS_SYRINGE_PUMP_FORM)
+            _lm_cam_fn = getattr(ifg, "lab_microscope_product_cam_fractions", None)
+            _sp_cam_fn = getattr(ifg, "syringe_pump_product_cam_fractions", None)
+            _open_cam = {}
+            if _IS_LAB_MICROSCOPE_FORM and callable(_lm_cam_fn):
+                _open_cam = _lm_cam_fn() or {}
+            elif _IS_SYRINGE_PUMP_FORM and callable(_sp_cam_fn):
+                _open_cam = _sp_cam_fn() or {}
+            if _open_hero and _open_cam:
+                _h_eff = _sh * float(_open_cam.get("h_eff_scale", 1.12))
+                _cf = float(_open_cam.get("centre_frac", 0.36))
+                _dist_k = float(_open_cam.get("dist_k", 0.68))
+                _frame = float(_open_cam.get("frame", 0.96))
+            else:
+                _h_eff = _sh * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
+                _cf = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
+                _dist_k = 1.16
+                _frame = 0.84
             _pc = (0.0, 0.0, (DECK_Z_MM + _sh * _cf) * fl.MM)
             _pmax = max(_sw, _sd, _sh) * fl.MM
             _ctrl = max(_h_eff, _sw / _fa, _sd / _fa) * fl.MM
             _hero_distance = perspective_distance_for_extent(
-                _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
+                _ctrl * _dist_k, focal_mm=62, frame_fraction=_frame)
             _pd = _hero_distance / math.sqrt(2)
             # Tip-back lid form: same look-down rule as product cams (ifg fractions).
             _tlh = ifg.tipback_lid_product_cam_fractions() if _IS_THERMOCYCLER_FORM else {}
-            _hz = float(_tlh.get("hero_z", 0.96 if _IS_INSTRUMENT_DEVICE else 0.12))
-            _htz = float(_tlh.get("hero_tgt_z", 0.02 if _IS_INSTRUMENT_DEVICE else 0.0))
-            _hty = (_sd * float(_tlh.get("hero_tgt_y_frac", 0.0)) * fl.MM
-                    if _IS_THERMOCYCLER_FORM else 0.0)
-            _hds = float(_tlh.get("hero_dist_scale", 1.0)) if _IS_THERMOCYCLER_FORM else 1.0
-            _fds = float(_tlh.get("front_dist_scale", 1.0)) if _IS_THERMOCYCLER_FORM else 1.0
+            if _open_hero and _open_cam:
+                _hz = float(_open_cam.get("hero_z", _open_cam.get("ext_z", 0.88)))
+                _htz = float(_open_cam.get("hero_tgt_z", _open_cam.get("tgt_z", 0.06)))
+                _hty = 0.0
+                _hds = float(_open_cam.get("hero_dist_scale", 0.92))
+                _fds = float(_open_cam.get(
+                    "hero_front_dist_scale",
+                    _open_cam.get("front_dist_scale", 0.78),
+                ))
+            else:
+                _hz = float(_tlh.get("hero_z", 0.96 if _IS_INSTRUMENT_DEVICE else 0.12))
+                _htz = float(_tlh.get("hero_tgt_z", 0.02 if _IS_INSTRUMENT_DEVICE else 0.0))
+                _hty = (_sd * float(_tlh.get("hero_tgt_y_frac", 0.0)) * fl.MM
+                        if _IS_THERMOCYCLER_FORM else 0.0)
+                _hds = float(_tlh.get("hero_dist_scale", 1.0)) if _IS_THERMOCYCLER_FORM else 1.0
+                _fds = float(_tlh.get("front_dist_scale", 1.0)) if _IS_THERMOCYCLER_FORM else 1.0
             _hero_cam = {"loc": (_pc[0] + _pd * _hds,
                                   _pc[1] - _pd * _fds,
                                   _pc[2] + _pmax * _hz),
@@ -23174,6 +23455,7 @@ if __name__ == "__main__":
         _selftest_instrument_proxy_geometry()
         _selftest_instrument_form_rule()
         _selftest_thermocycler_exterior_keep()
+        _selftest_instrument_mesh_keep_prefixes()
         _selftest_instrument_source_harness()
         _selftest_sealed_role_xy()
         _selftest_sealed_zone_pack_dominance()

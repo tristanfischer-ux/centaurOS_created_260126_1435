@@ -396,6 +396,12 @@ def is_thermocycler_form(
         return True
     if not is_instrument:
         return False
+    # GOTCHA (Pioreactor 0250): part vocab `peltier|tec_module` flipped a
+    # benchtop_bioreactor into tip-back PCR skin (form-meshes=thermocycler).
+    # Lab-electronics class slugs are authoritative — TEC/cartridge heater is
+    # vial thermal control, not a PCR sample-block product.
+    if LAB_ELECTRONICS_CLASS_RE.search(pc):
+        return False
     return bool(THERMOCYCLER_PART_RE.search(blob))
 
 
@@ -562,15 +568,27 @@ LM_SBC_D_MM = 30.0
 # Slightly lifted cream so product-hero AgX still clears glance cream_frac.
 LM_MAT_BODY_CREAM = (0.94, 0.90, 0.82)
 LM_MAT_BODY_CREAM_DK = (0.82, 0.78, 0.70)
-# Product cams: taller than wide OPEN array — slight pull-in + mid look-at.
-LM_CAM_EXT_Z = 0.95
-LM_CAM_SIDE_Z = 0.85
-LM_CAM_TGT_Z = 0.42
-LM_CAM_FRONT_DIST_SCALE = 0.88
-LM_CAM_H_EFF_SCALE = 1.35
-LM_CAM_DIST_K = 0.90
-LM_CAM_FRAME = 0.88
-LM_CAM_CENTRE_FRAC = 0.45
+# Product cams: taller than wide OPEN array — pull in hard enough that
+# drawing_gates render_view_quality clears height occupancy ≥0.45 and edge
+# density ≥0.002 on cream-on-studio product shots (OpenFlexure 0101: 0.90/0.88
+# landed h=0.44 + edge=0.0019 — float-dust FAIL). Closer than thermocycler tipback
+# 0.50 hero; cream body has weak FIND_EDGES contrast so fill must be large.
+# GOTCHA (0101 heal): dist_k=0.78 / tgt_z=0.38 cleared height but left edge
+# 0.00190 (still <0.0020) AND vision "severely cropped at the bottom" — look-at
+# was too high on the optics tube. Pull in + look lower + hero uses same pack
+# (sealed-instrument 1.92× h_eff left 00-hero at h=0.30).
+LM_CAM_EXT_Z = 1.05
+LM_CAM_SIDE_Z = 0.88
+LM_CAM_TGT_Z = 0.10
+LM_CAM_FRONT_DIST_SCALE = 0.78
+LM_CAM_H_EFF_SCALE = 1.12
+LM_CAM_DIST_K = 0.68
+LM_CAM_FRAME = 0.96
+LM_CAM_CENTRE_FRAC = 0.36
+LM_CAM_HERO_Z = 0.88
+LM_CAM_HERO_TGT_Z = 0.06
+LM_CAM_HERO_DIST_SCALE = 0.92
+LM_CAM_HERO_FRONT_DIST_SCALE = 0.78
 
 
 def is_lab_microscope_form(
@@ -622,6 +640,10 @@ def lab_microscope_product_cam_fractions() -> dict:
         "dist_k": LM_CAM_DIST_K,
         "frame": LM_CAM_FRAME,
         "centre_frac": LM_CAM_CENTRE_FRAC,
+        "hero_z": LM_CAM_HERO_Z,
+        "hero_tgt_z": LM_CAM_HERO_TGT_Z,
+        "hero_dist_scale": LM_CAM_HERO_DIST_SCALE,
+        "hero_front_dist_scale": LM_CAM_HERO_FRONT_DIST_SCALE,
     }
 
 
@@ -662,8 +684,16 @@ def lab_microscope_checklist_ok(mesh_names: list[str]) -> tuple[bool, list[str]]
 # glance_id → scripts/lib/form_render_glance.GLANCE_BY_FORM
 FORM_FAMILIES: dict[str, dict] = {
     "optical_handheld": {
-        "detect": "is_optical_via_instrument_device",  # sealed instrument path
+        "detect": "is_optical_handheld_form",
         "glance_id": "optical_handheld",
+        "gold_why": "docs/plans/GOLD-WHY-instrument-rules.md",
+        "vision_images": ("04-product-exterior.png", "00-hero.png"),
+    },
+    "lab_electronics": {
+        # INTENT (Rodeostat 0201): USB/AFE/EWOD instruments must NOT inherit the
+        # optical-bench cuvette story. Detect = class + watt-scale contract.
+        "detect": "is_lab_electronics_form",
+        "glance_id": "lab_electronics",
         "gold_why": "docs/plans/GOLD-WHY-instrument-rules.md",
         "vision_images": ("04-product-exterior.png", "00-hero.png"),
     },
@@ -695,6 +725,107 @@ FORM_FAMILIES: dict[str, dict] = {
 }
 
 
+# INTENT: sealed pocket/benchtop photometers — NOT every isInstrumentDevice.
+# Class/alias authoritative; part-vocab only when instrument + optical nouns.
+OPTICAL_HANDHELD_CLASS_RE = re.compile(
+    r"optical[_ -]?handheld|optical[_ -]?instrument|colorimeter|colourimeter|"
+    r"spectrophotometer|spectrometer|photometer|fluorometer|turbidity[_ -]?meter|"
+    r"absorbance[_ -]?meter",
+    re.I,
+)
+OPTICAL_HANDHELD_CLASS_ALIAS_RE = re.compile(
+    r"open[_ -]?colorimeter|yuri[_ -]?0?1|handheld[_ -]?optical",
+    re.I,
+)
+# Forms that must NEVER fall through to optical_handheld detect.
+_OPTICAL_HANDHELD_EXCLUDE_RE = re.compile(
+    r"bioreactor|pioreactor|ferment|potentiostat|rodeostat|thermo[_ -]?cycler|"
+    r"\bpcr\b|microscope|flexure|opendrop|electrowetting|microfluid|"
+    r"syringe[_ -]?pump|poseidon",
+    re.I,
+)
+
+
+LAB_ELECTRONICS_CLASS_RE = re.compile(
+    r"potentiostat|rodeostat|digital[_ -]?microfluidics|opendrop|electrowetting|"
+    r"benchtop[_ -]?bioreactor|pioreactor|turbidostat|chemostat|"
+    r"lab[_ -]?electronics|mixed[_ -]?signal",
+    re.I,
+)
+
+
+def is_lab_electronics_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> bool:
+    """True for sealed USB/bench electronics — AFE, EWOD, culture kit (not optical).
+
+    @description Form gate for PCB-first instruments. Never selects when optical
+                 handheld / microscope / thermocycler / syringe forms match.
+    """
+    pc = product_class or ""
+    if not is_instrument:
+        return False
+    if is_optical_handheld_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return False
+    if is_lab_microscope_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return False
+    if is_thermocycler_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return False
+    if is_syringe_pump_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return False
+    return bool(LAB_ELECTRONICS_CLASS_RE.search(pc))
+
+
+def is_optical_handheld_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> bool:
+    """True for sealed handheld/benchtop optical photometers — not a catch-all.
+
+    @description Form gate for cuvette/LED/photodiode instruments. Explicitly
+                 excludes bioreactors, potentiostats, microscopes, etc. so
+                 `isInstrumentDevice` alone never selects this family.
+    """
+    pc = product_class or ""
+    blob = part_blob or ""
+    if _OPTICAL_HANDHELD_EXCLUDE_RE.search(pc):
+        return False
+    if is_lab_microscope_form(
+        product_class=pc, part_blob=blob, is_instrument=is_instrument
+    ):
+        return False
+    if OPTICAL_HANDHELD_CLASS_RE.search(pc) or OPTICAL_HANDHELD_CLASS_ALIAS_RE.search(pc):
+        return True
+    if not is_instrument:
+        return False
+    # Part vocab: need a sealed photometry path — not OD-on-a-bioreactor alone.
+    has_cuvette_path = bool(
+        re.search(r"cuvette|sample[_ -]?chamber|optical[_ -]?path", blob, re.I)
+    )
+    has_photometry = bool(
+        re.search(
+            r"photodiode|phototransistor|spectrophot|colorimet|absorbance|"
+            r"wavelength|monochrom",
+            blob,
+            re.I,
+        )
+    )
+    return has_cuvette_path and has_photometry
+
+
 def resolve_form_family(
     *,
     product_class: str = "",
@@ -703,7 +834,7 @@ def resolve_form_family(
 ) -> str | None:
     """Return form family id for this brief/parts — never a product noun branch.
 
-    @returns 'syringe_pump' | 'lab_microscope' | 'thermocycler' | 'optical_handheld' | None
+    @returns form family id or None
     """
     if is_syringe_pump_form(
         product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
@@ -717,8 +848,16 @@ def resolve_form_family(
         product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
     ):
         return "thermocycler"
-    if is_instrument:
+    # GOTCHA (Pioreactor 0121 / Rodeostat 0201): optical_handheld is NOT a
+    # catch-all for isInstrumentDevice — lab electronics get their own family.
+    if is_optical_handheld_form(
+        product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
+    ):
         return "optical_handheld"
+    if is_lab_electronics_form(
+        product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return "lab_electronics"
     return None
 
 
@@ -1049,9 +1188,50 @@ def _selftest() -> None:
     _lm_bad, _lm_miss2 = lab_microscope_checklist_ok(["u_se_lm_body"])
     assert (not _lm_bad) and len(_lm_miss2) > 0, "empty actuators must fail checklist"
     assert sum(LM_MAT_BODY_CREAM) / 3.0 >= 0.80, "body must stay cream FDM, not charcoal"
+    _lm_cam = lab_microscope_product_cam_fractions()
+    assert float(_lm_cam["dist_k"]) <= 0.72, (
+        "lab_microscope product cam must pull in enough for cream edge density "
+        f"≥0.002 (got dist_k={_lm_cam['dist_k']})"
+    )
+    assert float(_lm_cam["frame"]) >= 0.94, (
+        "lab_microscope product cam frame fill must be ≥0.94 for cream-edge density"
+    )
+    assert float(_lm_cam["tgt_z"]) <= 0.18, (
+        "lab_microscope look-at must stay low enough that the base is not cropped "
+        f"(got tgt_z={_lm_cam['tgt_z']})"
+    )
+    assert float(_lm_cam["hero_dist_scale"]) <= 0.95, (
+        "lab_microscope hero must not use sealed-instrument zoom-out "
+        f"(got hero_dist_scale={_lm_cam['hero_dist_scale']})"
+    )
     assert resolve_form_family(product_class="lab_microscope") == "lab_microscope"
     assert resolve_form_family(product_class="openflexure") == "lab_microscope"
     assert FORM_FAMILIES["lab_microscope"]["glance_id"] == "lab_microscope"
+    # proveCatch: optical_handheld is NOT the instrument catch-all
+    assert is_optical_handheld_form(product_class="colorimeter")
+    assert is_optical_handheld_form(product_class="optical_instrument")
+    assert resolve_form_family(product_class="colorimeter") == "optical_handheld"
+    assert not is_optical_handheld_form(product_class="benchtop_bioreactor")
+    assert not is_optical_handheld_form(product_class="pioreactor")
+    assert not is_optical_handheld_form(product_class="potentiostat")
+    assert is_lab_electronics_form(product_class="potentiostat")
+    assert is_lab_electronics_form(product_class="benchtop_bioreactor")
+    assert is_lab_electronics_form(product_class="opendrop")
+    assert resolve_form_family(product_class="benchtop_bioreactor") == "lab_electronics"
+    assert resolve_form_family(product_class="potentiostat") == "lab_electronics"
+    assert resolve_form_family(product_class="opendrop") == "lab_electronics"
+    # proveCatch (Pioreactor 0250): peltier/TEC in part_blob must NOT flip culture kit
+    # to tip-back thermocycler form (class slug is authoritative for lab electronics).
+    assert not is_thermocycler_form(
+        product_class="benchtop_bioreactor",
+        part_blob="Peltier Tec Module Cartridge Heater Culture Vessel",
+        is_instrument=True,
+    ), "bioreactor + TEC must NOT select thermocycler form"
+    assert resolve_form_family(
+        product_class="pioreactor",
+        part_blob="Peltier Tec Module Od Photodiode Peristaltic Pump",
+        is_instrument=True,
+    ) == "lab_electronics"
     print("instrument_form_grammar _selftest: OK (beauty + desirability + use-physics)")
 
 

@@ -136,6 +136,86 @@ _EXTERIOR_SYRINGE_PUMP_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
 )
 
+# INTENT (OpenFlexure 0101): optical L-body/D-pad prompts false-fail OPEN
+# flexure-stage lab microscopes (cream body + stage + steppers). Form gate:
+# ifg.is_lab_microscope_form — never product==openflexure.
+_GA_LAB_MICROSCOPE_PROMPT = (
+    "You are an adversarial chartered engineer glancing at a GENERAL ARRANGEMENT "
+    "drawing of a BENCHTOP FLEXURE-STAGE LAB MICROSCOPE (OPEN printable stage — "
+    "NOT a colorimeter).\n\n"
+    "Expect orthographic views of a cream/printed body, XY/Z actuators or "
+    "flexure stage, optics tube / illumination, envelope in millimetres.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • FRONT/TOP elevations are empty / featureless blank rectangles\n"
+    "  • views are blank / cropped / unreadable\n"
+    "  • title block prints metres for a sub-500 mm benchtop instrument\n\n"
+    "Do NOT flag missing optical cube / cuvette / D-pad / charcoal polymer L-body — "
+    "those belong to colorimeters, not flexure microscopes.\n"
+    "Do NOT flag missing plant pipes, battery packs, or inverter stacks.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+_EXTERIOR_LAB_MICROSCOPE_PROMPT = (
+    "You are an adversarial industrial-design reviewer glancing at a product render "
+    "of a BENCHTOP FLEXURE-STAGE LAB MICROSCOPE (OPEN printable — NOT a colorimeter).\n\n"
+    "Expect: cream / light FDM body or pedestal, a stage with slide area, "
+    "stepper / flexure towers, optics tube and overhead illumination arm. "
+    "Open mechanism and dark actuators on a cream body are intentional.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • blank / empty / featureless render\n"
+    "  • sealed featureless charcoal cube with NO cream body and NO stage\n"
+    "  • colorimeter L-body / cuvette tower / D-pad wrongly as the product\n"
+    "  • steppers/stage floating in empty space with NO cream pedestal/body at all\n"
+    "  • product cropped unreadably small\n\n"
+    "Do NOT flag missing display glass / tactile keys / charcoal L-body.\n"
+    "Do NOT flag dark side actuator blocks / steppers / towers that sit on or beside "
+    "a shared cream body — that IS the OpenFlexure-class form (side motors on a "
+    "printed stage), not exploded geometry.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+# INTENT (Pioreactor / Rodeostat 2026-07-18): optical D-pad prompts false-fail
+# sealed lab electronics (potentiostat / culture kit / EWOD). Form gate:
+# ifg.is_lab_electronics_form — never product==pioreactor.
+_GA_LAB_ELECTRONICS_PROMPT = (
+    "You are an adversarial chartered engineer glancing at a GENERAL ARRANGEMENT "
+    "drawing of a BENCHTOP LAB ELECTRONICS instrument (potentiostat / culture "
+    "bioreactor kit / digital microfluidics — PCB-first sealed box, NOT a "
+    "colorimeter).\n\n"
+    "Expect orthographic views of a compact sealed enclosure with PCB / connector "
+    "cues, envelope in millimetres for a sub-500 mm benchtop instrument.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • FRONT/TOP elevations are empty / featureless blank rectangles\n"
+    "  • views are blank / cropped / unreadable\n"
+    "  • title block prints metres for a sub-500 mm benchtop instrument\n\n"
+    "Do NOT flag missing optical cube / cuvette / D-pad / charcoal polymer L-body — "
+    "those belong to colorimeters, not lab electronics.\n"
+    "Do NOT flag missing plant pipes, battery packs, or inverter stacks.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+_EXTERIOR_LAB_ELECTRONICS_PROMPT = (
+    "You are an adversarial industrial-design reviewer glancing at a product render "
+    "of a BENCHTOP LAB ELECTRONICS instrument (USB/PCB sealed box — potentiostat, "
+    "culture kit, EWOD controller — NOT a colorimeter).\n\n"
+    "Expect: compact sealed polymer enclosure, USB / BNC / power entry on a face, "
+    "optional small status LED or vial port. A flat deck without tactile D-pad is "
+    "correct for this form.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • blank / empty / featureless render\n"
+    "  • large bare green FR4 motherboard covering the exterior\n"
+    "  • exploded geometry outside the product envelope\n"
+    "  • product cropped unreadably small\n\n"
+    "Do NOT flag missing optical cube / cuvette tower / charcoal L-body D-pad.\n"
+    "Do NOT flag a flat keyless deck — lab electronics often have no keypad.\n"
+    "Do NOT flag small connector/port protrusions as floating debris.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
 
 def _form_state_signals(out_dir: str) -> tuple[str, str, bool]:
     """product_class, part_blob, is_instrument from run state.json."""
@@ -172,6 +252,22 @@ def _is_syringe_pump_out_dir(out_dir: str) -> bool:
     """True when state selects OPEN multi-channel syringe-pump form."""
     pc, part_blob, is_inst = _form_state_signals(out_dir)
     return ifg.is_syringe_pump_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_inst,
+    )
+
+
+def _is_lab_microscope_out_dir(out_dir: str) -> bool:
+    """True when state selects OPEN flexure-stage lab-microscope form."""
+    pc, part_blob, is_inst = _form_state_signals(out_dir)
+    return ifg.is_lab_microscope_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_inst,
+    )
+
+
+def _is_lab_electronics_out_dir(out_dir: str) -> bool:
+    """True when state selects sealed lab-electronics form (PCB/USB/BNC)."""
+    pc, part_blob, is_inst = _form_state_signals(out_dir)
+    return ifg.is_lab_electronics_form(
         product_class=pc, part_blob=part_blob, is_instrument=is_inst,
     )
 
@@ -216,9 +312,15 @@ def critique_drawing_set(out_dir: str, *, is_instrument: bool = False) -> dict:
     targets: list[tuple[str, str]] = []
     thermo = bool(is_instrument and _is_thermocycler_out_dir(out_dir))
     syringe = bool(is_instrument and _is_syringe_pump_out_dir(out_dir))
+    lab_micro = bool(is_instrument and _is_lab_microscope_out_dir(out_dir))
+    lab_elec = bool(is_instrument and _is_lab_electronics_out_dir(out_dir))
     ga = out / "drawings" / "general-arrangement.png"
     if ga.is_file() and ga.stat().st_size > 800:
-        if syringe:
+        if lab_elec:
+            prompt = _GA_LAB_ELECTRONICS_PROMPT
+        elif lab_micro:
+            prompt = _GA_LAB_MICROSCOPE_PROMPT
+        elif syringe:
             prompt = _GA_SYRINGE_PUMP_PROMPT
         elif thermo:
             prompt = _GA_THERMOCYCLER_PROMPT
@@ -233,7 +335,11 @@ def critique_drawing_set(out_dir: str, *, is_instrument: bool = False) -> dict:
             )
         targets.append((str(ga), prompt))
     if is_instrument:
-        if syringe:
+        if lab_elec:
+            exterior_prompt = _EXTERIOR_LAB_ELECTRONICS_PROMPT
+        elif lab_micro:
+            exterior_prompt = _EXTERIOR_LAB_MICROSCOPE_PROMPT
+        elif syringe:
             exterior_prompt = _EXTERIOR_SYRINGE_PUMP_PROMPT
         elif thermo:
             exterior_prompt = _EXTERIOR_THERMOCYCLER_PROMPT
@@ -322,6 +428,12 @@ def _selftest() -> None:
     assert ifg.is_thermocycler_form(product_class="thermocycler")
     assert not ifg.is_thermocycler_form(product_class="colorimeter")
     assert ifg.tipback_lid_vision_image_candidates()[0].startswith("04-")
+    assert "flexure" in _GA_LAB_MICROSCOPE_PROMPT.lower()
+    assert "cream" in _EXTERIOR_LAB_MICROSCOPE_PROMPT.lower()
+    assert "colorimeter" in _EXTERIOR_LAB_MICROSCOPE_PROMPT.lower()
+    assert ifg.is_lab_microscope_form(product_class="lab_microscope")
+    assert ifg.is_lab_microscope_form(product_class="openflexure")
+    assert not ifg.is_lab_microscope_form(product_class="colorimeter")
     # Without a key, critique_drawing_set must SKIP (never pretend PASS).
     old = os.environ.pop("OPENROUTER_API_KEY", None)
     try:
