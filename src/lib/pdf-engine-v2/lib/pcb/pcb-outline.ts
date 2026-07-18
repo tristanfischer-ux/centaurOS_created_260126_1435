@@ -18,6 +18,7 @@ import type {
   PcbOutlineSegment,
   PcbPoint,
 } from './pcb-contract'
+import type { PcbBoardShapeContract } from './pcb-architecture'
 
 const EPSILON_MM = 0.001
 
@@ -150,6 +151,108 @@ export function createRoundedRectangleContour(
       ),
     ],
   }
+}
+
+function shapeDatum(shape: PcbBoardShapeContract, id: string): number | null {
+  const value = shape.datums?.find((datum) => datum.id === id)?.valueMm
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function mountingHoleCenters(
+  count: number,
+  widthMm: number,
+  heightMm: number,
+  insetMm: number,
+): PcbPoint[] {
+  if (count <= 0) return []
+  if (count === 1) return [point(widthMm / 2, heightMm / 2)]
+  if (count === 2) {
+    return [
+      point(insetMm, heightMm / 2),
+      point(widthMm - insetMm, heightMm / 2),
+    ]
+  }
+  if (count === 3) {
+    return [
+      point(widthMm / 2, insetMm),
+      point(insetMm, heightMm - insetMm),
+      point(widthMm - insetMm, heightMm - insetMm),
+    ]
+  }
+  if (count === 4) {
+    return [
+      point(insetMm, insetMm),
+      point(widthMm - insetMm, insetMm),
+      point(widthMm - insetMm, heightMm - insetMm),
+      point(insetMm, heightMm - insetMm),
+    ]
+  }
+  const radiusX = widthMm / 2 - insetMm
+  const radiusY = heightMm / 2 - insetMm
+  return Array.from({ length: count }, (_, index) => {
+    const angle = (2 * Math.PI * index) / count
+    return point(
+      widthMm / 2 + radiusX * Math.cos(angle),
+      heightMm / 2 + radiusY * Math.sin(angle),
+    )
+  })
+}
+
+/**
+ * @description Converts a function-derived board-plan shape into fabrication
+ * geometry. Contracts without dimensional datums return null so legacy
+ * component-area outline generation remains authoritative.
+ * @param shape - Board-plan outline family, dimensional datums, and hole count.
+ * @returns Validated board geometry, or null when the contract has no dimensions.
+ * @throws When supplied dimensions or mounting-hole datums cannot form a valid board.
+ */
+export function createBoardGeometryFromShapeContract(
+  shape: PcbBoardShapeContract,
+): PcbBoardGeometry | null {
+  const widthMm = shapeDatum(shape, 'outline_width_mm')
+  const heightMm = shapeDatum(shape, 'outline_height_mm')
+  if (widthMm === null || heightMm === null) return null
+  const cornerRadiusMm = shapeDatum(shape, 'corner_radius_mm') ?? 2
+  const holeInsetMm = shapeDatum(shape, 'mounting_hole_inset_mm') ?? 3
+  const holeDiameterMm = shapeDatum(shape, 'mounting_hole_diameter_mm') ?? 3.2
+  if (
+    widthMm <= 0 ||
+    heightMm <= 0 ||
+    holeInsetMm <= holeDiameterMm / 2 ||
+    holeInsetMm >= Math.min(widthMm, heightMm) / 2
+  ) {
+    throw new Error(`Invalid ${shape.shapeFamily} board-shape datums`)
+  }
+
+  const geometry: PcbBoardGeometry = {
+    outline: createRoundedRectangleContour(
+      'board_outline',
+      widthMm,
+      heightMm,
+      cornerRadiusMm,
+    ),
+    cutouts: [],
+    mountingHoles: mountingHoleCenters(
+      shape.mountingHoles,
+      widthMm,
+      heightMm,
+      holeInsetMm,
+    ).map((center, index) => ({
+      id: `mounting_hole_${index + 1}`,
+      center,
+      diameterMm: holeDiameterMm,
+      plated: false,
+    })),
+    source: 'derived',
+    sourceDetail:
+      `${shape.shapeFamily} from ${shape.outlineBasis}; ` +
+      (shape.datums ?? []).map((datum) => datum.basis).join('; '),
+  }
+  const findings = validateBoardGeometry(geometry)
+  if (findings.length) {
+    throw new Error(`Invalid board-plan geometry: ${findings.join(', ')}`)
+  }
+  return geometry
 }
 
 /**

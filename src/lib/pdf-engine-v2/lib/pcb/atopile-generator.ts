@@ -68,10 +68,12 @@ import { join } from 'path'
 import { collectElectronicWords, type ElectronicWordRef } from './pcb-stage'
 import { lookupCached } from '../distributors/db-only-cascade'
 import {
+  createBoardGeometryFromShapeContract,
   createRoundedRectangleContour,
   validateBoardGeometry,
 } from './pcb-outline'
 import type { PcbBoardGeometry } from './pcb-contract'
+import type { PcbBoardShapeContract } from './pcb-architecture'
 
 // ── Real local KiCad footprint library root (the "15,435-footprint library" the
 // task's universal resolution target) — same install `discover-capability.ts` probes. ──
@@ -595,6 +597,12 @@ export interface GenerateAtopileProjectResult {
   offBoard: AtopileOffBoardCotsRecord[]
   unresolved: AtopileUnresolvedRecord[]
   boardOutline: PcbBoardGeometry
+}
+
+export interface GenerateAtopileProjectOptions {
+  footprintsRoot?: string
+  requiredWordIds?: string[]
+  boardShape?: PcbBoardShapeContract
 }
 
 function sanitizeIdentifier(id: string): string {
@@ -1221,12 +1229,14 @@ function emitModule(components: AtopileComponentRecord[], nets: AtopileNetRecord
  * generic package-family text tokens.
  * @param state - The chain's assembled state (same shape `pcb-stage.ts` consumes).
  * @param outDir - Directory to write `main.ato` + `ato.yaml` (+ `board-outline.json`) into.
- * @param opts - `footprintsRoot` override for tests (defaults to the real KiCad install).
+ * @param opts - Optional footprint root, board scope, and function-derived shape contract.
+ * Shape-less callers retain the component-area-derived legacy outline.
+ * @returns Generated Atopile project paths, records, and board geometry.
  */
 export function generateAtopileProject(
   state: Record<string, unknown>,
   outDir: string,
-  opts: { footprintsRoot?: string; requiredWordIds?: string[] } = {},
+  opts: GenerateAtopileProjectOptions = {},
 ): GenerateAtopileProjectResult {
   const footprintsRoot = opts.footprintsRoot ?? DEFAULT_FOOTPRINTS_ROOT
   footprintDirCache.clear()
@@ -1277,9 +1287,16 @@ export function generateAtopileProject(
     !hasActuationDriveBoard(state, electronicWords) &&
     (hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents) ||
       allComponents.length <= 12)
-  const boardOutline = computeBoardOutline(allComponents, {
-    isInstrumentSourceBoard: isCompactInstrumentBoard,
-  })
+  // DECISION: Board-plan geometry wins only when it carries complete dimensional
+  // datums. Missing/legacy shape contracts deliberately fall through to the
+  // unchanged area heuristic, keeping every existing caller compatible.
+  const boardOutline =
+    (opts.boardShape
+      ? createBoardGeometryFromShapeContract(opts.boardShape)
+      : null) ??
+    computeBoardOutline(allComponents, {
+      isInstrumentSourceBoard: isCompactInstrumentBoard,
+    })
 
   mkdirSync(outDir, { recursive: true })
 

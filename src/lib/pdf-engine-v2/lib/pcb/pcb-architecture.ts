@@ -15,6 +15,20 @@ export type PcbSystemDisposition =
   | 'multi_board'
   | 'unresolved'
 
+export interface PcbBoardShapeDatum {
+  id: string
+  valueMm: number
+  basis: string
+}
+
+export interface PcbBoardShapeContract {
+  shapeFamily: string
+  outlineBasis: string
+  datums?: PcbBoardShapeDatum[]
+  mountingHoles: number
+  rationale: string
+}
+
 export interface PcbBoardPlan {
   boardId: string
   role: string
@@ -22,12 +36,7 @@ export interface PcbBoardPlan {
   domains: Array<'logic' | 'analog' | 'power' | 'high_voltage' | 'wet_interface' | 'thermal_actuation' | 'motion_actuation'>
   channelRequirements: Array<{ role: string; count: number }>
   workPerformed: string[]
-  shape: {
-    shapeFamily: string
-    outlineBasis: string
-    mountingHoles: number
-    rationale: string
-  }
+  shape: PcbBoardShapeContract
   requiresKiCadDeliverable: boolean
 }
 
@@ -68,7 +77,16 @@ function wordBlob(state: Record<string, unknown>): string {
     .toLowerCase()
 }
 
-function board(boardId: string, role: string, domains: PcbBoardPlan['domains']): PcbBoardPlan {
+function datum(id: string, valueMm: number, basis: string): PcbBoardShapeDatum {
+  return { id, valueMm, basis }
+}
+
+function board(
+  boardId: string,
+  role: string,
+  domains: PcbBoardPlan['domains'],
+  datums: PcbBoardShapeDatum[] = [],
+): PcbBoardPlan {
   const phenotype: Record<string, { work: string[]; shape: string; basis: string; holes: number }> = {
     optical_source_daughterboard: { work: ['drive_optical_source', 'mate_source_harness'], shape: 'optical_registration_plate', basis: 'optical_axis_and_cube_face', holes: 4 },
     thermal_power_controller: { work: ['sense_sample_temperature', 'drive_heater_peltier_fan', 'enforce_thermal_cutoff'], shape: 'thermal_power_base', basis: 'thermal_connectors_and_heatsink', holes: 4 },
@@ -84,7 +102,13 @@ function board(boardId: string, role: string, domains: PcbBoardPlan['domains']):
   return {
     boardId, role, requiredWordIds: [], domains, channelRequirements: [],
     workPerformed: p.work,
-    shape: { shapeFamily: p.shape, outlineBasis: p.basis, mountingHoles: p.holes, rationale: `form_follows_${role}` },
+    shape: {
+      shapeFamily: p.shape,
+      outlineBasis: p.basis,
+      datums,
+      mountingHoles: p.holes,
+      rationale: `form_follows_${role}`,
+    },
     requiresKiCadDeliverable: true,
   }
 }
@@ -108,15 +132,27 @@ function assignmentBoard(wordText: string, boards: PcbBoardPlan[]): PcbBoardPlan
  */
 export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchitecturePlan {
   const blob = wordBlob(state)
+  const electrodeCount = Math.max(0, Math.floor(quantity(state, 'electrode_count') ?? 0))
+  const opticalPathLengthMm = Math.max(0, quantity(state, 'optical_path_length_mm') ?? 0)
   let systemDisposition: PcbSystemDisposition = 'unresolved'
   let boards: PcbBoardPlan[] = []
   const rationale: string[] = []
 
-  if ((quantity(state, 'electrode_count') ?? 0) >= 8) {
+  if (electrodeCount >= 8) {
+    const connectorPitchMm = quantity(state, 'cartridge_connector_pitch_mm') ?? 1.27
+    const electrodePitchMm = quantity(state, 'electrode_pitch_mm') ?? 2.54
+    const cartridgeWidthMm = Math.max(60, electrodeCount * connectorPitchMm + 12)
+    const cartridgeHeightMm = Math.max(24, electrodePitchMm * 8 + 10)
     systemDisposition = 'multi_board'
     boards = [
       board('hv_controller_main', 'high_voltage_controller', ['logic', 'high_voltage']),
-      board('electrode_cartridge', 'electrode_cartridge', ['high_voltage', 'wet_interface']),
+      board('electrode_cartridge', 'electrode_cartridge', ['high_voltage', 'wet_interface'], [
+        datum('outline_width_mm', cartridgeWidthMm, `${electrodeCount} channels × ${connectorPitchMm}mm connector pitch + edge margins`),
+        datum('outline_height_mm', cartridgeHeightMm, `${electrodePitchMm}mm electrode pitch × wet-interface depth`),
+        datum('corner_radius_mm', 2, 'replaceable cartridge handling edge'),
+        datum('mounting_hole_inset_mm', 3, 'cartridge frame registration'),
+        datum('mounting_hole_diameter_mm', 2.5, 'removable cartridge fastener'),
+      ]),
     ]
     rationale.push('electrode_count_requires_hv_controller_and_removable_array')
   } else if ((quantity(state, 'working_volume_ml') ?? 0) > 0) {
@@ -135,9 +171,17 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     systemDisposition = 'single_custom'
     boards = [board('thermal_controller', 'thermal_power_controller', ['logic', 'power', 'thermal_actuation'])]
     rationale.push('tube_array_requires_integrated_thermal_power_controller')
-  } else if ((quantity(state, 'optical_path_length_mm') ?? 0) > 0) {
+  } else if (opticalPathLengthMm > 0) {
+    const sourceBoardWidthMm = Math.max(25.4, Math.min(40, opticalPathLengthMm + 15.4))
+    const sourceBoardHeightMm = Math.max(20, Math.min(30, opticalPathLengthMm + 10))
     systemDisposition = 'daughterboard'
-    boards = [board('optical_source', 'optical_source_daughterboard', ['logic'])]
+    boards = [board('optical_source', 'optical_source_daughterboard', ['logic'], [
+      datum('outline_width_mm', sourceBoardWidthMm, `${opticalPathLengthMm}mm optical path + source connector margin`),
+      datum('outline_height_mm', sourceBoardHeightMm, `${opticalPathLengthMm}mm optical path + cube-face registration margin`),
+      datum('corner_radius_mm', 2, 'optical cube face edge clearance'),
+      datum('mounting_hole_inset_mm', 2.5, 'four-point optical-axis registration'),
+      datum('mounting_hole_diameter_mm', 2.2, 'source-board registration fastener'),
+    ])]
     rationale.push('optical_path_with_cots_host_requires_source_daughterboard')
   } else if ((quantity(state, 'channel_count') ?? 0) > 0) {
     if (/arduino|cnc\s*shield|driver\s*module|finished\s*module/.test(blob)) {
