@@ -33,31 +33,59 @@ describe('Yuri PCB gold architecture harness', () => {
       !product.failureCodes.includes('missing_expected_board'))).toBe(true)
   })
 
-  it('reports gold mismatches and unassigned roles honestly instead of weakening expectations', () => {
+  it('closes every architecture-level gold finding while preserving downstream generator findings', () => {
     const report = verifyYuriGoldStates({
       fixturePath: FIXTURE_PATH,
       sourceOutRoot: MAIN_OUT_ROOT,
     })
-    const failuresByProduct = Object.fromEntries(
-      report.products.map((product) => [product.product, product.failureCodes]),
-    )
-
-    expect(failuresByProduct.Colorimeter).toContain('channel_requirement_mismatch')
-    expect(failuresByProduct.NinjaPCR).toContain('channel_requirement_mismatch')
-    expect(failuresByProduct.Poseidon).toContain('disposition_mismatch')
-    expect(failuresByProduct.OpenFlexure).not.toContain('disposition_mismatch')
-    expect(failuresByProduct.Pioreactor).toEqual(expect.arrayContaining([
-      'channel_requirement_mismatch',
-      'empty_board_scope',
-    ]))
-    expect(failuresByProduct.Rodeostat).toContain('channel_requirement_mismatch')
-    expect(failuresByProduct.OpenDrop).toEqual(expect.arrayContaining([
+    const architectureFailureCodes = [
+      'disposition_mismatch',
+      'board_role_mismatch',
+      'board_shape_mismatch',
       'channel_requirement_mismatch',
       'unassigned_electronic_roles',
-    ]))
-    expect(report.products.find((product) => product.product === 'OpenDrop')?.unassignedWordIds).toEqual([
-      'current_measurement_tia_word',
-      'status_indicator_word',
-    ])
+      'empty_board_scope',
+      'missing_expected_board',
+    ]
+
+    expect(report.products.map((product) => ({
+      product: product.product,
+      architectureFailures: product.failureCodes.filter((code) =>
+        architectureFailureCodes.includes(code)),
+      architectureFailureDetails: product.failureDetails.filter((detail) =>
+        detail.includes('has no assigned electronic roles')),
+      unassignedWordIds: product.unassignedWordIds,
+    }))).toEqual(report.products.map((product) => ({
+      product: product.product,
+      architectureFailures: [],
+      architectureFailureDetails: [],
+      unassignedWordIds: [],
+    })))
+  })
+
+  it('keeps an explicit all-seven residual report for downstream work', () => {
+    const report = verifyYuriGoldStates({
+      fixturePath: FIXTURE_PATH,
+      sourceOutRoot: MAIN_OUT_ROOT,
+    })
+
+    expect(Object.fromEntries(
+      report.products.map((product) => [product.product, product.failureCodes]),
+    )).toEqual({
+      Colorimeter: ['board_scope_reclassified_off_board'],
+      NinjaPCR: ['board_scope_reclassified_off_board'],
+      Poseidon: [],
+      OpenFlexure: [],
+      Pioreactor: [
+        'board_scope_reclassified_off_board',
+        'unresolved_components',
+        'empty_generated_project',
+      ],
+      Rodeostat: ['board_scope_reclassified_off_board'],
+      OpenDrop: [
+        'board_scope_reclassified_off_board',
+        'empty_generated_project',
+      ],
+    })
   })
 })

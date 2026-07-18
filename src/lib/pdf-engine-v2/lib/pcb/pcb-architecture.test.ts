@@ -83,6 +83,128 @@ describe('derivePcbArchitecture', () => {
     expect(plan.boards[0].channelRequirements).toEqual([{ role: 'motion_channel', count: 4 }])
   })
 
+  it.each([
+    [
+      { optical_path_length_mm: 10 },
+      'optical_source_daughterboard',
+      [{ role: 'optical_source_channel', count: 1 }],
+    ],
+    [
+      { tube_count: 8 },
+      'thermal_power_controller',
+      [
+        { role: 'thermal_zone', count: 1 },
+        { role: 'lid_heater_channel', count: 1 },
+        { role: 'fan_channel', count: 1 },
+      ],
+    ],
+    [
+      { working_volume_ml: 20 },
+      'od_optics_board',
+      [{ role: 'od_measurement_channel', count: 1 }],
+    ],
+    [
+      { working_volume_ml: 20 },
+      'heater_stir_actuation_board',
+      [
+        { role: 'heater_channel', count: 1 },
+        { role: 'stir_channel', count: 1 },
+        { role: 'pump_channel', count: 1 },
+      ],
+    ],
+    [
+      { compliance_voltage_v: 10 },
+      'analog_front_end_shield',
+      [{ role: 'electrochemical_cell_channel', count: 1 }],
+    ],
+    [
+      { electrode_count: 64 },
+      'high_voltage_controller',
+      [{ role: 'electrode_switch_channel', count: 64 }],
+    ],
+    [
+      { electrode_count: 64 },
+      'electrode_cartridge',
+      [{ role: 'electrode_channel', count: 64 }],
+    ],
+  ] as const)(
+    'derives %s channel requirements for %s from contract function evidence',
+    (quantities, boardRole, expectedChannels) => {
+      const plan = derivePcbArchitecture(stateWithQuantities(quantities))
+      expect(plan.boards.find((item) => item.role === boardRole)?.channelRequirements)
+        .toEqual(expectedChannels)
+    },
+  )
+
+  it('recognises a finished modular motion stack from procurement evidence outside electronic words', () => {
+    const state = stateWithQuantities({ channel_count: 4 })
+    state.orchestratorContract = {
+      ...(state.orchestratorContract as Record<string, unknown>),
+      topology: [{
+        from_part: 'main_controller_mcu',
+        to_part: 'stepper_driver',
+        mechanism: 'control',
+        material_context: 'channel-independent step/dir',
+      }],
+      macro_assembly_prices: [{
+        word_name: 'control_console',
+        source_detail: 'MCU + CNC shield + plug-in stepper driver modules + bench PSU',
+      }],
+    }
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.systemDisposition).toBe('cots_only')
+    expect(plan.requiresAnyKiCadDeliverable).toBe(false)
+  })
+
+  it('uses repeated topology endpoints when no explicit channel quantity exists', () => {
+    const state = stateWithQuantities({ compliance_voltage_v: 10 })
+    state.orchestratorContract = {
+      ...(state.orchestratorContract as Record<string, unknown>),
+      topology: [
+        {
+          from_part: 'tia_adc_front_end_1',
+          to_part: 'working_electrode_connector_1',
+          mechanism: 'signal',
+        },
+        {
+          from_part: 'tia_adc_front_end_2',
+          to_part: 'working_electrode_connector_2',
+          mechanism: 'signal',
+        },
+      ],
+    }
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.boards[0].channelRequirements).toEqual([
+      { role: 'electrochemical_cell_channel', count: 2 },
+    ])
+  })
+
+  it('assigns status and analog-monitor roles to a compatible controller board', () => {
+    const state = stateWithQuantities({ electrode_count: 64 })
+    state.moduleDecomposition = {
+      modules: [{
+        module: 'control',
+        sub_modules: [{
+          id: 'electronics',
+          words: [
+            { id: 'hv_driver', name_human: 'High voltage driver', content_character: { character_id: 'hv_driver' }, modifier_characters: [] },
+            { id: 'current_tia', name_human: 'Current measurement TIA', content_character: { character_id: 'current_measurement_tia' }, modifier_characters: [] },
+            { id: 'status_led', name_human: 'Status indicator', content_character: { character_id: 'status_indicator' }, modifier_characters: [] },
+          ],
+        }],
+      }],
+    }
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ wordId: 'current_tia', placement: 'on_board', boardId: 'hv_controller_main' }),
+      expect.objectContaining({ wordId: 'status_led', placement: 'on_board', boardId: 'hv_controller_main' }),
+    ]))
+    expect(plan.unassignedWordIds).toEqual([])
+  })
+
   it('derives board shape and work from function rather than a generic square', () => {
     const optical = derivePcbArchitecture(stateWithQuantities({ optical_path_length_mm: 10 })).boards[0]
     expect(optical.workPerformed).toContain('drive_optical_source')

@@ -45,6 +45,7 @@ export type YuriGoldFailureCode =
   | 'missing_expected_board'
   | 'unresolved_components'
   | 'board_scope_reclassified_off_board'
+  | 'empty_generated_project'
 
 export interface YuriGeneratedBoardResult {
   boardId: string
@@ -64,6 +65,7 @@ export interface YuriGoldProductResult {
   observedBoardRoles: string[]
   observedShapes: Record<string, string>
   observedChannelRequirements: Record<string, ExpectedChannelRequirement[]>
+  observedBoardScopes: Record<string, string[]>
   generatedProjectCount: number
   generatedBoards: YuriGeneratedBoardResult[]
   routingArtifactsFound: string[]
@@ -198,8 +200,16 @@ function comparePlanToGold(
         `${expectedBoard.role} expected ${JSON.stringify(normalizedChannels(expectedBoard.channelRequirements))}; observed ${JSON.stringify(normalizedChannels(observedBoard.channelRequirements))}`,
       )
     }
-    if (observedBoard.requiredWordIds.length === 0) {
-      addFailure(codes, details, 'empty_board_scope', `${expectedBoard.role} has no assigned electronic roles`)
+    if (
+      observedBoard.requiredWordIds.length === 0 &&
+      observedBoard.channelRequirements.length === 0
+    ) {
+      addFailure(
+        codes,
+        details,
+        'empty_board_scope',
+        `${expectedBoard.role} has neither assigned electronic roles nor contract-derived channels`,
+      )
     }
   }
 
@@ -242,6 +252,14 @@ function generateExpectedBoardProjects(
 
       const unresolvedWordIds = generated.unresolved.map((item) => item.wordId)
       const offBoardWordIds = generated.offBoard.map((item) => item.wordId)
+      if (generated.components.length === 0) {
+        addFailure(
+          codes,
+          details,
+          'empty_generated_project',
+          `${expectedBoard.role} has architecture scope but generated no component instances`,
+        )
+      }
       if (unresolvedWordIds.length > 0) {
         addFailure(
           codes,
@@ -317,6 +335,9 @@ export function verifyYuriGoldStates(
       ),
       observedChannelRequirements: Object.fromEntries(
         plan.boards.map((board) => [board.role, normalizedChannels(board.channelRequirements)]),
+      ),
+      observedBoardScopes: Object.fromEntries(
+        plan.boards.map((board) => [board.role, board.requiredWordIds]),
       ),
       generatedProjectCount: generated.boards.length,
       generatedBoards: generated.boards,
