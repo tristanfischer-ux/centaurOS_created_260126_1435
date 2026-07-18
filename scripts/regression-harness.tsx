@@ -77,7 +77,7 @@ import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/
 import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
-import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure, reconcileComputedTwins, dropAttributePhantomWords } from './lib/orchestrator/generic/universal-contract-sizing'
+import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure, reconcileComputedTwins, dropAttributePhantomWords, formatCapacityM3 } from './lib/orchestrator/generic/universal-contract-sizing'
 import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
@@ -153,6 +153,38 @@ interface SnapshotResult {
 //
 // Spawns the repo .venv python ONCE across the whole harness run (memoised) — not per
 // snapshot. Vacuously passes (skips) if the .venv python is unavailable.
+// ── UNIVERSAL: a positive volume/rating never DISPLAYS as the literal "0" (2026-07-18) ──
+//
+// The zero-collapse family, third confirmed hit: (1) Codema 2026-07-09 — formatRatingKw
+// 1-dp rounding printed a 0.04 kW dosing pump as "Acid Dosing Pump · 0 kW"; (2) OpenDrop
+// 2026-07-18 — formatCapacityM3 printed a 0.00282 m³ instrument enclosure as "Enclosure
+// Shell · 0 m³" (ship red-team HIGH: contradicts the contract's enclosure_volume_m3).
+// The rule: any display formatter for a physical quantity must keep SIGNIFICANT figures
+// below 1 (fixed dp is not enough — 2 dp still prints 0.00282 as "0.00"), so a real
+// positive value never reads as zero. This invariant drives formatCapacityM3 directly
+// with device-scale, sub-unity, and plant-scale volumes.
+function checkCapacityDisplayNeverZero(): Assertion[] {
+  const out: Assertion[] = []
+  const cases: Array<[number, (s: string) => boolean, string]> = [
+    [0.00282, (s) => s === '0.0028', 'device enclosure 0.00282 m³ → "0.0028" (2 sig figs, never "0")'],
+    [0.04, (s) => s === '0.04', 'small charge 0.04 m³ → "0.04"'],
+    [0.5, (s) => s === '0.5', 'sub-unity 0.5 m³ stays "0.5"'],
+    [1.34, (s) => s === '1.3', '1.34 m³ keeps the 1-dp rule → "1.3"'],
+    [334.4, (s) => s === '334', 'plant tank 334.4 m³ stays integer "334"'],
+    [0, (s) => s === '0', 'a genuine zero still prints "0" (no fabricated volume)'],
+  ]
+  for (const [v, ok, label] of cases) {
+    const got = formatCapacityM3(v)
+    out.push({
+      id: `UNIVERSAL.capacity_display_never_zero.${String(v).replace(/\./g, '_')}`,
+      description: label,
+      passed: ok(got),
+      detail: `formatCapacityM3(${v}) = "${got}"`,
+    })
+  }
+  return out
+}
+
 let _reactionWorkedCheck: Assertion[] | null = null
 function checkReactionToolsWorkedSound(): Assertion[] {
   if (_reactionWorkedCheck) return _reactionWorkedCheck
@@ -4141,6 +4173,10 @@ function checkCo2FixInvariants(): Assertion[] {
       want('(q) isCoolingClass heat_pump_residential true', isCoolingClass('heat_pump_residential') === true)
       want('(q) isCoolingClass aquaculture_ras false', isCoolingClass('aquaculture_ras') === false)
       want('(q) isCoolingClass co2_mineralisation false', isCoolingClass('co2_mineralisation') === false)
+      // GOTCHA (Pioreactor 0121): bare 'bioreactor' in COOLING_CLASS_TOKENS
+      // suppressed refrigeration markers → industrial heat-pump tools leaked.
+      want('(q) isCoolingClass benchtop_bioreactor false', isCoolingClass('benchtop_bioreactor') === false)
+      want('(q) isCoolingClass pioreactor false', isCoolingClass('pioreactor') === false)
     }
     // (t) INC-1 seawater-source carve-out: seawater as a SOURCE/process fluid is in-domain
     //     for a seawater-using class (a sea-loch RAS draws seawater) → NOT flagged…
@@ -12272,6 +12308,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // worked[] arithmetic, exercised directly on the real CO2 reactions. Memoised so the
   // .venv python spawns once across the whole run, not per snapshot.
   for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
+  for (const a of checkCapacityDisplayNeverZero()) assertions.push(a)
   for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
   for (const a of checkDesignLoopClosesEarly()) assertions.push(a)
   for (const a of checkPrincipalEquipmentFromContract()) assertions.push(a)
@@ -13671,6 +13708,142 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
       failedPot.length,
       (n) => n === 0,
       () => `low-power lab-instrument skeleton cases failed: ${failedPot.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts LAB_ELECTRONICS_* floors and signal.`,
+    ))
+  }
+
+  // ── EXTENSION 2026-07-18 (Pioreactor): ml-scale culture + watt-scale load must
+  // NEVER select industrial heat_pump / scroll compressor / access ladder floors
+  // just because net_heating_required_w matches HEATING_DUTY_RE.
+  {
+    const failedPio: string[] = []
+    const wantPio = (label: string, cond: boolean) => { if (!cond) failedPio.push(label) }
+    const pioGraph: any = {
+      product_class: 'benchtop_bioreactor',
+      nodes: [
+        { class: 'environmental_interface', display: 'Thermal', role: 'support', required: true },
+        { class: 'mass_fluid_transport_process', display: 'Culture Fluid', role: 'principal', required: true },
+        { class: 'sensing_instrumentation', display: 'OD Sensing', role: 'principal', required: true },
+        { class: 'control_compute_communication', display: 'Control', role: 'support', required: true },
+        { class: 'power_distribution', display: 'Power', role: 'support', required: true },
+      ],
+      edges: [],
+    }
+    const pioContract: any = {
+      product_class: 'benchtop_bioreactor',
+      quantities: {
+        working_volume_ml: { value: 20 },
+        peak_electrical_power_w: { value: 35 },
+        connected_electrical_load_kw: { value: 0.035 },
+        enclosure_volume_m3: { value: 0.004 },
+        net_heating_required_w: { value: 0.934 },
+      },
+    }
+    const modsPio = deriveGenericSkeleton(pioGraph, {} as any, { class: 'benchtop_bioreactor' } as any, pioContract, new Map()) as any[]
+    const pioAll = modsPio
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || w.id || ''))))
+      .join(' | ')
+    for (const bad of ['Heat Pump', 'Scroll Compressor', 'Access Ladder', 'Chiller Unit', 'Circulation Pump', 'Expansion Vessel']) {
+      wantPio(`pioreactor floor does NOT emit ${bad}`, !new RegExp(bad, 'i').test(pioAll))
+    }
+    for (const good of ['Peltier', 'Cartridge Heater', 'Culture Vessel', 'Dosing', 'Od Photodiode']) {
+      wantPio(`pioreactor floor emits ${good}`, new RegExp(good, 'i').test(pioAll))
+    }
+    out.push(assertEq(
+      'UNIVERSAL.benchtop_bioreactor_skeleton_rejects_heat_pump_plant',
+      'Pioreactor proveCatch: working_volume_ml=20 + 35 W + net_heating_required_w must emit TEC/heater + culture/dosing floors and NEVER industrial Heat Pump / Scroll Compressor / Access Ladder / Chiller (the £81k plant BoM leak).',
+      failedPio.length,
+      (n) => n === 0,
+      () => `benchtop_bioreactor skeleton cases failed: ${failedPio.join(' ; ')}. Check derive-skeleton.ts LAB_DEVICE_THERMAL_FLOOR / LAB_CULTURE_* / hasBenchtopCultureSignal.`,
+    ))
+  }
+
+  // ── EXTENSION 2026-07-18 (Pioreactor 0236): unrated dosing_peristaltic_pump
+  // exploded a 37 kW Drive Motor + VSD; SCADA driver minted plant PLC racks from
+  // connected_electrical_load_kw=0.035. proveCatch the sizing demote + SCADA gate.
+  {
+    const failedDrive: string[] = []
+    const wantD = (label: string, cond: boolean) => { if (!cond) failedDrive.push(label) }
+    const {
+      explodeEquipmentSubAssemblies,
+      synthesizeProcessSystems,
+      demoteLiquidThermalPlantAtAirCooledScale,
+    } = require('./lib/orchestrator/generic/universal-contract-sizing') as typeof import('./lib/orchestrator/generic/universal-contract-sizing')
+    const modsDrive: any = [{
+      module: 'm',
+      sub_modules: [{
+        sub_module: 's',
+        words: [{
+          id: 'dosing_peristaltic_pump_word',
+          name_human: 'Dosing Peristaltic Pump',
+          content_character: {
+            character_id: 'dosing_peristaltic_pump',
+            name_human: 'Dosing Peristaltic Pump',
+          },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }],
+        }],
+      }],
+    }]
+    const qDrive = {
+      working_volume_ml: 20,
+      peak_electrical_power_w: 35,
+      connected_electrical_load_kw: 0.035,
+      enclosure_volume_m3: 0.00403,
+    }
+    explodeEquipmentSubAssemblies(modsDrive, qDrive)
+    const namesDrive = modsDrive
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || ''))))
+      .join(' | ')
+    wantD('peristaltic does NOT explode Drive Motor', !/drive\s*motor/i.test(namesDrive))
+    wantD('peristaltic does NOT explode VSD', !/variable[- ]speed\s*drive/i.test(namesDrive))
+    const modsVessel: any = [{
+      module: 'm',
+      sub_modules: [{
+        sub_module: 's',
+        words: [{
+          id: 'culture_vessel_word',
+          name_human: 'Culture Vessel',
+          content_character: {
+            character_id: 'culture_vessel',
+            name_human: 'Culture Vessel',
+          },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }],
+        }],
+      }],
+    }]
+    explodeEquipmentSubAssemblies(modsVessel, qDrive)
+    const namesVessel = modsVessel
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || ''))))
+      .join(' | ')
+    wantD('culture vessel does NOT explode Support Skirt', !/support\s*skirt/i.test(namesVessel))
+    wantD('culture vessel does NOT explode Inlet Nozzle', !/inlet\s*nozzle/i.test(namesVessel))
+    const modsScada: any = [{
+      module: 'control_compute_communication',
+      sub_modules: [{ sub_module: 'control', words: [] }],
+    }]
+    const nScada = synthesizeProcessSystems(modsScada, qDrive)
+    const scadaNames = modsScada
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || ''))))
+      .join(' | ')
+    wantD('watt-scale load does NOT mint plant SCADA', nScada === 0 && !/scada/i.test(scadaNames))
+    const modsDemote: any = [{
+      module: 'm',
+      sub_modules: [{
+        sub_module: 's',
+        words: [
+          { id: 'dm', name_human: 'Drive Motor', content_character: { character_id: 'dm', name_human: 'Drive Motor' }, modifier_characters: [{ kind: 'rating_primary', value: '37', unit: 'kW' }] },
+          { id: 'sc', name_human: 'SCADA / Plant Control System', content_character: { character_id: 'proc_scada', name_human: 'SCADA / Plant Control System' }, modifier_characters: [] },
+          { id: 'sk', name_human: 'Support Skirt / Legs', content_character: { character_id: 'skirt', name_human: 'Support Skirt / Legs' }, modifier_characters: [] },
+        ],
+      }],
+    }]
+    const nDem = demoteLiquidThermalPlantAtAirCooledScale(modsDemote, qDrive)
+    wantD('demote flags ≥3 industrial drive/SCADA/vessel words', nDem >= 3)
+    out.push(assertEq(
+      'UNIVERSAL.benchtop_bioreactor_rejects_industrial_drive_and_scada',
+      'Pioreactor proveCatch: watt-scale / 20 ml kit must NOT explode unrated peristaltic into 37 kW Drive Motor/VSD, must NOT explode Culture Vessel into Support Skirt/Nozzles, must NOT mint plant SCADA from 0.035 kW load, and demote must flag Drive Motor + SCADA + vessel plant as mis-emissions.',
+      failedDrive.length,
+      (n) => n === 0,
+      () => `benchtop drive/SCADA/vessel cases failed: ${failedDrive.join(' ; ')}. Check motorKw unknown-duty floor, LAB_SCALE_FLUID_MOVER_RE / LAB_SCALE_VESSEL_RE skip, SCADA ≥5 kW gate, WATT_SCALE_* demote REs.`,
     ))
   }
 

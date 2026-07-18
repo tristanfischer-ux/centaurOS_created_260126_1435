@@ -3183,9 +3183,19 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
     if nr:
         row = nr + 1
     else:
-        # no brief metrics → drop the empty banner we just wrote
-        for _c in range(1, 8):
-            ws.cell(cmp_start, _c).value = None
+        # GOTCHA (Rodeostat 0201 exit 38): sub_banner merges cols 1–7 — writing
+        # `.value = None` on MergedCell raises AttributeError and aborts excel.
+        # Unmerge first, then clear the anchor cell only.
+        try:
+            ws.unmerge_cells(
+                start_row=cmp_start, start_column=1,
+                end_row=cmp_start, end_column=7,
+            )
+        except Exception:
+            pass
+        _anchor = ws.cell(cmp_start, 1)
+        if type(_anchor).__name__ != "MergedCell":
+            _anchor.value = None
         row = cmp_start
 
     # ---- DISCLOSED COMMERCIAL DECISIONS (Tristan 2026-07-10, design-to-budget (b)):
@@ -8301,21 +8311,11 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         ac.fill = FILL_RESULT
         ac.border = BORDER
 
-        # Direction of the PASS test (2026-06-25 fix): HIGHER-is-better is the default (scale,
-        # power, capacity, ENERGY efficiency %, cycle LIFE). LOWER-is-better ONLY for genuine
-        # minimise targets — a feed-conversion ratio, a time/duration to complete, a cost-per-unit,
-        # or a cycle TIME (NOT cycle life). The old `category=='efficiency'` wrongly made round-trip
-        # efficiency lower-better (98.5% vs 88% → false FAIL), and `'cycle' in key` wrongly caught
-        # cycle_life (more cycles is better → false direction).
-        kl = key.lower()
-        lower_better = (
-            "fcr" in kl
-            or "feed_conversion" in kl
-            or "conversion_ratio" in kl
-            or "_days" in kl or "duration" in kl or "lead_time" in kl
-            or "lcoe" in kl or "cost_per" in kl
-            or ("cycle" in kl and bool(re.search(r"\btime\b|hour|minute|second|_s\b", kl)))
-        )
+        # Direction of the PASS test — MUST stay identical to `_brief_metric_is_lower_better`
+        # (Verification spine + quality-scorecard probe). Cover used a shorter list and
+        # marked focus_resolution_um FAIL with "≥ target" while Abbe 0.611 µm beats 1 µm
+        # (OpenFlexure 0101 Exec content_score 0 → floored SHIPS).
+        lower_better = _brief_metric_is_lower_better(key)
         # tolerance band: ±2% of target (display rounding + sizing granularity)
         tol = abs(tgt) * 0.02 if tgt else 0.0
         if lower_better:
@@ -8382,9 +8382,13 @@ _SOFT_BRIEF_CATEGORIES = frozenset({
 _INSTRUMENT_PCB_MAX_MM = 40.0
 # Actuation-drive control boards (MCU + stepper) need the [50,120] plant floor —
 # the 40 mm optical-daughterboard cap must not HARD-fail them (Poseidon 2026-07-16).
+# GOTCHA (OpenFlexure 0101): MCU + photodiode control board is 50 mm and has no
+# "stepper" token on-board (motors are off-board COTS) — still not a 40 mm LED
+# daughterboard. Match the sync-instrument-pcb-state actuation/control cap.
 _INSTRUMENT_ACTUATION_PCB_MAX_MM = 120.0
 _ACTUATION_PCB_RE = re.compile(
-    r"\b(?:stepper|microstep|h[_ -]?bridge|lead[_ -]?screw|motor[_ -]?driver)\b",
+    r"\b(?:stepper|microstep|h[_ -]?bridge|lead[_ -]?screw|motor[_ -]?driver|"
+    r"microcontroller|\bmcu\b|lqfp|motor[_ -]?controller)\b",
     re.I,
 )
 _ABSORBANCE_ERROR_MAX_PCT = 10.0
@@ -8458,6 +8462,30 @@ def _status_from_compare(compare: str, tgt: Optional[float], ach: Optional[float
     return "UNVERIFIED"
 
 
+def _brief_metric_is_lower_better(key: str) -> bool:
+    """True when a smaller achieved value meets/beats the brief target.
+
+    INTENT (OpenFlexure 2026-07-17/18): focus_resolution_um / optical resolution /
+    linewidth / noise / latency are lower-is-better. Scoring them as `ge` marks a
+    met 1 µm focus step FAIL when Abbe 0.611 µm is fuzzy-bound. Noun/unit signal —
+    never a class table. Shared by Verification spine + Exec cover matrix.
+    """
+    kl = (key or "").lower()
+    return (
+        "fcr" in kl
+        or "feed_conversion" in kl
+        or "conversion_ratio" in kl
+        or "_days" in kl or "duration" in kl or "lead_time" in kl
+        or "lcoe" in kl or "cost_per" in kl
+        or "resolution" in kl
+        or "linewidth" in kl
+        or "detection_limit" in kl
+        or "noise" in kl
+        or "latency" in kl
+        or ("cycle" in kl and bool(re.search(r"\btime\b|hour|minute|second|_s\b", kl)))
+    )
+
+
 def _brief_metric_status(metric: dict, quantities: Dict[str, Any], brief_text: str) -> dict:
     """Pure PASS/FAIL/UNVERIFIED for one brief metric — same rules as the compliance matrix."""
     key = (metric.get("key_metric") or metric.get("metric") or metric.get("name") or "").strip()
@@ -8475,15 +8503,8 @@ def _brief_metric_status(metric: dict, quantities: Dict[str, Any], brief_text: s
     qname, ach_raw, qunit_s = matched
     ach_converted = _convert_value(ach_raw, qunit_s, unit)
     ach = ach_converted if ach_converted is not None else ach_raw
-    kl = key.lower()
-    lower_better = (
-        "fcr" in kl
-        or "feed_conversion" in kl
-        or "conversion_ratio" in kl
-        or "_days" in kl or "duration" in kl or "lead_time" in kl
-        or "lcoe" in kl or "cost_per" in kl
-        or ("cycle" in kl and bool(re.search(r"\btime\b|hour|minute|second|_s\b", kl)))
-    )
+    # GOTCHA: cover matrix (_render_brief_compliance_section) MUST call the same helper.
+    lower_better = _brief_metric_is_lower_better(key)
     compare = "le" if lower_better else "ge"
     status = _status_from_compare(compare, tgt, ach, 0.02)
     return _verif_row(
@@ -25683,9 +25704,53 @@ def build(run_dir: str, out_path: str) -> dict:
         state["_dossierAudit"] = _aud_full
         print(f"  · SHIP GATE (full workbook): min {_ts_summary['min_tab']}={_ts_summary['min_score']}/10 · "
               f"{len(_ts_summary['fail_tabs'])} <8 · {len(_ts_summary['unscored_tabs'])} UNSCORED → ship_ok=False")
+    else:
+        # ── STICKY-FALSE REPAIR (OpenDrop 0410 heal, 2026-07-18): the MID-BUILD floor stamp
+        #    (pass 1, before the sheets re-scored) can set ship_ok=False off a STALE floor; when
+        #    the FINAL full-workbook re-derive reaches all-pass, that stamp must not survive —
+        #    the workbook verdict would say SHIPS while _dossierAudit says FAIL (two verdict
+        #    surfaces disagreeing; a false-FAIL is as dishonest as a false-PASS). Restore the
+        #    dossier audit's OWN verdict (findings-based) + record the MET floor. A genuine
+        #    audit FAIL (report.scorecard() itself) is preserved — only the floor stamp clears. ──
+        _aud_full = state.get("_dossierAudit") or {}
+        if _aud_full.get("per_tab_floor") and not _aud_full["per_tab_floor"].get("all_pass"):
+            _base = report.scorecard()
+            _base["per_tab_floor"] = {
+                "all_pass": True, "min_tab": _ts_summary.get("min_tab"),
+                "min_score": _ts_summary.get("min_score"),
+                "fail_tabs": [], "unscored_tabs": [],
+            }
+            state["_dossierAudit"] = _base
+            print(f"  · SHIP GATE (full workbook): per-tab ≥8 floor MET on the final re-derive — "
+                  f"mid-build floor stamp cleared; ship_ok restored to the dossier audit's own "
+                  f"verdict ({_base.get('verdict')} · ship_ok={_base.get('ship_ok')})")
     try:
         with open(os.path.join(run_dir, "tab-scorecard.json"), "w", encoding="utf-8") as _fh:
             json.dump({"tabs": _TAB_SCORES, "summary": _ts_summary}, _fh, indent=2, default=str)
+        # ── The ROUTED punch-list must reflect the FINAL scores too (2026-07-18): the mid-build
+        #    write above snapshots pass-1 scores; if the final re-derive clears (or changes) the
+        #    failures, a stale punch-list would send the loop chasing phantom defects. Rewrite it
+        #    from the FINAL summary — an all-pass build stamps a clean punch-list. ──
+        _punch_final = [
+            f"- **{_t}** — {(_v.get('score') if _v.get('score') is not None else 'UNSCORED')}/10 "
+            f"{_v.get('status')} — {(_v.get('issues') or ['—'])[0]}\n"
+            f"  FIX (at source): {_v.get('fix') or 'write a deterministic check for this tab'}"
+            for _t, _v in _TAB_SCORES.items() if _v.get("status") in ("FAIL", "UNSCORED")
+        ]
+        with open(os.path.join(run_dir, "tab-scorecard-punchlist.md"), "w", encoding="utf-8") as _fh:
+            if _punch_final:
+                _fh.write(
+                    f"# Per-tab quality punch-list — min {_ts_summary['min_tab']} "
+                    f"{_ts_summary['min_score']}/10 ({len(_ts_summary['fail_tabs'])} FAIL, "
+                    f"{len(_ts_summary['unscored_tabs'])} UNSCORED)\n\n"
+                    "Every tab must score ≥8. Fix each at SOURCE (the rule that produced the defect), "
+                    "not the symptom; re-run; the tab re-scores. An UNSCORED tab's fix is to write its "
+                    "deterministic check.\n\n" + "\n".join(_punch_final) + "\n")
+            else:
+                _fh.write(
+                    f"# Per-tab quality punch-list — ALL PASS (min {_ts_summary['min_tab']} "
+                    f"{_ts_summary['min_score']}/10; every tab ≥8, none UNSCORED)\n\n"
+                    "No open per-tab defects on the final full-workbook re-derive.\n")
     except Exception:  # noqa: BLE001
         pass
 
