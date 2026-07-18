@@ -16638,8 +16638,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
                 _vial_r = min(W, D) * 0.11
                 _vial_h = max(H * 0.8, 30.0)
-                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.78, 0.86, 0.90)),
-                                     metallic=0.0, roughness=0.06)
+                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.80, 0.88, 0.92)),
+                                     metallic=0.0, roughness=0.05, kind="glass", alpha=0.35)
                 _vial = fl.add_cyl("u_se_le_vial",
                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.5)),
                                    _vial_r * fl.MM, _vial_h * fl.MM, _glass,
@@ -17331,6 +17331,27 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             )
             _usb.dimensions = _mm3((12.0, 2.2, 5.0))
             _usb.hide_render = True
+            # RE-DUMP form-meshes.json now that the EXTERIOR body + optical cube + cuvette
+            # + HMI exist (Tristan 2026-07-18): the interior builder dumped form-meshes
+            # EARLY (only u_se_instrument_story_* interior props), so form_signature_gate
+            # saw no exterior body and false-failed R2 EXTERIOR_BODY_ABSENT — a gate-INPUT
+            # bug, not a render bug (the render already has the L-body + cube + cuvette +
+            # display + keys). Re-dump the real exterior so the gate sees the true scene.
+            try:
+                _out = os.environ.get("BLENDER_OUT_DIR") or ""
+                if _out:
+                    _names = sorted(
+                        o.name for o in bpy.data.objects
+                        if getattr(o, "type", None) == "MESH"
+                        and o.name.startswith(("u_se_product_", "u_se_exterior_",
+                                               "u_se_instrument_")))
+                    Path(_out).joinpath("form-meshes.json").write_text(json.dumps(
+                        {"form": "optical_handheld", "form_id": "optical_handheld",
+                         "meshes": _names}, indent=2))
+                    print("[univ][sealed] OPTICAL_HANDHELD form-meshes re-dumped with "
+                          f"exterior body ({len(_names)} meshes)")
+            except Exception as _oh_exc:
+                print(f"[univ][sealed] optical_handheld form-meshes re-dump skipped: {_oh_exc}")
             # Photoreal CAD bar: every curved exterior cue (lid, rim, screws, feet,
             # source PCB CAD) must shade-smooth — default Blender boxes/cyls are flat.
             # GOTCHA (2237 vision): shade-smooth on square D-pad boxes reads as
