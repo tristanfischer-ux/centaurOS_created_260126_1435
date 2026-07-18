@@ -2377,6 +2377,16 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
         scale = min(scale, 1.0)
     else:
         scale = needed_param / param_sum
+    # HONEST SURFACING (Tristan 2026-07-18): a LARGE rescale (raw parametric BoM far from
+    # gold) is a CALIBRATION, not an independent validation — forcing a suspicious exact
+    # 1.0× gold ratio hides that the engine's own bottom-up estimate was 1.7×–4.9× gold
+    # (Poseidon raw £893 vs £184). "Flag, not silent forced-fit": mark the disclosure when
+    # raw diverges > ±30% so the gold check + BoM tab can surface it, and record it for the
+    # dossier. The delivered price stays gold-anchored (the band is the price authority);
+    # what changes is that the masking is now VISIBLE, not a silent perfect ratio.
+    raw_ratio = before / target if target > 0 else 0.0
+    masked = raw_ratio > 1.30 or (raw_ratio < 0.70 and raw_ratio > 0)
+    cal = ("⚠ CALIBRATION-MASKED: " if masked else "")
     for r in parametric:
         qy = max(1, int(r.get("qty") or 1))
         old_line = float(r.get("line_gbp") or 0)
@@ -2385,12 +2395,24 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
         r["unit_gbp"] = round(new_line / qy, 2)
         r["basis"] = (
             (str(r.get("basis") or "") + " · ").lstrip(" ·")
-            + f"instrument gold-band rescale ×{scale:.3f} "
+            + f"{cal}instrument gold-band rescale ×{scale:.3f} "
             f"(parametric residue; catalogue pins held; "
-            f"materials were £{before:,.0f} → target £{target:,.0f} gold mid)"
+            f"materials were £{before:,.0f} = {raw_ratio:.2f}× gold "
+            f"→ target £{target:,.0f} gold mid)"
         )
     after = sum(float(r.get("line_gbp") or 0) for r in priced)
+    global _LAST_INSTRUMENT_RESCALE
+    _LAST_INSTRUMENT_RESCALE = {
+        "before_gbp": round(before, 2), "after_gbp": round(after, 2),
+        "target_gbp": round(target, 2), "scale": round(scale, 4),
+        "raw_ratio": round(raw_ratio, 3), "masked": masked,
+    }
     return (before, after)
+
+
+# Module-level record of the most recent instrument gold-band rescale, so the dossier /
+# gold check can surface a large (masking) rescale honestly instead of a silent 1.0×.
+_LAST_INSTRUMENT_RESCALE: dict | None = None
 
 
 # ── PART-NUMBER-DERIVED COMMODITY CLASS (council 2026-06-17, the marine-RAS mis-PIN
