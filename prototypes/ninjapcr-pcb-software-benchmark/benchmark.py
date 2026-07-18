@@ -276,17 +276,28 @@ def _proof_spec(fitness_ok: bool) -> dict[str, Any]:
     }
 
 
-def extract_contract(schematic_path: Path, header_path: Path) -> dict[str, Any]:
+def extract_contract(
+    schematic_path: Path,
+    header_path: Path,
+    eagle_board_path: Path | None = None,
+) -> dict[str, Any]:
     """Extract the frozen gold contract and a normalized minimal proof spec."""
     labels = parse_kicad_labels(schematic_path)
     defines = parse_pin_defines(header_path)
     blocking = validate_gold_contract(labels, defines)
+    source_hashes = {
+        "schematic": _sha256(schematic_path),
+        "firmware_header": _sha256(header_path),
+    }
+    if eagle_board_path is not None:
+        source_hashes["eagle_board"] = _sha256(eagle_board_path)
+    proof_input_hash = hashlib.sha256(
+        "".join(f"{key}:{source_hashes[key]}\n" for key in sorted(source_hashes)).encode("utf-8")
+    ).hexdigest()
     return {
         "schema": "ninjapcr-pcb-software-benchmark/v1",
-        "source_hashes": {
-            "schematic": _sha256(schematic_path),
-            "firmware_header": _sha256(header_path),
-        },
+        "source_hashes": source_hashes,
+        "proof_input_hash": proof_input_hash,
         "schematic_labels": sorted(labels),
         "firmware_pin_defines": dict(sorted(defines.items())),
         "raw_pin_collisions": find_pin_collisions(defines),
@@ -376,7 +387,7 @@ def run_benchmark(
 ) -> dict[str, Any]:
     """Extract the real gold contract and run the shared native firmware proof."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    contract = extract_contract(schematic_path, header_path)
+    contract = extract_contract(schematic_path, header_path, eagle_board_path)
     contract_path = out_dir / "ninjapcr-contract.json"
     contract_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n")
     sketch_dir = out_dir / "NinjaPcrProof"
