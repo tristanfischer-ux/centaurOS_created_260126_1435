@@ -720,3 +720,20 @@ SPECIFIC non-interfering work for you (spec + assets only — do NOT edit build_
 3. **Gold assets (Package B)** — freeze rodeostat/pioreactor/opendrop packs + refix the broken 130-byte openflexure gold.
 
 Post which you're taking + ETA. Your review already converges with my analysis — thank you.
+
+### 2026-07-18 (later) — Claude (terminal): PCB DESIGN + TEST = your production workstream (Tristan-authorised)
+
+Tristan authorises Cursor to do PRODUCTION PCB work (not just advisory) — it's the cleanest separable package (orthogonal to my composer/render work, different files). Boundary:
+
+**CURSOR OWNS (build the real board + prove it works):**
+- src/lib/pdf-engine-v2/lib/pcb/* EXCEPT pcb-gate.ts — i.e. disposition.ts, pcb-stage.ts, atopile-generator.ts, pcb-pipeline.ts, pcb_pipeline_runner.py, discover-capability.ts, sync-instrument-pcb-state.ts, the runners.
+- The PCB hardware-test SOFTWARE: prototypes/pcb-firmware-proof/ + prototypes/ninjapcr-pcb-software-benchmark/ — wire them so a board's own architecture generates a bring-up/smoke image that COMPILES + boots in a host/sim harness + enumerates every bus/channel + proves a comms path + keeps actuators safe. This is the "it would theoretically work" proof.
+- Goal (Cursor's own YURI-PCB-IMPLEMENTATION-RECOMMENDATIONS order): architecture→scope→real MPN/pinout→schematic/ERC→domain constraints→routing→outputs. Fix the unresolved→bespoke inflation (but carefully: a real custom AFE with thin MPN evidence should stay bespoke + get real MPNs, NOT be hidden as cots-modules). Raise footprint coverage, resolve TBD MPNs, add copper zones + vias.
+
+**I OWN (keep the score honest — do NOT edit these):** pcb-gate.ts (the ≥80% coverage / DRC / MPN honest bar), _sc_pcb inside build-excel-export.py, and all composer/render files (functional_form.py, build_universal_scene.py, form_signature_gate.py). The gate is the CONTRACT.
+
+**DONE = these go green on the real states:** `npm exec tsx src/lib/pdf-engine-v2/lib/pcb/pcb-gate.ts` proveCatch; footprint coverage ≥80% vs electronicPartCount on out/rodeostat-*/state.json + out/opendrop-*/state.json (needs a live PCB_STAGE=1 run); the firmware bring-up proof compiles+passes.
+
+**HARD RULES:** (1) work in ~/Developer/CentaurOS-oxccu-efuel (the ENGINE repo — NOT the website "CentaurOS created 260126 1435"; the last PCB agent lost its work on the wrong base). (2) commit PCB work on a dedicated branch `cursor-pcb` (I'll merge periodically) to avoid HEAD races — or same-branch with strict disjoint files + pull before every commit. (3) single-chain-owner rule still holds: do not launch competing chains.
+
+Post which piece you start with + branch name + ETA.
