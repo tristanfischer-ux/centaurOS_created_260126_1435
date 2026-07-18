@@ -94,6 +94,7 @@ export type FunctionClass =
   | 'power_module'
   | 'passive_c'
   | 'passive_r'
+  | 'passive_l'
   | 'fuse_protection'
   | 'diode_protection'
   | 'memory_ic'
@@ -116,25 +117,26 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // this it landed in unresolved[] ELECTRONIC gap and capped PCB at DRAFT/5.
   { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
-  { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless/i },
+  { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless|wi[_-]?fi|host[_-]?protocol[_-]?bridge|protocol[_-]?bridge|level[_-]?shifter/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
   // INTENT (Poseidon 2026-07-16): stepper/microstep/H-bridge driver boards are
   // gate-drive ICs (SOIC-8 class default) — without this, `stepper_driver_board`
   // landed in unresolved[] and floored the PCB readiness gate.
-  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver/i },
+  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
   { id: 'regulator', test: /controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
   { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient/i },
   { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?memory|eeprom|nonvolatile[_-]?memory/i },
-  { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port)|type[_-]?c/i },
-  { id: 'passive_c', test: /capacitor/i },
+  { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port)|type[_-]?c|debug[_-]?(?:interface|header|uart)|uart[_-]?header/i },
+  { id: 'passive_c', test: /capacitor|decoupling/i },
   // current_sense_on_driver / sense_shunt → SMD resistor (shunt), not unresolved.
   // GOTCHA: do not bare-match `current_sense` alone — that can be an amplifier IC.
   { id: 'passive_r', test: /resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor/i },
+  { id: 'passive_l', test: /ferrite|inductor|choke/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
   { id: 'display_module', test: /display[_-]?panel|\block?d\b|\boled\b|\btft\b|screen/i },
   { id: 'led', test: /status[_-]?indicator|annunciator|led[_-]?source|^led\b|[_-]led\b/i },
-  { id: 'switch', test: /control[_-]?switch|power[_-]?switch|pushbutton|(^|[_-])switch($|[_-])/i },
+  { id: 'switch', test: /control[_-]?switch|power[_-]?switch|pushbutton|estop|e[_-]?stop|power[_-]?kill|(^|[_-])switch($|[_-])/i },
   { id: 'connector', test: /interface_membrane|connector|receptacle|header|terminal/i },
 ]
 
@@ -309,6 +311,16 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     decouple: false,
     resolutionTier: 'package_family',
   },
+  passive_l: {
+    library: 'Inductor_SMD',
+    filenameTest: /^L_0603_1608Metric\.kicad_mod$/,
+    designatorPrefix: 'L',
+    pins: ['P1', 'P2'],
+    powerPin: null,
+    groundPin: null,
+    decouple: false,
+    resolutionTier: 'package_family',
+  },
   fuse_protection: {
     library: 'Fuse',
     filenameTest: /^Fuse_1206_3216Metric\.kicad_mod$/,
@@ -406,7 +418,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
 const AREA_MM2_BY_CLASS: Partial<Record<FunctionClass, number>> = {
   microcontroller: 64, sensor_ic: 20, op_amp: 20, connectivity_ic: 25,
   io_connector: 60, regulator: 15, gate_driver_ic: 20, power_module: 80,
-  passive_c: 1.3, passive_r: 1.3, fuse_protection: 4, diode_protection: 2,
+  passive_c: 1.3, passive_r: 1.3, passive_l: 1.3, fuse_protection: 4, diode_protection: 2,
   memory_ic: 20, usb_connector: 32, battery_connector: 32, display_module: 600,
   led: 1.3, switch: 12, connector: 40,
 }
@@ -602,12 +614,32 @@ export interface GenerateAtopileProjectResult {
 export interface GenerateAtopileProjectOptions {
   footprintsRoot?: string
   requiredWordIds?: string[]
+  requiredFunctionRoles?: string[]
   boardShape?: PcbBoardShapeContract
 }
 
 function sanitizeIdentifier(id: string): string {
   const cleaned = id.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1')
   return cleaned || 'part'
+}
+
+function requiredFunctionWord(role: string): ElectronicWordRef {
+  const normalizedRole = sanitizeIdentifier(role).toLowerCase()
+  const characterId = /electrode.*channel/i.test(normalizedRole)
+    ? `${normalizedRole}_connector`
+    : `${normalizedRole}_driver`
+  return {
+    moduleId: 'pcb_architecture',
+    subModuleId: 'board_function_requirements',
+    wordId: `required_${normalizedRole}_word`,
+    nameHuman: role.replace(/_/g, ' '),
+    characterId,
+    modifiers: {},
+    categories: [
+      /electrode.*channel/i.test(normalizedRole) ? 'board_role' : 'power_electronics',
+    ],
+    quantity: 1,
+  }
 }
 
 function sanitizePinName(pin: string | null): string | null {
@@ -647,7 +679,7 @@ const COTS_DETECTOR_MODULE_RE =
 // are purchased host modules for OPEN lab microscopes — same off-board path as
 // PyBadge-class compute/UI kits. Noun-keyed (never product==openflexure).
 const COTS_COMPUTE_UI_MODULE_RE =
-  /\bcompute[_ -]?ui[_ -]?module\b|\b(?:controller|mcu).{0,24}(?:ui|display|badge).{0,16}module\b|\b(?:sbc|compute[_ -]?module|raspberry[_ -]?pi|single[_ -]?board[_ -]?computer|motor[_ -]?controller[_ -]?board|sangaboard)\b/i
+  /\bcompute[_ -]?ui[_ -]?module\b|\b(?:controller|mcu).{0,24}(?:ui|display|badge).{0,16}module\b|\b(?:sbc|compute[_ -]?module|raspberry[_ -]?pi|single[_ -]?board[_ -]?computer|motor[_ -]?controller[_ -]?board|sangaboard|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge|usb[_ -]?uart)\b/i
 
 const INSTRUMENT_OPTOMECH_WORD_RE =
   /\b(collimat\w*|lens|optic(?:al)?|optics?[_ -]?tube|tube[_ -]?assembly|objective(?:[_ -]?mount)?|\brms\b|webcam|pi[_ -]?camera|grade[_ -]?camera|camera[_ -]?module|flexure(?:[_ -]?stage)?|condenser|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?(?:bezel|plate|standoff)|pcb[_ -]?mounting[_ -]?standoff|standoff|detector[_ -]?mount|face[_ -]?plate|front[_ -]?panel)\b/i
@@ -958,11 +990,10 @@ function resolveComponent(
     }
   }
 
-  // INTENT (2026-07-14): scoring's mpn_package axis means "word carries a real MPN",
-  // not "footprint came from DigiKey package text". A real part_number whose footprint
-  // resolved via function-class default was previously left at package_family — so
-  // TLC5916IDR / MCP1700 boards scored 8.1 forever. Promote whenever partNumber is real.
-  if (partNumber && tier !== 'unresolved') {
+  // INTENT: The MPN confidence axis means catalogue-verified identity, not merely
+  // a plausible-looking string in an upstream word. Unverified candidates retain
+  // their evidence but may only claim package/function-class resolution.
+  if (partNumber && mpnVerified && tier !== 'unresolved') {
     tier = 'mpn_package'
   }
 
@@ -1190,7 +1221,7 @@ function emitComponentBlock(component: AtopileComponentRecord): string {
   // no `value:` physical type the remote resistor/capacitor endpoint requires).
   // NEVER prefix a placeholder mpn with "generic_" — use the engine's own
   // "TBD (detailed design)" concept-stage convention instead.
-  const mpnComment = component.partNumber
+  const mpnComment = component.mpnVerified && component.partNumber
     ? `${component.manufacturer ?? ''} ${component.partNumber}`.trim()
     : `TBD (detailed design) - ${component.functionClass ?? 'part'}`
   lines.push(`    mpn = "${mpnComment.replace(/"/g, "'")}"`)
@@ -1243,15 +1274,26 @@ export function generateAtopileProject(
 
   const allElectronicWords = collectElectronicWords(state)
   const requiredWordIds = opts.requiredWordIds ? new Set(opts.requiredWordIds) : null
-  const electronicWords = requiredWordIds
+  const scopedElectronicWords = requiredWordIds
     ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
     : allElectronicWords
+  // INTENT: A board architecture may be forced by channel/function contracts
+  // even when the upstream BoM has no component-level electronic word yet.
+  // Emit an honest function-class requirement (null MPN), never an empty board.
+  const electronicWords = scopedElectronicWords.length > 0
+    ? scopedElectronicWords
+    : (opts.requiredFunctionRoles ?? []).map(requiredFunctionWord)
 
   const components: AtopileComponentRecord[] = []
   const offBoard: AtopileOffBoardCotsRecord[] = []
   const unresolved: AtopileUnresolvedRecord[] = []
   for (const word of electronicWords) {
-    const cotsReason = offBoardCotsReason(word, electronicWords, state)
+    // DECISION: requiredWordIds is the architecture planner's authoritative
+    // on-board scope. Legacy procurement heuristics may classify unplanned
+    // projects, but must never reverse an explicit on-board assignment.
+    const cotsReason = requiredWordIds
+      ? null
+      : offBoardCotsReason(word, electronicWords, state)
     if (cotsReason) {
       offBoard.push({
         wordId: word.wordId,

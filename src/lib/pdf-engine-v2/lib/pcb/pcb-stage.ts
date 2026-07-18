@@ -69,7 +69,7 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   },
   {
     category: 'connectivity',
-    pattern: /\b(usb|bluetooth|\bble\b|wi-?fi|rf transceiver|\bantenna\b|\buart\b|\bi2c\b|\bspi\b|\bcan bus\b|zigbee|lora)\b/i,
+    pattern: /\b(usb|bluetooth|\bble\b|wi-?fi|rf transceiver|\bantenna\b|\buart\b|\bi2c\b|\bspi\b|\bcan bus\b|zigbee|lora|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge|level[_ -]?shifter)\b/i,
   },
   {
     category: 'board_role',

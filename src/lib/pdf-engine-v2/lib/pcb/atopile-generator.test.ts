@@ -1136,4 +1136,42 @@ describe('atopile-generator', () => {
     expect(result.unresolved[0].wordId).toBe('mystery_electronic_word')
     expect(result.unresolved[0].reason.length).toBeGreaterThan(0)
   })
+
+  it('never promotes or emits an unverified candidate MPN', () => {
+    const outDir = makeTmpDir('atopile-unverified-mpn-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'power_distribution',
+          sub_modules: [{
+            id: 'power_distribution__filtering',
+            words: [{
+              id: 'dc_link_capacitor_word',
+              name_human: 'DC Link Capacitor',
+              content_character: { character_id: 'dc_link_capacitor' },
+              modifier_characters: [
+                { kind: 'part_number', value: 'NOT-A-REAL-MPN-999' },
+                { kind: 'form', value: '0603 capacitor on the power rail' },
+              ],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['dc_link_capacitor_word'],
+    })
+    const capacitor = result.components.find(
+      (component) => component.wordId === 'dc_link_capacitor_word',
+    )
+    const mainAto = readFileSync(result.mainAtoPath, 'utf8')
+
+    expect(capacitor?.mpnVerified).toBe(false)
+    expect(capacitor?.resolutionTier).toBe('package_family')
+    expect(mainAto).not.toContain('NOT-A-REAL-MPN-999')
+    expect(mainAto).toContain('TBD (detailed design) - passive_c')
+  })
 })

@@ -199,8 +199,14 @@ function board(
 }
 
 function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBoardPlan | undefined {
-  if (boards.length <= 1) return boards[0]
   const text = `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`.toLowerCase()
+  if (boards.length === 1) {
+    const onlyBoard = boards[0]
+    if (onlyBoard.role !== 'optical_source_daughterboard') return onlyBoard
+    return /led.?source|led.?driver|light.?source|optical.?source|source.?board|illumination|emitter/.test(text)
+      ? onlyBoard
+      : undefined
+  }
   const exactRoleBoard = boards.find((candidate) => {
     if (candidate.role === 'electrode_cartridge') return /electrode|cartridge|array|reservoir/.test(text)
     if (candidate.role === 'high_voltage_controller') {
@@ -232,6 +238,21 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
       candidate.domains.includes('power') || candidate.domains.includes('high_voltage'))
   }
   return undefined
+}
+
+function nonBoardPlacement(
+  word: ElectronicWordRef,
+): Pick<PcbWordAssignment, 'placement' | 'reasons'> | null {
+  const text = `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`.toLowerCase()
+  if (/cable|harness|standoff|bezel|window.?seal|legend|mounting.?plate/.test(text)) {
+    return { placement: 'interconnect_only', reasons: ['mechanical_or_interconnect_role'] }
+  }
+  if (
+    /compute.?ui.?module|detector.?module|wavelength.?selection.?module|bench.?psu/.test(text)
+  ) {
+    return { placement: 'off_board_module', reasons: ['purchased_or_host_side_module'] }
+  }
+  return null
 }
 
 /**
@@ -407,10 +428,17 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     if (systemDisposition === 'cots_only') {
       return { wordId: word.wordId, placement: 'off_board_module', reasons: ['cots_only_system'] }
     }
+    const nonBoard = nonBoardPlacement(word)
+    if (nonBoard) {
+      return { wordId: word.wordId, ...nonBoard }
+    }
     const selectedBoard = assignmentBoard(word, boards)
     if (selectedBoard) {
       selectedBoard.requiredWordIds.push(word.wordId)
       return { wordId: word.wordId, placement: 'on_board', boardId: selectedBoard.boardId, reasons: ['function_role_board_assignment'] }
+    }
+    if (boards.some((candidate) => candidate.role === 'optical_source_daughterboard')) {
+      return { wordId: word.wordId, placement: 'off_board_module', reasons: ['optical_source_board_excludes_host_role'] }
     }
     return { wordId: word.wordId, placement: 'unassigned', reasons: ['no_board_plan'] }
   })

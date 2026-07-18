@@ -33,7 +33,7 @@ describe('Yuri PCB gold architecture harness', () => {
       !product.failureCodes.includes('missing_expected_board'))).toBe(true)
   })
 
-  it('closes every architecture-level gold finding while preserving downstream generator findings', () => {
+  it('closes every architecture-level gold finding independently of generator checks', () => {
     const report = verifyYuriGoldStates({
       fixturePath: FIXTURE_PATH,
       sourceOutRoot: MAIN_OUT_ROOT,
@@ -63,7 +63,7 @@ describe('Yuri PCB gold architecture harness', () => {
     })))
   })
 
-  it('keeps an explicit all-seven residual report for downstream work', () => {
+  it('closes the downstream generator residuals for all seven products', () => {
     const report = verifyYuriGoldStates({
       fixturePath: FIXTURE_PATH,
       sourceOutRoot: MAIN_OUT_ROOT,
@@ -72,20 +72,13 @@ describe('Yuri PCB gold architecture harness', () => {
     expect(Object.fromEntries(
       report.products.map((product) => [product.product, product.failureCodes]),
     )).toEqual({
-      Colorimeter: ['board_scope_reclassified_off_board'],
-      NinjaPCR: ['board_scope_reclassified_off_board'],
+      Colorimeter: [],
+      NinjaPCR: [],
       Poseidon: [],
       OpenFlexure: [],
-      Pioreactor: [
-        'board_scope_reclassified_off_board',
-        'unresolved_components',
-        'empty_generated_project',
-      ],
-      Rodeostat: ['board_scope_reclassified_off_board'],
-      OpenDrop: [
-        'board_scope_reclassified_off_board',
-        'empty_generated_project',
-      ],
+      Pioreactor: [],
+      Rodeostat: [],
+      OpenDrop: [],
     })
   })
 })

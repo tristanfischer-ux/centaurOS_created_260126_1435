@@ -246,6 +246,7 @@ function generateExpectedBoardProjects(
     try {
       const generated = generateAtopileProject(state, projectDir, {
         requiredWordIds: boardPlan.requiredWordIds,
+        requiredFunctionRoles: boardPlan.channelRequirements.map((requirement) => requirement.role),
         boardShape: boardPlan.shape,
       })
       routingArtifacts.push(...listRoutingArtifacts(projectDir))
