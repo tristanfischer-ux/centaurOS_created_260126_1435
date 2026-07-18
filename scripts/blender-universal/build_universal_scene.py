@@ -12362,6 +12362,7 @@ _SEALED_ENV_MM = None   # (W, D, H) set by place_sealed_enclosure — the hero c
 _SEALED_FRONT_COVER = None
 _SEALED_SHELL_OBJECTS = []
 _LE_SIGNATURE = "generic"   # lab_electronics sub-type by contract signal (set in _sealed_enclosure_env_mm)
+_COMPOSER_STATE = None      # the run state, set in main(), read by the COMPOSER=1 universal placer
 _SEALED_CUTAWAY_MATERIAL = None
 _SEALED_EXTERIOR_MATERIAL = None
 _CAD_RESOLVER = None
@@ -12926,6 +12927,20 @@ def _prepare_sealed_product_view(view_name, entering):
                 obj.data.materials.clear()
                 obj.data.materials.append(_SEALED_CUTAWAY_MATERIAL)
     if entering and view_name in exterior_views:
+        # COMPOSER=1: the composed product is the u_se_cf_* meshes on/around the shell base.
+        # Show the shell + composed parts; hide all other product-namespace clutter.
+        if os.environ.get("COMPOSER"):
+            if _SEALED_FRONT_COVER is not None:
+                _SEALED_FRONT_COVER.hide_render = True   # composed form is the product face
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) not in ("MESH", "CURVE", "SURFACE"):
+                    continue
+                nm = obj.name
+                if nm.startswith(("u_se_cf_", "u_se_product_bottom", "u_se_product_deck")):
+                    obj.hide_render = False
+                elif nm.startswith("u_se_"):
+                    obj.hide_render = True
+            return
         # DECISION (thermocycler 2026-07-15 SIGHT on 1330 04/07): optical handhelds
         # want a closed opaque face; a benchtop PCR with an OPEN LID must still show
         # the sample-block deck + heatsink through side vents. Re-applying the
@@ -14641,6 +14656,87 @@ def _place_instrument_interior_layout(
     return form
 
 
+def _place_composed_form(W: float, D: float, H: float, base_z: float, MO: dict) -> bool:
+    """UNIVERSAL composer placer (COMPOSER=1) — build the product from functional_form's
+    geometry PLAN instead of a hardcoded family. This is the 'design→function→logical
+    assembly' path: an unseen archetype with a functional signal gets a coherent form, not
+    a box. Returns True if it placed a form (caller then SKIPS the hardcoded interior);
+    False if no plan (caller falls back). Emits a MEASURED form-proof.json (Cursor: proof =
+    delivered geometry, not intent)."""
+    global _COMPOSER_STATE
+    if _COMPOSER_STATE is None:
+        return False
+    try:
+        import functional_form as ff  # scripts/lib is on sys.path
+    except Exception as _exc:  # noqa: BLE001
+        print(f"[univ][composer] functional_form import failed: {_exc}")
+        return False
+    plan = ff.compose_geometry_plan(_COMPOSER_STATE, (W, D, H), base_z)
+    if not plan.get("ok"):
+        print(f"[univ][composer] no plan ({plan.get('reason')}) — falling back")
+        return False
+
+    def _mm3(t):
+        return tuple(c * fl.MM for c in t)
+
+    _skin = "structure_containment"
+    _mat_role = {
+        "grid": fl.make_mat("m_cf_grid", fl._to_linear((0.72, 0.58, 0.22)), metallic=0.85, roughness=0.35),
+        "vial": fl.make_mat("m_cf_vial", fl._to_linear((0.80, 0.88, 0.92)), metallic=0.0, roughness=0.05, kind="glass", alpha=0.35),
+        "cylinder": fl.make_mat("m_cf_cyl", fl._to_linear((0.55, 0.55, 0.58)), metallic=0.5, roughness=0.4),
+        "box": fl.make_mat("m_cf_box", fl._to_linear((0.20, 0.21, 0.24)), metallic=0.2, roughness=0.5),
+        "open-frame": fl.make_mat("m_cf_frame", fl._to_linear((0.30, 0.42, 0.72)), metallic=0.1, roughness=0.5),
+    }
+    n = 0
+    for p in plan["placements"]:
+        nm = "u_se_cf_" + re.sub(r"[^a-zA-Z0-9_]", "_", str(p["name"]))
+        shape = p["shape"]
+        ctr, sz = tuple(p["center_mm"]), tuple(p["size_mm"])
+        mat = _mat_role.get(shape, _mat_role["box"])
+        try:
+            if shape == "grid":
+                # a real pad MATRIX (rows×cols), not one box — the signature of an array device
+                gw, gd, gt = sz
+                ncol, nrow = 8, 5
+                cw, cd = gw / ncol, gd / nrow
+                cell = min(cw, cd) * 0.82
+                for r in range(nrow):
+                    for c in range(ncol):
+                        gx = ctr[0] + (c - (ncol - 1) / 2.0) * cw
+                        gy = ctr[1] + (r - (nrow - 1) / 2.0) * cd
+                        _o = fl.add_box(f"{nm}_{r}_{c}", _mm3((gx, gy, ctr[2])),
+                                        _mm3((cell, cell, gt)), mat, module=_skin, module_objects=MO)
+                        _o.dimensions = _mm3((cell, cell, gt))
+                        n += 1
+            elif shape in ("cylinder", "vial"):
+                _o = fl.add_cyl(nm, _mm3(ctr), (sz[0] / 2) * fl.MM, sz[2] * fl.MM, mat,
+                                module=_skin, module_objects=MO)
+                n += 1
+            else:  # box / open-frame
+                _o = fl.add_box(nm, _mm3(ctr), _mm3(sz), mat, module=_skin, module_objects=MO)
+                _o.dimensions = _mm3(sz)
+                n += 1
+        except Exception as _pe:  # noqa: BLE001
+            print(f"[univ][composer] placement {nm} failed: {_pe}")
+    # MEASURED form-proof: what actually got placed (roles + world-bbox) + the plan's
+    # connectedness — the delivered evidence, not intent.
+    try:
+        out = os.environ.get("BLENDER_OUT_DIR") or ""
+        if out:
+            proof = ff.compose_form(_COMPOSER_STATE)
+            placed = sorted(o.name for o in bpy.data.objects
+                            if getattr(o, "type", None) == "MESH" and o.name.startswith("u_se_cf_"))
+            Path(out).joinpath("form-proof.json").write_text(json.dumps({
+                "schema": "form-proof/v1(delivered)", "working_medium": plan.get("working_medium"),
+                "axis": plan.get("axis"), "n_meshes_placed": n,
+                "placed_roles": placed, "connectedness": proof.get("connectedness"),
+                "plan": plan}, indent=2))
+    except Exception as _fe:  # noqa: BLE001
+        print(f"[univ][composer] form-proof write skipped: {_fe}")
+    print(f"[univ][composer] placed {n} meshes for medium={plan.get('working_medium')} axis={plan.get('axis')}")
+    return n > 0
+
+
 def _place_lab_electronics_interior_layout(
     W: float,
     D: float,
@@ -16127,8 +16223,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     gap = max(4.0, iw * 0.015)
     min_slot_w = max(40.0, iw / 8.0)
     if _IS_INSTRUMENT_DEVICE:
-        # Single form-aligned interior composition (not vertical zone slabs).
-        _place_instrument_interior_layout(W, D, H, base_z, t, _story_mod, MO)
+        # COMPOSER=1: build the product from functional_form's geometry PLAN (universal,
+        # works on an unseen archetype). Falls back to the hardcoded family placer when no
+        # plan resolves, so the 7 known forms are untouched unless COMPOSER is set.
+        if os.environ.get("COMPOSER") and _place_composed_form(W, D, H, base_z, MO):
+            pass
+        else:
+            # Single form-aligned interior composition (not vertical zone slabs).
+            _place_instrument_interior_layout(W, D, H, base_z, t, _story_mod, MO)
     for key, frac, _rx in zones:
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
@@ -22897,6 +22999,8 @@ def main():
     print(f"[univ] state={state_path}")
     print(f"[univ] out  ={out_dir}")
     state = load_state(state_path)
+    global _COMPOSER_STATE
+    _COMPOSER_STATE = state   # for the COMPOSER=1 universal placer
 
     # Tell connection_sizing the plant SALINITY (for the marine→duplex pipe-material rule). Read
     # from the contract; absent / fresh-water leaves it None so a non-marine plant is unchanged.
