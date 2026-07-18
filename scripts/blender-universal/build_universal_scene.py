@@ -12930,13 +12930,16 @@ def _prepare_sealed_product_view(view_name, entering):
         # COMPOSER=1: the composed product is the u_se_cf_* meshes on/around the shell base.
         # Show the shell + composed parts; hide all other product-namespace clutter.
         if os.environ.get("COMPOSER"):
+            # The composed u_se_cf_* meshes ARE the whole product (the chassis role is the
+            # base body). Hide the generic shell entirely so there is ONE cohesive object,
+            # not the shell slabs PLUS the composed form (the two-floating-slabs defect).
             if _SEALED_FRONT_COVER is not None:
-                _SEALED_FRONT_COVER.hide_render = True   # composed form is the product face
+                _SEALED_FRONT_COVER.hide_render = True
             for obj in bpy.data.objects:
                 if getattr(obj, "type", None) not in ("MESH", "CURVE", "SURFACE"):
                     continue
                 nm = obj.name
-                if nm.startswith(("u_se_cf_", "u_se_product_bottom", "u_se_product_deck")):
+                if nm.startswith("u_se_cf_"):
                     obj.hide_render = False
                 elif nm.startswith("u_se_"):
                     obj.hide_render = True

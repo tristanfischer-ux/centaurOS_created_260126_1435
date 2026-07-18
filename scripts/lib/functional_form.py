@@ -511,19 +511,22 @@ class Placement:
 # Axis → how the role stack lays out in the (W, D, H) envelope. Each returns a dict
 # role → (center, size, exterior). Universal: keyed on the primary axis, not the product.
 def _plan_planar_array(roles, W, D, H, bz):
-    """electric_field: electrode GRID on the deck top; cartridge above it; drivers in base."""
-    top = bz + H
+    """electric_field: the controller_deck IS the base body (open PCBA); the electrode GRID
+    sits CONTIGUOUS on its top face; cartridge just above; HV driver inside the deck. One
+    cohesive stack — the deck is the chassis every other role attaches to (no floating)."""
+    deck_h = max(H, 8.0)
+    deck_top = bz + deck_h
     out = {}
     for rv in roles:
         r = rv.role
         if "grid" in r:
-            out[r] = ((0, 0, top + 1.0), (W * 0.66, D * 0.62, 1.4), True)     # pad matrix on deck
+            out[r] = ((0, 0, deck_top + 0.7), (W * 0.66, D * 0.62, 1.4), True)   # pads ON the deck
         elif "cartridge" in r:
-            out[r] = ((0, 0, top + 3.0), (W * 0.5, D * 0.5, 2.0), True)
+            out[r] = ((0, 0, deck_top + 2.6), (W * 0.5, D * 0.5, 2.0), True)      # over the grid
         elif "hv" in r:
-            out[r] = ((W * 0.3, 0, bz + H * 0.4), (W * 0.2, D * 0.3, H * 0.4), False)
-        else:  # controller deck
-            out[r] = ((-W * 0.28, 0, top + 1.2), (W * 0.16, D * 0.28, 2.4), True)
+            out[r] = ((W * 0.3, 0, bz + deck_h * 0.4), (W * 0.2, D * 0.3, deck_h * 0.5), False)
+        else:  # controller_deck = the base body/chassis (full footprint)
+            out[r] = ((0, 0, bz + deck_h * 0.5), (W, D, deck_h), True)
     return out
 
 
