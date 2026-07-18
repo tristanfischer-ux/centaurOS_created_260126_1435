@@ -12987,6 +12987,51 @@ def _prepare_sealed_product_view(view_name, entering):
                         continue
                     obj.data.materials.clear()
                     obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
+        elif _IS_INSTRUMENT_DEVICE and _IS_LAB_ELECTRONICS_FORM:
+            # LEAK FIX (Tristan 2026-07-18 SIGHT): lab_electronics fell to the optical
+            # `else` which never hid the u_se_le_* INTERIOR boards — so the PCB/chips/USB
+            # boxes (placed at base_z+H*0.28..0.55) PROTRUDED past / floated behind the
+            # sealed shell = the "generic grey box + detached floating module" seen on
+            # rodeostat/pioreactor/opendrop. The exterior product view is the SEALED shell
+            # + the face connectors (USB/BNC = real product language) ONLY; the board,
+            # chips and coin cell are interior (cutaway/hero) and must be hidden here.
+            if _SEALED_FRONT_COVER is not None:
+                _SEALED_FRONT_COVER.hide_render = False
+            # DEFAULT-HIDE (robust): the sealed exterior is the SHELL + genuine exterior
+            # signature parts ONLY. Everything else in the u_se_* product namespace
+            # (interior boards u_se_le_pcb/chip/cell, interior-positioned USB/BNC, the
+            # optical-story cutaway props, and the u_se_exterior_detail_source_harness
+            # wire that floated as a red/blue stub) is interior/cutaway and MUST be hidden
+            # here — mirrors how the working forms hide-all-but-keep. Non-u_se_ meshes
+            # (ground slab, backdrop) and lights/cameras are left untouched.
+            _keep = ("u_se_le_lead", "u_se_le_electrode", "u_se_le_grid",
+                     "u_se_le_cartridge", "u_se_le_vial", "u_se_le_od",
+                     "u_se_le_enclosure", "u_se_le_face")
+            _shell_ids = {id(o) for o in _SEALED_SHELL_OBJECTS if o}
+            if _SEALED_FRONT_COVER is not None:
+                _shell_ids.add(id(_SEALED_FRONT_COVER))
+            # Process ALL renderable-geometry types (not just MESH): the floating
+            # red/blue stub was the u_se_exterior_detail_source_harness WIRE, a CURVE
+            # (bevelled), which a MESH-only pass skipped → it stayed visible. Never touch
+            # LIGHT/CAMERA/EMPTY (hiding a light blacks the scene).
+            _geo_types = {"MESH", "CURVE", "SURFACE", "META", "FONT"}
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) not in _geo_types:
+                    continue
+                nm = obj.name
+                if id(obj) in _shell_ids or nm.startswith(_keep) or nm.startswith("u_se_product_"):
+                    obj.hide_render = False           # shell + face + signature parts
+                elif nm.startswith(("u_se_", "u_wire_", "u_pipe_", "u_exterior_")):
+                    obj.hide_render = True             # all other product-namespace clutter
+            if os.environ.get("DEBUG_LE"):
+                _vis = sorted(f"{o.name}:{o.type}" for o in bpy.data.objects
+                              if getattr(o, "type", None) in _geo_types and not o.hide_render)
+                print(f"[DEBUG_LE] view={view_name} LE_branch RAN; visible geo ({len(_vis)}): {_vis}")
+            if _SEALED_EXTERIOR_MATERIAL is not None:
+                for obj in _SEALED_SHELL_OBJECTS:
+                    if obj and obj.data:
+                        obj.data.materials.clear()
+                        obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
         else:
             _SEALED_FRONT_COVER.hide_render = False
             for obj in bpy.data.objects:
