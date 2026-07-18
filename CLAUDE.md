@@ -5,6 +5,9 @@
 > **Sub-agent model selection:** See `~/.claude/CLAUDE.md` for auto-toggle rules. Re-grep `src/lib/agents/specialists-config.ts` if uncertain.
 > **Dossier-quality sessions:** run as the adversarial chartered engineer — see [OPERATING-FRAME-2026-06.md](./OPERATING-FRAME-2026-06.md). The standing directive (§2) + the SIGHT mechanism (audit the DELIVERED artefact, not state.json — §0.5) are MANDATORY.
 > **Cursor harness inbox (advisory):** See [docs/plans/CURSOR-HARNESS-INBOX.md](./docs/plans/CURSOR-HARNESS-INBOX.md) — Cursor recommendations; this terminal stays in charge.
+> **Yuri functional-form audit (2026-07-18, READ BEFORE FORM WORK):** [docs/plans/YURI-FUNCTIONAL-FORM-COEVOLUTION-FINDINGS-2026-07-18.md](./docs/plans/YURI-FUNCTIONAL-FORM-COEVOLUTION-FINDINGS-2026-07-18.md) — all seven accepted renders fail gold function-driven morphology despite dossier floor 9; includes the `functional-form/v1` SOURCE plan and proveCatch gates.
+> **Yuri PCB audit (2026-07-18, READ BEFORE PCB WORK):** [docs/plans/YURI-PCB-GOLD-GAP-AUDIT-2026-07-18.md](./docs/plans/YURI-PCB-GOLD-GAP-AUDIT-2026-07-18.md) — `pipeline.ok` / `clean_board` prove export hygiene only; current PCB work is token-level (~2/10), with per-product gold gaps and a `pcb-architecture/v1` SOURCE plan.
+> **Yuri PCB implementation specification (2026-07-18, APPLY AFTER THE AUDIT):** [docs/plans/YURI-PCB-IMPLEMENTATION-RECOMMENDATIONS-2026-07-18.md](./docs/plans/YURI-PCB-IMPLEMENTATION-RECOMMENDATIONS-2026-07-18.md) — exact root-cause trace, target TypeScript schemas, file-by-file changes with rationale, migration order, readiness/gate unification, and adversarial tests. This is guidance only; reconcile with the terminal's current diff before editing.
 
 ---
 
