@@ -169,6 +169,23 @@ def _derive_working_medium(state: dict) -> tuple[Optional[str], str]:
     opl = _q(state, "optical_path_length_mm")
     if opl is not None and float(opl) > 0:
         return "light", f"optical_path_length_mm={opl} (a transmittance beam through a sample)"
+    # STRUCTURAL / CARRIER (rack / enclosure / holder / free-flyer bus) — a device with NO
+    # working medium but a structural payload/enclosure signal is a CARRIER: its form is driven
+    # by envelope + mount + payload, not a physics. Detected AFTER every instrument medium so a
+    # real instrument still wins; only a payload/enclosure-only device falls here. (Yuri Gap B —
+    # closes B4 rack / B5 free-flyer / F3 shock-holder / G6 electronics box.)
+    for sig, why in (("payload_slot_count", "holds N payload slots — a rack/carrier"),
+                     ("rack_slot_count", "a standard experiment rack"),
+                     ("bay_count", "a multi-bay carrier")):
+        v = _q(state, sig)
+        if v is not None and float(v) > 0:
+            return "structural_carrier", f"{sig}={v} ({why})"
+    for flag, why in (("is_enclosure", "a sealed enclosure"),
+                      ("electronics_only", "an electronics-only box (PCB carrier)"),
+                      ("shock_isolated", "a shock/g-load-isolated sample holder"),
+                      ("free_flyer", "an autonomous free-flyer bus")):
+        if _q(state, flag) in (True, "true", "True", "yes", 1, "1"):
+            return "structural_carrier", f"{flag} set ({why} — a carrier, no working medium)"
     # last-resort product_class hint (kept minimal; signals should carry it)
     pc = ((state.get("parsedBrief") or {}).get("product_class") or "").lower()
     for medium, pat in (("light", "colorimeter|photometer|spectro|absorb|fluor"),
@@ -419,6 +436,20 @@ _MEDIUM_FORM_RULE: dict[str, dict[str, Any]] = {
                       # cassette role — the proof recognises it as a declared dock, not an orphan.
                       ("dock_interface", "removable_interface", "instrument", True)],
     },
+    "structural_carrier": {   # rack / enclosure / holder / free-flyer bus (Yuri Gap B, 2026-07-18).
+        # NO working medium — a carrier whose form is envelope + mount + payload. ONE universal
+        # form: an outer shell (chassis) + a standard mount interface + N payload bays inside.
+        # The payload-slot COUNT drives the array, so the SAME form is a rack (N bays) / a box or
+        # holder (1 bay) / a free-flyer bus — differentiated by count + envelope, not branches.
+        "axis": "carrier-frame", "interface": "payload-bay", "openness": "sealed",
+        "operator_view": "front", "access": "front", "hazard": None,
+        "chassis": "carrier_shell",
+        "roles": [("carrier_shell", "box", True, False, "base"),
+                  ("mount_interface", "box", True, True, "front"),
+                  ("payload_bay", "box", True, True, "sample")],
+        "relations": [("mount_interface", "fastened", "carrier_shell", False),
+                      ("payload_bay", "supported_by", "carrier_shell", False)],
+    },
     "image_plane": {
         "axis": "optical-column", "interface": "stage-slide", "openness": "mechanism-open",
         "operator_view": "top", "access": "top", "hazard": None,
@@ -467,6 +498,13 @@ def derive_functional_form(state: dict) -> FunctionalFormContract:
     if medium == "sealed_cartridge":
         for sig in ("reservoir_count", "culture_chamber_count", "crystal_well_count",
                     "fluidic_channel_count", "sample_well_count"):
+            v = _q(state, sig)
+            if v is not None and float(v) > 0:
+                c.repeated_count = max(1, int(float(v)))
+                break
+    # carrier repetition: the payload-slot count drives the bay array (rack N bays; box/holder 1)
+    if medium == "structural_carrier":
+        for sig in ("payload_slot_count", "rack_slot_count", "bay_count"):
             v = _q(state, sig)
             if v is not None and float(v) > 0:
                 c.repeated_count = max(1, int(float(v)))
@@ -618,6 +656,7 @@ def cull_infeasible(candidates: list[Arrangement], c: FunctionalFormContract) ->
         "electrode-grid+cartridge": "electrode_grid", "electrode-leads": "electrode_lead",
         "culture-vial": "culture_vial", "syringe-cradle": "syringe_cradle",
         "stage-slide": "stage", "rotor-slots": "rotor", "reservoir-ports": "reservoir",
+        "payload-bay": "bay",
     }.get(c.sample_interface or "", "")
     foreign = {
         "electric_field": {"manifold", "valve", "pipe", "pump_head", "cuvette"},
@@ -948,6 +987,39 @@ def _plan_planar_card(roles, W, D, H, bz, n):
     return out
 
 
+def _plan_carrier(roles, W, D, H, bz, n):
+    """structural_carrier: an outer shell/frame (chassis, full envelope) + a standard mount
+    interface on the front face + N payload bays arrayed INSIDE the shell (contained → their
+    AABBs overlap the shell → touching → one connected carrier). N=1 → a box / holder; N>1 →
+    a rack. Universal: the payload-slot COUNT drives the bay grid; the same form is a rack /
+    carrier / enclosure / damped holder, keyed on count + envelope, not per-type branches."""
+    n = max(1, n)
+    body_h = max(H, 20.0)
+    fy = -D / 2
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "shell" in r:
+            out[r] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)              # full-envelope frame
+        elif "mount" in r:
+            out[r] = ((0, fy - 3, bz + body_h * 0.5), (W * 0.8, 6, body_h * 0.6), True)  # rails on front face
+    bay = next((rv.role for rv in roles if "bay" in rv.role), None)
+    if bay:
+        cols = 1
+        while cols * cols < n:
+            cols += 1
+        rows = (n + cols - 1) // cols
+        iw, idp = W * 0.82, D * 0.82                     # interior span (inside the shell walls)
+        bw, bd = iw / cols, idp / rows
+        for i in range(n):
+            cc, rr = i % cols, i // cols
+            cx = (cc - (cols - 1) / 2.0) * bw
+            cy = (rr - (rows - 1) / 2.0) * bd
+            out[f"{bay}_{i}" if n > 1 else bay] = (
+                (cx, cy, bz + body_h * 0.5), (bw * 0.8, bd * 0.8, body_h * 0.72), True)
+    return out
+
+
 def _plan_optical_column(roles, W, D, H, bz):
     """image_plane: flexure body base, stage on top, objective below stage, condenser above."""
     top = bz + H
@@ -1037,15 +1109,55 @@ def measured_connectedness(placements: list[dict], tol_mm: float = 2.0,
     return {"ok": len(groups) == 1, "n_components": len(groups), "floating": sorted(floating)}
 
 
-def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
+# Standard fit-anywhere deployment envelopes (Yuri "small & modular / fit-anywhere" hard rule).
+# Signal `deployment_envelope` → a HARD interior bounding box (W, D, H mm) a device of ANY
+# medium must fit inside. Values are approximate published internal dimensions.
+_DEPLOYMENT_ENVELOPES = {
+    "middeck-locker": (508.0, 533.0, 254.0),   # ISS Middeck Locker Equivalent (MLE), approx interior
+    "express-rack":   (508.0, 533.0, 254.0),   # single EXPRESS-rack locker ≈ MLE
+    "cubelab-u":      (100.0, 100.0, 100.0),    # NanoRacks CubeLab, per U (H scales with envelope_u)
+    "hand-luggage":   (560.0, 450.0, 250.0),    # IATA cabin bag 56×45×25 cm
+    "free-flyer":     (600.0, 600.0, 600.0),    # generic small bio free-flyer payload volume
+    "rack-19in-1u":   (482.6, 450.0, 44.45),    # 19" rack unit, per U (H scales with rack_u)
+}
+
+
+def resolve_deployment_envelope(state: dict):
+    """Read the fit-anywhere signals → (envelope_mm | None, meta). `deployment_envelope` names
+    a standard vessel; `envelope_u`/`rack_u` multiplies the per-U height. Surfaces launch_mass_kg
+    + microgravity as recorded constraints. Universal — applies to ANY medium, not just carriers."""
+    raw = _q(state, "deployment_envelope")
+    name = str(raw).strip().lower().replace(" ", "-") if raw else ""
+    env = _DEPLOYMENT_ENVELOPES.get(name)
+    if env and name in ("cubelab-u", "rack-19in-1u"):
+        u = _q(state, "envelope_u") or _q(state, "rack_u")
+        if u and float(u) > 0:
+            env = (env[0], env[1], round(env[2] * int(float(u)), 2))   # stack U along H
+    meta = {"deployment_envelope": name or None,
+            "resolved_box_mm": env,
+            "launch_mass_kg": _q(state, "launch_mass_kg"),
+            "microgravity": _q(state, "microgravity") in (True, "true", "True", "yes", 1, "1")}
+    return env, meta
+
+
+def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float] = None,
                           base_z_mm: float = 0.0) -> dict:
     """form-proof → concrete Placement list for an envelope. Universal: the primary axis
-    picks the layout; ANY medium's roles get coherent placement. Returns {ok, placements}
-    or {ok:False, reason} (never a silent box)."""
+    picks the layout; ANY medium's roles get coherent placement. If `envelope_mm` is None the
+    deployment-envelope signal supplies the box; if BOTH are present the device is checked to
+    FIT the declared deployment envelope (the fit-anywhere rule). Returns {ok, placements} or
+    {ok:False, reason} (never a silent box)."""
     proof = compose_form(state)
     if not proof.get("ok"):
         return {"schema": "geometry-plan/v1", "ok": False, "reason": proof.get("reason")}
     c = derive_functional_form(state)
+    dep_env, dep_meta = resolve_deployment_envelope(state)
+    if envelope_mm is None:
+        envelope_mm = dep_env
+    if envelope_mm is None:
+        return {"schema": "geometry-plan/v1", "ok": False,
+                "reason": "NO_ENVELOPE (no envelope arg and no deployment_envelope signal)",
+                "deployment": dep_meta}
     W, D, H = envelope_mm
     axis = c.primary_axis
     dispatch = {
@@ -1060,6 +1172,7 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
         "on-base": lambda: _plan_on_base(c.role_volumes, W, D, H, base_z_mm),
         "pressure-vessel": lambda: _plan_pressure(c.role_volumes, W, D, H, base_z_mm),
         "planar-card": lambda: _plan_planar_card(c.role_volumes, W, D, H, base_z_mm, c.repeated_count),
+        "carrier-frame": lambda: _plan_carrier(c.role_volumes, W, D, H, base_z_mm, c.repeated_count),
     }.get(axis)
     if not dispatch:
         return {"schema": "geometry-plan/v1", "ok": False, "reason": f"NO_LAYOUT_FOR_AXIS_{axis}"}
@@ -1077,10 +1190,23 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
     exempt = {rel[0] for rel in c.required_relations
               if rel[1] in ("external_lead", "electrical_cable", "nested_accessory")}
     measured = measured_connectedness(pl, exempt=exempt)
-    return {"schema": "geometry-plan/v1", "ok": bool(measured["ok"]), "axis": axis,
-            "working_medium": c.working_medium,
-            "placements": pl,
-            "measured_connectedness": measured}
+    result = {"schema": "geometry-plan/v1", "ok": bool(measured["ok"]), "axis": axis,
+              "working_medium": c.working_medium,
+              "placements": pl,
+              "measured_connectedness": measured,
+              "envelope_mm": tuple(round(float(x), 2) for x in envelope_mm),
+              "deployment": dep_meta}
+    # FIT-ANYWHERE check: a device with a DECLARED deployment envelope must fit inside it (the
+    # fit-anywhere hard rule). When the envelope WAS the deployment box it fits trivially; when
+    # the caller passed a larger device envelope than the declared box, that is an honest FAIL.
+    if dep_env is not None:
+        fits = all(float(envelope_mm[i]) <= float(dep_env[i]) + 0.01 for i in range(3))
+        result["fits_deployment_envelope"] = fits
+        if not fits:
+            result["ok"] = False
+            result["reason"] = (f"DOES_NOT_FIT_{dep_meta['deployment_envelope']} "
+                                f"({tuple(envelope_mm)} > {dep_env})")
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1208,6 +1334,47 @@ def _selftest() -> int:
     bad_c = Arrangement(axis="planar-card", stack=["card_substrate", "reagent_reservoirs", "drive_motor"],
                         visible_signature=["reagent_reservoirs"], label="axis-order")
     check("cassette with a foreign motor role is culled (F3)", len(cull_infeasible([bad_c], cbad)) == 0)
+
+    # STRUCTURAL / CARRIER family (Yuri Gap B, 2026-07-18) — a rack / enclosure / holder / bus
+    # has NO working medium but a structural payload/enclosure signal → a connected carrier form.
+    rack = compose_form(_synthetic_state(payload_slot_count=8))
+    check("rack resolves (structural_carrier)",
+          rack.get("ok") is True and rack.get("working_medium") == "structural_carrier")
+    for name, sig in (("free-flyer bus", {"free_flyer": True}),
+                      ("shock holder", {"shock_isolated": True}),
+                      ("electronics box", {"is_enclosure": True})):
+        r = compose_form(_synthetic_state(**sig))
+        check(f"{name} resolves (structural_carrier)", r.get("working_medium") == "structural_carrier")
+    # a real INSTRUMENT that also happens to carry a structural signal still wins its medium
+    check("instrument (rotor) with no structural signal is NOT a carrier",
+          compose_form(_synthetic_state(rotor_speed_rpm=120)).get("working_medium") == "rotation")
+    gp_rack = compose_geometry_plan(_synthetic_state(payload_slot_count=8), (482.6, 450.0, 400.0))
+    check("rack geometry plan ok (measured-connected)", gp_rack.get("ok") is True)
+    check("rack replicates payload bays by slot count (8 bays)",
+          sum(1 for p in gp_rack.get("placements", []) if "payload_bay" in p["name"]) == 8)
+
+    # SPACE / DEPLOYMENT ENVELOPE (fit-anywhere) — the envelope signal supplies a hard box, and
+    # a device larger than its DECLARED envelope is an honest FAIL (the fit-anywhere rule).
+    env_box, meta = resolve_deployment_envelope(_synthetic_state(deployment_envelope="middeck-locker"))
+    check("deployment_envelope 'middeck-locker' resolves to a box", env_box == (508.0, 533.0, 254.0))
+    check("cubelab-u scales height by envelope_u",
+          resolve_deployment_envelope(_synthetic_state(deployment_envelope="cubelab-u", envelope_u=4))[0]
+          == (100.0, 100.0, 400.0))
+    # a bioreactor with NO explicit envelope but a locker signal uses the locker box + records microgravity
+    gp_locker = compose_geometry_plan(_synthetic_state(
+        working_volume_ml=200, deployment_envelope="middeck-locker", microgravity=True))
+    check("device with only a deployment_envelope signal uses that box",
+          gp_locker.get("ok") is True and gp_locker.get("envelope_mm") == (508.0, 533.0, 254.0))
+    check("microgravity flag is recorded on the plan",
+          gp_locker.get("deployment", {}).get("microgravity") is True)
+    # proveCatch — a device bigger than its declared fit-anywhere envelope FAILS (does not fit)
+    gp_toobig = compose_geometry_plan(_synthetic_state(
+        working_volume_ml=200, deployment_envelope="cubelab-u"), (300.0, 300.0, 300.0))
+    check("oversize device FAILS its declared deployment envelope (fit-anywhere)",
+          gp_toobig.get("ok") is False and "DOES_NOT_FIT" in (gp_toobig.get("reason") or ""))
+    # no envelope arg AND no deployment signal → honest refusal (never a silent box)
+    check("no-envelope + no-signal geometry plan FAILS cleanly",
+          compose_geometry_plan(_synthetic_state(working_volume_ml=200)).get("reason", "").startswith("NO_ENVELOPE"))
 
     # GEOMETRY PLAN — the form-proof composes into concrete placements (universal layout).
     env = (100.0, 80.0, 30.0)
