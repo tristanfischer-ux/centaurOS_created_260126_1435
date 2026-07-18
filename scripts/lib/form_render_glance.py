@@ -489,16 +489,28 @@ def score_form_glance(form_id: str, png_path: str | Path) -> dict[str, Any]:
         }
     fn = GLANCE_BY_FORM.get(form_id)
     if fn is None:
+        # HONEST SCORING (Tristan 2026-07-18): an unregistered form must NOT pass
+        # vacuously. `lab_electronics` had no scorer, so rodeostat/pioreactor/opendrop
+        # glance-PASSED at score 1.0 while rendering an identical generic grey box — a
+        # check that never looked cannot certify a pass ("a genuine pass means a check
+        # looked and passed"). Return ok=False so the caller does NOT ship on an
+        # unverified render; the deterministic form_signature_gate is the real check
+        # for these forms until a colour scorer is registered.
         return {
             "schema": "form-render-glance/v1",
             "form": form_id,
             "image": str(path),
-            "ok": True,
-            "score": 1.0,
+            "ok": False,
+            "score": 0.0,
             "metrics": {},
-            "findings": [],
-            "skipped": True,
-            "message": f"no glance registered for form {form_id}",
+            "findings": [{
+                "code": "NO_GLANCE_SCORER",
+                "fix": "register a colour+geometry scorer for this form (or rely on "
+                       "form_signature_gate); an unchecked render must not ship",
+                "message": f"no glance scorer registered for form {form_id!r} — render is "
+                           f"UNVERIFIED, cannot certify a pass",
+            }],
+            "unverified": True,
         }
     return fn(path)
 

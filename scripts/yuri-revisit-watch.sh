@@ -95,6 +95,16 @@ check_bar() {
   elif [[ -n "$form" ]]; then
     log "WARN: no form-meshes.json in $dir"; ok=1
   fi
+  # PRODUCT-IDENTITY gate (Tristan 2026-07-18): the scene must carry product-specific
+  # geometry, not a generic grey-box skeleton reused across classes or cutaway-only
+  # 'story' props. Deterministic; keeps the loop churning until the render is real.
+  if [[ -f "$dir/form-meshes.json" || -f "$dir/blender-universal/form-meshes.json" ]]; then
+    if python3 "$ROOT/scripts/lib/form_signature_gate.py" "$dir" >>"$LOG" 2>&1; then
+      log "form_signature PASS $dir"
+    else
+      log "form_signature FAIL $dir (generic/story-only scene — no product geometry)"; ok=1
+    fi
+  fi
   local sc=""
   for cand in "$dir/tab-scorecard.json" "$dir/quality-scorecard.json"; do
     [[ -f "$cand" ]] && sc="$cand" && break

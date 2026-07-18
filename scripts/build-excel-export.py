@@ -331,6 +331,31 @@ def _render_vision_verdict(run_dir: str):
     return res
 
 
+_FORMSIG_CACHE: dict = {}
+
+
+def _form_signature_verdict(run_dir: str):
+    """SIGHT: deterministic PRODUCT-IDENTITY verdict on the delivered scene (cached).
+    Reads form-meshes.json + product_class and asserts the scene carries real
+    product-specific geometry — not a generic grey-box skeleton or cutaway-only 'story'
+    props (Tristan 2026-07-18: colorimeter/rodeostat/pioreactor/opendrop all rendered
+    an identical generic box + floating module yet scored ships/floor-9). Returns
+    {ok, findings, ...} or None when not applicable (non-Blender run)."""
+    if run_dir in _FORMSIG_CACHE:
+        return _FORMSIG_CACHE[run_dir]
+    res = None
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+        import form_signature_gate as _fsg
+        res = _fsg.check_run(run_dir)
+        if res.get("skipped"):
+            res = None
+    except Exception:  # noqa: BLE001 — never let the gate crash the build
+        res = None
+    _FORMSIG_CACHE[run_dir] = res
+    return res
+
+
 def _manifest_litter(run_dir: str):
     """SIGHT: default-size litter score for the delivered parts-manifest (cached). The engine reading
     its OWN rendered geometry — a render/GA tab can't be a genuine ≥8 while most objects are default
@@ -846,6 +871,27 @@ def _aux_tab_score(title: str, run_dir: str):
                 entry["fix"] = ("re-run Blender inspect pass so inspect-side.png is written "
                                 "with the ground slab hidden")
             return entry
+
+        # DETERMINISTIC PRODUCT-IDENTITY backstop (Tristan 2026-07-18) — caps the render to
+        # 4 (FAIL) when the SCENE has no product-specific geometry (a generic grey-box
+        # skeleton reused across classes, or cutaway-only 'story' props with no exterior
+        # body). This is the SIGHT gap that let colorimeter/rodeostat/pioreactor/opendrop
+        # ship at floor 9 while rendering an identical generic box + floating module. Runs
+        # BEFORE the vision critic so a lenient/absent vision verdict can never lift it.
+        _fs = _form_signature_verdict(run_dir)
+        if isinstance(_fs, dict) and _fs.get("ok") is False:
+            base = _cap_litter(_cov("blender", "Render"))
+            if isinstance(base, dict):
+                _fsf = _fs.get("findings") or []
+                _codes = ", ".join(f.get("code", "?") for f in _fsf[:3])
+                _msg0 = _fsf[0].get("message") if _fsf else "no product-specific geometry"
+                base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
+                base["status"] = "FAIL"
+                base["issues"] = ([f"PRODUCT IDENTITY: the scene carries no product-specific "
+                                   f"geometry ({_codes}) — {_msg0}"] + (base.get("issues") or []))[:6]
+                base["fix"] = (_fsf[0].get("fix") if _fsf else
+                               "build_universal_scene.py: give this product its signature geometry")
+            return _apply_side_elevation_gate(base)
 
         _vv = _render_vision_verdict(run_dir)
         _vv_defects = (_vv.get("defects") or []) if isinstance(_vv, dict) else []
