@@ -645,6 +645,69 @@ def _plan_optical_column(roles, W, D, H, bz):
     return out
 
 
+def measured_connectedness(placements: list[dict], tol_mm: float = 2.0) -> dict:
+    """MEASURED connectedness (Cursor: proof = delivered GEOMETRY, not intent). Builds an
+    adjacency graph over the actual placement bounding boxes — two roles are attached only
+    if their AABBs TOUCH/overlap within tol on every axis (real contact, NOT proximity of
+    centres). Asserts one connected component. Catches the floating-slab class the plan-
+    level (role-graph) check misses (opendrop v1: grid floated above a small deck block →
+    plan said connected, geometry did not). Pure — testable without Blender."""
+    n = len(placements)
+    if n == 0:
+        return {"ok": True, "n_components": 0, "floating": []}
+
+    def _touch(a, b) -> bool:
+        for ax in range(3):
+            gap = abs(a["center_mm"][ax] - b["center_mm"][ax]) - \
+                  (a["size_mm"][ax] / 2 + b["size_mm"][ax] / 2)
+            if gap > tol_mm:               # a real separation on this axis → not touching
+                return False
+        return True
+
+    adj = {i: set() for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            if _touch(placements[i], placements[j]):
+                adj[i].add(j)
+                adj[j].add(i)
+    # connected components
+    seen, comps = set(), 0
+    for i in range(n):
+        if i in seen:
+            continue
+        comps += 1
+        stack, comp = [i], []
+        while stack:
+            k = stack.pop()
+            if k in seen:
+                continue
+            seen.add(k)
+            comp.append(k)
+            stack.extend(adj[k] - seen)
+        if comps == 1:
+            largest = comp
+    # everything NOT in the first (largest by construction of the loop order isn't
+    # guaranteed largest — recompute) — report roles outside the biggest component
+    comp_of = {}
+    seen2, cid = set(), 0
+    groups: list[list[int]] = []
+    for i in range(n):
+        if i in seen2:
+            continue
+        stack, g = [i], []
+        while stack:
+            k = stack.pop()
+            if k in seen2:
+                continue
+            seen2.add(k)
+            g.append(k)
+            stack.extend(adj[k] - seen2)
+        groups.append(g)
+    biggest = max(groups, key=len) if groups else []
+    floating = [placements[i]["name"] for g in groups if g is not biggest for i in g]
+    return {"ok": len(groups) == 1, "n_components": len(groups), "floating": sorted(floating)}
+
+
 def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
                           base_z_mm: float = 0.0) -> dict:
     """form-proof → concrete Placement list for an envelope. Universal: the primary axis
@@ -676,9 +739,12 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
             name=name, shape=shape_of.get(base_role, shape_of.get(name, "box")),
             center_mm=tuple(round(float(x), 2) for x in ctr),
             size_mm=tuple(round(float(x), 2) for x in sz), on_exterior=ext))
-    return {"schema": "geometry-plan/v1", "ok": True, "axis": axis,
+    pl = [asdict(p) for p in placements]
+    measured = measured_connectedness(pl)
+    return {"schema": "geometry-plan/v1", "ok": bool(measured["ok"]), "axis": axis,
             "working_medium": c.working_medium,
-            "placements": [asdict(p) for p in placements]}
+            "placements": pl,
+            "measured_connectedness": measured}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -792,6 +858,21 @@ def _selftest() -> int:
     # generic box: no medium → no geometry plan (never a silent box)
     gp_gen = compose_geometry_plan(_synthetic_state(mass_kg=2), env)
     check("generic geometry plan FAILS (no medium)", gp_gen.get("ok") is False)
+    # MEASURED connectedness (Cursor: delivered geometry, not intent) — the composed plans
+    # must be geometrically ONE component (touching bboxes), not just role-graph connected.
+    check("EWOD plan is measured-connected (one geometric component)",
+          gp_ewod.get("measured_connectedness", {}).get("ok") is True)
+    # proveCatch — a role placed FLOATING (a real gap from every other bbox) must FIRE
+    # even if the role-graph says connected (the opendrop-v1 floating-slab class).
+    floaty = [{"name": "deck", "shape": "box", "center_mm": (0, 0, 0), "size_mm": (100, 80, 20), "on_exterior": True},
+              {"name": "floating_grid", "shape": "grid", "center_mm": (0, 0, 200), "size_mm": (60, 50, 2), "on_exterior": True}]
+    mc = measured_connectedness(floaty)
+    check("measured connectedness FIRES on a floating placement",
+          mc["ok"] is False and "floating_grid" in mc["floating"])
+    contig = [{"name": "deck", "shape": "box", "center_mm": (0, 0, 0), "size_mm": (100, 80, 20), "on_exterior": True},
+              {"name": "grid", "shape": "grid", "center_mm": (0, 0, 11), "size_mm": (60, 50, 2), "on_exterior": True}]
+    check("measured connectedness PASSES a contiguous stack",
+          measured_connectedness(contig)["ok"] is True)
     # determinism on the plan too
     check("geometry plan deterministic",
           json.dumps(compose_geometry_plan(_synthetic_state(electrode_count=64), env))
