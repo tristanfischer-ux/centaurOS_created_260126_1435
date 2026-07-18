@@ -1,6 +1,6 @@
 /**
  * @file Off-chain ingest for exact manufacturer-backed PCB candidates.
- * @description Writes three frozen-reference identities into forge-truth so
+ * @description Writes frozen-reference identities into forge-truth so
  * chain-side resolution remains a DB-only read. No live distributor adapter is
  * imported or called from this module.
  */
@@ -50,6 +50,70 @@ export interface PcbCandidateIngestResult {
  * revisions already cited by the function-keyed PCB resolver.
  */
 export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
+  {
+    partName: 'ESP-WROOM-02 ESP8266 Wi-Fi module',
+    manufacturer: 'Espressif Systems',
+    partNumber: 'ESP-WROOM-02',
+    componentClass: 'connectivity_ic',
+    function: '3.3 V Wi-Fi control module with UART, GPIO and PCB antenna',
+    package: '18-pad 18 x 20 mm surface-mount module with PCB antenna',
+    ratings: {
+      supplyVoltageV: '3.0 to 3.6',
+      recommendedSupplyCurrentA: 0.5,
+      pinCount: 18,
+    },
+    sourceUrl: 'https://documentation.espressif.com/0c-esp-wroom-02_datasheet_en.pdf',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Espressif datasheet defines the 18-pad module pinout, 3.3 V supply and antenna keepout; frozen NinjaPCR ESP2 uses the exact ESP-WROOM-02 symbol and footprint.',
+  },
+  {
+    partName: 'MAX1771 adjustable step-up DC-DC controller',
+    manufacturer: 'Maxim Integrated',
+    partNumber: 'MAX1771ESA',
+    componentClass: 'regulator',
+    function: 'adjustable high-voltage boost converter controller with external N-channel MOSFET',
+    package: '8-pin narrow SO surface-mount package',
+    ratings: {
+      inputVoltageV: '2 to 16.5',
+      presetOutputVoltageV: 12,
+      switchingFrequencyKhz: 300,
+    },
+    sourceUrl: 'https://www.analog.com/media/en/technical-documentation/data-sheets/MAX1771.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Maxim datasheet lists MAX1771ESA in 8-pin SO with a 2-16.5 V input range; frozen OpenDrop U1 uses exact value MAX1771ESA and SO08 footprint.',
+  },
+  {
+    partName: 'ADS1114 single-channel 16-bit delta-sigma ADC',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'ADS1114IDGSR',
+    componentClass: 'sensor_ic',
+    function: 'precision photodiode signal conversion with PGA, reference, comparator and I2C',
+    package: 'VSSOP (DGS), 10 pins, tape and reel',
+    ratings: {
+      supplyVoltageV: '2.0 to 5.5',
+      resolutionBits: 16,
+      sampleRateSps: 860,
+    },
+    sourceUrl: 'https://www.ti.com/lit/ds/symlink/ads1114.pdf',
+    sourceCommit: 'ca40a91e728801b139b1086853f7cf74ce76def9',
+    evidence: 'TI SBAS444E lists ADS1114IDGSR in 10-pin VSSOP; frozen Eye-Spy BOM and U2 schematic property give the exact ordering code and DGS footprint.',
+  },
+  {
+    partName: 'KK 254 three-circuit vertical friction-lock header',
+    manufacturer: 'Molex',
+    partNumber: '22-23-2031',
+    componentClass: 'connector',
+    function: 'three-circuit keyed fan power and tachometer wire-to-board interconnect',
+    package: 'vertical through-hole header, 3 circuits, 2.54 mm pitch',
+    ratings: {
+      voltageV: 250,
+      currentA: 2.5,
+      contactCount: 3,
+    },
+    sourceUrl: 'https://www.molex.com/en-us/products/part-detail/22232031',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Molex KK 254 product specification covers 6410 vertical friction-lock headers at 250 V and 2.5 A; frozen NinjaPCR FAN1 uses exact ordering code 22-23-2031.',
+  },
   {
     partName: 'OP07C precision single operational amplifier',
     manufacturer: 'Texas Instruments',

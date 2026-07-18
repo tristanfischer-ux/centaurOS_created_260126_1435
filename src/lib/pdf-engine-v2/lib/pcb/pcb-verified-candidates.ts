@@ -89,6 +89,18 @@ interface CandidateRule {
 
 const CANDIDATE_RULES: readonly CandidateRule[] = [
   {
+    roleTest: /wi[_ -]?fi[_ -]?module|esp8266[_ -]?module/i,
+    functionClass: 'connectivity_ic',
+    manufacturer: 'Espressif Systems',
+    partNumber: 'ESP-WROOM-02',
+    footprint: { library: 'RF_Module', footprint: 'ESP-WROOM-02' },
+    symbol: { library: 'RF_Module', symbol: 'ESP-WROOM-02' },
+    ratings: { voltageV: 3.6, currentA: 0.5 },
+    packageEvidence: 'Espressif ESP-WROOM-02: 18-pad 18 x 20 mm SMD Wi-Fi module with PCB antenna',
+    referenceEvidence: 'NinjaPCR frozen schematic ESP2 exact ESP-WROOM-02 symbol and footprint, revision 181768d6ec068a6dd68593042167699285744768; Espressif ESP-WROOM-02 datasheet',
+    pinoutEvidence: 'Espressif 18-pad pinout and antenna keepout; local KiCad RF_Module:ESP-WROOM-02 with RF_Module:ESP-WROOM-02',
+  },
+  {
     roleTest: /main[_ -]?controller|microcontroller|(^|[_ -])mcu($|[_ -])/i,
     functionClass: 'microcontroller',
     manufacturer: 'Microchip Technology',
@@ -98,6 +110,18 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     ratings: { voltageV: 3.63 },
     packageEvidence: 'forge-truth cache: ATSAMD21G18A-AU, 48TQFP',
     referenceEvidence: 'OpenDrop frozen source manifest, revision 934a44db3ed41c24ae4dddb5b805a22e4166284b',
+  },
+  {
+    roleTest: /photodiode[_ -]?(?:adc|converter)|optical[_ -]?(?:adc|measurement)/i,
+    functionClass: 'sensor_ic',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'ADS1114IDGSR',
+    footprint: { library: 'Package_SO', footprint: 'TSSOP-10_3x3mm_P0.5mm' },
+    symbol: { library: 'Analog_ADC', symbol: 'ADS1114IDGS' },
+    ratings: { voltageV: 5.5 },
+    packageEvidence: 'TI ADS1114IDGSR: 16-bit single-channel delta-sigma ADC in 10-pin VSSOP (DGS)',
+    referenceEvidence: 'Pioreactor Eye-Spy frozen BOM U2 exact ADS1114IDGSR and schematic DGS package, revision ca40a91e728801b139b1086853f7cf74ce76def9; TI ADS111x datasheet SBAS444E',
+    pinoutEvidence: 'TI DGS-10 pinout; local KiCad Analog_ADC:ADS1114IDGS with Package_SO:TSSOP-10_3x3mm_P0.5mm',
   },
   {
     roleTest: /analog[_ -]?to[_ -]?digital|(^|[_ -])adc($|[_ -])|thermal[_ -]?(?:adc|measurement)/i,
@@ -194,6 +218,18 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     referenceEvidence: 'universal low-voltage reverse-polarity switch role; DB-only candidate evidence',
   },
   {
+    roleTest: /high[_ -]?voltage[_ -]?(?:boost|step[_ -]?up)[_ -]?(?:controller|converter)|adjustable[_ -]?boost[_ -]?controller/i,
+    functionClass: 'regulator',
+    manufacturer: 'Maxim Integrated',
+    partNumber: 'MAX1771ESA',
+    footprint: { library: 'Package_SO', footprint: 'SO-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Regulator_Switching', symbol: 'MAX1771xSA' },
+    ratings: { voltageV: 16.5 },
+    packageEvidence: 'Maxim MAX1771ESA: adjustable step-up controller in 8-pin narrow SO package',
+    referenceEvidence: 'OpenDrop V4 frozen schematic U1 exact MAX1771ESA high-voltage boost controller, revision 934a44db3ed41c24ae4dddb5b805a22e4166284b; Maxim MAX1771 datasheet 19-0263 Rev 2',
+    pinoutEvidence: 'Maxim SO-8 pinout; local KiCad Regulator_Switching:MAX1771xSA with Package_SO:SO-8_3.9x4.9mm_P1.27mm',
+  },
+  {
     roleTest: /dc[_ -]?dc[_ -]?regulator|3\.3\s*v.*(?:regulator|ldo)|(?:regulator|ldo).*3\.3\s*v/i,
     functionClass: 'regulator',
     manufacturer: 'Microchip Technology',
@@ -219,6 +255,21 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     packageEvidence: 'Amphenol 12401610E4#2A: full-featured 24-contact right-angle SMT USB-C receptacle',
     referenceEvidence: 'OpenDrop V4 frozen schematic J1 exact Amphenol 12401610E4-2A footprint, revision 934a44db3ed41c24ae4dddb5b805a22e4166284b; Amphenol USB Type-C manufacturer data',
     pinoutEvidence: 'Amphenol contacts A1-A12/B1-B12 plus shield; local KiCad Connector:USB_C_Receptacle and exact Connector_USB footprint',
+  },
+  {
+    roleTest: /fan[_ -]?(?:power[_ -]?)?(?:connector|header)|three[_ -]?(?:circuit|position)[_ -]?fan/i,
+    functionClass: 'connector',
+    manufacturer: 'Molex',
+    partNumber: '22-23-2031',
+    footprint: {
+      library: 'Connector_Molex',
+      footprint: 'Molex_KK-254_AE-6410-03A_1x03_P2.54mm_Vertical',
+    },
+    symbol: { library: 'Connector_Generic', symbol: 'Conn_01x03' },
+    ratings: { voltageV: 250, currentA: 2.5 },
+    packageEvidence: 'Molex 22-23-2031: KK 254 vertical friction-lock header, three circuits, 2.54 mm pitch',
+    referenceEvidence: 'NinjaPCR frozen schematic FAN1 exact 22-23-2031 and matching footprint, revision 181768d6ec068a6dd68593042167699285744768; Molex KK 254 product specification PS-10-07-001',
+    pinoutEvidence: 'Molex three through-hole contacts; local KiCad Connector_Generic:Conn_01x03 with exact 6410-03A footprint',
   },
   {
     roleTest: /source[_ -]?board[_ -]?connector|four[_ -]?(?:position|pin)[_ -]?(?:board[_ -]?to[_ -]?board[_ -]?)?connector/i,

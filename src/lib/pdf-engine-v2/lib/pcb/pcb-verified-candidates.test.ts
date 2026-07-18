@@ -232,6 +232,58 @@ describe('verified function-keyed PCB candidates', () => {
   it.each([
     {
       request: {
+        wordId: 'wifi_module_word',
+        nameHuman: 'ESP8266 Wi-Fi module',
+        characterId: 'wifi_module',
+        functionClass: 'connectivity_ic',
+        requiredRatings: { voltageV: 3.3, currentA: 0.5 },
+      },
+      manufacturer: 'Espressif Systems',
+      partNumber: 'ESP-WROOM-02',
+      expectedSymbol: 'RF_Module:ESP-WROOM-02',
+      expectedFootprint: 'ESP-WROOM-02',
+    },
+    {
+      request: {
+        wordId: 'high_voltage_boost_controller_word',
+        nameHuman: 'Adjustable high-voltage boost controller',
+        characterId: 'high_voltage_boost_controller',
+        functionClass: 'regulator',
+        requiredRatings: { voltageV: 12 },
+      },
+      manufacturer: 'Maxim Integrated',
+      partNumber: 'MAX1771ESA',
+      expectedSymbol: 'Regulator_Switching:MAX1771xSA',
+      expectedFootprint: 'SO-8_3.9x4.9mm_P1.27mm',
+    },
+    {
+      request: {
+        wordId: 'photodiode_adc_word',
+        nameHuman: 'Single-channel precision photodiode ADC',
+        characterId: 'photodiode_adc',
+        functionClass: 'sensor_ic',
+        requiredRatings: { voltageV: 5.5 },
+      },
+      manufacturer: 'Texas Instruments',
+      partNumber: 'ADS1114IDGSR',
+      expectedSymbol: 'Analog_ADC:ADS1114IDGS',
+      expectedFootprint: 'TSSOP-10_3x3mm_P0.5mm',
+    },
+    {
+      request: {
+        wordId: 'fan_power_connector_word',
+        nameHuman: 'Three-circuit fan power connector',
+        characterId: 'fan_power_connector',
+        functionClass: 'connector',
+        requiredRatings: { voltageV: 12, currentA: 2.5 },
+      },
+      manufacturer: 'Molex',
+      partNumber: '22-23-2031',
+      expectedSymbol: 'Connector_Generic:Conn_01x03',
+      expectedFootprint: 'Molex_KK-254_AE-6410-03A_1x03_P2.54mm_Vertical',
+    },
+    {
+      request: {
         wordId: 'dac_output_stage_word',
         nameHuman: 'Precision bipolar DAC conditioning stage',
         characterId: 'dac_output_stage',

@@ -94,11 +94,11 @@ describe('offline seven-product PCB identity resolution report', () => {
     )
 
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
-    expect(report.acceptedMappings).toHaveLength(6)
+    expect(report.acceptedMappings).toHaveLength(5)
     expect(report.pendingExactMappings).toHaveLength(0)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
     expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
-    expect(punchlist.scopeReclassifications).toHaveLength(14)
+    expect(punchlist.scopeReclassifications).toHaveLength(16)
     expect(report.sevenProductSummary).toHaveLength(7)
     expect(report.sevenProductSummary.reduce(
       (total, product) => total + product.requiredBoards,
@@ -136,6 +136,8 @@ describe('offline seven-product PCB identity resolution report', () => {
       punchlist.scopeReclassifications.map((item) => [item.id, item.placement]),
     )).toEqual({
       'colorimeter-optical_source-detector_mount_plate_word': 'mechanical_only',
+      'colorimeter-optical_source-led_driver_word': 'passive_topology',
+      'colorimeter-optical_source-dc_dc_regulator_word': 'passive_topology',
       'ninjapcr-thermal_controller-usb_interface_tool_grounded_word': 'interconnect_only',
       'pioreactor-wet_lab_hat-usb_interface_word': 'off_board_module',
       'pioreactor-wet_lab_hat-firmware_storage_word': 'off_board_module',
@@ -207,12 +209,12 @@ describe('offline seven-product PCB identity resolution report', () => {
     expect(report.updatedSummary).toEqual({
       products: 7,
       requiredBoards: 8,
-      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 6,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 6 - 14,
-      resolvedDelta: 6,
-      reclassifiedNonComponentCount: 14,
-      missingMpn: report.baseline.missingMpn - 4 - 12,
-      missingSymbolPinout: report.baseline.missingSymbolPinout - 2 - 2,
+      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 5,
+      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 5 - 16,
+      resolvedDelta: 5,
+      reclassifiedNonComponentCount: 16,
+      missingMpn: 22,
+      missingSymbolPinout: 7,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([
       expect.stringContaining('no terminal-owned chain'),

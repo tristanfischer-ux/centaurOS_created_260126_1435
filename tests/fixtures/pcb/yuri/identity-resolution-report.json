@@ -11,46 +11,25 @@
   },
   "acceptedMappings": [
     {
-      "punchlistId": "colorimeter-optical_source-dc_dc_regulator_word",
+      "punchlistId": "ninjapcr-thermal_controller-wifi_module_word",
       "resolverRequest": {
-        "wordId": "dc_dc_regulator_word",
-        "nameHuman": "3.3 V low-current instrument rail regulator",
-        "characterId": "dc_dc_regulator",
-        "functionClass": "regulator",
+        "wordId": "wifi_module_word",
+        "nameHuman": "ESP8266 Wi-Fi module",
+        "characterId": "wifi_module",
+        "functionClass": "connectivity_ic",
         "requiredRatings": {
-          "voltageV": 5,
-          "currentA": 0.2
+          "voltageV": 3.3,
+          "currentA": 0.5
         }
       },
-      "manufacturer": "Microchip Technology",
-      "partNumber": "MCP1700T-3302E/TT",
-      "roleCompatibility": "Fixed 3.3 V rail at no more than 250 mA from an input no higher than 6 V; a 12 V input is explicitly rejected.",
-      "package": "3-lead SOT-23",
-      "ratings": "2.3-6.0 V input, fixed 3.3 V output, 250 mA maximum output",
-      "symbolPinout": "Regulator_Linear:MCP1700x-330xxTT; pin 1 GND, pin 2 VOUT, pin 3 VIN; Package_TO_SOT_SMD:SOT-23",
-      "manufacturerEvidence": "Microchip MCP1700 data sheet DS20001826F",
-      "databaseEvidence": "forge-truth distributor/spec-document cache"
-    },
-    {
-      "punchlistId": "colorimeter-optical_source-source_board_connector_word",
-      "resolverRequest": {
-        "wordId": "source_board_connector_word",
-        "nameHuman": "Four-position source board connector",
-        "characterId": "source_board_connector",
-        "functionClass": "connector",
-        "requiredRatings": {
-          "voltageV": 50,
-          "currentA": 1
-        }
-      },
-      "manufacturer": "JST Sales America Inc.",
-      "partNumber": "BM04B-SRSS-TB",
-      "roleCompatibility": "Four-position 1.00 mm vertical board interconnect; not a USB power-entry substitute.",
-      "package": "JST SH four-contact vertical SMD header, 1.00 mm pitch",
-      "ratings": "50 V, 1 A",
-      "symbolPinout": "Connector_Generic:Conn_01x04 pins 1-4; Connector_JST:JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical; MP pads are mechanical retention tabs",
-      "manufacturerEvidence": "JST SH series data sheet eSH.pdf",
-      "databaseEvidence": "forge-truth Eye-Spy BOM row and frozen Eye-Spy J1/J2 schematic"
+      "manufacturer": "Espressif Systems",
+      "partNumber": "ESP-WROOM-02",
+      "roleCompatibility": "Released NinjaPCR BOM fits ESP-WROOM-02 at ESP2 quantity 1 and explicitly marks the ESP-12F alternative quantity 0.",
+      "package": "18-pad 18 x 20 mm surface-mount Wi-Fi module with PCB antenna",
+      "ratings": "3.0-3.6 V supply; external supply capability of at least 500 mA recommended",
+      "symbolPinout": "RF_Module:ESP-WROOM-02; complete 18-pad manufacturer pinout; RF_Module:ESP-WROOM-02 footprint and antenna keepout",
+      "manufacturerEvidence": "Espressif ESP-WROOM-02 data sheet",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Espressif row; source URL and frozen source commit embedded in row metadata"
     },
     {
       "punchlistId": "pioreactor-od_optics-esd_protection_network_word",
@@ -139,14 +118,14 @@
     {
       "product": "Colorimeter",
       "requiredBoards": 1,
-      "resolvedDelta": 2,
+      "resolvedDelta": 0,
       "remainingUnresolved": 2
     },
     {
       "product": "NinjaPCR",
       "requiredBoards": 1,
-      "resolvedDelta": 0,
-      "remainingUnresolved": 10
+      "resolvedDelta": 1,
+      "remainingUnresolved": 9
     },
     {
       "product": "Poseidon",
@@ -182,27 +161,28 @@
   "updatedSummary": {
     "products": 7,
     "requiredBoards": 8,
-    "verifiedIdentityCount": 41,
-    "unresolvedIdentityCount": 30,
-    "resolvedDelta": 6,
-    "reclassifiedNonComponentCount": 14,
+    "verifiedIdentityCount": 40,
+    "unresolvedIdentityCount": 29,
+    "resolvedDelta": 5,
+    "reclassifiedNonComponentCount": 16,
     "missingMpn": 22,
-    "missingSymbolPinout": 8
+    "missingSymbolPinout": 7
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
-    "optical_source_and_visual_indication": 8,
+    "optical_source_and_visual_indication": 7,
     "power_entry_conversion_and_protection": 12,
-    "digital_compute_communications_and_storage": 6,
+    "digital_compute_communications_and_storage": 5,
     "precision_analog_measurement_and_control": 4,
     "wet_actuation_drive": 0,
-    "board_to_board_and_cartridge_interconnect": 0
+    "board_to_board_and_cartridge_interconnect": 1
   },
   "limitations": [
     "This is an offline identity delta against the frozen 50-item report; no terminal-owned chain or fabrication pipeline was rerun.",
-    "The three newly mapped identities were promoted only after the off-chain ingest added exact manufacturer-backed rows to forge-truth and the DB-only resolver plus local KiCad parity checks passed.",
+    "The newly mapped identities were promoted only after the off-chain ingest added exact manufacturer-backed rows to forge-truth and the DB-only resolver plus local KiCad parity checks passed.",
+    "The former Colorimeter regulator and BM04 connector closures were withdrawn because the frozen source board contains no regulator and uses generic BOOMELE four-pin connector footprints rather than JST BM04.",
     "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range.",
     "No candidate without an exact manufacturer ordering code, compatible ratings, package, and symbol/pinout source was promoted.",
-    "Fourteen roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
+    "Sixteen roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
   ]
 }

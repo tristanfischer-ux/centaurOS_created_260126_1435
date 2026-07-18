@@ -67,6 +67,7 @@ interface Punchlist {
       | 'mechanical_only'
       | 'functional_requirement'
       | 'passive_geometry'
+      | 'passive_topology'
     wholeSystemOwner: string
     evidence: string
     retainedFunction: string
@@ -188,14 +189,14 @@ describe('Yuri unresolved fitted-component punchlist', () => {
 
     expect(productCounts).toEqual({
       Colorimeter: 2,
-      NinjaPCR: 10,
+      NinjaPCR: 9,
       Pioreactor: 3,
       Rodeostat: 5,
       OpenDrop: 10,
     })
     expect(boardCounts).toEqual({
       optical_source: 2,
-      thermal_controller: 10,
+      thermal_controller: 9,
       wet_lab_hat: 1,
       od_optics: 2,
       analog_afe: 5,
@@ -203,15 +204,15 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     })
     expect(gapCounts).toEqual({
       mpn: 22,
-      symbol_pinout: 8,
+      symbol_pinout: 7,
     })
     expect(punchlist.summary).toEqual({
       baselineUnresolvedFittedComponents: 50,
-      resolvedIdentityCount: 6,
-      reclassifiedNonComponentCount: 14,
-      remainingUnresolvedFittedComponents: 30,
+      resolvedIdentityCount: 5,
+      reclassifiedNonComponentCount: 16,
+      remainingUnresolvedFittedComponents: 29,
       remainingMissingMpn: 22,
-      remainingMissingSymbolPinout: 8,
+      remainingMissingSymbolPinout: 7,
       targetBoards: 8,
       productsWithFittedBoards: 5,
     })
@@ -221,9 +222,9 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const punchlist = readPunchlist()
     const reclassifications = punchlist.scopeReclassifications
 
-    expect(punchlist.resolvedIdentityIds).toHaveLength(6)
-    expect(reclassifications).toHaveLength(14)
-    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(14)
+    expect(punchlist.resolvedIdentityIds).toHaveLength(5)
+    expect(reclassifications).toHaveLength(16)
+    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(16)
     expect(reclassifications.reduce<Record<string, number>>((counts, item) => {
       counts[item.placement] = (counts[item.placement] ?? 0) + 1
       return counts
@@ -233,6 +234,7 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       interconnect_only: 5,
       functional_requirement: 3,
       passive_geometry: 1,
+      passive_topology: 2,
     })
     for (const item of reclassifications) {
       expect(item.wholeSystemOwner.trim()).not.toBe('')
@@ -267,10 +269,10 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const markdown = readFileSync(MARKDOWN_PATH, 'utf8')
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(markdown).toContain('30 unresolved fitted components')
+    expect(markdown).toContain('29 unresolved fitted components')
     expect(markdown).toContain('22 missing MPN')
-    expect(markdown).toContain('8 missing symbol/pinout')
-    expect(markdown).toContain('14 evidence-backed non-components')
+    expect(markdown).toContain('7 missing symbol/pinout')
+    expect(markdown).toContain('16 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
       expect(markdown).toContain(group.universalFunctionRole)
     }

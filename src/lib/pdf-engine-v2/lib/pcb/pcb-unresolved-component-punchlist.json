@@ -9,17 +9,16 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 6,
-    "reclassifiedNonComponentCount": 14,
-    "remainingUnresolvedFittedComponents": 30,
+    "resolvedIdentityCount": 5,
+    "reclassifiedNonComponentCount": 16,
+    "remainingUnresolvedFittedComponents": 29,
     "remainingMissingMpn": 22,
-    "remainingMissingSymbolPinout": 8,
+    "remainingMissingSymbolPinout": 7,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
   },
   "resolvedIdentityIds": [
-    "colorimeter-optical_source-dc_dc_regulator_word",
-    "colorimeter-optical_source-source_board_connector_word",
+    "ninjapcr-thermal_controller-wifi_module_word",
     "pioreactor-od_optics-esd_protection_network_word",
     "rodeostat-analog_afe-dac_output_stage_word",
     "rodeostat-analog_afe-current_measurement_tia_word",
@@ -33,6 +32,22 @@
       "wholeSystemOwner": "optical_source mechanical registration",
       "evidence": "The role names a detector mounting plate and has no electrical interface, ratings, or orderable component identity.",
       "retainedFunction": "The optical-source board keeps its four-point registration geometry; only the false SOIC fitted-component identity is removed."
+    },
+    {
+      "id": "colorimeter-optical_source-led_driver_word",
+      "product": "Colorimeter",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "wavelength-specific LED ballast resistor",
+      "evidence": "Every frozen basic-led board implements one LED with one calculated series resistor; no constant-current driver IC is fitted.",
+      "retainedFunction": "LED current limiting remains mandatory and is implemented by the wavelength-specific ballast resistor."
+    },
+    {
+      "id": "colorimeter-optical_source-dc_dc_regulator_word",
+      "product": "Colorimeter",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "host-supplied 3.3 V source-board rail",
+      "evidence": "The frozen 3V3 source-board schematics contain only two connectors, one LED and one resistor; no board-local regulator is fitted.",
+      "retainedFunction": "The source board still requires a regulated 3.3 V input, owned by the host-side power architecture."
     },
     {
       "id": "ninjapcr-thermal_controller-usb_interface_tool_grounded_word",
@@ -786,21 +801,21 @@
           "characterId": "wifi_module",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["ESP8266 Wi-Fi control family", "3.3 V logic"],
-            "missing": ["chosen released module variant", "peak supply current", "antenna keepout", "certification status"],
-            "evidence": ["Frozen schematic contains ESP-12F and ESP-WROOM-02 alternatives; generated QFN-24 placeholder is not source-compatible."]
+            "requirements": ["ESP-WROOM-02 Wi-Fi control module", "3.0-3.6 V supply", "500 mA recommended supply capability"],
+            "missing": ["product-level regional certification decision"],
+            "evidence": ["Frozen released BOM fits ESP2 ESP-WROOM-02-BREAK at quantity 1 and marks ESP1 ESP-12F quantity 0; Espressif defines the exact 18-pad module pinout and antenna keepout."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Gold proves module families but not the selected current orderable manufacturer code." },
+          "missingEvidence": { "kind": "mpn", "details": "Baseline report lacked the released-BOM selection and manufacturer-backed module mapping now supplied by the off-chain ingest." },
           "sourceCandidate": {
-            "identity": "ESP-12F or ESP-WROOM-02 released module",
-            "evidenceLevel": "gold_role_family",
+            "identity": "Espressif Systems ESP-WROOM-02",
+            "evidenceLevel": "manufacturer_ordering_code",
             "source": "https://github.com/hisashin/NinjaPCR/blob/181768d6ec068a6dd68593042167699285744768/kicad/NinjaPCR/NinjaPCB_ver2.2.sch",
             "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Choose one firmware-compatible module variant.", "Verify manufacturer datasheet, lifecycle, peak current and antenna keepout.", "Ingest and map the full module pinout/footprint."]
+            "action": "ingest",
+            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
+            "acceptance": ["Use the released BOM selection rather than the unfitted ESP-12F alternative.", "Cache Espressif supply and antenna-keepout evidence.", "Map the complete local ESP-WROOM-02 symbol and footprint."]
           }
         },
         {

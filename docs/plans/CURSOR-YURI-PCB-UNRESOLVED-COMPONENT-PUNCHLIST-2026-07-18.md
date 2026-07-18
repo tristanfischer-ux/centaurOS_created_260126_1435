@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Six identities were subsequently resolved and 14 roles were proven to be non-components. The active residual is therefore **30 unresolved fitted components**: **22 missing MPN** and **8 missing symbol/pinout**.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Five identities were subsequently resolved and 16 roles were proven to be non-components. The active residual is therefore **29 unresolved fitted components**: **22 missing MPN** and **7 missing symbol/pinout**.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -19,28 +19,30 @@ The detailed sections preserve all 50 baseline entries for traceability. Items l
 
 `Unknown` is intentional where neither the offline report nor frozen source proves a rating. Placeholder footprints and synthetic pins are not rating evidence.
 
-The three latest identities were promoted only after the off-chain ingest wrote manufacturer-backed forge-truth rows and the DB-only resolver passed exact MPN, local symbol, full pinout, footprint, and electrical-pad parity. No chain-side database write was made.
+The latest identities were promoted only after the off-chain ingest wrote manufacturer-backed forge-truth rows and the DB-only resolver passed exact MPN, local symbol, full pinout, footprint, and electrical-pad parity. The former Colorimeter regulator and BM04 connector closures were withdrawn after direct source inspection disproved them. No chain-side database write was made.
 
 ## Counts
 
 | Product | Board(s) | Residual unresolved fitted components |
 |---|---|---:|
 | Colorimeter | `optical_source` | 2 |
-| NinjaPCR | `thermal_controller` | 10 |
+| NinjaPCR | `thermal_controller` | 9 |
 | Pioreactor | `wet_lab_hat`, `od_optics` | 3 |
 | Rodeostat | `analog_afe` | 5 |
 | OpenDrop | `hv_controller_main` | 10 |
-| **Total** | **6 boards with residual fitted-component gaps** | **30** |
+| **Total** | **6 boards with residual fitted-component gaps** | **29** |
 
 The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
 
 ## Evidence-backed reassignment matrix
 
-These **14 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
+These **16 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
 
 | Baseline identity | Placement | Whole-system owner retained |
 |---|---|---|
 | `colorimeter-optical_source-detector_mount_plate_word` | `mechanical_only` | Optical-source registration geometry |
+| `colorimeter-optical_source-led_driver_word` | `passive_topology` | Wavelength-specific LED ballast resistor |
+| `colorimeter-optical_source-dc_dc_regulator_word` | `passive_topology` | Host-supplied 3.3 V source-board rail |
 | `ninjapcr-thermal_controller-usb_interface_tool_grounded_word` | `interconnect_only` | Wi-Fi host path plus debug/programming header |
 | `pioreactor-wet_lab_hat-usb_interface_word` | `off_board_module` | Raspberry Pi host USB |
 | `pioreactor-wet_lab_hat-firmware_storage_word` | `off_board_module` | Raspberry Pi host persistence |
@@ -66,7 +68,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Colorimeter · `optical_source` · `led_source_word`** — Ratings: 470 nm is topology-backed; forward voltage/current, intensity/bin and axis tolerance unknown. Gap: **MPN**. Gold candidate: wavelength-specific LED in frozen `basic_led_pcb` (family only). Action: extract exact BOM code, verify manufacturer optical/electrical data, ingest, then map symbol/footprint.
 
 <a id="colorimeter-optical_source-led_driver_word"></a>
-- **Colorimeter · `optical_source` · `led_driver_word`** — Ratings: current, supply, channels and dissipation unknown. Gap: **symbol/pinout** for DB-backed `TLC5916IDR`, but gold uses a calculated resistor for one LED. Action: rederive topology; reject the driver unless requirements prove it, otherwise map the complete manufacturer pinout.
+- **Colorimeter · `optical_source` · `led_driver_word`** — **Reclassified:** every frozen source board uses one wavelength-specific LED and one calculated ballast resistor. No driver IC is fitted; the current-limiting function remains mandatory as passive topology.
 
 <a id="ninjapcr-thermal_controller-status_led_word"></a>
 - **NinjaPCR · `thermal_controller` · `status_led_word`** — Ratings: colour, forward voltage/current, intensity and resistor unknown. Gap: **MPN**. Action: define indication/current, ingest an orderable LED, calculate resistor, map polarity/footprint.
@@ -89,7 +91,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## power_entry_conversion_and_protection
 
 <a id="colorimeter-optical_source-dc_dc_regulator_word"></a>
-- **Colorimeter · `optical_source` · `dc_dc_regulator_word`** — **Resolved:** Microchip `MCP1700T-3302E/TT`, fixed 3.3 V/250 mA, with complete `MCP1700x-330xxTT` pinout and SOT-23 footprint. The resolver rejects it whenever the required input exceeds 6 V.
+- **Colorimeter · `optical_source` · `dc_dc_regulator_word`** — **Reclassified:** frozen 3V3 boards contain only two connectors, one LED and one resistor. The host owns regulation; no board-local regulator is fitted.
 
 <a id="ninjapcr-thermal_controller-terminal_block_word"></a>
 - **NinjaPCR · `thermal_controller` · `terminal_block_word`** — Ratings: 12 V/high-current thermal path known; current, wire gauge and temperature rise unknown. Gap: **MPN**. Gold candidate: `SCREW-TERMINAL-GREEN(2P-3.5)` family. Action: derive load/current and extract or source an exact rated connector.
@@ -145,7 +147,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## digital_compute_communications_and_storage
 
 <a id="ninjapcr-thermal_controller-wifi_module_word"></a>
-- **NinjaPCR · `thermal_controller` · `wifi_module_word`** — Ratings: ESP8266/3.3 V family known; selected variant, peak current, antenna keepout and certification unknown. Gap: **MPN**. Gold candidates: ESP-12F or ESP-WROOM-02 family. Action: select firmware-compatible module, verify manufacturer/lifecycle, ingest and map full module.
+- **NinjaPCR · `thermal_controller` · `wifi_module_word`** — **Resolved:** released BOM fits Espressif `ESP-WROOM-02` at ESP2 quantity 1 and marks ESP-12F quantity 0; the manufacturer 18-pad pinout, 3.0–3.6 V supply, 500 mA supply recommendation, exact local footprint, and antenna keepout are mapped.
 
 <a id="ninjapcr-thermal_controller-debug_uart_word"></a>
 - **NinjaPCR · `thermal_controller` · `debug_uart_word`** — Ratings: four-position interface known; real signals, logic voltage, orientation/current unknown. Gap: **MPN/pin contract**. Action: extract programmer/UART signals, source exact header and map truthful pins.
@@ -214,7 +216,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## board_to_board_and_cartridge_interconnect
 
 <a id="colorimeter-optical_source-source_board_connector_word"></a>
-- **Colorimeter · `optical_source` · `source_board_connector_word`** — **Resolved:** JST `BM04B-SRSS-TB`, four-position 1.00 mm vertical SH header rated 50 V/1 A, with pins 1-4 and exact JST footprint; mechanical MP pads are excluded from electrical parity.
+- **Colorimeter · `optical_source` · `source_board_connector_word`** — Ratings: two four-position daisy-chain connectors are source-backed, but the frozen footprint is generic `BOOMELE_SMD_SH_4PIN_RT`, not JST `BM04B-SRSS-TB`. Gap: **MPN**. Action: identify the exact connector and mating cable before mapping pinout/footprint.
 
 <a id="opendrop-electrode_cartridge-required_electrode_channel_word"></a>
 - **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — Ratings: 64 channels and cartridge mating known; connector count/code, voltage, creepage, contact rating and cycles unknown. Gap: **MPN**. Gold candidate: Mini-DIMM/cartridge interconnect family. Action: extract 64-channel pin/domain map, resolve exact connector or custom edge geometry, prove creepage/alignment and complete pads.
@@ -223,6 +225,6 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 
 1. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety, Pioreactor optics, Rodeostat analog performance, and OpenDrop HV/interconnect domains.
 2. **Ingest manufacturer-backed gold candidates** — Colorimeter LED identities and released NinjaPCR/Rodeostat BOM identities.
-3. **Close the 8 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
+3. **Close the 7 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
 4. **Implement the preserved function contracts** — replace Pioreactor channel requirements with complete switching/protection/connector topologies, and prove all 64 OpenDrop electrode routes and mating contacts.
-5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 30 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.
+5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 29 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.

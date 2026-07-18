@@ -54,7 +54,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     return databasePath
   }
 
-  it('writes only the three exact candidates with complete evidence metadata', async () => {
+  it('writes only the seven exact candidates with complete evidence metadata', async () => {
     const databasePath = createTemporaryDatabase()
     const embedding = Buffer.alloc(1536 * 4, 7)
 
@@ -66,10 +66,10 @@ describe('off-chain verified PCB candidate ingest', () => {
     })
 
     expect(result).toEqual({
-      inserted: 3,
+      inserted: 7,
       updated: 0,
       unchanged: 0,
-      embedded: 3,
+      embedded: 7,
       dryRun: false,
     })
 
@@ -82,14 +82,14 @@ describe('off-chain verified PCB candidate ingest', () => {
     `).all() as Array<Record<string, unknown>>
     database.close()
 
-    expect(rows).toHaveLength(3)
+    expect(rows).toHaveLength(7)
     expect(rows.map((row) => row.part_number).sort()).toEqual(
       PCB_VERIFIED_CANDIDATES.map((candidate) => candidate.partNumber).sort(),
     )
     for (const row of rows) {
       const metadata = JSON.parse(String(row.raw_excerpt)) as Record<string, unknown>
       expect(metadata).toEqual(expect.objectContaining({
-        sourceUrl: expect.stringMatching(/^https:\/\/(www\.)?(ti|st|amphenol-cs)\.com\//),
+        sourceUrl: expect.stringMatching(/^https:\/\//),
         sourceCommit: expect.stringMatching(/^[0-9a-f]{40}$/),
         package: expect.any(String),
         function: expect.any(String),
@@ -100,6 +100,12 @@ describe('off-chain verified PCB candidate ingest', () => {
       expect(row.confidence).toBe(0.95)
       expect(row.embedding_bytes).toBe(1536 * 4)
     }
+    expect(rows.map((row) => row.part_number)).toEqual(expect.arrayContaining([
+      'ESP-WROOM-02',
+      'MAX1771ESA',
+      'ADS1114IDGSR',
+      '22-23-2031',
+    ]))
   })
 
   it('is idempotent and does not duplicate documents or part rows', async () => {
@@ -117,7 +123,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     expect(second).toEqual({
       inserted: 0,
       updated: 0,
-      unchanged: 3,
+      unchanged: 7,
       embedded: 0,
       dryRun: false,
     })
@@ -131,8 +137,8 @@ describe('off-chain verified PCB candidate ingest', () => {
     ).get() as { count: number }
     database.close()
 
-    expect(documentCount.count).toBe(3)
-    expect(partCount.count).toBe(3)
+    expect(documentCount.count).toBe(7)
+    expect(partCount.count).toBe(7)
   })
 
   it('preserves an existing embedding when an update cannot generate a replacement', async () => {
