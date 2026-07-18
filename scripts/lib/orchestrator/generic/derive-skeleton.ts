@@ -531,6 +531,24 @@ const LAB_ELECTRONICS_HMI_FLOOR = [
   'status_indicator', 'run_start_control', 'host_gui_software',
   'calibration_prompt_ui', 'user_facing_legend',
 ]
+// INTENT (Pioreactor 0121): ml-scale culture instruments still matched
+// hasLowPowerLabElectronicsSignal but environmental_interface had NO floor →
+// thermalFloorForContract saw net_heating_required_w (0.9 W) as HEATING via
+// HEATING_DUTY_RE and emitted industrial heat_pump + scroll compressor +
+// access ladder (£81k vs gold £259). Device thermal = TEC/heater; culture
+// fluid = vial + dosing — never ASHP plant kit.
+const LAB_DEVICE_THERMAL_FLOOR = [
+  'peltier_tec_module', 'cartridge_heater', 'temperature_sensor',
+  'heatsink_fan', 'thermal_insulation', 'thermal_interface_pad',
+]
+const LAB_CULTURE_FLUID_FLOOR = [
+  'culture_vessel', 'magnetic_stirrer_drive', 'dosing_peristaltic_pump',
+  'media_tubing_set', 'vial_holder_fixture', 'sterile_filter_vent',
+]
+const LAB_CULTURE_SENSING_FLOOR = [
+  'od_photodiode_path', 'ir_led_emitter', 'culture_temperature_probe',
+  'stir_tachometer_sense', 'sensor_cable',
+]
 const LAB_ELECTRONICS_MODULE_FLOORS: Record<string, string[]> = {
   energy_storage_source: LAB_ELECTRONICS_ENERGY_FLOOR,
   energy_conversion_transduction: LAB_ELECTRONICS_ENERGY_CONVERSION_FLOOR,
@@ -541,9 +559,20 @@ const LAB_ELECTRONICS_MODULE_FLOORS: Record<string, string[]> = {
   safety_protection: LAB_ELECTRONICS_SAFETY_FLOOR,
   hmi_ergonomics: LAB_ELECTRONICS_HMI_FLOOR,
   human_machine_interface: LAB_ELECTRONICS_HMI_FLOOR,
+  // Always: watt-scale instruments reject heat with TEC/heater, not ASHP.
+  environmental_interface: LAB_DEVICE_THERMAL_FLOOR,
 }
 const LAB_ELECTRONICS_FORBIDDEN_COMPONENT_RE =
-  /main_breaker|distribution_busbar|power_contactor|protective_relay|emergency_stop|fire_detector|interlock_switch|warning_beacon|network_switch|communication_gateway|(?:io_module|i\/o\s*module)|scada|plc|pressure_sensor|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|dc_link_capacitor|gate_driver|chiller|scroll\s*compressor|circulation_pump|pipework_run|skid_frame|access_ladder|lifting_point|walkway_grating/i
+  /main_breaker|distribution_busbar|power_contactor|protective_relay|emergency_stop|fire_detector|interlock_switch|warning_beacon|network_switch|communication_gateway|(?:io_module|i\/o\s*module)|scada|plc|pressure_sensor|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|dc_link_capacitor|gate_driver|chiller|scroll\s*compressor|heat_pump|circulation_pump|pipework_run|skid_frame|access_ladder|lifting_point|walkway_grating|expansion_vessel|expansion_reservoir|air_damper|condensate_drain|process_water|optical_detector|cuvette|photodiode_path|led_emitter|square_cuvette/i
+
+/** ml-scale continuous-culture / turbidostat — fluid path is vial + dosing, not plant manifold. */
+function hasBenchtopCultureSignal(contract: ContractInProgress): boolean {
+  const pc = String((contract as { product_class?: unknown })?.product_class ?? '').toLowerCase()
+  if (/benchtop[_ -]?bioreactor|pioreactor|turbidostat|chemostat/.test(pc)) return true
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  const ml = Number(q.working_volume_ml?.value)
+  return Number.isFinite(ml) && ml > 0 && ml <= 500
+}
 
 /** True when the contract is a multi-channel benchtop linear syringe-dosing form.
  *  PURE — class slug OR archetype-builder quantity triad; never a product brand. */
@@ -614,9 +643,12 @@ function energyFloorFor(contract: ContractInProgress): string[] {
   return hasEnergyStorage(contract) ? ENERGY_STORAGE_FLOOR : ELECTRICAL_SUPPLY_FLOOR
 }
 
-/** Thermal floor: solid-state TEC kit for thermocycler tools; else duty-sign plant set. */
+/** Thermal floor: solid-state TEC kit for thermocycler / lab electronics; else duty-sign plant set. */
 function thermalFloorForContract(contract: ContractInProgress): string[] {
   if (hasThermocyclerSignal(contract)) return THERMOCYCLER_THERMAL_FLOOR
+  // GOTCHA (Pioreactor 0121): net_heating_required_w matches HEATING_DUTY_RE
+  // and selected industrial heat_pump. Watt-scale instruments always use TEC.
+  if (hasLowPowerLabElectronicsSignal(contract)) return LAB_DEVICE_THERMAL_FLOOR
   return thermalFloorFor(contract)
 }
 
@@ -732,13 +764,20 @@ function componentsForModule(
   const isSyringePump = hasSyringePumpSignal(contract)
   const isLabMicroscope = hasLabMicroscopeSignal(contract)
   const isLowPowerLabElectronics = hasLowPowerLabElectronicsSignal(contract)
+  const isBenchtopCulture = hasBenchtopCultureSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
   const seen = new Set<string>()
   const push = (c: string) => {
     // Heating-only plant: never admit a cooling component (from corpus OR floor).
-    if (isThermal && thermalMode === 'heating' && COOLING_COMPONENT_RE.test(c)) return
+    // Skip this filter for watt-scale lab instruments — their TEC floor is intentional.
+    if (
+      isThermal
+      && thermalMode === 'heating'
+      && !isLowPowerLabElectronics
+      && COOLING_COMPONENT_RE.test(c)
+    ) return
     // Thermocycler: never admit plant chillers / LV switchboard vocabulary.
     if (isThermocycler && THERMOCYCLER_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Syringe-pump: never admit plant circulation / ladder / membrane vocabulary.
@@ -765,6 +804,14 @@ function componentsForModule(
   const syringeFloors = isSyringePump
     ? syringePumpModuleFloors(Boolean(opts.syringeHasActuationNode))
     : null
+  // Culture instruments: override sensing + mass_fluid with vial/OD/dosing floors.
+  const cultureFloor: Record<string, string[]> | null = isBenchtopCulture
+    ? {
+        mass_fluid_transport_process: LAB_CULTURE_FLUID_FLOOR,
+        sensing_instrumentation: LAB_CULTURE_SENSING_FLOOR,
+        environmental_interface: LAB_DEVICE_THERMAL_FLOOR,
+      }
+    : null
   const instrumentFloor =
     (syringeFloors && syringeFloors[moduleKey])
     || (isLabMicroscope && LAB_MICROSCOPE_MODULE_FLOORS[moduleKey])
@@ -772,6 +819,7 @@ function componentsForModule(
     // GOTCHA: lab_microscope must NOT fall through to OPTICAL_MODULE_FLOORS
     // (cuvette/colorimeter vocabulary) — checked before optical.
     || (isOpticalInstrument && !isLabMicroscope && OPTICAL_MODULE_FLOORS[moduleKey])
+    || (cultureFloor && cultureFloor[moduleKey])
     || (isLowPowerLabElectronics && LAB_ELECTRONICS_MODULE_FLOORS[moduleKey])
     || null
   if (instrumentFloor) {

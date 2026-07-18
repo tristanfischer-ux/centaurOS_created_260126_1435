@@ -76,6 +76,12 @@ const CLASS_ALIASES: Record<string, string> = {
   uuv: 'auv',
   bioreactor: 'bioreactor',
   fermenter: 'bioreactor',
+  // GOTCHA (Pioreactor 0121): ml-scale kits must NOT alias to plant `bioreactor`
+  // (100–50 000 L class plan + Rushton/CIP plant tools). Keep a distinct class.
+  benchtop_bioreactor: 'benchtop_bioreactor',
+  pioreactor: 'benchtop_bioreactor',
+  turbidostat: 'benchtop_bioreactor',
+  chemostat: 'benchtop_bioreactor',
   wearable_medical: 'cgm',
   cgm: 'cgm',
   edge_ai: 'edge_ai',
@@ -271,6 +277,12 @@ const CLASS_ALIASES: Record<string, string> = {
   thermocycler: 'thermocycler',
   pcr_thermocycler: 'thermocycler',
   optical_instrument: 'optical_instrument',
+  // USB / droplet lab instruments (Yuri 06–07) — distinct from plant classes.
+  potentiostat: 'potentiostat',
+  rodeostat: 'potentiostat',
+  digital_microfluidics: 'digital_microfluidics',
+  opendrop: 'digital_microfluidics',
+  electrowetting: 'digital_microfluidics',
 }
 
 function normaliseClass(raw: string): string | null {

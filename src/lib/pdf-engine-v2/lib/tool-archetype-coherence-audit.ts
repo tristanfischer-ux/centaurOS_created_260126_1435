@@ -236,7 +236,12 @@ const COOLING_CLASS_TOKENS = [
   // matches the tools' own applicable_to → a chiller calc on these is legitimate)
   'bess', 'edge_ai', 'data_centre', 'data_center', 'datacentre', 'datacenter', 'server',
   'h2_electrolyser', 'electrolyser', 'electrolyzer', 'ups_inverter', 'cnc_machine', 'ventilator',
-  'bioreactor',
+  // GOTCHA (Pioreactor 0121): bare 'bioreactor' matched benchtop_bioreactor /
+  // pioreactor via classMatchesTokens and SUPPRESSED refrigeration markers —
+  // so heat_pump / scroll-compressor / Daikin plant tools leaked into a 20 ml
+  // makers kit (£81k vs gold £259). Industrial stirred-tank thermal plant is
+  // NOT an active-refrigeration product; device-scale bioreactors use TEC /
+  // incubator jackets, not ASHP plant tools. Do NOT re-add bare bioreactor.
 ]
 
 /** Shared word-boundaried token matcher over a class slug. Normalises separators

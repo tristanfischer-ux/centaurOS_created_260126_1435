@@ -26,6 +26,8 @@ export const hvacLoadSizingTool: Tool<any, any> = {
   source_url: 'internal://forgeos/hvac',
   domain: 'thermal',
   pinned_environment: { python: '3.14.4' },
+  // GOTCHA: do NOT list benchtop_bioreactor / pioreactor — those are watt-scale
+  // TEC instruments; HVAC load sizing is plant/cabinet cooling plant.
   applicable_to(envelope) { return ['bess', 'vertical_farm', 'heat_pump_residential', 'edge_ai', 'h2_electrolyser', 'ups_inverter', 'cnc_machine', 'ventilator', 'bioreactor'].includes(envelope.class) },
   async invoke(input: any): Promise<ToolResult<any>> {
     const t0 = Date.now()

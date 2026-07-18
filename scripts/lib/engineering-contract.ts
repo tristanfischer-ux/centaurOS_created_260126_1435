@@ -15537,7 +15537,15 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
   )
   const peakW = 35
   const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
-  const enclosureVolumeM3 = Number((0.18 * 0.14 * 0.16).toFixed(5))
+  // INTENT (Pioreactor 0327 calc-coverage): source_detail MUST carry an operator
+  // (×/=) so check_calc_coverage counts the L×W×H derivation as SHOWN — a bare
+  // prose phrase ("benchtop instrument envelope") hid the number at 97% coverage.
+  const enclosureLengthM = 0.18
+  const enclosureWidthM = 0.14
+  const enclosureHeightM = 0.16
+  const enclosureVolumeM3 = Number(
+    (enclosureLengthM * enclosureWidthM * enclosureHeightM).toFixed(5),
+  )
   const macroTotal = 259
   return {
     product_class: 'benchtop_bioreactor',
@@ -15556,7 +15564,9 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
         source_detail: 'SBC + stir + heater/TEC + dosing pumps',
       }),
       enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', {
-        source_detail: 'benchtop instrument envelope',
+        source_detail:
+          `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m compact benchtop envelope`,
+        formula: 'enclosure_length_m*enclosure_width_m*enclosure_height_m',
       }),
     },
     topology: [
@@ -15631,7 +15641,12 @@ registerArchetype('potentiostat', (brief: any) => {
   )
   const peakW = 8
   const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
-  const enclosureVolumeM3 = Number((0.12 * 0.08 * 0.04).toFixed(5))
+  const enclosureLengthM = 0.12
+  const enclosureWidthM = 0.08
+  const enclosureHeightM = 0.04
+  const enclosureVolumeM3 = Number(
+    (enclosureLengthM * enclosureWidthM * enclosureHeightM).toFixed(5),
+  )
   const macroTotal = 189
   return {
     product_class: 'potentiostat',
@@ -15650,7 +15665,9 @@ registerArchetype('potentiostat', (brief: any) => {
         source_detail: 'USB-powered analog front-end + MCU',
       }),
       enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', {
-        source_detail: 'handheld / USB instrument envelope',
+        source_detail:
+          `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m handheld / USB instrument envelope`,
+        formula: 'enclosure_length_m*enclosure_width_m*enclosure_height_m',
       }),
     },
     topology: [
@@ -15710,7 +15727,12 @@ registerArchetype('digital_microfluidics', (brief: any) => {
   )
   const peakW = 25
   const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
-  const enclosureVolumeM3 = Number((0.22 * 0.16 * 0.08).toFixed(5))
+  const enclosureLengthM = 0.22
+  const enclosureWidthM = 0.16
+  const enclosureHeightM = 0.08
+  const enclosureVolumeM3 = Number(
+    (enclosureLengthM * enclosureWidthM * enclosureHeightM).toFixed(5),
+  )
   const macroTotal = 236
   return {
     product_class: 'digital_microfluidics',
@@ -15729,7 +15751,9 @@ registerArchetype('digital_microfluidics', (brief: any) => {
         source_detail: 'HV supply + drivers + MCU/SBC',
       }),
       enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', {
-        source_detail: 'benchtop controller + array interface envelope',
+        source_detail:
+          `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m benchtop controller envelope`,
+        formula: 'enclosure_length_m*enclosure_width_m*enclosure_height_m',
       }),
     },
     topology: [

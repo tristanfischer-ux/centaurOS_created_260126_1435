@@ -612,7 +612,19 @@ function dimsForThroughputDevice(q: number, phrase: string): string {
 // ⌀1.2×1.1 ≈ 1.2 m³ dimension. Keep 1 dp below 100 m³ (where the rounding granularity bites),
 // integer at/above (a 334 m³ tank stays "334"). The contract value is the authoritative anchor;
 // this only governs its DISPLAY precision so the (⌀, H, V) triple reconciles at every scale.
-function formatCapacityM3(v: number): string {
+//
+// GOTCHA (OpenDrop 2026-07-18, same zero-collapse family as formatRatingKw's Codema dosing
+// pump): 1-dp rounding collapses a device-scale volume (a 0.00282 m³ instrument enclosure)
+// to the literal string "0" → the BoM ledger reads "Enclosure Shell · 0 m³" and the ship
+// red-team flags it HIGH as contradicting the contract. Below 1 m³ keep 2 SIGNIFICANT
+// figures (fixed dp is not enough — 2 dp still prints 0.00282 as "0.00"), so a real
+// positive volume never displays as zero.
+export function formatCapacityM3(v: number): string {
+  if (!(v > 0)) return '0'
+  if (v < 1) {
+    const s = Number(v.toPrecision(2)).toString()
+    return s === '0' ? v.toString() : s
+  }
   return v < 100 ? String(Math.round(v * 10) / 10) : String(Math.round(v))
 }
 // Emit a kW RATING faithfully to the contract value rather than integer-truncating it: a 2.5 kW
@@ -1016,6 +1028,16 @@ function nextMotorFrameKw(kw: number): number {
 // diaphragm metering), never the bulk IEC ladder. Universal — keyed on flow magnitude.
 const METERING_FLOW_M3H_MAX = 0.5
 const METERING_POWER_KW_FLOOR = 0.04
+// INTENT (Pioreactor 0236): COTS lab movers (peristaltic / magnetic stirrer) are
+// whole purchased assemblies — never explode into industrial Casing/Impeller/
+// Drive Motor/VSD anatomy (that path minted a 37 kW motor on a 20 ml kit).
+const LAB_SCALE_FLUID_MOVER_RE =
+  /peristaltic|syringe\s*pump|magnetic\s*stirr(?:er|ing)|stir\s*bar\s*drive|diaphragm\s*(?:dosing|metering)|metering\s*pump/i
+// INTENT (Pioreactor 0247): "Culture Vessel" matched /vessel|reactor/ → Shell Course /
+// Support Skirt / Inlet Nozzle plant anatomy (~£5k) on a 20 ml glass vial. COTS lab
+// vessels stay whole — never pressure-vessel explode.
+const LAB_SCALE_VESSEL_RE =
+  /culture\s*vessel|sample\s*vessel|glass\s*vial|\bvial\b|cuvette|microplate|well\s*plate|bioreactor\s*vessel|culture\s*tube/i
 const motorKw = (p: ParentPhysics) => {
   if (p.motorKwOverride && p.motorKwOverride > 0 && p.motorKwPinned) {
     return p.motorKwOverride // brief-pinned NAMEPLATE — honoured exactly, never re-margined
@@ -1030,7 +1052,13 @@ const motorKw = (p: ParentPhysics) => {
     // Trim/metering: keep the real small duty (floor at catalogue diaphragm ~40 W).
     return Math.max(METERING_POWER_KW_FLOOR, hydraulic || METERING_POWER_KW_FLOOR)
   }
-  return nextMotorFrameKw(Math.max(1.5, hydraulic || 30 / 0.88))
+  // GOTCHA (Pioreactor 0236): unrated parent (m3h=0, kw=0) used
+  // `hydraulic || 30/0.88` → IEC 37 kW Drive Motor on a dosing peristaltic
+  // inside a 35 W / 20 ml kit. Unknown duty → bulk 1.5 kW floor, never 30 kW.
+  if (!(hydraulic > 0)) {
+    return nextMotorFrameKw(1.5)
+  }
+  return nextMotorFrameKw(Math.max(1.5, hydraulic))
 }
 
 /** Fan shaft/electrical duty for SUB_ASSEMBLY fan anatomy. INTENT (2026-07-15):
@@ -2761,11 +2789,36 @@ const OCCUPANCY_SAFETY_PLANT_RE =
 // transformer (wind turbine, utility BESS) keeps every one of these words untouched.
 const GRID_INTERFACE_PLANT_RE =
   /\b(?:mv|hv|step[\s-]?up|pad[\s-]?mount(?:ed)?|isolation|auxiliary\s+power)\s+transformer|transformer\s+(?:skid|bay)|\bswitchgear\b|ring\s+main\s+unit|\brmu\b/i
+// INTENT (Pioreactor 0121): watt-scale / sub-1 m³ instruments still emitted
+// industrial ASHP vocabulary (Heat Pump, Scroll Compressor, Access Ladder) from
+// heating-duty skeleton floors + vessel explode. No person enters a 20 ml kit —
+// demote heating PLANT the same way we demote glycol loops at air-cooled scale.
+const OCCUPANCY_HEATING_PLANT_RE =
+  /\bheat\s*pumps?\b|scroll\s*compressor|access\s*ladder|access\s*walkway|walkway\s*(?:&\s*)?handrail|expansion\s*vessel\b/i
+// INTENT (Pioreactor 0236): watt-scale kits still shipped industrial drive-train
+// + plant SCADA after the heat-pump demote — Drive Motor 37 kW / VSD / Redundant
+// PLC racks. Same sealed-instrument gate as OCCUPANCY_HEATING_PLANT_RE.
+const WATT_SCALE_INDUSTRIAL_CONTROL_RE =
+  /\bdrive\s*motors?\b|\bvariable[- ]speed\s*drives?\b|\bvsd\b|\bvfd\b|\bscada\s*\/\s*plant\s*control|\bredundant\s*plc|\bplc\s*racks?\b|\bplant\s*control\s*system\b/i
+const WATT_SCALE_VESSEL_PLANT_RE =
+  /\bsupport\s*skirt|\binlet\s*nozzle|\boutlet\s*nozzle|\bdrain\s*nozzle|\bmanway\b|\baccess\s*ladder|\bshell\s*course|\btop\s*head|\bbase\s*\/\s*floor\s*plate|\btank\s*vent|\binternal\s*distribution|\binternal\s*lining|\boverflow\s*\/\s*weir\b/i
+const WATT_SCALE_FAN_ANATOMY_RE =
+  /\bfan\s*housing|\bventuri\b|\bimpeller\b|\bec\s*motors?\b|\bspeed\s*controllers?\b|\bguard\s*\/\s*grille\b|\bmounting\s*frame\s*(?:&\s*)?isolators\b/i
 export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
   const dissipation = Number(quantities['system_thermal_dissipation_kw'] ?? 0)
   const airCooled = dissipation > 0 && dissipation * 1.2 < 2
   const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
   const noOccupancy = envM3 > 0 && envM3 < 1
+  const peakW = Number(quantities['peak_electrical_power_w'] ?? 0)
+  const loadKw = Number(quantities['connected_electrical_load_kw'] ?? 0)
+  const workingMl = Number(quantities['working_volume_ml'] ?? 0)
+  const isWattScaleInstrument =
+    noOccupancy
+    && (
+      (Number.isFinite(peakW) && peakW > 0 && peakW <= 120)
+      || (Number.isFinite(loadKw) && loadKw > 0 && loadKw <= 0.12)
+      || (Number.isFinite(workingMl) && workingMl > 0 && workingMl <= 500)
+    )
   // run 51: the 230 V direct-tie contract emits transformer_rating_kva = null ("this
   // product HAS no transformer") — key PRESENCE alone read that null as "the contract
   // sizes a transformer" and blocked the grid-interface demotion, so a £3,000
@@ -2794,6 +2847,45 @@ export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], 
             `occupancy-scale safety plant in a sealed ${envM3.toFixed(2)} m³ enclosure (< 1 m³, no personnel ` +
             `access): protection is the BMS temperature chain + the pack vent path — a gas-detection/` +
             `suppression PLANT does not exist on the real product; demoted to a scope note`
+          demoted += 1
+          continue
+        }
+        // GOTCHA (Pioreactor 0121): heating-duty skeleton emitted Heat Pump +
+        // Scroll Compressor + Access Ladder inside a 0.004 m³ / 20 ml kit.
+        if (isWattScaleInstrument && OCCUPANCY_HEATING_PLANT_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `occupancy-scale heating PLANT in a watt-scale sealed ${envM3.toFixed(3)} m³ instrument ` +
+            `(peak ≤120 W / working volume ≤500 ml): thermal control is TEC/cartridge heater — ` +
+            `an ASHP / scroll compressor / access ladder does not exist on the real product; ` +
+            `demoted to a scope note`
+          demoted += 1
+          continue
+        }
+        // GOTCHA (Pioreactor 0236): unrated dosing_peristaltic_pump exploded a
+        // 37 kW Drive Motor + VSD; SCADA driver minted £25k PLC racks from 0.035 kW load.
+        if (isWattScaleInstrument && WATT_SCALE_INDUSTRIAL_CONTROL_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `industrial drive/SCADA PLANT in a watt-scale sealed ${envM3.toFixed(3)} m³ instrument ` +
+            `(peak ≤120 W / working volume ≤500 ml): agitation/dosing is a COTS lab motor / ` +
+            `peristaltic head and control is the on-board MCU — a kW-class Drive Motor / VSD / ` +
+            `plant SCADA does not exist on the real product; demoted to a scope note`
+          demoted += 1
+          continue
+        }
+        // GOTCHA (Pioreactor 0247): culture_vessel exploded Support Skirt / Nozzle Set.
+        if (isWattScaleInstrument && WATT_SCALE_VESSEL_PLANT_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `industrial pressure-vessel anatomy in a watt-scale sealed ${envM3.toFixed(3)} m³ instrument ` +
+            `(peak ≤120 W / working volume ≤500 ml): the culture vessel is a COTS glass vial / ` +
+            `tube — shell courses, skirts, manways and nozzle sets do not exist; demoted to a scope note`
+          demoted += 1
+          continue
+        }
+        if (isWattScaleInstrument && WATT_SCALE_FAN_ANATOMY_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `industrial fan anatomy in a watt-scale sealed ${envM3.toFixed(3)} m³ instrument: ` +
+            `heatsink cooling is a small axial fan as a COTS unit — Fan Housing / Impeller / ` +
+            `EC Motor / Speed Controller plant explode does not exist; demoted to a scope note`
           demoted += 1
           continue
         }
@@ -3020,7 +3112,33 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         const nmHead = nm.replace(/\s*\([^)]*\)\s*$/g, '').trim() || nm
         const rule = SUB_ASSEMBLY.find((r) => (r.match ? r.match(nmHead) : r.re.test(nmHead)))
         if (!rule) continue
+        // GOTCHA (Pioreactor 0236): lab COTS movers matched the industrial pump
+        // anatomy (Casing + 37 kW Drive Motor). Keep them as whole assemblies.
+        if (LAB_SCALE_FLUID_MOVER_RE.test(nmHead)) continue
+        // GOTCHA (Pioreactor 0247): Culture Vessel → pressure-vessel explode.
+        if (LAB_SCALE_VESSEL_RE.test(nmHead)) continue
         const physics = readParentPhysics(w)
+        const envM3ForParts = Number(quantities['enclosure_volume_m3'] ?? 0)
+        const skipOccupancyFittings = envM3ForParts > 0 && envM3ForParts < 1
+        const peakWForParts = Number(quantities['peak_electrical_power_w'] ?? 0)
+        const loadKwForParts = Number(quantities['connected_electrical_load_kw'] ?? 0)
+        const workingMlForParts = Number(quantities['working_volume_ml'] ?? 0)
+        const isWattScaleInstrument = skipOccupancyFittings && (
+          (Number.isFinite(peakWForParts) && peakWForParts > 0 && peakWForParts <= 120)
+          || (Number.isFinite(loadKwForParts) && loadKwForParts > 0 && loadKwForParts <= 0.12)
+          || (Number.isFinite(workingMlForParts) && workingMlForParts > 0 && workingMlForParts <= 500)
+        )
+        // Watt-scale sealed instruments never get industrial pump/blower drive trains,
+        // pressure-vessel / open-tank plant anatomy, OR heatsink-fan EC-motor anatomy
+        // (Pioreactor 0250: Heatsink Fan → Fan Housing / Impeller / EC Motor / Speed
+        // Controller blew interconnect to depth 20 and floored physics).
+        if (
+          isWattScaleInstrument
+          && rule.parts.some((p) =>
+            /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller/i.test(p.name))
+        ) {
+          continue
+        }
         // UNKNOWN-SIZE VESSEL ENVELOPE CAP (2026-07-09, Powerwall exit-32 round 2): a
         // size-less vessel word (no kW, no m³, no dims — the generic path's "Coolant
         // Expansion Tank") used to fall to the templates' 50 m³ default → a 4.0 m GRP
@@ -3029,8 +3147,9 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // plausibly exceed a quarter of it — cap the default there. A plant-scale or
         // envelope-less contract (Codema tanks carry real m³) is byte-identical.
         if (physics.kw === 0 && physics.m3 === 0 && physics.diaM === 0) {
-          const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
-          if (envM3 > 0 && envM3 < 50) physics.m3 = Math.max(0.01, envM3 * 0.25)
+          if (envM3ForParts > 0 && envM3ForParts < 50) {
+            physics.m3 = Math.max(0.01, envM3ForParts * 0.25)
+          }
         }
         // CABINET-FAN DUTY CAP (2026-07-10, exit-32 round 5): an enclosure/ventilation
         // FAN moves the heat the system actually rejects — its motor can never usefully
@@ -3096,6 +3215,14 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
           if (physics.kw === 0) physics.kw = drive
         }
         for (const spec of rule.parts) {
+          // GOTCHA (Pioreactor 0121): vessel explode still minted Access Ladder
+          // on culture_vessel inside a sealed instrument — skip occupancy fittings.
+          if (
+            skipOccupancyFittings
+            && /access\s*(ladder|walkway)|walkway|handrail|manway/i.test(spec.name)
+          ) {
+            continue
+          }
           out.push(subWord(spec, id || sanitizeId(nm), physics.qty, physics, costScale))
           added += 1
         }
@@ -4516,7 +4643,16 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
   { key: 'sludge_handling', driver: (q) => pickQ(q, /solids_load_kg_day|sludge_kg_day|tss_load/), label: 'Solids / Sludge Handling System', module: /mass_fluid|process|waste|water/,
     size: (kgd) => ({ dim: '', rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(25000 + kgd * 40) }),
     form: (kgd) => `Gravity thickener + rotary-screen / belt dewatering + skip; concentrates ~${Math.round(kgd)} kg/day captured solids to a haulable cake for off-site disposal` },
-  { key: 'scada', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'SCADA / Plant Control System', module: /control|compute|scada|sensing|instrument/,
+  { key: 'scada', driver: (q) => {
+      // GOTCHA (Pioreactor 0236): connected_electrical_load_kw=0.035 still fired the
+      // £25k "Redundant PLC racks + SCADA servers" plant line inside a USB lab box.
+      // Plant SCADA is for multi-kW housed process plants, not watt-scale instruments.
+      const kw = pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/)
+      if (!kw || !(kw >= 5)) return undefined
+      const env = pickQ(q, /enclosure_volume_m3/)
+      if (env != null && env > 0 && env < 1) return undefined
+      return kw
+    }, label: 'SCADA / Plant Control System', module: /control|compute|scada|sensing|instrument/,
     // P1-D (Sam/Codema 2026-07-08): was £60k + £50/kW → £63k on a 67 kW plant (~2× a
     // realistic installed SCADA for this scale). Recalibrated: £25k base + £80/kW → ~£30k
     // at 67 kW (industry band for a single-plant fertigation SCADA + PLC + HMI + I/O).
