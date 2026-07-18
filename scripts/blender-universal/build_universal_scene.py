@@ -12361,6 +12361,7 @@ _SEALED_HERO_PRODUCT = False
 _SEALED_ENV_MM = None   # (W, D, H) set by place_sealed_enclosure — the hero camera frames THIS
 _SEALED_FRONT_COVER = None
 _SEALED_SHELL_OBJECTS = []
+_LE_SIGNATURE = "generic"   # lab_electronics sub-type by contract signal (set in _sealed_enclosure_env_mm)
 _SEALED_CUTAWAY_MATERIAL = None
 _SEALED_EXTERIOR_MATERIAL = None
 _CAD_RESOLVER = None
@@ -12552,6 +12553,25 @@ def _sealed_enclosure_env_mm(state, quantities):
             is_instrument=_IS_INSTRUMENT_DEVICE,
         )) if callable(_le_detect) else False
     )
+    # LAB-ELECTRONICS SIGNATURE (Tristan 2026-07-18): the shared lab_electronics family
+    # covers three morphologically DIFFERENT products. Sub-type by CONTRACT SIGNAL (never a
+    # product-name table, per CORE FIX PRINCIPLE) so each gets its recognisable signature
+    # geometry: a potentiostat (compliance_voltage_v) → 3-electrode WE/RE/CE leads; a
+    # bioreactor (working_volume_ml ≤ 250) → culture vial + OD/stir; an EWOD device
+    # (electrode_count) → planar electrode grid + cartridge. product_class is often absent.
+    global _LE_SIGNATURE
+    _cv = qval(quantities, "compliance_voltage_v", None)
+    _wv = qval(quantities, "working_volume_ml", None)
+    _ec = qval(quantities, "electrode_count", None)
+    _pcs = (pc or "").lower()
+    if (_ec is not None and float(_ec) >= 8) or re.search(r"microfluid|opendrop|ewod|electrowet", _pcs):
+        _LE_SIGNATURE = "ewod"
+    elif (_wv is not None and 0 < float(_wv) <= 250) or re.search(r"bioreactor|pioreactor|ferment|chemostat|turbidostat", _pcs):
+        _LE_SIGNATURE = "vial_bioreactor"
+    elif (_cv is not None and float(_cv) > 0) or re.search(r"potentiostat|rodeostat|electrochem", _pcs):
+        _LE_SIGNATURE = "potentiostat"
+    else:
+        _LE_SIGNATURE = "generic"
     _tc = qval(quantities, "tube_count", None)
     if _tc is not None and float(_tc) > 0:
         _THERMOCYCLER_TUBE_COUNT = max(4, min(96, int(round(float(_tc)))))
