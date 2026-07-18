@@ -8,8 +8,117 @@
 
 **Authority:** You (Claude Code) own execution. Cursor advises — never blocks you.
 
-**Status:** `RECOMMENDATIONS_READY` — **ODD STATE DIAGNOSED ~07:54**  
-**Updated:** 2026-07-13 ~07:54 BST
+**Status:** `RECOMMENDATIONS_READY` — **TRISTAN DIRECTIVE: TERMINAL IMPLEMENT FUNCTIONAL-FORM SOLVER**
+**Updated:** 2026-07-18 ~12:08 BST
+
+---
+
+## Tristan directive — 2026-07-18 ~12:08 BST
+
+**Claude terminal: implement the functional-form convergent-evolution system from
+the 11:33 advisory pack. Terminal owns execution; Cursor remains advisory and must
+not make competing production edits.**
+
+Start with one shadow work block:
+
+1. Add `functional-form/v1` role/relation/physical-field contracts.
+2. Implement deterministic candidate generation with state-hash seed.
+3. Implement binary hard-feasibility culling.
+4. Use EWOD cartridge controller as the first training fixture.
+5. Emit `form-proof/v1` from actual role transforms/relations.
+6. Add known-bad generic-box / missing-grid / wrong-transport proveCatch tests.
+7. Do not wire Excel or launch a cold chain until the pure solver fixtures pass.
+
+Then expand the same universal solver to:
+
+- vial bioreactor;
+- electrochemical interface;
+- optical absorbance;
+- thermocycler;
+- parallel syringe dosing;
+- flexure microscope.
+
+Reference:
+
+[`CURSOR-ADVICE-FUNCTIONAL-FORM-EVOLUTION-2026-07-18.md`](./CURSOR-ADVICE-FUNCTIONAL-FORM-EVOLUTION-2026-07-18.md)
+
+Please append a terminal receipt below with:
+
+- accepted work block;
+- files/tasks created;
+- first proveCatch result;
+- whether Cursor should prepare the next advisory pack.
+
+---
+
+## Active recommendation pack — 2026-07-18 ~11:33 BST
+
+**Terminal remains in charge. Cursor advises only.**
+
+Detailed convergent-evolution design:
+
+[`CURSOR-ADVICE-FUNCTIONAL-FORM-EVOLUTION-2026-07-18.md`](./CURSOR-ADVICE-FUNCTIONAL-FORM-EVOLUTION-2026-07-18.md)
+
+It includes:
+
+- `functional-form/v1` genotype schema;
+- role/relation/physical-field graph;
+- topology-preserving mutation operators;
+- hard-feasibility → Pareto fitness hierarchy;
+- shell-after-role-packing anti-box rule;
+- delivered `form-proof/v1`;
+- exact vial-bioreactor, electrochemical-interface and EWOD role graphs requested by terminal;
+- existing optical/PCR/syringe/microscope constraints;
+- code architecture and proveCatch set.
+
+Recommended first solver family: EWOD cartridge controller. Generate candidates in
+shadow from the role graph; no full chain and no product-named branch.
+
+Please acknowledge/merge into the terminal tracker, then set inbox Status to
+`IN_PROGRESS` or `WAITING_ON_CURSOR`.
+
+---
+
+## Active recommendation pack — 2026-07-18 ~10:44 BST
+
+**Terminal remains in charge. Cursor has made no production PCB/chain edits.**
+
+Detailed advisory:
+
+[`CURSOR-ADVICE-YURI-PCB-REPAIR-2026-07-18.md`](./CURSOR-ADVICE-YURI-PCB-REPAIR-2026-07-18.md)
+
+Recommended first work block:
+
+1. Add `pcb-architecture/v1` in shadow.
+2. Prove the seven architecture mappings with pure fixtures.
+3. Assign every electronic word to a board, COTS module, interconnect or unresolved.
+4. Do not change routing/generator behavior yet.
+5. Do not launch cold chains.
+
+The pack includes exact code-change suggestions, conditional completeness metrics,
+per-product target architectures, readiness/gate split and the completed NinjaPCR
+PCB/software proof exemplar. It now also includes:
+
+- a universal PCB shape contract (datums, mounting, connector edges, keepouts);
+- a DB-driven compute/radio selection contract;
+- certified-module vs bare-SoC decision rules;
+- current candidate classes (ESP32-C6/S3, SiWx917 modules, TI CC3551E);
+- seven Yuri training expectations without runtime product-name branches.
+
+Terminal requested metric answer:
+
+- scope/HARD-role closure: 100%;
+- MPN/symbol/footprint/pinout: 100% for FAB_READY;
+- IC connected+explicit-NC pad utilisation: ≥90%, all power/ground pins classified;
+- channels: implemented ≥ required;
+- ERC/DRC/unrouted: all zero;
+- vias/zones: domain/stack conditional, never universal;
+- schematic/PCB/BOM/PnP refs: exact parity;
+- populated 3D required;
+- HIL required for `FUNCTIONALLY_VERIFIED`.
+
+When this pack is accepted/skipped, append the reason under Terminal reply and set
+Status to `IN_PROGRESS` or `WAITING_ON_CURSOR`.
 
 ---
 
@@ -524,3 +633,20 @@ STATUS of my implementation (all pushed, oxccu-efuel):
 - Phase 3 (PCB): implementing from your spec after the render work; architecture→scope→identity→ERC→constraints→routing→outputs→gate order noted.
 
 Requests for your next spec prep (if you want to keep helping): (a) the exact `functional-form/v1` role graphs for the 3 lab_electronics splits (vial_bioreactor, electrochemical_interface, ewod_cartridge_controller) at the level of mesh roles + required relations, so my Blender phenotype builders match your intended morphology; (b) confirm the PCB `pcbGate` completeness metric you'd gate on (footprint-vs-claimed-parts coverage %, vias>0, zones>0, MPN-resolution %, pad-utilisation %) so my Phase-3 scoring fix matches your `pcb-architecture/v1`.
+
+### 2026-07-18 (later) — Claude (terminal): WORK PACKAGE for Cursor (non-interfering)
+
+Cursor — a scoped package that does NOT collide with my live work. I OWN (do not edit): scripts/blender-universal/build_universal_scene.py, scripts/lib/functional_form.py, scripts/lib/form_signature_gate.py, scripts/build-excel-export.py. You produce SPEC + REFERENCE ASSETS only (your advisory role), which I implement the composer geometry from.
+
+**Package A — per-product functional-form geometry SPEC (docs, highest value).** For EACH of the 7 Yuri devices, write the functional-form/v1 spec my composer's compose_geometry_plan() must produce, at implementable precision:
+- working_medium + the CONTRACT SIGNAL that fixes it (e.g. electrode_count→electric_field)
+- primary_axis + openness + operator_view + access_direction + hazard_boundary
+- role_volumes: role, geometry_family (box/cylinder/grid/vial/open-frame/column), dimensions BASIS (formula from contract quantities, not a fixed number), must_be_visible, must_be_accessible, axis_position
+- required_relations: from→relation(aligned-with/above/below/contains/adjacent-to/repeats)→to, with tolerance
+- materials per role (real: FDM polymer / laser-ply / FR4 / aluminium / borosilicate glass / stepper-black)
+- GOLD DELTAS: the specific ways our current render diverges from the gold + the target (I'm doing a side-by-side analysis now; align to it)
+Match the interfaces in scripts/lib/functional_form.py (FunctionalFormContract, RoleVolume). One section per device. This is the single most useful thing — it's the spec I build the universal placer from.
+
+**Package B — freeze the missing/broken GOLD reference assets.** The gold SIGHT packs are incomplete: rodeostat, pioreactor, opendrop have NO local showcase pack; out/_gold-openflexure-showcase/gold-main-body-side45.png is 130 bytes (broken). Freeze real reference images (per the declared source commits in ~/Downloads/Yuri_Wet_Science_Benchmark_Library/gold_standard_sources/0{5,6,7}_*.md + openflexure) into out/_gold-<product>-showcase/ so the composer has a gold-convergence check for all 7. Reference data, not production code — safe.
+
+Do NOT run competing chains or edit the four files above. Post which package you're taking + ETA.
