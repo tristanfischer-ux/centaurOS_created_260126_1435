@@ -71,7 +71,9 @@
       "symbolPinout": "Device:D_TVS pins 1-2; Diode_SMD:D_SOD-923",
       "manufacturerEvidence": "Toshiba DF2S6.8MFS product data and frozen Eye-Spy manufacturer ordering code",
       "databaseEvidence": "forge-truth frozen Eye-Spy BOM/schematic row"
-    },
+    }
+  ],
+  "pendingExactMappings": [
     {
       "punchlistId": "rodeostat-analog_afe-dac_output_stage_word",
       "resolverRequest": {
@@ -168,32 +170,32 @@
     {
       "product": "Rodeostat",
       "requiredBoards": 1,
-      "resolvedDelta": 2,
-      "remainingUnresolved": 5
+      "resolvedDelta": 0,
+      "remainingUnresolved": 7
     },
     {
       "product": "OpenDrop",
       "requiredBoards": 2,
-      "resolvedDelta": 1,
-      "remainingUnresolved": 10
+      "resolvedDelta": 0,
+      "remainingUnresolved": 11
     }
   ],
   "updatedSummary": {
     "products": 7,
     "requiredBoards": 8,
-    "verifiedIdentityCount": 41,
-    "unresolvedIdentityCount": 30,
-    "resolvedDelta": 6,
+    "verifiedIdentityCount": 38,
+    "unresolvedIdentityCount": 33,
+    "resolvedDelta": 3,
     "reclassifiedNonComponentCount": 14,
-    "missingMpn": 22,
-    "missingSymbolPinout": 8
+    "missingMpn": 24,
+    "missingSymbolPinout": 9
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
     "optical_source_and_visual_indication": 8,
-    "power_entry_conversion_and_protection": 12,
+    "power_entry_conversion_and_protection": 13,
     "digital_compute_communications_and_storage": 6,
-    "precision_analog_measurement_and_control": 4,
+    "precision_analog_measurement_and_control": 6,
     "wet_actuation_drive": 0,
     "board_to_board_and_cartridge_interconnect": 0
   },

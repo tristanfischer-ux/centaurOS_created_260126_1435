@@ -9,21 +9,18 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 6,
+    "resolvedIdentityCount": 3,
     "reclassifiedNonComponentCount": 14,
-    "remainingUnresolvedFittedComponents": 30,
-    "remainingMissingMpn": 22,
-    "remainingMissingSymbolPinout": 8,
+    "remainingUnresolvedFittedComponents": 33,
+    "remainingMissingMpn": 24,
+    "remainingMissingSymbolPinout": 9,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
   },
   "resolvedIdentityIds": [
     "colorimeter-optical_source-dc_dc_regulator_word",
     "colorimeter-optical_source-source_board_connector_word",
-    "pioreactor-od_optics-esd_protection_network_word",
-    "rodeostat-analog_afe-dac_output_stage_word",
-    "rodeostat-analog_afe-current_measurement_tia_word",
-    "opendrop-hv_controller_main-usb_power_entry_word"
+    "pioreactor-od_optics-esd_protection_network_word"
   ],
   "scopeReclassifications": [
     {
