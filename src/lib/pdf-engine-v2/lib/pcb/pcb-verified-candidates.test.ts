@@ -156,6 +156,124 @@ describe('verified function-keyed PCB candidates', () => {
     )).toBeNull()
   })
 
+  it.each([
+    {
+      request: {
+        wordId: 'dc_dc_regulator_word',
+        nameHuman: '3.3 V low-current instrument rail regulator',
+        characterId: 'dc_dc_regulator',
+        functionClass: 'regulator',
+        requiredRatings: { voltageV: 5, currentA: 0.2 },
+      },
+      manufacturer: 'Microchip Technology',
+      partNumber: 'MCP1700T-3302E/TT',
+      description: 'IC REG LINEAR 3.3V 250MA SOT23-3',
+      expectedFootprint: 'SOT-23',
+      expectedSource: 'Microchip MCP1700 datasheet',
+    },
+    {
+      request: {
+        wordId: 'source_board_connector_word',
+        nameHuman: 'Four-position source board connector',
+        characterId: 'source_board_connector',
+        functionClass: 'connector',
+      },
+      manufacturer: 'JST Sales America Inc.',
+      partNumber: 'BM04B-SRSS-TB',
+      description: 'CONN HEADER SMD 4POS 1MM',
+      expectedFootprint: 'JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical',
+      expectedSource: 'Pioreactor Eye-Spy frozen BOM',
+    },
+    {
+      request: {
+        wordId: 'esd_protection_network_word',
+        nameHuman: '5 V interface TVS protection',
+        characterId: 'esd_protection_network',
+        functionClass: 'diode_protection',
+        requiredRatings: { voltageV: 5 },
+      },
+      manufacturer: 'Toshiba',
+      partNumber: 'DF2S6.8MFS,L3M',
+      description: 'TVS DIODE 5V 15V SOD923',
+      expectedFootprint: 'D_SOD-923',
+      expectedSource: 'Pioreactor Eye-Spy frozen BOM',
+    },
+  ] as const)(
+    'resolves $partNumber only for its source-backed universal role and package',
+    ({
+      request,
+      manufacturer,
+      partNumber,
+      description,
+      expectedFootprint,
+      expectedSource,
+    }) => {
+      const lookup = (): DbCascadeResult => ({
+        ...CACHE_HIT,
+        result: {
+          ...CACHE_HIT.result!,
+          mpn: partNumber,
+          manufacturer,
+          description,
+        },
+      })
+
+      const resolved = resolveVerifiedFunctionCandidate(request, lookup)
+
+      expect(resolved).toMatchObject({
+        manufacturer,
+        partNumber,
+        footprint: { footprint: expectedFootprint },
+      })
+      expect(resolved?.provenance).toContain(expectedSource)
+    },
+  )
+
+  it('does not repurpose the four-pin JST host interconnect as USB power entry', () => {
+    const lookup = (): DbCascadeResult => ({
+      ...CACHE_HIT,
+      result: {
+        ...CACHE_HIT.result!,
+        mpn: 'BM04B-SRSS-TB',
+        manufacturer: 'JST Sales America Inc.',
+        description: 'CONN HEADER SMD 4POS 1MM',
+      },
+    })
+
+    expect(resolveVerifiedFunctionCandidate({
+      wordId: 'usb_power_entry_word',
+      nameHuman: 'USB power entry',
+      characterId: 'usb_power_entry',
+      functionClass: 'usb_connector',
+    }, lookup)).toBeNull()
+  })
+
+  it('rejects the MCP1700 when a regulator role requires a 12 V input rating', () => {
+    const lookup = (): DbCascadeResult => ({
+      ...CACHE_HIT,
+      result: {
+        ...CACHE_HIT.result!,
+        mpn: 'MCP1700T-3302E/TT',
+        manufacturer: 'Microchip Technology',
+        description: 'IC REG LINEAR 3.3V 250MA SOT23-3',
+      },
+    })
+
+    expect(resolveVerifiedComponentIdentity({
+      wordId: 'dc_dc_regulator_word',
+      nameHuman: '12 V to 3.3 V regulator',
+      characterId: 'dc_dc_regulator',
+      functionClass: 'regulator',
+      requiredRatings: { voltageV: 12, currentA: 0.2 },
+    }, lookup, {
+      symbolsRoot: '/unused',
+      footprintsRoot: '/unused',
+    })).toEqual({
+      status: 'unresolved',
+      reason: 'MCP1700T-3302E/TT voltage rating 6 V is below required 12 V',
+    })
+  })
+
   it('promotes only a DB, symbol, complete-pinout, footprint and rating verified identity', () => {
     const root = mkdtempSync(join(tmpdir(), 'pcb-verified-candidate-'))
     roots.push(root)

@@ -1,0 +1,143 @@
+{
+  "schema": "pcb-yuri-identity-resolution-report/v1",
+  "baseline": {
+    "punchlistPath": "src/lib/pdf-engine-v2/lib/pcb/pcb-unresolved-component-punchlist.json",
+    "producingCommit": "d43f46aaf",
+    "totalGeneratedComponents": 85,
+    "verifiedIdentityCount": 35,
+    "unresolvedIdentityCount": 50,
+    "missingMpn": 38,
+    "missingSymbolPinout": 12
+  },
+  "acceptedMappings": [
+    {
+      "punchlistId": "colorimeter-optical_source-dc_dc_regulator_word",
+      "resolverRequest": {
+        "wordId": "dc_dc_regulator_word",
+        "nameHuman": "3.3 V low-current instrument rail regulator",
+        "characterId": "dc_dc_regulator",
+        "functionClass": "regulator",
+        "requiredRatings": {
+          "voltageV": 5,
+          "currentA": 0.2
+        }
+      },
+      "manufacturer": "Microchip Technology",
+      "partNumber": "MCP1700T-3302E/TT",
+      "roleCompatibility": "Fixed 3.3 V rail at no more than 250 mA from an input no higher than 6 V; a 12 V input is explicitly rejected.",
+      "package": "3-lead SOT-23",
+      "ratings": "2.3-6.0 V input, fixed 3.3 V output, 250 mA maximum output",
+      "symbolPinout": "Regulator_Linear:MCP1700x-330xxTT; pin 1 GND, pin 2 VOUT, pin 3 VIN; Package_TO_SOT_SMD:SOT-23",
+      "manufacturerEvidence": "Microchip MCP1700 data sheet DS20001826F",
+      "databaseEvidence": "forge-truth distributor/spec-document cache"
+    },
+    {
+      "punchlistId": "colorimeter-optical_source-source_board_connector_word",
+      "resolverRequest": {
+        "wordId": "source_board_connector_word",
+        "nameHuman": "Four-position source board connector",
+        "characterId": "source_board_connector",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 50,
+          "currentA": 1
+        }
+      },
+      "manufacturer": "JST Sales America Inc.",
+      "partNumber": "BM04B-SRSS-TB",
+      "roleCompatibility": "Four-position 1.00 mm vertical board interconnect; not a USB power-entry substitute.",
+      "package": "JST SH four-contact vertical SMD header, 1.00 mm pitch",
+      "ratings": "50 V, 1 A",
+      "symbolPinout": "Connector_Generic:Conn_01x04 pins 1-4; Connector_JST:JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical; MP pads are mechanical retention tabs",
+      "manufacturerEvidence": "JST SH series data sheet eSH.pdf",
+      "databaseEvidence": "forge-truth Eye-Spy BOM row and frozen Eye-Spy J1/J2 schematic"
+    },
+    {
+      "punchlistId": "pioreactor-od_optics-esd_protection_network_word",
+      "resolverRequest": {
+        "wordId": "esd_protection_network_word",
+        "nameHuman": "5 V interface TVS protection",
+        "characterId": "esd_protection_network",
+        "functionClass": "diode_protection",
+        "requiredRatings": {
+          "voltageV": 5
+        }
+      },
+      "manufacturer": "Toshiba",
+      "partNumber": "DF2S6.8MFS,L3M",
+      "roleCompatibility": "Two-terminal 5 V interface TVS used at frozen Eye-Spy D2-D5.",
+      "package": "SOD-923",
+      "ratings": "5 V working voltage, 15 V clamp",
+      "symbolPinout": "Device:D_TVS pins 1-2; Diode_SMD:D_SOD-923",
+      "manufacturerEvidence": "Toshiba DF2S6.8MFS product data and frozen Eye-Spy manufacturer ordering code",
+      "databaseEvidence": "forge-truth frozen Eye-Spy BOM/schematic row"
+    }
+  ],
+  "sevenProductSummary": [
+    {
+      "product": "Colorimeter",
+      "requiredBoards": 1,
+      "resolvedDelta": 2,
+      "remainingUnresolved": 3
+    },
+    {
+      "product": "NinjaPCR",
+      "requiredBoards": 1,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 11
+    },
+    {
+      "product": "Poseidon",
+      "requiredBoards": 0,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "OpenFlexure",
+      "requiredBoards": 0,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "Pioreactor",
+      "requiredBoards": 3,
+      "resolvedDelta": 1,
+      "remainingUnresolved": 10
+    },
+    {
+      "product": "Rodeostat",
+      "requiredBoards": 1,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 10
+    },
+    {
+      "product": "OpenDrop",
+      "requiredBoards": 2,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 13
+    }
+  ],
+  "updatedSummary": {
+    "products": 7,
+    "requiredBoards": 8,
+    "verifiedIdentityCount": 38,
+    "unresolvedIdentityCount": 47,
+    "resolvedDelta": 3,
+    "missingMpn": 36,
+    "missingSymbolPinout": 11
+  },
+  "remainingCategoryCounts": {
+    "mechanical_or_off_board_scope": 1,
+    "optical_source_and_visual_indication": 8,
+    "power_entry_conversion_and_protection": 16,
+    "digital_compute_communications_and_storage": 13,
+    "precision_analog_measurement_and_control": 6,
+    "wet_actuation_drive": 2,
+    "board_to_board_and_cartridge_interconnect": 1
+  },
+  "limitations": [
+    "This is an offline identity delta against the frozen 50-item report; no terminal-owned chain or fabrication pipeline was rerun.",
+    "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range.",
+    "No candidate without an exact manufacturer ordering code, compatible ratings, package, and symbol/pinout source was promoted."
+  ]
+}

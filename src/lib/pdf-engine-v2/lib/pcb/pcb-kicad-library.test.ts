@@ -56,6 +56,8 @@ describe('KiCad component identity library', () => {
   (pad "1" smd rect)
   (pad "2" smd rect)
   (pad "3" smd rect)
+  (pad "MP" smd rect)
+  (pad "MP" smd rect)
   (pad "" np_thru_hole circle)
 )
 `)
@@ -66,8 +68,8 @@ describe('KiCad component identity library', () => {
     })).toEqual({
       library: 'Package_Test',
       footprint: 'PART',
-      padCount: 4,
-      nonElectricalPadCount: 1,
+      padCount: 6,
+      nonElectricalPadCount: 3,
     })
   })
 

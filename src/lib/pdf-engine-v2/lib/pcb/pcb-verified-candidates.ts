@@ -84,6 +84,7 @@ interface CandidateRule {
   }
   packageEvidence: string
   referenceEvidence: string
+  pinoutEvidence?: string
 }
 
 const CANDIDATE_RULES: readonly CandidateRule[] = [
@@ -168,6 +169,45 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     packageEvidence: 'forge-truth cache: BSS84-7-F, P-channel 50 V MOSFET, SOT-23-3',
     referenceEvidence: 'universal low-voltage reverse-polarity switch role; DB-only candidate evidence',
   },
+  {
+    roleTest: /dc[_ -]?dc[_ -]?regulator|3\.3\s*v.*(?:regulator|ldo)|(?:regulator|ldo).*3\.3\s*v/i,
+    functionClass: 'regulator',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP1700T-3302E/TT',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    symbol: { library: 'Regulator_Linear', symbol: 'MCP1700x-330xxTT' },
+    ratings: { voltageV: 6, currentA: 0.25 },
+    packageEvidence: 'Microchip MCP1700T-3302E/TT: fixed 3.3 V, 250 mA LDO in 3-lead SOT-23',
+    referenceEvidence: 'Microchip MCP1700 datasheet DS20001826F and forge-truth distributor/spec-document cache',
+    pinoutEvidence: 'Microchip SOT-23 pinout 1=GND, 2=VOUT, 3=VIN; local KiCad Regulator_Linear:MCP1700x-330xxTT with Package_TO_SOT_SMD:SOT-23',
+  },
+  {
+    roleTest: /source[_ -]?board[_ -]?connector|four[_ -]?(?:position|pin)[_ -]?(?:board[_ -]?to[_ -]?board[_ -]?)?connector/i,
+    functionClass: 'connector',
+    manufacturer: 'JST Sales America Inc.',
+    partNumber: 'BM04B-SRSS-TB',
+    footprint: {
+      library: 'Connector_JST',
+      footprint: 'JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical',
+    },
+    symbol: { library: 'Connector_Generic', symbol: 'Conn_01x04' },
+    ratings: { voltageV: 50, currentA: 1 },
+    packageEvidence: 'JST SH BM04B-SRSS-TB: four SMD contacts, 1.00 mm pitch, vertical header',
+    referenceEvidence: 'JST SH manufacturer data sheet https://www.jst-mfg.com/product/pdf/eng/eSH.pdf; Pioreactor Eye-Spy frozen BOM and schematic, revision ca40a91e728801b139b1086853f7cf74ce76def9; Digi-Key 455-BM04B-SRSS-TBTR-ND',
+    pinoutEvidence: 'frozen Eye-Spy schematic J1/J2 pins 1-4; local KiCad Connector_Generic:Conn_01x04 and exact JST footprint',
+  },
+  {
+    roleTest: /esd[_ -]?protection|(?:^|[_ -])tvs(?:$|[_ -])|transient[_ -]?protection/i,
+    functionClass: 'diode_protection',
+    manufacturer: 'Toshiba',
+    partNumber: 'DF2S6.8MFS,L3M',
+    footprint: { library: 'Diode_SMD', footprint: 'D_SOD-923' },
+    symbol: { library: 'Device', symbol: 'D_TVS' },
+    ratings: { voltageV: 5 },
+    packageEvidence: 'Toshiba DF2S6.8MFS,L3M: 5 V working, 15 V clamp TVS in SOD-923',
+    referenceEvidence: 'Toshiba TVS manufacturer catalogue ALQ00261; Pioreactor Eye-Spy frozen BOM and schematic, revision ca40a91e728801b139b1086853f7cf74ce76def9; Digi-Key DF2S6.8MFSL3MCT-ND',
+    pinoutEvidence: 'frozen Eye-Spy schematic D2-D5 pins 1-2; local KiCad Device:D_TVS and Diode_SMD:D_SOD-923',
+  },
 ]
 
 function roleText(request: VerifiedCandidateRequest): string {
@@ -215,7 +255,11 @@ export function resolveVerifiedFunctionCandidate(
     partNumber: rule.partNumber,
     compatibleFunctionClass: rule.functionClass,
     footprint: rule.footprint,
-    provenance: `${rule.referenceEvidence}; forge-truth:${cached.source}`,
+    provenance: [
+      rule.referenceEvidence,
+      rule.pinoutEvidence,
+      `forge-truth:${cached.source}`,
+    ].filter(Boolean).join('; '),
     roleCompatibility: `${request.characterId} matches generic ${rule.functionClass} role`,
     packageCompatibility: rule.packageEvidence,
     cacheSource: cached.source,

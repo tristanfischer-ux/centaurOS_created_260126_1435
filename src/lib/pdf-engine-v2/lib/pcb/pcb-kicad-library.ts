@@ -166,8 +166,12 @@ export function resolveKicadFootprint(
   const source = readFileSync(path, 'utf8')
   const pads = extractForms(source, 'pad')
   if (pads.length === 0) return null
-  const nonElectricalPadCount = pads.filter((pad) =>
-    /^\(pad\s+""/.test(pad) || /\snp_thru_hole\s/.test(pad)).length
+  // GOTCHA: KiCad connector footprints name soldered retention tabs "MP".
+  // They are physical pads but have no corresponding schematic signal pin.
+  const nonElectricalPadCount = pads.filter((pad) => {
+    const padNumber = pad.match(/^\(pad\s+"([^"]*)"/)?.[1]
+    return padNumber === '' || padNumber === 'MP' || /\snp_thru_hole\s/.test(pad)
+  }).length
   return {
     library: ref.library,
     footprint: ref.footprint,
