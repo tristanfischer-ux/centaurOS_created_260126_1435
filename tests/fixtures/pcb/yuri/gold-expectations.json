@@ -1,0 +1,107 @@
+[
+  {
+    "product": "Colorimeter",
+    "runDirectory": "colorimeter-20260717-2254",
+    "expectedDisposition": "daughterboard",
+    "expectedBoards": [
+      {
+        "role": "optical_source_daughterboard",
+        "shapeFamily": "optical_registration_plate",
+        "channelRequirements": [
+          { "role": "optical_source_channel", "count": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "product": "NinjaPCR",
+    "runDirectory": "ninjapcr-20260718-0001",
+    "expectedDisposition": "single_custom",
+    "expectedBoards": [
+      {
+        "role": "thermal_power_controller",
+        "shapeFamily": "thermal_power_base",
+        "channelRequirements": [
+          { "role": "thermal_zone", "count": 1 },
+          { "role": "lid_heater_channel", "count": 1 },
+          { "role": "fan_channel", "count": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "product": "Poseidon",
+    "runDirectory": "poseidon-20260718-0022",
+    "expectedDisposition": "cots_only",
+    "expectedBoards": []
+  },
+  {
+    "product": "OpenFlexure",
+    "runDirectory": "openflexure-20260718-0101",
+    "expectedDisposition": "cots_only",
+    "expectedBoards": []
+  },
+  {
+    "product": "Pioreactor",
+    "runDirectory": "pioreactor-20260718-0327",
+    "expectedDisposition": "multi_board",
+    "expectedBoards": [
+      {
+        "role": "wet_lab_hat",
+        "shapeFamily": "wet_lab_hat",
+        "channelRequirements": []
+      },
+      {
+        "role": "od_optics_board",
+        "shapeFamily": "optical_registration_plate",
+        "channelRequirements": [
+          { "role": "od_measurement_channel", "count": 1 }
+        ]
+      },
+      {
+        "role": "heater_stir_actuation_board",
+        "shapeFamily": "wet_actuation_base",
+        "channelRequirements": [
+          { "role": "heater_channel", "count": 1 },
+          { "role": "stir_channel", "count": 1 },
+          { "role": "pump_channel", "count": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "product": "Rodeostat",
+    "runDirectory": "rodeostat-20260718-0201",
+    "expectedDisposition": "daughterboard",
+    "expectedBoards": [
+      {
+        "role": "analog_front_end_shield",
+        "shapeFamily": "precision_analog_shield",
+        "channelRequirements": [
+          { "role": "electrochemical_cell_channel", "count": 1 }
+        ]
+      }
+    ]
+  },
+  {
+    "product": "OpenDrop",
+    "runDirectory": "opendrop-20260718-0410",
+    "expectedDisposition": "multi_board",
+    "expectedBoards": [
+      {
+        "role": "high_voltage_controller",
+        "shapeFamily": "high_voltage_controller",
+        "channelRequirements": [
+          { "role": "electrode_switch_channel", "count": 64 }
+        ]
+      },
+      {
+        "role": "electrode_cartridge",
+        "shapeFamily": "electrode_cartridge",
+        "channelRequirements": [
+          { "role": "electrode_channel", "count": 64 }
+        ]
+      }
+    ]
+  }
+]
