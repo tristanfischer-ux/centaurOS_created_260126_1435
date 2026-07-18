@@ -94,8 +94,8 @@ describe('offline seven-product PCB identity resolution report', () => {
     )
 
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
-    expect(report.acceptedMappings).toHaveLength(3)
-    expect(report.pendingExactMappings).toHaveLength(3)
+    expect(report.acceptedMappings).toHaveLength(6)
+    expect(report.pendingExactMappings).toHaveLength(0)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
     expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
     expect(punchlist.scopeReclassifications).toHaveLength(14)
@@ -193,34 +193,12 @@ describe('offline seven-product PCB identity resolution report', () => {
     }
   })
 
-  it('keeps exact gold mappings pending until forge-truth ingest completes', () => {
+  it('has no exact gold mappings pending after forge-truth ingest completes', () => {
     const report = readJson<ResolutionReport>(REPORT_PATH)
 
-    for (const mapping of report.pendingExactMappings) {
-      const lookup = (): DbCascadeResult => ({
-        found: true,
-        result: {
-          source: 'digikey',
-          mpn: mapping.partNumber,
-          manufacturer: mapping.manufacturer,
-          description: mapping.package,
-          priceGBP: [],
-          stockUK: null,
-          datasheetUrl: null,
-          productUrl: '',
-          leadWeeks: null,
-          fetchedAt: '2026-07-18T00:00:00.000Z',
-        },
-        source: 'cache_hit',
-        ageHours: 1,
-      })
-
-      expect(resolveVerifiedFunctionCandidate(mapping.resolverRequest, lookup)).toMatchObject({
-        manufacturer: mapping.manufacturer,
-        partNumber: mapping.partNumber,
-      })
-      expect(mapping.databaseEvidence).toContain('requires scheduled ingest')
-    }
+    expect(report.pendingExactMappings).toEqual([])
+    expect(report.acceptedMappings.slice(-3).every((mapping) =>
+      mapping.databaseEvidence.includes('manufacturer_verified_pcb_ingest'))).toBe(true)
   })
 
   it('reports the exact honest delta without claiming a pipeline rerun', () => {
@@ -229,12 +207,12 @@ describe('offline seven-product PCB identity resolution report', () => {
     expect(report.updatedSummary).toEqual({
       products: 7,
       requiredBoards: 8,
-      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 3,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 3 - 14,
-      resolvedDelta: 3,
+      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 6,
+      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 6 - 14,
+      resolvedDelta: 6,
       reclassifiedNonComponentCount: 14,
-      missingMpn: report.baseline.missingMpn - 2 - 12,
-      missingSymbolPinout: report.baseline.missingSymbolPinout - 1 - 2,
+      missingMpn: report.baseline.missingMpn - 4 - 12,
+      missingSymbolPinout: report.baseline.missingSymbolPinout - 2 - 2,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([
       expect.stringContaining('no terminal-owned chain'),

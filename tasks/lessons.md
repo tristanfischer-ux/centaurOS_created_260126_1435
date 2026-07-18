@@ -402,3 +402,9 @@ NEVER: Mix `createSignedUrl(path, 3600)` writes with a bucket where `public=true
 ALWAYS: If the bucket is public, use `getPublicUrl`. If the file is actually confidential, flip the bucket to `public=false` AND re-sign on read (not write), so the URL can be refreshed every time the row is loaded.
 REASON: Commit f4efa76a (Apr 5, "C3 red team fix") switched 7 generators under src/app/(platform)/the-forge/services/ to signed URLs for `xray-images` (which is `public=true`). For 12 days, every CAD-lab generation silently broke because (a) a race condition in cad-lab-context.tsx wiped the URL, and (b) if it had survived, the URL expired 1h after generation and the user's next reload would show broken images. Fixed 2026-04-17 in commit TBD: reverted all 7 to `getPublicUrl` with security rationale comments. Access control is the UUID scanId in path (122 bits of entropy).
 RELATED: src/app/(platform)/the-forge/services/{image,cad,cfd,topo,thermal,fea,premium-analysis}-generator.ts
+
+### 2026-07-18 - RULE: Derive PCB residual category counts from baseline IDs
+NEVER: Subtract newly resolved identities from every evidence-gap category based on the replacement's complete metadata.
+ALWAYS: Filter the baseline punchlist by resolved and reclassified IDs, then count each surviving row's original `missingEvidence.kind`.
+REASON: Promoting OP07CDR, TL072CDT, and 12401610E4#2A reduced total unresolved identities by three, but their baseline taxonomy was two MPN gaps and one symbol/pinout gap; inferred arithmetic produced internally inconsistent category totals.
+RELATED: `pcb-unresolved-component-punchlist.json`, `pcb-yuri-identity-resolution-report.test.ts`
