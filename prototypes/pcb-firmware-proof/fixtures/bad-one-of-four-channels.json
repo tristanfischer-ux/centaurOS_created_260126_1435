@@ -1,0 +1,46 @@
+{
+  "schema": "pcb-firmware-proof-spec/v1",
+  "proof_target_id": "underimplemented_motion_controller",
+  "kind": "custom_board",
+  "design_fitness_ok": true,
+  "mcu": {
+    "mpn": "ATmega328P-AU",
+    "toolchain": "native-draft",
+    "pin_contract_complete": true
+  },
+  "buses": [],
+  "components": [],
+  "channels": [
+    {
+      "channel_id": "motor_axis",
+      "role": "stepper_channel",
+      "required_count": 4,
+      "instances": [
+        {
+          "instance_id": "axis_0",
+          "enable_net": "M0_EN",
+          "output_net": "M0_STEP"
+        }
+      ]
+    }
+  ],
+  "actuators": [
+    {
+      "actuator_id": "motors",
+      "domain": "motion_actuation",
+      "instance_ids": [
+        "axis_0"
+      ],
+      "safe_default": "off",
+      "requires_two_step_arm": true,
+      "max_duty_percent": 5,
+      "max_pulse_ms": 100
+    }
+  ],
+  "communications": [
+    {
+      "kind": "uart_banner",
+      "expected_banner_prefix": "PROOF|underimplemented_motion_controller|"
+    }
+  ]
+}

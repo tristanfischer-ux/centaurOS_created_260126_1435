@@ -1,0 +1,43 @@
+{
+  "arduino_cli_version": "arduino-cli  Version: 1.5.1 Commit: Homebrew Date: 2026-06-05T09:39:33Z",
+  "artifacts": [
+    {
+      "name": "NinjaPcrProof.ino.bin",
+      "sha256": "b6de35ffed3d5510e0f31de5753c827fd27d5863368f0d085d7c363997171a3b",
+      "size_bytes": 274016
+    },
+    {
+      "name": "NinjaPcrProof.ino.elf",
+      "sha256": "44cd3435be41ec1bf246af33d584a47d838c52ee3df01988b972625df06aae52",
+      "size_bytes": 2168300
+    },
+    {
+      "name": "NinjaPcrProof.ino.map",
+      "sha256": "c53dbf743018d797fe51bf1a6355c7d1dd943478f3dcf147508e0907d4d1c25f",
+      "size_bytes": 1858808
+    }
+  ],
+  "esp8266_core_version": "3.1.2",
+  "flash_total_bytes": 1048576,
+  "flash_used_bytes": 238996,
+  "gold_firmware_compile": {
+    "compatibility_overlay_ok": false,
+    "findings": [
+      "legacy min/max macros conflict with ESP8266 core 3.1.2",
+      "missing return statements treated as errors",
+      "bundled legacy ESP8266 HTTP update API incompatible with core 3.1.2"
+    ],
+    "unmodified_ok": false
+  },
+  "hardware_status": "UNVERIFIED_NO_HIL",
+  "iram_total_bytes": 65536,
+  "iram_used_bytes": 60931,
+  "liquid_crystal_version": "1.0.7",
+  "ok": true,
+  "proof_source_sha256": "736d990934b4bd046ce06f458601468b919825b10bf02d67654f2fe3833f4bf5",
+  "ram_total_bytes": 80192,
+  "ram_used_bytes": 28920,
+  "schema": "ninjapcr-real-target-compile/v1",
+  "source_path": "generated from gold contract; reproducible via benchmark.py",
+  "target": "esp8266:esp8266:generic"
+}
