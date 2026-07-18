@@ -9,10 +9,10 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 7,
-    "reclassifiedNonComponentCount": 16,
-    "remainingUnresolvedFittedComponents": 27,
-    "remainingMissingMpn": 27,
+    "resolvedIdentityCount": 8,
+    "reclassifiedNonComponentCount": 20,
+    "remainingUnresolvedFittedComponents": 22,
+    "remainingMissingMpn": 22,
     "remainingMissingSymbolPinout": 0,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
@@ -24,7 +24,8 @@
     "rodeostat-analog_afe-current_measurement_tia_word",
     "opendrop-hv_controller_main-usb_power_entry_word",
     "colorimeter-optical_source-led_source_word",
-    "colorimeter-optical_source-source_board_connector_word"
+    "colorimeter-optical_source-source_board_connector_word",
+    "rodeostat-analog_afe-esd_protection_network_word"
   ],
   "scopeReclassifications": [
     {
@@ -154,6 +155,38 @@
       "wholeSystemOwner": "64-channel electrode cartridge copper and mating interface",
       "evidence": "Electrowetting electrodes are patterned conductive geometry; the channel requirement was incorrectly emitted as one two-pin fitted connector.",
       "retainedFunction": "All 64 electrode channels remain mandatory in cartridge geometry, routing, creepage, and the controller mating interface."
+    },
+    {
+      "id": "rodeostat-analog_afe-ferrite_emc_bead_word",
+      "product": "Rodeostat",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "released shield decoupling network; no fitted ferrite owner",
+      "evidence": "The frozen revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd BOM and schematic contain no ferrite bead or impedance/current/DCR requirement.",
+      "retainedFunction": "No bead is fitted; a future measured-noise result must derive a new filter contract before procurement."
+    },
+    {
+      "id": "rodeostat-analog_afe-power_indicator_led_word",
+      "product": "Rodeostat",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "Adafruit ItsyBitsy M4 Express product 3800",
+      "evidence": "Frozen U2 is ITSY_BITSY_M4 and the shield has no indicator LED; Adafruit product 3800 includes a red D13 LED and RGB DotStar.",
+      "retainedFunction": "Power indication remains available from the purchased host module without adding a guarded-analogue-ground load."
+    },
+    {
+      "id": "rodeostat-analog_afe-adc_input_stage_word",
+      "product": "Rodeostat",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "Adafruit ItsyBitsy M4 Express product 3800 dual ATSAMD51 ADCs",
+      "evidence": "Frozen U2 routes conditioned analogue nets through A0-A5; Adafruit product 3800 specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs.",
+      "retainedFunction": "Electrochemical conversion remains owned by the host ADCs; the unrelated NAU7802 bridge ADC stays rejected."
+    },
+    {
+      "id": "rodeostat-analog_afe-status_indicator_word",
+      "product": "Rodeostat",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "Adafruit ItsyBitsy M4 Express product 3800",
+      "evidence": "Frozen U2 is the purchased ItsyBitsy M4 host; Adafruit product 3800 provides both red D13 and RGB DotStar firmware-controlled indicators.",
+      "retainedFunction": "Measurement/run/fault status remains a host-firmware function without an invented shield LED."
     }
   ],
   "roleGroups": [
@@ -287,22 +320,22 @@
           "wordId": "power_indicator_led_word",
           "characterId": "power_indicator_led",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["rail monitored", "colour", "forward voltage/current", "series resistor"],
-            "evidence": ["Offline report names 4-2489541-7 without role-compatible manufacturer evidence."]
+            "status": "source_verified",
+            "requirements": ["host-owned visual power indication"],
+            "missing": ["no separate shield LED is required"],
+            "evidence": ["Frozen shield fits U2 ITSY_BITSY_M4 and no indicator LED; Adafruit product 3800 includes red D13 and RGB DotStar indicators."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "4-2489541-7 is rejected as a 110 V DC panel indicator with no authoritative PCB package/terminal geometry. The monitored-rail LED and resistor MPNs remain missing." },
+          "missingEvidence": { "kind": "mpn", "details": "Closed as a non-fitted host-module function owned by exact Adafruit product 3800; TE 4-2489541-7 remains rejected." },
           "sourceCandidate": {
-            "identity": "TE Connectivity 4-2489541-7",
+            "identity": "Adafruit ItsyBitsy M4 Express product 3800",
             "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "reject_for_target_role"
+            "source": "https://www.adafruit.com/product/3800",
+            "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Define the monitored rail and LED current.", "Select an orderable LED/resistor pair from manufacturer datasheets.", "Do not reuse 4-2489541-7 without role evidence."]
+            "action": "reclassify",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
+            "acceptance": ["Assign indication to Adafruit 3800.", "Fit no duplicate shield LED.", "Keep 4-2489541-7 rejected."]
           }
         },
         {
@@ -312,17 +345,22 @@
           "wordId": "status_indicator_word",
           "characterId": "status_indicator",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["indicated state", "colour", "forward voltage/current", "series resistor"],
-            "evidence": ["Offline report supplies only a generic LED role."]
+            "status": "source_verified",
+            "requirements": ["host-firmware status indication"],
+            "missing": ["firmware state semantics remain a software contract"],
+            "evidence": ["Adafruit product 3800 provides red D13 and RGB DotStar indicators on frozen Rodeostat U2."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN or manufacturer optical/electrical ratings." },
-          "sourceCandidate": null,
+          "missingEvidence": { "kind": "mpn", "details": "Closed as a non-fitted host-module function owned by exact Adafruit product 3800." },
+          "sourceCandidate": {
+            "identity": "Adafruit ItsyBitsy M4 Express product 3800",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "https://www.adafruit.com/product/3800",
+            "disposition": "candidate_only"
+          },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Define the status semantics and drive current.", "Ingest a datasheet-backed LED and resistor.", "Map exact polarity and footprint."]
+            "action": "reclassify",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
+            "acceptance": ["Assign status indication to Adafruit 3800 host LEDs.", "Fit no duplicate shield LED.", "Retain firmware state semantics as a software requirement."]
           }
         },
         {
@@ -687,22 +725,22 @@
           "wordId": "esd_protection_network_word",
           "characterId": "esd_protection_network",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["protected interface", "working/clamp voltage", "capacitance/leakage", "channel count", "surge standard"],
-            "evidence": ["Precision electrochemical inputs require leakage-aware protection; generic SOD-323 diode evidence is insufficient."]
+            "status": "source_verified",
+            "requirements": ["two low-leakage unipolar rail clamps", "70 V reverse rating", "100 nA maximum leakage at 50 V", "2 pF maximum capacitance", "SOT-23 series-pair pinout"],
+            "missing": ["no IEC 61000-4-2 TVS certification is claimed"],
+            "evidence": ["Frozen D1/D2 name BAS70-04, C609810 and SOT-23; Slkor manufacturer data distributed by LCSC closes exact rating, package and pinout."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No protection MPN or leakage/capacitance evidence for the analog interface." },
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Slkor BAS70-04 ordering identity, frozen C609810 BOM row and complete SOT-23 pinout/footprint parity." },
           "sourceCandidate": {
-            "identity": "BAS07-04 dual low-leakage diode used in frozen Rodeostat source",
-            "evidenceLevel": "gold_source_value",
-            "source": "https://github.com/iorodeo/potentiostat/blob/86e4708fea84f8fc33bcbfc9a706b06f4b770efd/hardware/pcbs/itsy_bitsy_mx_shield_v0p1/high_current/potentiostat.sch",
+            "identity": "Slkor BAS70-04",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "https://www.lcsc.com/product-detail/C609810.html",
             "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Map each protected interface and allowable leakage/capacitance.", "Resolve BAS07-04 or a superior exact ordering code with manufacturer evidence.", "Ingest and map full pinout/footprint."]
+            "action": "ingest",
+            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
+            "acceptance": ["Ingest Slkor BAS70-04 and frozen revision provenance.", "Map pins 1=A1, 2=K2, 3=K1/A2.", "Prove SOT-23 three-pad parity and reject generic IEC TVS claims."]
           }
         },
         {
@@ -712,17 +750,17 @@
           "wordId": "ferrite_emc_bead_word",
           "characterId": "ferrite_emc_bead",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["rail/noise target", "impedance/frequency", "DC current", "DCR", "package"],
-            "evidence": ["Offline report supplies a generic 0603 bead without source or analysis."]
+            "status": "source_verified",
+            "requirements": ["zero fitted ferrite beads in the released shield"],
+            "missing": ["no future filter may be selected without measured rail-noise evidence"],
+            "evidence": ["Frozen revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd BOM and schematic contain no ferrite bead."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN or impedance/current evidence." },
+          "missingEvidence": { "kind": "mpn", "details": "Rejected as an unevidenced generated fitted role; no MPN should be assigned." },
           "sourceCandidate": null,
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Derive the filtered rail and impedance target from analog noise analysis.", "Ingest an exact bead with current/DCR curves.", "Map exact footprint."]
+            "action": "reclassify",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
+            "acceptance": ["Keep the released decoupling topology.", "Fit no ferrite bead.", "Require a new measured-noise contract before any future bead procurement."]
           }
         },
         {
@@ -1102,22 +1140,22 @@
           "wordId": "adc_input_stage_word",
           "characterId": "adc_input_stage",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": ["electrochemical measurement input"],
-            "missing": ["ADC ownership", "resolution/rate", "input range", "noise/leakage", "reference"],
-            "evidence": ["Offline candidate NAU7802 is sourced from NinjaPCR, not proven by Rodeostat gold."]
+            "status": "source_verified",
+            "requirements": ["host-owned electrochemical measurement input", "0-3.3 V conditioned input", "12-bit conversion", "1 MSPS ADC capability"],
+            "missing": ["system ENOB and calibration remain end-to-end validation requirements"],
+            "evidence": ["Frozen U2 exposes A0-A5 on ITSY_BITSY_M4; Adafruit product 3800 specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "NAU7802SGI now has a manufacturer-backed SOP-16 mapping but is rejected as a bridge/strain-gauge ADC with no Rodeostat electrochemical-conversion role evidence. The actual ADC identity remains missing." },
+          "missingEvidence": { "kind": "mpn", "details": "Closed as a non-fitted function owned by exact purchased module Adafruit 3800; NAU7802SGI remains rejected." },
           "sourceCandidate": {
-            "identity": "Nuvoton NAU7802SGI",
+            "identity": "Adafruit ItsyBitsy M4 Express product 3800",
             "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "reject_for_target_role"
+            "source": "https://www.adafruit.com/product/3800",
+            "disposition": "candidate_only"
           },
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Trace whether the COTS MCU ADC or a discrete ADC performs conversion in the frozen design.", "Remove NAU7802 unless requirements and gold/manufacturer evidence support it.", "Source/map the actual ADC/reference chain."]
+            "acceptance": ["Assign conversion to Adafruit 3800 host ADCs.", "Retain frozen U2 A0-A5 pin contract.", "Do not fit NAU7802 or another discrete ADC without a new architecture requirement."]
           }
         },
         {

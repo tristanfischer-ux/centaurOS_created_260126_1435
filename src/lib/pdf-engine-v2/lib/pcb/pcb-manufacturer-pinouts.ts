@@ -40,6 +40,18 @@ export type CuratedManufacturerIdentity =
 
 const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
   {
+    manufacturer: 'Slkor',
+    partNumber: 'BAS70-04',
+    symbolId: 'Forge_Manufacturer:BAS70-04',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    pins: [
+      { number: '1', name: 'A1', kind: 'passive' },
+      { number: '2', name: 'K2', kind: 'passive' },
+      { number: '3', name: 'K1/A2', kind: 'passive' },
+    ],
+    provenance: 'Slkor BAS70-04 manufacturer data distributed as LCSC C609810: dual series Schottky in SOT-23, pins 1=A1, 2=K2, 3=K1/A2; frozen Rodeostat D1/D2 identify BAS70-04, C609810 and Package_TO_SOT_SMD:SOT-23 at revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd; https://www.lcsc.com/product-detail/C609810.html',
+  },
+  {
     manufacturer: 'Microchip Technology',
     partNumber: 'MCP1700T-3302E/TT',
     symbolId: 'Forge_Manufacturer:MCP1700T-3302E-TT',

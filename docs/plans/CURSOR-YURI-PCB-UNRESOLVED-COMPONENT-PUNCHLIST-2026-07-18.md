@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Seven identities were subsequently resolved and 16 roles were proven to be non-components. The active residual is therefore **27 unresolved fitted components**: **27 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Eight identities were subsequently resolved and 20 roles were proven to be non-components. The active residual is therefore **22 unresolved fitted components**: **22 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -28,15 +28,15 @@ The latest identities were promoted only after the off-chain ingest wrote manufa
 | Colorimeter | `optical_source` | 0 |
 | NinjaPCR | `thermal_controller` | 9 |
 | Pioreactor | `wet_lab_hat`, `od_optics` | 3 |
-| Rodeostat | `analog_afe` | 5 |
+| Rodeostat | `analog_afe` | 0 |
 | OpenDrop | `hv_controller_main` | 10 |
-| **Total** | **5 boards with residual fitted-component gaps** | **27** |
+| **Total** | **4 boards with residual fitted-component gaps** | **22** |
 
 The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
 
 ## Evidence-backed reassignment matrix
 
-These **16 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
+These **20 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
 
 | Baseline identity | Placement | Whole-system owner retained |
 |---|---|---|
@@ -54,6 +54,10 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 | `rodeostat-analog_afe-usb_power_entry_word` | `off_board_module` | ItsyBitsy M4 host power entry |
 | `rodeostat-analog_afe-usb_interface_word` | `off_board_module` | ItsyBitsy M4 host USB data |
 | `rodeostat-analog_afe-host_protocol_bridge_word` | `interconnect_only` | Direct shield-to-host bus |
+| `rodeostat-analog_afe-ferrite_emc_bead_word` | `passive_topology` | Released shield decoupling; no bead without a measured filter requirement |
+| `rodeostat-analog_afe-power_indicator_led_word` | `off_board_module` | Adafruit ItsyBitsy M4 Express product 3800 indicators |
+| `rodeostat-analog_afe-adc_input_stage_word` | `off_board_module` | Adafruit ItsyBitsy M4 Express product 3800 dual ADCs |
+| `rodeostat-analog_afe-status_indicator_word` | `off_board_module` | Adafruit ItsyBitsy M4 Express product 3800 indicators |
 | `opendrop-hv_controller_main-usb_interface_word` | `interconnect_only` | Retained source-backed USB-C entry circuit |
 | `opendrop-electrode_cartridge-required_electrode_channel_word` | `passive_geometry` | All 64 cartridge electrodes, routes, creepage, and mating interface |
 
@@ -77,10 +81,10 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Pioreactor · `od_optics` · `power_indicator_led_word`** — Ratings: need, colour/current and resistor unknown. Gap: **MPN**. `4-2489541-7` is rejected: forge-truth identifies a 110 V DC panel indicator, no authoritative PCB package/terminal geometry was found, and frozen Eye-Spy has no indicator LED. Action: remove unless required; otherwise source a real board LED and resistor.
 
 <a id="rodeostat-analog_afe-power_indicator_led_word"></a>
-- **Rodeostat · `analog_afe` · `power_indicator_led_word`** — Ratings: monitored rail, colour/current and resistor unknown. Gap: **MPN**. The unsupported 110 V panel indicator `4-2489541-7` is rejected. Action: derive the indication and ingest a real board LED/resistor pair.
+- **Rodeostat · `analog_afe` · `power_indicator_led_word`** — **Reclassified off-board:** frozen U2 is Adafruit ItsyBitsy M4 Express product `3800`; its manufacturer page specifies the built-in red D13 and RGB DotStar indicators. No shield LED or resistor is fitted.
 
 <a id="rodeostat-analog_afe-status_indicator_word"></a>
-- **Rodeostat · `analog_afe` · `status_indicator_word`** — Ratings: state, colour/current and resistor unknown. Gap: **MPN**. Action: define state semantics, ingest LED/resistor with datasheets, map polarity.
+- **Rodeostat · `analog_afe` · `status_indicator_word`** — **Reclassified off-board:** firmware status is supplied by the red D13 and RGB DotStar indicators on Adafruit ItsyBitsy M4 Express product `3800`; the frozen shield fits no separate status LED.
 
 <a id="opendrop-hv_controller_main-power_indicator_led_word"></a>
 - **OpenDrop · `hv_controller_main` · `power_indicator_led_word`** — Ratings: LV/HV rail, colour/current and resistor unknown. Gap: **MPN**. The unsupported 110 V panel indicator `4-2489541-7` is rejected. Action: derive the rail indication and source the released or a datasheet-backed board LED.
@@ -130,10 +134,10 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Rodeostat · `analog_afe` · `usb_power_entry_word`** — Ratings: board ownership, current, connector and shield treatment unknown. Gap: **MPN**. Gold uses COTS ItsyBitsy M4 host. Action: reclassify USB to host unless the shield genuinely carries it.
 
 <a id="rodeostat-analog_afe-esd_protection_network_word"></a>
-- **Rodeostat · `analog_afe` · `esd_protection_network_word`** — Ratings: protected interface, clamp, leakage/capacitance and channel count unknown. Gap: **MPN**. Gold candidate: `BAS07-04` value/family. Action: derive leakage-sensitive protection and ingest exact ordering code.
+- **Rodeostat · `analog_afe` · `esd_protection_network_word`** — **Resolved:** frozen D1/D2 identify Slkor `BAS70-04`, LCSC C609810, in SOT-23. Manufacturer data distributed by LCSC closes pins 1=A1, 2=K2, 3=K1/A2 and 70 V/70 mA, 100 nA at 50 V, 2 pF ratings. This is a low-leakage rail clamp, not a generic IEC-certified TVS.
 
 <a id="rodeostat-analog_afe-ferrite_emc_bead_word"></a>
-- **Rodeostat · `analog_afe` · `ferrite_emc_bead_word`** — Ratings: rail/noise target, impedance, current and DCR unknown. Gap: **MPN**. Action: derive from analog noise analysis, then ingest exact bead.
+- **Rodeostat · `analog_afe` · `ferrite_emc_bead_word`** — **Rejected as not fitted:** frozen revision `86e4708fea84f8fc33bcbfc9a706b06f4b770efd` contains no ferrite bead and provides no impedance/current/DCR requirement from which to procure one.
 
 <a id="opendrop-hv_controller_main-usb_power_entry_word"></a>
 - **OpenDrop · `hv_controller_main` · `usb_power_entry_word`** — **Resolved:** frozen J1 and Amphenol evidence identify `12401610E4#2A`, a full-featured 24-contact USB-C receptacle; forge-truth confirms the identity and the resolver maps all A/B contacts plus shield to the exact local footprint.
@@ -191,7 +195,7 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Rodeostat · `analog_afe` · `dac_output_stage_word`** — **Resolved:** frozen U11/U13 nets and BOM LCSC C7433 identify TI `OP07CDR` for bipolar DAC shift/scale; forge-truth confirms the identity and complete OP07 SOIC-8 pinout/footprint parity passes.
 
 <a id="rodeostat-analog_afe-adc_input_stage_word"></a>
-- **Rodeostat · `analog_afe` · `adc_input_stage_word`** — Ratings: measurement role known; ADC ownership, resolution/rate, range/noise and reference unknown. Gap: **MPN**. Nuvoton Rev2.6 closes `NAU7802SGI` as a 16-pin SOP bridge/strain-gauge ADC, but that function is not Rodeostat role evidence. Action: trace and source the real conversion path.
+- **Rodeostat · `analog_afe` · `adc_input_stage_word`** — **Reclassified off-board:** frozen U2 routes conditioned outputs to A0-A5 on Adafruit ItsyBitsy M4 Express product `3800`; Adafruit specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs. No discrete shield ADC is fitted.
 
 <a id="rodeostat-analog_afe-current_measurement_tia_word"></a>
 - **Rodeostat · `analog_afe` · `current_measurement_tia_word`** — **Resolved:** frozen U9 directly joins `WRK_ELECT` to the selectable-gain TIA network; BOM LCSC C6961 identifies ST `TL072CDT`, and forge-truth plus complete TL072 SOIC-8 pinout/footprint parity pass.

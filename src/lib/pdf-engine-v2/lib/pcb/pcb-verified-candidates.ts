@@ -309,6 +309,18 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'frozen source-board J1/J2 pins 1=GND, 2=3V3, 3=SDA, 4=SCL; local KiCad Connector_Generic:Conn_01x04 with the frozen BOOMELE 1.0T-4P land pattern',
   },
   {
+    roleTest: /bas70[_ -]?04|low[_ -]?leakage[_ -]?(?:electrochemical[_ -]?)?(?:rail[_ -]?)?clamp|electrochemical[_ -]?input[_ -]?clamp/i,
+    functionClass: 'diode_protection',
+    manufacturer: 'Slkor',
+    partNumber: 'BAS70-04',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    symbol: { library: 'Device', symbol: 'D_Dual_Series_ACK' },
+    ratings: { voltageV: 70, currentA: 0.07 },
+    packageEvidence: 'Slkor BAS70-04: dual series Schottky clamp, 70 V / 70 mA, 100 nA maximum leakage at 50 V and 2 pF maximum capacitance in SOT-23',
+    referenceEvidence: 'Rodeostat frozen high-current schematic and BOM identify D1/D2 as BAS70-04, LCSC C609810, SOT-23, revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd; Slkor manufacturer data distributed by LCSC',
+    pinoutEvidence: 'Slkor SOT-23 series-diode pinout 1=A1, 2=K2, 3=K1/A2; curated Forge_Manufacturer:BAS70-04 pinout with Package_TO_SOT_SMD:SOT-23',
+  },
+  {
     roleTest: /esd[_ -]?protection|(?:^|[_ -])tvs(?:$|[_ -])|transient[_ -]?protection/i,
     functionClass: 'diode_protection',
     manufacturer: 'Toshiba',

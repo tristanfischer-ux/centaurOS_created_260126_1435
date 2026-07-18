@@ -228,25 +228,23 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     expect(productCounts).toEqual({
       NinjaPCR: 9,
       Pioreactor: 3,
-      Rodeostat: 5,
       OpenDrop: 10,
     })
     expect(boardCounts).toEqual({
       thermal_controller: 9,
       wet_lab_hat: 1,
       od_optics: 2,
-      analog_afe: 5,
       hv_controller_main: 10,
     })
     expect(gapCounts).toEqual({
-      mpn: 27,
+      mpn: 22,
     })
     expect(punchlist.summary).toEqual({
       baselineUnresolvedFittedComponents: 50,
-      resolvedIdentityCount: 7,
-      reclassifiedNonComponentCount: 16,
-      remainingUnresolvedFittedComponents: 27,
-      remainingMissingMpn: 27,
+      resolvedIdentityCount: 8,
+      reclassifiedNonComponentCount: 20,
+      remainingUnresolvedFittedComponents: 22,
+      remainingMissingMpn: 22,
       remainingMissingSymbolPinout: 0,
       targetBoards: 8,
       productsWithFittedBoards: 5,
@@ -257,19 +255,19 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const punchlist = readPunchlist()
     const reclassifications = punchlist.scopeReclassifications
 
-    expect(punchlist.resolvedIdentityIds).toHaveLength(7)
-    expect(reclassifications).toHaveLength(16)
-    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(16)
+    expect(punchlist.resolvedIdentityIds).toHaveLength(8)
+    expect(reclassifications).toHaveLength(20)
+    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(20)
     expect(reclassifications.reduce<Record<string, number>>((counts, item) => {
       counts[item.placement] = (counts[item.placement] ?? 0) + 1
       return counts
     }, {})).toEqual({
       mechanical_only: 1,
-      off_board_module: 4,
+      off_board_module: 7,
       interconnect_only: 5,
       functional_requirement: 3,
       passive_geometry: 1,
-      passive_topology: 2,
+      passive_topology: 3,
     })
     for (const item of reclassifications) {
       expect(item.wholeSystemOwner.trim()).not.toBe('')
@@ -304,10 +302,10 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const markdown = readFileSync(MARKDOWN_PATH, 'utf8')
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(markdown).toContain('27 unresolved fitted components')
-    expect(markdown).toContain('27 missing MPN')
+    expect(markdown).toContain('22 unresolved fitted components')
+    expect(markdown).toContain('22 missing MPN')
     expect(markdown).toContain('0 missing symbol/pinout')
-    expect(markdown).toContain('16 evidence-backed non-components')
+    expect(markdown).toContain('20 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
       expect(markdown).toContain(group.universalFunctionRole)
     }
@@ -326,8 +324,14 @@ describe('Yuri unresolved fitted-component punchlist', () => {
         ![
           'colorimeter-optical_source-led_source_word',
           'colorimeter-optical_source-source_board_connector_word',
+          'rodeostat-analog_afe-esd_protection_network_word',
         ].includes(id)),
-      ...punchlist.scopeReclassifications.map((item) => item.id),
+      ...punchlist.scopeReclassifications
+        .filter((item) => !item.id.startsWith('rodeostat-analog_afe-') ||
+          !['ferrite_emc_bead_word', 'power_indicator_led_word',
+            'adc_input_stage_word', 'status_indicator_word'].some((suffix) =>
+            item.id.endsWith(suffix)))
+        .map((item) => item.id),
     ])
     const baselineResidualIds = punchlist.roleGroups
       .flatMap((group) => group.entries)
@@ -337,8 +341,8 @@ describe('Yuri unresolved fitted-component punchlist', () => {
 
     expect(matrix.schema).toBe('pcb-residual-procurement-requirements/v1')
     expect(matrix.baselineCount).toBe(29)
-    expect(matrix.resolvedExactMpnCount).toBe(2)
-    expect(matrix.residualProcurementCount).toBe(27)
+    expect(matrix.resolvedExactMpnCount).toBe(3)
+    expect(matrix.residualProcurementCount).toBe(22)
     expect(matrix.requirements).toHaveLength(29)
     expect(matrix.requirements.map((item) => item.punchlistId).sort())
       .toEqual(baselineResidualIds)
@@ -347,6 +351,7 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       item.punchlistId).sort()).toEqual([
       'colorimeter-optical_source-led_source_word',
       'colorimeter-optical_source-source_board_connector_word',
+      'rodeostat-analog_afe-esd_protection_network_word',
     ])
     for (const item of matrix.requirements) {
       expect(item.function.trim()).not.toBe('')
@@ -365,10 +370,12 @@ describe('Yuri unresolved fitted-component punchlist', () => {
         expect(item.disposition.manufacturer?.trim()).not.toBe('')
         expect(item.disposition.partNumber?.trim()).not.toBe('')
         expect(item.disposition.blocker).toBeNull()
-      } else {
+      } else if (item.disposition.status === 'procurement_required') {
         expect(item.disposition.manufacturer).toBeNull()
         expect(item.disposition.partNumber).toBeNull()
         expect(item.disposition.blocker?.trim()).not.toBe('')
+      } else {
+        expect(item.disposition.blocker).toBeNull()
       }
     }
   })
