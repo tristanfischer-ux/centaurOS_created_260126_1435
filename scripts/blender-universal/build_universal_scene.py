@@ -17066,7 +17066,16 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         if (_IS_INSTRUMENT_DEVICE
                 and not _IS_THERMOCYCLER_FORM
                 and not _IS_SYRINGE_PUMP_FORM
-                and not _IS_LAB_MICROSCOPE_FORM):
+                and not _IS_LAB_MICROSCOPE_FORM
+                and not _IS_LAB_ELECTRONICS_FORM):
+            # ROOT-CAUSE FIX (Tristan/Cursor 2026-07-18, "colorimeter deck applied to
+            # everything"): this block builds the OPTICAL exterior — cuvette / optical
+            # cube / LED source-window / D-pad — which belongs ONLY to optical_handheld.
+            # It was gated to run for EVERY non-tc/sp/lm instrument, so it leaked the
+            # optical cuvette onto potentiostat / bioreactor / EWOD boxes (form_signature_
+            # gate R4 FOREIGN_SAMPLE_INTERFACE), and its form-meshes re-dump overwrote the
+            # lab_electronics signature dump. lab_electronics gets its OWN signature
+            # geometry (leads / vial / electrode grid) in place_sealed_enclosure instead.
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
             # INTENT (2026-07-14 glance): closed-product glass is DARK recessed
             # LCD (MAT_DISPLAY_GLASS), not FR4-teal emissive. Teal read as "green
