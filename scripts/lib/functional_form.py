@@ -91,6 +91,9 @@ class FunctionalFormContract:
     repeated_count: int = 1             # channels / electrode rows / stage axes
     hazard_boundary: Optional[str] = None   # heated-lid / high-voltage / wet-dry / light-tight
     role_volumes: list[RoleVolume] = field(default_factory=list)
+    chassis_role: Optional[str] = None      # the assembly root every role must reach
+    # typed attachment relations: (from_role, kind, to_role, intentional_detached)
+    required_relations: list = field(default_factory=list)
     # provenance: which signal fixed the working medium (audit / honesty)
     medium_basis: str = ""
 
@@ -149,64 +152,111 @@ def _derive_working_medium(state: dict) -> tuple[Optional[str], str]:
 # The UNIVERSAL medium → (axis, interface, openness, hazard, roles) rule. This is the
 # convergent-evolution core: the physics of each medium FORCES its morphology. A new
 # medium adds one row; the SAME role/axis/openness vocabulary composes the form.
+# Each rule now carries a CHASSIS root + typed RELATIONS (Cursor assembly-connectedness
+# spec): (from_role, kind, to_role, intentional_detached). Every non-accessory role must
+# reach the chassis by a typed attachment path (connected_component_count(primary)==1);
+# accessories (removable cap/cartridge/lead) are intentional_detached but still carry a
+# typed edge (nested_accessory / external_lead), so nothing floats unattached. Structural
+# repetition is EXPLICIT where the count is fixed (3 WE/RE/CE leads, source+detector OD,
+# 3 XYZ actuators) — Cursor's repeated-role expansion.
 _MEDIUM_FORM_RULE: dict[str, dict[str, Any]] = {
     "light": {
         "axis": "linear-through", "interface": "cuvette", "openness": "sealed",
         "operator_view": "top", "access": "top", "hazard": "light-tight",
+        "chassis": "hmi_deck",
         "roles": [("source", "box", True, False, "source"),
                   ("sample_cuvette", "box", True, True, "sample"),
                   ("detector", "box", False, False, "detector"),
                   ("hmi_deck", "box", True, True, "base")],
+        "relations": [("source", "fastened", "hmi_deck", False),
+                      ("detector", "fastened", "hmi_deck", False),
+                      ("sample_cuvette", "nested_accessory", "hmi_deck", True)],
     },
     "heat": {
         "axis": "block", "interface": "tube-wells", "openness": "sample-open",
         "operator_view": "top", "access": "top", "hazard": "heated-lid",
+        "chassis": "controller",
         "roles": [("sample_block", "box", True, True, "sample"),
                   ("hinged_lid", "box", True, True, "top"),
                   ("heatsink", "box", False, False, "base"),
                   ("controller", "box", False, False, "base")],
+        "relations": [("sample_block", "fastened", "controller", False),
+                      ("hinged_lid", "hinged", "controller", False),
+                      ("heatsink", "fastened", "controller", False)],
     },
     "electric_field": {
         "axis": "planar-array", "interface": "electrode-grid+cartridge", "openness": "open-pcba",
         "operator_view": "top", "access": "top", "hazard": "high-voltage",
+        "chassis": "controller_deck",
         "roles": [("electrode_grid", "grid", True, True, "sample"),
                   ("cartridge", "box", True, True, "top"),
                   ("hv_driver", "box", False, False, "base"),
                   ("controller_deck", "box", True, False, "base")],
+        "relations": [("electrode_grid", "fastened", "controller_deck", False),
+                      ("hv_driver", "fastened", "controller_deck", False),
+                      ("cartridge", "nested_accessory", "electrode_grid", True)],
     },
     "electric_current": {
         "axis": "external-cell", "interface": "electrode-leads", "openness": "sealed",
         "operator_view": "front", "access": "front", "hazard": None,
-        "roles": [("electrode_leads", "cylinder", True, True, "sample"),
+        "chassis": "afe_board",
+        "roles": [("electrode_lead_we", "cylinder", True, True, "sample"),
+                  ("electrode_lead_re", "cylinder", True, True, "sample"),
+                  ("electrode_lead_ce", "cylinder", True, True, "sample"),
                   ("afe_board", "box", False, False, "base"),
                   ("host_port", "box", True, True, "front")],
+        "relations": [("electrode_lead_we", "external_lead", "afe_board", True),
+                      ("electrode_lead_re", "external_lead", "afe_board", True),
+                      ("electrode_lead_ce", "external_lead", "afe_board", True),
+                      ("host_port", "fastened", "afe_board", False)],
     },
     "culture_fluid": {
         "axis": "vertical-wet-stack", "interface": "culture-vial", "openness": "sample-open",
         "operator_view": "top", "access": "top", "hazard": "wet-dry",
+        "chassis": "electronics_base",
         "roles": [("electronics_base", "box", True, False, "base"),
                   ("stir_heat", "box", False, False, "base"),
                   ("culture_vial", "vial", True, True, "sample"),
-                  ("od_sensors", "box", True, False, "sample"),
+                  ("od_source", "box", True, False, "sample"),
+                  ("od_detector", "box", True, False, "sample"),
                   ("sterile_cap", "box", True, True, "top")],
+        "relations": [("stir_heat", "fastened", "electronics_base", False),
+                      ("od_source", "fastened", "electronics_base", False),
+                      ("od_detector", "fastened", "electronics_base", False),
+                      ("culture_vial", "nested_accessory", "stir_heat", True),
+                      ("sterile_cap", "nested_accessory", "culture_vial", True)],
     },
     "linear_displacement": {
         "axis": "repeated-linear", "interface": "syringe-cradle", "openness": "mechanism-open",
         "operator_view": "top", "access": "front", "hazard": None,
+        "chassis": "stepper",
         "roles": [("stepper", "box", True, False, "base"),
                   ("leadscrew", "cylinder", True, False, "mid"),
                   ("carriage", "box", True, True, "mid"),
                   ("syringe_cradle", "open-frame", True, True, "sample"),
                   ("console", "box", True, True, "side")],
+        "relations": [("leadscrew", "supported_by", "stepper", False),
+                      ("carriage", "sliding", "leadscrew", False),
+                      ("syringe_cradle", "fastened", "stepper", False),
+                      ("console", "electrical_cable", "stepper", False)],
     },
     "image_plane": {
         "axis": "optical-column", "interface": "stage-slide", "openness": "mechanism-open",
         "operator_view": "top", "access": "top", "hazard": None,
+        "chassis": "flexure_body",
         "roles": [("flexure_body", "box", True, False, "base"),
                   ("stage", "box", True, True, "sample"),
                   ("objective", "cylinder", True, False, "detector"),
                   ("condenser", "cylinder", True, False, "source"),
-                  ("actuators", "box", True, False, "base")],
+                  ("actuator_x", "box", True, False, "base"),
+                  ("actuator_y", "box", True, False, "base"),
+                  ("actuator_z", "box", True, False, "base")],
+        "relations": [("stage", "supported_by", "flexure_body", False),
+                      ("objective", "fastened", "flexure_body", False),
+                      ("condenser", "fastened", "flexure_body", False),
+                      ("actuator_x", "fastened", "flexure_body", False),
+                      ("actuator_y", "fastened", "flexure_body", False),
+                      ("actuator_z", "fastened", "flexure_body", False)],
     },
 }
 
@@ -239,7 +289,82 @@ def derive_functional_form(state: dict) -> FunctionalFormContract:
                    must_be_accessible=acc, axis_position=pos)
         for (r, g, vis, acc, pos) in rule["roles"]
     ]
+    c.chassis_role = rule.get("chassis")
+    c.required_relations = list(rule.get("relations") or [])
     return c
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONNECTEDNESS INVARIANT (Cursor assembly-connectedness spec) — nothing floats.
+# A TYPED attachment graph over the role-volumes (NOT proximity). Every non-accessory
+# role must reach the chassis by a typed attachment path → connected_component_count
+# (primary)==1. Accessories (removable cap/cartridge/lead) are intentional_detached but
+# MUST still carry a typed edge (nested_accessory / external_lead) — a declared,
+# connected accessory, never a mid-air orphan.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ATTACH_KINDS = {"fastened", "bonded", "press_fit", "hinged", "sliding", "supported_by",
+                 "nested_accessory", "electrical_cable", "fluid_tube", "optical_alignment",
+                 "external_lead"}
+_ACCESSORY_KINDS = {"nested_accessory", "external_lead"}   # legitimately-detached edge types
+
+
+def assembly_connectedness_proof(c: FunctionalFormContract) -> dict:
+    """Build the typed attachment graph over the role-volumes and check the primary
+    assembly is ONE connected component. Returns assembly-connectedness-proof/v1."""
+    roles = {rv.role for rv in c.role_volumes}
+    chassis = c.chassis_role
+    findings: list[dict] = []
+    # index relations; validate kinds + endpoints exist
+    accessory_roles: set[str] = set()
+    adj: dict[str, set[str]] = {r: set() for r in roles}
+    for rel in c.required_relations:
+        frm, kind, to, intentional = rel
+        if kind not in _ATTACH_KINDS:
+            findings.append({"code": "BAD_ATTACH_KIND", "detail": f"{frm}-{kind}->{to}"})
+        if frm not in roles or to not in roles:
+            findings.append({"code": "ATTACH_ENDPOINT_MISSING", "detail": f"{frm}->{to}"})
+            continue
+        if intentional or kind in _ACCESSORY_KINDS:
+            accessory_roles.add(frm)
+        # accessory edges still CONNECT (a declared, attached accessory) — add to graph
+        adj[frm].add(to)
+        adj[to].add(frm)
+    # PRIMARY assembly = all roles EXCEPT declared accessories. It must be one component
+    # reachable from the chassis. (Accessories are checked to have a typed edge below.)
+    primary = roles - accessory_roles
+    if chassis and chassis in primary:
+        seen = set()
+        stack = [chassis]
+        while stack:
+            n = stack.pop()
+            if n in seen:
+                continue
+            seen.add(n)
+            for m in adj.get(n, ()):  # traverse all edges; accessories are leaves off primary
+                if m in primary and m not in seen:
+                    stack.append(m)
+        floating = sorted(primary - seen)
+        if floating:
+            findings.append({"code": "FLOATING_ROLE",
+                             "detail": f"{floating} not attached to chassis {chassis!r} "
+                                       f"by any typed path (mid-air / lost parent)"})
+    elif chassis is None:
+        findings.append({"code": "NO_CHASSIS", "detail": "no assembly root defined"})
+    # every accessory must have at least one typed accessory edge (declared, not orphan)
+    for a in accessory_roles:
+        if not adj.get(a):
+            findings.append({"code": "ORPHAN_ACCESSORY", "detail": a})
+    ok = len(findings) == 0
+    return {
+        "schema": "assembly-connectedness-proof/v1",
+        "ok": ok,
+        "chassis": chassis,
+        "primary_component_size": len(primary),
+        "n_accessories": len(accessory_roles),
+        "connected": ok,
+        "findings": findings,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -289,9 +414,10 @@ def cull_infeasible(candidates: list[Arrangement], c: FunctionalFormContract) ->
          sealed volume) — the sample must sit at or above the access face.
       F3 wrong-transport: a medium's role set must not contain a FOREIGN transport role
          (a flow manifold on an electric-field device; an optical cuvette on a current device)."""
+    # interface role SUBSTRING (handles the 3 electrode_lead_* instances, etc.)
     interface_role = {
         "cuvette": "sample_cuvette", "tube-wells": "sample_block",
-        "electrode-grid+cartridge": "electrode_grid", "electrode-leads": "electrode_leads",
+        "electrode-grid+cartridge": "electrode_grid", "electrode-leads": "electrode_lead",
         "culture-vial": "culture_vial", "syringe-cradle": "syringe_cradle",
         "stage-slide": "stage",
     }.get(c.sample_interface or "", "")
@@ -303,12 +429,12 @@ def cull_infeasible(candidates: list[Arrangement], c: FunctionalFormContract) ->
     }.get(c.working_medium or "", set())
     out = []
     for a in candidates:
-        # F1
-        if interface_role and interface_role not in a.stack:
+        # F1 — sample interface present + visible (substring: covers electrode_lead_we/re/ce)
+        if interface_role and not any(interface_role in r for r in a.stack):
             continue
-        if interface_role and interface_role not in a.visible_signature:
+        if interface_role and not any(interface_role in r for r in a.visible_signature):
             continue
-        # F3
+        # F3 — no foreign transport role
         if any(any(f in r for f in foreign) for r in a.stack):
             continue
         out.append(a)
@@ -345,9 +471,10 @@ def compose_form(state: dict) -> dict:
     if chosen is None:
         return {"schema": "form-proof/v1", "ok": False, "reason": "NO_FEASIBLE_ARRANGEMENT",
                 "detail": f"all {len(candidates)} candidates culled for {c.working_medium}"}
+    conn = assembly_connectedness_proof(c)
     return {
         "schema": "form-proof/v1",
-        "ok": True,
+        "ok": True and conn["ok"],
         "working_medium": c.working_medium,
         "medium_basis": c.medium_basis,
         "primary_axis": c.primary_axis,
@@ -360,6 +487,7 @@ def compose_form(state: dict) -> dict:
         "visible_signature": chosen.visible_signature,
         "n_candidates": len(candidates),
         "n_feasible": len(feasible),
+        "connectedness": conn,
     }
 
 
@@ -606,12 +734,41 @@ def _selftest() -> int:
     unseen = compose_form(_synthetic_state(compliance_voltage_v=5))
     check("unseen-but-functional resolves (electric_current)",
           unseen.get("ok") is True and unseen.get("working_medium") == "electric_current"
-          and "electrode_leads" in (unseen.get("visible_signature") or []))
+          and any("electrode_lead" in s for s in (unseen.get("visible_signature") or [])))
 
     # DETERMINISM — same input twice → identical proof (the twin-run precondition).
     a1 = compose_form(_synthetic_state(working_volume_ml=20))
     a2 = compose_form(_synthetic_state(working_volume_ml=20))
     check("deterministic (byte-identical proof)", json.dumps(a1) == json.dumps(a2))
+
+    # CONNECTEDNESS (Cursor assembly-connectedness spec) — nothing floats.
+    for med, sig in (("electric_field", 64), ("electric_current", 5), ("culture_fluid", 20)):
+        cc = derive_functional_form(_synthetic_state(**{
+            "electrode_count" if med == "electric_field" else
+            "compliance_voltage_v" if med == "electric_current" else "working_volume_ml": sig}))
+        proof = assembly_connectedness_proof(cc)
+        check(f"{med} assembly is ONE connected component", proof["ok"] is True)
+    # structural repetition landed (Cursor): 3 WE/RE/CE leads, source+detector OD, 3 actuators
+    cc_ec = derive_functional_form(_synthetic_state(compliance_voltage_v=5))
+    check("electrochemical has 3 WE/RE/CE leads",
+          sum(1 for rv in cc_ec.role_volumes if "electrode_lead" in rv.role) == 3)
+    cc_bio = derive_functional_form(_synthetic_state(working_volume_ml=20))
+    check("bioreactor has od_source + od_detector",
+          {"od_source", "od_detector"} <= {rv.role for rv in cc_bio.role_volumes})
+    cc_mic = derive_functional_form(_synthetic_state(stage_axis_count=3))
+    check("microscope has 3 XYZ actuators",
+          sum(1 for rv in cc_mic.role_volumes if rv.role.startswith("actuator_")) == 3)
+    # proveCatch — a FLOATING role (a role with no attaching relation) must FIRE.
+    cc_float = derive_functional_form(_synthetic_state(electrode_count=64))
+    cc_float.role_volumes.append(RoleVolume(role="floating_widget", geometry_family="box",
+                                            must_be_visible=True, must_be_accessible=False))
+    fp = assembly_connectedness_proof(cc_float)
+    check("floating role FIRES FLOATING_ROLE",
+          any(f["code"] == "FLOATING_ROLE" for f in fp["findings"]))
+    # an intentional-detached accessory (removable cap) is CONNECTED via a typed edge → PASS
+    check("intentional accessory (cartridge/cap) does NOT fire",
+          derive_functional_form(_synthetic_state(electrode_count=64)) and
+          assembly_connectedness_proof(derive_functional_form(_synthetic_state(working_volume_ml=20)))["ok"])
 
     # GEOMETRY PLAN — the form-proof composes into concrete placements (universal layout).
     env = (100.0, 80.0, 30.0)
