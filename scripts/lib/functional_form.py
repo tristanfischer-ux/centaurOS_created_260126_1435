@@ -531,18 +531,22 @@ def _plan_planar_array(roles, W, D, H, bz):
 
 
 def _plan_external_cell(roles, W, D, H, bz):
-    """electric_current: colour-coded electrode LEADS on the front face; board in base."""
-    fy = -D / 2
+    """electric_current: the afe_board IS the flat base body; colour-coded electrode LEADS
+    (external, exempt) + host_port mount ON its front face (touching)."""
+    body_h = max(H, 12.0)
+    fy = -D / 2                      # body front face
     out = {}
     leads = [rv for rv in roles if "lead" in rv.role]
     for i, rv in enumerate(leads):
         lx = (i - (len(leads) - 1) / 2) * W * 0.2
-        out[rv.role] = ((lx, fy - 8, bz + H * 0.5), (8, 16, 8), True)
+        # seated on the front face: back end overlaps the body, protrudes forward
+        out[rv.role] = ((lx, fy - 6, bz + body_h * 0.5), (8, 16, 8), True)
     for rv in roles:
         if "board" in rv.role or "afe" in rv.role:
-            out[rv.role] = ((0, 0, bz + H * 0.3), (W * 0.7, D * 0.6, H * 0.2), False)
+            out[rv.role] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)   # full base body
         elif "port" in rv.role:
-            out[rv.role] = ((W * 0.34, fy - 3, bz + H * 0.5), (12, 8, 6), True)
+            # on the front face, back edge touching the body (body front at fy)
+            out[rv.role] = ((W * 0.34, fy - 2, bz + body_h * 0.5), (12, 10, 6), True)
     return out
 
 
@@ -557,7 +561,10 @@ def _plan_vertical_wet_stack(roles, W, D, H, bz):
         if "vial" in r:
             out[r] = ((0, 0, top + vial_h * 0.5), (vr * 2, vr * 2, vial_h), True)   # shape=vial
         elif "od" in r:
-            out[r] = ((-(vr + 6), 0, top + vial_h * 0.4), (8, 11, 12), True)
+            # OD housings seated ON the base top (bottom touching), rising to hug the vial
+            _sx = -(vr + 6) if "source" in r else (vr + 6)
+            _odh = vial_h * 0.5
+            out[r] = ((_sx, 0, top + _odh * 0.5), (8, 11, _odh), True)
         elif "cap" in r:
             out[r] = ((0, 0, top + vial_h + 4), (vr * 2.2, vr * 2.2, 6), True)
         elif "stir" in r:
@@ -568,61 +575,74 @@ def _plan_vertical_wet_stack(roles, W, D, H, bz):
 
 
 def _plan_linear_through(roles, W, D, H, bz):
-    """light: source→sample(cuvette cube)→detector along the deck; HMI deck on the left."""
-    top = bz + H
+    """light: hmi_deck IS the flat L-body base; a near-cubic optical cube (cuvette) sits ON
+    the deck top with the source + detector seated ON the deck flanking it — all touching."""
+    body_h = max(H, 10.0)
+    top = bz + body_h
+    cube = min(W * 0.34, D * 0.7)          # near-cubic optical chamber
+    cx = W * 0.24
     out = {}
     for rv in roles:
         r = rv.role
         if "cuvette" in r or "sample" in r:
-            out[r] = ((W * 0.28, 0, top + H * 0.6), (W * 0.34, D * 0.7, H * 1.2), True)  # near-cubic
+            out[r] = ((cx, 0, top + cube * 0.5), (cube, cube, cube), True)          # on deck
         elif "source" in r:
-            out[r] = ((W * 0.05, -D * 0.2, top + H * 0.6), (10, 6, 10), True)
+            out[r] = ((cx - cube * 0.5 - 5, 0, top + 5), (10, 6, 10), True)         # on deck, by cube
         elif "detector" in r:
-            out[r] = ((W * 0.5, 0, top + H * 0.6), (10, 10, 10), False)
-        else:  # hmi deck
-            out[r] = ((-W * 0.25, 0, top + 1.0), (W * 0.4, D * 0.7, 3.0), True)
+            out[r] = ((cx + cube * 0.5 + 5, 0, top + 5), (10, 10, 10), False)       # on deck, by cube
+        else:  # hmi_deck = base body (full footprint)
+            out[r] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)
     return out
 
 
 def _plan_block(roles, W, D, H, bz):
-    """heat: heated sample block centre, hinged lid over it, heatsink+controller in base."""
-    top = bz + H
+    """heat: controller IS the base body; the aluminium sample block sits ON its top, the
+    hinged lid sits ON the block, the heatsink is seated ON the top beside the block."""
+    body_h = max(H, 12.0)
+    top = bz + body_h
+    blk_h = body_h * 0.45
     out = {}
     for rv in roles:
         r = rv.role
         if "block" in r:
-            out[r] = ((0, 0, top - H * 0.1), (W * 0.5, D * 0.5, H * 0.3), True)
+            out[r] = ((0, 0, top + blk_h * 0.5), (W * 0.5, D * 0.5, blk_h), True)   # on deck
         elif "lid" in r:
-            out[r] = ((0, -D * 0.1, top + H * 0.15), (W * 0.6, D * 0.5, H * 0.1), True)
+            out[r] = ((0, 0, top + blk_h + 3), (W * 0.6, D * 0.5, 6), True)          # on block
         elif "heatsink" in r:
-            out[r] = ((0, D * 0.2, bz + H * 0.3), (W * 0.5, D * 0.2, H * 0.4), False)
-        else:  # controller
-            out[r] = ((0, 0, bz + H * 0.2), (W * 0.6, D * 0.5, H * 0.15), False)
+            out[r] = ((0, D * 0.28, top + blk_h * 0.5), (W * 0.5, D * 0.18, blk_h), False)  # on deck by block
+        else:  # controller = base body
+            out[r] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), False)
     return out
 
 
 def _plan_repeated_linear(roles, W, D, H, bz, n):
-    """linear_displacement: N parallel bays (stepper→screw→carriage→cradle) + side console."""
-    out = {}
+    """linear_displacement: a shared open BASE PLATE carries N parallel bays (stepper→screw
+    →carriage→cradle, all seated ON the plate so they touch it → one connected frame); the
+    console is a SEPARATE volume joined by a cable (typed edge, exempt)."""
     n = max(1, n)
+    plate_h = max(6.0, H * 0.12)
+    ptop = bz + plate_h
+    sh = max(H * 0.5, 10.0)
+    bw = W / (n + 1.5)
+    out = {"sp_base": ((0, 0, bz + plate_h * 0.5), (W, D, plate_h), True)}   # shared frame plate
     for i in range(n):
-        bx = (i - (n - 1) / 2) * W / (n + 1)
+        bx = (i - (n - 1) / 2) * (W / n) * 0.92
         for rv in roles:
             r = rv.role
             if "console" in r:
                 continue
             key = f"{r}_{i}" if n > 1 else r
             if "stepper" in r:
-                out[key] = ((bx, D * 0.3, bz + H * 0.5), (W / (n + 2), D * 0.2, H * 0.5), True)
+                out[key] = ((bx, D * 0.28, ptop + sh * 0.5), (bw, D * 0.2, sh), True)      # on plate, rear
             elif "leadscrew" in r:
-                out[key] = ((bx, 0, bz + H * 0.5), (4, D * 0.5, 4), True)
+                out[key] = ((bx, 0, ptop + sh * 0.5), (5, D * 0.62, 5), True)              # spans back→front, touches stepper
             elif "carriage" in r:
-                out[key] = ((bx, 0, bz + H * 0.55), (W / (n + 2), D * 0.15, H * 0.3), True)
+                out[key] = ((bx, 0, ptop + sh * 0.5), (bw, D * 0.14, sh * 0.6), True)      # on screw axis
             elif "cradle" in r:
-                out[key] = ((bx, -D * 0.3, bz + H * 0.5), (W / (n + 2), D * 0.2, H * 0.4), True)
+                out[key] = ((bx, -D * 0.28, ptop + sh * 0.4), (bw, D * 0.2, sh * 0.8), True)  # on plate, front
     for rv in roles:
-        if "console" in rv.role:
-            out[rv.role] = ((W * 0.5, 0, bz + H * 0.5), (W * 0.2, D * 0.4, H * 0.6), True)
+        if "console" in rv.role:                              # separate, cable-connected (exempt)
+            out[rv.role] = ((W * 0.62, 0, bz + sh * 0.6), (W * 0.22, D * 0.42, sh * 1.2), True)
     return out
 
 
@@ -637,7 +657,8 @@ def _plan_optical_column(roles, W, D, H, bz):
         elif "objective" in r:
             out[r] = ((0, 0, top - H * 0.25), (10, 10, H * 0.4), True)
         elif "condenser" in r:
-            out[r] = ((0, 0, top + H * 0.35), (12, 12, H * 0.3), True)
+            # illumination column rising from the body top (bottom touching) over the stage
+            out[r] = ((0, 0, top + H * 0.15), (12, 12, H * 0.3), True)
         elif "actuator" in r:
             out[r] = ((W * 0.35, 0, bz + H * 0.5), (W * 0.12, D * 0.2, H * 0.5), True)
         else:  # flexure body
@@ -645,13 +666,19 @@ def _plan_optical_column(roles, W, D, H, bz):
     return out
 
 
-def measured_connectedness(placements: list[dict], tol_mm: float = 2.0) -> dict:
+def measured_connectedness(placements: list[dict], tol_mm: float = 2.0,
+                           exempt: set | None = None) -> dict:
     """MEASURED connectedness (Cursor: proof = delivered GEOMETRY, not intent). Builds an
     adjacency graph over the actual placement bounding boxes — two roles are attached only
     if their AABBs TOUCH/overlap within tol on every axis (real contact, NOT proximity of
-    centres). Asserts one connected component. Catches the floating-slab class the plan-
-    level (role-graph) check misses (opendrop v1: grid floated above a small deck block →
-    plan said connected, geometry did not). Pure — testable without Blender."""
+    centres). Asserts the PRIMARY structure (non-exempt roles) is one connected component.
+    `exempt` = role names joined by a TYPED non-contact edge (external_lead / cable /
+    nested_accessory) — legitimately geometrically separate, so excluded from the primary-
+    component requirement (a lead exits the body; a console connects by cable). Catches the
+    floating-slab class the plan-level (role-graph) check misses. Pure — no Blender."""
+    exempt = exempt or set()
+    placements = [p for p in placements
+                  if not any(e in p["name"] for e in exempt)]
     n = len(placements)
     if n == 0:
         return {"ok": True, "n_components": 0, "floating": []}
@@ -740,7 +767,10 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
             center_mm=tuple(round(float(x), 2) for x in ctr),
             size_mm=tuple(round(float(x), 2) for x in sz), on_exterior=ext))
     pl = [asdict(p) for p in placements]
-    measured = measured_connectedness(pl)
+    # roles joined by a typed NON-contact edge are legitimately geometrically separate
+    exempt = {rel[0] for rel in c.required_relations
+              if rel[1] in ("external_lead", "electrical_cable", "nested_accessory")}
+    measured = measured_connectedness(pl, exempt=exempt)
     return {"schema": "geometry-plan/v1", "ok": bool(measured["ok"]), "axis": axis,
             "working_medium": c.working_medium,
             "placements": pl,
