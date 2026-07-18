@@ -113,6 +113,20 @@ def _q(state: dict, key: str):
 def _derive_working_medium(state: dict) -> tuple[Optional[str], str]:
     """Map contract SIGNALS → working medium. Ordered so a specific signal wins.
     Returns (medium, basis-string). product_class is a LAST-resort hint only."""
+    # CONSUMABLE / CASSETTE (the razor-and-blade BLADE) — an explicit consumable card is
+    # detected BEFORE any instrument medium, so a smart / organoid / crystal cassette that
+    # ALSO carries an instrument signal (electrode_count, working_volume_ml) still resolves as
+    # the CARD, not the powered instrument that reads it. Keyed on signals only a consumable
+    # declares. (Yuri Gap A, 2026-07-18 — the recurring-revenue centre; ref reconciliation doc.)
+    if _q(state, "is_consumable") in (True, "true", "True", "yes", 1, "1") \
+            or _q(state, "cassette_format") is not None:
+        return "sealed_cartridge", ("is_consumable/cassette_format present "
+                                    "(a sealed consumable cartridge — the razor-and-blade blade)")
+    for sig in ("reservoir_count", "fluidic_channel_count", "culture_chamber_count",
+                "crystal_well_count", "sample_well_count"):
+        v = _q(state, sig)
+        if v is not None and float(v) > 0:
+            return "sealed_cartridge", f"{sig}={v} (an on-card reservoir/chamber array = a sealed consumable cartridge)"
     rpm = _q(state, "rotor_speed_rpm") or _q(state, "rpm_max") or _q(state, "spin_speed_rpm")
     if rpm is not None and float(rpm) > 0:
         return "rotation", f"rotor_speed_rpm={rpm} (a spinning rotor separates by centrifugal force)"
@@ -381,6 +395,30 @@ _MEDIUM_FORM_RULE: dict[str, dict[str, Any]] = {
                       ("pressure_gauge", "fastened", "vessel_body", False),
                       ("relief_valve", "fastened", "vessel_body", False)],
     },
+    "sealed_cartridge": {   # the razor-and-blade CONSUMABLE (Yuri Gap A, 2026-07-18). NOT a
+        # powered instrument — a thin planar microfluidic/culture CARD. Its physics: a bonded
+        # fluidic layer holding an array of reservoirs/chambers, read through a window, keyed
+        # into a host instrument by a removable dock. The reservoir/chamber COUNT drives the
+        # array, so the SAME form serves a smart / organoid / protein-crystal cassette.
+        "axis": "planar-card", "interface": "reservoir-ports", "openness": "sealed",
+        "operator_view": "top", "access": "top", "hazard": "wet-dry",
+        "chassis": "card_substrate",
+        "roles": [("card_substrate", "box", True, False, "base"),
+                  ("fluidic_layer", "box", True, False, "mid"),
+                  ("reagent_reservoirs", "box", True, True, "sample"),
+                  ("inlet_ports", "cylinder", True, True, "top"),
+                  ("detection_window", "box", True, False, "sample"),
+                  ("dock_interface", "box", True, True, "base")],
+        "relations": [("fluidic_layer", "bonded", "card_substrate", False),
+                      ("reagent_reservoirs", "fastened", "fluidic_layer", False),
+                      ("inlet_ports", "fastened", "fluidic_layer", False),
+                      ("detection_window", "bonded", "card_substrate", False),
+                      ("dock_interface", "fastened", "card_substrate", False),
+                      # FIRST-CLASS razor-and-blade boundary: the card is removable from the
+                      # (external) host instrument. `instrument` is an external endpoint, not a
+                      # cassette role — the proof recognises it as a declared dock, not an orphan.
+                      ("dock_interface", "removable_interface", "instrument", True)],
+    },
     "image_plane": {
         "axis": "optical-column", "interface": "stage-slide", "openness": "mechanism-open",
         "operator_view": "top", "access": "top", "hazard": None,
@@ -425,6 +463,14 @@ def derive_functional_form(state: dict) -> FunctionalFormContract:
             v = _q(state, sig)
             if v is not None:
                 c.repeated_count = max(1, int(float(v)))
+    # cassette repetition: the reservoir/chamber/well count drives the on-card array
+    if medium == "sealed_cartridge":
+        for sig in ("reservoir_count", "culture_chamber_count", "crystal_well_count",
+                    "fluidic_channel_count", "sample_well_count"):
+            v = _q(state, sig)
+            if v is not None and float(v) > 0:
+                c.repeated_count = max(1, int(float(v)))
+                break
     c.role_volumes = [
         RoleVolume(role=r, geometry_family=g, must_be_visible=vis,
                    must_be_accessible=acc, axis_position=pos)
@@ -446,7 +492,11 @@ def derive_functional_form(state: dict) -> FunctionalFormContract:
 
 _ATTACH_KINDS = {"fastened", "bonded", "press_fit", "hinged", "sliding", "supported_by",
                  "nested_accessory", "electrical_cable", "fluid_tube", "optical_alignment",
-                 "external_lead"}
+                 "external_lead", "removable_interface"}
+# a role whose ONLY declared tie is a removable_interface to this external host is a
+# first-class razor-and-blade dock boundary, not an orphan (the consumable pops out of the
+# instrument). The target `instrument` is NOT a role of the assembly being composed.
+_EXTERNAL_HOST = "instrument"
 _ACCESSORY_KINDS = {"nested_accessory", "external_lead"}   # legitimately-detached edge types
 
 
@@ -463,6 +513,13 @@ def assembly_connectedness_proof(c: FunctionalFormContract) -> dict:
         frm, kind, to, intentional = rel
         if kind not in _ATTACH_KINDS:
             findings.append({"code": "BAD_ATTACH_KIND", "detail": f"{frm}-{kind}->{to}"})
+        # a removable_interface to the EXTERNAL host is a declared razor-and-blade dock
+        # boundary — frm must be a real role, but the target is outside this assembly, so it
+        # adds no internal edge and is never an orphan (the cassette pops out of the instrument).
+        if kind == "removable_interface" and to == _EXTERNAL_HOST:
+            if frm not in roles:
+                findings.append({"code": "ATTACH_ENDPOINT_MISSING", "detail": f"{frm}->{to}"})
+            continue
         if frm not in roles or to not in roles:
             findings.append({"code": "ATTACH_ENDPOINT_MISSING", "detail": f"{frm}->{to}"})
             continue
@@ -560,13 +617,16 @@ def cull_infeasible(candidates: list[Arrangement], c: FunctionalFormContract) ->
         "cuvette": "sample_cuvette", "tube-wells": "sample_block",
         "electrode-grid+cartridge": "electrode_grid", "electrode-leads": "electrode_lead",
         "culture-vial": "culture_vial", "syringe-cradle": "syringe_cradle",
-        "stage-slide": "stage", "rotor-slots": "rotor",
+        "stage-slide": "stage", "rotor-slots": "rotor", "reservoir-ports": "reservoir",
     }.get(c.sample_interface or "", "")
     foreign = {
         "electric_field": {"manifold", "valve", "pipe", "pump_head", "cuvette"},
         "electric_current": {"cuvette", "electrode_grid", "manifold"},
         "culture_fluid": {"cuvette", "electrode_grid"},
         "light": {"electrode_grid", "manifold"},
+        # a CONSUMABLE card carries no active drive — a motor/rotor/heatsink/transducer/gantry
+        # belongs to the instrument that reads it, never to the blade.
+        "sealed_cartridge": {"motor", "rotor", "stepper", "heatsink", "transducer", "gantry", "leadscrew"},
     }.get(c.working_medium or "", set())
     out = []
     for a in candidates:
@@ -853,6 +913,41 @@ def _plan_rotary(roles, W, D, H, bz):
     return out
 
 
+def _plan_planar_card(roles, W, D, H, bz, n):
+    """sealed_cartridge (the razor-and-blade CONSUMABLE): a THIN planar card. card_substrate
+    IS the full-footprint laminate body (chassis); the microfluidic layer is bonded on top;
+    N reagent reservoirs + N inlet ports sit on the fluidic layer (bottom touching); a clear
+    detection window and a keyed dock rail (the removable interface to the host instrument)
+    are on the card. Everything bonded → one connected card. The reservoir COUNT drives the
+    array, so the SAME form serves a smart / organoid / crystal cassette. Envelope H is CLAMPED
+    thin (5–12 mm) — a cassette is a card regardless of the generic envelope handed in."""
+    n = max(1, n)
+    sh = min(max(H, 5.0), 12.0)                 # a cassette is thin
+    top = bz + sh
+    flu_top = top + 2.0                         # top of the bonded fluidic layer
+    out = {}
+    for rv in roles:
+        r = rv.role
+        if "substrate" in r:
+            out[r] = ((0, 0, bz + sh * 0.5), (W, D, sh), True)                  # full-footprint card body
+        elif "fluidic" in r:
+            out[r] = ((0, 0, top + 1.0), (W * 0.9, D * 0.9, 2.0), True)         # bonded on top
+        elif "window" in r:
+            out[r] = ((0, D * 0.30, top + 1.1), (W * 0.4, D * 0.22, 2.2), True)  # clear read zone
+        elif "dock" in r:
+            out[r] = ((0, D * 0.44, bz + sh * 0.5), (W * 0.7, D * 0.12, sh), True)  # keyed rail, rear edge
+    res = next((rv.role for rv in roles if "reservoir" in rv.role), None)
+    prt = next((rv.role for rv in roles if "port" in rv.role), None)
+    ww = W / (n + 1.5)
+    for i in range(n):
+        cx = (i - (n - 1) / 2.0) * (W / n) * 0.9
+        if res:
+            out[f"{res}_{i}" if n > 1 else res] = ((cx, D * 0.05, flu_top + 3.0), (ww * 0.7, D * 0.34, 6.0), True)
+        if prt:
+            out[f"{prt}_{i}" if n > 1 else prt] = ((cx, -D * 0.34, flu_top + 2.5), (ww * 0.4, D * 0.10, 5.0), True)
+    return out
+
+
 def _plan_optical_column(roles, W, D, H, bz):
     """image_plane: flexure body base, stage on top, objective below stage, condenser above."""
     top = bz + H
@@ -964,6 +1059,7 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float],
         "rotary-stack": lambda: _plan_rotary(c.role_volumes, W, D, H, base_z_mm),
         "on-base": lambda: _plan_on_base(c.role_volumes, W, D, H, base_z_mm),
         "pressure-vessel": lambda: _plan_pressure(c.role_volumes, W, D, H, base_z_mm),
+        "planar-card": lambda: _plan_planar_card(c.role_volumes, W, D, H, base_z_mm, c.repeated_count),
     }.get(axis)
     if not dispatch:
         return {"schema": "geometry-plan/v1", "ok": False, "reason": f"NO_LAYOUT_FOR_AXIS_{axis}"}
@@ -1078,6 +1174,40 @@ def _selftest() -> int:
     check("intentional accessory (cartridge/cap) does NOT fire",
           derive_functional_form(_synthetic_state(electrode_count=64)) and
           assembly_connectedness_proof(derive_functional_form(_synthetic_state(working_volume_ml=20)))["ok"])
+
+    # CASSETTE (the razor-and-blade CONSUMABLE, Yuri Gap A 2026-07-18) — a consumable card
+    # resolves to a connected sealed_cartridge form. It is NOT a powered instrument.
+    cas = compose_form(_synthetic_state(cassette_format="SBS", reservoir_count=6))
+    check("cassette resolves (sealed_cartridge)",
+          cas.get("ok") is True and cas.get("working_medium") == "sealed_cartridge")
+    check("cassette signature exposes reservoirs + ports + window",
+          {"reagent_reservoirs", "inlet_ports", "detection_window"} <= set(cas.get("visible_signature") or []))
+    cc_cas = derive_functional_form(_synthetic_state(cassette_format="SBS", reservoir_count=6))
+    check("cassette declares a FIRST-CLASS removable_interface dock",
+          any(kind == "removable_interface" for (_f, kind, _t, _i) in cc_cas.required_relations))
+    check("cassette assembly is ONE connected component (dock external, NOT an orphan)",
+          assembly_connectedness_proof(cc_cas)["ok"] is True)
+    # a smart / organoid cassette that ALSO carries an instrument signal still resolves as the CARD
+    smart = compose_form(_synthetic_state(cassette_format="slide", electrode_count=64, reservoir_count=4))
+    check("smart cassette (electrode_count present) is the CARD, not the EWOD instrument",
+          smart.get("working_medium") == "sealed_cartridge")
+    # a bare EWOD INSTRUMENT (no consumable signal) is unaffected — still electric_field
+    check("bare EWOD instrument (no cassette signal) is STILL electric_field",
+          compose_form(_synthetic_state(electrode_count=64)).get("working_medium") == "electric_field")
+    # geometry: thin, full-footprint card; reservoirs replicate by count
+    env_c = (127.0, 85.0, 40.0)                 # SBS-ish footprint, generous H → must clamp thin
+    gp_cas = compose_geometry_plan(_synthetic_state(cassette_format="SBS", reservoir_count=6), env_c)
+    check("cassette geometry plan ok (measured-connected)", gp_cas.get("ok") is True)
+    _sub = next((p for p in gp_cas.get("placements", []) if "substrate" in p["name"]), None)
+    check("cassette substrate is a thin full-footprint card (H clamped ≤12 mm)",
+          _sub is not None and _sub["size_mm"][2] <= 12.0 and _sub["size_mm"][0] == env_c[0])
+    check("cassette replicates reservoirs by reservoir_count (6 wells)",
+          sum(1 for p in gp_cas.get("placements", []) if "reagent_reservoirs" in p["name"]) == 6)
+    # proveCatch — a cassette carrying a FOREIGN instrument drive role (a motor) is culled (F3)
+    cbad = derive_functional_form(_synthetic_state(cassette_format="SBS", reservoir_count=6))
+    bad_c = Arrangement(axis="planar-card", stack=["card_substrate", "reagent_reservoirs", "drive_motor"],
+                        visible_signature=["reagent_reservoirs"], label="axis-order")
+    check("cassette with a foreign motor role is culled (F3)", len(cull_infeasible([bad_c], cbad)) == 0)
 
     # GEOMETRY PLAN — the form-proof composes into concrete placements (universal layout).
     env = (100.0, 80.0, 30.0)
