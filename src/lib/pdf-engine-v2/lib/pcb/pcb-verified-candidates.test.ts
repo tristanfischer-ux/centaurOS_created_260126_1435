@@ -247,6 +247,20 @@ describe('verified function-keyed PCB candidates', () => {
       expectedFootprint: 'BOOMELE_1.0T-4P',
       expectedSource: 'Open Colorimeter frozen source-board J1/J2',
     },
+    {
+      request: {
+        wordId: 'hat_host_connector_word',
+        nameHuman: 'Raspberry Pi HAT 40-pin host connector',
+        characterId: 'hat_host_connector',
+        functionClass: 'connector',
+        requiredRatings: { voltageV: 5, currentA: 0.1 },
+      },
+      manufacturer: 'Samtec',
+      partNumber: 'SSQ-120-03-T-D',
+      description: 'CONN RCPT 40POS 0.1 GOLD THT',
+      expectedFootprint: 'PinSocket_2x20_P2.54mm_Vertical',
+      expectedSource: 'Pioreactor frozen HAT',
+    },
   ] as const)(
     'resolves $partNumber only for its source-backed universal role and package',
     ({
@@ -434,6 +448,19 @@ describe('verified function-keyed PCB candidates', () => {
       partNumber: '1.0T-4P',
       expectedSymbol: 'Connector_Generic:Conn_01x04',
       expectedFootprint: 'BOOMELE_1.0T-4P',
+    },
+    {
+      request: {
+        wordId: 'hat_host_connector_word',
+        nameHuman: 'Raspberry Pi HAT 40-pin host connector',
+        characterId: 'hat_host_connector',
+        functionClass: 'connector',
+        requiredRatings: { voltageV: 5, currentA: 0.1 },
+      },
+      manufacturer: 'Samtec',
+      partNumber: 'SSQ-120-03-T-D',
+      expectedSymbol: 'Forge_Manufacturer:SSQ-120-03-T-D',
+      expectedFootprint: 'PinSocket_2x20_P2.54mm_Vertical',
     },
     {
       request: {

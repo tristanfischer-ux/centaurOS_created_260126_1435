@@ -94,6 +94,27 @@
       "databaseEvidence": "forge-truth frozen Eye-Spy BOM/schematic row"
     },
     {
+      "punchlistId": "pioreactor-wet_lab_hat-debug_header_word",
+      "resolverRequest": {
+        "wordId": "hat_host_connector_word",
+        "nameHuman": "Raspberry Pi HAT 40-pin host connector",
+        "characterId": "hat_host_connector",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 5,
+          "currentA": 0.1
+        }
+      },
+      "manufacturer": "Samtec",
+      "partNumber": "SSQ-120-03-T-D",
+      "roleCompatibility": "The HAT-local RP2040 is programmed through GPIO24/GPIO25 over the fitted Raspberry Pi host socket; a separate synthetic debug header is not fitted.",
+      "package": "2x20 vertical through-hole socket, 2.54 mm pitch, 10.00 mm square tails, matte-tin contacts",
+      "ratings": "465 VAC / 655 VDC; 6.3 A per pin with two pins powered; -55 to +105 C for matte-tin option",
+      "symbolPinout": "Forge_Manufacturer:SSQ-120-03-T-D; complete Raspberry Pi physical pins 1-40, including pin 18 GPIO24/SWDIO and pin 22 GPIO25/SWCLK; Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical",
+      "manufacturerEvidence": "Samtec SSQ-TH series print and SSQ-120-03-T-D product record; frozen Pioreactor HAT v1.2 CAD, frozen exact SSQ-120-03-T-D board BOM evidence and Pioreactor GPIO contract",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Samtec row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
       "punchlistId": "rodeostat-analog_afe-dac_output_stage_word",
       "resolverRequest": {
         "wordId": "dac_output_stage_word",
@@ -140,7 +161,10 @@
         "nameHuman": "Low-leakage electrochemical rail clamp",
         "characterId": "low_leakage_rail_clamp",
         "functionClass": "diode_protection",
-        "requiredRatings": { "voltageV": 70, "currentA": 0.07 }
+        "requiredRatings": {
+          "voltageV": 70,
+          "currentA": 0.07
+        }
       },
       "manufacturer": "Slkor",
       "partNumber": "BAS70-04",
@@ -179,7 +203,9 @@
         "nameHuman": "50 kohm SPI high-voltage setpoint potentiometer",
         "characterId": "programmable_hv_setpoint",
         "functionClass": "programmable_resistor",
-        "requiredRatings": { "voltageV": 3.3 }
+        "requiredRatings": {
+          "voltageV": 3.3
+        }
       },
       "manufacturer": "Microchip Technology",
       "partNumber": "MCP41050-I/SN",
@@ -197,7 +223,9 @@
         "nameHuman": "Five-line 5 V ESD protection array",
         "characterId": "five_line_esd_protection",
         "functionClass": "diode_protection",
-        "requiredRatings": { "voltageV": 5 }
+        "requiredRatings": {
+          "voltageV": 5
+        }
       },
       "manufacturer": "Nexperia",
       "partNumber": "PESD5V0L5UY",
@@ -215,7 +243,9 @@
         "nameHuman": "Droplet feedback amplifier",
         "characterId": "droplet_feedback_amplifier",
         "functionClass": "op_amp",
-        "requiredRatings": { "voltageV": 5 }
+        "requiredRatings": {
+          "voltageV": 5
+        }
       },
       "manufacturer": "Microchip Technology",
       "partNumber": "MCP6002-I/SN",
@@ -229,6 +259,18 @@
   ],
   "pendingExactMappings": [],
   "rejectedMappings": [
+    {
+      "punchlistId": "pioreactor-od_optics-ferrite_emc_bead_word",
+      "rejectedIdentity": "Unspecified 0603 ferrite bead",
+      "reason": "Rejected as not fitted: the frozen Eye-Spy rail network contains exact local decoupling but no ferrite bead, and no measured impedance/current/DCR requirement justifies adding one.",
+      "evidence": "Frozen Eye-Spy BOM revision ca40a91e728801b139b1086853f7cf74ce76def9 contains no ferrite bead."
+    },
+    {
+      "punchlistId": "pioreactor-od_optics-power_indicator_led_word",
+      "rejectedIdentity": "TE Connectivity 4-2489541-7",
+      "reason": "Rejected as not fitted: Eye-Spy has no indicator LED, the candidate is a 110 V panel indicator without PCB pad geometry, and Pioreactor assigns system PCB indication to the HAT GPIO23 path.",
+      "evidence": "Frozen Eye-Spy BOM revision ca40a91e728801b139b1086853f7cf74ce76def9 contains no indicator LED; Pioreactor v1.x GPIO contract places the PCB LED on GPIO23."
+    },
     {
       "punchlistId": "opendrop-hv_controller_main-adc_input_stage_word",
       "rejectedIdentity": "Nuvoton NAU7802SGI",
@@ -300,8 +342,8 @@
     {
       "product": "Pioreactor",
       "requiredBoards": 3,
-      "resolvedDelta": 1,
-      "remainingUnresolved": 3
+      "resolvedDelta": 2,
+      "remainingUnresolved": 0
     },
     {
       "product": "Rodeostat",
@@ -319,18 +361,18 @@
   "updatedSummary": {
     "products": 7,
     "requiredBoards": 8,
-    "verifiedIdentityCount": 46,
-    "unresolvedIdentityCount": 19,
-    "resolvedDelta": 11,
-    "reclassifiedNonComponentCount": 20,
-    "missingMpn": 19,
+    "verifiedIdentityCount": 47,
+    "unresolvedIdentityCount": 16,
+    "resolvedDelta": 12,
+    "reclassifiedNonComponentCount": 22,
+    "missingMpn": 16,
     "missingSymbolPinout": 0
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
-    "optical_source_and_visual_indication": 4,
-    "power_entry_conversion_and_protection": 9,
-    "digital_compute_communications_and_storage": 5,
+    "optical_source_and_visual_indication": 3,
+    "power_entry_conversion_and_protection": 8,
+    "digital_compute_communications_and_storage": 4,
     "precision_analog_measurement_and_control": 1,
     "wet_actuation_drive": 0,
     "board_to_board_and_cartridge_interconnect": 0
@@ -342,6 +384,6 @@
     "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range; the exact MCP1700 symbol is now closed but a compliant replacement MPN is still required.",
     "Manufacturer pinouts close NAU7802SGI and OPA334AIDBVR symbol uncertainty, but both remain rejected for the cited Rodeostat/OpenDrop roles; 4-2489541-7 remains unsupported because no authoritative PCB package/terminal geometry was found.",
     "No candidate without an exact manufacturer ordering code, compatible ratings, package, and symbol/pinout source was promoted.",
-    "Sixteen roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
+    "Twenty-two roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
   ]
 }

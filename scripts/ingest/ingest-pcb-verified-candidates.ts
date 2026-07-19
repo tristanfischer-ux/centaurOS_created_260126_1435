@@ -377,6 +377,25 @@ export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
     evidence: 'Amphenol product data identifies 12401610E4#2A as a 24-contact right-angle top-mount USB Type-C receptacle; frozen OpenDrop J1 uses its exact footprint.',
   },
   {
+    partName: 'Raspberry Pi HAT 40-contact host socket',
+    manufacturer: 'Samtec',
+    partNumber: 'SSQ-120-03-T-D',
+    componentClass: 'connector',
+    function: 'Raspberry Pi HAT host interconnect carrying power, GPIO buses and the RP2040 SWD programming path',
+    package: '2x20 vertical through-hole socket, 2.54 mm pitch, 10.00 mm square tails, matte-tin contacts',
+    pinout: 'Raspberry Pi physical pins 1-40; physical pin 18 is GPIO24/SWDIO and pin 22 is GPIO25/SWCLK; full application mapping is curated in Forge_Manufacturer:SSQ-120-03-T-D',
+    ratings: {
+      voltageVac: 465,
+      voltageVdc: 655,
+      currentPerPinA: 6.3,
+      contactCount: 40,
+      operatingTemperatureC: '-55 to 105',
+    },
+    sourceUrl: 'https://www.samtec.com/products/ssq-120-03-t-d',
+    sourceCommit: 'ca40a91e728801b139b1086853f7cf74ce76def9',
+    evidence: 'Samtec SSQ-TH series data defines SSQ-120-03-T-D as a 20-position-per-row, double-row, lead-style-03, matte-tin, 2.54 mm through-hole socket rated 6.3 A per pin with two pins powered and 465 VAC/655 VDC; frozen Pioreactor HAT v1.2 CAD requires the 40-contact host socket and the frozen Pioreactor temperature-board BOM independently names exact SSQ-120-03-T-D.',
+  },
+  {
     partName: '50 kohm SPI high-voltage setpoint potentiometer',
     manufacturer: 'Microchip Technology',
     partNumber: 'MCP41050-I/SN',
@@ -393,7 +412,7 @@ export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
     },
     sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/11195c.pdf',
     sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
-    evidence: 'Microchip DS11195C identifies MCP41050-I/SN as the industrial-temperature 50 kohm, 256-position SPI potentiometer in eight-lead SOIC; frozen OpenDrop U15 has value MCP41050 and SO08 footprint on the MAX1771 VSENS setpoint path.',
+    evidence: 'Microchip DS11195C identifies MCP41050-I/SN as the industrial-temperature 50 kohm, 256-position SPI potentiometer in eight-lead SOIC and defines pins 1 CS, 2 SCK, 3 SI, 4 VSS, 5 PA0, 6 PW0, 7 PB0, 8 VDD; frozen OpenDrop U15 has value MCP41050 and SO08 footprint on the MAX1771 VSENS setpoint path.',
   },
   {
     partName: 'Five-line 5 V ESD protection diode array',
@@ -412,7 +431,7 @@ export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
     },
     sourceUrl: 'https://assets.nexperia.com/documents/data-sheet/PESDXL5UF_V_Y.pdf',
     sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
-    evidence: 'Nexperia PESDxL5UF/V/Y Rev. 02 identifies PESD5V0L5UY as a fivefold 5 V array in SOT363; frozen OpenDrop D4 names the exact MPN and SOT-363_SC-70-6 footprint.',
+    evidence: 'Nexperia PESDxL5UF/V/Y Rev. 02 identifies PESD5V0L5UY as a fivefold 5 V array in SOT363 and defines pins 1, 3, 4, 5 and 6 as cathodes with pin 2 common anode; frozen OpenDrop D4 names the exact MPN and SOT-363_SC-70-6 footprint.',
   },
   {
     partName: 'Dual rail-to-rail droplet feedback amplifier',
@@ -430,7 +449,7 @@ export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
     },
     sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/MCP6001-1R-1U-2-4-1-MHz-Low-Power-Op-Amp-DS20001733L.pdf',
     sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
-    evidence: 'Microchip DS20001733L identifies MCP6002-I/SN as the industrial-temperature dual 1 MHz rail-to-rail op amp in eight-lead SOIC; frozen OpenDrop U6 has value MCP6002 and SO08 footprint in the named FEEDBACK AMPLIFIER.',
+    evidence: 'Microchip DS20001733L identifies MCP6002-I/SN as the industrial-temperature dual 1 MHz rail-to-rail op amp in eight-lead SOIC and defines pins 1 VOUTA, 2 VINA-, 3 VINA+, 4 VSS, 5 VINB+, 6 VINB-, 7 VOUTB, 8 VDD; frozen OpenDrop U6 has value MCP6002 and SO08 footprint in the named FEEDBACK AMPLIFIER.',
   },
 ] as const
 
@@ -457,7 +476,7 @@ function metadataFor(candidate: PcbVerifiedCandidate): string {
     evidence: candidate.evidence,
     function: candidate.function,
     package: candidate.package,
-    pinout: candidate.pinout,
+    ...(candidate.pinout ? { pinout: candidate.pinout } : {}),
     ratings: candidate.ratings,
     sourceCommit: candidate.sourceCommit,
     sourceUrl: candidate.sourceUrl,

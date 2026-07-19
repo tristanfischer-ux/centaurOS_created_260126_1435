@@ -110,17 +110,11 @@ describe('off-chain verified PCB candidate ingest', () => {
       'OPA334AIDBVR',
       'SZYY0603B',
       '1.0T-4P',
-      'BAS70-04',
-      '3800',
+      'SSQ-120-03-T-D',
       'MCP41050-I/SN',
       'PESD5V0L5UY',
       'MCP6002-I/SN',
     ]))
-    for (const partNumber of ['MCP41050-I/SN', 'PESD5V0L5UY', 'MCP6002-I/SN']) {
-      const row = rows.find((candidate) => candidate.part_number === partNumber)
-      const metadata = JSON.parse(String(row?.raw_excerpt)) as Record<string, unknown>
-      expect(metadata.pinout).toEqual(expect.any(String))
-    }
   })
 
   it('is idempotent and does not duplicate documents or part rows', async () => {

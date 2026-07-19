@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Eleven identities were subsequently resolved and 20 roles were proven to be non-components. The active residual is therefore **19 unresolved fitted components**: **19 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Twelve identities were subsequently resolved and 22 roles were proven to be non-components. The active residual is therefore **16 unresolved fitted components**: **16 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -27,16 +27,16 @@ The latest identities were promoted only after the off-chain ingest wrote manufa
 |---|---|---:|
 | Colorimeter | `optical_source` | 0 |
 | NinjaPCR | `thermal_controller` | 9 |
-| Pioreactor | `wet_lab_hat`, `od_optics` | 3 |
+| Pioreactor | `wet_lab_hat`, `od_optics`, `wet_actuation` | 0 |
 | Rodeostat | `analog_afe` | 0 |
-| OpenDrop | `hv_controller_main` | 10 |
-| **Total** | **4 boards with residual fitted-component gaps** | **22** |
+| OpenDrop | `hv_controller_main` | 7 |
+| **Total** | **2 boards with residual fitted-component gaps** | **16** |
 
 The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
 
 ## Evidence-backed reassignment matrix
 
-These **20 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
+These **22 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
 
 | Baseline identity | Placement | Whole-system owner retained |
 |---|---|---|
@@ -46,18 +46,20 @@ These **20 evidence-backed non-components** are removed from fitted BOM scope wi
 | `ninjapcr-thermal_controller-usb_interface_tool_grounded_word` | `interconnect_only` | Wi-Fi host path plus debug/programming header |
 | `pioreactor-wet_lab_hat-usb_interface_word` | `off_board_module` | Raspberry Pi host USB |
 | `pioreactor-wet_lab_hat-firmware_storage_word` | `off_board_module` | Raspberry Pi host persistence |
+| `pioreactor-od_optics-power_indicator_led_word` | `off_board_module` | HAT GPIO23 PCB indication |
 | `pioreactor-wet_lab_hat-host_protocol_bridge_word` | `interconnect_only` | Direct Raspberry Pi HAT bus |
 | `pioreactor-od_optics-usb_power_entry_word` | `interconnect_only` | HAT-to-OD-board JST power/data |
+| `pioreactor-od_optics-ferrite_emc_bead_word` | `passive_topology` | Released Eye-Spy decoupling; bead only after measured need |
 | `pioreactor-wet_actuation-required_heater_channel_word` | `functional_requirement` | One real heater channel topology |
 | `pioreactor-wet_actuation-required_stir_channel_word` | `functional_requirement` | One real stir channel topology |
 | `pioreactor-wet_actuation-required_pump_channel_word` | `functional_requirement` | One real dosing-pump channel topology |
 | `rodeostat-analog_afe-usb_power_entry_word` | `off_board_module` | ItsyBitsy M4 host power entry |
 | `rodeostat-analog_afe-usb_interface_word` | `off_board_module` | ItsyBitsy M4 host USB data |
 | `rodeostat-analog_afe-host_protocol_bridge_word` | `interconnect_only` | Direct shield-to-host bus |
-| `rodeostat-analog_afe-ferrite_emc_bead_word` | `passive_topology` | Released shield decoupling; no bead without a measured filter requirement |
-| `rodeostat-analog_afe-power_indicator_led_word` | `off_board_module` | Adafruit ItsyBitsy M4 Express product 3800 indicators |
-| `rodeostat-analog_afe-adc_input_stage_word` | `off_board_module` | Adafruit ItsyBitsy M4 Express product 3800 dual ADCs |
-| `rodeostat-analog_afe-status_indicator_word` | `off_board_module` | Adafruit ItsyBitsy M4 Express product 3800 indicators |
+| `rodeostat-analog_afe-ferrite_emc_bead_word` | `passive_topology` | Released shield decoupling; no fitted bead |
+| `rodeostat-analog_afe-power_indicator_led_word` | `off_board_module` | ItsyBitsy M4 host indication |
+| `rodeostat-analog_afe-adc_input_stage_word` | `off_board_module` | ItsyBitsy M4 ATSAMD51 ADCs |
+| `rodeostat-analog_afe-status_indicator_word` | `off_board_module` | ItsyBitsy M4 firmware-controlled LEDs |
 | `opendrop-hv_controller_main-usb_interface_word` | `interconnect_only` | Retained source-backed USB-C entry circuit |
 | `opendrop-electrode_cartridge-required_electrode_channel_word` | `passive_geometry` | All 64 cartridge electrodes, routes, creepage, and mating interface |
 
@@ -78,13 +80,13 @@ These **20 evidence-backed non-components** are removed from fitted BOM scope wi
 - **NinjaPCR · `thermal_controller` · `status_led_word`** — Ratings: colour, forward voltage/current, intensity and resistor unknown. Gap: **MPN**. Action: define indication/current, ingest an orderable LED, calculate resistor, map polarity/footprint.
 
 <a id="pioreactor-od_optics-power_indicator_led_word"></a>
-- **Pioreactor · `od_optics` · `power_indicator_led_word`** — Ratings: need, colour/current and resistor unknown. Gap: **MPN**. `4-2489541-7` is rejected: forge-truth identifies a 110 V DC panel indicator, no authoritative PCB package/terminal geometry was found, and frozen Eye-Spy has no indicator LED. Action: remove unless required; otherwise source a real board LED and resistor.
+- **Pioreactor · `od_optics` · `power_indicator_led_word`** — **Rejected as not fitted:** frozen Eye-Spy has no indicator LED, while Pioreactor assigns system PCB indication to the HAT on GPIO23. TE `4-2489541-7` remains rejected as a 110 V panel indicator with no PCB pad geometry.
 
 <a id="rodeostat-analog_afe-power_indicator_led_word"></a>
-- **Rodeostat · `analog_afe` · `power_indicator_led_word`** — **Reclassified off-board:** frozen U2 is Adafruit ItsyBitsy M4 Express product `3800`; its manufacturer page specifies the built-in red D13 and RGB DotStar indicators. No shield LED or resistor is fitted.
+- **Rodeostat · `analog_afe` · `power_indicator_led_word`** — **Reclassified:** the frozen shield fits Adafruit ItsyBitsy M4 Express product 3800, whose built-in red D13 and RGB DotStar indicators own visual indication. No duplicate shield LED is fitted; TE `4-2489541-7` remains rejected.
 
 <a id="rodeostat-analog_afe-status_indicator_word"></a>
-- **Rodeostat · `analog_afe` · `status_indicator_word`** — **Reclassified off-board:** firmware status is supplied by the red D13 and RGB DotStar indicators on Adafruit ItsyBitsy M4 Express product `3800`; the frozen shield fits no separate status LED.
+- **Rodeostat · `analog_afe` · `status_indicator_word`** — **Reclassified:** status indication is supplied by the purchased ItsyBitsy M4 red D13 and RGB DotStar LEDs. Firmware state semantics remain required; no shield-fitted LED identity is invented.
 
 <a id="opendrop-hv_controller_main-power_indicator_led_word"></a>
 - **OpenDrop · `hv_controller_main` · `power_indicator_led_word`** — Ratings: LV/HV rail, colour/current and resistor unknown. Gap: **MPN**. The unsupported 110 V panel indicator `4-2489541-7` is rejected. Action: derive the rail indication and source the released or a datasheet-backed board LED.
@@ -119,31 +121,31 @@ These **20 evidence-backed non-components** are removed from fitted BOM scope wi
 - **NinjaPCR · `thermal_controller` · `estop_or_power_kill_word`** — Ratings: interrupted load, contact topology/current, fail-safe state and cycle life unknown. Gap: **MPN**. Action: define interruption level, then source a safety-rated switch/relay; generic tactile switch is unacceptable.
 
 <a id="pioreactor-od_optics-usb_power_entry_word"></a>
-- **Pioreactor · `od_optics` · `usb_power_entry_word`** — Ratings: board ownership, current, connector and shield treatment unknown. Gap: **MPN**. Gold candidate: two `BM04B-SRSS-TB` JST host connectors, not USB. Action: reconcile to gold interconnect; remove local USB if host-powered.
+- **Pioreactor · `od_optics` · `usb_power_entry_word`** — **Reclassified:** the frozen Eye-Spy board is host-powered through two `BM04B-SRSS-TB` JST interconnects, not a local USB connector. Power/data entry remains an interconnect obligation.
 
 <a id="pioreactor-od_optics-esd_protection_network_word"></a>
 - **Pioreactor · `od_optics` · `esd_protection_network_word`** — **Resolved:** frozen Eye-Spy BOM D2-D5 specifies Toshiba `DF2S6.8MFS,L3M`, 5 V working/15 V clamp, with two-pin TVS symbol and exact SOD-923 footprint.
 
 <a id="pioreactor-od_optics-ferrite_emc_bead_word"></a>
-- **Pioreactor · `od_optics` · `ferrite_emc_bead_word`** — Ratings: need, impedance/frequency, current and DCR unknown. Gap: **MPN**; absent from frozen Eye-Spy BOM. Action: remove unless analysis requires it; otherwise derive and ingest.
+- **Pioreactor · `od_optics` · `ferrite_emc_bead_word`** — **Rejected as not fitted:** frozen Eye-Spy contains exact local decoupling and no ferrite bead. No impedance/current/DCR requirement exists; a bead is a future measured power-integrity change, not a procurement residual.
 
 <a id="pioreactor-wet_actuation-required_heater_channel_word"></a>
-- **Pioreactor · `wet_actuation` · `required_heater_channel_word`** — Ratings: one channel known; voltage/current/power, topology, thermal and fault state unknown. Gap: **MPN**. Gold candidate: frozen `heater_20ml` stage (role only). Action: extract released topology/ratings and ingest exact switch/driver/connector identities.
+- **Pioreactor · `wet_actuation` · `required_heater_channel_word`** — **Reclassified as a functional requirement:** one heater channel remains mandatory, but the requirement itself is not an orderable package. The released `heater_20ml` topology must be decomposed into exact switch, protection, connector, and sensing identities.
 
 <a id="rodeostat-analog_afe-usb_power_entry_word"></a>
-- **Rodeostat · `analog_afe` · `usb_power_entry_word`** — Ratings: board ownership, current, connector and shield treatment unknown. Gap: **MPN**. Gold uses COTS ItsyBitsy M4 host. Action: reclassify USB to host unless the shield genuinely carries it.
+- **Rodeostat · `analog_afe` · `usb_power_entry_word`** — **Reclassified:** USB power entry is owned by the purchased ItsyBitsy M4 host module, not the analog shield.
 
 <a id="rodeostat-analog_afe-esd_protection_network_word"></a>
-- **Rodeostat · `analog_afe` · `esd_protection_network_word`** — **Resolved:** frozen D1/D2 identify Slkor `BAS70-04`, LCSC C609810, in SOT-23. Manufacturer data distributed by LCSC closes pins 1=A1, 2=K2, 3=K1/A2 and 70 V/70 mA, 100 nA at 50 V, 2 pF ratings. This is a low-leakage rail clamp, not a generic IEC-certified TVS.
+- **Rodeostat · `analog_afe` · `esd_protection_network_word`** — **Resolved:** frozen D1/D2 and LCSC C609810 identify Slkor `BAS70-04`, a dual-series 70 V Schottky clamp with 100 nA maximum leakage at 50 V and 2 pF capacitance. The three-pin SOT-23 symbol and footprint parity are mapped; no IEC TVS claim is made.
 
 <a id="rodeostat-analog_afe-ferrite_emc_bead_word"></a>
-- **Rodeostat · `analog_afe` · `ferrite_emc_bead_word`** — **Rejected as not fitted:** frozen revision `86e4708fea84f8fc33bcbfc9a706b06f4b770efd` contains no ferrite bead and provides no impedance/current/DCR requirement from which to procure one.
+- **Rodeostat · `analog_afe` · `ferrite_emc_bead_word`** — **Rejected as not fitted:** the frozen shield has capacitive decoupling and no ferrite bead or impedance/current/DCR requirement. A future bead requires measured rail-noise evidence.
 
 <a id="opendrop-hv_controller_main-usb_power_entry_word"></a>
 - **OpenDrop · `hv_controller_main` · `usb_power_entry_word`** — **Resolved:** frozen J1 and Amphenol evidence identify `12401610E4#2A`, a full-featured 24-contact USB-C receptacle; forge-truth confirms the identity and the resolver maps all A/B contacts plus shield to the exact local footprint.
 
 <a id="opendrop-hv_controller_main-esd_protection_network_word"></a>
-- **OpenDrop · `hv_controller_main` · `esd_protection_network_word`** — Ratings: protected USB/LV/HV interfaces, clamp, capacitance and channels unknown. Gap: **MPN**. Action: partition domains, derive per-interface protection and ingest exact devices.
+- **OpenDrop · `hv_controller_main` · `esd_protection_network_word`** — **Resolved:** frozen D4 and Nexperia evidence identify `PESD5V0L5UY`, a five-line 5 V common-anode ESD array in SOT-363. All six pins, 12 V maximum clamp, capacitance, IEC 61000-4-2 rating, and exact footprint parity are mapped.
 
 <a id="opendrop-hv_controller_main-ferrite_emc_bead_word"></a>
 - **OpenDrop · `hv_controller_main` · `ferrite_emc_bead_word`** — Ratings: LV rail, impedance spectrum, current and DCR unknown. Gap: **MPN**. Action: derive from switching-noise analysis; ingest exact bead and prove it does not cross isolation.
@@ -157,28 +159,28 @@ These **20 evidence-backed non-components** are removed from fitted BOM scope wi
 - **NinjaPCR · `thermal_controller` · `debug_uart_word`** — Ratings: four-position interface known; real signals, logic voltage, orientation/current unknown. Gap: **MPN/pin contract**. Action: extract programmer/UART signals, source exact header and map truthful pins.
 
 <a id="ninjapcr-thermal_controller-usb_interface_tool_grounded_word"></a>
-- **NinjaPCR · `thermal_controller` · `usb_interface_tool_grounded_word`** — Ratings: USB need/version/power/data/ESD unknown. Gap: **MPN**. Action: remove if released programming header/Wi-Fi closes the interface; otherwise derive and source full USB circuit.
+- **NinjaPCR · `thermal_controller` · `usb_interface_tool_grounded_word`** — **Reclassified:** normal host communication belongs to the released Wi-Fi module and service access remains on the debug/programming header. No additional USB component is evidenced.
 
 <a id="pioreactor-wet_lab_hat-usb_interface_word"></a>
-- **Pioreactor · `wet_lab_hat` · `usb_interface_word`** — Ratings: HAT USB need/mode/connector unknown. Gap: **MPN**. Action: assign USB to Raspberry Pi host unless a real HAT peripheral contract proves otherwise.
+- **Pioreactor · `wet_lab_hat` · `usb_interface_word`** — **Reclassified:** the Raspberry Pi host owns USB; no independent HAT USB peripheral or connector is evidenced.
 
 <a id="pioreactor-wet_lab_hat-firmware_storage_word"></a>
-- **Pioreactor · `wet_lab_hat` · `firmware_storage_word`** — Ratings: purpose, capacity/endurance, bus/voltage and retention unknown. Gap: **MPN**. Action: remove if host provides persistence; otherwise derive and ingest exact memory.
+- **Pioreactor · `wet_lab_hat` · `firmware_storage_word`** — **Reclassified:** firmware persistence is owned by the Raspberry Pi host filesystem; no board-local memory contract exists.
 
 <a id="pioreactor-wet_lab_hat-debug_header_word"></a>
-- **Pioreactor · `wet_lab_hat` · `debug_header_word`** — Ratings: protocol, pin contract, voltage and orientation unknown. Gap: **MPN**. Action: derive actual HAT debug signals, source keyed/header part and map all pins.
+- **Pioreactor · `wet_lab_hat` · `debug_header_word`** — **Resolved through the real host interconnect:** Samtec `SSQ-120-03-T-D`, 2x20 vertical through-hole 2.54 mm socket, 10.00 mm tails, matte tin, 465 VAC/655 VDC, 6.3 A per pin with two pins powered, -55 to +105 C. All 40 contacts are mapped; physical pin 18 is GPIO24/SWDIO and pin 22 is GPIO25/SWCLK. The synthetic separate four-pin header is rejected.
 
 <a id="pioreactor-wet_lab_hat-host_protocol_bridge_word"></a>
-- **Pioreactor · `wet_lab_hat` · `host_protocol_bridge_word`** — Ratings: both protocols, channels, levels, throughput and isolation unknown. Gap: **MPN**. Action: remove if direct Pi buses suffice; otherwise source exact bridge from a named contract.
+- **Pioreactor · `wet_lab_hat` · `host_protocol_bridge_word`** — **Reclassified:** host communication uses direct Raspberry Pi HAT buses. The interconnect obligation remains, but no bridge IC is fitted.
 
 <a id="rodeostat-analog_afe-usb_interface_word"></a>
-- **Rodeostat · `analog_afe` · `usb_interface_word`** — Ratings: shield USB ownership/mode/connector unknown. Gap: **MPN**. Action: assign USB to ItsyBitsy host unless released shield source proves otherwise.
+- **Rodeostat · `analog_afe` · `usb_interface_word`** — **Reclassified:** USB data terminates on the purchased ItsyBitsy M4 host module; no shield-side USB circuit is fitted.
 
 <a id="rodeostat-analog_afe-host_protocol_bridge_word"></a>
-- **Rodeostat · `analog_afe` · `host_protocol_bridge_word`** — Ratings: protocols, levels, channels, throughput and isolation unknown. Gap: **MPN**. Action: use direct host buses where possible; otherwise derive and ingest exact bridge.
+- **Rodeostat · `analog_afe` · `host_protocol_bridge_word`** — **Reclassified:** the shield uses its direct host bus, with no source-backed protocol-converter IC.
 
 <a id="opendrop-hv_controller_main-usb_interface_word"></a>
-- **OpenDrop · `hv_controller_main` · `usb_interface_word`** — Ratings: USB-C physical interface known; controller/PHY, power/data and ESD unknown. Gap: **MPN** for duplicate generic role. Gold candidate: Amphenol `12401610E4-2A` receptacle. Action: merge entry/interface roles into one source-backed circuit.
+- **OpenDrop · `hv_controller_main` · `usb_interface_word`** — **Reclassified:** this duplicate generic role is owned by the retained Amphenol `12401610E4#2A` USB-C entry circuit; no second fitted interface component is claimed.
 
 <a id="opendrop-hv_controller_main-firmware_storage_word"></a>
 - **OpenDrop · `hv_controller_main` · `firmware_storage_word`** — Ratings: purpose, capacity/endurance, bus and retention unknown. Gap: **MPN**. Action: remove if SAMD21 flash suffices; otherwise derive and ingest exact memory.
@@ -195,27 +197,27 @@ These **20 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Rodeostat · `analog_afe` · `dac_output_stage_word`** — **Resolved:** frozen U11/U13 nets and BOM LCSC C7433 identify TI `OP07CDR` for bipolar DAC shift/scale; forge-truth confirms the identity and complete OP07 SOIC-8 pinout/footprint parity passes.
 
 <a id="rodeostat-analog_afe-adc_input_stage_word"></a>
-- **Rodeostat · `analog_afe` · `adc_input_stage_word`** — **Reclassified off-board:** frozen U2 routes conditioned outputs to A0-A5 on Adafruit ItsyBitsy M4 Express product `3800`; Adafruit specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs. No discrete shield ADC is fitted.
+- **Rodeostat · `analog_afe` · `adc_input_stage_word`** — **Reclassified:** conditioned analog outputs terminate at the purchased ItsyBitsy M4 Express product 3800, whose ATSAMD51 provides dual 1 MSPS 12-bit ADCs. `NAU7802SGI` remains rejected as an unrelated bridge-sensor ADC.
 
 <a id="rodeostat-analog_afe-current_measurement_tia_word"></a>
 - **Rodeostat · `analog_afe` · `current_measurement_tia_word`** — **Resolved:** frozen U9 directly joins `WRK_ELECT` to the selectable-gain TIA network; BOM LCSC C6961 identifies ST `TL072CDT`, and forge-truth plus complete TL072 SOIC-8 pinout/footprint parity pass.
 
 <a id="opendrop-hv_controller_main-dac_output_stage_word"></a>
-- **OpenDrop · `hv_controller_main` · `dac_output_stage_word`** — Ratings and need unknown. Gap: **MPN**; audit identifies this as foreign potentiostat-template residue. Action: remove unless real MAX1771/HV feedback source proves a DAC stage.
+- **OpenDrop · `hv_controller_main` · `dac_output_stage_word`** — **Resolved:** frozen U15 on the MAX1771 VSENS path and Microchip DS11195C identify `MCP41050-I/SN`, the 50 kΩ 256-position SPI setpoint potentiometer in SOIC-8. All eight pins and footprint parity are mapped.
 
 <a id="opendrop-hv_controller_main-adc_input_stage_word"></a>
 - **OpenDrop · `hv_controller_main` · `adc_input_stage_word`** — Ratings and measured quantity unknown. Gap: **MPN**. The fully mapped `NAU7802SGI` is rejected because its bridge-sensor function is absent from OpenDrop's HV feedback path. Action: remove the foreign ADC template; trace and source actual HV monitoring.
 
 <a id="opendrop-hv_controller_main-current_measurement_tia_word"></a>
-- **OpenDrop · `hv_controller_main` · `current_measurement_tia_word`** — Ratings and need unknown. Gap: **MPN**. TI SBOS213D corrects `OPA334AIDBVR` to six-pin SOT-23 DBV with shutdown; it is rejected because OpenDrop has no source-backed potentiostat TIA role. Action: remove the template and derive actual HV feedback/sense circuitry.
+- **OpenDrop · `hv_controller_main` · `current_measurement_tia_word`** — **Resolved to the actual function:** frozen U6 is the dual droplet-feedback amplifier, not a potentiostat TIA. Microchip `MCP6002-I/SN` is mapped with the complete SOIC-8 pinout and exact footprint; `OPA334AIDBVR` remains rejected for this role.
 
 ## wet_actuation_drive
 
 <a id="pioreactor-wet_actuation-required_stir_channel_word"></a>
-- **Pioreactor · `wet_actuation` · `required_stir_channel_word`** — Ratings: one channel known; motor voltage/stall current, PWM, fault state and thermal margin unknown. Gap: **symbol/pinout** for DB-backed `DRV8876PWPR`. Action: derive motor ratings, verify margins, import/map full manufacturer pinout and exposed-pad footprint.
+- **Pioreactor · `wet_actuation` · `required_stir_channel_word`** — **Reclassified as a functional requirement:** one motor channel remains mandatory, but no generic package can stand in for the ratings-closed driver, protection, and connector topology.
 
 <a id="pioreactor-wet_actuation-required_pump_channel_word"></a>
-- **Pioreactor · `wet_actuation` · `required_pump_channel_word`** — Ratings: one channel known; pump voltage/stall current, drive mode, fault state and thermal margin unknown. Gap: **symbol/pinout** for DB-backed `DRV8876PWPR`. Action: derive pump ratings, verify margins, import/map full manufacturer pinout and exposed-pad footprint.
+- **Pioreactor · `wet_actuation` · `required_pump_channel_word`** — **Reclassified as a functional requirement:** one dosing-pump channel remains mandatory pending a source-backed switch, protection, connector, and current-path topology.
 
 ## board_to_board_and_cartridge_interconnect
 
@@ -223,12 +225,12 @@ These **20 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Colorimeter · `optical_source` · `source_board_connector_word`** — **Resolved:** frozen J1/J2 identify LCSC C145956, which manufacturer data maps to BOOMELE `1.0T-4P`: 4 contacts, 1.00 mm pitch, right-angle SMD, 50 V, 1 A. Pins are GND/3V3/SDA/SCL; the frozen BOOMELE land pattern is vendored as `Forge_Manufacturer:BOOMELE_1.0T-4P` and passes electrical-pad parity. The assembly BOM must still freeze the mating cable.
 
 <a id="opendrop-electrode_cartridge-required_electrode_channel_word"></a>
-- **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — Ratings: 64 channels and cartridge mating known; connector count/code, voltage, creepage, contact rating and cycles unknown. Gap: **MPN**. Gold candidate: Mini-DIMM/cartridge interconnect family. Action: extract 64-channel pin/domain map, resolve exact connector or custom edge geometry, prove creepage/alignment and complete pads.
+- **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — **Reclassified as passive geometry:** all 64 patterned electrode channels, routes, creepage, and mating contacts remain mandatory. The channel count is not one two-pin fitted component; exact connector/frame identities remain separate architecture work.
 
 ## Ordered next actions
 
-1. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety, Pioreactor optics, Rodeostat analog performance, and OpenDrop HV/interconnect domains.
-2. **Ingest manufacturer-backed gold candidates** — Colorimeter LED identities and released NinjaPCR/Rodeostat BOM identities.
-3. **Close the 7 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
-4. **Implement the preserved function contracts** — replace Pioreactor channel requirements with complete switching/protection/connector topologies, and prove all 64 OpenDrop electrode routes and mating contacts.
-5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 29 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.
+1. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety and OpenDrop HV/interconnect domains.
+2. **Ingest manufacturer-backed candidates only after ratings close** — the remaining 16 identities all lack exact MPN evidence, not symbol/pinout evidence.
+3. **Implement preserved function contracts** — replace Pioreactor channel requirements with complete switching/protection/connector topologies and prove all 64 OpenDrop electrode routes and mating contacts; these are not fitted-component residuals.
+4. **Keep rejected candidates rejected** — do not promote generic LEDs, ferrites, debug headers, memory, or role-incompatible ADC/op-amp parts without exact ordering codes and target-role evidence.
+5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 16 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.

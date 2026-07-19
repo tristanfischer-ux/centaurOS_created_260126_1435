@@ -9,10 +9,10 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 11,
-    "reclassifiedNonComponentCount": 20,
-    "remainingUnresolvedFittedComponents": 19,
-    "remainingMissingMpn": 19,
+    "resolvedIdentityCount": 12,
+    "reclassifiedNonComponentCount": 22,
+    "remainingUnresolvedFittedComponents": 16,
+    "remainingMissingMpn": 16,
     "remainingMissingSymbolPinout": 0,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
@@ -28,6 +28,7 @@
     "opendrop-hv_controller_main-current_measurement_tia_word",
     "colorimeter-optical_source-led_source_word",
     "colorimeter-optical_source-source_board_connector_word",
+    "pioreactor-wet_lab_hat-debug_header_word",
     "rodeostat-analog_afe-esd_protection_network_word"
   ],
   "scopeReclassifications": [
@@ -80,6 +81,14 @@
       "retainedFunction": "Firmware and persistent storage remain owned by the host filesystem rather than a fabricated SOIC memory package."
     },
     {
+      "id": "pioreactor-od_optics-power_indicator_led_word",
+      "product": "Pioreactor",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "wet-lab HAT PCB status LED on Raspberry Pi GPIO23",
+      "evidence": "The frozen Eye-Spy BOM has no indicator LED, while the Pioreactor v1.x GPIO contract assigns the system PCB LED to GPIO23 on the HAT.",
+      "retainedFunction": "Whole-system power/status indication remains on the HAT; no optically contaminating duplicate LED is fitted beside the Eye-Spy photodiode path."
+    },
+    {
       "id": "pioreactor-wet_lab_hat-host_protocol_bridge_word",
       "product": "Pioreactor",
       "placement": "interconnect_only",
@@ -94,6 +103,14 @@
       "wholeSystemOwner": "wet-lab HAT to OD-board JST power/data interconnect",
       "evidence": "The frozen Eye-Spy board uses two four-pin JST host headers and no local USB power connector.",
       "retainedFunction": "OD-board power and data entry remain required through the host interconnect."
+    },
+    {
+      "id": "pioreactor-od_optics-ferrite_emc_bead_word",
+      "product": "Pioreactor",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "Eye-Spy rail decoupling and measured host-side power integrity",
+      "evidence": "The frozen Eye-Spy BOM contains its exact decoupling network and no ferrite bead; no impedance, current or DCR requirement exists to justify inserting one.",
+      "retainedFunction": "The released local decoupling remains fitted; a series bead becomes a new procurement requirement only if measured rail-noise evidence derives its impedance/current/DCR contract."
     },
     {
       "id": "pioreactor-wet_actuation-required_heater_channel_word",
@@ -144,22 +161,6 @@
       "retainedFunction": "The digital host interface remains an explicit shield interconnect."
     },
     {
-      "id": "opendrop-hv_controller_main-usb_interface_word",
-      "product": "OpenDrop",
-      "placement": "interconnect_only",
-      "wholeSystemOwner": "source-backed USB-C entry circuit",
-      "evidence": "The same board already has a physical USB-C power/data entry role; the second generic USB-interface word duplicates that circuit rather than naming another fitted component.",
-      "retainedFunction": "USB power/data remain required through the retained USB-C entry and its protection contract."
-    },
-    {
-      "id": "opendrop-electrode_cartridge-required_electrode_channel_word",
-      "product": "OpenDrop",
-      "placement": "passive_geometry",
-      "wholeSystemOwner": "64-channel electrode cartridge copper and mating interface",
-      "evidence": "Electrowetting electrodes are patterned conductive geometry; the channel requirement was incorrectly emitted as one two-pin fitted connector.",
-      "retainedFunction": "All 64 electrode channels remain mandatory in cartridge geometry, routing, creepage, and the controller mating interface."
-    },
-    {
       "id": "rodeostat-analog_afe-ferrite_emc_bead_word",
       "product": "Rodeostat",
       "placement": "passive_topology",
@@ -190,6 +191,22 @@
       "wholeSystemOwner": "Adafruit ItsyBitsy M4 Express product 3800",
       "evidence": "Frozen U2 is the purchased ItsyBitsy M4 host; Adafruit product 3800 provides both red D13 and RGB DotStar firmware-controlled indicators.",
       "retainedFunction": "Measurement/run/fault status remains a host-firmware function without an invented shield LED."
+    },
+    {
+      "id": "opendrop-hv_controller_main-usb_interface_word",
+      "product": "OpenDrop",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "source-backed USB-C entry circuit",
+      "evidence": "The same board already has a physical USB-C power/data entry role; the second generic USB-interface word duplicates that circuit rather than naming another fitted component.",
+      "retainedFunction": "USB power/data remain required through the retained USB-C entry and its protection contract."
+    },
+    {
+      "id": "opendrop-electrode_cartridge-required_electrode_channel_word",
+      "product": "OpenDrop",
+      "placement": "passive_geometry",
+      "wholeSystemOwner": "64-channel electrode cartridge copper and mating interface",
+      "evidence": "Electrowetting electrodes are patterned conductive geometry; the channel requirement was incorrectly emitted as one two-pin fitted connector.",
+      "retainedFunction": "All 64 electrode channels remain mandatory in cartridge geometry, routing, creepage, and the controller mating interface."
     }
   ],
   "roleGroups": [
@@ -796,24 +813,24 @@
           "product": "OpenDrop",
           "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
           "wordId": "esd_protection_network_word",
-          "characterId": "five_line_esd_protection",
+          "characterId": "esd_protection_network",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["five unidirectional 5 V protection channels", "12 V maximum clamp at 2.5 A", "19 pF maximum capacitance", "IEC 61000-4-2 level 4", "six-lead SOT363"],
+            "requirements": ["five protected 5 V lines", "12 V maximum clamp", "SOT363 common-anode array", "IEC 61000-4-2 level 4"],
             "missing": ["closed by exact PESD5V0L5UY mapping"],
-            "evidence": ["Frozen OpenDrop D4 names PESD5V0L5UY and SOT-363_SC-70-6; Nexperia Rev. 02 closes ratings and pinout."]
+            "evidence": ["Frozen OpenDrop D4 names PESD5V0L5UY and SOT-363_SC-70-6; Nexperia PESDxL5UF/V/Y Rev. 02 defines all pins and ratings."]
           },
           "missingEvidence": { "kind": "mpn", "details": "Closed by exact Nexperia PESD5V0L5UY identity, package, pinout and ratings." },
           "sourceCandidate": {
             "identity": "Nexperia PESD5V0L5UY",
             "evidenceLevel": "manufacturer_ordering_code",
             "source": "forge-truth:manufacturer_verified_pcb_ingest; Nexperia PESDxL5UF/V/Y Rev. 02; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
-            "disposition": "accepted"
+            "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "resolved_exact_mpn",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Resolve Nexperia PESD5V0L5UY.", "Map pins 1/3/4/5/6 as cathodes and pin 2 as common anode.", "Require exact SOT-363_SC-70-6 pad parity."]
+            "action": "ingest",
+            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
+            "acceptance": ["Exact PESD5V0L5UY DB row exists.", "SOT363 symbol exposes five cathodes and common anode.", "Resolver enforces 5 V standoff and exact six-pad parity."]
           }
         },
         {
@@ -953,17 +970,22 @@
           "wordId": "debug_header_word",
           "characterId": "debug_header",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["debug protocol", "pin contract", "logic voltage", "connector orientation"],
-            "evidence": ["Offline output substitutes a generic four-pin USB-like header."]
+            "status": "source_verified",
+            "requirements": ["Raspberry Pi 40-pin HAT socket", "3.3 V SWDIO on physical pin 18", "3.3 V SWCLK on physical pin 22"],
+            "missing": ["a separate fitted debug header is rejected because SWD traverses the host socket"],
+            "evidence": ["Frozen HAT v1.2 uses the Raspberry Pi host socket; Pioreactor maps GPIO24/GPIO25 to SWD, and Samtec identifies exact SSQ-120-03-T-D package and ratings."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No exact header ordering code or source-backed pinout." },
-          "sourceCandidate": null,
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact host-socket MPN and full 40-contact application pinout; no separate four-pin header is fitted." },
+          "sourceCandidate": {
+            "identity": "Samtec SSQ-120-03-T-D",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "https://www.samtec.com/products/ssq-120-03-t-d",
+            "disposition": "candidate_only"
+          },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive the actual HAT debug/programming protocol and signals.", "Source an exact keyed/header part.", "Map every real pin and orientation."]
+            "action": "ingest",
+            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
+            "acceptance": ["Use SSQ-120-03-T-D only for the Raspberry Pi HAT host connector role.", "Carry GPIO24/SWDIO and GPIO25/SWCLK on physical pins 18 and 22.", "Reject the synthetic separate four-pin USB-like header."]
           }
         },
         {
@@ -1196,7 +1218,7 @@
           "product": "OpenDrop",
           "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
           "wordId": "dac_output_stage_word",
-          "characterId": "programmable_hv_setpoint",
+          "characterId": "dac_output_stage",
           "requiredRatings": {
             "status": "source_verified",
             "requirements": ["50 kohm, 256-position SPI high-voltage setpoint adjustment", "2.7-5.5 V supply", "8-lead SOIC"],
@@ -1208,12 +1230,12 @@
             "identity": "Microchip Technology MCP41050-I/SN",
             "evidenceLevel": "manufacturer_ordering_code",
             "source": "forge-truth:manufacturer_verified_pcb_ingest; Microchip DS11195C; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
-            "disposition": "accepted"
+            "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "resolved_exact_mpn",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Resolve Microchip MCP41050-I/SN.", "Map SOIC-8 SPI and PA0/PW0/PB0 pinout.", "Retain only the frozen MAX1771 VSENS setpoint function."]
+            "action": "ingest",
+            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
+            "acceptance": ["Exact MCP41050-I/SN DB row exists.", "SOIC-8 symbol and footprint expose all eight manufacturer pins.", "Resolver enforces the programmable HV-setpoint role and 5.5 V rating."]
           }
         },
         {
@@ -1246,24 +1268,24 @@
           "product": "OpenDrop",
           "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
           "wordId": "current_measurement_tia_word",
-          "characterId": "droplet_feedback_amplifier",
+          "characterId": "current_measurement_tia",
           "requiredRatings": {
             "status": "source_verified",
             "requirements": ["dual rail-to-rail droplet feedback amplifier", "1.8-6.0 V supply", "1 MHz gain bandwidth", "8-lead SOIC"],
             "missing": ["closed by exact MCP6002-I/SN mapping"],
-            "evidence": ["Frozen OpenDrop U6 is MCP6002 in SO08 in the named FEEDBACK AMPLIFIER; Microchip DS20001733L closes package, pinout and ratings."]
+            "evidence": ["Frozen OpenDrop U6 is MCP6002 in SO08 under FEEDBACK AMPLIFIER; Microchip DS20001733L identifies exact industrial SOIC ordering code MCP6002-I/SN."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Microchip MCP6002-I/SN identity, package, pinout and ratings; OPA334 remains rejected." },
+          "missingEvidence": { "kind": "mpn", "details": "OPA334AIDBVR remains rejected; the actual frozen droplet-feedback role is closed by exact Microchip MCP6002-I/SN identity, package, pinout and ratings." },
           "sourceCandidate": {
             "identity": "Microchip Technology MCP6002-I/SN",
             "evidenceLevel": "manufacturer_ordering_code",
             "source": "forge-truth:manufacturer_verified_pcb_ingest; Microchip DS20001733L; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
-            "disposition": "accepted"
+            "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "resolved_exact_mpn",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Resolve Microchip MCP6002-I/SN.", "Map the exact dual-op-amp SOIC-8 pinout.", "Name the role droplet feedback amplifier rather than an unevidenced HV TIA."]
+            "action": "ingest",
+            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
+            "acceptance": ["Exact MCP6002-I/SN DB row exists.", "SOIC-8 symbol and footprint expose all eight manufacturer pins.", "Resolver restricts this mapping to the droplet feedback amplifier role."]
           }
         }
       ]

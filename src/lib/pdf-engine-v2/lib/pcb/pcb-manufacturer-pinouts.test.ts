@@ -16,10 +16,18 @@ describe('manufacturer-backed local PCB pinouts', () => {
   function createFootprints(): string {
     const root = mkdtempSync(join(tmpdir(), 'pcb-manufacturer-pinouts-'))
     roots.push(root)
+    const connectorPinSocket = join(root, 'Connector_PinSocket_2.54mm.pretty')
     const packageSo = join(root, 'Package_SO.pretty')
     const packageSot = join(root, 'Package_TO_SOT_SMD.pretty')
+    mkdirSync(connectorPinSocket)
     mkdirSync(packageSo)
     mkdirSync(packageSot)
+    writeFileSync(
+      join(connectorPinSocket, 'PinSocket_2x20_P2.54mm_Vertical.kicad_mod'),
+      `(footprint "PinSocket_2x20_P2.54mm_Vertical"
+  ${Array.from({ length: 40 }, (_, index) => `(pad "${index + 1}" thru_hole circle)`).join(' ')}
+)\n`,
+    )
     writeFileSync(
       join(packageSot, 'SOT-23.kicad_mod'),
       '(footprint "SOT-23" (pad "1" smd rect) (pad "2" smd rect) (pad "3" smd rect))\n',
@@ -78,6 +86,20 @@ describe('manufacturer-backed local PCB pinouts', () => {
         { number: '6', name: 'V+', kind: 'power_in' },
       ],
       source: 'SBOS213D',
+    },
+    {
+      manufacturer: 'Samtec',
+      partNumber: 'SSQ-120-03-T-D',
+      symbolId: 'Forge_Manufacturer:SSQ-120-03-T-D',
+      footprint: 'PinSocket_2x20_P2.54mm_Vertical',
+      pinCount: 40,
+      pins: [
+        { number: '1', name: '3V3', kind: 'power_in' },
+        { number: '18', name: 'GPIO24_SWDIO', kind: 'bidirectional' },
+        { number: '22', name: 'GPIO25_SWCLK', kind: 'bidirectional' },
+        { number: '40', name: 'GPIO21_HALL', kind: 'bidirectional' },
+      ],
+      source: 'SSQ-120-03-T-D',
     },
   ] as const)(
     'verifies $partNumber manufacturer pins against exact footprint parity',

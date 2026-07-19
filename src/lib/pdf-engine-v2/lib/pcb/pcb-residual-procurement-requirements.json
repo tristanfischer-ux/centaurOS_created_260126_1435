@@ -1,8 +1,8 @@
 {
   "schema": "pcb-residual-procurement-requirements/v1",
   "baselineCount": 29,
-  "resolvedExactMpnCount": 6,
-  "residualProcurementCount": 19,
+  "resolvedExactMpnCount": 7,
+  "residualProcurementCount": 16,
   "requirements": [
     {
       "punchlistId": "colorimeter-optical_source-led_source_word",
@@ -186,15 +186,15 @@
     },
     {
       "punchlistId": "pioreactor-wet_lab_hat-debug_header_word",
-      "function": "Service/debug access for any HAT-local programmable device.",
-      "electrical": { "voltage": "3.3 V Raspberry Pi logic domain", "current": "Signal-only; optional reference supply current must be explicitly limited", "power": "No host back-powering permitted" },
-      "signalIntegrity": { "precision": "Protocol logic thresholds must match the selected target", "bandwidth": "SWD/UART/I2C rate set by the named target", "noise": "Ground reference adjacent to clock/data and short service cable" },
-      "channelCount": "Protocol-dependent; minimum GND, reference, clock and data for SWD.",
-      "interface": "No connector may be sourced until the HAT-local debug target and protocol are named.",
-      "packageConstraints": "Keyed compact service connector or Tag-Connect footprint preferred; orientation datum required.",
-      "environmentLifecycle": "At least 50 service cycles or pogo-rated pad life; active cable ecosystem.",
-      "evidence": ["Wet-lab HAT is hosted by Raspberry Pi.", "No frozen HAT-local MCU or exact debug connector is evidenced."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Name the HAT-local programmable target and debug protocol; otherwise remove the fitted-header requirement." }
+      "function": "Raspberry Pi HAT host socket carrying the RP2040 SWD programming path; no separate debug header is fitted.",
+      "electrical": { "voltage": "3.3 V SWD logic and 3.3/5 V Raspberry Pi rails; connector rated 465 VAC / 655 VDC", "current": "SWD is signal-only; SSQ/TSW pair rated 6.3 A per pin with two powered pins", "power": "Host-rail power uses dedicated 3V3, 5V and ground contacts; SWD contacts carry logic only" },
+      "signalIntegrity": { "precision": "Raspberry Pi 3.3 V logic thresholds", "bandwidth": "OpenOCD SWD over GPIO24/GPIO25", "noise": "Physical pin 18 is GPIO24/SWDIO, pin 22 is GPIO25/SWCLK; eight ground contacts provide return references" },
+      "channelCount": "Forty contacts in two rows; complete physical pins 1-40 mapped, including SWDIO and SWCLK.",
+      "interface": "2x20 Raspberry Pi HAT socket; physical pin 18 GPIO24/SWDIO and physical pin 22 GPIO25/SWCLK program the HAT RP2040.",
+      "packageConstraints": "Samtec lead style 03, double-row, matte-tin, vertical through-hole socket; 2.54 mm pitch and 10.00 mm square tails; Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical.",
+      "environmentLifecycle": "-55 to +105 C for matte-tin option; RoHS; exact active Samtec product record.",
+      "evidence": ["Frozen Pioreactor HAT v1.2 CAD requires the 40-contact Raspberry Pi socket and frozen Pioreactor board evidence names SSQ-120-03-T-D.", "Pioreactor GPIO contract assigns GPIO24/GPIO25 to SWD; Raspberry Pi physical mapping assigns them to pins 18/22.", "Samtec SSQ-TH print defines exact ordering-code construction, package, 6.3 A two-pin-powered rating and 465 VAC/655 VDC rating."],
+      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Samtec", "partNumber": "SSQ-120-03-T-D", "blocker": null }
     },
     {
       "punchlistId": "pioreactor-od_optics-ferrite_emc_bead_word",
@@ -206,7 +206,7 @@
       "packageConstraints": "0603 or larger only after current/DCR closure; exact land pattern required.",
       "environmentLifecycle": "-40 to +85 C minimum; impedance-vs-frequency and current curves required.",
       "evidence": ["Frozen Eye-Spy BOM contains no ferrite bead.", "OD board carries precision photodiode conversion and LED drive."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Run rail-current and noise-spectrum analysis; remove the bead if no measurable filtering requirement exists." }
+      "disposition": { "status": "rejected_not_fitted", "manufacturer": null, "partNumber": null, "blocker": null }
     },
     {
       "punchlistId": "pioreactor-od_optics-power_indicator_led_word",
@@ -218,7 +218,7 @@
       "packageConstraints": "0603 SMD, opaque/light-piped placement away from detector line of sight.",
       "environmentLifecycle": "-40 to +85 C minimum, RoHS, active lifecycle.",
       "evidence": ["Frozen Eye-Spy BOM has no fitted indicator LED.", "Generated 110 V panel indicator candidate was rejected."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Prove the indicator is required and optically isolated; then assign rail, colour and intensity." }
+      "disposition": { "status": "rejected_not_fitted", "manufacturer": null, "partNumber": null, "blocker": null }
     },
     {
       "punchlistId": "rodeostat-analog_afe-esd_protection_network_word",

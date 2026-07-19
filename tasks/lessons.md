@@ -408,3 +408,15 @@ NEVER: Subtract newly resolved identities from every evidence-gap category based
 ALWAYS: Filter the baseline punchlist by resolved and reclassified IDs, then count each surviving row's original `missingEvidence.kind`.
 REASON: Promoting OP07CDR, TL072CDT, and 12401610E4#2A reduced total unresolved identities by three, but their baseline taxonomy was two MPN gaps and one symbol/pinout gap; inferred arithmetic produced internally inconsistent category totals.
 RELATED: `pcb-unresolved-component-punchlist.json`, `pcb-yuri-identity-resolution-report.test.ts`
+
+### 2026-07-19 - RULE: Name debug-interface pins by exact protocol signal
+NEVER: Collapse SWDIO and SWCLK into a generic `SWD` pin label in a manufacturer-backed PCB mapping.
+ALWAYS: Verify and preserve each protocol signal name, physical pin number, and direction from the target and adapter evidence.
+REASON: The first Pioreactor HAT socket test used generic SWD labels even though GPIO24 is SWDIO and GPIO25 is SWCLK.
+RELATED: `pcb-manufacturer-pinouts.ts`, `pcb-manufacturer-pinouts.test.ts`
+
+### 2026-07-19 - RULE: Test procurement dispositions by semantic subtype
+NEVER: Apply rejected-candidate null-identity assertions to evidence-backed off-board ownership reclassifications.
+ALWAYS: Assert `rejected_not_fitted`, `reclassified_off_board_module`, `resolved_exact_mpn`, and `procurement_required` independently.
+REASON: The reconciled matrix correctly retained Adafruit product 3800 as the owner of Rodeostat off-board functions, but a catch-all test branch incorrectly required its manufacturer and part number to be null.
+RELATED: `pcb-residual-procurement-requirements.json`, `pcb-unresolved-component-punchlist.test.ts`
