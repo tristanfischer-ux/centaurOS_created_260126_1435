@@ -4298,12 +4298,23 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
   // placeholder (physics_fidelity "core RPM/kinematics empty"). GUARDED so it fires ONLY on a
   // slow rotation signal (≤60 rpm) at benchtop scale (ml working volume or a gimbal/clinostat
   // key) → byte-stable for every process plant (no rpm quantity) and every centrifuge (rpm ≫ 60).
-  const gimbalRpm = pickQ(quantities, /gimbal.*rpm|max_rotation_speed_rpm|rotation_speed_rpm|rotor_speed_rpm|rpm_max/) ?? 0
-  const benchScale = (pickQ(quantities, /working_volume_ml|culture_volume_ml/) ?? 0) > 0
-    || Object.keys(quantities).some((k) => /gimbal|random.?position|clinostat|reorient/i.test(k))
-  if (gimbalRpm > 0 && gimbalRpm <= 60 && benchScale) {
+  // TEXT signal: the brief's gimbal/clinostat/random-positioning intent survives in the module
+  // text even when the engine mapped the CLASS to a stirred bioreactor (the actuation module gets
+  // mis-named "…Stirrer Motor"). Fire on EITHER that text OR a slow-rotation rpm quantity — both
+  // are gimbal-specific, so every process plant + centrifuge (rpm ≫ 60, no gimbal text) is untouched.
+  const modBlob = JSON.stringify(modules ?? '').toLowerCase()
+  const gimbalText = /gimbal|random.?position|clinostat|reorient/.test(modBlob)
+    || Object.keys(quantities).some((k) => /gimbal/i.test(k))
+  let gimbalRpm = pickQ(quantities, /gimbal.*rpm|max_rotation_speed_rpm|rotation_speed_rpm|rotor_speed_rpm|rpm_max/) ?? 0
+  const benchScale = (pickQ(quantities, /working_volume_ml|culture_volume_ml/) ?? 0) > 0 || gimbalText
+  if (gimbalText || (gimbalRpm > 0 && gimbalRpm <= 60 && benchScale)) {
+    if (gimbalRpm <= 0 || gimbalRpm > 60) gimbalRpm = 15    // slow-reorientation default when no clean rpm
     const gt = findActuationSubModule(modules)
-    if (gt) for (const w of gimbalDrivetrainWords(quantities, gimbalRpm)) toAdd.push({ sm: gt, w })
+    if (gt) {
+      for (const w of gimbalDrivetrainWords(quantities, gimbalRpm)) toAdd.push({ sm: gt, w })
+      // the actuation module was mis-named for a stirred bioreactor — name it the gimbal it is
+      if (/stir|peristaltic|pump/i.test(String(gt.name_human ?? ''))) gt.name_human = 'Dual-Axis RPM Gimbal Drivetrain'
+    }
   }
 
   for (const { sm, w } of toAdd) ((sm.words ??= []) as WordLike[]).push(w)

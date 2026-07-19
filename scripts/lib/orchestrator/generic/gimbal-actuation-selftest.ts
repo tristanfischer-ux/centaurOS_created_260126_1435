@@ -26,10 +26,22 @@ function run(): void {
   const motor = gw.find((w) => w.id.includes('motor'))!
   if (!/NEMA 17/.test(motor.name_human)) throw new Error(`gimbal-actuation: 0.5 kg benchtop payload must size a NEMA 17, got "${motor.name_human}"`)
 
-  // (b) synthesizeActuation populates the actuation module for a gimbal appliance
+  // (b) synthesizeActuation populates the actuation module for a gimbal appliance (rpm-quantity path)
   const gimbalModules = [{ sub_modules: [{ id: 'actuation_kinematics__primary_assembly', name_human: 'Gimbal', words: [] }] }] as never
   const nAdded = synthesizeActuation(gimbalModules, { max_rotation_speed_rpm: 20, working_volume_ml: 20 })
   if (nAdded < 6) throw new Error(`gimbal-actuation: appliance must add ≥6 gimbal actuators, added ${nAdded}`)
+
+  // (b2) TEXT path — the engine mis-mapped the class to a stirred bioreactor (no rpm quantity, the
+  // actuation module NAMED "…Stirrer Motor") but the brief's gimbal intent survives in the module
+  // text. The drivetrain must still synthesise AND the mis-name must be corrected.
+  const misMapped = [{
+    module_brief: 'The instrument reorients the cassette on a dual-axis gimbal to time-average gravity.',
+    sub_modules: [{ id: 'actuation_kinematics__primary_assembly', name_human: 'Peristaltic Pump Drives & Magnetic Stirrer Motor', words: [] }],
+  }] as never
+  const nText = synthesizeActuation(misMapped, { do_agitation_speed_rpm: 100, working_volume_ml: 20 })
+  if (nText < 6) throw new Error(`gimbal-actuation: TEXT path must add ≥6 gimbal actuators, added ${nText}`)
+  const smName = String((misMapped as { sub_modules: { name_human: string }[] }[])[0].sub_modules[0].name_human)
+  if (!/gimbal/i.test(smName)) throw new Error(`gimbal-actuation: mis-named stirrer actuation module must be corrected to a gimbal, got "${smName}"`)
 
   // BYTE-STABILITY — a process plant (no rpm quantity) must NOT get a gimbal
   const plant = [{ sub_modules: [{ id: 'power_distribution__x', words: [] }] }] as never
