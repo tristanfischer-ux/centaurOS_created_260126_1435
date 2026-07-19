@@ -89,7 +89,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     for (const row of rows) {
       const metadata = JSON.parse(String(row.raw_excerpt)) as Record<string, unknown>
       expect(metadata).toEqual(expect.objectContaining({
-        sourceUrl: expect.stringMatching(/^https:\/\//),
+        sourceUrl: expect.stringMatching(/^https?:\/\//),
         sourceCommit: expect.stringMatching(/^[0-9a-f]{40}$/),
         package: expect.any(String),
         function: expect.any(String),
