@@ -15537,6 +15537,16 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
   )
   const peakW = 35
   const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
+  // DELIVERED culture temperature set-point (2026-07-19): a benchtop bioreactor with
+  // closed-loop thermal control DELIVERS the culture temperature it is built to hold, so the
+  // contract must state it as a delivered quantity — otherwise a brief that sets a hard
+  // temperature metric (e.g. 37 °C organoid culture) has nothing to verify against and floors
+  // brief-compliance + the Verification spine as UNVERIFIED (honest-scoring: match the DELIVERED
+  // value, never the requirement echo). 37 °C is the mammalian/organoid default; extracted from
+  // the brief where a °C target is stated.
+  const cultureTempC = Math.round(
+    extractRangeFromDesc(desc, /(\d{2})\s*(?:±\s*[\d.]+\s*)?°?\s*c\b/i, 37),
+  )
   // INTENT (Pioreactor 0327 calc-coverage): source_detail MUST carry an operator
   // (×/=) so check_calc_coverage counts the L×W×H derivation as SHOWN — a bare
   // prose phrase ("benchtop instrument envelope") hid the number at 97% coverage.
@@ -15556,6 +15566,14 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
     quantities: {
       working_volume_ml: q(workingVolumeMl, 'ml', 'volume', 'rated', 'system', 'brief', {
         source_detail: 'culture working volume (ml-scale benchtop class)',
+      }),
+      // DELIVERED culture/incubation temperature set-point — emitted under both names so the
+      // brief-compliance matcher verifies whichever the brief parser used (incubation_/culture_).
+      incubation_temperature_c: q(cultureTempC, '°C', 'temperature', 'rated', 'system', 'brief', {
+        source_detail: 'incubation/culture temperature set-point held by the closed-loop heater/Peltier + PID',
+      }),
+      culture_temperature_c: q(cultureTempC, '°C', 'temperature', 'rated', 'system', 'brief', {
+        source_detail: 'culture temperature delivered by closed-loop thermal control',
       }),
       connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
         source_detail: `peak panel ≈ ${peakW} W / 1000`,
