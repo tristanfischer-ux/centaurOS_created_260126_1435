@@ -16757,15 +16757,41 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                     _vial_r * 0.85 * fl.MM, _vial_h * 0.52 * fl.MM, _fluidm,
                                     module=_skin_mod, module_objects=MO)
                 _sig_new.append(_fluid)
-                for _sx, _lbl in ((-(_vial_r + 6.0), "src"), (_vial_r + 6.0, "det")):
+                # VESSEL HOLDER COLLAR (2026-07-19, vision-critic "cuvette + optical
+                # blocks floating disconnected from chassis"): a short opaque ring seats
+                # the vial ON the deck so the glass reads as PLUGGED INTO a holder, not
+                # hovering. Universal for every vial_bioreactor — no per-product table.
+                _collar_h = max(6.0, _vial_h * 0.14)
+                _collarm = fl.make_mat("m_se_le_vial_collar", fl._to_linear((0.14, 0.15, 0.17)),
+                                       metallic=0.45, roughness=0.45)
+                _collar = fl.add_cyl("u_se_le_vial_collar",
+                                     _mm3((0.0, 0.0, _z_top + _collar_h * 0.5)),
+                                     _vial_r * 1.42 * fl.MM, _collar_h * fl.MM, _collarm,
+                                     module=_skin_mod, module_objects=MO)
+                _sig_new.append(_collar)
+                # OD SOURCE/DETECTOR: SEATED on the deck (bottom ≈ deck top) and CLAMPED
+                # to the vessel via a short arm — the pair previously floated at mid-vial
+                # height with a gap to the chassis (the flagged defect). Housing now runs
+                # from just above the collar up the vessel; the arm ties it to the glass.
+                _od_h = _vial_h * 0.52
+                for _sx, _lbl in ((-(_vial_r + 5.0), "src"), (_vial_r + 5.0, "det")):
                     _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.09, 0.09, 0.11)),
                                        metallic=0.3, roughness=0.5)
                     _od = fl.add_box(f"u_se_le_od_{_lbl}",
-                                     _mm3((_sx, 0.0, _z_top + _vial_h * 0.4)),
-                                     _mm3((8.0, 11.0, 12.0)), _odm,
+                                     _mm3((_sx, 0.0, _z_top + _collar_h + _od_h * 0.5)),
+                                     _mm3((8.0, 11.0, _od_h)), _odm,
                                      module=_skin_mod, module_objects=MO)
-                    _od.dimensions = _mm3((8.0, 11.0, 12.0))
+                    _od.dimensions = _mm3((8.0, 11.0, _od_h))
                     _sig_new.append(_od)
+                    # Clamp arm: bridges the OD housing inner face to the vial wall at
+                    # beam height, so the pair reads as mounted to the vessel, not adrift.
+                    _arm_x = _sx * 0.5
+                    _arm = fl.add_box(f"u_se_le_od_arm_{_lbl}",
+                                      _mm3((_arm_x, 0.0, _z_top + _collar_h + _od_h * 0.5)),
+                                      _mm3((abs(_sx) + 4.0, 3.5, 3.5)), _odm,
+                                      module=_skin_mod, module_objects=MO)
+                    _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.5, 3.5))
+                    _sig_new.append(_arm)
             # Re-dump form-meshes.json to include the signature parts (the interior
             # builder dumped earlier, before these existed) so form_signature_gate sees them.
             try:
