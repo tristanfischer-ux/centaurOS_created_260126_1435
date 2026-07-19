@@ -140,7 +140,9 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'passive_c', test: /capacitor|decoupling/i },
   // current_sense_on_driver / sense_shunt → SMD resistor (shunt), not unresolved.
   // GOTCHA: do not bare-match `current_sense` alone — that can be an amplifier IC.
-  { id: 'passive_r', test: /resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor/i },
+  // INTENT (Pioreactor heater_20ml): cartridge/resistive heater loads are SMD
+  // resistor packages on the actuation daughterboard — not gate-driver ICs.
+  { id: 'passive_r', test: /resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor|cartridge[_-]?heater|resistive[_-]?heater|heater[_-]?element/i },
   { id: 'passive_l', test: /ferrite|inductor|choke/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
   { id: 'display_module', test: /display[_-]?panel|\block?d\b|\boled\b|\btft\b|screen/i },

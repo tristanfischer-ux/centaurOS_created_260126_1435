@@ -316,6 +316,50 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
     ],
     provenance: 'Texas Instruments OPA334 Data Sheet SBOS213D: OPA334AIDBVR is shutdown version in 6-pin SOT-23 DBV; pins 1=OUT, 2=V-, 3=+IN, 4=-IN, 5=ENABLE, 6=V+; https://www.ti.com/lit/ds/symlink/opa334.pdf',
   },
+  {
+    manufacturer: 'Texas Instruments',
+    partNumber: 'TMP1075DSGR',
+    symbolId: 'Forge_Manufacturer:TMP1075DSGR',
+    footprint: {
+      library: 'Package_SON',
+      footprint: 'WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm',
+    },
+    pins: [
+      { number: '1', name: 'A0', kind: 'input' },
+      { number: '2', name: 'A1', kind: 'input' },
+      { number: '3', name: 'A2', kind: 'input' },
+      { number: '4', name: 'ALERT', kind: 'output' },
+      { number: '5', name: 'GND', kind: 'power_in' },
+      { number: '6', name: 'SDA', kind: 'bidirectional' },
+      { number: '7', name: 'SCL', kind: 'input' },
+      { number: '8', name: 'V+', kind: 'power_in' },
+      { number: '9', name: 'EP', kind: 'passive' },
+    ],
+    provenance: 'TI TMP1075 datasheet SBOS858 DSG (WSON-8) pinout + Pioreactor heater_20ml BOM U1 @ ca40a91e; https://www.ti.com/lit/ds/symlink/tmp1075.pdf',
+  },
+  {
+    manufacturer: 'Texas Instruments',
+    partNumber: 'DRV5021A3QDBZR',
+    symbolId: 'Forge_Manufacturer:DRV5021A3QDBZR',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    pins: [
+      { number: '1', name: 'OUT', kind: 'output' },
+      { number: '2', name: 'VCC', kind: 'power_in' },
+      { number: '3', name: 'GND', kind: 'power_in' },
+    ],
+    provenance: 'TI DRV5021 datasheet SLVSE41 DBZ (SOT-23) pinout + Pioreactor heater_20ml BOM U2 @ ca40a91e; https://www.ti.com/lit/ds/symlink/drv5021.pdf',
+  },
+  {
+    manufacturer: 'Rohm',
+    partNumber: 'ESR18EZPJ3R9',
+    symbolId: 'Forge_Manufacturer:ESR18EZPJ3R9',
+    footprint: { library: 'Resistor_SMD', footprint: 'R_1206_3216Metric' },
+    pins: [
+      { number: '1', name: '1', kind: 'passive' },
+      { number: '2', name: '2', kind: 'passive' },
+    ],
+    provenance: 'Rohm ESR18 thick-film 1206 two-terminal resistor + Pioreactor heater_20ml BOM R12–R28 @ ca40a91e',
+  },
 ] as const
 
 function normalized(value: string): string {

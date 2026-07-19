@@ -31,6 +31,7 @@ import {
   type PcbStageDisposition,
   type PcbStageDispositionResult,
 } from './disposition'
+import type { PcbArchitecturePlan } from './pcb-architecture'
 import type { PcbPipelineResult } from './pcb-pipeline'
 
 interface CategoryPattern {
@@ -46,7 +47,9 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     category: 'processor',
     // compute_ui_module = purchased MCU+UI kit (gold PyBadge-class host) — still a
     // processor-category electronic assembly for PCB disposition, just off-board.
-    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|compute[_ -]?ui[_ -]?module|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing)\b/i,
+    // INTENT: firmware_storage / debug_header are host-MCU companions — collect
+    // them from role identity (form-prose matching was removed; see GOTCHA below).
+    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|compute[_ -]?ui[_ -]?module|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing|firmware[_ -]?storage|debug[_ -]?header|debug[_ -]?uart)\b/i,
   },
   {
     category: 'analog_frontend',
@@ -61,7 +64,11 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     // INTENT (Poseidon 2026-07-16): stepper/microstep/H-bridge driver boards are
     // power-electronics (collected → atopile) — "Stepper Driver Board" was silently
     // dropped because only "gate driver" / "led driver" matched.
-    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|stepper[_ -]?driver|microstep[_ -]?driver|h[_ -]?bridge|motor[_ -]?driver|driver[_ -]?board|driver[_ -]?ic|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail))?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove)\b/i,
+    // INTENT (Pioreactor heater_20ml / organoid 1546): cartridge/resistive heaters
+    // are power-electronics on the wet-actuation board. Do NOT match bare
+    // peltier/TEC module nouns here — those are purchased thermal assemblies
+    // (collected via form-prose smear otherwise) and must stay off-board.
+    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|stepper[_ -]?driver|microstep[_ -]?driver|h[_ -]?bridge|motor[_ -]?driver|driver[_ -]?board|driver[_ -]?ic|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail))?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove|cartridge[_ -]?heater|resistive[_ -]?heater|heater[_ -]?(?:element|channel|pcb|board))\b/i,
   },
   {
     category: 'display',
@@ -81,7 +88,10 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   },
   {
     category: 'sensor_ic',
-    pattern: /\b(sensor ic|monitor ic|\bimu\b|accelerometer|gyroscope|cell monitor)\b/i,
+    // INTENT (Pioreactor heater_20ml / organoid 1546): culture temperature probes
+    // and cartridge-heater sense are sensor-IC electronics — without these nouns
+    // collectElectronicWords never sees the wet-actuation board scope.
+    pattern: /\b(sensor ic|monitor ic|\bimu\b|accelerometer|gyroscope|cell monitor|temperature[_ -]?(?:sensor|probe|ic)|culture[_ -]?temperature|tmp\d{3,}|thermistor|rtd)\b/i,
   },
 ]
 
@@ -140,11 +150,12 @@ function walkDesignWords(
         // ("photodiode, cuvette, LED...") in their form text. They are not physical
         // PCB candidates; counting them creates false electronic gaps.
         if (isGenericPlaceholderWord(word)) continue
+        // Category scan uses role identity only — see collectElectronicWords GOTCHA.
         const parts: string[] = [
+          word.id ?? '',
           word.name_human ?? '',
           word.content_character?.character_id ?? '',
           word.content_character?.name_human ?? '',
-          ...(word.modifier_characters ?? []).map((mc) => mc?.value ?? ''),
         ]
         let quantity = 1
         const qtyMod = (word.modifier_characters ?? []).find((mc) => mc?.kind === 'quantity')
@@ -281,14 +292,19 @@ export function collectElectronicWords(
         for (const mc of word.modifier_characters ?? []) {
           if (mc?.kind) modifiers[mc.kind] = mc.value ?? ''
         }
-        const text = [
+        // GOTCHA: form/modifier prose often copies sibling-assembly blurbs
+        // ("peltier heating & cooling block", "optical density (od600)…") onto
+        // every word in a sub-module. Category detection must key on the word's
+        // own identity — otherwise thermal insulation / TIM pads inflate
+        // electronicPartCount and steal PCB scope (organoid 1546).
+        const roleIdentity = [
+          word.id ?? '',
           word.name_human ?? '',
           word.content_character?.character_id ?? '',
           word.content_character?.name_human ?? '',
-          ...Object.values(modifiers),
         ].join(' ')
         const categories = ELECTRONIC_CATEGORY_PATTERNS
-          .filter(({ pattern }) => pattern.test(text))
+          .filter(({ pattern }) => pattern.test(roleIdentity))
           .map(({ category }) => category)
         if (categories.length === 0) continue
         let quantity = 1
@@ -417,6 +433,8 @@ export interface PcbStageResult {
   /** Phase D (2026-07-12): set only when disposition==='bespoke' AND PCB_STAGE actually
    *  attempted the build/route/DRC pipeline (or honestly recorded why it couldn't). */
   pipeline?: PcbPipelineRecord
+  /** Architecture plan recorded by the chain before Atopile generation (scope truth). */
+  architecture?: PcbArchitecturePlan
 }
 
 /**

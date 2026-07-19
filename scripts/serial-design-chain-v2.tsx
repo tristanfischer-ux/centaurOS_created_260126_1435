@@ -70,6 +70,7 @@ import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { runWordDomainCoherence, type WordDomainCoherenceResult, runToolImpliedComponentGrounding, type ToolImpliedComponentResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
+import { derivePcbArchitecture } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-architecture'
 import { generateAtopileProject } from '../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
 import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
@@ -9947,7 +9948,34 @@ async function main() {
         if (pcbResult.canAuthor) {
           try {
             const pcbProjectDir = resolve(outDir, 'pcb-project')
-            const genResult = generateAtopileProject(stPcb, pcbProjectDir)
+            // INTENT (2026-07-19, organoid 1546 floor): architecture on-board
+            // scope must reach generateAtopileProject as requiredWordIds — without
+            // it, instrument COTS heuristics dump host rail parts off-board and
+            // ship a 3-footprint token board while electronicPartCount stays ~12.
+            // FLOW: derivePcbArchitecture → state.pcb.architecture → generator opts
+            // (same scope contract as pcb-yuri-gold-harness).
+            const architecture = derivePcbArchitecture(stPcb)
+            stPcb.pcb.architecture = architecture
+            pcb.architecture = architecture
+            const onBoardWordIds = [...new Set(
+              architecture.boards.flatMap((board) => board.requiredWordIds),
+            )]
+            const primaryBoard =
+              architecture.boards.find((board) => board.role === 'wet_lab_hat' && board.requiredWordIds.length > 0)
+              ?? architecture.boards.find((board) => board.requiredWordIds.length > 0)
+              ?? architecture.boards[0]
+            const genResult = generateAtopileProject(stPcb, pcbProjectDir, {
+              requiredWordIds: onBoardWordIds.length > 0 ? onBoardWordIds : undefined,
+              boardShape: primaryBoard?.shape,
+              requiredFunctionRoles: architecture.boards.flatMap((board) =>
+                board.channelRequirements.map((requirement) => requirement.role),
+              ),
+            })
+            console.error(
+              `[chain] PCB architecture: disposition=${architecture.systemDisposition} ` +
+              `boards=[${architecture.boards.map((b) => `${b.role}:${b.requiredWordIds.length}`).join(',')}] ` +
+              `on_board_scope=${onBoardWordIds.length}`,
+            )
             console.error(
               `[chain] PCB atopile project: ${genResult.components.length} component(s), ` +
               `${genResult.offBoard.length} off-board COTS, ${genResult.unresolved.length} unresolved, ` +
