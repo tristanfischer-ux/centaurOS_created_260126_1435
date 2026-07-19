@@ -1341,13 +1341,34 @@ export function selftestContractStrict(): { passed: boolean; failures: string[] 
   expect('emitter: a genuine same-dimension cost literal still catches',
     sameDimensionCostStillFires.hits.some((h) => h.brief_key === 'unit_cost_ceiling_gbp'))
 
+  // (10) MAINS-VOLTAGE vs COST (2026-07-19, benchtop-bioreactor exit-25): a bare 400 that is
+  //      400 V AC mains — in a 3-phase formula `(400 * Math.sqrt(3))` or an `AC 400 3~/50 Hz`
+  //      string — must NOT collide with a money-family cost ceiling. Tested across common round
+  //      ceilings (100/200/400/8500) so the whole digit-collision class dies (Cursor P0 fixture).
+  const mainsLines = [
+    "  mod('rating_primary', `${Math.ceil((p.continuousPowerKw * 1000 / (400 * Math.sqrt(3)) * 1.25) / 100) * 100} A 3-phase`),",
+    "  english_sentence: `${p.coolantChemistryDesc}, IP54 outdoor mount, AC 400 3~/50 Hz`,",
+  ].join('\n')
+  for (const ceiling of [100, 200, 400, 8500]) {
+    const mainsSkip = scanEmitterForBriefLiterals(mainsLines, { unit_cost_ceiling_gbp: ceiling }, 'benchtop_bioreactor')
+    expect(`emitter: mains 400 V (√3 / AC 3~) does not collide with £${ceiling} cost ceiling`, mainsSkip.passed)
+  }
+
+  // (11) THE REAL EMITTER FILE at a £400 ceiling must have ZERO false positives — the exact
+  //      benchtop-bioreactor exit-25 scenario (brief £400 vs deterministic-emitter.ts 400 V mains).
+  const emitterPath = path.resolve(__dirname, 'deterministic-emitter.ts')
+  if (fs.existsSync(emitterPath)) {
+    const realEmitter = scanEmitterFileForBriefLiterals(emitterPath, { unit_cost_ceiling_gbp: 400 }, 'benchtop_bioreactor')
+    expect('real emitter file: zero false positives at £400 ceiling (mains 400 V not flagged)', realEmitter.passed)
+  }
+
   return { passed: failures.length === 0, failures }
 }
 
 if (require.main === module && process.argv.includes('--selftest')) {
   const { passed, failures } = selftestContractStrict()
   if (passed) {
-    console.log('[brief-value-literal-scanner] contract-strict selftest: PASS (9 cases)')
+    console.log('[brief-value-literal-scanner] contract-strict selftest: PASS (base + mains-context)')
     process.exit(0)
   } else {
     console.error('[brief-value-literal-scanner] contract-strict selftest: FAIL')
