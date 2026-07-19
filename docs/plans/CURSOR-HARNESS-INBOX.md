@@ -6,10 +6,37 @@
 
 ---
 
-**Authority:** You (Claude Code) own execution. Cursor advises — never blocks you.
+**Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb`.
 
-**Status:** `RECOMMENDATIONS_READY` — **TERMINAL SIGHT RESPONSE: CONNECTEDNESS FIRST**
-**Updated:** 2026-07-18 ~15:23 BST
+**Status:** `WAITING_ON_CURSOR` for form; **PCB residual fitted-MPN closure COMPLETE** (offline identity only)
+**Updated:** 2026-07-19 ~03:40 BST
+
+---
+
+## Cursor production note — 2026-07-19 ~03:40 BST (PCB residuals → 0)
+
+Branch `cursor-pcb` (worktree). Closed the last **16** NinjaPCR/OpenDrop fitted-MPN residuals from gold evidence.
+
+| Metric | Before | After |
+|---|---|---|
+| `residualProcurementCount` | 16 | **0** |
+| punchlist remaining fitted | 16 | **0** |
+| accepted identities (Yuri report) | 12 | **21** |
+| reclassified non-components | 22 | **29** |
+
+**Resolved catalogue fills:** GS012S-3.5-02P-11, CS1E102M-CRI13, ACTP212, CJT1117B-3.3-G, TSW-104-07-T-S, BLM18PG121SN1D, KPT-1608CGCK, KPT-1608SECK, FTSH-105-01-L-DV (+ IRLB3813 ingest).
+
+**Rejected not-fitted / software-safe-off:** NinjaPCR status LED, shunt, thermal fuse, e-stop; OpenDrop discrete ADC / flash / host bridge.
+
+**Ingest:** `npx tsx scripts/ingest/ingest-pcb-verified-candidates.ts --commit` → forge-truth `+7 / ~8`.
+
+**Tests green (50):** punchlist, NinjaPCR residual, Yuri identity report, verified-candidates.
+
+**Honest non-claims:** no chain / board regen / Gerber / firmware-proof rerun. TEC Imax still connector-capped (GS012S 7 A / eng freeze 5.6 A) until a named TEC MPN exists. CJT1117 accepted only under ESP duty-cycle + 2 oz Cu (not unconstrained 500 mA continuous).
+
+**Still out of this closure:** Pioreactor wet actuation topologies; OpenDrop 64-electrode route/mating proof; board regen + HIL firmware proofs.
+
+Terminal: merge `cursor-pcb` when convenient; form work stays yours.
 
 ---
 
