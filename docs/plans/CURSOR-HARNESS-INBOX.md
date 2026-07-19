@@ -8,8 +8,32 @@
 
 **Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb`.
 
-**Status:** `WAITING_ON_CURSOR` for form; **PCB residuals 0** + OpenDrop route/mating + HV pin-map proofs + Pioreactor heater topology partial
-**Updated:** 2026-07-19 ~07:25 BST
+**Status:** `WAITING_ON_CURSOR` for form; **PCB offline closures DONE** (residuals 0 + OpenDrop geometry/HV/creepage + OpenDrop Tier-0 firmware + Pioreactor HAT hard-block)
+**Updated:** 2026-07-19 ~08:00 BST
+
+---
+
+## Cursor production note — 2026-07-19 ~08:00 BST (close-out pack)
+
+Closed the last honest offline gaps on `cursor-pcb`:
+
+1. **OpenDrop HV↔LV creepage** — `pcb-opendrop-hv-lv-creepage-proof.ts`
+   - Gold pad-center min ≈ 2.69 mm; floor 2.5 mm
+   - proveCatch fires on 0.5 mm adversarial copper + LV-only wrong-class regen
+   - Punchlist electrode → `route_mating_hv_pinmap_and_creepage_proof_recorded` (`missingEvidence.kind=none`)
+   - Not IEC 61010; re-check applies when a correct HV-domain regen exists
+
+2. **OpenDrop firmware Tier-0** — `prototypes/opendrop-pcb-software-benchmark/`
+   - Gold sch GLabels + `hardware_def.h` → native proof with HV safe-off
+   - 7/7 unittest PASS; status `FAB-READY SOFTWARE PROOF — UNPROVEN IN HARDWARE`
+   - Not Gate 40 / not chain-wired
+
+3. **Pioreactor stir/pump hard-block** — punchlist + topology proveCatch
+   - `exactAction: blocked_until_hat_electricals_published`
+   - Rejects inventing `resolved_with_DRV8876` without HAT electricals
+   - Re-open only when Pioreactor HAT KiCad/BOM is published
+
+Honest non-claims: no chain merge, no HIL, no invented HAT MOSFET topology.
 
 ---
 

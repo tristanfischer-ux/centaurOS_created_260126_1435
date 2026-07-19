@@ -2094,27 +2094,28 @@
             ],
             "missing": [],
             "evidence": [
-              "Pioreactor/hardware @ ca40a91e publishes heater_20ml + eye-spy only; no stir/pump PCB and no Pioreactor HAT schematic/BOM (hats/ is raspberrypi/hats EEPROM utils).",
-              "Channel remains a mandatory wet_actuation function until host-HAT motor/pump drive identities are published or measured."
+              "Pioreactor/hardware @ ca40a91e (and live master as of 2026-07-19) publishes heater_20ml + eye-spy + mechanical HAT STEP only; no stir/pump PCB and no Pioreactor HAT schematic/BOM (hats/ is raspberrypi/hats EEPROM utils).",
+              "Offline topology proveCatch rejects inventing resolved_with_DRV8876 without HAT electricals.",
+              "Hard-closed as blocked: re-open only when a Pioreactor HAT KiCad/BOM artefact is published."
             ]
           },
           "missingEvidence": {
             "kind": "unpublished_hat_electricals",
-            "details": "Stir/pump drive topologies live on the unpublished Pioreactor HAT. Do not invent DRV8876 (or any motor driver) without HAT BOM/schematic evidence."
+            "details": "Honest hard-block until vendor publishes HAT electricals. DRV8876 is a non-binding ordering-code guess, not the next action."
           },
           "sourceCandidate": {
             "identity": "Texas Instruments DRV8876PWPR",
             "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "candidate_only"
+            "source": "non-binding catalogue guess — not gold-backed",
+            "disposition": "candidate_only_non_binding"
           },
           "exactAction": {
-            "action": "map_symbol_pinout",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
+            "action": "blocked_until_hat_electricals_published",
+            "targetSource": "Pioreactor/hardware HAT KiCad + BOM (unpublished)",
             "acceptance": [
-              "Derive stir motor voltage/stall current and verify DRV8876 margins.",
-              "Import/map the manufacturer pinout and exact HTSSOP exposed-pad footprint.",
-              "Pass pin/pad parity and thermal-pad checks."
+              "HAT schematic/BOM published under a frozen gold commit.",
+              "Stir motor voltage/stall current derived from that evidence.",
+              "Driver MPN (if any) mapped with pin/pad parity — never invented ahead of HAT publication."
             ]
           }
         },
@@ -2134,27 +2135,28 @@
             ],
             "missing": [],
             "evidence": [
-              "Pioreactor/hardware @ ca40a91e publishes heater_20ml + eye-spy only; no stir/pump PCB and no Pioreactor HAT schematic/BOM (hats/ is raspberrypi/hats EEPROM utils).",
-              "Channel remains a mandatory wet_actuation function until host-HAT motor/pump drive identities are published or measured."
+              "Pioreactor/hardware @ ca40a91e (and live master as of 2026-07-19) publishes heater_20ml + eye-spy + mechanical HAT STEP only; no stir/pump PCB and no Pioreactor HAT schematic/BOM (hats/ is raspberrypi/hats EEPROM utils).",
+              "Offline topology proveCatch rejects inventing resolved_with_DRV8876 without HAT electricals.",
+              "Hard-closed as blocked: re-open only when a Pioreactor HAT KiCad/BOM artefact is published."
             ]
           },
           "missingEvidence": {
             "kind": "unpublished_hat_electricals",
-            "details": "Stir/pump drive topologies live on the unpublished Pioreactor HAT. Do not invent DRV8876 (or any motor driver) without HAT BOM/schematic evidence."
+            "details": "Honest hard-block until vendor publishes HAT electricals. DRV8876 is a non-binding ordering-code guess, not the next action."
           },
           "sourceCandidate": {
             "identity": "Texas Instruments DRV8876PWPR",
             "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "candidate_only"
+            "source": "non-binding catalogue guess — not gold-backed",
+            "disposition": "candidate_only_non_binding"
           },
           "exactAction": {
-            "action": "map_symbol_pinout",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
+            "action": "blocked_until_hat_electricals_published",
+            "targetSource": "Pioreactor/hardware HAT KiCad + BOM (unpublished)",
             "acceptance": [
-              "Derive pump voltage/stall current and verify DRV8876 margins.",
-              "Import/map the manufacturer pinout and exact HTSSOP exposed-pad footprint.",
-              "Pass pin/pad parity and thermal-pad checks."
+              "HAT schematic/BOM published under a frozen gold commit.",
+              "Pump voltage/stall current derived from that evidence.",
+              "Driver MPN (if any) mapped with pin/pad parity — never invented ahead of HAT publication."
             ]
           }
         }
@@ -2216,27 +2218,28 @@
           "wordId": "required_electrode_channel_word",
           "characterId": "electrode_channel_connector",
           "requiredRatings": {
-            "status": "route_mating_and_hv_pinmap_proof_recorded",
+            "status": "route_mating_hv_pinmap_and_creepage_proof_recorded",
             "requirements": [
               "64 electrode channels (brief floor)",
               "cartridge/main-controller Mini-DIMM mating interface",
               "electrode_channel remains passive_board_geometry (never low-density connector package)",
               "HV/LV domain split: V_HV + V_HV_C + GND_C + FLUXL_* vs separate V_USB host rail",
-              "hv_controller_main keeps high_voltage domain + isolate_high_voltage work"
+              "hv_controller_main keeps high_voltage domain + isolate_high_voltage work",
+              "HV↔LV pad-center separation ≥ 2.5 mm floor (gold ≈ 2.69 mm); LV-only regen copper fails"
             ],
             "missing": [],
             "evidence": [
               "Gold OpenDrop V4 @ 934a44db3ed41c24ae4dddb5b805a22e4166284b cartridge schematic exposes 132 FLUXL_* electrode refs (\u226564 brief floor).",
               "Gold Mini_Dimm_Cartridge_06_244 footprint has contiguous mating pads 1\u2013244 (custom edge geometry, not a catalogue MPN).",
               "Gold main board: MAX1771ESA on V_HV, V_HV_C/GND_C mating rails, 4\u00d7 TLP222A isolators, separate V_USB LV host rail.",
-              "Offline proveCatch: src/lib/pdf-engine-v2/lib/pcb/pcb-opendrop-electrode-route-proof.ts \u2014 fires on JST/2-pad/collapsed-count; passes gold fixture + architecture/generator passive geometry.",
-              "Offline proveCatch: src/lib/pdf-engine-v2/lib/pcb/pcb-opendrop-hv-domain-pinmap-proof.ts \u2014 fires on LV-only domains / missing isolate work / electrode-on-USB pin-map; passes gold fixture + architecture high_voltage domains.",
-              "Fixtures: tests/fixtures/pcb/yuri/opendrop-electrode-gold-evidence.json + opendrop-hv-domain-pinmap-gold-evidence.json"
+              "Gold main PCB pad-center min HV↔LV ≈ 2.69 mm (V_HV↔V_USB).",
+              "Offline proveCatch: pcb-opendrop-electrode-route-proof.ts, pcb-opendrop-hv-domain-pinmap-proof.ts, pcb-opendrop-hv-lv-creepage-proof.ts.",
+              "Creepage proveCatch fires on 0.5 mm adversarial pads and LV-only wrong-class boards; not IEC 61010 certification."
             ]
           },
           "missingEvidence": {
-            "kind": "board_regen_creepage_alignment",
-            "details": "Route/mating + HV pin-map/voltage-domain proofs are recorded offline. Remaining work is board-regen creepage/alignment verification on regenerated copper \u2014 not a fitted MPN gap and not unpublished pin-map documentation."
+            "kind": "none",
+            "details": "Offline geometry + HV pin-map + HV↔LV copper-separation proofs recorded. Remaining optional work is re-running the creepage checker on a correct HV-domain board regen (current regen is LV-only and correctly fails missing_hv_domain_copper) — not a fitted MPN gap."
           },
           "sourceCandidate": {
             "identity": "OpenDrop V4 Mini-DIMM cartridge interconnect family",
@@ -2245,15 +2248,16 @@
             "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "geometry_and_hv_pinmap_proof_recorded",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-opendrop-electrode-route-proof.ts + pcb-opendrop-hv-domain-pinmap-proof.ts",
+            "action": "geometry_hv_pinmap_and_creepage_proof_recorded",
+            "targetSource": "pcb-opendrop-electrode-route-proof.ts + pcb-opendrop-hv-domain-pinmap-proof.ts + pcb-opendrop-hv-lv-creepage-proof.ts",
             "acceptance": [
               "Gold FLUXL electrode refs \u2265 brief electrode_count floor (64).",
               "Gold Mini-DIMM mating pad count = 244 contiguous pads.",
               "Architecture preserves electrode_channel count from brief.",
               "Generator marks electrode_channel as passive_board_geometry and proveCatch rejects low-density connector collapse.",
               "Architecture keeps high_voltage on hv_controller_main + electrode_cartridge with isolate_high_voltage work.",
-              "Pin-map classes keep V_HV/V_HV_C as hv_power, GND_C as hv_return, FLUXL_ as electrode_array, V_USB as lv_host."
+              "Pin-map classes keep V_HV/V_HV_C as hv_power, GND_C as hv_return, FLUXL_ as electrode_array, V_USB as lv_host.",
+              "HV↔LV pad-center floor 2.5 mm; adversarial 0.5 mm and LV-only OpenDrop claims fire."
             ]
           }
         }

@@ -226,4 +226,21 @@ export function proveCatchPioreactorWetActuationTopology(
   if (badSwitch.ok || badSwitch.heaterSwitchHonest) {
     throw new Error('proveCatch failed to reject on-board invented heater switch')
   }
+
+  // INTENT: Closing stir/pump with DRV8876 (or any invented resolution) without
+  // published HAT electricals is the false-closure mode — must stay blocked.
+  const falseStirResolved: PioreactorHeaterChannelTopology = {
+    ...topology,
+    stirPumpChannels: {
+      ...topology.stirPumpChannels,
+      status: 'resolved_with_DRV8876',
+      evidence: 'invented motor driver without HAT schematic',
+    },
+  }
+  const badStir = evaluatePioreactorWetActuationTopology(falseStirResolved)
+  if (badStir.ok || badStir.stirPumpBlockedHonestly) {
+    throw new Error(
+      'proveCatch failed to reject invented stir/pump resolution without HAT electricals',
+    )
+  }
 }

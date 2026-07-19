@@ -54,6 +54,20 @@ describe('Pioreactor wet-actuation topology (heater_20ml gold)', () => {
     expect(verdict.findings.join(' ')).toMatch(/DRV8876|resistive FFC/i)
   })
 
+  it('fires when stir/pump are falsely marked resolved without HAT electricals', () => {
+    const topology = loadPioreactorHeaterChannelTopology(WORKSPACE_ROOT)
+    const verdict = evaluatePioreactorWetActuationTopology({
+      ...topology,
+      stirPumpChannels: {
+        status: 'resolved_with_DRV8876',
+        evidence: 'invented',
+      },
+    })
+
+    expect(verdict.ok).toBe(false)
+    expect(verdict.stirPumpBlockedHonestly).toBe(false)
+  })
+
   it('re-checks gold heater BOM MPNs when the Pioreactor gold checkout is available', () => {
     const goldRoot = resolvePioreactorGoldRoot(WORKSPACE_ROOT)
     if (!goldRoot) {
