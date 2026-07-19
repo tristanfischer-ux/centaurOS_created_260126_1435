@@ -52,6 +52,28 @@ function main(): number {
   writeFileSync(running, `pid=${process.pid}\nstarted=${new Date().toISOString()}\n`)
   console.log(`[bg-runner] started; sentinel ${running}`)
 
+  // CHAIN_COMPOSER (opt-in, 2026-07-19): route the render through the UNIVERSAL functional-form
+  // composer (build_universal_scene.py + COMPOSER=1) instead of the bespoke LLM-emitted scene.
+  // Default OFF → the bespoke gen+render path below is byte-unchanged (no makers-kit impact).
+  const composerMode = !['', '0', 'false', 'no', 'off'].includes(
+    (process.env.CHAIN_COMPOSER ?? '').trim().toLowerCase())
+  if (composerMode) {
+    const tc = Date.now()
+    try {
+      execFileSync(
+        'blender',
+        ['--background', '--python', resolve(__dirname, 'blender-universal', 'build_universal_scene.py'), '--', statePath],
+        { stdio: 'inherit', timeout: 1_200_000, env: { ...process.env, COMPOSER: '1', BLENDER_OUT_DIR: outDir } },
+      )
+      console.log(`[bg-runner] COMPOSER render OK in ${((Date.now() - tc) / 1000).toFixed(1)}s`)
+    } catch (err: any) {
+      console.error(`[bg-runner] COMPOSER render failed (${err?.status ?? 'err'})`)
+    }
+    writeFileSync(done, `done=${new Date().toISOString()}\ncomposer=1\n`)
+    try { unlinkSync(running) } catch { /* ignore */ }
+    return 0
+  }
+
   const t0 = Date.now()
   let genOk = false
   try {
