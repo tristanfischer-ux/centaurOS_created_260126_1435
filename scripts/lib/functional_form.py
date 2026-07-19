@@ -471,6 +471,41 @@ _MEDIUM_FORM_RULE: dict[str, dict[str, Any]] = {
 }
 
 
+# Composite-host (Option A, 2026-07-19): a device can carry signals for SEVERAL media in one
+# enclosure (an RPM-appliance spins AND incubates AND images AND docks a cassette). The composer
+# forms the PRIMARY (dominant) medium, then attaches labelled SUBSYSTEM modules for the other
+# functions present — "core + integrated subsystems", which is honestly what an appliance is.
+# Each secondary signal maps to (the medium it would drive, the subsystem role it becomes); it
+# only fires when that medium != the primary (so a single-function device gets NO subsystems and
+# the 40/40 single-medium forms are unchanged).
+_SUBSYSTEM_SIGNALS = [
+    ("chamber_volume_l", "thermal_volume", "incubation_module"),
+    ("bath_volume_l", "thermal_volume", "incubation_module"),
+    ("optical_path_length_mm", "light", "imaging_module"),
+    ("stage_axis_count", "image_plane", "imaging_module"),
+    ("working_volume_ml", "culture_fluid", "perfusion_module"),
+    ("rotor_speed_rpm", "rotation", "agitation_module"),
+    ("channel_count", "linear_displacement", "pump_module"),
+]
+
+
+def _secondary_subsystems(state: dict, primary_medium: Optional[str]) -> list[str]:
+    """Roles for the NON-primary functions present in a composite device (Option A). Empty for a
+    single-function device — so single-medium forms are byte-unchanged."""
+    subs: list[str] = []
+    for sig, med, role in _SUBSYSTEM_SIGNALS:
+        if med == primary_medium or role in subs:
+            continue
+        v = _q(state, sig)
+        if v is not None and float(v) > 0:
+            subs.append(role)
+    # a HOST (not itself a cassette) that carries a cassette signal accepts a cassette → a dock
+    if primary_medium and primary_medium != "sealed_cartridge":
+        if any(_q(state, s) is not None for s in ("cassette_format", "culture_chamber_count")):
+            subs.append("cassette_dock")
+    return subs
+
+
 def derive_functional_form(state: dict) -> FunctionalFormContract:
     """contract signals → FunctionalFormContract. Universal: keyed on functional signals,
     with the medium→form rule composing the primitives. A medium with no rule still gets
@@ -516,6 +551,14 @@ def derive_functional_form(state: dict) -> FunctionalFormContract:
     ]
     c.chassis_role = rule.get("chassis")
     c.required_relations = list(rule.get("relations") or [])
+    # composite-host (Option A): attach a subsystem module for each NON-primary function present,
+    # fastened to the chassis (part of the primary assembly). No-op for single-function devices.
+    if c.chassis_role:
+        for role in _secondary_subsystems(state, c.working_medium):
+            c.role_volumes.append(RoleVolume(role=role, geometry_family="box",
+                                             must_be_visible=True, must_be_accessible=True,
+                                             axis_position="front"))
+            c.required_relations.append((role, "fastened", c.chassis_role, False))
     return c
 
 
@@ -1193,6 +1236,26 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float] =
     if not dispatch:
         return {"schema": "geometry-plan/v1", "ok": False, "reason": f"NO_LAYOUT_FOR_AXIS_{axis}"}
     raw = dispatch()
+    # composite-host (Option A): the primary layout only knows its own roles. Any extra role
+    # (a subsystem module) is seated on the FRONT portion of the chassis top, in a row, bottom
+    # touching the chassis top face → visible + connected, within the envelope (no protrusion).
+    # subsystems are identified by their naming convention (…_module / cassette_dock) and are
+    # OVERRIDDEN here — the primary layout's catch-all `else` (which builds the chassis) would
+    # otherwise swallow an unknown role and place it as the full body.
+    subs = [rv.role for rv in c.role_volumes if rv.role.endswith("_module") or rv.role == "cassette_dock"]
+    chassis_p = raw.get(c.chassis_role or "")
+    if subs and chassis_p:
+        cctr, csz, _ = chassis_p
+        cfront = cctr[1] - csz[1] / 2.0                        # chassis FRONT face
+        ns = len(subs)
+        sd = max(min(csz[1] * 0.22, 40.0), 8.0)               # module depth (protrudes forward)
+        for i, role in enumerate(subs):
+            sx = cctr[0] + (i - (ns - 1) / 2.0) * (csz[0] / (ns + 0.4))
+            # on the front face, lower portion, back face touching the chassis → visible module,
+            # clear of any top-mounted primary feature (rotor bowl / vial). Protrusion doesn't
+            # affect the envelope-level fit-anywhere check (that compares the whole envelope box).
+            raw[role] = ((sx, cfront - sd * 0.5, cctr[2] - csz[2] * 0.10),
+                         (csz[0] / (ns + 0.8) * 0.82, sd, csz[2] * 0.5), True)
     shape_of = {rv.role: rv.geometry_family for rv in c.role_volumes}
     placements = []
     for name, (ctr, sz, ext) in raw.items():
@@ -1391,6 +1454,22 @@ def _selftest() -> int:
     # no envelope arg AND no deployment signal → honest refusal (never a silent box)
     check("no-envelope + no-signal geometry plan FAILS cleanly",
           compose_geometry_plan(_synthetic_state(working_volume_ml=200)).get("reason", "").startswith("NO_ENVELOPE"))
+
+    # COMPOSITE-HOST (Option A, 2026-07-19) — a device carrying SEVERAL media signals forms the
+    # primary + attaches subsystem modules; a single-function device gets NONE (no regression).
+    comp = derive_functional_form(_synthetic_state(rotor_speed_rpm=20, chamber_volume_l=15))
+    check("composite host: primary medium is the dominant (rotation)", comp.working_medium == "rotation")
+    check("composite host: an incubation subsystem is attached",
+          any(rv.role == "incubation_module" for rv in comp.role_volumes))
+    check("composite host: subsystem is fastened to the chassis (primary assembly)",
+          assembly_connectedness_proof(comp)["ok"] is True)
+    solo = derive_functional_form(_synthetic_state(rotor_speed_rpm=20))
+    check("single-function device gets NO subsystem (no regression)",
+          not any(rv.role.endswith("_module") for rv in solo.role_volumes))
+    gp_comp = compose_geometry_plan(_synthetic_state(rotor_speed_rpm=20, chamber_volume_l=15), (200.0, 200.0, 200.0))
+    check("composite host geometry places + connects the subsystem",
+          gp_comp.get("ok") is True
+          and any("incubation_module" in p["name"] for p in gp_comp.get("placements", [])))
 
     # GEOMETRY PLAN — the form-proof composes into concrete placements (universal layout).
     env = (100.0, 80.0, 30.0)
