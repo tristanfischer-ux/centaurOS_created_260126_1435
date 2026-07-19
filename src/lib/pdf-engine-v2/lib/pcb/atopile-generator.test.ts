@@ -16,6 +16,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { generateAtopileProject } from './atopile-generator'
+import { derivePcbArchitecture } from './pcb-architecture'
+
+import type { PcbBoardGeometry } from './pcb-contract'
 
 const REPO_ROOT = join(__dirname, '../../../../..')
 const COLORIMETER_STATE_PATH = join(REPO_ROOT, 'out/colorimeter-20260712-1010/state.json')
@@ -26,6 +29,20 @@ jest.mock('../distributors/db-only-cascade', () => ({
 
 function makeTmpDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
+}
+
+function geometryDimensions(geometry: PcbBoardGeometry): { widthMm: number; heightMm: number } {
+  const points = geometry.outline.segments.flatMap((segment) => [
+    segment.start,
+    segment.end,
+    ...(segment.kind === 'arc' ? [segment.mid] : []),
+  ])
+  const xs = points.map((point) => point.xMm)
+  const ys = points.map((point) => point.yMm)
+  return {
+    widthMm: Math.max(...xs) - Math.min(...xs),
+    heightMm: Math.max(...ys) - Math.min(...ys),
+  }
 }
 
 describe('atopile-generator', () => {
@@ -260,6 +277,65 @@ describe('atopile-generator', () => {
 
     const mainAto = readFileSync(result.mainAtoPath, 'utf8')
     expect(mainAto).not.toMatch(/colorimeter|cuvette|photodiode|absorbance/i)
+  })
+
+  it('uses an optical registration board-plan shape with four holes and non-square dimensions', () => {
+    const outDir = makeTmpDir('atopile-optical-shape-')
+    tmpDirs.push(outDir)
+    const state = {
+      ...arbitraryElectronicDesign,
+      orchestratorContract: {
+        ...arbitraryElectronicDesign.orchestratorContract,
+        quantities: { optical_path_length_mm: { value: 10 } },
+      },
+    }
+    const boardShape = derivePcbArchitecture(state).boards[0].shape
+
+    const result = generateAtopileProject(state, outDir, { boardShape })
+    const dimensions = geometryDimensions(result.boardOutline)
+
+    expect(boardShape.shapeFamily).toBe('optical_registration_plate')
+    expect(dimensions.widthMm).not.toBe(dimensions.heightMm)
+    expect(result.boardOutline.mountingHoles).toHaveLength(4)
+    expect(result.boardOutline.sourceDetail).toContain('optical_axis_and_cube_face')
+  })
+
+  it('uses electrode count and connector pitch to make a wide cartridge outline', () => {
+    const outDir = makeTmpDir('atopile-cartridge-shape-')
+    tmpDirs.push(outDir)
+    const state = {
+      ...arbitraryElectronicDesign,
+      orchestratorContract: {
+        ...arbitraryElectronicDesign.orchestratorContract,
+        quantities: {
+          electrode_count: { value: 64 },
+          cartridge_connector_pitch_mm: { value: 1.27 },
+          electrode_pitch_mm: { value: 2.54 },
+        },
+      },
+    }
+    const plan = derivePcbArchitecture(state)
+    const boardShape = plan.boards.find((board) => board.role === 'electrode_cartridge')!.shape
+
+    const result = generateAtopileProject(state, outDir, { boardShape })
+    const dimensions = geometryDimensions(result.boardOutline)
+
+    expect(boardShape.shapeFamily).toBe('electrode_cartridge')
+    expect(dimensions.widthMm).toBeGreaterThan(dimensions.heightMm * 2)
+    expect(result.boardOutline.sourceDetail).toContain('64 channels')
+    expect(result.boardOutline.sourceDetail).toContain('1.27mm connector pitch')
+  })
+
+  it('preserves the generic square outline when no board shape is supplied', () => {
+    const outDir = makeTmpDir('atopile-generic-shape-')
+    tmpDirs.push(outDir)
+
+    const result = generateAtopileProject(arbitraryElectronicDesign, outDir)
+    const dimensions = geometryDimensions(result.boardOutline)
+
+    expect(dimensions.widthMm).toBe(dimensions.heightMm)
+    expect(result.boardOutline.mountingHoles).toEqual([])
+    expect(result.boardOutline.sourceDetail).toContain('Phase B estimate')
   })
 
   it('dispositions compact instrument UI/controller/detector modules as off-board COTS while keeping LEDs on-board', () => {
@@ -1059,5 +1135,86 @@ describe('atopile-generator', () => {
     expect(result.unresolved).toHaveLength(1)
     expect(result.unresolved[0].wordId).toBe('mystery_electronic_word')
     expect(result.unresolved[0].reason.length).toBeGreaterThan(0)
+  })
+
+  it('never promotes or emits an unverified candidate MPN', () => {
+    const outDir = makeTmpDir('atopile-unverified-mpn-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'power_distribution',
+          sub_modules: [{
+            id: 'power_distribution__filtering',
+            words: [{
+              id: 'dc_link_capacitor_word',
+              name_human: 'DC Link Capacitor',
+              content_character: { character_id: 'dc_link_capacitor' },
+              modifier_characters: [
+                { kind: 'part_number', value: 'NOT-A-REAL-MPN-999' },
+                { kind: 'form', value: '0603 capacitor on the power rail' },
+              ],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['dc_link_capacitor_word'],
+    })
+    const capacitor = result.components.find(
+      (component) => component.wordId === 'dc_link_capacitor_word',
+    )
+    const mainAto = readFileSync(result.mainAtoPath, 'utf8')
+
+    expect(capacitor?.mpnVerified).toBe(false)
+    expect(capacitor?.resolutionTier).toBe('package_family')
+    expect(mainAto).not.toContain('NOT-A-REAL-MPN-999')
+    expect(mainAto).toContain('TBD (detailed design) - passive_c')
+  })
+
+  it('records architecture channel requirements without inventing fitted components', () => {
+    const outDir = makeTmpDir('atopile-function-requirements-')
+    tmpDirs.push(outDir)
+    const result = generateAtopileProject({
+      moduleDecomposition: { modules: [] },
+      orchestratorContract: { topology: [] },
+    }, outDir, {
+      requiredWordIds: [],
+      requiredFunctionRoles: [
+        'heater_channel',
+        'stir_channel',
+        'pump_channel',
+        'electrode_channel',
+      ],
+    })
+    const mainAto = readFileSync(result.mainAtoPath, 'utf8')
+
+    expect(result.components).toEqual([])
+    expect(result.functionRequirements).toEqual([
+      {
+        role: 'heater_channel',
+        implementation: 'unresolved_board_function',
+        reason: 'architecture function requires a real component topology',
+      },
+      {
+        role: 'stir_channel',
+        implementation: 'unresolved_board_function',
+        reason: 'architecture function requires a real component topology',
+      },
+      {
+        role: 'pump_channel',
+        implementation: 'unresolved_board_function',
+        reason: 'architecture function requires a real component topology',
+      },
+      {
+        role: 'electrode_channel',
+        implementation: 'passive_board_geometry',
+        reason: 'electrode channel is patterned board geometry, not a fitted package',
+      },
+    ])
+    expect(mainAto).not.toContain('Part_required_')
   })
 })

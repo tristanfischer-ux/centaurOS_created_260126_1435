@@ -20,6 +20,13 @@ const config: Config = {
     setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
+        // Worktree / sibling-checkout safety: pin React to this tree's copies so
+        // parallel Jest workers cannot resolve a parent checkout's react-dom and
+        // trip "Cannot read properties of null (reading 'useState')".
+        '^react$': '<rootDir>/node_modules/react',
+        '^react-dom$': '<rootDir>/node_modules/react-dom',
+        '^react/jsx-runtime$': '<rootDir>/node_modules/react/jsx-runtime',
+        '^react/jsx-dev-runtime$': '<rootDir>/node_modules/react/jsx-dev-runtime',
         // remark-gfm is ESM-only and next/jest's default transformIgnorePatterns
         // blocks it from being transformed. Provide a no-op mock for unit tests.
         '^remark-gfm$': '<rootDir>/src/__mocks__/remark-gfm.ts',

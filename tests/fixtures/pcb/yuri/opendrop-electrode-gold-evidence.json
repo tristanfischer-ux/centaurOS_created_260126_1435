@@ -1,0 +1,17 @@
+{
+  "schema": "opendrop-electrode-gold-evidence/v1",
+  "sourceCommit": "934a44db3ed41c24ae4dddb5b805a22e4166284b",
+  "briefElectrodeChannelFloor": 64,
+  "fluxlElectrodeRefCount": 132,
+  "matingPadCount": 244,
+  "matingPadMin": 1,
+  "matingPadMax": 244,
+  "footprintName": "Mini_Dimm_Cartridge_06_244",
+  "schematicRelativePath": "OpenDropV4/Electronics/CartridgeV4/DIMMCartridgeV4/DIMMCartridgeV4.sch",
+  "footprintRelativePath": "KiCadLibrary/GaudiLabsFootPrints.pretty/Mini_Dimm_Cartridge_06_244.kicad_mod",
+  "notes": [
+    "Gold OpenDrop V4 cartridge places FLUXL_* electrode pads on a Mini-DIMM edge (244 pads).",
+    "Brief floor is 64 channels; gold exposes 132 FLUXL refs on a 244-pad mating family — the architecture must preserve the brief count and never collapse electrodes to a 2-pin JST package.",
+    "Mating is custom edge-contact geometry (GaudiLabs Mini_Dimm footprint), not a catalogue MPN."
+  ]
+}

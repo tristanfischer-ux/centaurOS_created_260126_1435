@@ -9,10 +9,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+GOLD_ROOT = ROOT if (ROOT / "out/_gold-ninjapcr-repo").exists() else Path(
+    str(ROOT).removesuffix("-cursor-pcb")
+)
 MODULE_PATH = ROOT / "prototypes/ninjapcr-pcb-software-benchmark/benchmark.py"
-SCHEMATIC = ROOT / "out/_gold-ninjapcr-repo/kicad/NinjaPCR/NinjaPCB_ver2.3.sch"
-EAGLE_BOARD = ROOT / "out/_gold-ninjapcr-repo/eagle/NinjaPCB_ver2.2.brd"
-HEADER = ROOT / "out/_gold-ninjapcr-repo/arduino/NinjaPCR/board_conf_ninjapcrwifi.h"
+SCHEMATIC = GOLD_ROOT / "out/_gold-ninjapcr-repo/kicad/NinjaPCR/NinjaPCB_ver2.3.sch"
+EAGLE_BOARD = GOLD_ROOT / "out/_gold-ninjapcr-repo/eagle/NinjaPCB_ver2.2.brd"
+HEADER = GOLD_ROOT / "out/_gold-ninjapcr-repo/arduino/NinjaPCR/board_conf_ninjapcrwifi.h"
 
 
 def load_module():

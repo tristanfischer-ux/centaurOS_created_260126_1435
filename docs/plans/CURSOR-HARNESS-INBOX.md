@@ -6,7 +6,7 @@
 
 ---
 
-**Authority:** You (Claude Code) own execution. Cursor advises — never blocks you.
+**Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb`.
 
 **Status:** `IN_PROGRESS` — **CURSOR PCB WORKSTREAM ACTIVE ON `cursor-pcb`**
 **Updated:** 2026-07-18 ~15:45 BST
@@ -205,6 +205,103 @@ Key boundary:
 
 No Cursor production implementation begins until Tristan approves and terminal
 posts an integration baseline/receipt.
+**Status:** `WAITING_ON_CURSOR` for form; **PCB offline closures DONE** (residuals 0 + OpenDrop geometry/HV/creepage + OpenDrop Tier-0 firmware + Pioreactor HAT hard-block)
+**Updated:** 2026-07-19 ~08:00 BST
+
+---
+
+## Cursor production note — 2026-07-19 ~08:00 BST (close-out pack)
+
+Closed the last honest offline gaps on `cursor-pcb`:
+
+1. **OpenDrop HV↔LV creepage** — `pcb-opendrop-hv-lv-creepage-proof.ts`
+   - Gold pad-center min ≈ 2.69 mm; floor 2.5 mm
+   - proveCatch fires on 0.5 mm adversarial copper + LV-only wrong-class regen
+   - Punchlist electrode → `route_mating_hv_pinmap_and_creepage_proof_recorded` (`missingEvidence.kind=none`)
+   - Not IEC 61010; re-check applies when a correct HV-domain regen exists
+
+2. **OpenDrop firmware Tier-0** — `prototypes/opendrop-pcb-software-benchmark/`
+   - Gold sch GLabels + `hardware_def.h` → native proof with HV safe-off
+   - 7/7 unittest PASS; status `FAB-READY SOFTWARE PROOF — UNPROVEN IN HARDWARE`
+   - Not Gate 40 / not chain-wired
+
+3. **Pioreactor stir/pump hard-block** — punchlist + topology proveCatch
+   - `exactAction: blocked_until_hat_electricals_published`
+   - Rejects inventing `resolved_with_DRV8876` without HAT electricals
+   - Re-open only when Pioreactor HAT KiCad/BOM is published
+
+Honest non-claims: no chain merge, no HIL, no invented HAT MOSFET topology.
+
+---
+
+## Cursor production note — 2026-07-19 ~07:25 BST (OpenDrop HV domain / pin-map)
+
+Offline half after electrode route/mating: controller↔cartridge voltage-domain honesty.
+
+**Gold SIGHT** (`_gold-opendrop-repo` @ `934a44db…`):
+- Main: `MAX1771ESA` on `V_HV`, mating rails `V_HV_C`/`GND_C`, 4× `TLP222A` isolators, separate `V_USB` LV host
+- Cartridge: `V_HV_C`/`GND_C` + `FLUXL_*` electrode array on Mini-DIMM
+
+**Landed on `cursor-pcb`:**
+- `pcb-opendrop-hv-domain-pinmap-proof.ts` (+ test + fixture)
+- proveCatch fires on LV-only domains / missing `isolate_high_voltage` / electrode-on-USB pin-map / missing `V_HV`
+- Passes gold fixture + live architecture `high_voltage` domains
+- Punchlist electrode entry → `route_mating_and_hv_pinmap_proof_recorded`
+
+**Still open:** board-regen creepage/alignment on regenerated copper; Pioreactor HAT stir/pump (unpublished electricals); firmware-proof chain wiring (prototypes only).
+
+Honest non-claims: no chain / Gerber / board regen / HIL.
+
+---
+
+## Cursor production note — 2026-07-19 ~04:55 BST (Pioreactor heater topology)
+
+Froze `out/_gold-pioreactor-repo` @ `ca40a91e` (main checkout; not committed).
+
+**Gold SIGHT:** `heater_20ml` is a resistive FFC daughterboard — Molex `52207-0760`, 15× Rohm `ESR18EZPJ3R9`, TI `TMP1075DSGR` + `DRV5021A3QDBZR`. No MOSFET on that PCB. `hats/` submodule is `raspberrypi/hats` EEPROM utils — **not** Pioreactor HAT electricals.
+
+**Landed:** `pcb-pioreactor-wet-actuation-topology.ts` proveCatch (rejects DRV8876-as-heater; keeps switch `off_board_host_hat`). Stir/pump remain blocked on unpublished HAT.
+
+---
+
+## Cursor production note — 2026-07-19 ~04:50 BST (OpenDrop electrode route/mating)
+
+Next non-fitted gap after MPN closure: OpenDrop 64-channel cartridge geometry.
+
+**Landed on `cursor-pcb`:**
+- `pcb-opendrop-electrode-route-proof.ts` (+ test + fixture)
+- Gold SIGHT: 132 `FLUXL_*` refs, Mini-DIMM pads 1–244 @ `934a44db…`
+- proveCatch fires on JST/2-pad/collapsed-count; passes architecture `electrode_channel×64` + generator `passive_board_geometry`
+- Punchlist electrode entry updated to `route_mating_proof_recorded`
+
+**Still open:** Pioreactor wet_actuation topologies (needs `_gold-pioreactor-repo`); board-regen creepage/alignment; firmware-proof chain wiring.
+
+---
+
+## Cursor production note — 2026-07-19 ~03:40 BST (PCB residuals → 0)
+
+Branch `cursor-pcb` (worktree). Closed the last **16** NinjaPCR/OpenDrop fitted-MPN residuals from gold evidence.
+
+| Metric | Before | After |
+|---|---|---|
+| `residualProcurementCount` | 16 | **0** |
+| punchlist remaining fitted | 16 | **0** |
+| accepted identities (Yuri report) | 12 | **21** |
+| reclassified non-components | 22 | **29** |
+
+**Resolved catalogue fills:** GS012S-3.5-02P-11, CS1E102M-CRI13, ACTP212, CJT1117B-3.3-G, TSW-104-07-T-S, BLM18PG121SN1D, KPT-1608CGCK, KPT-1608SECK, FTSH-105-01-L-DV (+ IRLB3813 ingest).
+
+**Rejected not-fitted / software-safe-off:** NinjaPCR status LED, shunt, thermal fuse, e-stop; OpenDrop discrete ADC / flash / host bridge.
+
+**Ingest:** `npx tsx scripts/ingest/ingest-pcb-verified-candidates.ts --commit` → forge-truth `+7 / ~8`.
+
+**Tests green (50):** punchlist, NinjaPCR residual, Yuri identity report, verified-candidates.
+
+**Honest non-claims:** no chain / board regen / Gerber / firmware-proof rerun. TEC Imax still connector-capped (GS012S 7 A / eng freeze 5.6 A) until a named TEC MPN exists. CJT1117 accepted only under ESP duty-cycle + 2 oz Cu (not unconstrained 500 mA continuous).
+
+**Still out of this closure:** Pioreactor wet actuation topologies; OpenDrop 64-electrode route/mating proof; board regen + HIL firmware proofs.
+
+Terminal: merge `cursor-pcb` when convenient; form work stays yours.
 
 ---
 

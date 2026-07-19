@@ -11,6 +11,27 @@ See `src/__tests__/chain-must-be-db-only.test.ts` for the enforcement regression
 
 ## Jobs
 
+### `ingest-pcb-verified-candidates.ts`
+
+**Frequency:** On demand after manufacturer and frozen-reference verification
+
+**Quota usage:** Ten OpenAI embedding calls when embedding columns and a key are available
+
+**What it does:** Idempotently writes ten exact manufacturer-backed identities,
+including `MCP1700T-3302E/TT`, `NAU7802SGI`, and the correctly six-pin
+`OPA334AIDBVR`, with package, function, ratings, source URL, and frozen source
+commit. It never runs in the design chain.
+
+**Usage:**
+```bash
+npx tsx scripts/ingest/ingest-pcb-verified-candidates.ts
+npx tsx scripts/ingest/ingest-pcb-verified-candidates.ts --commit
+npx tsx scripts/ingest/ingest-pcb-verified-candidates.ts --db=/tmp/forge-truth.db --commit
+```
+
+The default is a dry run. Validate against a temporary database before using
+`--commit` against `~/.forge-truth/forge-truth.db`.
+
 ### `run-weekly-component-sweep.sh`
 
 **Frequency:** Weekly (Sunday 02:00)

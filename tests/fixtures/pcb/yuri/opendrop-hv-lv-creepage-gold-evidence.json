@@ -1,0 +1,26 @@
+{
+  "schema": "opendrop-hv-lv-creepage-gold-evidence/v1",
+  "sourceCommit": "934a44db3ed41c24ae4dddb5b805a22e4166284b",
+  "pcbRelativePath": "OpenDropV4/Electronics/OpenDropV4_MainBoard/PCB/OpenDropV4.kicad_pcb",
+  "hvNets": [
+    "V_HV",
+    "V_HV_C"
+  ],
+  "lvNets": [
+    "V_USB",
+    "+3V3"
+  ],
+  "minPadCenterDistancesMm": {
+    "V_HV<->V_USB": 2.694,
+    "V_HV<->+3V3": 25.432,
+    "V_HV_C<->V_USB": 2.794,
+    "V_HV_C<->+3V3": 24.124
+  },
+  "minHvLvPadCenterMm": 2.694,
+  "hvLvPadCenterFloorMm": 2.5,
+  "notes": [
+    "Pad-center distances are a gross bridging floor, not IEC 61010 creepage certification.",
+    "Gold observed min HV\u2194LV pad-center is above 2.5 mm; adversarial copper at 0.5 mm must fire.",
+    "Net-class clearance in gold is not HV-specific (Big class includes V_HV and V_USB) \u2014 do not use net-class as the gate."
+  ]
+}

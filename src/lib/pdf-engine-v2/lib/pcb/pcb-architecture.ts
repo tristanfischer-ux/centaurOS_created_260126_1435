@@ -1,0 +1,590 @@
+/**
+ * @file Universal PCB architecture planner (shadow v1).
+ * @description Separates "the design contains electronics" from "the design needs
+ * a bespoke PCB". Function quantities and procurement evidence select zero, one,
+ * or multiple board roles before any Atopile project is generated.
+ */
+
+import { collectElectronicWords } from './pcb-stage'
+
+import type { ElectronicWordRef } from './pcb-stage'
+
+export type PcbSystemDisposition =
+  | 'not_applicable'
+  | 'cots_only'
+  | 'daughterboard'
+  | 'single_custom'
+  | 'multi_board'
+  | 'unresolved'
+
+export interface PcbBoardShapeDatum {
+  id: string
+  valueMm: number
+  basis: string
+}
+
+export interface PcbBoardShapeContract {
+  shapeFamily: string
+  outlineBasis: string
+  datums?: PcbBoardShapeDatum[]
+  mountingHoles: number
+  rationale: string
+}
+
+export interface PcbBoardPlan {
+  boardId: string
+  role: string
+  requiredWordIds: string[]
+  domains: Array<'logic' | 'analog' | 'power' | 'high_voltage' | 'wet_interface' | 'thermal_actuation' | 'motion_actuation'>
+  channelRequirements: Array<{ role: string; count: number }>
+  workPerformed: string[]
+  shape: PcbBoardShapeContract
+  requiresKiCadDeliverable: boolean
+}
+
+export interface PcbWordAssignment {
+  wordId: string
+  placement:
+    | 'on_board'
+    | 'off_board_module'
+    | 'interconnect_only'
+    | 'mechanical_only'
+    | 'functional_requirement'
+    | 'passive_geometry'
+    | 'unassigned'
+  boardId?: string
+  reasons: string[]
+}
+
+export interface PcbArchitecturePlan {
+  schema: 'pcb-architecture/v1'
+  systemDisposition: PcbSystemDisposition
+  requiresAnyKiCadDeliverable: boolean
+  assignments: PcbWordAssignment[]
+  boards: PcbBoardPlan[]
+  unassignedWordIds: string[]
+  rationale: string[]
+  confidence: 'high' | 'medium' | 'low'
+}
+
+function quantity(state: Record<string, unknown>, key: string): number | null {
+  for (const holderName of ['orchestratorContract', 'engineeringContract'] as const) {
+    const holder = state[holderName] as { quantities?: Record<string, unknown> } | undefined
+    const raw = holder?.quantities?.[key]
+    const value = typeof raw === 'object' && raw !== null && 'value' in raw
+      ? (raw as { value?: unknown }).value
+      : raw
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return null
+}
+
+function firstPositiveQuantity(
+  state: Record<string, unknown>,
+  keys: string[],
+  fallback: number,
+): number {
+  for (const key of keys) {
+    const value = quantity(state, key)
+    if (value !== null && value > 0) return Math.max(1, Math.floor(value))
+  }
+  return fallback
+}
+
+function contractRecord(state: Record<string, unknown>): Record<string, unknown> {
+  for (const holderName of ['orchestratorContract', 'engineeringContract'] as const) {
+    const holder = state[holderName]
+    if (typeof holder === 'object' && holder !== null && !Array.isArray(holder)) {
+      return holder as Record<string, unknown>
+    }
+  }
+  return {}
+}
+
+function topologyChannelCount(state: Record<string, unknown>, rolePattern: RegExp): number {
+  const topology = contractRecord(state).topology
+  if (!Array.isArray(topology)) return 0
+  const matchingEndpoints = new Set<string>()
+  const indexedEndpoints = new Set<string>()
+  let hasContextOnlyMatch = false
+  for (const edge of topology) {
+    if (typeof edge !== 'object' || edge === null || Array.isArray(edge)) continue
+    const record = edge as Record<string, unknown>
+    const endpoints = [record.from_part, record.to_part]
+      .filter((value): value is string => typeof value === 'string')
+      .filter((value) => rolePattern.test(value))
+    for (const endpoint of endpoints) {
+      const normalized = endpoint.toLowerCase()
+      matchingEndpoints.add(normalized)
+      const indexMatch = normalized.match(/(?:_|-)(\d+)$/)
+      if (indexMatch) indexedEndpoints.add(indexMatch[1])
+    }
+    if (endpoints.length === 0 && rolePattern.test(evidenceText(record))) {
+      hasContextOnlyMatch = true
+    }
+  }
+  if (indexedEndpoints.size > 0) return indexedEndpoints.size
+  return matchingEndpoints.size > 0 || hasContextOnlyMatch ? 1 : 0
+}
+
+function derivedChannelCount(
+  state: Record<string, unknown>,
+  quantityKeys: string[],
+  topologyPattern: RegExp,
+  fallback: number,
+): number {
+  const quantityCount = firstPositiveQuantity(state, quantityKeys, 0)
+  if (quantityCount > 0) return quantityCount
+  return Math.max(topologyChannelCount(state, topologyPattern), fallback)
+}
+
+function evidenceText(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(evidenceText).join(' ')
+  if (typeof value !== 'object' || value === null) return ''
+  return Object.values(value as Record<string, unknown>).map(evidenceText).join(' ')
+}
+
+function architectureEvidenceBlob(state: Record<string, unknown>): string {
+  const parsedBrief = state.parsedBrief as Record<string, unknown> | undefined
+  const contract = contractRecord(state)
+  const electronicWords = collectElectronicWords(state)
+    .map((word) => `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`)
+    .join(' ')
+  return [
+    electronicWords,
+    parsedBrief?.original_text,
+    parsedBrief?.product_description,
+    contract.topology,
+    contract.macro_assembly_prices,
+  ].map(evidenceText).join(' ').toLowerCase()
+}
+
+function hasFinishedMotionStack(state: Record<string, unknown>): boolean {
+  const text = architectureEvidenceBlob(state)
+  const hasControllerCarrier =
+    /\b(?:arduino|single.board.computer|raspberry|mcu|microcontroller|controller)\b/.test(text)
+  const hasFinishedDriverCarrier =
+    /\b(?:cnc\s*shield|motor.controller.board|sangaboard|stepper.driver.(?:module|carrier)|plug.in.stepper.driver)\b/.test(text)
+  return hasControllerCarrier && hasFinishedDriverCarrier
+}
+
+function datum(id: string, valueMm: number, basis: string): PcbBoardShapeDatum {
+  return { id, valueMm, basis }
+}
+
+function board(
+  boardId: string,
+  role: string,
+  domains: PcbBoardPlan['domains'],
+  datums: PcbBoardShapeDatum[] = [],
+): PcbBoardPlan {
+  const phenotype: Record<string, { work: string[]; shape: string; basis: string; holes: number }> = {
+    optical_source_daughterboard: { work: ['drive_optical_source', 'mate_source_harness'], shape: 'optical_registration_plate', basis: 'optical_axis_and_cube_face', holes: 4 },
+    thermal_power_controller: { work: ['sense_sample_temperature', 'drive_heater_peltier_fan', 'enforce_thermal_cutoff'], shape: 'thermal_power_base', basis: 'thermal_connectors_and_heatsink', holes: 4 },
+    motion_driver_board: { work: ['drive_repeated_motion_channels', 'sense_channel_current'], shape: 'linear_channel_spine', basis: 'channel_count_and_connector_pitch', holes: 4 },
+    analog_front_end_shield: { work: ['drive_cell_voltage', 'measure_cell_current', 'switch_measurement_range'], shape: 'precision_analog_shield', basis: 'host_header_and_guarded_input_edge', holes: 4 },
+    wet_lab_hat: { work: ['interface_host_compute', 'isolate_wet_peripherals'], shape: 'wet_lab_hat', basis: 'host_header_standard', holes: 4 },
+    od_optics_board: { work: ['drive_od_source', 'measure_od_detector'], shape: 'optical_registration_plate', basis: 'vial_optical_axis', holes: 2 },
+    heater_stir_actuation_board: { work: ['drive_heater_stir_pumps', 'sense_wet_actuation_faults'], shape: 'wet_actuation_base', basis: 'wet_connector_edge_and_power_dissipation', holes: 4 },
+    high_voltage_controller: { work: ['generate_high_voltage', 'isolate_high_voltage', 'switch_electrode_channels'], shape: 'high_voltage_controller', basis: 'hv_lv_boundary_and_creepage', holes: 4 },
+    electrode_cartridge: { work: ['present_electrode_array', 'route_droplet_channels'], shape: 'electrode_cartridge', basis: 'electrode_pitch_and_cartridge_connector', holes: 2 },
+  }
+  const p = phenotype[role] ?? { work: ['implement_board_functions'], shape: 'generic_rectangular', basis: 'component_and_connector_envelope', holes: 4 }
+  return {
+    boardId, role, requiredWordIds: [], domains, channelRequirements: [],
+    workPerformed: p.work,
+    shape: {
+      shapeFamily: p.shape,
+      outlineBasis: p.basis,
+      datums,
+      mountingHoles: p.holes,
+      rationale: `form_follows_${role}`,
+    },
+    requiresKiCadDeliverable: true,
+  }
+}
+
+function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBoardPlan | undefined {
+  const text = `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`.toLowerCase()
+  if (boards.length === 1) {
+    const onlyBoard = boards[0]
+    if (onlyBoard.role !== 'optical_source_daughterboard') return onlyBoard
+    return /led.?source|led.?driver|light.?source|optical.?source|source.?board|illumination|emitter/.test(text)
+      ? onlyBoard
+      : undefined
+  }
+  const exactRoleBoard = boards.find((candidate) => {
+    if (candidate.role === 'electrode_cartridge') return /electrode|cartridge|array|reservoir/.test(text)
+    if (candidate.role === 'high_voltage_controller') {
+      return /hv|high.?voltage|switch|boost|isolat|controller|microcontroller|current.?measurement|\btia\b|status.?indicator/.test(text)
+    }
+    if (candidate.role === 'od_optics_board') return /optical|density|photodiode|adc|sensor|led/.test(text)
+    if (candidate.role === 'heater_stir_actuation_board') return /heat|stir|motor|pump|driver|peltier|power/.test(text)
+    if (candidate.role === 'wet_lab_hat') return /hat|host|microcontroller|compute|raspberry|interface/.test(text)
+    return false
+  })
+  if (exactRoleBoard) return exactRoleBoard
+
+  // DECISION: Fall back by electrical function only after role-specific routing.
+  // This closes whole-system scope without assigning a wet sensor to whichever
+  // board happened to be listed first.
+  if (word.categories.includes('analog_frontend')) {
+    return boards.find((candidate) => candidate.domains.includes('analog'))
+  }
+  if (
+    word.categories.includes('processor') ||
+    word.categories.includes('connectivity') ||
+    word.categories.includes('display') ||
+    word.categories.includes('board_role')
+  ) {
+    return boards.find((candidate) => candidate.domains.includes('logic'))
+  }
+  if (word.categories.includes('power_electronics')) {
+    return boards.find((candidate) =>
+      candidate.domains.includes('power') || candidate.domains.includes('high_voltage'))
+  }
+  return undefined
+}
+
+function nonBoardPlacement(
+  word: ElectronicWordRef,
+  state: Record<string, unknown>,
+  boards: PcbBoardPlan[],
+  allWords: ElectronicWordRef[],
+): Omit<PcbWordAssignment, 'wordId'> | null {
+  const roleText = `${word.wordId} ${word.nameHuman} ${word.characterId}`.toLowerCase()
+  const selectedBoard = assignmentBoard(word, boards) ?? (
+    boards.length === 1 ? boards[0] : undefined
+  )
+  const evidence = architectureEvidenceBlob(state)
+  const hasExplicitPartIdentity = [word.modifiers.part_number, word.modifiers.manufacturer]
+    .some((value) => Boolean(
+      value?.trim() &&
+      !/\b(?:tbd|unknown|generic|detailed design)\b/i.test(value),
+    ))
+  const hasCotsComputeHost =
+    /\b(?:raspberry\s*pi|single.board.computer|itsybitsy|pybadge|compute.ui.module)\b/i
+      .test(evidence)
+  const hasIntegratedFirmwareMcu =
+    /\b(?:samd21|esp8266|esp32|stm32)\b/i.test(evidence)
+  const hasPhysicalUsbEntry = allWords.some((candidate) =>
+    /usb[_ -]?(?:power[_ -]?entry|connector|receptacle|port)/i.test(
+      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
+    ))
+  const hasRadioAndDebugAccess =
+    allWords.some((candidate) => /wi-?fi|wifi[_ -]?module/i.test(
+      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
+    )) &&
+    allWords.some((candidate) => /debug[_ -]?(?:uart|header)|\buart\b/i.test(
+      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
+    ))
+
+  if (/mounting.?plate|detector.?mount|standoff|bezel|window.?seal|legend/.test(roleText)) {
+    return {
+      placement: 'mechanical_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['mechanical_datum_not_fitted_component'],
+    }
+  }
+  if (/cable|harness/.test(roleText)) {
+    return { placement: 'interconnect_only', reasons: ['mechanical_or_interconnect_role'] }
+  }
+  if (
+    /compute.?ui.?module|detector.?module|wavelength.?selection.?module|bench.?psu/.test(roleText)
+  ) {
+    return { placement: 'off_board_module', reasons: ['purchased_or_host_side_module'] }
+  }
+  if (!hasExplicitPartIdentity && selectedBoard?.role === 'wet_lab_hat') {
+    if (/host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)) {
+      return {
+        placement: 'interconnect_only',
+        boardId: selectedBoard.boardId,
+        reasons: ['host_hat_uses_direct_compute_bus'],
+      }
+    }
+    if (/usb[_ -]?interface|firmware[_ -]?storage/.test(roleText)) {
+      return {
+        placement: 'off_board_module',
+        reasons: ['host_compute_owns_usb_or_persistence'],
+      }
+    }
+  }
+  if (!hasExplicitPartIdentity && selectedBoard?.role === 'analog_front_end_shield') {
+    if (/host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)) {
+      return {
+        placement: 'interconnect_only',
+        boardId: selectedBoard.boardId,
+        reasons: ['host_shield_uses_direct_compute_bus'],
+      }
+    }
+    if (/usb[_ -]?(?:interface|power[_ -]?entry)/.test(roleText)) {
+      return {
+        placement: 'off_board_module',
+        reasons: ['host_compute_module_owns_usb'],
+      }
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    selectedBoard?.role === 'od_optics_board' &&
+    /usb[_ -]?power[_ -]?entry/.test(roleText) &&
+    boards.some((candidate) => candidate.role === 'wet_lab_hat')
+  ) {
+    return {
+      placement: 'interconnect_only',
+      boardId: selectedBoard.boardId,
+      reasons: ['host_hat_interconnect_owns_peripheral_power_entry'],
+    }
+  }
+  if (!hasExplicitPartIdentity && hasCotsComputeHost) {
+    if (/host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)) {
+      return {
+        placement: 'interconnect_only',
+        ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+        reasons: ['direct_host_bus_interconnect_not_bridge_component'],
+      }
+    }
+    if (/usb[_ -]?(?:interface|power[_ -]?entry)|firmware[_ -]?storage/.test(roleText)) {
+      return {
+        placement: 'off_board_module',
+        reasons: ['cots_compute_host_owns_interface_or_storage'],
+      }
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    /usb[_ -]?interface/.test(roleText) &&
+    hasPhysicalUsbEntry
+  ) {
+    return {
+      placement: 'interconnect_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['duplicate_usb_interface_contract'],
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    /usb[_ -]?interface/.test(roleText) &&
+    hasRadioAndDebugAccess
+  ) {
+    return {
+      placement: 'interconnect_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['radio_and_debug_interfaces_close_host_access'],
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    hasIntegratedFirmwareMcu &&
+    /firmware[_ -]?storage|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)
+  ) {
+    return {
+      placement: 'functional_requirement',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['integrated_mcu_owns_firmware_or_protocol_function'],
+    }
+  }
+  return null
+}
+
+/**
+ * @description Derive a board-system architecture from functional quantities and
+ * module procurement signals. Product names are not consulted.
+ */
+export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchitecturePlan {
+  const electrodeCount = Math.max(0, Math.floor(quantity(state, 'electrode_count') ?? 0))
+  const opticalPathLengthMm = Math.max(0, quantity(state, 'optical_path_length_mm') ?? 0)
+  let systemDisposition: PcbSystemDisposition = 'unresolved'
+  let boards: PcbBoardPlan[] = []
+  const rationale: string[] = []
+
+  if (electrodeCount >= 8) {
+    const connectorPitchMm = quantity(state, 'cartridge_connector_pitch_mm') ?? 1.27
+    const electrodePitchMm = quantity(state, 'electrode_pitch_mm') ?? 2.54
+    const cartridgeWidthMm = Math.max(60, electrodeCount * connectorPitchMm + 12)
+    const cartridgeHeightMm = Math.max(24, electrodePitchMm * 8 + 10)
+    systemDisposition = 'multi_board'
+    boards = [
+      board('hv_controller_main', 'high_voltage_controller', ['logic', 'analog', 'high_voltage']),
+      board('electrode_cartridge', 'electrode_cartridge', ['high_voltage', 'wet_interface'], [
+        datum('outline_width_mm', cartridgeWidthMm, `${electrodeCount} channels × ${connectorPitchMm}mm connector pitch + edge margins`),
+        datum('outline_height_mm', cartridgeHeightMm, `${electrodePitchMm}mm electrode pitch × wet-interface depth`),
+        datum('corner_radius_mm', 2, 'replaceable cartridge handling edge'),
+        datum('mounting_hole_inset_mm', 3, 'cartridge frame registration'),
+        datum('mounting_hole_diameter_mm', 2.5, 'removable cartridge fastener'),
+      ]),
+    ]
+    boards[0].channelRequirements.push({
+      role: 'electrode_switch_channel',
+      count: electrodeCount,
+    })
+    boards[1].channelRequirements.push({
+      role: 'electrode_channel',
+      count: electrodeCount,
+    })
+    rationale.push('electrode_count_requires_hv_controller_and_removable_array')
+  } else if ((quantity(state, 'working_volume_ml') ?? 0) > 0) {
+    systemDisposition = 'multi_board'
+    boards = [
+      board('wet_lab_hat', 'wet_lab_hat', ['logic', 'wet_interface']),
+      board('od_optics', 'od_optics_board', ['analog', 'wet_interface']),
+      board('wet_actuation', 'heater_stir_actuation_board', ['power', 'wet_interface', 'thermal_actuation']),
+    ]
+    boards[1].channelRequirements.push({
+      role: 'od_measurement_channel',
+      count: derivedChannelCount(
+        state,
+        ['od_channel_count', 'optical_density_channel_count'],
+        /\bod\b|optical.?density|photodiode/i,
+        1,
+      ),
+    })
+    boards[2].channelRequirements.push(
+      {
+        role: 'heater_channel',
+        count: derivedChannelCount(
+          state,
+          ['heater_channel_count', 'heater_count'],
+          /heat(?:er|ing)|thermal.?actuat/i,
+          1,
+        ),
+      },
+      {
+        role: 'stir_channel',
+        count: derivedChannelCount(
+          state,
+          ['stir_channel_count', 'stirrer_count'],
+          /stir|agitat/i,
+          1,
+        ),
+      },
+      {
+        role: 'pump_channel',
+        count: derivedChannelCount(
+          state,
+          ['dosing_pump_count', 'pump_channel_count'],
+          /dosing.?pump|metering.?pump/i,
+          1,
+        ),
+      },
+    )
+    rationale.push('culture_volume_requires_host_optics_and_wet_actuation_split')
+  } else if ((quantity(state, 'compliance_voltage_v') ?? 0) > 0) {
+    systemDisposition = 'daughterboard'
+    boards = [board('analog_afe', 'analog_front_end_shield', ['analog', 'logic'])]
+    boards[0].channelRequirements.push({
+      role: 'electrochemical_cell_channel',
+      count: derivedChannelCount(
+        state,
+        ['electrochemical_cell_count', 'cell_channel_count'],
+        /working.?electrode|electrochemical.?cell/i,
+        1,
+      ),
+    })
+    rationale.push('compliance_voltage_requires_precision_analog_front_end')
+  } else if ((quantity(state, 'tube_count') ?? 0) > 0) {
+    systemDisposition = 'single_custom'
+    boards = [board('thermal_controller', 'thermal_power_controller', ['logic', 'power', 'thermal_actuation'])]
+    boards[0].channelRequirements.push(
+      {
+        role: 'thermal_zone',
+        count: derivedChannelCount(
+          state,
+          ['thermal_zone_count', 'sample_zone_count', 'block_count'],
+          /sample.?block|thermal.?zone|temperature.?sensor/i,
+          1,
+        ),
+      },
+      {
+        role: 'lid_heater_channel',
+        count: derivedChannelCount(
+          state,
+          ['lid_heater_channel_count', 'lid_heater_count'],
+          /lid.?heater|heated.?lid/i,
+          1,
+        ),
+      },
+      {
+        role: 'fan_channel',
+        count: derivedChannelCount(
+          state,
+          ['fan_channel_count', 'cooling_fan_count'],
+          /cooling.?fan|heatsink.?fan|heat.?rejection/i,
+          1,
+        ),
+      },
+    )
+    rationale.push('tube_array_requires_integrated_thermal_power_controller')
+  } else if (opticalPathLengthMm > 0) {
+    const sourceBoardWidthMm = Math.max(25.4, Math.min(40, opticalPathLengthMm + 15.4))
+    const sourceBoardHeightMm = Math.max(20, Math.min(30, opticalPathLengthMm + 10))
+    systemDisposition = 'daughterboard'
+    boards = [board('optical_source', 'optical_source_daughterboard', ['logic'], [
+      datum('outline_width_mm', sourceBoardWidthMm, `${opticalPathLengthMm}mm optical path + source connector margin`),
+      datum('outline_height_mm', sourceBoardHeightMm, `${opticalPathLengthMm}mm optical path + cube-face registration margin`),
+      datum('corner_radius_mm', 2, 'optical cube face edge clearance'),
+      datum('mounting_hole_inset_mm', 2.5, 'four-point optical-axis registration'),
+      datum('mounting_hole_diameter_mm', 2.2, 'source-board registration fastener'),
+    ])]
+    boards[0].channelRequirements.push({
+      role: 'optical_source_channel',
+      count: firstPositiveQuantity(state, ['optical_source_channel_count', 'wavelength_channel_count'], 1),
+    })
+    rationale.push('optical_path_with_cots_host_requires_source_daughterboard')
+  } else if ((quantity(state, 'channel_count') ?? 0) > 0) {
+    if (hasFinishedMotionStack(state)) {
+      systemDisposition = 'cots_only'
+      rationale.push('motion_channels_resolved_by_finished_controller_modules')
+    } else {
+      systemDisposition = 'single_custom'
+      boards = [board('motion_controller', 'motion_driver_board', ['logic', 'power', 'motion_actuation'])]
+      boards[0].channelRequirements.push({ role: 'motion_channel', count: Math.max(1, Math.floor(quantity(state, 'channel_count') ?? 1)) })
+      rationale.push('motion_channels_require_integrated_driver_board')
+    }
+  } else if ((quantity(state, 'stage_axis_count') ?? 0) >= 2) {
+    if (hasFinishedMotionStack(state) ||
+        /single.board.computer|raspberry|camera/.test(architectureEvidenceBlob(state))) {
+      systemDisposition = 'cots_only'
+      rationale.push('imaging_and_motion_roles_resolved_by_finished_modules')
+    } else {
+      systemDisposition = 'daughterboard'
+      boards = [board('stage_motion', 'motion_driver_board', ['logic', 'motion_actuation'])]
+      rationale.push('stage_axes_require_motion_daughterboard')
+    }
+  } else {
+    rationale.push('no_functional_board_architecture_signal')
+  }
+
+  const words = collectElectronicWords(state)
+  const assignments: PcbWordAssignment[] = words.map((word) => {
+    if (systemDisposition === 'cots_only') {
+      return { wordId: word.wordId, placement: 'off_board_module', reasons: ['cots_only_system'] }
+    }
+    const nonBoard = nonBoardPlacement(word, state, boards, words)
+    if (nonBoard) {
+      return { wordId: word.wordId, ...nonBoard }
+    }
+    const selectedBoard = assignmentBoard(word, boards)
+    if (selectedBoard) {
+      selectedBoard.requiredWordIds.push(word.wordId)
+      return { wordId: word.wordId, placement: 'on_board', boardId: selectedBoard.boardId, reasons: ['function_role_board_assignment'] }
+    }
+    if (boards.some((candidate) => candidate.role === 'optical_source_daughterboard')) {
+      return { wordId: word.wordId, placement: 'off_board_module', reasons: ['optical_source_board_excludes_host_role'] }
+    }
+    return { wordId: word.wordId, placement: 'unassigned', reasons: ['no_board_plan'] }
+  })
+  const unassignedWordIds = assignments.filter((item) => item.placement === 'unassigned').map((item) => item.wordId)
+
+  return {
+    schema: 'pcb-architecture/v1',
+    systemDisposition,
+    requiresAnyKiCadDeliverable: boards.some((item) => item.requiresKiCadDeliverable),
+    assignments,
+    boards,
+    unassignedWordIds,
+    rationale,
+    confidence: systemDisposition === 'unresolved' ? 'low' : 'medium',
+  }
+}

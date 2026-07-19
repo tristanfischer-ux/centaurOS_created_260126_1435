@@ -1,0 +1,547 @@
+{
+  "schema": "pcb-yuri-identity-resolution-report/v1",
+  "baseline": {
+    "punchlistPath": "src/lib/pdf-engine-v2/lib/pcb/pcb-unresolved-component-punchlist.json",
+    "producingCommit": "d43f46aaf",
+    "totalGeneratedComponents": 85,
+    "verifiedIdentityCount": 35,
+    "unresolvedIdentityCount": 50,
+    "missingMpn": 38,
+    "missingSymbolPinout": 12
+  },
+  "acceptedMappings": [
+    {
+      "punchlistId": "colorimeter-optical_source-led_source_word",
+      "resolverRequest": {
+        "wordId": "led_source_word",
+        "nameHuman": "470 nm optical source LED",
+        "characterId": "led_source",
+        "functionClass": "led",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.015
+        }
+      },
+      "manufacturer": "Yongyu Photoelectric",
+      "partNumber": "SZYY0603B",
+      "roleCompatibility": "Frozen 470 nm source board requires one 0603 LED at 3.1 V/15 mA; SZYY0603B provides a 469 nm peak in the required package.",
+      "package": "0603 SMD, 1.6 x 0.8 x 0.6 mm, polarised two-terminal LED",
+      "ratings": "469 nm peak; 460-475 nm dominant wavelength; 3.1 V nominal; 30 mA rated and 15 mA application operating point",
+      "symbolPinout": "Device:LED; manufacturer polarity drawing; LED_SMD:LED_0603_1608Metric",
+      "manufacturerEvidence": "Yongyu SZYY0603B manufacturer data distributed as LCSC C434421; frozen Open Colorimeter 470 nm schematic",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Yongyu row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "colorimeter-optical_source-source_board_connector_word",
+      "resolverRequest": {
+        "wordId": "source_board_connector_word",
+        "nameHuman": "Four-position right-angle source board connector",
+        "characterId": "source_board_connector",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.1
+        }
+      },
+      "manufacturer": "BOOMELE (Boom Precision Elec)",
+      "partNumber": "1.0T-4P",
+      "roleCompatibility": "Frozen source-board J1/J2 identify LCSC C145956 and carry GND, 3V3, SDA and SCL through two right-angle 1 mm four-contact connectors.",
+      "package": "four-contact 1.00 mm-pitch right-angle SMD SH-compatible header",
+      "ratings": "50 V, 1 A, -25 to +85 C, UL94V-0",
+      "symbolPinout": "Connector_Generic:Conn_01x04; pins 1 GND, 2 3V3, 3 SDA, 4 SCL; exact frozen Forge_Manufacturer:BOOMELE_1.0T-4P footprint",
+      "manufacturerEvidence": "BOOMELE 1.0T-4P manufacturer data distributed as LCSC C145956; frozen Open Colorimeter J1/J2 footprint and pin nets",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact BOOMELE row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-wifi_module_word",
+      "resolverRequest": {
+        "wordId": "wifi_module_word",
+        "nameHuman": "ESP8266 Wi-Fi module",
+        "characterId": "wifi_module",
+        "functionClass": "connectivity_ic",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.5
+        }
+      },
+      "manufacturer": "Espressif Systems",
+      "partNumber": "ESP-WROOM-02",
+      "roleCompatibility": "Released NinjaPCR BOM fits ESP-WROOM-02 at ESP2 quantity 1 and explicitly marks the ESP-12F alternative quantity 0.",
+      "package": "18-pad 18 x 20 mm surface-mount Wi-Fi module with PCB antenna",
+      "ratings": "3.0-3.6 V supply; external supply capability of at least 500 mA recommended",
+      "symbolPinout": "RF_Module:ESP-WROOM-02; complete 18-pad manufacturer pinout; RF_Module:ESP-WROOM-02 footprint and antenna keepout",
+      "manufacturerEvidence": "Espressif ESP-WROOM-02 data sheet",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Espressif row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "pioreactor-od_optics-esd_protection_network_word",
+      "resolverRequest": {
+        "wordId": "esd_protection_network_word",
+        "nameHuman": "5 V interface TVS protection",
+        "characterId": "esd_protection_network",
+        "functionClass": "diode_protection",
+        "requiredRatings": {
+          "voltageV": 5
+        }
+      },
+      "manufacturer": "Toshiba",
+      "partNumber": "DF2S6.8MFS,L3M",
+      "roleCompatibility": "Two-terminal 5 V interface TVS used at frozen Eye-Spy D2-D5.",
+      "package": "SOD-923",
+      "ratings": "5 V working voltage, 15 V clamp",
+      "symbolPinout": "Device:D_TVS pins 1-2; Diode_SMD:D_SOD-923",
+      "manufacturerEvidence": "Toshiba DF2S6.8MFS product data and frozen Eye-Spy manufacturer ordering code",
+      "databaseEvidence": "forge-truth frozen Eye-Spy BOM/schematic row"
+    },
+    {
+      "punchlistId": "pioreactor-wet_lab_hat-debug_header_word",
+      "resolverRequest": {
+        "wordId": "hat_host_connector_word",
+        "nameHuman": "Raspberry Pi HAT 40-pin host connector",
+        "characterId": "hat_host_connector",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 5,
+          "currentA": 0.1
+        }
+      },
+      "manufacturer": "Samtec",
+      "partNumber": "SSQ-120-03-T-D",
+      "roleCompatibility": "The HAT-local RP2040 is programmed through GPIO24/GPIO25 over the fitted Raspberry Pi host socket; a separate synthetic debug header is not fitted.",
+      "package": "2x20 vertical through-hole socket, 2.54 mm pitch, 10.00 mm square tails, matte-tin contacts",
+      "ratings": "465 VAC / 655 VDC; 6.3 A per pin with two pins powered; -55 to +105 C for matte-tin option",
+      "symbolPinout": "Forge_Manufacturer:SSQ-120-03-T-D; complete Raspberry Pi physical pins 1-40, including pin 18 GPIO24/SWDIO and pin 22 GPIO25/SWCLK; Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical",
+      "manufacturerEvidence": "Samtec SSQ-TH series print and SSQ-120-03-T-D product record; frozen Pioreactor HAT v1.2 CAD, frozen exact SSQ-120-03-T-D board BOM evidence and Pioreactor GPIO contract",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Samtec row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "rodeostat-analog_afe-dac_output_stage_word",
+      "resolverRequest": {
+        "wordId": "dac_output_stage_word",
+        "nameHuman": "Precision bipolar DAC conditioning stage",
+        "characterId": "dac_output_stage",
+        "functionClass": "op_amp",
+        "requiredRatings": {
+          "voltageV": 30
+        }
+      },
+      "manufacturer": "Texas Instruments",
+      "partNumber": "OP07CDR",
+      "roleCompatibility": "Frozen U11/U13 OP07 stages shift the host DAC from 0-3.3 V to bipolar and apply selectable gain.",
+      "package": "8-pin SOIC (D), 3.9 x 4.9 mm, 1.27 mm pitch",
+      "ratings": "36 V maximum supply span; low-offset single operational amplifier",
+      "symbolPinout": "Amplifier_Operational:OP07; pins 1/5 offset null, 2 IN-, 3 IN+, 4 V-, 6 OUT, 7 V+, 8 NC; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "TI OP07x data sheet SLOS099H; frozen Rodeostat U11/U13 schematic nets and BOM LCSC C7433",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact TI row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "rodeostat-analog_afe-current_measurement_tia_word",
+      "resolverRequest": {
+        "wordId": "current_measurement_tia_word",
+        "nameHuman": "Selectable-gain current measurement TIA",
+        "characterId": "current_measurement_tia",
+        "functionClass": "op_amp",
+        "requiredRatings": {
+          "voltageV": 30
+        }
+      },
+      "manufacturer": "STMicroelectronics",
+      "partNumber": "TL072CDT",
+      "roleCompatibility": "Frozen U9 directly connects WRK_ELECT to the Kelvin-switched transimpedance network and TIA_OUT_BIP.",
+      "package": "8-pin SOIC, 3.9 x 4.9 mm, 1.27 mm pitch",
+      "ratings": "6-36 V supply span; dual low-noise JFET-input operational amplifier",
+      "symbolPinout": "Amplifier_Operational:TL072; pins 1 OUT1, 2 IN1-, 3 IN1+, 4 VCC-, 5 IN2+, 6 IN2-, 7 OUT2, 8 VCC+; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "ST TL072 data sheet; frozen Rodeostat U9 schematic TIA nets and BOM LCSC C6961",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact ST row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "rodeostat-analog_afe-esd_protection_network_word",
+      "resolverRequest": {
+        "wordId": "esd_protection_network_word",
+        "nameHuman": "Low-leakage electrochemical rail clamp",
+        "characterId": "low_leakage_rail_clamp",
+        "functionClass": "diode_protection",
+        "requiredRatings": {
+          "voltageV": 70,
+          "currentA": 0.07
+        }
+      },
+      "manufacturer": "Slkor",
+      "partNumber": "BAS70-04",
+      "roleCompatibility": "Frozen Rodeostat D1/D2 use the exact dual-series low-leakage Schottky clamp on the precision analogue path.",
+      "package": "SOT-23, three terminals, dual Schottky diodes in series",
+      "ratings": "70 V reverse; 70 mA forward; 100 nA maximum leakage at 50 V; 2 pF maximum capacitance",
+      "symbolPinout": "Forge_Manufacturer:BAS70-04; pins 1 A1, 2 K2, 3 K1/A2; Package_TO_SOT_SMD:SOT-23",
+      "manufacturerEvidence": "Slkor BAS70-04 manufacturer data distributed as LCSC C609810; frozen Rodeostat D1/D2 exact BOM and schematic identity",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Slkor row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-usb_power_entry_word",
+      "resolverRequest": {
+        "wordId": "usb_power_entry_word",
+        "nameHuman": "Full-featured USB-C power and data receptacle",
+        "characterId": "usb_power_entry",
+        "functionClass": "usb_connector",
+        "requiredRatings": {
+          "voltageV": 5,
+          "currentA": 5
+        }
+      },
+      "manufacturer": "Amphenol ICC",
+      "partNumber": "12401610E4#2A",
+      "roleCompatibility": "Frozen OpenDrop J1 is the board USB-C power/data entry; duplicate interface placeholders remain out of fitted scope.",
+      "package": "24-contact right-angle SMT USB-C receptacle with through-hole shield tabs",
+      "ratings": "USB 3.2 Gen 2 full-featured receptacle; USB Type-C current capability up to 5 A",
+      "symbolPinout": "Connector:USB_C_Receptacle; contacts A1-A12/B1-B12 plus SH; Connector_USB:USB_C_Receptacle_Amphenol_12401610E4-2A",
+      "manufacturerEvidence": "Amphenol 12401610E4#2A manufacturer data; frozen OpenDrop J1 exact footprint identity",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Amphenol row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-dac_output_stage_word",
+      "resolverRequest": {
+        "wordId": "dac_output_stage_word",
+        "nameHuman": "50 kohm SPI high-voltage setpoint potentiometer",
+        "characterId": "programmable_hv_setpoint",
+        "functionClass": "programmable_resistor",
+        "requiredRatings": {
+          "voltageV": 3.3
+        }
+      },
+      "manufacturer": "Microchip Technology",
+      "partNumber": "MCP41050-I/SN",
+      "roleCompatibility": "Frozen OpenDrop U15 is the 50 kohm SPI device on the MAX1771 VSENS high-voltage setpoint path.",
+      "package": "8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch",
+      "ratings": "2.7-5.5 V supply; 50 kohm nominal; 256 positions; 1 mA maximum wiper current; -40 to +85 C",
+      "symbolPinout": "Potentiometer_Digital:MCP41050; pins 1 CS, 2 SCK, 3 SI, 4 VSS, 5 PA0, 6 PW0, 7 PB0, 8 VDD; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "Microchip MCP41XXX/42XXX data sheet DS11195C; frozen OpenDrop U15 value, SO08 footprint and VSENS net",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Microchip row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-esd_protection_network_word",
+      "resolverRequest": {
+        "wordId": "esd_protection_network_word",
+        "nameHuman": "Five-line 5 V ESD protection array",
+        "characterId": "five_line_esd_protection",
+        "functionClass": "diode_protection",
+        "requiredRatings": {
+          "voltageV": 5
+        }
+      },
+      "manufacturer": "Nexperia",
+      "partNumber": "PESD5V0L5UY",
+      "roleCompatibility": "Frozen OpenDrop D4 uses this five-line common-anode array on exposed low-voltage channels.",
+      "package": "six-lead SOT363 (SC-88)",
+      "ratings": "5 V reverse standoff; 12 V maximum clamp at 2.5 A; 19 pF maximum per line; IEC 61000-4-2 level 4",
+      "symbolPinout": "Power_Protection:PESD5V0L5UY; pins 1/3/4/5/6 cathodes 1-5, pin 2 common anode; Package_TO_SOT_SMD:SOT-363_SC-70-6",
+      "manufacturerEvidence": "Nexperia PESDxL5UF/V/Y Rev. 02; frozen OpenDrop D4 exact value and footprint",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Nexperia row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-current_measurement_tia_word",
+      "resolverRequest": {
+        "wordId": "current_measurement_tia_word",
+        "nameHuman": "Droplet feedback amplifier",
+        "characterId": "droplet_feedback_amplifier",
+        "functionClass": "op_amp",
+        "requiredRatings": {
+          "voltageV": 5
+        }
+      },
+      "manufacturer": "Microchip Technology",
+      "partNumber": "MCP6002-I/SN",
+      "roleCompatibility": "Frozen OpenDrop U6 is the dual rail-to-rail FEEDBACK AMPLIFIER used for droplet-presence sensing.",
+      "package": "8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch",
+      "ratings": "1.8-6.0 V supply; 1 MHz gain bandwidth; 100 uA typical quiescent current per amplifier; -40 to +85 C",
+      "symbolPinout": "Amplifier_Operational:MCP6002-xSN; pins 1 VOUTA, 2 VINA-, 3 VINA+, 4 VSS, 5 VINB+, 6 VINB-, 7 VOUTB, 8 VDD; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "Microchip MCP6001/2/4 data sheet DS20001733L; frozen OpenDrop U6 value, SO08 footprint and FEEDBACK net",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Microchip row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-terminal_block_word",
+      "resolverRequest": {
+        "wordId": "terminal_block_word",
+        "nameHuman": "Thermal terminal block",
+        "characterId": "terminal_block",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 12,
+          "currentA": 2.23
+        }
+      },
+      "manufacturer": "GOOSVN (Ningbo Gosun Technology)",
+      "partNumber": "GS012S-3.5-02P-11",
+      "roleCompatibility": "Matches frozen H2-3.5-7.0X7.0MM / Seeed OPL 320110028 thermal field terminations",
+      "package": "2P 3.5 mm pitch through-hole screw terminal, ~7x7 mm",
+      "ratings": "300 V / 7 A; heater load 1.79 A @ 12 V",
+      "symbolPinout": "Forge_Manufacturer:GS012S-3.5-02P-11:1=A,2=B",
+      "manufacturerEvidence": "Seeed OPL 320110028 \u2192 GS012S-3.5-02P-11; Gosun GS012S 300V/7A datasheet",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-bulk_capacitor_word",
+      "resolverRequest": {
+        "wordId": "bulk_capacitor_word",
+        "nameHuman": "1000uF 25V bulk capacitor",
+        "characterId": "bulk_capacitor",
+        "functionClass": "passive_c",
+        "requiredRatings": {
+          "voltageV": 25
+        }
+      },
+      "manufacturer": "ST (Xianke / \u5148\u79d1)",
+      "partNumber": "CS1E102M-CRI13",
+      "roleCompatibility": "Exact gold OPL C3 identity for 12 V thermal bulk decoupling",
+      "package": "SMD aluminium D12.5xL13.5 mm polar can",
+      "ratings": "1000 uF 25 V; heater-path RMS <1 A",
+      "symbolPinout": "Forge_Manufacturer:CS1E102M-CRI13:1=+,2=-",
+      "manufacturerEvidence": "Seeed OPL 302030098 \u2192 CS1E102M-CRI13; LCSC C123705",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-h_bridge_tec_driver_word",
+      "resolverRequest": {
+        "wordId": "h_bridge_tec_driver_word",
+        "nameHuman": "TEC/heater power stage",
+        "characterId": "h_bridge_tec_driver",
+        "functionClass": "relay",
+        "requiredRatings": {
+          "voltageV": 14,
+          "currentA": 5.6
+        }
+      },
+      "manufacturer": "Panasonic Industry",
+      "partNumber": "ACTP212",
+      "roleCompatibility": "Primary polarity constituent of frozen ACTP212+IRLB3813 thermal power stage",
+      "package": "Twin Form-C 8-pin PCB relay 17.4x14x13.5 mm",
+      "ratings": "14 VDC / 20 A class; heater 1.79 A; TEC connector-capped 7 A",
+      "symbolPinout": "Forge_Manufacturer:ACTP212:COM1/COM2/NC/NO/coils",
+      "manufacturerEvidence": "Frozen NinjaPCR v2.3 ACTP212 + Infineon IRLB3813PBF topology; heater_film1 6.72 ohm",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-dc_dc_regulator_word",
+      "resolverRequest": {
+        "wordId": "dc_dc_regulator_word",
+        "nameHuman": "12 V to 3.3 V CJT1117 LDO",
+        "characterId": "dc_dc_regulator",
+        "functionClass": "regulator",
+        "requiredRatings": {
+          "voltageV": 12,
+          "currentA": 0.17
+        }
+      },
+      "manufacturer": "Jiangsu Changjing Electronics Technology",
+      "partNumber": "CJT1117B-3.3-G",
+      "roleCompatibility": "Exact gold REG LDO with closed ESP8266 load/thermal budget on 2 oz copper",
+      "package": "SOT-223-3 tab",
+      "ratings": "12 V in / 3.3 V out; avg \u226480 mA, TX peak \u2264170 mA",
+      "symbolPinout": "Forge_Manufacturer:CJT1117B-3.3-G:GND/OUTPUT/INPUT",
+      "manufacturerEvidence": "Seeed OPL 310030097 \u2192 CJT1117B-3.3; LCSC C164899 CJT1117B-3.3-G",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-debug_uart_word",
+      "resolverRequest": {
+        "wordId": "debug_uart_word",
+        "nameHuman": "Debug UART header",
+        "characterId": "debug_uart",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 3.3
+        }
+      },
+      "manufacturer": "Samtec",
+      "partNumber": "TSW-104-07-T-S",
+      "roleCompatibility": "Catalogue 1x4 2.54 mm header for frozen SERIAL4 PINHD-1X4",
+      "package": "1x4 through-hole 2.54 mm pin header",
+      "ratings": "3.3 V UART signal contacts",
+      "symbolPinout": "Forge_Manufacturer:TSW-104-07-T-S:1=TXD,2=RXD,3=GND,4=3V3",
+      "manufacturerEvidence": "Samtec TSW series catalog; frozen SERIAL4 nets TXD/RXD/GND/3V3",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-ferrite_emc_bead_word",
+      "resolverRequest": {
+        "wordId": "ferrite_emc_bead_word",
+        "nameHuman": "LV ferrite bead",
+        "characterId": "ferrite_emc_bead",
+        "functionClass": "passive_l",
+        "requiredRatings": {
+          "currentA": 2
+        }
+      },
+      "manufacturer": "Murata Manufacturing",
+      "partNumber": "BLM18PG121SN1D",
+      "roleCompatibility": "Orderable 0603 bead for frozen Ferrite_Bead_Small FB1-FB8 LV rails",
+      "package": "0603 L_0603_1608Metric",
+      "ratings": "120 ohm@100 MHz, 2 A, LV-only",
+      "symbolPinout": "Device:Ferrite_Bead:1=1,2=2",
+      "manufacturerEvidence": "Murata BLM18PG datasheet; OpenDrop V4 FB footprints revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-power_indicator_led_word",
+      "resolverRequest": {
+        "wordId": "power_indicator_led_word",
+        "nameHuman": "Power LED",
+        "characterId": "power_indicator_led",
+        "functionClass": "led",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.003
+        }
+      },
+      "manufacturer": "Kingbright",
+      "partNumber": "KPT-1608CGCK",
+      "roleCompatibility": "Green 0603 LED for frozen LED1 + 390 ohm ballast",
+      "package": "LED_0603_1608Metric",
+      "ratings": "Vf\u22482.1 V, ~3.1 mA with 390 ohm on 3.3 V",
+      "symbolPinout": "Device:LED:1=K,2=A",
+      "manufacturerEvidence": "Kingbright KPT-1608CGCK; OpenDrop LED1+390R revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-debug_header_word",
+      "resolverRequest": {
+        "wordId": "debug_header_word",
+        "nameHuman": "SWD debug header",
+        "characterId": "debug_header",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 3.3
+        }
+      },
+      "manufacturer": "Samtec",
+      "partNumber": "FTSH-105-01-L-DV",
+      "roleCompatibility": "Catalogue 2x5 1.27 mm SMD header for frozen J2 SWD",
+      "package": "2x5 1.27 mm SMD straight header",
+      "ratings": "3.3 V SWD signal/reference",
+      "symbolPinout": "Forge_Manufacturer:FTSH-105-01-L-DV:SWDIO/SWCLK/RESET/3V3/GND",
+      "manufacturerEvidence": "Samtec FTSH catalog; OpenDrop J2 Conn_02x05 revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-status_indicator_word",
+      "resolverRequest": {
+        "wordId": "status_indicator_word",
+        "nameHuman": "Status LED",
+        "characterId": "status_indicator",
+        "functionClass": "led",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.003
+        }
+      },
+      "manufacturer": "Kingbright",
+      "partNumber": "KPT-1608SECK",
+      "roleCompatibility": "Orange/amber 0603 status LED for frozen LED2/LED3 / RX_LED",
+      "package": "LED_0603_1608Metric",
+      "ratings": "~3 mA with 390 ohm ballast",
+      "symbolPinout": "Device:LED:1=K,2=A",
+      "manufacturerEvidence": "Kingbright KPT-1608SECK; OpenDrop LED2/LED3 revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    }
+  ],
+  "pendingExactMappings": [],
+  "rejectedMappings": [
+    {
+      "punchlistId": "pioreactor-od_optics-ferrite_emc_bead_word",
+      "rejectedIdentity": "Unspecified 0603 ferrite bead",
+      "reason": "Rejected as not fitted: the frozen Eye-Spy rail network contains exact local decoupling but no ferrite bead, and no measured impedance/current/DCR requirement justifies adding one.",
+      "evidence": "Frozen Eye-Spy BOM revision ca40a91e728801b139b1086853f7cf74ce76def9 contains no ferrite bead."
+    },
+    {
+      "punchlistId": "pioreactor-od_optics-power_indicator_led_word",
+      "rejectedIdentity": "TE Connectivity 4-2489541-7",
+      "reason": "Rejected as not fitted: Eye-Spy has no indicator LED, the candidate is a 110 V panel indicator without PCB pad geometry, and Pioreactor assigns system PCB indication to the HAT GPIO23 path.",
+      "evidence": "Frozen Eye-Spy BOM revision ca40a91e728801b139b1086853f7cf74ce76def9 contains no indicator LED; Pioreactor v1.x GPIO contract places the PCB LED on GPIO23."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-adc_input_stage_word",
+      "rejectedIdentity": "NAU7802 / discrete ADC template",
+      "reason": "Not fitted: OpenDrop V4 has no discrete ADC ordering code; HV setpoint is MCP41050 and monitoring uses SAMD21 ADC.",
+      "evidence": "OpenDrop V4 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-firmware_storage_word",
+      "rejectedIdentity": "external SPI/I2C flash/EEPROM",
+      "reason": "Not fitted: SAMD21 internal flash closes firmware storage; no external memory ordering code.",
+      "evidence": "OpenDrop V4 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-host_protocol_bridge_word",
+      "rejectedIdentity": "QFN protocol bridge IC",
+      "reason": "Not fitted: native SAMD21 USB via Amphenol 12401610E4#2A; no bridge ordering code.",
+      "evidence": "OpenDrop V4 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b"
+    }
+  ],
+  "sevenProductSummary": [
+    {
+      "product": "Colorimeter",
+      "requiredBoards": 1,
+      "resolvedDelta": 2,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "NinjaPCR",
+      "requiredBoards": 1,
+      "resolvedDelta": 6,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "Poseidon",
+      "requiredBoards": 0,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "OpenFlexure",
+      "requiredBoards": 0,
+      "resolvedDelta": 0,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "Pioreactor",
+      "requiredBoards": 3,
+      "resolvedDelta": 2,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "Rodeostat",
+      "requiredBoards": 1,
+      "resolvedDelta": 3,
+      "remainingUnresolved": 0
+    },
+    {
+      "product": "OpenDrop",
+      "requiredBoards": 2,
+      "resolvedDelta": 8,
+      "remainingUnresolved": 0
+    }
+  ],
+  "updatedSummary": {
+    "products": 7,
+    "requiredBoards": 8,
+    "verifiedIdentityCount": 56,
+    "unresolvedIdentityCount": 0,
+    "resolvedDelta": 21,
+    "reclassifiedNonComponentCount": 29,
+    "missingMpn": 0,
+    "missingSymbolPinout": 0
+  },
+  "remainingCategoryCounts": {
+    "mechanical_or_off_board_scope": 0,
+    "optical_source_and_visual_indication": 0,
+    "power_entry_conversion_and_protection": 0,
+    "digital_compute_communications_and_storage": 0,
+    "precision_analog_measurement_and_control": 0,
+    "wet_actuation_drive": 0,
+    "board_to_board_and_cartridge_interconnect": 0
+  },
+  "limitations": [
+    "Identity closure is offline evidence work \u2014 no terminal-owned chain or Blender/form rerun is claimed.",
+    "NinjaPCR CJT1117B-3.3-G accepts a closed ESP8266 load budget (\u2264170 mA TX peak) on gold 2 oz copper; a sustained 500 mA continuous 12 V rail exceeds that thermal closure and must not be reintroduced.",
+    "No candidate without manufacturer ordering-code evidence was promoted; OpenDrop LED/ferrite/header identities are catalogue fills of frozen land patterns, not invented gold BOM codes.",
+    "NinjaPCR TEC continuous current remains connector-capped at GS012S 7 A with an engineering freeze \u22645.6 A pending a named TEC MPN."
+  ]
+}

@@ -399,6 +399,15 @@ def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path
         side = math.ceil(side / 10) * 10
     return side, side
 
+def routing_is_complete(unrouted_count: int, track_count: int) -> bool:
+    """Return whether every required connection is routed.
+
+    Track count is diagnostic only: a one-footprint board can legitimately need
+    zero tracks, while a board with many tracks can still retain a ratsnest.
+    """
+    _ = track_count
+    return unrouted_count == 0
+
 def selftest() -> None:
     """proveCatch: compact optical/source boards stay in the 25–40 mm window.
 
@@ -432,7 +441,16 @@ def selftest() -> None:
     # proveCatch: IC grid is board-centred (old cy-20 shoved pads off a 40 mm board).
     _footprint_cache["Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"] = FootprintData(
         bbox_w=6.0, bbox_h=5.0, resolved_from="fixture",
-        pads=[{"num": "1", "x": -2.7, "y": -1.9, "w": 0.6, "h": 1.5, "rot": 0, "type": "smd", "shape": "rect"}],
+        pads=[
+            {"num": "1", "x": -2.7, "y": -1.905, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "2", "x": -2.7, "y": -0.635, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "3", "x": -2.7, "y": 0.635, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "4", "x": -2.7, "y": 1.905, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "5", "x": 2.7, "y": 1.905, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "6", "x": 2.7, "y": 0.635, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "7", "x": 2.7, "y": -0.635, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "8", "x": 2.7, "y": -1.905, "w": 1.5, "h": 0.6, "rot": 0, "type": "smd", "shape": "rect"},
+        ],
     )
     _footprint_cache["LED_SMD:LED_0603_1608Metric"] = FootprintData(
         bbox_w=1.6, bbox_h=0.8, resolved_from="fixture",
@@ -518,7 +536,43 @@ def selftest() -> None:
         raise AssertionError(
             f"SMD band must sit below IC (F1.y={place_d['F1'][1]:.1f} U1.y={place_d['U1'][1]:.1f})"
         )
-    print("pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + motherboard counter-case + IC/SMD band + fuse pitch + LQFP band)")
+    # proveCatch (Pioreactor wet-actuation 2026-07-18): the SMD band must sit
+    # below the lowest IC GRID ROW, not merely below board centre. Three SOICs
+    # create two rows; the old cy-based anchor overlapped row two on every retry.
+    wet_actuation = [
+        Component("U1", "heater gate driver", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"),
+        Component("U2", "stir gate driver", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"),
+        Component("U3", "pump gate driver", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"),
+        Component("C1", "heater decouple", "Capacitor_SMD:C_0603_1608Metric"),
+        Component("C2", "stir decouple", "Capacitor_SMD:C_0603_1608Metric"),
+        Component("C3", "pump decouple", "Capacitor_SMD:C_0603_1608Metric"),
+    ]
+    place_wet = place_components(
+        wet_actuation, cfg, Path("/tmp/unused"), 55.0, 55.0, 12.0, 5.0,
+        ic_spacing=21.0, smd_spacing=7.0,
+    )
+    lowest_ic_row_y = max(place_wet[ref][1] for ref in ("U1", "U2", "U3"))
+    first_support_row_y = min(place_wet[ref][1] for ref in ("C1", "C2", "C3"))
+    if first_support_row_y <= lowest_ic_row_y:
+        raise AssertionError(
+            "SMD support band must start below the lowest IC grid row "
+            f"(support={first_support_row_y:.1f}, IC={lowest_ic_row_y:.1f})"
+        )
+    ok_wet, reason_wet = validate_placement(
+        place_wet, wet_actuation, cfg, Path("/tmp/unused"), 55.0, 55.0,
+    )
+    if not ok_wet:
+        raise AssertionError(
+            f"multi-row IC grid must clear its SMD support band, got: {reason_wet}"
+        )
+    # proveCatch (OpenDrop cartridge 2026-07-18): a one-footprint board with no
+    # remaining ratsnest needs zero tracks. Track presence must not override the
+    # autorouter's explicit zero-unrouted result.
+    if not routing_is_complete(unrouted_count=0, track_count=0):
+        raise AssertionError("zero-unrouted board must be complete even when zero tracks are required")
+    if routing_is_complete(unrouted_count=1, track_count=20):
+        raise AssertionError("track presence must not hide an unrouted connection")
+    print("pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + motherboard counter-case + IC/SMD band + fuse pitch + LQFP band + multi-row IC/SMD band + zero-route completeness)")
 
 # ─── Placement (unchanged algorithm; NAIVE — grid/edge placement, not a real
 #     autoplacer. Bounded to the board's own outline bbox with a margin >= the
@@ -646,11 +700,15 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
     max_pad_extent = max_smd_half_h
     smd_spacing = max(smd_spacing, 2 * max_pad_extent + 0.5)
     band_gap = max(2.5, ic_spacing * 0.2, 1.0)
-    # DECISION (2026-07-16): anchor the SMD band BELOW the IC pad extent.
-    # Centring the SMD grid on smd_cy pulled row-0 back into the LQFP pads
-    # (Poseidon retest: U1@cy vs F1@cy+5.6 with extents 4.92+2.27 needed ≥7.4).
+    # DECISION (2026-07-18): anchor the SMD band below the LOWEST occupied IC
+    # grid row. A board-centre anchor clears one IC row but overlaps row two
+    # whenever three or more ICs form a multi-row grid (Pioreactor wet actuation).
     if ics:
-        smd_top = cy + max_ic_half_h + band_gap
+        lowest_ic_edge = max(
+            placements[c.ref][1] + max(_pad_radial_extent(fp), fp.bbox_h / 2, 1.0)
+            for c, fp in ics
+        )
+        smd_top = lowest_ic_edge + band_gap
         smd_y0 = smd_top + max_smd_half_h
     else:
         smd_y0 = cy - (smd_rows - 1) * smd_spacing / 2
@@ -1134,7 +1192,7 @@ def run(args) -> dict:
         emit(result)
         return result
     result["kicad_pcb_path"] = str(routed_board)
-    result["routed"] = track_count > 0
+    result["routed"] = routing_is_complete(unrouted, track_count)
 
     # 5. DRC (real kicad-cli invocation — the only source of truth for violations)
     result["stage_reached"] = "drc"

@@ -1,0 +1,871 @@
+/**
+ * @file Off-chain ingest for exact manufacturer-backed PCB candidates.
+ * @description Writes frozen-reference identities into forge-truth so
+ * chain-side resolution remains a DB-only read. No live distributor adapter is
+ * imported or called from this module.
+ */
+
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { resolve } from 'node:path'
+
+import Database from 'better-sqlite3'
+
+const DISCOVERY_SOURCE = 'manufacturer_verified_pcb_ingest'
+const EMBEDDING_MODEL = 'text-embedding-3-small'
+const EMBEDDING_DIMENSIONS = 1536
+
+interface PcbVerifiedCandidate {
+  partName: string
+  manufacturer: string
+  partNumber: string
+  componentClass: string
+  function: string
+  package: string
+  pinout?: string
+  ratings: Record<string, string | number | boolean>
+  sourceUrl: string
+  sourceCommit: string
+  evidence: string
+}
+
+export interface PcbCandidateIngestOptions {
+  databasePath: string
+  commit: boolean
+  embed?: (text: string) => Promise<Buffer | null>
+  now?: string
+}
+
+export interface PcbCandidateIngestResult {
+  inserted: number
+  updated: number
+  unchanged: number
+  embedded: number
+  dryRun: boolean
+}
+
+/**
+ * @description The only identities this focused ingest is authorised to write.
+ * Metadata is transcribed from the manufacturer sources and frozen reference
+ * revisions already cited by the function-keyed PCB resolver.
+ */
+export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
+  {
+    partName: 'BAS70-04 dual low-leakage series Schottky clamp',
+    manufacturer: 'Slkor',
+    partNumber: 'BAS70-04',
+    componentClass: 'diode_protection',
+    function: 'low-leakage rail clamping in the precision electrochemical analogue path',
+    package: 'SOT-23, three terminals, dual Schottky diodes in series',
+    ratings: {
+      reverseVoltageV: 70,
+      forwardCurrentA: 0.07,
+      surgeCurrentA: 0.1,
+      reverseLeakageAAt50V: 1e-7,
+      capacitancePf: 2,
+      pinCount: 3,
+    },
+    sourceUrl: 'https://www.lcsc.com/product-detail/C609810.html',
+    sourceCommit: '86e4708fea84f8fc33bcbfc9a706b06f4b770efd',
+    evidence: 'Frozen Rodeostat high-current BOM and schematic identify D1/D2 as BAS70-04, LCSC C609810, SOT-23. Slkor manufacturer data distributed by LCSC defines exact MPN, series configuration, 70 V/70 mA ratings, 100 nA leakage at 50 V, 2 pF capacitance and pins 1=A1, 2=K2, 3=K1/A2. This is a low-leakage clamp, not evidence of IEC 61000-4-2 TVS certification.',
+  },
+  {
+    partName: 'ItsyBitsy M4 Express compute and mixed-signal host module',
+    manufacturer: 'Adafruit Industries',
+    partNumber: '3800',
+    componentClass: 'compute_module',
+    function: 'USB host, dual ADC, firmware compute, power indication and status indication for the Rodeostat analogue shield',
+    package: 'assembled module, 35.9 x 17.8 x 4.2 mm, frozen 33-pin castellated/header interface',
+    ratings: {
+      logicVoltageV: 3.3,
+      processor: 'Microchip ATSAMD51G19A, 120 MHz Cortex-M4',
+      adcResolutionBits: 12,
+      adcSampleRateSps: 1_000_000,
+      adcCount: 2,
+      analogInputCount: 7,
+      flashBytes: 524_288,
+      ramBytes: 196_608,
+      interfacePinCount: 33,
+      indicators: 'red D13 LED and RGB DotStar LED',
+    },
+    sourceUrl: 'https://www.adafruit.com/product/3800',
+    sourceCommit: '86e4708fea84f8fc33bcbfc9a706b06f4b770efd',
+    evidence: 'Frozen Rodeostat U2 is ITSY_BITSY_M4 with a 33-pin module symbol/footprint and routes conditioned analogue signals to A0-A5 host pins. Adafruit product 3800 specifies the 35.9 x 17.8 x 4.2 mm ItsyBitsy M4 Express, ATSAMD51G19A, 3.3 V logic, dual 1 MSPS 12-bit ADCs, red D13 LED and RGB DotStar LED.',
+  },
+  {
+    partName: '469 nm blue 0603 optical source LED',
+    manufacturer: 'Yongyu Photoelectric',
+    partNumber: 'SZYY0603B',
+    componentClass: 'led',
+    function: '470 nm-class optical source for a 3.3 V resistor-ballasted daughterboard',
+    package: '0603 SMD, 1.6 x 0.8 x 0.6 mm, water-clear, polarised two-terminal diode',
+    ratings: {
+      forwardVoltageV: 3.1,
+      forwardCurrentA: 0.03,
+      validatedOperatingCurrentA: 0.015,
+      peakWavelengthNm: 469,
+      dominantWavelengthNm: '460 to 475',
+      luminousIntensityMcd: 175,
+      operatingTemperatureC: '-40 to 85',
+    },
+    sourceUrl: 'https://www.lcsc.com/datasheet/C434421.pdf',
+    sourceCommit: 'b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7',
+    evidence: 'Yongyu manufacturer data for LCSC C434421 defines exact MPN SZYY0603B, polarity, 0603 package, 469 nm peak and 3.1 V/30 mA ratings; frozen Open Colorimeter 470 nm source board requires one 0603 LED operated at 3.1 V/15 mA.',
+  },
+  {
+    partName: 'Four-contact 1 mm right-angle source-board connector',
+    manufacturer: 'BOOMELE (Boom Precision Elec)',
+    partNumber: '1.0T-4P',
+    componentClass: 'connector',
+    function: 'daisy-chain 3.3 V, ground, SDA and SCL source-board interconnect',
+    package: 'four-contact, 1.00 mm-pitch, right-angle surface-mount SH-compatible header',
+    ratings: {
+      voltageV: 50,
+      currentA: 1,
+      contactCount: 4,
+      operatingTemperatureC: '-25 to 85',
+      flammability: 'UL94V-0',
+    },
+    sourceUrl: 'https://www.lcsc.com/product-detail/C145956.html',
+    sourceCommit: 'b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7',
+    evidence: 'BOOMELE manufacturer data for LCSC C145956 identifies exact MPN 1.0T-4P and its four-contact right-angle 1 mm package; frozen Open Colorimeter J1/J2 name LCSC C145956 and map pins 1 GND, 2 3V3, 3 SDA, 4 SCL.',
+  },
+  {
+    partName: 'ESP-WROOM-02 ESP8266 Wi-Fi module',
+    manufacturer: 'Espressif Systems',
+    partNumber: 'ESP-WROOM-02',
+    componentClass: 'connectivity_ic',
+    function: '3.3 V Wi-Fi control module with UART, GPIO and PCB antenna',
+    package: '18-pad 18 x 20 mm surface-mount module with PCB antenna',
+    ratings: {
+      supplyVoltageV: '3.0 to 3.6',
+      recommendedSupplyCurrentA: 0.5,
+      pinCount: 18,
+    },
+    sourceUrl: 'https://documentation.espressif.com/0c-esp-wroom-02_datasheet_en.pdf',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Espressif datasheet defines the 18-pad module pinout, 3.3 V supply and antenna keepout; frozen NinjaPCR ESP2 uses the exact ESP-WROOM-02 symbol and footprint.',
+  },
+  {
+    partName: 'NinjaPCR gold OPL 1000 uF 25 V bulk capacitor',
+    manufacturer: 'ST (Xianke / 先科)',
+    partNumber: 'CS1E102M-CRI13',
+    componentClass: 'passive_c',
+    function: '12 V thermal-stage bulk decoupling on frozen CAP_SMD_AL_D125',
+    package: 'polar radial can SMD, 12.5 mm diameter x 13.5 mm body length',
+    pinout: 'two polarised terminals: positive and negative; polarity stripe marks negative terminal',
+    ratings: {
+      capacitanceUf: 1000,
+      ratedVoltageV: 25,
+      tolerancePercent: '-20 to +20',
+      enduranceHoursAt105C: 2000,
+      operatingTemperatureC: '-40 to 105',
+      closedHeaterPathRmsA: 0.9,
+    },
+    sourceUrl: 'https://www.lcsc.com/product-detail/C123705.html',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Seeed OPL SKU 302030098 maps frozen NinjaPCR C3 CAP_SMDAL_1000UF_25V to exact MPN CS1E102M-CRI13 (1000 uF 25 V D12.5xL13.5). Gold heater_film1 closes 1.79 A @ 12 V so heater-path bulk RMS stays below 1 A. LCSC C123705 confirms the ordering identity.',
+  },
+  {
+    partName: 'NinjaPCR alternate 1000 uF 25 V bulk capacitor',
+    manufacturer: 'Panasonic Industry',
+    partNumber: 'EEVFK1E102Q',
+    componentClass: 'passive_c',
+    function: 'datasheet-complete alternate for 12 V thermal-stage bulk decoupling',
+    package: 'polar radial can SMD, 12.5 mm diameter x 13.5 mm body length',
+    pinout: 'two polarised terminals: positive and negative; polarity stripe marks negative terminal',
+    ratings: {
+      capacitanceUf: 1000,
+      ratedVoltageV: 25,
+      tolerancePercent: '-20 to +20',
+      rippleCurrentArmsAt100Khz: 1.1,
+      impedanceMohmAt100Khz: 60,
+      enduranceHoursAt105C: 5000,
+      operatingTemperatureC: '-55 to 105',
+    },
+    sourceUrl: 'https://industrial.panasonic.com/ww/products/pt/aluminum-cap-smd/models/EEVFK1E102Q',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Panasonic EEVFK1E102Q matches the frozen D12.5 1000 uF 25 V envelope with published 1.1 Arms ripple. Retained as an alternate; gold OPL identity CS1E102M-CRI13 is the accepted fitted MPN.',
+  },
+  {
+    partName: 'NinjaPCR thermal screw terminal',
+    manufacturer: 'GOOSVN (Ningbo Gosun Technology)',
+    partNumber: 'GS012S-3.5-02P-11',
+    componentClass: 'connector',
+    function: '2-position 3.5 mm field-wire termination for heater and TEC power',
+    package: 'through-hole 2-position screw terminal, 3.5 mm pitch, approximately 7 x 7 mm',
+    pinout: 'two screw clamps: contact 1 and contact 2; no polarity key',
+    ratings: {
+      voltageV: 300,
+      currentA: 7,
+      pitchMm: 3.5,
+      wireAwg: '24 to 18',
+      operatingTemperatureC: '-40 to 105',
+      closedHeaterCurrentA: 1.79,
+    },
+    sourceUrl: 'http://www.gosun-tech.com/Products-GS012S.htm',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Frozen NinjaPCR BOM HEATER_POWER/HEATER_TEMP/PELTIER are H2-3.5-7.0X7.0MM Seeed OPL 320110028, which maps to GS012S-3.5-02P-11. Gosun GS012S series is 300 V / 7 A. Gold heater_film1 (6.72 ohm, 19 W @ 11.3 V) closes 1.79 A at 12 V.',
+  },
+  {
+    partName: 'NinjaPCR twin power relay for thermal polarity',
+    manufacturer: 'Panasonic Industry',
+    partNumber: 'ACTP212',
+    componentClass: 'relay',
+    function: 'twin Form-C relay for bidirectional thermal-load polarity control in the frozen power stage',
+    package: 'sealed 17.4 x 14 x 13.5 mm through-hole PCB relay, eight pins',
+    pinout: 'frozen gold symbol: pins 1/2 switched load commons, pin 3 shared NC feed, pin 4 shared NO feed, pins 5/6 coil 1, pins 7/8 coil 2; verify bottom-view orientation against ASCTB229E drawing',
+    ratings: {
+      coilVoltageV: 12,
+      coilCurrentMa: 83.3,
+      coilResistanceOhm: 144,
+      contactArrangement: '1 Form C x 2, 8 pins',
+      noResistiveSwitching: '30 A at 14 VDC',
+      ncResistiveSwitching: '10 A at 14 VDC',
+      operatingTemperatureC: '-40 to 85',
+      closedHeaterCurrentA: 1.79,
+      tecConnectorLimitA: 7,
+    },
+    sourceUrl: 'https://www.industrypanasonic.com/datasheet/industrypanasonic/ACTP512.pdf',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Frozen NinjaPCR v2.3 names ACTP212 with IRLB3813PBF as the released thermal power stage. Heater_film1 closes 1.79 A @ 12 V; TEC continuous current is connector-capped by GS012S at 7 A.',
+  },
+  {
+    partName: 'NinjaPCR TEC/heater low-side power MOSFET',
+    manufacturer: 'Infineon Technologies',
+    partNumber: 'IRLB3813PBF',
+    componentClass: 'power_mosfet',
+    function: 'low-side PWM switch in the frozen relay/MOSFET thermal stage',
+    package: 'TO-220AB through-hole, three leads plus drain tab',
+    pinout: 'lead 1 Gate, lead 2 Drain, lead 3 Source; metal tab is Drain',
+    ratings: {
+      drainSourceVoltageV: 30,
+      packageLimitedContinuousCurrentA: 120,
+      pulsedDrainCurrentA: 1050,
+      maxRdsOnMohmAt10V: 1.95,
+      maxRdsOnMohmAt4V5: 2.6,
+      maxPowerDissipationW: 230,
+      junctionTemperatureC: '-55 to 175',
+      closedHeaterCurrentA: 1.79,
+    },
+    sourceUrl: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlb3813-datasheet-en.pdf',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Frozen NinjaPCR Q1 is IRLB3813PBF on TO220BV with gold heatsink. Closed against heater 1.79 A @ 12 V and GS012S-limited TEC current.',
+  },
+  {
+    partName: 'NinjaPCR 3.3 V linear regulator',
+    manufacturer: 'Jiangsu Changjing Electronics Technology',
+    partNumber: 'CJT1117B-3.3-G',
+    componentClass: 'regulator',
+    function: '3.3 V LDO for ESP-WROOM-02 from the 12 V controller supply',
+    package: 'SOT-223, three leads plus output tab',
+    pinout: 'pin 1 GND, pin 2 OUTPUT, pin 3 INPUT; exposed tab is OUTPUT',
+    ratings: {
+      recommendedInputVoltageV: 15,
+      outputVoltageV: 3.3,
+      outputCurrentA: 1,
+      dropoutVoltageVAt1A: 1.3,
+      thermalResistanceJunctionAmbientCPerW: 100,
+      operatingJunctionTemperatureC: '-25 to 125',
+      closedAverageLoadA: 0.08,
+      closedTxPeakLoadA: 0.17,
+    },
+    sourceUrl: 'https://www.jscj-elec.com/gallery/file/CJT1117B-XXX%20SOT-223%20V1.pdf',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Seeed OPL 310030097 / LCSC C164899 identify CJT1117B-3.3-G for frozen REG. ESP-WROOM-02 load closes at ≤80 mA average / ≤170 mA TX peak on gold 2 oz copper; unconstrained 500 mA continuous is rejected.',
+  },
+  {
+    partName: 'NinjaPCR SERIAL4 debug UART header',
+    manufacturer: 'Samtec',
+    partNumber: 'TSW-104-07-T-S',
+    componentClass: 'connector',
+    function: '1x4 programming/service UART header for ESP-WROOM-02',
+    package: '1x4 through-hole pin header, 2.54 mm pitch',
+    pinout: 'pin 1 TXD, pin 2 RXD, pin 3 GND, pin 4 3V3/reference',
+    ratings: {
+      voltageV: 3.3,
+      pitchMm: 2.54,
+      contactCount: 4,
+    },
+    sourceUrl: 'https://www.samtec.com/products/tsw',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Frozen NinjaPCR SERIAL4 is PINHD-1X4 with TXD/RXD/GND/3V3. Samtec TSW-104-07-T-S is the catalogue 1x4 2.54 mm header that realises the frozen land pattern.',
+  },
+  {
+    partName: 'OpenDrop LV ferrite bead',
+    manufacturer: 'Murata Manufacturing',
+    partNumber: 'BLM18PG121SN1D',
+    componentClass: 'passive_l',
+    function: '0603 series ferrite on OpenDrop LV rails adjacent to MAX1771 switching',
+    package: '0603 (1608) SMD ferrite bead',
+    pinout: 'two-terminal series element; pins 1 and 2',
+    ratings: {
+      impedanceOhmAt100Mhz: 120,
+      currentA: 2,
+      dcrOhm: 0.05,
+    },
+    sourceUrl: 'https://www.murata.com/en-us/products/productdetail?partno=BLM18PG121SN1%23',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Frozen OpenDrop V4 places Ferrite_Bead_Small FB1-FB8 on L_0603_1608Metric without an ordering code. Murata BLM18PG121SN1D fills that LV-only land pattern at 120 ohm@100 MHz / 2 A.',
+  },
+  {
+    partName: 'OpenDrop power indicator LED',
+    manufacturer: 'Kingbright',
+    partNumber: 'KPT-1608CGCK',
+    componentClass: 'led',
+    function: 'green 0603 power/ready indicator for frozen LED1',
+    package: '0603 SMD LED',
+    pinout: 'two-terminal polarised diode; cathode mark matches LED_0603_1608Metric',
+    ratings: {
+      forwardVoltageV: 2.1,
+      forwardCurrentA: 0.02,
+      validatedOperatingCurrentA: 0.0031,
+    },
+    sourceUrl: 'https://www.kingbrightusa.com/PDF/KPT-1608CGCK.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Frozen OpenDrop LED1 is a generic 0603 with 390 ohm ballast on 3.3 V (~3.1 mA). Kingbright KPT-1608CGCK is the catalogue green fill for that land pattern.',
+  },
+  {
+    partName: 'OpenDrop status indicator LED',
+    manufacturer: 'Kingbright',
+    partNumber: 'KPT-1608SECK',
+    componentClass: 'led',
+    function: 'orange/amber 0603 status/RX indicator for frozen LED2/LED3',
+    package: '0603 SMD LED',
+    pinout: 'two-terminal polarised diode; cathode mark matches LED_0603_1608Metric',
+    ratings: {
+      forwardVoltageV: 2.1,
+      forwardCurrentA: 0.02,
+      validatedOperatingCurrentA: 0.003,
+    },
+    sourceUrl: 'https://www.kingbrightusa.com/PDF/KPT-1608SECK.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Frozen OpenDrop LED2/LED3 and RX_LED/D13 nets are generic 0603 indicators with 390 ohm ballasts. Kingbright KPT-1608SECK fills the status colour role on that land pattern.',
+  },
+  {
+    partName: 'OpenDrop SWD debug header',
+    manufacturer: 'Samtec',
+    partNumber: 'FTSH-105-01-L-DV',
+    componentClass: 'connector',
+    function: '2x5 1.27 mm SMD SWD programming header for SAMD21',
+    package: '2x5 SMD straight header, 1.27 mm pitch',
+    pinout: 'Conn_02x05_Odd_Even: SWDIO, SWCLK, RESET, +3V3, GND on frozen J2 nets',
+    ratings: {
+      voltageV: 3.3,
+      pitchMm: 1.27,
+      contactCount: 10,
+    },
+    sourceUrl: 'https://www.samtec.com/products/ftsh',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD. Samtec FTSH-105-01-L-DV is the catalogue header for that land pattern.',
+  },
+  {
+    partName: 'MAX1771 adjustable step-up DC-DC controller',
+    manufacturer: 'Maxim Integrated',
+    partNumber: 'MAX1771ESA',
+    componentClass: 'regulator',
+    function: 'adjustable high-voltage boost converter controller with external N-channel MOSFET',
+    package: '8-pin narrow SO surface-mount package',
+    ratings: {
+      inputVoltageV: '2 to 16.5',
+      presetOutputVoltageV: 12,
+      switchingFrequencyKhz: 300,
+    },
+    sourceUrl: 'https://www.analog.com/media/en/technical-documentation/data-sheets/MAX1771.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Maxim datasheet lists MAX1771ESA in 8-pin SO with a 2-16.5 V input range; frozen OpenDrop U1 uses exact value MAX1771ESA and SO08 footprint.',
+  },
+  {
+    partName: 'ADS1114 single-channel 16-bit delta-sigma ADC',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'ADS1114IDGSR',
+    componentClass: 'sensor_ic',
+    function: 'precision photodiode signal conversion with PGA, reference, comparator and I2C',
+    package: 'VSSOP (DGS), 10 pins, tape and reel',
+    ratings: {
+      supplyVoltageV: '2.0 to 5.5',
+      resolutionBits: 16,
+      sampleRateSps: 860,
+    },
+    sourceUrl: 'https://www.ti.com/lit/ds/symlink/ads1114.pdf',
+    sourceCommit: 'ca40a91e728801b139b1086853f7cf74ce76def9',
+    evidence: 'TI SBAS444E lists ADS1114IDGSR in 10-pin VSSOP; frozen Eye-Spy BOM and U2 schematic property give the exact ordering code and DGS footprint.',
+  },
+  {
+    partName: 'MCP1700 fixed 3.3 V low-quiescent-current LDO',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP1700T-3302E/TT',
+    componentClass: 'regulator',
+    function: '3.3 V low-current linear regulation from a supply no higher than 6 V',
+    package: '3-lead SOT-23 (TT), tape and reel',
+    ratings: {
+      inputVoltageV: '2.3 to 6.0',
+      outputVoltageV: 3.3,
+      outputCurrentA: 0.25,
+      pinCount: 3,
+    },
+    sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/MCP1700-Data-Sheet-20001826F.pdf',
+    sourceCommit: 'd43f46aafa1b722fe2f7a42cd1e026712acfe4b5',
+    evidence: 'Microchip DS20001826F identifies MCP1700T-3302E/TT as 3.3 V in three-lead SOT-23 and defines pins 1 GND, 2 VOUT, 3 VIN; its 6 V maximum rejects direct use on a 12 V rail.',
+  },
+  {
+    partName: 'NAU7802 24-bit bridge-sensor ADC',
+    manufacturer: 'Nuvoton Technology Corporation',
+    partNumber: 'NAU7802SGI',
+    componentClass: 'sensor_ic',
+    function: 'high-resolution low-rate differential bridge and strain-gauge conversion',
+    package: 'SOP-16, 150 mil',
+    ratings: {
+      supplyVoltageV: '2.7 to 5.5',
+      resolutionBits: 24,
+      pinCount: 16,
+    },
+    sourceUrl: 'https://www.nuvoton.com/export/resource-files/en-us--DS_NAU7802_DataSheet_EN_Rev2.6.pdf',
+    sourceCommit: 'd43f46aafa1b722fe2f7a42cd1e026712acfe4b5',
+    evidence: 'Nuvoton NAU7802 Rev2.6 defines the complete SOP-16 pinout and the NAU7802SGI product record identifies SOP-16; this bridge ADC is not evidence for generic electrochemical or high-voltage ADC roles.',
+  },
+  {
+    partName: 'OPA334 zero-drift operational amplifier with shutdown',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'OPA334AIDBVR',
+    componentClass: 'op_amp',
+    function: 'single-supply zero-drift amplification with logic-controlled shutdown',
+    package: 'SOT-23 (DBV), 6 pins, tape and reel',
+    ratings: {
+      supplyVoltageV: '2.7 to 5.5',
+      pinCount: 6,
+      shutdown: true,
+    },
+    sourceUrl: 'https://www.ti.com/lit/ds/symlink/opa334.pdf',
+    sourceCommit: 'd43f46aafa1b722fe2f7a42cd1e026712acfe4b5',
+    evidence: 'TI SBOS213D identifies OPA334AIDBVR as the shutdown version in six-pin SOT-23 DBV and defines pins 1 OUT, 2 V-, 3 +IN, 4 -IN, 5 ENABLE, 6 V+; the prior SOT-23-5 mapping was false.',
+  },
+  {
+    partName: 'KK 254 three-circuit vertical friction-lock header',
+    manufacturer: 'Molex',
+    partNumber: '22-23-2031',
+    componentClass: 'connector',
+    function: 'three-circuit keyed fan power and tachometer wire-to-board interconnect',
+    package: 'vertical through-hole header, 3 circuits, 2.54 mm pitch',
+    ratings: {
+      voltageV: 250,
+      currentA: 2.5,
+      contactCount: 3,
+    },
+    sourceUrl: 'https://www.molex.com/en-us/products/part-detail/22232031',
+    sourceCommit: '181768d6ec068a6dd68593042167699285744768',
+    evidence: 'Molex KK 254 product specification covers 6410 vertical friction-lock headers at 250 V and 2.5 A; frozen NinjaPCR FAN1 uses exact ordering code 22-23-2031.',
+  },
+  {
+    partName: 'OP07C precision single operational amplifier',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'OP07CDR',
+    componentClass: 'op_amp',
+    function: 'precision bipolar DAC shift and scale operational amplifier',
+    package: 'SOIC (D), 8 pins, tape and reel',
+    ratings: {
+      recommendedSupplyVoltageV: 36,
+      recommendedDualSupplyVoltageV: '±18',
+      operatingTemperatureC: '0 to 70',
+    },
+    sourceUrl: 'https://www.ti.com/lit/ds/symlink/op07.pdf',
+    sourceCommit: '86e4708fea84f8fc33bcbfc9a706b06f4b770efd',
+    evidence: 'TI SLOS099H lists active OP07CDR in 8-pin SOIC (D); frozen Rodeostat BOM maps U11/U13 to OP07CDR.',
+  },
+  {
+    partName: 'TL072C low-noise dual JFET-input operational amplifier',
+    manufacturer: 'STMicroelectronics',
+    partNumber: 'TL072CDT',
+    componentClass: 'op_amp',
+    function: 'dual selectable-gain transimpedance and current measurement amplifier',
+    package: 'SO-8, tape and reel',
+    ratings: {
+      supplyVoltageV: 36,
+      dualSupplyVoltageV: '±18',
+      operatingTemperatureC: '0 to 70',
+    },
+    sourceUrl: 'https://www.st.com/resource/en/datasheet/tl072.pdf',
+    sourceCommit: '86e4708fea84f8fc33bcbfc9a706b06f4b770efd',
+    evidence: 'ST TL072 production datasheet specifies a dual JFET-input amplifier in SO-8; frozen Rodeostat BOM maps U9 to TL072CDT.',
+  },
+  {
+    partName: 'USB 3.2 Gen 2 Type-C 24-contact receptacle',
+    manufacturer: 'Amphenol ICC',
+    partNumber: '12401610E4#2A',
+    componentClass: 'usb_connector',
+    function: 'full-featured USB-C power and data receptacle',
+    package: 'right-angle top-mount dual-row SMT receptacle, 24 contacts',
+    ratings: {
+      candidateRequiredVoltageV: 5,
+      candidateRequiredCurrentA: 5,
+      contactCount: 24,
+      interface: 'USB 3.2 Gen 2',
+    },
+    sourceUrl: 'https://www.amphenol-cs.com/product/12401610E42A.html',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Amphenol product data identifies 12401610E4#2A as a 24-contact right-angle top-mount USB Type-C receptacle; frozen OpenDrop J1 uses its exact footprint.',
+  },
+  {
+    partName: 'Raspberry Pi HAT 40-contact host socket',
+    manufacturer: 'Samtec',
+    partNumber: 'SSQ-120-03-T-D',
+    componentClass: 'connector',
+    function: 'Raspberry Pi HAT host interconnect carrying power, GPIO buses and the RP2040 SWD programming path',
+    package: '2x20 vertical through-hole socket, 2.54 mm pitch, 10.00 mm square tails, matte-tin contacts',
+    pinout: 'Raspberry Pi physical pins 1-40; physical pin 18 is GPIO24/SWDIO and pin 22 is GPIO25/SWCLK; full application mapping is curated in Forge_Manufacturer:SSQ-120-03-T-D',
+    ratings: {
+      voltageVac: 465,
+      voltageVdc: 655,
+      currentPerPinA: 6.3,
+      contactCount: 40,
+      operatingTemperatureC: '-55 to 105',
+    },
+    sourceUrl: 'https://www.samtec.com/products/ssq-120-03-t-d',
+    sourceCommit: 'ca40a91e728801b139b1086853f7cf74ce76def9',
+    evidence: 'Samtec SSQ-TH series data defines SSQ-120-03-T-D as a 20-position-per-row, double-row, lead-style-03, matte-tin, 2.54 mm through-hole socket rated 6.3 A per pin with two pins powered and 465 VAC/655 VDC; frozen Pioreactor HAT v1.2 CAD requires the 40-contact host socket and the frozen Pioreactor temperature-board BOM independently names exact SSQ-120-03-T-D.',
+  },
+  {
+    partName: '50 kohm SPI high-voltage setpoint potentiometer',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP41050-I/SN',
+    componentClass: 'programmable_resistor',
+    function: '256-position SPI adjustment of the MAX1771 high-voltage feedback setpoint',
+    package: '8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch (SN)',
+    pinout: 'pins 1=CS, 2=SCK, 3=SI, 4=VSS, 5=PA0, 6=PW0, 7=PB0, 8=VDD',
+    ratings: {
+      supplyVoltageV: '2.7 to 5.5',
+      nominalResistanceOhm: 50000,
+      resolutionBits: 8,
+      wiperCurrentA: 0.001,
+      operatingTemperatureC: '-40 to 85',
+    },
+    sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/11195c.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Microchip DS11195C identifies MCP41050-I/SN as the industrial-temperature 50 kohm, 256-position SPI potentiometer in eight-lead SOIC and defines pins 1 CS, 2 SCK, 3 SI, 4 VSS, 5 PA0, 6 PW0, 7 PB0, 8 VDD; frozen OpenDrop U15 has value MCP41050 and SO08 footprint on the MAX1771 VSENS setpoint path.',
+  },
+  {
+    partName: 'Five-line 5 V ESD protection diode array',
+    manufacturer: 'Nexperia',
+    partNumber: 'PESD5V0L5UY',
+    componentClass: 'diode_protection',
+    function: 'five-channel unidirectional ESD and transient protection for exposed low-voltage lines',
+    package: 'six-lead SOT363 (SC-88)',
+    pinout: 'pins 1/3/4/5/6=cathodes 1-5; pin 2=common anode',
+    ratings: {
+      reverseStandoffVoltageV: 5,
+      clampingVoltageV: 12,
+      peakPulseCurrentA: 2.5,
+      diodeCapacitancePf: 19,
+      contactDischargeKv: 8,
+    },
+    sourceUrl: 'https://assets.nexperia.com/documents/data-sheet/PESDXL5UF_V_Y.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Nexperia PESDxL5UF/V/Y Rev. 02 identifies PESD5V0L5UY as a fivefold 5 V array in SOT363 and defines pins 1, 3, 4, 5 and 6 as cathodes with pin 2 common anode; frozen OpenDrop D4 names the exact MPN and SOT-363_SC-70-6 footprint.',
+  },
+  {
+    partName: 'Dual rail-to-rail droplet feedback amplifier',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP6002-I/SN',
+    componentClass: 'op_amp',
+    function: 'dual low-power feedback amplifier for droplet-presence sensing',
+    package: '8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch (SN)',
+    pinout: 'pins 1=VOUTA, 2=VINA-, 3=VINA+, 4=VSS, 5=VINB+, 6=VINB-, 7=VOUTB, 8=VDD',
+    ratings: {
+      supplyVoltageV: '1.8 to 6.0',
+      gainBandwidthMhz: 1,
+      quiescentCurrentUaPerAmplifier: 100,
+      operatingTemperatureC: '-40 to 85',
+    },
+    sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/MCP6001-1R-1U-2-4-1-MHz-Low-Power-Op-Amp-DS20001733L.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Microchip DS20001733L identifies MCP6002-I/SN as the industrial-temperature dual 1 MHz rail-to-rail op amp in eight-lead SOIC and defines pins 1 VOUTA, 2 VINA-, 3 VINA+, 4 VSS, 5 VINB+, 6 VINB-, 7 VOUTB, 8 VDD; frozen OpenDrop U6 has value MCP6002 and SO08 footprint in the named FEEDBACK AMPLIFIER.',
+  },
+] as const
+
+interface ExistingPartRow {
+  id: number
+  document_id: number
+  part_name: string | null
+  raw_excerpt: string | null
+  confidence: number | null
+  embedding?: Buffer | null
+  embed_hash?: string | null
+  component_class?: string | null
+  source_doc_id?: string | null
+  discovery_source?: string | null
+}
+
+function tableColumns(database: Database.Database, table: string): Set<string> {
+  const rows = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  return new Set(rows.map((row) => row.name))
+}
+
+function metadataFor(candidate: PcbVerifiedCandidate): string {
+  return JSON.stringify({
+    evidence: candidate.evidence,
+    function: candidate.function,
+    package: candidate.package,
+    ...(candidate.pinout ? { pinout: candidate.pinout } : {}),
+    ratings: candidate.ratings,
+    sourceCommit: candidate.sourceCommit,
+    sourceUrl: candidate.sourceUrl,
+  })
+}
+
+function embeddingSource(candidate: PcbVerifiedCandidate, metadata: string): string {
+  return [
+    candidate.partName,
+    candidate.manufacturer,
+    candidate.partNumber,
+    candidate.componentClass,
+    metadata,
+  ].join(' ')
+}
+
+function embeddingHash(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 32)
+}
+
+function loadOpenAiKey(): string | null {
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
+  const environmentPath = resolve(__dirname, '..', '..', '.env.local')
+  if (!existsSync(environmentPath)) return null
+  const match = readFileSync(environmentPath, 'utf8').match(/^OPENAI_API_KEY="?([^"\n]+)"?/m)
+  return match?.[1] ?? null
+}
+
+async function requestEmbedding(text: string): Promise<Buffer | null> {
+  const apiKey = loadOpenAiKey()
+  if (!apiKey) return null
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: EMBEDDING_MODEL,
+        input: text.slice(0, 8000),
+        dimensions: EMBEDDING_DIMENSIONS,
+      }),
+    })
+    if (!response.ok) {
+      console.error('[PcbCandidateIngest] Embedding request failed:', {
+        status: response.status,
+      })
+      return null
+    }
+    const payload = await response.json() as { data?: Array<{ embedding?: number[] }> }
+    const vector = payload.data?.[0]?.embedding
+    if (!vector || vector.length !== EMBEDDING_DIMENSIONS) {
+      console.error('[PcbCandidateIngest] Embedding response has wrong dimensions:', {
+        expected: EMBEDDING_DIMENSIONS,
+        actual: vector?.length ?? 0,
+      })
+      return null
+    }
+    const buffer = Buffer.alloc(vector.length * 4)
+    vector.forEach((value, index) => buffer.writeFloatLE(value, index * 4))
+    return buffer
+  } catch (error) {
+    console.error('[PcbCandidateIngest] Embedding request errored:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    return null
+  }
+}
+
+function ensureDocument(
+  database: Database.Database,
+  candidate: PcbVerifiedCandidate,
+): number {
+  const existing = database.prepare(`
+    SELECT id
+    FROM pretraining_spec_documents
+    WHERE source_url = ? AND LOWER(manufacturer) = LOWER(?) AND product_name = ?
+    LIMIT 1
+  `).get(
+    candidate.sourceUrl,
+    candidate.manufacturer,
+    candidate.partNumber,
+  ) as { id: number } | undefined
+  if (existing) return existing.id
+
+  const inserted = database.prepare(`
+    INSERT INTO pretraining_spec_documents
+      (product_class, manufacturer, product_name, source_url, document_type,
+       extraction_status, source_type)
+    VALUES ('pcb_component', ?, ?, ?, 'manufacturer_datasheet', 'done', ?)
+  `).run(
+    candidate.manufacturer,
+    candidate.partNumber,
+    candidate.sourceUrl,
+    DISCOVERY_SOURCE,
+  )
+  return Number(inserted.lastInsertRowid)
+}
+
+function hasCurrentMetadata(
+  row: ExistingPartRow,
+  candidate: PcbVerifiedCandidate,
+  metadata: string,
+  hash: string,
+  supportsEmbedding: boolean,
+): boolean {
+  return row.part_name === candidate.partName
+    && row.raw_excerpt === metadata
+    && row.confidence === 0.95
+    && row.component_class === candidate.componentClass
+    && row.source_doc_id === candidate.sourceUrl
+    && row.discovery_source === DISCOVERY_SOURCE
+    && (!supportsEmbedding || (row.embedding != null && row.embed_hash === hash))
+}
+
+/**
+ * @description Idempotently ingests the exact manufacturer-backed PCB
+ * candidates into a supplied forge-truth-compatible SQLite database.
+ * @param options Database path, write mode, optional embedding implementation,
+ * and deterministic timestamp override.
+ * @returns Counts of inserted, updated, unchanged, and embedded rows.
+ * @throws When the database or required tables/columns are unavailable.
+ */
+export async function ingestPcbVerifiedCandidates(
+  options: PcbCandidateIngestOptions,
+): Promise<PcbCandidateIngestResult> {
+  // INTENT: Resolve frozen-gold identity misses through a separately operated
+  // evidence ingest while preserving the runtime chain as a pure DB consumer.
+  if (!existsSync(options.databasePath)) {
+    throw new Error(`forge-truth database not found: ${options.databasePath}`)
+  }
+  const database = new Database(options.databasePath, { readonly: !options.commit })
+  database.pragma('busy_timeout = 4000')
+  const partColumns = tableColumns(database, 'pretraining_extracted_parts')
+  const supportsEmbedding = partColumns.has('embedding') && partColumns.has('embed_hash')
+  const supportsMetadata = ['component_class', 'source_doc_id', 'discovery_source', 'discovered_at']
+    .every((column) => partColumns.has(column))
+  if (!supportsMetadata) {
+    database.close()
+    throw new Error('pretraining_extracted_parts lacks required provenance metadata columns')
+  }
+
+  let inserted = 0
+  let updated = 0
+  let unchanged = 0
+  let embedded = 0
+  const now = options.now ?? new Date().toISOString()
+  const embed = options.embed ?? requestEmbedding
+
+  try {
+    for (const candidate of PCB_VERIFIED_CANDIDATES) {
+      const metadata = metadataFor(candidate)
+      const sourceText = embeddingSource(candidate, metadata)
+      const hash = embeddingHash(sourceText)
+      const optionalSelect = supportsEmbedding ? ', embedding, embed_hash' : ''
+      const existing = database.prepare(`
+        SELECT id, document_id, part_name, raw_excerpt, confidence,
+               component_class, source_doc_id, discovery_source
+               ${optionalSelect}
+        FROM pretraining_extracted_parts
+        WHERE LOWER(manufacturer) = LOWER(?) AND LOWER(part_number) = LOWER(?)
+        LIMIT 1
+      `).get(candidate.manufacturer, candidate.partNumber) as ExistingPartRow | undefined
+
+      if (existing && hasCurrentMetadata(existing, candidate, metadata, hash, supportsEmbedding)) {
+        unchanged++
+        continue
+      }
+      if (!options.commit) {
+        if (existing) updated++
+        else inserted++
+        continue
+      }
+
+      const documentId = ensureDocument(database, candidate)
+      const embedding = supportsEmbedding ? await embed(sourceText) : null
+      if (embedding) embedded++
+      if (existing) {
+        const embeddingSet = supportsEmbedding ? ', embedding = ?, embed_hash = ?' : ''
+        const values: unknown[] = [
+          documentId,
+          candidate.partName,
+          metadata,
+          candidate.componentClass,
+          candidate.sourceUrl,
+          now,
+          DISCOVERY_SOURCE,
+        ]
+        if (supportsEmbedding) {
+          values.push(
+            embedding ?? existing.embedding ?? null,
+            embedding ? hash : existing.embed_hash ?? null,
+          )
+        }
+        values.push(existing.id)
+        database.prepare(`
+          UPDATE pretraining_extracted_parts
+          SET document_id = ?, part_name = ?, raw_excerpt = ?, confidence = 0.95,
+              component_class = ?, source_doc_id = ?, discovered_at = ?,
+              discovery_source = ? ${embeddingSet}
+          WHERE id = ?
+        `).run(...values)
+        updated++
+      } else {
+        const embeddingColumns = supportsEmbedding ? ', embedding, embed_hash' : ''
+        const embeddingPlaceholders = supportsEmbedding ? ', ?, ?' : ''
+        const values: unknown[] = [
+          documentId,
+          candidate.partName,
+          candidate.manufacturer,
+          candidate.partNumber,
+          metadata,
+          candidate.componentClass,
+          candidate.sourceUrl,
+          now,
+          DISCOVERY_SOURCE,
+        ]
+        if (supportsEmbedding) values.push(embedding, embedding ? hash : null)
+        database.prepare(`
+          INSERT INTO pretraining_extracted_parts
+            (document_id, part_name, manufacturer, part_number, raw_excerpt,
+             confidence, component_class, source_doc_id, discovered_at,
+             discovery_source ${embeddingColumns})
+          VALUES (?, ?, ?, ?, ?, 0.95, ?, ?, ?, ? ${embeddingPlaceholders})
+        `).run(...values)
+        inserted++
+      }
+    }
+  } finally {
+    database.close()
+  }
+
+  return {
+    inserted,
+    updated,
+    unchanged,
+    embedded,
+    dryRun: !options.commit,
+  }
+}
+
+async function main(): Promise<void> {
+  const databaseArg = process.argv.find((argument) => argument.startsWith('--db='))
+  const databasePath = databaseArg?.slice('--db='.length)
+    ?? resolve(homedir(), '.forge-truth', 'forge-truth.db')
+  const commit = process.argv.includes('--commit')
+  const result = await ingestPcbVerifiedCandidates({ databasePath, commit })
+  console.log('[PcbCandidateIngest] Complete:', {
+    databasePath,
+    ...result,
+  })
+}
+
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error('[PcbCandidateIngest] Failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    process.exit(1)
+  })
+}
