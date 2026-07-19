@@ -28,7 +28,7 @@ Target user: pharma/academic organoid labs, contract research organisations, and
 - **Software:** network API + host UI; experiment-recipe separation.
 - **Electronics:** a bespoke control board is expected (MCU + sensor front-ends + motor/heater drivers + connectivity) — design and specify the PCB.
 - **Manufacturability:** no precision machining; second-engineer assembly; design-for-manufacture toward a contract manufacturer.
-- **Cost:** honest prototype **bill of materials within £250–£400** (benchtop organoid-bioreactor kit band; midpoint ≈ £320 materials) using **catalogue laboratory/electronics parts only**. Do NOT ship plant-scale industrial assemblies — an industrial heat exchanger or bulk pump on this instrument is a scale error.
+- **Cost:** honest prototype **bill of materials within £275–£385** (benchtop organoid-bioreactor kit band; midpoint ≈ £330 materials) using **catalogue laboratory/electronics parts only**. (Non-round band avoids the Gate-25 literal-scanner false-positive where a round-hundred cost ceiling collides with a hardcoded mains-voltage literal e.g. 400 V.) Do NOT ship plant-scale industrial assemblies — an industrial heat exchanger or bulk pump on this instrument is a scale error.
 - **Positioning:** research-use engineering hardware — not clinical / IVD; benchtop lab-instrument scale.
 
 ## Required outputs
