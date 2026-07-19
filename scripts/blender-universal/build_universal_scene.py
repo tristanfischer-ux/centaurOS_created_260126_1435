@@ -16810,6 +16810,59 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                       module=_skin_mod, module_objects=MO)
                     _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.5, 3.5))
                     _sig_new.append(_arm)
+                # FRONT CONTROL-PANEL FASCIA (2026-07-19 — the render_vision_critic
+                # flagged "featureless closed chassis with no visible display, keys,
+                # ports"). Group the controls on a recessed dark bezel in the lower
+                # front (clear of the top handle strip), proud of the face so they cast
+                # shadow and read as a real fascia. Dark panel + dark keys CONTRAST the
+                # light body. CRITICAL: every mesh MUST use the `u_se_le_face` prefix —
+                # the lab_electronics exterior keep-list (build ~L13045 `_keep`) hides
+                # any u_se_le_* NOT in its allowlist, and `u_se_le_face` is the allowed
+                # front-face signature prefix (a bare u_se_le_display/key/panel is culled
+                # on 04, the bug that hid the first fascia attempt).
+                _pan_face = _fy - tt                    # operator face plane (mm)
+                _panelm = fl.make_mat("m_se_le_panel", fl._to_linear((0.16, 0.17, 0.19)),
+                                      metallic=0.4, roughness=0.5)
+                _panel = fl.add_box("u_se_le_face_panel",
+                                    _mm3((-W * 0.14, _pan_face - 2.0, base_z + H * 0.32)),
+                                    _mm3((W * 0.50, 4.0, H * 0.40)), _panelm,
+                                    module=_skin_mod, module_objects=MO)
+                _panel.dimensions = _mm3((W * 0.50, 4.0, H * 0.40))
+                _sig_new.append(_panel)
+                _dispm = fl.make_mat("m_se_le_display", fl._to_linear((0.03, 0.10, 0.16)),
+                                     metallic=0.1, roughness=0.12, kind="glass", alpha=0.92)
+                _disp = fl.add_box("u_se_le_face_display",
+                                   _mm3((-W * 0.16, _pan_face - 6.0, base_z + H * 0.42)),
+                                   _mm3((W * 0.34, 6.0, H * 0.16)), _dispm,
+                                   module=_skin_mod, module_objects=MO)
+                _disp.dimensions = _mm3((W * 0.34, 6.0, H * 0.16))
+                _sig_new.append(_disp)
+                _keym = fl.make_mat("m_se_le_key", fl._to_linear((0.07, 0.07, 0.09)),
+                                    metallic=0.3, roughness=0.55)
+                for _ki in range(3):
+                    _kx = -W * 0.28 + _ki * (W * 0.12)
+                    _key = fl.add_box(f"u_se_le_face_key_{_ki}",
+                                      _mm3((_kx, _pan_face - 6.0, base_z + H * 0.20)),
+                                      _mm3((W * 0.08, 6.0, H * 0.10)), _keym,
+                                      module=_skin_mod, module_objects=MO)
+                    _key.dimensions = _mm3((W * 0.08, 6.0, H * 0.10))
+                    _sig_new.append(_key)
+                _ledm = fl.make_mat("m_se_le_status_led", fl._to_linear((0.15, 0.90, 0.38)),
+                                    kind="led_emissive", emission_strength=3.0)
+                _led = fl.add_cyl("u_se_le_face_led",
+                                  _mm3((W * 0.06, _pan_face - 6.0, base_z + H * 0.20)),
+                                  2.6 * fl.MM, 6.0 * fl.MM, _ledm,
+                                  module=_skin_mod, module_objects=MO,
+                                  rotation=(math.radians(90), 0.0, 0.0))
+                _sig_new.append(_led)
+                _portm = fl.make_mat("m_se_le_face_port", fl._to_linear((0.08, 0.08, 0.10)),
+                                     metallic=0.45, roughness=0.4)
+                _port = fl.add_box("u_se_le_face_port",
+                                   _mm3((W * 0.30, _pan_face - 5.0, base_z + H * 0.30)),
+                                   _mm3((14.0, 5.0, 9.0)), _portm,
+                                   module=_skin_mod, module_objects=MO)
+                _port.dimensions = _mm3((14.0, 5.0, 9.0))
+                _sig_new.append(_port)
             # Re-dump form-meshes.json to include the signature parts (the interior
             # builder dumped earlier, before these existed) so form_signature_gate sees them.
             try:
