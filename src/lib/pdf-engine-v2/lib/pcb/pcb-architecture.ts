@@ -206,7 +206,11 @@ function board(
 }
 
 function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBoardPlan | undefined {
-  const text = `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`.toLowerCase()
+  // GOTCHA: modifier/form prose often copies sibling-assembly blurbs
+  // ("optical density (od600) sensor & temperature probe assembly") onto every
+  // word in the sub-module — matching against that text steals roles across
+  // boards. Board routing keys on word identity only.
+  const text = `${word.wordId} ${word.nameHuman} ${word.characterId}`.toLowerCase()
   if (boards.length === 1) {
     const onlyBoard = boards[0]
     if (onlyBoard.role !== 'optical_source_daughterboard') return onlyBoard
@@ -219,9 +223,19 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
     if (candidate.role === 'high_voltage_controller') {
       return /hv|high.?voltage|switch|boost|isolat|controller|microcontroller|current.?measurement|\btia\b|status.?indicator/.test(text)
     }
-    if (candidate.role === 'od_optics_board') return /optical|density|photodiode|adc|sensor|led/.test(text)
-    if (candidate.role === 'heater_stir_actuation_board') return /heat|stir|motor|pump|driver|peltier|power/.test(text)
-    if (candidate.role === 'wet_lab_hat') return /hat|host|microcontroller|compute|raspberry|interface/.test(text)
+    // DECISION: heater/stir/temp roles are matched before OD optics so culture
+    // temperature probes cannot be stolen by an OD channel sibling blurb.
+    if (candidate.role === 'heater_stir_actuation_board') {
+      return /heat(?:er|ing)?|stir|agitat|pump|peltier|\btec\b|cartridge[_ -]?heater|temperature[_ -]?(?:sensor|probe)|culture[_ -]?temperature/i.test(text)
+    }
+    // GOTCHA: bare `led` / `sensor` / `adc` used to steal host power-indicator +
+    // rail-protection words onto the OD daughterboard (organoid 1546 token board).
+    if (candidate.role === 'od_optics_board') {
+      return /(?:^|[_ -])(?:od|optical[_ -]?density)(?:[_ -]|$)|photodiode|od[_ -]?sensor|density[_ -]?sensor|optical[_ -]?(?:adc|measurement)/i.test(text)
+    }
+    if (candidate.role === 'wet_lab_hat') {
+      return /hat|host|microcontroller|compute|raspberry|interface|usb|firmware|debug|esd|ferrite|polyfuse|reverse[_ -]?polarity|power[_ -]?indicator/i.test(text)
+    }
     return false
   })
   if (exactRoleBoard) return exactRoleBoard
@@ -241,8 +255,11 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
     return boards.find((candidate) => candidate.domains.includes('logic'))
   }
   if (word.categories.includes('power_electronics')) {
-    return boards.find((candidate) =>
-      candidate.domains.includes('power') || candidate.domains.includes('high_voltage'))
+    // DECISION: host-rail protection prefers the logic/HAT board when present —
+    // wet_actuation is thermal loads, not USB/ESD/polyfuse.
+    return boards.find((candidate) => candidate.role === 'wet_lab_hat')
+      ?? boards.find((candidate) =>
+        candidate.domains.includes('power') || candidate.domains.includes('high_voltage'))
   }
   return undefined
 }
@@ -287,6 +304,26 @@ function nonBoardPlacement(
       reasons: ['mechanical_datum_not_fitted_component'],
     }
   }
+  // INTENT: Peltier modules, heatsink fans, insulation and TIM pads are purchased
+  // thermal assemblies — not PCB footprints (same gold WHY as NinjaPCR TEC path).
+  if (
+    /peltier|\btec\b|thermoelectric|heatsink(?:[_ -]?fan)?|heat[_ -]?sink|thermal[_ -]?insulation|thermal[_ -]?interface|thermal[_ -]?pad|tim[_ -]?pad/i
+      .test(roleText)
+  ) {
+    return {
+      placement: 'off_board_module',
+      reasons: ['purchased_thermal_assembly_not_pcb_footprint'],
+    }
+  }
+  // INTENT: Stir tach remains a host-HAT sense obligation until Pioreactor-class
+  // HAT electricals are published — do not invent a board package for it.
+  if (/stir[_ -]?tach|tachometer[_ -]?sense/i.test(roleText)) {
+    return {
+      placement: 'functional_requirement',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['stir_sense_awaits_unpublished_host_hat_topology'],
+    }
+  }
   if (/cable|harness/.test(roleText)) {
     return { placement: 'interconnect_only', reasons: ['mechanical_or_interconnect_role'] }
   }
@@ -303,7 +340,10 @@ function nonBoardPlacement(
         reasons: ['host_hat_uses_direct_compute_bus'],
       }
     }
-    if (/usb[_ -]?interface|firmware[_ -]?storage/.test(roleText)) {
+    // DECISION: only park USB/firmware off-board when a purchased SBC/UI host
+    // already owns those ports. A bare MCU on the wet_lab_hat must keep them
+    // as fitted footprints (organoid 1546 coverage floor).
+    if (hasCotsComputeHost && /usb[_ -]?interface|firmware[_ -]?storage/.test(roleText)) {
       return {
         placement: 'off_board_module',
         reasons: ['host_compute_owns_usb_or_persistence'],
@@ -331,10 +371,14 @@ function nonBoardPlacement(
     /usb[_ -]?power[_ -]?entry/.test(roleText) &&
     boards.some((candidate) => candidate.role === 'wet_lab_hat')
   ) {
-    return {
-      placement: 'interconnect_only',
-      boardId: selectedBoard.boardId,
-      reasons: ['host_hat_interconnect_owns_peripheral_power_entry'],
+    // When the HAT carries a bare MCU (no COTS host), USB power entry belongs
+    // on the HAT as a fitted receptacle — not an optics interconnect stub.
+    if (hasCotsComputeHost) {
+      return {
+        placement: 'interconnect_only',
+        boardId: selectedBoard.boardId,
+        reasons: ['host_hat_interconnect_owns_peripheral_power_entry'],
+      }
     }
   }
   if (!hasExplicitPartIdentity && hasCotsComputeHost) {
@@ -427,7 +471,9 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
   } else if ((quantity(state, 'working_volume_ml') ?? 0) > 0) {
     systemDisposition = 'multi_board'
     boards = [
-      board('wet_lab_hat', 'wet_lab_hat', ['logic', 'wet_interface']),
+      // DECISION: wet_lab_hat owns host-rail power (USB/ESD/polyfuse) as well as
+      // logic — thermal actuation power stays on heater_stir_actuation_board.
+      board('wet_lab_hat', 'wet_lab_hat', ['logic', 'power', 'wet_interface']),
       board('od_optics', 'od_optics_board', ['analog', 'wet_interface']),
       board('wet_actuation', 'heater_stir_actuation_board', ['power', 'wet_interface', 'thermal_actuation']),
     ]

@@ -315,6 +315,81 @@ describe('derivePcbArchitecture', () => {
     expect(plan.unassignedWordIds).not.toContain(words[0].id)
   })
 
+  it('keeps bare-MCU wet-lab USB power on-board and routes heater sense to wet_actuation', () => {
+    // INTENT / proveCatch (organoid 1546): without COTS compute host evidence,
+    // USB power entry must stay a fitted HAT footprint; culture temperature +
+    // cartridge heater must land on heater_stir_actuation_board — never OD optics
+    // via sibling form-prose smear.
+    const state = withElectronicWords(stateWithQuantities({ working_volume_ml: 20 }), [
+      {
+        id: 'microcontroller_mcu_word',
+        nameHuman: 'Microcontroller Mcu',
+        characterId: 'microcontroller_mcu',
+      },
+      {
+        id: 'usb_power_entry_word',
+        nameHuman: 'Usb Power Entry',
+        characterId: 'usb_power_entry',
+      },
+      {
+        id: 'cartridge_heater_word',
+        nameHuman: 'Cartridge Heater',
+        characterId: 'cartridge_heater',
+      },
+      {
+        id: 'culture_temperature_probe_word',
+        nameHuman: 'Culture Temperature Probe',
+        characterId: 'culture_temperature_probe',
+        modifiers: [{
+          kind: 'form',
+          value: 'representative optical density (od600) sensor & temperature probe assembly',
+        }],
+      },
+      {
+        id: 'esd_protection_network_word',
+        nameHuman: 'Esd Protection Network',
+        characterId: 'esd_protection_network',
+      },
+    ])
+    // GOTCHA: do not mention Raspberry/Pi/PyBadge here — hasCotsComputeHost is a
+    // positive presence regex and will false-trigger on "no Raspberry Pi".
+    state.parsedBrief = {
+      original_text: 'benchtop bioreactor with bare MCU control board and USB power entry on the HAT',
+    }
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.systemDisposition).toBe('multi_board')
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wordId: 'usb_power_entry_word',
+        placement: 'on_board',
+        boardId: 'wet_lab_hat',
+      }),
+      expect.objectContaining({
+        wordId: 'cartridge_heater_word',
+        placement: 'on_board',
+        boardId: 'wet_actuation',
+      }),
+      expect.objectContaining({
+        wordId: 'culture_temperature_probe_word',
+        placement: 'on_board',
+        boardId: 'wet_actuation',
+      }),
+      expect.objectContaining({
+        wordId: 'esd_protection_network_word',
+        placement: 'on_board',
+        boardId: 'wet_lab_hat',
+      }),
+    ]))
+    expect(plan.boards.find((item) => item.role === 'od_optics_board')?.requiredWordIds)
+      .toEqual([])
+    expect(plan.boards.find((item) => item.role === 'heater_stir_actuation_board')?.requiredWordIds)
+      .toEqual(expect.arrayContaining([
+        'cartridge_heater_word',
+        'culture_temperature_probe_word',
+      ]))
+  })
+
   it('collapses a duplicate USB-interface concept while retaining the physical USB entry', () => {
     const state = withElectronicWords(stateWithQuantities({ electrode_count: 64 }), [
       {
