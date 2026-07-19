@@ -85,6 +85,7 @@ run "derive-topology.ts --selftest"           npx tsx scripts/lib/orchestrator/g
 run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/generic/pump-motor-selftest.ts
 run "drive-duty --selftest"                   npx tsx scripts/lib/orchestrator/generic/drive-duty-selftest.ts
 run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/generic/instrument-sizing-selftest.ts
+run "gimbal-actuation --selftest"             npx tsx scripts/lib/orchestrator/generic/gimbal-actuation-selftest.ts
 run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
 run "membrane-stage-brief-gate --selftest"    npx tsx scripts/lib/orchestrator/generic/membrane-stage-brief-gate-selftest.ts
 run "ion-exchange-brief-gate --selftest"      npx tsx scripts/lib/orchestrator/generic/ion-exchange-brief-gate-selftest.ts

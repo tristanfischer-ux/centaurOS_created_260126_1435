@@ -4291,8 +4291,63 @@ export function synthesizeActuation(modules: ModuleLike[], quantities: Record<st
     }
   }
 
+  // ── RPM-GIMBAL DRIVETRAIN (Yuri organoid RPM-appliance / clinostat / random-positioning
+  // machine, 2026-07-19). A benchtop device that REORIENTS a payload on a dual-axis gimbal at
+  // a slow rpm has an actuation module that is NOT a pump/valve/blower — it is a motor + encoder
+  // + slip-ring drivetrain per axis. The process-plant path above leaves that module a 1-word
+  // placeholder (physics_fidelity "core RPM/kinematics empty"). GUARDED so it fires ONLY on a
+  // slow rotation signal (≤60 rpm) at benchtop scale (ml working volume or a gimbal/clinostat
+  // key) → byte-stable for every process plant (no rpm quantity) and every centrifuge (rpm ≫ 60).
+  const gimbalRpm = pickQ(quantities, /gimbal.*rpm|max_rotation_speed_rpm|rotation_speed_rpm|rotor_speed_rpm|rpm_max/) ?? 0
+  const benchScale = (pickQ(quantities, /working_volume_ml|culture_volume_ml/) ?? 0) > 0
+    || Object.keys(quantities).some((k) => /gimbal|random.?position|clinostat|reorient/i.test(k))
+  if (gimbalRpm > 0 && gimbalRpm <= 60 && benchScale) {
+    const gt = findActuationSubModule(modules)
+    if (gt) for (const w of gimbalDrivetrainWords(quantities, gimbalRpm)) toAdd.push({ sm: gt, w })
+  }
+
   for (const { sm, w } of toAdd) ((sm.words ??= []) as WordLike[]).push(w)
   return toAdd.length
+}
+
+/** The dual-axis RPM-gimbal drivetrain (Yuri RPM-appliance). Physics-derived: torque per axis
+ *  from the payload's gravity-imbalance + inertial ramp sizes the motor frame; the rest of the
+ *  drivetrain (encoders / slip-ring / drivers / bearings / frame) is the fixed anatomy a
+ *  continuously-reorienting two-axis gimbal requires. Returns _actuator-tagged words (priced +
+ *  wired like any final control element). Universal — keyed on the rpm signal, not a class. */
+export function gimbalDrivetrainWords(quantities: Record<string, number>, rpm: number): WordLike[] {
+  const host: WordLike = { id: 'rpm_gimbal_assembly', name_human: 'RPM Gimbal Assembly' }
+  const payloadKg = pickQ(quantities, /payload.*kg|cassette.*mass_kg|rotating_mass_kg/) ?? 0.5
+  const r = 0.08                          // payload radius from the axis (m), benchtop gimbal
+  const ecc = 0.02                        // static gravity-imbalance offset of the payload (m)
+  const omega = (rpm * 2 * Math.PI) / 60  // rad/s
+  const alpha = omega / 2                 // ramp to speed in ~2 s (rad/s²)
+  const inertia = payloadKg * r * r       // point-mass inertia estimate (kg·m²)
+  const tGrav = payloadKg * 9.81 * ecc    // gravity-imbalance torque (N·m)
+  const tInert = inertia * alpha          // inertial ramp torque (N·m)
+  const tAxis = (tGrav + tInert) * 1.5    // ×1.5 friction/margin, per axis
+  const [frame, motorGbp] = tAxis <= 0.45 ? ['NEMA 17', 16] : tAxis <= 1.9 ? ['NEMA 23', 34] : ['NEMA 34', 70]
+  return [
+    actuatorWord('gimbal_motor', `Gimbal Axis Motor (${frame} stepper, dual-axis)`, host, 2,
+      [mod('dimension', `${frame}, holding torque ≥ ${tAxis.toFixed(2)} N·m/axis`), mod('rating_primary', `${Math.round(rpm)}`, 'rpm')],
+      motorGbp * 2,
+      `Two ${frame} stepper motors, one per gimbal axis (inner roll + outer pitch), each sized for ${tAxis.toFixed(2)} N·m (gravity-imbalance ${tGrav.toFixed(2)} + inertial ramp ${tInert.toFixed(3)} N·m, ×1.5 margin); reorients the docked cassette to time-average gravity toward zero`),
+    actuatorWord('gimbal_encoder', 'Gimbal Axis Encoder (magnetic absolute, dual-axis)', host, 2,
+      [mod('dimension', '12-bit magnetic absolute (AS5600 class)')], 18,
+      'One absolute rotary encoder per axis for closed-loop angle control of the random-positioning trajectory'),
+    actuatorWord('gimbal_slipring', 'Continuous-Rotation Slip-Ring (12-circuit)', host, 1,
+      [mod('dimension', '12-circuit; power + serial/I²C across the rotating joint')], 28,
+      'A 12-circuit slip-ring carries power and sensor data across the continuously-rotating inner axis so the cassette perfusion/sensing wiring never twists — the enabling part for unlimited gimbal rotation'),
+    actuatorWord('gimbal_driver', 'Stepper Motor Driver (dual-axis)', host, 2,
+      [mod('dimension', 'microstepping driver (TMC2209 class), 1/16 step')], 12,
+      'One microstepping driver per axis; quiet 1/16-step motion for smooth low-rpm reorientation'),
+    actuatorWord('gimbal_bearing', 'Gimbal Axis Bearing (2 per axis)', host, 4,
+      [mod('dimension', 'precision ball bearing, preloaded')], 12,
+      'Two preloaded ball bearings per gimbal axis support the rotating inner and outer rings'),
+    actuatorWord('gimbal_frame', 'Dual-Axis Gimbal Frame (inner + outer ring)', host, 1,
+      [mod('dimension', 'machined/printed inner roll ring + outer pitch ring')], 55,
+      'The two-ring gimbal structure — inner ring carries the cassette nest, outer ring carries the inner-axis motor — that physically realises the two rotation axes'),
+  ]
 }
 
 function findActuationSubModule(modules: ModuleLike[]): SubLike | undefined {
