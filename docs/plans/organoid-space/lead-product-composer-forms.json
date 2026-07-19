@@ -1,0 +1,947 @@
+{
+  "M2_form": {
+    "schema": "form-proof/v1",
+    "ok": true,
+    "working_medium": "sealed_cartridge",
+    "medium_basis": "is_consumable/cassette_format present (a sealed consumable cartridge \u2014 the razor-and-blade blade)",
+    "primary_axis": "planar-card",
+    "sample_interface": "reservoir-ports",
+    "openness": "sealed",
+    "operator_view": "top",
+    "repeated_count": 24,
+    "hazard_boundary": "wet-dry",
+    "arrangement": [
+      "card_substrate",
+      "dock_interface",
+      "fluidic_layer",
+      "reagent_reservoirs",
+      "detection_window",
+      "inlet_ports"
+    ],
+    "visible_signature": [
+      "card_substrate",
+      "fluidic_layer",
+      "reagent_reservoirs",
+      "inlet_ports",
+      "detection_window",
+      "dock_interface"
+    ],
+    "n_candidates": 2,
+    "n_feasible": 2,
+    "connectedness": {
+      "schema": "assembly-connectedness-proof/v1",
+      "ok": true,
+      "chassis": "card_substrate",
+      "primary_component_size": 6,
+      "n_accessories": 0,
+      "connected": true,
+      "findings": []
+    }
+  },
+  "M2_geometry": {
+    "schema": "geometry-plan/v1",
+    "ok": true,
+    "axis": "planar-card",
+    "working_medium": "sealed_cartridge",
+    "placements": [
+      {
+        "name": "card_substrate",
+        "shape": "box",
+        "center_mm": [
+          0.0,
+          0.0,
+          6.0
+        ],
+        "size_mm": [
+          127.76,
+          85.6,
+          12.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "fluidic_layer",
+        "shape": "box",
+        "center_mm": [
+          0.0,
+          0.0,
+          13.0
+        ],
+        "size_mm": [
+          114.98,
+          77.04,
+          2.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "detection_window",
+        "shape": "box",
+        "center_mm": [
+          0.0,
+          25.68,
+          13.1
+        ],
+        "size_mm": [
+          51.1,
+          18.83,
+          2.2
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "dock_interface",
+        "shape": "box",
+        "center_mm": [
+          0.0,
+          37.66,
+          6.0
+        ],
+        "size_mm": [
+          89.43,
+          10.27,
+          12.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_0",
+        "shape": "box",
+        "center_mm": [
+          -55.1,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_0",
+        "shape": "cylinder",
+        "center_mm": [
+          -55.1,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_1",
+        "shape": "box",
+        "center_mm": [
+          -50.31,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_1",
+        "shape": "cylinder",
+        "center_mm": [
+          -50.31,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_2",
+        "shape": "box",
+        "center_mm": [
+          -45.51,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_2",
+        "shape": "cylinder",
+        "center_mm": [
+          -45.51,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_3",
+        "shape": "box",
+        "center_mm": [
+          -40.72,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_3",
+        "shape": "cylinder",
+        "center_mm": [
+          -40.72,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_4",
+        "shape": "box",
+        "center_mm": [
+          -35.93,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_4",
+        "shape": "cylinder",
+        "center_mm": [
+          -35.93,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_5",
+        "shape": "box",
+        "center_mm": [
+          -31.14,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_5",
+        "shape": "cylinder",
+        "center_mm": [
+          -31.14,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_6",
+        "shape": "box",
+        "center_mm": [
+          -26.35,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_6",
+        "shape": "cylinder",
+        "center_mm": [
+          -26.35,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_7",
+        "shape": "box",
+        "center_mm": [
+          -21.56,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_7",
+        "shape": "cylinder",
+        "center_mm": [
+          -21.56,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_8",
+        "shape": "box",
+        "center_mm": [
+          -16.77,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_8",
+        "shape": "cylinder",
+        "center_mm": [
+          -16.77,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_9",
+        "shape": "box",
+        "center_mm": [
+          -11.98,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_9",
+        "shape": "cylinder",
+        "center_mm": [
+          -11.98,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_10",
+        "shape": "box",
+        "center_mm": [
+          -7.19,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_10",
+        "shape": "cylinder",
+        "center_mm": [
+          -7.19,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_11",
+        "shape": "box",
+        "center_mm": [
+          -2.4,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_11",
+        "shape": "cylinder",
+        "center_mm": [
+          -2.4,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_12",
+        "shape": "box",
+        "center_mm": [
+          2.4,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_12",
+        "shape": "cylinder",
+        "center_mm": [
+          2.4,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_13",
+        "shape": "box",
+        "center_mm": [
+          7.19,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_13",
+        "shape": "cylinder",
+        "center_mm": [
+          7.19,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_14",
+        "shape": "box",
+        "center_mm": [
+          11.98,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_14",
+        "shape": "cylinder",
+        "center_mm": [
+          11.98,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_15",
+        "shape": "box",
+        "center_mm": [
+          16.77,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_15",
+        "shape": "cylinder",
+        "center_mm": [
+          16.77,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_16",
+        "shape": "box",
+        "center_mm": [
+          21.56,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_16",
+        "shape": "cylinder",
+        "center_mm": [
+          21.56,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_17",
+        "shape": "box",
+        "center_mm": [
+          26.35,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_17",
+        "shape": "cylinder",
+        "center_mm": [
+          26.35,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_18",
+        "shape": "box",
+        "center_mm": [
+          31.14,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_18",
+        "shape": "cylinder",
+        "center_mm": [
+          31.14,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_19",
+        "shape": "box",
+        "center_mm": [
+          35.93,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_19",
+        "shape": "cylinder",
+        "center_mm": [
+          35.93,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_20",
+        "shape": "box",
+        "center_mm": [
+          40.72,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_20",
+        "shape": "cylinder",
+        "center_mm": [
+          40.72,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_21",
+        "shape": "box",
+        "center_mm": [
+          45.51,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_21",
+        "shape": "cylinder",
+        "center_mm": [
+          45.51,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_22",
+        "shape": "box",
+        "center_mm": [
+          50.31,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_22",
+        "shape": "cylinder",
+        "center_mm": [
+          50.31,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "reagent_reservoirs_23",
+        "shape": "box",
+        "center_mm": [
+          55.1,
+          4.28,
+          17.0
+        ],
+        "size_mm": [
+          3.51,
+          29.1,
+          6.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "inlet_ports_23",
+        "shape": "cylinder",
+        "center_mm": [
+          55.1,
+          -29.1,
+          16.5
+        ],
+        "size_mm": [
+          2.0,
+          8.56,
+          5.0
+        ],
+        "on_exterior": true
+      }
+    ],
+    "measured_connectedness": {
+      "ok": true,
+      "n_components": 1,
+      "floating": []
+    },
+    "envelope_mm": [
+      127.76,
+      85.6,
+      14.35
+    ],
+    "deployment": {
+      "deployment_envelope": null,
+      "resolved_box_mm": null,
+      "launch_mass_kg": null,
+      "microgravity": false
+    }
+  },
+  "M1_form": {
+    "schema": "form-proof/v1",
+    "ok": true,
+    "working_medium": "rotation",
+    "medium_basis": "rotor_speed_rpm=20 (a spinning rotor separates by centrifugal force)",
+    "primary_axis": "rotary-stack",
+    "sample_interface": "rotor-slots",
+    "openness": "sample-open",
+    "operator_view": "top",
+    "repeated_count": 1,
+    "hazard_boundary": "spinning-rotor",
+    "arrangement": [
+      "motor_base",
+      "rotor",
+      "lid"
+    ],
+    "visible_signature": [
+      "motor_base",
+      "rotor",
+      "lid"
+    ],
+    "n_candidates": 2,
+    "n_feasible": 2,
+    "connectedness": {
+      "schema": "assembly-connectedness-proof/v1",
+      "ok": true,
+      "chassis": "motor_base",
+      "primary_component_size": 3,
+      "n_accessories": 0,
+      "connected": true,
+      "findings": []
+    }
+  },
+  "M1_geometry": {
+    "schema": "geometry-plan/v1",
+    "ok": true,
+    "axis": "rotary-stack",
+    "working_medium": "rotation",
+    "placements": [
+      {
+        "name": "motor_base",
+        "shape": "box",
+        "center_mm": [
+          0.0,
+          0.0,
+          225.0
+        ],
+        "size_mm": [
+          400.0,
+          400.0,
+          450.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "rotor",
+        "shape": "cylinder",
+        "center_mm": [
+          0.0,
+          0.0,
+          445.0
+        ],
+        "size_mm": [
+          320.0,
+          320.0,
+          8.0
+        ],
+        "on_exterior": true
+      },
+      {
+        "name": "lid",
+        "shape": "box",
+        "center_mm": [
+          0.0,
+          0.0,
+          454.0
+        ],
+        "size_mm": [
+          384.0,
+          384.0,
+          8.0
+        ],
+        "on_exterior": true
+      }
+    ],
+    "measured_connectedness": {
+      "ok": true,
+      "n_components": 1,
+      "floating": []
+    },
+    "envelope_mm": [
+      400.0,
+      400.0,
+      450.0
+    ],
+    "deployment": {
+      "deployment_envelope": null,
+      "resolved_box_mm": null,
+      "launch_mass_kg": null,
+      "microgravity": false
+    }
+  }
+}
