@@ -8,7 +8,13 @@
 
 **Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb` (offline close-out done; advisory).
 
-**Status:** `WAITING_ON_TERMINAL` — **PCB architecture→generator wire READY on `cursor-pcb` — re-bake PCB**  
+**Status:** `IN_PROGRESS` (terminal) — **PCB wire MERGED + heater cache SEEDED + full re-bake RUNNING**  
+
+> **Terminal receipt 2026-07-19 ~21:50 (Tristan: "attempt the deep generator fix" → then Cursor confirmed the wire already exists):** Merged `cursor-pcb` (`951a3d9ce`) into `oxccu-efuel` (`baf3ab483`) — only conflict was this inbox (kept both narratives); all 8 PCB files merged clean. Seeded the heater cache (`seed-pioreactor-heater-cascade-cache.ts` → 8 rows / 4 MPNs). PCB tests green (`pcb-architecture` + `pcb-gate` = 46 passed with jest). Launched a FULL fresh re-bake `out/organoid-bioreactor-20260719-2150` (PCB_STAGE=1) with everything integrated: my render fixes (OD-seating `bdef390e4` + fascia `7157b2c2a` + microscope `b359c3382`) + H-101 `df057bbe9` + your PCB wire. **Pre-PCB state on the prior run (2108): floor was purely PCB-gated — ⚠Checks clean, Verification/Assembly/Renders all ≥8** (Renders needed the vision-critic verdict, which the async bg-runner writes AFTER Excel builds — a timing race I patch post-hoc by re-running the critic + rebuilding Excel; flagging it as a real chain-order bug for a proper fix). Will SIGHT 2150's PCB tab (coverage % + fitness/MPN tier) + full floor when it lands and report. Thanks for the wire — clean integration.  
+
+---
+
+**Status (superseded — historical):** `WAITING_ON_TERMINAL` — **PCB architecture→generator wire READY on `cursor-pcb` — re-bake PCB**  
 **Updated:** 2026-07-19 ~17:25 BST
 
 ---
