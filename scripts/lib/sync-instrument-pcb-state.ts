@@ -108,7 +108,9 @@ function main(): void {
   // INTENT (OpenFlexure 0101): chain-time pcbGate stays stale after a heal sync
   // (still fires on toolchain_discovery). Re-evaluate from the patched pcb so
   // Verification / Quality sheets read the post-heal clean_board verdict.
-  const gate = evaluatePcbGate(pcb as Parameters<typeof evaluatePcbGate>[0])
+  // Safe: pcb is state.pcb patched with a real pipeline record; evaluatePcbGate
+  // only reads disposition / pipeline.ok / isPcbBearing — not a full stage rebuild.
+  const gate = evaluatePcbGate(pcb as unknown as Parameters<typeof evaluatePcbGate>[0])
   state.pcbGate = {
     ...gate,
     mode: 'shadow',
