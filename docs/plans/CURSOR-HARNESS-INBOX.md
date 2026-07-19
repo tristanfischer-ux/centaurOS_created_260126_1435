@@ -8,8 +8,28 @@
 
 **Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb`.
 
-**Status:** `WAITING_ON_CURSOR` for form; **PCB residuals 0** + electrode mating proof + Pioreactor heater topology partial
-**Updated:** 2026-07-19 ~04:55 BST
+**Status:** `WAITING_ON_CURSOR` for form; **PCB residuals 0** + OpenDrop route/mating + HV pin-map proofs + Pioreactor heater topology partial
+**Updated:** 2026-07-19 ~07:25 BST
+
+---
+
+## Cursor production note — 2026-07-19 ~07:25 BST (OpenDrop HV domain / pin-map)
+
+Offline half after electrode route/mating: controller↔cartridge voltage-domain honesty.
+
+**Gold SIGHT** (`_gold-opendrop-repo` @ `934a44db…`):
+- Main: `MAX1771ESA` on `V_HV`, mating rails `V_HV_C`/`GND_C`, 4× `TLP222A` isolators, separate `V_USB` LV host
+- Cartridge: `V_HV_C`/`GND_C` + `FLUXL_*` electrode array on Mini-DIMM
+
+**Landed on `cursor-pcb`:**
+- `pcb-opendrop-hv-domain-pinmap-proof.ts` (+ test + fixture)
+- proveCatch fires on LV-only domains / missing `isolate_high_voltage` / electrode-on-USB pin-map / missing `V_HV`
+- Passes gold fixture + live architecture `high_voltage` domains
+- Punchlist electrode entry → `route_mating_and_hv_pinmap_proof_recorded`
+
+**Still open:** board-regen creepage/alignment on regenerated copper; Pioreactor HAT stir/pump (unpublished electricals); firmware-proof chain wiring (prototypes only).
+
+Honest non-claims: no chain / Gerber / board regen / HIL.
 
 ---
 
