@@ -977,13 +977,24 @@ def _plan_planar_card(roles, W, D, H, bz, n):
             out[r] = ((0, D * 0.44, bz + sh * 0.5), (W * 0.7, D * 0.12, sh), True)  # keyed rail, rear edge
     res = next((rv.role for rv in roles if "reservoir" in rv.role), None)
     prt = next((rv.role for rv in roles if "port" in rv.role), None)
-    ww = W / (n + 1.5)
+    # GRID the wells like a real multi-well plate (SBS 24 = 4×6), not a 1-D comb: columns
+    # from the card aspect ratio so a wide card fills row-major. Universal — the count drives
+    # the grid, the same as the carrier bays.
+    cols = max(1, round((n * (W / max(D, 1.0))) ** 0.5))
+    rows = (n + cols - 1) // cols
+    gw, gd = (W * 0.82) / cols, (D * 0.62) / rows
     for i in range(n):
-        cx = (i - (n - 1) / 2.0) * (W / n) * 0.9
+        cc, rr = i % cols, i // cols
+        cx = (cc - (cols - 1) / 2.0) * gw
+        cy = (rr - (rows - 1) / 2.0) * gd + D * 0.08        # wells zone; front edge left for ports
         if res:
-            out[f"{res}_{i}" if n > 1 else res] = ((cx, D * 0.05, flu_top + 3.0), (ww * 0.7, D * 0.34, 6.0), True)
+            out[f"{res}_{i}" if n > 1 else res] = ((cx, cy, flu_top + 3.0), (gw * 0.60, gd * 0.60, 6.0), True)
+    # inlet ports = a fluidic manifold row along the FRONT edge (a few, not one comb-tooth per well)
+    npr = min(n, 8)
+    for j in range(npr):
+        px = (j - (npr - 1) / 2.0) * (W * 0.78 / npr)
         if prt:
-            out[f"{prt}_{i}" if n > 1 else prt] = ((cx, -D * 0.34, flu_top + 2.5), (ww * 0.4, D * 0.10, 5.0), True)
+            out[f"{prt}_{j}" if npr > 1 else prt] = ((px, -D * 0.42, flu_top + 2.0), (6.0, 5.0, 4.0), True)
     return out
 
 
