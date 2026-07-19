@@ -45,6 +45,15 @@ BLENDER_BIN = os.environ.get(
 )
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 from blender_out_lock import blender_out_dir_lock  # noqa: E402
+from render_view_contract import is_product_scale  # noqa: E402
+
+# Plant-scale bespoke templates that must NEVER render a benchtop lab instrument. The
+# "bioreactor" key is a 200 L single-use skid; it wrongly substring-matches the benchtop
+# `benchtop_bioreactor` class → an opaque vessel-on-a-box with no cut-away and no
+# parts-manifest (so the spatial drawings are skipped). A product-scale design whose only
+# template match is one of these routes to the UNIVERSAL builder instead, which renders
+# sealed-enclosure instruments WITH a cut-away hero + a full parts-manifest for the drawings.
+_PLANT_TEMPLATES_WRONG_FOR_BENCHTOP = {"bioreactor-9shot.py"}
 
 # product_class → template filename. Substring match: any product_class
 # CONTAINING the key uses the matching template. Order doesn't matter for
@@ -325,7 +334,8 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
     if written == 0:
         (out_dir / "module-overview.png").write_bytes(module_src.read_bytes())
         written = 1
-    print(f"[render-scene] UNIVERSAL OK — cover + {written} module page(s) from {cover_src.name}", flush=True)
+    _cover_name = cover_src.name if cover_src is not None else "shaded 00-hero"
+    print(f"[render-scene] UNIVERSAL OK — cover + {written} module page(s) from {_cover_name}", flush=True)
     return 0
 
 
@@ -397,6 +407,22 @@ def main() -> int:
         print(
             "[render-scene] containerised design (enclosure signal in brief/contract) → "
             "UNIVERSAL deterministic builder (kill-switch: UNIVERSAL_CONTAINERISED=0)",
+            flush=True,
+        )
+        return run_universal_fallback(state_path, out_dir, state)
+
+    # BENCHTOP INSTRUMENT mis-matched a PLANT template → UNIVERSAL (2026-07-19): a
+    # product-scale (benchtop) design whose only bespoke match is a plant-scale skid template
+    # (the 200 L "bioreactor" catching benchtop_bioreactor) must render via the UNIVERSAL
+    # builder — it gives a cut-away sealed-enclosure hero + the full parts-manifest the spatial
+    # drawings need. Same precedence idea as the containerised → UNIVERSAL route above.
+    _bench_tpl = resolve_template(product_class)
+    if (is_product_scale(state) and _bench_tpl is not None
+            and _bench_tpl.name in _PLANT_TEMPLATES_WRONG_FOR_BENCHTOP):
+        print(
+            f"[render-scene] benchtop instrument (product_class={product_class!r}, product-scale) "
+            f"mis-matched plant template {_bench_tpl.name} → UNIVERSAL deterministic builder "
+            f"(cut-away + parts-manifest for drawings)",
             flush=True,
         )
         return run_universal_fallback(state_path, out_dir, state)
