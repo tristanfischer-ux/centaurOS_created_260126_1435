@@ -935,20 +935,24 @@ def _plan_pressure(roles, W, D, H, bz):
 
 
 def _plan_rotary(roles, W, D, H, bz):
-    """rotation: motor_base IS the body; the slotted ROTOR disk seated ON its top (touching);
-    a hinged lid overlapping the rotor. Universal — added via the fast loop, same contact rule."""
+    """rotation: a LOWER motor base + a VISIBLE cylindrical rotor bowl on top + a distinct lid
+    — the centrifuge/RPM silhouette. The base is only the lower ~half of the envelope (NOT the
+    full box, which would hide the rotor and read as a featureless cube); the bowl and lid sit
+    on top so the signature reads on the exterior. All touching → one connected body."""
     body_h = max(H, 12.0)
-    top = bz + body_h
-    rr = min(W, D) * 0.40
+    base_h = body_h * 0.48                       # base is the LOWER half only
+    bowl_h = body_h * 0.40                        # the rotor chamber/bowl rises above the base
+    rr = min(W, D) * 0.42
+    base_top = bz + base_h
     out = {}
     for rv in roles:
         r = rv.role
         if "rotor" in r:
-            out[r] = ((0, 0, top - 5), (rr * 2, rr * 2, 8), True)        # rotor RECESSED in the chamber
+            out[r] = ((0, 0, base_top + bowl_h * 0.5), (rr * 2, rr * 2, bowl_h), True)   # visible bowl on the base
         elif "lid" in r:
-            out[r] = ((0, 0, top + 4), (W * 0.96, D * 0.96, 8), True)    # lid RESTS on the body rim
-        else:  # motor_base = base body
-            out[r] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)
+            out[r] = ((0, 0, base_top + bowl_h + 3), (rr * 2.15, rr * 2.15, 6), True)    # lid on the bowl rim
+        else:  # motor_base = the lower base body
+            out[r] = ((0, 0, bz + base_h * 0.5), (W, D, base_h), True)
     return out
 
 
@@ -999,35 +1003,36 @@ def _plan_planar_card(roles, W, D, H, bz, n):
 
 
 def _plan_carrier(roles, W, D, H, bz, n):
-    """structural_carrier: an outer shell/frame (chassis, full envelope) + a standard mount
-    interface on the front face + N payload bays arrayed INSIDE the shell (contained → their
-    AABBs overlap the shell → touching → one connected carrier). N=1 → a box / holder; N>1 →
-    a rack. Universal: the payload-slot COUNT drives the bay grid; the same form is a rack /
-    carrier / enclosure / damped holder, keyed on count + envelope, not per-type branches."""
+    """structural_carrier: a rear FRAME/spine (chassis) + a mount interface on the back + N
+    payload bays as a VISIBLE stack of modules in FRONT of the spine (each bay's back face
+    touches the spine → one connected carrier, and the bays READ on the exterior instead of
+    hiding inside a solid shell). A tall envelope stacks them vertically (a 9U rack); a wide
+    one grids them. N=1 → a box/holder; N>1 → a rack. Universal — count + envelope drive it."""
     n = max(1, n)
     body_h = max(H, 20.0)
-    fy = -D / 2
+    spine_d = max(D * 0.22, 4.0)
+    spine_y = D * 0.5 - spine_d * 0.5                     # spine at the rear of the envelope
+    bd = D - spine_d                                      # bays fill the depth in front of the spine
     out = {}
     for rv in roles:
         r = rv.role
         if "shell" in r:
-            out[r] = ((0, 0, bz + body_h * 0.5), (W, D, body_h), True)              # full-envelope frame
+            out[r] = ((0, spine_y, bz + body_h * 0.5), (W, spine_d, body_h), True)          # rear frame
         elif "mount" in r:
-            out[r] = ((0, fy - 3, bz + body_h * 0.5), (W * 0.8, 6, body_h * 0.6), True)  # rails on front face
+            out[r] = ((0, D * 0.5 - 1, bz + body_h * 0.5), (W * 0.7, 4, body_h * 0.6), True)  # rails on the back
     bay = next((rv.role for rv in roles if "bay" in rv.role), None)
     if bay:
-        cols = 1
-        while cols * cols < n:
-            cols += 1
+        # grid across the FRONT face: columns across W, rows up H (a visible module stack)
+        cols = max(1, round((n * (W / max(body_h, 1.0))) ** 0.5))
         rows = (n + cols - 1) // cols
-        iw, idp = W * 0.82, D * 0.82                     # interior span (inside the shell walls)
-        bw, bd = iw / cols, idp / rows
+        bw, bh = (W * 0.9) / cols, (body_h * 0.9) / rows
         for i in range(n):
             cc, rr = i % cols, i // cols
             cx = (cc - (cols - 1) / 2.0) * bw
-            cy = (rr - (rows - 1) / 2.0) * bd
+            cy = -D * 0.5 + bd * 0.5                      # in front of the spine (back face touches it)
+            cz = bz + body_h * 0.05 + (rr + 0.5) * bh
             out[f"{bay}_{i}" if n > 1 else bay] = (
-                (cx, cy, bz + body_h * 0.5), (bw * 0.8, bd * 0.8, body_h * 0.72), True)
+                (cx, cy, cz), (bw * 0.86, bd, bh * 0.86), True)   # full depth → back face touches the spine
     return out
 
 
