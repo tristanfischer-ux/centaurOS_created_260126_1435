@@ -2208,19 +2208,23 @@
           "wordId": "required_electrode_channel_word",
           "characterId": "electrode_channel_connector",
           "requiredRatings": {
-            "status": "partially_verified",
+            "status": "route_mating_proof_recorded",
             "requirements": [
-              "64 electrode channels",
-              "cartridge/main-controller mating interface"
+              "64 electrode channels (brief floor)",
+              "cartridge/main-controller Mini-DIMM mating interface",
+              "electrode_channel remains passive_board_geometry (never low-density connector package)"
             ],
             "missing": [],
             "evidence": [
-              "Gold V4 source contains Mini-DIMM/cartridge connector geometry; generated board collapses 64 channels to one 2-pin JST."
+              "Gold OpenDrop V4 @ 934a44db3ed41c24ae4dddb5b805a22e4166284b cartridge schematic exposes 132 FLUXL_* electrode refs (\u226564 brief floor).",
+              "Gold Mini_Dimm_Cartridge_06_244 footprint has contiguous mating pads 1\u2013244 (custom edge geometry, not a catalogue MPN).",
+              "Offline proveCatch: src/lib/pdf-engine-v2/lib/pcb/pcb-opendrop-electrode-route-proof.ts \u2014 fires on JST/2-pad/collapsed-count; passes gold fixture + architecture/generator passive geometry.",
+              "Fixture: tests/fixtures/pcb/yuri/opendrop-electrode-gold-evidence.json"
             ]
           },
           "missingEvidence": {
-            "kind": "mpn",
-            "details": "No orderable high-density cartridge connector MPN or complete 64-channel pin contract."
+            "kind": "board_regen_creepage_alignment",
+            "details": "Route/mating pad proof is recorded offline. Remaining work is board-regen creepage/alignment verification and controller\u2194cartridge pin-map voltage-domain documentation \u2014 not a fitted MPN gap."
           },
           "sourceCandidate": {
             "identity": "OpenDrop V4 Mini-DIMM cartridge interconnect family",
@@ -2229,12 +2233,13 @@
             "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
+            "action": "geometry_proof_recorded",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-opendrop-electrode-route-proof.ts",
             "acceptance": [
-              "Extract the released 64-channel connector/pin map and voltage-domain boundaries.",
-              "Resolve exact connector/frame/adaptor ordering codes or document custom edge-contact geometry.",
-              "Prove creepage, alignment and complete symbol/pad mapping."
+              "Gold FLUXL electrode refs \u2265 brief electrode_count floor (64).",
+              "Gold Mini-DIMM mating pad count = 244 contiguous pads.",
+              "Architecture preserves electrode_channel count from brief.",
+              "Generator marks electrode_channel as passive_board_geometry and proveCatch rejects low-density connector collapse."
             ]
           }
         }

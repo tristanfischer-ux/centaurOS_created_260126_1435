@@ -246,11 +246,12 @@ These **29 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Colorimeter · `optical_source` · `source_board_connector_word`** — **Resolved:** frozen J1/J2 identify LCSC C145956, which manufacturer data maps to BOOMELE `1.0T-4P`: 4 contacts, 1.00 mm pitch, right-angle SMD, 50 V, 1 A. Pins are GND/3V3/SDA/SCL; the frozen BOOMELE land pattern is vendored as `Forge_Manufacturer:BOOMELE_1.0T-4P` and passes electrical-pad parity. The assembly BOM must still freeze the mating cable.
 
 <a id="opendrop-electrode_cartridge-required_electrode_channel_word"></a>
-- **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — **Reclassified as passive geometry:** all 64 patterned electrode channels, routes, creepage, and mating contacts remain mandatory. The channel count is not one two-pin fitted component; exact connector/frame identities remain separate architecture work.
+- **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — **Reclassified as passive geometry** with **route/mating proveCatch recorded:** gold V4 @ `934a44db…` exposes **132** `FLUXL_*` electrode refs (≥64 brief floor) on a **244-pad** `Mini_Dimm_Cartridge_06_244` edge (custom geometry, not a catalogue MPN). Offline gate `pcb-opendrop-electrode-route-proof.ts` proves architecture keeps `electrode_channel` count and the generator keeps `passive_board_geometry`, and fires on JST/2-pad/collapsed-count collapses. Remaining: board-regen creepage/alignment + pin-map voltage-domain docs.
 
 ## Ordered next actions
 
 1. **Fitted-identity residual is closed at 0** — NinjaPCR heater current (1.79 A @ 12 V from gold film) plus OpenDrop land-pattern catalogue fills closed the last 16 MPN gaps; seven roles were honestly rejected/reclassified as not fitted.
-2. **Implement preserved function contracts** — Pioreactor channel requirements still need complete switching/protection/connector topologies; OpenDrop still needs proof of all 64 electrode routes and mating contacts. These are not fitted-component residuals.
-3. **Keep rejected candidates rejected** — do not reintroduce thermal fuses, e-stops, shunts, discrete OpenDrop ADCs/bridges/memory, or unconstrained 500 mA continuous on the NinjaPCR 12 V LDO without new gold evidence.
-4. **Regenerate boards / firmware proofs** — terminal-owned chain work. This document records offline identity closure only; it does not claim a pipeline rerun.
+2. **OpenDrop electrode route/mating proveCatch is recorded** — see `pcb-opendrop-electrode-route-proof.ts`. Creepage/alignment still need board regen.
+3. **Implement preserved Pioreactor function contracts** — heater/stir/pump channel topologies still need gold-backed switch/protection/connector identities (`needs-gold-first` until `_gold-pioreactor-repo` is frozen).
+4. **Keep rejected candidates rejected** — do not reintroduce thermal fuses, e-stops, shunts, discrete OpenDrop ADCs/bridges/memory, or unconstrained 500 mA continuous on the NinjaPCR 12 V LDO without new gold evidence.
+5. **Regenerate boards / firmware proofs** — terminal-owned chain / Cursor firmware-proof wiring. This document records offline identity + geometry proof only; it does not claim a pipeline rerun.

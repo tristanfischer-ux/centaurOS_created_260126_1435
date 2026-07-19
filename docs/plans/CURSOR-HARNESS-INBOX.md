@@ -8,8 +8,22 @@
 
 **Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb`.
 
-**Status:** `WAITING_ON_CURSOR` for form; **PCB residual fitted-MPN closure COMPLETE** (offline identity only)
-**Updated:** 2026-07-19 ~03:40 BST
+**Status:** `WAITING_ON_CURSOR` for form; **PCB residuals 0** + **OpenDrop electrode route/mating proveCatch landed**
+**Updated:** 2026-07-19 ~04:50 BST
+
+---
+
+## Cursor production note — 2026-07-19 ~04:50 BST (OpenDrop electrode route/mating)
+
+Next non-fitted gap after MPN closure: OpenDrop 64-channel cartridge geometry.
+
+**Landed on `cursor-pcb`:**
+- `pcb-opendrop-electrode-route-proof.ts` (+ test + fixture)
+- Gold SIGHT: 132 `FLUXL_*` refs, Mini-DIMM pads 1–244 @ `934a44db…`
+- proveCatch fires on JST/2-pad/collapsed-count; passes architecture `electrode_channel×64` + generator `passive_board_geometry`
+- Punchlist electrode entry updated to `route_mating_proof_recorded`
+
+**Still open:** Pioreactor wet_actuation topologies (needs `_gold-pioreactor-repo`); board-regen creepage/alignment; firmware-proof chain wiring.
 
 ---
 
