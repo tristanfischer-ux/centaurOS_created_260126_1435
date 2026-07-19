@@ -874,7 +874,9 @@ def run_gates(out_dir: str) -> list:
                 view_failures.append(f"{view.view_id}: missing {view.filename}")
             continue
         checked_views += 1
-        quality = evaluate_image(path)
+        # pass the enclosure volume so a compact benchtop product's smooth (low-edge but
+        # frame-filling) service view is not failed as "blank" — occupancy floors still guard.
+        quality = evaluate_image(path, enclosure_volume_m3=float(_encl_m3) if _encl_m3 else None)
         if not quality.passed:
             view_failures.append(
                 f"{view.view_id}: " + "; ".join(quality.reasons))

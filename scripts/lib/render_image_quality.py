@@ -23,8 +23,21 @@ def evaluate_image(
     min_edge_density: float = 0.002,
     min_width_occupancy: float = 0.35,
     min_height_occupancy: float = 0.45,
+    enclosure_volume_m3: float | None = None,
 ) -> ImageQualityResult:
-    """Reject blank, tiny or edge-only renders before workbook embedding."""
+    """Reject blank, tiny or edge-only renders before workbook embedding.
+
+    A COMPACT benchtop/handheld product legitimately has a smooth, low-edge surface (a matte
+    polymer box) — a service view of it can sit below the plant-tuned 0.002 edge-density floor
+    while still FILLING the frame (high occupancy). The occupancy floors are what actually catch
+    a blank/tiny render, so scale ONLY the edge-density floor down by device size. Keyed on the
+    enclosure volume, never a product noun. (benchtop_bioreactor service view 0.0016 SIGHT, 2026-07-19)
+    """
+    if enclosure_volume_m3 is not None and enclosure_volume_m3 > 0:
+        if enclosure_volume_m3 < 0.02:        # handheld (< 20 L)
+            min_edge_density = min(min_edge_density, 0.0010)
+        elif enclosure_volume_m3 < 0.2:       # benchtop instrument (< 200 L)
+            min_edge_density = min(min_edge_density, 0.0013)
     image = Image.open(path).convert("L")
     width, height = image.size
     edges = image.filter(ImageFilter.FIND_EDGES)
