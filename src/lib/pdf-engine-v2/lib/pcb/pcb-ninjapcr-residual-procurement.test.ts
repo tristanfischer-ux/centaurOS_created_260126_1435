@@ -202,7 +202,11 @@ describe('NinjaPCR residual procurement closure', () => {
           footprint: expectedFootprint,
         }),
       })
-      expect(resolved?.pins.map((pin) => pin.name)).toEqual([...expectedPins])
+      expect('pins' in resolved).toBe(true)
+      if (!('pins' in resolved)) {
+        throw new Error(`expected verified identity for ${partNumber}`)
+      }
+      expect(resolved.pins.map((pin) => pin.name)).toEqual([...expectedPins])
       expect(
         resolveVerifiedFunctionCandidate(
           request,
