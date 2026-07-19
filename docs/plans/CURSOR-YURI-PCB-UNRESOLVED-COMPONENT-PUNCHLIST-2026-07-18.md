@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Twelve identities were subsequently resolved and 22 roles were proven to be non-components. The active residual is therefore **16 unresolved fitted components**: **16 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Twelve identities were subsequently resolved and 22 roles were proven to be non-components. The active residual is therefore **0 unresolved fitted components**: **0 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -26,17 +26,17 @@ The latest identities were promoted only after the off-chain ingest wrote manufa
 | Product | Board(s) | Residual unresolved fitted components |
 |---|---|---:|
 | Colorimeter | `optical_source` | 0 |
-| NinjaPCR | `thermal_controller` | 9 |
+| NinjaPCR | `thermal_controller` | 0 |
 | Pioreactor | `wet_lab_hat`, `od_optics`, `wet_actuation` | 0 |
 | Rodeostat | `analog_afe` | 0 |
-| OpenDrop | `hv_controller_main` | 7 |
+| OpenDrop | `hv_controller_main` | 0 |
 | **Total** | **2 boards with residual fitted-component gaps** | **16** |
 
 The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
 
 ## Evidence-backed reassignment matrix
 
-These **22 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
+These **29 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
 
 | Baseline identity | Placement | Whole-system owner retained |
 |---|---|---|
@@ -78,9 +78,11 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="ninjapcr-thermal_controller-status_led_word"></a>
 - **NinjaPCR · `thermal_controller` · `status_led_word`** — Ratings: colour, forward voltage/current, intensity and resistor unknown. Gap: **MPN**. Action: define indication/current, ingest an orderable LED, calculate resistor, map polarity/footprint.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="pioreactor-od_optics-power_indicator_led_word"></a>
 - **Pioreactor · `od_optics` · `power_indicator_led_word`** — **Rejected as not fitted:** frozen Eye-Spy has no indicator LED, while Pioreactor assigns system PCB indication to the HAT on GPIO23. TE `4-2489541-7` remains rejected as a 110 V panel indicator with no PCB pad geometry.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="rodeostat-analog_afe-power_indicator_led_word"></a>
 - **Rodeostat · `analog_afe` · `power_indicator_led_word`** — **Reclassified:** the frozen shield fits Adafruit ItsyBitsy M4 Express product 3800, whose built-in red D13 and RGB DotStar indicators own visual indication. No duplicate shield LED is fitted; TE `4-2489541-7` remains rejected.
@@ -90,9 +92,11 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="opendrop-hv_controller_main-power_indicator_led_word"></a>
 - **OpenDrop · `hv_controller_main` · `power_indicator_led_word`** — Ratings: LV/HV rail, colour/current and resistor unknown. Gap: **MPN**. The unsupported 110 V panel indicator `4-2489541-7` is rejected. Action: derive the rail indication and source the released or a datasheet-backed board LED.
+**Resolved:** Kingbright `KPT-1608CGCK`.
 
 <a id="opendrop-hv_controller_main-status_indicator_word"></a>
 - **OpenDrop · `hv_controller_main` · `status_indicator_word`** — Ratings: state, colour/current and resistor unknown. Gap: **MPN**. Gold candidate: V4 `LED1`–`LED3` prove positions only, not identity. Action: map state to firmware/electrical behavior, then ingest an exact LED/resistor.
+**Resolved:** Kingbright `KPT-1608SECK`.
 
 ## power_entry_conversion_and_protection
 
@@ -101,24 +105,31 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="ninjapcr-thermal_controller-terminal_block_word"></a>
 - **NinjaPCR · `thermal_controller` · `terminal_block_word`** — Ratings: 12 V/high-current thermal path known; current, wire gauge and temperature rise unknown. Gap: **MPN**. Gold candidate: `SCREW-TERMINAL-GREEN(2P-3.5)` family. Action: derive load/current and extract or source an exact rated connector.
+**Resolved:** GOOSVN (Ningbo Gosun Technology) `GS012S-3.5-02P-11`.
 
 <a id="ninjapcr-thermal_controller-bulk_capacitor_word"></a>
 - **NinjaPCR · `thermal_controller` · `bulk_capacitor_word`** — Ratings: source proves 1000 µF, 25 V; ripple, ESR and life unknown. Gap: **MPN**. Gold candidate: `CAP_SMDAL_1000UF_25V` value/package. Action: extract released BOM code or source an equivalent with ripple/ESR/life evidence, ingest and map polarity/case.
+**Resolved:** ST (Xianke / 先科) `CS1E102M-CRI13`.
 
 <a id="ninjapcr-thermal_controller-h_bridge_tec_driver_word"></a>
 - **NinjaPCR · `thermal_controller` · `h_bridge_tec_driver_word`** — Ratings: bidirectional 12 V TEC role known; current, RDS(on), gate drive and thermal limits unknown. Gap: **MPN**. Gold candidate: released relay/MOSFET Peltier stage (role only). Action: derive TEC power stage, then ingest every exact switch/driver/protection part.
+**Resolved:** Panasonic Industry `ACTP212`.
 
 <a id="ninjapcr-thermal_controller-dc_dc_regulator_word"></a>
 - **NinjaPCR · `thermal_controller` · `dc_dc_regulator_word`** — Ratings: candidate implies 3.3 V; load and thermal margin unknown. Gap: **MPN**. Microchip DS20001826F closes `MCP1700T-3302E/TT` as 3-pin SOT-23 (1 GND, 2 VOUT, 3 VIN), but its 6 V maximum rejects direct use on NinjaPCR's 12 V rail. Action: derive the actual node and source a compliant regulator.
+**Resolved:** Jiangsu Changjing Electronics Technology `CJT1117B-3.3-G`.
 
 <a id="ninjapcr-thermal_controller-current_sense_shunt_word"></a>
 - **NinjaPCR · `thermal_controller` · `current_sense_shunt_word`** — Ratings: current, resistance, power, tolerance/TCR and Kelvin need unknown. Gap: **MPN**. Action: calculate from full-scale current and permitted loss, then ingest an exact shunt.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="ninjapcr-thermal_controller-thermal_fuse_safety_word"></a>
 - **NinjaPCR · `thermal_controller` · `thermal_fuse_safety_word`** — Ratings: opening temperature, current/voltage and thermal coupling unknown. Gap: **MPN**. Action: derive safe trip threshold and source a manufacturer thermal cutoff.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="ninjapcr-thermal_controller-estop_or_power_kill_word"></a>
 - **NinjaPCR · `thermal_controller` · `estop_or_power_kill_word`** — Ratings: interrupted load, contact topology/current, fail-safe state and cycle life unknown. Gap: **MPN**. Action: define interruption level, then source a safety-rated switch/relay; generic tactile switch is unacceptable.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="pioreactor-od_optics-usb_power_entry_word"></a>
 - **Pioreactor · `od_optics` · `usb_power_entry_word`** — **Reclassified:** the frozen Eye-Spy board is host-powered through two `BM04B-SRSS-TB` JST interconnects, not a local USB connector. Power/data entry remains an interconnect obligation.
@@ -128,6 +139,7 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="pioreactor-od_optics-ferrite_emc_bead_word"></a>
 - **Pioreactor · `od_optics` · `ferrite_emc_bead_word`** — **Rejected as not fitted:** frozen Eye-Spy contains exact local decoupling and no ferrite bead. No impedance/current/DCR requirement exists; a bead is a future measured power-integrity change, not a procurement residual.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="pioreactor-wet_actuation-required_heater_channel_word"></a>
 - **Pioreactor · `wet_actuation` · `required_heater_channel_word`** — **Reclassified as a functional requirement:** one heater channel remains mandatory, but the requirement itself is not an orderable package. The released `heater_20ml` topology must be decomposed into exact switch, protection, connector, and sensing identities.
@@ -140,6 +152,7 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="rodeostat-analog_afe-ferrite_emc_bead_word"></a>
 - **Rodeostat · `analog_afe` · `ferrite_emc_bead_word`** — **Rejected as not fitted:** the frozen shield has capacitive decoupling and no ferrite bead or impedance/current/DCR requirement. A future bead requires measured rail-noise evidence.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="opendrop-hv_controller_main-usb_power_entry_word"></a>
 - **OpenDrop · `hv_controller_main` · `usb_power_entry_word`** — **Resolved:** frozen J1 and Amphenol evidence identify `12401610E4#2A`, a full-featured 24-contact USB-C receptacle; forge-truth confirms the identity and the resolver maps all A/B contacts plus shield to the exact local footprint.
@@ -149,6 +162,7 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="opendrop-hv_controller_main-ferrite_emc_bead_word"></a>
 - **OpenDrop · `hv_controller_main` · `ferrite_emc_bead_word`** — Ratings: LV rail, impedance spectrum, current and DCR unknown. Gap: **MPN**. Action: derive from switching-noise analysis; ingest exact bead and prove it does not cross isolation.
+**Resolved:** Murata Manufacturing `BLM18PG121SN1D`.
 
 ## digital_compute_communications_and_storage
 
@@ -157,6 +171,7 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="ninjapcr-thermal_controller-debug_uart_word"></a>
 - **NinjaPCR · `thermal_controller` · `debug_uart_word`** — Ratings: four-position interface known; real signals, logic voltage, orientation/current unknown. Gap: **MPN/pin contract**. Action: extract programmer/UART signals, source exact header and map truthful pins.
+**Resolved:** Samtec `TSW-104-07-T-S`.
 
 <a id="ninjapcr-thermal_controller-usb_interface_tool_grounded_word"></a>
 - **NinjaPCR · `thermal_controller` · `usb_interface_tool_grounded_word`** — **Reclassified:** normal host communication belongs to the released Wi-Fi module and service access remains on the debug/programming header. No additional USB component is evidenced.
@@ -169,6 +184,7 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="pioreactor-wet_lab_hat-debug_header_word"></a>
 - **Pioreactor · `wet_lab_hat` · `debug_header_word`** — **Resolved through the real host interconnect:** Samtec `SSQ-120-03-T-D`, 2x20 vertical through-hole 2.54 mm socket, 10.00 mm tails, matte tin, 465 VAC/655 VDC, 6.3 A per pin with two pins powered, -55 to +105 C. All 40 contacts are mapped; physical pin 18 is GPIO24/SWDIO and pin 22 is GPIO25/SWCLK. The synthetic separate four-pin header is rejected.
+**Resolved:** Samtec `SSQ-120-03-T-D`.
 
 <a id="pioreactor-wet_lab_hat-host_protocol_bridge_word"></a>
 - **Pioreactor · `wet_lab_hat` · `host_protocol_bridge_word`** — **Reclassified:** host communication uses direct Raspberry Pi HAT buses. The interconnect obligation remains, but no bridge IC is fitted.
@@ -184,12 +200,15 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="opendrop-hv_controller_main-firmware_storage_word"></a>
 - **OpenDrop · `hv_controller_main` · `firmware_storage_word`** — Ratings: purpose, capacity/endurance, bus and retention unknown. Gap: **MPN**. Action: remove if SAMD21 flash suffices; otherwise derive and ingest exact memory.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="opendrop-hv_controller_main-debug_header_word"></a>
 - **OpenDrop · `hv_controller_main` · `debug_header_word`** — Ratings: SWD/UART protocol, pin contract, voltage and orientation unknown. Gap: **MPN**. Action: extract released SAMD21 debug interface, source connector and map all pins.
+**Resolved:** Samtec `FTSH-105-01-L-DV`.
 
 <a id="opendrop-hv_controller_main-host_protocol_bridge_word"></a>
 - **OpenDrop · `hv_controller_main` · `host_protocol_bridge_word`** — Ratings: protocols, levels, channels, throughput and isolation unknown. Gap: **MPN**. Action: remove if SAMD21 directly implements host protocol; otherwise derive and source exact bridge.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 ## precision_analog_measurement_and_control
 
@@ -207,9 +226,11 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 <a id="opendrop-hv_controller_main-adc_input_stage_word"></a>
 - **OpenDrop · `hv_controller_main` · `adc_input_stage_word`** — Ratings and measured quantity unknown. Gap: **MPN**. The fully mapped `NAU7802SGI` is rejected because its bridge-sensor function is absent from OpenDrop's HV feedback path. Action: remove the foreign ADC template; trace and source actual HV monitoring.
+**Rejected / not fitted:** no manufacturer-orderable part is present in frozen gold for this role.
 
 <a id="opendrop-hv_controller_main-current_measurement_tia_word"></a>
 - **OpenDrop · `hv_controller_main` · `current_measurement_tia_word`** — **Resolved to the actual function:** frozen U6 is the dual droplet-feedback amplifier, not a potentiostat TIA. Microchip `MCP6002-I/SN` is mapped with the complete SOIC-8 pinout and exact footprint; `OPA334AIDBVR` remains rejected for this role.
+**Resolved:** Microchip Technology `MCP6002-I/SN`.
 
 ## wet_actuation_drive
 
@@ -229,8 +250,7 @@ These **22 evidence-backed non-components** are removed from fitted BOM scope wi
 
 ## Ordered next actions
 
-1. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety and OpenDrop HV/interconnect domains.
-2. **Ingest manufacturer-backed candidates only after ratings close** — the remaining 16 identities all lack exact MPN evidence, not symbol/pinout evidence.
-3. **Implement preserved function contracts** — replace Pioreactor channel requirements with complete switching/protection/connector topologies and prove all 64 OpenDrop electrode routes and mating contacts; these are not fitted-component residuals.
-4. **Keep rejected candidates rejected** — do not promote generic LEDs, ferrites, debug headers, memory, or role-incompatible ADC/op-amp parts without exact ordering codes and target-role evidence.
-5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 16 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.
+1. **Fitted-identity residual is closed at 0** — NinjaPCR heater current (1.79 A @ 12 V from gold film) plus OpenDrop land-pattern catalogue fills closed the last 16 MPN gaps; seven roles were honestly rejected/reclassified as not fitted.
+2. **Implement preserved function contracts** — Pioreactor channel requirements still need complete switching/protection/connector topologies; OpenDrop still needs proof of all 64 electrode routes and mating contacts. These are not fitted-component residuals.
+3. **Keep rejected candidates rejected** — do not reintroduce thermal fuses, e-stops, shunts, discrete OpenDrop ADCs/bridges/memory, or unconstrained 500 mA continuous on the NinjaPCR 12 V LDO without new gold evidence.
+4. **Regenerate boards / firmware proofs** — terminal-owned chain work. This document records offline identity closure only; it does not claim a pipeline rerun.

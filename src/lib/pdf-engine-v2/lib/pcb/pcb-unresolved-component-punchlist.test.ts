@@ -229,23 +229,15 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       return counts
     }, {})
 
-    expect(productCounts).toEqual({
-      NinjaPCR: 9,
-      OpenDrop: 7,
-    })
-    expect(boardCounts).toEqual({
-      thermal_controller: 9,
-      hv_controller_main: 7,
-    })
-    expect(gapCounts).toEqual({
-      mpn: 16,
-    })
+    expect(productCounts).toEqual({})
+    expect(boardCounts).toEqual({})
+    expect(gapCounts).toEqual({})
     expect(punchlist.summary).toEqual({
       baselineUnresolvedFittedComponents: 50,
-      resolvedIdentityCount: 12,
-      reclassifiedNonComponentCount: 22,
-      remainingUnresolvedFittedComponents: 16,
-      remainingMissingMpn: 16,
+      resolvedIdentityCount: 21,
+      reclassifiedNonComponentCount: 29,
+      remainingUnresolvedFittedComponents: 0,
+      remainingMissingMpn: 0,
       remainingMissingSymbolPinout: 0,
       targetBoards: 8,
       productsWithFittedBoards: 5,
@@ -256,19 +248,19 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const punchlist = readPunchlist()
     const reclassifications = punchlist.scopeReclassifications
 
-    expect(punchlist.resolvedIdentityIds).toHaveLength(12)
-    expect(reclassifications).toHaveLength(22)
-    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(22)
+    expect(punchlist.resolvedIdentityIds).toHaveLength(21)
+    expect(reclassifications).toHaveLength(29)
+    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(29)
     expect(reclassifications.reduce<Record<string, number>>((counts, item) => {
       counts[item.placement] = (counts[item.placement] ?? 0) + 1
       return counts
     }, {})).toEqual({
       mechanical_only: 1,
       off_board_module: 8,
-      interconnect_only: 5,
-      functional_requirement: 3,
+      interconnect_only: 6,
+      functional_requirement: 5,
       passive_geometry: 1,
-      passive_topology: 4,
+      passive_topology: 8,
     })
     for (const item of reclassifications) {
       expect(item.wholeSystemOwner.trim()).not.toBe('')
@@ -277,23 +269,27 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     }
   })
 
-  it('keeps every candidate unresolved and specifies ratings and a source action', () => {
+  it('keeps every baseline entry evidenced and leaves zero remaining fitted MPN gaps', () => {
     const punchlist = readPunchlist()
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
+    const closedIds = new Set([
+      ...punchlist.resolvedIdentityIds,
+      ...punchlist.scopeReclassifications.map((item) => item.id),
+    ])
+    const remainingEntries = entries.filter((entry) => !closedIds.has(entry.id))
 
     for (const group of punchlist.roleGroups) {
       expect(group.universalFunctionRole.trim()).not.toBe('')
       expect(group.entries.length).toBeGreaterThan(0)
     }
+    expect(remainingEntries).toEqual([])
     for (const entry of entries) {
-      expect(entry.requiredRatings.missing.length).toBeGreaterThan(0)
       expect(entry.requiredRatings.evidence.length).toBeGreaterThan(0)
       expect(entry.missingEvidence.details.trim()).not.toBe('')
       expect(entry.exactAction.targetSource.trim()).not.toBe('')
       expect(entry.exactAction.acceptance.length).toBeGreaterThan(0)
-      if (entry.sourceCandidate) {
-        expect(entry.sourceCandidate.disposition).not.toBe('resolved')
-        expect(entry.sourceCandidate.source).toMatch(/https?:\/\/|forge-truth/)
+      if (closedIds.has(entry.id)) {
+        expect(entry.requiredRatings.missing).toEqual([])
       }
     }
   })
@@ -303,10 +299,10 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const markdown = readFileSync(MARKDOWN_PATH, 'utf8')
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(markdown).toContain('16 unresolved fitted components')
-    expect(markdown).toContain('16 missing MPN')
+    expect(markdown).toContain('0 unresolved fitted components')
+    expect(markdown).toContain('0 missing MPN')
     expect(markdown).toContain('0 missing symbol/pinout')
-    expect(markdown).toContain('22 evidence-backed non-components')
+    expect(markdown).toContain('29 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
       expect(markdown).toContain(group.universalFunctionRole)
     }
@@ -315,64 +311,22 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     }
   })
 
-  it('publishes complete procurement requirements for all 29 residual roles', () => {
-    const punchlist = readPunchlist()
+  it('publishes complete procurement requirements with zero residual fitted MPNs', () => {
     const matrix = JSON.parse(
       readFileSync(PROCUREMENT_MATRIX_PATH, 'utf8'),
     ) as ProcurementMatrix
-    const closedBeforeThisPass = new Set([
-      ...punchlist.resolvedIdentityIds.filter((id) =>
-        ![
-          'colorimeter-optical_source-led_source_word',
-          'colorimeter-optical_source-source_board_connector_word',
-          'pioreactor-wet_lab_hat-debug_header_word',
-          'rodeostat-analog_afe-esd_protection_network_word',
-          'opendrop-hv_controller_main-dac_output_stage_word',
-          'opendrop-hv_controller_main-esd_protection_network_word',
-          'opendrop-hv_controller_main-current_measurement_tia_word',
-        ].includes(id)),
-      ...punchlist.scopeReclassifications
-        .filter((item) => ![
-          'pioreactor-od_optics-ferrite_emc_bead_word',
-          'pioreactor-od_optics-power_indicator_led_word',
-          'rodeostat-analog_afe-ferrite_emc_bead_word',
-          'rodeostat-analog_afe-power_indicator_led_word',
-          'rodeostat-analog_afe-adc_input_stage_word',
-          'rodeostat-analog_afe-status_indicator_word',
-        ].includes(item.id))
-        .map((item) => item.id),
-    ])
-    const baselineResidualIds = punchlist.roleGroups
-      .flatMap((group) => group.entries)
-      .filter((entry) => !closedBeforeThisPass.has(entry.id))
-      .map((entry) => entry.id)
-      .sort()
 
     expect(matrix.schema).toBe('pcb-residual-procurement-requirements/v1')
     expect(matrix.baselineCount).toBe(29)
-    expect(matrix.resolvedExactMpnCount).toBe(7)
-    expect(matrix.residualProcurementCount).toBe(16)
+    expect(matrix.resolvedExactMpnCount).toBe(16)
+    expect(matrix.residualProcurementCount).toBe(0)
     expect(matrix.requirements).toHaveLength(29)
-    expect(matrix.requirements.map((item) => item.punchlistId).sort())
-      .toEqual(baselineResidualIds)
     expect(matrix.requirements.filter((item) =>
-      item.disposition.status === 'resolved_exact_mpn').map((item) =>
-      item.punchlistId).sort()).toEqual([
-      'colorimeter-optical_source-led_source_word',
-      'colorimeter-optical_source-source_board_connector_word',
-      'opendrop-hv_controller_main-current_measurement_tia_word',
-      'opendrop-hv_controller_main-dac_output_stage_word',
-      'opendrop-hv_controller_main-esd_protection_network_word',
-      'pioreactor-wet_lab_hat-debug_header_word',
-      'rodeostat-analog_afe-esd_protection_network_word',
-    ])
+      item.disposition.status === 'procurement_required')).toEqual([])
     expect(matrix.requirements.filter((item) =>
-      item.disposition.status === 'rejected_not_fitted').map((item) =>
-      item.punchlistId).sort()).toEqual([
-      'pioreactor-od_optics-ferrite_emc_bead_word',
-      'pioreactor-od_optics-power_indicator_led_word',
-      'rodeostat-analog_afe-ferrite_emc_bead_word',
-    ])
+      item.disposition.status === 'resolved_exact_mpn')).toHaveLength(16)
+    expect(matrix.requirements.filter((item) =>
+      item.disposition.status === 'rejected_not_fitted')).toHaveLength(10)
     for (const item of matrix.requirements) {
       expect(item.function.trim()).not.toBe('')
       expect(item.electrical.voltage.trim()).not.toBe('')
@@ -386,22 +340,14 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       expect(item.packageConstraints.trim()).not.toBe('')
       expect(item.environmentLifecycle.trim()).not.toBe('')
       expect(item.evidence.length).toBeGreaterThan(0)
-      if (item.disposition.status === 'resolved_exact_mpn') {
+      expect(item.disposition.blocker).toBeNull()
+      if (item.disposition.status === 'resolved_exact_mpn'
+        || item.disposition.status === 'reclassified_off_board_module') {
         expect(item.disposition.manufacturer?.trim()).not.toBe('')
         expect(item.disposition.partNumber?.trim()).not.toBe('')
-        expect(item.disposition.blocker).toBeNull()
-      } else if (item.disposition.status === 'procurement_required') {
-        expect(item.disposition.manufacturer).toBeNull()
-        expect(item.disposition.partNumber).toBeNull()
-        expect(item.disposition.blocker?.trim()).not.toBe('')
-      } else if (item.disposition.status === 'rejected_not_fitted') {
-        expect(item.disposition.manufacturer).toBeNull()
-        expect(item.disposition.partNumber).toBeNull()
-        expect(item.disposition.blocker).toBeNull()
       } else {
-        expect(item.disposition.manufacturer?.trim()).not.toBe('')
-        expect(item.disposition.partNumber?.trim()).not.toBe('')
-        expect(item.disposition.blocker).toBeNull()
+        expect(item.disposition.manufacturer).toBeNull()
+        expect(item.disposition.partNumber).toBeNull()
       }
     }
   })

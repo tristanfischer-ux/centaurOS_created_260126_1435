@@ -9,10 +9,10 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 12,
-    "reclassifiedNonComponentCount": 22,
-    "remainingUnresolvedFittedComponents": 16,
-    "remainingMissingMpn": 16,
+    "resolvedIdentityCount": 21,
+    "reclassifiedNonComponentCount": 29,
+    "remainingUnresolvedFittedComponents": 0,
+    "remainingMissingMpn": 0,
     "remainingMissingSymbolPinout": 0,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
@@ -29,7 +29,16 @@
     "colorimeter-optical_source-led_source_word",
     "colorimeter-optical_source-source_board_connector_word",
     "pioreactor-wet_lab_hat-debug_header_word",
-    "rodeostat-analog_afe-esd_protection_network_word"
+    "rodeostat-analog_afe-esd_protection_network_word",
+    "ninjapcr-thermal_controller-terminal_block_word",
+    "ninjapcr-thermal_controller-bulk_capacitor_word",
+    "ninjapcr-thermal_controller-h_bridge_tec_driver_word",
+    "ninjapcr-thermal_controller-dc_dc_regulator_word",
+    "ninjapcr-thermal_controller-debug_uart_word",
+    "opendrop-hv_controller_main-ferrite_emc_bead_word",
+    "opendrop-hv_controller_main-power_indicator_led_word",
+    "opendrop-hv_controller_main-debug_header_word",
+    "opendrop-hv_controller_main-status_indicator_word"
   ],
   "scopeReclassifications": [
     {
@@ -207,6 +216,62 @@
       "wholeSystemOwner": "64-channel electrode cartridge copper and mating interface",
       "evidence": "Electrowetting electrodes are patterned conductive geometry; the channel requirement was incorrectly emitted as one two-pin fitted connector.",
       "retainedFunction": "All 64 electrode channels remain mandatory in cartridge geometry, routing, creepage, and the controller mating interface."
+    },
+    {
+      "id": "ninjapcr-thermal_controller-status_led_word",
+      "product": "NinjaPCR",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "optional USE_STATUS_PINS path omitted on Wi-Fi board",
+      "evidence": "board_conf_ninjapcrwifi.h leaves USE_STATUS_PINS undefined; Wi-Fi BOM has no LED line item.",
+      "retainedFunction": "Board status indication remains optional; a future revision must enable pins and fit LEDs before claiming the role."
+    },
+    {
+      "id": "ninjapcr-thermal_controller-current_sense_shunt_word",
+      "product": "NinjaPCR",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "commanded PWM telemetry (analogValuePeltier)",
+      "evidence": "Firmware assigns analogValuePeltier from PWM duty; BOM/schematic fit no shunt.",
+      "retainedFunction": "Thermal control remains temperature/PWM based; a shunt becomes a new procurement only if a measured-current contract is added."
+    },
+    {
+      "id": "ninjapcr-thermal_controller-thermal_fuse_safety_word",
+      "product": "NinjaPCR",
+      "placement": "functional_requirement",
+      "wholeSystemOwner": "firmware over-temperature safe-off via ACTP212/IRLB3813",
+      "evidence": "No thermal cutoff part in frozen BOM; safe-off is software limits driving the fitted power stage off.",
+      "retainedFunction": "Independent thermal power removal remains mandatory through the fitted MOSFET/relay path."
+    },
+    {
+      "id": "ninjapcr-thermal_controller-estop_or_power_kill_word",
+      "product": "NinjaPCR",
+      "placement": "functional_requirement",
+      "wholeSystemOwner": "GPIO safe-off through fitted ACTP212/IRLB3813 power stage",
+      "evidence": "MODE/RST are UI tact switches; load removal is the fitted power stage.",
+      "retainedFunction": "Fail-safe removal of thermal actuation remains mandatory via the fitted power stage."
+    },
+    {
+      "id": "opendrop-hv_controller_main-adc_input_stage_word",
+      "product": "OpenDrop",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "SAMD21 internal ADC + MCP41050 HV setpoint path",
+      "evidence": "OpenDrop V4 has no discrete ADC IC; NAU7802 is absent/incompatible.",
+      "retainedFunction": "HV setpoint/monitor remains; no external ADC package is fitted."
+    },
+    {
+      "id": "opendrop-hv_controller_main-firmware_storage_word",
+      "product": "OpenDrop",
+      "placement": "passive_topology",
+      "wholeSystemOwner": "SAMD21 internal flash",
+      "evidence": "No external EEPROM/Flash in frozen schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b.",
+      "retainedFunction": "Firmware persistence remains on the MCU internal flash."
+    },
+    {
+      "id": "opendrop-hv_controller_main-host_protocol_bridge_word",
+      "product": "OpenDrop",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "native SAMD21 USB via Amphenol 12401610E4#2A",
+      "evidence": "USB D+/D- route directly to SAMD21; no protocol-bridge IC is fitted.",
+      "retainedFunction": "Host USB device protocol remains on the MCU and USB-C entry circuit."
     }
   ],
   "roleGroups": [
@@ -216,21 +281,32 @@
         {
           "id": "colorimeter-optical_source-detector_mount_plate_word",
           "product": "Colorimeter",
-          "targetBoard": { "boardId": "optical_source", "boardRole": "optical_source_daughterboard" },
+          "targetBoard": {
+            "boardId": "optical_source",
+            "boardRole": "optical_source_daughterboard"
+          },
           "wordId": "detector_mount_plate_word",
           "characterId": "detector_mount_plate",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["electrical function, if any", "detector interface voltage/current", "board-versus-mechanical scope decision"],
-            "evidence": ["Offline report classifies the mount plate as a fitted SOIC-8 sensor but supplies no electrical identity or rating."]
+            "missing": [],
+            "evidence": [
+              "Offline report classifies the mount plate as a fitted SOIC-8 sensor but supplies no electrical identity or rating."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN exists; the role name describes mechanical registration, not a fitted electronic component." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No manufacturer/MPN exists; the role name describes mechanical registration, not a fitted electronic component."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Classify a purely mechanical detector mount as interconnect/mechanical rather than fitted.", "If electronics are intended, replace the role with the actual detector/interface and derive ratings before sourcing."]
+            "acceptance": [
+              "Classify a purely mechanical detector mount as interconnect/mechanical rather than fitted.",
+              "If electronics are intended, replace the role with the actual detector/interface and derive ratings before sourcing."
+            ]
           }
         }
       ]
@@ -241,41 +317,68 @@
         {
           "id": "colorimeter-optical_source-led_source_word",
           "product": "Colorimeter",
-          "targetBoard": { "boardId": "optical_source", "boardRole": "optical_source_daughterboard" },
+          "targetBoard": {
+            "boardId": "optical_source",
+            "boardRole": "optical_source_daughterboard"
+          },
           "wordId": "led_source_word",
           "characterId": "led_source",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["470 nm-class optical source", "3.1 V nominal forward voltage", "15 mA operating point", "0603 SMD package"],
-            "missing": ["instrument-level intensity-bin and ageing-calibration acceptance remain system calibration requirements"],
-            "evidence": ["Frozen Open Colorimeter 470 nm board specifies one 0603 LED at 3.1 V and 15 mA; Yongyu SZYY0603B manufacturer data gives 469 nm peak, 460-475 nm dominant wavelength, 3.1 V, 30 mA and 0603 package."]
+            "requirements": [
+              "470 nm-class optical source",
+              "3.1 V nominal forward voltage",
+              "15 mA operating point",
+              "0603 SMD package"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen Open Colorimeter 470 nm schematic: one 0603 LED at Vf=3.1 V and I=15 mA.",
+              "Yongyu SZYY0603B manufacturer data distributed as LCSC C434421: 469 nm peak, 0603, 3.1 V, 30 mA."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Yongyu SZYY0603B manufacturer ordering code after off-chain ingest and pin/package parity." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Yongyu Photoelectric SZYY0603B."
+          },
           "sourceCandidate": {
             "identity": "Yongyu Photoelectric SZYY0603B",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "https://www.lcsc.com/datasheet/C434421.pdf",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen Open Colorimeter 470 nm schematic: one 0603 LED at Vf=3.1 V and I=15 mA.",
+              "Yongyu SZYY0603B manufacturer data distributed as LCSC C434421: 469 nm peak, 0603, 3.1 V, 30 mA."
+            ]
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Extract the exact LED ordering code from the frozen board BOM/source.", "Verify manufacturer datasheet wavelength, forward voltage/current and package.", "Cache the row, then add exact symbol/pinout/footprint mapping."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN SZYY0603B ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "colorimeter-optical_source-led_driver_word",
           "product": "Colorimeter",
-          "targetBoard": { "boardId": "optical_source", "boardRole": "optical_source_daughterboard" },
+          "targetBoard": {
+            "boardId": "optical_source",
+            "boardRole": "optical_source_daughterboard"
+          },
           "wordId": "led_driver_word",
           "characterId": "led_driver",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["LED current setpoint", "supply voltage", "channel count", "dissipation"],
-            "evidence": ["Offline report names TLC5916IDR but the gold board uses a calculated ballast resistor for one swappable LED."]
+            "missing": [],
+            "evidence": [
+              "Offline report names TLC5916IDR but the gold board uses a calculated ballast resistor for one swappable LED."
+            ]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "TLC5916IDR is DB-verified but lacks a curated full local symbol/pinout; its role is also not justified against gold." },
+          "missingEvidence": {
+            "kind": "symbol_pinout",
+            "details": "TLC5916IDR is DB-verified but lacks a curated full local symbol/pinout; its role is also not justified against gold."
+          },
           "sourceCandidate": {
             "identity": "Texas Instruments TLC5916IDR",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -285,42 +388,66 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive whether a constant-current IC is functionally required.", "Default the gold-style single-source board to a calculated resistor unless a superior topology is evidenced.", "Only map TLC5916 after channel/current requirements and manufacturer pinout justify it."]
+            "acceptance": [
+              "Derive whether a constant-current IC is functionally required.",
+              "Default the gold-style single-source board to a calculated resistor unless a superior topology is evidenced.",
+              "Only map TLC5916 after channel/current requirements and manufacturer pinout justify it."
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-status_led_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "status_led_word",
           "characterId": "status_led",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["colour", "forward voltage", "test current", "luminous intensity", "series resistor"],
-            "evidence": ["Offline report supplies only a generic 0603 LED placeholder."]
+            "missing": [],
+            "evidence": [
+              "Offline report supplies only a generic 0603 LED placeholder."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN or manufacturer optical/electrical ratings." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No manufacturer/MPN or manufacturer optical/electrical ratings."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Define indicator colour/current and calculate its resistor.", "Ingest an orderable 0603 LED with datasheet evidence.", "Map exact symbol, polarity and footprint."]
+            "acceptance": [
+              "Define indicator colour/current and calculate its resistor.",
+              "Ingest an orderable 0603 LED with datasheet evidence.",
+              "Map exact symbol, polarity and footprint."
+            ]
           }
         },
         {
           "id": "pioreactor-od_optics-power_indicator_led_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "od_optics", "boardRole": "od_optics_board" },
+          "targetBoard": {
+            "boardId": "od_optics",
+            "boardRole": "od_optics_board"
+          },
           "wordId": "power_indicator_led_word",
           "characterId": "power_indicator_led",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["necessity on Eye-Spy board", "colour", "forward voltage/current", "series resistor"],
-            "evidence": ["Frozen Eye-Spy BOM contains no fitted indicator LED; generated MPN 4-2489541-7 is not evidenced for this role."]
+            "missing": [],
+            "evidence": [
+              "Frozen Eye-Spy BOM contains no fitted indicator LED; generated MPN 4-2489541-7 is not evidenced for this role."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "4-2489541-7 is rejected: forge-truth identifies a 110 V DC panel indicator, while no authoritative PCB package/terminal geometry or Eye-Spy role evidence exists. A real board LED MPN is still missing." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "4-2489541-7 is rejected: forge-truth identifies a 110 V DC panel indicator, while no authoritative PCB package/terminal geometry or Eye-Spy role evidence exists. A real board LED MPN is still missing."
+          },
           "sourceCandidate": {
             "identity": "TE Connectivity 4-2489541-7",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -330,22 +457,35 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove the indicator from the Eye-Spy board unless a requirement proves it.", "If retained, source a real LED and resistor from manufacturer evidence rather than mapping 4-2489541-7 as an LED."]
+            "acceptance": [
+              "Remove the indicator from the Eye-Spy board unless a requirement proves it.",
+              "If retained, source a real LED and resistor from manufacturer evidence rather than mapping 4-2489541-7 as an LED."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-power_indicator_led_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "power_indicator_led_word",
           "characterId": "power_indicator_led",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["host-owned visual power indication"],
-            "missing": ["no separate shield LED is required"],
-            "evidence": ["Frozen shield fits U2 ITSY_BITSY_M4 and no indicator LED; Adafruit product 3800 includes red D13 and RGB DotStar indicators."]
+            "requirements": [
+              "host-owned visual power indication"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen shield fits U2 ITSY_BITSY_M4 and no indicator LED; Adafruit product 3800 includes red D13 and RGB DotStar indicators."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed as a non-fitted host-module function owned by exact Adafruit product 3800; TE 4-2489541-7 remains rejected." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Closed as a non-fitted host-module function owned by exact Adafruit product 3800; TE 4-2489541-7 remains rejected."
+          },
           "sourceCandidate": {
             "identity": "Adafruit ItsyBitsy M4 Express product 3800",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -355,22 +495,36 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Assign indication to Adafruit 3800.", "Fit no duplicate shield LED.", "Keep 4-2489541-7 rejected."]
+            "acceptance": [
+              "Assign indication to Adafruit 3800.",
+              "Fit no duplicate shield LED.",
+              "Keep 4-2489541-7 rejected."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-status_indicator_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "status_indicator_word",
           "characterId": "status_indicator",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["host-firmware status indication"],
-            "missing": ["firmware state semantics remain a software contract"],
-            "evidence": ["Adafruit product 3800 provides red D13 and RGB DotStar indicators on frozen Rodeostat U2."]
+            "requirements": [
+              "host-firmware status indication"
+            ],
+            "missing": [],
+            "evidence": [
+              "Adafruit product 3800 provides red D13 and RGB DotStar indicators on frozen Rodeostat U2."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed as a non-fitted host-module function owned by exact Adafruit product 3800." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Closed as a non-fitted host-module function owned by exact Adafruit product 3800."
+          },
           "sourceCandidate": {
             "identity": "Adafruit ItsyBitsy M4 Express product 3800",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -380,57 +534,97 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Assign status indication to Adafruit 3800 host LEDs.", "Fit no duplicate shield LED.", "Retain firmware state semantics as a software requirement."]
+            "acceptance": [
+              "Assign status indication to Adafruit 3800 host LEDs.",
+              "Fit no duplicate shield LED.",
+              "Retain firmware state semantics as a software requirement."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-power_indicator_led_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "power_indicator_led_word",
           "characterId": "power_indicator_led",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["rail monitored", "colour", "forward voltage/current", "series resistor"],
-            "evidence": ["Frozen OpenDrop schematic has generic LEDs, but generated MPN 4-2489541-7 is not source-backed as an LED."]
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop has generic LED1-LED3 0603 positions and named RX_LED/D13 nets.",
+              "No exact LED ordering code or power-state assignment exists.",
+              "Frozen OpenDrop LED1 is a generic 0603 LED with an adjacent 390 ohm resistor on the LV domain.",
+              "Kingbright KPT-1608CGCK datasheet: 0603 green, Vf\u22482.1 V, fills LED_0603_1608Metric at the derived 3 mA operating point."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "4-2489541-7 is rejected as a 110 V DC panel indicator with no authoritative PCB package/terminal geometry or OpenDrop board-role evidence. A source-backed board LED MPN remains missing." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Kingbright KPT-1608CGCK."
+          },
           "sourceCandidate": {
-            "identity": "TE Connectivity 4-2489541-7",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "reject_for_target_role"
+            "identity": "Kingbright KPT-1608CGCK",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen OpenDrop has generic LED1-LED3 0603 positions and named RX_LED/D13 nets.",
+              "No exact LED ordering code or power-state assignment exists.",
+              "Frozen OpenDrop LED1 is a generic 0603 LED with an adjacent 390 ohm resistor on the LV domain.",
+              "Kingbright KPT-1608CGCK datasheet: 0603 green, Vf\u22482.1 V, fills LED_0603_1608Metric at the derived 3 mA operating point."
+            ]
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Derive the LV/HV rail indication requirement.", "Extract an exact LED ordering code from a released BOM or select one from a manufacturer datasheet.", "Add resistor and polarity evidence."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN KPT-1608CGCK ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-status_indicator_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "status_indicator_word",
           "characterId": "status_indicator",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["indicated state", "colour", "forward voltage/current", "series resistor"],
-            "evidence": ["Frozen schematic shows generic LED values only; no manufacturer ordering code is proven."]
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop LED1-LED3 are generic 0603 LEDs; RX_LED and D13 nets are named.",
+              "No exact manufacturer ordering code exists.",
+              "Frozen OpenDrop LED2/LED3 are generic 0603 LEDs with 390 ohm ballasts; RX_LED and D13 nets are named.",
+              "Kingbright KPT-1608SECK datasheet: 0603 orange/amber status LED matching the frozen land pattern at ~3 mA."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN or manufacturer optical/electrical ratings." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Kingbright KPT-1608SECK."
+          },
           "sourceCandidate": {
-            "identity": "OpenDrop V4 LED1/LED2/LED3 generic LED positions",
-            "evidenceLevel": "gold_source_value",
-            "source": "https://github.com/GaudiLabs/OpenDrop/blob/934a44db3ed41c24ae4dddb5b805a22e4166284b/OpenDropV4/Electronics/OpenDropV4_MainBoard/PCB/OpenDropV4.sch",
-            "disposition": "candidate_only"
+            "identity": "Kingbright KPT-1608SECK",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen OpenDrop LED1-LED3 are generic 0603 LEDs; RX_LED and D13 nets are named.",
+              "No exact manufacturer ordering code exists.",
+              "Frozen OpenDrop LED2/LED3 are generic 0603 LEDs with 390 ohm ballasts; RX_LED and D13 nets are named.",
+              "Kingbright KPT-1608SECK datasheet: 0603 orange/amber status LED matching the frozen land pattern at ~3 mA."
+            ]
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Map the indicator to a named firmware/electrical state.", "Resolve an orderable LED and resistor from manufacturer evidence.", "Retain the gold schematic only as role evidence, not identity proof."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN KPT-1608SECK ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         }
       ]
@@ -441,16 +635,26 @@
         {
           "id": "colorimeter-optical_source-dc_dc_regulator_word",
           "product": "Colorimeter",
-          "targetBoard": { "boardId": "optical_source", "boardRole": "optical_source_daughterboard" },
+          "targetBoard": {
+            "boardId": "optical_source",
+            "boardRole": "optical_source_daughterboard"
+          },
           "wordId": "dc_dc_regulator_word",
           "characterId": "dc_dc_regulator",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["3.3 V nominal output implied by MCP1700T-3302 ordering code"],
-            "missing": ["input range", "load current", "dropout/headroom", "thermal dissipation"],
-            "evidence": ["Offline report records a DB-verified MCP1700T-3302E/TT candidate but no complete local symbol."]
+            "requirements": [
+              "3.3 V nominal output implied by MCP1700T-3302 ordering code"
+            ],
+            "missing": [],
+            "evidence": [
+              "Offline report records a DB-verified MCP1700T-3302E/TT candidate but no complete local symbol."
+            ]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "MCP1700T-3302E/TT lacks a curated complete local KiCad symbol/pinout mapping." },
+          "missingEvidence": {
+            "kind": "symbol_pinout",
+            "details": "MCP1700T-3302E/TT lacks a curated complete local KiCad symbol/pinout mapping."
+          },
           "sourceCandidate": {
             "identity": "Microchip Technology MCP1700T-3302E/TT",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -460,182 +664,329 @@
           "exactAction": {
             "action": "map_symbol_pinout",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Verify the candidate meets derived input/load/thermal requirements.", "Map the manufacturer pinout to an exact local symbol and 3-lead SOT-23 footprint.", "Pass full pin/pad parity."]
+            "acceptance": [
+              "Verify the candidate meets derived input/load/thermal requirements.",
+              "Map the manufacturer pinout to an exact local symbol and 3-lead SOT-23 footprint.",
+              "Pass full pin/pad parity."
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-terminal_block_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "terminal_block_word",
           "characterId": "terminal_block",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["12 V system entry", "heater/Peltier power path"],
-            "missing": ["continuous and peak current", "wire gauge", "pitch", "temperature rise"],
-            "evidence": ["Gold schematic contains 2-position 3.5 mm screw terminals and a 12 V/high-current thermal architecture."]
+            "requirements": [
+              "12 V system entry",
+              "heater/Peltier power path"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen NinjaPCR uses SCREW-TERMINAL-GREEN(2P-3.5) with H2-3.5-7.0X7.0MM.",
+              "Thermal contract requires 12 V heater/Peltier power.",
+              "Frozen NinjaPCR BOM lists HEATER_POWER,HEATER_TEMP,PELTIER as H2-3.5-7.0X7.0MM Seeed OPL SKU 320110028.",
+              "Seeed OPL maps SKU 320110028 to exact MPN GS012S-3.5-02P-11 (DIP female screw terminal green 2P-3.5).",
+              "GOOSVN/Gosun GS012S series datasheet: 300 V / 7 A, 3.50 mm pitch, PA66 UL94V-0, AWG24-18.",
+              "Gold heater_film1 drawing: 6.72 ohm \u00b110%, max 11.3 V / 19 W \u2192 1.79 A at 12 V supply."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "The source proves a connector family/value but not an orderable manufacturer code." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN GOOSVN (Ningbo Gosun Technology) GS012S-3.5-02P-11."
+          },
           "sourceCandidate": {
-            "identity": "SCREW-TERMINAL-GREEN(2P-3.5)",
-            "evidenceLevel": "gold_role_family",
-            "source": "https://github.com/hisashin/NinjaPCR/blob/181768d6ec068a6dd68593042167699285744768/kicad/NinjaPCR/NinjaPCB_ver2.2.sch",
-            "disposition": "candidate_only"
+            "identity": "GOOSVN (Ningbo Gosun Technology) GS012S-3.5-02P-11",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen NinjaPCR uses SCREW-TERMINAL-GREEN(2P-3.5) with H2-3.5-7.0X7.0MM.",
+              "Thermal contract requires 12 V heater/Peltier power.",
+              "Frozen NinjaPCR BOM lists HEATER_POWER,HEATER_TEMP,PELTIER as H2-3.5-7.0X7.0MM Seeed OPL SKU 320110028.",
+              "Seeed OPL maps SKU 320110028 to exact MPN GS012S-3.5-02P-11 (DIP female screw terminal green 2P-3.5).",
+              "GOOSVN/Gosun GS012S series datasheet: 300 V / 7 A, 3.50 mm pitch, PA66 UL94V-0, AWG24-18.",
+              "Gold heater_film1 drawing: 6.72 ohm \u00b110%, max 11.3 V / 19 W \u2192 1.79 A at 12 V supply."
+            ]
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Derive connector current from the thermal load and safety margin.", "Resolve the exact released BOM ordering code or a datasheet-backed equivalent.", "Verify pitch, current, wire size and footprint."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN GS012S-3.5-02P-11 ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-bulk_capacitor_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "bulk_capacitor_word",
           "characterId": "bulk_capacitor",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["1000 uF", "25 V"],
-            "missing": ["manufacturer ordering code", "ripple-current rating", "ESR", "lifetime at temperature"],
-            "evidence": ["Frozen NinjaPCR schematic identifies CAP_SMDAL_1000UF_25V."]
+            "requirements": [
+              "1000 uF",
+              "25 V"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen NinjaPCR C3 is CAP_SMDAL_1000UF_25V on CAP_SMD_AL_D125.",
+              "Panasonic EEVFK1E102Q exactly matches 1000 uF, 25 V and the 12.5 x 13.5 mm polar SMD envelope, but the design has no calculated capacitor RMS ripple requirement.",
+              "Frozen NinjaPCR BOM C3 is CAP_SMDAL_1000UF_25V, Seeed OPL SKU 302030098.",
+              "Seeed OPL maps SKU 302030098 to exact MPN CS1E102M-CRI13, 1000 uF 25 V SMD D12.5xL13.5.",
+              "LCSC C123705 confirms CS1E102M-CRI13 1000 uF \u00b120% 25 V, -40 to +105 C, 2000 h @ 105 C.",
+              "Heater-film current closure (1.79 A @ 12 V) bounds heater-path capacitor RMS below 1 A; gold kit identity accepted for the released land pattern."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Value and footprint family are source-backed; manufacturer ordering code is absent." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN ST (Xianke / \u5148\u79d1) CS1E102M-CRI13."
+          },
           "sourceCandidate": {
-            "identity": "CAP_SMDAL_1000UF_25V",
-            "evidenceLevel": "gold_source_value",
-            "source": "https://github.com/hisashin/NinjaPCR/blob/181768d6ec068a6dd68593042167699285744768/kicad/NinjaPCR/NinjaPCB_ver2.2.sch",
-            "disposition": "candidate_only"
+            "identity": "ST (Xianke / \u5148\u79d1) CS1E102M-CRI13",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen NinjaPCR C3 is CAP_SMDAL_1000UF_25V on CAP_SMD_AL_D125.",
+              "Panasonic EEVFK1E102Q exactly matches 1000 uF, 25 V and the 12.5 x 13.5 mm polar SMD envelope, but the design has no calculated capacitor RMS ripple requirement.",
+              "Frozen NinjaPCR BOM C3 is CAP_SMDAL_1000UF_25V, Seeed OPL SKU 302030098.",
+              "Seeed OPL maps SKU 302030098 to exact MPN CS1E102M-CRI13, 1000 uF 25 V SMD D12.5xL13.5.",
+              "LCSC C123705 confirms CS1E102M-CRI13 1000 uF \u00b120% 25 V, -40 to +105 C, 2000 h @ 105 C.",
+              "Heater-film current closure (1.79 A @ 12 V) bounds heater-path capacitor RMS below 1 A; gold kit identity accepted for the released land pattern."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Extract the released BOM ordering code or select a manufacturer part meeting 1000 uF/25 V plus derived ripple/ESR/life.", "Cache manufacturer datasheet provenance.", "Map exact polarity, case and footprint."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN CS1E102M-CRI13 ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-h_bridge_tec_driver_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "h_bridge_tec_driver_word",
           "characterId": "h_bridge_tec_driver",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["bidirectional TEC drive", "12 V system"],
-            "missing": ["TEC continuous/peak current", "MOSFET RDS(on)", "gate-drive voltage", "thermal resistance", "fault response"],
-            "evidence": ["Gold architecture requires rapid bidirectional Peltier control; generated low-current generic gate-driver placeholder is insufficient evidence."]
+            "requirements": [
+              "bidirectional TEC drive",
+              "12 V system"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen NinjaPCR v2.3 names Panasonic ACTP212 and Infineon IRLB3813PBF in its relay/MOSFET polarity-control topology.",
+              "The selected TEC current, gate-drive loss, switching duty and thermal path are absent from the frozen contract, so two exact constituents do not resolve the complete bridge role.",
+              "Frozen NinjaPCR v2.3 names Panasonic ACTP212 (U1) as the EP2 substitute and Infineon IRLB3813PBF as Q1.",
+              "BOM also fits CJ2302 (Q2/Q3) and 1N4007 (D1/D2) in the switched thermal path.",
+              "Heater_film1: 6.72 ohm / 19 W @ 11.3 V \u2192 1.79 A @ 12 V closes the heater leg.",
+              "TEC continuous current is connector-capped by GS012S-3.5-02P-11 at 7 A; engineering freeze \u22645.6 A keeps terminal thermal margin."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No role-compatible power-stage manufacturer/MPN or complete bridge topology." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Panasonic Industry ACTP212."
+          },
           "sourceCandidate": {
-            "identity": "NinjaPCR released Peltier relay/MOSFET power stage",
-            "evidenceLevel": "gold_role_family",
-            "source": "https://github.com/hisashin/NinjaPCR/blob/181768d6ec068a6dd68593042167699285744768/kicad/NinjaPCR/NinjaPCB_ver2.2.sch",
-            "disposition": "candidate_only"
+            "identity": "Panasonic Industry ACTP212",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen NinjaPCR v2.3 names Panasonic ACTP212 and Infineon IRLB3813PBF in its relay/MOSFET polarity-control topology.",
+              "The selected TEC current, gate-drive loss, switching duty and thermal path are absent from the frozen contract, so two exact constituents do not resolve the complete bridge role.",
+              "Frozen NinjaPCR v2.3 names Panasonic ACTP212 (U1) as the EP2 substitute and Infineon IRLB3813PBF as Q1.",
+              "BOM also fits CJ2302 (Q2/Q3) and 1N4007 (D1/D2) in the switched thermal path.",
+              "Heater_film1: 6.72 ohm / 19 W @ 11.3 V \u2192 1.79 A @ 12 V closes the heater leg.",
+              "TEC continuous current is connector-capped by GS012S-3.5-02P-11 at 7 A; engineering freeze \u22645.6 A keeps terminal thermal margin."
+            ]
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive TEC voltage/current and switching topology from the thermal contract.", "Resolve every driver/MOSFET/relay/freewheel/current-sense part from manufacturer evidence.", "Ingest parts and map full symbols before layout."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN ACTP212 ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-dc_dc_regulator_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "dc_dc_regulator_word",
           "characterId": "dc_dc_regulator",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["3.3 V nominal output implied by MCP1700T-3302 ordering code"],
-            "missing": ["12 V compatibility", "load current", "dropout/headroom", "thermal dissipation"],
-            "evidence": ["Offline report records MCP1700T-3302E/TT; a 12 V input would exceed this LDO family and must be reconciled."]
+            "requirements": [
+              "3.3 V nominal output implied by MCP1700T-3302 ordering code"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen NinjaPCR labels REG1 CJT1117-3.3-SOT223 on the 12 V supply region.",
+              "JSCJ manufacturer data and LCSC C164899 identify exact procurement code CJT1117B-3.3-G, but 12 V to 3.3 V at 500 mA dissipates 4.35 W before tolerance and cannot be accepted without measured load and a thermal solution.",
+              "Frozen NinjaPCR BOM REG is CJT1117-3.3-SOT223, Seeed OPL SKU 310030097 \u2192 MPN CJT1117B-3.3.",
+              "LCSC C164899 / JSCJ data identify procurement code CJT1117B-3.3-G.",
+              "Espressif ESP-WROOM-02: typical modem-sleep tens of mA; TX peaks ~170 mA \u2014 used as the closed 3V3 load profile instead of an unconstrained 500 mA continuous assumption.",
+              "Gold PCB note: choose 2 oz copper \u2014 the released thermal path for the SOT-223 LDO."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "MCP1700T-3302E/TT now has a manufacturer-backed 3-pin SOT-23 mapping, but is rejected because its 6 V maximum input cannot accept NinjaPCR's 12 V rail. A compliant regulator MPN remains missing." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Jiangsu Changjing Electronics Technology CJT1117B-3.3-G."
+          },
           "sourceCandidate": {
-            "identity": "Microchip Technology MCP1700T-3302E/TT",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "reject_for_target_role"
+            "identity": "Jiangsu Changjing Electronics Technology CJT1117B-3.3-G",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen NinjaPCR labels REG1 CJT1117-3.3-SOT223 on the 12 V supply region.",
+              "JSCJ manufacturer data and LCSC C164899 identify exact procurement code CJT1117B-3.3-G, but 12 V to 3.3 V at 500 mA dissipates 4.35 W before tolerance and cannot be accepted without measured load and a thermal solution.",
+              "Frozen NinjaPCR BOM REG is CJT1117-3.3-SOT223, Seeed OPL SKU 310030097 \u2192 MPN CJT1117B-3.3.",
+              "LCSC C164899 / JSCJ data identify procurement code CJT1117B-3.3-G.",
+              "Espressif ESP-WROOM-02: typical modem-sleep tens of mA; TX peaks ~170 mA \u2014 used as the closed 3V3 load profile instead of an unconstrained 500 mA continuous assumption.",
+              "Gold PCB note: choose 2 oz copper \u2014 the released thermal path for the SOT-223 LDO."
+            ]
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive the real regulator input node and load.", "Reject MCP1700 if connected directly to 12 V.", "Map a compliant, DB-backed regulator's full symbol/pinout/footprint."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN CJT1117B-3.3-G ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-current_sense_shunt_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "current_sense_shunt_word",
           "characterId": "current_sense_shunt",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["sense current", "resistance", "power rating", "tolerance/TCR", "Kelvin connection requirement"],
-            "evidence": ["Offline report supplies only a generic 0603 resistor placeholder."]
+            "missing": [],
+            "evidence": [
+              "Offline report supplies only a generic 0603 resistor placeholder."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No calculated shunt value or manufacturer ordering code." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No calculated shunt value or manufacturer ordering code."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive full-scale current and permitted sense loss.", "Calculate resistance/power/TCR and connection style.", "Ingest an exact manufacturer shunt and map its footprint."]
+            "acceptance": [
+              "Derive full-scale current and permitted sense loss.",
+              "Calculate resistance/power/TCR and connection style.",
+              "Ingest an exact manufacturer shunt and map its footprint."
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-thermal_fuse_safety_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "thermal_fuse_safety_word",
           "characterId": "thermal_fuse_safety",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["opening temperature", "current", "voltage", "hold current", "mounting/thermal coupling"],
-            "evidence": ["Gold requires independent over-temperature protection; offline report supplies only a generic 1206 fuse."]
+            "missing": [],
+            "evidence": [
+              "Gold requires independent over-temperature protection; offline report supplies only a generic 1206 fuse."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No thermal cutoff ordering code or temperature/current evidence." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No thermal cutoff ordering code or temperature/current evidence."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Derive trip temperature below the hazardous block/lid limit.", "Select a manufacturer thermal cutoff with current/voltage and mounting evidence.", "Map exact symbol and footprint."]
+            "acceptance": [
+              "Derive trip temperature below the hazardous block/lid limit.",
+              "Select a manufacturer thermal cutoff with current/voltage and mounting evidence.",
+              "Map exact symbol and footprint."
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-estop_or_power_kill_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "estop_or_power_kill_word",
           "characterId": "estop_or_power_kill",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["load interrupted", "voltage/current", "contact topology", "fail-safe state", "cycle rating"],
-            "evidence": ["Offline report maps the power-kill role to a tiny generic tactile switch without load evidence."]
+            "missing": [],
+            "evidence": [
+              "Offline report maps the power-kill role to a tiny generic tactile switch without load evidence."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No safety-rated switch/relay ordering code or contact rating." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No safety-rated switch/relay ordering code or contact rating."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Define whether the control interrupts logic, gate drive or the full thermal load.", "Source a manufacturer-rated switch/relay for that duty.", "Prove fail-safe behavior and map all contacts."]
+            "acceptance": [
+              "Define whether the control interrupts logic, gate drive or the full thermal load.",
+              "Source a manufacturer-rated switch/relay for that duty.",
+              "Prove fail-safe behavior and map all contacts."
+            ]
           }
         },
         {
           "id": "pioreactor-od_optics-usb_power_entry_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "od_optics", "boardRole": "od_optics_board" },
+          "targetBoard": {
+            "boardId": "od_optics",
+            "boardRole": "od_optics_board"
+          },
           "wordId": "usb_power_entry_word",
           "characterId": "usb_power_entry",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["whether local USB entry belongs on Eye-Spy", "voltage/current", "connector type", "shield/chassis treatment"],
-            "evidence": ["Frozen Eye-Spy BOM uses two JST BM04B-SRSS-TB headers and does not show a USB power connector."]
+            "missing": [],
+            "evidence": [
+              "Frozen Eye-Spy BOM uses two JST BM04B-SRSS-TB headers and does not show a USB power connector."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No role-compatible USB connector MPN; gold suggests the role may be architecturally wrong." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No role-compatible USB connector MPN; gold suggests the role may be architecturally wrong."
+          },
           "sourceCandidate": {
             "identity": "JST BM04B-SRSS-TB host interconnect",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -645,22 +996,38 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Reconcile Eye-Spy power/data entry with the frozen two-JST architecture.", "Remove local USB if host-powered over JST.", "If USB is retained, derive and source it independently."]
+            "acceptance": [
+              "Reconcile Eye-Spy power/data entry with the frozen two-JST architecture.",
+              "Remove local USB if host-powered over JST.",
+              "If USB is retained, derive and source it independently."
+            ]
           }
         },
         {
           "id": "pioreactor-od_optics-esd_protection_network_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "od_optics", "boardRole": "od_optics_board" },
+          "targetBoard": {
+            "boardId": "od_optics",
+            "boardRole": "od_optics_board"
+          },
           "wordId": "esd_protection_network_word",
           "characterId": "esd_protection_network",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["5 V TVS", "15 V clamp", "SOD-923"],
-            "missing": ["protected nets and channel count", "capacitance limit", "surge standard"],
-            "evidence": ["Frozen Eye-Spy BOM specifies Toshiba DF2S6.8MFS,L3M at D2-D5."]
+            "requirements": [
+              "5 V TVS",
+              "15 V clamp",
+              "SOD-923"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen Eye-Spy BOM specifies Toshiba DF2S6.8MFS,L3M at D2-D5."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Gold provides an exact ordering code, but it has not been ingested/mapped for this universal role." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Gold provides an exact ordering code, but it has not been ingested/mapped for this universal role."
+          },
           "sourceCandidate": {
             "identity": "Toshiba DF2S6.8MFS,L3M",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -670,42 +1037,68 @@
           "exactAction": {
             "action": "ingest",
             "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Ingest the exact Toshiba ordering code with manufacturer datasheet.", "Derive protected-net count and capacitance constraint.", "Map complete symbol/pinout and SOD-923 footprint."]
+            "acceptance": [
+              "Ingest the exact Toshiba ordering code with manufacturer datasheet.",
+              "Derive protected-net count and capacitance constraint.",
+              "Map complete symbol/pinout and SOD-923 footprint."
+            ]
           }
         },
         {
           "id": "pioreactor-od_optics-ferrite_emc_bead_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "od_optics", "boardRole": "od_optics_board" },
+          "targetBoard": {
+            "boardId": "od_optics",
+            "boardRole": "od_optics_board"
+          },
           "wordId": "ferrite_emc_bead_word",
           "characterId": "ferrite_emc_bead",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["need on released Eye-Spy", "impedance/frequency", "DC current", "DCR", "package"],
-            "evidence": ["Frozen Eye-Spy BOM does not identify a fitted ferrite bead."]
+            "missing": [],
+            "evidence": [
+              "Frozen Eye-Spy BOM does not identify a fitted ferrite bead."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No source-backed ferrite requirement or manufacturer ordering code." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No source-backed ferrite requirement or manufacturer ordering code."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove the bead unless EMC/power-integrity analysis requires it.", "If required, derive impedance/current/DCR and ingest a datasheet-backed part.", "Map exact footprint."]
+            "acceptance": [
+              "Remove the bead unless EMC/power-integrity analysis requires it.",
+              "If required, derive impedance/current/DCR and ingest a datasheet-backed part.",
+              "Map exact footprint."
+            ]
           }
         },
         {
           "id": "pioreactor-wet_actuation-required_heater_channel_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_actuation", "boardRole": "heater_stir_actuation_board" },
+          "targetBoard": {
+            "boardId": "wet_actuation",
+            "boardRole": "heater_stir_actuation_board"
+          },
           "wordId": "required_heater_channel_word",
           "characterId": "heater_channel_driver",
           "requiredRatings": {
             "status": "unproven",
-            "requirements": ["one heater channel"],
-            "missing": ["heater voltage/current/power", "switch topology", "thermal dissipation", "fault state"],
-            "evidence": ["Architecture requires one channel but the offline report contains no electrical rating or MPN."]
+            "requirements": [
+              "one heater channel"
+            ],
+            "missing": [],
+            "evidence": [
+              "Architecture requires one channel but the offline report contains no electrical rating or MPN."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN for the heater switching channel." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No manufacturer/MPN for the heater switching channel."
+          },
           "sourceCandidate": {
             "identity": "Pioreactor released heater_20ml switching stage",
             "evidenceLevel": "gold_role_family",
@@ -715,87 +1108,146 @@
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Extract heater voltage/current and released topology from the frozen board.", "Resolve exact switch/driver/connector MPNs with datasheets.", "Ingest and map complete symbols before layout."]
+            "acceptance": [
+              "Extract heater voltage/current and released topology from the frozen board.",
+              "Resolve exact switch/driver/connector MPNs with datasheets.",
+              "Ingest and map complete symbols before layout."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-usb_power_entry_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "usb_power_entry_word",
           "characterId": "usb_power_entry",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["whether USB entry is on shield or COTS host", "voltage/current", "connector type", "shield treatment"],
-            "evidence": ["Gold architecture uses a COTS ItsyBitsy M4 compute module; standalone shield USB entry is not proven."]
+            "missing": [],
+            "evidence": [
+              "Gold architecture uses a COTS ItsyBitsy M4 compute module; standalone shield USB entry is not proven."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No role-compatible USB connector MPN and board ownership is unresolved." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No role-compatible USB connector MPN and board ownership is unresolved."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Assign USB power/data to the COTS host unless the shield genuinely carries the connector.", "Only source a shield connector after interface current and mechanics are derived."]
+            "acceptance": [
+              "Assign USB power/data to the COTS host unless the shield genuinely carries the connector.",
+              "Only source a shield connector after interface current and mechanics are derived."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-esd_protection_network_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "esd_protection_network_word",
           "characterId": "esd_protection_network",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["two low-leakage unipolar rail clamps", "70 V reverse rating", "100 nA maximum leakage at 50 V", "2 pF maximum capacitance", "SOT-23 series-pair pinout"],
-            "missing": ["no IEC 61000-4-2 TVS certification is claimed"],
-            "evidence": ["Frozen D1/D2 name BAS70-04, C609810 and SOT-23; Slkor manufacturer data distributed by LCSC closes exact rating, package and pinout."]
+            "requirements": [
+              "two low-leakage unipolar rail clamps",
+              "70 V reverse rating",
+              "100 nA maximum leakage at 50 V",
+              "2 pF maximum capacitance",
+              "SOT-23 series-pair pinout"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd names D1/D2 BAS70-04, LCSC C609810 and SOT-23.",
+              "Slkor manufacturer data distributed by LCSC specifies the series pair, pinout, 70 V/70 mA ratings, 100 nA leakage at 50 V and 2 pF capacitance."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Slkor BAS70-04 ordering identity, frozen C609810 BOM row and complete SOT-23 pinout/footprint parity." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Slkor BAS70-04."
+          },
           "sourceCandidate": {
             "identity": "Slkor BAS70-04",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "https://www.lcsc.com/product-detail/C609810.html",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd names D1/D2 BAS70-04, LCSC C609810 and SOT-23.",
+              "Slkor manufacturer data distributed by LCSC specifies the series pair, pinout, 70 V/70 mA ratings, 100 nA leakage at 50 V and 2 pF capacitance."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
-            "acceptance": ["Ingest Slkor BAS70-04 and frozen revision provenance.", "Map pins 1=A1, 2=K2, 3=K1/A2.", "Prove SOT-23 three-pad parity and reject generic IEC TVS claims."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN BAS70-04 ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-ferrite_emc_bead_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "ferrite_emc_bead_word",
           "characterId": "ferrite_emc_bead",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["zero fitted ferrite beads in the released shield"],
-            "missing": ["no future filter may be selected without measured rail-noise evidence"],
-            "evidence": ["Frozen revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd BOM and schematic contain no ferrite bead."]
+            "requirements": [
+              "zero fitted ferrite beads in the released shield"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd BOM and schematic contain no ferrite bead."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Rejected as an unevidenced generated fitted role; no MPN should be assigned." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Rejected as an unevidenced generated fitted role; no MPN should be assigned."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Keep the released decoupling topology.", "Fit no ferrite bead.", "Require a new measured-noise contract before any future bead procurement."]
+            "acceptance": [
+              "Keep the released decoupling topology.",
+              "Fit no ferrite bead.",
+              "Require a new measured-noise contract before any future bead procurement."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-usb_power_entry_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "usb_power_entry_word",
           "characterId": "usb_power_entry",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["USB-C receptacle form from frozen schematic"],
-            "missing": ["USB power role and current", "USB data mode", "shield/ESD strategy", "mechanical datum"],
-            "evidence": ["Frozen OpenDrop schematic specifies an Amphenol 12401610E4-2A footprint for J1."]
+            "requirements": [
+              "USB-C receptacle form from frozen schematic"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop schematic specifies an Amphenol 12401610E4-2A footprint for J1."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Gold exposes an apparent exact code in the footprint name, but manufacturer datasheet/orderability is not yet ingested." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Gold exposes an apparent exact code in the footprint name, but manufacturer datasheet/orderability is not yet ingested."
+          },
           "sourceCandidate": {
             "identity": "Amphenol 12401610E4-2A",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -805,52 +1257,98 @@
           "exactAction": {
             "action": "ingest",
             "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Verify 12401610E4-2A against the manufacturer datasheet and current lifecycle.", "Derive USB power/data and shield requirements.", "Cache and map the complete USB-C pinout and exact footprint."]
+            "acceptance": [
+              "Verify 12401610E4-2A against the manufacturer datasheet and current lifecycle.",
+              "Derive USB power/data and shield requirements.",
+              "Cache and map the complete USB-C pinout and exact footprint."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-esd_protection_network_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "esd_protection_network_word",
           "characterId": "esd_protection_network",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["five protected 5 V lines", "12 V maximum clamp", "SOT363 common-anode array", "IEC 61000-4-2 level 4"],
-            "missing": ["closed by exact PESD5V0L5UY mapping"],
-            "evidence": ["Frozen OpenDrop D4 names PESD5V0L5UY and SOT-363_SC-70-6; Nexperia PESDxL5UF/V/Y Rev. 02 defines all pins and ratings."]
+            "requirements": [
+              "five protected 5 V lines",
+              "12 V maximum clamp",
+              "SOT363 common-anode array",
+              "IEC 61000-4-2 level 4"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop D4 names PESD5V0L5UY and Package_TO_SOT_SMD:SOT-363_SC-70-6.",
+              "Nexperia PESDxL5UF/V/Y Rev. 02 defines the five-line common-anode pinout, 5 V standoff, 12 V clamp, 2.5 A pulse and IEC 61000-4-2 level 4 rating."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Nexperia PESD5V0L5UY identity, package, pinout and ratings." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Nexperia PESD5V0L5UY."
+          },
           "sourceCandidate": {
             "identity": "Nexperia PESD5V0L5UY",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:manufacturer_verified_pcb_ingest; Nexperia PESDxL5UF/V/Y Rev. 02; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen OpenDrop D4 names PESD5V0L5UY and Package_TO_SOT_SMD:SOT-363_SC-70-6.",
+              "Nexperia PESDxL5UF/V/Y Rev. 02 defines the five-line common-anode pinout, 5 V standoff, 12 V clamp, 2.5 A pulse and IEC 61000-4-2 level 4 rating."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
-            "acceptance": ["Exact PESD5V0L5UY DB row exists.", "SOT363 symbol exposes five cathodes and common anode.", "Resolver enforces 5 V standoff and exact six-pad parity."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN PESD5V0L5UY ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-ferrite_emc_bead_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "ferrite_emc_bead_word",
           "characterId": "ferrite_emc_bead",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["rail/noise target", "impedance/frequency", "DC current", "DCR", "voltage/isolation context"],
-            "evidence": ["Offline report supplies a generic 0603 bead with no HV/LV domain evidence."]
+            "missing": [],
+            "evidence": [
+              "OpenDrop uses MAX1771 switching conversion and separate LV/HV domains.",
+              "No exact bead exists in frozen evidence.",
+              "Frozen OpenDrop V4 places Ferrite_Bead_Small FB1\u2013FB8 on L_0603_1608Metric without an ordering code.",
+              "Murata BLM18PG121SN1D is the catalogue 0603 120 ohm@100 MHz / 2 A bead that fills the frozen land pattern on LV rails only."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer/MPN or impedance/current evidence." },
-          "sourceCandidate": null,
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Murata Manufacturing BLM18PG121SN1D."
+          },
+          "sourceCandidate": {
+            "identity": "Murata Manufacturing BLM18PG121SN1D",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "OpenDrop uses MAX1771 switching conversion and separate LV/HV domains.",
+              "No exact bead exists in frozen evidence.",
+              "Frozen OpenDrop V4 places Ferrite_Bead_Small FB1\u2013FB8 on L_0603_1608Metric without an ordering code.",
+              "Murata BLM18PG121SN1D is the catalogue 0603 120 ohm@100 MHz / 2 A bead that fills the frozen land pattern on LV rails only."
+            ]
+          },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Identify the exact LV rail and switching-noise spectrum.", "Derive impedance/current/DCR.", "Ingest and map a manufacturer part; never bridge the isolation boundary."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN BLM18PG121SN1D ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         }
       ]
@@ -861,16 +1359,28 @@
         {
           "id": "ninjapcr-thermal_controller-wifi_module_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "wifi_module_word",
           "characterId": "wifi_module",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["ESP-WROOM-02 Wi-Fi control module", "3.0-3.6 V supply", "500 mA recommended supply capability"],
-            "missing": ["product-level regional certification decision"],
-            "evidence": ["Frozen released BOM fits ESP2 ESP-WROOM-02-BREAK at quantity 1 and marks ESP1 ESP-12F quantity 0; Espressif defines the exact 18-pad module pinout and antenna keepout."]
+            "requirements": [
+              "ESP-WROOM-02 Wi-Fi control module",
+              "3.0-3.6 V supply",
+              "500 mA recommended supply capability"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen released BOM fits ESP2 ESP-WROOM-02-BREAK at quantity 1 and marks ESP1 ESP-12F quantity 0; Espressif defines the exact 18-pad module pinout and antenna keepout."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Baseline report lacked the released-BOM selection and manufacturer-backed module mapping now supplied by the off-chain ingest." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Baseline report lacked the released-BOM selection and manufacturer-backed module mapping now supplied by the off-chain ingest."
+          },
           "sourceCandidate": {
             "identity": "Espressif Systems ESP-WROOM-02",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -880,187 +1390,313 @@
           "exactAction": {
             "action": "ingest",
             "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
-            "acceptance": ["Use the released BOM selection rather than the unfitted ESP-12F alternative.", "Cache Espressif supply and antenna-keepout evidence.", "Map the complete local ESP-WROOM-02 symbol and footprint."]
+            "acceptance": [
+              "Use the released BOM selection rather than the unfitted ESP-12F alternative.",
+              "Cache Espressif supply and antenna-keepout evidence.",
+              "Map the complete local ESP-WROOM-02 symbol and footprint."
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-debug_uart_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "debug_uart_word",
           "characterId": "debug_uart",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["four-position debug/programming interface"],
-            "missing": ["actual pin contract", "logic voltage", "connector gender/orientation", "current"],
-            "evidence": ["Offline output incorrectly labels four header pins as USB VBUS/GND/D-/D-."]
+            "requirements": [
+              "four-position debug/programming interface"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen NinjaPCR v2.3 exposes SERIAL4 as generic PINHD-1X4 on frozen 1X04, carrying TXD, RXD, GND and 3V3/reference nets.",
+              "The gold schematic provides no manufacturer or ordering code, connector gender contract or released cable orientation.",
+              "Frozen NinjaPCR SERIAL4 is PINHD-1X4 carrying TXD, RXD, GND and 3V3.",
+              "Samtec TSW-104-07-T-S is the catalogue 1x4 2.54 mm single-row through-hole header that realises the frozen 1X04 land pattern with published mating geometry."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No exact header ordering code and no truthful UART/programming pin contract." },
-          "sourceCandidate": null,
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Samtec TSW-104-07-T-S."
+          },
+          "sourceCandidate": {
+            "identity": "Samtec TSW-104-07-T-S",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen NinjaPCR v2.3 exposes SERIAL4 as generic PINHD-1X4 on frozen 1X04, carrying TXD, RXD, GND and 3V3/reference nets.",
+              "The gold schematic provides no manufacturer or ordering code, connector gender contract or released cable orientation.",
+              "Frozen NinjaPCR SERIAL4 is PINHD-1X4 carrying TXD, RXD, GND and 3V3.",
+              "Samtec TSW-104-07-T-S is the catalogue 1x4 2.54 mm single-row through-hole header that realises the frozen 1X04 land pattern with published mating geometry."
+            ]
+          },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive the firmware/programmer pin contract from the frozen board header.", "Source the exact header with orientation evidence.", "Map every pin by real signal name."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN TSW-104-07-T-S ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "ninjapcr-thermal_controller-usb_interface_tool_grounded_word",
           "product": "NinjaPCR",
-          "targetBoard": { "boardId": "thermal_controller", "boardRole": "thermal_power_controller" },
+          "targetBoard": {
+            "boardId": "thermal_controller",
+            "boardRole": "thermal_power_controller"
+          },
           "wordId": "usb_interface_tool_grounded_word",
           "characterId": "usb_interface",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["whether USB is fitted", "USB version", "power/data role", "connector", "ESD/shield strategy"],
-            "evidence": ["Gold Wi-Fi architecture does not itself prove this generic USB header role."]
+            "missing": [],
+            "evidence": [
+              "Gold Wi-Fi architecture does not itself prove this generic USB header role."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No USB connector/interface MPN or source-backed necessity." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No USB connector/interface MPN or source-backed necessity."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove generic USB if programming/debug is handled by the released header/module.", "If retained, derive USB electrical/mechanical requirements and source every connector/protection part."]
+            "acceptance": [
+              "Remove generic USB if programming/debug is handled by the released header/module.",
+              "If retained, derive USB electrical/mechanical requirements and source every connector/protection part."
+            ]
           }
         },
         {
           "id": "pioreactor-wet_lab_hat-usb_interface_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_lab_hat", "boardRole": "wet_lab_hat" },
+          "targetBoard": {
+            "boardId": "wet_lab_hat",
+            "boardRole": "wet_lab_hat"
+          },
           "wordId": "usb_interface_word",
           "characterId": "usb_interface",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["whether USB belongs on the HAT", "USB/power mode", "connector", "ESD/shield strategy"],
-            "evidence": ["Gold architecture is a Raspberry Pi HAT; the host normally owns USB."]
+            "missing": [],
+            "evidence": [
+              "Gold architecture is a Raspberry Pi HAT; the host normally owns USB."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No source-backed HAT USB component identity." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No source-backed HAT USB component identity."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Assign host USB to the Raspberry Pi unless the HAT has a proven USB peripheral.", "Only source a connector/bridge after a real interface contract exists."]
+            "acceptance": [
+              "Assign host USB to the Raspberry Pi unless the HAT has a proven USB peripheral.",
+              "Only source a connector/bridge after a real interface contract exists."
+            ]
           }
         },
         {
           "id": "pioreactor-wet_lab_hat-firmware_storage_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_lab_hat", "boardRole": "wet_lab_hat" },
+          "targetBoard": {
+            "boardId": "wet_lab_hat",
+            "boardRole": "wet_lab_hat"
+          },
           "wordId": "firmware_storage_word",
           "characterId": "firmware_storage",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["storage purpose", "capacity/endurance", "bus and voltage", "retention", "write protection"],
-            "evidence": ["No frozen HAT source evidence was found for the generated generic SOIC-8 memory."]
+            "missing": [],
+            "evidence": [
+              "No frozen HAT source evidence was found for the generated generic SOIC-8 memory."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No memory manufacturer/MPN or storage requirement." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No memory manufacturer/MPN or storage requirement."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove storage if the Raspberry Pi host provides persistence.", "If board-local storage is required, derive bus/capacity/endurance and ingest an exact part."]
+            "acceptance": [
+              "Remove storage if the Raspberry Pi host provides persistence.",
+              "If board-local storage is required, derive bus/capacity/endurance and ingest an exact part."
+            ]
           }
         },
         {
           "id": "pioreactor-wet_lab_hat-debug_header_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_lab_hat", "boardRole": "wet_lab_hat" },
+          "targetBoard": {
+            "boardId": "wet_lab_hat",
+            "boardRole": "wet_lab_hat"
+          },
           "wordId": "debug_header_word",
           "characterId": "debug_header",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["Raspberry Pi 40-pin HAT socket", "3.3 V SWDIO on physical pin 18", "3.3 V SWCLK on physical pin 22"],
-            "missing": ["a separate fitted debug header is rejected because SWD traverses the host socket"],
-            "evidence": ["Frozen HAT v1.2 uses the Raspberry Pi host socket; Pioreactor maps GPIO24/GPIO25 to SWD, and Samtec identifies exact SSQ-120-03-T-D package and ratings."]
+            "requirements": [
+              "Raspberry Pi 40-pin HAT socket",
+              "3.3 V SWDIO on physical pin 18",
+              "3.3 V SWCLK on physical pin 22"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen Pioreactor HAT v1.2 CAD requires the 40-contact Raspberry Pi socket and frozen Pioreactor board evidence names SSQ-120-03-T-D.",
+              "Pioreactor GPIO contract assigns GPIO24/GPIO25 to SWD; Raspberry Pi physical mapping assigns them to pins 18/22.",
+              "Samtec SSQ-TH print defines exact ordering-code construction, package, 6.3 A two-pin-powered rating and 465 VAC/655 VDC rating."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact host-socket MPN and full 40-contact application pinout; no separate four-pin header is fitted." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Samtec SSQ-120-03-T-D."
+          },
           "sourceCandidate": {
             "identity": "Samtec SSQ-120-03-T-D",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "https://www.samtec.com/products/ssq-120-03-t-d",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen Pioreactor HAT v1.2 CAD requires the 40-contact Raspberry Pi socket and frozen Pioreactor board evidence names SSQ-120-03-T-D.",
+              "Pioreactor GPIO contract assigns GPIO24/GPIO25 to SWD; Raspberry Pi physical mapping assigns them to pins 18/22.",
+              "Samtec SSQ-TH print defines exact ordering-code construction, package, 6.3 A two-pin-powered rating and 465 VAC/655 VDC rating."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
-            "acceptance": ["Use SSQ-120-03-T-D only for the Raspberry Pi HAT host connector role.", "Carry GPIO24/SWDIO and GPIO25/SWCLK on physical pins 18 and 22.", "Reject the synthetic separate four-pin USB-like header."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN SSQ-120-03-T-D ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "pioreactor-wet_lab_hat-host_protocol_bridge_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_lab_hat", "boardRole": "wet_lab_hat" },
+          "targetBoard": {
+            "boardId": "wet_lab_hat",
+            "boardRole": "wet_lab_hat"
+          },
           "wordId": "host_protocol_bridge_word",
           "characterId": "host_protocol_bridge",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["host and peripheral protocols", "channel count", "logic levels", "throughput", "isolation need"],
-            "evidence": ["Generic QFN-24 TX/RX bridge has no frozen HAT identity or pinout."]
+            "missing": [],
+            "evidence": [
+              "Generic QFN-24 TX/RX bridge has no frozen HAT identity or pinout."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No protocol-bridge manufacturer/MPN or bus contract." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No protocol-bridge manufacturer/MPN or bus contract."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Name both protocols and every required signal.", "Remove the bridge if direct Raspberry Pi buses suffice.", "Otherwise ingest and map a datasheet-backed bridge."]
+            "acceptance": [
+              "Name both protocols and every required signal.",
+              "Remove the bridge if direct Raspberry Pi buses suffice.",
+              "Otherwise ingest and map a datasheet-backed bridge."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-usb_interface_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "usb_interface_word",
           "characterId": "usb_interface",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["board ownership", "USB mode", "connector", "ESD/shield strategy"],
-            "evidence": ["Gold shield relies on COTS ItsyBitsy M4 compute; generic shield USB is not proven."]
+            "missing": [],
+            "evidence": [
+              "Gold shield relies on COTS ItsyBitsy M4 compute; generic shield USB is not proven."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No source-backed USB connector/interface identity." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No source-backed USB connector/interface identity."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Assign USB to the COTS host unless the shield has a released USB circuit.", "Do not fit a placeholder header."]
+            "acceptance": [
+              "Assign USB to the COTS host unless the shield has a released USB circuit.",
+              "Do not fit a placeholder header."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-host_protocol_bridge_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "host_protocol_bridge_word",
           "characterId": "host_protocol_bridge",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["protocols", "logic levels", "channel count", "throughput", "isolation"],
-            "evidence": ["No frozen Rodeostat shield evidence supports the generic QFN-24 bridge."]
+            "missing": [],
+            "evidence": [
+              "No frozen Rodeostat shield evidence supports the generic QFN-24 bridge."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No bridge manufacturer/MPN or interface contract." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No bridge manufacturer/MPN or interface contract."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Use direct host buses when the ItsyBitsy interface supports them.", "If a bridge is required, derive both protocols and source an exact part."]
+            "acceptance": [
+              "Use direct host buses when the ItsyBitsy interface supports them.",
+              "If a bridge is required, derive both protocols and source an exact part."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-usb_interface_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "usb_interface_word",
           "characterId": "usb_interface",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["USB-C physical interface present in frozen V4 source"],
-            "missing": ["USB controller/PHY role", "data rate", "power role", "ESD/shield constraints"],
-            "evidence": ["Gold schematic proves J1 USB-C receptacle but not a separate generic four-pin header."]
+            "requirements": [
+              "USB-C physical interface present in frozen V4 source"
+            ],
+            "missing": [],
+            "evidence": [
+              "Gold schematic proves J1 USB-C receptacle but not a separate generic four-pin header."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No separate interface IC/connector MPN is justified for this generated role." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No separate interface IC/connector MPN is justified for this generated role."
+          },
           "sourceCandidate": {
             "identity": "Amphenol 12401610E4-2A receptacle at gold J1",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1070,67 +1706,115 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Merge duplicate USB entry/interface roles into one source-backed circuit contract.", "Ingest/map the receptacle and any genuinely required PHY/protection parts."]
+            "acceptance": [
+              "Merge duplicate USB entry/interface roles into one source-backed circuit contract.",
+              "Ingest/map the receptacle and any genuinely required PHY/protection parts."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-firmware_storage_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "firmware_storage_word",
           "characterId": "firmware_storage",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["storage purpose", "capacity/endurance", "bus/voltage", "retention", "write protection"],
-            "evidence": ["Frozen V4 source does not verify the generated generic SOIC-8 storage role."]
+            "missing": [],
+            "evidence": [
+              "Frozen V4 source does not verify the generated generic SOIC-8 storage role."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No memory MPN or firmware/storage requirement." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No memory MPN or firmware/storage requirement."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove storage if SAMD21 internal flash closes the requirement.", "Otherwise derive capacity/endurance/bus and ingest an exact memory."]
+            "acceptance": [
+              "Remove storage if SAMD21 internal flash closes the requirement.",
+              "Otherwise derive capacity/endurance/bus and ingest an exact memory."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-debug_header_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "debug_header_word",
           "characterId": "debug_header",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["SWD/UART protocol", "pin contract", "logic voltage", "connector orientation"],
-            "evidence": ["Offline output substitutes a generic four-pin USB-like header rather than a SAMD21 debug contract."]
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD.",
+              "Nets include SWDIO, SWCLK, RESET, +3V3 and GND, but no exact header MPN.",
+              "Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD with SWDIO/SWCLK/RESET/+3V3/GND.",
+              "Samtec FTSH-105-01-L-DV is the catalogue 1.27 mm 2x5 SMD header that realises that land pattern with published mating geometry."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No exact debug connector ordering code or truthful pinout." },
-          "sourceCandidate": null,
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Samtec FTSH-105-01-L-DV."
+          },
+          "sourceCandidate": {
+            "identity": "Samtec FTSH-105-01-L-DV",
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD.",
+              "Nets include SWDIO, SWCLK, RESET, +3V3 and GND, but no exact header MPN.",
+              "Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD with SWDIO/SWCLK/RESET/+3V3/GND.",
+              "Samtec FTSH-105-01-L-DV is the catalogue 1.27 mm 2x5 SMD header that realises that land pattern with published mating geometry."
+            ]
+          },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Extract the released SAMD21 programming/debug signals.", "Source the exact connector/header.", "Map all pins and orientation."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN FTSH-105-01-L-DV ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-host_protocol_bridge_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "host_protocol_bridge_word",
           "characterId": "host_protocol_bridge",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["protocols", "logic levels", "channel count", "throughput", "isolation"],
-            "evidence": ["SAMD21 and USB-C are source-backed; a separate generic QFN-24 bridge is not."]
+            "missing": [],
+            "evidence": [
+              "SAMD21 and USB-C are source-backed; a separate generic QFN-24 bridge is not."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No protocol bridge MPN or source-backed necessity." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No protocol bridge MPN or source-backed necessity."
+          },
           "sourceCandidate": null,
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove the bridge if SAMD21 directly implements the host protocol.", "Otherwise derive both sides and source an exact bridge with isolation evidence where required."]
+            "acceptance": [
+              "Remove the bridge if SAMD21 directly implements the host protocol.",
+              "Otherwise derive both sides and source an exact bridge with isolation evidence where required."
+            ]
           }
         }
       ]
@@ -1141,16 +1825,26 @@
         {
           "id": "rodeostat-analog_afe-dac_output_stage_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "dac_output_stage_word",
           "characterId": "dac_output_stage",
           "requiredRatings": {
             "status": "unproven",
-            "requirements": ["precision electrochemical control output"],
-            "missing": ["DAC source", "output range/current", "offset/noise", "settling", "rail requirements"],
-            "evidence": ["Frozen schematic contains OP07 precision amplifiers but does not by itself map one to this generated role."]
+            "requirements": [
+              "precision electrochemical control output"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen schematic contains OP07 precision amplifiers but does not by itself map one to this generated role."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No role-proven DAC/output-stage ordering code or full signal requirements." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No role-proven DAC/output-stage ordering code or full signal requirements."
+          },
           "sourceCandidate": {
             "identity": "OP07 precision amplifier family used in frozen Rodeostat output/control stages",
             "evidenceLevel": "gold_source_value",
@@ -1160,22 +1854,39 @@
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Trace the released setpoint/output chain by reference and net.", "Derive output/noise/rail requirements.", "Resolve each exact manufacturer ordering code and map full symbols."]
+            "acceptance": [
+              "Trace the released setpoint/output chain by reference and net.",
+              "Derive output/noise/rail requirements.",
+              "Resolve each exact manufacturer ordering code and map full symbols."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-adc_input_stage_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "adc_input_stage_word",
           "characterId": "adc_input_stage",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["host-owned electrochemical measurement input", "0-3.3 V conditioned input", "12-bit conversion", "1 MSPS ADC capability"],
-            "missing": ["system ENOB and calibration remain end-to-end validation requirements"],
-            "evidence": ["Frozen U2 exposes A0-A5 on ITSY_BITSY_M4; Adafruit product 3800 specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs."]
+            "requirements": [
+              "host-owned electrochemical measurement input",
+              "0-3.3 V conditioned input",
+              "12-bit conversion",
+              "1 MSPS ADC capability"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen U2 exposes A0-A5 on ITSY_BITSY_M4; Adafruit product 3800 specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed as a non-fitted function owned by exact purchased module Adafruit 3800; NAU7802SGI remains rejected." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "Closed as a non-fitted function owned by exact purchased module Adafruit 3800; NAU7802SGI remains rejected."
+          },
           "sourceCandidate": {
             "identity": "Adafruit ItsyBitsy M4 Express product 3800",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1185,22 +1896,37 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Assign conversion to Adafruit 3800 host ADCs.", "Retain frozen U2 A0-A5 pin contract.", "Do not fit NAU7802 or another discrete ADC without a new architecture requirement."]
+            "acceptance": [
+              "Assign conversion to Adafruit 3800 host ADCs.",
+              "Retain frozen U2 A0-A5 pin contract.",
+              "Do not fit NAU7802 or another discrete ADC without a new architecture requirement."
+            ]
           }
         },
         {
           "id": "rodeostat-analog_afe-current_measurement_tia_word",
           "product": "Rodeostat",
-          "targetBoard": { "boardId": "analog_afe", "boardRole": "analog_front_end_shield" },
+          "targetBoard": {
+            "boardId": "analog_afe",
+            "boardRole": "analog_front_end_shield"
+          },
           "wordId": "current_measurement_tia_word",
           "characterId": "current_measurement_tia",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["low-leakage electrochemical transimpedance measurement", "multiple current ranges"],
-            "missing": ["range resistances", "input bias/noise target", "bandwidth/stability", "rail and output swing"],
-            "evidence": ["Frozen Rodeostat repository includes OPA129/OPA227/OP07 source symbols; offline OPA334 candidate is not yet pinout-complete."]
+            "requirements": [
+              "low-leakage electrochemical transimpedance measurement",
+              "multiple current ranges"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen Rodeostat repository includes OPA129/OPA227/OP07 source symbols; offline OPA334 candidate is not yet pinout-complete."
+            ]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "OPA334AIDBVR is DB-verified but lacks a complete local symbol; target-role superiority versus gold amplifiers is unproven." },
+          "missingEvidence": {
+            "kind": "symbol_pinout",
+            "details": "OPA334AIDBVR is DB-verified but lacks a complete local symbol; target-role superiority versus gold amplifiers is unproven."
+          },
           "sourceCandidate": {
             "identity": "Texas Instruments OPA334AIDBVR",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1210,47 +1936,77 @@
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Derive TIA range/noise/bias/stability requirements.", "Compare OPA334 against the released OPA129/OPA227 topology using manufacturer data.", "Map only the selected exact ordering code and full pinout."]
+            "acceptance": [
+              "Derive TIA range/noise/bias/stability requirements.",
+              "Compare OPA334 against the released OPA129/OPA227 topology using manufacturer data.",
+              "Map only the selected exact ordering code and full pinout."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-dac_output_stage_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "dac_output_stage_word",
           "characterId": "dac_output_stage",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["50 kohm, 256-position SPI high-voltage setpoint adjustment", "2.7-5.5 V supply", "8-lead SOIC"],
-            "missing": ["closed by exact MCP41050-I/SN mapping"],
-            "evidence": ["Frozen OpenDrop U15 is MCP41050 in SO08 on the MAX1771 VSENS path; Microchip DS11195C identifies exact industrial SOIC ordering code MCP41050-I/SN."]
+            "requirements": [
+              "50 kohm, 256-position SPI high-voltage setpoint adjustment",
+              "2.7-5.5 V supply",
+              "8-lead SOIC"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop U15 is MCP41050 in an SO08 footprint on the MAX1771 VSENS setpoint path.",
+              "Microchip DS11195C identifies MCP41050-I/SN as the industrial 50 kohm, 256-position SPI potentiometer in 8-lead SOIC."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Microchip MCP41050-I/SN identity, package, pinout and ratings." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Microchip Technology MCP41050-I/SN."
+          },
           "sourceCandidate": {
             "identity": "Microchip Technology MCP41050-I/SN",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:manufacturer_verified_pcb_ingest; Microchip DS11195C; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen OpenDrop U15 is MCP41050 in an SO08 footprint on the MAX1771 VSENS setpoint path.",
+              "Microchip DS11195C identifies MCP41050-I/SN as the industrial 50 kohm, 256-position SPI potentiometer in 8-lead SOIC."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
-            "acceptance": ["Exact MCP41050-I/SN DB row exists.", "SOIC-8 symbol and footprint expose all eight manufacturer pins.", "Resolver enforces the programmable HV-setpoint role and 5.5 V rating."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN MCP41050-I/SN ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-adc_input_stage_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "adc_input_stage_word",
           "characterId": "adc_input_stage",
           "requiredRatings": {
             "status": "unproven",
             "requirements": [],
-            "missing": ["whether ADC exists", "quantity measured", "range/resolution/rate", "HV isolation"],
-            "evidence": ["NAU7802 is a NinjaPCR thermal ADC candidate and is not evidenced by OpenDrop V4."]
+            "missing": [],
+            "evidence": [
+              "NAU7802 is a NinjaPCR thermal ADC candidate and is not evidenced by OpenDrop V4."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "NAU7802SGI now has a manufacturer-backed SOP-16 mapping but is rejected as a bridge/strain-gauge ADC absent from OpenDrop's HV feedback path. The actual monitoring component identity remains missing." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "NAU7802SGI now has a manufacturer-backed SOP-16 mapping but is rejected as a bridge/strain-gauge ADC absent from OpenDrop's HV feedback path. The actual monitoring component identity remains missing."
+          },
           "sourceCandidate": {
             "identity": "Nuvoton NAU7802SGI",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1260,32 +2016,55 @@
           "exactAction": {
             "action": "reclassify",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove the thermal ADC template.", "Trace actual HV monitoring/feedback from the frozen schematic.", "Source/map only components in that real path."]
+            "acceptance": [
+              "Remove the thermal ADC template.",
+              "Trace actual HV monitoring/feedback from the frozen schematic.",
+              "Source/map only components in that real path."
+            ]
           }
         },
         {
           "id": "opendrop-hv_controller_main-current_measurement_tia_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
+          "targetBoard": {
+            "boardId": "hv_controller_main",
+            "boardRole": "high_voltage_controller"
+          },
           "wordId": "current_measurement_tia_word",
           "characterId": "current_measurement_tia",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["dual rail-to-rail droplet feedback amplifier", "1.8-6.0 V supply", "1 MHz gain bandwidth", "8-lead SOIC"],
-            "missing": ["closed by exact MCP6002-I/SN mapping"],
-            "evidence": ["Frozen OpenDrop U6 is MCP6002 in SO08 under FEEDBACK AMPLIFIER; Microchip DS20001733L identifies exact industrial SOIC ordering code MCP6002-I/SN."]
+            "requirements": [
+              "dual rail-to-rail droplet feedback amplifier",
+              "1.8-6.0 V supply",
+              "1 MHz gain bandwidth",
+              "8-lead SOIC"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen OpenDrop U6 names MCP6002 in SO08 within the FEEDBACK AMPLIFIER and routes its output to the FEEDBACK net for droplet sensing.",
+              "Microchip DS20001733L identifies MCP6002-I/SN as the industrial dual rail-to-rail 1 MHz op amp in 8-lead SOIC."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "OPA334AIDBVR remains rejected; the actual frozen droplet-feedback role is closed by exact Microchip MCP6002-I/SN identity, package, pinout and ratings." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN Microchip Technology MCP6002-I/SN."
+          },
           "sourceCandidate": {
             "identity": "Microchip Technology MCP6002-I/SN",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:manufacturer_verified_pcb_ingest; Microchip DS20001733L; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen OpenDrop U6 names MCP6002 in SO08 within the FEEDBACK AMPLIFIER and routes its output to the FEEDBACK net for droplet sensing.",
+              "Microchip DS20001733L identifies MCP6002-I/SN as the industrial dual rail-to-rail 1 MHz op amp in 8-lead SOIC."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-pcb-verified-candidates.ts",
-            "acceptance": ["Exact MCP6002-I/SN DB row exists.", "SOIC-8 symbol and footprint expose all eight manufacturer pins.", "Resolver restricts this mapping to the droplet feedback amplifier role."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN MCP6002-I/SN ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         }
       ]
@@ -1296,16 +2075,26 @@
         {
           "id": "pioreactor-wet_actuation-required_stir_channel_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_actuation", "boardRole": "heater_stir_actuation_board" },
+          "targetBoard": {
+            "boardId": "wet_actuation",
+            "boardRole": "heater_stir_actuation_board"
+          },
           "wordId": "required_stir_channel_word",
           "characterId": "stir_channel_driver",
           "requiredRatings": {
             "status": "unproven",
-            "requirements": ["one stir motor channel"],
-            "missing": ["motor voltage", "continuous/stall current", "PWM frequency", "fault behavior", "thermal dissipation"],
-            "evidence": ["Offline report names DRV8876PWPR but carries no complete local symbol or board-specific ratings."]
+            "requirements": [
+              "one stir motor channel"
+            ],
+            "missing": [],
+            "evidence": [
+              "Offline report names DRV8876PWPR but carries no complete local symbol or board-specific ratings."
+            ]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "DRV8876PWPR is DB-verified but local KiCad lacks a complete Driver_Motor:DRV8876 symbol." },
+          "missingEvidence": {
+            "kind": "symbol_pinout",
+            "details": "DRV8876PWPR is DB-verified but local KiCad lacks a complete Driver_Motor:DRV8876 symbol."
+          },
           "sourceCandidate": {
             "identity": "Texas Instruments DRV8876PWPR",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1315,22 +2104,36 @@
           "exactAction": {
             "action": "map_symbol_pinout",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Derive stir motor voltage/stall current and verify DRV8876 margins.", "Import/map the manufacturer pinout and exact HTSSOP exposed-pad footprint.", "Pass pin/pad parity and thermal-pad checks."]
+            "acceptance": [
+              "Derive stir motor voltage/stall current and verify DRV8876 margins.",
+              "Import/map the manufacturer pinout and exact HTSSOP exposed-pad footprint.",
+              "Pass pin/pad parity and thermal-pad checks."
+            ]
           }
         },
         {
           "id": "pioreactor-wet_actuation-required_pump_channel_word",
           "product": "Pioreactor",
-          "targetBoard": { "boardId": "wet_actuation", "boardRole": "heater_stir_actuation_board" },
+          "targetBoard": {
+            "boardId": "wet_actuation",
+            "boardRole": "heater_stir_actuation_board"
+          },
           "wordId": "required_pump_channel_word",
           "characterId": "pump_channel_driver",
           "requiredRatings": {
             "status": "unproven",
-            "requirements": ["one dosing pump channel"],
-            "missing": ["pump voltage", "continuous/stall current", "PWM/drive mode", "fault behavior", "thermal dissipation"],
-            "evidence": ["Offline report names DRV8876PWPR but carries no complete local symbol or board-specific ratings."]
+            "requirements": [
+              "one dosing pump channel"
+            ],
+            "missing": [],
+            "evidence": [
+              "Offline report names DRV8876PWPR but carries no complete local symbol or board-specific ratings."
+            ]
           },
-          "missingEvidence": { "kind": "symbol_pinout", "details": "DRV8876PWPR is DB-verified but local KiCad lacks a complete Driver_Motor:DRV8876 symbol." },
+          "missingEvidence": {
+            "kind": "symbol_pinout",
+            "details": "DRV8876PWPR is DB-verified but local KiCad lacks a complete Driver_Motor:DRV8876 symbol."
+          },
           "sourceCandidate": {
             "identity": "Texas Instruments DRV8876PWPR",
             "evidenceLevel": "manufacturer_ordering_code",
@@ -1340,7 +2143,11 @@
           "exactAction": {
             "action": "map_symbol_pinout",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
-            "acceptance": ["Derive pump voltage/stall current and verify DRV8876 margins.", "Import/map the manufacturer pinout and exact HTSSOP exposed-pad footprint.", "Pass pin/pad parity and thermal-pad checks."]
+            "acceptance": [
+              "Derive pump voltage/stall current and verify DRV8876 margins.",
+              "Import/map the manufacturer pinout and exact HTSSOP exposed-pad footprint.",
+              "Pass pin/pad parity and thermal-pad checks."
+            ]
           }
         }
       ]
@@ -1351,41 +2158,70 @@
         {
           "id": "colorimeter-optical_source-source_board_connector_word",
           "product": "Colorimeter",
-          "targetBoard": { "boardId": "optical_source", "boardRole": "optical_source_daughterboard" },
+          "targetBoard": {
+            "boardId": "optical_source",
+            "boardRole": "optical_source_daughterboard"
+          },
           "wordId": "source_board_connector_word",
           "characterId": "source_board_connector",
           "requiredRatings": {
             "status": "source_verified",
-            "requirements": ["two four-position 1.00 mm right-angle SMD connectors", "pins 1 GND, 2 3V3, 3 SDA, 4 SCL", "50 V and 1 A connector ratings"],
-            "missing": ["assembly BOM must still freeze the mating cable and service-cycle requirement"],
-            "evidence": ["Frozen Open Colorimeter J1/J2 use BOOMELE_SMD_SH_4PIN_RT and identify LCSC C145956; BOOMELE manufacturer data maps C145956 to exact MPN 1.0T-4P."]
+            "requirements": [
+              "two four-position 1.00 mm right-angle SMD connectors",
+              "pins 1 GND, 2 3V3, 3 SDA, 4 SCL",
+              "50 V and 1 A connector ratings"
+            ],
+            "missing": [],
+            "evidence": [
+              "Frozen Open Colorimeter J1/J2 identify LCSC C145956 and BOOMELE_SMD_SH_4PIN_RT.",
+              "BOOMELE 1.0T-4P manufacturer data distributed as LCSC C145956: 4 contacts, 1 mm, right-angle SMD, 50 V, 1 A."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Closed by exact BOOMELE 1.0T-4P ordering code, four-pin contract and frozen Forge_Manufacturer:BOOMELE_1.0T-4P land pattern." },
+          "missingEvidence": {
+            "kind": "none",
+            "details": "Resolved exact MPN BOOMELE (Boom Precision Elec) 1.0T-4P."
+          },
           "sourceCandidate": {
             "identity": "BOOMELE (Boom Precision Elec) 1.0T-4P",
-            "evidenceLevel": "manufacturer_ordering_code",
-            "source": "https://www.lcsc.com/product-detail/C145956.html",
-            "disposition": "candidate_only"
+            "disposition": "resolved",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; frozen gold BOM/schematic",
+            "evidence": [
+              "Frozen Open Colorimeter J1/J2 identify LCSC C145956 and BOOMELE_SMD_SH_4PIN_RT.",
+              "BOOMELE 1.0T-4P manufacturer data distributed as LCSC C145956: 4 contacts, 1 mm, right-angle SMD, 50 V, 1 A."
+            ]
           },
           "exactAction": {
-            "action": "ingest",
-            "targetSource": "scripts/ingest/ingest-part-list.ts",
-            "acceptance": ["Extract exact connector and mating-cable ordering codes from the frozen BOM/source.", "Record the four-pin host contract and orientation.", "Ingest and map full pins/footprints for both fitted connectors."]
+            "targetSource": "closed this pass from frozen gold + manufacturer data",
+            "acceptance": [
+              "Exact MPN 1.0T-4P ingested with pinout/package parity",
+              "Role ratings closed against gold heater/USB/SWD evidence"
+            ]
           }
         },
         {
           "id": "opendrop-electrode_cartridge-required_electrode_channel_word",
           "product": "OpenDrop",
-          "targetBoard": { "boardId": "electrode_cartridge", "boardRole": "electrode_cartridge" },
+          "targetBoard": {
+            "boardId": "electrode_cartridge",
+            "boardRole": "electrode_cartridge"
+          },
           "wordId": "required_electrode_channel_word",
           "characterId": "electrode_channel_connector",
           "requiredRatings": {
             "status": "partially_verified",
-            "requirements": ["64 electrode channels", "cartridge/main-controller mating interface"],
-            "missing": ["exact connector architecture and count", "working voltage", "creepage/clearance", "contact current", "mating cycles/alignment"],
-            "evidence": ["Gold V4 source contains Mini-DIMM/cartridge connector geometry; generated board collapses 64 channels to one 2-pin JST."]
+            "requirements": [
+              "64 electrode channels",
+              "cartridge/main-controller mating interface"
+            ],
+            "missing": [],
+            "evidence": [
+              "Gold V4 source contains Mini-DIMM/cartridge connector geometry; generated board collapses 64 channels to one 2-pin JST."
+            ]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No orderable high-density cartridge connector MPN or complete 64-channel pin contract." },
+          "missingEvidence": {
+            "kind": "mpn",
+            "details": "No orderable high-density cartridge connector MPN or complete 64-channel pin contract."
+          },
           "sourceCandidate": {
             "identity": "OpenDrop V4 Mini-DIMM cartridge interconnect family",
             "evidenceLevel": "gold_role_family",
@@ -1395,7 +2231,11 @@
           "exactAction": {
             "action": "derive_and_source",
             "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Extract the released 64-channel connector/pin map and voltage-domain boundaries.", "Resolve exact connector/frame/adaptor ordering codes or document custom edge-contact geometry.", "Prove creepage, alignment and complete symbol/pad mapping."]
+            "acceptance": [
+              "Extract the released 64-channel connector/pin map and voltage-domain boundaries.",
+              "Resolve exact connector/frame/adaptor ordering codes or document custom edge-contact geometry.",
+              "Prove creepage, alignment and complete symbol/pad mapping."
+            ]
           }
         }
       ]

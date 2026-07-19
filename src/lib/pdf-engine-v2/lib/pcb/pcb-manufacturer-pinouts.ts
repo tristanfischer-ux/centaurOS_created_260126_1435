@@ -44,6 +44,105 @@ export type CuratedManufacturerIdentity =
 
 const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
   {
+    manufacturer: 'ST (Xianke / 先科)',
+    partNumber: 'CS1E102M-CRI13',
+    symbolId: 'Forge_Manufacturer:CS1E102M-CRI13',
+    footprint: {
+      library: 'Forge_Manufacturer',
+      footprint: 'Panasonic_EEVFK1E102Q',
+    },
+    pins: [
+      { number: '1', name: '+', kind: 'passive' },
+      { number: '2', name: '-', kind: 'passive' },
+    ],
+    provenance: 'Seeed OPL 302030098 / LCSC C123705: CS1E102M-CRI13 is 1000 uF 25 V polar SMD D12.5xL13.5; frozen NinjaPCR CAP_SMD_AL_D125 land geometry; https://www.lcsc.com/product-detail/C123705.html',
+  },
+  {
+    manufacturer: 'GOOSVN (Ningbo Gosun Technology)',
+    partNumber: 'GS012S-3.5-02P-11',
+    symbolId: 'Forge_Manufacturer:GS012S-3.5-02P-11',
+    footprint: {
+      library: 'Forge_Manufacturer',
+      footprint: 'GOOSVN_GS012S_3.5_02P',
+    },
+    pins: [
+      { number: '1', name: 'A', kind: 'passive' },
+      { number: '2', name: 'B', kind: 'passive' },
+    ],
+    provenance: 'Seeed OPL 320110028 maps to GS012S-3.5-02P-11; Gosun GS012S series 2-position 3.5 mm screw terminal, contacts 1/2; http://www.gosun-tech.com/Products-GS012S.htm',
+  },
+  {
+    manufacturer: 'Samtec',
+    partNumber: 'TSW-104-07-T-S',
+    symbolId: 'Forge_Manufacturer:TSW-104-07-T-S',
+    footprint: {
+      library: 'Connector_PinHeader_2.54mm',
+      footprint: 'PinHeader_1x04_P2.54mm_Vertical',
+    },
+    pins: [
+      { number: '1', name: 'TXD', kind: 'bidirectional' },
+      { number: '2', name: 'RXD', kind: 'bidirectional' },
+      { number: '3', name: 'GND', kind: 'power_in' },
+      { number: '4', name: '3V3', kind: 'power_in' },
+    ],
+    provenance: 'Samtec TSW 1x4 2.54 mm header; frozen NinjaPCR SERIAL4 PINHD-1X4 nets TXD/RXD/GND/3V3; https://www.samtec.com/products/tsw',
+  },
+  {
+    manufacturer: 'Samtec',
+    partNumber: 'FTSH-105-01-L-DV',
+    symbolId: 'Forge_Manufacturer:FTSH-105-01-L-DV',
+    footprint: {
+      library: 'Connector_PinHeader_1.27mm',
+      footprint: 'PinHeader_2x05_P1.27mm_Vertical_SMD',
+    },
+    pins: [
+      { number: '1', name: 'SWDIO', kind: 'bidirectional' },
+      { number: '2', name: 'SWCLK', kind: 'input' },
+      { number: '3', name: 'GND', kind: 'power_in' },
+      { number: '4', name: 'RESET', kind: 'input' },
+      { number: '5', name: 'GND', kind: 'power_in' },
+      { number: '6', name: '3V3', kind: 'power_in' },
+      { number: '7', name: 'NC', kind: 'passive' },
+      { number: '8', name: 'NC', kind: 'passive' },
+      { number: '9', name: 'GND', kind: 'power_in' },
+      { number: '10', name: 'NC', kind: 'passive' },
+    ],
+    provenance: 'Samtec FTSH-105-01-L-DV 2x5 1.27 mm SMD header; frozen OpenDrop J2 Conn_02x05 SWD nets; https://www.samtec.com/products/ftsh',
+  },
+  {
+    manufacturer: 'Murata Manufacturing',
+    partNumber: 'BLM18PG121SN1D',
+    symbolId: 'Device:Ferrite_Bead',
+    footprint: { library: 'Inductor_SMD', footprint: 'L_0603_1608Metric' },
+    pins: [
+      { number: '1', name: '1', kind: 'passive' },
+      { number: '2', name: '2', kind: 'passive' },
+    ],
+    provenance: 'Murata BLM18PG121SN1D 0603 ferrite; OpenDrop V4 FB1-FB8 L_0603_1608Metric land; https://www.murata.com/en-us/products/productdetail?partno=BLM18PG121SN1%23',
+  },
+  {
+    manufacturer: 'Kingbright',
+    partNumber: 'KPT-1608CGCK',
+    symbolId: 'Device:LED',
+    footprint: { library: 'LED_SMD', footprint: 'LED_0603_1608Metric' },
+    pins: [
+      { number: '1', name: 'K', kind: 'passive' },
+      { number: '2', name: 'A', kind: 'passive' },
+    ],
+    provenance: 'Kingbright KPT-1608CGCK 0603 green LED; OpenDrop LED1 land pattern; https://www.kingbrightusa.com/PDF/KPT-1608CGCK.pdf',
+  },
+  {
+    manufacturer: 'Kingbright',
+    partNumber: 'KPT-1608SECK',
+    symbolId: 'Device:LED',
+    footprint: { library: 'LED_SMD', footprint: 'LED_0603_1608Metric' },
+    pins: [
+      { number: '1', name: 'K', kind: 'passive' },
+      { number: '2', name: 'A', kind: 'passive' },
+    ],
+    provenance: 'Kingbright KPT-1608SECK 0603 orange LED; OpenDrop LED2/LED3 land pattern; https://www.kingbrightusa.com/PDF/KPT-1608SECK.pdf',
+  },
+  {
     manufacturer: 'Panasonic Industry',
     partNumber: 'EEVFK1E102Q',
     symbolId: 'Forge_Manufacturer:EEVFK1E102Q',

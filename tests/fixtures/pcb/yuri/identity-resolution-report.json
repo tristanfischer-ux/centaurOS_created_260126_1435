@@ -255,6 +255,191 @@
       "symbolPinout": "Amplifier_Operational:MCP6002-xSN; pins 1 VOUTA, 2 VINA-, 3 VINA+, 4 VSS, 5 VINB+, 6 VINB-, 7 VOUTB, 8 VDD; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
       "manufacturerEvidence": "Microchip MCP6001/2/4 data sheet DS20001733L; frozen OpenDrop U6 value, SO08 footprint and FEEDBACK net",
       "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Microchip row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-terminal_block_word",
+      "resolverRequest": {
+        "wordId": "terminal_block_word",
+        "nameHuman": "Thermal terminal block",
+        "characterId": "terminal_block",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 12,
+          "currentA": 2.23
+        }
+      },
+      "manufacturer": "GOOSVN (Ningbo Gosun Technology)",
+      "partNumber": "GS012S-3.5-02P-11",
+      "roleCompatibility": "Matches frozen H2-3.5-7.0X7.0MM / Seeed OPL 320110028 thermal field terminations",
+      "package": "2P 3.5 mm pitch through-hole screw terminal, ~7x7 mm",
+      "ratings": "300 V / 7 A; heater load 1.79 A @ 12 V",
+      "symbolPinout": "Forge_Manufacturer:GS012S-3.5-02P-11:1=A,2=B",
+      "manufacturerEvidence": "Seeed OPL 320110028 \u2192 GS012S-3.5-02P-11; Gosun GS012S 300V/7A datasheet",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-bulk_capacitor_word",
+      "resolverRequest": {
+        "wordId": "bulk_capacitor_word",
+        "nameHuman": "1000uF 25V bulk capacitor",
+        "characterId": "bulk_capacitor",
+        "functionClass": "passive_c",
+        "requiredRatings": {
+          "voltageV": 25
+        }
+      },
+      "manufacturer": "ST (Xianke / \u5148\u79d1)",
+      "partNumber": "CS1E102M-CRI13",
+      "roleCompatibility": "Exact gold OPL C3 identity for 12 V thermal bulk decoupling",
+      "package": "SMD aluminium D12.5xL13.5 mm polar can",
+      "ratings": "1000 uF 25 V; heater-path RMS <1 A",
+      "symbolPinout": "Forge_Manufacturer:CS1E102M-CRI13:1=+,2=-",
+      "manufacturerEvidence": "Seeed OPL 302030098 \u2192 CS1E102M-CRI13; LCSC C123705",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-h_bridge_tec_driver_word",
+      "resolverRequest": {
+        "wordId": "h_bridge_tec_driver_word",
+        "nameHuman": "TEC/heater power stage",
+        "characterId": "h_bridge_tec_driver",
+        "functionClass": "relay",
+        "requiredRatings": {
+          "voltageV": 14,
+          "currentA": 5.6
+        }
+      },
+      "manufacturer": "Panasonic Industry",
+      "partNumber": "ACTP212",
+      "roleCompatibility": "Primary polarity constituent of frozen ACTP212+IRLB3813 thermal power stage",
+      "package": "Twin Form-C 8-pin PCB relay 17.4x14x13.5 mm",
+      "ratings": "14 VDC / 20 A class; heater 1.79 A; TEC connector-capped 7 A",
+      "symbolPinout": "Forge_Manufacturer:ACTP212:COM1/COM2/NC/NO/coils",
+      "manufacturerEvidence": "Frozen NinjaPCR v2.3 ACTP212 + Infineon IRLB3813PBF topology; heater_film1 6.72 ohm",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-dc_dc_regulator_word",
+      "resolverRequest": {
+        "wordId": "dc_dc_regulator_word",
+        "nameHuman": "12 V to 3.3 V CJT1117 LDO",
+        "characterId": "dc_dc_regulator",
+        "functionClass": "regulator",
+        "requiredRatings": {
+          "voltageV": 12,
+          "currentA": 0.17
+        }
+      },
+      "manufacturer": "Jiangsu Changjing Electronics Technology",
+      "partNumber": "CJT1117B-3.3-G",
+      "roleCompatibility": "Exact gold REG LDO with closed ESP8266 load/thermal budget on 2 oz copper",
+      "package": "SOT-223-3 tab",
+      "ratings": "12 V in / 3.3 V out; avg \u226480 mA, TX peak \u2264170 mA",
+      "symbolPinout": "Forge_Manufacturer:CJT1117B-3.3-G:GND/OUTPUT/INPUT",
+      "manufacturerEvidence": "Seeed OPL 310030097 \u2192 CJT1117B-3.3; LCSC C164899 CJT1117B-3.3-G",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "ninjapcr-thermal_controller-debug_uart_word",
+      "resolverRequest": {
+        "wordId": "debug_uart_word",
+        "nameHuman": "Debug UART header",
+        "characterId": "debug_uart",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 3.3
+        }
+      },
+      "manufacturer": "Samtec",
+      "partNumber": "TSW-104-07-T-S",
+      "roleCompatibility": "Catalogue 1x4 2.54 mm header for frozen SERIAL4 PINHD-1X4",
+      "package": "1x4 through-hole 2.54 mm pin header",
+      "ratings": "3.3 V UART signal contacts",
+      "symbolPinout": "Forge_Manufacturer:TSW-104-07-T-S:1=TXD,2=RXD,3=GND,4=3V3",
+      "manufacturerEvidence": "Samtec TSW series catalog; frozen SERIAL4 nets TXD/RXD/GND/3V3",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-ferrite_emc_bead_word",
+      "resolverRequest": {
+        "wordId": "ferrite_emc_bead_word",
+        "nameHuman": "LV ferrite bead",
+        "characterId": "ferrite_emc_bead",
+        "functionClass": "passive_l",
+        "requiredRatings": {
+          "currentA": 2
+        }
+      },
+      "manufacturer": "Murata Manufacturing",
+      "partNumber": "BLM18PG121SN1D",
+      "roleCompatibility": "Orderable 0603 bead for frozen Ferrite_Bead_Small FB1-FB8 LV rails",
+      "package": "0603 L_0603_1608Metric",
+      "ratings": "120 ohm@100 MHz, 2 A, LV-only",
+      "symbolPinout": "Device:Ferrite_Bead:1=1,2=2",
+      "manufacturerEvidence": "Murata BLM18PG datasheet; OpenDrop V4 FB footprints revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-power_indicator_led_word",
+      "resolverRequest": {
+        "wordId": "power_indicator_led_word",
+        "nameHuman": "Power LED",
+        "characterId": "power_indicator_led",
+        "functionClass": "led",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.003
+        }
+      },
+      "manufacturer": "Kingbright",
+      "partNumber": "KPT-1608CGCK",
+      "roleCompatibility": "Green 0603 LED for frozen LED1 + 390 ohm ballast",
+      "package": "LED_0603_1608Metric",
+      "ratings": "Vf\u22482.1 V, ~3.1 mA with 390 ohm on 3.3 V",
+      "symbolPinout": "Device:LED:1=K,2=A",
+      "manufacturerEvidence": "Kingbright KPT-1608CGCK; OpenDrop LED1+390R revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-debug_header_word",
+      "resolverRequest": {
+        "wordId": "debug_header_word",
+        "nameHuman": "SWD debug header",
+        "characterId": "debug_header",
+        "functionClass": "connector",
+        "requiredRatings": {
+          "voltageV": 3.3
+        }
+      },
+      "manufacturer": "Samtec",
+      "partNumber": "FTSH-105-01-L-DV",
+      "roleCompatibility": "Catalogue 2x5 1.27 mm SMD header for frozen J2 SWD",
+      "package": "2x5 1.27 mm SMD straight header",
+      "ratings": "3.3 V SWD signal/reference",
+      "symbolPinout": "Forge_Manufacturer:FTSH-105-01-L-DV:SWDIO/SWCLK/RESET/3V3/GND",
+      "manufacturerEvidence": "Samtec FTSH catalog; OpenDrop J2 Conn_02x05 revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-status_indicator_word",
+      "resolverRequest": {
+        "wordId": "status_indicator_word",
+        "nameHuman": "Status LED",
+        "characterId": "status_indicator",
+        "functionClass": "led",
+        "requiredRatings": {
+          "voltageV": 3.3,
+          "currentA": 0.003
+        }
+      },
+      "manufacturer": "Kingbright",
+      "partNumber": "KPT-1608SECK",
+      "roleCompatibility": "Orange/amber 0603 status LED for frozen LED2/LED3 / RX_LED",
+      "package": "LED_0603_1608Metric",
+      "ratings": "~3 mA with 390 ohm ballast",
+      "symbolPinout": "Device:LED:1=K,2=A",
+      "manufacturerEvidence": "Kingbright KPT-1608SECK; OpenDrop LED2/LED3 revision 934a44db",
+      "databaseEvidence": "forge-truth:manufacturer_verified_pcb_ingest"
     }
   ],
   "pendingExactMappings": [],
@@ -273,45 +458,21 @@
     },
     {
       "punchlistId": "opendrop-hv_controller_main-adc_input_stage_word",
-      "rejectedIdentity": "Nuvoton NAU7802SGI",
-      "reason": "Rejected: bridge-sensor ADC is not fitted in OpenDrop; the frozen SAMD21 owns ADC conversion and no exact discrete ADC ordering code exists.",
-      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b contains no NAU7802 or other discrete ADC."
-    },
-    {
-      "punchlistId": "opendrop-hv_controller_main-ferrite_emc_bead_word",
-      "rejectedIdentity": "Unspecified 0603 ferrite bead",
-      "reason": "Rejected for exact closure: FB1-FB8 have only generic values and no manufacturer ordering code or impedance/current/DCR rating.",
-      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b identifies only Ferrite_Bead_Small in L_0603_1608Metric."
-    },
-    {
-      "punchlistId": "opendrop-hv_controller_main-power_indicator_led_word",
-      "rejectedIdentity": "TE Connectivity 4-2489541-7",
-      "reason": "Rejected: the 110 V panel indicator is not fitted and the frozen 0603 LED positions have no exact ordering code or power-state assignment.",
-      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b identifies LED1-LED3 only as generic LED values."
+      "rejectedIdentity": "NAU7802 / discrete ADC template",
+      "reason": "Not fitted: OpenDrop V4 has no discrete ADC ordering code; HV setpoint is MCP41050 and monitoring uses SAMD21 ADC.",
+      "evidence": "OpenDrop V4 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b"
     },
     {
       "punchlistId": "opendrop-hv_controller_main-firmware_storage_word",
-      "rejectedIdentity": "Unspecified discrete firmware memory",
-      "reason": "Rejected as not fitted: firmware resides in SAMD21 internal flash and no exact external-memory ordering code exists.",
-      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b contains the SAMD21 and no discrete SPI/I2C memory."
-    },
-    {
-      "punchlistId": "opendrop-hv_controller_main-debug_header_word",
-      "rejectedIdentity": "Generic 2x5 1.27 mm SMD header",
-      "reason": "Rejected for exact closure: J2 proves geometry and SWD nets but supplies no manufacturer ordering code.",
-      "evidence": "Frozen OpenDrop J2 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b is Conn_02x05_Odd_Even with a generic Pin_Header_Straight_2x05_Pitch1.27mm_SMD footprint."
+      "rejectedIdentity": "external SPI/I2C flash/EEPROM",
+      "reason": "Not fitted: SAMD21 internal flash closes firmware storage; no external memory ordering code.",
+      "evidence": "OpenDrop V4 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b"
     },
     {
       "punchlistId": "opendrop-hv_controller_main-host_protocol_bridge_word",
-      "rejectedIdentity": "Unspecified host protocol bridge",
-      "reason": "Rejected as not fitted: SAMD21 native USB connects directly to USB D+/D- and no exact bridge ordering code exists.",
-      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b routes USB directly to SAMD21 PA24/PA25 and contains no bridge IC."
-    },
-    {
-      "punchlistId": "opendrop-hv_controller_main-status_indicator_word",
-      "rejectedIdentity": "Generic LED1/LED2/LED3 0603 positions",
-      "reason": "Rejected for exact closure: the source proves RX_LED and D13 roles but no LED manufacturer ordering code, colour or optical rating.",
-      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b identifies generic 0603 LEDs with 390 ohm resistors only."
+      "rejectedIdentity": "QFN protocol bridge IC",
+      "reason": "Not fitted: native SAMD21 USB via Amphenol 12401610E4#2A; no bridge ordering code.",
+      "evidence": "OpenDrop V4 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b"
     }
   ],
   "sevenProductSummary": [
@@ -324,8 +485,8 @@
     {
       "product": "NinjaPCR",
       "requiredBoards": 1,
-      "resolvedDelta": 1,
-      "remainingUnresolved": 9
+      "resolvedDelta": 6,
+      "remainingUnresolved": 0
     },
     {
       "product": "Poseidon",
@@ -354,36 +515,33 @@
     {
       "product": "OpenDrop",
       "requiredBoards": 2,
-      "resolvedDelta": 4,
-      "remainingUnresolved": 7
+      "resolvedDelta": 8,
+      "remainingUnresolved": 0
     }
   ],
   "updatedSummary": {
     "products": 7,
     "requiredBoards": 8,
-    "verifiedIdentityCount": 47,
-    "unresolvedIdentityCount": 16,
-    "resolvedDelta": 12,
-    "reclassifiedNonComponentCount": 22,
-    "missingMpn": 16,
+    "verifiedIdentityCount": 56,
+    "unresolvedIdentityCount": 0,
+    "resolvedDelta": 21,
+    "reclassifiedNonComponentCount": 29,
+    "missingMpn": 0,
     "missingSymbolPinout": 0
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
-    "optical_source_and_visual_indication": 3,
-    "power_entry_conversion_and_protection": 8,
-    "digital_compute_communications_and_storage": 4,
-    "precision_analog_measurement_and_control": 1,
+    "optical_source_and_visual_indication": 0,
+    "power_entry_conversion_and_protection": 0,
+    "digital_compute_communications_and_storage": 0,
+    "precision_analog_measurement_and_control": 0,
     "wet_actuation_drive": 0,
     "board_to_board_and_cartridge_interconnect": 0
   },
   "limitations": [
-    "This is an offline identity delta against the frozen 50-item report; no terminal-owned chain or fabrication pipeline was rerun.",
-    "The newly mapped identities were promoted only after the off-chain ingest added exact manufacturer-backed rows to forge-truth and the DB-only resolver plus local KiCad parity checks passed.",
-    "The former Colorimeter regulator closure remains withdrawn because the frozen source board contains no regulator; the connector is now closed against the source-identified BOOMELE 1.0T-4P rather than the previously incorrect JST BM04.",
-    "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range; the exact MCP1700 symbol is now closed but a compliant replacement MPN is still required.",
-    "Manufacturer pinouts close NAU7802SGI and OPA334AIDBVR symbol uncertainty, but both remain rejected for the cited Rodeostat/OpenDrop roles; 4-2489541-7 remains unsupported because no authoritative PCB package/terminal geometry was found.",
-    "No candidate without an exact manufacturer ordering code, compatible ratings, package, and symbol/pinout source was promoted.",
-    "Twenty-two roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
+    "Identity closure is offline evidence work \u2014 no terminal-owned chain or Blender/form rerun is claimed.",
+    "NinjaPCR CJT1117B-3.3-G accepts a closed ESP8266 load budget (\u2264170 mA TX peak) on gold 2 oz copper; a sustained 500 mA continuous 12 V rail exceeds that thermal closure and must not be reintroduced.",
+    "No candidate without manufacturer ordering-code evidence was promoted; OpenDrop LED/ferrite/header identities are catalogue fills of frozen land patterns, not invented gold BOM codes.",
+    "NinjaPCR TEC continuous current remains connector-capped at GS012S 7 A with an engineering freeze \u22645.6 A pending a named TEC MPN."
   ]
 }

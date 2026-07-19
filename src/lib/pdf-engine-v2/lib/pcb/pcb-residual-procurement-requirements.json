@@ -1,404 +1,912 @@
 {
   "schema": "pcb-residual-procurement-requirements/v1",
   "baselineCount": 29,
-  "resolvedExactMpnCount": 7,
-  "residualProcurementCount": 16,
+  "resolvedExactMpnCount": 16,
+  "residualProcurementCount": 0,
   "requirements": [
     {
       "punchlistId": "colorimeter-optical_source-led_source_word",
       "function": "Single 470 nm-class optical emitter for Beer-Lambert illumination.",
-      "electrical": { "voltage": "3.3 V source rail; LED Vf 3.1 V nominal", "current": "15 mA operating point from frozen topology; 30 mA part rating", "power": "46.5 mW nominal optical-source electrical input; part dissipation rating 100 mW" },
-      "signalIntegrity": { "precision": "Peak wavelength 469 nm; dominant wavelength 460-475 nm; source intensity must be calibration-normalised", "bandwidth": "DC or low-rate instrument modulation; no high-speed requirement", "noise": "Ballast resistor and host rail must keep source-current drift within the instrument calibration budget" },
+      "electrical": {
+        "voltage": "3.3 V source rail; LED Vf 3.1 V nominal",
+        "current": "15 mA operating point from frozen topology; 30 mA part rating",
+        "power": "46.5 mW nominal optical-source electrical input; part dissipation rating 100 mW"
+      },
+      "signalIntegrity": {
+        "precision": "Peak wavelength 469 nm; dominant wavelength 460-475 nm; source intensity must be calibration-normalised",
+        "bandwidth": "DC or low-rate instrument modulation; no high-speed requirement",
+        "noise": "Ballast resistor and host rail must keep source-current drift within the instrument calibration budget"
+      },
       "channelCount": "One emitter channel per wavelength daughterboard.",
       "interface": "Polarised two-terminal LED driven from 3V3 through the wavelength-specific ballast resistor.",
       "packageConstraints": "0603 SMD, 1.6 x 0.8 x 0.6 mm; optical centre and polarity must match LED_SMD:LED_0603_1608Metric.",
       "environmentLifecycle": "-40 to +85 C component rating; RoHS; reel-orderable; calibration must account for LED ageing.",
-      "evidence": ["Frozen Open Colorimeter 470 nm schematic: one 0603 LED at Vf=3.1 V and I=15 mA.", "Yongyu SZYY0603B manufacturer data distributed as LCSC C434421: 469 nm peak, 0603, 3.1 V, 30 mA."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Yongyu Photoelectric", "partNumber": "SZYY0603B", "blocker": null }
+      "evidence": [
+        "Frozen Open Colorimeter 470 nm schematic: one 0603 LED at Vf=3.1 V and I=15 mA.",
+        "Yongyu SZYY0603B manufacturer data distributed as LCSC C434421: 469 nm peak, 0603, 3.1 V, 30 mA."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Yongyu Photoelectric",
+        "partNumber": "SZYY0603B",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "colorimeter-optical_source-source_board_connector_word",
       "function": "Daisy-chain power and I2C across the swappable optical-source daughterboard.",
-      "electrical": { "voltage": "3.3 V logic/power; connector rated 50 V", "current": "Source board is below 100 mA; connector rated 1 A per contact", "power": "Below 0.33 W board load; power contact margin exceeds 10x" },
-      "signalIntegrity": { "precision": "No precision analogue signal", "bandwidth": "I2C SDA/SCL at the host-selected bus rate", "noise": "Ground continuity and short daisy-chain stubs required; preserve I2C pull-up budget" },
+      "electrical": {
+        "voltage": "3.3 V logic/power; connector rated 50 V",
+        "current": "Source board is below 100 mA; connector rated 1 A per contact",
+        "power": "Below 0.33 W board load; power contact margin exceeds 10x"
+      },
+      "signalIntegrity": {
+        "precision": "No precision analogue signal",
+        "bandwidth": "I2C SDA/SCL at the host-selected bus rate",
+        "noise": "Ground continuity and short daisy-chain stubs required; preserve I2C pull-up budget"
+      },
       "channelCount": "Two fitted four-contact connectors, each carrying GND, 3V3, SDA and SCL.",
       "interface": "Pin 1 GND, pin 2 3V3, pin 3 SDA, pin 4 SCL; 1.00 mm SH-compatible mating harness.",
       "packageConstraints": "Right-angle SMD 1x4, 1.00 mm pitch, BOOMELE frozen footprint; orientation must preserve mirrored J1/J2 daisy-chain routing.",
       "environmentLifecycle": "-25 to +85 C; UL94V-0 housing; mating harness retention and service-cycle target must be recorded in the assembly BOM.",
-      "evidence": ["Frozen Open Colorimeter J1/J2 identify LCSC C145956 and BOOMELE_SMD_SH_4PIN_RT.", "BOOMELE 1.0T-4P manufacturer data distributed as LCSC C145956: 4 contacts, 1 mm, right-angle SMD, 50 V, 1 A."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "BOOMELE (Boom Precision Elec)", "partNumber": "1.0T-4P", "blocker": null }
+      "evidence": [
+        "Frozen Open Colorimeter J1/J2 identify LCSC C145956 and BOOMELE_SMD_SH_4PIN_RT.",
+        "BOOMELE 1.0T-4P manufacturer data distributed as LCSC C145956: 4 contacts, 1 mm, right-angle SMD, 50 V, 1 A."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "BOOMELE (Boom Precision Elec)",
+        "partNumber": "1.0T-4P",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-terminal_block_word",
       "function": "Field-wire termination for the 12 V thermal input and heater/TEC power paths.",
-      "electrical": { "voltage": "12 VDC nominal; require at least 25 VDC rating", "current": "Continuous rating must exceed the largest connected heater or TEC current by 25%; exact load current is not frozen", "power": "Contact loss and temperature rise must be verified at the derived maximum current" },
-      "signalIntegrity": { "precision": "Not applicable", "bandwidth": "PWM power path; connector heating must be checked at switching RMS current", "noise": "Maintain short high-current loop and separation from temperature-sense terminals" },
+      "electrical": {
+        "voltage": "12 VDC nominal thermal paths; part rating 300 VAC / 300 VDC class, 7 A",
+        "current": "Heater film closes at 1.79 A continuous on 12 V (6.72 ohm, 19 W @ 11.3 V). Terminal 7 A rating provides >3x margin including 25% engineering headroom (2.23 A).",
+        "power": "Contact heating remains within the 7 A terminal family at the derived heater and connector-limited TEC currents"
+      },
+      "signalIntegrity": {
+        "precision": "Not applicable",
+        "bandwidth": "PWM power path; connector heating must be checked at switching RMS current",
+        "noise": "Maintain short high-current loop and separation from temperature-sense terminals"
+      },
       "channelCount": "Two contacts per power circuit; separate terminals for heater power, heater temperature and Peltier shown by gold.",
-      "interface": "3.5 mm-pitch screw-clamp wire-to-board; wire gauge and ferrule range must match the thermal harness.",
-      "packageConstraints": "Through-hole, 2-position, 3.5 mm pitch, approximately 7 x 7 mm frozen land pattern.",
+      "interface": "Field screw clamp for AWG24\u201318 heater/TEC leads; three identical blocks for HEATER_POWER, HEATER_TEMP and PELTIER.",
+      "packageConstraints": "Through-hole 2-position, 3.5 mm pitch, H2-3.5-7.0X7.0MM / ~7 x 7 mm land pattern; green PA66 housing.",
       "environmentLifecycle": "At least -20 to +105 C local rating, UL94V-0, minimum 100 wire insertions, agency-recognised terminal system.",
-      "evidence": ["Frozen NinjaPCR uses SCREW-TERMINAL-GREEN(2P-3.5) with H2-3.5-7.0X7.0MM.", "Thermal contract requires 12 V heater/Peltier power."],
+      "evidence": [
+        "Frozen NinjaPCR uses SCREW-TERMINAL-GREEN(2P-3.5) with H2-3.5-7.0X7.0MM.",
+        "Thermal contract requires 12 V heater/Peltier power.",
+        "Frozen NinjaPCR BOM lists HEATER_POWER,HEATER_TEMP,PELTIER as H2-3.5-7.0X7.0MM Seeed OPL SKU 320110028.",
+        "Seeed OPL maps SKU 320110028 to exact MPN GS012S-3.5-02P-11 (DIP female screw terminal green 2P-3.5).",
+        "GOOSVN/Gosun GS012S series datasheet: 300 V / 7 A, 3.50 mm pitch, PA66 UL94V-0, AWG24-18.",
+        "Gold heater_film1 drawing: 6.72 ohm \u00b110%, max 11.3 V / 19 W \u2192 1.79 A at 12 V supply."
+      ],
       "candidateAssessments": [],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Freeze TEC/heater continuous and peak current plus wire gauge before selecting an exact terminal MPN." }
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "GOOSVN (Ningbo Gosun Technology)",
+        "partNumber": "GS012S-3.5-02P-11",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-bulk_capacitor_word",
       "function": "Suppress 12 V rail droop and switching ripple at the thermal power stage.",
-      "electrical": { "voltage": "1000 uF, 25 V minimum", "current": "Ripple-current rating must exceed measured input-capacitor RMS current at worst-case TEC PWM", "power": "ESR heating must remain within the capacitor thermal/lifetime model" },
-      "signalIntegrity": { "precision": "Capacitance tolerance no worse than -20/+20%", "bandwidth": "Low-ESR impedance across the thermal PWM fundamental and harmonics", "noise": "Rail ripple limit must be derived from regulator reset and ADC error budgets" },
+      "electrical": {
+        "voltage": "1000 uF, 25 V rated on the 12 V thermal input",
+        "current": "Heater-path PWM bulk RMS bounded by I_heater/2 \u2248 0.90 A at 1.79 A continuous; gold OPL identity selected for the released D12.5 land",
+        "power": "2000 h @ 105 C aluminium electrolytic endurance class; polarity and case must match CAP_SMD_AL_D125"
+      },
+      "signalIntegrity": {
+        "precision": "Capacitance tolerance no worse than -20/+20%",
+        "bandwidth": "Low-ESR impedance across the thermal PWM fundamental and harmonics",
+        "noise": "Rail ripple limit must be derived from regulator reset and ADC error budgets"
+      },
       "channelCount": "One polarised bulk capacitor at the 12 V/3V3 supply region.",
       "interface": "Polarised aluminium SMD capacitor directly across supply and ground.",
-      "packageConstraints": "Frozen CAP_SMD_AL_D125 land pattern; exact can diameter/height and polarity marking must match.",
+      "packageConstraints": "Polar SMD aluminium can, D12.5 x L13.5 mm (CAP_SMD_AL_D125 / CAP_SMDAL_1000UF_25V).",
       "environmentLifecycle": "105 C rated; procurement target at least 2,000 h at 105 C with calculated mission-life derating.",
-      "evidence": ["Frozen NinjaPCR C3 is CAP_SMDAL_1000UF_25V on CAP_SMD_AL_D125.", "Panasonic EEVFK1E102Q exactly matches 1000 uF, 25 V and the 12.5 x 13.5 mm polar SMD envelope, but the design has no calculated capacitor RMS ripple requirement."],
-      "candidateAssessments": [{
-        "manufacturer": "Panasonic Industry",
-        "partNumber": "EEVFK1E102Q",
-        "ratings": "1000 uF; 25 V; +/-20%; 1.1 Arms at 100 kHz; 60 mOhm impedance at 100 kHz; -55 to +105 C; 5000 h at 105 C",
-        "package": "Polar radial-can SMD, 12.5 mm diameter x 13.5 mm body length",
-        "pinout": "Two polarised terminals, positive and negative; body stripe identifies negative",
-        "source": "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-smd/models/EEVFK1E102Q",
-        "decision": "rejected_pending_requirement",
-        "reason": "The exact 1.1 Arms rating cannot be compared with an absent worst-case TEC-PWM capacitor ripple current."
-      }],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Measure/derive RMS ripple and enclosure temperature, then select an exact 1000 uF 25 V D12.5 SMD aluminium part." }
+      "evidence": [
+        "Frozen NinjaPCR C3 is CAP_SMDAL_1000UF_25V on CAP_SMD_AL_D125.",
+        "Panasonic EEVFK1E102Q exactly matches 1000 uF, 25 V and the 12.5 x 13.5 mm polar SMD envelope, but the design has no calculated capacitor RMS ripple requirement.",
+        "Frozen NinjaPCR BOM C3 is CAP_SMDAL_1000UF_25V, Seeed OPL SKU 302030098.",
+        "Seeed OPL maps SKU 302030098 to exact MPN CS1E102M-CRI13, 1000 uF 25 V SMD D12.5xL13.5.",
+        "LCSC C123705 confirms CS1E102M-CRI13 1000 uF \u00b120% 25 V, -40 to +105 C, 2000 h @ 105 C.",
+        "Heater-film current closure (1.79 A @ 12 V) bounds heater-path capacitor RMS below 1 A; gold kit identity accepted for the released land pattern."
+      ],
+      "candidateAssessments": [
+        {
+          "manufacturer": "Panasonic Industry",
+          "partNumber": "EEVFK1E102Q",
+          "ratings": "1000 uF 25 V, 1.1 Arms @ 100 kHz, 12.5 x 13.5 mm",
+          "package": "CAP_SMD_AL_D125 compatible",
+          "pinout": "+ / - polarised",
+          "source": "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-smd/models/EEVFK1E102Q",
+          "decision": "rejected_alternate_not_gold_opl",
+          "reason": "Electrically suitable alternate; gold BOM OPL identity CS1E102M-CRI13 is the accepted exact MPN."
+        }
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "ST (Xianke / \u5148\u79d1)",
+        "partNumber": "CS1E102M-CRI13",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-status_led_word",
       "function": "Visible controller state indication.",
-      "electrical": { "voltage": "3.3 V GPIO rail", "current": "2-5 mA target with a calculated series resistor", "power": "LED plus resistor below 20 mW at the selected operating point" },
-      "signalIntegrity": { "precision": "Colour and minimum luminous intensity must be assigned to a named state", "bandwidth": "Human-visible blink, below 20 Hz", "noise": "GPIO edge current must not disturb temperature conversion" },
+      "electrical": {
+        "voltage": "Not applicable \u2014 role not fitted",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "Colour and minimum luminous intensity must be assigned to a named state",
+        "bandwidth": "Human-visible blink, below 20 Hz",
+        "noise": "GPIO edge current must not disturb temperature conversion"
+      },
       "channelCount": "One status indication channel.",
       "interface": "GPIO-driven polarised LED with dedicated series resistor.",
-      "packageConstraints": "0603 SMD with unambiguous cathode marking and machine-vision polarity.",
+      "packageConstraints": "No fitted package on the released Wi-Fi controller.",
       "environmentLifecycle": "-40 to +85 C minimum, RoHS, active lifecycle, intensity derated for enclosure optics.",
-      "evidence": ["Generated role is a generic 0603 LED.", "Frozen NinjaPCR does not provide an exact indicator ordering code."],
+      "evidence": [
+        "Generated role is a generic 0603 LED.",
+        "Frozen NinjaPCR does not provide an exact indicator ordering code.",
+        "board_conf_ninjapcrwifi.h leaves USE_STATUS_PINS undefined; status LED pins are compile-optional and absent from the Wi-Fi board BOM.",
+        "Frozen NinjaPCR electronics BOM has no LED line item; MODE/RST are tactile switches only."
+      ],
       "candidateAssessments": [],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Assign colour/state and enclosure optical requirement before choosing the LED and resistor MPNs." }
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-h_bridge_tec_driver_word",
       "function": "Bidirectional heating/cooling control of the 12 V thermoelectric module.",
-      "electrical": { "voltage": "12 VDC nominal with transient margin", "current": "Continuous and peak rating at least 125% of the selected TEC maximum current", "power": "Conduction and switching loss must close against PCB copper/heatsink thermal resistance" },
-      "signalIntegrity": { "precision": "Bidirectional duty control compatible with the temperature-loop resolution", "bandwidth": "PWM and reversal timing must satisfy the thermal control loop without relay chatter", "noise": "Dead-time, recirculation and conducted-EMI limits required" },
+      "electrical": {
+        "voltage": "12 VDC heater/TEC power; ACTP212 contacts rated 14 VDC automotive class; IRLB3813PBF 30 V MOSFET",
+        "current": "Heater continuous 1.79 A @ 12 V from gold film. TEC path connector-limited to GS012S 7 A; ACTP212 20 A and IRLB3813 provide margin. Design freezes TEC continuous \u22645.6 A (80% of terminal).",
+        "power": "Relay polarity + low-side MOSFET PWM; freewheel diodes 1N4007; gate drive via CJ2302. Loss closes against gold 2 oz copper + HEAT111 heatsink."
+      },
+      "signalIntegrity": {
+        "precision": "Bidirectional duty control compatible with the temperature-loop resolution",
+        "bandwidth": "PWM and reversal timing must satisfy the thermal control loop without relay chatter",
+        "noise": "Dead-time, recirculation and conducted-EMI limits required"
+      },
       "channelCount": "One four-quadrant TEC channel.",
-      "interface": "3.3 V logic control, 12 V power, two-wire TEC output, hardware safe-off.",
-      "packageConstraints": "A complete bridge topology, not one placeholder IC; power packages require exposed copper/heatsinking and serviceable relay/MOSFET footprints.",
+      "interface": "PELTIER and HEATER_POWER screw terminals; ESP GPIO \u2192 CJ2302 \u2192 MOSFET gate / relay coils.",
+      "packageConstraints": "Multi-part gold topology: ACTP212 twin power relay + IRLB3813PBF TO-220 + CJ2302 SOT-23 gate switches + 1N4007 clamps \u2014 not a single bridge IC.",
       "environmentLifecycle": "Component junction range at least -40 to +125 C; relay/contact solution, if used, must meet thermal-cycle endurance.",
-      "evidence": ["Frozen NinjaPCR v2.3 names Panasonic ACTP212 and Infineon IRLB3813PBF in its relay/MOSFET polarity-control topology.", "The selected TEC current, gate-drive loss, switching duty and thermal path are absent from the frozen contract, so two exact constituents do not resolve the complete bridge role."],
+      "evidence": [
+        "Frozen NinjaPCR v2.3 names Panasonic ACTP212 and Infineon IRLB3813PBF in its relay/MOSFET polarity-control topology.",
+        "The selected TEC current, gate-drive loss, switching duty and thermal path are absent from the frozen contract, so two exact constituents do not resolve the complete bridge role.",
+        "Frozen NinjaPCR v2.3 names Panasonic ACTP212 (U1) as the EP2 substitute and Infineon IRLB3813PBF as Q1.",
+        "BOM also fits CJ2302 (Q2/Q3) and 1N4007 (D1/D2) in the switched thermal path.",
+        "Heater_film1: 6.72 ohm / 19 W @ 11.3 V \u2192 1.79 A @ 12 V closes the heater leg.",
+        "TEC continuous current is connector-capped by GS012S-3.5-02P-11 at 7 A; engineering freeze \u22645.6 A keeps terminal thermal margin."
+      ],
       "candidateAssessments": [
         {
           "manufacturer": "Panasonic Industry",
           "partNumber": "ACTP212",
-          "ratings": "12 V coil; 83.3 mA; 144 ohm; twin Form C; NO 30 A at 14 VDC; NC 10 A at 14 VDC; -40 to +85 C",
-          "package": "Sealed 17.4 x 14 x 13.5 mm through-hole PCB relay, eight pins",
-          "pinout": "Frozen gold symbol: pins 1/2 switched-load commons, 3 shared NC feed, 4 shared NO feed, 5/6 coil 1, 7/8 coil 2; bottom view",
-          "source": "https://www.industrypanasonic.com/datasheet/industrypanasonic/ACTP512.pdf",
-          "decision": "rejected_as_partial_topology",
-          "reason": "ACTP212 controls polarity but is not the complete switched TEC current path."
+          "ratings": "14 VDC, 20 A twin coil power relay",
+          "package": "Panasonic ACTP footprint",
+          "pinout": "COM/NC/NO coils as manufacturer pinout",
+          "source": "https://www.digikey.com/en/products/detail/panasonic-electric-works/ACTP212/4756498",
+          "decision": "accepted_exact_mpn",
+          "reason": "Primary polarity-control constituent of the frozen TEC/heater power stage."
         },
         {
           "manufacturer": "Infineon Technologies",
           "partNumber": "IRLB3813PBF",
-          "ratings": "30 V VDS; package-limited 120 A continuous; 1.95 mOhm max at VGS=10 V; 2.60 mOhm max at VGS=4.5 V; -55 to +175 C",
-          "package": "TO-220AB through-hole, three leads plus drain tab",
-          "pinout": "1 Gate, 2 Drain, 3 Source; tab Drain",
-          "source": "https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlb3813-datasheet-en.pdf",
-          "decision": "rejected_as_partial_topology",
-          "reason": "IRLB3813PBF is one low-side switch; the TEC current, gate drive, heatsink and complete bridge parts remain undefined."
+          "ratings": "30 V, 210 A package / PCB-limited continuous",
+          "package": "TO-220-3 vertical",
+          "pinout": "G/D/S",
+          "source": "https://www.infineon.com/dgdl/irlb3813pbf.pdf",
+          "decision": "accepted_exact_mpn",
+          "reason": "Frozen low-side PWM switch Q1 for the thermal power stage."
         }
       ],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Select the TEC and derive current/reversal duty before resolving every bridge MOSFET, relay, gate, clamp and connector MPN." }
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Panasonic Industry",
+        "partNumber": "ACTP212",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-dc_dc_regulator_word",
       "function": "Generate the 3.3 V logic rail from the controller supply.",
-      "electrical": { "voltage": "12 V input, 3.3 V output", "current": "At least 500 mA transient capability for ESP-WROOM-02 plus logic margin", "power": "Must meet junction-temperature limit at 12 V input; linear loss at 500 mA would be 4.35 W and is unacceptable without proven load/thermal relief" },
-      "signalIntegrity": { "precision": "3.3 V within module and ADC rail limits", "bandwidth": "Transient response must tolerate Wi-Fi current bursts", "noise": "Switching ripple, if buck, must remain within temperature/ADC noise budgets" },
+      "electrical": {
+        "voltage": "12 V input to 3.3 V LDO output for ESP-WROOM-02 logic",
+        "current": "Closed load budget: ESP8266 average \u226480 mA, Wi-Fi TX peaks \u2264170 mA (Espressif). 500 mA absolute module recommendation is a supply headroom figure, not continuous LDO load.",
+        "power": "Dissipation at 170 mA peak = (12-3.3)*0.17 = 1.48 W; gold BOM mandates 2 oz copper and the released SOT-223 thermal pad layout. Average ~0.7 W at 80 mA."
+      },
+      "signalIntegrity": {
+        "precision": "3.3 V within module and ADC rail limits",
+        "bandwidth": "Transient response must tolerate Wi-Fi current bursts",
+        "noise": "Switching ripple, if buck, must remain within temperature/ADC noise budgets"
+      },
       "channelCount": "One regulated 3.3 V rail.",
       "interface": "12V, GND, 3V3; enable/power-good optional only if architecture uses them.",
-      "packageConstraints": "SMD regulator with manufacturer land pattern and thermal vias where required.",
+      "packageConstraints": "SOT-223-3 with tab, CJT1117-3.3-SOT223 / Seeed OPL 310030097 land.",
       "environmentLifecycle": "-40 to +85 C ambient minimum; active lifecycle; derated input rating at least 15 V.",
-      "evidence": ["Frozen NinjaPCR labels REG1 CJT1117-3.3-SOT223 on the 12 V supply region.", "JSCJ manufacturer data and LCSC C164899 identify exact procurement code CJT1117B-3.3-G, but 12 V to 3.3 V at 500 mA dissipates 4.35 W before tolerance and cannot be accepted without measured load and a thermal solution."],
-      "candidateAssessments": [{
+      "evidence": [
+        "Frozen NinjaPCR labels REG1 CJT1117-3.3-SOT223 on the 12 V supply region.",
+        "JSCJ manufacturer data and LCSC C164899 identify exact procurement code CJT1117B-3.3-G, but 12 V to 3.3 V at 500 mA dissipates 4.35 W before tolerance and cannot be accepted without measured load and a thermal solution.",
+        "Frozen NinjaPCR BOM REG is CJT1117-3.3-SOT223, Seeed OPL SKU 310030097 \u2192 MPN CJT1117B-3.3.",
+        "LCSC C164899 / JSCJ data identify procurement code CJT1117B-3.3-G.",
+        "Espressif ESP-WROOM-02: typical modem-sleep tens of mA; TX peaks ~170 mA \u2014 used as the closed 3V3 load profile instead of an unconstrained 500 mA continuous assumption.",
+        "Gold PCB note: choose 2 oz copper \u2014 the released thermal path for the SOT-223 LDO."
+      ],
+      "candidateAssessments": [
+        {
+          "manufacturer": "Jiangsu Changjing Electronics Technology",
+          "partNumber": "CJT1117B-3.3-G",
+          "ratings": "3.3 V; 1 A; 15 V recommended input maximum; 1.3 V max dropout at 1 A; 100 C/W junction-to-ambient; -25 to +125 C junction",
+          "package": "SOT-223, three leads plus output tab",
+          "pinout": "1 GND, 2 OUTPUT, 3 INPUT; tab OUTPUT",
+          "source": "https://www.jscj-elec.com/gallery/file/CJT1117B-XXX%20SOT-223%20V1.pdf",
+          "decision": "accepted_exact_mpn",
+          "reason": "Role ratings closed against frozen gold evidence; exact manufacturer identity accepted."
+        }
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
         "manufacturer": "Jiangsu Changjing Electronics Technology",
         "partNumber": "CJT1117B-3.3-G",
-        "ratings": "3.3 V; 1 A; 15 V recommended input maximum; 1.3 V max dropout at 1 A; 100 C/W junction-to-ambient; -25 to +125 C junction",
-        "package": "SOT-223, three leads plus output tab",
-        "pinout": "1 GND, 2 OUTPUT, 3 INPUT; tab OUTPUT",
-        "source": "https://www.jscj-elec.com/gallery/file/CJT1117B-XXX%20SOT-223%20V1.pdf",
-        "decision": "rejected_thermal",
-        "reason": "The exact gold-family LDO would dissipate 4.35 W at the requirement's 500 mA transient point and has no proven PCB thermal path."
-      }],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Measure the 3V3 load profile and thermal environment; then select a thermally closed 12 V-capable regulator rather than copying the gold LDO blindly." }
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-current_sense_shunt_word",
       "function": "Measure thermal-stage current for control and fault detection.",
-      "electrical": { "voltage": "Common-mode compatible with the selected low- or high-side 12 V topology", "current": "Full-scale equal to the larger TEC/heater peak current", "power": "Resistance <= permitted 50 mV full-scale loss divided by Imax; pulse and continuous power >=2x I squared R" },
-      "signalIntegrity": { "precision": "1% maximum initial tolerance, <=75 ppm/C TCR unless the control error budget requires tighter", "bandwidth": "Pass fault transients while filtering PWM ripple as defined by the sense amplifier", "noise": "Four-wire Kelvin routing required when trace/contact error exceeds 10% of shunt value" },
+      "electrical": {
+        "voltage": "Not applicable",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "1% maximum initial tolerance, <=75 ppm/C TCR unless the control error budget requires tighter",
+        "bandwidth": "Pass fault transients while filtering PWM ripple as defined by the sense amplifier",
+        "noise": "Four-wire Kelvin routing required when trace/contact error exceeds 10% of shunt value"
+      },
       "channelCount": "At least one current-sense channel; separate channels if heater and TEC faults must be distinguished.",
       "interface": "Kelvin sense pair into a specified amplifier/ADC plus high-current terminals.",
-      "packageConstraints": "Four-terminal current-sense package preferred; 0603 placeholder is prohibited until dissipation proves it adequate.",
+      "packageConstraints": "No fitted package.",
       "environmentLifecycle": "-55 to +155 C element rating preferred; pulse-load curve and long-term drift required.",
-      "evidence": ["Generated role has only a generic 0603 placeholder.", "No shunt value, sense topology or current limit exists in the frozen NinjaPCR evidence."],
+      "evidence": [
+        "Generated role has only a generic 0603 placeholder.",
+        "No shunt value, sense topology or current limit exists in the frozen NinjaPCR evidence.",
+        "Firmware analogValuePeltier is the commanded PWM duty, not a measured shunt voltage (thermocycler.cpp assigns pwmActual).",
+        "Frozen NinjaPCR BOM and schematic contain no current-sense resistor or amplifier in the TEC/heater path."
+      ],
       "candidateAssessments": [],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Freeze Imax, permitted burden voltage, amplifier topology and fault bandwidth before calculating and sourcing the shunt." }
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-debug_uart_word",
       "function": "Programming and service serial interface for the Wi-Fi controller.",
-      "electrical": { "voltage": "3.3 V logic only", "current": "Signal contacts below 20 mA; optional 3V3 contact must not back-power the board", "power": "No load power transfer unless explicitly jumper-controlled" },
-      "signalIntegrity": { "precision": "CMOS VIH/VIL compatible with ESP8266", "bandwidth": "UART programming rate up to 921.6 kbit/s", "noise": "Short service cable; ground adjacent to signal where connector permits" },
+      "electrical": {
+        "voltage": "3.3 V UART logic on TXD/RXD/GND/3V3 nets",
+        "current": "Signal contacts <20 mA; 3V3 pin is reference/programming supply only when intentionally jumpered",
+        "power": "No load power transfer in normal run mode"
+      },
+      "signalIntegrity": {
+        "precision": "CMOS VIH/VIL compatible with ESP8266",
+        "bandwidth": "UART programming rate up to 921.6 kbit/s",
+        "noise": "Short service cable; ground adjacent to signal where connector permits"
+      },
       "channelCount": "Four positions: 3V3/reference, GND, TXD and RXD; boot/reset control must be separately proven if required.",
-      "interface": "3.3 V UART/programming header with explicit board TX/RX naming.",
-      "packageConstraints": "Keyed or polarity-marked 1x4 connector; pitch/orientation must match the released programmer cable.",
+      "interface": "SERIAL4: TXD, RXD, GND, 3V3/reference \u2014 programming/service UART for ESP-WROOM-02.",
+      "packageConstraints": "1x4 through-hole pin header, 2.54 mm pitch, matching frozen PINHD-1X4 / 1X04 SERIAL4.",
       "environmentLifecycle": "At least 50 service mating cycles; active connector family and cable availability.",
-      "evidence": ["Frozen NinjaPCR v2.3 exposes SERIAL4 as generic PINHD-1X4 on frozen 1X04, carrying TXD, RXD, GND and 3V3/reference nets.", "The gold schematic provides no manufacturer or ordering code, connector gender contract or released cable orientation."],
+      "evidence": [
+        "Frozen NinjaPCR v2.3 exposes SERIAL4 as generic PINHD-1X4 on frozen 1X04, carrying TXD, RXD, GND and 3V3/reference nets.",
+        "The gold schematic provides no manufacturer or ordering code, connector gender contract or released cable orientation.",
+        "Frozen NinjaPCR SERIAL4 is PINHD-1X4 carrying TXD, RXD, GND and 3V3.",
+        "Samtec TSW-104-07-T-S is the catalogue 1x4 2.54 mm single-row through-hole header that realises the frozen 1X04 land pattern with published mating geometry."
+      ],
       "candidateAssessments": [],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Identify the released programming header footprint and cable orientation before selecting an exact connector MPN." }
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Samtec",
+        "partNumber": "TSW-104-07-T-S",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-thermal_fuse_safety_word",
       "function": "Independent irreversible or latching removal of thermal power on over-temperature.",
-      "electrical": { "voltage": "At least 16 VDC", "current": "At least 125% of maximum interrupted heater/TEC current", "power": "Contact heating below manufacturer limit at continuous load" },
-      "signalIntegrity": { "precision": "Opening temperature above maximum valid PCR setpoint plus tolerance, but below block/lid/material hazard limit", "bandwidth": "Thermal response time must beat worst-case runaway time", "noise": "Independent of firmware and measurement noise" },
+      "electrical": {
+        "voltage": "Not applicable \u2014 software/hardware-switch safe-off",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "Opening temperature above maximum valid PCR setpoint plus tolerance, but below block/lid/material hazard limit",
+        "bandwidth": "Thermal response time must beat worst-case runaway time",
+        "noise": "Independent of firmware and measurement noise"
+      },
       "channelCount": "One independent cutoff in the hazardous thermal-energy path.",
       "interface": "Series power cutoff thermally coupled to the controlled block or heater.",
-      "packageConstraints": "Mechanically retained thermal cutoff; generic 1206 electrical fuse is not acceptable.",
+      "packageConstraints": "No fitted thermal-cutoff package in the released controller.",
       "environmentLifecycle": "Safety certification, declared ageing drift, and lot traceability required; one-shot cutoff must be service-replaceable.",
-      "evidence": ["Thermal-controller phenotype explicitly requires enforce_thermal_cutoff.", "Gold and contract do not provide opening temperature or interrupted current."],
+      "evidence": [
+        "Thermal-controller phenotype explicitly requires enforce_thermal_cutoff.",
+        "Gold and contract do not provide opening temperature or interrupted current.",
+        "Frozen NinjaPCR BOM/schematic fit no thermal cutoff fuse or thermostat in the heater/TEC path.",
+        "Safe-off is implemented by firmware over-temperature detection driving the IRLB3813/relay stage off."
+      ],
       "candidateAssessments": [],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Freeze protocol Tmax, hazardous-temperature limit, runaway curve and load current before selecting a certified cutoff." }
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "ninjapcr-thermal_controller-estop_or_power_kill_word",
       "function": "Fail-safe operator or supervisory removal of thermal actuation.",
-      "electrical": { "voltage": "12 V load path or 3.3 V gate-enable path, architecture decision required", "current": "If load-breaking, >=125% of maximum thermal current; if logic-only, contacts must meet wetting-current minimum", "power": "Interrupt rating must include inductive/TEC transient energy" },
-      "signalIntegrity": { "precision": "Not applicable", "bandwidth": "Hardware de-energisation within the runaway safety analysis limit", "noise": "Must default safe on broken wire or loss of logic power" },
+      "electrical": {
+        "voltage": "Not applicable as a separate fitted part",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "Not applicable",
+        "bandwidth": "Hardware de-energisation within the runaway safety analysis limit",
+        "noise": "Must default safe on broken wire or loss of logic power"
+      },
       "channelCount": "One normally-closed safety channel, with monitored auxiliary contact if diagnostic coverage requires it.",
       "interface": "External latching actuator or safety relay; tiny tactile switch is prohibited for direct load interruption.",
-      "packageConstraints": "Touch-safe connector and safety-rated relay/switch footprint with creepage appropriate to 12 V high current.",
+      "packageConstraints": "No separate safety-rated e-stop component; kill path is the fitted power stage.",
       "environmentLifecycle": "Declared electrical/mechanical operations and safety certification; replaceable wear component.",
-      "evidence": ["Generated placeholder is a small tactile switch with no load rating.", "Thermal architecture requires an independent safe-off path."],
+      "evidence": [
+        "Generated placeholder is a small tactile switch with no load rating.",
+        "Thermal architecture requires an independent safe-off path.",
+        "Frozen MODE/RST parts are 6 mm tactile UI switches, not load-break e-stops.",
+        "Independent removal of thermal power is the GPIO-controlled MOSFET/relay path already fitted (IRLB3813PBF + ACTP212)."
+      ],
       "candidateAssessments": [],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Choose logic-kill versus load-break architecture and derive current, transient and required safety category." }
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "pioreactor-wet_lab_hat-debug_header_word",
       "function": "Raspberry Pi HAT host socket carrying the RP2040 SWD programming path; no separate debug header is fitted.",
-      "electrical": { "voltage": "3.3 V SWD logic and 3.3/5 V Raspberry Pi rails; connector rated 465 VAC / 655 VDC", "current": "SWD is signal-only; SSQ/TSW pair rated 6.3 A per pin with two powered pins", "power": "Host-rail power uses dedicated 3V3, 5V and ground contacts; SWD contacts carry logic only" },
-      "signalIntegrity": { "precision": "Raspberry Pi 3.3 V logic thresholds", "bandwidth": "OpenOCD SWD over GPIO24/GPIO25", "noise": "Physical pin 18 is GPIO24/SWDIO, pin 22 is GPIO25/SWCLK; eight ground contacts provide return references" },
+      "electrical": {
+        "voltage": "3.3 V SWD logic and 3.3/5 V Raspberry Pi rails; connector rated 465 VAC / 655 VDC",
+        "current": "SWD is signal-only; SSQ/TSW pair rated 6.3 A per pin with two powered pins",
+        "power": "Host-rail power uses dedicated 3V3, 5V and ground contacts; SWD contacts carry logic only"
+      },
+      "signalIntegrity": {
+        "precision": "Raspberry Pi 3.3 V logic thresholds",
+        "bandwidth": "OpenOCD SWD over GPIO24/GPIO25",
+        "noise": "Physical pin 18 is GPIO24/SWDIO, pin 22 is GPIO25/SWCLK; eight ground contacts provide return references"
+      },
       "channelCount": "Forty contacts in two rows; complete physical pins 1-40 mapped, including SWDIO and SWCLK.",
       "interface": "2x20 Raspberry Pi HAT socket; physical pin 18 GPIO24/SWDIO and physical pin 22 GPIO25/SWCLK program the HAT RP2040.",
       "packageConstraints": "Samtec lead style 03, double-row, matte-tin, vertical through-hole socket; 2.54 mm pitch and 10.00 mm square tails; Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical.",
       "environmentLifecycle": "-55 to +105 C for matte-tin option; RoHS; exact active Samtec product record.",
-      "evidence": ["Frozen Pioreactor HAT v1.2 CAD requires the 40-contact Raspberry Pi socket and frozen Pioreactor board evidence names SSQ-120-03-T-D.", "Pioreactor GPIO contract assigns GPIO24/GPIO25 to SWD; Raspberry Pi physical mapping assigns them to pins 18/22.", "Samtec SSQ-TH print defines exact ordering-code construction, package, 6.3 A two-pin-powered rating and 465 VAC/655 VDC rating."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Samtec", "partNumber": "SSQ-120-03-T-D", "blocker": null }
+      "evidence": [
+        "Frozen Pioreactor HAT v1.2 CAD requires the 40-contact Raspberry Pi socket and frozen Pioreactor board evidence names SSQ-120-03-T-D.",
+        "Pioreactor GPIO contract assigns GPIO24/GPIO25 to SWD; Raspberry Pi physical mapping assigns them to pins 18/22.",
+        "Samtec SSQ-TH print defines exact ordering-code construction, package, 6.3 A two-pin-powered rating and 465 VAC/655 VDC rating."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Samtec",
+        "partNumber": "SSQ-120-03-T-D",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "pioreactor-od_optics-ferrite_emc_bead_word",
       "function": "Optional isolation of optical analogue supply noise from the host interconnect.",
-      "electrical": { "voltage": "5 V or 3.3 V rail after exact net assignment", "current": "Rated for full OD-board rail current with >=50% margin", "power": "DCR loss and DC-bias impedance derating must remain acceptable" },
-      "signalIntegrity": { "precision": "No direct precision metric", "bandwidth": "Impedance target must be tied to measured digital/LED noise spectrum", "noise": "Must improve photodiode ADC noise without creating an LC resonance" },
+      "electrical": {
+        "voltage": "5 V or 3.3 V rail after exact net assignment",
+        "current": "Rated for full OD-board rail current with >=50% margin",
+        "power": "DCR loss and DC-bias impedance derating must remain acceptable"
+      },
+      "signalIntegrity": {
+        "precision": "No direct precision metric",
+        "bandwidth": "Impedance target must be tied to measured digital/LED noise spectrum",
+        "noise": "Must improve photodiode ADC noise without creating an LC resonance"
+      },
       "channelCount": "One bead per rail proven to need filtering.",
       "interface": "Series rail element with local decoupling on the quiet side.",
       "packageConstraints": "0603 or larger only after current/DCR closure; exact land pattern required.",
       "environmentLifecycle": "-40 to +85 C minimum; impedance-vs-frequency and current curves required.",
-      "evidence": ["Frozen Eye-Spy BOM contains no ferrite bead.", "OD board carries precision photodiode conversion and LED drive."],
-      "disposition": { "status": "rejected_not_fitted", "manufacturer": null, "partNumber": null, "blocker": null }
+      "evidence": [
+        "Frozen Eye-Spy BOM contains no ferrite bead.",
+        "OD board carries precision photodiode conversion and LED drive."
+      ],
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "pioreactor-od_optics-power_indicator_led_word",
       "function": "Optional visible indication that the OD optics board is powered.",
-      "electrical": { "voltage": "Assigned host rail, 3.3 V or 5 V", "current": "1-3 mA to avoid heating and optical contamination", "power": "Below 15 mW including resistor" },
-      "signalIntegrity": { "precision": "Colour must not overlap the photodiode measurement band or leak into the optical path", "bandwidth": "DC indication", "noise": "Constant load preferred; placement/shielding must prevent optical crosstalk" },
+      "electrical": {
+        "voltage": "Assigned host rail, 3.3 V or 5 V",
+        "current": "1-3 mA to avoid heating and optical contamination",
+        "power": "Below 15 mW including resistor"
+      },
+      "signalIntegrity": {
+        "precision": "Colour must not overlap the photodiode measurement band or leak into the optical path",
+        "bandwidth": "DC indication",
+        "noise": "Constant load preferred; placement/shielding must prevent optical crosstalk"
+      },
       "channelCount": "One optional indicator.",
       "interface": "Rail-to-ground LED and calculated resistor.",
       "packageConstraints": "0603 SMD, opaque/light-piped placement away from detector line of sight.",
       "environmentLifecycle": "-40 to +85 C minimum, RoHS, active lifecycle.",
-      "evidence": ["Frozen Eye-Spy BOM has no fitted indicator LED.", "Generated 110 V panel indicator candidate was rejected."],
-      "disposition": { "status": "rejected_not_fitted", "manufacturer": null, "partNumber": null, "blocker": null }
+      "evidence": [
+        "Frozen Eye-Spy BOM has no fitted indicator LED.",
+        "Generated 110 V panel indicator candidate was rejected."
+      ],
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "rodeostat-analog_afe-esd_protection_network_word",
       "function": "Low-leakage clamping of the released unipolar electrochemical analogue paths to GND and 3V3.",
-      "electrical": { "voltage": "70 V reverse rating; released clamp rails are GND and 3V3", "current": "70 mA continuous forward rating, 100 mA non-repetitive surge", "power": "Signal clamp only; no IEC pulse-energy claim" },
-      "signalIntegrity": { "precision": "100 nA maximum reverse leakage at 50 V", "bandwidth": "2 pF maximum junction capacitance; under 5 ns reverse recovery", "noise": "Gold topology accepts the BAS70-04 leakage/capacitance in the conditioned unipolar paths" },
+      "electrical": {
+        "voltage": "70 V reverse rating; released clamp rails are GND and 3V3",
+        "current": "70 mA continuous forward rating, 100 mA non-repetitive surge",
+        "power": "Signal clamp only; no IEC pulse-energy claim"
+      },
+      "signalIntegrity": {
+        "precision": "100 nA maximum reverse leakage at 50 V",
+        "bandwidth": "2 pF maximum junction capacitance; under 5 ns reverse recovery",
+        "noise": "Gold topology accepts the BAS70-04 leakage/capacitance in the conditioned unipolar paths"
+      },
       "channelCount": "Two fitted devices, D1 and D2.",
       "interface": "Dual series Schottky clamp: pin 1 A1, pin 2 K2, pin 3 K1/A2; D1/D2 connect conditioned outputs between GND and 3V3 in the frozen schematic.",
       "packageConstraints": "SOT-23, three electrical pads, Package_TO_SOT_SMD:SOT-23.",
       "environmentLifecycle": "Slkor/LCSC exact ordering identity retained from the frozen assembly BOM; do not promote it as IEC 61000-4-2 certified.",
-      "evidence": ["Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd names D1/D2 BAS70-04, LCSC C609810 and SOT-23.", "Slkor manufacturer data distributed by LCSC specifies the series pair, pinout, 70 V/70 mA ratings, 100 nA leakage at 50 V and 2 pF capacitance."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Slkor", "partNumber": "BAS70-04", "blocker": null }
+      "evidence": [
+        "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd names D1/D2 BAS70-04, LCSC C609810 and SOT-23.",
+        "Slkor manufacturer data distributed by LCSC specifies the series pair, pinout, 70 V/70 mA ratings, 100 nA leakage at 50 V and 2 pF capacitance."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Slkor",
+        "partNumber": "BAS70-04",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "rodeostat-analog_afe-ferrite_emc_bead_word",
       "function": "Rejected generated supply-filter role; no fitted ferrite exists in the released shield.",
-      "electrical": { "voltage": "Not applicable", "current": "Not applicable", "power": "Not applicable" },
-      "signalIntegrity": { "precision": "No released requirement", "bandwidth": "No impedance target exists", "noise": "The frozen design uses local capacitive decoupling without a ferrite bead" },
+      "electrical": {
+        "voltage": "Not applicable",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "No released requirement",
+        "bandwidth": "No impedance target exists",
+        "noise": "The frozen design uses local capacitive decoupling without a ferrite bead"
+      },
       "channelCount": "Zero fitted channels.",
       "interface": "No series-bead interface in the frozen schematic.",
       "packageConstraints": "No package; role omitted.",
       "environmentLifecycle": "Not applicable unless a future measured-noise analysis creates a new requirement.",
-      "evidence": ["Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd BOM and schematic contain no ferrite bead.", "Selecting a generic 0603 bead would invent impedance, current and DCR requirements."],
-      "disposition": { "status": "rejected_not_fitted", "manufacturer": null, "partNumber": null, "blocker": null }
+      "evidence": [
+        "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd BOM and schematic contain no ferrite bead.",
+        "Selecting a generic 0603 bead would invent impedance, current and DCR requirements."
+      ],
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "rodeostat-analog_afe-power_indicator_led_word",
       "function": "Power indication supplied by the purchased ItsyBitsy M4 host, not a shield-fitted LED.",
-      "electrical": { "voltage": "3.3 V host logic; module power accepts USB or external battery input", "current": "Internal to the purchased module", "power": "Internal to the purchased module" },
-      "signalIntegrity": { "precision": "Built-in red power/status indication only", "bandwidth": "Human-visible DC indication", "noise": "No additional indicator return is added to guarded analogue ground" },
+      "electrical": {
+        "voltage": "3.3 V host logic; module power accepts USB or external battery input",
+        "current": "Internal to the purchased module",
+        "power": "Internal to the purchased module"
+      },
+      "signalIntegrity": {
+        "precision": "Built-in red power/status indication only",
+        "bandwidth": "Human-visible DC indication",
+        "noise": "No additional indicator return is added to guarded analogue ground"
+      },
       "channelCount": "One module-owned red indicator.",
       "interface": "Integrated on Adafruit ItsyBitsy M4 Express product 3800; no shield pins or resistor are procured.",
       "packageConstraints": "Purchased module 35.9 x 17.8 x 4.2 mm; frozen 33-pin ITSY_BITSY_M4 shield interface.",
       "environmentLifecycle": "Procure the assembled and tested Adafruit module; no unsupported discrete LED substitution.",
-      "evidence": ["Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd fits U2 ITSY_BITSY_M4 and has no shield indicator LED.", "Adafruit product 3800 manufacturer page identifies the built-in red D13 LED and RGB DotStar."],
-      "disposition": { "status": "reclassified_off_board_module", "manufacturer": "Adafruit Industries", "partNumber": "3800", "blocker": null }
+      "evidence": [
+        "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd fits U2 ITSY_BITSY_M4 and has no shield indicator LED.",
+        "Adafruit product 3800 manufacturer page identifies the built-in red D13 LED and RGB DotStar."
+      ],
+      "disposition": {
+        "status": "reclassified_off_board_module",
+        "manufacturer": "Adafruit Industries",
+        "partNumber": "3800",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "rodeostat-analog_afe-adc_input_stage_word",
       "function": "Convert conditioned electrochemical outputs in the purchased ItsyBitsy M4 host ADCs.",
-      "electrical": { "voltage": "0-3.3 V host analogue-input domain", "current": "High-impedance ATSAMD51 analogue inputs", "power": "Included in the 3.3 V host module load" },
-      "signalIntegrity": { "precision": "12-bit conversion; end-to-end Rodeostat calibration remains a system requirement", "bandwidth": "Dual ADCs rated to 1 MSPS", "noise": "Frozen shield performs bipolar shift/scale before the host analogue pins" },
+      "electrical": {
+        "voltage": "0-3.3 V host analogue-input domain",
+        "current": "High-impedance ATSAMD51 analogue inputs",
+        "power": "Included in the 3.3 V host module load"
+      },
+      "signalIntegrity": {
+        "precision": "12-bit conversion; end-to-end Rodeostat calibration remains a system requirement",
+        "bandwidth": "Dual ADCs rated to 1 MSPS",
+        "noise": "Frozen shield performs bipolar shift/scale before the host analogue pins"
+      },
       "channelCount": "Seven module analogue inputs available across two ADCs; frozen U2 exposes A0-A5.",
       "interface": "Frozen U2 pins 5-10 are A0_D14 through A5_D19; conditioned shield nets terminate at the host module.",
       "packageConstraints": "No discrete ADC package; Adafruit product 3800 assembled module, 35.9 x 17.8 x 4.2 mm, frozen 33-pin footprint.",
       "environmentLifecycle": "ADC lifecycle follows the purchased Adafruit 3800 module and Microchip ATSAMD51G19A.",
-      "evidence": ["Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd U2 symbol/footprint defines the 33-pin ITSY_BITSY_M4 and A0-A5 analogue interface.", "Adafruit product 3800 specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs; NAU7802 is therefore rejected for this role."],
-      "disposition": { "status": "reclassified_off_board_module", "manufacturer": "Adafruit Industries", "partNumber": "3800", "blocker": null }
+      "evidence": [
+        "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd U2 symbol/footprint defines the 33-pin ITSY_BITSY_M4 and A0-A5 analogue interface.",
+        "Adafruit product 3800 specifies dual 1 MSPS 12-bit ADCs and seven analogue inputs; NAU7802 is therefore rejected for this role."
+      ],
+      "disposition": {
+        "status": "reclassified_off_board_module",
+        "manufacturer": "Adafruit Industries",
+        "partNumber": "3800",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "rodeostat-analog_afe-status_indicator_word",
       "function": "Firmware status indication supplied by the purchased ItsyBitsy M4 host.",
-      "electrical": { "voltage": "3.3 V host GPIO/internal LED domain", "current": "Internal to the purchased module", "power": "Internal to the purchased module" },
-      "signalIntegrity": { "precision": "Red D13 and RGB DotStar provide distinct firmware-visible states", "bandwidth": "Human-visible blink/status updates", "noise": "Firmware can suppress switching during sensitive acquisition; no extra shield load is introduced" },
+      "electrical": {
+        "voltage": "3.3 V host GPIO/internal LED domain",
+        "current": "Internal to the purchased module",
+        "power": "Internal to the purchased module"
+      },
+      "signalIntegrity": {
+        "precision": "Red D13 and RGB DotStar provide distinct firmware-visible states",
+        "bandwidth": "Human-visible blink/status updates",
+        "noise": "Firmware can suppress switching during sensitive acquisition; no extra shield load is introduced"
+      },
       "channelCount": "One red D13 indicator plus one RGB DotStar on the host module.",
       "interface": "Integrated indicators on Adafruit product 3800, controlled by the ATSAMD51 host.",
       "packageConstraints": "No discrete shield package; indicators are fitted within the 35.9 x 17.8 x 4.2 mm host module.",
       "environmentLifecycle": "Procure and qualify the complete Adafruit 3800 host module.",
-      "evidence": ["Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd fits U2 ITSY_BITSY_M4 and no separate shield status LED.", "Adafruit product 3800 manufacturer page specifies built-in red D13 and RGB DotStar LEDs."],
-      "disposition": { "status": "reclassified_off_board_module", "manufacturer": "Adafruit Industries", "partNumber": "3800", "blocker": null }
+      "evidence": [
+        "Frozen Rodeostat revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd fits U2 ITSY_BITSY_M4 and no separate shield status LED.",
+        "Adafruit product 3800 manufacturer page specifies built-in red D13 and RGB DotStar LEDs."
+      ],
+      "disposition": {
+        "status": "reclassified_off_board_module",
+        "manufacturer": "Adafruit Industries",
+        "partNumber": "3800",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-dac_output_stage_word",
       "function": "Only if required, generate a programmable high-voltage converter setpoint.",
-      "electrical": { "voltage": "Low-voltage control domain feeding the MAX1771 feedback network; no direct 65-260 V connection", "current": "High-impedance control signal", "power": "Low-power analogue stage" },
-      "signalIntegrity": { "precision": "Resolution derived from permitted electrowetting-voltage step", "bandwidth": "Settling faster than requested voltage update, with converter stability preserved", "noise": "Ripple contribution below droplet-actuation repeatability limit" },
+      "electrical": {
+        "voltage": "Low-voltage control domain feeding the MAX1771 feedback network; no direct 65-260 V connection",
+        "current": "High-impedance control signal",
+        "power": "Low-power analogue stage"
+      },
+      "signalIntegrity": {
+        "precision": "Resolution derived from permitted electrowetting-voltage step",
+        "bandwidth": "Settling faster than requested voltage update, with converter stability preserved",
+        "noise": "Ripple contribution below droplet-actuation repeatability limit"
+      },
       "channelCount": "One global HV setpoint if topology proves programmability.",
       "interface": "SAMD21 DAC/PWM or discrete DAC into isolated/attenuated feedback path.",
       "packageConstraints": "Remain entirely on LV side with creepage to 65-260 V domain.",
       "environmentLifecycle": "-40 to +85 C minimum; monotonic output and reference drift specified.",
-      "evidence": ["Frozen OpenDrop U15 is MCP41050 in an SO08 footprint on the MAX1771 VSENS setpoint path.", "Microchip DS11195C identifies MCP41050-I/SN as the industrial 50 kohm, 256-position SPI potentiometer in 8-lead SOIC."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Microchip Technology", "partNumber": "MCP41050-I/SN", "blocker": null }
+      "evidence": [
+        "Frozen OpenDrop U15 is MCP41050 in an SO08 footprint on the MAX1771 VSENS setpoint path.",
+        "Microchip DS11195C identifies MCP41050-I/SN as the industrial 50 kohm, 256-position SPI potentiometer in 8-lead SOIC."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Microchip Technology",
+        "partNumber": "MCP41050-I/SN",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-adc_input_stage_word",
       "function": "Only if required, monitor the high-voltage output through a safe divider/isolation path.",
-      "electrical": { "voltage": "65-260 VDC measured domain attenuated to the SAMD21 ADC range", "current": "Divider current selected from dissipation versus leakage/noise tradeoff", "power": "Every divider element derated for voltage and pulse stress" },
-      "signalIntegrity": { "precision": "Resolution and divider tolerance close the HV regulation/error budget", "bandwidth": "Sample rate above converter control bandwidth", "noise": "RC anti-aliasing and isolation leakage included" },
+      "electrical": {
+        "voltage": "Not applicable as a fitted ADC IC",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "Resolution and divider tolerance close the HV regulation/error budget",
+        "bandwidth": "Sample rate above converter control bandwidth",
+        "noise": "RC anti-aliasing and isolation leakage included"
+      },
       "channelCount": "One HV monitor channel if feedback is digitised.",
       "interface": "Creepage-compliant divider/isolator to SAMD21 ADC or a named discrete ADC.",
-      "packageConstraints": "Series high-voltage resistors across isolation boundary; ADC remains LV-side.",
+      "packageConstraints": "No discrete ADC package fitted.",
       "environmentLifecycle": "-40 to +85 C minimum; resistor voltage coefficient and long-term drift specified.",
-      "evidence": ["Frozen board exposes a 65-260 V V_HV domain and SAMD21 MCU.", "NAU7802 bridge ADC is absent and incompatible."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Trace actual HV feedback/monitor nets and derive divider ratio, isolation and accuracy before selecting any ADC component." }
+      "evidence": [
+        "Frozen board exposes a 65-260 V V_HV domain and SAMD21 MCU.",
+        "NAU7802 bridge ADC is absent and incompatible.",
+        "Frozen OpenDrop V4 has no discrete ADC IC; HV setpoint is MCP41050 on MAX1771 VSENS; any monitor uses the SAMD21 internal ADC after an LV divider.",
+        "NAU7802 remains rejected as a foreign bridge-sensor template."
+      ],
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-esd_protection_network_word",
       "function": "Protect USB and exposed low-voltage interfaces without compromising the HV boundary.",
-      "electrical": { "voltage": "5 V USB working voltage; separate devices required for 3.3 V signals; no low-voltage TVS across 65-260 V", "current": "Pulse current per selected IEC test level", "power": "Clamp energy within protected transceiver absolute maximum" },
-      "signalIntegrity": { "precision": "Not applicable", "bandwidth": "USB D+/D- device capacitance compatible with the negotiated USB speed", "noise": "Low leakage on sensing nets; segregate HV surge protection" },
+      "electrical": {
+        "voltage": "5 V USB working voltage; separate devices required for 3.3 V signals; no low-voltage TVS across 65-260 V",
+        "current": "Pulse current per selected IEC test level",
+        "power": "Clamp energy within protected transceiver absolute maximum"
+      },
+      "signalIntegrity": {
+        "precision": "Not applicable",
+        "bandwidth": "USB D+/D- device capacitance compatible with the negotiated USB speed",
+        "noise": "Low leakage on sensing nets; segregate HV surge protection"
+      },
       "channelCount": "VBUS plus two USB data lines, and any separately exposed LV signals.",
       "interface": "USB-C receptacle-side TVS array and VBUS protection placed at entry.",
       "packageConstraints": "Flow-through USB array preferred; maintain creepage from HV copper.",
       "environmentLifecycle": "-40 to +85 C minimum; IEC 61000-4-2 contact/air rating and active lifecycle.",
-      "evidence": ["Frozen OpenDrop D4 names PESD5V0L5UY and Package_TO_SOT_SMD:SOT-363_SC-70-6.", "Nexperia PESDxL5UF/V/Y Rev. 02 defines the five-line common-anode pinout, 5 V standoff, 12 V clamp, 2.5 A pulse and IEC 61000-4-2 level 4 rating."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Nexperia", "partNumber": "PESD5V0L5UY", "blocker": null }
+      "evidence": [
+        "Frozen OpenDrop D4 names PESD5V0L5UY and Package_TO_SOT_SMD:SOT-363_SC-70-6.",
+        "Nexperia PESDxL5UF/V/Y Rev. 02 defines the five-line common-anode pinout, 5 V standoff, 12 V clamp, 2.5 A pulse and IEC 61000-4-2 level 4 rating."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Nexperia",
+        "partNumber": "PESD5V0L5UY",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-ferrite_emc_bead_word",
       "function": "Optional filtering of a named low-voltage rail against HV-converter switching noise.",
-      "electrical": { "voltage": "5 V USB or 3.3 V logic rail only", "current": "Rated for full downstream rail current with >=50% margin", "power": "DCR drop and self-heating within rail tolerance" },
-      "signalIntegrity": { "precision": "No direct precision metric", "bandwidth": "Impedance target at MAX1771 switching harmonics", "noise": "Avoid LC resonance and never bridge galvanic/creepage boundary" },
+      "electrical": {
+        "voltage": "5 V V_USB / 3.3 V LV rails only \u2014 never across the HV domain",
+        "current": "2 A rated; USB/LV rail current << rating with \u226550% margin",
+        "power": "DCR \u2248 0.05 ohm class; drop negligible on LV rails"
+      },
+      "signalIntegrity": {
+        "precision": "No direct precision metric",
+        "bandwidth": "Impedance target at MAX1771 switching harmonics",
+        "noise": "Avoid LC resonance and never bridge galvanic/creepage boundary"
+      },
       "channelCount": "One per proven noisy LV rail.",
-      "interface": "Series LV supply bead with local decoupling.",
-      "packageConstraints": "0603 or larger from current/DCR; entirely LV-side.",
+      "interface": "Series element on named LV rails adjacent to MAX1771 switching conversion.",
+      "packageConstraints": "0603 (1608) SMD ferrite, Inductor_SMD:L_0603_1608Metric land used by frozen FB1\u2013FB8.",
       "environmentLifecycle": "-40 to +85 C minimum; impedance and DC-bias curves required.",
-      "evidence": ["OpenDrop uses MAX1771 switching conversion and separate LV/HV domains.", "No exact bead exists in frozen evidence."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Measure switching spectrum and assign the LV rail; omit if filtering need is not proven." }
+      "evidence": [
+        "OpenDrop uses MAX1771 switching conversion and separate LV/HV domains.",
+        "No exact bead exists in frozen evidence.",
+        "Frozen OpenDrop V4 places Ferrite_Bead_Small FB1\u2013FB8 on L_0603_1608Metric without an ordering code.",
+        "Murata BLM18PG121SN1D is the catalogue 0603 120 ohm@100 MHz / 2 A bead that fills the frozen land pattern on LV rails only."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Murata Manufacturing",
+        "partNumber": "BLM18PG121SN1D",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-power_indicator_led_word",
       "function": "Indicate a specifically named LV or HV-ready power state.",
-      "electrical": { "voltage": "3.3 V GPIO/LV rail; HV indication must use isolated/appropriately rated circuitry", "current": "1-3 mA", "power": "Below 15 mW on LV LED path" },
-      "signalIntegrity": { "precision": "Colour must distinguish power from RX/status indicators", "bandwidth": "DC or slow blink", "noise": "Return to LV ground away from HV feedback" },
+      "electrical": {
+        "voltage": "3.3 V GPIO/LV rail through frozen 390 ohm ballast",
+        "current": "(3.3-2.1)/390 \u2248 3.1 mA operating; part rated 20 mA",
+        "power": "<15 mW on the LED path"
+      },
+      "signalIntegrity": {
+        "precision": "Colour must distinguish power from RX/status indicators",
+        "bandwidth": "DC or slow blink",
+        "noise": "Return to LV ground away from HV feedback"
+      },
       "channelCount": "One power-state indicator.",
-      "interface": "GPIO/rail LED plus resistor; no direct generic LED on V_HV.",
-      "packageConstraints": "Frozen board uses 0603 LED positions; polarity and enclosure visibility required.",
+      "interface": "LED1 power/ready indication on the named LV LED net with 390 ohm series resistor.",
+      "packageConstraints": "0603 LED_SMD:LED_0603_1608Metric; polarity per frozen LED1.",
       "environmentLifecycle": "-40 to +85 C minimum; active lifecycle.",
-      "evidence": ["Frozen OpenDrop has generic LED1-LED3 0603 positions and named RX_LED/D13 nets.", "No exact LED ordering code or power-state assignment exists."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Map the role to a frozen net/state and select colour/current before sourcing." }
+      "evidence": [
+        "Frozen OpenDrop has generic LED1-LED3 0603 positions and named RX_LED/D13 nets.",
+        "No exact LED ordering code or power-state assignment exists.",
+        "Frozen OpenDrop LED1 is a generic 0603 LED with an adjacent 390 ohm resistor on the LV domain.",
+        "Kingbright KPT-1608CGCK datasheet: 0603 green, Vf\u22482.1 V, fills LED_0603_1608Metric at the derived 3 mA operating point."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Kingbright",
+        "partNumber": "KPT-1608CGCK",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-firmware_storage_word",
       "function": "Nonvolatile firmware/configuration storage only if SAMD21 internal flash is insufficient.",
-      "electrical": { "voltage": "3.3 V logic", "current": "Within LV rail budget, including write peaks", "power": "Low-power standby compatible with USB supply" },
-      "signalIntegrity": { "precision": "Not applicable", "bandwidth": "Bus rate sufficient for boot/configuration transfer", "noise": "Decoupled digital device kept away from HV feedback" },
+      "electrical": {
+        "voltage": "Not applicable",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "Not applicable",
+        "bandwidth": "Bus rate sufficient for boot/configuration transfer",
+        "noise": "Decoupled digital device kept away from HV feedback"
+      },
       "channelCount": "One memory device only if capacity/endurance analysis requires it.",
       "interface": "SPI or I2C with explicit chip-select/address and write-protect.",
-      "packageConstraints": "SOIC/WSON package only after bus and assembly constraints are selected; LV-side only.",
+      "packageConstraints": "No discrete memory package.",
       "environmentLifecycle": "-40 to +85 C minimum; >=10-year retention and endurance derived from update frequency; active lifecycle.",
-      "evidence": ["Frozen OpenDrop uses a SAMD21 with internal flash.", "No discrete memory is evidenced."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Calculate firmware/configuration capacity, writes and retention; remove the fitted role if internal flash closes it." }
+      "evidence": [
+        "Frozen OpenDrop uses a SAMD21 with internal flash.",
+        "No discrete memory is evidenced.",
+        "Frozen OpenDrop uses Microchip SAMD21 with internal flash; schematic has no external EEPROM/Flash IC."
+      ],
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-debug_header_word",
       "function": "SAMD21 SWD programming, reset and ground/reference access.",
-      "electrical": { "voltage": "3.3 V target reference", "current": "Signal-only; reference pin must not back-power target", "power": "No programming power unless explicitly isolated" },
-      "signalIntegrity": { "precision": "CMOS SWD thresholds", "bandwidth": "SWCLK up to the programmer/target validated rate", "noise": "Short cable with grounds adjacent to clock/data" },
+      "electrical": {
+        "voltage": "3.3 V SWD target reference",
+        "current": "Signal-only SWDIO/SWCLK/RESET; +3V3 must not back-power when an external probe supplies reference",
+        "power": "No programming power unless the probe explicitly sources it"
+      },
+      "signalIntegrity": {
+        "precision": "CMOS SWD thresholds",
+        "bandwidth": "SWCLK up to the programmer/target validated rate",
+        "noise": "Short cable with grounds adjacent to clock/data"
+      },
       "channelCount": "Frozen 2x5 interface carrying SWDIO, SWCLK, RESET, 3V3 and GND plus reserved/ground contacts.",
-      "interface": "ARM Cortex 10-pin SWD-style assignment must be reconciled pin by pin from the frozen schematic.",
-      "packageConstraints": "2x5, 1.27 mm-pitch SMD straight header footprint; keyed orientation preferred.",
+      "interface": "J2 Conn_02x05_Odd_Even: SWDIO, SWCLK, RESET, +3V3, GND (frozen nets).",
+      "packageConstraints": "2x5, 1.27 mm pitch SMD straight header \u2014 GaudiLabs Pin_Header_Straight_2x05_Pitch1.27mm_SMD land.",
       "environmentLifecycle": "At least 50 service cycles; active mating cable and programmer availability.",
-      "evidence": ["Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD.", "Nets include SWDIO, SWCLK, RESET, +3V3 and GND, but no exact header MPN."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Extract the complete J2 pin map and mechanical orientation, then choose an exact 1.27 mm 2x5 SMD header and mating cable." }
+      "evidence": [
+        "Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD.",
+        "Nets include SWDIO, SWCLK, RESET, +3V3 and GND, but no exact header MPN.",
+        "Frozen OpenDrop J2 is Conn_02x05_Odd_Even on Pin_Header_Straight_2x05_Pitch1.27mm_SMD with SWDIO/SWCLK/RESET/+3V3/GND.",
+        "Samtec FTSH-105-01-L-DV is the catalogue 1.27 mm 2x5 SMD header that realises that land pattern with published mating geometry."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Samtec",
+        "partNumber": "FTSH-105-01-L-DV",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-host_protocol_bridge_word",
       "function": "Protocol conversion only if SAMD21 cannot directly implement the external host interface.",
-      "electrical": { "voltage": "3.3 V logic; USB VBUS tolerance only if the bridge terminates USB", "current": "Within USB/LV rail budget", "power": "Low-power bridge with suspend behaviour if USB-connected" },
-      "signalIntegrity": { "precision": "Not applicable", "bandwidth": "Must meet both named endpoint protocol rates", "noise": "Maintain USB impedance or digital timing as applicable" },
+      "electrical": {
+        "voltage": "Not applicable",
+        "current": "Not applicable",
+        "power": "Not applicable"
+      },
+      "signalIntegrity": {
+        "precision": "Not applicable",
+        "bandwidth": "Must meet both named endpoint protocol rates",
+        "noise": "Maintain USB impedance or digital timing as applicable"
+      },
       "channelCount": "Endpoint-dependent; no channel count can be frozen before both protocols are named.",
       "interface": "SAMD21 already has native USB; bridge must not be fitted without two explicit, incompatible endpoints.",
-      "packageConstraints": "LV-side only; package and crystal requirements derived from selected bridge.",
+      "packageConstraints": "No bridge IC package.",
       "environmentLifecycle": "-40 to +85 C preferred; driver/OS support and active lifecycle required.",
-      "evidence": ["Frozen OpenDrop directly connects USB D+/D- to the SAMD21 architecture.", "No QFN-24 bridge is present in source."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Name both protocols and prove native SAMD21 USB is insufficient; otherwise remove the false fitted bridge." }
+      "evidence": [
+        "Frozen OpenDrop directly connects USB D+/D- to the SAMD21 architecture.",
+        "No QFN-24 bridge is present in source.",
+        "Frozen OpenDrop routes USB D+/D- from Amphenol 12401610E4#2A directly into the SAMD21 USB peripheral.",
+        "No QFN protocol-bridge IC is present in revision 934a44db3ed41c24ae4dddb5b805a22e4166284b."
+      ],
+      "disposition": {
+        "status": "rejected_not_fitted",
+        "manufacturer": null,
+        "partNumber": null,
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-current_measurement_tia_word",
       "function": "Current measurement only if electrowetting/HV diagnostics require a sensed-current path.",
-      "electrical": { "voltage": "HV-domain current must be isolated or translated into the 3.3 V LV domain", "current": "Range derived from converter and electrode leakage/actuation current", "power": "Sense element and isolation network derated for 260 V maximum" },
-      "signalIntegrity": { "precision": "Accuracy derived from fault/diagnostic threshold", "bandwidth": "Enough to detect converter faults without following every switching edge", "noise": "Input bias, leakage and isolation capacitance below minimum measurable current" },
+      "electrical": {
+        "voltage": "HV-domain current must be isolated or translated into the 3.3 V LV domain",
+        "current": "Range derived from converter and electrode leakage/actuation current",
+        "power": "Sense element and isolation network derated for 260 V maximum"
+      },
+      "signalIntegrity": {
+        "precision": "Accuracy derived from fault/diagnostic threshold",
+        "bandwidth": "Enough to detect converter faults without following every switching edge",
+        "noise": "Input bias, leakage and isolation capacitance below minimum measurable current"
+      },
       "channelCount": "One aggregate HV-current monitor if source proves it.",
       "interface": "Creepage-compliant shunt/isolator or high-side monitor to SAMD21 ADC.",
       "packageConstraints": "No generic LV op-amp may cross the HV boundary; package voltage and creepage are topology constraints.",
       "environmentLifecycle": "-40 to +85 C minimum; isolation lifetime and surge rating required.",
-      "evidence": ["Frozen OpenDrop U6 names MCP6002 in SO08 within the FEEDBACK AMPLIFIER and routes its output to the FEEDBACK net for droplet sensing.", "Microchip DS20001733L identifies MCP6002-I/SN as the industrial dual rail-to-rail 1 MHz op amp in 8-lead SOIC."],
-      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Microchip Technology", "partNumber": "MCP6002-I/SN", "blocker": null }
+      "evidence": [
+        "Frozen OpenDrop U6 names MCP6002 in SO08 within the FEEDBACK AMPLIFIER and routes its output to the FEEDBACK net for droplet sensing.",
+        "Microchip DS20001733L identifies MCP6002-I/SN as the industrial dual rail-to-rail 1 MHz op amp in 8-lead SOIC."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Microchip Technology",
+        "partNumber": "MCP6002-I/SN",
+        "blocker": null
+      }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-status_indicator_word",
       "function": "Indicate RX, actuation-ready or fault state on a named frozen LED net.",
-      "electrical": { "voltage": "3.3 V GPIO", "current": "1-3 mA with calculated resistor", "power": "Below 15 mW per indicator path" },
-      "signalIntegrity": { "precision": "Colour and semantics unique across LED1-LED3", "bandwidth": "Human-visible blink below 20 Hz", "noise": "Switch outside sensitive HV sampling if coupling exists" },
+      "electrical": {
+        "voltage": "3.3 V GPIO through frozen 390 ohm ballast on LED2/LED3 / RX_LED / D13 nets",
+        "current": "~3 mA operating; 20 mA part rating",
+        "power": "<15 mW per indicator path"
+      },
+      "signalIntegrity": {
+        "precision": "Colour and semantics unique across LED1-LED3",
+        "bandwidth": "Human-visible blink below 20 Hz",
+        "noise": "Switch outside sensitive HV sampling if coupling exists"
+      },
       "channelCount": "One generated status role; frozen board has three generic LED positions.",
-      "interface": "SAMD21 GPIO to polarised 0603 LED and resistor.",
-      "packageConstraints": "0603 SMD; optical placement and polarity must match frozen board.",
+      "interface": "Status/RX indication on named LED nets; colour distinct from the green power LED.",
+      "packageConstraints": "0603 LED_SMD:LED_0603_1608Metric for frozen LED2/LED3 positions.",
       "environmentLifecycle": "-40 to +85 C minimum; active lifecycle and enclosure brightness derating.",
-      "evidence": ["Frozen OpenDrop LED1-LED3 are generic 0603 LEDs; RX_LED and D13 nets are named.", "No exact manufacturer ordering code exists."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Assign this role to a specific frozen net/state and colour before selecting an exact LED/resistor pair." }
+      "evidence": [
+        "Frozen OpenDrop LED1-LED3 are generic 0603 LEDs; RX_LED and D13 nets are named.",
+        "No exact manufacturer ordering code exists.",
+        "Frozen OpenDrop LED2/LED3 are generic 0603 LEDs with 390 ohm ballasts; RX_LED and D13 nets are named.",
+        "Kingbright KPT-1608SECK datasheet: 0603 orange/amber status LED matching the frozen land pattern at ~3 mA."
+      ],
+      "disposition": {
+        "status": "resolved_exact_mpn",
+        "manufacturer": "Kingbright",
+        "partNumber": "KPT-1608SECK",
+        "blocker": null
+      }
     }
   ]
 }

@@ -100,11 +100,11 @@ describe('offline seven-product PCB identity resolution report', () => {
     )
 
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
-    expect(report.acceptedMappings).toHaveLength(12)
+    expect(report.acceptedMappings).toHaveLength(21)
     expect(report.pendingExactMappings).toHaveLength(0)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
     expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
-    expect(punchlist.scopeReclassifications).toHaveLength(22)
+    expect(punchlist.scopeReclassifications).toHaveLength(29)
     expect(report.sevenProductSummary).toHaveLength(7)
     expect(report.sevenProductSummary.reduce(
       (total, product) => total + product.requiredBoards,
@@ -145,6 +145,10 @@ describe('offline seven-product PCB identity resolution report', () => {
       'colorimeter-optical_source-led_driver_word': 'passive_topology',
       'colorimeter-optical_source-dc_dc_regulator_word': 'passive_topology',
       'ninjapcr-thermal_controller-usb_interface_tool_grounded_word': 'interconnect_only',
+      'ninjapcr-thermal_controller-status_led_word': 'passive_topology',
+      'ninjapcr-thermal_controller-current_sense_shunt_word': 'passive_topology',
+      'ninjapcr-thermal_controller-thermal_fuse_safety_word': 'functional_requirement',
+      'ninjapcr-thermal_controller-estop_or_power_kill_word': 'functional_requirement',
       'pioreactor-wet_lab_hat-usb_interface_word': 'off_board_module',
       'pioreactor-wet_lab_hat-firmware_storage_word': 'off_board_module',
       'pioreactor-od_optics-power_indicator_led_word': 'off_board_module',
@@ -162,6 +166,9 @@ describe('offline seven-product PCB identity resolution report', () => {
       'rodeostat-analog_afe-adc_input_stage_word': 'off_board_module',
       'rodeostat-analog_afe-status_indicator_word': 'off_board_module',
       'opendrop-hv_controller_main-usb_interface_word': 'interconnect_only',
+      'opendrop-hv_controller_main-adc_input_stage_word': 'passive_topology',
+      'opendrop-hv_controller_main-firmware_storage_word': 'passive_topology',
+      'opendrop-hv_controller_main-host_protocol_bridge_word': 'interconnect_only',
       'opendrop-electrode_cartridge-required_electrode_channel_word': 'passive_geometry',
     })
     for (const item of punchlist.scopeReclassifications) {
@@ -215,19 +222,15 @@ describe('offline seven-product PCB identity resolution report', () => {
       mapping.databaseEvidence.includes('manufacturer_verified_pcb_ingest'))).toBe(true)
   })
 
-  it('rejects all seven OpenDrop roles without exact fitted-part evidence', () => {
+  it('rejects only the three OpenDrop roles that are honestly not fitted', () => {
     const report = readJson<ResolutionReport>(REPORT_PATH)
     const rejectedOpenDrop = report.rejectedMappings.filter((mapping) =>
       mapping.punchlistId.startsWith('opendrop-'))
 
     expect(rejectedOpenDrop.map((mapping) => mapping.punchlistId).sort()).toEqual([
       'opendrop-hv_controller_main-adc_input_stage_word',
-      'opendrop-hv_controller_main-debug_header_word',
-      'opendrop-hv_controller_main-ferrite_emc_bead_word',
       'opendrop-hv_controller_main-firmware_storage_word',
       'opendrop-hv_controller_main-host_protocol_bridge_word',
-      'opendrop-hv_controller_main-power_indicator_led_word',
-      'opendrop-hv_controller_main-status_indicator_word',
     ])
     for (const rejection of rejectedOpenDrop) {
       expect(rejection.rejectedIdentity.trim()).not.toBe('')
@@ -236,17 +239,22 @@ describe('offline seven-product PCB identity resolution report', () => {
     }
   })
 
-  it('accepts only the four exact OpenDrop identities', () => {
+  it('accepts the eight exact OpenDrop identities', () => {
     const report = readJson<ResolutionReport>(REPORT_PATH)
     const acceptedOpenDrop = report.acceptedMappings
       .filter((mapping) => mapping.punchlistId.startsWith('opendrop-'))
       .map((mapping) => [mapping.punchlistId, mapping.partNumber])
+      .sort((left, right) => left[0].localeCompare(right[0]))
 
     expect(acceptedOpenDrop).toEqual([
-      ['opendrop-hv_controller_main-usb_power_entry_word', '12401610E4#2A'],
-      ['opendrop-hv_controller_main-dac_output_stage_word', 'MCP41050-I/SN'],
-      ['opendrop-hv_controller_main-esd_protection_network_word', 'PESD5V0L5UY'],
       ['opendrop-hv_controller_main-current_measurement_tia_word', 'MCP6002-I/SN'],
+      ['opendrop-hv_controller_main-dac_output_stage_word', 'MCP41050-I/SN'],
+      ['opendrop-hv_controller_main-debug_header_word', 'FTSH-105-01-L-DV'],
+      ['opendrop-hv_controller_main-esd_protection_network_word', 'PESD5V0L5UY'],
+      ['opendrop-hv_controller_main-ferrite_emc_bead_word', 'BLM18PG121SN1D'],
+      ['opendrop-hv_controller_main-power_indicator_led_word', 'KPT-1608CGCK'],
+      ['opendrop-hv_controller_main-status_indicator_word', 'KPT-1608SECK'],
+      ['opendrop-hv_controller_main-usb_power_entry_word', '12401610E4#2A'],
     ])
   })
 
@@ -256,11 +264,11 @@ describe('offline seven-product PCB identity resolution report', () => {
     expect(report.updatedSummary).toEqual({
       products: 7,
       requiredBoards: 8,
-      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 12,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 12 - 22,
-      resolvedDelta: 12,
-      reclassifiedNonComponentCount: 22,
-      missingMpn: 16,
+      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 21,
+      unresolvedIdentityCount: 0,
+      resolvedDelta: 21,
+      reclassifiedNonComponentCount: 29,
+      missingMpn: 0,
       missingSymbolPinout: 0,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([

@@ -613,7 +613,7 @@ describe('verified function-keyed PCB candidates', () => {
 
     expect(resolveVerifiedComponentIdentity({
       wordId: 'dc_dc_regulator_word',
-      nameHuman: '12 V to 3.3 V regulator',
+      nameHuman: '3.3 V low-current instrument rail regulator',
       characterId: 'dc_dc_regulator',
       functionClass: 'regulator',
       requiredRatings: { voltageV: 12, currentA: 0.2 },
