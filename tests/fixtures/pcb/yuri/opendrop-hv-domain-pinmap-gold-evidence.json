@@ -1,0 +1,42 @@
+{
+  "schema": "opendrop-hv-domain-pinmap-gold-evidence/v1",
+  "sourceCommit": "934a44db3ed41c24ae4dddb5b805a22e4166284b",
+  "briefElectrodeChannelFloor": 64,
+  "mainBoardSchematicRelativePath": "OpenDropV4/Electronics/OpenDropV4_MainBoard/PCB/OpenDropV4.sch",
+  "cartridgeSchematicRelativePath": "OpenDropV4/Electronics/CartridgeV4/DIMMCartridgeV4/DIMMCartridgeV4.sch",
+  "footprintRelativePath": "KiCadLibrary/GaudiLabsFootPrints.pretty/Mini_Dimm_Cartridge_06_244.kicad_mod",
+  "matingFamily": "Mini_Dimm",
+  "matingPadCount": 244,
+  "hvGeneratorPart": "MAX1771ESA",
+  "isolationPart": "TLP222A",
+  "isolationPartCount": 4,
+  "mainRequiredNets": [
+    "V_HV",
+    "V_HV_C",
+    "GND_C",
+    "V_USB"
+  ],
+  "cartridgeRequiredNets": [
+    "V_HV_C",
+    "GND_C"
+  ],
+  "mainObservedNets": [
+    "V_HV",
+    "V_HV_C",
+    "GND_C",
+    "V_USB"
+  ],
+  "cartridgeObservedNets": [
+    "V_HV_C",
+    "GND_C"
+  ],
+  "electrodeNetFamily": "FLUXL_",
+  "fluxlElectrodeRefCount": 132,
+  "lvHostNet": "V_USB",
+  "notes": [
+    "Gold OpenDrop V4 main board generates HV (MAX1771ESA on V_HV) and mates cartridge HV rail V_HV_C / return GND_C through Mini-DIMM.",
+    "TLP222A optocouplers (4\u00d7) isolate HV switching from LV logic \u2014 architecture must keep isolate_high_voltage work on hv_controller_main.",
+    "V_USB is a separate LV host rail \u2014 electrode/FLUXL nets must never be classified as USB/LV-only.",
+    "Cartridge carries V_HV_C + GND_C + FLUXL_* electrode array; pin-map class contract is power/return vs electrode array."
+  ]
+}
