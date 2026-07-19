@@ -2393,6 +2393,27 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
         new_line = max(0.01, round(old_line * scale, 2))
         r["line_gbp"] = new_line
         r["unit_gbp"] = round(new_line / qy, 2)
+        # C3 roll-up invariant (H-101 fix 2026-07-19): the sub-component breakdown_gbp
+        # values were computed from the PRE-rescale parent line (requirements_bom.py kid
+        # breakdown pass runs BEFORE this rescale), so parts_ledger's
+        # subcomponent_gbp = Σ breakdown_gbp still sums to the OLD line (£60) while the
+        # parent line is now rescaled (£27.65) → deterministic_checks_lib C3 FAILs
+        # (Σ sub-components ≠ line total). Scale each SUB-COMPONENT child by the SAME
+        # applied ratio (eff = new/old, honouring the max(0.01) floor) so the kids sum
+        # back to new_line exactly. Universal: keyed on tag-prefix + SUB-COMPONENT
+        # status, no per-class table.
+        _ptag = str(r.get("tag") or "")
+        if _ptag and old_line > 0:
+            _eff = new_line / old_line
+            # canonical parent↔child link is `sub_of == parent tag` (same key the corpus
+            # lift's child-rescale uses via kids_by_tag) — not a tag-regex.
+            for _kr in rows:  # full list — `priced` filtered SUB-COMPONENT rows out
+                if _kr.get("status") != "SUB-COMPONENT" or _kr.get("sub_of") != _ptag:
+                    continue
+                if _kr.get("breakdown_gbp"):
+                    _kr["breakdown_gbp"] = round(float(_kr["breakdown_gbp"]) * _eff, 2)
+                if _kr.get("unit_gbp"):
+                    _kr["unit_gbp"] = round(float(_kr["unit_gbp"]) * _eff, 2)
         r["basis"] = (
             (str(r.get("basis") or "") + " · ").lstrip(" ·")
             + f"{cal}instrument gold-band rescale ×{scale:.3f} "
@@ -3426,6 +3447,31 @@ def _selftest() -> int:
         print(f"  FAIL gold mid must beat wrong macro (£184 not £460), got {_tgt_gold}"); bad += 1
     if _tgt_oi != 125.0:
         print(f"  FAIL optical_instrument gold mid £125, got {_tgt_oi}"); bad += 1
+    # proveCatch (H-101 roll-up, 2026-07-19): when a parametric PRINCIPAL with
+    # SUB-COMPONENT children is gold-rescaled, the children's breakdown_gbp must be
+    # scaled by the SAME ratio so Σ(children.breakdown_gbp) == parent.line_gbp stays
+    # true (deterministic_checks_lib C3 / parts_ledger subcomponent_gbp invariant).
+    # Before the fix the kids summed to the PRE-rescale line (£1000) while the parent
+    # rescaled to ~£184 → BoM <tag> FAIL.
+    _saved_h101 = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _h101_rows = [
+        {"tag": "H-101", "requirement": "Cartridge Heater", "unit_gbp": 1000.0,
+         "line_gbp": 1000.0, "qty": 1, "status": "NOT FOUND", "basis": "parametric"},
+        {"tag": "H-101.1", "status": "SUB-COMPONENT", "sub_of": "H-101",
+         "unit_gbp": 600.0, "line_gbp": 0, "breakdown_gbp": 600.0, "basis": "kid"},
+        {"tag": "H-101.2", "status": "SUB-COMPONENT", "sub_of": "H-101",
+         "unit_gbp": 400.0, "line_gbp": 0, "breakdown_gbp": 400.0, "basis": "kid"},
+    ]
+    _rescale_instrument_materials_to_gold(
+        _h101_rows, {"orchestratorContract": {"macro_assembly_total_gbp": 184}})
+    _IS_INSTRUMENT_DEVICE = _saved_h101
+    _h_parent = next(r for r in _h101_rows if r["tag"] == "H-101")
+    _h_kidsum = round(sum(r["breakdown_gbp"] for r in _h101_rows
+                          if r.get("sub_of") == "H-101"), 2)
+    if abs(_h_kidsum - float(_h_parent["line_gbp"])) > 1.0:
+        print(f"  FAIL H-101 roll-up: Σ children £{_h_kidsum} ≠ parent line "
+              f"£{_h_parent['line_gbp']} after gold rescale"); bad += 1
     # proveCatch (Poseidon 2026-07-17): catalogue polyfuse must KEEP £1.41 while
     # parametric over-bill absorbs gold rescale — uniform scale crushed it to £0.22.
     _saved_cat = _IS_INSTRUMENT_DEVICE
