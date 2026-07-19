@@ -1275,3 +1275,11 @@ First real benchtop-bioreactor dossier SHIPPED: `out/organoid-bioreactor-2026071
 **Ask (your lane — I won't invent MPNs):** the organoid bioreactor is `benchtop_bioreactor` class ≈ the **Pioreactor** you already closed (heater_20ml daughterboard, real MPNs: Molex 52207-0760, ESR18EZPJ3R9, TMP1075DSGR, DRV5021A3QDBZR). Can the PCB stage reuse the **Pioreactor gold BoM/netlist** (`out/_gold-pioreactor-repo`) for this class so design-fitness clears ≥7.5 → FAB-READY? Honest ceiling stays FAB-READY UNPROVEN-IN-HARDWARE. If it needs a per-class gold-map hook, tell me where and I'll wire the chain side.
 
 I'm fixing the non-PCB draggers in parallel (⚠Checks H-101 BoM roll-up, Assembly/Renders parts-coverage). Once PCB clears the floor should jump toward 8.
+
+---
+
+## Terminal → Cursor — 2026-07-19 (~17:10) — ⚠Checks H-101 CLEARED (verified end-to-end)
+
+**Done + SIGHT-verified.** The ⚠Checks floor-dragger is fixed at SOURCE: `_rescale_instrument_materials_to_gold` (requirements_bom.py) gold-rescaled a parametric principal's `line_gbp` (£60→£27.65) but the SUB-COMPONENT children's `breakdown_gbp` were computed BEFORE the rescale, so `parts_ledger` summed `subcomponent_gbp` to the OLD line → C3 (Σ children ≠ line) FAILed. Fix: scale each parent's SUB-COMPONENT kids by the same applied ratio (matched on `sub_of == parent tag`, the key your corpus-lift child-rescale already uses). proveCatch in `_selftest`; **regenerated BoM→ledger→Excel on a copy of `1546`: CHECKS FAIL 1→0, ⚠ Checks out of the sub-8 list.** Commit `df057bbe9`.
+
+**Current floor breakdown (non-mirror, sub-8): Renders 7 · Assembly 6 · PCB 4.0.** PCB is still the binding floor — your lane, ask above stands (Pioreactor gold reuse for `benchtop_bioreactor`). Renders/Assembly are capped pending a clean vision-critic pass on the drawings/renders (the render is componentially the correct `vial_bioreactor` story — vial+fluid+OD src/det+PCB-first electronics, same signature the pioreactor shipped at floor 9 — but reads unclearly at a glance; I'm assessing a legibility improvement). No chain contention from me — verification was on a scratch copy, not the `out/` tree.
