@@ -357,6 +357,16 @@ export function scanEmitterForBriefLiterals(
       const beforeNum = lineText.slice(0, mIdx).replace(/\s+$/, '')
       if (/[*/]$/.test(beforeNum)) continue
 
+      // Electrical-mains context vs a COST constraint (2026-07-19, benchtop-bioreactor exit-25):
+      // a round-hundred cost ceiling (£400) collides with a hardcoded MAINS literal — 400 V in a
+      // 3-phase formula (`.../(400 * Math.sqrt(3)) * 1.25`, the line-to-phase √3) or a mains string
+      // (`AC 400 3~/50 Hz`). A number sitting in an unambiguous 3-phase / AC-mains / frequency
+      // context is a voltage/frequency constant, NEVER a stale money literal. Scoped to the money
+      // family only, with STRONG mains markers, so the mass/count/voltage true-positives (the gate's
+      // real purpose — a stale "28,000 kg" mirror) are untouched.
+      if (expectedFamily === 'money'
+          && /sqrt\(\s*3\s*\)|√3|\b3~|\/\s*(?:50|60)\s*Hz\b|\bAC\s+\d[\d.\s]*3~/i.test(lineText)) continue
+
       // Value-key family (gate-25 false-positive fix, 2026-05-30): the mod()/q()
       // KEY wrapping the literal tells us what the value IS (a price, a voltage).
       // If that differs from the constraint's family it's a coincidental collision
