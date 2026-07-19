@@ -8,8 +8,18 @@
 
 **Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb`.
 
-**Status:** `WAITING_ON_CURSOR` for form; **PCB residuals 0** + **OpenDrop electrode route/mating proveCatch landed**
-**Updated:** 2026-07-19 ~04:50 BST
+**Status:** `WAITING_ON_CURSOR` for form; **PCB residuals 0** + electrode mating proof + Pioreactor heater topology partial
+**Updated:** 2026-07-19 ~04:55 BST
+
+---
+
+## Cursor production note — 2026-07-19 ~04:55 BST (Pioreactor heater topology)
+
+Froze `out/_gold-pioreactor-repo` @ `ca40a91e` (main checkout; not committed).
+
+**Gold SIGHT:** `heater_20ml` is a resistive FFC daughterboard — Molex `52207-0760`, 15× Rohm `ESR18EZPJ3R9`, TI `TMP1075DSGR` + `DRV5021A3QDBZR`. No MOSFET on that PCB. `hats/` submodule is `raspberrypi/hats` EEPROM utils — **not** Pioreactor HAT electricals.
+
+**Landed:** `pcb-pioreactor-wet-actuation-topology.ts` proveCatch (rejects DRV8876-as-heater; keeps switch `off_board_host_hat`). Stir/pump remain blocked on unpublished HAT.
 
 ---
 

@@ -1,0 +1,62 @@
+{
+  "schema": "pioreactor-heater-channel-topology/v1",
+  "sourceCommit": "ca40a91e728801b139b1086853f7cf74ce76def9",
+  "sourceRepo": "https://github.com/Pioreactor/hardware",
+  "boardPath": "heater_20ml/Heater_Jan_0824_Public",
+  "channelRole": "heater_channel",
+  "topologyKind": "ffc_mated_resistive_heater_with_sense",
+  "constituents": [
+    {
+      "role": "host_ffc_connector",
+      "manufacturer": "Molex",
+      "partNumber": "52207-0760",
+      "package": "FFC/FPC 7-pos 1.00 mm right-angle top-contact",
+      "evidence": "Heater BOM J1 / Digi-Key WM3818TR-ND"
+    },
+    {
+      "role": "resistive_heater_element",
+      "manufacturer": "Rohm",
+      "partNumber": "ESR18EZPJ3R9",
+      "package": "1206 3.9 ohm 0.5 W",
+      "quantity": 15,
+      "evidence": "Heater BOM R12–R28 (15×) / Digi-Key RHM3.9ITR-ND — the heating load, not a series ballast"
+    },
+    {
+      "role": "temperature_sense_ic",
+      "manufacturer": "Texas Instruments",
+      "partNumber": "TMP1075DSGR",
+      "package": "WSON-8",
+      "evidence": "Heater BOM U1 / Digi-Key 296-TMP1075DSGRTR-ND; i2c 0x4F in heater_tests.py"
+    },
+    {
+      "role": "magnetic_lid_sense_ic",
+      "manufacturer": "Texas Instruments",
+      "partNumber": "DRV5021A3QDBZR",
+      "package": "SOT-23",
+      "evidence": "Heater BOM U2 / Digi-Key 296-DRV5021A3QDBZRCT-ND; HALL_SENSOR_PIN in heater_tests.py"
+    }
+  ],
+  "powerSwitch": {
+    "placement": "off_board_host_hat",
+    "status": "unpublished_in_gold_hardware_repo",
+    "evidence": [
+      "heater_20ml BOM contains no MOSFET, gate driver, or polyfuse — only resistive loads + FFC + sense ICs.",
+      "hats/ submodule is raspberrypi/hats EEPROM utils, not the Pioreactor HAT schematic/BOM.",
+      "Heating correlation test drives heat from the host HAT side (pioreactor.actions.self_test)."
+    ]
+  },
+  "forbiddenSubstitutions": [
+    {
+      "partNumber": "DRV8876PWPR",
+      "reason": "Brushed-DC motor driver is not the gold heater topology; heater_20ml is a resistive FFC daughterboard."
+    }
+  ],
+  "stirPumpChannels": {
+    "status": "blocked_unpublished_hat_electricals",
+    "evidence": "No stir/pump PCB or HAT KiCad/BOM is published at ca40a91e in Pioreactor/hardware."
+  },
+  "notes": [
+    "Freeze path: out/_gold-pioreactor-repo @ ca40a91e (main checkout; not committed).",
+    "This closes the heater channel *daughterboard* decomposition; the HAT-side switch remains an honest off-board obligation."
+  ]
+}

@@ -126,15 +126,15 @@
       "product": "Pioreactor",
       "placement": "functional_requirement",
       "wholeSystemOwner": "wet_actuation heater channel contract",
-      "evidence": "The word was synthesized from a channel requirement and is not a manufacturer-orderable package or topology.",
-      "retainedFunction": "One heater channel remains mandatory until real switch, protection, connector, and sensing components implement it."
+      "evidence": "Gold heater_20ml @ ca40a91e is a resistive FFC daughterboard (Molex 52207-0760, 15\u00d7 ESR18EZPJ3R9, TMP1075DSGR, DRV5021A3QDBZR). The channel function remains mandatory; the power switch is off-board on the unpublished host HAT \u2014 not a fitted package identity on wet_actuation.",
+      "retainedFunction": "One heater channel remains mandatory: FFC-mated resistive heater + sense on heater_20ml, driven by the host HAT switch/protection topology."
     },
     {
       "id": "pioreactor-wet_actuation-required_stir_channel_word",
       "product": "Pioreactor",
       "placement": "functional_requirement",
       "wholeSystemOwner": "wet_actuation stir channel contract",
-      "evidence": "The word was synthesized from a channel requirement; mapping the requirement itself to one generic driver package hides the complete motor circuit.",
+      "evidence": "No stir/pump PCB or Pioreactor HAT KiCad/BOM is published at ca40a91e; hats/ submodule is raspberrypi/hats EEPROM tooling only. Channel stays a functional requirement without inventing a motor-driver package.",
       "retainedFunction": "One stir channel remains mandatory pending a ratings-closed driver and connector topology."
     },
     {
@@ -142,7 +142,7 @@
       "product": "Pioreactor",
       "placement": "functional_requirement",
       "wholeSystemOwner": "wet_actuation dosing-pump channel contract",
-      "evidence": "The word was synthesized from a channel requirement and does not identify the pump switch, protection, connector, or current path.",
+      "evidence": "No stir/pump PCB or Pioreactor HAT KiCad/BOM is published at ca40a91e; hats/ submodule is raspberrypi/hats EEPROM tooling only. Channel stays a functional requirement without inventing a motor-driver package.",
       "retainedFunction": "One dosing-pump channel remains mandatory pending a real component topology."
     },
     {
@@ -1086,18 +1086,24 @@
           "wordId": "required_heater_channel_word",
           "characterId": "heater_channel_driver",
           "requiredRatings": {
-            "status": "unproven",
+            "status": "topology_partially_verified",
             "requirements": [
-              "one heater channel"
+              "heater channel FFC interconnect",
+              "resistive heater load elements",
+              "temperature + lid sense",
+              "host-HAT power switch (off-board)"
             ],
             "missing": [],
             "evidence": [
-              "Architecture requires one channel but the offline report contains no electrical rating or MPN."
+              "Gold heater_20ml @ ca40a91e BOM: Molex 52207-0760 FFC, 15\u00d7 Rohm ESR18EZPJ3R9 3.9\u03a9 heaters, TI TMP1075DSGR, TI DRV5021A3QDBZR.",
+              "No MOSFET/gate-driver/polyfuse on heater PCB \u2014 power switch remains off_board_host_hat (HAT KiCad unpublished; hats/ submodule is raspberrypi/hats EEPROM utils only).",
+              "Offline topology proveCatch: pcb-pioreactor-wet-actuation-topology.ts rejects DRV8876-as-heater.",
+              "Fixture: tests/fixtures/pcb/yuri/pioreactor-heater-channel-topology.json"
             ]
           },
           "missingEvidence": {
-            "kind": "mpn",
-            "details": "No manufacturer/MPN for the heater switching channel."
+            "kind": "unpublished_hat_switch",
+            "details": "Heater daughterboard identities are gold-closed. Remaining gap is the host-HAT heater drive switch/protection topology, which is not published in Pioreactor/hardware @ ca40a91e."
           },
           "sourceCandidate": {
             "identity": "Pioreactor released heater_20ml switching stage",
@@ -1106,12 +1112,12 @@
             "disposition": "candidate_only"
           },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
+            "action": "topology_partial_recorded",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-pioreactor-wet-actuation-topology.ts",
             "acceptance": [
-              "Extract heater voltage/current and released topology from the frozen board.",
-              "Resolve exact switch/driver/connector MPNs with datasheets.",
-              "Ingest and map complete symbols before layout."
+              "Gold heater_20ml constituents recorded with exact MPNs.",
+              "Power switch placement remains off_board_host_hat until HAT electricals are published.",
+              "proveCatch rejects DRV8876PWPR as heater-channel driver."
             ]
           }
         },
@@ -2082,18 +2088,19 @@
           "wordId": "required_stir_channel_word",
           "characterId": "stir_channel_driver",
           "requiredRatings": {
-            "status": "unproven",
+            "status": "blocked_unpublished_hat",
             "requirements": [
               "one stir motor channel"
             ],
             "missing": [],
             "evidence": [
-              "Offline report names DRV8876PWPR but carries no complete local symbol or board-specific ratings."
+              "Pioreactor/hardware @ ca40a91e publishes heater_20ml + eye-spy only; no stir/pump PCB and no Pioreactor HAT schematic/BOM (hats/ is raspberrypi/hats EEPROM utils).",
+              "Channel remains a mandatory wet_actuation function until host-HAT motor/pump drive identities are published or measured."
             ]
           },
           "missingEvidence": {
-            "kind": "symbol_pinout",
-            "details": "DRV8876PWPR is DB-verified but local KiCad lacks a complete Driver_Motor:DRV8876 symbol."
+            "kind": "unpublished_hat_electricals",
+            "details": "Stir/pump drive topologies live on the unpublished Pioreactor HAT. Do not invent DRV8876 (or any motor driver) without HAT BOM/schematic evidence."
           },
           "sourceCandidate": {
             "identity": "Texas Instruments DRV8876PWPR",
@@ -2121,18 +2128,19 @@
           "wordId": "required_pump_channel_word",
           "characterId": "pump_channel_driver",
           "requiredRatings": {
-            "status": "unproven",
+            "status": "blocked_unpublished_hat",
             "requirements": [
               "one dosing pump channel"
             ],
             "missing": [],
             "evidence": [
-              "Offline report names DRV8876PWPR but carries no complete local symbol or board-specific ratings."
+              "Pioreactor/hardware @ ca40a91e publishes heater_20ml + eye-spy only; no stir/pump PCB and no Pioreactor HAT schematic/BOM (hats/ is raspberrypi/hats EEPROM utils).",
+              "Channel remains a mandatory wet_actuation function until host-HAT motor/pump drive identities are published or measured."
             ]
           },
           "missingEvidence": {
-            "kind": "symbol_pinout",
-            "details": "DRV8876PWPR is DB-verified but local KiCad lacks a complete Driver_Motor:DRV8876 symbol."
+            "kind": "unpublished_hat_electricals",
+            "details": "Stir/pump drive topologies live on the unpublished Pioreactor HAT. Do not invent DRV8876 (or any motor driver) without HAT BOM/schematic evidence."
           },
           "sourceCandidate": {
             "identity": "Texas Instruments DRV8876PWPR",

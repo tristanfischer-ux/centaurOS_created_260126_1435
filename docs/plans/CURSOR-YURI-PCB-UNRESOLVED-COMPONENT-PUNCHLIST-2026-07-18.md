@@ -252,6 +252,6 @@ These **29 evidence-backed non-components** are removed from fitted BOM scope wi
 
 1. **Fitted-identity residual is closed at 0** — NinjaPCR heater current (1.79 A @ 12 V from gold film) plus OpenDrop land-pattern catalogue fills closed the last 16 MPN gaps; seven roles were honestly rejected/reclassified as not fitted.
 2. **OpenDrop electrode route/mating proveCatch is recorded** — see `pcb-opendrop-electrode-route-proof.ts`. Creepage/alignment still need board regen.
-3. **Implement preserved Pioreactor function contracts** — heater/stir/pump channel topologies still need gold-backed switch/protection/connector identities (`needs-gold-first` until `_gold-pioreactor-repo` is frozen).
+3. **Pioreactor heater daughterboard topology is partially recorded** — gold `heater_20ml` @ `ca40a91e` decomposes FFC + resistive heaters + sense ICs (`pcb-pioreactor-wet-actuation-topology.ts`). Host-HAT heater switch + stir/pump drives remain blocked until Pioreactor publishes HAT electricals (current `hats/` submodule is only `raspberrypi/hats` EEPROM tooling).
 4. **Keep rejected candidates rejected** — do not reintroduce thermal fuses, e-stops, shunts, discrete OpenDrop ADCs/bridges/memory, or unconstrained 500 mA continuous on the NinjaPCR 12 V LDO without new gold evidence.
 5. **Regenerate boards / firmware proofs** — terminal-owned chain / Cursor firmware-proof wiring. This document records offline identity + geometry proof only; it does not claim a pipeline rerun.
