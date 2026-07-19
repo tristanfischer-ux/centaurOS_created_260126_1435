@@ -16429,7 +16429,18 @@ def tab_electrical(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]
 # selection — the prior 0.8 weight capped that shape at 8.0 forever, so a DRC-clean
 # instrument PCBA could never clear a ≥9 sheet floor without near-complete MPN coverage.
 # function_class stays 0.2 (role guess only). mpn_package stays 1.0. proveCatch updated.
-_PCB_TIER_WEIGHT = {"mpn_package": 1.0, "package_family": 0.9, "function_class": 0.2}
+# TIER VOCABULARY must match the atopile-generator's resolutionTier names (2026-07-19):
+# the generator emits `mpn_symbol_footprint` (DB-verified manufacturer/MPN + role-compatible
+# symbol+footprint — the HIGHEST tier) and `mpn_package_only` (real MPN + package, no symbol),
+# NOT the legacy `mpn_package`. Omitting them made the scorer treat 10 fully-MPN'd parts as the
+# 0.2 default (function_class-level) → a genuinely fab-grade 16-part board read design-fitness
+# 4.2 with "11 of 16 function_class" (a false-UNVERIFIED, as dishonest as a false-PASS). All
+# three MPN/catalogue tiers are verified; only function_class/unresolved are not.
+_PCB_TIER_WEIGHT = {
+    "mpn_symbol_footprint": 1.0, "mpn_package": 1.0, "mpn_package_only": 0.95,
+    "package_family": 0.9, "function_class": 0.2,
+}
+_PCB_VERIFIED_TIERS = ("mpn_symbol_footprint", "mpn_package", "mpn_package_only", "package_family")
 
 
 def _pcb_effective_tier(comp: dict) -> str:
@@ -16453,7 +16464,7 @@ def _pcb_fitness_axis(tiers: Dict[str, int]) -> Tuple[float, int, int]:
     verified part. Pure, no I/O — proveCatch in _selftest, both directions. Returns
     (score_0_10, resolved_n, verified_n)."""
     resolved_n = sum(int(v or 0) for v in tiers.values())
-    verified_n = int(tiers.get("mpn_package", 0)) + int(tiers.get("package_family", 0))
+    verified_n = sum(int(tiers.get(t, 0) or 0) for t in _PCB_VERIFIED_TIERS)
     if resolved_n == 0:
         return 0.0, 0, 0
     weighted = sum(_PCB_TIER_WEIGHT.get(tier, 0.2) * int(n or 0) for tier, n in tiers.items())
@@ -31428,6 +31439,27 @@ def _selftest() -> int:
     if not (_cl_score >= 9.0 and _cl_resolved == 10 and _cl_verified == 10):
         print(f"  FAIL pcb-fitness-axis proveNoFalsePositive: a verified-tier BoM (9 "
               f"mpn_package + 1 package_family) must score >=9/10, got {_cl_score!r}"); bad += 1
+    # proveCatch (2026-07-19, benchtop_bioreactor 2150 false-UNVERIFIED): the atopile
+    # generator emits `mpn_symbol_footprint` (real MPN + symbol + footprint, the HIGHEST
+    # tier) + `mpn_package_only`, NOT the legacy `mpn_package`. The scorer's tier map/
+    # verified set MUST recognise them, or a genuinely fab-grade 16-part board (10
+    # mpn_symbol_footprint + 5 package_family + 1 mpn_package_only, real MPNs like
+    # ATSAMD21G18A-AU / TMP1075DSGR) reads design-fitness 4.2 with "11 of 16
+    # function_class" — a false-UNVERIFIED that FAILed the PCB tab of a shipping dossier.
+    _gen_tiers = {"mpn_symbol_footprint": 10, "package_family": 5, "mpn_package_only": 1}
+    _gen_score, _gen_resolved, _gen_verified = _pcb_fitness_axis(_gen_tiers)
+    if not (_gen_score >= 9.0 and _gen_resolved == 16 and _gen_verified == 16):
+        print(f"  FAIL pcb-fitness-axis generator-tier vocab: a board of 10 "
+              f"mpn_symbol_footprint + 5 package_family + 1 mpn_package_only is FULLY "
+              f"verified (16/16) and must score >=9/10, got score={_gen_score!r} "
+              f"verified={_gen_verified!r} (tier names must match the atopile generator)"); bad += 1
+    _gen_readiness, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=_gen_score, n_electronic_gap=0,
+        n_on_board=16, n_electronic_design=15, n_electronic_full=15)
+    if _gen_readiness != "FAB-READY":
+        print(f"  FAIL pcb-readiness generator-tier: a fully verified-tier 16-part board "
+              f"covering the design must read FAB-READY, got {_gen_readiness!r}"); bad += 1
     if _pcb_effective_tier({"resolutionTier": "package_family",
                             "partNumber": "TLC5916IDR",
                             "manufacturer": "Texas Instruments"}) != "mpn_package":
