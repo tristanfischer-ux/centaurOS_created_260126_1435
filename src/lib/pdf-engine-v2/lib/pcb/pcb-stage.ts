@@ -69,7 +69,11 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   },
   {
     category: 'connectivity',
-    pattern: /\b(usb|bluetooth|\bble\b|wi-?fi|rf transceiver|\bantenna\b|\buart\b|\bi2c\b|\bspi\b|\bcan bus\b|zigbee|lora)\b/i,
+    // INTENT (Pioreactor 0327): host_protocol_bridge / protocol_bridge / level_shifter
+    // are connectivity electronics — without these nouns, collectElectronicWords
+    // drops the word entirely (neither off-board nor unresolved) and the LED-board
+    // host-scrub proveCatch cannot fire.
+    pattern: /\b(usb|bluetooth|\bble\b|wi-?fi|rf transceiver|\bantenna\b|\buart\b|\bi2c\b|\bspi\b|\bcan bus\b|zigbee|lora|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge|level[_ -]?shifter)\b/i,
   },
   {
     category: 'board_role',

@@ -26,7 +26,16 @@ function baseState(overrides: Partial<PcbStageResult> = {}): PcbStageResult {
 describe('evaluatePcbGate', () => {
   it('PASSES on a clean, routed, DRC-zero-violation board with gerbers', () => {
     const state = baseState({
-      pipeline: { ok: true, stageReached: 'export', routed: true, drc: { ran: true, violations: 0 }, errors: [] },
+      pipeline: {
+        ok: true,
+        stageReached: 'export',
+        routed: true,
+        drc: { ran: true, violations: 0 },
+        // Coverage honesty (2026-07-18): clean_board requires placed footprints
+        // ≥ PCB_MIN_FOOTPRINT_COVERAGE of electronicPartCount (baseState = 5).
+        components: 5,
+        errors: [],
+      },
     })
     const r = evaluatePcbGate(state)
     expect(r.applicable).toBe(true)
