@@ -6,27 +6,30 @@ Target user: pharma/academic organoid labs, contract research organisations, and
 
 ## System description
 
-- A **dual-axis random-positioning gimbal** that continuously reorients a docked cassette to time-average gravity toward zero, with a stated rotation band (**≈1–20 rpm class**, slow) and a mixing / time-averaged-gravity justification.
+This is a **benchtop laboratory instrument** in the class of an open-hardware bioreactor / cell-culture appliance (Pioreactor / rotating-wall-vessel scale), NOT a process plant. **Do NOT specify industrial process equipment**: no industrial heat exchangers or chillers, no bulk reservoirs, no industrial/HVAC pumps, no CIP skids. Every part is a **catalogue laboratory or electronics component** a benchtop instrument would use (small stepper/BLDC motors, micro peristaltic/diaphragm pumps, PTC/Peltier heaters, MCU/SBC, small optics), buildable without precision machining.
+
+- A **dual-axis random-positioning gimbal** that continuously reorients a docked cassette to time-average gravity toward zero, with a stated rotation band (**≈1–20 rpm class**, slow, small BLDC/stepper motors + encoders) and a time-averaged-gravity justification.
 - A **cassette dock** with a keyed mechanical + fluidic + optical + data interface accepting an ANSI/SLAS-footprint organoid cassette (the consumable); state the registration and sealing approach.
-- **CO₂-independent incubation** of the docked cassette (**≈15 litre chamber class**) at 37 ± 0.2 °C using HEPES-buffered media so no gas bottle is required; closed-loop thermal stability characterised.
-- **Perfusion**: a micro positive-displacement or peristaltic pump plus solenoid microvalves circulating media through the cassette, with a bubble-trap strategy (bubbles are lethal in reduced-gravity culture); state flow band.
-- **In-line live-cell imaging** (compact widefield / phase module, low-power) reading the cassette optical window, streaming images to the host.
+- **Warm-cassette incubation** — the appliance holds the **small docked cassette** (a flat ANSI/SLAS card holding **≈2–20 ml of culture across its wells**) at 37 ± 0.2 °C using a **low-power PTC heater or Peltier (tens of watts)** in an insulated bay; CO₂-independent HEPES-buffered media so no gas bottle. This is warming a small card, NOT a bulk chamber — no industrial heat exchanger.
+- **Micro-perfusion**: a **micro peristaltic or diaphragm pump (µL/min–mL/min, a few watts)** plus small solenoid microvalves circulating media through the cassette, with a bubble-trap strategy (bubbles are lethal in reduced-gravity culture); state flow band and µL dead volume.
+- **In-line live-cell imaging** (compact widefield / phase CMOS module, **< 5 W**) reading the cassette optical window, streaming images to the host.
 - A **documented network API and browser / host UI** separating motion, incubation, perfusion, imaging, and experiment recipes.
-- Prefer **catalogue motors, encoders, pumps, sensors, MCU/SBC, optics, and printable/fabricated structural parts**; buildable without precision machining.
+- Prefer **catalogue motors, encoders, micro-pumps, sensors, MCU/SBC, optics, and printable/fabricated structural parts**; buildable without precision machining.
 - Mechanically and biologically **safe for bench use** (spill containment, electrical isolation, sealed enclosure, no plant-scale skids).
 
 ## Key constraints (state these as the brief's hard targets)
 
 - **Form:** sealed benchtop appliance, approx 400 × 400 × 450 mm class; printable / fabricated structural parts.
-- **Motion:** dual-axis RPM, ≈1–20 rpm band, with time-averaged-gravity rationale.
-- **Incubation:** 37 ± 0.2 °C, CO₂-independent (HEPES media), ≈15 L chamber class.
-- **Perfusion:** pump + valves + bubble trap; state flow band and dead volume.
-- **Imaging:** in-line live-cell widefield/phase, < 5 W, reads the cassette window.
+- **Primary scale metric:** culture handled is **≈2–20 ml (the cassette), ml-scale — a benchtop instrument, not a litre-scale vessel.**
+- **Motion:** dual-axis RPM, ≈1–20 rpm band, small motors, with time-averaged-gravity rationale.
+- **Incubation:** 37 ± 0.2 °C, CO₂-independent (HEPES media), low-power PTC/Peltier warming of the small cassette bay — tens of watts, no chiller/heat-exchanger.
+- **Perfusion:** micro-pump (µL/min–mL/min) + microvalves + bubble trap; state flow band and µL dead volume.
+- **Imaging:** in-line live-cell widefield/phase CMOS, < 5 W, reads the cassette window.
 - **Consumable interface:** keyed ANSI/SLAS cassette dock (mech + fluidic + optical + data + ID).
 - **Software:** network API + host UI; experiment-recipe separation.
 - **Manufacturability:** no precision machining; second-engineer assembly; design-for-manufacture toward a contract manufacturer.
-- **Cost:** honest prototype **bill of materials within £2,000–£4,000** (research-grade benchtop RPM-appliance band; midpoint ≈ £3,000 materials). Prefer catalogue parts the engine can price. Do not ship plant-scale industrial assemblies.
-- **Positioning:** research-use engineering hardware — not clinical / IVD.
+- **Cost:** honest prototype **bill of materials within £2,000–£4,000** (research-grade benchtop RPM-appliance band; midpoint ≈ £3,000 materials) using **catalogue laboratory/electronics parts only**. Do NOT ship plant-scale industrial assemblies — an industrial heat exchanger or bulk pump on this instrument is a scale error.
+- **Positioning:** research-use engineering hardware — not clinical / IVD; benchtop lab-instrument scale.
 
 ## Required outputs
 
