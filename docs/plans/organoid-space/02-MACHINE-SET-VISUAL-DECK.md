@@ -28,9 +28,9 @@ The M2 card with fixative/stabiliser reservoirs, capsule-compatible. **Quality: 
 
 ## The razor (ground host) — `rotation`
 
-### M1 — Organoid RPM-appliance
+### M1 — Organoid RPM-appliance (composite host)
 ![M1](renders/M1-rpm-appliance.png)
-A base + a cylindrical rotor bowl + a lid — the centrifuge/RPM silhouette (fixed this session; it was a featureless cube before SIGHT). The ground flagship that docks the cassette. **Quality: good** as a rotary host; *composite-host note:* incubation/perfusion/imaging are docked subsystems, not yet co-composed into the one enclosure.
+A base + a cylindrical rotor bowl + a lid (the RPM/centrifuge core) **plus a distinct incubation subsystem module on the front face** — the composite-host capability (Option A, built this session, commit f6c65f7f7): the appliance forms its primary medium (rotation) and attaches a labelled subsystem module for each other function present (incubation here; imaging/perfusion/cassette-dock when those signals are present). **Quality: good** — reads as an integrated appliance (core function + subsystem), not just a rotary core.
 
 ## The orbital core — `culture_fluid`
 

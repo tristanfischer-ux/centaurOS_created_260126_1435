@@ -39,4 +39,10 @@ Narrow scope: just add a first-class `cassette_dock` to instrument hosts (the ra
 
 **Decision needed:** A (recommended), B, or C? On approval I'll build it with proveCatch + re-render M1/M6 to confirm.
 
-*Related: `02-MACHINE-SET-VISUAL-DECK.md` (composite-host listed as the remaining fidelity gap), `00-SYNTHESIS-AND-DESIGN.md` §7.*
+---
+
+## RESOLVED — 2026-07-19: Tristan approved, Option A BUILT (commit f6c65f7f7)
+
+Built Option A: primary medium + attached subsystem modules (chamber_volume→incubation_module, optical/stage→imaging_module, working_volume→perfusion_module, rotor→agitation_module, channel→pump_module, plus a cassette_dock when a host carries a cassette signal). Subsystems fasten to the chassis and mount on its front face (visible). Single-function devices get NONE (40/40 single-medium forms byte-unchanged, verified). SIGHT-confirmed on M1 (rotary core + a distinct front incubation module). proveCatch in `functional_form.py --selftest`. Option B (full multi-medium co-composition) remains the eventual destination for a future deliberate project.
+
+*Related: `02-MACHINE-SET-VISUAL-DECK.md`, `00-SYNTHESIS-AND-DESIGN.md` §7.*
