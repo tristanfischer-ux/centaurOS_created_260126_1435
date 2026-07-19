@@ -14018,10 +14018,14 @@ def _place_lab_microscope_layout(
 
     # Three actuator towers (X/Y/Z) around the body — geared stepper + leadscrew.
     # Layout: X left, Y right, Z/focus rear — OpenFlexure-class motion WHY.
+    # Tucked inboard + lowered (2026-07-19 SIGHT — the steppers floated at mid-height
+    # sticking well out, reading as random black blocks AND widening the product past
+    # the camera frame). Seat them low against the body corners like the gold
+    # OpenFlexure geared-stepper drives.
     act_specs = (
-        ("x", -body_w * 0.52 - face * 0.55, 0.0, base_z + body_h * 0.55, (0.0, 0.0, 0.0)),
-        ("y", body_w * 0.52 + face * 0.55, 0.0, base_z + body_h * 0.55, (0.0, 0.0, 0.0)),
-        ("z", 0.0, body_d * 0.52 + face * 0.55, base_z + body_h * 0.72, (0.0, 0.0, 0.0)),
+        ("x", -body_w * 0.52 - face * 0.28, 0.0, base_z + body_h * 0.34, (0.0, 0.0, 0.0)),
+        ("y", body_w * 0.52 + face * 0.28, 0.0, base_z + body_h * 0.34, (0.0, 0.0, 0.0)),
+        ("z", 0.0, body_d * 0.52 + face * 0.28, base_z + body_h * 0.48, (0.0, 0.0, 0.0)),
     )
     for axis, ax, ay, az, _rot in act_specs:
         tower_h = face * 1.35
@@ -14068,27 +14072,41 @@ def _place_lab_microscope_layout(
         tube_h * fl.MM,
         tube_mat, module=story_mod, module_objects=MO)
 
-    # Illumination arm + condenser disk above stage with warm LED.
+    # Illumination OVER-ARM (2026-07-19 SIGHT — the condenser floated centred while
+    # the arm sat at the rear, so it read as a black lollipop on a stick). Build a
+    # proper gooseneck: rear PILLAR → horizontal ARM reaching over the stage →
+    # condenser + down-firing LED on the arm's front end, aimed at the sample. This
+    # transmitted-illumination arch is the single most recognisable microscope cue.
     arm_h = float(getattr(ifg, "LM_ILLUM_ARM_H_MM", max(55.0, H * 0.28)))
-    arm_z = stage_z + stage_t * 0.5 + arm_h * 0.45
+    _stage_top = stage_z + stage_t * 0.5
+    _pillar_y = stage_d * 0.5 + 12.0            # just behind the sample stage
+    _arm_top = _stage_top + arm_h
+    _pillar = fl.add_box(
+        f"{pfx}illum_pillar",
+        _mm3((0.0, _pillar_y, _stage_top + arm_h * 0.5)),
+        _mm3((18.0, 18.0, arm_h)),
+        arm_mat, module=story_mod, module_objects=MO)
+    _pillar.dimensions = _mm3((18.0, 18.0, arm_h))
+    # Horizontal arm from the pillar forward to over the stage centre.
     _arm = fl.add_box(
         f"{pfx}illum_arm",
-        _mm3((0.0, D * 0.28, arm_z)),
-        _mm3((18.0, D * 0.22, arm_h)),
+        _mm3((0.0, _pillar_y * 0.5 - 2.0, _arm_top - 8.0)),
+        _mm3((18.0, _pillar_y + 10.0, 16.0)),
         arm_mat, module=story_mod, module_objects=MO)
-    _arm.dimensions = _mm3((18.0, D * 0.22, arm_h))
-    cond_z = stage_z + stage_t * 0.5 + arm_h * 0.78
+    _arm.dimensions = _mm3((18.0, _pillar_y + 10.0, 16.0))
+    # Condenser head + down-firing warm LED hanging under the arm, over the sample.
+    _head_z = _arm_top - 22.0
     _cond = fl.add_cyl(
         f"{pfx}condenser",
-        _mm3((0.0, 0.0, cond_z)),
+        _mm3((0.0, 0.0, _head_z)),
         (cond_od / 2.0) * fl.MM,
-        6.0 * fl.MM,
+        11.0 * fl.MM,
         cond_mat, module=story_mod, module_objects=MO)
     _led = fl.add_cyl(
         f"{pfx}led",
-        _mm3((0.0, 0.0, cond_z - 5.0)),
-        (cond_od * 0.28) * fl.MM,
-        4.0 * fl.MM,
+        _mm3((0.0, 0.0, _head_z - 7.5)),
+        (cond_od * 0.30) * fl.MM,
+        5.0 * fl.MM,
         led_mat, module=story_mod, module_objects=MO)
 
     # Small green FR4 SBC on the body side.
