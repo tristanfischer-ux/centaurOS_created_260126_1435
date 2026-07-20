@@ -8641,7 +8641,8 @@ def _iter_worked_results(state: dict) -> List[dict]:
     return out
 
 
-def _cost_ceiling_stack_field(brief_text: str, ucc: Any = None) -> tuple:
+def _cost_ceiling_stack_field(brief_text: str, ucc: Any = None,
+                              is_device_scale: bool = False) -> tuple:
     """Map unit_cost_ceiling brief wording → (costStack key, human label).
 
     INTENT (Powerwall 2026-07-15): the brief's £8,500 ceiling said "ex-works" but
@@ -8669,6 +8670,15 @@ def _cost_ceiling_stack_field(brief_text: str, ucc: Any = None) -> tuple:
         return ("channel_list_price_gbp", "List price vs unit cost ceiling")
     if re.search(r"\bmaterials?\b|\bbom\b|\braw\b", blob):
         return ("raw_materials_bom_gbp", "Materials vs unit cost ceiling")
+    # DEVICE-SCALE DEFAULT (2026-07-20, Pillar 3 / council H4 + Cursor P0.4): a benchtop
+    # / handheld / instrument product with a bare "unit cost ≤ £X" ceiling (no
+    # materials/BoM/ex-works wording) means the SELLABLE unit price, not just materials —
+    # comparing raw_materials lets a £259-materials build PASS a £385 ceiling while the
+    # ex-works OEM price is £429 (the 2150 false-PASS). Ex-works (oem_transfer_price_gbp)
+    # is the honest layer for a catalogue instrument. Plant/CAPEX classes keep the legacy
+    # materials default (their "unit cost" is genuinely a materials/CAPEX figure).
+    if is_device_scale:
+        return ("oem_transfer_price_gbp", "Ex-works (OEM) vs unit cost ceiling")
     return ("raw_materials_bom_gbp", "Materials vs unit cost ceiling")
 
 
@@ -8841,7 +8851,13 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
         # INTENT: brief wording selects the costStack layer — "ex-works"/"oem" is
         # oem_transfer_price_gbp (chain convention); "materials"/"BoM" is raw;
         # "list"/"listing"/"ASP"/"product-only" is channel_list. Never always-raw.
-        _cs_key, _cs_label = _cost_ceiling_stack_field(brief_text, ucc)
+        # Device-scale signal: an instrument flag OR a sub-1 m³ enclosure → the "unit
+        # cost" ceiling means the sellable ex-works price, not materials (see helper).
+        _encl_q = quantities.get("enclosure_volume_m3")
+        _encl_v = num(_encl_q.get("value")) if isinstance(_encl_q, dict) else num(_encl_q)
+        _dev_scale = bool(state.get("isInstrumentDevice")) or (
+            _encl_v is not None and 0 < float(_encl_v) < 1.0)
+        _cs_key, _cs_label = _cost_ceiling_stack_field(brief_text, ucc, is_device_scale=_dev_scale)
         _ach_cost = num((state.get("costStack") or {}).get(_cs_key))
         rows.append(_verif_row(
             "brief", f"{_cs_label} vs unit cost ceiling",
@@ -26285,6 +26301,23 @@ def _selftest() -> int:
     if _cost_ceiling_stack_field(
             "product-only listings / channel ASP ceiling")[0] != "channel_list_price_gbp":
         print("  FAIL cost-ceiling layer: listing/ASP must select channel_list"); bad += 1
+    # proveCatch DEVICE-SCALE default (2026-07-20, Cursor P0.4): a benchtop/instrument
+    # product with a BARE "unit cost ≤ £X" ceiling (no materials/BoM/ex-works wording)
+    # means the sellable ex-works price → oem, not materials (a £259-materials build must
+    # not silently PASS a £385 unit-cost ceiling while oem is £429). Materials wording
+    # still forces materials even for a device; a plant class keeps the materials default.
+    if _cost_ceiling_stack_field("honest unit cost within £385", {"value": 385},
+                                 is_device_scale=True)[0] != "oem_transfer_price_gbp":
+        print("  FAIL cost-ceiling device-scale: a bare unit-cost ceiling on a device must "
+              "select oem_transfer_price_gbp (ex-works), not materials"); bad += 1
+    if _cost_ceiling_stack_field("bill of materials within £385", {"value": 385},
+                                 is_device_scale=True)[0] != "raw_materials_bom_gbp":
+        print("  FAIL cost-ceiling device-scale: explicit 'materials/BoM' wording must keep "
+              "raw_materials even on a device (honour the brief's literal ask)"); bad += 1
+    if _cost_ceiling_stack_field("unit cost within £385", {"value": 385},
+                                 is_device_scale=False)[0] != "raw_materials_bom_gbp":
+        print("  FAIL cost-ceiling plant: a non-device (plant/CAPEX) class keeps the legacy "
+              "materials default for a bare unit-cost ceiling"); bad += 1
     _exw_state = {
         "parsedBrief": {
             "original_text": "Unit cost ceiling: £8500 ex-works",
