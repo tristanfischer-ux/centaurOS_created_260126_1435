@@ -29102,6 +29102,38 @@ def _selftest() -> int:
                 and _rv2c["score"] >= 8):
             print(f"  FAIL V2: a PLANT (phenotype N/A) must be unaffected — coverage + vision-clean "
                   f"still earns ≥8 (got {_rv2c.get('score') if _rv2c else None})"); bad += 1
+    # ═══ P7 (2026-07-20): an INTERFACE-CRITICAL role (USB/debug/power connector) without a real
+    # catalogue MPN must drop the board to ENGINEERING DRAFT — never FAB-READY — even when the
+    # overall fitness number looks fine. Subset of the all-on-board-fab-tier bar (Cursor Fix 1),
+    # named here so a future connector/interface EXEMPTION from that bar is caught. ═══
+    from collections import Counter as _CtrP7
+    _p7_comps = [
+        {"resolutionTier": "mpn_symbol_footprint", "partNumber": "STM32F103"},
+        {"resolutionTier": "mpn_package", "partNumber": "NCP1117"},
+        {"resolutionTier": "mpn_package_only", "partNumber": "GRM188"},
+        # the interface-critical role, generic package only — NO orderable MPN:
+        {"functionClass": "usb_connector", "resolutionTier": "package_family", "partNumber": ""},
+    ]
+    _p7_tiers = _CtrP7(_pcb_effective_tier(_c) for _c in _p7_comps)
+    _p7_nnf = sum(int(_n or 0) for _t, _n in _p7_tiers.items() if _t not in _PCB_FAB_VERIFIED_TIERS)
+    _p7_fit, _p7_res, _p7_ver = _pcb_fitness_axis(_p7_tiers)
+    _p7_verdict, _p7_why = _pcb_readiness_verdict(
+        True, True, True, True, False, _p7_fit, 0,
+        n_on_board=4, n_electronic_design=4, n_electronic_full=4,
+        n_non_fab_tier=_p7_nnf, all_on_board_fab_tier=(_p7_nnf == 0))
+    if _p7_verdict == "FAB-READY" or _p7_nnf < 1:
+        print(f"  FAIL P7: an interface-critical usb_connector at package_family (no MPN, fitness "
+              f"{_p7_fit}) must read ENGINEERING DRAFT, not FAB-READY "
+              f"(got {_p7_verdict!r}, n_non_fab_tier={_p7_nnf})"); bad += 1
+    # proveNoFalsePositive: the SAME interface role WITH a real MPN → fab-tier, board can be FAB-READY.
+    _p7_ok = [dict(_c) for _c in _p7_comps[:3]] + [
+        {"functionClass": "usb_connector", "resolutionTier": "mpn_symbol_footprint",
+         "partNumber": "10118194-0001LF"}]   # real Amphenol USB micro-B MPN
+    _p7_okt = _CtrP7(_pcb_effective_tier(_c) for _c in _p7_ok)
+    _p7_oknnf = sum(int(_n or 0) for _t, _n in _p7_okt.items() if _t not in _PCB_FAB_VERIFIED_TIERS)
+    if _p7_oknnf != 0:
+        print(f"  FAIL P7 proveNoFalsePositive: an interface role WITH a real MPN must be fab-tier "
+              f"(got n_non_fab_tier={_p7_oknnf})"); bad += 1
     # ═══ S11 (council M5, 2026-07-20): BoM↔PCB identity reconcile — a part designed onto
     # the PCB with a real MPN must NOT read "bespoke fabrication" in the BoM. ═══
     _s11_state = {
