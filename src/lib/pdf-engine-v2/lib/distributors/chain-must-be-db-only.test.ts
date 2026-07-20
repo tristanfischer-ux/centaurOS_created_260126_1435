@@ -109,6 +109,30 @@ describe('chain-must-be-db-only', () => {
     }
   })
 
+  it('A6: the DB-first READ path must NOT be gated by SKIP_LIBRARY_WRITEBACK', () => {
+    // SKIP_LIBRARY_WRITEBACK exists to stop the chain WRITING to forge-truth.db (dry-runs,
+    // tests). Coupling the readonly cascade READ (db-only-cascade.getDb) to it was a footgun:
+    // a dry-run that set SKIP_LIBRARY_WRITEBACK=1 silently lost every DB-first read hit and
+    // cratered BoM coverage. Reads now have their own opt-in (SKIP_LIBRARY_READS). This guard
+    // fails if the writeback flag ever leaks back into the getDb() read gate.
+    const dbOnlyPath = resolve(REPO_ROOT, 'src/lib/pdf-engine-v2/lib/distributors/db-only-cascade.ts')
+    const source = readFileSync(dbOnlyPath, 'utf-8')
+    // isolate the getDb() body (readonly handle) — the writeback flag must not appear as a gate there
+    const getDbMatch = source.match(/function getDb\(\)[^{]*\{[\s\S]*?\n\}/)
+    expect(getDbMatch).not.toBeNull()
+    const getDbBody = getDbMatch![0]
+    const gatesOnWriteback = /process\.env\.SKIP_LIBRARY_WRITEBACK\s*===\s*['"]1['"]/.test(getDbBody)
+    if (gatesOnWriteback) {
+      throw new Error(
+        'A6 VIOLATION: db-only-cascade.getDb() (a READ path) gates on SKIP_LIBRARY_WRITEBACK.\n' +
+        'That flag is for WRITE-back only; coupling reads to it craters BoM coverage on dry-runs.\n' +
+        'Use SKIP_LIBRARY_READS for the read gate instead.',
+      )
+    }
+    // and the intended read gate must be present
+    expect(/process\.env\.SKIP_LIBRARY_READS\s*===\s*['"]1['"]/.test(getDbBody)).toBe(true)
+  })
+
   it('scripts/ingest/* files are NOT subject to the chain-only rule (they may call live APIs)', () => {
     const ingestDir = resolve(REPO_ROOT, 'scripts/ingest')
     if (!existsSync(ingestDir)) {

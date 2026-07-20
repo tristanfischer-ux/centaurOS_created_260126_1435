@@ -82,7 +82,13 @@ export interface DbCascadeResult {
 
 function getDb(): Database.Database | null {
   if (dbHandle !== undefined) return dbHandle
-  if (process.env.SKIP_LIBRARY_WRITEBACK === '1' || process.env.NODE_ENV === 'test') {
+  // A6 (2026-07-20): this is a READ path (readonly handle, cascade-cache lookups). It must
+  // NOT be gated by SKIP_LIBRARY_WRITEBACK — that flag exists to stop the chain WRITING back
+  // to forge-truth.db (dry-runs, tests), and coupling reads to it was a footgun: a dry-run
+  // that set SKIP_LIBRARY_WRITEBACK=1 silently lost every DB-first read hit and cratered BoM
+  // coverage. Reads now have their OWN opt-in (SKIP_LIBRARY_READS) for the rare case someone
+  // genuinely wants the DB cascade off; NODE_ENV==='test' still isolates unit tests.
+  if (process.env.SKIP_LIBRARY_READS === '1' || process.env.NODE_ENV === 'test') {
     dbHandle = null
     return null
   }
