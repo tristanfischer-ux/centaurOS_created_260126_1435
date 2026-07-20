@@ -448,6 +448,8 @@ export interface PcbStageResult {
     tier: 0
     results: Array<{ target: string; result: { ok: boolean; skipped?: boolean; reason?: string } }>
     allOk: boolean
+    /** Alias of allOk — Excel readiness reads `ok`. */
+    ok: boolean
   }
 }
 

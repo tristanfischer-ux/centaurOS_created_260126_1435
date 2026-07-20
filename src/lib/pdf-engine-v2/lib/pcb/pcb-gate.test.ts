@@ -92,6 +92,46 @@ describe('evaluatePcbGate', () => {
     expect(evaluatePcbGate(null)).toEqual({ applicable: false, fires: false, reason: 'no_pcb_state_pcb_stage_off', details: [] })
     expect(evaluatePcbGate(undefined)).toEqual({ applicable: false, fires: false, reason: 'no_pcb_state_pcb_stage_off', details: [] })
   })
+
+  it('P6: FIRES when pipeline is clean but designFitness has HIGH findings', () => {
+    const state = baseState({
+      pipeline: {
+        ok: true,
+        stageReached: 'export',
+        routed: true,
+        drc: { ran: true, violations: 0 },
+        components: 5,
+        errors: [],
+      },
+      designFitness: {
+        ok: false,
+        findings: [{
+          severity: 'high',
+          message: 'board missing required roles: od_optics',
+        }],
+      },
+    })
+    const r = evaluatePcbGate(state)
+    expect(r.fires).toBe(true)
+    expect(r.reason).toBe('clean_toolchain_but_architecture_unfit')
+  })
+
+  it('P6: FIRES when pipeline is clean but multiBoardMerged', () => {
+    const state = baseState({
+      pipeline: {
+        ok: true,
+        stageReached: 'export',
+        routed: true,
+        drc: { ran: true, violations: 0 },
+        components: 5,
+        errors: [],
+      },
+      multiBoardMerged: true,
+    })
+    const r = evaluatePcbGate(state)
+    expect(r.fires).toBe(true)
+    expect(r.reason).toBe('clean_toolchain_but_multi_board_merged')
+  })
 })
 
 describe('pcbGateEnforceModeFromEnv', () => {

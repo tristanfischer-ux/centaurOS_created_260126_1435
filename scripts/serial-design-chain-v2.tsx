@@ -10001,10 +10001,25 @@ async function main() {
               )
             }
             // P4b: architecture-vs-implementation fitness (P9b prerequisite).
+            // INTENT: Channel counts stay 0 until a real topology maps components to
+            // channel roles — fail closed (channel_under_implementation) rather than
+            // inventing "implemented" from footprint count alone.
+            const implementedChannels: Record<string, number> = {}
+            for (const fr of genResult.functionRequirements) {
+              implementedChannels[fr.role] =
+                fr.implementation === 'passive_board_geometry' ? 1 : 0
+            }
+            for (const board of architecture.boards) {
+              for (const req of board.channelRequirements) {
+                if (implementedChannels[req.role] === undefined) {
+                  implementedChannels[req.role] = 0
+                }
+              }
+            }
             const designFitness = evaluatePcbDesignFitness(architecture, {
               resolvedWordIds: genResult.components.map((c) => c.wordId),
               unresolvedWordIds: genResult.unresolved.map((u) => u.wordId),
-              implementedChannels: {},
+              implementedChannels,
             })
             stPcb.pcb.designFitness = designFitness
             pcb.designFitness = designFitness
@@ -10086,11 +10101,16 @@ async function main() {
                   : { ok: false as const, skipped: true, reason: 'design_fitness_ok_false' }
                 proofResults.push({ target: thin.proofTargetId, result })
               }
+              // GOTCHA: Excel `_pcb_two_axis_assessment` reads firmwareProof.ok
+              // (legacy); also emit allOk for chain logs. Keep both in sync.
+              const allOk = proofResults.length > 0
+                && proofResults.every((r) => r.result.ok === true)
               const firmwareProof = {
                 schema: 'pcb-firmware-proof-stage/v1' as const,
                 tier: 0 as const,
                 results: proofResults,
-                allOk: proofResults.length > 0 && proofResults.every((r) => r.result.ok === true),
+                allOk,
+                ok: allOk,
               }
               stPcb.pcb.firmwareProof = firmwareProof
               pcb.firmwareProof = firmwareProof
@@ -10113,6 +10133,7 @@ async function main() {
                   },
                 }],
                 allOk: false,
+                ok: false,
               }
               stPcb.pcb.firmwareProof = firmwareProof
               pcb.firmwareProof = firmwareProof
