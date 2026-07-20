@@ -59,7 +59,11 @@ Legend: ✅ done · �doing · ⬜ open
 ## Source meta-root (Terminal — Pillar 4 F)
 | ID | Item | Status | SHA |
 |---|---|---|---|
-| F1 | `isProcessPlantScale(state)=isProcessPlantClass && !isDeviceScaleDesign` consulted by word-expansion / geometry / electrical / cost / interconnect (kills plant-vessel leak, metre geometry, 3ph/25kVA, DN25 pipe, plant cost curve) | ⬜ | |
+| F1a | word-expansion: 'Cartridge Heater' no longer explodes into a pressure-vessel FILTER (regex precision + watt-scale skip extended to plant-vessel part names) — kills the 9-word H1 leak | ✅ | a0dbdedc6 |
+| F1b | geometry emitter: metre-scale part envelopes (Culture Vessel 3.1 m³) → size from working volume for device-scale | ⬜ | |
+| F1c | cost engine: plant class_reference medians (£20k vessel / £5.38M actuation) → device-scale bands; stop the ×0.461 rescale masking | ⬜ | |
+| F1d | electrical model: 400V 3ph / 25 kVA incomer / DN pipe on a 35W device → device-scale DC model | ⬜ | |
+| F1e | interconnect: DN25 pipe → micro-tubing for device-scale fluid loops | ⬜ | |
 | F2 | Redundant Peltier + cartridge heater on ~1W duty → collapse to one thermal actuator | ⬜ | |
 | F3 | Pump slot-mispin (Watson-Marlow tubing SKU pinned as pump) → reject | ⬜ | |
 | F4 | confidence-honesty: no `confidence:high` on an admittedly-unfound MPN | ⬜ | |
