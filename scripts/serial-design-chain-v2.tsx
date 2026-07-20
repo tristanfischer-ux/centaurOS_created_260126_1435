@@ -74,6 +74,10 @@ import { derivePcbArchitecture } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-arch
 import { generateAtopileProject } from '../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
 import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
+import { evaluatePcbDesignFitness } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-design-fitness'
+import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-spec'
+import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
+import { runTier0FirmwareProof } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -9985,6 +9989,28 @@ async function main() {
                 board.channelRequirements.map((requirement) => requirement.role),
               ),
             })
+            // P5 honesty: architecture may require N KiCad deliverables; chain still
+            // emits one merged project — flag so Excel/gate can refuse FAB-READY.
+            const kicadBoards = architecture.boards.filter((b) => b.requiresKiCadDeliverable)
+            const multiBoardMerged = kicadBoards.length > 1
+            stPcb.pcb.multiBoardMerged = multiBoardMerged
+            pcb.multiBoardMerged = multiBoardMerged
+            if (multiBoardMerged) {
+              console.error(
+                `[chain] PCB honesty: multiBoardMerged=true (${kicadBoards.length} KiCad boards → one project)`,
+              )
+            }
+            // P4b: architecture-vs-implementation fitness (P9b prerequisite).
+            const designFitness = evaluatePcbDesignFitness(architecture, {
+              resolvedWordIds: genResult.components.map((c) => c.wordId),
+              unresolvedWordIds: genResult.unresolved.map((u) => u.wordId),
+              implementedChannels: {},
+            })
+            stPcb.pcb.designFitness = designFitness
+            pcb.designFitness = designFitness
+            console.error(
+              `[chain] PCB designFitness: ok=${designFitness.ok} findings=${designFitness.findings.length}`,
+            )
             console.error(
               `[chain] PCB architecture: disposition=${architecture.systemDisposition} ` +
               `boards=[${architecture.boards.map((b) => `${b.role}:${b.requiredWordIds.length}`).join(',')}] ` +
@@ -10028,6 +10054,73 @@ async function main() {
               routed: pipelineResult.routed, drc_violations: pipelineResult.drc.violations,
               off_board_cots: genResult.offBoard.length, unresolved: genResult.unresolved.length,
             })
+
+            // P9b MVP: Tier-0 firmware proof — fail closed; never alone → FUNCTIONALLY VERIFIED.
+            // FLOW: deriveFirmwareProofSpecs → buildFirmwareProofContract → firmware_proof.py prove
+            // → state.pcb.firmwareProof (Excel already reads this for UNPROVEN banner).
+            try {
+              const thinSpecs = deriveFirmwareProofSpecs(architecture)
+              const proofResults: Array<{
+                target: string
+                result: ReturnType<typeof runTier0FirmwareProof>
+              }> = []
+              for (const thin of thinSpecs) {
+                const mcuComp = genResult.components.find((c) =>
+                  /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
+                const fat = buildFirmwareProofContract({
+                  thin,
+                  designFitnessOk: designFitness.ok === true,
+                  mcu: mcuComp?.partNumber
+                    ? { mpn: mcuComp.partNumber, manufacturer: mcuComp.manufacturer ?? undefined }
+                    : undefined,
+                  components: genResult.components.map((c) => ({
+                    wordId: c.wordId,
+                    refdes: c.instanceName,
+                    mpn: c.partNumber,
+                    characterId: c.characterId ?? undefined,
+                  })),
+                })
+                const proofOut = resolve(pcbProjectDir, 'firmware-proof', thin.proofTargetId)
+                const result = designFitness.ok === true
+                  ? runTier0FirmwareProof(fat, proofOut, process.cwd())
+                  : { ok: false as const, skipped: true, reason: 'design_fitness_ok_false' }
+                proofResults.push({ target: thin.proofTargetId, result })
+              }
+              const firmwareProof = {
+                schema: 'pcb-firmware-proof-stage/v1' as const,
+                tier: 0 as const,
+                results: proofResults,
+                allOk: proofResults.length > 0 && proofResults.every((r) => r.result.ok === true),
+              }
+              stPcb.pcb.firmwareProof = firmwareProof
+              pcb.firmwareProof = firmwareProof
+              console.error(
+                `[chain] PCB firmwareProof (Tier-0): targets=${proofResults.length} allOk=${firmwareProof.allOk}`,
+              )
+              logAction({
+                step: 'pcb_firmware_proof', ok: firmwareProof.allOk,
+                targets: proofResults.length, all_ok: firmwareProof.allOk,
+              })
+            } catch (fwErr) {
+              const firmwareProof = {
+                schema: 'pcb-firmware-proof-stage/v1' as const,
+                tier: 0 as const,
+                results: [{
+                  target: 'exception',
+                  result: {
+                    ok: false as const,
+                    reason: String(fwErr).slice(0, 200),
+                  },
+                }],
+                allOk: false,
+              }
+              stPcb.pcb.firmwareProof = firmwareProof
+              pcb.firmwareProof = firmwareProof
+              console.error(
+                `[chain] PCB firmwareProof threw (recorded fail-closed): ${(fwErr as Error).message?.slice(0, 200)}`,
+              )
+              logAction({ step: 'pcb_firmware_proof', ok: false, error: String(fwErr).slice(0, 200) })
+            }
           } catch (pipeErr) {
             const record: PcbPipelineRecord = {
               ok: false,

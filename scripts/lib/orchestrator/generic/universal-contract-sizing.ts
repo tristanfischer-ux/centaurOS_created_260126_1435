@@ -3976,7 +3976,7 @@ function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: n
   }
 }
 
-type SubLike = { id?: string; words?: WordLike[] }
+type SubLike = { id?: string; name_human?: string; words?: WordLike[] }
 function findInstrumentSubModule(modules: ModuleLike[]): SubLike | undefined {
   for (const re of [/sensing|instrument|monitor/i, /control|compute|scada|plc/i]) {
     for (const m of modules ?? []) for (const sm of (m.sub_modules ?? []) as SubLike[]) {

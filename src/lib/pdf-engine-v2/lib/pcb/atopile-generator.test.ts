@@ -15,7 +15,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { generateAtopileProject } from './atopile-generator'
+import { classifyFunction, generateAtopileProject } from './atopile-generator'
 import { derivePcbArchitecture } from './pcb-architecture'
 
 import type { PcbBoardGeometry } from './pcb-contract'
@@ -1173,6 +1173,50 @@ describe('atopile-generator', () => {
     expect(capacitor?.resolutionTier).toBe('package_family')
     expect(mainAto).not.toContain('NOT-A-REAL-MPN-999')
     expect(mainAto).toContain('TBD (detailed design) - passive_c')
+  })
+
+  it('P4: classifies usb_power_entry separately from debug headers', () => {
+    expect(classifyFunction('usb_power_entry')).toBe('usb_connector')
+    expect(classifyFunction('usb_power_interface')).toBe('usb_connector')
+    expect(classifyFunction('debug_header')).toBe('debug_connector')
+    expect(classifyFunction('debug_uart_header')).toBe('debug_connector')
+  })
+
+  it('P4: usb_power_entry never resolves to PinHeader_*', () => {
+    const outDir = makeTmpDir('atopile-p4-usb-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'power',
+          sub_modules: [{
+            id: 'power__usb',
+            words: [{
+              id: 'usb_power_entry_word',
+              name_human: 'USB Power Entry',
+              content_character: { character_id: 'usb_power_entry' },
+              modifier_characters: [{ kind: 'quantity', value: '×1' }],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['usb_power_entry_word'],
+    })
+    const usb = result.components.find((c) => c.wordId === 'usb_power_entry_word')
+    const unresolved = result.unresolved.find((u) => u.wordId === 'usb_power_entry_word')
+
+    if (usb) {
+      expect(usb.footprint?.library).toBe('Connector_USB')
+      expect(usb.footprint?.footprint).toMatch(/USB_/i)
+      expect(usb.footprint?.footprint).not.toMatch(/PinHeader/i)
+    } else {
+      expect(unresolved).toBeDefined()
+      expect(unresolved?.reason).not.toMatch(/PinHeader/i)
+    }
   })
 
   it('records architecture channel requirements without inventing fitted components', () => {
