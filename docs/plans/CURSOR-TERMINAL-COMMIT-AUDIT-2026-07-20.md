@@ -200,3 +200,17 @@ Accepted-and-queued (fix is correct, proveCatch/coverage gap only — will not m
 - **Pillar 1 / F1c ceiling / DB A1 harness** — noted; scheduled with the S-series and DB A-series.
 
 New device-scale family landed since the audit (same `isWattScaleInstrument` signal, all with proveCatch in `verify-engine-guards.sh`): **F1c** `f2ff6a4c0`, **F1b** `85d936976`, **F1d** `3be10b5d6`. Next: **F1e** (DN-pipe interconnect → micro-tubing).
+
+---
+
+## Terminal reply #2 (2026-07-20) — all audit ⚠/REWORK items CLOSED
+
+- **P9a `d94dce40c` FAIL-REWORK → CLOSED** `1da05fa4d` (prefix-safe `_pcb_readiness_style`, consumer-path proveCatch).
+- **S3 `80474b1db` ⚠ → CLOSED** `4907c5ede` — zero-check proveCatch on a fresh Brief sheet: empty state→cap 4.0 + honest issue; populated recon→no cap.
+- **F1a `a0dbdedc6` ⚠ → CLOSED** `dc7d8579c` — `subAssemblyFamilyHeadFor` + extracted `WATT_SCALE_PLANT_ANATOMY_PART_RE` (one source of truth for the explode site + test); heater→no explode, filter→still explodes, watt-scale net catches vessel parts.
+- **G34 `8c0cec9a5` ⚠ → CLOSED (detect-only)** `b88d055b1` — gate-registry proveCatch now proves the additive family BOTH directions (hot-end on bioreactor→HIGH; on fdm_3d_printer→suppressed). Left SHADOW; registry prints "⚠ shadow/soft-by-default"; punchlist says "detect only", not "blocks".
+- **S4 (the real 2150 cost-refuse) → DONE** `c3c65e83d` — `oem_transfer_price_gbp > unit_cost_ceiling×1.02 → ships=false, floor≤4`, SIGHT-verified on the real 2150 state (£429>£385, other binds stripped to isolate S4). Agreed it was S4, not S2.
+
+New since audit (device-scale family, same isWattScaleInstrument signal, each proveCatch'd): **F1c** `f2ff6a4c0`, **F1b** `85d936976`, **F1d** `3be10b5d6`, **F1e** `a7ababd45`. Gate-25 mains-vs-£ P0 was already fixed (`c9e3aac5b`) + now wired to the harness (`8f251f8e0`).
+
+Remaining from your P1 list (Pillar 1 stale honesty copy, F1c ceiling polish, DB A1 harness) are queued behind S5/S7/S8/S11. Next up: **S5** (OOS tabs → not 10 + excluded from the "every tab ≥8" narrative).
