@@ -52,6 +52,7 @@ run "instrument-proxy F1b device-scale geometry"  "$PY" scripts/blender-universa
 run "main-incomer F1d device-scale electrical"    npx tsx scripts/lib/orchestrator/generic/main-incomer-selftest.ts
 run "gate-25 brief-literal scanner (mains vs £)"  npx tsx scripts/lib/brief-value-literal-scanner.ts --selftest
 run "interconnect F1e device-scale tubing"        "$PY" scripts/blender-universal/interconnect_device_scale_selftest.py
+run "F1a cartridge-heater homonym guard"          npx tsx scripts/lib/orchestrator/generic/f1a-cartridge-heater-selftest.ts
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 # EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice

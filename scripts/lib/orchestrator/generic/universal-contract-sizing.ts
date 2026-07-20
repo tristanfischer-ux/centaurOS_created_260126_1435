@@ -2720,6 +2720,26 @@ const SUB_ASSEMBLY: {
     ] },
 ]
 
+/**
+ * F1a proveCatch surface (2026-07-20). The FIRST part-name of the SUB_ASSEMBLY family a
+ * name explodes into (mirrors the real match idiom `r.match ? r.match(n) : r.re.test(n)`
+ * at the explode sites), or null when nothing matches. Lets a selftest prove the council-H1
+ * homonym fix directly on the REAL SUB_ASSEMBLY table: 'Cartridge Heater' must NOT explode
+ * into the pressure-vessel FILTER family (first part 'Pressure Vessel Shell') while
+ * 'Cartridge Filter' still must. Pure — no side effects. */
+export function subAssemblyFamilyHeadFor(name: string): string | null {
+  const n = String(name || '')
+  const rule = SUB_ASSEMBLY.find((r) => (r.match ? r.match(n) : r.re.test(n)))
+  return rule?.parts?.[0]?.name ?? null
+}
+/** Exposed for the F1a watt-scale proveCatch: does this SUB_ASSEMBLY part name read as
+ *  industrial pump/blower or pressure-vessel/filter plant anatomy that a watt-scale
+ *  instrument must skip? References the SAME regex the explode site uses (single source of
+ *  truth). Lazy (the const is defined later) — the function body only runs when called. */
+export function isWattScalePlantAnatomyPart(name: string): boolean {
+  return WATT_SCALE_PLANT_ANATOMY_PART_RE.test(String(name || ''))
+}
+
 function sanitizeId(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48) || 'part'
 }
@@ -2809,6 +2829,14 @@ const WATT_SCALE_VESSEL_PLANT_RE =
   /\bsupport\s*skirt|\binlet\s*nozzle|\boutlet\s*nozzle|\bdrain\s*nozzle|\bmanway\b|\baccess\s*ladder|\bshell\s*course|\btop\s*head|\bbase\s*\/\s*floor\s*plate|\btank\s*vent|\binternal\s*distribution|\binternal\s*lining|\boverflow\s*\/\s*weir\b/i
 const WATT_SCALE_FAN_ANATOMY_RE =
   /\bfan\s*housing|\bventuri\b|\bimpeller\b|\bec\s*motors?\b|\bspeed\s*controllers?\b|\bguard\s*\/\s*grille\b|\bmounting\s*frame\s*(?:&\s*)?isolators\b/i
+// A SUB_ASSEMBLY part-name that reads as industrial pump/blower drive-train OR pressure-
+// vessel / open-tank / filter plant anatomy — when ANY part of a matched family reads like
+// this on a watt-scale instrument, the WHOLE explode is skipped (F1a, council H1: a
+// 'Cartridge Heater' that slipped into the filter family must not mint a Pressure Vessel
+// Shell / Filter Media / Underdrain / Skid Frame on a 20 mL device). Single source of truth
+// for both the explode-site skip and its proveCatch (`isWattScalePlantAnatomyPart`).
+const WATT_SCALE_PLANT_ANATOMY_PART_RE =
+  /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller|pressure\s*vessel\s*shell|filter\s*media|distribution\s*header|underdrain|nozzle\s*plate|backwash|air\s*scour|sample\s*cock|skid\s*frame/i
 export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
   const dissipation = Number(quantities['system_thermal_dissipation_kw'] ?? 0)
   const airCooled = dissipation > 0 && dissipation * 1.2 < 2
@@ -3139,8 +3167,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // Controller blew interconnect to depth 20 and floored physics).
         if (
           isWattScaleInstrument
-          && rule.parts.some((p) =>
-            /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller|pressure\s*vessel\s*shell|filter\s*media|distribution\s*header|underdrain|nozzle\s*plate|backwash|air\s*scour|sample\s*cock|skid\s*frame/i.test(p.name))
+          && rule.parts.some((p) => WATT_SCALE_PLANT_ANATOMY_PART_RE.test(p.name))
         ) {
           continue
         }
