@@ -9029,6 +9029,47 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             hard_brief_keys.append(key)
         rows.append(st)
 
+    # ── S9 (council H9, 2026-07-20): STABILITY / tolerance "hold-and-report" requirements ──
+    # A stability metric (temperature_stability_k = 0.5 K on the organoid brief) lives in
+    # `constraints.derived_requirements`, which the metrics loop above never iterates — so it
+    # was SILENTLY DROPPED from the Verification spine (the reader saw the 37 °C setpoint HARD
+    # PASS and assumed stability was covered). Worse, a stability requirement CANNOT be
+    # satisfied by a setpoint echo (37==37): it needs a DERIVED achieved value (the ±K the
+    # control loop actually holds). Emit a HARD row that PASSes only against a real derived
+    # stability quantity, else UNVERIFIED — never dropped, never PASS-by-echo. Universal —
+    # keyed on the requirement noun (stability/tolerance/ripple/…), no product class.
+    _STABILITY_REQ_RX = re.compile(
+        r"stabilit|toleranc|ripple|settling|precision|accuracy|repeatab|drift|jitter", re.I)
+    _seen_keys = {str((m.get("key_metric") or m.get("metric") or "")).strip().lower()
+                  for m in metrics if isinstance(m, dict)}
+    for dr in (con.get("derived_requirements") or []):
+        if not isinstance(dr, dict):
+            continue
+        _dk = str(dr.get("key") or "").strip()
+        _lbl = str(dr.get("label") or dr.get("key") or "")
+        if not _dk or _dk.lower() in _seen_keys:
+            continue
+        if not (_STABILITY_REQ_RX.search(_dk) or _STABILITY_REQ_RX.search(_lbl)):
+            continue
+        _tgt = num(dr.get("value"))
+        if _tgt is None:
+            continue
+        hard_brief_keys.append(_dk)
+        # a DERIVED achieved value must exist — the setpoint does NOT satisfy stability.
+        _ach_q = (quantities.get(_dk) or quantities.get(_dk.replace("_k", "_c"))
+                  or quantities.get("temperature_stability_c") or quantities.get("temp_stability_k")
+                  or quantities.get("temp_stability_c"))
+        _ach = num(_ach_q.get("value")) if isinstance(_ach_q, dict) else num(_ach_q)
+        rows.append(_verif_row(
+            "brief", _lbl or _humanize_class(_dk),
+            status=_status_from_compare("le", _tgt, _ach, 0.02),
+            hardness="HARD",
+            provenance=(f"derived_requirements[{_dk}] — needs a DERIVED stability figure; a "
+                        f"setpoint echo does NOT satisfy a hold-and-report requirement (council H9)"),
+            target=_tgt, achieved=_ach if _ach is not None else "—", unit=dr.get("unit") or "",
+            target_num=_tgt, achieved_num=_ach, compare="le",
+        ))
+
     ucc = con.get("unit_cost_ceiling") or {}
     ceiling = num(ucc.get("value")) if isinstance(ucc, dict) else num(ucc)
     if ceiling is not None and ceiling > 0:
@@ -28890,6 +28931,30 @@ def _selftest() -> int:
     if "bespoke fabrication" not in _m_mpn:
         print(f"  FAIL S10: a genuinely fabricated mechanical part (Enclosure Shell) must keep "
               f"'bespoke fabrication to drawing' (got {_m_mpn!r})"); bad += 1
+    # ═══ S9 (council H9, 2026-07-20): a STABILITY derived-requirement must appear as a HARD
+    # verification row and resolve to UNVERIFIED absent a DERIVED stability figure — never
+    # silently dropped, never PASS-by-setpoint-echo. ═══
+    _s9_state = {"parsedBrief": {"constraints": {
+        "target_performance": {"metrics": [{"key_metric": "culture_temperature_c", "value": 37, "unit": "C"}]},
+        "derived_requirements": [{"key": "temperature_stability_k", "label": "Temperature Control Stability",
+                                  "value": 0.5, "unit": "K"}]}}}
+    _s9_rows = _assemble_verification_rows(_s9_state, ".")
+    _s9_stab = [r for r in _s9_rows if "stability" in str(r.get("claim") or "").lower()]
+    if not _s9_stab:
+        print("  FAIL S9: a temperature_stability_k derived-requirement must appear as a "
+              "verification row (not be silently dropped)"); bad += 1
+    elif not (_s9_stab[0].get("hardness") == "HARD" and _s9_stab[0].get("status") == "UNVERIFIED"):
+        print(f"  FAIL S9: a stability requirement with NO derived figure must be HARD + "
+              f"UNVERIFIED (setpoint echo ≠ pass), got {_s9_stab[0].get('hardness')}/"
+              f"{_s9_stab[0].get('status')}"); bad += 1
+    # proveNoFalsePositive: a DERIVED stability quantity ≤ target → PASS.
+    _s9_ok_state = json.loads(json.dumps(_s9_state))
+    _s9_ok_state["orchestratorContract"] = {"quantities": {"temperature_stability_k": {"value": 0.3}}}
+    _s9_ok_rows = _assemble_verification_rows(_s9_ok_state, ".")
+    _s9_ok = [r for r in _s9_ok_rows if "stability" in str(r.get("claim") or "").lower()]
+    if _s9_ok and _s9_ok[0].get("status") != "PASS":
+        print(f"  FAIL S9: a DERIVED stability 0.3 K ≤ 0.5 K target must PASS "
+              f"(got {_s9_ok[0].get('status')})"); bad += 1
     # ═══ S7 (2026-07-20): the multi-axis ship card + the vision axis bind ═══
     import tempfile as _tf7
     _CLEAN_ST = {"parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385}}},
