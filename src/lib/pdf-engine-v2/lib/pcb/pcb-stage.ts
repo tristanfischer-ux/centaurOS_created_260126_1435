@@ -435,6 +435,20 @@ export interface PcbStageResult {
   pipeline?: PcbPipelineRecord
   /** Architecture plan recorded by the chain before Atopile generation (scope truth). */
   architecture?: PcbArchitecturePlan
+  /** Architecture-vs-implementation fitness (P4b / P9b prerequisite). */
+  designFitness?: {
+    ok: boolean
+    findings: Array<{ severity?: string; code?: string; message?: string; fixStage?: string }>
+  }
+  /** True when architecture needs >1 KiCad deliverable but chain emitted one project (P5). */
+  multiBoardMerged?: boolean
+  /** Tier-0 firmware proof stage record (P9b) — never alone upgrades to FUNCTIONALLY VERIFIED. */
+  firmwareProof?: {
+    schema: 'pcb-firmware-proof-stage/v1'
+    tier: 0
+    results: Array<{ target: string; result: { ok: boolean; skipped?: boolean; reason?: string } }>
+    allOk: boolean
+  }
 }
 
 /**
