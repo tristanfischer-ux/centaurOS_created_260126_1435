@@ -2047,7 +2047,11 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
         _bd = (_sa.get("blocking_defects") if isinstance(_sa, dict) else None) or []
         if isinstance(_bd, list) and len(_bd) > 0:
             ships = False
-            open_n = max(open_n, len(_bd))
+            # NOTE (S7 one-truth reconcile, 2026-07-20): the bind refuses via ships+floor;
+            # it does NOT inflate open_n. open_issues is the CELL-BACKED count (tabs/sections
+            # below 8 — the workbook's LIVE OPEN ISSUES formula) so python and the recalculated
+            # workbook always agree (the ONE-TRUTH read-back). The blocking defect surfaces in
+            # the findings, not as N phantom open-issue counts no cell reproduces.
             if floor is None or floor > 4.0:
                 floor = 4.0
             print(f"  ! self-audit blocking_defects blocked SHIPS ({len(_bd)}): "
@@ -2063,7 +2067,7 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                       if str((f or {}).get("marker_family")) == "process_plant_vessel"]
             if _plant:
                 ships = False
-                open_n = max(open_n, len(_plant))
+                # (one-truth reconcile) refuse via ships+floor; open_n stays the cell-backed count.
                 if floor is None or floor > 4.0:
                     floor = 4.0
                 print(f"  ! process-plant word leak on a DEVICE-SCALE product blocked "
@@ -2088,12 +2092,26 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 and _oem is not None and _oem > 0
                 and _oem > _ceiling * 1.02):
             ships = False
-            open_n = max(open_n, 1)
+            # (one-truth reconcile) refuse via ships+floor; open_n stays the cell-backed count.
             if floor is None or floor > 4.0:
                 floor = 4.0
             print(f"  ! ex-works price £{_oem:,.0f} exceeds the £{_ceiling:,.0f} unit-cost "
                   f"ceiling ({_oem / _ceiling:.2f}×) — not viable at the stated budget; "
                   f"blocked SHIPS (S4)")
+        # ── S7: VISION AXIS BIND (2026-07-20) ──────────────────────────────────
+        # The tab floor already folds the PCB + Renders tab scores, but a DELIVERED
+        # vision critique that flags the render BROKEN must block ships directly —
+        # a reader's 5-second glance would reject a broken hero, so the engine takes
+        # that glance too (SIGHT). Only binds when the critique EXISTS and says broken
+        # (an absent critique is S12's timing concern, never a silent block here).
+        _vis = _render_vision_verdict(run_dir or "")
+        if isinstance(_vis, dict) and bool(_vis.get("broken")):
+            ships = False
+            # (one-truth reconcile) refuse via ships+floor; open_n stays the cell-backed count.
+            if floor is None or floor > 4.0:
+                floor = 4.0
+            print(f"  ! render vision critic flagged the hero BROKEN "
+                  f"({(_vis.get('defects') or ['unspecified'])[:1]}) — blocked SHIPS (S7)")
     return {"floor": floor, "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
@@ -2114,6 +2132,71 @@ def verdict_text(style: str = "line", v: Optional[dict] = None) -> str:
     return (f"VERDICT: {short} · floor {fl_txt} "
             f"(min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit "
             f"is advisory and never floors; ships at ≥8 everywhere)")
+
+
+def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict]:
+    """S7 (2026-07-20): the SHIP gate as its FIVE independent axes, each read from its OWN
+    canonical state field — never the collapsed tab scorecard. SHIPS requires every
+    APPLICABLE axis to pass. Returns [{axis, applicable, passed, detail}] so the Quality &
+    Audit tab can render the card (and the reader sees WHICH axis fails, not one word).
+    Universal — no product class named; an axis with no applicable data is `applicable:False`
+    and never blocks. The floor/self-audit/oem/pcb axes are ALSO bound in compute_verdict;
+    this is the single readable surface + the source of the vision bind."""
+    axes: List[dict] = []
+    st = state if isinstance(state, dict) else {}
+    # 1. TAB FLOOR — min of every deterministic section & non-mirror tab (compute_verdict).
+    fl = (v or {}).get("floor")
+    axes.append({"axis": "Tab floor ≥8", "applicable": True,
+                 "passed": isinstance(fl, (int, float)) and fl >= 8,
+                 "detail": (f"floor {fl:g}/10" if isinstance(fl, (int, float)) else "floor —")})
+    # 2. SELF-AUDIT — the engine's own audit found no blocking defect.
+    _bd = (st.get("selfAudit") or {}).get("blocking_defects") or []
+    axes.append({"axis": "Self-audit — no blocking defects", "applicable": True,
+                 "passed": not _bd,
+                 "detail": ("clean" if not _bd else f"{len(_bd)} blocking defect(s)")})
+    # 3. EX-WORKS vs UNIT-COST CEILING (S4) — only when the brief states a ceiling.
+    _ucc = ((st.get("parsedBrief") or {}).get("constraints") or {}).get("unit_cost_ceiling") or {}
+    _ceiling = num(_ucc.get("value")) if isinstance(_ucc, dict) else num(_ucc)
+    _oem = num((st.get("costStack") or {}).get("oem_transfer_price_gbp"))
+    if _ceiling is not None and _ceiling > 0 and _oem is not None and _oem > 0:
+        axes.append({"axis": "Ex-works ≤ unit-cost ceiling", "applicable": True,
+                     "passed": _oem <= _ceiling * 1.02,
+                     "detail": f"£{_oem:,.0f} vs £{_ceiling:,.0f} ceiling"})
+    else:
+        axes.append({"axis": "Ex-works ≤ unit-cost ceiling", "applicable": False,
+                     "passed": True, "detail": "no unit-cost ceiling in the brief"})
+    # 4. PCB READINESS — only when the design is PCB-bearing; fab-ready (any disclosed
+    #    FAB-READY string) passes, ENGINEERING DRAFT / FAIL does not.
+    _pcb = st.get("pcb") or {}
+    if _pcb.get("isPcbBearing"):
+        try:
+            _rd = str(_pcb_two_axis_assessment(_pcb, run_dir or "").get("readiness") or "")
+            axes.append({"axis": "PCB readiness — fab-ready", "applicable": True,
+                         "passed": _rd.startswith("FAB-READY"), "detail": _rd or "—"})
+        except Exception:  # noqa: BLE001 — never let the axis crash the verdict
+            axes.append({"axis": "PCB readiness — fab-ready", "applicable": True,
+                         "passed": False, "detail": "readiness not computed"})
+    else:
+        axes.append({"axis": "PCB readiness — fab-ready", "applicable": False,
+                     "passed": True, "detail": "no PCB in this design"})
+    # 5. RENDER VISION — a DELIVERED vision critique that flags the render broken blocks
+    #    ships; no critique on file is `applicable:False` (S12 ensures it runs pre-Excel).
+    _vis = _render_vision_verdict(run_dir or "")
+    if isinstance(_vis, dict):
+        _broken = bool(_vis.get("broken"))
+        _defects = ", ".join(str(d) for d in (_vis.get("defects") or []))[:60]
+        axes.append({"axis": "Render vision — not broken", "applicable": True,
+                     "passed": not _broken,
+                     "detail": (f"broken: {_defects}" if _broken else "clean")})
+    else:
+        axes.append({"axis": "Render vision — not broken", "applicable": False,
+                     "passed": True, "detail": "no vision critique on file"})
+    return axes
+
+
+def ship_axes_all_pass(axes: List[dict]) -> bool:
+    """SHIPS iff every APPLICABLE axis passed (S7)."""
+    return all(a.get("passed") for a in axes if a.get("applicable"))
 
 
 def _register_verdict_cell(ws: Worksheet, row: int, col: int,
@@ -14179,21 +14262,25 @@ def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[
         _note = ("this tab performed NO stress/structural or performance analysis — only the "
                  "ISO 2768-1 general-tolerance boilerplate (which passes every fabricated row "
                  "regardless of size); the stress/allowables table is empty")
+        _tol_rows = {("tolerance", i): rv for i, rv in (_tol_res.get("rows") or {}).items()}
+        _tol_contract = _tol_res.get("contract") or []
+        _tol_np = _tol_res.get("n_pass") or 0
+        _tol_nt = _tol_res.get("n_total") or 0
         if _dev:
             # A device with no pressure-containing / performance-rated principals genuinely
             # has nothing to stress-analyse → VERIFIED OUT-OF-SCOPE (excluded from the floor,
-            # like the other device-scale OOS tabs), never a fake 10.
+            # like the other device-scale OOS tabs), never a fake 10. Full-shape dict so the
+            # generic contract consumer (score/status/n_pass/n_total) never KeyErrors.
             return {"tab": "Engineering Analysis", "scored": False, "score": 8, "status": "PASS",
+                    "rows": _tol_rows, "contract": _tol_contract, "n_pass": _tol_np, "n_total": _tol_nt,
                     "issues": [_note + " — VERIFIED out of scope for this device (no pressure/"
                                "structural principals); general tolerances apply per ISO 2768-1"],
                     "mech": "engineering analysis — verified out of scope (no principals to stress-analyse)",
                     "fix": ""}
         # A non-device (structural/plant) design that produced ZERO stress rows is a REAL
         # gap, not a boilerplate pass — cap below the ship floor with an honest issue.
-        return {"tab": "Engineering Analysis", "score_cap": 4.0,
-                "rows": {("tolerance", i): rv for i, rv in (_tol_res.get("rows") or {}).items()},
-                "contract": _tol_res.get("contract") or [],
-                "n_pass": _tol_res.get("n_pass") or 0, "n_total": _tol_res.get("n_total") or 0,
+        return {"tab": "Engineering Analysis", "score_cap": 4.0, "score": 4.0, "status": "FAIL",
+                "rows": _tol_rows, "contract": _tol_contract, "n_pass": _tol_np, "n_total": _tol_nt,
                 "issues": [_note + " — a structural/plant design must carry a real "
                            "stress/allowables analysis of its principal parts"],
                 "mech": "engineering analysis — tolerance boilerplate only (no stress/performance)",
@@ -22201,6 +22288,42 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
     _register_verdict_cell(ws, r, 1, style="line")
     r += 2
+    # ---- SHIP GATE — THE FIVE AXES (S7, 2026-07-20): SHIPS is not one collapsed word —
+    # it is EVERY applicable axis passing (tab floor / self-audit / ex-works vs ceiling /
+    # PCB readiness / render vision), each read from its OWN state field. Render them so
+    # the reader sees WHICH axis fails, never a single green 'SHIPS' hiding a broken axis. ----
+    try:
+        _axes = compute_ship_axes(state, run_dir, _VERDICT)
+        _all = ship_axes_all_pass(_axes)
+        _hc = ws.cell(r, 1, f"SHIP GATE — {'every applicable axis MET' if _all else 'an axis is UNMET'} "
+                            f"(SHIPS requires ALL applicable axes)")
+        _hc.font = FONT_PASS if _all else FONT_FAIL
+        _hc.fill = FILL_PASS if _all else FILL_FAIL
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+        r += 1
+        # numeric operand col (B) drives the LIVE verdict formula (col C) — no bare
+        # PASS/FAIL literal (the _enforce_live_check_gate contract). B: 1=met, 0=unmet,
+        # blank=not-applicable (out of scope).
+        header(ws, r, ["Ship-gate axis", "Met (1/0, blank=n/a)", "Verdict", "Detail", ""])
+        r += 1
+        for _ax in _axes:
+            ws.cell(r, 1, _ax["axis"]).font = FONT_SUB
+            _apx = bool(_ax.get("applicable"))
+            _psx = bool(_ax.get("passed"))
+            _op = ws.cell(r, 2, (1 if _psx else 0) if _apx else None)
+            _op.font = FONT_NOTE
+            _vc = ws.cell(r, 3, f'=IF($B{r}="","— (n/a — not in scope)",'
+                                f'IF($B{r}>=1,"PASS ✓","⛔ FAIL"))')
+            _vc.font = FONT_PASS if (_psx or not _apx) else FONT_FAIL
+            if _apx:
+                _vc.fill = FILL_PASS if _psx else FILL_FAIL
+            dc = ws.cell(r, 4, str(_ax.get("detail") or ""))
+            dc.font = FONT_NOTE
+            dc.alignment = WRAP_TOP
+            r += 1
+        r += 1
+    except Exception as _ax_exc:  # noqa: BLE001 — the card is additive; never kill the tab
+        print(f"  ! ship-gate axes card skipped (non-fatal): {_ax_exc}")
     # ---- SECTION TABLE (B3-floor fix 2026-07-03): the scored rows are the DETERMINISTIC
     # (FACT) scorecard sections — the corroboration-computed numbers the verdict floor
     # actually ranges over. The LLM self-audit's numbers annotate the same rows as
@@ -22798,6 +22921,9 @@ _dt(["Axis", "Claim", "Target", "Achieved", "Unit", "STATUS", "Hardness", "Prove
     unit=["Unit"])
 _dt(["Section", "Score", "≥8?", "Defects"], "overview-sections",
     ["Section", "Score", "≥8?"], numeric=["Score"])
+# S7 ship-gate axes card (Quality & Audit) — axis + live verdict formula over the Met operand.
+_dt(["Ship-gate axis", "Met (1/0, blank=n/a)", "Verdict", "Detail", ""], "ship-gate-axes",
+    ["Ship-gate axis", "Verdict"])
 _dt(["Metric", "Value", "Unit", "Notes / source"], "overview-metrics",
     ["Metric", "Value", "Notes / source"])
 _dt(["Category", "Cost (£)", "% of capex", "Share"], "overview-cost",
@@ -25513,13 +25639,23 @@ def build(run_dir: str, out_path: str) -> dict:
             _cres = None
         if _cres:
             _CONTRACT_RESULTS[_cname] = _cres
-            _TAB_SCORES[_cname] = {
-                "score": _cres["score"], "target": 8, "status": _cres["status"],
-                "issues": _cres["issues"], "fix": _cres["fix"],
-                "basis": f"column-contract arithmetic: 10 × {_cres['n_pass']}/{_cres['n_total']} rows passing",
+            _c_np = _cres.get("n_pass", 0)
+            _c_nt = _cres.get("n_total", 0)
+            _entry = {
+                "score": _cres.get("score"), "target": 8, "status": _cres.get("status"),
+                "issues": _cres.get("issues") or [], "fix": _cres.get("fix") or "",
+                "basis": f"column-contract arithmetic: 10 × {_c_np}/{_c_nt} rows passing",
             }
-            print(f"  · column contract [{_cname}]: {_cres['n_pass']}/{_cres['n_total']} rows PASS "
-                  f"→ {_cres['score']}/10" +
+            # A contract eval may set score_cap (a real gap capped below the floor) or
+            # scored:False (verified out-of-scope) — PROPAGATE both so the floor logic +
+            # the OOS chip see them (S8: the Engineering-Analysis tolerance-only case).
+            if isinstance(_cres.get("score_cap"), (int, float)):
+                _entry["score_cap"] = _cres["score_cap"]
+            if _cres.get("scored") is False:
+                _entry["scored"] = False
+            _TAB_SCORES[_cname] = _entry
+            print(f"  · column contract [{_cname}]: {_c_np}/{_c_nt} rows PASS "
+                  f"→ {_cres.get('score')}/10" +
                   (f" ({_cres['source_fabricated']} fabricated source tick(s) neutralised)"
                    if _cres.get("source_fabricated") else ""))
     # ── ELECTRICAL MERGE (Bundle B fix 4): the 'Panel schedule' + 'Single-line' tabs are
@@ -28562,6 +28698,51 @@ def _selftest() -> int:
         print(f"  FAIL S8: a NON-device Engineering-Analysis tab with an empty stress table "
               f"must be capped ≤4 (a real gap), not a boilerplate 10 "
               f"(got score_cap={_s8_pl.get('score_cap') if _s8_pl else None})"); bad += 1
+    # ═══ S7 (2026-07-20): the multi-axis ship card + the vision axis bind ═══
+    import tempfile as _tf7
+    _CLEAN_ST = {"parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385}}},
+                 "costStack": {"oem_transfer_price_gbp": 300},
+                 "selfAudit": {"blocking_defects": []},
+                 "pcb": {"isPcbBearing": False}}
+    with _tf7.TemporaryDirectory() as _td7:
+        _axes_ok = compute_ship_axes(_CLEAN_ST, _td7, {"floor": 9})
+        # 5 axes, and with a clean state every APPLICABLE axis passes → ships-by-axes True.
+        if len(_axes_ok) != 5:
+            print(f"  FAIL S7: compute_ship_axes must return the 5 canonical axes "
+                  f"(got {len(_axes_ok)})"); bad += 1
+        if not ship_axes_all_pass(_axes_ok):
+            print(f"  FAIL S7: a clean state (floor 9, no blocking defects, oem<ceiling, no "
+                  f"PCB, no vision file) must pass every applicable axis "
+                  f"(got {[(a['axis'], a['applicable'], a['passed']) for a in _axes_ok]})"); bad += 1
+        # the oem axis is applicable (ceiling present) and passes (£300 < £385)
+        _oem_axis = next(a for a in _axes_ok if a["axis"].startswith("Ex-works"))
+        if not (_oem_axis["applicable"] and _oem_axis["passed"]):
+            print(f"  FAIL S7: the ex-works axis must be applicable+pass at £300 vs £385 "
+                  f"(got {_oem_axis})"); bad += 1
+        # PCB axis is NOT applicable (no PCB) → does not block.
+        _pcb_axis = next(a for a in _axes_ok if a["axis"].startswith("PCB"))
+        if _pcb_axis["applicable"]:
+            print(f"  FAIL S7: a non-PCB design must mark the PCB axis inapplicable "
+                  f"(got {_pcb_axis})"); bad += 1
+        # proveCatch: a DELIVERED broken vision critique fails the vision axis AND blocks ships.
+        with open(os.path.join(_td7, "render-vision-critique.json"), "w") as _fh7:
+            json.dump({"ok": False, "broken": True, "defects": ["hero is a grey box"]}, _fh7)
+        _VISION_CACHE.pop(_td7, None)   # bust the read cache so the new file is seen
+        _axes_broken = compute_ship_axes(_CLEAN_ST, _td7, {"floor": 9})
+        _vis_axis = next(a for a in _axes_broken if a["axis"].startswith("Render vision"))
+        if not (_vis_axis["applicable"] and not _vis_axis["passed"]):
+            print(f"  FAIL S7: a delivered broken vision critique must fail the vision axis "
+                  f"(got {_vis_axis})"); bad += 1
+        if ship_axes_all_pass(_axes_broken):
+            print("  FAIL S7: a broken vision axis must make ship_axes_all_pass False"); bad += 1
+        # the vision bind in compute_verdict: broken critique → ships False even at floor 9.
+        _VISION_CACHE.pop(_td7, None)
+        _v7 = compute_verdict({"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]}},
+                              {"Overview": {"score": 9, "status": "PASS"}}, _td7)
+        if _v7["ships"] or (_v7["floor"] or 99) > 4.0:
+            print(f"  FAIL S7: a delivered BROKEN vision critique must block SHIPS in "
+                  f"compute_verdict even at floor 9 (got {_v7})"); bad += 1
+        _VISION_CACHE.pop(_td7, None)
     # ═══ MACRO SELF-AUDIT BINDING (2026-07-20, Pillar 1) — the engine must REFUSE a
     # dossier whose own detectors flagged it, even when every TAB scores ≥8. Frozen
     # organoid-bioreactor-2150 shape: all tabs ≥8 but selfAudit.blocking_defects
