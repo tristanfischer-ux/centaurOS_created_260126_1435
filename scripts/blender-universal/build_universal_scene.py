@@ -687,7 +687,16 @@ DEFAULT_SHAPE = "box"  # anything unmatched → a modest box
 # is `horizontal_vessel` — none is tall_column/tall_vessel/vertical_vessel/tank/stack/
 # cone_vessel) fixes the proven defect with zero blast radius elsewhere. Widening further
 # is a legitimate follow-up but belongs to its own verified, re-checked change.
-_ROUND_VESSEL_SHAPES = {"horizontal_vessel"}
+# B1 (2026-07-20): EVERY round-vessel shape (not just horizontal) — a part with an explicit BOX
+# dim under ANY round shape must render at that dim, not fall to the placed-footprint / type-
+# default cylinder. The organoid 2150 Culture Vessel carried a device-scale '38×70 mm' box dim
+# and the Sterile Vent got a device-scale box from the F1b instrument proxy, but both classify
+# as `vertical_vessel` — absent here, the manifest round-branch ignored their box dims and read
+# the metre-scale PLACED footprint (⌀1600 / ⌀1360), sprawling the scene to 10× the 160 mm
+# enclosure (the Lego-in-a-box hero). Universal — keyed on the dim-KIND vs shape-FAMILY
+# mismatch, never a class/name.
+_ROUND_VESSEL_SHAPES = {"horizontal_vessel", "vertical_vessel", "tall_vessel",
+                        "tall_column", "tank", "stack", "inline_spool"}
 
 # ── 3. TYPE-DEFAULT sizes (mm) — used only when the word has NO explicit dim ─
 # Each entry: overall (diameter_or_width, length_or_height) in mm. For vessels

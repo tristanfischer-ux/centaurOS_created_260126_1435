@@ -73,6 +73,17 @@ def main() -> int:
     if d is None or max(v for k, v in d.items() if k.endswith("_mm")) > DEVICE_MAX_MM:
         fails.append(f"backstop with default envelope produced non-device dims: {d}")
 
+    # ── B1 (2026-07-20): a round-VESSEL part carrying an explicit BOX dim must render at that
+    # dim (device-scale), not fall to the metre-scale placed footprint / type-default cylinder.
+    # The 2150 Culture Vessel ('38×70 mm' box dim, classified vertical_vessel) rendered ⌀1600
+    # because vertical_vessel was absent from _ROUND_VESSEL_SHAPES → the scene sprawled 10× the
+    # enclosure (Lego-in-a-box). Assert the coercion now covers every round-vessel shape. ──
+    _rvs = getattr(_bus, "_ROUND_VESSEL_SHAPES", set())
+    for _sh in ("vertical_vessel", "horizontal_vessel", "tall_vessel", "tall_column", "tank", "stack"):
+        if _sh not in _rvs:
+            fails.append(f"B1: '{_sh}' must be in _ROUND_VESSEL_SHAPES so a box-dim'd vessel is "
+                         f"honoured at its dim, not the metre-scale placed footprint")
+
     if fails:
         print("[instrument-proxy][selftest] FAIL:")
         for f in fails:
