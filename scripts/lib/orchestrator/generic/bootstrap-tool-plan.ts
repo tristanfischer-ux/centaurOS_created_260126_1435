@@ -109,6 +109,7 @@ import type {
 import { getTool, listTools } from '../registry'
 import { composeToolGraph, type ToolIOSchema } from '../auto-planner'
 import { sweepToolRelevance, checkUnitCoverage } from './relevance-sweep'
+import { deriveDesignScaleTier } from './design-scale-tier'
 import { coerceContractValueToParamUnit, magnitudeRefusal } from './unit-coercion'
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -2071,12 +2072,40 @@ export async function bootstrapToolPlan(
     )
   }
 
+  // F1f Layer 1: pin the physics scale tier from the signals available at tool-plan time
+  // (brief metrics + the contract duties), so the sweep can HARD-VETO plant-only tools on a
+  // lab-scale identity BEFORE the LLM — a "heater" noun can no longer pull a fish-farm tool.
+  // (state.designIdentity is stamped later at state-save; this derives the SAME tier early.)
+  const _dutyNum = (rx: RegExp): number | undefined => {
+    for (const q2 of contractQuantities) if (rx.test(String(q2.key))) {
+      const n = Number(q2.value); if (Number.isFinite(n)) return n
+    }
+    return undefined
+  }
+  const _briefMetric = (key: string): number | undefined => {
+    const ms = (brief as { constraints?: { target_performance?: { metrics?: Array<{ key_metric?: string; value?: unknown }> } } })
+      ?.constraints?.target_performance?.metrics ?? []
+    for (const m of ms) if (String(m?.key_metric ?? '').toLowerCase() === key) {
+      const n = Number(m?.value); if (Number.isFinite(n)) return n
+    }
+    return undefined
+  }
+  const _md = (brief as { constraints?: { max_dimensions_mm?: Record<string, unknown> } })?.constraints?.max_dimensions_mm
+  const _edges = _md ? Object.values(_md).map(v => Number(v)).filter(n => Number.isFinite(n) && n > 0) : []
+  const _scaleTier = deriveDesignScaleTier({
+    enclosure_volume_m3: _dutyNum(/^enclosure_volume_m3$/),
+    peak_electrical_power_w: _dutyNum(/^peak_electrical_power_w$/),
+    connected_electrical_load_kw: _dutyNum(/^connected_electrical_load_kw$/),
+    working_volume_ml: _dutyNum(/^working_volume_ml$/) ?? _briefMetric('working_volume_ml'),
+    max_edge_mm: _edges.length ? Math.max(..._edges) : undefined,
+  })
   const sweep = await sweepToolRelevance({
     slug, brief, envelope,
     duties: contractQuantities.map(q2 => ({ key: q2.key, value: q2.value, unit: q2.unit })),
     catalogue: fullCatalogue,
     targetProcess: processText,
     applicableToThisClass,
+    scaleTier: _scaleTier,
   })
   if (sweep.ok) {
     // UNION the swept-relevant set with the universal aggregators V3 requires (mass

@@ -49,6 +49,7 @@ run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_
 run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mispin-selftest.ts
 run "reference-anchor F1c device-scale guard"     npx tsx scripts/enrich-state-with-reference-anchor.tsx --selftest
 run "F1f design-scale-tier (identity lock)"       npx tsx scripts/lib/orchestrator/generic/design-scale-tier-selftest.ts
+run "F1f Layer1 hard scale-veto (relevance)"      npx tsx scripts/lib/orchestrator/generic/f1f-scale-veto-selftest.ts
 run "instrument-proxy F1b device-scale geometry"  "$PY" scripts/blender-universal/instrument_proxy_selftest.py
 run "main-incomer F1d device-scale electrical"    npx tsx scripts/lib/orchestrator/generic/main-incomer-selftest.ts
 run "gate-25 brief-literal scanner (mains vs £)"  npx tsx scripts/lib/brief-value-literal-scanner.ts --selftest

@@ -53,6 +53,43 @@ import { homedir } from 'node:os'
 
 import type { BriefEnvelope, ParsedConstraints } from '../types'
 import type { ToolCatalogueEntry } from './bootstrap-tool-plan'
+import type { DesignScaleTier } from './design-scale-tier'
+
+// F1f Layer 1 (2026-07-20): HARD scale-veto — a PLANT-ONLY tool family is INVISIBLE to a lab-
+// scale (handheld/benchtop) design identity, no matter what shared noun the brief carries
+// ("heater" → aquaculture/RAS tank-heat tool). This is the PREVENT layer the author-scope
+// EXCLUDES signal (advisory) could not enforce: a keyword YES can no longer drag a fish-farm /
+// process-plant / DN-pipe / pressure-vessel tool onto a 20 mL / 35 W device. Universal — keyed
+// on the tool's OWN id/domain (plant-only families), gated by the PINNED physics scale_tier
+// (state.designIdentity, F1f Layer 0), never a product name.
+export const PLANT_ONLY_TOOL_RX =
+  /aquaculture|(?:^|[^a-z])ras[-:_]|irrigation[:_-]|pressure[-_]?vessel[:_]|nutrient[-_]?solution|hvac[:_-]?load|refrigeration[-_]?cycle|building[-_]?envelope|process[-_]?plant|crystalli[sz]er|distillation|\bstripper\b|\babsorber\b|backwash|underdrain|drum[-_]?filter|clarifier|biofilter|cooling[-_]?tower|boiler[:_]/i
+
+/** Lab-scale identity: a handheld / benchtop instrument for which plant-only tools are vetoed. */
+export function isLabScaleTier(tier: DesignScaleTier | undefined | null): boolean {
+  return tier === 'handheld' || tier === 'benchtop'
+}
+
+/** Apply the F1f Layer-1 hard veto to a completed verdict set: on a lab-scale identity, force
+ *  every PLANT-ONLY tool to relevant=false (hard_veto), regardless of the LLM/cache verdict.
+ *  Returns the (verdicts, relevant_ids) with the veto applied. Deterministic post-filter — no
+ *  cache-key change; applied on BOTH the cache-hit and fresh paths so the selection is identical.
+ *  A no-tier / non-lab identity is a strict no-op (fully backward-compatible). */
+export function applyScaleVeto(
+  verdicts: ToolRelevanceVerdict[],
+  scaleTier: DesignScaleTier | undefined,
+): { verdicts: ToolRelevanceVerdict[]; vetoed: string[] } {
+  if (!isLabScaleTier(scaleTier)) return { verdicts, vetoed: [] }
+  const vetoed: string[] = []
+  const out = verdicts.map((v) => {
+    if (PLANT_ONLY_TOOL_RX.test(v.tool_id)) {
+      vetoed.push(v.tool_id)
+      return { ...v, relevant: false, reason: `hard_veto:scale_tier_mismatch (${scaleTier} identity; plant-only tool)` }
+    }
+    return v
+  })
+  return { verdicts: out, vetoed }
+}
 
 // Same strong reasoner the bootstrap harvest + brief expander use — the sweep is a
 // once-per-class (cached) judgement and must match hand quality (the minimal RIGHT
@@ -474,6 +511,11 @@ export interface RelevanceSweepInput {
    * must justify a YES on genuine physics, not a shared keyword.
    */
   applicableToThisClass?: ReadonlyMap<string, boolean | null>
+  /** F1f Layer 1: the PINNED physics scale tier (state.designIdentity.scale_tier). When it is
+   *  lab-scale (handheld/benchtop), plant-only tool families are HARD-VETOED (invisible to the
+   *  sweep) — a keyword YES can no longer drag a fish-farm / process-plant tool onto a device.
+   *  Absent → no veto (fully backward-compatible). */
+  scaleTier?: DesignScaleTier
 }
 
 /**
@@ -520,12 +562,15 @@ export async function sweepToolRelevance(input: RelevanceSweepInput): Promise<Re
     // The cache is valid only if it covers EVERY catalogue tool (a complete sweep).
     // A partial cache (catalogue grew since) is ignored → fresh sweep.
     if (verdicts.length === catalogueToolIds.length) {
-      const relevant = verdicts.filter(v => v.relevant).map(v => v.tool_id).sort()
+      // F1f Layer 1 hard veto — applied on the cache path too so a lab-scale identity's plant-
+      // only tools are excluded deterministically, whatever the cached LLM verdict said.
+      const { verdicts: _vv, vetoed } = applyScaleVeto(verdicts, input.scaleTier)
+      const relevant = _vv.filter(v => v.relevant).map(v => v.tool_id).sort()
       console.error(
         `[relevance-sweep] CACHE HIT slug=${slug} key=${cacheKey}: ${relevant.length}/${catalogueToolIds.length} tools relevant ` +
-        `(replayed, no LLM call) — deterministic selection.`,
+        `(replayed, no LLM call)${vetoed.length ? ` · ${vetoed.length} plant-only tool(s) hard-vetoed on ${input.scaleTier} identity` : ''} — deterministic selection.`,
       )
-      return { ok: true, relevant_tool_ids: relevant, verdicts, cache_key: cacheKey, from_cache: true, llm_cost_usd: null, batch_calls: 0 }
+      return { ok: true, relevant_tool_ids: relevant, verdicts: _vv, cache_key: cacheKey, from_cache: true, llm_cost_usd: null, batch_calls: 0 }
     }
   }
 
@@ -593,21 +638,25 @@ export async function sweepToolRelevance(input: RelevanceSweepInput): Promise<Re
   const verdicts: ToolRelevanceVerdict[] = sorted.map(entry =>
     verdictById.get(entry.tool_id) ?? { tool_id: entry.tool_id, relevant: false, reason: '(omitted by sweep → not relevant)' },
   )
-  const relevant = verdicts.filter(v => v.relevant).map(v => v.tool_id).sort()
-
-  // (f) CACHE the complete verdict set keyed by the brief+catalogue hash.
+  // (f) CACHE the RAW verdict set (the model's judgement) keyed by the brief+catalogue hash —
+  // the F1f scale-veto is a deterministic post-filter applied on read, so a future scale_tier
+  // change re-vetoes correctly and the cache stays scale-agnostic.
   writeCache(cacheKey, slug, verdicts)
+
+  // F1f Layer 1 hard veto — plant-only tools are invisible to a lab-scale identity.
+  const { verdicts: _vetoedVerdicts, vetoed } = applyScaleVeto(verdicts, input.scaleTier)
+  const relevant = _vetoedVerdicts.filter(v => v.relevant).map(v => v.tool_id).sort()
 
   console.error(
     `[relevance-sweep] DONE slug=${slug} key=${cacheKey}: ${relevant.length}/${catalogue.length} tools RELEVANT ` +
-    `(${batchCalls} batch call(s), cost_usd=${totalCost.toFixed(4)}). Cached → re-runs replay this exact selection. ` +
+    `(${batchCalls} batch call(s), cost_usd=${totalCost.toFixed(4)})${vetoed.length ? ` · ${vetoed.length} plant-only tool(s) hard-vetoed on ${input.scaleTier} identity (${vetoed.join(', ')})` : ''}. Cached → re-runs replay this exact selection. ` +
     `Relevant: ${relevant.join(', ')}`,
   )
 
   return {
     ok: true,
     relevant_tool_ids: relevant,
-    verdicts,
+    verdicts: _vetoedVerdicts,
     cache_key: cacheKey,
     from_cache: false,
     llm_cost_usd: totalCost > 0 ? totalCost : null,
