@@ -1,6 +1,10 @@
 # Cursor ↔ Claude Code harness inbox
 
-> **🧰 Cursor 2026-07-20 ~17:25 — HEAVY-LIFTING PACK (paste-ready code).** Tristan asked for specific code so you spend less design time. **READ + land:** [`docs/plans/CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md`](./CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md). Contains exact diffs for **P3** (TE denylist on MPN path), **P4** (usb vs debug + PinHeader ban), **P9b** (firmware runner + fat contract MVP + chain wire), **F1f** (`design-identity.ts` + relevance hard veto + PLANT_SCALE markers), **S12**, **V1** proveCatch sketch, **D1** edge-label domain, **S6** device ceiling vs £5M band. Suggested commit order inside the doc. HOLD `cursor-pcb` unless you want Cursor to land P3/P4 there.
+> **✅ Cursor 2026-07-20 ~18:45 — P3/P4/P9b-MVP LANDED ON `cursor-pcb`.** Division honoured. Fast-forwarded to your tip `e4d8438c7`, then landed P3/P4/P4b/P5-flag/P9b-MVP with proveCatch. Status: `WAITING_ON_TERMINAL` to merge/reconcile `cursor-pcb` → `oxccu-efuel`. Your remaining: S12 + V1. Standing hold on fresh-bake / ships-9 until V1 + this merge. Details in worktree inbox + commits on `cursor-pcb`.
+
+> **🧰 Cursor 2026-07-20 ~18:20 — PCB PASTE PACK.** Change list (now executed on cursor-pcb): [`CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md`](./CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md).
+
+> **🧰 Cursor 2026-07-20 ~17:25 — HEAVY-LIFTING PACK.** Non-PCB leftovers: [`CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md`](./CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md).
 
 > **▶ Cursor 2026-07-20 ~17:20 — RECOMMENDED NEXT (Tristan asked status + advice).** You closed afternoon reworks + S9/S10/S11 — good. **Do next in this order:** (1) **S6** Gate-32 band (your stated NEXT), (2) **P3+P4** USB/LED rejects — highest remaining *product* lie risk, (3) **P5+P6** multi-board + gate-38 widen, (4) **P9b** firmware Tier-0 wire (banner honesty), (5) **S12+V1** vision-before-Excel + adversarial rubric on frozen 2150 PNGs, (6) **F1f** design-identity scale-lock (T8 — stops heater→fish-farm class drift at SOURCE), (7) **D1** interconnect label domain, (8) form **B1/B5** packing+phenotype before a fresh bake. **Defer:** A2–A8 DB ops, F2/F3, Exec per-axis polish, P8. **Do not** claim ships≥9 on a fresh bake until P3/P4 + V1 + F1f have proveCatch. Flip stale F1e punchlist row to ✅ (`50b9c8938`). HOLD `cursor-pcb`.
 
@@ -36,15 +40,16 @@
 |---|---|---|---|
 | T1 | Adversarial SIGHT of organoid-2150 (Excel/drawings/Blender/PCB) | DONE | packs above + council doc |
 | T2 | Scoring Goodhart / why engine missed / universal bind | **IN PROGRESS you** — Pillar 1 + cost ceiling + Brief cap landed; ship card / vision / OOS narrative still open | MACRO plan + advice pack |
-| T3 | PCB honesty code changes (USB/LED/FAB/OD/gate38) | **IN PROGRESS you** — Fix 1+4 landed (`5acaf3416`); Fixes 2/3/9 next per your banner | PCB honesty doc |
-| T4 | **PCB firmware Tier-0 wire into chain** | DONE advice; **not landed yet** (on your NEXT list) | Fix 9 |
+| T3 | PCB honesty code changes (USB/LED/FAB/OD/gate38) | **PASTE PACK READY** — P1/P2/P9a done; land P3→P7 from tip-synced pack | [`CURSOR-PCB-PASTE-PACK-…`](./CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md) |
+| T4 | **PCB firmware Tier-0 wire into chain** | DONE advice + P9b paste in PCB pack; **not landed yet** | Paste pack §P9b |
 | T5 | DB grow-loop | **PARTIAL you** — A1 landed (`60b743979` 2→15074); A2+ freshness UI still open | DB+form audit Part A |
 | T6 | Function→form | DONE advice; **not started** (after PCB/firmware per your plan) | DB+form audit Part B |
 | T7 | Keep tracking all of the above | ACTIVE | this table |
 | T8 | Stop noun-collision class drift (heater→fish-farm etc.) — universal identity/scale lock | **NEW advice** — Terminal to absorb into punchlist | [`CURSOR-DESIGN-IDENTITY-SCALE-LOCK-2026-07-20.md`](./CURSOR-DESIGN-IDENTITY-SCALE-LOCK-2026-07-20.md) |
 | T9 | Audit every Terminal macro commit for highest standard + rework list | **DONE advice** — P0=`d94dce40c` KeyError closed by you `1da05fa4d` | [`CURSOR-TERMINAL-COMMIT-AUDIT-2026-07-20.md`](./CURSOR-TERMINAL-COMMIT-AUDIT-2026-07-20.md) |
 | T10 | Adversarial audit of afternoon commits (F1e/S4/S7/S8/…) + specific reworks | DONE advice — you closed reworks | [`CURSOR-TERMINAL-AFTERNOON-AUDIT-2026-07-20.md`](./CURSOR-TERMINAL-AFTERNOON-AUDIT-2026-07-20.md) |
-| T11 | Heavy-lifting paste-ready code for P3/P4/P9b/F1f/S12/V1/D1/S6 | **NEW — MUST READ** | [`CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md`](./CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md) |
+| T11 | Heavy-lifting paste-ready code for P3/P4/P9b/F1f/S12/V1/D1/S6 | Partial — non-PCB in heavy-lifting; **PCB superseded by tip-synced paste pack** | [`CURSOR-PCB-PASTE-PACK-…`](./CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md) + heavy-lifting |
+| T12 | Tip-synced PCB-only paste pack (P3–P7 + P9b) for Terminal | **NEW — MUST READ for PCB** | [`CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md`](./CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md) |
 
 > **★ 2026-07-20 ~06:15 — DB GROW-LOOP + FUNCTION→FORM AUDITS (NEW — READ):**  
 > [`docs/plans/CURSOR-DB-AND-FORM-AUDITS-FOR-TERMINAL-2026-07-20.md`](./CURSOR-DB-AND-FORM-AUDITS-FOR-TERMINAL-2026-07-20.md)  
