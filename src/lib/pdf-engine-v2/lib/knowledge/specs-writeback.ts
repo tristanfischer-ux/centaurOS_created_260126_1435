@@ -114,6 +114,16 @@ function getDb(): Database.Database | null {
     db.pragma('journal_mode = WAL')
     db.pragma('busy_timeout = 2000')
 
+    // A4 (2026-07-20): self-migrate the row-level timestamp columns so a fresh or
+    // un-migrated forge-truth.db still gains created_at/updated_at (the growing-DB
+    // freshness surface reads updated_at). Idempotent — 'duplicate column' is expected
+    // on an already-migrated DB and is swallowed.
+    for (const col of ['created_at', 'updated_at']) {
+      try {
+        db.prepare(`ALTER TABLE pretraining_extracted_specs ADD COLUMN ${col} TEXT`).run()
+      } catch { /* column already exists — fine */ }
+    }
+
     // NOTE: pre-existing duplicates in pretraining_extracted_specs
     // (477 dup groups as of 2026-05-26) preclude a UNIQUE index. Dedup is
     // enforced application-side via stmtExistsSpec pre-check below.
@@ -161,8 +171,10 @@ function getDb(): Database.Database | null {
 
     stmtInsertSpec = db.prepare(`
       INSERT INTO pretraining_extracted_specs
-        (document_id, spec_key, spec_value, spec_unit, raw_excerpt, embedding, embed_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (document_id, spec_key, spec_value, spec_unit, raw_excerpt, embedding, embed_hash,
+         created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?,
+         strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     `)
 
     // App-side dedup pre-check (UNIQUE index not allowed; see comment above)

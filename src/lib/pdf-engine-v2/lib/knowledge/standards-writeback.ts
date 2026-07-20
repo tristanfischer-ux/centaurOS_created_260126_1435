@@ -111,6 +111,15 @@ function getDb(): Database.Database | null {
         ON pretraining_extracted_standards(document_id, standard_name)
     `).run()
 
+    // A4 (2026-07-20): self-migrate the row-level timestamp columns (idempotent; the
+    // growing-DB freshness surface reads updated_at). 'duplicate column' is expected on
+    // an already-migrated DB.
+    for (const col of ['created_at', 'updated_at']) {
+      try {
+        db.prepare(`ALTER TABLE pretraining_extracted_standards ADD COLUMN ${col} TEXT`).run()
+      } catch { /* column already exists — fine */ }
+    }
+
     stmtLookupExact = db.prepare(`
       SELECT st.scope, st.raw_excerpt, d.extracted_at
       FROM pretraining_extracted_standards st
@@ -145,8 +154,10 @@ function getDb(): Database.Database | null {
 
     stmtInsertStandard = db.prepare(`
       INSERT INTO pretraining_extracted_standards
-        (document_id, standard_name, scope, raw_excerpt, embedding, embed_hash)
-      VALUES (?, ?, ?, ?, ?, ?)
+        (document_id, standard_name, scope, raw_excerpt, embedding, embed_hash,
+         created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?,
+         strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     `)
 
     // App-side dedup pre-check (UNIQUE index not allowed; see comment above)
