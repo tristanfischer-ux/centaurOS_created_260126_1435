@@ -1169,6 +1169,26 @@ function resolveComponent(
     }
   }
 
+  // P3: a denylisted MPN that fell through to a bare package must not place —
+  // prefer the denylist reason (operator-actionable) over a generic interface gap.
+  // GOTCHA: tier (a.5) may overwrite identityBlocker with a curated-miss string;
+  // re-read the denylist from the original partNumber so the TE-LED reason survives.
+  const denyAfterFallback = partNumber ? isDeniedPcbMpn(partNumber) : null
+  if (
+    !mpnVerified
+    && (tier === 'package_family' || tier === 'function_class')
+    && denyAfterFallback
+  ) {
+    return {
+      unresolved: {
+        wordId: word.wordId,
+        nameHuman: word.nameHuman,
+        characterId: word.characterId,
+        reason: denyAfterFallback,
+      },
+    }
+  }
+
   // P7: interface-critical roles may not stay on a bare package_family / function_class
   // default — Fix 1 already floors FAB-READY on non-catalogue tiers; this forces an
   // honest electronic gap instead of a silent generic footprint for USB/ESD/MCU/flash/fuse.

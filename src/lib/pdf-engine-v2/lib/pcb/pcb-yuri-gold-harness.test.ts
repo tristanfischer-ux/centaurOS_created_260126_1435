@@ -127,6 +127,10 @@ describe('Yuri PCB gold architecture harness', () => {
       sourceOutRoot: MAIN_OUT_ROOT,
     })
 
+    // INTENT (P7 2026-07-20): interface-critical roles without catalogue MPN now
+    // land in unresolved[] instead of silent package_family. Gold fixtures that
+    // still lack real USB/ESD/firmware/LED MPNs must surface unresolved_components
+    // — that is the honesty signal, not a harness regression.
     expect(Object.fromEntries(
       report.products.map((product) => [product.product, product.failureCodes]),
     )).toEqual({
@@ -134,9 +138,9 @@ describe('Yuri PCB gold architecture harness', () => {
       NinjaPCR: [],
       Poseidon: [],
       OpenFlexure: [],
-      Pioreactor: ['empty_generated_project'],
-      Rodeostat: [],
-      OpenDrop: ['empty_generated_project'],
+      Pioreactor: ['unresolved_components', 'empty_generated_project'],
+      Rodeostat: ['unresolved_components'],
+      OpenDrop: ['unresolved_components', 'empty_generated_project'],
     })
     const pioreactor = report.products.find((product) => product.product === 'Pioreactor')
     const openDrop = report.products.find((product) => product.product === 'OpenDrop')
