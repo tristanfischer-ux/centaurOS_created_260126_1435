@@ -21,7 +21,7 @@ Legend: ✅ done · �doing · ⬜ open
 | S8 | Engineering Analysis empty table → not 10 (council M6). FIX: tolerance-only → device OOS / plant cap≤4. **Cursor tweak DONE:** device with pressure/structural principals + empty stress → cap≤4 (not OOS); only OOS when NO such principal. Also fixed the committed-`dfd17129f` KeyError (returns were missing n_pass/n_total → broke every full build; found via SIGHT rebuild). | ✅ | dfd17129f + 67662bb56 + 06f74c4b3 |
 | S9 | Council H9 — stability HARD metric requires derived `temp_stability_c`, not setpoint echo | ⬜ | |
 | S10 | Council H10 — "bespoke fabrication to drawing" on catalogue/electronic families → UNRESOLVED, not satisfied | ⬜ | |
-| S11 | Council M5 — BoM↔PCB identity reconcile (MCU real MPN in PCB vs "bespoke/FR4" in BoM) | ⬜ | |
+| S11 | Council M5 — BoM↔PCB identity reconcile. DONE: `_build_mpn_by_word` harvests `state.pcb.pipeline.generator.components` (keyed nameHuman/characterId/space-form) → `_bom_row_mpn` backfills; a real board MPN overrides a TBD/empty partVerification, never a resolved one. SIGHT-verified 2150: MCU/temp-sensor/polyfuse/reverse-polarity now show real MPNs (was 'bespoke fabrication'). proveCatch both directions. | ✅ | dd75fdada |
 | S12 | **Vision-critic-before-Excel** timing race — Excel waits on render-vision-critique.json OR Renders capped ≤6 until present | ⬜ | |
 
 ## PCB honesty (Terminal — Cursor Fixes 1–9)
