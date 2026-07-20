@@ -53,7 +53,7 @@ Legend: ✅ done · �doing · ⬜ open
 | ID | Item | Status | SHA |
 |---|---|---|---|
 | D1 | Interconnect edge-domain coherence. DONE: `edge_domain_verdict` (connection_sizing.py) — an indicator/optical endpoint wired to a thermal/fluid actuator (LED→Peltier), OR a 400/415V-3ph label between device parts → within_spec=False DOMAIN MISMATCH (interconnect gate counts FAIL). SIGHT-verified real 2150 LED→Peltier edge. proveCatch both directions. | ✅ | df93bea1d |
-| D2 | Drawing gates: OOS/absent → `skipped` not `pass:true`; `all_pass` false if any in-scope drawing has major inspection defects | ⬜ | |
+| D2 | Drawing gates: OOS/absent → `skipped` not `pass:true`; `all_pass` false if any in-scope drawing has major inspection defects. **DONE (c97f07112):** the scorecard built cards from each gate's `drawings` LIST — a passing multi-drawing gate (part_coverage lists SLD+panel+pid) marked every listed drawing pass:true even out-of-scope. On frozen 2150 (instrument pack = {general-arrangement, interconnect}) that false-passed 4 drawings. `scorecard(gates, state)` now assigns `status` pass/fail/skipped (OOS-first so the real verdict lands on the in-scope drawing); guard: only real `_STEM_TO_PACK_KEY` drawings can be OOS-skipped — pseudo-surfaces (renders/line-velocity-schedule) keep real pass/fail. `all_pass` unchanged (backstop). Consumer `_drawing_gates_has_fail` retargeted `pass:false`→`status=="fail"`. SIGHT 2150: 4 OOS→skipped, GA+renders stay fail, all_pass False. | ✅ | c97f07112 |
 
 ## Gate coverage
 | ID | Item | Status | SHA |
@@ -81,7 +81,7 @@ Legend: ✅ done · �doing · ⬜ open
 | A3 | weekly-component-sweep LaunchAgent (`com.forge.weekly-component-sweep`) | ⬜ | |
 | A4 | timestamp columns (specs/standards created_at/updated_at) + `state.growingDb` + Excel last-updated surface | ⬜ | |
 | A5 | material_prices live refresh (stale since 2026-05-30; fetchLivePriceGbpPerKg stub) | ⬜ | |
-| A6 | split `SKIP_LIBRARY_WRITEBACK` (currently also kills cascade reads — surprise) | ⬜ | |
+| A6 | split `SKIP_LIBRARY_WRITEBACK` (currently also kills cascade reads — surprise). **DONE (524cc248b):** `db-only-cascade.getDb()` is a READONLY read path (the chain's DB-first part lookup) but was gated by the WRITE-back flag → a dry-run with SKIP_LIBRARY_WRITEBACK=1 silently disabled DB reads → BoM coverage cratered. Read gate now uses its own opt-in `SKIP_LIBRARY_READS`; writeback modules keep SKIP_LIBRARY_WRITEBACK. Guard in chain-must-be-db-only.test.ts fails if the writeback flag re-appears in getDb() (8/8 pass). | ✅ | 524cc248b |
 | A7 | class_reference_graphs web-on-miss | ⬜ | |
 | A8 | prove-growing-db-loop harness (keyed hit ≫2 on a DB slice) | ⬜ | |
 
