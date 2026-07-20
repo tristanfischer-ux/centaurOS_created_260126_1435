@@ -941,6 +941,28 @@ def _aux_tab_score(title: str, run_dir: str):
                                "envelope (F1b device-scale proxy + AABB packing), not a sprawling scene")
             return _apply_side_elevation_gate(base)
 
+        # V2 (2026-07-20): a DEVICE render earns ≥8 only on a POSITIVELY-verified containment.
+        # `_ph` is None when the phenotype gate could not compute (an instrument device with no
+        # parts-manifest scene bbox / no enclosure volume) — the body is UNVERIFIED. Ledger
+        # coverage + a flaky vision-clean verdict must NOT mint ≥8 there (the 2150 lesson: the
+        # vision critic returned broken=false + 8 checks on a Lego-in-a-box hero; only the
+        # DETERMINISTIC containment gate caught it). Plants (phenotype N/A → None but not an
+        # instrument) and verified-containment devices (_ph.ok True) are unaffected. Applied as
+        # an advisory on the earning path below (→ _cov caps at 7), never overriding the lower
+        # FAIL caps (shape / form-signature / named vision defect) which return above.
+        _containment_unverified = False
+        if _ph is None:
+            try:
+                _st_ph = load_json(os.path.join(run_dir, "state.json")) or {}
+                _containment_unverified = bool(_st_ph.get("isInstrumentDevice"))
+            except Exception:  # noqa: BLE001
+                _containment_unverified = False
+        _v2_adv = ("ADVISORY: containment UNVERIFIED — no parts-manifest scene bbox, so the "
+                   "phenotype gate could not confirm the parts pack into the device body; "
+                   "coverage + a vision-clean verdict alone cannot mint ≥8 on a device "
+                   "(regenerate the render so the manifest carries a scene bbox)"
+                   ) if _containment_unverified else ""
+
         # DETERMINISTIC PRODUCT-IDENTITY backstop (Tristan 2026-07-18) — caps the render to
         # 4 (FAIL) when the SCENE has no product-specific geometry (a generic grey-box
         # skeleton reused across classes, or cutaway-only 'story' props with no exterior
@@ -1029,7 +1051,9 @@ def _aux_tab_score(title: str, run_dir: str):
             # VERIFIED clean → score on the DETERMINISTIC checks (coverage/litter/shape).
             # GOTCHA (2026-07-14): empty-defect "broken=False" on placeholder CAD still
             # minted Renders 9 — require named defects list OR a real checklist count.
-            base = _cap_litter(_cov("blender", "Render"))
+            # V2 (2026-07-20): a device with UNVERIFIED containment (_v2_adv) caps at 7 here —
+            # a vision-clean verdict cannot substitute for a deterministic containment pass.
+            base = _cap_litter(_cov("blender", "Render", advisory=_v2_adv))
             _chk_n = int(_vv.get("checks_run") or _vv.get("n_checks") or 0)
             if isinstance(base, dict) and _chk_n < 3 and not _vv_defects:
                 _sc0 = base.get("score")
@@ -29039,6 +29063,45 @@ def _selftest() -> int:
         if _pv3 is not None:
             print(f"  FAIL B5: a non-instrument (plant) must be N/A for the device phenotype "
                   f"gate (got {_pv3})"); bad += 1
+    # ═══ V2 (2026-07-20): ledger coverage + a flaky vision-clean verdict must NOT mint ≥8 on a
+    # DEVICE whose containment could not be positively verified (no parts-manifest bbox). The 2150
+    # proved the vision critic returns broken=false + 8 checks on a Lego hero — only a DETERMINISTIC
+    # containment pass earns ≥8. A contained device (bbox present) still earns; a plant is N/A. ═══
+    def _write_render_run(_td, *, with_bbox, instrument=True):
+        _PHENOTYPE_CACHE.pop(_td, None); _COV_CACHE.pop(_td, None)
+        json.dump({"isInstrumentDevice": instrument,
+                   "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 0.00403}}},
+                  open(os.path.join(_td, "state.json"), "w"))
+        json.dump({"ok": True, "broken": False, "checks_run": 8, "defects": []},
+                  open(os.path.join(_td, "render-vision-critique.json"), "w"))   # flaky clean
+        json.dump({"coverage_by_drawing": {"blender": {"pct": 100, "present": 35, "expected": 35}}},
+                  open(os.path.join(_td, "parts-ledger.json"), "w"))             # full coverage
+        _pm = {"parts": [{"name": "Culture Vessel", "shape": "box"}]}
+        if with_bbox:
+            _pm["bbox_mm"] = {"length_mm": 180.0, "width_mm": 140.0, "height_mm": 100.0}  # contained
+        json.dump(_pm, open(os.path.join(_td, "parts-manifest.json"), "w"))
+    with _tfp.TemporaryDirectory() as _tdv2:
+        _write_render_run(_tdv2, with_bbox=False, instrument=True)     # LEAK case: uncomputable containment
+        _rv2 = _aux_tab_score("Renders", _tdv2)
+        if not (isinstance(_rv2, dict) and isinstance(_rv2.get("score"), (int, float))
+                and _rv2["score"] <= 7):
+            print(f"  FAIL V2: a device render with full coverage + a vision-clean verdict but "
+                  f"UNVERIFIED containment (no manifest bbox) must cap ≤7, not mint ≥8 "
+                  f"(got {_rv2.get('score') if _rv2 else None})"); bad += 1
+    with _tfp.TemporaryDirectory() as _tdv2b:
+        _write_render_run(_tdv2b, with_bbox=True, instrument=True)     # positive: verified containment
+        _rv2b = _aux_tab_score("Renders", _tdv2b)
+        if not (isinstance(_rv2b, dict) and isinstance(_rv2b.get("score"), (int, float))
+                and _rv2b["score"] >= 8):
+            print(f"  FAIL V2 proveNoFalsePositive: a device with VERIFIED containment (contained "
+                  f"bbox) + vision-clean must still earn ≥8 (got {_rv2b.get('score') if _rv2b else None})"); bad += 1
+    with _tfp.TemporaryDirectory() as _tdv2c:
+        _write_render_run(_tdv2c, with_bbox=False, instrument=False)   # plant: N/A, unaffected
+        _rv2c = _aux_tab_score("Renders", _tdv2c)
+        if not (isinstance(_rv2c, dict) and isinstance(_rv2c.get("score"), (int, float))
+                and _rv2c["score"] >= 8):
+            print(f"  FAIL V2: a PLANT (phenotype N/A) must be unaffected — coverage + vision-clean "
+                  f"still earns ≥8 (got {_rv2c.get('score') if _rv2c else None})"); bad += 1
     # ═══ S11 (council M5, 2026-07-20): BoM↔PCB identity reconcile — a part designed onto
     # the PCB with a real MPN must NOT read "bespoke fabrication" in the BoM. ═══
     _s11_state = {
