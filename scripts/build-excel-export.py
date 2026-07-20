@@ -16628,6 +16628,22 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
             "so the software/functional side is UNPROVEN (never 'FUNCTIONALLY VERIFIED')")
 
 
+def _pcb_readiness_style(readiness: str) -> Tuple[PatternFill, str, str]:
+    """PREFIX-SAFE (fill, text-colour, severity) for a PCB readiness verdict (P9a rework
+    2026-07-20). `_pcb_readiness_verdict` now returns the disclosed string "FAB-READY —
+    UNPROVEN IN HARDWARE" (never a bare "FAB-READY"), so every consumer MUST match by
+    PREFIX, not an exact dict key — the exact-key dicts at the banner + `_sc_pcb` raised
+    KeyError on the disclosed string (the very board that IS fab-ready), while the
+    startswith-switched selftests passed. One helper, one truth, no KeyError."""
+    rl = str(readiness or "")
+    if rl.startswith("FAB-READY"):
+        return FILL_PASS, "006100", "INFO"
+    if rl.startswith("ENGINEERING DRAFT"):
+        return FILL_ADVISORY, "9C6500", "MED"
+    # FAIL (or any unrecognised verdict) → the safe, honest red band.
+    return FILL_FAIL, "9C0006", "HIGH"
+
+
 def _pcb_rel(path: Optional[str], run_dir: str) -> str:
     """A run_dir-relative path for display — NEVER the raw absolute machine path (dead
     in a shared xlsx). Falls back to the basename if relpath can't be computed."""
@@ -17336,9 +17352,7 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
 
     # ── Readiness banner (top) — driven by hygiene AND design-fitness together ───────
     r += 1
-    _fill, _txtcolor = {"FAB-READY": (FILL_PASS, "006100"),
-                        "ENGINEERING DRAFT": (FILL_ADVISORY, "9C6500"),
-                        "FAIL": (FILL_FAIL, "9C0006")}[a["readiness"]]
+    _fill, _txtcolor, _ = _pcb_readiness_style(a["readiness"])
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=8)
     # LIVE verdict formula (not a bare 'FAIL —' literal — _enforce_live_check_gate refuses
     # the whole workbook save on a bare PASS/FAIL literal, which blocked EVERY colorimeter
@@ -17363,7 +17377,9 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         f'"ENGINEERING DRAFT — hygiene is clean, but the BoM is not fab-grade (design-fitness "'
         f'&TEXT({_fs},"0.0")&"/10"&IF({_gp}>0,"; "&TEXT({_gp},"0")&" unresolved electronic '
         f'gap(s)","")&")",'
-        f'"FAB-READY — DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier"))'
+        f'"FAB-READY — UNPROVEN IN HARDWARE — DRC-clean, fully routed, Gerbers complete, and the '
+        f'BoM is verified-tier, but there is no hardware-in-the-loop firmware proof, so it is NOT '
+        f'FUNCTIONALLY VERIFIED"))'
     )
     bc = ws.cell(r, 1, readiness_fx)
     bc.fill = _fill
@@ -24584,7 +24600,7 @@ def _sc_pcb(wb, ws, state, run_dir):
     comps = list(a["hygiene_components"]) + list(a["fitness_components"])
     iss = []
 
-    verdict_sev = {"FAIL": "HIGH", "ENGINEERING DRAFT": "MED", "FAB-READY": "INFO"}[a["readiness"]]
+    _, _, verdict_sev = _pcb_readiness_style(a["readiness"])
     iss.append(f"[{verdict_sev}] readiness: {a['readiness']} — {a['readiness_why']}")
 
     if not a["drc_ok"]:
@@ -31732,6 +31748,36 @@ def _selftest() -> int:
     if not _full_r.startswith("FAB-READY"):
         print(f"  FAIL pcb-readiness partial-board proveNoFalsePositive: 24/29 on-board "
               f"with clean hygiene must still read FAB-READY, got {_full_r!r}"); bad += 1
+    # ── P9a REWORK proveCatch (2026-07-20, Cursor FAIL-REWORK of d94dce40c) ──
+    # The banner + _sc_pcb consumers keyed the readiness on EXACT "FAB-READY" dicts, so
+    # the disclosed "FAB-READY — UNPROVEN IN HARDWARE" string (the very board that IS
+    # fab-ready) raised KeyError while the startswith-switched verdict selftests passed.
+    # (1) _pcb_readiness_verdict must NEVER return a bare "FAB-READY" — always disclosed.
+    if _allmpn_r == "FAB-READY" or _full_r == "FAB-READY" or _cl_readiness == "FAB-READY":
+        print(f"  FAIL P9a: _pcb_readiness_verdict returned a BARE 'FAB-READY' — must always "
+              f"disclose 'FAB-READY — UNPROVEN IN HARDWARE' (allmpn={_allmpn_r!r})"); bad += 1
+    if "UNPROVEN IN HARDWARE" not in _allmpn_r:
+        print(f"  FAIL P9a: a fab-ready board must carry the UNPROVEN-IN-HARDWARE disclosure, "
+              f"got {_allmpn_r!r}"); bad += 1
+    # (2) the PREFIX-SAFE style helper must resolve EVERY verdict family WITHOUT KeyError,
+    #     including the disclosed string — this is the exact path that crashed the banner.
+    try:
+        for _rv in ("FAB-READY — UNPROVEN IN HARDWARE", "ENGINEERING DRAFT", "FAIL",
+                    _allmpn_r, _archgap_r, _dirty_readiness, "some unknown verdict"):
+            _f, _c, _sev = _pcb_readiness_style(_rv)
+            if _sev not in ("INFO", "MED", "HIGH"):
+                print(f"  FAIL P9a: _pcb_readiness_style({_rv!r}) gave bad severity {_sev!r}"); bad += 1
+        # the disclosed fab-ready string is the PASS band (green/INFO), not a crash or red
+        _f_ok, _c_ok, _sev_ok = _pcb_readiness_style("FAB-READY — UNPROVEN IN HARDWARE")
+        if _sev_ok != "INFO" or _c_ok != "006100":
+            print(f"  FAIL P9a: disclosed FAB-READY must map to the PASS band (INFO/green), "
+                  f"got sev={_sev_ok!r} color={_c_ok!r}"); bad += 1
+        # an unknown/garbage verdict must fall to the SAFE red band, never silently green
+        if _pcb_readiness_style("garbage")[2] != "HIGH":
+            print("  FAIL P9a: an unrecognised verdict must fall to the safe HIGH/red band"); bad += 1
+    except Exception as _ex:
+        print(f"  FAIL P9a: _pcb_readiness_style raised {type(_ex).__name__}: {_ex} — the "
+              f"exact-key dicts still crash on the disclosed FAB-READY string"); bad += 1
     # proveNoFalsePositive: correctly-excluded mechanical/off-board unresolved words
     # (module_rack, dc_busbar) must NOT be classified as an electronic gap.
     if _pcb_unresolved_disposition("Module Rack", "module_rack") != \
