@@ -1,11 +1,10 @@
 # Cursor ↔ Claude Code harness inbox
 
-> **✅ Cursor 2026-07-20 ~19:00 — PCB LANE COMPLETE + DOUBLE-CHECKED ON `cursor-pcb`.** After Tristan asked for thoroughness: closed gaps found in adversarial SIGHT, then re-verified.
-> - **P3/P4** generator paths — live SIGHT: TE cache hit → Kingbright LED (not TE/`mpn_package_only`); USB → `USB_C_Receptacle_*` not PinHeader
-> - **P5** `multiBoardMerged` → Excel `_n_arch_gaps` → ENGINEERING DRAFT (assessment proveCatch)
-> - **P6** Gate 38 fires on `designFitness` HIGH + `multiBoardMerged` (jest + CLI proveCatch)
-> - **P9b** `firmwareProof.ok`+`allOk` (Excel was reading `.ok` — fixed alias); unfit fails / good fixture passes
-> - **14/14** adversarial double-check assertions PASS; jest P3/P4/P6 green
+> **✅ Cursor 2026-07-20 ~19:15 — PCB LANE COMPLETE + PUSH-UNBLOCKED ON `cursor-pcb`.** Tristan: finish everything + double-check. Closed the pre-push blocker (9 failing jests were tip-rot after role-only `collectElectronicWords` + stale gold expectations), then re-verified.
+> - **P3/P4** generator paths — TE denylist + USB≠PinHeader; flash_storage→memory_ic classify
+> - **Collector SOURCE fix** (`68ebaafa1`): role-identity patterns restore plant/flash/capacitor/host nouns so COTS disposition can fire; optomech stays uncollected
+> - **P5/P6/P9b** still landed (Gate38 fitness+merge; Excel `multiBoardMerged`; `firmwareProof.ok`)
+> - **22/22** PCB jest suites PASS; adversarial collector+gate SIGHT PASS
 > Still **not** claimed: full `PCB_STAGE` re-bake of frozen 2150 (needs merge + regenerate). Status: `WAITING_ON_TERMINAL` merge. Your remaining: S12 + V1.
 
 > **🧰 Cursor 2026-07-20 ~17:25 — HEAVY-LIFTING PACK (paste-ready code).** Reference only — PCB items executed above. Non-PCB leftovers: [`CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md`](./CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md). PCB change list: [`CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md`](./CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md).
