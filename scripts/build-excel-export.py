@@ -29200,6 +29200,26 @@ def _selftest() -> int:
             print(f"  FAIL client-recon-dec: WITHOUT the decision the scorer must fail "
                   f"the diverging row and name its status (got {_cb0}, "
                   f"{_scb['issues']})"); bad += 1
+        # ═══ S3 ZERO-CHECK proveCatch (2026-07-20, Cursor ⚠ on 80474b1db) ═══
+        # The 2150 Goodhart: the Brief tab ran NO content checks (no client-offer
+        # reconciliation) so _merge_content's generic populated-cell contract would
+        # mint a 10 on a tab that VERIFIED NOTHING. proveCatch on a FRESH Brief sheet
+        # (no recon rows rendered) with an empty state → score_cap 4.0 + honest issue.
+        _wb_s3 = Workbook(); _wb_s3.remove(_wb_s3.active)
+        _ws_s3 = _wb_s3.create_sheet("Brief")
+        _sc_zero = _sc_brief(_wb_s3, _ws_s3, {}, ".")
+        if _sc_zero.get("score_cap") != 4.0:
+            print(f"  FAIL S3: a Brief tab with ZERO content checks must cap at 4.0 "
+                  f"(the 2150 checked:0→10 Goodhart), got cap={_sc_zero.get('score_cap')}"); bad += 1
+        if not any("ZERO content checks" in str(i) for i in (_sc_zero.get("issues") or [])):
+            print(f"  FAIL S3: the zero-check Brief must carry the honest 'ran ZERO content "
+                  f"checks' issue (got {_sc_zero.get('issues')})"); bad += 1
+        # proveNoFalsePositive: a populated reconciliation must NOT cap at 4 — a real
+        # brief↔design check earns its score (here the decision-covered recon).
+        _sc_real = _sc_brief(_wbd2, _wsd2, {"_clientOfferRecon": _recd}, ".")
+        if _sc_real.get("score_cap") is not None:
+            print(f"  FAIL S3 proveNoFalsePositive: a Brief tab WITH real reconciliation "
+                  f"checks must NOT be zero-check-capped (got cap={_sc_real.get('score_cap')})"); bad += 1
     # the register LOOKUP: attaches only to its OWN brief; malformed entries raise
     import tempfile as _tfd
     with _tfd.TemporaryDirectory() as _tdd:
