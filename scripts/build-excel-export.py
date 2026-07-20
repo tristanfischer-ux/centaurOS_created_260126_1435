@@ -1598,6 +1598,7 @@ def _register_check_range(sheet_title: str, col_letter: str, r1: int, r2: int,
 _QA_SCORE_CELLS: Dict[str, str] = {}
 _QA_FLOOR_CELL: List[str] = []      # single absolute ref, list for mutability
 _QA_OPEN_CELL: List[str] = []
+_QA_SHIP_AXIS_CELLS: List[str] = []  # S7: the APPLICABLE ship-gate axes' Met operand cells (col B of the card)
 
 
 def _contiguous_col_ranges(col_letter: str, rows: List[int]) -> List[str]:
@@ -2121,6 +2122,19 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 floor = 4.0
             print(f"  ! render vision critic flagged the hero BROKEN "
                   f"({(_vis.get('defects') or ['unspecified'])[:1]}) — blocked SHIPS (S7)")
+        # ── S7 UNIFICATION (2026-07-20, Cursor): ships = ship_axes_all_pass. Every axis
+        # binds — including instrument+no-vision-critique (UNVERIFIED render glance) and a
+        # PCB that is ENGINEERING DRAFT (not fab-ready). The individual binds above cover
+        # most; this makes the verdict the SINGLE multi-axis gate so no axis can be walked.
+        try:
+            _axes_v = compute_ship_axes(state, run_dir, {"floor": floor})
+            if not ship_axes_all_pass(_axes_v):
+                _unmet = [a["axis"] for a in _axes_v if a.get("applicable") and not a.get("passed")]
+                ships = False
+                if _unmet and _unmet != ["Tab floor ≥8"]:
+                    print(f"  ! ship-gate axis/axes unmet → blocked SHIPS (S7 unify): {_unmet}")
+        except Exception as _axv_exc:  # noqa: BLE001 — never let the axis gate crash the verdict
+            print(f"  ! ship-axes unification skipped (non-fatal): {_axv_exc}")
     return {"floor": floor, "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
@@ -2140,7 +2154,9 @@ def verdict_text(style: str = "line", v: Optional[dict] = None) -> str:
     fl_txt = (f"{fl:g}/10" if isinstance(fl, (int, float)) else "—")
     return (f"VERDICT: {short} · floor {fl_txt} "
             f"(min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit "
-            f"is advisory and never floors; ships at ≥8 everywhere)")
+            f"SCORE is advisory and never floors, but its blocking-defects DO bind ships "
+            f"(+ ex-works>ceiling / process-plant leak / broken-vision binds); "
+            f"ships at ≥8 on every scored surface)")
 
 
 def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict]:
@@ -2189,14 +2205,23 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
         axes.append({"axis": "PCB readiness — fab-ready", "applicable": False,
                      "passed": True, "detail": "no PCB in this design"})
     # 5. RENDER VISION — a DELIVERED vision critique that flags the render broken blocks
-    #    ships; no critique on file is `applicable:False` (S12 ensures it runs pre-Excel).
+    #    ships. INSTRUMENT + NO CRITIQUE ≠ green (Cursor afternoon audit): a benchtop
+    #    instrument HAS a hero render that a 5-second glance would judge — an absent critique
+    #    is UNVERIFIED (applicable, not-passed), never an out-of-scope walk-through. A plant
+    #    with no hero-critique on file stays applicable:False.
     _vis = _render_vision_verdict(run_dir or "")
+    _is_instrument = bool(st.get("isInstrumentDevice"))
     if isinstance(_vis, dict):
         _broken = bool(_vis.get("broken"))
         _defects = ", ".join(str(d) for d in (_vis.get("defects") or []))[:60]
         axes.append({"axis": "Render vision — not broken", "applicable": True,
                      "passed": not _broken,
                      "detail": (f"broken: {_defects}" if _broken else "clean")})
+    elif _is_instrument:
+        axes.append({"axis": "Render vision — not broken", "applicable": True,
+                     "passed": False,
+                     "detail": "no vision critique on file yet — an instrument hero is UNVERIFIED "
+                               "until the render glance runs (not a pass)"})
     else:
         axes.append({"axis": "Render vision — not broken", "applicable": False,
                      "passed": True, "detail": "no vision critique on file"})
@@ -22315,6 +22340,7 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
     # PCB readiness / render vision), each read from its OWN state field. Render them so
     # the reader sees WHICH axis fails, never a single green 'SHIPS' hiding a broken axis. ----
     try:
+        _QA_SHIP_AXIS_CELLS.clear()
         _axes = compute_ship_axes(state, run_dir, _VERDICT)
         _all = ship_axes_all_pass(_axes)
         _hc = ws.cell(r, 1, f"SHIP GATE — {'every applicable axis MET' if _all else 'an axis is UNMET'} "
@@ -22334,6 +22360,10 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             _psx = bool(_ax.get("passed"))
             _op = ws.cell(r, 2, (1 if _psx else 0) if _apx else None)
             _op.font = FONT_NOTE
+            # capture APPLICABLE axes' Met cells so the ONE-VERDICT formula AND-gates on them
+            # (S7: SHIPS requires every applicable axis met, not open_issues=0 alone).
+            if _apx:
+                _QA_SHIP_AXIS_CELLS.append(f"'{ws.title}'!$B${r}")
             _vc = ws.cell(r, 3, f'=IF($B{r}="","— (n/a — not in scope)",'
                                 f'IF($B{r}>=1,"PASS ✓","⛔ FAIL"))')
             _vc.font = FONT_PASS if (_psx or not _apx) else FONT_FAIL
@@ -25224,11 +25254,20 @@ def _write_verdict_formulas(wb: Workbook, state: dict) -> int:
     if not (_QA_FLOOR_CELL and _QA_OPEN_CELL):
         return 0
     fl, op = _QA_FLOOR_CELL[0], _QA_OPEN_CELL[0]
-    short = (f'IF({op}=0,"SHIPS","DRAFT — "&{op}&" open issue"&IF({op}=1,"","s"))')
+    # S7 (2026-07-20): SHIPS requires BOTH zero open tabs AND every applicable ship-gate axis
+    # MET (the axis Met operand cells, col B of the ship-gate card — captured in _QA_SHIP_AXIS_CELLS).
+    # A clean-tab dossier with a failing bind (ex-works>ceiling, self-audit defect, broken vision)
+    # must NOT read SHIPS from open_issues=0 alone.
+    _axis_and = ""
+    if _QA_SHIP_AXIS_CELLS:
+        _axis_and = "," + ",".join(f'{c}>=1' for c in _QA_SHIP_AXIS_CELLS)
+    short = (f'IF(AND({op}=0{_axis_and}),"SHIPS",'
+             f'"DRAFT — "&{op}&" open issue"&IF({op}=1,"","s")'
+             f'&IF({op}=0," (a ship-gate axis is unmet)",""))')
     line = (f'="VERDICT: "&{short}&" · floor "&{_fx_num_txt(fl)}&"/10 '
             f'(min of every DETERMINISTIC section & non-mirror tab — live cells on '
-            f'Quality & Audit; the LLM self-audit is advisory and never floors; '
-            f'ships at ≥8 everywhere)"')
+            f'Quality & Audit; the LLM self-audit SCORE is advisory and never floors, but its '
+            f'blocking-defects + the ship-gate axes DO bind ships; ships at ≥8 on every scored surface)"')
     n = 0
     for _vt, _vr, _vc, _vstyle, _vsuf in _VERDICT_CELLS:
         if _vt not in wb.sheetnames:
@@ -28780,6 +28819,32 @@ def _selftest() -> int:
             print(f"  FAIL S7: a delivered BROKEN vision critique must block SHIPS in "
                   f"compute_verdict even at floor 9 (got {_v7})"); bad += 1
         _VISION_CACHE.pop(_td7, None)
+    # S7 UNIFY (Cursor) — FRESH tempdir (no vision critique file) for the no-critique cases.
+    with _tf7.TemporaryDirectory() as _td7b:
+        # an INSTRUMENT with clean tabs but NO vision critique must NOT ship — the hero glance
+        # is UNVERIFIED, not a walk-through pass.
+        _inst_st = {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+                    "isInstrumentDevice": True, "selfAudit": {"blocking_defects": []}}
+        _VISION_CACHE.pop(_td7b, None)
+        _v_inst = compute_verdict(_inst_st, {"Overview": {"score": 9, "status": "PASS"}}, _td7b)
+        _ax_inst = compute_ship_axes(_inst_st, _td7b, {"floor": 9})
+        _vis_inst = next(a for a in _ax_inst if a["axis"].startswith("Render vision"))
+        if not (_vis_inst["applicable"] and not _vis_inst["passed"]):
+            print(f"  FAIL S7 unify: an instrument with NO vision critique must mark the vision "
+                  f"axis applicable+unmet (UNVERIFIED), not a walk-through (got {_vis_inst})"); bad += 1
+        if _v_inst["ships"]:
+            print(f"  FAIL S7 unify: an instrument with clean tabs but NO vision critique must "
+                  f"NOT ship (vision UNVERIFIED) — got ships={_v_inst['ships']}"); bad += 1
+        # proveNoFalsePositive: a NON-instrument (plant) with clean tabs + no vision critique
+        # still ships (the vision axis is n/a for a plant with no hero to glance).
+        _plant_novis = {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+                        "selfAudit": {"blocking_defects": []}}
+        _VISION_CACHE.pop(_td7b, None)
+        _v_plant = compute_verdict(_plant_novis, {"Overview": {"score": 9, "status": "PASS"}}, _td7b)
+        if not _v_plant["ships"]:
+            print(f"  FAIL S7 unify: a NON-instrument with clean tabs + no vision critique must "
+                  f"still ship (vision n/a) — got {_v_plant}"); bad += 1
+        _VISION_CACHE.pop(_td7b, None)
     # ═══ MACRO SELF-AUDIT BINDING (2026-07-20, Pillar 1) — the engine must REFUSE a
     # dossier whose own detectors flagged it, even when every TAB scores ≥8. Frozen
     # organoid-bioreactor-2150 shape: all tabs ≥8 but selfAudit.blocking_defects
