@@ -1984,6 +1984,71 @@ def _checks_part_type_coherence(state: dict, run_dir: str) -> List[Check]:
     return out
 
 
+_PELTIER_RX = re.compile(r"\b(peltier|thermo[- ]?electric|tec\s*module|\btec\b)\b", re.I)
+_RESISTIVE_HEATER_RX = re.compile(
+    r"\b(cartridge heater|resistive heat\w*|film heater|kapton heater|"
+    r"heating element|band heater|silicone heater|\bheater\b)\b", re.I)
+# a trivially-small thermal duty (W) below which ONE bidirectional actuator suffices —
+# a Peltier heats AND cools, so a separate resistive heater is provably redundant.
+_REDUNDANT_THERMAL_DUTY_CEILING_W = 10.0
+
+
+def _checks_thermal_actuator_redundancy(state: dict, run_dir: str) -> List[Check]:
+    """F2 (2026-07-20): a single small thermal-control loop must not carry TWO powered
+    thermal actuators. The frozen 2150 emitted BOTH a Peltier/TEC module (X-111) AND a
+    cartridge heater (H-101) for a `net_heating_required_w` of 0.93 W — and a Peltier
+    already heats AND cools, so the separate resistive heater is pure redundancy on a
+    sub-1W duty. Universal (no per-class table): fires ONLY when a bidirectional
+    thermoelectric actuator AND a separate resistive heater are BOTH present AND the
+    net thermal duty is trivially small (< 10 W) — a kW-scale thermal cycler that
+    genuinely needs fast resistive heat + Peltier cooling never trips (duty gate), and
+    a design with no thermal-duty quantity never trips (conservative — cannot prove it
+    is small). Routed fix: collapse to one thermal actuator in equipment synthesis."""
+    out: List[Check] = []
+    rb = _requirements_bom(state)
+    if not rb:
+        return out
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    # net thermal duty in W (a kW dissipation quantity is converted); None if unknown
+    duty_w = _first_qval(q, ["net_heating_required_w", "net_cooling_required_w",
+                             "vessel_heat_loss_w"])
+    diss_kw = _first_qval(q, ["system_thermal_dissipation_kw"])
+    if duty_w is None and diss_kw is not None:
+        duty_w = diss_kw * 1000.0
+    if duty_w is None:
+        return out                       # cannot prove the duty is small — do not fire
+    peltier, heater = [], []
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("requirement") or row.get("name") or "")
+        if name.startswith("↳"):
+            continue
+        if _PELTIER_RX.search(name):
+            peltier.append(f"{row.get('tag', '')} {name}".strip())
+        elif _RESISTIVE_HEATER_RX.search(name):
+            heater.append(f"{row.get('tag', '')} {name}".strip())
+    redundant = bool(peltier) and bool(heater) and duty_w < _REDUNDANT_THERMAL_DUTY_CEILING_W
+    out.append(Check(
+        name="Thermal-actuator redundancy: one small duty must not carry two actuators",
+        category="CONSISTENCY", relation="le",
+        status=FAIL if redundant else PASS,
+        actual=float(1 if redundant else 0), expected=0.0, tol=0.0, unit="loops",
+        producer="consistency:thermal_actuator_redundancy",
+        detail=(f"A bidirectional Peltier/TEC ({peltier[0] if peltier else '—'}) AND a "
+                f"separate resistive heater ({heater[0] if heater else '—'}) both serve a "
+                f"net thermal duty of {duty_w:.2f} W (< {_REDUNDANT_THERMAL_DUTY_CEILING_W:.0f} W) "
+                f"— the Peltier alone heats and cools this loop, so the second actuator is "
+                f"redundant. Collapse to one thermal actuator at equipment synthesis."
+                if redundant else
+                (f"Thermal actuators reconcile (duty {duty_w:.2f} W): "
+                 + ("single actuator" if not (peltier and heater)
+                    else f"two actuators but duty ≥ {_REDUNDANT_THERMAL_DUTY_CEILING_W:.0f} W")
+                 + ".")),
+    ))
+    return out
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -1995,6 +2060,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks: List[Check] = []
     checks.extend(_checks_consistency(state, run_dir))
     checks.extend(_checks_part_type_coherence(state, run_dir))
+    checks.extend(_checks_thermal_actuator_redundancy(state, run_dir))
     checks.extend(_checks_adequacy(state, run_dir))
     checks.extend(_checks_balance(state, run_dir))
     checks.extend(_checks_cost(state, run_dir))
@@ -2161,6 +2227,37 @@ def _selftest() -> int:
     check(len(okc) == 1 and okc[0].status == PASS,
           f"PART-TYPE: real-pump-SKU + consumable-req + placeholder must PASS; "
           f"got {[(c.status, c.actual) for c in okc]}")
+
+    # ---- THERMAL-ACTUATOR REDUNDANCY (F2, 2026-07-20): a Peltier + a separate resistive
+    #      heater on a sub-10W duty FAILs (the frozen 2150 X-111 Peltier + H-101 heater on
+    #      0.93 W); the SAME two actuators on a kW-scale duty PASS; a single actuator PASSes;
+    #      no thermal-duty quantity -> no check emitted (conservative). ----
+    def _therm(rb, net_w=None, diss_kw=None):
+        q = {}
+        if net_w is not None:
+            q["net_heating_required_w"] = {"value": net_w, "unit": "W"}
+        if diss_kw is not None:
+            q["system_thermal_dissipation_kw"] = {"value": diss_kw, "unit": "kW"}
+        return {"requirementsBom": rb, "orchestratorContract": {"quantities": q}}
+    two_actuators = [
+        {"tag": "X-111", "requirement": "Peltier Tec Module", "part": "requirement stated"},
+        {"tag": "H-101", "requirement": "Cartridge Heater", "part": "requirement stated"},
+    ]
+    tr = _checks_thermal_actuator_redundancy(_therm(two_actuators, net_w=0.934), "")
+    check(len(tr) == 1 and tr[0].status == FAIL and tr[0].actual == 1.0,
+          f"THERMAL-REDUNDANCY: Peltier + heater on 0.93 W must FAIL; "
+          f"got {[(c.status, c.actual) for c in tr]}")
+    tr_big = _checks_thermal_actuator_redundancy(_therm(two_actuators, diss_kw=40.0), "")
+    check(len(tr_big) == 1 and tr_big[0].status == PASS,
+          f"THERMAL-REDUNDANCY: same two actuators on 40 kW must PASS; "
+          f"got {[(c.status, c.actual) for c in tr_big]}")
+    tr_one = _checks_thermal_actuator_redundancy(
+        _therm([{"tag": "H-101", "requirement": "Cartridge Heater"}], net_w=0.9), "")
+    check(len(tr_one) == 1 and tr_one[0].status == PASS,
+          f"THERMAL-REDUNDANCY: single heater must PASS; got {[c.status for c in tr_one]}")
+    tr_noduty = _checks_thermal_actuator_redundancy(_therm(two_actuators), "")
+    check(len(tr_noduty) == 0,
+          f"THERMAL-REDUNDANCY: no thermal-duty quantity -> no check emitted; got {len(tr_noduty)}")
 
     # ---- DEFECTIVE run: each family must trip exactly its own FAIL ----
     bad_state = {
