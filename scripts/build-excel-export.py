@@ -16539,7 +16539,8 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                            n_electronic_full: int = 0,
                            n_non_fab_tier: int = 0,
                            all_on_board_fab_tier: bool = True,
-                           n_architecture_gaps: int = 0) -> Tuple[str, str]:
+                           n_architecture_gaps: int = 0,
+                           firmware_proof_ok: Optional[bool] = None) -> Tuple[str, str]:
     """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
     board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
     unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
@@ -16610,7 +16611,21 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                 f"hygiene + fitness clean but {n_non_fab_tier} on-board part(s) carry no "
                 f"catalogue MPN (package_family/function_class only) — FAB-READY requires "
                 f"mpn_symbol_footprint / mpn_package / mpn_package_only on EVERY on-board part")
-    return "FAB-READY", "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier"
+    # FIRMWARE / HARDWARE HONESTY (Cursor Fix 9 half, 2026-07-20, per CLAUDE.md doctrine):
+    # a board is fabricable, but "FAB-READY" bare implies more than we can prove. There is
+    # never a HIL result in-chain, so the MAX honest verdict is "FAB-READY — UNPROVEN IN
+    # HARDWARE"; "FUNCTIONALLY VERIFIED" requires a HIL transcript we never have. If a
+    # Tier-0 firmware-contract proof PASSED (firmware_proof_ok True) the software contract
+    # is at least compile+contract-proven; if it was never run (None) we say so.
+    if firmware_proof_ok is True:
+        return ("FAB-READY — UNPROVEN IN HARDWARE",
+                "DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and a Tier-0 "
+                "firmware-contract proof PASSED (compile + pin/bus/channel contract) — but no "
+                "hardware-in-the-loop test exists, so it is NOT 'FUNCTIONALLY VERIFIED'")
+    return ("FAB-READY — UNPROVEN IN HARDWARE",
+            "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier — but NO "
+            "firmware-contract proof has been run and there is no hardware-in-the-loop test, "
+            "so the software/functional side is UNPROVEN (never 'FUNCTIONALLY VERIFIED')")
 
 
 def _pcb_rel(path: Optional[str], run_dir: str) -> str:
@@ -17209,12 +17224,14 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         # electronic gap (the 2150 od_optics: od_measurement_channel×1, requiredWordIds=[]).
         if _chreq and not _reqw:
             _n_arch_gaps += 1
+    _fw = pcb.get("firmwareProof") if isinstance(pcb.get("firmwareProof"), dict) else None
+    _fw_ok = _fw.get("ok") if isinstance(_fw, dict) else None  # None = never run (Fix 9 harness pending)
     readiness, readiness_why = _pcb_readiness_verdict(
         pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
         n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope,
         n_electronic_full=n_electronic_design,
         n_non_fab_tier=_n_non_fab_tier, all_on_board_fab_tier=_all_on_board_fab,
-        n_architecture_gaps=_n_arch_gaps)
+        n_architecture_gaps=_n_arch_gaps, firmware_proof_ok=_fw_ok)
 
     hygiene_components: List[Tuple[str, float, float]] = [
         ("DRC clean (0 violations)", 1 if drc_ok else 0, 1),
@@ -24589,7 +24606,7 @@ def _sc_pcb(wb, ws, state, run_dir):
     if a["resolved_n"]:
         weak_n = a["resolved_n"] - a["verified_n"]
         if weak_n:
-            iss.append(f"[{'HIGH' if a['readiness'] != 'FAB-READY' else 'MED'}] {weak_n} of "
+            iss.append(f"[{'HIGH' if not str(a['readiness']).startswith('FAB-READY') else 'MED'}] {weak_n} of "
                        f"{a['resolved_n']} resolved part(s) carry no verified MPN/package "
                        "(function_class only, design-fitness "
                        f"{a['fitness_score']:.1f}/10) — see the resolution-tier legend")
@@ -31640,7 +31657,7 @@ def _selftest() -> int:
         bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
         n_on_board=16, n_electronic_design=16, n_electronic_full=16,
         n_non_fab_tier=0, all_on_board_fab_tier=True)
-    if _allmpn_r != "FAB-READY":
+    if not _allmpn_r.startswith("FAB-READY"):
         print(f"  FAIL pcb-readiness Fix1 proveNoFalsePositive: an all-catalogue-MPN board "
               f"must still read FAB-READY, got {_allmpn_r!r}"); bad += 1
     # proveCatch Fix 4: an architecture gap (required channel board with 0 built words) → DRAFT.
@@ -31674,7 +31691,7 @@ def _selftest() -> int:
     _cl_readiness, _cl_why = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=_cl_score, n_electronic_gap=0)
-    if _cl_readiness != "FAB-READY":
+    if not _cl_readiness.startswith("FAB-READY"):
         print(f"  FAIL pcb-readiness proveNoFalsePositive: DRC-clean/routed/Gerber-complete "
               f"+ a verified-tier BoM (fitness {_cl_score:.1f}/10) must read FAB-READY, "
               f"got {_cl_readiness!r}"); bad += 1
@@ -31697,7 +31714,7 @@ def _selftest() -> int:
     _gap_readiness, _ = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=10.0, n_electronic_gap=1)
-    if _gap_readiness == "FAB-READY":
+    if _gap_readiness.startswith("FAB-READY"):
         print("  FAIL pcb-readiness proveCatch: an unresolved ELECTRONIC gap must block "
               "FAB-READY even when every RESOLVED part is verified-tier"); bad += 1
     # proveCatch (2026-07-14): 3 on-board vs 29 design electronics → DRAFT, never FAB-READY.
@@ -31712,7 +31729,7 @@ def _selftest() -> int:
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
         n_on_board=24, n_electronic_design=29)
-    if _full_r != "FAB-READY":
+    if not _full_r.startswith("FAB-READY"):
         print(f"  FAIL pcb-readiness partial-board proveNoFalsePositive: 24/29 on-board "
               f"with clean hygiene must still read FAB-READY, got {_full_r!r}"); bad += 1
     # proveNoFalsePositive: correctly-excluded mechanical/off-board unresolved words
