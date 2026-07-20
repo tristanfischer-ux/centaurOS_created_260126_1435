@@ -1,6 +1,6 @@
 # Macro program — living punchlist (single source of truth)
 
-> **▶▶ RESUME AFTER COMPACTION (2026-07-20).** Task: execute the FULL macro engine-self-audit program (Tristan directed — Terminal executes ALL incl PCB + DB + form; Cursor advises via `CURSOR-HARNESS-INBOX.md`, HOLD on `cursor-pcb`, single chain owner). Diagnosis + plan: `MACRO-ENGINE-SELF-AUDIT-PLAN-2026-07-20.md`; council findings: `COUNCIL-BIOREACTOR-2150-ADVERSARIAL-FINDINGS-2026-07-19.md`; Cursor packs: `CURSOR-PCB-HONESTY-FIXES-…` (Fixes 1–9) + `CURSOR-DB-AND-FORM-AUDITS-…` (A1–A8, B1–B7). **Method (mandatory):** each fix = SOURCE rule change + proveCatch on the FROZEN known-bad fixture `out/organoid-bioreactor-20260719-2150/` + no `if organoid`; run `python3 scripts/build-excel-export.py --selftest` (needs `PATH=/opt/homebrew/opt/node@22/bin:$PATH`) after every scoring edit; commit `--no-verify` with a `regression-harness:` line; update THIS table (status + SHA) + the inbox ▶ banner. **Acceptance:** re-scoring frozen 2150 → `ships=false`, PCB not FAB-READY, cost refuses — already true; a FRESH bake may claim ≥8 only when the adversarial checks pass on the new artefacts. **12 done / 38 open. NEXT = F1d** (electrical model: 400 V 3-ph / 25 kVA incomer / DN pipe on a 35 W device → device-scale DC model; same `isDeviceScaleProduct`/`isWattScaleInstrument` gate). F1c DONE (f2ff6a4c0): `enrich-state-with-reference-anchor.tsx` suppresses plant-scale references (bespoke bands + corpus medians > £10k) on benchtop instruments — all 5 mis-anchors verified suppressed on frozen 2150. F1b DONE (85d936976): `_instrument_proxy_dim` (build_universal_scene.py) now gives device-scale mechanical/fluidic parts + a universal envelope-relative backstop — no instrument part can inherit a plant TYPE_DEFAULT (the ⌀1.6 m culture-vessel / 1.5 m stirrer leak); proveCatch instrument_proxy_selftest.py. **Method reminder:** SIGHT the frozen 2150 artefact for the real locus (F1b's real root was proxy-coverage, NOT the punchlist's working-volume guess — always confirm before coding). Then F1e interconnect, P3/P4 PCB role guards, P9b firmware harness wire, S5/S8/S11 scoring Goodharts, adversarial vision V1, form B1–B7.
+> **▶▶ RESUME AFTER COMPACTION (2026-07-20).** Task: execute the FULL macro engine-self-audit program (Tristan directed — Terminal executes ALL incl PCB + DB + form; Cursor advises via `CURSOR-HARNESS-INBOX.md`, HOLD on `cursor-pcb`, single chain owner). Diagnosis + plan: `MACRO-ENGINE-SELF-AUDIT-PLAN-2026-07-20.md`; council findings: `COUNCIL-BIOREACTOR-2150-ADVERSARIAL-FINDINGS-2026-07-19.md`; Cursor packs: `CURSOR-PCB-HONESTY-FIXES-…` (Fixes 1–9) + `CURSOR-DB-AND-FORM-AUDITS-…` (A1–A8, B1–B7). **Method (mandatory):** each fix = SOURCE rule change + proveCatch on the FROZEN known-bad fixture `out/organoid-bioreactor-20260719-2150/` + no `if organoid`; run `python3 scripts/build-excel-export.py --selftest` (needs `PATH=/opt/homebrew/opt/node@22/bin:$PATH`) after every scoring edit; commit `--no-verify` with a `regression-harness:` line; update THIS table (status + SHA) + the inbox ▶ banner. **Acceptance:** re-scoring frozen 2150 → `ships=false`, PCB not FAB-READY, cost refuses — already true; a FRESH bake may claim ≥8 only when the adversarial checks pass on the new artefacts. **13 done / 37 open. NEXT = F1e** (interconnect: DN25 / DN-pipe fluid lines on a 20 mL device → micro-tubing; same watt-scale gate — SIGHT the frozen 2150 connection-schedule / interconnect for the DN labels first). F1d DONE (3be10b5d6): `sizeMainIncomer` models a watt-scale instrument as single-phase 230 V (was 3-ph 400 V), phase-aware stamp, proveCatch main-incomer-selftest.ts. F1c DONE (f2ff6a4c0): `enrich-state-with-reference-anchor.tsx` suppresses plant-scale references (bespoke bands + corpus medians > £10k) on benchtop instruments — all 5 mis-anchors verified suppressed on frozen 2150. F1b DONE (85d936976): `_instrument_proxy_dim` (build_universal_scene.py) now gives device-scale mechanical/fluidic parts + a universal envelope-relative backstop — no instrument part can inherit a plant TYPE_DEFAULT (the ⌀1.6 m culture-vessel / 1.5 m stirrer leak); proveCatch instrument_proxy_selftest.py. **Method reminder:** SIGHT the frozen 2150 artefact for the real locus (F1b's real root was proxy-coverage, NOT the punchlist's working-volume guess — always confirm before coding). Then F1e interconnect, P3/P4 PCB role guards, P9b firmware harness wire, S5/S8/S11 scoring Goodharts, adversarial vision V1, form B1–B7.
 
 
 
@@ -12,8 +12,8 @@ Legend: ✅ done · �doing · ⬜ open
 | ID | Item | Status | SHA |
 |---|---|---|---|
 | S1 | Pillar 1 — bind selfAudit.blocking_defects + device-scale process_plant_vessel leak → ships=false, floor≤4 | ✅ | 6ff4ce411 |
-| S2 | Cost ceiling → ex-works (oem) for device-scale bare unit-cost | ✅ | 897203942 |
-| S3 | Brief `checked==0` → not 10 (cap ≤4) | ✅ | 80474b1db |
+| S2 | Cost ceiling → ex-works (oem) for device-scale bare unit-cost. **Cursor audit:** rule ✅; 2150 cost refuse still needs S4 (brief says BoM → materials path). | ✅ | 897203942 |
+| S3 | Brief `checked==0` → not 10 (cap ≤4). **Cursor audit:** cap OK; `_selftest` proveCatch still missing — add before calling closed. | ⚠ | 80474b1db |
 | S4 | **oem>ceiling → ships bind directly** in compute_verdict (cost HARD alone may not floor) | ⬜ | |
 | S5 | **OOS tabs**: score=None, excluded from min_tab AND the "every tab ≥8" narrative; invert selftests ~28266/~31472 | ⬜ | |
 | S6 | **Gate 32** £100–£5M/unit band → real per-class band; HIGH when output_family=unit & oem>ceiling | ⬜ | |
@@ -35,7 +35,7 @@ Legend: ✅ done · �doing · ⬜ open
 | P6 | Fix 6 — Gate 38 widen beyond pipeline.ok (fitness + role guards + firmware-absent) | ⬜ | |
 | P7 | Fix 7 — interface-critical roles must be mpn-tier (subset of P1) | ⬜ | |
 | P8 | Fix 8 — PnP `Val=?` (cosmetic; Excel already fills; do NOT block FAB on it) | ⬜ optional | |
-| P9a | **Fix 9 honesty half** — no board reads bare FAB-READY; max = "FAB-READY — UNPROVEN IN HARDWARE" (reads state.pcb.firmwareProof.ok; discloses when no proof run) | ✅ | d94dce40c |
+| P9a | **Fix 9 honesty half** — no board reads bare FAB-READY; max = "FAB-READY — UNPROVEN IN HARDWARE". **🔴 Cursor audit FAIL-REWORK `d94dce40c`:** banner/`_sc_pcb` dicts still exact `"FAB-READY"` → KeyError on UNPROVEN string; live Excel formula still bare FAB-READY. See `CURSOR-TERMINAL-COMMIT-AUDIT-2026-07-20.md`. | 🔴 REWORK | d94dce40c |
 | P9b | **Fix 9 harness wire** — invoke deriveFirmwareProofSpecs + firmware_proof.py Tier-0 in pcb-stage per architecture board; set state.pcb.firmwareProof | ⬜ | |
 
 ## Form / vision (Terminal — Blender + render_vision_critic + composer)
@@ -58,16 +58,17 @@ Legend: ✅ done · �doing · ⬜ open
 ## Gate coverage
 | ID | Item | Status | SHA |
 |---|---|---|---|
-| G34 | Gate 34 — additive-manufacturing marker family (FDM extruder/steps-per-mm) | ✅ | 8c0cec9a5 |
+| G34 | Gate 34 — additive-manufacturing marker family (FDM extruder/steps-per-mm). **Cursor audit:** markers OK; additive proveCatch missing in gate-registry; still shadow — not acceptance-done. | ⚠ | 8c0cec9a5 |
 
 ## Source meta-root (Terminal — Pillar 4 F)
 | ID | Item | Status | SHA |
 |---|---|---|---|
-| F1a | word-expansion: 'Cartridge Heater' no longer explodes into a pressure-vessel FILTER (regex precision + watt-scale skip extended to plant-vessel part names) — kills the 9-word H1 leak | ✅ | a0dbdedc6 |
+| F1a | word-expansion: 'Cartridge Heater' no longer explodes into a pressure-vessel FILTER (regex precision + watt-scale skip). **Cursor audit:** SOURCE OK; add heater-vs-filter + watt-scale selftest. | ⚠ | a0dbdedc6 |
 | F1b | geometry emitter: metre-scale part envelopes (Culture Vessel ⌀1.6 m, stirrer 1.5 m). **ROOT (not working-volume):** `_instrument_proxy_dim` (build_universal_scene.py) returned None for mechanical/fluidic parts (modules outside `_INSTRUMENT_SHAPE_MODULES`) → fell to PLANT `TYPE_DEFAULTS`. FIX: device-scale lab-mechanical noun rules + a universal envelope-relative backstop (never None for an instrument device). proveCatch instrument_proxy_selftest.py (11 cases). | ✅ | 85d936976 |
 | F1c | cost engine: plant class_reference medians (£20k vessel / £5.38M actuation) → device-scale bands. SOURCE = `enrich-state-with-reference-anchor.tsx`: `isDeviceScaleProduct()` suppresses the bespoke-equipment band + any corpus median > £10k on a benchtop instrument. SIGHT-verified all 5 mis-anchors suppressed on frozen 2150. | ✅ | f2ff6a4c0 |
-| F1d | electrical model: 400V 3ph / 25 kVA incomer / DN pipe on a 35W device → device-scale DC model | ⬜ | |
+| F1d | electrical model: 400V 3ph incomer on a 35W device → single-phase 230 V. SOURCE = `sizeMainIncomer` (universal-contract-sizing.ts): watt-scale instrument + no derived transformer → vLine=230, phase-aware stamp. proveCatch main-incomer-selftest.ts. | ✅ | 3be10b5d6 |
 | F1e | interconnect: DN25 pipe → micro-tubing for device-scale fluid loops | ⬜ | |
+| F1f | **Design identity / scale lock** — pin `state.designIdentity.scale_tier` from brief physics (not nouns); hard-veto plant/RAS tools before relevance-sweep; homonym-safe heater/vessel explode; Gate 34 `PLANT_SCALE` markers. Cursor pack: `CURSOR-DESIGN-IDENTITY-SCALE-LOCK-2026-07-20.md`. Universal — Tristan: desktop “heater” must not pull fish-farm heaters. | ⬜ | |
 | F2 | Redundant Peltier + cartridge heater on ~1W duty → collapse to one thermal actuator | ⬜ | |
 | F3 | Pump slot-mispin (Watson-Marlow tubing SKU pinned as pump) → reject | ⬜ | |
 | F4 | confidence-honesty: no `confidence:high` on an admittedly-unfound MPN | ⬜ | |
