@@ -19551,6 +19551,20 @@ def _catalogue_fallback_mpn(requirement: str) -> str:
 
 _TBD_MPN_TEXT = "TBD (detailed design)"
 
+# S10 (council H10): catalogue-electronic noun families — a part whose noun names a catalogue
+# electronic component (never a machined-to-drawing mechanical part). If such a part has no
+# resolved MPN, "bespoke fabrication to drawing" is a false-satisfied claim → UNRESOLVED.
+_ELECTRONIC_NOUN_RX = re.compile(
+    r"\bmcu\b|microcontroller|\bmpu\b|\bcpu\b|processor|\bfpga\b|\bic\b|\badc\b|\bdac\b|"
+    r"\bafe\b|amplifier|op[- ]?amp|\bregulator\b|\bldo\b|\bpmic\b|\bdc[- ]?dc\b|transceiver|"
+    r"\bsensor\b|thermistor|thermocouple|photodiode|phototransistor|\bled\b|\bdiode\b|"
+    r"\bmosfet\b|transistor|\bbjt\b|\bfuse\b|polyfuse|\btvs\b|\besd\b|varistor|"
+    r"connector|receptacle|\bheader\b|\busb\b|ethernet|\brj45\b|\bhdmi\b|crystal|oscillator|"
+    r"\beeprom\b|\bflash\b|memory|\bram\b|isolat(?:or|ion)|opto|relay|\bpcb\b|"
+    r"resistor|capacitor|inductor|ferrite|\bbead\b|reference|comparator|\bgpio\b|"
+    r"peltier|thermoelectric|\btec\s+module\b|tachometer|protocol\s+bridge|"
+    r"debug\s+header|firmware\s+storage|voltage\s+reference|\btia\b", re.I)
+
 # ── HONEST TBD TAXONOMY (2026-07-03; extended 2026-07-04 round-3 dissection). Real
 # concept-stage EPC practice: several classes of bought-out line do NOT carry MPNs
 # at concept stage FOR HONEST REASONS — nobody expects a manufacturer part number on
@@ -19961,7 +19975,26 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                         tbd = True
                         tbd_count += 1
             elif kind == "fabricated" and not mpn_txt:
-                mpn_txt = "bespoke fabrication to drawing — see sizing basis"
+                # S10 (council H10, 2026-07-20): "bespoke fabrication to drawing" is honest for a
+                # genuinely FABRICATED mechanical part (an enclosure / bracket machined to a
+                # drawing — no catalogue MPN exists). It is a FALSE-SATISFIED claim for a
+                # catalogue ELECTRONIC part (an MCU / sensor / USB receptacle / isolator) that
+                # SHOULD carry a real MPN but the engine didn't resolve one — that is UNRESOLVED,
+                # not a design choice. (After S11, PCB-designed electronics already carry their
+                # board MPN, so only genuinely-unresolved electronics reach here.) Flag it as a
+                # real gap so the row FAILs (honest red beats fake green). Keyed on the FR4/
+                # electronic material signal + an electronic-noun family, no product class.
+                _is_electronic = bool(re.search(r"fr4|electronic\s+comp|pcb[- ]?mount",
+                                                material_txt or "", re.I)) \
+                    or bool(_ELECTRONIC_NOUN_RX.search(req))
+                if _is_electronic:
+                    mpn_txt = "UNRESOLVED — catalogue electronic part; MPN required at detailed design"
+                    reasons.append("catalogue electronic component with NO resolved MPN — "
+                                   "'bespoke fabrication to drawing' is not a valid identity for a "
+                                   "catalogue part (council H10); resolve a real MPN or mark it "
+                                   "OEM-proprietary with evidence")
+                else:
+                    mpn_txt = "bespoke fabrication to drawing — see sizing basis"
         if not str(row.get("basis") or "").strip():
             reasons.append("pricing basis missing")
         # CLASS FIT (fix 6): a foreign-domain product fails its row — routed upstream.
@@ -28840,6 +28873,23 @@ def _selftest() -> int:
     if "AD8237" not in _s11_afe:
         print(f"  FAIL S11: a partVerification-resolved part (AD8237) must NOT be overwritten "
               f"by a PCB TBD (got {_s11_afe!r})"); bad += 1
+    # ═══ S10 (council H10, 2026-07-20): a catalogue ELECTRONIC part with no MPN reads
+    # UNRESOLVED (fails its row), never a false-satisfied "bespoke fabrication"; a genuinely
+    # FABRICATED mechanical part (enclosure) keeps the honest "bespoke fabrication". ═══
+    _s10_elec_rows = [{"tag": "I-1", "requirement": "Microcontroller Mcu", "part": "requirement stated",
+                       "qty": 1, "unit_gbp": 3, "line_gbp": 3, "basis": "class ref", "wall_mm": 1}]
+    _s10_mech_rows = [{"tag": "X-1", "requirement": "Enclosure Shell", "part": "requirement stated",
+                       "qty": 1, "unit_gbp": 8, "line_gbp": 8, "basis": "moulded take-off", "wall_mm": 3}]
+    _s10_e = _eval_bom_ledger_contract(".", {"isInstrumentDevice": True, "requirementsBom": _s10_elec_rows})
+    _s10_m = _eval_bom_ledger_contract(".", {"isInstrumentDevice": True, "requirementsBom": _s10_mech_rows})
+    _e_mpn = ((_s10_e or {}).get("rows") or {}).get(0, {}).get("mpn", "")
+    _m_mpn = ((_s10_m or {}).get("rows") or {}).get(0, {}).get("mpn", "")
+    if "UNRESOLVED" not in _e_mpn:
+        print(f"  FAIL S10: a catalogue electronic part (MCU) with no MPN must read UNRESOLVED, "
+              f"not 'bespoke fabrication' (got {_e_mpn!r})"); bad += 1
+    if "bespoke fabrication" not in _m_mpn:
+        print(f"  FAIL S10: a genuinely fabricated mechanical part (Enclosure Shell) must keep "
+              f"'bespoke fabrication to drawing' (got {_m_mpn!r})"); bad += 1
     # ═══ S7 (2026-07-20): the multi-axis ship card + the vision axis bind ═══
     import tempfile as _tf7
     _CLEAN_ST = {"parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385}}},
