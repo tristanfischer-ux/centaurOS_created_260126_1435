@@ -1368,7 +1368,7 @@ export function selftestContractStrict(): { passed: boolean; failures: string[] 
 if (require.main === module && process.argv.includes('--selftest')) {
   const { passed, failures } = selftestContractStrict()
   if (passed) {
-    console.log('[brief-value-literal-scanner] contract-strict selftest: PASS (base + mains-context)')
+    console.log('[brief-value-literal-scanner] contract-strict selftest: OK — PASS (base + mains-context)')
     process.exit(0)
   } else {
     console.error('[brief-value-literal-scanner] contract-strict selftest: FAIL')

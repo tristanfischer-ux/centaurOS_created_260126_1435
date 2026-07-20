@@ -50,6 +50,7 @@ run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mi
 run "reference-anchor F1c device-scale guard"     npx tsx scripts/enrich-state-with-reference-anchor.tsx --selftest
 run "instrument-proxy F1b device-scale geometry"  "$PY" scripts/blender-universal/instrument_proxy_selftest.py
 run "main-incomer F1d device-scale electrical"    npx tsx scripts/lib/orchestrator/generic/main-incomer-selftest.ts
+run "gate-25 brief-literal scanner (mains vs £)"  npx tsx scripts/lib/brief-value-literal-scanner.ts --selftest
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 # EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice
