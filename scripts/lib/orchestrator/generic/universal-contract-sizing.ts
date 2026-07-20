@@ -2648,7 +2648,12 @@ const SUB_ASSEMBLY: {
   // Filter' / 'Ro Membrane' never inherits a drum + gearmotor + backwash spray bar + reject trough
   // (the physics-critic HIGH: "the Gac Filter / RO Membrane sub-module contains rotary drum-filter
   // components"). Universal — keyed on the media/membrane noun, no class table.
-  { re: /\bgac\b|granular.?activ|activated.?carbon|carbon.?filter|sand.?filter|multi.?media|cartridge|\bmembrane\b|reverse.?osmos|\bro\b|\buf\b|ultrafiltrat|nanofiltrat|\bnf\b|softener|ion.?exchange|\bresin\b|deioni/i,
+  // GOTCHA (2026-07-20, council H1): bare `cartridge` matched "Cartridge HEATER" (a benchtop
+  // thermal part) and exploded it into a pressure-vessel filter (Pressure Vessel Shell /
+  // Backwash / Underdrain / Skid Frame) on a 20 ml bioreactor — the word "cartridge" collided
+  // with cartridge-FILTER. Require a filter context (cartridge filter/element/housing/vessel),
+  // never a cartridge heater/fuse/valve.
+  { re: /\bgac\b|granular.?activ|activated.?carbon|carbon.?filter|sand.?filter|multi.?media|cartridge[\s-]?(?:filter|element|housing|vessel)|\bmembrane\b|reverse.?osmos|\bro\b|\buf\b|ultrafiltrat|nanofiltrat|\bnf\b|softener|ion.?exchange|\bresin\b|deioni/i,
     parts: [
       { name: 'Pressure Vessel Shell', derive: (p) => ({ rating: { v: p.m3h || 15, u: 'm³/h' }, gbp: 3000 + (p.m3h || 15) * 90 }) },
       { name: 'Filter Media / Membrane Elements', derive: (p) => ({ gbp: 2000 + (p.m3h || 15) * 65 }) },
@@ -3135,7 +3140,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         if (
           isWattScaleInstrument
           && rule.parts.some((p) =>
-            /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller/i.test(p.name))
+            /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller|pressure\s*vessel\s*shell|filter\s*media|distribution\s*header|underdrain|nozzle\s*plate|backwash|air\s*scour|sample\s*cock|skid\s*frame/i.test(p.name))
         ) {
           continue
         }
