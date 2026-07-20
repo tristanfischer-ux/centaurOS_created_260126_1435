@@ -995,7 +995,13 @@ def _aux_tab_score(title: str, run_dir: str):
         # tab score — never a derived max(2, …) number no other surface quotes. (The
         # canonical 'Quality & Audit' entry is set in build() from compute_verdict; this
         # branch only serves a direct _aux_tab_score call before that entry exists.)
-        _scored = [v.get("score") for v in _TAB_SCORES.values() if isinstance(v.get("score"), (int, float))]
+        # S5 (2026-07-20): exclude VERIFIED-OUT-OF-SCOPE tabs (`scored is False`) — a tab
+        # that proved its own OOS verification is neither a pass nor a fail and must not be
+        # counted in the "every tab ≥8" weakest-tab computation (consistency with the
+        # canonical compute_verdict path, which already excludes `scored is False`). Keyed on
+        # the flag any scorer may set, never a tab name.
+        _scored = [v.get("score") for v in _TAB_SCORES.values()
+                   if isinstance(v.get("score"), (int, float)) and v.get("scored") is not False]
         if _scored:
             _worst = min(_scored)
             _ok = _worst >= 8
@@ -28472,6 +28478,30 @@ def _selftest() -> int:
         print(f"  FAIL verified-out-of-scope: the DUTY branch (real HVAC content, normally "
               f"scored) must floor exactly like any other tab, unaffected by the mechanism's "
               f"existence (got {_duty_v})"); bad += 1
+    # ═══ S5 (2026-07-20): the ⚠ Audit FALLBACK weakest-tab computation must ALSO exclude
+    # verified-out-of-scope tabs (scored:False) — consistency with compute_verdict, so an
+    # OOS 10 never pads the "every tab ≥8" count and an all-OOS set is honest (None). ═══
+    _s5_saved = dict(_TAB_SCORES)
+    try:
+        _TAB_SCORES.clear()
+        _TAB_SCORES.update({
+            "Overview": {"score": 6, "status": "FAIL"},
+            "P&ID": {"score": 10, "status": "PASS", "scored": False},   # verified OOS
+        })
+        _s5_fb = _aux_tab_score("Quality & Audit", ".")
+        if not _s5_fb or _s5_fb.get("score") != 6 or _s5_fb.get("status") != "FAIL":
+            print(f"  FAIL S5: the ⚠ Audit fallback must report the weakest REAL tab (6, FAIL) "
+                  f"and NOT let a verified-OOS 10 pad it (got {_s5_fb})"); bad += 1
+        # all-OOS → no scored tab → None (never a fabricated 8/PASS over zero real tabs)
+        _TAB_SCORES.clear()
+        _TAB_SCORES.update({"P&ID": {"score": 10, "status": "PASS", "scored": False}})
+        _s5_allo = _aux_tab_score("Quality & Audit", ".")
+        if _s5_allo is not None:
+            print(f"  FAIL S5: an all-OOS tab set must return None from the audit fallback, "
+                  f"never a fabricated pass (got {_s5_allo})"); bad += 1
+    finally:
+        _TAB_SCORES.clear()
+        _TAB_SCORES.update(_s5_saved)
     # ═══ MACRO SELF-AUDIT BINDING (2026-07-20, Pillar 1) — the engine must REFUSE a
     # dossier whose own detectors flagged it, even when every TAB scores ≥8. Frozen
     # organoid-bioreactor-2150 shape: all tabs ≥8 but selfAudit.blocking_defects
