@@ -82,10 +82,13 @@ describe('Yuri PCB gold architecture harness', () => {
         usb_interface_tool_grounded_word: 'interconnect_only',
       },
       Pioreactor: {
-        usb_interface_word: 'off_board_module',
-        firmware_storage_word: 'off_board_module',
+        // P4 USB role honesty: power entry is an on-board receptacle when the
+        // HAT owns the port; data/interface stays interconnect-only; SPI flash
+        // that the planner scopes onto the HAT is on_board (not a COTS module).
+        usb_interface_word: 'interconnect_only',
+        firmware_storage_word: 'on_board',
         host_protocol_bridge_word: 'interconnect_only',
-        usb_power_entry_word: 'interconnect_only',
+        usb_power_entry_word: 'on_board',
       },
       Rodeostat: {
         usb_power_entry_word: 'off_board_module',
@@ -108,10 +111,13 @@ describe('Yuri PCB gold architecture harness', () => {
         }
       ).observedAssignments
       expect(assignments).toMatchObject(expectedAssignments)
+      // Only non-on_board placements must stay outside board BOM scope.
+      // on_board assignments (e.g. usb_power_entry receptacle) belong in scopes.
+      const outsideBoardKeys = Object.entries(expectedAssignments)
+        .filter(([, placement]) => placement !== 'on_board')
+        .map(([wordId]) => wordId)
       const boardWordIds = Object.values(product.observedBoardScopes).flat()
-      expect(boardWordIds).toEqual(expect.not.arrayContaining(
-        Object.keys(expectedAssignments),
-      ))
+      expect(boardWordIds).toEqual(expect.not.arrayContaining(outsideBoardKeys))
     }
   })
 
@@ -134,13 +140,24 @@ describe('Yuri PCB gold architecture harness', () => {
     })
     const pioreactor = report.products.find((product) => product.product === 'Pioreactor')
     const openDrop = report.products.find((product) => product.product === 'OpenDrop')
+    // wet_actuation now emits real heater/stir drive footprints (componentCount > 0).
+    // The remaining unimplemented board function is OD optics on its own board.
     expect(pioreactor?.generatedBoards.find((board) => board.boardId === 'wet_actuation'))
+      .toMatchObject({
+        componentCount: expect.any(Number),
+      })
+    expect(
+      (pioreactor?.generatedBoards.find((board) => board.boardId === 'wet_actuation')
+        ?.componentCount ?? 0) > 0,
+    ).toBe(true)
+    expect(pioreactor?.generatedBoards.find((board) => board.boardId === 'od_optics'))
       .toMatchObject({
         componentCount: 0,
         functionRequirements: [
-          expect.objectContaining({ role: 'heater_channel' }),
-          expect.objectContaining({ role: 'stir_channel' }),
-          expect.objectContaining({ role: 'pump_channel' }),
+          expect.objectContaining({
+            role: 'od_measurement_channel',
+            implementation: 'unresolved_board_function',
+          }),
         ],
       })
     expect(openDrop?.generatedBoards.find((board) => board.boardId === 'electrode_cartridge'))
@@ -206,6 +223,8 @@ describe('Yuri PCB gold architecture harness', () => {
         projectDir !== runDir)).toBe(true)
 
       const boards = report.products.flatMap((product) => product.boards)
+      // P3/P4 identity honesty resolves USB receptacle + LED candidates that used
+      // to stay package_family-only — unverified MPN count drops 6 → 3.
       expect(boards[0]).toMatchObject({
         boardId: 'optical_source',
         pipelineOk: true,
@@ -215,9 +234,9 @@ describe('Yuri PCB gold architecture harness', () => {
         boardSizeMm: { w: 41, h: 31 },
         pipelineComponentCount: 11,
         verifiedIdentityCount: 0,
-        unresolvedIdentityCount: 6,
-        unverifiedMpnCount: 6,
-        resolutionTierCounts: { package_family: 6 },
+        unresolvedIdentityCount: 3,
+        unverifiedMpnCount: 3,
+        resolutionTierCounts: { package_family: 3 },
         identitySources: [],
         identityBlockers: expect.arrayContaining([
           expect.objectContaining({
@@ -226,7 +245,7 @@ describe('Yuri PCB gold architecture harness', () => {
           }),
         ]),
         engineeringFindings: [
-          '6 generated component(s) lack verified MPN/symbol/pinout identity',
+          '3 generated component(s) lack verified MPN/symbol/pinout identity',
         ],
         errors: [],
       })

@@ -17587,8 +17587,17 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         # electronic gap (the 2150 od_optics: od_measurement_channel×1, requiredWordIds=[]).
         if _chreq and not _reqw:
             _n_arch_gaps += 1
+    # P5: architecture needs N KiCad deliverables but chain emitted one merged project.
+    if pcb.get("multiBoardMerged") is True:
+        _n_arch_gaps += 1
     _fw = pcb.get("firmwareProof") if isinstance(pcb.get("firmwareProof"), dict) else None
-    _fw_ok = _fw.get("ok") if isinstance(_fw, dict) else None  # None = never run (Fix 9 harness pending)
+    # P9b: chain writes both `ok` and `allOk` (alias); accept either. None = never run.
+    _fw_ok = None
+    if isinstance(_fw, dict):
+        if "ok" in _fw:
+            _fw_ok = bool(_fw.get("ok"))
+        elif "allOk" in _fw:
+            _fw_ok = bool(_fw.get("allOk"))
     readiness, readiness_why = _pcb_readiness_verdict(
         pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
         n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope,
@@ -32467,6 +32476,53 @@ def _selftest() -> int:
     if _archgap_r != "ENGINEERING DRAFT":
         print(f"  FAIL pcb-readiness Fix4: an un-built required-channel board (od_optics gap) "
               f"must read ENGINEERING DRAFT, got {_archgap_r!r}"); bad += 1
+    # P5 proveCatch: multiBoardMerged on state.pcb must count as an architecture gap
+    # inside _pcb_two_axis_assessment (not only when empty channel boards exist).
+    import tempfile as _tempfile_p5
+    import shutil as _shutil_p5
+    _p5_td = _tempfile_p5.mkdtemp(prefix="pcb-p5-merge-")
+    try:
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _p5_pcb = {
+            "isPcbBearing": True,
+            "disposition": "bespoke",
+            "electronicPartCount": 16,
+            "multiBoardMerged": True,
+            "architecture": {"boards": []},
+            "pipeline": {
+                "ok": True,
+                "routed": True,
+                "unroutedAfterFreerouting": 0,
+                "drc": {"ran": True, "violations": 0},
+                "gerbers": {"files": ["synthetic.gbr"]},
+                "drill": {"files": []},
+                "pos": {},
+                "generator": {
+                    "components": [
+                        {
+                            "instanceName": f"u{i}",
+                            "resolutionTier": "mpn_symbol_footprint",
+                            "partNumber": f"PN{i}",
+                            "manufacturer": "M",
+                        }
+                        for i in range(16)
+                    ],
+                    "offBoard": [],
+                    "unresolved": [],
+                    "offBoardCount": 0,
+                },
+            },
+        }
+        _p5_a = _pcb_two_axis_assessment(_p5_pcb, _p5_td)
+        if _p5_a.get("readiness") != "ENGINEERING DRAFT":
+            print(f"  FAIL P5 multiBoardMerged: expected ENGINEERING DRAFT, got "
+                  f"{_p5_a.get('readiness')!r}"); bad += 1
+        elif "architecture gap" not in str(_p5_a.get("readiness_why") or "").lower():
+            print(f"  FAIL P5 multiBoardMerged: why must mention architecture gap, got "
+                  f"{_p5_a.get('readiness_why')!r}"); bad += 1
+    finally:
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _shutil_p5.rmtree(_p5_td, ignore_errors=True)
     if _pcb_effective_tier({"resolutionTier": "package_family",
                             "partNumber": "TLC5916IDR",
                             "manufacturer": "Texas Instruments"}) != "mpn_package":

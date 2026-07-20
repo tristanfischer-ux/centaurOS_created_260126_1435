@@ -102,6 +102,32 @@ export function evaluatePcbGate(pcb: PcbStageResult | null | undefined): PcbGate
         ],
       }
     }
+
+    // P6: toolchain hygiene ≠ architecture fitness / multi-board honesty.
+    const fitness = pcb.designFitness
+    if (fitness && fitness.ok === false) {
+      const highs = (fitness.findings ?? []).filter((f) => f.severity === 'high')
+      if (highs.length > 0) {
+        return {
+          applicable: true,
+          fires: true,
+          reason: 'clean_toolchain_but_architecture_unfit',
+          details: highs.slice(0, 5).map((f) => f.message ?? 'architecture unfit'),
+        }
+      }
+    }
+
+    if (pcb.multiBoardMerged === true) {
+      return {
+        applicable: true,
+        fires: true,
+        reason: 'clean_toolchain_but_multi_board_merged',
+        details: [
+          'architecture requires multiple KiCad deliverables but only one project was generated',
+        ],
+      }
+    }
+
     return { applicable: true, fires: false, reason: 'clean_board', details: [] }
   }
 
@@ -178,12 +204,30 @@ if (require.main === module) {
     pipeline: { ...clean.pipeline!, ok: true, components: 14 },
   }
 
+  // P6: clean pipeline + architecture unfit / multi-board smash must still fire.
+  const unfit: PcbStageResult = {
+    ...clean,
+    designFitness: {
+      ok: false,
+      findings: [{
+        severity: 'high',
+        message: 'board missing required roles: od_optics',
+      }],
+    },
+  }
+  const merged: PcbStageResult = {
+    ...clean,
+    multiBoardMerged: true,
+  }
+
   const rClean = evaluatePcbGate(clean)
   const rFailed = evaluatePcbGate(failed)
   const rCots = evaluatePcbGate(cots)
   const rNone = evaluatePcbGate(null)
   const rToken = evaluatePcbGate(token)
   const rComplete = evaluatePcbGate(complete)
+  const rUnfit = evaluatePcbGate(unfit)
+  const rMerged = evaluatePcbGate(merged)
 
   const ok =
     rClean.applicable === true && rClean.fires === false &&
@@ -191,9 +235,11 @@ if (require.main === module) {
     rCots.applicable === false && rCots.fires === false &&
     rNone.applicable === false && rNone.fires === false &&
     rToken.fires === true && rToken.reason === 'clean_toolchain_but_incomplete_board' &&
-    rComplete.fires === false
+    rComplete.fires === false &&
+    rUnfit.fires === true && rUnfit.reason === 'clean_toolchain_but_architecture_unfit' &&
+    rMerged.fires === true && rMerged.reason === 'clean_toolchain_but_multi_board_merged'
 
-  console.log(JSON.stringify({ rClean, rFailed, rCots, rNone }, null, 2))
+  console.log(JSON.stringify({ rClean, rFailed, rCots, rNone, rUnfit, rMerged }, null, 2))
   console.log(ok ? 'PCB GATE proveCatch: PASS' : 'PCB GATE proveCatch: FAIL')
   process.exit(ok ? 0 : 1)
 }
