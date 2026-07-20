@@ -10,7 +10,11 @@ describe('Gate 25 brief-value literal scanner', () => {
       'const a = `${Math.ceil((p.continuousPowerKw * 1000 / (400 * Math.sqrt(3)) * 1.25) / 100) * 100} A 3-phase`',
       'const b = `${p.coolantChemistryDesc}, IP54 outdoor mount, AC 400 3~/50 Hz`',
     ].join('\n')
-    const res = scanEmitterForBriefLiterals(src, { unit_cost_ceiling_gbp: 400 } as never)
+    const res = scanEmitterForBriefLiterals(
+      src,
+      { unit_cost_ceiling_gbp: 400 } as never,
+      'benchtop_bioreactor',
+    )
     expect(res.hits).toHaveLength(0)
   })
 
@@ -19,6 +23,7 @@ describe('Gate 25 brief-value literal scanner', () => {
     const res = scanEmitterForBriefLiterals(
       'const m = `structural floor rated 35000 kg`',
       { max_mass_kg: 35000 } as never,
+      'benchtop_bioreactor',
     )
     expect(res.hits.length).toBeGreaterThanOrEqual(1)
   })

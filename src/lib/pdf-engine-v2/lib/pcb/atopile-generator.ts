@@ -1106,7 +1106,8 @@ function resolveComponent(
       mpnVerified = false
       identityBlocker = denyReason
       resolvedPartNumber = null
-      if (tier === 'mpn_package' || tier === 'mpn_package_only') {
+      // GOTCHA: tier is never already mpn_package_only here (that promote is the else).
+      if (tier === 'mpn_package') {
         const fb = functionClass ? FUNCTION_CLASS_DEFAULTS[functionClass] : null
         if (fb) {
           const resolved = resolveFootprintByGlob(footprintsRoot, fb.library, fb.filenameTest)
