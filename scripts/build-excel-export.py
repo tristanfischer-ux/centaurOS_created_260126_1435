@@ -23530,6 +23530,23 @@ def _sc_brief(wb, ws, state, run_dir):
                              if s.get("status") not in _PASSING})
             iss.append(f"{len(secs) - cons} client-offer section(s) not consistent "
                        f"({', '.join(others)}) — mirrored as HOLDS")
+    if not comps:
+        # ZERO-CHECK GUARD (2026-07-20, Pillar 3 / Cursor P0.3): the Brief tab ran NO
+        # content checks (no client-offer reconciliation sections/rows), so the only
+        # thing left is _merge_content's generic "cell completeness+type contract" —
+        # populated cells, which would mint a 10 on a tab that verified NOTHING (the
+        # 2150 Brief=10/checked:0 Goodhart). A populated-but-unverified Brief cannot be
+        # a genuine ≥8 "wow": cap ≤4 with an honest issue so the engine is forced to run
+        # a real brief↔design fidelity check to earn the score. Universal (fires on any
+        # run whose Brief scorer found nothing to reconcile), no per-class table.
+        return {"components": [], "issues": [
+            "brief scorer ran ZERO content checks — no client-offer reconciliation to "
+            "verify the engine's structured interpretation against the original brief; "
+            "a populated Brief tab is not a verified one"],
+            "score_cap": 4.0,
+            "mech": "client-offer reconciliation (live section mapping) — 0 checks available",
+            "fix": "emit a brief↔contract fidelity reconciliation so the Brief tab verifies "
+                   "the design honours every stated brief constraint"}
     return {"components": comps, "issues": iss,
             "mech": "client-offer reconciliation (live section mapping)", "fix": ""}
 
