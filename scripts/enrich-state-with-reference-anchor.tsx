@@ -99,6 +99,65 @@ const CORPUS_TRUST_MIN_PRICED = 3
 /** If the corpus median is >this× outside the bespoke envelope, treat it as a mis-anchor. */
 const CORPUS_MISANCHOR_FACTOR = 3
 
+// ---------------------------------------------------------------------------
+// DEVICE-SCALE reference guard (2026-07-20, F1c — the organoid-bioreactor
+// £20k-vessel / £5.38M-actuation leak).
+//
+// The corpus + the bespoke-equipment bands are both PLANT-scale references:
+// the bespoke band's smallest class (`agitated_vessel`) is an £8k–£60k
+// jacketed 316L stirred TANK, and the corpus nearest-neighbour returns a
+// £5.38M spacecraft reaction-control-thruster set for an "actuation" query.
+// On a benchtop instrument (35 W, 20 mL working volume, 0.004 m³ envelope)
+// EVERY such anchor is a class-mismatch: it flags a £1 lab consumable as
+// "under-priced vs a £20k tank", drives the corpus-median lift + OEM-ceiling
+// logic off a plant reference, and poisons the benchmark net. A device-scale
+// product simply has no single part worth £10k+ — so a plant-scale reference
+// on one of its lines is noise, not signal. Universal: keyed off the SAME
+// watt-scale-instrument signal the sizing engine uses (enclosure < 1 m³ AND a
+// low power / small working volume), never a per-class table.
+// ---------------------------------------------------------------------------
+/** No single BoM line of a benchtop instrument is a genuine £10k+ principal —
+ *  a plant-scale reference (bespoke band or corpus median) above this is a
+ *  class-mismatch, not an under-priced part. */
+const DEVICE_SCALE_REF_CEILING_GBP = 10_000
+
+/** Read a numeric quantity from wherever the chain stashed it (shared_quantities
+ *  on either contract, wordDomainCoherence, or a module's derived_parameters). */
+function readScaleQty(state: any, key: string): number | undefined {
+  const asNum = (x: any): number | undefined => {
+    const n = typeof x === 'object' && x != null ? Number(x.value) : Number(x)
+    return Number.isFinite(n) ? n : undefined
+  }
+  const cands = [
+    state?.engineeringContract?.shared_quantities?.[key],
+    state?.orchestratorContract?.shared_quantities?.[key],
+    state?.orchestratorContract?.quantities?.[key],
+    state?.wordDomainCoherence?.[key],
+  ]
+  for (const c of cands) { const n = asNum(c); if (n !== undefined) return n }
+  for (const m of (state?.moduleDecomposition?.modules ?? [])) {
+    const n = asNum(m?.derived_parameters?.[key]); if (n !== undefined) return n
+  }
+  return undefined
+}
+
+/** True when the product is a benchtop/handheld instrument for which plant-scale
+ *  references (bespoke chemical-process bands, industrial corpus medians) must
+ *  NOT anchor a per-line flag. Mirrors `isWattScaleInstrument` in
+ *  universal-contract-sizing.ts: a sub-1 m³ envelope AND a low power / small
+ *  working volume, OR the explicit isInstrumentDevice signal. */
+function isDeviceScaleProduct(state: any): boolean {
+  if (state?.isInstrumentDevice === true) return true
+  const vol = readScaleQty(state, 'enclosure_volume_m3')
+  if (vol === undefined || !(vol < 1)) return false
+  const powW = readScaleQty(state, 'peak_electrical_power_w')
+  const loadKw = readScaleQty(state, 'connected_electrical_load_kw')
+  const volMl = readScaleQty(state, 'working_volume_ml')
+  return (powW !== undefined && powW <= 120)
+    || (loadKw !== undefined && loadKw <= 0.12)
+    || (volMl !== undefined && volMl <= 500)
+}
+
 /** Parse a numeric token followed by a unit out of a free-text string. */
 function parseFirstNumber(re: RegExp, ...texts: (string | null | undefined)[]): number | null {
   for (const t of texts) {
@@ -157,7 +216,14 @@ function bespokeFlagDecision(
   ourUnit: number,
   corpusMedian: number | null,
   corpusPriced: number,
+  deviceScale: boolean,
 ): { flag: 'over' | 'under' | 'in_range'; ratio: number | null; ref_median_gbp: number; ref_low_gbp: number; ref_high_gbp: number; ref: BespokeReference } | null {
+  // F1c (2026-07-20): the bespoke-equipment bands are PLANT-scale chemical-process
+  // references (smallest is an £8k–£60k jacketed 316L tank). On a benchtop
+  // instrument NONE of them applies — a lab-scale "culture vessel" is a £10–500
+  // consumable, not a stirred tank. Suppress the band entirely so the caller keeps
+  // the (also device-scale-guarded) corpus path. Universal — keyed on scale only.
+  if (deviceScale) return null
   const name = String(word?.name_human ?? verification?.word_name ?? '')
   const form = (Array.isArray(word?.modifier_characters) ? word.modifier_characters : []).find((m: any) => m?.kind === 'form')?.value
   const pn = verification?.part_number
@@ -393,8 +459,61 @@ async function batchLookup(
 // Main
 // ---------------------------------------------------------------------------
 
+/**
+ * F1c proveCatch — the device-scale reference guard. Asserts (a) the benchtop
+ * organoid-bioreactor 2150 signals classify as device-scale, (b) a plant does
+ * NOT, (c) the bespoke-equipment band is suppressed for a device-scale product
+ * and still fires for a plant, and (d) a plant-scale corpus median is above the
+ * device ceiling (so the caller's guard fires). Runs with no network / no state.
+ */
+function runSelfTest(): void {
+  const fails: string[] = []
+  const ok = (cond: boolean, msg: string) => { if (!cond) fails.push(msg) }
+
+  // (a) the frozen 2150 benchtop bioreactor is device-scale — via the explicit
+  // signal AND, independently, via the watt-scale branch (35 W, 20 mL, 0.004 m³).
+  ok(isDeviceScaleProduct({ isInstrumentDevice: true }), '2150 isInstrumentDevice → device-scale')
+  ok(isDeviceScaleProduct({ engineeringContract: { shared_quantities: {
+    enclosure_volume_m3: 0.00403, peak_electrical_power_w: 35, working_volume_ml: 20 } } }),
+    '2150 watt-scale signals (0.004 m³ / 35 W / 20 mL) → device-scale')
+  // (b) a utility BESS / plant is NOT device-scale.
+  ok(!isDeviceScaleProduct({ engineeringContract: { shared_quantities: {
+    enclosure_volume_m3: 38, connected_electrical_load_kw: 1200 } } }),
+    'utility plant (38 m³ / 1.2 MW) → NOT device-scale')
+  ok(!isDeviceScaleProduct({}), 'no scale signals → NOT device-scale (fail-open safe)')
+
+  // (c) the bespoke-equipment band: a fabricated agitated vessel anchors on the
+  // plant band at plant scale, but is SUPPRESSED on a device-scale product.
+  const vesselWord = { name_human: 'Fabricated 316L Agitated Vessel',
+    modifier_characters: [{ kind: 'form', value: 'jacketed stirred tank' }] }
+  const plantVerdict = bespokeFlagDecision(vesselWord, {}, 30, null, 0, /*deviceScale*/ false)
+  const deviceVerdict = bespokeFlagDecision(vesselWord, {}, 30, null, 0, /*deviceScale*/ true)
+  ok(plantVerdict !== null, 'agitated vessel anchors on the bespoke band at PLANT scale')
+  ok(deviceVerdict === null, 'agitated vessel band SUPPRESSED on a device-scale product (F1c)')
+  if (plantVerdict) ok(plantVerdict.ref_median_gbp > DEVICE_SCALE_REF_CEILING_GBP,
+    'the plant vessel band reference is > the device-scale ceiling (proves the mis-anchor magnitude)')
+
+  // (d) the corpus-median caller guard fires only when device-scale AND median
+  // exceeds the ceiling — mirror the exact 2150 leaks (£20k vessel, £5.38M actuation).
+  const guardFires = (deviceScale: boolean, median: number) =>
+    deviceScale && median != null && median > DEVICE_SCALE_REF_CEILING_GBP
+  ok(guardFires(true, 20000), 'device-scale + £20k corpus median → suppressed')
+  ok(guardFires(true, 5382000), 'device-scale + £5.38M corpus median → suppressed')
+  ok(!guardFires(true, 450), 'device-scale + £450 in-scale median → KEPT (a real lab-part reference survives)')
+  ok(!guardFires(false, 20000), 'plant + £20k median → KEPT (plant references are legitimate)')
+
+  if (fails.length) {
+    console.error('[engine-c][selftest] FAIL:')
+    for (const f of fails) console.error('  ✗ ' + f)
+    process.exit(1)
+  }
+  console.error('[engine-c] _selftest passed — F1c device-scale reference guard proveCatch (11 assertions)')
+  process.exit(0)
+}
+
 async function main(): Promise<void> {
   const [, , inputArg, outputArg] = process.argv
+  if (inputArg === '--selftest') { runSelfTest(); return }
   if (!inputArg) {
     console.error('usage: enrich-state-with-reference-anchor.tsx <state.json> [out.json]')
     process.exit(2)
@@ -496,7 +615,16 @@ async function main(): Promise<void> {
   const overFlags: FlagRow[] = []
   const underFlags: FlagRow[] = []
 
+  // F1c (2026-07-20): compute product scale ONCE. On a benchtop instrument the
+  // plant-scale references (bespoke bands, industrial corpus medians) are all
+  // class-mismatches — suppress them so a £1 lab consumable is never flagged
+  // "under-priced vs a £20k tank" and the £5.38M spacecraft-thruster corpus
+  // median never anchors an actuation line.
+  const deviceScale = isDeviceScaleProduct(state)
+  if (deviceScale) console.error('[engine-c] device-scale product — plant-scale references suppressed (bespoke bands off; corpus medians > £' + DEVICE_SCALE_REF_CEILING_GBP.toLocaleString('en-GB') + ' treated as class-mismatch)')
+
   let bespokeRescued = 0  // lines whose flag came from the bespoke band, not the corpus
+  let deviceScaleSuppressed = 0  // corpus medians rejected as plant-scale mis-anchors
   for (const r of requests) {
     const res = results.get(r.request_id)
     const v = r.verif_ref
@@ -511,7 +639,7 @@ async function main(): Promise<void> {
     // median, or not a bespoke part). This rescues BOTH the no_reference case
     // (corpus found nothing) and the wild-ratio false flags (desk-fan / whole-
     // skid mis-anchors).
-    const bespoke = bespokeFlagDecision(r.word_ref, v, ourUnit, corpusMedian, corpusPriced)
+    const bespoke = bespokeFlagDecision(r.word_ref, v, ourUnit, corpusMedian, corpusPriced, deviceScale)
 
     if (bespoke) {
       counts[bespoke.flag] += 1
@@ -553,6 +681,26 @@ async function main(): Promise<void> {
       v.engine_c_ref_count = 0
       v.engine_c_priced_count = 0
       counts.no_reference += 1
+      continue
+    }
+    // F1c (2026-07-20): on a benchtop instrument a corpus median above the
+    // device-scale ceiling is a nearest-neighbour class-mismatch (the "actuation"
+    // query returned a £5.38M spacecraft reaction-control-thruster set; a "vial
+    // holder" returned a £42.5k buffer vessel). Recording it as an under-priced
+    // reference poisons the corpus-median lift, the OEM ceiling, and the
+    // benchmark net. Suppress to no_reference — the line keeps its own estimate.
+    if (deviceScale && res.median_unit_cost_gbp != null && Number(res.median_unit_cost_gbp) > DEVICE_SCALE_REF_CEILING_GBP) {
+      v.engine_c_flag = 'no_reference'
+      v.engine_c_ref_median_gbp = null
+      v.engine_c_ref_p25_gbp = null
+      v.engine_c_ref_p75_gbp = null
+      v.engine_c_ref_count = res.ref_count
+      v.engine_c_priced_count = res.priced_count
+      v.engine_c_our_unit_gbp = ourUnit
+      v.engine_c_ratio = null
+      v.engine_c_ref_basis = 'device_scale_misanchor_suppressed'
+      counts.no_reference += 1
+      deviceScaleSuppressed += 1
       continue
     }
     const median = res.median_unit_cost_gbp
@@ -612,6 +760,8 @@ async function main(): Promise<void> {
     over_ratio_threshold: OVER_RATIO,
     under_ratio_threshold: UNDER_RATIO,
     bespoke_band_rescued_lines: bespokeRescued,
+    device_scale_misanchor_suppressed_lines: deviceScaleSuppressed,
+    is_device_scale_product: deviceScale,
     k: K,
   }
 
@@ -628,6 +778,9 @@ async function main(): Promise<void> {
   )
   console.error(
     `[engine-c] ${bespokeRescued} bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median`
+  )
+  if (deviceScale) console.error(
+    `[engine-c] ${deviceScaleSuppressed} plant-scale reference(s) suppressed as class-mismatch on this device-scale product (F1c)`
   )
   console.error(`[engine-c] wrote ${outputPath}`)
 }

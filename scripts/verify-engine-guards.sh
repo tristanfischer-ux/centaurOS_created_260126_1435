@@ -47,6 +47,7 @@ run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.p
 run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest
 run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_rot_test.py
 run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mispin-selftest.ts
+run "reference-anchor F1c device-scale guard"     npx tsx scripts/enrich-state-with-reference-anchor.tsx --selftest
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 # EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice
