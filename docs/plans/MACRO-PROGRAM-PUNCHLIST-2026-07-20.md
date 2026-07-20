@@ -1,5 +1,9 @@
 # Macro program — living punchlist (single source of truth)
 
+> **▶▶ RESUME AFTER COMPACTION (2026-07-20).** Task: execute the FULL macro engine-self-audit program (Tristan directed — Terminal executes ALL incl PCB + DB + form; Cursor advises via `CURSOR-HARNESS-INBOX.md`, HOLD on `cursor-pcb`, single chain owner). Diagnosis + plan: `MACRO-ENGINE-SELF-AUDIT-PLAN-2026-07-20.md`; council findings: `COUNCIL-BIOREACTOR-2150-ADVERSARIAL-FINDINGS-2026-07-19.md`; Cursor packs: `CURSOR-PCB-HONESTY-FIXES-…` (Fixes 1–9) + `CURSOR-DB-AND-FORM-AUDITS-…` (A1–A8, B1–B7). **Method (mandatory):** each fix = SOURCE rule change + proveCatch on the FROZEN known-bad fixture `out/organoid-bioreactor-20260719-2150/` + no `if organoid`; run `python3 scripts/build-excel-export.py --selftest` (needs `PATH=/opt/homebrew/opt/node@22/bin:$PATH`) after every scoring edit; commit `--no-verify` with a `regression-harness:` line; update THIS table (status + SHA) + the inbox ▶ banner. **Acceptance:** re-scoring frozen 2150 → `ships=false`, PCB not FAB-READY, cost refuses — already true; a FRESH bake may claim ≥8 only when the adversarial checks pass on the new artefacts. **10 done / 40 open. NEXT = F1c** (build-cost-basis.ts:161 `pv.engine_c_ref_median_gbp` is a plant-dominated corpus median → make it device-scale for device-scale products; same family as the requirements_bom commodity-noun corpus-lift skips). Then F1b/F1d/F1e, P3/P4 PCB role guards, P9b firmware harness wire, S5/S8/S11 scoring Goodharts, adversarial vision V1, form B1–B7.
+
+
+
 **Fixture:** `out/organoid-bioreactor-20260719-2150/` (frozen known-bad). Every item: SOURCE fix + proveCatch on 2150 + no `if organoid`. Update status + SHA as items land. Acceptance: re-scoring frozen 2150 → `ships=false`, PCB not FAB-READY, cost refuses, vision fails blockout; a fresh bake claims ≥8 only when the adversarial checks pass.
 
 Legend: ✅ done · �doing · ⬜ open
