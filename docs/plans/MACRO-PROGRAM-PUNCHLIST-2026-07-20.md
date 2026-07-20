@@ -22,7 +22,7 @@ Legend: ✅ done · �doing · ⬜ open
 | S9 | Council H9 — stability HARD metric requires derived figure, not setpoint echo. DONE: `temperature_stability_k`(0.5 K) lived in `constraints.derived_requirements` (verification loop only did target_performance.metrics → silently dropped). `_assemble_verification_rows` now iterates derived_requirements, emits a HARD stability row (`_STABILITY_REQ_RX`) resolving against a DERIVED ±K quantity → UNVERIFIED absent one. SIGHT-verified 2150: row now UNVERIFIED HARD (was dropped). proveCatch both. | ✅ | 19ae39abb |
 | S10 | Council H10 — catalogue-electronic with no MPN → UNRESOLVED (row FAILs), not false-satisfied "bespoke fabrication". DONE: `_ELECTRONIC_NOUN_RX` + FR4/electronic material signal; mechanical parts keep honest bespoke. SIGHT-verified 2150: 10 electronics→UNRESOLVED, mechanical stays bespoke. proveCatch both. | ✅ | babbbb74b |
 | S11 | Council M5 — BoM↔PCB identity reconcile. DONE: `_build_mpn_by_word` harvests `state.pcb.pipeline.generator.components` (keyed nameHuman/characterId/space-form) → `_bom_row_mpn` backfills; a real board MPN overrides a TBD/empty partVerification, never a resolved one. SIGHT-verified 2150: MCU/temp-sensor/polyfuse/reverse-polarity now show real MPNs (was 'bespoke fabrication'). proveCatch both directions. | ✅ | dd75fdada |
-| S12 | **Vision-critic-before-Excel** timing race — Excel waits on render-vision-critique.json OR Renders capped ≤6 until present | ⬜ | |
+| S12 | **Vision-critic-before-Excel** timing race. **SUBSTANTIALLY COVERED** by B5 + S7: the phenotype-containment gate (B5) caps Renders deterministically with NO vision dependency, and S7-unify makes an instrument with NO critique on file UNVERIFIED (ships blocked). A broken/absent-critique hero can no longer ship on timing. Residual: an explicit Excel-waits-on-critique wait-loop (belt+braces) — low priority given B5+S7. | ⚠ covered | c8384f67f + dd3ee17f9 |
 
 ## PCB honesty (Terminal — Cursor Fixes 1–9)
 | ID | Item | Status | SHA |
@@ -41,13 +41,13 @@ Legend: ✅ done · �doing · ⬜ open
 ## Form / vision (Terminal — Blender + render_vision_critic + composer)
 | ID | Item | Status | SHA |
 |---|---|---|---|
-| V1 | Adversarial vision — rubric must FAIL 2150 04/00-hero Lego (instrument criteria + proveCatch on frozen PNGs); broken:false on catastrophe-only checklist must not allow Renders ≥8 for instruments | ⬜ | |
+| V1 | Adversarial vision — a Lego hero must not score ≥8. **V1a DONE (c8384f67f):** SIGHT opened 2150 00-hero.png = floating vertical PCB + blocky primitives, yet form-signature ok:True + vision broken:false → Renders 9/10. Root: gates check geometry EXISTS not CONTAINED. `_phenotype_containment_verdict` caps Renders ≤4 when scene bbox > 1.8× the enclosure (2150: 11.3× → 9→4 FAIL). Deterministic, runs before form-sig+vision. proveCatch sprawl/contained/plant. **V1b OPEN (needs Blender):** strengthen the LLM rubric / actually fix the form (B1). | ✅ V1a | c8384f67f |
 | V2 | Renders tab capped by authenticity/vision-adversarial, not "35/35 ledger coverage" | ⬜ | |
 | B1 | Pack real part AABBs into the envelope (covariant, not roles-fill-a-box) | ⬜ | |
 | B2 | Emit `functional_form/v1` proof | ⬜ | |
 | B3 | Composer default-on for instruments | ⬜ | |
 | B4 | Split lab_electronics families by function (one shared shell today) | ⬜ | |
-| B5 | **Phenotype HARD gate** with aspect-ratio proveCatch (long-thin-guts-in-a-cube must FAIL) | ⬜ | |
+| B5 | **Phenotype HARD gate** — DONE as the containment gate (c8384f67f): parts sprawling > 1.8× outside the device enclosure FAIL Renders (the Lego-in-a-box hero). SIGHT-verified 2150 (11.3×→FAIL); proveCatch contained-PASS / plant-N/A. (Aspect-ratio long-thin variant folds into the same scene-bbox-vs-enclosure signal.) | ✅ | c8384f67f |
 
 ## Drawings (Terminal — Pillar 3 E)
 | ID | Item | Status | SHA |
