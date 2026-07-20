@@ -499,13 +499,14 @@ describe('atopile-generator', () => {
     const offBoardIds = new Set(result.offBoard.map((record) => record.wordId))
     // Host-side power/USB/firmware/status ride with the purchased COTS
     // controller+UI kit (not the optical source daughterboard).
+    // GOTCHA: collimating_optic / sensor_interconnect_cable are optomech/harness
+    // role nouns — role-only collectElectronicWords correctly ignores them (they
+    // are not PCB footprints). Assert absence, not off-board disposition.
     expect(offBoardIds).toEqual(new Set([
       'main_controller_word',
       'local_display_word',
       'user_input_buttons_word',
       'optical_detector_module_word',
-      'sensor_interconnect_cable_word',
-      'collimating_optic_word',
       'dc_input_fuse_word',
       'firmware_storage_word',
       'power_switch_word',
@@ -521,6 +522,8 @@ describe('atopile-generator', () => {
       ...result.unresolved.map((record) => record.wordId),
     ])
     expect(allPcbIds.has('sensing_instrumentation_subcomponent_1_word')).toBe(false)
+    expect(allPcbIds.has('sensor_interconnect_cable_word')).toBe(false)
+    expect(allPcbIds.has('collimating_optic_word')).toBe(false)
 
     const led = result.components.find((component) => component.wordId === 'status_led_word')
     expect(led).toBeDefined()
@@ -1111,14 +1114,13 @@ describe('atopile-generator', () => {
                 words: [
                   {
                     id: 'mystery_electronic_word',
-                    name_human: 'Mystery Electronic Assembly',
-                    content_character: { character_id: 'mystery_electronic_assembly' },
+                    name_human: 'Mystery Electronic PCBA',
+                    // GOTCHA: collectElectronicWords keys on role identity only —
+                    // board_role signal must live in name/character_id, not form prose.
+                    content_character: { character_id: 'mystery_electronic_pcba' },
                     modifier_characters: [
                       { kind: 'quantity', value: '×1' },
-                      // "board_role" category match keeps it electronic-flagged so the
-                      // test exercises the "detected but unclassifiable" path, not the
-                      // "never flagged electronic at all" path.
-                      { kind: 'form', value: 'Bespoke PCBA — role not yet characterised' },
+                      { kind: 'form', value: 'Bespoke assembly — role not yet characterised' },
                     ],
                   },
                 ],

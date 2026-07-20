@@ -47,9 +47,9 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     category: 'processor',
     // compute_ui_module = purchased MCU+UI kit (gold PyBadge-class host) — still a
     // processor-category electronic assembly for PCB disposition, just off-board.
-    // INTENT: firmware_storage / debug_header are host-MCU companions — collect
-    // them from role identity (form-prose matching was removed; see GOTCHA below).
-    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|compute[_ -]?ui[_ -]?module|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing|firmware[_ -]?storage|debug[_ -]?header|debug[_ -]?uart)\b/i,
+    // INTENT: firmware_storage / flash_storage / debug_header are host-MCU companions —
+    // collect them from role identity (form-prose matching was removed; see GOTCHA).
+    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|compute[_ -]?ui[_ -]?module|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing|firmware[_ -]?storage|flash[_ -]?(?:storage|memory)|debug[_ -]?header|debug[_ -]?uart)\b/i,
   },
   {
     category: 'analog_frontend',
@@ -68,11 +68,13 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     // are power-electronics on the wet-actuation board. Do NOT match bare
     // peltier/TEC module nouns here — those are purchased thermal assemblies
     // (collected via form-prose smear otherwise) and must stay off-board.
-    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|stepper[_ -]?driver|microstep[_ -]?driver|h[_ -]?bridge|motor[_ -]?driver|driver[_ -]?board|driver[_ -]?ic|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail))?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove|cartridge[_ -]?heater|resistive[_ -]?heater|heater[_ -]?(?:element|channel|pcb|board))\b/i,
+    // INTENT (2026-07-20): capacitors + dc_dc_converters must match role identity —
+    // `dc_link_capacitor` / `dc_dc_converters` were dropped after form-prose removal.
+    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|stepper[_ -]?driver|microstep[_ -]?driver|h[_ -]?bridge|motor[_ -]?driver|driver[_ -]?board|driver[_ -]?ic|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management|modules?|racks?))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?(?:regulator|converters?)|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail|semiconductors?))?|(?:bulk[_ -]?)?capacitors?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|mains[_ -]?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove|cartridge[_ -]?heater|resistive[_ -]?heater|heater[_ -]?(?:element|channel|pcb|board)|estop|e[_ -]?stop|power[_ -]?kill)\b/i,
   },
   {
     category: 'display',
-    pattern: /\b(oled|\block?d\b|\btft\b|e-?ink|display|readout|keypad|user[- ]input|buttons?|membrane[- ]switch|display driver|display module|display panel|segment display|compute[_ -]?ui[_ -]?module)\b/i,
+    pattern: /\b(oled|\block?d\b|\btft\b|e-?ink|display|readout|keypad|user[- ]input|buttons?|membrane[- ]switch|display driver|display module|display panel|segment display|compute[_ -]?ui[_ -]?module|local[_ -]?hmi)\b/i,
   },
   {
     category: 'connectivity',
@@ -80,7 +82,9 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     // are connectivity electronics — without these nouns, collectElectronicWords
     // drops the word entirely (neither off-board nor unresolved) and the LED-board
     // host-scrub proveCatch cannot fire.
-    pattern: /\b(usb|bluetooth|\bble\b|wi-?fi|rf transceiver|\bantenna\b|\buart\b|\bi2c\b|\bspi\b|\bcan bus\b|zigbee|lora|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge|level[_ -]?shifter)\b/i,
+    // INTENT (2026-07-20): host_interface + ethernet_switch are role-identity nouns
+    // (form-prose "wi-fi gateway" used to collect them; role-only must still see them).
+    pattern: /\b(usb|bluetooth|\bble\b|wi-?fi|rf transceiver|\bantenna\b|\buart\b|\bi2c\b|\bspi\b|\bcan bus\b|zigbee|lora|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge|level[_ -]?shifter|host[_ -]?interface|ethernet[_ -]?switch)\b/i,
   },
   {
     category: 'board_role',
@@ -91,7 +95,17 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     // INTENT (Pioreactor heater_20ml / organoid 1546): culture temperature probes
     // and cartridge-heater sense are sensor-IC electronics — without these nouns
     // collectElectronicWords never sees the wet-actuation board scope.
-    pattern: /\b(sensor ic|monitor ic|\bimu\b|accelerometer|gyroscope|cell monitor|temperature[_ -]?(?:sensor|probe|ic)|culture[_ -]?temperature|tmp\d{3,}|thermistor|rtd)\b/i,
+    // INTENT (2026-07-20): fan tach / failure sense is a host peripheral role noun.
+    pattern: /\b(sensor ic|monitor ic|\bimu\b|accelerometer|gyroscope|cell monitor|temperature[_ -]?(?:sensor|probe|ic)|culture[_ -]?temperature|tmp\d{3,}|thermistor|rtd|fan[_ -]?(?:failure|tach|sense)|tachometer)\b/i,
+  },
+  {
+    // INTENT (2026-07-20): wall-ESS / plant purchased field assemblies must be
+    // collected from role identity so PLANT_PURCHASED_ASSEMBLY_RE can disposition
+    // them off-board. Form-prose "fuse-backed supply" used to drag them in; after
+    // role-only collection they vanished (neither off-board nor unresolved) and
+    // the wall-ESS proveCatch went red. Noun-keyed — never a class table.
+    category: 'purchased_field_assembly',
+    pattern: /\b(?:smoke[_ -]?detectors?|gas[_ -]?(?:sensors?|detection(?:[_ -]?system)?)|hydrogen[_ -]?(?:detection[_ -]?)?sensors?|fire[_ -]?(?:detectors?|suppression(?:[_ -]?system)?)|arc[_ -]?(?:fault|flash)(?:[_ -]?(?:detection|protection))?|power[_ -]?conversion[_ -]?system|pcs(?:[_ -]?(?:inverter|unit))?|auxiliary[_ -]?power(?:[_ -]?(?:supply|distribution|transformer|pdu|unit))?)\b/i,
   },
 ]
 

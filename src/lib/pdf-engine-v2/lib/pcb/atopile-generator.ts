@@ -123,7 +123,7 @@ export type FunctionClass =
  * as a `main_controller` in a drone or a BMS). First match wins.
  */
 const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> = [
-  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|monitor[_-]?ic|cell[_-]?monitor/i },
+  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   // INTENT (Rodeostat 0201): dac_output_stage is a real SOIC DAC IC — without
   // this it landed in unresolved[] ELECTRONIC gap and capped PCB at DRAFT/5.
   { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog/i },
@@ -137,7 +137,10 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'regulator', test: /controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
   { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient/i },
-  { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?memory|eeprom|nonvolatile[_-]?memory/i },
+  // INTENT (2026-07-20): flash_storage is the engine's common character_id —
+  // flash_memory alone left NinjaPCR thermal_controller unresolved after
+  // role-only collection started seeing the word.
+  { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?(?:storage|memory)|eeprom|nonvolatile[_-]?memory/i },
   // P4: USB power/receptacle roles must not share PinHeader defaults with SWD/UART.
   { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port|entry)|type[_-]?c/i },
   { id: 'debug_connector', test: /debug[_-]?(?:interface|header|uart)|swd[_-]?header|uart[_-]?header|jtag[_-]?header/i },
