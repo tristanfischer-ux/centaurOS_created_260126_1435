@@ -356,6 +356,48 @@ def _form_signature_verdict(run_dir: str):
     return res
 
 
+_PHENOTYPE_CACHE: dict = {}
+
+
+def _phenotype_containment_verdict(run_dir: str):
+    """SIGHT / B5 (2026-07-20): a DETERMINISTIC phenotype-containment check for an instrument
+    device — do the rendered parts FIT inside the product enclosure, or do they SPRAWL far
+    outside it (the Lego-in-a-box hero: a floating vertical PCB + metre-scale primitives around
+    a 160 mm device)? Reads the delivered parts-manifest scene bbox vs the enclosure envelope
+    (cube edge from enclosure_volume_m3). A scene grossly larger than the enclosure means the
+    parts are not packed into the product body → the render is phenotypically wrong, whatever a
+    lenient form-signature / vision verdict says. Only fires for a device (a plant legitimately
+    sprawls). Returns {ok, ratio, scene_edge_mm, enclosure_edge_mm} or None (not applicable).
+    Cached per run_dir. Composes with F1b (which fixes the geometry at source — a fresh device
+    manifest fits, so this stays silent); this is the SIGHT backstop for any sprawl that slips."""
+    if run_dir in _PHENOTYPE_CACHE:
+        return _PHENOTYPE_CACHE[run_dir]
+    res = None
+    try:
+        state = load_json(os.path.join(run_dir, "state.json")) or {}
+        if state.get("isInstrumentDevice"):
+            _sq = (state.get("engineeringContract") or {}).get("shared_quantities") or {}
+            _ev = num(_sq.get("enclosure_volume_m3"))
+            if _ev is not None and _ev > 0:
+                _encl_edge = (_ev ** (1.0 / 3.0)) * 1000.0     # cube-edge proxy for the enclosure, mm
+                pm = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+                bb = pm.get("bbox_mm") or {}
+                _scene_edge = max(num(bb.get("length_mm")) or 0.0,
+                                  num(bb.get("width_mm")) or 0.0,
+                                  num(bb.get("height_mm")) or 0.0)
+                if _scene_edge > 0 and _encl_edge > 0:
+                    ratio = _scene_edge / _encl_edge
+                    # a coherent device render packs the parts INTO the enclosure (scene ≈ the
+                    # enclosure); >1.8× means parts sprawl outside the product body. 1.8× tol
+                    # absorbs a legitimate lid/handle/port that pokes just proud of the shell.
+                    res = {"ok": ratio <= 1.8, "ratio": round(ratio, 1),
+                           "scene_edge_mm": round(_scene_edge), "enclosure_edge_mm": round(_encl_edge)}
+    except Exception:  # noqa: BLE001 — a phenotype read must never crash the build
+        res = None
+    _PHENOTYPE_CACHE[run_dir] = res
+    return res
+
+
 def _manifest_litter(run_dir: str):
     """SIGHT: default-size litter score for the delivered parts-manifest (cached). The engine reading
     its OWN rendered geometry — a render/GA tab can't be a genuine ≥8 while most objects are default
@@ -871,6 +913,28 @@ def _aux_tab_score(title: str, run_dir: str):
                 entry["fix"] = ("re-run Blender inspect pass so inspect-side.png is written "
                                 "with the ground slab hidden")
             return entry
+
+        # DETERMINISTIC PHENOTYPE CONTAINMENT (B5 / V1a, 2026-07-20) — caps the render to 4
+        # when the delivered parts SPRAWL outside the product enclosure (the Lego-in-a-box
+        # hero: a floating vertical PCB + metre-scale primitives around a 160 mm device). The
+        # form-signature gate checks that geometry EXISTS; this checks it is CONTAINED. Runs
+        # first so a lenient form-signature (ok:True on a sprawling scene, the 2150 false-9)
+        # and a lenient vision critic (broken:false on a glance-rejectable hero) can never lift
+        # it. Composes with F1b (which fixes the scale at source — a fresh device fits, silent).
+        _ph = _phenotype_containment_verdict(run_dir)
+        if isinstance(_ph, dict) and _ph.get("ok") is False:
+            base = _cap_litter(_cov("blender", "Render"))
+            if isinstance(base, dict):
+                base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
+                base["status"] = "FAIL"
+                base["issues"] = ([f"PHENOTYPE: the rendered parts sprawl {_ph.get('ratio')}× outside "
+                                   f"the product enclosure (scene {_ph.get('scene_edge_mm')} mm vs "
+                                   f"~{_ph.get('enclosure_edge_mm')} mm enclosure) — a device hero must "
+                                   f"pack its parts INTO the body, not float them around it (Lego-in-a-box)"]
+                                  + (base.get("issues") or []))[:6]
+                base["fix"] = ("build_universal_scene.py: size + place parts to FIT the enclosure "
+                               "envelope (F1b device-scale proxy + AABB packing), not a sprawling scene")
+            return _apply_side_elevation_gate(base)
 
         # DETERMINISTIC PRODUCT-IDENTITY backstop (Tristan 2026-07-18) — caps the render to
         # 4 (FAIL) when the SCENE has no product-specific geometry (a generic grey-box
@@ -28885,6 +28949,36 @@ def _selftest() -> int:
               f"table must be capped ≤4 (a real gap), NOT verified-out-of-scope "
               f"(got scored={_s8_pv.get('scored') if _s8_pv else None}, "
               f"cap={_s8_pv.get('score_cap') if _s8_pv else None})"); bad += 1
+    # ═══ B5/V1a (2026-07-20): the phenotype-containment gate — a device whose rendered parts
+    # SPRAWL far outside the enclosure (the Lego-in-a-box hero) must FAIL, whatever a lenient
+    # form-signature / vision verdict says. ═══
+    import tempfile as _tfp
+    def _write_run(_td, encl_v, scene_edge, instrument=True):
+        _PHENOTYPE_CACHE.pop(_td, None)
+        with open(os.path.join(_td, "state.json"), "w") as _f:
+            json.dump({"isInstrumentDevice": instrument,
+                       "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": encl_v}}}, _f)
+        with open(os.path.join(_td, "parts-manifest.json"), "w") as _f:
+            json.dump({"bbox_mm": {"length_mm": scene_edge, "width_mm": scene_edge * 0.8, "height_mm": scene_edge * 0.6}}, _f)
+    with _tfp.TemporaryDirectory() as _tdph:
+        # (1) SPRAWL: 0.004 m³ enclosure (~159 mm) but an 1800 mm scene (11×) → phenotype FAIL.
+        _write_run(_tdph, 0.00403, 1800.0)
+        _pv = _phenotype_containment_verdict(_tdph)
+        if not (isinstance(_pv, dict) and _pv.get("ok") is False):
+            print(f"  FAIL B5: a device whose scene (1800 mm) sprawls 11× its ~159 mm enclosure "
+                  f"must FAIL the phenotype-containment check (got {_pv})"); bad += 1
+        # (2) CONTAINED: the same enclosure with a ~180 mm scene → PASS (parts fit the body).
+        _write_run(_tdph, 0.00403, 180.0)
+        _pv2 = _phenotype_containment_verdict(_tdph)
+        if not (isinstance(_pv2, dict) and _pv2.get("ok") is True):
+            print(f"  FAIL B5 proveNoFalsePositive: a device whose parts FIT the enclosure "
+                  f"(~180 mm scene vs ~159 mm) must PASS (got {_pv2})"); bad += 1
+        # (3) A PLANT (not an instrument device) legitimately sprawls → not applicable (None).
+        _write_run(_tdph, 40.0, 8000.0, instrument=False)
+        _pv3 = _phenotype_containment_verdict(_tdph)
+        if _pv3 is not None:
+            print(f"  FAIL B5: a non-instrument (plant) must be N/A for the device phenotype "
+                  f"gate (got {_pv3})"); bad += 1
     # ═══ S11 (council M5, 2026-07-20): BoM↔PCB identity reconcile — a part designed onto
     # the PCB with a real MPN must NOT read "bespoke fabrication" in the BoM. ═══
     _s11_state = {
