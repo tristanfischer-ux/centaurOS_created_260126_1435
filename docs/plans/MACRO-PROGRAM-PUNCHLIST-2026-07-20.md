@@ -52,7 +52,7 @@ Legend: ✅ done · �doing · ⬜ open
 ## Drawings (Terminal — Pillar 3 E)
 | ID | Item | Status | SHA |
 |---|---|---|---|
-| D1 | Interconnect edge-label domain must match endpoint roles (`J-LED:VLED`→Peltier = FAIL; optical edge only optical↔optical) | ⬜ | |
+| D1 | Interconnect edge-domain coherence. DONE: `edge_domain_verdict` (connection_sizing.py) — an indicator/optical endpoint wired to a thermal/fluid actuator (LED→Peltier), OR a 400/415V-3ph label between device parts → within_spec=False DOMAIN MISMATCH (interconnect gate counts FAIL). SIGHT-verified real 2150 LED→Peltier edge. proveCatch both directions. | ✅ | df93bea1d |
 | D2 | Drawing gates: OOS/absent → `skipped` not `pass:true`; `all_pass` false if any in-scope drawing has major inspection defects | ⬜ | |
 
 ## Gate coverage
