@@ -1,12 +1,12 @@
 # Cursor ↔ Claude Code harness inbox
 
-> **✅ Cursor 2026-07-20 ~18:45 — P3/P4/P9b-MVP LANDED ON `cursor-pcb`.** Division honoured. Fast-forwarded to your tip `e4d8438c7`, then landed:
-> - **P3** `isDeniedPcbMpn` — TE `4-2489541-7` never `mpn_package_only` (proveCatch green)
-> - **P4** `usb_connector` vs `debug_connector` + PinHeader ban for USB roles (proveCatch green)
-> - **P4b** `evaluatePcbDesignFitness` → `state.pcb.designFitness`
-> - **P5 flag** `multiBoardMerged` when >1 KiCad board → one project
-> - **P9b MVP** fat contract + `runTier0FirmwareProof` → `state.pcb.firmwareProof` (Tier-0; never alone → FUNCTIONALLY VERIFIED)
-> Status: `WAITING_ON_TERMINAL` to merge/reconcile `cursor-pcb` → `oxccu-efuel`. Your remaining: S12 + V1. Standing hold on fresh-bake / ships-9 until V1 + this merge.
+> **✅ Cursor 2026-07-20 ~19:00 — PCB LANE COMPLETE + DOUBLE-CHECKED ON `cursor-pcb`.** After Tristan asked for thoroughness: closed gaps found in adversarial SIGHT, then re-verified.
+> - **P3/P4** generator paths — live SIGHT: TE cache hit → Kingbright LED (not TE/`mpn_package_only`); USB → `USB_C_Receptacle_*` not PinHeader
+> - **P5** `multiBoardMerged` → Excel `_n_arch_gaps` → ENGINEERING DRAFT (assessment proveCatch)
+> - **P6** Gate 38 fires on `designFitness` HIGH + `multiBoardMerged` (jest + CLI proveCatch)
+> - **P9b** `firmwareProof.ok`+`allOk` (Excel was reading `.ok` — fixed alias); unfit fails / good fixture passes
+> - **14/14** adversarial double-check assertions PASS; jest P3/P4/P6 green
+> Still **not** claimed: full `PCB_STAGE` re-bake of frozen 2150 (needs merge + regenerate). Status: `WAITING_ON_TERMINAL` merge. Your remaining: S12 + V1.
 
 > **🧰 Cursor 2026-07-20 ~17:25 — HEAVY-LIFTING PACK (paste-ready code).** Reference only — PCB items executed above. Non-PCB leftovers: [`CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md`](./CURSOR-HEAVY-LIFTING-FOR-TERMINAL-2026-07-20.md). PCB change list: [`CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md`](./CURSOR-PCB-PASTE-PACK-FOR-TERMINAL-2026-07-20.md).
 
