@@ -84,11 +84,13 @@ describe('atopile-generator', () => {
       tmpDirs.push(outDir)
       const result = generateAtopileProject(state, outDir)
 
-      // The colorimeter design has on-board IC/passive/connector words plus
-      // front-panel/controller/display modules that are now intentionally off-board
-      // COTS assemblies. Assert sane floors, not exact counts.
-      expect(result.components.length).toBeGreaterThanOrEqual(10)
-      expect(result.offBoard.length).toBeGreaterThanOrEqual(1)
+      // INTENT: Floor is on-board count after role-identity COTS disposition, not the
+      // pre-collector total. Host modules (main_controller / display_panel /
+      // status_indicator) correctly leave the board — that is a reclassification,
+      // not a silent drop (sibling test still asserts every word lands somewhere).
+      // Live measure on out/colorimeter-20260712-1010: 9 on-board + 3 off-board + 0 unresolved.
+      expect(result.components.length).toBeGreaterThanOrEqual(9)
+      expect(result.offBoard.length).toBeGreaterThanOrEqual(3)
       for (const component of result.components) {
         expect(component.footprint).not.toBeNull()
         expect(component.footprint!.library.length).toBeGreaterThan(0)
