@@ -256,12 +256,28 @@ export const GATES: GateProof[] = [
     enforcedByDefault: () => physicsCriticEnforceModeFromEnv(undefined) !== 'off',
   },
   {
-    code: 34, name: 'tool-archetype-coherence', intent: 'a marine/hull worked-calc rendered into a non-marine plant (a stand-in for a missing process tool)',
+    code: 34, name: 'tool-archetype-coherence', intent: 'a marine/hull OR additive-manufacturing worked-calc rendered into a foreign-domain product (a stand-in for a missing in-class tool)',
     proveCatch: () => {
-      const st: any = { keyMetrics: { product_class: 'co2_mineralisation' }, toolsUsedPage: { tools: [{ tool_id: 'pressure-vessel:design', label: 'pressure-vessel:design',
+      // (a) MARINE family: a submersible-hull worked-calc on a non-marine plant → HIGH.
+      const marineSt: any = { keyMetrics: { product_class: 'co2_mineralisation' }, toolsUsedPage: { tools: [{ tool_id: 'pressure-vessel:design', label: 'pressure-vessel:design',
         worked: [{ label: 'External hydrostatic pressure', substitution: '29.8 m seawater depth, rho_water=1025 kg/m³' }] }] } }
-      const res = computeToolArchetypeCoherence(st)
-      return evaluateToolArchetypeEnforcement(res, 'on').shouldExit === true || (Array.isArray(res.findings) && res.findings.some((f: any) => f.severity === 'high'))
+      const marineRes = computeToolArchetypeCoherence(marineSt)
+      const marineFires = evaluateToolArchetypeEnforcement(marineRes, 'on').shouldExit === true
+        || (Array.isArray(marineRes.findings) && marineRes.findings.some((f: any) => f.severity === 'high'))
+      // (b) ADDITIVE-MANUFACTURING family (2026-07-20, Cursor ⚠): an FDM hot-end / filament-melt
+      //     worked-calc leaked onto a benchtop BIOREACTOR (a 37 °C thermal loop mis-rendered as a
+      //     210 °C printer hot-end) → HIGH on the non-printer class.
+      const amTool = [{ tool_id: 'thermal:hot-end', label: 'thermal:hot-end',
+        worked: [{ label: 'Nozzle temperature', substitution: 'E3D V6 with silicone sock, melt incoming filament to 210.48 °C' }] }]
+      const amLeakSt: any = { keyMetrics: { product_class: 'benchtop_bioreactor' }, toolsUsedPage: { tools: amTool } }
+      const amRes = computeToolArchetypeCoherence(amLeakSt)
+      const amFires = Array.isArray(amRes.findings) && amRes.findings.some((f: any) => f.severity === 'high')
+      // (c) proveNoFalsePositive: the SAME additive tool on a 3D-PRINTER class is IN-domain → no finding.
+      const amOkSt: any = { keyMetrics: { product_class: 'fdm_3d_printer' }, toolsUsedPage: { tools: amTool } }
+      const amOkRes = computeToolArchetypeCoherence(amOkSt)
+      const amSuppressedOnPrinter = !(Array.isArray(amOkRes.findings) && amOkRes.findings.some((f: any) => f.severity === 'high'
+        && String(f.family ?? f.marker_family ?? '') === 'additive_manufacturing'))
+      return marineFires && amFires && amSuppressedOnPrinter
     },
     enforcedByDefault: () => toolArchetypeEnforceModeFromEnv(undefined) !== 'off',
   },
