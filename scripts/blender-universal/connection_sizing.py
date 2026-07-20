@@ -965,11 +965,32 @@ def flow_to_m3s(value: float, unit: Optional[str], density_kg_m3: float) -> floa
         return value / 1000.0 / 60.0
     if u in ("l/h", "lph", "l hr-1", "l/hr"):
         return value / 1000.0 / 3600.0
+    # LAB-SCALE volumetric units (F1e 2026-07-20): a benchtop instrument's flows are
+    # authored in mL/µL — WITHOUT these cases "10 mL/min" fell to the unknown-unit
+    # fallback and was read as 10 m³/s → the DN300 clamp on a 20 mL device. 1 mL = 1e-6 m³,
+    # 1 µL = 1e-9 m³.
+    if u in ("ml/s", "mls", "ml s-1", "cc/s", "ccm/s"):
+        return value * 1e-6
+    if u in ("ml/min", "mlpm", "ml min-1", "ml/m", "cc/min", "ccm", "sccm"):
+        return value * 1e-6 / 60.0
+    if u in ("ml/h", "mlph", "ml hr-1", "ml/hr", "cc/h"):
+        return value * 1e-6 / 3600.0
+    if u in ("ul/s", "µl/s", "μl/s"):
+        return value * 1e-9
+    if u in ("ul/min", "µl/min", "μl/min", "ul min-1"):
+        return value * 1e-9 / 60.0
+    if u in ("ul/h", "µl/h", "μl/h", "ul/hr"):
+        return value * 1e-9 / 3600.0
     if u in ("m3/s", "m3s", "m^3/s", "m³/s"):
         return value
     if u in ("m3/h", "m3h", "m^3/h", "m³/h"):
         return value / 3600.0
-    # Unknown unit: assume already m³/s (best-effort; flagged by caller's notes).
+    # Unknown unit (F1e): the old "assume already m³/s" default turned any unrecognised
+    # small-flow unit into a plant-scale flow (mL/min → DN300). On a DEVICE-SCALE product a
+    # bare/unknown flow is far more likely lab-scale — assume mL/min (1e-6/60 m³/s) so it
+    # sizes as micro-tubing, not a DN300 main. Plant behaviour (assume m³/s) is unchanged.
+    if _DEVICE_SCALE_INTERCONNECT:
+        return value * 1e-6 / 60.0
     return value
 
 
@@ -1414,6 +1435,32 @@ def size_fluid(edge: dict, length_m: float, flow_value: float,
     # D = sqrt(4 Q / (π v))
     ideal_dia_m = math.sqrt(4.0 * q_m3s / (math.pi * max(1e-9, v_target)))
     ideal_bore_mm = ideal_dia_m * 1000.0
+    # DEVICE-SCALE LAB-FLOW → MICRO-TUBING (F1e 2026-07-20): a benchtop instrument's authored
+    # flow (mL/min, µL/min) needs a bore far below the smallest DN — the DN ladder would clamp
+    # it to a DN15+ process pipe with flanged ends. On a device-scale product, a sub-DN15 bore
+    # is lab MICRO-TUBING (silicone/PTFE, barbed ends), sized to carry Q at the liquid-velocity
+    # target and clamped to a real lab range. Not a gas line (ducts stay DN). Universal —
+    # keyed on the device-scale flag + a small required bore, no per-class table.
+    if _DEVICE_SCALE_INTERCONNECT and not is_gas and ideal_bore_mm < PIPE_DN_LADDER[0][1]:
+        tube_id_mm = max(0.5, min(12.0, ideal_bore_mm))     # lab tubing bore 0.5–12 mm ID
+        tube_od_mm = round(tube_id_mm + 2.0, 1)             # ~1 mm wall each side
+        _area = math.pi * (tube_id_mm / 1000.0 / 2.0) ** 2
+        _v_act = q_m3s / max(1e-12, _area)
+        return _spec(
+            kind="tube", mechanism=mechanism,
+            carried_rating=round(flow_value, 4), carried_unit=flow_unit or "m³/s",
+            size_label=f"{tube_od_mm:g} mm OD micro-tubing",
+            outer_dia_mm=tube_od_mm,
+            drop_pct_or_velocity=round(_v_act, 3),
+            within_spec=(_v_act <= LIQUID_VELOCITY_LIMIT_MS),
+            spec_limit=f"≤{LIQUID_VELOCITY_LIMIT_MS:g} m/s velocity (lab micro-tubing)",
+            material_qty_desc=f"{tube_od_mm:g} mm OD micro-tubing, {length_m:.1f} m",
+            tool_used="lab micro-tubing (device-scale flow)",
+            assumptions=[f"device-scale flow {flow_value:g} {flow_unit or '(unit?)'} = "
+                         f"{q_m3s:.2e} m³/s → {tube_id_mm:g} mm ID lab tubing at "
+                         f"{v_target:g} m/s target (below the smallest DN — not a process pipe)"],
+            notes="device-scale fluid loop — lab micro-tubing, not a DN process pipe",
+        )
     dn_label, dn_bore_mm = _round_up_pipe_dn(ideal_bore_mm)
 
     # Achieved velocity in the chosen standard bore.

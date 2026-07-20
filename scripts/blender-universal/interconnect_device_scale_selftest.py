@@ -53,15 +53,29 @@ def main() -> int:
     ok("micro-tubing" in _label(dc) and "DN25" not in _label(dc),
        f"device compatibility edge must be micro-tubing, got {_label(dc)!r}")
 
-    # NO OVER-REACH: a REAL flow demand is still sized by the fluid physics in BOTH
-    # modes — the fix only changes the no-flow / compatibility DEFAULT, never a sized
-    # edge. (A device with a genuine authored flow is sized on its merits.)
+    # NO OVER-REACH: a PLANT-scale flow (12 m³/h) is still sized by the fluid physics as a
+    # DN pipe in BOTH modes — the device-scale tube branch only fires below the smallest DN.
     realflow = {"constraint_kind": "flow_capacity", "mechanism": "fluid_loop",
                 "required_value": 12.0, "required_unit": "m3/h"}
     cs.set_device_scale_interconnect(True)
     rf = cs.size_connection(realflow, 3.0)
     ok("micro-tubing" not in _label(rf),
-       f"a REAL flow demand must be sized by physics, not forced to micro-tubing, got {_label(rf)!r}")
+       f"a PLANT-scale flow (12 m³/h) must be sized as a DN pipe, not micro-tubing, got {_label(rf)!r}")
+
+    # F1e small-authored-lab-flow (Cursor afternoon audit): a device flow authored in mL/min
+    # or L/h must (a) parse correctly (NOT fall to the unknown→m³/s→DN300 bug) and (b) size as
+    # lab micro-tubing, not a DN process pipe.
+    cs.set_device_scale_interconnect(True)
+    # the unit parser: 10 mL/min = 10e-6/60 m³/s ≈ 1.67e-7, NOT 10 m³/s.
+    q_ml = cs.flow_to_m3s(10.0, "mL/min", 1000.0)
+    ok(abs(q_ml - 10e-6 / 60.0) < 1e-12,
+       f"10 mL/min must parse to {10e-6/60.0:.3e} m³/s, not the unknown→m³/s DN300 bug (got {q_ml:.3e})")
+    for val, unit in [(10.0, "mL/min"), (10.0, "L/h"), (250.0, "uL/min")]:
+        e = {"constraint_kind": "flow_capacity", "mechanism": "fluid_loop",
+             "required_value": val, "required_unit": unit}
+        sp = cs.size_connection(e, 1.0)
+        ok("micro-tubing" in _label(sp) and "DN" not in _label(sp),
+           f"a device lab flow {val} {unit} must size as micro-tubing, not a DN pipe (got {_label(sp)!r})")
 
     # Reset the module flag so a later import in the same process is not polluted.
     cs.set_device_scale_interconnect(False)
