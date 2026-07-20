@@ -2063,6 +2063,31 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 print(f"  ! process-plant word leak on a DEVICE-SCALE product blocked "
                       f"SHIPS ({len(_plant)} words: "
                       f"{[f.get('name') for f in _plant[:3]]})")
+        # ── S4: EX-WORKS PRICE OVER THE UNIT-COST CEILING (2026-07-20) ──────────
+        # The brief-wording layer (S2) picks WHICH cost the HARD verification row
+        # measures (materials vs ex-works vs list) — so a brief that says "bill of
+        # materials ≤ £X" passes its HARD row on materials even when the ex-works
+        # (oem_transfer_price) EXCEEDS the customer's unit budget (2150: oem £429 >
+        # ceiling £385, materials passed → false SHIP). But the ex-works price is
+        # what the factory gate must charge; if even the customer's stated per-unit
+        # budget cannot cover it, the product is NOT viable at that price point —
+        # a ship-relevant fact no brief wording can paper over. Bind it directly.
+        # UNIVERSAL (oem is always ≥ materials, so this can only fire when the true
+        # sellable price busts the budget); fires only when BOTH numbers are real.
+        _cons = (state.get("parsedBrief") or {}).get("constraints") or {}
+        _ucc = _cons.get("unit_cost_ceiling") or {}
+        _ceiling = num(_ucc.get("value")) if isinstance(_ucc, dict) else num(_ucc)
+        _oem = num((state.get("costStack") or {}).get("oem_transfer_price_gbp"))
+        if (_ceiling is not None and _ceiling > 0
+                and _oem is not None and _oem > 0
+                and _oem > _ceiling * 1.02):
+            ships = False
+            open_n = max(open_n, 1)
+            if floor is None or floor > 4.0:
+                floor = 4.0
+            print(f"  ! ex-works price £{_oem:,.0f} exceeds the £{_ceiling:,.0f} unit-cost "
+                  f"ceiling ({_oem / _ceiling:.2f}×) — not viable at the stated budget; "
+                  f"blocked SHIPS (S4)")
     return {"floor": floor, "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
@@ -28483,6 +28508,44 @@ def _selftest() -> int:
     if not _clean_bind_v["ships"] or _clean_bind_v["floor"] != 9:
         print(f"  FAIL macro-binding proveNoFalsePositive: a clean state (empty blocking_defects, "
               f"no plant leak) with tabs ≥8 must still SHIP at floor 9 (got {_clean_bind_v})"); bad += 1
+    # ═══ S4: EX-WORKS PRICE OVER THE UNIT-COST CEILING (2026-07-20) ═══
+    # The frozen 2150 shape: brief unit_cost_ceiling £385, ex-works oem £429 (1.11×).
+    # The brief-wording HARD row measured materials (which passed), so ONLY a direct
+    # oem>ceiling bind refuses the ship. proveCatch it + proveNoFalsePositive under.
+    _s4_over = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385, "currency": "GBP"}}},
+         "costStack": {"oem_transfer_price_gbp": 429}},
+        _bind_tabs)
+    if _s4_over["ships"] or (_s4_over["floor"] or 99) > 4.0:
+        print(f"  FAIL S4: ex-works oem £429 > unit-cost ceiling £385 must block SHIPS and "
+              f"floor ≤4 even when every tab ≥8 (got {_s4_over})"); bad += 1
+    # proveNoFalsePositive: ex-works UNDER the ceiling still ships at floor 9.
+    _s4_under = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385, "currency": "GBP"}}},
+         "costStack": {"oem_transfer_price_gbp": 300}},
+        _bind_tabs)
+    if not _s4_under["ships"] or _s4_under["floor"] != 9:
+        print(f"  FAIL S4 proveNoFalsePositive: ex-works £300 UNDER the £385 ceiling must "
+              f"still SHIP at floor 9 (got {_s4_under})"); bad += 1
+    # proveNoFalsePositive: within the 2% tolerance is not a bust (a rounding brush).
+    _s4_tol = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385, "currency": "GBP"}}},
+         "costStack": {"oem_transfer_price_gbp": 390}},  # 1.01× — within tol
+        _bind_tabs)
+    if not _s4_tol["ships"]:
+        print(f"  FAIL S4 tolerance: ex-works £390 (1.01× of £385) is within the 2% tol and "
+              f"must NOT block SHIPS (got {_s4_tol})"); bad += 1
+    # proveNoFalsePositive: no ceiling in the brief → the bind never fires.
+    _s4_noceil = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "costStack": {"oem_transfer_price_gbp": 999999}},
+        _bind_tabs)
+    if not _s4_noceil["ships"]:
+        print(f"  FAIL S4: with NO unit_cost_ceiling in the brief the bind must never fire "
+              f"(got {_s4_noceil})"); bad += 1
     # ═══ (11) MARKDOWN EMPHASIS never renders as literal text (fix 4) ═══
     if clean_cell("**TOTALS**") != "TOTALS" or clean_cell("**42.7 kW**") != "42.7 kW":
         print(f"  FAIL md-emphasis: '**TOTALS**' must render 'TOTALS' (got "
