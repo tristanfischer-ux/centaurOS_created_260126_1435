@@ -1921,6 +1921,21 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"heatsink|heat\s*sink", (50.0, 40.0, 20.0)),
         (r"sample\s*block|thermal\s*block|tube\s*block", (60.0, 40.0, 18.0)),
         (r"lid\s*heater|heated\s*lid", (55.0, 40.0, 6.0)),
+        # INTENT (organoid-bioreactor 2150, F1b 2026-07-20): benchtop MECHANICAL /
+        # FLUIDIC parts live in mass_fluid_transport / environmental_interface —
+        # modules NOT in _INSTRUMENT_SHAPE_MODULES — so with no noun rule they fell
+        # through to the PLANT TYPE_DEFAULTS (magnetic stirrer 1.5 m, culture vessel
+        # ⌀1.6 m, cartridge heater 0.95 m on a 20 mL / 35 W device). Device-scale
+        # lab-mechanical sizes, universal across benchtop instruments.
+        (r"magnetic\s*stir|stir(?:rer)?\s*(?:drive|bar|plate)|stirrer\b", (120.0, 100.0, 60.0)),
+        (r"cartridge\s*heat|band\s*heat|immersion\s*heat|process\s*heat", (16.0, 16.0, 80.0)),
+        (r"culture\s*vessel|bioreactor\s*vessel|glass\s*vessel|reaction\s*vessel", (38.0, 38.0, 70.0)),
+        (r"sterile\s*(?:filter|vent)|vent\s*filter|air\s*filter|0\.2\s*(?:um|µm)\s*filter", (25.0, 25.0, 20.0)),
+        (r"vial\s*holder|tube\s*(?:rack|holder)|vial\s*rack|sample\s*rack|holder\s*fixture", (90.0, 60.0, 40.0)),
+        (r"media\s*tubing|tubing\s*set|perfusion\s*line|fluid\s*line|dosing\s*line", (60.0, 40.0, 15.0)),
+        (r"thermal\s*insulation|insulation\s*(?:jacket|sleeve|wrap)|lagging", (60.0, 40.0, 12.0)),
+        (r"thermal\s*(?:interface|pad)|gap\s*pad|tim\b", (30.0, 30.0, 2.0)),
+        (r"peristaltic\s*pump|dosing\s*pump|metering\s*pump|micro\s*pump", (110.0, 80.0, 60.0)),
     ]
     for pattern, (w_mm, d_mm, h_mm) in rules:
         if re.search(pattern, n, re.I):
@@ -1945,7 +1960,20 @@ def _instrument_proxy_dim(name, module_id, quantities):
             "d_mm": 12.0 + ((bucket // 3) % 11),
             "h_mm": 5.0 + ((bucket // 7) % 7),
         }
-    return None
+    # UNIVERSAL DEVICE-SCALE BACKSTOP (F1b 2026-07-20): this function is ONLY called
+    # when isInstrumentDevice is True (see extract_parts). A benchtop instrument has
+    # NO metre-scale part, so a no-rule / non-instrument-module part must still get a
+    # DEVICE-scale envelope-relative box — returning None here let it fall to the
+    # PLANT TYPE_DEFAULTS (the ⌀1.6 m culture vessel / 1.5 m stirrer leak). Size a
+    # generic mechanical part to a modest fraction of the product envelope, bucketed
+    # by name+module for footprint diversity (so distinct parts don't collapse to one
+    # litter box), clamped so it never exceeds the enclosure. Universal — keyed on the
+    # instrument signal + the product envelope, no per-noun / per-class table.
+    bucket = _stable_name_bucket(f"{module_id}|{n}")
+    gw = min(w_env * 0.6, 40.0 + (bucket % 60))
+    gd = min(d_env * 0.6, 30.0 + ((bucket // 3) % 45))
+    gh = min(h_env * 0.8, 20.0 + ((bucket // 7) % 40))
+    return {"kind": "box", "w_mm": round(gw, 1), "d_mm": round(gd, 1), "h_mm": round(gh, 1)}
 
 
 def extract_parts(state):
