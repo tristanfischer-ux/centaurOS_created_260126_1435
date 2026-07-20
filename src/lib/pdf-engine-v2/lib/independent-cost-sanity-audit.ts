@@ -636,6 +636,32 @@ export function computeCostSanity(state: any): CostSanityResult {
     band_basis: bandBasis,
   }
 
+  // ── S6 (2026-07-20): the wide per-UNIT industry band (£100–£5M/unit) must NOT paper over a
+  // busted BRIEF unit-cost ceiling. When the output is per-unit AND the brief states a
+  // unit_cost_ceiling that the EX-WORKS price exceeds, flag HIGH regardless of where perUnit
+  // sits in the £100–£5M band — a £429 device against a £385 brief ceiling is a real miss the
+  // industry band would hide. Same signal as the S4 verdict bind; the two agree. Universal —
+  // fires only when BOTH a brief ceiling and a real ex-works price exist. ──
+  if (denom.family === 'unit') {
+    const _ucc = (state?.parsedBrief?.constraints?.unit_cost_ceiling ?? {}) as { value?: unknown }
+    const _ceiling = Number(typeof _ucc === 'object' && _ucc ? (_ucc as { value?: unknown }).value : _ucc)
+    const _oem = Number((state?.costStack as { oem_transfer_price_gbp?: unknown } ?? {})?.oem_transfer_price_gbp)
+    if (Number.isFinite(_ceiling) && _ceiling > 0 && Number.isFinite(_oem) && _oem > 0 && _oem > _ceiling * 1.02) {
+      return {
+        ...base,
+        ...common,
+        verdict: 'high',
+        ratio_to_nearest_edge: _oem / _ceiling,
+        direction: 'over',
+        message:
+          `Independent cost sanity HIGH: the ex-works unit price ${fmtGbp(_oem)} exceeds the brief's ` +
+          `${fmtGbp(_ceiling)} unit-cost ceiling (${(_oem / _ceiling).toFixed(2)}×) — the wide ` +
+          `${bandRange} industry band for per-unit output does NOT apply when the brief states a ` +
+          `per-unit budget (S6; agrees with the S4 ship bind). Not viable at the stated price point.`,
+      }
+    }
+  }
+
   // Within band → PASS.
   if (perUnit >= band.low && perUnit <= band.high) {
     return {

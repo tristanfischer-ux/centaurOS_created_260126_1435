@@ -245,7 +245,19 @@ export const GATES: GateProof[] = [
     code: 32, name: 'independent-cost-sanity', intent: 'a dossier whose £/output-unit is wildly off the industry band (a 3 MWh BESS at £2,967/kWh)',
     proveCatch: () => {
       const st: any = { keyMetrics: { product_class: 'bess' }, parsedBrief: { constraints: { target_performance: { metrics: [{ key_metric: 'usable_energy_mwh', value: 3, unit: 'MWh', category: 'scale' }] } } }, costStack: { oem_transfer_price_gbp: 8_900_000 } }
-      return evaluateCostSanityEnforcement(computeCostSanity(st), 'on').shouldExit === true
+      const bessFires = evaluateCostSanityEnforcement(computeCostSanity(st), 'on').shouldExit === true
+      // S6 (2026-07-20): a per-UNIT device whose ex-works price busts the BRIEF ceiling must be
+      // HIGH even though £429/unit sits inside the wide £100–£5M/unit industry band.
+      const s6St: any = { keyMetrics: { product_class: 'benchtop_bioreactor' }, isInstrumentDevice: true,
+        parsedBrief: { constraints: { unit_cost_ceiling: { value: 385, currency: 'GBP' },
+          target_performance: { metrics: [{ key_metric: 'working_volume_ml', value: 20, unit: 'ml', category: 'scale' }] } } },
+        costStack: { oem_transfer_price_gbp: 429 } }
+      const s6 = computeCostSanity(s6St)
+      const s6Fires = s6.output_family === 'unit' && s6.verdict === 'high'
+      // proveNoFalsePositive: the SAME device UNDER its ceiling (£300) is not S6-flagged HIGH.
+      const s6OkSt: any = { ...s6St, costStack: { oem_transfer_price_gbp: 300 } }
+      const s6Ok = computeCostSanity(s6OkSt).verdict !== 'high'
+      return bessFires && s6Fires && s6Ok
     },
     enforcedByDefault: () => costSanityEnforceModeFromEnv(undefined) !== 'off',
   },
