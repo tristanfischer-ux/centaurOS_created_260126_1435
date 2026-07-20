@@ -73,6 +73,7 @@ import { lookupCached } from '../distributors/db-only-cascade'
 import {
   resolveVerifiedComponentIdentity,
 } from './pcb-verified-candidates'
+import { isDeniedPcbMpn } from './pcb-manufacturer-pinouts'
 import {
   createBoardGeometryFromShapeContract,
   createRoundedRectangleContour,
@@ -108,6 +109,7 @@ export type FunctionClass =
   | 'diode_protection'
   | 'memory_ic'
   | 'usb_connector'
+  | 'debug_connector'
   | 'battery_connector'
   | 'display_module'
   | 'led'
@@ -136,7 +138,9 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
   { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient/i },
   { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?memory|eeprom|nonvolatile[_-]?memory/i },
-  { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port)|type[_-]?c|debug[_-]?(?:interface|header|uart)|uart[_-]?header/i },
+  // P4: USB power/receptacle roles must not share PinHeader defaults with SWD/UART.
+  { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port|entry)|type[_-]?c/i },
+  { id: 'debug_connector', test: /debug[_-]?(?:interface|header|uart)|swd[_-]?header|uart[_-]?header|jtag[_-]?header/i },
   { id: 'passive_c', test: /capacitor|decoupling/i },
   // current_sense_on_driver / sense_shunt → SMD resistor (shunt), not unresolved.
   // GOTCHA: do not bare-match `current_sense` alone — that can be an amplifier IC.
@@ -151,7 +155,12 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'connector', test: /interface_membrane|connector|receptacle|header|terminal/i },
 ]
 
-function classifyFunction(characterId: string): FunctionClass | null {
+/**
+ * @description Maps a generic electronic role (`character_id`) to a function class.
+ * @param characterId Engine word role vocabulary (never a product name)
+ * @returns Matching function class, or null when no rule matches
+ */
+export function classifyFunction(characterId: string): FunctionClass | null {
   for (const rule of FUNCTION_CLASS_RULES) {
     if (rule.test.test(characterId)) return rule.id
   }
@@ -363,11 +372,22 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     resolutionTier: 'package_family',
   },
   usb_connector: {
+    library: 'Connector_USB',
+    // Prefer real receptacle; glob miss → unresolved (honest), never PinHeader.
+    filenameTest: /^USB_C_Receptacle_.*\.kicad_mod$/i,
+    designatorPrefix: 'J',
+    pins: ['VBUS', 'GND', 'D+', 'D-', 'CC1', 'CC2'],
+    powerPin: 'VBUS',
+    groundPin: 'GND',
+    decouple: false,
+    resolutionTier: 'package_family',
+  },
+  debug_connector: {
     library: 'Connector_PinHeader_2.54mm',
     filenameTest: /^PinHeader_1x04_P2\.54mm_Vertical\.kicad_mod$/,
     designatorPrefix: 'J',
-    pins: ['VBUS', 'GND', 'D+', 'D-'],
-    powerPin: 'VBUS',
+    pins: ['SWDIO', 'SWCLK', 'GND', 'VCC'],
+    powerPin: 'VCC',
     groundPin: 'GND',
     decouple: false,
     resolutionTier: 'package_family',
@@ -430,7 +450,7 @@ const AREA_MM2_BY_CLASS: Partial<Record<FunctionClass, number>> = {
   microcontroller: 64, sensor_ic: 20, op_amp: 20, connectivity_ic: 25,
   io_connector: 60, regulator: 15, gate_driver_ic: 20, power_module: 80,
   passive_c: 1.3, passive_r: 1.3, passive_l: 1.3, fuse_protection: 4, diode_protection: 2,
-  memory_ic: 20, usb_connector: 32, battery_connector: 32, display_module: 600,
+  memory_ic: 20, usb_connector: 32, debug_connector: 20, battery_connector: 32, display_module: 600,
   led: 1.3, switch: 12, connector: 40,
 }
 const DEFAULT_AREA_MM2 = 25
@@ -980,15 +1000,27 @@ function resolveComponent(
   let resolvedManufacturer = manufacturer
   let resolvedPartNumber = partNumber
 
-  // Tier (a): MPN-driven
+  // Tier (a): MPN-driven — DENYLIST first (P3)
+  // INTENT: lookupCached verifies catalogue identity, not "safe to place as this role".
+  // TE 4-2489541-7 is a 110 V panel indicator that previously became mpn_package_only
+  // on LED_0603 because curated pinout reject never ran on this path.
   if (partNumber) {
-    const mpnResult = resolveViaMpn(manufacturer, partNumber)
-    mpnVerified = mpnResult.verified
-    if (mpnResult.packageText) {
-      const resolved = resolveFootprintByPackageText(mpnResult.packageText, functionClass, footprintsRoot)
-      if (resolved) {
-        footprint = resolved.ref
-        tier = 'mpn_package'
+    const denyReason = isDeniedPcbMpn(partNumber)
+    if (denyReason) {
+      mpnVerified = false
+      identityBlocker = denyReason
+      resolvedPartNumber = null
+      // Do NOT set footprint from the denylisted MPN's package text.
+      // Fall through to curated identity (a.5) then package/function-class.
+    } else {
+      const mpnResult = resolveViaMpn(manufacturer, partNumber)
+      mpnVerified = mpnResult.verified
+      if (mpnResult.packageText) {
+        const resolved = resolveFootprintByPackageText(mpnResult.packageText, functionClass, footprintsRoot)
+        if (resolved) {
+          footprint = resolved.ref
+          tier = 'mpn_package'
+        }
       }
     }
   }
@@ -1066,11 +1098,65 @@ function resolveComponent(
     }
   }
 
-  // INTENT: The MPN confidence axis means catalogue-verified identity, not merely
-  // a plausible-looking string in an upstream word. Unverified candidates retain
-  // their evidence but may only claim package/function-class resolution.
+  // INTENT: Catalogue-verified string without symbol/pinout is mpn_package_only —
+  // unless the MPN is denylisted for PCB placement (P3 belt-and-braces).
   if (partNumber && mpnVerified && !identityVerified && tier !== 'unresolved') {
-    tier = 'mpn_package_only'
+    const denyReason = isDeniedPcbMpn(partNumber)
+    if (denyReason) {
+      mpnVerified = false
+      identityBlocker = denyReason
+      resolvedPartNumber = null
+      if (tier === 'mpn_package' || tier === 'mpn_package_only') {
+        const fb = functionClass ? FUNCTION_CLASS_DEFAULTS[functionClass] : null
+        if (fb) {
+          const resolved = resolveFootprintByGlob(footprintsRoot, fb.library, fb.filenameTest)
+          footprint = resolved
+          tier = fb.resolutionTier
+        } else {
+          return {
+            unresolved: {
+              wordId: word.wordId,
+              nameHuman: word.nameHuman,
+              characterId: word.characterId,
+              reason: denyReason,
+            },
+          }
+        }
+      }
+    } else {
+      tier = 'mpn_package_only'
+    }
+  }
+
+  if (!footprint) {
+    return {
+      unresolved: {
+        wordId: word.wordId,
+        nameHuman: word.nameHuman,
+        characterId: word.characterId,
+        reason: identityBlocker
+          ?? (functionClass
+            ? `function class '${functionClass}' resolved but its default footprint is missing from the local KiCad library`
+            : 'no MPN, no matching package-family text, and no recognised function-class role for this word'),
+      },
+    }
+  }
+
+  // P4: USB power/interface roles must never ship as debug pin headers.
+  const fpName = footprint.footprint ?? ''
+  if (
+    /usb[_-]?(?:power|interface|connector|entry|receptacle|port)/i.test(word.characterId)
+    && /PinHeader/i.test(fpName)
+  ) {
+    return {
+      unresolved: {
+        wordId: word.wordId,
+        nameHuman: word.nameHuman,
+        characterId: word.characterId,
+        reason:
+          'usb_power_entry cannot use PinHeader_* — need a USB receptacle footprint/MPN or leave unresolved',
+      },
+    }
   }
 
   const fallbackPins = fallback ? fallback.pins.map((pin) => sanitizePinName(pin)!) : ['P1', 'P2']

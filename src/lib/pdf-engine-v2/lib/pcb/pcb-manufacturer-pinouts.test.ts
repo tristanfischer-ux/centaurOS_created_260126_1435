@@ -2,7 +2,10 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { resolveCuratedManufacturerIdentity } from './pcb-manufacturer-pinouts'
+import {
+  isDeniedPcbMpn,
+  resolveCuratedManufacturerIdentity,
+} from './pcb-manufacturer-pinouts'
 
 describe('manufacturer-backed local PCB pinouts', () => {
   const roots: string[] = []
@@ -135,6 +138,11 @@ describe('manufacturer-backed local PCB pinouts', () => {
       status: 'unsupported',
       reason: '4-2489541-7 is evidenced only as a 110 V DC panel indicator; no authoritative PCB package and terminal pin geometry were found',
     })
+  })
+
+  it('P3: denylist blocks TE panel indicator for PCB placement even when cache would verify', () => {
+    expect(isDeniedPcbMpn('4-2489541-7')).toMatch(/panel indicator/i)
+    expect(isDeniedPcbMpn('ATSAMD21G18A-AU')).toBeNull()
   })
 
   it('rejects a manufacturer mismatch and a footprint parity mismatch', () => {

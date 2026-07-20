@@ -149,4 +149,55 @@ describe('Atopile verified identity integration', () => {
       groundPin: null,
     })
   })
+
+  it('P3: TE 4-2489541-7 never lands as mpn_package_only on an LED role', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (mpn === '4-2489541-7') {
+        return cacheHit(
+          'TE Connectivity',
+          '4-2489541-7',
+          'INDICATOR PANEL 110V DC GREEN LED_0603',
+        )
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+
+    const state = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'hmi',
+          sub_modules: [{
+            id: 'hmi__indicators',
+            words: [{
+              id: 'power_indicator_led_word',
+              name_human: 'Power indicator LED',
+              content_character: { character_id: 'power_indicator_led' },
+              modifier_characters: [
+                { kind: 'manufacturer', value: 'TE Connectivity' },
+                { kind: 'part_number', value: '4-2489541-7' },
+                { kind: 'form', value: 'LED_0603' },
+              ],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const outDir = mkdtempSync(join(tmpdir(), 'atopile-p3-te-led-'))
+    tmpDirs.push(outDir)
+
+    const result = generateAtopileProject(state, outDir, {
+      requiredWordIds: ['power_indicator_led_word'],
+    })
+    const led = result.components.find((c) => c.wordId === 'power_indicator_led_word')
+    const unresolved = result.unresolved.find((u) => u.wordId === 'power_indicator_led_word')
+
+    if (led) {
+      expect(led.resolutionTier).not.toBe('mpn_package_only')
+      expect(led.partNumber).not.toBe('4-2489541-7')
+      expect(led.mpnVerified).toBe(false)
+    } else {
+      expect(unresolved?.reason).toMatch(/panel indicator|deny|4-2489541-7/i)
+    }
+  })
 })

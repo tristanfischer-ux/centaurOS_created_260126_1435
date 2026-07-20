@@ -366,6 +366,25 @@ function normalized(value: string): string {
   return value.trim().toLowerCase()
 }
 
+/** INTENT: Distributor-cache hits are not placement authority. Some verified MPNs
+ *  are panel/industrial parts that must never land on a PCBA role footprint. */
+const PCB_MPN_DENYLIST = new Map<string, string>([
+  [
+    normalized('4-2489541-7'),
+    '4-2489541-7 is a 110 V DC panel indicator — not an SMD PCB LED; deny placement even if distributor cache verifies the MPN',
+  ],
+])
+
+/**
+ * @description Returns a human reason if this MPN must not be placed on a PCB, else null.
+ * @param partNumber Catalogue / BoM part number
+ * @returns Deny reason string, or null when placement may proceed
+ */
+export function isDeniedPcbMpn(partNumber: string | null | undefined): string | null {
+  if (!partNumber) return null
+  return PCB_MPN_DENYLIST.get(normalized(partNumber)) ?? null
+}
+
 /**
  * @description Reports whether an exact manufacturer/MPN pair has a curated
  * local pinout whose provenance is owned by this module.
