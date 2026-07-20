@@ -2088,16 +2088,25 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
         _ucc = _cons.get("unit_cost_ceiling") or {}
         _ceiling = num(_ucc.get("value")) if isinstance(_ucc, dict) else num(_ucc)
         _oem = num((state.get("costStack") or {}).get("oem_transfer_price_gbp"))
-        if (_ceiling is not None and _ceiling > 0
-                and _oem is not None and _oem > 0
-                and _oem > _ceiling * 1.02):
-            ships = False
-            # (one-truth reconcile) refuse via ships+floor; open_n stays the cell-backed count.
-            if floor is None or floor > 4.0:
-                floor = 4.0
-            print(f"  ! ex-works price £{_oem:,.0f} exceeds the £{_ceiling:,.0f} unit-cost "
-                  f"ceiling ({_oem / _ceiling:.2f}×) — not viable at the stated budget; "
-                  f"blocked SHIPS (S4)")
+        if _ceiling is not None and _ceiling > 0:
+            if _oem is not None and _oem > 0 and _oem > _ceiling * 1.02:
+                ships = False
+                # (one-truth reconcile) refuse via ships+floor; open_n stays cell-backed.
+                if floor is None or floor > 4.0:
+                    floor = 4.0
+                print(f"  ! ex-works price £{_oem:,.0f} exceeds the £{_ceiling:,.0f} unit-cost "
+                      f"ceiling ({_oem / _ceiling:.2f}×) — not viable at the stated budget; "
+                      f"blocked SHIPS (S4)")
+            elif _oem is None or not (_oem > 0):
+                # MISSING-OEM DODGE (Cursor afternoon audit, 2026-07-20): the brief states a
+                # unit-cost ceiling but the engine produced NO sellable ex-works price — the
+                # viability constraint is UNVERIFIED, not satisfied. A HARD brief cost ceiling
+                # with no price to check against it cannot ship (an absent number is not a pass).
+                ships = False
+                if floor is None or floor > 4.0:
+                    floor = 4.0
+                print(f"  ! brief states a £{_ceiling:,.0f} unit-cost ceiling but NO ex-works "
+                      f"price was computed — viability UNVERIFIED; blocked SHIPS (S4)")
         # ── S7: VISION AXIS BIND (2026-07-20) ──────────────────────────────────
         # The tab floor already folds the PCB + Renders tab scores, but a DELIVERED
         # vision critique that flags the render BROKEN must block ships directly —
@@ -14266,19 +14275,32 @@ def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[
         _tol_contract = _tol_res.get("contract") or []
         _tol_np = _tol_res.get("n_pass") or 0
         _tol_nt = _tol_res.get("n_total") or 0
-        if _dev:
-            # A device with no pressure-containing / performance-rated principals genuinely
-            # has nothing to stress-analyse → VERIFIED OUT-OF-SCOPE (excluded from the floor,
-            # like the other device-scale OOS tabs), never a fake 10. Full-shape dict so the
-            # generic contract consumer (score/status/n_pass/n_total) never KeyErrors.
+        # PRINCIPALS-EXIST CHECK (Cursor afternoon audit, 2026-07-20): a device is OOS ONLY
+        # when it has NO pressure-containing / structural principal to stress-analyse. If the
+        # BoM DOES carry such a principal (a pressure vessel / reactor / load-bearing member)
+        # but the stress section is empty, that is a real GAP (the sizing didn't emit P=/σ=),
+        # not out-of-scope — cap it like a plant, never OOS. Keyed on the part noun, not class.
+        _PRESSURE_STRUCT_RX = re.compile(
+            r"pressure\s*vessel|reactor|autoclave|\bboiler\b|accumulator|receiver|"
+            r"load[\s-]?bearing|structural\s*(?:frame|member|beam|column)|pressuris|"
+            r"\bmanifold\b.*pressure|high[\s-]?pressure", re.I)
+        _has_principal = any(
+            _PRESSURE_STRUCT_RX.search(str((rv or {}).get("name") or rv or ""))
+            for rv in ((_build_tolerance_rows(state)) or []))
+        if _dev and not _has_principal:
+            # A device with no pressure-containing / structural principal genuinely has nothing
+            # to stress-analyse → VERIFIED OUT-OF-SCOPE (excluded from the floor, like the other
+            # device-scale OOS tabs), never a fake 10. Full-shape dict so the generic contract
+            # consumer (score/status/n_pass/n_total) never KeyErrors.
             return {"tab": "Engineering Analysis", "scored": False, "score": 8, "status": "PASS",
                     "rows": _tol_rows, "contract": _tol_contract, "n_pass": _tol_np, "n_total": _tol_nt,
                     "issues": [_note + " — VERIFIED out of scope for this device (no pressure/"
                                "structural principals); general tolerances apply per ISO 2768-1"],
                     "mech": "engineering analysis — verified out of scope (no principals to stress-analyse)",
                     "fix": ""}
-        # A non-device (structural/plant) design that produced ZERO stress rows is a REAL
-        # gap, not a boilerplate pass — cap below the ship floor with an honest issue.
+        # A NON-device (structural/plant) design — OR a device that DOES carry a pressure/
+        # structural principal — that produced ZERO stress rows is a REAL gap, not a
+        # boilerplate pass or an out-of-scope: cap below the ship floor with an honest issue.
         return {"tab": "Engineering Analysis", "score_cap": 4.0, "score": 4.0, "status": "FAIL",
                 "rows": _tol_rows, "contract": _tol_contract, "n_pass": _tol_np, "n_total": _tol_nt,
                 "issues": [_note + " — a structural/plant design must carry a real "
@@ -28698,6 +28720,21 @@ def _selftest() -> int:
         print(f"  FAIL S8: a NON-device Engineering-Analysis tab with an empty stress table "
               f"must be capped ≤4 (a real gap), not a boilerplate 10 "
               f"(got score_cap={_s8_pl.get('score_cap') if _s8_pl else None})"); bad += 1
+    # S8 principals-check (Cursor afternoon audit): a DEVICE that DOES carry a pressure/
+    # structural principal (a Pressure Vessel) but has an empty stress table is a real GAP →
+    # cap ≤4, NOT verified-out-of-scope. (proveNoFalsePositive against the OOS dodge.)
+    _s8_dev_pv = {"isInstrumentDevice": True,
+                  "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 0.004}},
+                  "requirementsBom": [{"tag": "V-1", "requirement": "High-Pressure Reactor Vessel",
+                                       "material": "SS316", "wall_mm": 4}]}
+    _s8_pv = _eval_engineering_analysis_contract(".", _s8_dev_pv)
+    if _s8_pv is not None and (_s8_pv.get("scored") is False
+                               or not (isinstance(_s8_pv.get("score_cap"), (int, float))
+                                       and _s8_pv["score_cap"] <= 4.0)):
+        print(f"  FAIL S8: a DEVICE with a pressure/structural principal but an empty stress "
+              f"table must be capped ≤4 (a real gap), NOT verified-out-of-scope "
+              f"(got scored={_s8_pv.get('scored') if _s8_pv else None}, "
+              f"cap={_s8_pv.get('score_cap') if _s8_pv else None})"); bad += 1
     # ═══ S7 (2026-07-20): the multi-axis ship card + the vision axis bind ═══
     import tempfile as _tf7
     _CLEAN_ST = {"parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385}}},
