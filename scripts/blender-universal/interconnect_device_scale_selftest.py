@@ -80,13 +80,38 @@ def main() -> int:
     # Reset the module flag so a later import in the same process is not polluted.
     cs.set_device_scale_interconnect(False)
 
+    # D1 (council, 2026-07-20): an interconnect edge whose endpoints are in incompatible
+    # physical domains (an indicator LED wired to a Peltier; a 400/415 V 3-phase feeder between
+    # two device parts) must FAIL its check (within_spec=False), not size silently.
+    led_peltier = {"from_part": "Power Indicator LED", "to_part": "Peltier Tec Module",
+                   "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+                   "required_value": 0.1, "required_unit": "A",
+                   "material_context": "LV power feeder 400/415V 3ph"}
+    dsp = cs.size_connection(led_peltier, 0.3)
+    ok(dsp.get("within_spec") is False and "DOMAIN MISMATCH" in _label(dsp),
+       f"an indicator-LED→Peltier edge must FAIL the domain check, got within_spec="
+       f"{dsp.get('within_spec')} label={_label(dsp)!r}")
+    # proveNoFalsePositive: coherent edges size normally (control MCU→LED; power Regulator→Heater).
+    for coh in (
+        {"from_part": "Microcontroller Mcu", "to_part": "Power Indicator LED",
+         "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+         "required_value": 0.02, "required_unit": "A"},
+        {"from_part": "Regulator", "to_part": "Cartridge Heater",
+         "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+         "required_value": 2.0, "required_unit": "A"},
+    ):
+        csp = cs.size_connection(coh, 0.2)
+        ok("DOMAIN MISMATCH" not in _label(csp),
+           f"a coherent edge {coh['from_part']}→{coh['to_part']} must NOT be flagged domain-mismatch "
+           f"(got {_label(csp)!r})")
+
     if fails:
         print("[interconnect-device-scale][selftest] FAIL:")
         for f in fails:
             print("  ✗ " + f)
         return 1
-    print("[interconnect-device-scale] _selftest passed — F1e device-scale interconnect "
-          "proveCatch (device micro-tubing, plant DN25, real flow still sized)")
+    print("[interconnect-device-scale] _selftest passed — F1e device-scale interconnect + D1 "
+          "domain coherence (micro-tubing; DN25 plant; real flow sized; LED→Peltier domain FAIL)")
     return 0
 
 

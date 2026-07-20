@@ -1031,6 +1031,61 @@ def _round_up_duct(required_side_mm: float) -> int:
     return DUCT_SIZE_LADDER[-1]
 
 
+# ── D1 EDGE-DOMAIN COHERENCE (council, 2026-07-20) ──────────────────────────
+# An interconnect edge's endpoints must be in COMPATIBLE physical domains: an
+# indicator LED (an optical OUTPUT annunciator) is not a power SOURCE for a Peltier
+# (a thermal actuator) — the 2150 ledger carried `Power Indicator LED → Peltier Tec
+# Module` on a "power" electrical_bus with a "400/415V 3ph" material_context (a
+# nonsensical topology + a plant-voltage label on a 0.1 A device edge). A domain-
+# mismatched edge must FAIL its check, not size silently. Universal — keyed on the
+# endpoint-part NOUN role, no product class.
+_ROLE_DOMAIN_RULES = (
+    ("indicator", re.compile(r"\bindicator\b|pilot\s*light|status\s*(?:led|light)|annunciator|\bbeacon\b", re.I)),
+    ("optical", re.compile(r"\bled\b|photodiode|phototransistor|\blaser\b|collimat|\blens\b|detector|cuvette|optical", re.I)),
+    ("thermal", re.compile(r"peltier|\btec\b|thermoelectric|\bheater\b|cartridge\s*heat|heat\s*sink|\bfan\b", re.I)),
+    ("fluid", re.compile(r"\bpump\b|\bvalve\b|tubing|manifold|perfusion|nozzle|\bfilter\b", re.I)),
+    ("control", re.compile(r"\bmcu\b|microcontroller|controller|\bfpga\b|processor|logic\s*board", re.I)),
+    ("power", re.compile(r"\bpsu\b|power\s*supply|regulator|\bldo\b|battery|incomer|busbar|transformer|rectifier", re.I)),
+)
+
+
+def _part_role_domain(name: str) -> str:
+    """The physical DOMAIN of an endpoint part from its noun (indicator/optical/thermal/
+    fluid/control/power), else '' (unknown → never flagged). Indicator is checked BEFORE
+    optical so 'Power Indicator LED' reads indicator, not a generic optical/LED source."""
+    n = str(name or "")
+    for domain, rx in _ROLE_DOMAIN_RULES:
+        if rx.search(n):
+            return domain
+    return ""
+
+
+def edge_domain_verdict(from_part, to_part, material_context=None) -> str:
+    """A one-line reason when an interconnect edge is DOMAIN-INCOHERENT, else ''. Catches:
+      (1) an INDICATOR endpoint driving/receiving a THERMAL or FLUID actuator via a power/
+          current edge — an annunciator is a sink, never a source for an actuator;
+      (2) an OPTICAL-only endpoint paired with a THERMAL/FLUID actuator (an optical net does
+          not terminate on a Peltier — the J-LED:VLED→Peltier case);
+      (3) a plant-voltage material_context (400/415 V 3-phase) on ANY edge whose endpoints are
+          both device-scale parts (composes with F1d — no 3-phase plant feeder on a lab device).
+    Universal, keyed on the endpoint noun + the label text. PURE."""
+    df, dt = _part_role_domain(from_part), _part_role_domain(to_part)
+    roles = {df, dt}
+    # (1)+(2): an indicator/optical endpoint must NOT pair with a thermal/fluid actuator.
+    if ("indicator" in roles or "optical" in roles) and ("thermal" in roles or "fluid" in roles):
+        return (f"domain mismatch: an {('indicator' if 'indicator' in roles else 'optical')} "
+                f"endpoint ('{from_part}' → '{to_part}') is wired to a "
+                f"{('thermal' if 'thermal' in roles else 'fluid')} actuator — incoherent topology "
+                f"(an indicator/optical part is not a power source/sink for an actuator)")
+    # (3): a 3-phase plant-voltage label on a device edge (neither endpoint is plant power gear).
+    if material_context and re.search(r"\b400\s*/?\s*415?\s*V\b.*\b3\s*ph|3[\s-]?phase.*\b400", str(material_context), re.I) \
+            and "power" not in roles:
+        return (f"plant-voltage label on a device edge: material_context '{material_context}' "
+                f"declares a 400/415 V 3-phase feeder between two device-scale parts "
+                f"('{from_part}' → '{to_part}') — a lab device has no 3-phase plant feeder (F1d)")
+    return ""
+
+
 def _spec(**kw) -> dict:
     """Build a ConnectionSpec with all the documented keys, defaulting absent
     ones so every spec has a uniform shape for the schedule + the CAD."""
@@ -1681,6 +1736,24 @@ def size_connection(edge: dict, length_m: float,
     margin = _f(edge.get("required_margin_factor"), 1.0) or 1.0
     unit = edge.get("required_unit")
     length_m = max(0.0, _f(length_m))
+
+    # D1 (2026-07-20): DOMAIN COHERENCE — an edge whose endpoints are in incompatible physical
+    # domains (an indicator LED wired to a Peltier; a plant-voltage feeder between two device
+    # parts) is a topology fault, not a sizing case. Flag it within_spec=False with the reason
+    # so the interconnect/drawing gate counts it FAIL instead of sizing it silently.
+    _dm = edge_domain_verdict(edge.get("from_part"), edge.get("to_part"), edge.get("material_context"))
+    if _dm:
+        return _spec(
+            kind="fault", mechanism=mechanism or "unknown",
+            carried_rating=None, carried_unit=None,
+            size_label="DOMAIN MISMATCH — not sized",
+            outer_dia_mm=None, drop_pct_or_velocity=None, within_spec=False,
+            spec_limit="endpoint domains must be compatible",
+            material_qty_desc=f"{edge.get('from_part') or '?'} → {edge.get('to_part') or '?'}: {_dm}",
+            tool_used="(domain-coherence check — NOT sized)",
+            assumptions=[_dm],
+            notes=_dm,
+        )
 
     # Resolve the value carried by this segment.
     if carried_value is not None:
