@@ -4582,7 +4582,7 @@ function isMainIncomerWord(w: WordLike): boolean {
  *  `main_incomer_breaker_frame_a` back to the contract quantities (the BoM / single-line /
  *  panel / drawing_gates read it). Returns the number of words stamped. Strict no-op when the
  *  contract declares no connected load OR there is no main-incomer word to stamp. */
-function sizeMainIncomer(
+export function sizeMainIncomer(
   modules: ModuleLike[],
   quantities: Record<string, number>,
   contract?: ContractInProgress,
@@ -4601,9 +4601,32 @@ function sizeMainIncomer(
   const txKva = pickQ(quantities, /^(main_)?transformer_(rating_)?kva$/) ?? pickQ(quantities, /transformer.*kva/)
   const txSecA = pickQ(quantities, /transformer_secondary_current_a/)
   let vLine = 400
+  let vLineFromTx = false
   if (txKva && txSecA && txSecA > 0) {
     const v = (txKva * 1000) / (Math.sqrt(3) * txSecA) // V_line = kVA·1000 / (√3·I_secondary)
-    if (Number.isFinite(v) && v >= 200 && v <= 1000) vLine = Math.round(v)
+    if (Number.isFinite(v) && v >= 200 && v <= 1000) { vLine = Math.round(v); vLineFromTx = true }
+  }
+  // DEVICE-SCALE ELECTRICAL MODEL (F1d 2026-07-20): a benchtop instrument has NO
+  // 3-phase 400 V incomer — it plugs into a single-phase 230 V wall socket (or a DC
+  // brick). The default vLine=400 minted a "√3·400" 3-phase incomer on a 35 W /
+  // 20 mL organoid device. When the product is a watt-scale instrument (same signal
+  // as the sizing guard) AND no transformer secondary voltage was derived, model the
+  // supply as single-phase 230 V. Universal — keyed on the device-scale signal +
+  // absence of a 3-phase source, no per-class table.
+  if (!vLineFromTx) {
+    const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
+    const noOccupancy = envM3 > 0 && envM3 < 1
+    const peakW = Number(quantities['peak_electrical_power_w'] ?? 0)
+    const loadKw = Number(quantities['connected_electrical_load_kw'] ?? 0)
+    const workingMl = Number(quantities['working_volume_ml'] ?? 0)
+    const isWattScaleInstrument =
+      noOccupancy
+      && (
+        (Number.isFinite(peakW) && peakW > 0 && peakW <= 120)
+        || (Number.isFinite(loadKw) && loadKw > 0 && loadKw <= 0.12)
+        || (Number.isFinite(workingMl) && workingMl > 0 && workingMl <= 500)
+      )
+    if (isWattScaleInstrument) vLine = 230
   }
   const PF = 0.9
   const MARGIN = 1.25
@@ -4627,7 +4650,7 @@ function sizeMainIncomer(
     if (isSubcomponent(w)) continue
     mergeMods(w, [
       mod('rating_primary', String(frameA), 'A'),
-      mod('dimension', `${vLine} V 3-phase LV incomer · ${frameA} A ACB frame (sized to ${Math.round(connectedKw)} kW connected load, PF ${PF}, ${Math.round((MARGIN - 1) * 100)}% margin)`),
+      mod('dimension', `${vLine} V ${singlePhase ? 'single-phase' : '3-phase'} ${singlePhase ? 'supply' : 'LV incomer'} · ${frameA} A ${singlePhase ? 'MCB' : 'ACB'} frame (sized to ${connectedKw < 1 ? connectedKw.toFixed(2) : String(Math.round(connectedKw))} kW connected load, PF ${PF}, ${Math.round((MARGIN - 1) * 100)}% margin)`),
     ])
     ;(w as { _synthesized?: boolean })._synthesized = true
     stamped += 1
