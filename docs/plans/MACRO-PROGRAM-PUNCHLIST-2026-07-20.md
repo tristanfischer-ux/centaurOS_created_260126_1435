@@ -35,7 +35,7 @@ Legend: ✅ done · �doing · ⬜ open
 | P6 | Fix 6 — Gate 38 widen beyond pipeline.ok (fitness + role guards + firmware-absent) | ⬜ | |
 | P7 | Fix 7 — interface-critical roles must be mpn-tier (subset of P1) | ⬜ | |
 | P8 | Fix 8 — PnP `Val=?` (cosmetic; Excel already fills; do NOT block FAB on it) | ⬜ optional | |
-| P9a | **Fix 9 honesty half** — no board reads bare FAB-READY; max = "FAB-READY — UNPROVEN IN HARDWARE". **🔴 Cursor audit FAIL-REWORK `d94dce40c`:** banner/`_sc_pcb` dicts still exact `"FAB-READY"` → KeyError on UNPROVEN string; live Excel formula still bare FAB-READY. See `CURSOR-TERMINAL-COMMIT-AUDIT-2026-07-20.md`. | 🔴 REWORK | d94dce40c |
+| P9a | **Fix 9 honesty half** — no board reads bare FAB-READY; max = "FAB-READY — UNPROVEN IN HARDWARE". **REWORKED (Cursor FAIL-REWORK closed):** prefix-safe `_pcb_readiness_style()` helper replaces BOTH exact-key dicts (banner + `_sc_pcb`) → no KeyError on the disclosed string; live Excel formula now carries the UNPROVEN disclosure; proveCatch exercises the REAL consumer path (verdict never bare FAB-READY; style helper handles disclosed+garbage without exception). | ✅ | 1da05fa4d |
 | P9b | **Fix 9 harness wire** — invoke deriveFirmwareProofSpecs + firmware_proof.py Tier-0 in pcb-stage per architecture board; set state.pcb.firmwareProof | ⬜ | |
 
 ## Form / vision (Terminal — Blender + render_vision_critic + composer)
