@@ -126,7 +126,15 @@ function getDb(): Database.Database | null {
       SELECT s.spec_value, s.spec_unit, s.raw_excerpt, d.source_url, d.extracted_at
       FROM pretraining_extracted_specs s
       JOIN pretraining_spec_documents d ON s.document_id = d.id
-      WHERE d.source_type IN ('datasheet','manufacturer','distributor_cascade','web_extracted')
+      -- A1 (2026-07-20, Cursor DB audit): the live corpus is ~15,027 rows under
+      -- source_type='manufacturer_datasheet' (+45 'stage0_harvest'); the old filter
+      -- listed only 'datasheet'/'manufacturer'/'distributor_cascade'/'web_extracted'
+      -- so the keyed DB-first path matched ~2 rows of 15,074 — the growing-DB loop's
+      -- primary read was Goodharted empty (every keyed lookup fell through to web).
+      -- Accept BOTH the corpus names AND the writeback names.
+      WHERE d.source_type IN (
+              'datasheet','manufacturer_datasheet','manufacturer',
+              'distributor_cascade','web_extracted','stage0_harvest')
         AND LOWER(s.spec_key) = LOWER(?)
         AND (
           LOWER(COALESCE(d.manufacturer,'')) LIKE LOWER('%' || ? || '%')
@@ -135,9 +143,11 @@ function getDb(): Database.Database | null {
       ORDER BY
         CASE d.source_type
           WHEN 'datasheet' THEN 0
+          WHEN 'manufacturer_datasheet' THEN 0
           WHEN 'manufacturer' THEN 1
           WHEN 'distributor_cascade' THEN 2
-          ELSE 3
+          WHEN 'stage0_harvest' THEN 3
+          ELSE 4
         END ASC
       LIMIT 1
     `)
