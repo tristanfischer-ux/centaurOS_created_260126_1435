@@ -149,13 +149,32 @@ export const REFRIGERATION_MARKERS: DomainMarker[] = [
   { id: 'evaporator / refrigeration cycle', re: /\bevaporator\s+(?:duty|load|temperature)\b|\brefrigerat(?:ion|ing)\s+cycle\b|\bcooling\s+cop\b|\bcop_cool(?:ing)?\b|\beer\b\s+rating/ },
 ]
 
+/**
+ * ADDITIVE_MANUFACTURING_MARKERS — the FDM / 3D-printer hot-end + printer-motion
+ * vocabulary. Legitimate on a 3D-printer / filament-printer product; a DOMAIN ERROR on
+ * anything else. The benchtop organoid-bioreactor 2150 leak (2026-07-20): the relevance
+ * sweep selected `extruder:thermal` ("FDM Extruder Thermal Model", steady_state_temp
+ * 210.48 °C, "E3D V6 with silicone sock", melt incoming filament) + `motion-kinematics:
+ * steps-per-mm` (steps_per_mm=80, printer motor torque) and RENDERED them as this 37 °C
+ * culture bioreactor's live "physics", marked USED. Gate 34 had no additive-manufacturing
+ * family so the leak walked through (the exact letter-vs-intent Gate-Intent failure).
+ * Markers are strong FDM-only tokens (filament melt, hot-end, steps/mm) so a generic
+ * "extruder" in a food/plastics-plant context is not tripped without the FDM/thermal cue.
+ */
+export const ADDITIVE_MANUFACTURING_MARKERS: DomainMarker[] = [
+  { id: 'FDM extruder hot-end', re: /\b(?:fdm|fff)\s+extruder\b|\bhot[\s-]?end\b|\be3d\s+v6\b|\bsilicone\s+sock\b|\bfilament\s+(?:melt|drive|feed|enters|diameter)\b|\bmelt\s+(?:incoming\s+)?filament\b|\bnozzle\s+temperature\b/ },
+  { id: 'printer motion steps/mm', re: /\bsteps[_\s/-]?per[_\s-]?mm\b|\bsteps\s*\/\s*mm\b|\bprinter\s+(?:steps|motor|motion|stepper)\b/ },
+  { id: 'extruder thermal model', re: /\bextruder\s+(?:thermal\s+model|power|temp(?:erature)?)\b|\bua_block\b/ },
+]
+
 /** All marker families the gate scans, tagged by family for the finding text. */
-export type MarkerFamily = 'marine' | 'irrigation' | 'hydroponic' | 'refrigeration'
+export type MarkerFamily = 'marine' | 'irrigation' | 'hydroponic' | 'refrigeration' | 'additive_manufacturing'
 export const MARKER_FAMILIES: Array<{ family: MarkerFamily; markers: DomainMarker[] }> = [
   { family: 'marine', markers: MARINE_MARKERS },
   { family: 'irrigation', markers: IRRIGATION_MARKERS },
   { family: 'hydroponic', markers: HYDROPONIC_MARKERS },
   { family: 'refrigeration', markers: REFRIGERATION_MARKERS },
+  { family: 'additive_manufacturing', markers: ADDITIVE_MANUFACTURING_MARKERS },
 ]
 
 /** The PRODUCT family for which a marker family is legitimate — used in the finding
@@ -166,6 +185,7 @@ function familyHome(family: MarkerFamily): string {
     case 'hydroponic': return 'hydroponic/soilless-crop grower'
     case 'refrigeration': return 'cooling/refrigeration product'
     case 'irrigation': return 'agricultural-irrigation/sprinkler system'
+    case 'additive_manufacturing': return '3D-printer/FDM additive-manufacturing product'
   }
 }
 
@@ -273,6 +293,14 @@ export function isCoolingClass(productClass: string): boolean {
   return classMatchesTokens(productClass, COOLING_CLASS_TOKENS)
 }
 
+/** Is this product class a 3D-printer / FDM / additive-manufacturing product (the
+ *  extruder hot-end + printer-motion markers are legitimate there, a domain error
+ *  everywhere else — e.g. a 37 °C culture bioreactor)? PURE. */
+export function isAdditiveManufacturingClass(productClass: string): boolean {
+  return /3d[_\s-]?print|\bfdm\b|\bfff\b|fused[_\s-]?deposition|additive[_\s-]?manufactur|filament[_\s-]?(?:printer|extrud)|\bslicer\b/i
+    .test(String(productClass ?? ''))
+}
+
 /** SEAWATER-SOURCE class tokens — classes that legitimately HANDLE seawater as a
  *  process / source / make-up fluid (marine aquaculture / RAS, desalination, offshore
  *  or coastal intake). For these, the WATER-SOURCE marine markers (seawater, seawater
@@ -325,6 +353,7 @@ export function toolLeaksWrongDomain(tool: any, productClass: string): boolean {
   const marine = isMarineClass(productClass)
   const hydroponic = isHydroponicClass(productClass)
   const cooling = isCoolingClass(productClass)
+  const additive = isAdditiveManufacturingClass(productClass)
   const seawaterSource = isSeawaterSourceClass(productClass)
   const irrigation = isIrrigationClass(productClass)
   const worked: any[] = Array.isArray(tool?.worked) ? tool.worked : []
@@ -334,6 +363,7 @@ export function toolLeaksWrongDomain(tool: any, productClass: string): boolean {
       if (hit.family === 'hydroponic' && hydroponic) continue
       if (hit.family === 'refrigeration' && cooling) continue
       if (hit.family === 'irrigation' && irrigation) continue
+      if (hit.family === 'additive_manufacturing' && additive) continue
       if (hit.family === 'marine' && seawaterSource && SEAWATER_SOURCE_MARKER_IDS.has(hit.marker)) continue
       return true
     }
@@ -533,6 +563,7 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
     if (family === 'hydroponic') return !hydroponic
     if (family === 'refrigeration') return !cooling
     if (family === 'irrigation') return !isIrrigationClass(productClass)  // irrigation legitimate on an irrigation/water/fertigation plant
+    if (family === 'additive_manufacturing') return !isAdditiveManufacturingClass(productClass)  // FDM markers legitimate only on a 3D-printer class
     return true
   }
 
