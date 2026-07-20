@@ -14164,6 +14164,41 @@ def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[
     present = [(tag, res) for tag, res in sections if res]
     if not present:
         return None
+    # ── S8 (council M6, 2026-07-20): the tolerance section auto-PASSes every fab row (ISO
+    # 2768-1 "applies regardless of size" boilerplate), so on a design with NO stress and
+    # NO pump substance it alone mints a 10 over an EMPTY stress table (the 2150 Goodhart:
+    # "Engineering Analysis 10/10" while zero parts were stress-checked). Boilerplate cannot
+    # carry this tab to a clean ≥8 by itself. Universal — keyed on which sections have real
+    # content, never a class name.
+    if {tag for tag, _ in present} == {"tolerance"}:
+        _eq = (state.get("engineeringContract") or {}).get("shared_quantities") or {}
+        _encl = _eq.get("enclosure_volume_m3")
+        _encl_v = num(_encl.get("value")) if isinstance(_encl, dict) else num(_encl)
+        _dev = bool(state.get("isInstrumentDevice")) or (_encl_v is not None and 0 < float(_encl_v) < 1.0)
+        _tol_res = next(res for tag, res in present if tag == "tolerance")
+        _note = ("this tab performed NO stress/structural or performance analysis — only the "
+                 "ISO 2768-1 general-tolerance boilerplate (which passes every fabricated row "
+                 "regardless of size); the stress/allowables table is empty")
+        if _dev:
+            # A device with no pressure-containing / performance-rated principals genuinely
+            # has nothing to stress-analyse → VERIFIED OUT-OF-SCOPE (excluded from the floor,
+            # like the other device-scale OOS tabs), never a fake 10.
+            return {"tab": "Engineering Analysis", "scored": False, "score": 8, "status": "PASS",
+                    "issues": [_note + " — VERIFIED out of scope for this device (no pressure/"
+                               "structural principals); general tolerances apply per ISO 2768-1"],
+                    "mech": "engineering analysis — verified out of scope (no principals to stress-analyse)",
+                    "fix": ""}
+        # A non-device (structural/plant) design that produced ZERO stress rows is a REAL
+        # gap, not a boilerplate pass — cap below the ship floor with an honest issue.
+        return {"tab": "Engineering Analysis", "score_cap": 4.0,
+                "rows": {("tolerance", i): rv for i, rv in (_tol_res.get("rows") or {}).items()},
+                "contract": _tol_res.get("contract") or [],
+                "n_pass": _tol_res.get("n_pass") or 0, "n_total": _tol_res.get("n_total") or 0,
+                "issues": [_note + " — a structural/plant design must carry a real "
+                           "stress/allowables analysis of its principal parts"],
+                "mech": "engineering analysis — tolerance boilerplate only (no stress/performance)",
+                "fix": ("emit principal pressure/structural parts with P=/σ= figures in their "
+                        "materials-take-off basis (requirements_bom.py::_materials_takeoff)")}
     n_pass = sum(res["n_pass"] for _, res in present)
     n_total = sum(res["n_total"] for _, res in present)
     rows: Dict[Any, dict] = {}
@@ -28502,6 +28537,31 @@ def _selftest() -> int:
     finally:
         _TAB_SCORES.clear()
         _TAB_SCORES.update(_s5_saved)
+    # ═══ S8 (council M6, 2026-07-20): an empty stress/allowables table cannot mint a 10 on
+    # the strength of the ISO 2768 tolerance boilerplate alone. Build a state whose ONLY
+    # Engineering-Analysis content is the tolerance section (one fab part, no pressure part,
+    # no pump) and assert: device → verified out-of-scope (scored:False, no fake 10, off the
+    # floor); non-device → capped ≤4 (a real gap). ═══
+    # wall_mm>0 makes _bom_row_kind classify it 'fabricated' → a tolerance row (the boilerplate
+    # section), while it carries NO design pressure → no stress row and no pump → tolerance-only.
+    _s8_bom = [{"tag": "X-101", "requirement": "Enclosure Shell", "material": "ABS",
+                "wall_mm": 3}]
+    _s8_dev = {"isInstrumentDevice": True,
+               "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 0.004}},
+               "requirementsBom": _s8_bom}
+    _s8_dv = _eval_engineering_analysis_contract(".", _s8_dev)
+    if _s8_dv is not None and _s8_dv.get("scored") is not False:
+        print(f"  FAIL S8: a DEVICE Engineering-Analysis tab with only tolerance boilerplate "
+              f"(empty stress table) must be verified-out-of-scope, not a 10 "
+              f"(got scored={_s8_dv.get('scored') if _s8_dv else None})"); bad += 1
+    _s8_plant = {"isInstrumentDevice": False,
+                 "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 38.0}},
+                 "requirementsBom": _s8_bom}
+    _s8_pl = _eval_engineering_analysis_contract(".", _s8_plant)
+    if _s8_pl is not None and not (isinstance(_s8_pl.get("score_cap"), (int, float)) and _s8_pl["score_cap"] <= 4.0):
+        print(f"  FAIL S8: a NON-device Engineering-Analysis tab with an empty stress table "
+              f"must be capped ≤4 (a real gap), not a boilerplate 10 "
+              f"(got score_cap={_s8_pl.get('score_cap') if _s8_pl else None})"); bad += 1
     # ═══ MACRO SELF-AUDIT BINDING (2026-07-20, Pillar 1) — the engine must REFUSE a
     # dossier whose own detectors flagged it, even when every TAB scores ≥8. Frozen
     # organoid-bioreactor-2150 shape: all tabs ≥8 but selfAudit.blocking_defects
