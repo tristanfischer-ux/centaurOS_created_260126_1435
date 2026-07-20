@@ -83,7 +83,7 @@ Legend: ✅ done · �doing · ⬜ open
 | A5 | material_prices live refresh (stale since 2026-05-30; fetchLivePriceGbpPerKg stub) | ⬜ | |
 | A6 | split `SKIP_LIBRARY_WRITEBACK` (currently also kills cascade reads — surprise). **DONE (524cc248b):** `db-only-cascade.getDb()` is a READONLY read path (the chain's DB-first part lookup) but was gated by the WRITE-back flag → a dry-run with SKIP_LIBRARY_WRITEBACK=1 silently disabled DB reads → BoM coverage cratered. Read gate now uses its own opt-in `SKIP_LIBRARY_READS`; writeback modules keep SKIP_LIBRARY_WRITEBACK. Guard in chain-must-be-db-only.test.ts fails if the writeback flag re-appears in getDb() (8/8 pass). | ✅ | 524cc248b |
 | A7 | class_reference_graphs web-on-miss | ⬜ | |
-| A8 | prove-growing-db-loop harness (keyed hit ≫2 on a DB slice) | ⬜ | |
+| A8 | prove-growing-db-loop harness (keyed hit ≫2 on a DB slice). **DONE (2c27651aa):** `scripts/ingest/prove_growing_db_loop.py` proves DB-first MISS → fixture web → writeback → re-read HIT → freshness max_ts ADVANCES → store grew 0→2. Production-safe + deterministic (TEMP DB, fixture web, no network/quota/production write). Exercises the EXACT real-writeback SQL so a regression in A1 (source_type filter), A4 (self-migrate + strftime stamp) fails it. PROVE-THE-CATCH: re-runs the lookup with the pre-A1 filter (no 'web_extracted') and asserts it MISSES the canary — so the harness fails if A1 regresses. Wired into verify-engine-guards.sh. | ✅ | 2c27651aa |
 
 ## Housekeeping
 | ID | Item | Status | SHA |
