@@ -77,6 +77,18 @@ def main() -> int:
         ok("micro-tubing" in _label(sp) and "DN" not in _label(sp),
            f"a device lab flow {val} {unit} must size as micro-tubing, not a DN pipe (got {_label(sp)!r})")
 
+    # NO LEAK INTO PLANT (Cursor afternoon audit, the missing direction): the SAME small
+    # lab-scale flows in PLANT mode (flag OFF) must still take the DN ladder — the
+    # micro-tubing branch is device-only and must never bleed into a plant schedule.
+    cs.set_device_scale_interconnect(False)
+    for val, unit in [(10.0, "mL/min"), (10.0, "L/h"), (250.0, "uL/min")]:
+        e = {"constraint_kind": "flow_capacity", "mechanism": "fluid_loop",
+             "required_value": val, "required_unit": unit}
+        sp = cs.size_connection(e, 1.0)
+        ok("micro-tubing" not in _label(sp),
+           f"a PLANT small flow {val} {unit} must stay on the DN ladder, not micro-tubing "
+           f"(got {_label(sp)!r})")
+
     # Reset the module flag so a later import in the same process is not polluted.
     cs.set_device_scale_interconnect(False)
 
