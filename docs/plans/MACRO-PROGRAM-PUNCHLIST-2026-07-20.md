@@ -31,7 +31,8 @@ Legend: ✅ done · �doing · ⬜ open
 | P6 | Fix 6 — Gate 38 widen beyond pipeline.ok (fitness + role guards + firmware-absent) | ⬜ | |
 | P7 | Fix 7 — interface-critical roles must be mpn-tier (subset of P1) | ⬜ | |
 | P8 | Fix 8 — PnP `Val=?` (cosmetic; Excel already fills; do NOT block FAB on it) | ⬜ optional | |
-| P9 | **Fix 9 — firmware Tier-0 wire**: invoke deriveFirmwareProofSpecs + firmware_proof.py in pcb-stage.ts per architecture board; state.pcb.firmwareProof; banner UNPROVEN IN HARDWARE; never FUNCTIONALLY VERIFIED without HIL | ⬜ | |
+| P9a | **Fix 9 honesty half** — no board reads bare FAB-READY; max = "FAB-READY — UNPROVEN IN HARDWARE" (reads state.pcb.firmwareProof.ok; discloses when no proof run) | ✅ | d94dce40c |
+| P9b | **Fix 9 harness wire** — invoke deriveFirmwareProofSpecs + firmware_proof.py Tier-0 in pcb-stage per architecture board; set state.pcb.firmwareProof | ⬜ | |
 
 ## Form / vision (Terminal — Blender + render_vision_critic + composer)
 | ID | Item | Status | SHA |
