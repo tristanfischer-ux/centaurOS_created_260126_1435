@@ -7741,6 +7741,43 @@ def _build_mpn_by_word(state: dict) -> Dict[str, str]:
                     key = _mpn_join_key(str(k)) if folded_pass else str(k).strip().lower()
                     if key:
                         out.setdefault(key, label)
+    # ── S11 BoM↔PCB IDENTITY RECONCILE (council M5, 2026-07-20) ──────────────────
+    # A part designed onto the PCB carries a REAL catalogue MPN in the PCB tab
+    # (ATSAMD21G18A-AU / TMP1075DSGR …), but the BoM ledger row for the SAME part
+    # showed "bespoke fabrication to drawing" because its partVerification had no
+    # MPN — the same part with two identities across surfaces. Harvest the PCB
+    # generator's resolved components (keyed by nameHuman + characterId, literal +
+    # folded) so `_bom_row_mpn`'s existing join backfills the BoM MPN from the board.
+    # setdefault → a real partVerification MPN still wins; only fills the gaps.
+    _pcb_comps = (((state.get("pcb") or {}).get("pipeline") or {})
+                  .get("generator") or {}).get("components") or []
+    _is_tbd_marker = lambda s: bool(re.match(r"^\s*TBD\b", str(s or ""), re.I))  # noqa: E731
+    for c in _pcb_comps:
+        if not isinstance(c, dict):
+            continue
+        _mpn = str(c.get("partNumber") or "").strip()
+        if not _mpn or _is_tbd_marker(_mpn):
+            continue
+        _mfr = str(c.get("manufacturer") or "").strip()
+        _lbl = f"{_mfr} {_mpn}".strip()
+        # register every identity form incl. the SPACE form of a snake_case characterId
+        # ('microcontroller_mcu' → 'microcontroller mcu', the BoM row's head-noun join key).
+        _ids = []
+        for k in (c.get("nameHuman"), c.get("characterId"), c.get("instanceName")):
+            if not k:
+                continue
+            _s = str(k).strip()
+            _ids += [_s.lower(), _s.replace("_", " ").strip().lower(), _mpn_join_key(_s)]
+        for key in _ids:
+            if not key:
+                continue
+            # a real on-board part number is AUTHORITATIVE over an empty OR a TBD-deferred
+            # partVerification entry (council M5: the same part must not read 'bespoke
+            # fabrication' in the BoM while the PCB tab carries its catalogue MPN). Override
+            # a TBD/empty; never override another part's already-RESOLVED literal identity.
+            _cur = out.get(key)
+            if _cur is None or _is_tbd_marker(_cur):
+                out[key] = _lbl
     return out
 
 
@@ -28774,6 +28811,35 @@ def _selftest() -> int:
               f"table must be capped ≤4 (a real gap), NOT verified-out-of-scope "
               f"(got scored={_s8_pv.get('scored') if _s8_pv else None}, "
               f"cap={_s8_pv.get('score_cap') if _s8_pv else None})"); bad += 1
+    # ═══ S11 (council M5, 2026-07-20): BoM↔PCB identity reconcile — a part designed onto
+    # the PCB with a real MPN must NOT read "bespoke fabrication" in the BoM. ═══
+    _s11_state = {
+        "partVerifications": [
+            {"word_name": "Microcontroller Mcu", "word_id": "microcontroller_mcu",
+             "part_number": "TBD (detailed design)", "manufacturer": ""},   # deferred
+            {"word_name": "Analog Front End", "word_id": "afe",
+             "part_number": "AD8237", "manufacturer": "Analog Devices"},     # already resolved
+        ],
+        "pcb": {"pipeline": {"generator": {"components": [
+            {"nameHuman": "Microcontroller Mcu", "characterId": "microcontroller_mcu",
+             "partNumber": "ATSAMD21G18A-AU", "manufacturer": "Microchip Technology"},
+            {"nameHuman": "Analog Front End", "characterId": "afe",
+             "partNumber": "TBD", "manufacturer": ""},                       # PCB unresolved
+        ]}}},
+    }
+    _s11_map = _build_mpn_by_word(_s11_state)
+    _s11_mcu = _bom_row_mpn({"tag": "I-104", "requirement": "Microcontroller Mcu",
+                             "part": "requirement stated"}, _s11_map)
+    if "ATSAMD21G18A-AU" not in _s11_mcu:
+        print(f"  FAIL S11: a PCB-resolved MCU (ATSAMD21G18A-AU) must backfill the BoM MPN over "
+              f"a TBD partVerification, not read 'bespoke fabrication' (got {_s11_mcu!r})"); bad += 1
+    # proveNoFalsePositive: a part already RESOLVED in partVerifications is NOT overridden by
+    # a PCB TBD (the resolved literal identity wins).
+    _s11_afe = _bom_row_mpn({"tag": "I-1", "requirement": "Analog Front End",
+                             "part": "requirement stated"}, _s11_map)
+    if "AD8237" not in _s11_afe:
+        print(f"  FAIL S11: a partVerification-resolved part (AD8237) must NOT be overwritten "
+              f"by a PCB TBD (got {_s11_afe!r})"); bad += 1
     # ═══ S7 (2026-07-20): the multi-axis ship card + the vision axis bind ═══
     import tempfile as _tf7
     _CLEAN_ST = {"parsedBrief": {"constraints": {"unit_cost_ceiling": {"value": 385}}},
