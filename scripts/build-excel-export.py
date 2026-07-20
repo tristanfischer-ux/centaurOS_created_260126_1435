@@ -483,7 +483,12 @@ def _drawing_gate_failing(run_dir: str, *keys: str) -> Optional[bool]:
         d = drawings.get(k)
         if isinstance(d, dict):
             seen = True
-            if d.get("pass") is False:
+            # D2 (2026-07-20): a `skipped` card (out-of-scope drawing) also carries
+            # pass:false, but it is NOT a failure — only a genuine FAIL corroborates.
+            # New drawing-gates.json carries `status`; fall back to the old pass:false
+            # meaning for legacy files that predate the status field.
+            _status = d.get("status")
+            if _status == "fail" or (_status is None and d.get("pass") is False):
                 return True
     return False if seen else None
 

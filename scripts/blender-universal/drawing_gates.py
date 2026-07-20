@@ -1459,21 +1459,45 @@ GATE_STAGE = {
 }
 
 
-def scorecard(gates: list) -> dict:
+def scorecard(gates: list, state: Optional[dict] = None) -> dict:
     by_drawing: dict = {}
     for g in gates:
         for dwg in g.drawings:
             by_drawing.setdefault(dwg, []).append(g)
     cards = {}
+    n_skipped = 0
     for dwg, gl in sorted(by_drawing.items()):
         fails = [g for g in gl if not g.passed]
-        cards[dwg] = {"pass": not fails,
-                      "failing_gates": [{"gate": g.name, "severity": g.severity,
+        # D2 (2026-07-20): a drawing appears in the scorecard because a gate LISTS it,
+        # not because a gate VERIFIED it. A multi-drawing gate (e.g. part_coverage lists
+        # single-line-diagram + panel-schedule + pid) marks EVERY listed drawing pass:true
+        # when it passes — even ones OUT OF SCOPE for this product (a fluid-less handheld
+        # has no P&ID). A co-listed out-of-scope drawing was never actually inspected, so
+        # it must read `skipped`, never a green `pass` (and never a `fail` co-attached from
+        # a gate whose real subject is the in-scope drawing). Checked OOS-FIRST so the
+        # gate's real pass/fail verdict lands on its in-scope drawing(s); gate-level
+        # `all_pass` stays the backstop for any fail. With no state we cannot know the pack
+        # → assume in scope (back-compat for the unit harness). GUARD: only a genuine
+        # form-factor DRAWING (a `_STEM_TO_PACK_KEY` member) can be OOS-skipped — a
+        # co-listed pseudo-surface (`renders`, `line-velocity-schedule`) is scored
+        # regardless of the drawing pack and must keep its real pass/fail (else a genuine
+        # render/schedule defect would be laundered into `skipped`).
+        if (state is not None and dwg in _STEM_TO_PACK_KEY
+                and not _in_drawing_pack(state, dwg)):
+            status = "skipped"
+            n_skipped += 1
+        elif fails:
+            status = "fail"
+        else:
+            status = "pass"
+        cards[dwg] = {"pass": status == "pass", "status": status,
+                      "failing_gates": ([{"gate": g.name, "severity": g.severity,
                                           "stage": GATE_STAGE.get(g.name, "?"), "detail": g.detail}
-                                         for g in fails]}
+                                         for g in fails] if status == "fail" else [])}
     all_pass = all(g.passed for g in gates)
     return {"all_pass": all_pass, "n_gates": len(gates),
-            "n_failing": sum(1 for g in gates if not g.passed), "drawings": cards}
+            "n_failing": sum(1 for g in gates if not g.passed),
+            "n_drawings_skipped": n_skipped, "drawings": cards}
 
 
 def main(argv) -> int:
@@ -1484,9 +1508,15 @@ def main(argv) -> int:
         return _selftest()
     out_dir = argv[0]
     gates = run_gates(out_dir)
-    card = scorecard(gates)
+    _state = None
+    try:
+        _state = json.load(open(os.path.join(out_dir, "state.json")))
+    except Exception:  # noqa: BLE001
+        _state = None
+    card = scorecard(gates, _state)
     json.dump(card, open(os.path.join(out_dir, "drawing-gates.json"), "w"), indent=2)
     print(f"[drawing-gates] {card['n_gates']} gates · {card['n_failing']} failing · "
+          f"{card.get('n_drawings_skipped', 0)} drawing(s) skipped (out-of-scope) · "
           f"ALL-PASS={card['all_pass']}")
     for g in gates:
         mark = "✓" if g.passed else "✗"
@@ -2171,6 +2201,36 @@ def _selftest() -> int:
     chk("card_sld_fails", card["drawings"]["single-line-diagram"]["pass"] is False)
     chk("card_pid_passes", card["drawings"]["pid"]["pass"] is True)
     chk("card_routes_stage", card["drawings"]["single-line-diagram"]["failing_gates"][0]["stage"].startswith("draw-script"))
+
+    # D2 (2026-07-20): a co-listed OUT-OF-SCOPE drawing must read `skipped`, not a green
+    # `pass`. On an instrument the pack is {general-arrangement, interconnect}; a passing
+    # multi-drawing gate that co-lists single-line-diagram (OOS) must NOT mark it pass.
+    _inst = {"isInstrumentDevice": True, "product_class": "colorimeter",
+             "orchestratorContract": {"quantities": {}}}
+    gs_pass = [Gate("part_coverage", ["single-line-diagram", "general-arrangement"],
+                    "high", True, "all fed")]
+    c_inst = scorecard(gs_pass, _inst)
+    chk("d2_oos_sld_skipped", c_inst["drawings"]["single-line-diagram"]["status"] == "skipped")
+    chk("d2_oos_sld_not_pass", c_inst["drawings"]["single-line-diagram"]["pass"] is False)
+    chk("d2_inscope_ga_passes", c_inst["drawings"]["general-arrangement"]["status"] == "pass")
+    chk("d2_skipped_counted", c_inst["n_drawings_skipped"] == 1)
+    # a FAILING multi-drawing gate: the fail lands on the IN-SCOPE drawing; the OOS
+    # co-listee is skipped (not a false FAIL); gate-level all_pass still goes False.
+    gs_fail = [Gate("part_coverage", ["single-line-diagram", "general-arrangement"],
+                    "high", False, "GA part unfed")]
+    c_fail = scorecard(gs_fail, _inst)
+    chk("d2_fail_on_inscope_ga", c_fail["drawings"]["general-arrangement"]["status"] == "fail")
+    chk("d2_oos_sld_skipped_even_on_fail", c_fail["drawings"]["single-line-diagram"]["status"] == "skipped")
+    chk("d2_all_pass_false_backstop", c_fail["all_pass"] is False)
+    # no-state back-compat: OOS is unknown → assume in scope (the existing gs case above).
+    chk("d2_no_state_backcompat_pid_pass", scorecard(gs)["drawings"]["pid"]["status"] == "pass")
+    # PSEUDO-SURFACE GUARD: `renders` is scored regardless of the drawing pack — a FAILING
+    # render on an instrument must stay `fail`, NOT be laundered into `skipped` just because
+    # `renders` is not a form-factor drawing-pack key.
+    gs_render = [Gate("interior_fill", ["renders", "general-arrangement"], "high", False,
+                      "phenotype sprawl")]
+    c_render = scorecard(gs_render, _inst)
+    chk("d2_renders_pseudo_stays_fail", c_render["drawings"]["renders"]["status"] == "fail")
 
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
