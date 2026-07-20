@@ -840,6 +840,48 @@ _PIECE_OF_STOCK_RX = re.compile(
 _UNIT_BASIS_YIELD_MIN = 2
 _UNIT_BASIS_YIELD_MAX = 500
 
+# ── Part-type coherence (F3, 2026-07-20): an ACTIVE-MACHINE requirement must not be
+# pinned to a CONSUMABLE/stock SKU. The frozen organoid-bioreactor 2150 shipped
+# "P-101 Dosing Peristaltic Pump = Watson-Marlow TUB-SAN-6.4" at £20.74, status
+# IDENTIFIED — a length of sanitary tubing presented as a resolved pump (a chartered
+# engineer rejects it on sight). Universal, no per-class table: fires only when the
+# REQUIREMENT names an active machine/actuator AND the pinned PART identity is a
+# consumable stock noun (a pump's tubing, a valve's o-ring, a motor's coupling). ──
+_ACTIVE_MACHINE_RX = re.compile(
+    r"\b(pumps?|motors?|drives?|actuators?|solenoids?|valves?|fans?|blowers?|"
+    r"compressors?|mixers?|agitators?|stirrers?|impellers?|heaters?|peltiers?|"
+    r"chillers?|spindles?|gearbox(?:es)?|servos?|steppers?)\b", re.I)
+# consumable/stock SKU alpha-prefixes (e.g. Watson-Marlow TUB-SAN-6.4 -> "TUB"): a
+# generic stock-noun abbreviation lexicon, the SKU-prefix companion to _PIECE_OF_STOCK_RX.
+_CONSUMABLE_SKU_PREFIX = {
+    "tub", "tube", "hose", "hos", "seal", "gsk", "gskt", "gask", "oring", "orng",
+    "ferr", "grom", "grmt", "slv", "sleev", "clmp", "lbl", "tape", "film", "memb",
+    "filt", "crt", "gasket", "ptfe", "silic",
+}
+_SKU_PREFIX_RX = re.compile(r"^([A-Za-z]{2,6})[-_ ]")
+
+
+def _part_is_consumable_stock(part: str) -> bool:
+    """True when a pinned part identity reads as a consumable/stock item (tubing,
+    gasket, o-ring, sleeve, label …) rather than a machine — by stock-noun match
+    OR by a consumable SKU alpha-prefix."""
+    p = str(part or "")
+    if _PIECE_OF_STOCK_RX.search(p):
+        return True
+    # test every whitespace token for a consumable SKU alpha-prefix (mfr TUB-SAN-6.4)
+    for tok in p.split():
+        m = _SKU_PREFIX_RX.match(tok)
+        if m and m.group(1).lower() in _CONSUMABLE_SKU_PREFIX:
+            return True
+    return False
+
+
+def _part_is_placeholder(part: str) -> bool:
+    """Non-catalogue placeholders that carry no real SKU (never a mispin)."""
+    p = str(part or "").strip().lower()
+    return (not p) or p in ("requirement stated", "made to spec", "tbd", "not found",
+                            "—", "-", "n/a") or bool(re.match(r"^tbd\b", p))
+
 
 def _reconcile_unit_basis_gbp(word_name, bom_unit_price_gbp, distributor_best_gbp
                               ) -> Tuple[bool, Optional[int], Optional[str]]:
@@ -1891,6 +1933,57 @@ def _apply_cross_check_join(checks: List[Check], state: Optional[dict]) -> None:
             return
 
 
+def _checks_part_type_coherence(state: dict, run_dir: str) -> List[Check]:
+    """F3 (2026-07-20): every ACTIVE-MACHINE BoM line must be pinned to a MACHINE,
+    not a consumable/stock SKU. The frozen 2150 shipped a peristaltic PUMP pinned to
+    a sanitary-TUBING SKU (Watson-Marlow TUB-SAN-6.4, £20.74, IDENTIFIED) — a
+    slot-mispin a chartered engineer rejects on sight. Universal (no per-class
+    table): fires ONLY when the requirement noun is an active machine/actuator AND
+    the pinned part identity reads as a consumable (stock noun or consumable SKU
+    prefix). A consumable requirement legitimately pinned to a consumable (a 'Tubing
+    Set' -> tubing SKU) never fires because its requirement is not an active machine."""
+    out: List[Check] = []
+    rb = _requirements_bom(state)
+    if not rb:
+        return out
+    bad: List[str] = []
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or row.get("name") or "")
+        # skip connection/sub-component roll-up rows (they carry the ↳ prefix)
+        if req.startswith("↳"):
+            continue
+        part = str(row.get("part") or "")
+        # the requirement must be an active machine, and NOT itself a consumable
+        if not _ACTIVE_MACHINE_RX.search(req):
+            continue
+        if _PIECE_OF_STOCK_RX.search(req):
+            continue
+        if _part_is_placeholder(part):
+            continue
+        if _part_is_consumable_stock(part):
+            tag = str(row.get("tag") or "").strip()
+            bad.append(f"{tag + ' ' if tag else ''}{req.strip()} = {part.strip()}")
+    n = len(bad)
+    out.append(Check(
+        name="Part-type coherence: no active machine pinned to a consumable SKU",
+        category="CONSISTENCY", relation="le",
+        status=PASS if n == 0 else FAIL,
+        actual=float(n), expected=0.0, tol=0.0, unit="lines",
+        producer="consistency:part_type_coherence",
+        detail=(f"{n} BoM line(s) pin an active machine/actuator to a consumable or "
+                f"stock SKU (a pump to its tubing, a valve to its o-ring) — the line "
+                f"names a machine but the part is a length of stock, so the requirement "
+                f"is NOT actually fulfilled and the price is consumable-tier. "
+                + (f"e.g. {bad[0]}." if bad else "Every active machine is pinned to a "
+                   "machine.")
+                + " Fix at part resolution (re-resolve the machine's own MPN, not its "
+                  "consumable), never by relabelling the line."),
+    ))
+    return out
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -1901,6 +1994,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
         return []
     checks: List[Check] = []
     checks.extend(_checks_consistency(state, run_dir))
+    checks.extend(_checks_part_type_coherence(state, run_dir))
     checks.extend(_checks_adequacy(state, run_dir))
     checks.extend(_checks_balance(state, run_dir))
     checks.extend(_checks_cost(state, run_dir))
@@ -2043,6 +2137,30 @@ def _selftest() -> int:
     pcs = _checks_module_integrity(populated_state, "")
     check(len(pcs) == 1 and pcs[0].status == PASS,
           f"HOLLOW-MODULE: an all-populated decomposition must PASS; got {[c.status for c in pcs]}")
+
+    # ---- PART-TYPE COHERENCE (F3, 2026-07-20): an active machine pinned to a consumable
+    #      SKU FAILs (the frozen 2150 pump = TUB-SAN-6.4 tubing); a machine pinned to a real
+    #      machine SKU, and a consumable requirement pinned to a consumable, both PASS. ----
+    mispin_state = {"requirementsBom": [
+        {"tag": "P-101", "requirement": "Dosing Peristaltic Pump",
+         "part": "Watson-Marlow TUB-SAN-6.4", "status": "IDENTIFIED", "line_gbp": 20.74},
+    ]}
+    mpc = _checks_part_type_coherence(mispin_state, "")
+    check(len(mpc) == 1 and mpc[0].status == FAIL and mpc[0].actual == 1.0,
+          f"PART-TYPE: a pump pinned to a tubing SKU must FAIL count 1; "
+          f"got {[(c.status, c.actual) for c in mpc]}")
+    ok_machine = {"requirementsBom": [
+        {"tag": "P-1", "requirement": "Dosing Peristaltic Pump",
+         "part": "Watson-Marlow 630Du", "status": "IDENTIFIED"},          # real pump SKU
+        {"tag": "X-104", "requirement": "Media Tubing Set",
+         "part": "Watson-Marlow TUB-SAN-6.4", "status": "IDENTIFIED"},     # consumable→consumable
+        {"tag": "V-101", "requirement": "Culture Vessel",
+         "part": "made to spec", "status": "BESPOKE"},                     # placeholder
+    ]}
+    okc = _checks_part_type_coherence(ok_machine, "")
+    check(len(okc) == 1 and okc[0].status == PASS,
+          f"PART-TYPE: real-pump-SKU + consumable-req + placeholder must PASS; "
+          f"got {[(c.status, c.actual) for c in okc]}")
 
     # ---- DEFECTIVE run: each family must trip exactly its own FAIL ----
     bad_state = {
