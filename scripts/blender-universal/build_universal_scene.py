@@ -12544,6 +12544,11 @@ def _sealed_enclosure_env_mm(state, quantities):
     if _IS_INSTRUMENT_DEVICE and not _flag:
         print(f"[univ][sealed] isInstrumentDevice derived from enclosure "
               f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
+    # F1e (2026-07-20): tell the connection sizer this is a device so a no-flow
+    # fluid edge defaults to lab micro-tubing, not a plant DN25 process pipe.
+    _set_dsi = getattr(cs, "set_device_scale_interconnect", None)
+    if callable(_set_dsi):
+        _set_dsi(_IS_INSTRUMENT_DEVICE)
     # FLOW: form gate lives in instrument_form_grammar — class + part vocab,
     # never a product-noun branch (see ifg.is_thermocycler_form proveCatch).
     _IS_THERMOCYCLER_FORM = ifg.is_thermocycler_form(

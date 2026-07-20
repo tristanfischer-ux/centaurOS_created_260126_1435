@@ -318,6 +318,32 @@ GAS_VELOCITY_LIMIT_MS = 30.0       # gas erosion limit (API RP 14E ballpark)
 STEAM_VELOCITY_LIMIT_MS = 45.0     # steam line erosion ceiling
 
 
+# ── DEVICE-SCALE INTERCONNECT (F1e 2026-07-20, organoid-bioreactor DN25 leak) ──
+# A benchtop instrument's fluid edges have NO flow demand authored on them, so
+# size_connection's HONEST-UNKNOWN branch fell back to a NOMINAL DN25 (26.6 mm OD
+# carbon-steel/HDPE process pipe with flanged ends at £28/m) "for CAD continuity"
+# — plant plumbing on a 20 mL / 35 W device (the 2150 schedule carried ~15 DN25
+# runs of 2–5 m). On a device-scale product the right CAD-continuity default is
+# lab MICRO-TUBING (silicone / PTFE, ~6 mm OD, barbed push-fit ends), not a DN25
+# flanged pipe. The flag is set once from the chain's isInstrumentDevice signal
+# (build_universal_scene.set_device_scale_interconnect) before any edge is sized.
+# Universal — keyed on the device signal, no per-class table.
+_DEVICE_SCALE_INTERCONNECT = False
+# Nominal lab micro-tubing: 6 mm OD (a common ~4 mm ID / 6 mm OD silicone/PTFE
+# bore), a barbed/push-fit termination pair, and a device-scale £/m.
+MICRO_TUBING_OD_MM = 6.0
+MICRO_TUBING_GBP_PER_M = 3.5           # silicone / PTFE lab tubing, UK-2026 order-of-magnitude
+MICRO_TUBING_TERMINATION_GBP = 2.5     # a barbed / push-fit connector per end
+
+
+def set_device_scale_interconnect(is_device_scale: bool) -> None:
+    """Set the module-level device-scale interconnect flag (F1e). Called from
+    build_universal_scene when the chain's isInstrumentDevice signal is true, so a
+    no-flow fluid edge defaults to lab micro-tubing instead of a plant DN25 pipe."""
+    global _DEVICE_SCALE_INTERCONNECT
+    _DEVICE_SCALE_INTERCONNECT = bool(is_device_scale)
+
+
 # ===========================================================================
 # 1b. COST MODEL — supply+install unit-cost ladders for the distribution BoM.
 #
@@ -1640,20 +1666,40 @@ def size_connection(edge: dict, length_m: float,
             # (build_universal_scene counts `is False`; draw_panel_schedule renders None
             # as "—"; size_connection_to_spec returns immediately on not-False).
             # A nominal DN25 keeps CAD continuity (same idiom as material_compatibility).
-            spec = _spec(
-                kind="pipe", mechanism=mechanism or "fluid_loop",
-                carried_rating=None, carried_unit=None,
-                size_label="DN25 (nominal — flow unknown)",
-                outer_dia_mm=PIPE_DN_OD["DN25"],
-                drop_pct_or_velocity=None, within_spec=None,
-                spec_limit=f"≤{LIQUID_VELOCITY_LIMIT_MS:g} m/s velocity (UNVERIFIED — no flow demand)",
-                material_qty_desc=f"DN25 nominal pipe, {length_m:.1f} m (flow unknown)",
-                tool_used="(no flow demand — NOT sized)",
-                assumptions=["fluid edge carries no required_value flow demand; the pipe "
-                             "cannot be sized and velocity / within-spec are UNVERIFIED "
-                             "(fix at source: author the flow demand on the topology edge)"],
-                notes="no flow demand on this edge — velocity UNVERIFIED; nominal DN25 for CAD continuity",
-            )
+            # DEVICE-SCALE (F1e 2026-07-20): on a benchtop instrument the CAD-continuity
+            # default is lab MICRO-TUBING (~6 mm OD silicone/PTFE, push-fit ends), NOT a
+            # DN25 flanged process pipe — a 20 mL device has no DN25 plumbing. Same
+            # HONEST-UNKNOWN verdict (within_spec=None), just a device-scale nominal.
+            if _DEVICE_SCALE_INTERCONNECT:
+                spec = _spec(
+                    kind="tube", mechanism=mechanism or "fluid_loop",
+                    carried_rating=None, carried_unit=None,
+                    size_label=f"{MICRO_TUBING_OD_MM:g} mm OD micro-tubing (nominal — flow unknown)",
+                    outer_dia_mm=MICRO_TUBING_OD_MM,
+                    drop_pct_or_velocity=None, within_spec=None,
+                    spec_limit=f"≤{LIQUID_VELOCITY_LIMIT_MS:g} m/s velocity (UNVERIFIED — no flow demand)",
+                    material_qty_desc=f"{MICRO_TUBING_OD_MM:g} mm OD micro-tubing, {length_m:.1f} m (flow unknown)",
+                    tool_used="(no flow demand — NOT sized)",
+                    assumptions=["fluid edge carries no required_value flow demand; the tube "
+                                 "cannot be sized and velocity / within-spec are UNVERIFIED "
+                                 "(fix at source: author the flow demand on the topology edge)"],
+                    notes="no flow demand on this edge — velocity UNVERIFIED; nominal lab micro-tubing for CAD continuity (device-scale)",
+                )
+            else:
+                spec = _spec(
+                    kind="pipe", mechanism=mechanism or "fluid_loop",
+                    carried_rating=None, carried_unit=None,
+                    size_label="DN25 (nominal — flow unknown)",
+                    outer_dia_mm=PIPE_DN_OD["DN25"],
+                    drop_pct_or_velocity=None, within_spec=None,
+                    spec_limit=f"≤{LIQUID_VELOCITY_LIMIT_MS:g} m/s velocity (UNVERIFIED — no flow demand)",
+                    material_qty_desc=f"DN25 nominal pipe, {length_m:.1f} m (flow unknown)",
+                    tool_used="(no flow demand — NOT sized)",
+                    assumptions=["fluid edge carries no required_value flow demand; the pipe "
+                                 "cannot be sized and velocity / within-spec are UNVERIFIED "
+                                 "(fix at source: author the flow demand on the topology edge)"],
+                    notes="no flow demand on this edge — velocity UNVERIFIED; nominal DN25 for CAD continuity",
+                )
 
     elif ck in ("voltage_rating",):
         # A voltage-only edge: render as a thin signal/HV-sense lead — no
@@ -1710,18 +1756,34 @@ def size_connection(edge: dict, length_m: float,
         # Pure compatibility constraint — no quantity to size. Render as the
         # generic process pipe at a nominal small size (it still connects two
         # parts in the CAD) and flag that it's compatibility-only.
-        spec = _spec(
-            kind="pipe", mechanism=mechanism or "fluid_loop",
-            carried_rating=None, carried_unit=None,
-            size_label="DN25 (nominal)", outer_dia_mm=PIPE_DN_OD["DN25"],
-            drop_pct_or_velocity=None, within_spec=True,
-            spec_limit=edge.get("material_context") or "material compatibility",
-            material_qty_desc=f"DN25 nominal connection, {length_m:.1f} m",
-            tool_used="(material_compatibility — no quantity)",
-            assumptions=["material_compatibility edge carries no rated quantity; "
-                         "drawn at a nominal DN25 so the parts stay connected"],
-            notes="compatibility-only edge — nominal pipe",
-        )
+        # DEVICE-SCALE (F1e): lab micro-tubing, not a DN25 process pipe.
+        if _DEVICE_SCALE_INTERCONNECT:
+            spec = _spec(
+                kind="tube", mechanism=mechanism or "fluid_loop",
+                carried_rating=None, carried_unit=None,
+                size_label=f"{MICRO_TUBING_OD_MM:g} mm OD micro-tubing (nominal)",
+                outer_dia_mm=MICRO_TUBING_OD_MM,
+                drop_pct_or_velocity=None, within_spec=True,
+                spec_limit=edge.get("material_context") or "material compatibility",
+                material_qty_desc=f"{MICRO_TUBING_OD_MM:g} mm OD micro-tubing, {length_m:.1f} m",
+                tool_used="(material_compatibility — no quantity)",
+                assumptions=["material_compatibility edge carries no rated quantity; "
+                             "drawn at nominal lab micro-tubing so the parts stay connected (device-scale)"],
+                notes="compatibility-only edge — nominal micro-tubing (device-scale)",
+            )
+        else:
+            spec = _spec(
+                kind="pipe", mechanism=mechanism or "fluid_loop",
+                carried_rating=None, carried_unit=None,
+                size_label="DN25 (nominal)", outer_dia_mm=PIPE_DN_OD["DN25"],
+                drop_pct_or_velocity=None, within_spec=True,
+                spec_limit=edge.get("material_context") or "material compatibility",
+                material_qty_desc=f"DN25 nominal connection, {length_m:.1f} m",
+                tool_used="(material_compatibility — no quantity)",
+                assumptions=["material_compatibility edge carries no rated quantity; "
+                             "drawn at a nominal DN25 so the parts stay connected"],
+                notes="compatibility-only edge — nominal pipe",
+            )
 
     else:
         # Unknown constraint_kind: be explicit rather than fabricate a size.
