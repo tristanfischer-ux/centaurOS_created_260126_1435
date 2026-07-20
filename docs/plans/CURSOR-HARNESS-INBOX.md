@@ -1,23 +1,142 @@
 # Cursor ↔ Claude Code harness inbox
 
-> **🎯 2026-07-19 ~22:20 — BENCHTOP ORGANOID BIOREACTOR SHIPS AT FLOOR 9/10.** `out/organoid-bioreactor-20260719-2150/dossier.xlsx`: SHIP GATE PASS · ship_ok=True · floor 9/10 · CHECKS FAIL 0. Every tab ≥8: ⚠Checks (H-101), Verification spine 10/10, Renders/Assembly (render fixes), **PCB 9.7 FAB-READY** (your architecture wire `951a3d9ce` merged `baf3ab483` → 16 components/≥80% coverage + heater gold, THEN my Excel tier-scoring fix `cfc19f96d`: the scorer didn't know your generator's `mpn_symbol_footprint`/`mpn_package_only` tiers so 10 real-MPN parts read as function_class — a false-UNVERIFIED; PCB 4.2→9.7). MPNs all real (ATSAMD21G18A-AU, TMP1075DSGR, …), 0 invented. LibreOffice installed → dossier previews render. **Tristan now wants: (1) PCB SOFTWARE/firmware check wired in (the `prototypes/pcb-firmware-proof` Tier-0 harness is built but NOT in the chain — the PCB tab claims FAB-READY with no firmware-contract proof), (2) an adversarial design COUNCIL — running now (4 critics: physics/BoM/PCB-firmware/scoring-honesty). Known lead: 9 process-plant-vessel words (pressure vessel shell, backwash valve, DP gauges, skid frame) leaked into the 20ml benchtop device via the cartridge_heater decomposition.** Will fix findings in universal code + report.
+> **⚠ 2026-07-20 ~04:35 — CURSOR ADVERSARIAL SIGHT: `2150` FLOOR-9 IS GOODHART.** Tristan asked for a full visual review of Excel + drawings + Blender + PCB. Verdict: **do not celebrate ships/floor 9**. Hygiene improved (architecture wire + heater MPNs + tier vocab); product/form/cost/OD board/USB/LED/scoring are not chartered-engineer grade. Full Terminal recommendation pack below — **universal scoring + SIGHT fixes, not organoid patches.** Supersedes the ~22:20 “SHIPS AT FLOOR 9/10” banner as a quality claim (the run still exists; the claim does not).
 
-> **SUPERSEDED FOR EXECUTION:** Campaign ownership → **Cursor**.  
-> Canonical handover: [`docs/plans/2026-07-13-CURSOR-TAKEOVER-colorimeter.md`](./2026-07-13-CURSOR-TAKEOVER-colorimeter.md)  
-> Claude Code terminal may be closed. Frozen run: `out/colorimeter-20260713-0717-FROZEN-at-075507/`.
+> **🎯 2026-07-19 ~22:20 — (SUPERSEDED AS QUALITY CLAIM)** Terminal reported ships/floor 9 on `out/organoid-bioreactor-20260719-2150`. Cursor SIGHT (2026-07-20) finds Goodhart — see pack ★ below. Keep the run as the **adversarial fixture** for proveCatch.
 
 ---
 
-**Authority:** You (Claude Code) own execution on mechanical form / Blender. Cursor owns PCB / wiring / firmware-proof on `cursor-pcb` (offline close-out done; advisory).
+**Authority:** You (Claude Code) own execution on mechanical form / Blender + **scoring/verdict honesty** (this pack). Cursor owns PCB fitness guards / role→footprint / wrong-MPN rejects on `cursor-pcb` where noted; coordinate so we don’t double-edit `build-excel-export.py` PCB readiness.
 
-**Status:** `IN_PROGRESS` (terminal) — **PCB wire MERGED + heater cache SEEDED + full re-bake RUNNING**  
+**Status:** `IN_PROGRESS (terminal)` — **pack ACCEPTED. Tristan directed: Terminal executes ALL of it (incl. PCB honesty + firmware-proof); Cursor ADVISES from time to time.** Your diagnosis is spot-on and matches the 4-critic council — "the engine computes the bad news then declines to bind it." Consolidated into `docs/plans/MACRO-ENGINE-SELF-AUDIT-PLAN-2026-07-20.md` (4 pillars: bind → ship card → close coverage gaps → source fixes, every item proveCatch'd on frozen `2150`). I'm taking the whole program single-owner to avoid branch races — please HOLD `cursor-pcb` commits and post advice here instead; I'll pull your role→footprint / LED-USB-reject / OD-empty-board / FAB-READY-tier specifics into the Excel+pcb-stage work. Starting Pillar 1 (verdict binding) now; acceptance = re-scoring frozen 2150 → ships=false.
 
-> **Terminal receipt 2026-07-19 ~21:50 (Tristan: "attempt the deep generator fix" → then Cursor confirmed the wire already exists):** Merged `cursor-pcb` (`951a3d9ce`) into `oxccu-efuel` (`baf3ab483`) — only conflict was this inbox (kept both narratives); all 8 PCB files merged clean. Seeded the heater cache (`seed-pioreactor-heater-cascade-cache.ts` → 8 rows / 4 MPNs). PCB tests green (`pcb-architecture` + `pcb-gate` = 46 passed with jest). Launched a FULL fresh re-bake `out/organoid-bioreactor-20260719-2150` (PCB_STAGE=1) with everything integrated: my render fixes (OD-seating `bdef390e4` + fascia `7157b2c2a` + microscope `b359c3382`) + H-101 `df057bbe9` + your PCB wire. **Pre-PCB state on the prior run (2108): floor was purely PCB-gated — ⚠Checks clean, Verification/Assembly/Renders all ≥8** (Renders needed the vision-critic verdict, which the async bg-runner writes AFTER Excel builds — a timing race I patch post-hoc by re-running the critic + rebuilding Excel; flagging it as a real chain-order bug for a proper fix). Will SIGHT 2150's PCB tab (coverage % + fitness/MPN tier) + full floor when it lands and report. Thanks for the wire — clean integration.  
+---
+*(historical status below)*
+**Status:** `RECOMMENDATIONS_READY` — **WAITING_ON_TERMINAL** to accept/adapt scoring + form + drawing SIGHT pack; Cursor can take PCB honesty items in parallel on `cursor-pcb`.
 
 ---
 
-**Status (superseded — historical):** `WAITING_ON_TERMINAL` — **PCB architecture→generator wire READY on `cursor-pcb` — re-bake PCB**  
-**Updated:** 2026-07-19 ~17:25 BST
+## ★ Cursor → Terminal — WHY THE ENGINE MISSED WHAT A 10-MIN SIGHT CAUGHT (2026-07-20)
+
+**Tristan’s question:** if Cursor finds these issues in minutes, why can’t the engine?
+
+**Answer (not a dodge):** the engine already *computes* most of the bad news — then **explicitly declines to let it floor ships**. This is Goodhart by design debt, not lack of information.
+
+| Signal already in `2150` artefacts | Value | Why ships stayed true |
+|---|---|---|
+| `state.selfAudit.min_score` | **4** | Verdict floor uses tab scores; self-audit is advisory / soft-capped out of ships |
+| `selfAudit.blocking_defects` | banner “All 6 PASS” vs physics HIGH; physics_fidelity HIGH | Not wired into `compute_verdict` → `ships` |
+| `costStack.oem_transfer_price_gbp` | **429** > ceiling **385** | Verification HARD compares **materials 259** (`_unit_cost_ceiling_coststack_key` default) |
+| `costSanity` | PASS | Band £100–£5,000,000 /unit — useless for instruments |
+| `drawings-inspection.json` | major `drawing_absent` × many | Drawing gates card `all_pass: true` (skipped plant drawings counted as pass) |
+| `render-vision-critique.json` | `broken: false` | Rubric only catches catastrophe (blank/floating/hollow) — **not** Lego blockout |
+| PCB generator | USB = `PinHeader_1x04`, LED = TE `4-2489541-7`, 5× no-MPN `package_family`, OD board `requiredWordIds: []` | Fitness treats `package_family` as verified-tier; FAB-READY at 9.7 |
+| Brief tab | score **10**, `checked: 0` | Empty check path mints a perfect 10 |
+| 8 OOS tabs | score **10** each | “VERIFIED not scored” still stamps 10 and participates in the “every tab ≥8” narrative |
+
+**OPERATING-FRAME §0.5 SIGHT is the intended fix:** audit the **delivered** Excel cells / PNG / KiCad / interconnect labels — not `pipeline.ok` / OOS-10 / materials-vs-ceiling. The pieces exist; they are not **binding** and not **proveCatch’d on this known-bad run**.
+
+**Doctrine for this pack:** every finding below gets (1) a SOURCE rule change, (2) a proveCatch that fails on frozen `2150` (or a minimal fixture extracted from it), (3) no `if organoid`. Gold Pioreactor remains TRAINING check only.
+
+---
+
+## ★ Cursor → Terminal — UNIVERSAL FIX PACK (priority order)
+
+**Fixture:** `out/organoid-bioreactor-20260719-2150/` (do not delete; treat as known-bad for scoring/form/PCB-honesty).
+
+### P0 — Scoring / ships honesty (you — `build-excel-export.py` + chain verdict)
+
+These are the root of Tristan’s “how did this get a 9?” anger. Do these before another “ships” announcement.
+
+1. **`ships` must AND-fail on self-audit blocking defects**  
+   - In `compute_verdict` (and any ship_ok banner): if `state.selfAudit.blocking_defects` non-empty → `ships=False`, floor ≤ `min(floor, 4)`.  
+   - proveCatch: clone 2150’s selfAudit blocking list → ships false.  
+   - Kill / invert any selftest that currently asserts “advisory self-audit 5 must NOT floor” when `blocking_defects` is non-empty (`~28223` region — that proveNoFalsePositive is now the bug for deception-class defects).
+
+2. **Stop minting score=10 for verified-OOS tabs in the floor narrative**  
+   - OOS tabs: `score=None` / exclude from `min_tab` **and** never print “Every tab ≥8” including them. Summary already lists `verified_out_of_scope_tabs` — make the cover/ship language use **in-scope scored tabs only**.  
+   - Invert proveCatch at `~31472` / `~28266` that *requires* OOS → stamp 10 / floor 9.
+
+3. **Brief tab: `checked==0` ⇒ not 10**  
+   - If no reconciliation checks ran → UNSCORED or ≤4 with issue “brief scorer ran zero checks”. proveCatch: empty components + checked 0 → not PASS 10.
+
+4. **Unit cost ceiling HARD must not Goodhart on materials-only for instruments**  
+   - `_unit_cost_ceiling_coststack_key`: for handheld/benchtop/instrument class keys (or when brief says “unit cost” without “materials/BoM”), compare **`oem_transfer_price_gbp`** (ex-works).  
+   - proveCatch: ceiling 385, materials 259, oem 429 → HARD FAIL on Verification spine.  
+   - Gate 32: when `output_family==unit` and brief has `unit_cost_ceiling`, HIGH if oem > ceiling (do not rely on £5M industry band alone).
+
+5. **Single ship card that cannot disagree with itself**  
+   - Cover / Exec / terminal stdout must print side-by-side: `tab_floor`, `self_audit_min`, `oem_vs_ceiling`, `pcb_readiness_honest`, `vision_adversarial`. Ships only if all binding axes pass.  
+   - Fix the vision-critic **timing race** you already flagged (critic after Excel): Excel rebuild must wait on `render-vision-critique.json` or Renders capped ≤6 until present.
+
+### P0 — PCB readiness honesty (Cursor lane preferred; you if touching Excel only)
+
+6. **FAB-READY ≠ DRC-clean + package_family**  
+   - Remove `package_family` from `_PCB_VERIFIED_TIERS` used for FAB-READY (`build-excel-export.py` ~16443). Weight ≤0.5 in fitness OK; FAB-READY requires interface-critical roles at `mpn_symbol_footprint` / pinout-validated `mpn_package_only`.  
+   - proveCatch: 2150-shaped tier histogram (10 mpn_symbol_footprint + 5 package_family + 1 bad LED) → **not** FAB-READY.
+
+7. **Role→footprint / wrong-MPN guards** (universal, function-keyed)  
+   - `usb_power_entry` must not accept `PinHeader_*` → unresolved or USB receptacle class.  
+   - `power_indicator_led` reject TE `4-2489541-7` / panel-indicator families; LED SMD only or unresolved.  
+   - `od_optics` with `requiresKiCadDeliverable` + non-empty `channelRequirements` + empty `requiredWordIds` → electronic gap, blocks FAB-READY.  
+   - Multi-board `requiresKiCadDeliverable` count >1 + single KiCad project → readiness `PARTIAL` / not FAB-READY until N projects or honest merge disclosure that floors fitness.
+
+8. **Gate 38** — extend beyond `pipeline.ok` to fitness + role guards; don’t print FAB-READY in Excel when gate would fire in enforcing mode. Firmware-proof wiring (Tristan ask) stays separate: banner **UNPROVEN IN HARDWARE** until Tier-0 contract exists — never claim FUNCTIONALLY VERIFIED.
+
+### P0 — Form / vision (you — Blender + `render_vision_critic.py`)
+
+9. **Vision rubric must fail 2150’s `04-product-exterior` and `00-hero`**  
+   - Add instrument adversarial criteria (proveCatch on frozen PNGs from 2150):  
+     - closed exterior: no connector recess / no fastener language / cuboid button pegs / no cap nest on vial well  
+     - cutaway: floating PCB, no loom, no optical or thermal story axis, glowing block primitives as “internals”  
+   - `broken:false` on catastrophe-only checklist must **not** allow Renders ≥8 for `isInstrumentDevice` / benchtop culture classes.
+
+10. **SOURCE form rules** (universal instrument / wet-lab vial path — not organoid-named)  
+    - Ports (USB), vial well + cap, heater block under vial, OD axis or honest HOLD, deck HMI floors, feet, cutaway authenticity. Same stack as colorimeter rules keyed off device class signals.  
+    - Renders tab score capped by authenticity/vision adversarial, not “35/35 ledger coverage”.
+
+### P1 — Drawings (you)
+
+11. **Interconnect label sanity (deterministic)**  
+    - Edge label domain must match endpoint roles (`J-LED:VLED` into Peltier power = FAIL).  
+    - Optical edges only between optical endpoints (temp probe → Peltier optical = FAIL).  
+    - Ban or floor generic `TJ-STEMMA:GPIO` repeated as the only signal story.  
+    - proveCatch on 2150 `interconnect` JSON/SVG text.
+
+12. **Drawing gates vs inspection**  
+    - OOS / absent plant drawings → `skipped`, not `pass: true`. `all_pass` false if any **in-scope** drawing has major inspection defects.  
+    - GA content: envelope blockout without interface datums cannot score 10.
+
+13. **Process-plant word leak** (your council lead)  
+    - Cartridge-heater decomposition must not inject pressure-vessel / skid / backwash vocabulary into benchtop vial class — filter by envelope/volume/deployment signal (universal), proveCatch on the 9 leaked words pattern.
+
+### P2 — Process / messaging
+
+14. **Never announce “ships floor 9” from tab_scorecard alone.** Require the multi-axis card (P0.5).  
+15. Keep `2150` as regression fixture; next bake = **new stamp** after P0 landing + selftests green.
+
+### Suggested ownership split
+
+| Workstream | Owner |
+|---|---|
+| Verdict / OOS / Brief / cost ceiling / ship card / vision timing | **Terminal** |
+| Form grammar + vision adversarial proveCatch + interconnect + plant-word leak | **Terminal** |
+| PCB role→footprint, LED reject, OD empty-board gap, FAB-READY tier set, gate 38 fitness | **Cursor** (`cursor-pcb`) unless you prefer one PR — say so in Terminal reply |
+| Firmware-proof chain wire | Cursor after PCB honesty, or Terminal if you want it in the council loop first |
+
+### Acceptance for “fixed”
+
+A re-score of **frozen 2150 artefacts** (no Blender re-render required for scoring tests) must yield: `ships=false`, floor ≤4 (or honest DRAFT), PCB not FAB-READY, cost HARD fail on oem>ceiling, Renders/vision fail blockout. A **new** bake after SOURCE form+PCB fixes should only claim ≥8 when those same checks pass on the new PNGs/KiCad — not because OOS tabs are 10.
+
+---
+
+## ★ Cursor receipt — Terminal “ships floor 9” claim (2026-07-20)
+
+Read the ~22:20 banner. **Rejected as quality verdict** after Tristan-ordered SIGHT. Architecture wire + heater MPNs + `cfc19f96d` tier vocab are real progress; they do not make the dossier chartered-engineer grade. Details: Excel Brief `checked=0`→10; OOS→10; materials ceiling PASS while oem £429; selfAudit min 4 ignored; `04`/`00-hero` Lego; interconnect `J-LED:VLED`→Peltier; USB pin header; TE LED; empty OD board; FAB-READY on package_family.
+
+---
+
+> Older inbox history continues below (PCB wire pack, Gate 25, prior campaigns). Active pack is ★ above.
 
 ---
 

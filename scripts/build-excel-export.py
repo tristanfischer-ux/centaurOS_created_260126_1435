@@ -2028,6 +2028,41 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
               f"{[f.get('code') for f in _ff_findings]}")
         if floor is None or floor > 4.0:
             floor = 4.0
+    # ── MACRO SELF-AUDIT BINDING (2026-07-20, Pillar 1) ──────────────────────
+    # The engine COMPUTED the bad news for organoid-bioreactor-2150 (self-audit
+    # min 4 + blocking_defects, a 9-word process-plant leak on a device-scale box)
+    # then let SHIPS stay true because these signals were advisory. That is the
+    # Goodhart-by-design-debt Tristan flagged: "if the council finds it in minutes,
+    # why can't the engine?" — it did find it, it just didn't BIND it. These blocks
+    # make the existing detectors floor the verdict. UNIVERSAL (state fields, no
+    # per-class table). proveCatch on the frozen 2150 state in _selftest.
+    if isinstance(state, dict):
+        _sa = state.get("selfAudit")
+        _bd = (_sa.get("blocking_defects") if isinstance(_sa, dict) else None) or []
+        if isinstance(_bd, list) and len(_bd) > 0:
+            ships = False
+            open_n = max(open_n, len(_bd))
+            if floor is None or floor > 4.0:
+                floor = 4.0
+            print(f"  ! self-audit blocking_defects blocked SHIPS ({len(_bd)}): "
+                  f"{[str(d)[:70] for d in _bd[:2]]}")
+        # Process-plant vocabulary emitted onto a DEVICE-SCALE product (the
+        # pressure-vessel/backwash/skid words leaked onto a 20 ml benchtop box):
+        # a physical-scale impossibility the coherence audit already detected but
+        # only flagged. Block when the design is device-scale AND carries any
+        # process_plant_vessel marker.
+        _wdc = state.get("wordDomainCoherence")
+        if isinstance(_wdc, dict) and _wdc.get("is_device_scale") is True:
+            _plant = [f for f in (_wdc.get("flagged") or [])
+                      if str((f or {}).get("marker_family")) == "process_plant_vessel"]
+            if _plant:
+                ships = False
+                open_n = max(open_n, len(_plant))
+                if floor is None or floor > 4.0:
+                    floor = 4.0
+                print(f"  ! process-plant word leak on a DEVICE-SCALE product blocked "
+                      f"SHIPS ({len(_plant)} words: "
+                      f"{[f.get('name') for f in _plant[:3]]})")
     return {"floor": floor, "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
@@ -28282,6 +28317,42 @@ def _selftest() -> int:
         print(f"  FAIL verified-out-of-scope: the DUTY branch (real HVAC content, normally "
               f"scored) must floor exactly like any other tab, unaffected by the mechanism's "
               f"existence (got {_duty_v})"); bad += 1
+    # ═══ MACRO SELF-AUDIT BINDING (2026-07-20, Pillar 1) — the engine must REFUSE a
+    # dossier whose own detectors flagged it, even when every TAB scores ≥8. Frozen
+    # organoid-bioreactor-2150 shape: all tabs ≥8 but selfAudit.blocking_defects
+    # non-empty AND a 9-word process_plant_vessel leak on a device-scale product. ═══
+    _bind_tabs = {"Overview": {"score": 9, "status": "PASS"},
+                  "PCB": {"score": 9, "status": "PASS"}}
+    _sa_block_v = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "selfAudit": {"blocking_defects": ["[brief_compliance] banner PASS vs physics HIGH",
+                                            "[physics_fidelity] 2 HIGH wrong-class parts"]}},
+        _bind_tabs)
+    if _sa_block_v["ships"] or (_sa_block_v["floor"] or 99) > 4.0:
+        print(f"  FAIL macro-binding: selfAudit.blocking_defects non-empty must block SHIPS "
+              f"and floor ≤4 even with every tab ≥8 (got {_sa_block_v})"); bad += 1
+    _plant_leak_v = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "wordDomainCoherence": {"verdict": "flagged", "is_device_scale": True,
+                                 "is_process_plant_class": True,
+                                 "flagged": [{"name": "Pressure Vessel Shell",
+                                              "marker_family": "process_plant_vessel"},
+                                             {"name": "Backwash / Service Valve Nest",
+                                              "marker_family": "process_plant_vessel"}]}},
+        _bind_tabs)
+    if _plant_leak_v["ships"] or (_plant_leak_v["floor"] or 99) > 4.0:
+        print(f"  FAIL macro-binding: process_plant_vessel words on a device-scale product "
+              f"must block SHIPS and floor ≤4 (got {_plant_leak_v})"); bad += 1
+    # proveNoFalsePositive: a CLEAN state (no blocking_defects; coherence not device-scale
+    # OR no plant markers) with every tab ≥8 must still SHIP — the binding must not over-fire.
+    _clean_bind_v = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]},
+         "selfAudit": {"blocking_defects": []},
+         "wordDomainCoherence": {"verdict": "clean", "is_device_scale": True, "flagged": []}},
+        _bind_tabs)
+    if not _clean_bind_v["ships"] or _clean_bind_v["floor"] != 9:
+        print(f"  FAIL macro-binding proveNoFalsePositive: a clean state (empty blocking_defects, "
+              f"no plant leak) with tabs ≥8 must still SHIP at floor 9 (got {_clean_bind_v})"); bad += 1
     # ═══ (11) MARKDOWN EMPHASIS never renders as literal text (fix 4) ═══
     if clean_cell("**TOTALS**") != "TOTALS" or clean_cell("**42.7 kW**") != "42.7 kW":
         print(f"  FAIL md-emphasis: '**TOTALS**' must render 'TOTALS' (got "
