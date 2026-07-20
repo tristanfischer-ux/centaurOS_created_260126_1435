@@ -87,6 +87,7 @@ import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-eng
 // + every class plan into the orchestrator's global registry + planner.
 import './lib/orchestrator/register-all'
 import { orchestrateDesign } from './lib/orchestrator/orchestrate'
+import { buildDesignIdentity } from './lib/orchestrator/generic/design-scale-tier'
 import { detectEnvelope, isFieldErected, formFactorForClass } from './lib/orchestrator/envelope'
 import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
 import type { ContractInProgress as OrchestratorContract } from './lib/orchestrator/types'
@@ -7772,6 +7773,19 @@ async function main() {
   }
 
   const statePath = resolve(outDir, 'state.json')
+  // F1f Layer 0 (2026-07-20): pin the DESIGN SCALE TIER from brief physics (envelope + power +
+  // working volume), ONCE, immutably — so downstream retrieval / tool-pick / word-expand gate on
+  // the pinned identity instead of re-inferring the product from an overloaded part noun ("heater"
+  // → fish-farm template). scale_tier is AUTHORITATIVE; a noun never moves it. Consumers (relevance
+  // sweep hard veto, scale-gated RAG, homonym-safe expand) read state.designIdentity.
+  try {
+    ;(state as Record<string, unknown>).designIdentity = buildDesignIdentity(state)
+    const _di = (state as { designIdentity?: { scale_tier?: string; basis?: string } }).designIdentity
+    console.error(`[chain] designIdentity pinned: scale_tier=${_di?.scale_tier} — ${_di?.basis}`)
+  } catch (err) {
+    console.error(`[chain] designIdentity pin failed (non-fatal): ${(err as Error).message}`)
+  }
+
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
 
