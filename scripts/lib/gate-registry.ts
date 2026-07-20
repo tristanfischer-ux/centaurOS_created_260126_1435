@@ -277,7 +277,19 @@ export const GATES: GateProof[] = [
       const amOkRes = computeToolArchetypeCoherence(amOkSt)
       const amSuppressedOnPrinter = !(Array.isArray(amOkRes.findings) && amOkRes.findings.some((f: any) => f.severity === 'high'
         && String(f.family ?? f.marker_family ?? '') === 'additive_manufacturing'))
-      return marineFires && amFires && amSuppressedOnPrinter
+      // (d) PLANT_SCALE family (F1f Layer 4): a DN process pipe / skid worked-calc leaked onto a
+      //     BENCHTOP identity → HIGH; the SAME on a plant identity → suppressed (legitimate there).
+      const dnTool = [{ tool_id: 'pipe:sizing', label: 'pipe:sizing',
+        worked: [{ label: 'Line size', substitution: 'DN50 process pipe at 2 m/s, skid frame' }] }]
+      const psLeak: any = { designIdentity: { scale_tier: 'benchtop' }, isInstrumentDevice: true,
+        keyMetrics: { product_class: 'benchtop_bioreactor' }, toolsUsedPage: { tools: dnTool } }
+      const psFires = (computeToolArchetypeCoherence(psLeak).findings ?? []).some((f: any) =>
+        f.severity === 'high' && String(f.family ?? f.marker_family ?? '') === 'plant_scale')
+      const psOk: any = { designIdentity: { scale_tier: 'plant' },
+        keyMetrics: { product_class: 'water_treatment' }, toolsUsedPage: { tools: dnTool } }
+      const psSuppressedOnPlant = !(computeToolArchetypeCoherence(psOk).findings ?? []).some((f: any) =>
+        f.severity === 'high' && String(f.family ?? f.marker_family ?? '') === 'plant_scale')
+      return marineFires && amFires && amSuppressedOnPrinter && psFires && psSuppressedOnPlant
     },
     enforcedByDefault: () => toolArchetypeEnforceModeFromEnv(undefined) !== 'off',
   },

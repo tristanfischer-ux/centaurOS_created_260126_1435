@@ -167,14 +167,31 @@ export const ADDITIVE_MANUFACTURING_MARKERS: DomainMarker[] = [
   { id: 'extruder thermal model', re: /\bextruder\s+(?:thermal\s+model|power|temp(?:erature)?)\b|\bua_block\b/ },
 ]
 
+/**
+ * PLANT_SCALE_MARKERS (F1f Layer 4, 2026-07-20) — process-plant / building / field anatomy
+ * that must NEVER appear on a lab-scale (handheld/benchtop/cabinet) product. The detect net
+ * for leftovers that slipped past the Layer-1 tool veto: a DN process pipe, a 400 V 3-phase
+ * incomer, backwash/underdrain/air-scour, a skid frame, a cooling tower on a 20 mL / 35 W
+ * device. Suppressed on a genuinely plant/field-scale identity (legitimate there); fires on a
+ * lab-scale one. Keyed on the worked-calc / prose text, not a product name.
+ */
+export const PLANT_SCALE_MARKERS: DomainMarker[] = [
+  { id: 'DN process pipe', re: /\bDN\s*(?:15|20|25|32|40|50|65|80|100|125|150|200|250|300)\b/i },
+  { id: '400V 3-phase incomer', re: /\b400\s*V\b[^.]*\b3[\s-]?(?:ph|phase)\b|\b3[\s-]?(?:ph|phase)\b[^.]*\b400\s*V\b|√3\s*·?\s*400/i },
+  { id: 'backwash/underdrain/air-scour', re: /\bbackwash\b|\bunderdrain\b|\bair\s+scour\b/i },
+  { id: 'skid frame', re: /\bskid\s+frame\b/i },
+  { id: 'cooling tower / process HVAC duct', re: /\bcooling\s+tower\b|\bventilation\s+duct\b|\bHVAC\s+duct\b/i },
+]
+
 /** All marker families the gate scans, tagged by family for the finding text. */
-export type MarkerFamily = 'marine' | 'irrigation' | 'hydroponic' | 'refrigeration' | 'additive_manufacturing'
+export type MarkerFamily = 'marine' | 'irrigation' | 'hydroponic' | 'refrigeration' | 'additive_manufacturing' | 'plant_scale'
 export const MARKER_FAMILIES: Array<{ family: MarkerFamily; markers: DomainMarker[] }> = [
   { family: 'marine', markers: MARINE_MARKERS },
   { family: 'irrigation', markers: IRRIGATION_MARKERS },
   { family: 'hydroponic', markers: HYDROPONIC_MARKERS },
   { family: 'refrigeration', markers: REFRIGERATION_MARKERS },
   { family: 'additive_manufacturing', markers: ADDITIVE_MANUFACTURING_MARKERS },
+  { family: 'plant_scale', markers: PLANT_SCALE_MARKERS },
 ]
 
 /** The PRODUCT family for which a marker family is legitimate — used in the finding
@@ -186,6 +203,7 @@ function familyHome(family: MarkerFamily): string {
     case 'refrigeration': return 'cooling/refrigeration product'
     case 'irrigation': return 'agricultural-irrigation/sprinkler system'
     case 'additive_manufacturing': return '3D-printer/FDM additive-manufacturing product'
+    case 'plant_scale': return 'process-plant / building / field-erected product'
   }
 }
 
@@ -296,6 +314,49 @@ export function isCoolingClass(productClass: string): boolean {
 /** Is this product class a 3D-printer / FDM / additive-manufacturing product (the
  *  extruder hot-end + printer-motion markers are legitimate there, a domain error
  *  everywhere else — e.g. a 37 °C culture bioreactor)? PURE. */
+/**
+ * F1f Layer 4 — is the product genuinely PLANT/FIELD scale (so process-plant anatomy is
+ * legitimate)? Prefers the pinned physics identity `state.designIdentity.scale_tier` (plant /
+ * field); else derives from the watt-scale signal — a sub-1 m³ enclosure with low duty is
+ * DEFINITELY NOT a plant, so plant markers must fire. A design with NO scale signal at all is
+ * treated as plant-scale (conservative — never false-flag an unknown-scale industrial dossier).
+ * Universal — envelope/power physics, never a product name. PURE.
+ */
+export function isPlantScaleProduct(state: any): boolean {
+  const tier = String(state?.designIdentity?.scale_tier ?? '').toLowerCase()
+  if (tier === 'plant' || tier === 'field') return true
+  if (tier === 'handheld' || tier === 'benchtop' || tier === 'cabinet') return false
+  // No pinned tier — derive from the watt-scale signal (same family as isWattScaleInstrument).
+  const asNum = (x: any): number | undefined => {
+    const n = typeof x === 'object' && x != null ? Number(x.value) : Number(x)
+    return Number.isFinite(n) ? n : undefined
+  }
+  const q = (key: string): number | undefined => {
+    const cands = [
+      state?.engineeringContract?.shared_quantities?.[key],
+      state?.orchestratorContract?.shared_quantities?.[key],
+      state?.orchestratorContract?.quantities?.[key],
+      state?.wordDomainCoherence?.[key],
+    ]
+    for (const c of cands) { const n = asNum(c); if (n !== undefined) return n }
+    for (const m of (state?.moduleDecomposition?.modules ?? [])) {
+      const n = asNum(m?.derived_parameters?.[key]); if (n !== undefined) return n
+    }
+    return undefined
+  }
+  if (state?.isInstrumentDevice === true) return false
+  const vol = q('enclosure_volume_m3')
+  const powW = q('peak_electrical_power_w')
+  const loadKw = q('connected_electrical_load_kw')
+  const volMl = q('working_volume_ml')
+  const wattScale = vol !== undefined && vol < 1 && (
+    (powW !== undefined && powW <= 120)
+    || (loadKw !== undefined && loadKw <= 0.12)
+    || (volMl !== undefined && volMl <= 500))
+  if (wattScale) return false                 // definitely a device → plant markers fire
+  return true                                 // no device signal → conservative: treat as plant
+}
+
 export function isAdditiveManufacturingClass(productClass: string): boolean {
   return /3d[_\s-]?print|\bfdm\b|\bfff\b|fused[_\s-]?deposition|additive[_\s-]?manufactur|filament[_\s-]?(?:printer|extrud)|\bslicer\b/i
     .test(String(productClass ?? ''))
@@ -503,6 +564,11 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
   const hydroponic = isHydroponicClass(productClass)
   const cooling = isCoolingClass(productClass)
   const seawaterSource = isSeawaterSourceClass(productClass)
+  // F1f Layer 4: is the product genuinely PLANT/FIELD scale? Prefer the pinned physics
+  // identity (state.designIdentity.scale_tier, F1f Layer 0); fall back to the watt-scale
+  // signal (enclosure < 1 m³ + low duty → definitely NOT plant). A plant-scale product
+  // legitimately carries DN pipe / 400 V 3-ph / skid anatomy; a lab-scale one must not.
+  const plantScale = isPlantScaleProduct(state)
   const base: ToolArchetypeCoherenceResult = {
     verdict: 'pass',
     product_class: productClass,
@@ -564,6 +630,7 @@ export function computeToolArchetypeCoherence(state: any): ToolArchetypeCoherenc
     if (family === 'refrigeration') return !cooling
     if (family === 'irrigation') return !isIrrigationClass(productClass)  // irrigation legitimate on an irrigation/water/fertigation plant
     if (family === 'additive_manufacturing') return !isAdditiveManufacturingClass(productClass)  // FDM markers legitimate only on a 3D-printer class
+    if (family === 'plant_scale') return !plantScale  // plant anatomy legitimate ONLY on a plant/field-scale product (F1f L4)
     return true
   }
 
