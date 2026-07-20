@@ -65,6 +65,7 @@ run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --s
 # must fire HIGH; a clean fixture must be silent.
 run "ooxml_strict_check.py --selftest"       "$PY" scripts/lib/ooxml_strict_check.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
+run "growing_db_freshness.py --selftest"      "$PY" scripts/lib/growing_db_freshness.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
 run "draw_pid.py --selftest (T-23/T-03)"      "$PY" scripts/blender-universal/draw_pid.py --selftest
 run "draw_process_schedules_test (T-09)"      "$PY" scripts/blender-universal/draw_process_schedules_test.py

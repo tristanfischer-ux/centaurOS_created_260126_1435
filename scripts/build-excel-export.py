@@ -22703,6 +22703,52 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         ws.cell(r, 4, "AIM: 100%" if "—" not in str(_val) else "").font = FONT_NOTE
         r += 1
 
+    # ---- GROWING DB — self-building corpus freshness (A4, 2026-07-20). The engine's
+    # long pole is BoM DATA COVERAGE, grown by DB-first→web-on-miss→writeback. This
+    # surfaces whether the corpus is actually GROWING: per-table row count + the most-
+    # recent write (max_ts) + its age, so an operator can see a stale store (e.g. the
+    # material_prices seed frozen since May 2026) at a glance. Read READONLY at render;
+    # never blocks the build (a missing helper/DB just omits the section). ----
+    try:
+        import importlib.util as _ilu
+        _gdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib",
+                                 "growing_db_freshness.py")
+        _spec = _ilu.spec_from_file_location("growing_db_freshness", _gdf_path)
+        _gdf = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_gdf)
+        _fresh = _gdf.compute_freshness()
+    except Exception:  # noqa: BLE001
+        _fresh = {"present": False, "tables": {}}
+    if _fresh.get("present"):
+        r += 1
+        _mad = _fresh.get("min_age_days")
+        sub_banner(ws, r, f"Growing DB — self-building corpus freshness "
+                          f"(freshest write {_mad if _mad is not None else '?'} d ago; "
+                          f"materials stale > {getattr(_gdf, 'MATERIALS_STALE_DAYS', 28)} d)", 4)
+        r += 1
+        _GDB_LABELS = {
+            "pretraining_extracted_parts": "Branded parts (existence + MPN)",
+            "pretraining_extracted_specs": "Component specs (datasheet values)",
+            "pretraining_extracted_standards": "Standards (scope + citations)",
+            "distributor_cascade_cache": "Distributor price cache",
+            "material_prices": "Material prices (£/kg)",
+        }
+        for _tbl, _lbl in _GDB_LABELS.items():
+            _e = _fresh.get("tables", {}).get(_tbl) or {}
+            if not _e.get("present"):
+                continue
+            _age = _e.get("age_days")
+            _extra = ""
+            if _tbl == "distributor_cascade_cache":
+                _extra = f" · {_e.get('hits', 0)} hits / {_e.get('expired', 0)} expired"
+            _val = (f"{_e.get('n', 0):,} rows · last {str(_e.get('max_ts') or '—')[:10]} "
+                    f"({_age if _age is not None else '?'} d){_extra}")
+            ws.cell(r, 1, _lbl).font = FONT_SUB
+            _vc = ws.cell(r, 2, _val)
+            _vc.fill = FILL_ADVISORY if _e.get("stale") else FILL_PASS
+            if _e.get("stale"):
+                ws.cell(r, 4, "STALE — refresh the seed (A5)").font = FONT_NOTE
+            r += 1
+
     # ---- PER-TAB deterministic scorecard (Tristan 2026-06-26): every tab vs the ≥8 floor.
     # LIVE SCORES (2026-07-03): every Score cell (B) is a FORMULA — =ROUND(MIN(...),1)
     # over (a) the tab's own Row-check/Cell-check columns via live COUNTIF arithmetic
