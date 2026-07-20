@@ -2049,6 +2049,62 @@ def _checks_thermal_actuator_redundancy(state: dict, run_dir: str) -> List[Check
     return out
 
 
+_RESOLVED_BOM_STATUS = {"IDENTIFIED", "VERIFIED", "RESOLVED"}
+
+
+def _checks_part_status_honesty(state: dict, run_dir: str) -> List[Check]:
+    """F4 (2026-07-20): a BoM line presented as IDENTIFIED/resolved must not be pinned to
+    a part its OWN verification stage proved FAKE. The frozen 2150 shipped "P-101 Dosing
+    Peristaltic Pump = Watson-Marlow TUB-SAN-6.4 IDENTIFIED" while the partVerification
+    for that exact SKU said status=`unverified` (verifier semantic: 'confident this SKU
+    is fake' — part-verification.ts VERIFIER_SYSTEM). Presenting a proven-fake SKU as a
+    resolved catalogue pin is the confidence-honesty violation (a false-IDENTIFIED is as
+    dishonest as a false-PASS — [[forgeos_honest_scoring_precondition]]). Universal, no
+    per-class table: joins a resolved BoM line to any partVerification whose part_number
+    appears verbatim in the line's part text and whose status is `unverified`. An honest
+    line (status NOT FOUND / TBD / UNRESOLVED, or a verified pv) never trips."""
+    out: List[Check] = []
+    rb = _requirements_bom(state)
+    if not rb:
+        return out
+    # index unverified pvs by their real SKU (>=4 chars) for a substring join
+    unverified_skus: List[Tuple[str, str]] = []   # (part_number.lower, mfr)
+    for pv in (state.get("partVerifications") or []):
+        if not isinstance(pv, dict):
+            continue
+        pn = str(pv.get("part_number") or "").strip()
+        if len(pn) >= 4 and str(pv.get("status") or "").strip().lower() == "unverified":
+            unverified_skus.append((pn.lower(), str(pv.get("manufacturer") or "")))
+    bad: List[str] = []
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("status") or "").strip().upper() not in _RESOLVED_BOM_STATUS:
+            continue
+        part = str(row.get("part") or "").lower()
+        for pn, _mfr in unverified_skus:
+            if pn in part:
+                tag = str(row.get("tag") or "").strip()
+                req = str(row.get("requirement") or row.get("name") or "").strip()
+                bad.append(f"{tag + ' ' if tag else ''}{req} = {row.get('part')}")
+                break
+    n = len(bad)
+    out.append(Check(
+        name="Part-status honesty: no IDENTIFIED line over a proven-unverified SKU",
+        category="CONSISTENCY", relation="le",
+        status=PASS if n == 0 else FAIL,
+        actual=float(n), expected=0.0, tol=0.0, unit="lines",
+        producer="consistency:part_status_honesty",
+        detail=(f"{n} BoM line(s) are presented as IDENTIFIED/resolved but pin a SKU the "
+                f"verification stage marked `unverified` (proved fake). A resolved line "
+                f"must join to a verified or honestly-TBD part, never a proven-fake SKU. "
+                + (f"e.g. {bad[0]}." if bad else "Every resolved line is honestly grounded.")
+                + " Fix at part resolution (re-resolve a real SKU, or demote the line to "
+                  "UNRESOLVED/RFQ), never by relabelling an unverified part IDENTIFIED."),
+    ))
+    return out
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -2061,6 +2117,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_consistency(state, run_dir))
     checks.extend(_checks_part_type_coherence(state, run_dir))
     checks.extend(_checks_thermal_actuator_redundancy(state, run_dir))
+    checks.extend(_checks_part_status_honesty(state, run_dir))
     checks.extend(_checks_adequacy(state, run_dir))
     checks.extend(_checks_balance(state, run_dir))
     checks.extend(_checks_cost(state, run_dir))
@@ -2258,6 +2315,39 @@ def _selftest() -> int:
     tr_noduty = _checks_thermal_actuator_redundancy(_therm(two_actuators), "")
     check(len(tr_noduty) == 0,
           f"THERMAL-REDUNDANCY: no thermal-duty quantity -> no check emitted; got {len(tr_noduty)}")
+
+    # ---- PART-STATUS HONESTY (F4, 2026-07-20): an IDENTIFIED BoM line pinned to a SKU the
+    #      verification stage proved `unverified` FAILs (the frozen 2150 P-101 IDENTIFIED over
+    #      an unverified TUB-SAN-6.4); a verified pv, an honest UNRESOLVED line, and a resolved
+    #      line with no unverified pv all PASS. ----
+    laundered = {
+        "requirementsBom": [
+            {"tag": "P-101", "requirement": "Dosing Peristaltic Pump",
+             "part": "Watson-Marlow TUB-SAN-6.4", "status": "IDENTIFIED"},
+        ],
+        "partVerifications": [
+            {"manufacturer": "Watson-Marlow", "part_number": "TUB-SAN-6.4",
+             "status": "unverified", "confidence": "high"},
+        ],
+    }
+    ph = _checks_part_status_honesty(laundered, "")
+    check(len(ph) == 1 and ph[0].status == FAIL and ph[0].actual == 1.0,
+          f"PART-STATUS: IDENTIFIED over an unverified SKU must FAIL count 1; "
+          f"got {[(c.status, c.actual) for c in ph]}")
+    honest = {
+        "requirementsBom": [
+            {"tag": "P-1", "requirement": "Pump", "part": "Acme PUMP-9000", "status": "IDENTIFIED"},
+            {"tag": "X-1", "requirement": "Vent", "part": "Bad FAKE-123", "status": "NOT FOUND"},
+        ],
+        "partVerifications": [
+            {"manufacturer": "Acme", "part_number": "PUMP-9000", "status": "verified"},
+            {"manufacturer": "Bad", "part_number": "FAKE-123", "status": "unverified"},
+        ],
+    }
+    hh = _checks_part_status_honesty(honest, "")
+    check(len(hh) == 1 and hh[0].status == PASS,
+          f"PART-STATUS: verified-IDENTIFIED + unverified-but-NOT-FOUND must PASS; "
+          f"got {[(c.status, c.actual) for c in hh]}")
 
     # ---- DEFECTIVE run: each family must trip exactly its own FAIL ----
     bad_state = {
