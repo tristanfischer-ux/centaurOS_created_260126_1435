@@ -173,6 +173,7 @@ def main() -> int:
     print("[prove-growing-db-loop] loop PROVEN — DB-first MISS → fixture web → writeback "
           "→ re-read HIT (A1 filter) → freshness max_ts advances (A4 stamp); store grew "
           "0→2 rows. Deterministic, temp DB, no network, no production write.")
+    print("[prove-growing-db-loop] selftest OK")
     return 0
 
 
