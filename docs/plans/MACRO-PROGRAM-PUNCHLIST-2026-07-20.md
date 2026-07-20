@@ -29,14 +29,14 @@ Legend: ✅ done · �doing · ⬜ open
 |---|---|---|---|
 | P1 | Fix 1 — package_family weight 0.9→0.5 + `_PCB_FAB_VERIFIED_TIERS` (FAB needs catalogue MPN on every on-board part) | ✅ | 5acaf3416 |
 | P2 | Fix 4 — empty required-channel board (od_optics) = architecture gap → DRAFT | ✅ | 5acaf3416 |
-| P3 | Fix 2 — TE `4-2489541-7` LED reject (pinout reject on DB-MPN path; atopile-generator + pinouts) | ⬜ | |
-| P4 | Fix 3 — `usb_power_entry` must not accept `PinHeader_*` → USB receptacle or unresolved | ⬜ | |
+| P3 | Fix 2 — TE `4-2489541-7` LED reject. DONE by Cursor (cursor-pcb), merged: `isDeniedPcbMpn` — TE panel LED never mpn_package_only; proveCatch green. | ✅ | ee6983a37 (merged 0ef7dd2e8) |
+| P4 | Fix 3 — usb PinHeader ban. DONE by Cursor (cursor-pcb), merged: `usb_connector` vs `debug_connector` split + PinHeader ban for USB roles; proveCatch green. | ✅ | ee6983a37 (merged) |
 | P5 | Fix 5 — multi-board `requiresKiCadDeliverable`>1 built as ONE KiCad project → PARTIAL/not FAB-READY (serial-design-chain + readiness) | ⬜ | |
 | P6 | Fix 6 — Gate 38 widen beyond pipeline.ok (fitness + role guards + firmware-absent) | ⬜ | |
 | P7 | Fix 7 — interface-critical roles must be mpn-tier (subset of P1) | ⬜ | |
 | P8 | Fix 8 — PnP `Val=?` (cosmetic; Excel already fills; do NOT block FAB on it) | ⬜ optional | |
 | P9a | **Fix 9 honesty half** — no board reads bare FAB-READY; max = "FAB-READY — UNPROVEN IN HARDWARE". **REWORKED (Cursor FAIL-REWORK closed):** prefix-safe `_pcb_readiness_style()` helper replaces BOTH exact-key dicts (banner + `_sc_pcb`) → no KeyError on the disclosed string; live Excel formula now carries the UNPROVEN disclosure; proveCatch exercises the REAL consumer path (verdict never bare FAB-READY; style helper handles disclosed+garbage without exception). | ✅ | 1da05fa4d |
-| P9b | **Fix 9 harness wire** — invoke deriveFirmwareProofSpecs + firmware_proof.py Tier-0 in pcb-stage per architecture board; set state.pcb.firmwareProof | ⬜ | |
+| P9b | **Fix 9 harness wire** — DONE by Cursor (cursor-pcb), merged: `runTier0FirmwareProof` → state.pcb.firmwareProof (Tier-0; never alone→FUNCTIONALLY VERIFIED) + P4b designFitness + P5 multiBoardMerged flag. **Terminal follow-up:** wire firmwareProof.ok into `_pcb_readiness_verdict` (it already reads it — verify on a fresh bake). | ✅ | 3459f23d1 (merged) |
 
 ## Form / vision (Terminal — Blender + render_vision_critic + composer)
 | ID | Item | Status | SHA |
