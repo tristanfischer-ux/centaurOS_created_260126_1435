@@ -16489,9 +16489,18 @@ def tab_electrical(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]
 # three MPN/catalogue tiers are verified; only function_class/unresolved are not.
 _PCB_TIER_WEIGHT = {
     "mpn_symbol_footprint": 1.0, "mpn_package": 1.0, "mpn_package_only": 0.95,
-    "package_family": 0.9, "function_class": 0.2,
+    # package_family (a generic package match, no catalogue MPN) may contribute to a
+    # DRAFT fitness score but must NEVER carry a board to FAB-READY: weight 0.9→0.5
+    # (Cursor Fix 1, 2026-07-20) — at 0.9 the 2150 board (5/16 package_family incl the
+    # boot flash, USB entry, ESD net) read FAB-READY 9.7, a banner lie.
+    "package_family": 0.5, "function_class": 0.2,
 }
+# Fitness "verified_n" (has-a-package) still counts package_family — it IS a real package.
 _PCB_VERIFIED_TIERS = ("mpn_symbol_footprint", "mpn_package", "mpn_package_only", "package_family")
+# FAB-READY IDENTITY BAR — a shippable PCBA needs a catalogue MPN on EVERY on-board part;
+# a generic package_family footprint is not orderable. FAB-READY requires all on-board
+# parts in THIS set (Cursor Fix 1).
+_PCB_FAB_VERIFIED_TIERS = ("mpn_symbol_footprint", "mpn_package", "mpn_package_only")
 
 
 def _pcb_effective_tier(comp: dict) -> str:
@@ -16527,7 +16536,10 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                            n_electronic_gap: int,
                            n_on_board: int = 0,
                            n_electronic_design: int = 0,
-                           n_electronic_full: int = 0) -> Tuple[str, str]:
+                           n_electronic_full: int = 0,
+                           n_non_fab_tier: int = 0,
+                           all_on_board_fab_tier: bool = True,
+                           n_architecture_gaps: int = 0) -> Tuple[str, str]:
     """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
     board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
     unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
@@ -16582,6 +16594,22 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
         if n_electronic_gap:
             why += f"; {n_electronic_gap} unresolved ELECTRONIC gap(s) remain"
         return "ENGINEERING DRAFT", why
+    # FAB-READY IDENTITY BAR (Cursor Fix 1 + Fix 4, 2026-07-20): a shippable PCBA needs a
+    # catalogue MPN on EVERY on-board part AND every architecturally-required board/channel
+    # built. A generic package_family footprint is not orderable; an empty required-channel
+    # board (od_optics with requiredWordIds=[]) is a structural gap. Either → ENGINEERING
+    # DRAFT even when hygiene + fitness look fine (the 2150 FAB-READY-9.7 banner lie:
+    # 5/16 on-board parts were package_family, incl the boot flash + USB entry).
+    if n_architecture_gaps > 0:
+        return ("ENGINEERING DRAFT",
+                f"hygiene clean but {n_architecture_gaps} architecture gap(s) — a required "
+                f"board/channel (e.g. od_optics) has no built footprints; a partial board "
+                f"set is not a shippable product PCBA")
+    if (not all_on_board_fab_tier) or n_non_fab_tier > 0:
+        return ("ENGINEERING DRAFT",
+                f"hygiene + fitness clean but {n_non_fab_tier} on-board part(s) carry no "
+                f"catalogue MPN (package_family/function_class only) — FAB-READY requires "
+                f"mpn_symbol_footprint / mpn_package / mpn_package_only on EVERY on-board part")
     return "FAB-READY", "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier"
 
 
@@ -17164,10 +17192,29 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         n_on_board_scope = _n_gen_on
     elif _n_off > 0 and n_electronic_design > _n_off:
         n_on_board_scope = n_electronic_design - _n_off
+    # FAB-READY identity bar (Cursor Fix 1/4): every ON-BOARD part must carry a catalogue
+    # MPN tier, and every architecturally-required board/channel must be built. tiers is a
+    # Counter of the on-board components' effective tiers.
+    _n_non_fab_tier = sum(int(n or 0) for t, n in tiers.items()
+                          if t not in _PCB_FAB_VERIFIED_TIERS)
+    _all_on_board_fab = (_n_non_fab_tier == 0) and resolved_n > 0
+    _arch = pcb.get("architecture") if isinstance(pcb.get("architecture"), dict) else {}
+    _n_arch_gaps = 0
+    for _b in (_arch.get("boards") or []):
+        if not isinstance(_b, dict):
+            continue
+        _reqw = _b.get("requiredWordIds") or []
+        _chreq = _b.get("channelRequirements") or []
+        # a board that MUST implement channels but has zero built words = a structural
+        # electronic gap (the 2150 od_optics: od_measurement_channel×1, requiredWordIds=[]).
+        if _chreq and not _reqw:
+            _n_arch_gaps += 1
     readiness, readiness_why = _pcb_readiness_verdict(
         pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
         n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope,
-        n_electronic_full=n_electronic_design)
+        n_electronic_full=n_electronic_design,
+        n_non_fab_tier=_n_non_fab_tier, all_on_board_fab_tier=_all_on_board_fab,
+        n_architecture_gaps=_n_arch_gaps)
 
     hygiene_components: List[Tuple[str, float, float]] = [
         ("DRC clean (0 violations)", 1 if drc_ok else 0, 1),
@@ -31547,40 +31594,64 @@ def _selftest() -> int:
               f"whose BoM is function_class-heavy (fitness {_wd_score:.1f}/10) must read "
               f"ENGINEERING DRAFT, NOT {_wd_readiness!r} — a wrong-domain board must "
               "never read FAB-READY"); bad += 1
-    # proveNoFalsePositive: the SAME clean hygiene with a verified-tier BoM scores high
-    # and reads FAB-READY — the honesty cap must not punish a genuinely fit board.
+    # package_family carries a DRAFT fitness contribution (weight 0.5, Cursor Fix 1) but
+    # a package_family-only board is NOT FAB-READY — a generic package is not orderable.
     _package_floor_tiers = {"package_family": 10}
     _pf_score, _pf_resolved, _pf_verified = _pcb_fitness_axis(_package_floor_tiers)
-    if not (_pf_score >= 9.0 and _pf_resolved == 10 and _pf_verified == 10):
-        print(f"  FAIL pcb-fitness-axis package-family floor: a board with all components "
-              f"resolved to real package families must reach the ≥9/10 sheet floor "
-              f"(weight 0.9), got score={_pf_score!r}"); bad += 1
+    if not (abs(_pf_score - 5.0) < 0.1 and _pf_resolved == 10 and _pf_verified == 10):
+        print(f"  FAIL pcb-fitness-axis package-family weight: 10 package_family (weight 0.5) "
+              f"must score ~5.0 (a DRAFT contribution, not a ≥9 FAB pass), got {_pf_score!r}"); bad += 1
+    _pf_readiness, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=_pf_score, n_electronic_gap=0,
+        n_on_board=10, n_electronic_design=10, n_electronic_full=10,
+        n_non_fab_tier=10, all_on_board_fab_tier=False)
+    if _pf_readiness != "ENGINEERING DRAFT":
+        print(f"  FAIL pcb-readiness package-family: a package_family-only board is NOT "
+              f"FAB-READY (no catalogue MPN on any part), got {_pf_readiness!r}"); bad += 1
     _clean_tiers = {"mpn_package": 9, "package_family": 1}
     _cl_score, _cl_resolved, _cl_verified = _pcb_fitness_axis(_clean_tiers)
-    if not (_cl_score >= 9.0 and _cl_resolved == 10 and _cl_verified == 10):
-        print(f"  FAIL pcb-fitness-axis proveNoFalsePositive: a verified-tier BoM (9 "
-              f"mpn_package + 1 package_family) must score >=9/10, got {_cl_score!r}"); bad += 1
-    # proveCatch (2026-07-19, benchtop_bioreactor 2150 false-UNVERIFIED): the atopile
-    # generator emits `mpn_symbol_footprint` (real MPN + symbol + footprint, the HIGHEST
-    # tier) + `mpn_package_only`, NOT the legacy `mpn_package`. The scorer's tier map/
-    # verified set MUST recognise them, or a genuinely fab-grade 16-part board (10
-    # mpn_symbol_footprint + 5 package_family + 1 mpn_package_only, real MPNs like
-    # ATSAMD21G18A-AU / TMP1075DSGR) reads design-fitness 4.2 with "11 of 16
-    # function_class" — a false-UNVERIFIED that FAILed the PCB tab of a shipping dossier.
+    if not (_cl_resolved == 10 and _cl_verified == 10):
+        print(f"  FAIL pcb-fitness-axis proveNoFalsePositive: verified_n must count "
+              f"package_family as has-a-package (got {_cl_verified!r})"); bad += 1
+    # proveCatch (2026-07-20, Cursor Fix 1 — INVERTED from cfc19f96d): the 2150 board
+    # (10 mpn_symbol_footprint + 5 package_family + 1 mpn_package_only) has 5 on-board
+    # parts with NO catalogue MPN (package_family: boot flash, USB entry, ESD, debug,
+    # ferrite). Fitness may be mid (~8.4 with package_family weight 0.5) but readiness MUST
+    # be ENGINEERING DRAFT — FAB-READY requires a catalogue MPN on EVERY on-board part.
+    # (cfc19f96d correctly added the mpn tiers; this corrects its over-generous FAB pass.)
     _gen_tiers = {"mpn_symbol_footprint": 10, "package_family": 5, "mpn_package_only": 1}
     _gen_score, _gen_resolved, _gen_verified = _pcb_fitness_axis(_gen_tiers)
-    if not (_gen_score >= 9.0 and _gen_resolved == 16 and _gen_verified == 16):
-        print(f"  FAIL pcb-fitness-axis generator-tier vocab: a board of 10 "
-              f"mpn_symbol_footprint + 5 package_family + 1 mpn_package_only is FULLY "
-              f"verified (16/16) and must score >=9/10, got score={_gen_score!r} "
-              f"verified={_gen_verified!r} (tier names must match the atopile generator)"); bad += 1
+    if _gen_resolved != 16 or _gen_verified != 16:
+        print(f"  FAIL pcb-fitness-axis generator-tier vocab: mpn_symbol_footprint / "
+              f"mpn_package_only must be recognised (resolved/verified 16/16), got "
+              f"{_gen_resolved!r}/{_gen_verified!r}"); bad += 1
     _gen_readiness, _ = _pcb_readiness_verdict(
         pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
         bespoke_missing=False, fitness_score=_gen_score, n_electronic_gap=0,
-        n_on_board=16, n_electronic_design=15, n_electronic_full=15)
-    if _gen_readiness != "FAB-READY":
-        print(f"  FAIL pcb-readiness generator-tier: a fully verified-tier 16-part board "
-              f"covering the design must read FAB-READY, got {_gen_readiness!r}"); bad += 1
+        n_on_board=16, n_electronic_design=15, n_electronic_full=15,
+        n_non_fab_tier=5, all_on_board_fab_tier=False)
+    if _gen_readiness != "ENGINEERING DRAFT":
+        print(f"  FAIL pcb-readiness Fix1: the 2150 shape (5 package_family on-board) must "
+              f"read ENGINEERING DRAFT, not FAB-READY, got {_gen_readiness!r}"); bad += 1
+    # proveNoFalsePositive: an ALL-catalogue-MPN board still reads FAB-READY.
+    _allmpn_r, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
+        n_on_board=16, n_electronic_design=16, n_electronic_full=16,
+        n_non_fab_tier=0, all_on_board_fab_tier=True)
+    if _allmpn_r != "FAB-READY":
+        print(f"  FAIL pcb-readiness Fix1 proveNoFalsePositive: an all-catalogue-MPN board "
+              f"must still read FAB-READY, got {_allmpn_r!r}"); bad += 1
+    # proveCatch Fix 4: an architecture gap (required channel board with 0 built words) → DRAFT.
+    _archgap_r, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
+        n_on_board=16, n_electronic_design=16, n_electronic_full=16,
+        n_non_fab_tier=0, all_on_board_fab_tier=True, n_architecture_gaps=1)
+    if _archgap_r != "ENGINEERING DRAFT":
+        print(f"  FAIL pcb-readiness Fix4: an un-built required-channel board (od_optics gap) "
+              f"must read ENGINEERING DRAFT, got {_archgap_r!r}"); bad += 1
     if _pcb_effective_tier({"resolutionTier": "package_family",
                             "partNumber": "TLC5916IDR",
                             "manufacturer": "Texas Instruments"}) != "mpn_package":
