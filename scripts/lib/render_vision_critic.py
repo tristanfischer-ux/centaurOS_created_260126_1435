@@ -99,16 +99,26 @@ def cache_write(geo_hash: str, res: dict) -> None:
 _PROMPT = (
     "You are an adversarial chartered engineer inspecting a 3-D render of a process/utility PLANT laid "
     "out on a rectangular platform/skid. Look ONLY at what is visibly wrong — do not invent defects.\n"
-    "Flag any of these VISUAL defects if present:\n"
+    "A COHERENT plant is the bar: every item sits ON the platform, connected to its neighbours, at a "
+    "believable relative scale, and the whole thing reads as one designed layout — not a pile of blocks.\n"
+    "Flag broken=true if ANY of these VISUAL defects is present (an INCOHERENT render is BROKEN even if "
+    "each individual block looks 'fine' — judge the WHOLE):\n"
     "  • a STRAY pipe/beam/cable shooting OFF the platform or into empty space (a long thin element "
     "going nowhere, or to a floating box outside the plant)\n"
-    "  • a FLOATING / disconnected object not sitting on the platform with the rest\n"
+    "  • a FLOATING / disconnected object — anything not sitting on the platform, or visibly detached "
+    "from the equipment it should join (a gap of empty space between a part and the chassis it belongs to)\n"
+    "  • GROSS SCALE-INCOHERENCE — one part many times larger or smaller than physically plausible for "
+    "its neighbours, OR an assembly of same-size blocks stacked/scattered like toy bricks in a box "
+    "(a 'Lego-in-a-box' layout) rather than a real plant with a sensible size hierarchy\n"
+    "  • a FEATURELESS layout — plain closed boxes with no pipes, connections, nozzles, or discernible "
+    "equipment features; a render that could be any grey blocks, not a specific plant\n"
     "  • a BLANK / empty render (no plant visible)\n"
     "  • GARBLED / exploded / overlapping geometry that is obviously not a real layout\n"
-    "  • a part at an absurd scale (e.g. one object dwarfing the whole plant)\n"
+    "Do NOT flag a clean, coherent, connected plant with a sensible size hierarchy and real features — "
+    "simplified-but-recognisable equipment is acceptable and must PASS.\n"
     "Reply with STRICT JSON only: {\"broken\": true|false, \"defects\": [\"short description\", ...]}. "
     "broken=true if ANY defect above is visible; defects lists each one in a few words. If the render "
-    "looks like a clean, plausible plant layout, return {\"broken\": false, \"defects\": []}."
+    "looks like a clean, plausible, connected plant layout, return {\"broken\": false, \"defects\": []}."
 )
 
 
@@ -167,7 +177,18 @@ _PRODUCT_PROMPT = (
     "  • implausible service access, airflow, or component stacking\n"
     "  • product cropped, too small, or unreadable\n\n"
     "A translucent cutaway is intentional, but translucency must not wash out "
-    "the internal architecture. Reply with STRICT JSON only: "
+    "the internal architecture.\n\n"
+    "COHERENCE OVERRIDE — always broken=true when the render is INCOHERENT as a whole, "
+    "regardless of the checklist above:\n"
+    "  • any internal part FLOATING or disconnected — a gap of empty space between a "
+    "component and the enclosure/board it mounts to\n"
+    "  • GROSS scale-incoherence — one part many times larger/smaller than plausible, "
+    "or same-size blocks stacked/scattered like toy bricks in a box ('Lego-in-a-box')\n"
+    "  • a FEATURELESS closed shell — a plain sealed box with NO discernible internal "
+    "zones, ports, or product features (could be any anonymous block)\n"
+    "A clean sealed product with a credible internal architecture and mounted, connected "
+    "parts must still PASS — do not reject a coherent product. "
+    "Reply with STRICT JSON only: "
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
@@ -192,16 +213,25 @@ _INSTRUMENT_PROMPT = (
     "  • a translucent or ghosted body shell that still reads as one closed chassis\n\n"
     "Do NOT flag missing battery-pack density, inverter stacks, PV/AC busbars, plant pipes, "
     "or BESS thermal ducts — those belong to energy-storage products, not instruments.\n\n"
-    "Flag broken=true ONLY when any of these are present:\n"
+    "Flag broken=true ONLY when any of these are present (an INCOHERENT device is BROKEN "
+    "even if each block looks 'fine' on its own — judge the WHOLE product):\n"
     "  • blank / empty render (no product visible)\n"
     "  • parts floating OUTSIDE the product envelope or disconnected from the chassis "
     "(not merely visible through a translucent cube)\n"
+    "  • exploded, floating, or wildly overlapping geometry\n"
+    "  • a part FLOATING or DISCONNECTED — a visible gap of empty space between a component "
+    "and the body/board it should mount to (parts that do not read as one assembled device)\n"
+    "  • GROSS scale-incoherence — one part many times larger/smaller than plausible for a "
+    "handheld/benchtop device, OR same-size blocks stacked/scattered like toy bricks in a box "
+    "('Lego-in-a-box') instead of a real device with a sensible size hierarchy\n"
     "  • a hollow open-front arch / gutted chassis with internals hanging in empty air\n"
-    "  • a featureless empty box with NO optical path, PCB, port, or grip cues\n"
+    "  • a featureless empty box with NO optical path, PCB, port, display, or grip cues "
+    "(a plain sealed block that could be anything)\n"
     "  • cutaway that is only vertical grey slabs (cabinet language) with no optical axis\n"
     "  • display that reads as a pale blank patch or green FR4 plate on a closed exterior\n"
-    "  • product cropped so small it is unreadable\n"
-    "  • absurd scale (one part dwarfing the whole device unrealistically)\n\n"
+    "  • product cropped so small it is unreadable\n\n"
+    "A clean, coherent benchtop/handheld instrument with a real fascia and mounted, connected "
+    "parts (optical bench + PCB + ports) must still PASS — do NOT reject a coherent device. "
     "Reply with STRICT JSON only: "
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
@@ -453,6 +483,57 @@ def _rubric_check_labels(prompt: str) -> list[str]:
     return labels
 
 
+# INCOHERENCE FLOOR (V1b, 2026-07-21) — the pure verdict-from-rubric-output decision. The
+# rubric prompts now instruct the model to set broken=true on a floating/disconnected part,
+# gross scale-incoherence (a Lego-in-a-box), or a featureless closed shell. But a flaky
+# vision model can NAME the very defect in its `defects` list and still emit broken=false
+# (the exact failure the 2150 organoid Lego hero slipped through — ~8 checks, broken=false,
+# only the deterministic V1a phenotype gate saved it). This floor closes that hole
+# DETERMINISTICALLY: if the model's OWN words describe a hard-incoherence defect, the verdict
+# is BROKEN regardless of the flag it set. Pure + offline (no API) → proveCatch'able directly.
+_INCOHERENCE_MARKERS = (
+    "floating", "float ", "disconnected", "detached", "not connected", "unsupported",
+    "hovering", "suspended in", "gap between", "not attached", "not sitting", "off the platform",
+    "shooting off", "into empty space", "into the air", "flies off", "flying off",
+    "lego", "toy brick", "toy block", "stacked block", "scattered block", "pile of block",
+    "scale-incoheren", "scale incoheren", "absurd scale", "wildly out of scale",
+    "dwarf", "many times larger", "many times smaller", "out of proportion", "wrong scale",
+    "featureless", "anonymous box", "anonymous block", "plain box", "plain block",
+    "empty box", "hollow shell", "no discernible", "no features", "no product feature",
+    "exploded", "garbled", "overlapping geometry",
+)
+
+
+def _defect_names_incoherence(defects) -> bool:
+    """True when any defect string describes a HARD-incoherence phenotype (floating /
+    disconnected / gross scale / Lego-in-a-box / featureless shell / exploded)."""
+    for d in defects or []:
+        s = str(d).lower()
+        if any(m in s for m in _INCOHERENCE_MARKERS):
+            return True
+    return False
+
+
+def verdict_from_model_output(raw: dict) -> dict:
+    """Canonicalise the model's raw JSON ({broken, defects}) into the final critic verdict,
+    applying the INCOHERENCE FLOOR: a named hard-incoherence defect forces broken=true even
+    if the model set broken=false (a model that SEES it but does not FLIP the flag). Never
+    turns a broken verdict clean — the flag can only be floored UP, never relaxed (the
+    flag-only council contract: the critic may FLAG/FAIL, never rescue). Pure; no I/O."""
+    if not isinstance(raw, dict):
+        return {"broken": None, "defects": []}
+    defects = raw.get("defects") or []
+    broken = bool(raw.get("broken"))
+    floored = False
+    if not broken and _defect_names_incoherence(defects):
+        broken = True
+        floored = True
+    out = {"broken": broken, "defects": defects}
+    if floored:
+        out["incoherence_floor"] = True
+    return out
+
+
 def _critique_once(image_path: str, model: str, timeout: int) -> dict:
     return _critique_render_impl(image_path, model, timeout)
 
@@ -551,21 +632,27 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
         tail = txt2.split('"defects"', 1)[-1] if '"defects"' in txt2 else ""
         out = {"broken": bm.group(1).lower() == "true",
                "defects": re.findall(r'"([^"]{3,90})"', tail)}
+    # INCOHERENCE FLOOR (V1b, 2026-07-21): a named hard-incoherence defect forces broken=true
+    # even if the flaky model set broken=false (the 2150 Lego-hero hole).
+    v = verdict_from_model_output(out)
     # INTENT (2026-07-14): Excel Renders scorer requires checks_run≥3 so an empty
     # broken=false cannot mint a 9. Count the rubric's explicit "Flag broken=true"
     # criteria that this prompt asked the model to evaluate — a real glance, not a
     # nameless shrug. Deterministic from the prompt text; never invents per-item PASS.
     prompt = _prompt_for_image(image_path)
     checks = _rubric_check_labels(prompt)
-    return {
-        "broken": bool(out.get("broken")),
-        "defects": out.get("defects") or [],
+    res = {
+        "broken": bool(v.get("broken")),
+        "defects": v.get("defects") or [],
         "model": model,
         "ok": True,
         "checks_run": len(checks),
         "n_checks": len(checks),
         "checklist": checks,
     }
+    if v.get("incoherence_floor"):
+        res["incoherence_floor"] = True
+    return res
 
 
 _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")
@@ -662,7 +749,58 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     return res
 
 
+def _selftest() -> int:
+    """proveCatch (GATE INTENT RULE) for the V1b incoherence floor — offline/pure, no vision
+    API. Drives verdict_from_model_output() with the exact known-bad rubric-outputs the 2150
+    organoid Lego hero produced (model NAMES the incoherence but leaves broken=false) and
+    asserts the verdict is floored to broken=true; and drives it with a clean coherent output
+    and asserts it stays broken=false (false-positive discipline)."""
+    fails = []
+
+    # KNOWN-BAD: the exact 2150 failure shape — the model listed the defect but did NOT flip
+    # the flag. Each of these MUST floor to broken=true.
+    known_bad = [
+        {"broken": False, "defects": ["parts appear to be floating above the base"]},
+        {"broken": False, "defects": ["stacked blocks look like Lego bricks in a box"]},
+        {"broken": False, "defects": ["one cube dwarfs the whole device — scale-incoherent"]},
+        {"broken": False, "defects": ["featureless grey box with no discernible product features"]},
+        {"broken": False, "defects": ["a component is disconnected from the chassis"]},
+        {"broken": False, "defects": ["exploded geometry, parts scattered"]},
+    ]
+    for kb in known_bad:
+        v = verdict_from_model_output(kb)
+        if v.get("broken") is not True or not v.get("incoherence_floor"):
+            fails.append(f"FLOOR MISSED: {kb['defects']} → {v}")
+
+    # ALREADY-BROKEN: a model that flipped the flag stays broken (never relaxed).
+    v = verdict_from_model_output({"broken": True, "defects": ["stray red beam off the platform"]})
+    if v.get("broken") is not True:
+        fails.append(f"BROKEN RELAXED: {v}")
+
+    # CLEAN COHERENT: no incoherence phenotype in the words → must PASS (false-positive discipline).
+    clean = [
+        {"broken": False, "defects": []},
+        {"broken": False, "defects": ["minor: display slightly dim"]},  # soft, not incoherence
+        {"broken": False, "defects": ["cuvette port could be more recessed"]},
+    ]
+    for c in clean:
+        v = verdict_from_model_output(c)
+        if v.get("broken") is not False or v.get("incoherence_floor"):
+            fails.append(f"FALSE POSITIVE: {c['defects']} → {v}")
+
+    if fails:
+        print("render_vision_critic _selftest: FAIL")
+        for f in fails:
+            print("  " + f)
+        return 1
+    print("render_vision_critic _selftest passed "
+          f"({len(known_bad)} incoherence-floor catches, 1 no-relax, {len(clean)} clean-pass)")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        raise SystemExit(_selftest())
     mdl = next((sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--model"), DEFAULT_MODEL)
     if "--write" in sys.argv:
         rd = sys.argv[sys.argv.index("--write") + 1]
