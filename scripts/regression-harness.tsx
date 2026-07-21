@@ -99,6 +99,7 @@ import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
 import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { CLASS_HAZARDS, getClassHazards } from '../src/lib/pdf-engine-v2/class-hazards'
+import { CLASS_STANDARDS } from '../src/lib/pdf-engine-v2/class-standards'
 import { auditCrossPageNumericConsistency } from './lib/cross-page-numeric-consistency-audit'
 import { computeScenarioPlanning, type ScenarioModel, type Bands } from './lib/scenario-planning'
 import { planScenariosForState } from './lib/scenario-models'
@@ -8829,6 +8830,75 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       CLASS_HAZARDS['co2_mineralisation'] ? 1 : 0,
       (n: number) => n === 1,
       () => 'co2_mineralisation missing from CLASS_HAZARDS — its §Risk page will null. Add the entry in src/lib/pdf-engine-v2/class-hazards.ts.',
+    ))
+  }
+
+  // ── UNIVERSAL.lab_instrument_class_carries_ce_marking_standards (2026-07-21) ──
+  //
+  // A mains/USB-powered laboratory instrument (organoid benchtop bioreactor,
+  // Pioreactor, Poseidon syringe pump, OpenFlexure microscope, Rodeostat
+  // potentiostat, OpenDrop EWOD, PCR thermocycler, colorimeter) is legally CE/UKCA
+  // electrical equipment. The MANDATORY market-access floor for that whole family is
+  // LVD 2014/35/EU + EMC 2014/30/EU + RoHS 2011/65/EU + IEC 61010-1 (electrical safety
+  // for measurement/control/laboratory equipment) + IEC 61326-1 (EMC for laboratory
+  // equipment). Before the syringe_pump/benchtop refactors (class-standards.ts, the
+  // lab-instrument SYRINGE_PUMP floor), organoid-bioreactor-20260721-rebake2 cited NONE
+  // of these — the compliance gate (stages/3.5-compliance-gate.ts) flagged them
+  // missing_mandatory, which drags Risk & Regulatory + ⚠ Checks and (with a bare-registry
+  // WARN-floor) blocked the dossier. The SOURCE fix is the class registry declaring the
+  // full set for every lab-instrument class; this invariant LOCKS it so it cannot regress.
+  //
+  // Keyed UNIVERSALLY off the load-bearing signal — a class is a lab instrument iff its
+  // registry declares mandatory IEC 61010-1 (the governing lab-equipment safety standard).
+  // Any such class MUST also carry the other four mandatory codes (they are one indivisible
+  // CE-marking floor); and — the spurious-emission proveCatch — a NON-lab electrical class
+  // (energy_storage) must NOT carry the lab-only IEC 61010-1 / IEC 61326-1 pair.
+  {
+    const REQUIRED_LAB_CODES = ['LVD 2014/35/EU', 'EMC 2014/30/EU', 'RoHS 2011/65/EU', 'IEC 61010-1', 'IEC 61326-1']
+    const LAB_ONLY_CODES = ['IEC 61010-1', 'IEC 61326-1']
+    const mandatoryCodes = (cls: string): Set<string> =>
+      new Set((CLASS_STANDARDS[cls]?.standards ?? []).filter((s) => s.mandatory).map((s) => s.code))
+    // Positive: any class declaring the lab-safety anchor carries the WHOLE CE-marking floor.
+    let labClassCount = 0
+    for (const cls of Object.keys(CLASS_STANDARDS)) {
+      const codes = mandatoryCodes(cls)
+      if (!codes.has('IEC 61010-1')) continue // not a lab instrument — nothing to assert
+      labClassCount += 1
+      const missing = REQUIRED_LAB_CODES.filter((c) => !codes.has(c))
+      assertions.push(assertEq(
+        `UNIVERSAL.lab_instrument_class_carries_ce_marking_standards.${cls}`,
+        `Lab-instrument class '${cls}' declares the full mandatory CE/UKCA floor (LVD 2014/35/EU + EMC 2014/30/EU + RoHS 2011/65/EU + IEC 61010-1 + IEC 61326-1)`,
+        missing.length,
+        (n: number) => n === 0,
+        () => `Lab-instrument class '${cls}' is missing mandatory standard(s) [${missing.join(', ')}] from its registry — the compliance gate will flag missing_mandatory and drag Risk & Regulatory + ⚠ Checks. Fix: add the codes to the class's standards in src/lib/pdf-engine-v2/class-standards.ts (or point it at the shared SYRINGE_PUMP lab-instrument floor).`,
+      ))
+    }
+    // The registry must actually contain lab-instrument classes (guards a refactor that
+    // silently drops every lab floor at once — labClassCount would fall to 0).
+    assertions.push(assertEq(
+      'UNIVERSAL.lab_instrument_class_carries_ce_marking_standards.family_present',
+      'CLASS_STANDARDS still registers ≥1 lab-instrument class carrying the IEC 61010-1 CE-marking floor',
+      labClassCount,
+      (n: number) => n >= 1,
+      (n: number) => `No class declares the IEC 61010-1 lab-instrument floor (${n}) — every lab-instrument compliance table would regress to a bare/WARN registry. Restore the SYRINGE_PUMP-derived floors in src/lib/pdf-engine-v2/class-standards.ts.`,
+    ))
+    // Anchor: benchtop_bioreactor (the organoid fixture's class) carries the full set.
+    assertions.push(assertEq(
+      'UNIVERSAL.lab_instrument_class_carries_ce_marking_standards.benchtop_bioreactor_anchor',
+      "benchtop_bioreactor (the organoid dossier's class) carries every mandatory CE-marking lab standard",
+      REQUIRED_LAB_CODES.filter((c) => !mandatoryCodes('benchtop_bioreactor').has(c)).length,
+      (n: number) => n === 0,
+      () => 'benchtop_bioreactor lost one of LVD/EMC/RoHS/IEC 61010-1/IEC 61326-1 — the organoid dossier will re-fire missing_mandatory. Fix in src/lib/pdf-engine-v2/class-standards.ts.',
+    ))
+    // Spurious-emission proveCatch: a NON-lab electrical class does NOT inherit the
+    // lab-only IEC 61010-1 / IEC 61326-1 pair (the fix keys off lab signal, not "if organoid").
+    const bessLabOnly = LAB_ONLY_CODES.filter((c) => mandatoryCodes('energy_storage').has(c))
+    assertions.push(assertEq(
+      'UNIVERSAL.lab_instrument_class_carries_ce_marking_standards.non_lab_excludes_lab_only',
+      'A non-lab electrical class (energy_storage) does NOT spuriously carry the lab-only IEC 61010-1 / IEC 61326-1 standards',
+      bessLabOnly.length,
+      (n: number) => n === 0,
+      () => `energy_storage spuriously carries lab-instrument-only standard(s) [${bessLabOnly.join(', ')}] — the lab CE-marking floor leaked into a plant class. It must be keyed off the lab-instrument signal, not applied blanket. Fix in src/lib/pdf-engine-v2/class-standards.ts.`,
     ))
   }
 
