@@ -6744,6 +6744,30 @@ def build_parts_manifest(parts):
                     "h": round(min(float((r.get("dims_mm") or {}).get("h", 8)), 8.0), 1),
                 }
 
+    # CONTAINMENT CLAMP (2026-07-21, PLAUSIBILITY P8): NO part may be larger than the
+    # enclosure shell it sits inside — a geometric impossibility a competent engineer rejects
+    # on sight. A wrong dim modifier (an LLM "200×200×100 mm" thermal pad) or a world-bbox echo
+    # can stamp a part bigger than the box that contains it. Uniformly scale any offender down
+    # to fit the shell's inner envelope (aspect preserved, orientation-free via sorted extents).
+    # Universal: only fires when a single enclosure-shell row exists (a plant with no shell, or a
+    # part that already fits, is untouched). Enforces at GENERATION what P8 catches after.
+    _shell = next((r for r in rows if re.search(
+        r"enclosure|shell|housing|chassis|main\s*body|cabinet", str(r.get("name") or ""), re.I)), None)
+    if _shell and isinstance(_shell.get("dims_mm"), dict):
+        _sv_shell = sorted((float(x) for x in _shell["dims_mm"].values()), reverse=True)
+        if len(_sv_shell) == 3 and all(v > 0 for v in _sv_shell):
+            for r in rows:
+                if r is _shell or not isinstance(r.get("dims_mm"), dict):
+                    continue
+                d = r["dims_mm"]
+                sv_part = sorted((float(v) for v in d.values()), reverse=True)
+                if len(sv_part) != 3:
+                    continue
+                over = max((sv_part[i] / (_sv_shell[i] * 0.95)) for i in range(3) if _sv_shell[i] > 0)
+                if over > 1.0:
+                    for k in list(d.keys()):
+                        d[k] = round(float(d[k]) / over, 1)
+
     # AGGREGATE FAMILIES (rack-farm / panel-array / tower-machine / aero-body) draw
     # their kit under a synthetic naming scheme, so per-word matching above finds
     # (almost) nothing. When that happens, recover the GA equipment from the drawn
