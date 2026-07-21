@@ -1,5 +1,17 @@
 # Organoid bioreactor → 9/10 on EVERY tab — master plan (2026-07-21)
 
+## POST-COMPACTION RESUME (2026-07-21, ~97% ctx — compacted while the FINAL bake ran)
+**Final bake:** `out/organoid-bioreactor-20260721-final/` (running in bg, PCB_STAGE=1, all fixes in; log at scratchpad/bake-organoid-final.log). When it lands, do the ADVERSARIAL SIGHT below — a 9 on the scorecard is a claim about the checks, NOT proof the tab is true. Try to FALSIFY each green:
+1. **temp-stability honesty (PRIORITY):** in `final/state.json`, is `orchestratorContract.quantities.temperature_stability_k` the DERIVED **0.133 K** (honest, tool `control_systems_run.derive_thermal_stability`) or a **0.5 K** that just ECHOES the brief's ≤0.5 K target? A mid-bake log line showed `[U6] temperature_stability_k = 0.5 K [derived]` — if the echo wins over the tool's 0.133 K, the Verification PASS is FALSE (requirement-echo trap, commit 19ae39abb). Fix precedence (tool value must win) + re-bake if so.
+2. **Open the delivered Excel CELLS (not tab-scorecard.json):** ⚠Checks (invariants genuinely PASS, not skipped) · BoM (count real MPNs vs 'TBD'; Stir Tachometer Sense + Sensor Cable were honest-TBD — is BoM still ≥8?) · Verification (every HARD row PASS WITH evidence) · Calculations (live formulas, not empty).
+3. **Cross-tab number reconciliation:** Exec cost == BoM total == cost-waterfall; a quantity that differs between two tabs is a real defect a green hides.
+4. **SIGHT the PNGs:** 04/07 product exterior, 00-hero cover (the cutaway was busy — polish candidate), open the drawing set.
+5. **OOS-tab audit:** the "out of scope" tabs at 10 — legitimately N/A or dodged?
+6. **Vision-critic** on the delivered hero (broken=false honestly).
+7. **RENDER CONTAINMENT BUG (Tristan SIGHT 2026-07-21):** the 00-hero CUTAWAY shows a box protruding from the RIGHT wall that the opaque 04/07 exterior hides. Root: the +x part cluster (Sterile Filter Vent pos x=47.6 + w13 → ~60mm vs ~51mm enclosure half-wall; also Front-Panel Connector Ports + Temperature Sensor box at x=40.8) protrudes past the right wall. R4 grew the enclosure for overall sprawl (phenotype 1.0×) but the +x cluster still pokes out. FIX (build_universal_scene.py): contain the +x cluster inside the envelope (or grow the enclosure to cover it) AND keep cutaway↔exterior geometry consistent. A green Renders score HID this — proves score≠truth.
+Then: ships ≥8/target-9 on EVERY tab only if the artefacts honestly pass; else the precise short punchlist. **PCB is Cursor's lane** (merge origin/cursor-pcb when flagged; stay off pcb/*). Tip before compaction ~`842630687`+.
+STATE GOING IN: 20+ tabs ≥9; cost £256 ex-works (<£385); 12+ real MPNs landing; Exec narrative live (templated, title-cased); temp-stability tool derives 0.133 K. All Terminal source fixes committed+pushed. Remaining honest risks: temp-stability echo (check #1), the 2 honest-TBD BoM lines, the busy 00-hero cutaway cover.
+
 ## THE GOAL (hold every turn)
 ONE genuine 9/10 organoid benchtop-bioreactor dossier: **every scored tab ≥8 (target 9)**, coherent Blender renders (clean product views + cutaway hero), complete engineering drawings, a fab-ready (or honest-ceiling) PCB, honest cost, ALL ⚠Checks pass, `ship_ok=True`. A chartered engineer would rely on it. Fixture: `out/organoid-bioreactor-20260721-rebake2`.
 
