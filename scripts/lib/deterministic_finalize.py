@@ -275,6 +275,68 @@ def rename_class_alien_control(state) -> int:
     return len(provenance)
 
 
+# CANONICAL component FUNCTIONS per module role — used to name an anonymous
+# "{Module} Subcomponent {N}" coverage proxy by the Nth function that role provides
+# but the design has not already named. Keyed on a module-role TOKEN, not a product
+# class. Honest: a bioreactor's sensing module genuinely needs optical-density +
+# dissolved-oxygen sensing (the brief states OD / growth monitoring), so these are
+# REAL functions the role must carry — not fabricated parts.
+_CANONICAL_MODULE_FUNCTIONS = [
+    (re.compile(r"sensing|instrumentation", re.I),
+     ["Optical Density Sensor", "Dissolved Oxygen Probe", "pH Probe",
+      "Level Sensor", "Turbidity Sensor", "Conductivity Sensor"]),
+    (re.compile(r"control|compute|communication", re.I),
+     ["Auxiliary Controller I/O", "Expansion Header", "Watchdog Supervisor"]),
+    (re.compile(r"power|distribution", re.I),
+     ["Auxiliary Power Regulator", "Power Filter Stage", "Bulk Decoupling Bank"]),
+]
+_SUBCOMPONENT_NAME_RE = re.compile(r"\bsubcomponent\s*\d+\b", re.I)
+
+
+def rename_generic_subcomponents(state) -> int:
+    """Fix (2026-07-21, Decision 2A): a synthesized '{Module} Subcomponent {N}' coverage
+    proxy is an anonymous placeholder that ships as a generic/duplicate BoM + register line
+    (PLAUSIBILITY P5 fails it). Name it by the Nth CANONICAL FUNCTION its module provides
+    that the design has NOT already named — honest (those functions are real for the role),
+    universal (module-role-keyed, no product class). A module with no canonical map, or one
+    whose functions are all already covered, leaves the generic name (honestly flagged)."""
+    patterns, provenance = [], []
+    for m in _modules(state):
+        mid = str(m.get("module") or m.get("module_id") or m.get("id") or "")
+        mname = str(m.get("name_human") or mid).replace("_", " ")
+        funcs = next((fl for rx, fl in _CANONICAL_MODULE_FUNCTIONS
+                      if rx.search(mid) or rx.search(mname)), None)
+        if not funcs:
+            continue
+        used = set()   # names already used by NAMED (non-subcomponent) siblings
+        for sm in (m.get("sub_modules") or []):
+            for w in _words(sm):
+                nm = _name(w)
+                if nm and not _SUBCOMPONENT_NAME_RE.search(nm):
+                    used.add(nm.lower())
+        avail = [f for f in funcs if f.lower() not in used]
+        ai = 0
+        for sm in (m.get("sub_modules") or []):
+            for w in _words(sm):
+                nm = _name(w)
+                if not nm or not _SUBCOMPONENT_NAME_RE.search(nm):
+                    continue
+                if ai >= len(avail):
+                    continue     # ran out of canonical functions → leave generic (honest)
+                new_name = avail[ai]; ai += 1
+                patterns.append((re.compile(r"(?<!\w)" + re.escape(nm) + r"(?!\w)", re.I),
+                                 new_name))
+                provenance.append((w,
+                    f"deterministic_finalize subcomponent_functional_rename: '{nm}' anonymous "
+                    f"coverage proxy → '{new_name}' (the next canonical {mname} function the "
+                    f"design had not named; id + modifier structure preserved)"))
+    if patterns:
+        _replace_everywhere(state, patterns)
+    for w, note in provenance:
+        w["rename_provenance"] = note
+    return len(provenance)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 0. sub_module_word_density — merge thin sub-modules into their densest sibling
 #
@@ -805,6 +867,9 @@ def finalize(state) -> dict:
         # class-alien rename VERY FIRST so every later fix (density merge / prose
         # coverage / overview scrub) sees the corrected, brief-named system name
         "class_alien_renamed": rename_class_alien_control(state),
+        # name anonymous "{Module} Subcomponent N" coverage proxies by their module's
+        # next canonical function (Decision 2A) BEFORE the density/prose passes see them
+        "subcomponent_functional_renamed": rename_generic_subcomponents(state),
         # scope-word demotion BEFORE the density merge so the merge's word-count
         # decisions see the FINAL word set (a sub-module a demotion thins out must
         # be judged on what's left, not on a count that's about to shrink)
