@@ -3077,10 +3077,62 @@ export function stripOversizeDimensionModifiers(modules: ModuleLike[], quantitie
   return stripped
 }
 
+// F2 (2026-07-21, organoid exit-32 cost blocker): one small thermal-control loop must not carry
+// TWO powered thermal actuators. A bidirectional Peltier/TEC already heats AND cools, so a
+// separate resistive heater on a trivially-small net duty (< 10 W) is provable redundancy.
+// Mirrors the F2 ⚠Check (deterministic_checks_lib.py `_checks_thermal_actuator_redundancy`) —
+// the CHECK detects it, this is the routed SOURCE fix ("collapse at equipment synthesis"): keep
+// the Peltier, demote every separate resistive heater to a scope note (never a priced line) via
+// the shared mis_emission_note mechanism. Fires ONLY when a Peltier AND a resistive heater are
+// BOTH present AND the net thermal duty is < 10 W: a kW-scale thermal cycler that genuinely needs
+// fast resistive heat never trips (duty gate); a design with no thermal-duty quantity never trips
+// (conservative — cannot prove it is small). Universal — no per-class table.
+const _F2_PELTIER_RE = /\b(peltier|thermo[- ]?electric|tec\s*module|\btec\b)\b/i
+const _F2_HEATER_RE = /\b(cartridge heater|resistive heat\w*|film heater|kapton heater|heating element|band heater|silicone heater|\bheater\b)\b/i
+
+export function collapseRedundantThermalActuator(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
+  const firstNum = (keys: string[]): number | undefined => {
+    for (const k of keys) { const v = Number(quantities?.[k]); if (Number.isFinite(v) && v !== 0) return v }
+    return undefined
+  }
+  let dutyW = firstNum(['net_heating_required_w', 'net_cooling_required_w', 'vessel_heat_loss_w'])
+  if (dutyW === undefined) {
+    const kw = firstNum(['system_thermal_dissipation_kw'])
+    if (kw !== undefined) dutyW = kw * 1000
+  }
+  if (dutyW === undefined || dutyW >= 10) return 0   // unknown duty (conservative) or genuinely large → no fire
+  const peltiers: WordLike[] = []
+  const heaters: WordLike[] = []
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        if ((w as { mis_emission_note?: string }).mis_emission_note) continue
+        const nm = String(w.name_human ?? w.content_character?.name_human ?? '')
+        const nmHead = nm.replace(/\s*\([^)]*\)\s*$/g, '').trim() || nm
+        if (_F2_PELTIER_RE.test(nmHead)) peltiers.push(w)
+        else if (_F2_HEATER_RE.test(nmHead)) heaters.push(w)
+      }
+    }
+  }
+  if (peltiers.length === 0 || heaters.length === 0) return 0   // only redundant when BOTH present
+  let demoted = 0
+  for (const w of heaters) {
+    ;(w as { mis_emission_note?: string }).mis_emission_note =
+      `redundant thermal actuator: a bidirectional Peltier/TEC already heats AND cools this ` +
+      `${dutyW.toFixed(2)} W loop (< 10 W), so this separate resistive heater is redundant — ` +
+      `collapsed to one thermal actuator, demoted to a scope note (never a priced line)`
+    demoted += 1
+  }
+  return demoted
+}
+
 export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3, briefPinnedKeys?: Set<string>): number {
   // Air-cooled-scale demotion runs FIRST (both synthesis paths call this explode —
   // the Codema two-paths lesson), so a demoted plant word is never decomposed below.
   demoteLiquidThermalPlantAtAirCooledScale(modules, quantities)
+  // F2: redundant Peltier+resistive-heater on a sub-10 W duty → keep the Peltier, demote the
+  // heater (before explode, so the demoted heater never decomposes into priced children).
+  collapseRedundantThermalActuator(modules, quantities)
   // Supervisory-controller populations + near-synonym duplicates normalise here too,
   // for the same both-paths reason: a demoted duplicate must never explode into
   // priced children, and an invented ×N must never smear into sub-assembly pricing.

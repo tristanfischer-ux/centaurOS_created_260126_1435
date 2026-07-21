@@ -272,6 +272,38 @@ const dimNoEnv: any = { sub_modules: [{ words: [
 expect(stripOversizeDimensionModifiers([dimNoEnv], {}) === 0,
   'no enclosure signal must be a strict no-op (utility/open-skid byte-identity)')
 
+// ── 12. F2: redundant Peltier + resistive heater on a sub-10 W duty → keep the Peltier,
+//     demote the heater; a kW-scale duty (thermal cycler) keeps both; no duty quantity = no-op ──
+import { collapseRedundantThermalActuator } from './universal-contract-sizing'
+const thermMod: any = { sub_modules: [{ words: [
+  mkWord('peltier_tec_module_word', 'Peltier TEC Module', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('cartridge_heater_word', 'Cartridge Heater', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(collapseRedundantThermalActuator([thermMod], { net_heating_required_w: 0.93 }) === 1,
+  'a 0.93 W loop with a Peltier + cartridge heater must demote the heater (exactly 1)')
+const heaterW = thermMod.sub_modules[0].words.find((w: any) => w.id === 'cartridge_heater_word')
+const peltierW = thermMod.sub_modules[0].words.find((w: any) => w.id === 'peltier_tec_module_word')
+expect(!!heaterW.mis_emission_note, 'the redundant resistive heater must be demoted')
+expect(!peltierW.mis_emission_note, 'the bidirectional Peltier must be KEPT (never demoted)')
+// NO FALSE POSITIVE: a kW-scale thermal cycler genuinely needs fast resistive heat + Peltier cooling
+const cyclerMod: any = { sub_modules: [{ words: [
+  mkWord('peltier_tec_module_word', 'Peltier TEC Module', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('film_heater_word', 'Film Heater', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(collapseRedundantThermalActuator([cyclerMod], { net_heating_required_w: 250 }) === 0,
+  'a 250 W duty must keep BOTH actuators (above the 10 W redundancy ceiling)')
+// NO FALSE POSITIVE: no thermal-duty quantity → conservative no-op (cannot prove the duty is small)
+expect(collapseRedundantThermalActuator([{ sub_modules: [{ words: [
+  mkWord('peltier_tec_module_word', 'Peltier TEC Module', []),
+  mkWord('cartridge_heater_word', 'Cartridge Heater', []),
+] }] } as any], {}) === 0,
+  'no thermal-duty quantity must be a strict no-op')
+// NO FALSE POSITIVE: a Peltier ALONE (no separate heater) is not redundant
+expect(collapseRedundantThermalActuator([{ sub_modules: [{ words: [
+  mkWord('peltier_tec_module_word', 'Peltier TEC Module', []),
+] }] } as any], { net_heating_required_w: 0.5 }) === 0,
+  'a single Peltier (no separate heater) must not be demoted')
+
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '
   + 'plant-scale default calibration preserved; air-cooled scale demotes tank/pump/chiller '
