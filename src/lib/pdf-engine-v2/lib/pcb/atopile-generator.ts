@@ -586,6 +586,12 @@ function isRealPartNumber(pn: string | undefined): pn is string {
   return norm.length >= 3
 }
 
+// INTENT (P7): Roles that define the human/power/firmware interface of a board
+// must carry a catalogue MPN — a silent package_family default is an architecture lie.
+// Keyed on character_id nouns (universal), not product class.
+const PCB_INTERFACE_CRITICAL_ROLE =
+  /usb[_-]?(?:power|interface|connector|entry)|power[_-]?indicator[_-]?led|esd[_-]?protection|microcontroller_mcu|firmware[_-]?storage|current[_-]?limit[_-]?polyfuse/i
+
 // ── Component + net records ─────────────────────────────────────────────────────
 
 export type ResolutionTier =
@@ -1159,6 +1165,46 @@ function resolveComponent(
         characterId: word.characterId,
         reason:
           'usb_power_entry cannot use PinHeader_* — need a USB receptacle footprint/MPN or leave unresolved',
+      },
+    }
+  }
+
+  // P3: a denylisted MPN that fell through to a bare package must not place —
+  // prefer the denylist reason (operator-actionable) over a generic interface gap.
+  // GOTCHA: tier (a.5) may overwrite identityBlocker with a curated-miss string;
+  // re-read the denylist from the original partNumber so the TE-LED reason survives.
+  const denyAfterFallback = partNumber ? isDeniedPcbMpn(partNumber) : null
+  if (
+    !mpnVerified
+    && (tier === 'package_family' || tier === 'function_class')
+    && denyAfterFallback
+  ) {
+    return {
+      unresolved: {
+        wordId: word.wordId,
+        nameHuman: word.nameHuman,
+        characterId: word.characterId,
+        reason: denyAfterFallback,
+      },
+    }
+  }
+
+  // P7: interface-critical roles may not stay on a bare package_family / function_class
+  // default — Fix 1 already floors FAB-READY on non-catalogue tiers; this forces an
+  // honest electronic gap instead of a silent generic footprint for USB/ESD/MCU/flash/fuse.
+  // DECISION: role set matches CURSOR-PCB-HONESTY Fix 7 (noun/role keyed, not per-product).
+  if (
+    !mpnVerified
+    && PCB_INTERFACE_CRITICAL_ROLE.test(word.characterId)
+    && (tier === 'package_family' || tier === 'function_class')
+  ) {
+    return {
+      unresolved: {
+        wordId: word.wordId,
+        nameHuman: word.nameHuman,
+        characterId: word.characterId,
+        reason:
+          `interface-critical role '${word.characterId}' requires a catalogue MPN — package_family default is not enough`,
       },
     }
   }

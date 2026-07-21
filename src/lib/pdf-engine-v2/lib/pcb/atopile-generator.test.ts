@@ -84,11 +84,13 @@ describe('atopile-generator', () => {
       tmpDirs.push(outDir)
       const result = generateAtopileProject(state, outDir)
 
-      // The colorimeter design has on-board IC/passive/connector words plus
-      // front-panel/controller/display modules that are now intentionally off-board
-      // COTS assemblies. Assert sane floors, not exact counts.
-      expect(result.components.length).toBeGreaterThanOrEqual(10)
-      expect(result.offBoard.length).toBeGreaterThanOrEqual(1)
+      // INTENT: Floor is on-board count after role-identity COTS disposition, not the
+      // pre-collector total. Host modules (main_controller / display_panel /
+      // status_indicator) correctly leave the board — that is a reclassification,
+      // not a silent drop (sibling test still asserts every word lands somewhere).
+      // Live measure on out/colorimeter-20260712-1010: 9 on-board + 3 off-board + 0 unresolved.
+      expect(result.components.length).toBeGreaterThanOrEqual(9)
+      expect(result.offBoard.length).toBeGreaterThanOrEqual(3)
       for (const component of result.components) {
         expect(component.footprint).not.toBeNull()
         expect(component.footprint!.library.length).toBeGreaterThan(0)
@@ -1215,10 +1217,49 @@ describe('atopile-generator', () => {
       expect(usb.footprint?.library).toBe('Connector_USB')
       expect(usb.footprint?.footprint).toMatch(/USB_/i)
       expect(usb.footprint?.footprint).not.toMatch(/PinHeader/i)
+      // Catalogue-verified path only — P7 forbids bare package_family for USB roles.
+      expect(usb.mpnVerified).toBe(true)
     } else {
       expect(unresolved).toBeDefined()
-      expect(unresolved?.reason).not.toMatch(/PinHeader/i)
+      // P4 PinHeader ban OR P7 interface-critical MPN gap — either is honest.
+      expect(unresolved?.reason).toMatch(/USB|interface-critical|catalogue MPN/i)
     }
+  })
+
+  it('P7: interface-critical role without catalogue MPN lands in unresolved[]', () => {
+    const outDir = makeTmpDir('atopile-p7-interface-critical-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'control',
+          sub_modules: [{
+            id: 'control__mcu',
+            words: [{
+              id: 'microcontroller_mcu_word',
+              name_human: 'Microcontroller MCU',
+              content_character: { character_id: 'microcontroller_mcu' },
+              modifier_characters: [
+                { kind: 'quantity', value: '×1' },
+                { kind: 'form', value: 'ARM Cortex-M0+ MCU, LQFP-32 package' },
+              ],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['microcontroller_mcu_word'],
+    })
+    const onBoard = result.components.find((c) => c.wordId === 'microcontroller_mcu_word')
+    const gap = result.unresolved.find((u) => u.wordId === 'microcontroller_mcu_word')
+
+    // proveCatch: package_family default alone must NOT place an interface-critical MCU.
+    expect(onBoard).toBeUndefined()
+    expect(gap).toBeDefined()
+    expect(gap!.reason).toMatch(/interface-critical|catalogue MPN/i)
   })
 
   it('records architecture channel requirements without inventing fitted components', () => {
