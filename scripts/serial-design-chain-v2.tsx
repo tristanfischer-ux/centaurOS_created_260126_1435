@@ -70,11 +70,9 @@ import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { runWordDomainCoherence, type WordDomainCoherenceResult, runToolImpliedComponentGrounding, type ToolImpliedComponentResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
-import { derivePcbArchitecture } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-architecture'
-import { generateAtopileProject } from '../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
+import { runBespokeMultiBoardPcb } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-multi-board-run'
 import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
-import { evaluatePcbDesignFitness } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-design-fitness'
 import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-spec'
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
 import { runTier0FirmwareProof } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
@@ -9997,109 +9995,56 @@ async function main() {
       if (pcbResult.disposition === 'bespoke') {
         if (pcbResult.canAuthor) {
           try {
-            const pcbProjectDir = resolve(outDir, 'pcb-project')
-            // INTENT (2026-07-19, organoid 1546 floor): architecture on-board
-            // scope must reach generateAtopileProject as requiredWordIds — without
-            // it, instrument COTS heuristics dump host rail parts off-board and
-            // ship a 3-footprint token board while electronicPartCount stays ~12.
-            // FLOW: derivePcbArchitecture → state.pcb.architecture → generator opts
-            // (same scope contract as pcb-yuri-gold-harness).
-            const architecture = derivePcbArchitecture(stPcb)
+            // INTENT (2026-07-21): FUNDAMENTAL FIX — architecture plans N KiCad
+            // boards; do NOT flatMap them into one project (that was multiBoardMerged
+            // forever + pad-soup placement). FLOW: runBespokeMultiBoardPcb →
+            // per-board generateAtopileProject + pipeline → aggregate fitness/channels.
+            const multi = runBespokeMultiBoardPcb(stPcb, outDir, runPcbPipeline)
+            const { architecture, designFitness, pipeline: record } = multi
+            const genComponents = multi.allComponents
+            const pcbProjectDir = multi.boardPipelines[0]?.projectDir ?? resolve(outDir, 'pcb-project')
             stPcb.pcb.architecture = architecture
             pcb.architecture = architecture
-            const onBoardWordIds = [...new Set(
-              architecture.boards.flatMap((board) => board.requiredWordIds),
-            )]
-            const primaryBoard =
-              architecture.boards.find((board) => board.role === 'wet_lab_hat' && board.requiredWordIds.length > 0)
-              ?? architecture.boards.find((board) => board.requiredWordIds.length > 0)
-              ?? architecture.boards[0]
-            const genResult = generateAtopileProject(stPcb, pcbProjectDir, {
-              requiredWordIds: onBoardWordIds.length > 0 ? onBoardWordIds : undefined,
-              boardShape: primaryBoard?.shape,
-              requiredFunctionRoles: architecture.boards.flatMap((board) =>
-                board.channelRequirements.map((requirement) => requirement.role),
-              ),
-            })
-            // P5 honesty: architecture may require N KiCad deliverables; chain still
-            // emits one merged project — flag so Excel/gate can refuse FAB-READY.
-            const kicadBoards = architecture.boards.filter((b) => b.requiresKiCadDeliverable)
-            const multiBoardMerged = kicadBoards.length > 1
-            stPcb.pcb.multiBoardMerged = multiBoardMerged
-            pcb.multiBoardMerged = multiBoardMerged
-            if (multiBoardMerged) {
-              console.error(
-                `[chain] PCB honesty: multiBoardMerged=true (${kicadBoards.length} KiCad boards → one project)`,
-              )
-            }
-            // P4b: architecture-vs-implementation fitness (P9b prerequisite).
-            // INTENT: Channel counts stay 0 until a real topology maps components to
-            // channel roles — fail closed (channel_under_implementation) rather than
-            // inventing "implemented" from footprint count alone.
-            const implementedChannels: Record<string, number> = {}
-            for (const fr of genResult.functionRequirements) {
-              implementedChannels[fr.role] =
-                fr.implementation === 'passive_board_geometry' ? 1 : 0
-            }
-            for (const board of architecture.boards) {
-              for (const req of board.channelRequirements) {
-                if (implementedChannels[req.role] === undefined) {
-                  implementedChannels[req.role] = 0
-                }
-              }
-            }
-            const designFitness = evaluatePcbDesignFitness(architecture, {
-              resolvedWordIds: genResult.components.map((c) => c.wordId),
-              unresolvedWordIds: genResult.unresolved.map((u) => u.wordId),
-              implementedChannels,
-            })
+            stPcb.pcb.multiBoardMerged = multi.multiBoardMerged
+            pcb.multiBoardMerged = multi.multiBoardMerged
+            stPcb.pcb.boardPipelines = multi.boardPipelines.map((b) => ({
+              boardId: b.boardId,
+              role: b.role,
+              projectDir: b.projectDir,
+              pipelineOk: b.pipeline.ok,
+              stageReached: b.pipeline.stageReached,
+              componentCount: b.generator.components.length,
+              unresolvedCount: b.generator.unresolved.length,
+            }))
+            pcb.boardPipelines = stPcb.pcb.boardPipelines
             stPcb.pcb.designFitness = designFitness
             pcb.designFitness = designFitness
+            stPcb.pcb.pipeline = record
+            pcb.pipeline = record
             console.error(
               `[chain] PCB designFitness: ok=${designFitness.ok} findings=${designFitness.findings.length}`,
             )
             console.error(
               `[chain] PCB architecture: disposition=${architecture.systemDisposition} ` +
               `boards=[${architecture.boards.map((b) => `${b.role}:${b.requiredWordIds.length}`).join(',')}] ` +
-              `on_board_scope=${onBoardWordIds.length}`,
+              `kicad_projects=${multi.kicadBoardCount} multiBoardMerged=${multi.multiBoardMerged}`,
             )
-            console.error(
-              `[chain] PCB atopile project: ${genResult.components.length} component(s), ` +
-              `${genResult.offBoard.length} off-board COTS, ${genResult.unresolved.length} unresolved, ` +
-              `${genResult.nets.length} net(s) -> ${pcbProjectDir}`,
-            )
-            const pipelineResult = runPcbPipeline(pcbProjectDir, outDir)
-            const record: PcbPipelineRecord = {
-              ...pipelineResult,
-              generator: {
-                componentCount: genResult.components.length,
-                netCount: genResult.nets.length,
-                offBoardCount: genResult.offBoard.length,
-                offBoard: genResult.offBoard,
-                unresolvedCount: genResult.unresolved.length,
-                unresolved: genResult.unresolved,
-                components: genResult.components.map((c) => ({
-                  instanceName: c.instanceName,
-                  nameHuman: c.nameHuman,
-                  characterId: c.characterId,
-                  manufacturer: c.manufacturer,
-                  partNumber: c.partNumber,
-                  footprint: c.footprint ? { library: c.footprint.library, footprint: c.footprint.footprint } : null,
-                  resolutionTier: c.resolutionTier,
-                  quantityInDesign: c.quantityInDesign,
-                })),
-              },
+            for (const b of multi.boardPipelines) {
+              console.error(
+                `[chain] PCB board ${b.boardId}: ${b.generator.components.length} component(s), ` +
+                `${b.generator.unresolved.length} unresolved, pipeline.ok=${b.pipeline.ok} ` +
+                `stage=${b.pipeline.stageReached} -> ${b.projectDir}`,
+              )
             }
-            stPcb.pcb.pipeline = record
-            pcb.pipeline = record
             console.error(
-              `[chain] PCB pipeline: ok=${pipelineResult.ok} stage_reached=${pipelineResult.stageReached} ` +
-              `routed=${pipelineResult.routed} drc_violations=${pipelineResult.drc.violations}`,
+              `[chain] PCB pipeline aggregate: ok=${record.ok} stage_reached=${record.stageReached} ` +
+              `routed=${record.routed} drc_violations=${record.drc.violations}`,
             )
             logAction({
-              step: 'pcb_pipeline', ok: pipelineResult.ok, stage_reached: pipelineResult.stageReached,
-              routed: pipelineResult.routed, drc_violations: pipelineResult.drc.violations,
-              off_board_cots: genResult.offBoard.length, unresolved: genResult.unresolved.length,
+              step: 'pcb_pipeline', ok: record.ok, stage_reached: record.stageReached,
+              routed: record.routed, drc_violations: record.drc.violations,
+              boards: multi.kicadBoardCount,
+              unresolved: multi.allUnresolved.length,
             })
 
             // P9b MVP: Tier-0 firmware proof — fail closed; never alone → FUNCTIONALLY VERIFIED.
@@ -10112,7 +10057,7 @@ async function main() {
                 result: ReturnType<typeof runTier0FirmwareProof>
               }> = []
               for (const thin of thinSpecs) {
-                const mcuComp = genResult.components.find((c) =>
+                const mcuComp = genComponents.find((c) =>
                   /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
                 const fat = buildFirmwareProofContract({
                   thin,
@@ -10120,7 +10065,7 @@ async function main() {
                   mcu: mcuComp?.partNumber
                     ? { mpn: mcuComp.partNumber, manufacturer: mcuComp.manufacturer ?? undefined }
                     : undefined,
-                  components: genResult.components.map((c) => ({
+                  components: genComponents.map((c) => ({
                     wordId: c.wordId,
                     refdes: c.instanceName,
                     mpn: c.partNumber,

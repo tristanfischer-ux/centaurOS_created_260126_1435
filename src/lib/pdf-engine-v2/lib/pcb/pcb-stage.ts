@@ -456,6 +456,19 @@ export interface PcbStageResult {
   }
   /** True when architecture needs >1 KiCad deliverable but chain emitted one project (P5). */
   multiBoardMerged?: boolean
+  /**
+   * Per-board pipeline summaries when `runBespokeMultiBoardPcb` emitted one
+   * KiCad project per `requiresKiCadDeliverable` board (2026-07-21).
+   */
+  boardPipelines?: Array<{
+    boardId: string
+    role: string
+    projectDir: string
+    pipelineOk: boolean
+    stageReached: string
+    componentCount: number
+    unresolvedCount: number
+  }>
   /** Tier-0 firmware proof stage record (P9b) — never alone upgrades to FUNCTIONALLY VERIFIED. */
   firmwareProof?: {
     schema: 'pcb-firmware-proof-stage/v1'
