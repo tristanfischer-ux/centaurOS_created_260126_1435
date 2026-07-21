@@ -1872,20 +1872,40 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
             pid_na = False
 
     drawing_pass = {}
+    drawing_skipped = {}
     dg_path = os.path.join(run_dir or "", "drawing-gates.json")
     if os.path.isfile(dg_path):
         try:
+            _dg_drawings = (json.load(open(dg_path)).get("drawings") or {})
             drawing_pass = {
                 str(name): bool((entry or {}).get("pass"))
-                for name, entry in (json.load(open(dg_path)).get("drawings") or {}).items()
+                for name, entry in _dg_drawings.items()
+                if isinstance(entry, dict)
+            }
+            # A drawing the gate marks status=="skipped" (deliberately not applicable to
+            # THIS product — e.g. an SLD/P&ID on a fluid-less benchtop instrument) is not a
+            # coverage DEFECT; it is a not-in-scope sheet. NinjaPCR 1330 covered the case
+            # where the sheet was ABSENT from drawing-gates.json entirely; the organoid
+            # instrument (2026-07-21) surfaced the SIBLING case where the sheet IS present
+            # but carries pass=false/status=skipped/failing_gates=[] — deliberately unscored,
+            # yet the old guard read pass=false as a coverage failure and floored Verification.
+            drawing_skipped = {
+                str(name): (str((entry or {}).get("status") or "").strip().lower() == "skipped")
+                for name, entry in _dg_drawings.items()
                 if isinstance(entry, dict)
             }
         except (OSError, ValueError):
             drawing_pass = {}
+            drawing_skipped = {}
 
     def _coverage_applicable(name: str) -> bool:
         norm = str(name).lower().replace("_", "-")
         if pid_na and norm in ("pid", "p&id"):
+            return False
+        # A gate-SKIPPED sheet (not applicable to this product) is never a coverage
+        # defect, regardless of the sheet family — universal, keyed on the gate's own
+        # status, not a per-drawing name list.
+        if drawing_skipped.get(norm):
             return False
         # GOTCHA (NinjaPCR 1330): fluid-less / sealed instruments do not emit
         # panel-schedule or SLD (pack_drawings = GA+interconnect only). The
@@ -4064,6 +4084,51 @@ def _selftest() -> int:
         repe3 = audit_dossier(inst_state, clean_rows, run_dir=te3)
         expect(not any(f.check == "coverage_partial" for f in repe3.findings),
                "E3: isInstrumentDevice must skip absent SLD/PNL (NinjaPCR coverage_partial)")
+
+    # ---- Fixture E4 (organoid 2026-07-21): a drawing PRESENT in drawing-gates but
+    # status=="skipped" (pass:false, failing_gates:[]) is a not-applicable sheet, NOT a
+    # coverage defect. Proves the skipped-status skip; and (negative) a genuinely-FAILING
+    # SLD (pass:false, NOT skipped, under-covered) must STILL flag on a non-instrument.
+    with tempfile.TemporaryDirectory() as te4:
+        with open(os.path.join(te4, "drawing-gates.json"), "w") as fh:
+            json.dump({"drawings": {
+                "single-line-diagram": {"pass": False, "status": "skipped", "failing_gates": []},
+                "pid": {"pass": False, "status": "skipped", "failing_gates": []},
+            }}, fh)
+        with open(os.path.join(te4, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 260, "coverage_by_drawing": {
+                "general-arrangement": {"expected": 34, "present": 34},
+                "blender": {"expected": 34, "present": 34},
+                "single-line-diagram": {"expected": 2, "present": 0},
+                "pid": {"expected": 0, "present": 0},
+            }}, fh)
+        inst4 = {
+            **clean_state,
+            "isInstrumentDevice": True,
+            "orchestratorContract": {
+                "product_class": "organoid_bioreactor",
+                "quantities": {"enclosure_volume_m3": {"value": 0.004, "unit": "m3"}},
+            },
+        }
+        repe4 = audit_dossier(inst4, clean_rows, run_dir=te4)
+        expect(not any(f.check == "coverage_partial" for f in repe4.findings),
+               "E4: a gate-SKIPPED SLD (0/2) must not create coverage_partial")
+        # NEGATIVE: a non-skipped, genuinely-failing SLD on a NON-instrument still flags.
+        with open(os.path.join(te4, "drawing-gates.json"), "w") as fh:
+            json.dump({"drawings": {
+                "single-line-diagram": {"pass": False, "status": "fail",
+                                        "failing_gates": ["G3"]},
+            }}, fh)
+        plant4 = {
+            **clean_state,
+            "orchestratorContract": {
+                "product_class": "bess",
+                "quantities": {"enclosure_volume_m3": {"value": 30.0, "unit": "m3"}},
+            },
+        }
+        repe4b = audit_dossier(plant4, clean_rows, run_dir=te4)
+        expect(any(f.check == "coverage_partial" for f in repe4b.findings),
+               "E4-neg: a genuinely-FAILING SLD (0/2, not skipped) on a plant must still flag")
 
     # ---- Fixture F: phantom reference in connection trace -> HIGH -------------
     with tempfile.TemporaryDirectory() as tf:

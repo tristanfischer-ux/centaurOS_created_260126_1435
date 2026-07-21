@@ -4362,6 +4362,81 @@ def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
     return r + 1
 
 
+def _render_brief_constraint_fidelity(ws: Worksheet, fid: List[dict], r: int) -> int:
+    """Render the 'Brief constraint fidelity — does the design honour each stated
+    constraint?' table on the Brief tab (2026-07-21). One row per STATED brief constraint
+    with numeric Target · Achieved and a LIVE verdict formula (col D recomputes from B/C —
+    never a bare 'PASS' literal, which the no-cheating gate forbids). Columns: A claim ·
+    B target · C achieved · D verdict(live) · E provenance. Returns the next free row."""
+    set_widths(ws, {"A": 80, "B": 14, "C": 14, "D": 12, "E": 46})
+    sub_banner(ws, r, "Brief constraint fidelity — does the design honour each stated "
+                      "constraint?", 5)
+    r += 1
+    note = ws.cell(r, 1,
+                   "Each STATED brief constraint is checked against the design's achieved "
+                   "value; the Verdict cell recomputes live from Target vs Achieved (the same "
+                   "proof the Verification tab carries). A PASS proves the engine's structured "
+                   "interpretation honours the constraint; a stability/tolerance requirement "
+                   "with no DERIVED achieved figure reads UNVERIFIED — a setpoint echo never "
+                   "satisfies it.")
+    note.font = Font(italic=True, size=9, color="555555")
+    note.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    ws.row_dimensions[r].height = 42
+    r += 1
+    _cols = ["Stated brief constraint", "Target", "Achieved", "Verdict (live)", "Provenance"]
+    for i, name in enumerate(_cols, start=1):
+        c = ws.cell(r, i, name)
+        c.font = FONT_HEADER
+        c.fill = FILL_HEADER
+        c.border = BORDER
+        c.alignment = Alignment(vertical="center", wrap_text=True)
+    _hdr = r
+    r += 1
+    for row in fid:
+        _unit = str(row.get("unit") or "")
+        _cmp = str(row.get("compare") or "ge")
+        _tol = float(row.get("tol_frac") or 0.02)
+        _tn = row.get("target_num")
+        _an = row.get("achieved_num")
+        cA = ws.cell(r, 1, clean_cell(str(row.get("claim") or "—"))); cA.font = FONT_SUB
+        # Target / Achieved numeric where available (so the verdict formula is live), else "—".
+        if isinstance(_tn, (int, float)):
+            ws.cell(r, 2, _tn)
+        else:
+            ws.cell(r, 2, clean_cell(str(row.get("target") or "—")))
+        if isinstance(_an, (int, float)):
+            ws.cell(r, 3, _an)
+        else:
+            ws.cell(r, 3, clean_cell("—"))
+        if _unit:
+            ws.cell(r, 2).number_format = "0.###"
+            ws.cell(r, 3).number_format = "0.###"
+        # LIVE verdict: recompute PASS/FAIL/UNVERIFIED from B (target) vs C (achieved).
+        _nums = f"AND(ISNUMBER(B{r}),ISNUMBER(C{r}))"
+        if _cmp == "le":
+            _cond = f"C{r}<=B{r}+ABS(B{r})*{_tol}"
+        elif _cmp in ("eq", "eq_frac"):
+            _cond = f"ABS(C{r}-B{r})<=MAX(ABS(B{r})*{_tol},1E-9)"
+        else:  # ge (default)
+            _cond = f"C{r}>=B{r}-ABS(B{r})*{_tol}"
+        vc = ws.cell(r, 4, f'=IF(NOT({_nums}),"UNVERIFIED",IF({_cond},"PASS","FAIL"))')
+        vc.alignment = Alignment(horizontal="center")
+        pc = ws.cell(r, 5, clean_cell(str(row.get("provenance") or "—")))
+        pc.font = FONT_NOTE
+        pc.alignment = WRAP_TOP
+        r += 1
+    # Conditional-format the live verdict column green/red so the reader sees PASS/FAIL colour
+    # without a static literal (the value is a formula; the colour is a rule).
+    from openpyxl.formatting.rule import CellIsRule
+    _vrange = f"D{_hdr + 1}:D{r - 1}"
+    ws.conditional_formatting.add(_vrange, CellIsRule(
+        operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS))
+    ws.conditional_formatting.add(_vrange, CellIsRule(
+        operator="equal", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL))
+    return r + 1
+
+
 def tab_brief(wb: Workbook, state: dict, run_dir: str) -> None:
     """The ORIGINAL client brief (left) vs the engine's ENHANCED, structured brief
     (right). Original = 0-original-brief.md (prose, one paragraph per row, wrapped);
@@ -4478,9 +4553,19 @@ def tab_brief(wb: Workbook, state: dict, run_dir: str) -> None:
 
     # ── Client offer vs this design, by subsystem (fix 1, reviewers 2026-07-02) ──
     recon = _client_offer_reconciliation(state, orig, _load_brief_decisions(orig))
+    _next_r = max(left_r, right_r) + 2
     if recon:
         state["_clientOfferRecon"] = recon      # the holds register reads this
-        _render_client_offer_recon(ws, recon, max(left_r, right_r) + 2)
+        _next_r = _render_client_offer_recon(ws, recon, _next_r) + 2
+
+    # ── Brief↔design constraint fidelity (2026-07-21) — the REAL content check the
+    # Brief tab verifies: does the design honour each STATED brief constraint? Renders
+    # the verification spine's brief-axis rows (target vs achieved vs PASS/FAIL/
+    # UNVERIFIED) so the reader SEES the check the scorer runs — not a populated-but-
+    # unverified interpretation. Universal; shown whenever the brief states a constraint.
+    _fid = _brief_constraint_fidelity(state, run_dir)
+    if _fid:
+        _render_brief_constraint_fidelity(ws, _fid, _next_r)
 
     ws.freeze_panes = "A4"
     back_link(ws, 3)
@@ -9115,10 +9200,35 @@ def _bom_noun_qty(bom: list, noun_rx: re.Pattern) -> float:
     for b in bom or []:
         if not isinstance(b, dict):
             continue
-        blob = " ".join(str(b.get(k) or "") for k in ("requirement", "part", "tag", "name"))
+        # Match against BOTH the requirementsBom shape (requirement/part/tag/name) AND the
+        # partVerifications shape (word_id/word_name/name_human) — the realisation bill can
+        # come from either source (see _realisation_bill).
+        blob = " ".join(str(b.get(k) or "") for k in (
+            "requirement", "part", "tag", "name",
+            "word_id", "word_name", "name_human"))
         if noun_rx.search(blob):
-            total += num(b.get("qty")) or 0.0
+            total += num(b.get("qty") or b.get("quantity")) or 1.0
     return total
+
+
+def _realisation_bill(state: dict) -> Tuple[List[dict], str]:
+    """The bill the realisation checks read: state.requirementsBom when populated, else a
+    fallback to state.partVerifications (2026-07-21).
+
+    WHY: a run can carry its bill as `partVerifications` (37 priced parts, £259 total on the
+    organoid instrument) with NO `requirementsBom` list at all — a legitimate render mode, not
+    an empty design. The realisation spine read ONLY `requirementsBom`, so it FALSE-FAILED the
+    'Bill of materials' HARD row and the noun-match rows (e.g. Path-length hardware, which the
+    design DOES carry as a 'Vial Holder Fixture' + '625nm LED Emitter' + 'Photodetector') —
+    flooring Verification on a bill that is actually present. Returns (bill_rows, source_label);
+    empty only when the design genuinely has neither bill."""
+    rb = state.get("requirementsBom")
+    if isinstance(rb, list) and rb:
+        return rb, "requirementsBom"
+    pv = state.get("partVerifications")
+    if isinstance(pv, list) and pv:
+        return pv, "partVerifications"
+    return [], "requirementsBom"
 
 
 def _pcb_pos_count(run_dir: str) -> Optional[int]:
@@ -9436,7 +9546,7 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
         ))
 
     # ── realisation: BoM / PCB match the maths ──
-    bom = state.get("requirementsBom") or []
+    bom, _bom_src = _realisation_bill(state)
     for qty_rx, bom_rx, label in _REALISATION_BOM_SIGNALS:
         demand = any(qty_rx.search(qn) for qn in quantities)
         if not demand:
@@ -9446,7 +9556,7 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             "realisation", label,
             status=_status_from_compare("ge", 1.0, got, 0),
             hardness="HARD",
-            provenance="requirementsBom noun match for contract quantity signal",
+            provenance=f"{_bom_src} noun match for contract quantity signal",
             target=1, achieved=got, unit="qty",
             target_num=1.0, achieved_num=got, compare="ge", tol_frac=0,
         ))
@@ -9455,7 +9565,7 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
         rows.append(_verif_row(
             "realisation", "Bill of materials",
             status="FAIL", hardness="HARD",
-            provenance="state.requirementsBom empty",
+            provenance="state.requirementsBom + state.partVerifications both empty",
             target=1, achieved=0, unit="lines",
             target_num=1.0, achieved_num=0.0, compare="ge", tol_frac=0,
         ))
@@ -24141,11 +24251,55 @@ def _sc_overview(wb, ws, state, run_dir):
             "mech": "dashboard integrity (every quoted number vs its engine source)", "fix": ""}
 
 
+def _brief_constraint_fidelity(state: dict, run_dir: str = "") -> List[dict]:
+    """The brief↔design fidelity checks the Brief tab verifies — one row per STATED
+    brief constraint (working volume, culture temperature, stability, cost ceiling,
+    mass, every target_performance metric), each with target · achieved · PASS/FAIL/
+    UNVERIFIED. Reuses the verification spine's BRIEF-AXIS rows (the SAME closed
+    target-vs-achieved arithmetic the Verification tab already computes) — so the Brief
+    tab proves the engine's structured interpretation honours each constraint rather
+    than merely re-displaying a populated interpretation. Universal (fires on any brief
+    that states target_performance / derived_requirements / a cost or mass ceiling),
+    keyed on the brief's own constraints — no per-class table. Returns [] when the brief
+    carries no verifiable constraints (then the ZERO-CHECK guard still applies).
+
+    Returns the RAW spine row dicts (carrying target_num/achieved_num/compare/tol_frac) so
+    the Brief-tab renderer can emit a LIVE status formula (never a bare verdict literal —
+    the no-cheating gate forbids those); the stringified `as_dict` rows drop the numeric
+    fields the formula needs."""
+    try:
+        rows = _assemble_verification_rows(state or {}, run_dir or "")
+    except Exception:  # noqa: BLE001
+        return []
+    return [r for r in rows if str(r.get("axis")).strip().lower() == "brief"]
+
+
 def _sc_brief(wb, ws, state, run_dir):
     comps = []
     iss = []
     secs = ((state.get("_clientOfferRecon") or {}).get("sections") or [])
     rows = _fam_rows(wb, ws.title, "recon")
+    # ── BRIEF↔DESIGN CONSTRAINT FIDELITY (2026-07-21, Pillar 3) ──
+    # An instrument-shaped brief (organoid bioreactor: 37 °C, ml working volume, OD,
+    # £275-385) carries NO client-offer per-section cost table, so the client-offer
+    # reconciliation legitimately returns None and the tab used to fall through to the
+    # ZERO-CHECK cap (4.0) — a populated-but-unverified Brief. Verify each STATED brief
+    # constraint against the design instead: reuse the verification spine's brief-axis
+    # rows (working volume / culture temperature / stability / cost ceiling / mass /
+    # target_performance), each a real target-vs-achieved check. A HARD constraint that
+    # is FAIL/UNVERIFIED counts against the tab (never a fake PASS-by-echo); a stability
+    # requirement with no derived achieved figure honestly reads UNVERIFIED.
+    fid = _brief_constraint_fidelity(state, run_dir)
+    if fid:
+        _fid_pass = sum(1 for r in fid if str(r.get("status")).upper() in ("PASS", "OK"))
+        comps.append(("brief constraints honoured by the design "
+                      "(target vs achieved, verification spine)", _fid_pass, len(fid)))
+        _open = [str(r.get("claim")) for r in fid
+                 if str(r.get("status")).upper() in ("FAIL", "UNVERIFIED", "OPEN")]
+        if _open:
+            iss.append(f"{len(_open)} stated brief constraint(s) not verified against the "
+                       f"design ({', '.join(_open[:4])}) — the engine's interpretation does "
+                       f"not yet prove it honours these; close each on the Verification spine")
     if secs or rows:
         # a decision-covered row PASSES (consistent_with_decision — the recorded scope
         # decision renders inline on the Brief tab); a diverging row with NO recorded
@@ -24181,8 +24335,20 @@ def _sc_brief(wb, ws, state, run_dir):
             "mech": "client-offer reconciliation (live section mapping) — 0 checks available",
             "fix": "emit a brief↔contract fidelity reconciliation so the Brief tab verifies "
                    "the design honours every stated brief constraint"}
+    # Basis reflects what actually ran: client-offer reconciliation (plant briefs with a
+    # section-cost table) and/or brief↔design constraint fidelity (instrument briefs).
+    _mechs = []
+    if secs or rows:
+        _mechs.append("client-offer reconciliation (live section mapping)")
+    if fid:
+        _mechs.append("brief↔design constraint fidelity (verification spine, per-constraint "
+                      "target vs achieved)")
     return {"components": comps, "issues": iss,
-            "mech": "client-offer reconciliation (live section mapping)", "fix": ""}
+            "mech": " + ".join(_mechs) or "client-offer reconciliation (live section mapping)",
+            "fix": ("close the unverified brief constraint(s) on the Verification spine — a "
+                    "derived achieved figure per stated target" if any(
+                        str(r.get("status")).upper() in ("FAIL", "UNVERIFIED", "OPEN") for r in fid)
+                    else "")}
 
 
 def _sc_verification(wb, ws, state, run_dir):
@@ -29485,6 +29651,89 @@ def _selftest() -> int:
     if not _s4_noceil["ships"]:
         print(f"  FAIL S4: with NO unit_cost_ceiling in the brief the bind must never fire "
               f"(got {_s4_noceil})"); bad += 1
+    # ═══ S13 (2026-07-21): BRIEF↔DESIGN CONSTRAINT FIDELITY — the Brief tab runs REAL
+    # content checks (one per stated brief constraint) instead of the ZERO-CHECK 4.0 cap on
+    # an instrument brief with no client-offer section table. ═══
+    class _WSStub:
+        def __init__(self, t): self.title = t
+    _s13_state = {
+        "parsedBrief": {"constraints": {
+            "target_performance": {"metrics": [
+                {"key_metric": "working_volume_ml", "value": 20, "unit": "ml",
+                 "category": "capacity"}]},
+            "derived_requirements": [
+                {"key": "culture_temperature_c", "label": "Culture Temperature", "value": 37,
+                 "unit": "C", "category": "thermal"},
+                {"key": "temperature_stability_k", "label": "Temperature Control Stability",
+                 "value": 0.5, "unit": "K", "category": "thermal"}],
+            "unit_cost_ceiling": {"value": 385, "currency": "GBP"}}},
+        "orchestratorContract": {"quantities": {
+            "working_volume_ml": {"value": 20, "unit": "ml"},
+            "culture_temperature_c": {"value": 37, "unit": "C"}}},
+        "costStack": {"raw_materials_bom_gbp": 145},
+    }
+    _s13_fid = _brief_constraint_fidelity(_s13_state, "")
+    _s13_claims = {str(r.get("claim")) for r in _s13_fid}
+    # the fidelity checks MUST include the stated constraints (real content checks, not zero)
+    if len(_s13_fid) < 3 or not any("Stability" in c for c in _s13_claims):
+        print(f"  FAIL S13: Brief fidelity must yield ≥3 real constraint checks incl. stability "
+              f"(got {len(_s13_fid)}: {sorted(_s13_claims)})"); bad += 1
+    _s13_sc = _sc_brief(None, _WSStub("Brief"), _s13_state, "")
+    # a stability requirement with NO derived achieved value → the tab honestly declares an
+    # UNVERIFIED brief constraint (never a zero-check 4.0, never a fake pass).
+    if _s13_sc.get("score_cap") == 4.0 and any("ZERO content checks" in str(i)
+                                               for i in (_s13_sc.get("issues") or [])):
+        print(f"  FAIL S13: Brief with real constraint checks must NOT fall to the ZERO-CHECK "
+              f"cap (got {_s13_sc})"); bad += 1
+    if not any("Temperature Control Stability" in str(i) for i in (_s13_sc.get("issues") or [])):
+        print(f"  FAIL S13: an UNVERIFIED stability constraint must surface as a Brief issue "
+              f"(got {_s13_sc.get('issues')})"); bad += 1
+    # proveNoFalsePositive: when EVERY stated constraint verifies (stability derived + met),
+    # the Brief scorer reports no open constraint (all fidelity checks pass).
+    _s13_ok = json.loads(json.dumps(_s13_state))
+    _s13_ok["orchestratorContract"]["quantities"]["temperature_stability_k"] = {
+        "value": 0.3, "unit": "K"}
+    _s13_ok["_verificationSpine"] = None
+    _s13_okfid = _brief_constraint_fidelity(_s13_ok, "")
+    _s13_okopen = [r for r in _s13_okfid
+                   if str(r.get("status")).upper() in ("FAIL", "UNVERIFIED", "OPEN")]
+    if _s13_okopen:
+        print(f"  FAIL S13 proveNoFalsePositive: with a derived 0.3 K ≤ 0.5 K stability the "
+              f"stability constraint must verify (got open {[r.get('claim') for r in _s13_okopen]})"); bad += 1
+    # ═══ S14 (2026-07-21): REALISATION BILL falls back to partVerifications — a run whose
+    # bill is partVerifications (no requirementsBom list) must NOT false-FAIL 'Bill of
+    # materials' / noun-match realisation rows. ═══
+    _s14_state = {
+        "orchestratorContract": {"quantities": {
+            "optical_path_length_mm": {"value": 13.0, "unit": "mm"}}},
+        "partVerifications": [
+            {"word_id": "vial_holder_fixture_word", "word_name": "Vial Holder Fixture"},
+            {"word_id": "led_emitter_word", "word_name": "625nm LED Emitter"},
+            {"word_id": "photodetector_word", "word_name": "Photodetector"}],
+    }
+    _s14_bill, _s14_src = _realisation_bill(_s14_state)
+    if _s14_src != "partVerifications" or len(_s14_bill) != 3:
+        print(f"  FAIL S14: an empty requirementsBom must fall back to partVerifications "
+              f"(got src={_s14_src}, n={len(_s14_bill)})"); bad += 1
+    _s14_rows = _assemble_verification_rows(_s14_state, "")
+    _s14_bad = [r for r in _s14_rows
+                if str(r.get("hardness")).upper() == "HARD"
+                and str(r.get("status")).upper() in ("FAIL",)
+                and str(r.get("claim")) in ("Bill of materials",)]
+    if _s14_bad:
+        print(f"  FAIL S14: a partVerifications-only bill must NOT false-FAIL 'Bill of "
+              f"materials' (got {[r.get('provenance') for r in _s14_bad]})"); bad += 1
+    _s14_path = [r for r in _s14_rows if "Path-length" in str(r.get("claim"))]
+    if _s14_path and str(_s14_path[0].get("status")).upper() != "PASS":
+        print(f"  FAIL S14: 'Vial Holder Fixture' in partVerifications must satisfy the "
+              f"Path-length hardware realisation row (got {_s14_path[0].get('status')})"); bad += 1
+    # proveNoFalsePositive: a truly-empty design (no bill at all) STILL FAILS 'Bill of materials'.
+    _s14_empty = _assemble_verification_rows(
+        {"orchestratorContract": {"quantities": {}}}, "")
+    if not any(str(r.get("claim")) == "Bill of materials"
+               and str(r.get("status")).upper() == "FAIL" for r in _s14_empty):
+        print("  FAIL S14 proveNoFalsePositive: a design with NO bill at all must still FAIL "
+              "'Bill of materials'"); bad += 1
     # ═══ (11) MARKDOWN EMPHASIS never renders as literal text (fix 4) ═══
     if clean_cell("**TOTALS**") != "TOTALS" or clean_cell("**42.7 kW**") != "42.7 kW":
         print(f"  FAIL md-emphasis: '**TOTALS**' must render 'TOTALS' (got "
