@@ -6644,6 +6644,15 @@ def build_parts_manifest(parts):
                     and sd.get("w_mm") and sd.get("d_mm"):
                 dims = {"w": round(sd["w_mm"], 1), "d": round(sd["d_mm"], 1),
                         "h": round(sd.get("h_mm") or h, 1)}
+            elif isinstance(sd, dict) and sd.get("kind") == "cyl" and sd.get("dia_mm"):
+                # CYL-DIM IN THE BOX BRANCH (2026-07-21, the organoid Culture Temperature
+                # Probe: a valid "6 mm dia × 50 mm" cyl dim rendered 260×309×240 mm = the
+                # polluted world-bbox because only the ROUND-shape branch honoured a cyl
+                # dim). Report the cylinder's own box footprint (dia × dia × length) so a
+                # non-round-shaped part carrying a cyl dim is NOT sized from the drawn bbox.
+                _cd = round(float(sd["dia_mm"]), 1)
+                _cl = round(float(sd.get("len_mm") or h), 1)
+                dims = {"w": _cd, "d": _cd, "h": _cl}
             else:
                 dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
         # An INSTRUMENT's reported dims must match its capped render geometry (≤600 mm) — the
