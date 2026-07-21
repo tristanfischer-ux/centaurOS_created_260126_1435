@@ -267,6 +267,25 @@ function pureTests(): void {
   check('existing temperature_stability_k seed is NOT clobbered by the tool write',
     (rss.contract.quantities['temperature_stability_k'] as any)?.value === 0.2)
 
+  // (d′) a BRIEF-ECHO (the brief's TARGET seeded as the value, no calculator source,
+  // not measured) IS overwritten by the tool's derived prediction — else the HARD
+  // stability claim stays UNVERIFIED (the organoid 0.5 K, 2026-07-21).
+  const echoStab: ContractInProgress = {
+    ...thermalContract,
+    quantities: {
+      ...thermalContract.quantities,
+      temperature_stability_k: {
+        value: 0.5, unit: 'K', family: 'temperature', provenance: 'derived',
+        basis: 'Standard acceptable thermal fluctuation for mammalian cell/organoid culture.',
+      } as any,
+    },
+  }
+  const rse = applyStepOutputs(pidStep, echoStab, pidOut)
+  check('brief-echo temperature_stability_k IS overwritten by the derived prediction',
+    Math.abs((rse.contract.quantities['temperature_stability_k'] as any)?.value - 0.1327) < 1e-6)
+  check('overwritten stability is labelled a prediction (measured=false)',
+    (rse.contract.quantities['temperature_stability_k'] as any)?.measured === false)
+
   // ── candidate-store boundary (security item 18) ─────────────────────────
   let threw = false
   try { assertCandidateSlug(`x'; DROP TABLE class_tool_plan_candidates;--`) } catch { threw = true }

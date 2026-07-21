@@ -1576,7 +1576,19 @@ export function applyStepOutputs(
   if (_CONTROL_SYSTEMS_TOOL_RE.test(step.tool_id)) {
     const ts = num(output, 'temperature_stability_k')
     const already = (c.quantities as Record<string, any> | undefined)?.['temperature_stability_k']
-    if (ts !== undefined && !(already && Number.isFinite(already.value))) {
+    // OVERWRITE A REQUIREMENT-ECHO (2026-07-21, the organoid 0.5 K that stayed
+    // UNVERIFIED): the LLM brief-expansion often seeds `temperature_stability_k` with
+    // the brief's TARGET value itself (0.5 K, basis "standard acceptable thermal
+    // fluctuation…") — a requirement echo, not a derived achieved figure, so the
+    // Verification spine correctly refuses to verify a requirement against itself and
+    // the HARD stability claim stayed UNVERIFIED (Brief 7, Verification 4). The tool's
+    // first-principles prediction must WIN over such an echo. Only a GENUINE seed is
+    // protected: a first-principles calculator quantity (`source==='calculator'`) or a
+    // real HIL-measured value (`measured===true`). A bare brief echo (no calculator
+    // source, not measured) is overwritten. Honest ABSENT (no tool value) writes nothing.
+    const alreadyIsRealSeed = !!already && Number.isFinite(already.value) &&
+      (already.source === 'calculator' || already.measured === true)
+    if (ts !== undefined && !alreadyIsRealSeed) {
       const measured = (output as Record<string, unknown> | null)?.['temperature_stability_k_measured']
       const basis = (output as Record<string, unknown> | null)?.['temperature_stability_k_basis']
       const qty = mkQty(ts, 'K', 'temperature', p('temperature_stability_k'), 'predicted')
