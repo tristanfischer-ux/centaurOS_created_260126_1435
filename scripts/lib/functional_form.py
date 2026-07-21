@@ -1199,6 +1199,61 @@ def resolve_deployment_envelope(state: dict):
     return env, meta
 
 
+def _placements_bbox(raw: dict):
+    """Union AABB (min, max, size, centre) of a {role: (centre, size, ext)} placement map."""
+    xs, ys, zs = [], [], []
+    for (ctr, sz, _ext) in raw.values():
+        for i, arr in ((0, xs), (1, ys), (2, zs)):
+            arr += [ctr[i] - sz[i] / 2.0, ctr[i] + sz[i] / 2.0]
+    bmin = (min(xs), min(ys), min(zs))
+    bmax = (max(xs), max(ys), max(zs))
+    bsz = tuple(bmax[i] - bmin[i] for i in range(3))
+    bctr = tuple((bmin[i] + bmax[i]) / 2.0 for i in range(3))
+    return bmin, bmax, bsz, bctr
+
+
+def _contain_placements(raw: dict, W: float, D: float, H: float, base_z: float,
+                        safety: float = 0.99):
+    """B3 device-scale containment clamp (SOURCE fix, universal — same class as B1's
+    round-vessel device-scale fix). A per-axis planner lays roles out on the ENVELOPE it is
+    handed, but nothing guarantees the resulting assembly's UNION bbox fits inside that box —
+    a `vertical-wet-stack` culture column, for instance, stacks past the enclosure top (frozen
+    2150: 159×194×293 union in a 159³ envelope → H 1.84×, a tower poking out). This clamps the
+    WHOLE assembly (interior + protruding subsystems) to fit within (W, D, H): a UNIFORM scale
+    (preserving the functional silhouette — a tall column stays a tall column, just contained)
+    about the assembly centre, re-seated centred in X/Y and anchored on the base in Z. Uniform
+    scaling is affine, so touch relationships (the connectedness proof) are preserved. Returns
+    (new_raw, evidence). Fires ONLY on a TRUE overflow (union bbox strictly larger than the
+    envelope) — a part that exactly fills a footprint (a full-width cassette card, 127≡127) is
+    NOT an overflow and stays untouched, so the seven passing forms remain byte-identical. When
+    it does fire it scales to `safety`×envelope so the assembly sits just inside the walls."""
+    if not raw:
+        return raw, {"applied": False, "reason": "no_placements"}
+    bmin, bmax, bsz, bctr = _placements_bbox(raw)
+    avail = (max(W, 1e-6), max(D, 1e-6), max(H, 1e-6))         # the TRUE envelope (no margin)
+    ratios = [bsz[i] / avail[i] for i in range(3) if bsz[i] > 1e-6]
+    worst = max(ratios) if ratios else 0.0
+    if worst <= 1.0 + 1e-3:                                    # already fits (incl. exact-fill)
+        return raw, {"applied": False, "worst_ratio": round(worst, 4),
+                     "pre_bbox_mm": tuple(round(v, 2) for v in bsz)}
+    s = safety / worst                                         # down-scale to safety×envelope
+    # scale about the assembly centre, then translate: centre X/Y at the envelope centre (0,0),
+    # anchor the scaled assembly's floor at base_z (a device sits on its base, not floating).
+    scaled_min_z = bctr[2] + (bmin[2] - bctr[2]) * s
+    dz = base_z - scaled_min_z
+    out = {}
+    for name, (ctr, sz, ext) in raw.items():
+        nc = [(ctr[i] - bctr[i]) * s for i in range(3)]        # centred at 0 in every axis
+        nc[2] = bctr[2] + (ctr[2] - bctr[2]) * s + dz          # re-anchor Z on the base
+        ns = [sz[i] * s for i in range(3)]
+        out[name] = (tuple(nc), tuple(ns), ext)
+    _, _, post_sz, _ = _placements_bbox(out)
+    return out, {"applied": True, "scale": round(s, 4), "worst_ratio": round(worst, 4),
+                 "pre_bbox_mm": tuple(round(v, 2) for v in bsz),
+                 "post_bbox_mm": tuple(round(v, 2) for v in post_sz),
+                 "envelope_mm": (round(W, 2), round(D, 2), round(H, 2))}
+
+
 def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float] = None,
                           base_z_mm: float = 0.0) -> dict:
     """form-proof → concrete Placement list for an envelope. Universal: the primary axis
@@ -1256,6 +1311,8 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float] =
             # affect the envelope-level fit-anywhere check (that compares the whole envelope box).
             raw[role] = ((sx, cfront - sd * 0.5, cctr[2] - csz[2] * 0.10),
                          (csz[0] / (ns + 0.8) * 0.82, sd, csz[2] * 0.5), True)
+    # B3 — pack the whole assembly INTO the enclosure envelope (device-scale AABB containment).
+    raw, containment = _contain_placements(raw, W, D, H, base_z_mm)
     shape_of = {rv.role: rv.geometry_family for rv in c.role_volumes}
     placements = []
     for name, (ctr, sz, ext) in raw.items():
@@ -1274,6 +1331,7 @@ def compose_geometry_plan(state: dict, envelope_mm: tuple[float, float, float] =
               "placements": pl,
               "measured_connectedness": measured,
               "envelope_mm": tuple(round(float(x), 2) for x in envelope_mm),
+              "containment": containment,
               "deployment": dep_meta}
     # FIT-ANYWHERE check: a device with a DECLARED deployment envelope must fit inside it (the
     # fit-anywhere hard rule). When the envelope WAS the deployment box it fits trivially; when
@@ -1479,11 +1537,36 @@ def _selftest() -> int:
     check("EWOD plan places an electrode grid on the exterior",
           any("grid" in p["name"] and p["on_exterior"] and p["shape"] == "grid"
               for p in gp_ewod.get("placements", [])))
-    gp_bio = compose_geometry_plan(_synthetic_state(working_volume_ml=20), env)
+    # a culture vessel is a vial SHAPE that sits on the base and is CONTAINED within the
+    # envelope it is given (B3 — no poking out the top). Use a tall-enough envelope so the vial
+    # fits without forced scaling; the flat-envelope clamp is proven separately below.
+    env_tall = (100.0, 80.0, 90.0)
+    gp_bio = compose_geometry_plan(_synthetic_state(working_volume_ml=20), env_tall)
     _vial = next((p for p in gp_bio.get("placements", []) if "vial" in p["name"]), None)
-    check("culture plan: vial is a vial shape protruding above the base",
+    check("culture plan: vial is a vial shape contained within the envelope top",
           _vial is not None and _vial["shape"] == "vial"
-          and _vial["center_mm"][2] > env[2])   # vial centre above envelope top
+          and _vial["center_mm"][2] + _vial["size_mm"][2] / 2.0 <= env_tall[2] + 0.5)
+    # B3 proveCatch — a `vertical-wet-stack` in a SHORT envelope (the frozen-2150 tower) must be
+    # CLAMPED to fit: the whole assembly's union bbox ≤ envelope on every axis, base on z=0.
+    env_flat = (100.0, 80.0, 30.0)
+    gp_tower = compose_geometry_plan(_synthetic_state(working_volume_ml=20), env_flat)
+    _tp = gp_tower.get("placements", [])
+    _bx = [c - s / 2 for p in _tp for c, s in [(p["center_mm"][0], p["size_mm"][0])]] + \
+          [c + s / 2 for p in _tp for c, s in [(p["center_mm"][0], p["size_mm"][0])]]
+    _bz = [p["center_mm"][2] - p["size_mm"][2] / 2 for p in _tp]
+    _tz = [p["center_mm"][2] + p["size_mm"][2] / 2 for p in _tp]
+    check("B3 tower is CLAMPED (containment applied on a short envelope)",
+          gp_tower.get("containment", {}).get("applied") is True)
+    check("B3 clamped assembly fits within the envelope on every axis",
+          (max(_tz) - min(_bz)) <= env_flat[2] + 0.5 and (max(_bx) - min(_bx)) <= env_flat[0] + 0.5)
+    check("B3 clamped assembly sits on the base (min z ≈ 0)", abs(min(_bz)) <= 0.5)
+    check("B3 clamp preserves the connectedness proof",
+          gp_tower.get("measured_connectedness", {}).get("ok") is True)
+    # a plan that already fits is a NO-OP — containment never perturbs a good form (a full-
+    # footprint cassette card exactly fills its footprint, ratio 1.0, and must stay untouched).
+    _gp_fit = compose_geometry_plan(_synthetic_state(cassette_format="SBS", reservoir_count=6), (127.0, 85.0, 40.0))
+    check("B3 containment is a no-op when the assembly already fits",
+          _gp_fit.get("containment", {}).get("applied") is False)
     gp_pump = compose_geometry_plan(_synthetic_state(channel_count=3), env)
     check("syringe plan repeats bays by channel_count (3× cradles)",
           sum(1 for p in gp_pump.get("placements", []) if "cradle" in p["name"]) == 3)
