@@ -1432,12 +1432,23 @@ function resolveComponent(
 
   const fallbackPins = fallback ? fallback.pins.map((pin) => sanitizePinName(pin)!) : ['P1', 'P2']
   const resolvedPins = identityVerified ? pinSpecs.map(pinIdentifier) : fallbackPins
+  // GOTCHA: OPA334 lists V- (power_in) before V+ — picking the first power_in
+  // shorted the negative rail onto VCC (organoid OD final20). Prefer positive
+  // supply names; never treat V-/VEE as the primary powerPin.
   const resolvedPowerPin = identityVerified
     ? pinSpecs.find((pin) =>
-      pin.kind === 'power_in' && !/(?:gnd|vss)/i.test(pin.name)) ?? null
+        pin.kind === 'power_in' &&
+        /^(?:V\+|VDD|VCC|VBUS|VIN|AVDD|DVDD)/i.test(pin.name)) ??
+      pinSpecs.find((pin) =>
+        pin.kind === 'power_in' &&
+        !/(?:gnd|vss|^V-|^VEE)/i.test(pin.name)) ??
+      null
     : null
   const resolvedGroundPin = identityVerified
-    ? pinSpecs.find((pin) => /(?:gnd|vss)/i.test(pin.name)) ?? null
+    ? pinSpecs.find((pin) => /(?:gnd|vss)/i.test(pin.name)) ??
+      // Single-supply op-amps: V- is the return rail when no GND pin exists.
+      pinSpecs.find((pin) => /^V-$/i.test(pin.name) || /^VEE$/i.test(pin.name)) ??
+      null
     : null
 
   return {
@@ -1552,6 +1563,17 @@ function tieSupplyRails(
         addMember(vcc, component.instanceName, pin)
       }
     }
+    // GOTCHA: curated op-amp / sensor pins named `V+` / `V-` sanitise to `V___N`
+    // and miss powerPinRe — read pinSpecs.name so single-supply TIA/TMP rails close.
+    for (const pin of component.pinSpecs ?? []) {
+      const id = pinIdentifier(pin)
+      if (/^V\+$/i.test(pin.name) || /^VDD$/i.test(pin.name)) {
+        addMember(vcc, component.instanceName, id)
+      } else if (/^V-$/i.test(pin.name) || /^VEE$/i.test(pin.name)) {
+        // Single-supply boards: negative rail pin ties to GND (no −V generator).
+        addMember(gnd, component.instanceName, id)
+      }
+    }
     if (component.powerPin) addMember(vcc, component.instanceName, component.powerPin)
     if (component.groundPin) addMember(gnd, component.instanceName, component.groundPin)
   }
@@ -1643,14 +1665,93 @@ function wireHostInterfaceNets(
 }
 
 /**
+ * @description Wire photodiode → TIA → optical ADC when all three roles exist.
+ * INTENT: densify companions must form a circuit, not a lonely parts list —
+ * Eye-Spy-class OD path is otherwise FAB-theatre (parts present, nets only VCC).
+ * Universal: keyed on functionClass/characterId/pin names, never a product slug.
+ */
+function wireOdOpticalFrontEndNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+  vcc: AtopileNetRecord,
+  gnd: AtopileNetRecord,
+): void {
+  const roleBlob = (c: AtopileComponentRecord): string =>
+    `${c.characterId} ${c.wordId} ${c.nameHuman} ${c.partNumber ?? ''}`
+
+  const photodiode = components.find(
+    (c) =>
+      /(?:^|[_ -])(?:od[_ -]?)?photodiode(?:$|[_ -])|bpw34/i.test(roleBlob(c)) &&
+      c.functionClass !== 'op_amp',
+  )
+  const tia = components.find(
+    (c) =>
+      c.functionClass === 'op_amp' ||
+      /(?:photodiode[_ -]?)?(?:tia|transimpedance)|opa334/i.test(roleBlob(c)),
+  )
+  const adc = components.find(
+    (c) =>
+      c !== photodiode &&
+      c !== tia &&
+      c.functionClass === 'sensor_ic' &&
+      /ads111|optical[_ -]?adc|ain0|(?:^|[_ -])adc(?:$|[_ -])/i.test(roleBlob(c)),
+  )
+  if (!photodiode || !tia || !adc) return
+
+  const pdK = findPinMatching(photodiode, [/^K$/i, /^K__/i, /cathode/i])
+  const pdA = findPinMatching(photodiode, [/^A$/i, /^A__/i, /anode/i])
+  const tiaNeg = findPinMatching(tia, [/^-IN$/i, /^IN-$/i, /^-IN_/, /NIN/i])
+  const tiaPos = findPinMatching(tia, [/^\+IN$/i, /^IN\+$/i, /^\+IN_/, /\+IN/i])
+  const tiaOut = findPinMatching(tia, [/^OUT$/i, /^OUT(?:_|$)/i, /^VOUT/i])
+  // GOTCHA: package-family sensor defaults are VCC/GND/OUT/NC — no AIN0 until
+  // curated pinout lands. Synthesise AIN0 (same concept-stage idiom as USB_DP).
+  const adcAin =
+    findPinMatching(adc, [/^AIN0/i, /^AIN0_/, /^AIN$/i, /^IN0/i, /^AINP/i]) ??
+    ensureComponentPin(adc, 'AIN0')
+  const tiaEnable = findPinMatching(tia, [/^ENABLE$/i, /^ENABLE_/, /^EN(?:_|$)/i, /^SHDN/i])
+
+  // Classic single-supply photovoltaic TIA: PD cathode → −IN, anode → GND;
+  // +IN referenced to GND; OUT → ADC AIN0.
+  if (pdK && tiaNeg) {
+    const net = ensureNet('OD_PD_TIA', 'signal')
+    addMember(net, photodiode.instanceName, pdK)
+    addMember(net, tia.instanceName, tiaNeg)
+  }
+  if (pdA) addMember(gnd, photodiode.instanceName, pdA)
+  if (tiaPos) addMember(gnd, tia.instanceName, tiaPos)
+  if (tiaOut) {
+    const net = ensureNet('OD_TIA_ADC', 'signal')
+    addMember(net, tia.instanceName, tiaOut)
+    addMember(net, adc.instanceName, adcAin)
+  }
+  if (tiaEnable) addMember(vcc, tia.instanceName, tiaEnable)
+
+  // Rail TVS across VCC/GND when an ESD diode sits on an OD densify board.
+  const esd = components.find(
+    (c) =>
+      c.functionClass === 'diode_protection' ||
+      /esd[_ -]?protection|df2s|tvs/i.test(roleBlob(c)),
+  )
+  if (esd) {
+    const a1 = findPinMatching(esd, [/^A1$/i, /^A$/i, /^1$/i, /^K$/i])
+    const a2 = findPinMatching(esd, [/^A2$/i, /^C$/i, /^2$/i])
+    if (a1 && a2) {
+      addMember(vcc, esd.instanceName, a1)
+      addMember(gnd, esd.instanceName, a2)
+    }
+  }
+}
+
+/**
  * @description Builds VCC/GND global rails (battery → regulator → rails when both
  * exist, per the universal power topology every electronic product shares),
- * host-interface USB/SWD nets, topology-derived signal nets from
- * `orchestratorContract.topology`, and one generic decoupling cap per powered
- * IC-class component (a rule, not a per-part table). Mutates `components` in
- * place to append dynamically-needed extra pins for topology signal connections
- * (this design is concept-stage — the engine's own BoM already marks every part
- * "exact pinout confirmed at detailed design").
+ * host-interface USB/SWD nets, OD photodiode→TIA→ADC front-end nets when present,
+ * topology-derived signal nets from `orchestratorContract.topology`, and one
+ * generic decoupling cap per powered IC-class component (a rule, not a per-part
+ * table). Mutates `components` in place to append dynamically-needed extra pins
+ * for topology signal connections (this design is concept-stage — the engine's
+ * own BoM already marks every part "exact pinout confirmed at detailed design").
  */
 function buildNets(
   components: AtopileComponentRecord[],
@@ -1700,6 +1801,7 @@ function buildNets(
 
   tieSupplyRails(components, addMember, vcc, gnd, skipRails)
   wireHostInterfaceNets(components, ensureNet, addMember)
+  wireOdOpticalFrontEndNets(components, ensureNet, addMember, vcc, gnd)
 
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
@@ -1795,7 +1897,11 @@ function hasInstrumentOpticalSourceBoard(
 
 function computeBoardOutline(
   components: AtopileComponentRecord[],
-  opts: { isInstrumentSourceBoard?: boolean; isHostInterfaceBoard?: boolean } = {},
+  opts: {
+    isInstrumentSourceBoard?: boolean
+    isHostInterfaceBoard?: boolean
+    isThermalActuationBoard?: boolean
+  } = {},
 ): PcbBoardGeometry {
   const AREA_MULTIPLIER = 5.0 // matches prior-art pcb_chain.py's validated constant
   const totalAreaMm2 = components.reduce(
@@ -1807,7 +1913,15 @@ function computeBoardOutline(
   // dual receptacles + TQFP — the generic 50 mm plant floor still soups placement.
   // DECISION (2026-07-21 densify): host MCU+dual-USB+SWD needs ≥90 mm so USB_DP
   // vias clear Edge.Cuts (80 mm floored vias into copper_edge_clearance).
-  const minSide = opts.isInstrumentSourceBoard ? 25 : opts.isHostInterfaceBoard ? 90 : 50
+  // DECISION (2026-07-21): heater/FFC/NTC boards need ≥70 mm — 50 mm forced a
+  // placement retry (C2 off-board Y≈53.8) on every organoid wet_actuation solo.
+  const minSide = opts.isInstrumentSourceBoard
+    ? 25
+    : opts.isHostInterfaceBoard
+      ? 90
+      : opts.isThermalActuationBoard
+        ? 70
+        : 50
   const maxSide = opts.isInstrumentSourceBoard ? 40 : 250
   const roundTo = opts.isInstrumentSourceBoard ? 5 : 10
   const side = Math.max(minSide, Math.min(maxSide, Math.ceil(rawSide / roundTo) * roundTo))
@@ -1824,9 +1938,12 @@ function computeBoardOutline(
       : opts.isHostInterfaceBoard
         ? `Phase B host-interface board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
           `over ${components.length} components, clamped [90,250]mm (MCU+USB+SWD edge keepout), rounded to 10mm.`
-        : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
-          `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
-          'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
+        : opts.isThermalActuationBoard
+          ? `Phase B thermal-actuation board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+            `over ${components.length} components, clamped [70,250]mm (heater/FFC keepout), rounded to 10mm.`
+          : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+            `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
+            'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
   }
   const findings = validateBoardGeometry(geometry)
   if (findings.length) {
@@ -1996,10 +2113,21 @@ export function generateAtopileProject(
     allComponents.some((c) => c.functionClass === 'microcontroller') &&
     allComponents.some((c) =>
       c.functionClass === 'usb_connector' || c.functionClass === 'debug_connector')
+  // GOTCHA (organoid 2026-07-21): heater_stir boards are ≤12 parts but need the
+  // plant ≥50 mm floor — compact 25 mm outline forced placement retry (C2 off-board).
+  const hasThermalActuationEdge =
+    opts.boardRole === 'heater_stir_actuation_board' ||
+    (opts.requiredFunctionRoles ?? []).includes('heater_channel') ||
+    allComponents.some((c) =>
+      /heat(?:er|ing)|tmp1075|esr18|ffc[_ -]?connector|cartridge[_ -]?heater/i.test(
+        `${c.characterId} ${c.wordId} ${c.partNumber ?? ''}`,
+      ),
+    )
   const isCompactInstrumentBoard =
     instrumentDeviceContext(state, electronicWords) &&
     !hasActuationDriveBoard(state, electronicWords) &&
     !hasHostInterfaceEdge &&
+    !hasThermalActuationEdge &&
     (hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents) ||
       allComponents.length <= 12)
   // DECISION: Board-plan geometry wins only when it carries complete dimensional
@@ -2014,6 +2142,7 @@ export function generateAtopileProject(
   const derivedOutline = computeBoardOutline(allComponents, {
     isInstrumentSourceBoard: isCompactInstrumentBoard,
     isHostInterfaceBoard: hasHostInterfaceEdge,
+    isThermalActuationBoard: hasThermalActuationEdge,
   })
   const boardOutline = opts.boardShape
     ? (shapedOutline ??

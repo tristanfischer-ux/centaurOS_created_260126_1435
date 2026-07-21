@@ -1372,6 +1372,27 @@ describe('atopile-generator', () => {
       .toMatch(/OPA334/i)
     expect(result.components.find((c) => c.wordId === 'od_esd_protection_network_word')?.partNumber)
       .toMatch(/DF2S/i)
+    // proveCatch: densify must wire photodiode→TIA→ADC, not only share VCC.
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('OD_PD_TIA')).toBe(true)
+    expect(netNames.has('OD_TIA_ADC')).toBe(true)
+    const pdTia = result.nets.find((n) => n.name === 'OD_PD_TIA')!
+    expect(pdTia.members.some((m) => m.instanceName.includes('photodiode'))).toBe(true)
+    expect(pdTia.members.some((m) => m.instanceName.includes('tia'))).toBe(true)
+    const tiaAdc = result.nets.find((n) => n.name === 'OD_TIA_ADC')!
+    expect(tiaAdc.members.some((m) => m.instanceName.includes('tia'))).toBe(true)
+    expect(tiaAdc.members.some((m) => m.instanceName.includes('subcomponent_2'))).toBe(true)
+    // proveCatch: OPA334 V- (pin 2) must sit on GND only — never also on VCC.
+    const tia = result.components.find((c) => c.wordId === 'od_photodiode_tia_word')!
+    expect(tia.powerPin).toMatch(/V___6|V\+_6/)
+    const tiaVccPins = result.nets.find((n) => n.name === 'VCC')!.members
+      .filter((m) => m.instanceName === tia.instanceName)
+      .map((m) => m.pin)
+    const tiaGndPins = result.nets.find((n) => n.name === 'GND')!.members
+      .filter((m) => m.instanceName === tia.instanceName)
+      .map((m) => m.pin)
+    expect(tiaVccPins).not.toContain('V___2')
+    expect(tiaGndPins).toContain('V___2')
   })
 
   it('proveCatch: culture boardShape with holes but no datums still stamps mounting holes', () => {

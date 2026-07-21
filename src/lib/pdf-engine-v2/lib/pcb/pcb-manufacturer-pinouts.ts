@@ -318,6 +318,28 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
   },
   {
     manufacturer: 'Texas Instruments',
+    partNumber: 'ADS1114IDGSR',
+    symbolId: 'Analog_ADC:ADS1114IDGS',
+    footprint: { library: 'Package_SO', footprint: 'TSSOP-10_3x3mm_P0.5mm' },
+    pins: [
+      { number: '1', name: 'ADDR', kind: 'input' },
+      { number: '2', name: 'ALERT/RDY', kind: 'output' },
+      { number: '3', name: 'GND', kind: 'power_in' },
+      { number: '4', name: 'AIN0', kind: 'input' },
+      { number: '5', name: 'AIN1', kind: 'input' },
+      // GOTCHA: ADS1114 (not 1115) exposes AIN0/AIN1 only — DGS pins 6–7 are NC.
+      { number: '6', name: 'NC', kind: 'nc' },
+      { number: '7', name: 'NC', kind: 'nc' },
+      { number: '8', name: 'VDD', kind: 'power_in' },
+      { number: '9', name: 'SDA', kind: 'bidirectional' },
+      { number: '10', name: 'SCL', kind: 'input' },
+    ],
+    provenance:
+      'TI ADS111x SBAS444E DGS-10 pinout + Pioreactor Eye-Spy frozen BOM U2 @ ca40a91e; ' +
+      'https://www.ti.com/lit/ds/symlink/ads1114.pdf',
+  },
+  {
+    manufacturer: 'Texas Instruments',
     partNumber: 'TMP1075DSGR',
     symbolId: 'Forge_Manufacturer:TMP1075DSGR',
     footprint: {
