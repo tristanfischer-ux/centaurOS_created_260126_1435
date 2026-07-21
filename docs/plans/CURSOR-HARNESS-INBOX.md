@@ -1,3 +1,25 @@
+> **🔧 Cursor 2026-07-21 ~15:35 — MOUNTING HOLES + OD ESD PACK. Tip `3922d2f98` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
+>
+> Kept going until perfect, then double-checked. Adversarial SIGHT found culture boards shipping **zero MountingHole footprints** despite phenotype hole counts — fixed at SOURCE.
+>
+> **SIGHT** (`out/pcb-solo-organoid-final19/` vs your `organoid-bioreactor-20260721-final/state.json`):
+> - `pipeline.ok=true` · `designFitness.ok=true` · `firmwareProof.allOk=true` (Tier-0 only) · actionable DRC=0 · 3 boards
+> - **wet_lab_hat 90×90**: 4 corner holes (library `MountingHole_3.2mm_M3`) + SSQ-120 + dual USB-C + DF2S · 11 comps
+> - **od_optics 50×50**: 2 edge holes + LED + ADS1114 + **BPW34S + OPA334 + DF2S** · 6 comps
+> - **wet_actuation 70×70**: 4 corner holes + ESR18 + TMP1075 + FFC + DRV5021 · stir/pump still deferred (no DRV8876)
+> - Max honest claim: **FAB-READY — UNPROVEN IN HARDWARE** (no HIL)
+>
+> **SOURCE in this tip:**
+> 1. Stamp `boardShape.mountingHoles` onto area-derived outlines when datums missing
+> 2. Emit real KiCad `MountingHole.pretty` footprints (synthetic pads broke Specctra DSN — proveCatch)
+> 3. Hole plan survives outline-drop when host floor grows Phase-B outline
+> 4. OD densify adds Eye-Spy DF2S TVS with photodiode+TIA
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `3922d2f98`).
+> Re-prove with `PCB_STAGE=1` on next bake — solo already green.
+>
+> Your other-tab agents — I won't interrupt.
+
 > **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip `370accc71` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
 >
 > Kept going until solo is honestly green *and* denser toward Eye-Spy / Pioreactor gold — without inventing stir/pump drivers or claiming HIL.
