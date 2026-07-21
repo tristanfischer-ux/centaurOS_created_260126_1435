@@ -4,8 +4,8 @@
  * generator had ANY electronic words — `functionRequirements` was only emitted on
  * an empty board, so fitness always reported channel_under_implementation. This
  * module counts channels from (a) passive geometry roles and (b) known component
- * topology signatures (heater gold MPNs, OD optical path nouns) — never from a
- * bare role name. Stir/pump stay 0 without HAT electrical evidence (honest DRAFT).
+ * topology signatures (heater gold / minimal temp+load, OD optical path) — never
+ * from a bare role name. Stir/pump stay 0 without HAT electrical evidence (honest DRAFT).
  */
 
 import type { AtopileFunctionRequirementRecord } from './atopile-generator'
@@ -17,7 +17,7 @@ export interface ChannelEvidenceComponent {
   functionClass?: string | null
 }
 
-/** Pioreactor heater_20ml gold constituents (ca40a91e) — all four required to mint heater_channel. */
+/** Pioreactor heater_20ml gold constituents (ca40a91e) — full set mints heater_channel. */
 export const HEATER_CHANNEL_GOLD_MPNS = [
   'TMP1075DSGR',
   'DRV5021A3QDBZR',
@@ -47,15 +47,46 @@ export function hasHeaterChannelGoldTopology(
 }
 
 /**
- * @description True when components show an OD measurement path (source + sense/ADC).
+ * @description True when the board has both temperature sense AND a heater load.
+ * INTENT (2026-07-21): organoid wet_actuation resolves TMP1075 + ESR18/cartridge
+ * heater without the unpublished HAT hall + FFC gold pair — mint heater=1 from
+ * that minimal closed loop, never from a lone "heater" noun or temp probe alone.
  */
-export function hasOdMeasurementPath(components: ChannelEvidenceComponent[]): boolean {
+export function hasHeaterChannelMinimalTopology(
+  components: ChannelEvidenceComponent[],
+): boolean {
   const blob = components
     .map((c) => `${c.characterId ?? ''} ${c.nameHuman ?? ''} ${c.functionClass ?? ''} ${c.partNumber ?? ''}`)
     .join(' ')
     .toLowerCase()
-  const hasSource = /led|emitter|light.?source|od.?source|optical.?source/.test(blob)
-  const hasSense = /photodiode|photo.?transistor|ads111|adc|od.?detector|optical.?detector|tsl2591/.test(blob)
+  const mpns = new Set(
+    components
+      .map((c) => (c.partNumber ? normalizeMpnToken(c.partNumber) : ''))
+      .filter(Boolean),
+  )
+  const hasTempSense =
+    mpns.has(normalizeMpnToken('TMP1075DSGR'))
+    || /tmp1075|temperature[_ -]?(?:sensor|probe|ic)|culture[_ -]?temperature/.test(blob)
+  const hasHeaterLoad =
+    mpns.has(normalizeMpnToken('ESR18EZPJ3R9'))
+    || /cartridge[_ -]?heater|resistive[_ -]?heater|heater[_ -]?element|esr18/.test(blob)
+  return hasTempSense && hasHeaterLoad
+}
+
+/**
+ * @description True when components show an OD measurement path (source + sense/ADC).
+ */
+export function hasOdMeasurementPath(components: ChannelEvidenceComponent[]): boolean {
+  const hasSource = components.some((c) => {
+    if (c.functionClass === 'led') return true
+    const blob = `${c.characterId ?? ''} ${c.nameHuman ?? ''} ${c.partNumber ?? ''}`.toLowerCase()
+    return /led|emitter|light.?source|od.?source|optical.?source|szyy0603/.test(blob)
+  })
+  const hasSense = components.some((c) => {
+    const blob = `${c.characterId ?? ''} ${c.nameHuman ?? ''} ${c.functionClass ?? ''} ${c.partNumber ?? ''}`.toLowerCase()
+    return /photodiode|photo.?transistor|ads111|od.?detector|optical.?detector|tsl2591|optical[_ -]?adc/.test(blob)
+      || (c.functionClass === 'sensor_ic' && /\badc\b|ads111|optical/.test(blob))
+  })
   return hasSource && hasSense
 }
 
@@ -84,8 +115,11 @@ export function deriveImplementedChannelCounts(args: {
     }
   }
 
-  // Heater: gold topology only — never invent from a lone "heater" noun.
-  if ((counts.heater_channel ?? 0) === 0 && hasHeaterChannelGoldTopology(components)) {
+  // Heater: full gold OR minimal temp-sense + heater-load — never a lone noun.
+  if (
+    (counts.heater_channel ?? 0) === 0
+    && (hasHeaterChannelGoldTopology(components) || hasHeaterChannelMinimalTopology(components))
+  ) {
     counts.heater_channel = 1
   }
 

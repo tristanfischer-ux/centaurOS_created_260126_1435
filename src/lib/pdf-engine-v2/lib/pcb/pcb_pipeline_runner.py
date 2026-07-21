@@ -84,7 +84,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--kicad-footprints-root", required=True, help="global KiCad SharedSupport/footprints dir")
     p.add_argument("--board-outline", default="", help="Phase B board-outline.json (PcbBoardGeometry)")
     p.add_argument("--max-passes", type=int, default=500)
-    p.add_argument("--max-iterations", type=int, default=4)
+    # DECISION (2026-07-21): 8 retries — organoid HAT pad-soup needed board growth
+    # past the old 4-iter ceiling once clamp-stacking was removed (off-board → grow).
+    p.add_argument("--max-iterations", type=int, default=8)
     p.add_argument("--freerouting-timeout-s", type=int, default=300)
     return p.parse_args()
 
@@ -565,6 +567,41 @@ def selftest() -> None:
         raise AssertionError(
             f"multi-row IC grid must clear its SMD support band, got: {reason_wet}"
         )
+    # proveCatch (2026-07-21): coincident centres (old margin-clamp stack) must FAIL
+    # even when pad circles barely clear — organoid wet_lab_hat F1≡C3.
+    stacked_comps = [
+        Component("F1", "polyfuse", "Fuse:Fuse_1206_3216Metric"),
+        Component("C3", "decouple", "Capacitor_SMD:C_0603_1608Metric"),
+    ]
+    stacked_place = {"F1": (10.0, 10.0), "C3": (10.0, 10.0)}
+    ok_stack, reason_stack = validate_placement(
+        stacked_place, stacked_comps, cfg, Path("/tmp/unused"), 60.0, 60.0,
+    )
+    if ok_stack or "clamp_stack" not in reason_stack:
+        raise AssertionError(
+            f"coincident centres must fire clamp_stack, got ok={ok_stack} reason={reason_stack!r}"
+        )
+    # proveCatch: dense SMD on an undersized outline must NOT collapse to shared
+    # centres (anti-clamp). Off-board / body-overlap failures are honest; soup is not.
+    dense = [
+        Component(f"C{i}", "decouple", "Capacitor_SMD:C_0603_1608Metric")
+        for i in range(1, 13)
+    ]
+    place_dense = place_components(
+        dense, cfg, Path("/tmp/unused"), 25.0, 25.0, 8.0, 2.0, smd_spacing=3.0,
+    )
+    centres = [(round(xy[0], 2), round(xy[1], 2)) for xy in place_dense.values()]
+    if len(centres) != len(set(centres)):
+        raise AssertionError(
+            f"dense placement must not share centres (margin-clamp soup), got {place_dense}"
+        )
+    ok_dense, reason_dense = validate_placement(
+        place_dense, dense, cfg, Path("/tmp/unused"), 25.0, 25.0,
+    )
+    if not ok_dense and "clamp_stack" in reason_dense:
+        raise AssertionError(
+            f"dense undersized board must fail off-board/body, not clamp_stack: {reason_dense}"
+        )
     # proveCatch (OpenDrop cartridge 2026-07-18): a one-footprint board with no
     # remaining ratsnest needs zero tracks. Track presence must not override the
     # autorouter's explicit zero-unrouted result.
@@ -572,7 +609,11 @@ def selftest() -> None:
         raise AssertionError("zero-unrouted board must be complete even when zero tracks are required")
     if routing_is_complete(unrouted_count=1, track_count=20):
         raise AssertionError("track presence must not hide an unrouted connection")
-    print("pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + motherboard counter-case + IC/SMD band + fuse pitch + LQFP band + multi-row IC/SMD band + zero-route completeness)")
+    print(
+        "pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + "
+        "motherboard counter-case + IC/SMD band + fuse pitch + LQFP band + multi-row "
+        "IC/SMD band + clamp_stack + anti-clamp dense + zero-route completeness)"
+    )
 
 # ─── Placement (unchanged algorithm; NAIVE — grid/edge placement, not a real
 #     autoplacer. Bounded to the board's own outline bbox with a margin >= the
@@ -582,11 +623,15 @@ def selftest() -> None:
 def validate_placement(placements: Dict, components: List[Component], cfg: ChainConfig, fp_root: Path,
                         board_w: float, board_h: float, clearance: float = 1.0) -> Tuple[bool, str]:
     all_pads = []
+    bodies: List[Tuple[str, float, float, float, float]] = []
     for c in components:
         if c.ref not in placements:
             continue
         cx, cy = placements[c.ref]
         fp = parse_footprint(c.footprint, cfg, fp_root)
+        half_w = max(fp.bbox_w / 2, 0.4)
+        half_h = max(fp.bbox_h / 2, 0.4)
+        bodies.append((c.ref, cx - half_w, cy - half_h, cx + half_w, cy + half_h))
         for p in fp.pads:
             pad_x = cx + p["x"]
             pad_y = cy + p["y"]
@@ -596,6 +641,21 @@ def validate_placement(placements: Dict, components: List[Component], cfg: Chain
             if pad_y < clearance or pad_y > board_h - clearance:
                 return False, f"{c.ref} pad {p['num']} off-board Y ({pad_y:.1f})"
             all_pads.append((c.ref, pad_x, pad_y, pad_r))
+
+    # INTENT (2026-07-21): coincident centres from the old margin-clamp stack
+    # (F1≡C3 dist=0.01 on organoid) must fail even when pad circles barely clear.
+    seen_centres: Dict[Tuple[float, float], str] = {}
+    for c in components:
+        if c.ref not in placements:
+            continue
+        cx, cy = placements[c.ref]
+        key = (round(cx, 2), round(cy, 2))
+        if key in seen_centres:
+            return False, (
+                f"clamp_stack: {seen_centres[key]} and {c.ref} share centre "
+                f"({cx:.1f},{cy:.1f}) — board too small for the grid"
+            )
+        seen_centres[key] = c.ref
 
     min_gap = 0.25
     for i in range(len(all_pads)):
@@ -607,6 +667,25 @@ def validate_placement(placements: Dict, components: List[Component], cfg: Chain
             dist = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
             if dist < r1 + r2 + min_gap:
                 return False, f"pad overlap: {ref1}({x1:.1f},{y1:.1f}) vs {ref2}({x2:.1f},{y2:.1f}) dist={dist:.2f}"
+
+    # Body AABB keepout — pads can clear while packages still collide.
+    body_gap = 0.5
+    for i in range(len(bodies)):
+        ref1, x1a, y1a, x1b, y1b = bodies[i]
+        for j in range(i + 1, len(bodies)):
+            ref2, x2a, y2a, x2b, y2b = bodies[j]
+            if ref1 == ref2:
+                continue
+            if (
+                x1a < x2b + body_gap
+                and x1b + body_gap > x2a
+                and y1a < y2b + body_gap
+                and y1b + body_gap > y2a
+            ):
+                return False, (
+                    f"body overlap: {ref1} vs {ref2} "
+                    f"(aabb gap < {body_gap:g} mm)"
+                )
     return True, "ok"
 
 def place_components(components: List[Component], cfg: ChainConfig, fp_root: Path, board_w: float, board_h: float,
@@ -674,10 +753,9 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
         row = i // cols
         x = cx - (cols - 1) * ic_spacing / 2 + col * ic_spacing
         y = cy - (rows - 1) * ic_spacing / 2 + row * ic_spacing
-        half_h = max(fp.bbox_h / 2, 1.0)
-        half_w = max(fp.bbox_w / 2, 1.0)
-        x = min(max(x, margin + half_w), board_w - margin - half_w)
-        y = min(max(y, margin + half_h), board_h - margin - half_h)
+        # DECISION (2026-07-21): do NOT margin-clamp into the board. Clamping a
+        # grid that does not fit collapses many parts onto the same edge point
+        # (organoid wet_lab_hat F1≡C3). Natural coords go off-board → retry grows.
         placements[c.ref] = (x, y)
 
     smd.sort(key=lambda x: max(x[1].bbox_w, x[1].bbox_h), reverse=True)
@@ -717,10 +795,7 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
         row = i // smd_cols
         x = cx - (smd_cols - 1) * smd_spacing / 2 + col * smd_spacing
         y = smd_y0 + row * smd_spacing
-        half_h = max(fp.bbox_h / 2, 0.5)
-        half_w = max(fp.bbox_w / 2, 0.5)
-        x = min(max(x, margin + half_w), board_w - margin - half_w)
-        y = min(max(y, margin + half_h), board_h - margin - half_h)
+        # Same anti-stack rule as ICs — never clamp into a soup.
         placements[c.ref] = (x, y)
 
     return placements

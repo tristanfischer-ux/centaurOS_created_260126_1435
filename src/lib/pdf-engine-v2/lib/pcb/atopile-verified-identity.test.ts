@@ -287,4 +287,61 @@ describe('Atopile verified identity integration', () => {
     expect(led?.partNumber).toBe('KPT-1608CGCK')
     expect(result.unresolved.map((u) => u.wordId)).toEqual([])
   })
+
+  it('proveCatch: OD-form sensing proxies promote SZYY0603B + ADS1114IDGSR', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      const hits: Record<string, DbCascadeResult> = {
+        SZYY0603B: cacheHit('Yongyu Photoelectric', 'SZYY0603B', '0603 blue LED 470nm'),
+        ADS1114IDGSR: cacheHit('Texas Instruments', 'ADS1114IDGSR', '16-bit ADC VSSOP-10'),
+        CC0603KRX7R9BB104: cacheHit('YAGEO', 'CC0603KRX7R9BB104', '100nF 0603'),
+      }
+      return hits[mpn] ?? {
+        found: false,
+        result: null,
+        source: 'unknown',
+        ageHours: null,
+      }
+    })
+    const state = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'sensing_instrumentation',
+          sub_modules: [{
+            id: 'od_path',
+            words: [
+              {
+                id: 'sensing_instrumentation_subcomponent_1_word',
+                name_human: 'Sensing Instrumentation Subcomponent 1',
+                content_character: { character_id: 'sensing_instrumentation_subcomponent_1' },
+                modifier_characters: [{
+                  kind: 'form',
+                  value: 'representative optical density (od600) sensor & temperature probe assembly',
+                }],
+              },
+              {
+                id: 'sensing_instrumentation_subcomponent_2_word',
+                name_human: 'Sensing Instrumentation Subcomponent 2',
+                content_character: { character_id: 'sensing_instrumentation_subcomponent_2' },
+                modifier_characters: [{
+                  kind: 'form',
+                  value: 'representative optical density (od600) sensor & temperature probe assembly',
+                }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const outDir = mkdtempSync(join(tmpdir(), 'atopile-od-proxy-mpn-'))
+    tmpDirs.push(outDir)
+    const result = generateAtopileProject(state, outDir)
+
+    const led = result.components.find((c) => c.wordId === 'sensing_instrumentation_subcomponent_1_word')
+    const adc = result.components.find((c) => c.wordId === 'sensing_instrumentation_subcomponent_2_word')
+    expect(led?.mpnVerified).toBe(true)
+    expect(led?.partNumber).toBe('SZYY0603B')
+    expect(adc?.mpnVerified).toBe(true)
+    expect(adc?.partNumber).toBe('ADS1114IDGSR')
+  })
 })

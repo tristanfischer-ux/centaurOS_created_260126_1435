@@ -68,7 +68,11 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { collectElectronicWords, type ElectronicWordRef } from './pcb-stage'
+import {
+  collectElectronicWords,
+  hasOdOpticalFormEvidence,
+  type ElectronicWordRef,
+} from './pcb-stage'
 import { lookupCached } from '../distributors/db-only-cascade'
 import {
   resolveVerifiedComponentIdentity,
@@ -995,6 +999,27 @@ function offBoardCotsReason(
 }
 
 /**
+ * @description Map anonymous sensing_instrumentation_subcomponent_N + OD form
+ * onto a concrete OD path role. Odd index → source LED; even → optical ADC.
+ * INTENT: organoid-class briefs emit OD emitter/detector only as these proxies;
+ * without synthesis they never match a curated candidate (channel stays 0).
+ */
+function synthesizeOdProxyRole(
+  word: ElectronicWordRef,
+): { characterId: string; functionClass: FunctionClass } | null {
+  const identity = `${word.wordId} ${word.characterId}`
+  const match = identity.match(/sensing[_ -]?instrumentation[_ -]?subcomponent[_ -]?(\d+)/i)
+  if (!match) return null
+  if (!hasOdOpticalFormEvidence(Object.values(word.modifiers).join(' '))) return null
+  const index = Number(match[1])
+  if (!Number.isFinite(index) || index < 1) return null
+  if (index % 2 === 1) {
+    return { characterId: 'od_source_led', functionClass: 'led' }
+  }
+  return { characterId: 'optical_adc_measurement', functionClass: 'sensor_ic' }
+}
+
+/**
  * @description Resolves one candidate electronic word to a component record via
  * the three universal tiers, in priority order. Never fakes a footprint — a word
  * matching no tier lands in the caller's `unresolved[]` list.
@@ -1004,7 +1029,9 @@ function resolveComponent(
   footprintsRoot: string,
   symbolsRoot: string,
 ): { component: AtopileComponentRecord } | { unresolved: AtopileUnresolvedRecord } {
-  const functionClass = classifyFunction(word.characterId)
+  const odProxy = synthesizeOdProxyRole(word)
+  const roleCharacterId = odProxy?.characterId ?? word.characterId
+  const functionClass = odProxy?.functionClass ?? classifyFunction(word.characterId)
   const manufacturer = word.modifiers.manufacturer?.trim() || null
   const partNumberRaw = word.modifiers.part_number?.trim()
   const partNumber = isRealPartNumber(partNumberRaw) ? partNumberRaw! : null
@@ -1058,7 +1085,10 @@ function resolveComponent(
     const identity = resolveVerifiedComponentIdentity({
       wordId: word.wordId,
       nameHuman: word.nameHuman,
-      characterId: word.characterId,
+      // GOTCHA: OD proxies keep the anonymous wordId for audit, but curated
+      // role matching must see the synthesized OD path character (od_source_led /
+      // optical_adc_measurement) or ADS1114/SZYY never select.
+      characterId: roleCharacterId,
       functionClass,
       requiredRatings: requiredRatings(word),
     }, lookupCached, { symbolsRoot, footprintsRoot })

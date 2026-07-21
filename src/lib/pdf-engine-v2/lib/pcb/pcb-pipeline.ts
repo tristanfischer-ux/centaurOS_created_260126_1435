@@ -154,7 +154,9 @@ export function runPcbPipeline(
     '--kicad-footprints-root', capability.kicadFootprints.path,
     '--board-outline', boardOutlinePath,
     '--max-passes', String(opts.maxPasses ?? 500),
-    '--max-iterations', String(opts.maxIterations ?? 4),
+    // DECISION (2026-07-21): default 8 matches pcb_pipeline_runner.py — dense
+    // boards need more grow-retries once margin-clamp stacking is forbidden.
+    '--max-iterations', String(opts.maxIterations ?? 8),
     '--freerouting-timeout-s', String(opts.freeroutingTimeoutS ?? 300),
   ]
 

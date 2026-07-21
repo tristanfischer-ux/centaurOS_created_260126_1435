@@ -122,14 +122,48 @@ const EXPLICIT_COTS_PATTERN = /\b(off-the-shelf module|cots module|purchased mod
 const GENERIC_PLACEHOLDER_WORD_RE =
   /\b(?:[a-z][a-z0-9_ -]+[_ -])?sub[-_ ]?component[_ -]?\d+\b/i
 
-function isGenericPlaceholderWord(word: RawWordShape): boolean {
-  const identityText = [
+/** Sensing-path anonymous slots (organoid OD emitter/detector proxies). */
+const SENSING_INSTRUMENTATION_PROXY_RE =
+  /sensing[_ -]?instrumentation[_ -]?subcomponent[_ -]?\d+/i
+
+/**
+ * @description Form/modifier evidence that the word is an OD optical path part.
+ * Universal noun signal — never a product-class table.
+ */
+export function hasOdOpticalFormEvidence(formOrModifiers: string): boolean {
+  return /optical\s*density|\bod600\b|od[_ -]?sensor|od[_ -]?detector|od[_ -]?source|optical[_ -]?(?:adc|measurement|path)/i
+    .test(formOrModifiers)
+}
+
+function wordIdentityText(word: RawWordShape): string {
+  return [
     word.id ?? '',
     word.name_human ?? '',
     word.content_character?.character_id ?? '',
     word.content_character?.name_human ?? '',
   ].join(' ')
-  return GENERIC_PLACEHOLDER_WORD_RE.test(identityText)
+}
+
+function wordFormBlob(word: RawWordShape): string {
+  return (word.modifier_characters ?? [])
+    .map((mc) => mc.value ?? '')
+    .join(' ')
+}
+
+function isGenericPlaceholderWord(word: RawWordShape): boolean {
+  const identityText = wordIdentityText(word)
+  if (!GENERIC_PLACEHOLDER_WORD_RE.test(identityText)) return false
+  // INTENT (2026-07-21): OD path parts often arrive only as
+  // sensing_instrumentation_subcomponent_N with "optical density (od600)" in
+  // form. Keep collecting those; still drop other anonymous subcomponent_N
+  // placeholders that inherit sibling prose (false electronic gaps).
+  if (
+    SENSING_INSTRUMENTATION_PROXY_RE.test(identityText)
+    && hasOdOpticalFormEvidence(wordFormBlob(word))
+  ) {
+    return false
+  }
+  return true
 }
 
 export interface ElectronicSignalScan {
@@ -317,9 +351,19 @@ export function collectElectronicWords(
           word.content_character?.character_id ?? '',
           word.content_character?.name_human ?? '',
         ].join(' ')
-        const categories = ELECTRONIC_CATEGORY_PATTERNS
+        let categories = ELECTRONIC_CATEGORY_PATTERNS
           .filter(({ pattern }) => pattern.test(roleIdentity))
           .map(({ category }) => category)
+        // GOTCHA: sensing_instrumentation_subcomponent_N never matches a role
+        // noun pattern — OD function lives only in form. Mint analog_frontend
+        // when form proves optical-density path (collected above via proxy rescue).
+        if (
+          categories.length === 0
+          && SENSING_INSTRUMENTATION_PROXY_RE.test(roleIdentity)
+          && hasOdOpticalFormEvidence(Object.values(modifiers).join(' '))
+        ) {
+          categories = ['analog_frontend']
+        }
         if (categories.length === 0) continue
         let quantity = 1
         if (modifiers.quantity) {
