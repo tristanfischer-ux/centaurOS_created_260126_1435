@@ -79,6 +79,7 @@ import {
 } from './pcb-verified-candidates'
 import { isDeniedPcbMpn } from './pcb-manufacturer-pinouts'
 import {
+  applyShapeMountingHolesToGeometry,
   createBoardGeometryFromShapeContract,
   createRoundedRectangleContour,
   validateBoardGeometry,
@@ -1113,6 +1114,20 @@ function ensureOdGoldCompanionWords(
       quantity: 1,
     })
   }
+  // INTENT: Eye-Spy OD path carries Toshiba DF2S TVS on the detector board —
+  // densify ESD only when the optical front-end already exists (never alone).
+  if (!/esd[_ -]?protection|df2s|tvs/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'od_esd_protection_network_word',
+      nameHuman: 'OD ESD protection',
+      characterId: 'esd_protection_network',
+      modifiers: {},
+      categories: ['protection'],
+      quantity: 1,
+    })
+  }
   return out
 }
 
@@ -1990,14 +2005,20 @@ export function generateAtopileProject(
   // DECISION: Board-plan geometry wins only when it carries complete dimensional
   // datums. Missing/legacy shape contracts deliberately fall through to the
   // unchanged area heuristic, keeping every existing caller compatible.
-  const boardOutline =
-    (opts.boardShape
-      ? createBoardGeometryFromShapeContract(opts.boardShape)
-      : null) ??
-    computeBoardOutline(allComponents, {
-      isInstrumentSourceBoard: isCompactInstrumentBoard,
-      isHostInterfaceBoard: hasHostInterfaceEdge,
-    })
+  // GOTCHA (organoid 2026-07-21): culture HAT/OD/actuation phenotypes declare
+  // mountingHoles but no outline_* datums — without stamping, every board ships
+  // zero MountingHole footprints despite architecture.holes.
+  const shapedOutline = opts.boardShape
+    ? createBoardGeometryFromShapeContract(opts.boardShape)
+    : null
+  const derivedOutline = computeBoardOutline(allComponents, {
+    isInstrumentSourceBoard: isCompactInstrumentBoard,
+    isHostInterfaceBoard: hasHostInterfaceEdge,
+  })
+  const boardOutline = opts.boardShape
+    ? (shapedOutline ??
+        applyShapeMountingHolesToGeometry(derivedOutline, opts.boardShape))
+    : derivedOutline
 
   mkdirSync(outDir, { recursive: true })
 

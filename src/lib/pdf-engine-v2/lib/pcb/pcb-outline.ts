@@ -158,7 +158,11 @@ function shapeDatum(shape: PcbBoardShapeContract, id: string): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function mountingHoleCenters(
+/**
+ * @description Corner / edge registration centres for N mounting holes.
+ * Universal — keyed only by count + board envelope, never a product name.
+ */
+export function mountingHoleCenters(
   count: number,
   widthMm: number,
   heightMm: number,
@@ -196,6 +200,98 @@ function mountingHoleCenters(
       heightMm / 2 + radiusY * Math.sin(angle),
     )
   })
+}
+
+/**
+ * @description Bounding box of a contour's line/arc endpoints (and arc mids).
+ */
+export function contourBoundingBox(
+  contour: PcbContour,
+): { widthMm: number; heightMm: number; minX: number; minY: number } {
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const segment of contour.segments) {
+    xs.push(segment.start.xMm, segment.end.xMm)
+    ys.push(segment.start.yMm, segment.end.yMm)
+    if (segment.kind === 'arc') {
+      xs.push(segment.mid.xMm)
+      ys.push(segment.mid.yMm)
+    }
+  }
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  return {
+    widthMm: maxX - minX,
+    heightMm: maxY - minY,
+    minX,
+    minY,
+  }
+}
+
+/**
+ * @description When a board-plan shape declares mountingHoles but lacks outline
+ * datums (culture HAT / OD / actuation), stamp registration holes onto the
+ * component-area-derived outline so fabrication geometry stays phenotype-honest.
+ * No-op when the shape has zero holes or geometry already carries holes.
+ */
+export function applyShapeMountingHolesToGeometry(
+  geometry: PcbBoardGeometry,
+  shape: PcbBoardShapeContract,
+): PcbBoardGeometry {
+  if (shape.mountingHoles <= 0 || geometry.mountingHoles.length > 0) {
+    return geometry
+  }
+  const { widthMm, heightMm } = contourBoundingBox(geometry.outline)
+  const holeInsetMm = shapeDatum(shape, 'mounting_hole_inset_mm') ?? 3
+  const holeDiameterMm = shapeDatum(shape, 'mounting_hole_diameter_mm') ?? 3.2
+  if (
+    holeInsetMm <= holeDiameterMm / 2 ||
+    holeInsetMm >= Math.min(widthMm, heightMm) / 2
+  ) {
+    // GOTCHA: tiny compact outlines (e.g. 25 mm) cannot host inset=3 + Ø3.2;
+    // shrink inset so holes still land — never silently drop the phenotype.
+    const safeInset = Math.max(
+      holeDiameterMm / 2 + 0.4,
+      Math.min(holeInsetMm, Math.min(widthMm, heightMm) / 2 - 0.5),
+    )
+    if (safeInset <= holeDiameterMm / 2) return geometry
+    return {
+      ...geometry,
+      mountingHoles: mountingHoleCenters(
+        shape.mountingHoles,
+        widthMm,
+        heightMm,
+        safeInset,
+      ).map((center, index) => ({
+        id: `mounting_hole_${index + 1}`,
+        center,
+        diameterMm: Math.min(holeDiameterMm, safeInset * 1.6),
+        plated: false,
+      })),
+      sourceDetail:
+        `${geometry.sourceDetail}; ${shape.shapeFamily} mounting_holes=` +
+        `${shape.mountingHoles} (stamped onto area-derived outline)`,
+    }
+  }
+  return {
+    ...geometry,
+    mountingHoles: mountingHoleCenters(
+      shape.mountingHoles,
+      widthMm,
+      heightMm,
+      holeInsetMm,
+    ).map((center, index) => ({
+      id: `mounting_hole_${index + 1}`,
+      center,
+      diameterMm: holeDiameterMm,
+      plated: false,
+    })),
+    sourceDetail:
+      `${geometry.sourceDetail}; ${shape.shapeFamily} mounting_holes=` +
+      `${shape.mountingHoles} (stamped onto area-derived outline)`,
+  }
 }
 
 /**
@@ -452,6 +548,21 @@ function selftest(): void {
     throw new Error('Non-plated mounting hole was not rendered')
   }
 
+  // proveCatch: shape with holes but no outline datums stamps onto area geometry.
+  const areaDerived = geometry(createRoundedRectangleContour('area-hat', 90, 90, 3))
+  const stamped = applyShapeMountingHolesToGeometry(areaDerived, {
+    shapeFamily: 'wet_lab_hat',
+    outlineBasis: 'host_header_standard',
+    mountingHoles: 4,
+    rationale: 'form_follows_wet_lab_hat',
+  })
+  if (stamped.mountingHoles.length !== 4) {
+    throw new Error(`culture hole stamp expected 4 holes, got ${stamped.mountingHoles.length}`)
+  }
+  if (!stamped.sourceDetail.includes('mounting_holes=4')) {
+    throw new Error('stamped geometry must record mounting_holes provenance')
+  }
+
   const open: PcbContour = {
     id: 'open-board',
     segments: [
@@ -462,7 +573,9 @@ function selftest(): void {
   if (!validateContour(open).some((finding) => finding.includes('open_or_discontinuous'))) {
     throw new Error('Open outline proveCatch did not fire')
   }
-  console.log('pcb-outline selftest: OK (circle / rounded / polygon / irregular + cutout / open catch)')
+  console.log(
+    'pcb-outline selftest: OK (circle / rounded / polygon / irregular + cutout / hole stamp / open catch)',
+  )
 }
 
 if (process.argv.includes('--selftest')) selftest()

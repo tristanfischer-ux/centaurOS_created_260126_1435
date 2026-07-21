@@ -1314,6 +1314,9 @@ describe('atopile-generator', () => {
       if (/OPA334/i.test(mpn ?? '')) {
         return cacheHit('Texas Instruments', 'OPA334AIDBVR', 'zero-drift TIA op amp')
       }
+      if (/DF2S/i.test(mpn ?? '')) {
+        return cacheHit('Toshiba', 'DF2S6.8MFS,L3M', 'Eye-Spy OD TVS')
+      }
       if (/SZYY0603B|ADS1114|CC0603/i.test(mpn ?? '')) {
         return cacheHit('TI', mpn ?? '', 'OD densify companion')
       }
@@ -1362,10 +1365,32 @@ describe('atopile-generator', () => {
     const ids = new Set(result.components.map((c) => c.wordId))
     expect(ids.has('od_photodiode_word')).toBe(true)
     expect(ids.has('od_photodiode_tia_word')).toBe(true)
+    expect(ids.has('od_esd_protection_network_word')).toBe(true)
     expect(result.components.find((c) => c.wordId === 'od_photodiode_word')?.partNumber)
       .toMatch(/BPW34S/i)
     expect(result.components.find((c) => c.wordId === 'od_photodiode_tia_word')?.partNumber)
       .toMatch(/OPA334/i)
+    expect(result.components.find((c) => c.wordId === 'od_esd_protection_network_word')?.partNumber)
+      .toMatch(/DF2S/i)
+  })
+
+  it('proveCatch: culture boardShape with holes but no datums still stamps mounting holes', () => {
+    const outDir = makeTmpDir('atopile-culture-holes-')
+    tmpDirs.push(outDir)
+    const state = {
+      ...arbitraryElectronicDesign,
+      orchestratorContract: {
+        ...arbitraryElectronicDesign.orchestratorContract,
+        quantities: { working_volume_ml: { value: 20 } },
+      },
+    }
+    const hatShape = derivePcbArchitecture(state).boards.find((b) => b.role === 'wet_lab_hat')!.shape
+    expect(hatShape.mountingHoles).toBe(4)
+    expect(hatShape.datums ?? []).toEqual([])
+
+    const result = generateAtopileProject(state, outDir, { boardShape: hatShape })
+    expect(result.boardOutline.mountingHoles).toHaveLength(4)
+    expect(result.boardOutline.sourceDetail).toMatch(/mounting_holes=4/)
   })
 
   it('densify: wet_lab_hat synthesizes Samtec 2x20 host GPIO connector', () => {
@@ -1373,7 +1398,7 @@ describe('atopile-generator', () => {
       if (/SSQ-120-03-T-D/i.test(mpn ?? '')) {
         return cacheHit('Samtec', 'SSQ-120-03-T-D', '2x20 HAT socket')
       }
-      if (/ATSAMD21|12401610|CC0603/i.test(mpn ?? '')) {
+      if (/ATSAMD21|12401610|CC0603|DF2S/i.test(mpn ?? '')) {
         return cacheHit('Microchip', mpn ?? '', 'HAT densify companion')
       }
       return { found: false, result: null, source: 'unknown', ageHours: null }

@@ -193,6 +193,14 @@ describe('derivePcbArchitecture', () => {
     expect(plan.rationale).toContain('stir_pump_deferred_until_host_hat_drive_topology_published')
   })
 
+  it('proveCatch: culture boards declare mounting-hole phenotypes (HAT 4 / OD 2 / actuation 4)', () => {
+    const plan = derivePcbArchitecture(stateWithQuantities({ working_volume_ml: 20 }))
+    expect(plan.boards.find((b) => b.role === 'wet_lab_hat')?.shape.mountingHoles).toBe(4)
+    expect(plan.boards.find((b) => b.role === 'od_optics_board')?.shape.mountingHoles).toBe(2)
+    expect(plan.boards.find((b) => b.role === 'heater_stir_actuation_board')?.shape.mountingHoles)
+      .toBe(4)
+  })
+
   it('recognises a finished modular motion stack from procurement evidence outside electronic words', () => {
     const state = stateWithQuantities({ channel_count: 4 })
     state.orchestratorContract = {
