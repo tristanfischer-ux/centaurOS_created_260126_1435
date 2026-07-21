@@ -8,6 +8,14 @@ ONE genuine 9/10 organoid benchtop-bioreactor dossier: **every scored tab ≥8 (
 - **Now:** the engine scores itself HONESTLY (no fake-9). Cost blocker CRACKED (2.08×→1.11×, materials £484→£191). Drawings at 9. But 12 tabs still <8 — the honest remaining gap.
 - **Going:** fix each of the 12 sub-8 tabs at SOURCE (the punchlist routes each), parallel where file-disjoint, then ONE final re-bake + adversarial SIGHT. Ship only when every tab honestly ≥8.
 
+## CORRECTIONS (Cursor audit, accepted 2026-07-21)
+- **Materials = £259** (`costStack.raw_materials_bom_gbp`), NOT £191 (that was the partVerifications sum). Use £259 for the ceiling decision. `factory_cogs_gbp`=£343, ex-works=£429.
+- **Do NOT say "cost cracked"** — still 1.11× on ex-works until the COGS-vs-ex-works ceiling basis (R6) is decided. No more ceiling-cutting.
+- **R3 = propagation/live-check, not a new registry** — `class-standards.ts` already declares the lab-instrument standards (CONFIRMED: source present + guard added, 483afc256). The real Excel-save blocker is the **bare-literal `'FAIL'` at Quality & Audit!D11** (no-cheating LIVE-CHECK) + self-audit defects + ceiling.
+- **R4 must KILL ferrite@95mm** (a real mis-placed part — also the R1c plant-voltage edge), not just grow the box to pass phenotype.
+- **NEW ROOT R9 — self-audit false "All 6 PASS"**: brief_compliance banner asserts all-pass over high-severity engineering + a physics_fidelity optical-path mismatch (self-audit blocking_defects). Must fix — it binds ships.
+- **Sequencing: Wave 1 = R3(+R1) then R4; PARK R8 (decomp) until the Excel has SAVED once** (the bare-literal live-check is the immediate gate to even producing a workbook to SIGHT).
+
 ## DONE (this program — do NOT redo)
 - Scoring honesty S1–S12, F1a–f, gates 31–38, honest-scoring precondition — engine self-scores truthfully.
 - COST: filler phantom (−£87, c070bef3f), F2 thermal (8b83fa435), 17 real lab parts ingested (116f72dfa+live), scale-aware device-commodity ceilings (221ab9633) → materials £191, ex-works £429/1.11×.

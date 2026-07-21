@@ -8880,8 +8880,24 @@ def augment_topology_connect_orphans(state, topology, parts):
                 _ac_v = float(_val); break
         except (TypeError, ValueError):
             pass
-    _lv_feeder_ctx = (f'LV power feeder {_ac_v:.0f}V 1ph' if _ac_v is not None and _ac_v <= 250.0
-                      else 'LV power feeder 400/415V 3ph')
+    # DEVICE-SCALE FALLBACK (2026-07-21, organoid R1c): when NO explicit AC system voltage is
+    # declared, the OLD flat default stamped a plant '400/415V 3ph' feeder label on EVERY power
+    # edge — so on a benchtop instrument 14/36 connection runs read DOMAIN MISMATCH ('plant-
+    # voltage label on a device edge', e.g. Ferrite EMC Bead → Dosing Pump) and Connection trace
+    # / ⚠Checks failed. A device-scale instrument (enclosure < 1 m³) is single-phase mains, never
+    # a 3-phase plant feeder. Mirrors F1d (main-incomer 400→230). Universal — no per-class table.
+    _encl_v_raw = quantities.get('enclosure_volume_m3')
+    _encl_v_raw = _encl_v_raw.get('value') if isinstance(_encl_v_raw, dict) else _encl_v_raw
+    try:
+        _is_device_scale = _encl_v_raw is not None and 0.0 < float(_encl_v_raw) < 1.0
+    except (TypeError, ValueError):
+        _is_device_scale = False
+    if _ac_v is not None and _ac_v <= 250.0:
+        _lv_feeder_ctx = f'LV power feeder {_ac_v:.0f}V 1ph'
+    elif _ac_v is None and _is_device_scale:
+        _lv_feeder_ctx = 'LV power feeder 230V 1ph'
+    else:
+        _lv_feeder_ctx = 'LV power feeder 400/415V 3ph'
     ctrl_hub = _module_repr_part_name('control_compute_communication', parts)
 
     # ── the electrical distribution hierarchy (role-keyed series spine + load hub) ──
