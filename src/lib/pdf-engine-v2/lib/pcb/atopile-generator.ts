@@ -127,10 +127,12 @@ export type FunctionClass =
  * as a `main_controller` in a drone or a BMS). First match wins.
  */
 const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> = [
-  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
+  // GOTCHA: op_amp/tia MUST precede sensor_ic — `od_photodiode_tia` contains
+  // "photodiode" and would otherwise mis-classify as sensor_ic (no OPA334 match).
   // INTENT (Rodeostat 0201): dac_output_stage is a real SOIC DAC IC — without
   // this it landed in unresolved[] ELECTRONIC gap and capped PCB at DRAFT/5.
-  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog/i },
+  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance/i },
+  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless|wi[_-]?fi|host[_-]?protocol[_-]?bridge|protocol[_-]?bridge|level[_-]?shifter/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
@@ -681,6 +683,8 @@ export interface GenerateAtopileProjectOptions {
   symbolsRoot?: string
   requiredWordIds?: string[]
   requiredFunctionRoles?: string[]
+  /** Architecture board role (e.g. wet_lab_hat) — densify companions key off this. */
+  boardRole?: string
   boardShape?: PcbBoardShapeContract
 }
 
@@ -1020,6 +1024,131 @@ function synthesizeOdProxyRole(
 }
 
 /**
+ * @description When a board requires heater_channel, ensure gold FFC + hall sense
+ * companions are present for densify (Pioreactor heater_20ml topology). Does NOT
+ * invent stir/pump drivers — those stay deferred until HAT drive is published.
+ */
+function ensureHeaterGoldCompanionWords(
+  words: ElectronicWordRef[],
+  requiredFunctionRoles: string[] | undefined,
+): ElectronicWordRef[] {
+  if (!requiredFunctionRoles?.includes('heater_channel')) return words
+  const blob = words.map((w) => `${w.wordId} ${w.characterId} ${w.nameHuman}`).join(' ')
+  // GOTCHA: empty boards that only declare heater_channel as a functionRequirement
+  // must stay component-free — densify companions only when temp/load words exist.
+  if (!/heat(?:er|ing)|temperature[_ -]?(?:sensor|probe)|tmp1075|esr18|cartridge[_ -]?heater/i.test(blob)) {
+    return words
+  }
+  const anchor = words[0]
+  const moduleId = anchor?.moduleId ?? 'thermal_actuation'
+  const subModuleId = anchor?.subModuleId ?? 'heater_channel'
+  const out = [...words]
+  if (!/(?:host[_ -]?)?ffc[_ -]?connector|52207/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'host_ffc_connector_word',
+      nameHuman: 'Host FFC connector',
+      characterId: 'host_ffc_connector',
+      modifiers: {},
+      categories: ['connector'],
+      quantity: 1,
+    })
+  }
+  if (!/(?:magnetic[_ -]?)?(?:lid[_ -]?)?(?:hall|lid[_ -]?sense)|drv5021/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'magnetic_lid_sense_word',
+      nameHuman: 'Magnetic lid hall sense',
+      characterId: 'magnetic_lid_sense',
+      modifiers: {},
+      categories: ['sensor'],
+      quantity: 1,
+    })
+  }
+  return out
+}
+
+/**
+ * @description When a board requires od_measurement_channel and already has LED/ADC
+ * evidence, densify with Eye-Spy gold photodiode + TIA. Does not invent OD from
+ * a bare channel role on an empty board.
+ */
+function ensureOdGoldCompanionWords(
+  words: ElectronicWordRef[],
+  requiredFunctionRoles: string[] | undefined,
+): ElectronicWordRef[] {
+  if (!requiredFunctionRoles?.includes('od_measurement_channel')) return words
+  const blob = words.map((w) => `${w.wordId} ${w.characterId} ${w.nameHuman}`).join(' ')
+  // GOTCHA: need source or ADC evidence before synthesizing detector/TIA.
+  if (!/od[_ -]?source|szyy|sensing[_ -]?instrumentation|optical[_ -]?adc|ads111|led/i.test(blob)) {
+    return words
+  }
+  const anchor = words[0]
+  const moduleId = anchor?.moduleId ?? 'od_optics'
+  const subModuleId = anchor?.subModuleId ?? 'od_measurement'
+  const out = [...words]
+  if (!/(?:^|[_ -])(?:od[_ -]?)?photodiode(?:$|[_ -])|bpw34|optical[_ -]?detector/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'od_photodiode_word',
+      nameHuman: 'OD photodiode detector',
+      characterId: 'od_photodiode',
+      modifiers: {},
+      categories: ['sensor'],
+      quantity: 1,
+    })
+  }
+  if (!/(?:od[_ -]?)?(?:photodiode[_ -]?)?(?:tia|transimpedance)|opa334|optical[_ -]?front[_ -]?end/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'od_photodiode_tia_word',
+      nameHuman: 'OD photodiode TIA',
+      characterId: 'od_photodiode_tia',
+      modifiers: {},
+      categories: ['amplifier'],
+      quantity: 1,
+    })
+  }
+  return out
+}
+
+/**
+ * @description wet_lab_hat densify: Samtec 2×20 host GPIO socket (Pioreactor HAT
+ * gold). Only when boardRole is wet_lab_hat and MCU/USB evidence already exists.
+ */
+function ensureHatHostConnectorWords(
+  words: ElectronicWordRef[],
+  boardRole: string | undefined,
+): ElectronicWordRef[] {
+  if (boardRole !== 'wet_lab_hat') return words
+  const blob = words.map((w) => `${w.wordId} ${w.characterId} ${w.nameHuman}`).join(' ')
+  if (!/microcontroller|(?:^|[_ -])mcu(?:$|[_ -])|usb[_ -]?(?:interface|power|connector)/i.test(blob)) {
+    return words
+  }
+  if (/(?:raspberry[_ -]?pi|rpi)[_ -]?hat[_ -]?(?:host|gpio)[_ -]?connector|hat[_ -]?host[_ -]?connector|ssq[_ -]?120/i.test(blob)) {
+    return words
+  }
+  const anchor = words[0]
+  return [
+    ...words,
+    {
+      moduleId: anchor?.moduleId ?? 'host_interface',
+      subModuleId: anchor?.subModuleId ?? 'hat_host',
+      wordId: 'hat_host_connector_word',
+      nameHuman: 'HAT host GPIO connector',
+      characterId: 'hat_host_connector',
+      modifiers: {},
+      categories: ['connector'],
+      quantity: 1,
+    },
+  ]
+}
+
+/**
  * @description Resolves one candidate electronic word to a component record via
  * the three universal tiers, in priority order. Never fakes a footprint — a word
  * matching no tier lands in the caller's `unresolved[]` list.
@@ -1152,6 +1281,35 @@ function resolveComponent(
           ? `function class '${functionClass}' resolved but its default footprint is missing from the local KiCad library`
           : 'no MPN, no matching package-family text, and no recognised function-class role for this word',
       },
+    }
+  }
+
+  // DECISION (2026-07-21): Amphenol 12401548 mid-mount lands B1–B12 as PTH with
+  // sub-default hole-to-hole/clearance — 100+ intra-footprint DRC on every HAT.
+  // Remap to the SMT sibling 12401610 (OpenDrop gold Type-C land) so pipeline
+  // DRC is honest, not just filtered. Same manufacturer / USB-C receptacle class.
+  if (
+    functionClass === 'usb_connector'
+    && (
+      /12401548/i.test(resolvedPartNumber ?? '')
+      || /12401548/i.test(footprint.footprint)
+    )
+  ) {
+    const smtSibling = resolveFootprintByGlob(
+      footprintsRoot,
+      'Connector_USB',
+      /^USB_C_Receptacle_Amphenol_12401610E4-2A\.kicad_mod$/,
+    )
+    if (smtSibling) {
+      footprint = smtSibling
+      resolvedManufacturer = resolvedManufacturer ?? 'Amphenol ICC'
+      resolvedPartNumber = '12401610E4#2A'
+      identityProvenance =
+        (identityProvenance ? `${identityProvenance}; ` : '') +
+        'remapped mid-mount Amphenol 12401548 → SMT 12401610 Type-C land (KiCad-default DRC-clean; OpenDrop gold)'
+      if (tier === 'mpn_package' || tier === 'package_family') {
+        tier = 'mpn_symbol_footprint'
+      }
     }
   }
 
@@ -1326,13 +1484,158 @@ function slug(text: string): string {
 }
 
 /**
+ * @description Find a component pin whose name matches any of the patterns.
+ * Prefers curated pinSpecs identifiers, then schematic pin strings.
+ */
+function findPinMatching(
+  component: AtopileComponentRecord,
+  patterns: RegExp[],
+): string | null {
+  for (const pin of component.pinSpecs ?? []) {
+    const id = pinIdentifier(pin)
+    if (patterns.some((p) => p.test(pin.name) || p.test(id))) return id
+  }
+  for (const pin of component.pins) {
+    if (patterns.some((p) => p.test(pin))) return pin
+  }
+  return null
+}
+
+/**
+ * @description Ensure a named pin exists on the component (concept-stage synth).
+ */
+function ensureComponentPin(component: AtopileComponentRecord, pin: string): string {
+  if (!component.pins.includes(pin)) component.pins.push(pin)
+  return pin
+}
+
+/**
+ * @description Wire every GND / VDD / VBUS / 3V3 pin to shared rails (not just
+ * the singular powerPin/groundPin — SAMD-class MCUs have many VDDIO/GND pads).
+ */
+function tieSupplyRails(
+  components: AtopileComponentRecord[],
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+  vcc: AtopileNetRecord,
+  gnd: AtopileNetRecord,
+  skip: Set<AtopileComponentRecord>,
+): void {
+  const powerPinRe = /^(?:VDD|VCC|VBUS|VIN|3V3|P3V3|VOUT)(?:_|$|[A-Z0-9])/i
+  const gndPinRe = /^(?:GND|VSS|AGND|DGND|GNDANA|SHIELD)(?:_|$|[A-Z0-9])/i
+  for (const component of components) {
+    if (skip.has(component)) continue
+    const pinNames = [
+      ...new Set([
+        ...component.pins,
+        ...(component.pinSpecs ?? []).map((p) => pinIdentifier(p)),
+      ]),
+    ]
+    for (const pin of pinNames) {
+      if (gndPinRe.test(pin) || /^GND/i.test(pin)) {
+        addMember(gnd, component.instanceName, pin)
+      } else if (powerPinRe.test(pin) || component.powerPin === pin) {
+        addMember(vcc, component.instanceName, pin)
+      }
+    }
+    if (component.powerPin) addMember(vcc, component.instanceName, component.powerPin)
+    if (component.groundPin) addMember(gnd, component.instanceName, component.groundPin)
+  }
+}
+
+/**
+ * @description Universal host-interface nets: USB D+/D- and SWD when the board
+ * carries an MCU plus USB and/or debug header. Never product-named.
+ *
+ * USB: prefer pins named USB_DP/DM / D+ / D-; else Microchip USB pad pair
+ * PA25/PA24 when both exist on the MCU pinout (silicon convention, not a product).
+ * SWD: prefer SWDIO/SWCLK; else PA31/PA30 when both exist.
+ */
+function wireHostInterfaceNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+): void {
+  const mcu = components.find((c) => c.functionClass === 'microcontroller')
+  if (!mcu) return
+
+  const usbs = components.filter((c) => c.functionClass === 'usb_connector')
+  for (const usb of usbs) {
+    // Type-C curated pinouts use D__A6/D__B6 (DP) and D__A7/D__B7 (DM).
+    // Package-family defaults use D+/D- (sanitised to colliding D_ — prefer A6/A7).
+    const usbDp =
+      findPinMatching(usb, [/D__A6/i, /D__B6/i, /^D\+$/i, /USB_?DP/i, /^DP(?:_|$)/i])
+    const usbDm =
+      findPinMatching(usb, [/D__A7/i, /D__B7/i, /^D-$/i, /USB_?DM/i, /^DM(?:_|$)/i])
+    let mcuDp = findPinMatching(mcu, [/USB_?DP/i, /^DP(?:_|$)/i])
+    let mcuDm = findPinMatching(mcu, [/USB_?DM/i, /^DM(?:_|$)/i])
+    // GOTCHA: SAMD TQFP pin names are PA24/PA25 — USBDM/USBDP silicon pair.
+    if (!mcuDp && !mcuDm) {
+      const pa25 = findPinMatching(mcu, [/^PA25(?:_|$)/i])
+      const pa24 = findPinMatching(mcu, [/^PA24(?:_|$)/i])
+      if (pa25 && pa24) {
+        mcuDp = pa25
+        mcuDm = pa24
+      }
+    }
+    if (usbDp) {
+      const dpPin = mcuDp ?? ensureComponentPin(mcu, 'USB_DP')
+      const net = ensureNet('USB_DP', 'signal')
+      addMember(net, usb.instanceName, usbDp)
+      addMember(net, mcu.instanceName, dpPin)
+    }
+    if (usbDm) {
+      const dmPin = mcuDm ?? ensureComponentPin(mcu, 'USB_DM')
+      const net = ensureNet('USB_DM', 'signal')
+      addMember(net, usb.instanceName, usbDm)
+      addMember(net, mcu.instanceName, dmPin)
+    }
+  }
+
+  const debug = components.find((c) => c.functionClass === 'debug_connector')
+  if (!debug) return
+  const pairs: Array<{ net: string; debugPat: RegExp[]; mcuPat: RegExp[]; synth: string; samd?: RegExp }> = [
+    {
+      net: 'SWDIO',
+      debugPat: [/SWDIO/i],
+      mcuPat: [/SWDIO/i],
+      synth: 'SWDIO',
+      samd: /^PA31(?:_|$)/i,
+    },
+    {
+      net: 'SWCLK',
+      debugPat: [/SWCLK/i],
+      mcuPat: [/SWCLK/i],
+      synth: 'SWCLK',
+      samd: /^PA30(?:_|$)/i,
+    },
+    {
+      net: 'RESET',
+      debugPat: [/RESET|NRST|__RESET__/i],
+      mcuPat: [/RESET|NRST|__RESET__/i],
+      synth: 'RESET',
+    },
+  ]
+  for (const pair of pairs) {
+    const dPin = findPinMatching(debug, pair.debugPat)
+    if (!dPin) continue
+    let mPin = findPinMatching(mcu, pair.mcuPat)
+    if (!mPin && pair.samd) mPin = findPinMatching(mcu, [pair.samd])
+    if (!mPin) mPin = ensureComponentPin(mcu, pair.synth)
+    const net = ensureNet(pair.net, 'signal')
+    addMember(net, debug.instanceName, dPin)
+    addMember(net, mcu.instanceName, mPin)
+  }
+}
+
+/**
  * @description Builds VCC/GND global rails (battery → regulator → rails when both
  * exist, per the universal power topology every electronic product shares),
- * topology-derived signal nets from `orchestratorContract.topology`, and one
- * generic decoupling cap per powered IC-class component (a rule, not a per-part
- * table). Mutates `components` in place to append dynamically-needed extra pins
- * for topology signal connections (this design is concept-stage — the engine's
- * own BoM already marks every part "exact pinout confirmed at detailed design").
+ * host-interface USB/SWD nets, topology-derived signal nets from
+ * `orchestratorContract.topology`, and one generic decoupling cap per powered
+ * IC-class component (a rule, not a per-part table). Mutates `components` in
+ * place to append dynamically-needed extra pins for topology signal connections
+ * (this design is concept-stage — the engine's own BoM already marks every part
+ * "exact pinout confirmed at detailed design").
  */
 function buildNets(
   components: AtopileComponentRecord[],
@@ -1366,6 +1669,7 @@ function buildNets(
   // supply is assumed upstream of the board — concept-stage, per the engine's own
   // maturity convention).
   let regulatorHandledSeparately = false
+  const skipRails = new Set<AtopileComponentRecord>()
   if (battery && regulator && battery.powerPin && battery.groundPin && regulator.powerPin && regulator.groundPin) {
     const battNet = ensureNet('BATT', 'power')
     addMember(battNet, battery.instanceName, battery.powerPin)
@@ -1375,13 +1679,12 @@ function buildNets(
     const regOutPin = regulator.pins.find((p) => /vout|out/i.test(p)) ?? regulator.pins[regulator.pins.length - 1]
     addMember(vcc, regulator.instanceName, regOutPin)
     regulatorHandledSeparately = true
+    skipRails.add(battery)
+    skipRails.add(regulator)
   }
 
-  for (const component of components) {
-    if (regulatorHandledSeparately && (component === battery || component === regulator)) continue
-    if (component.powerPin) addMember(vcc, component.instanceName, component.powerPin)
-    if (component.groundPin) addMember(gnd, component.instanceName, component.groundPin)
-  }
+  tieSupplyRails(components, addMember, vcc, gnd, skipRails)
+  wireHostInterfaceNets(components, ensureNet, addMember)
 
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
@@ -1487,7 +1790,9 @@ function computeBoardOutline(
   const rawSide = Math.sqrt(Math.max(totalAreaMm2, 1) * AREA_MULTIPLIER)
   // DECISION (2026-07-21): MCU+USB-C host boards need ≥80 mm edge keepout for
   // dual receptacles + TQFP — the generic 50 mm plant floor still soups placement.
-  const minSide = opts.isInstrumentSourceBoard ? 25 : opts.isHostInterfaceBoard ? 80 : 50
+  // DECISION (2026-07-21 densify): host MCU+dual-USB+SWD needs ≥90 mm so USB_DP
+  // vias clear Edge.Cuts (80 mm floored vias into copper_edge_clearance).
+  const minSide = opts.isInstrumentSourceBoard ? 25 : opts.isHostInterfaceBoard ? 90 : 50
   const maxSide = opts.isInstrumentSourceBoard ? 40 : 250
   const roundTo = opts.isInstrumentSourceBoard ? 5 : 10
   const side = Math.max(minSide, Math.min(maxSide, Math.ceil(rawSide / roundTo) * roundTo))
@@ -1503,7 +1808,7 @@ function computeBoardOutline(
         'Host peripherals / purchased assemblies stay off-board; this outline is the control/source daughterboard.'
       : opts.isHostInterfaceBoard
         ? `Phase B host-interface board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
-          `over ${components.length} components, clamped [80,250]mm (MCU+USB edge keepout), rounded to 10mm.`
+          `over ${components.length} components, clamped [90,250]mm (MCU+USB+SWD edge keepout), rounded to 10mm.`
         : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
           `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
           'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
@@ -1590,7 +1895,18 @@ export function generateAtopileProject(
   const scopedElectronicWords = requiredWordIds
     ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
     : allElectronicWords
-  const electronicWords = scopedElectronicWords
+  // INTENT: densify with published gold companions only — heater FFC+hall,
+  // OD photodiode+TIA, HAT 2×20 host socket. Stir/pump stay deferred.
+  const electronicWords = ensureHatHostConnectorWords(
+    ensureOdGoldCompanionWords(
+      ensureHeaterGoldCompanionWords(
+        scopedElectronicWords,
+        opts.requiredFunctionRoles,
+      ),
+      opts.requiredFunctionRoles,
+    ),
+    opts.boardRole,
+  )
   // INTENT: Channel contracts describe work the board must implement; they are
   // not manufacturer-orderable packages. Keep the obligation explicit until a
   // real topology assigns components or passive copper geometry to the role.

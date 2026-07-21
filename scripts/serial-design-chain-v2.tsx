@@ -10019,6 +10019,8 @@ async function main() {
             pcb.boardPipelines = stPcb.pcb.boardPipelines
             stPcb.pcb.designFitness = designFitness
             pcb.designFitness = designFitness
+            stPcb.pcb.implementedChannels = multi.implementedChannels
+            pcb.implementedChannels = multi.implementedChannels
             stPcb.pcb.pipeline = record
             pcb.pipeline = record
             console.error(
@@ -10056,21 +10058,26 @@ async function main() {
                 target: string
                 result: ReturnType<typeof runTier0FirmwareProof>
               }> = []
+              const mcuComp = genComponents.find((c) =>
+                /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
               for (const thin of thinSpecs) {
-                const mcuComp = genComponents.find((c) =>
-                  /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
+                const boardRun = multi.boardPipelines.find((b) => b.boardId === thin.proofTargetId)
+                const boardComponents = boardRun?.generator.components ?? []
                 const fat = buildFirmwareProofContract({
                   thin,
                   designFitnessOk: designFitness.ok === true,
                   mcu: mcuComp?.partNumber
                     ? { mpn: mcuComp.partNumber, manufacturer: mcuComp.manufacturer ?? undefined }
                     : undefined,
-                  components: genComponents.map((c) => ({
+                  components: boardComponents.map((c) => ({
                     wordId: c.wordId,
                     refdes: c.instanceName,
                     mpn: c.partNumber,
                     characterId: c.characterId ?? undefined,
                   })),
+                  // GOTCHA: must pass design evidence — inventing instances from
+                  // requiredCount made stir/pump "PASS" while PCB implemented 0.
+                  implementedChannels: multi.implementedChannels,
                 })
                 const proofOut = resolve(pcbProjectDir, 'firmware-proof', thin.proofTargetId)
                 const result = designFitness.ok === true

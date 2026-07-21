@@ -17,8 +17,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { classifyFunction, generateAtopileProject } from './atopile-generator'
 import { derivePcbArchitecture } from './pcb-architecture'
+import { lookupCached } from '../distributors/db-only-cascade'
 
 import type { PcbBoardGeometry } from './pcb-contract'
+import type { DbCascadeResult } from '../distributors/db-only-cascade'
 
 const REPO_ROOT = join(__dirname, '../../../../..')
 const COLORIMETER_STATE_PATH = join(REPO_ROOT, 'out/colorimeter-20260712-1010/state.json')
@@ -26,6 +28,24 @@ const COLORIMETER_STATE_PATH = join(REPO_ROOT, 'out/colorimeter-20260712-1010/st
 jest.mock('../distributors/db-only-cascade', () => ({
   lookupCached: jest.fn(() => ({ found: false, result: null, source: 'unknown', ageHours: null })),
 }))
+
+const mockedLookup = lookupCached as jest.MockedFunction<typeof lookupCached>
+
+function cacheHit(manufacturer: string, mpn: string, description: string): DbCascadeResult {
+  return {
+    found: true,
+    result: {
+      source: 'curated_gold_seed',
+      mpn,
+      manufacturer,
+      description,
+      priceGBP: [{ qty: 1, unitPriceGbp: 1 }],
+      stockUK: 1,
+    },
+    source: 'cache_hit',
+    ageHours: 1,
+  }
+}
 
 function makeTmpDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
@@ -47,6 +67,14 @@ function geometryDimensions(geometry: PcbBoardGeometry): { widthMm: number; heig
 
 describe('atopile-generator', () => {
   const tmpDirs: string[] = []
+  afterEach(() => {
+    mockedLookup.mockImplementation(() => ({
+      found: false,
+      result: null,
+      source: 'unknown',
+      ageHours: null,
+    }))
+  })
   afterAll(() => {
     for (const dir of tmpDirs) {
       try { rmSync(dir, { recursive: true, force: true }) } catch { /* no-op */ }
@@ -1186,7 +1214,209 @@ describe('atopile-generator', () => {
     expect(classifyFunction('debug_uart_header')).toBe('debug_connector')
   })
 
+  it('densify: debug_header resolves FTSH-105 (debug_connector), not PinHeader_1x04', () => {
+    mockedLookup.mockImplementation((manufacturer, mpn) => {
+      if (/FTSH-105/i.test(mpn ?? '')) {
+        return cacheHit('Samtec', 'FTSH-105-01-L-DV', 'Samtec FTSH-105-01-L-DV SWD header')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-densify-ftsh-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'host',
+          sub_modules: [{
+            id: 'host__debug',
+            words: [{
+              id: 'debug_header_word',
+              name_human: 'SWD debug header',
+              content_character: { character_id: 'debug_header' },
+              modifier_characters: [{ kind: 'quantity', value: '×1' }],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['debug_header_word'],
+    })
+    const hdr = result.components.find((c) => c.wordId === 'debug_header_word')
+    expect(hdr?.partNumber).toMatch(/FTSH-105-01-L-DV/i)
+    expect(hdr?.footprint?.footprint).toMatch(/PinHeader_2x05_P1\.27mm/i)
+    expect(hdr?.footprint?.footprint).not.toMatch(/PinHeader_1x04/i)
+  })
+
+  it('densify: heater_channel synthesizes FFC + hall gold companions', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/52207-0760/i.test(mpn ?? '')) {
+        return cacheHit('Molex', '52207-0760', 'Molex FFC host connector')
+      }
+      if (/DRV5021/i.test(mpn ?? '')) {
+        return cacheHit('Texas Instruments', 'DRV5021A3QDBZR', 'TI hall lid sense')
+      }
+      if (/ESR18|TMP1075|CC0603/i.test(mpn ?? '')) {
+        return cacheHit('Rohm', mpn ?? '', 'heater densify companion')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-densify-heater-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'actuation',
+          sub_modules: [{
+            id: 'actuation__heater',
+            words: [
+              {
+                id: 'cartridge_heater_word',
+                name_human: 'Cartridge heater',
+                content_character: { character_id: 'cartridge_heater' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'culture_temperature_probe_word',
+                name_human: 'Culture temperature probe',
+                content_character: { character_id: 'culture_temperature_probe' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['cartridge_heater_word', 'culture_temperature_probe_word'],
+      requiredFunctionRoles: ['heater_channel'],
+    })
+    const ids = new Set(result.components.map((c) => c.wordId))
+    expect(ids.has('host_ffc_connector_word')).toBe(true)
+    expect(ids.has('magnetic_lid_sense_word')).toBe(true)
+    expect(result.components.find((c) => c.wordId === 'host_ffc_connector_word')?.partNumber)
+      .toMatch(/52207-0760/i)
+    expect(result.components.find((c) => c.wordId === 'magnetic_lid_sense_word')?.partNumber)
+      .toMatch(/DRV5021/i)
+  })
+
+  it('densify: od_measurement_channel synthesizes photodiode + TIA gold companions', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/BPW34S/i.test(mpn ?? '')) {
+        return cacheHit('ams-OSRAM', 'BPW34S', 'SMD PIN photodiode')
+      }
+      if (/OPA334/i.test(mpn ?? '')) {
+        return cacheHit('Texas Instruments', 'OPA334AIDBVR', 'zero-drift TIA op amp')
+      }
+      if (/SZYY0603B|ADS1114|CC0603/i.test(mpn ?? '')) {
+        return cacheHit('TI', mpn ?? '', 'OD densify companion')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-densify-od-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'optics',
+          sub_modules: [{
+            id: 'optics__od',
+            words: [
+              {
+                id: 'sensing_instrumentation_subcomponent_1_word',
+                name_human: 'OD source LED proxy',
+                content_character: { character_id: 'sensing_instrumentation_subcomponent_1' },
+                modifier_characters: [
+                  { kind: 'form', value: 'optical density source LED emitter' },
+                  { kind: 'quantity', value: '×1' },
+                ],
+              },
+              {
+                id: 'sensing_instrumentation_subcomponent_2_word',
+                name_human: 'OD ADC proxy',
+                content_character: { character_id: 'sensing_instrumentation_subcomponent_2' },
+                modifier_characters: [
+                  { kind: 'form', value: 'optical density photodiode ADC measurement' },
+                  { kind: 'quantity', value: '×1' },
+                ],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: [
+        'sensing_instrumentation_subcomponent_1_word',
+        'sensing_instrumentation_subcomponent_2_word',
+      ],
+      requiredFunctionRoles: ['od_measurement_channel'],
+    })
+    const ids = new Set(result.components.map((c) => c.wordId))
+    expect(ids.has('od_photodiode_word')).toBe(true)
+    expect(ids.has('od_photodiode_tia_word')).toBe(true)
+    expect(result.components.find((c) => c.wordId === 'od_photodiode_word')?.partNumber)
+      .toMatch(/BPW34S/i)
+    expect(result.components.find((c) => c.wordId === 'od_photodiode_tia_word')?.partNumber)
+      .toMatch(/OPA334/i)
+  })
+
+  it('densify: wet_lab_hat synthesizes Samtec 2x20 host GPIO connector', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/SSQ-120-03-T-D/i.test(mpn ?? '')) {
+        return cacheHit('Samtec', 'SSQ-120-03-T-D', '2x20 HAT socket')
+      }
+      if (/ATSAMD21|12401610|CC0603/i.test(mpn ?? '')) {
+        return cacheHit('Microchip', mpn ?? '', 'HAT densify companion')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-densify-hat-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'host',
+          sub_modules: [{
+            id: 'host__mcu',
+            words: [
+              {
+                id: 'microcontroller_mcu_word',
+                name_human: 'Host MCU',
+                content_character: { character_id: 'microcontroller_mcu' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'usb_interface_word',
+                name_human: 'USB interface',
+                content_character: { character_id: 'usb_interface' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['microcontroller_mcu_word', 'usb_interface_word'],
+      boardRole: 'wet_lab_hat',
+    })
+    expect(result.components.some((c) => c.wordId === 'hat_host_connector_word')).toBe(true)
+    expect(result.components.find((c) => c.wordId === 'hat_host_connector_word')?.partNumber)
+      .toMatch(/SSQ-120-03-T-D/i)
+  })
+
   it('P4: usb_power_entry never resolves to PinHeader_*', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/12401610/i.test(mpn ?? '')) {
+        return cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C receptacle')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
     const outDir = makeTmpDir('atopile-p4-usb-')
     tmpDirs.push(outDir)
     const design = {

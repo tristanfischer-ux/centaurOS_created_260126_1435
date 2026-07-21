@@ -147,11 +147,8 @@ describe('derivePcbArchitecture', () => {
     [
       { working_volume_ml: 20 },
       'heater_stir_actuation_board',
-      [
-        { role: 'heater_channel', count: 1 },
-        { role: 'stir_channel', count: 1 },
-        { role: 'pump_channel', count: 1 },
-      ],
+      // GOTCHA: stir/pump are deferredChannelRequirements until HAT drive published
+      [{ role: 'heater_channel', count: 1 }],
     ],
     [
       { compliance_voltage_v: 10 },
@@ -176,6 +173,25 @@ describe('derivePcbArchitecture', () => {
         .toEqual(expectedChannels)
     },
   )
+
+  it('proveCatch: stir/pump deferred until host-HAT drive topology published', () => {
+    const plan = derivePcbArchitecture(stateWithQuantities({ working_volume_ml: 20 }))
+    const actuation = plan.boards.find((item) => item.role === 'heater_stir_actuation_board')
+    expect(actuation?.channelRequirements).toEqual([{ role: 'heater_channel', count: 1 }])
+    expect(actuation?.deferredChannelRequirements).toEqual([
+      {
+        role: 'stir_channel',
+        count: 1,
+        reason: 'blocked_until_host_hat_drive_topology_published',
+      },
+      {
+        role: 'pump_channel',
+        count: 1,
+        reason: 'blocked_until_host_hat_drive_topology_published',
+      },
+    ])
+    expect(plan.rationale).toContain('stir_pump_deferred_until_host_hat_drive_topology_published')
+  })
 
   it('recognises a finished modular motion stack from procurement evidence outside electronic words', () => {
     const state = stateWithQuantities({ channel_count: 4 })

@@ -326,6 +326,7 @@ function generateExpectedBoardProjects(
         requiredWordIds: boardPlan.requiredWordIds,
         requiredFunctionRoles: boardPlan.channelRequirements.map((requirement) => requirement.role),
         boardShape: boardPlan.shape,
+        boardRole: boardPlan.role,
       })
       routingArtifacts.push(...listRoutingArtifacts(projectDir))
 
@@ -588,6 +589,7 @@ export function verifyYuriGoldPipelines(
             (requirement) => requirement.role,
           ),
           boardShape: boardPlan.shape,
+          boardRole: boardPlan.role,
         })
         const pipeline = pipelineRunner(projectDir, runDir, options.pipelineOptions)
         return pipelineBoardResult(boardPlan, projectDir, runDir, generated, pipeline)

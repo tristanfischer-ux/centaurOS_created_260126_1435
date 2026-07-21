@@ -44,9 +44,12 @@ export interface MultiBoardPcbRunResult {
   /** Aggregate: ok only if every required board pipeline is ok. */
   pipeline: PcbPipelineRecord
   designFitness: PcbDesignFitnessResult
+  /** Design-evidence channel counts — firmware contracts must use this, not requiredCount. */
+  implementedChannels: Record<string, number>
   /** Union of components across boards — for firmware proof / Excel MPN backfill. */
   allComponents: GenerateAtopileProjectResult['components']
   allUnresolved: GenerateAtopileProjectResult['unresolved']
+  allFunctionReqs: GenerateAtopileProjectResult['functionRequirements']
   kicadBoardCount: number
 }
 
@@ -115,6 +118,7 @@ export function runBespokeMultiBoardPcb(
     const genResult = generateAtopileProject(state, projectDir, {
       requiredWordIds: board.requiredWordIds.length > 0 ? board.requiredWordIds : undefined,
       boardShape: board.shape,
+      boardRole: board.role,
       requiredFunctionRoles: board.channelRequirements.map((r) => r.role),
     })
     const pipelineResult = runPipeline(projectDir, chainOutDir)
@@ -200,8 +204,10 @@ export function runBespokeMultiBoardPcb(
     boardPipelines,
     pipeline,
     designFitness,
+    implementedChannels,
     allComponents,
     allUnresolved,
+    allFunctionReqs,
     kicadBoardCount: boards.length,
   }
 }

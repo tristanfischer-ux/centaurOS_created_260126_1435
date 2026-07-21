@@ -360,6 +360,17 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
     ],
     provenance: 'Rohm ESR18 thick-film 1206 two-terminal resistor + Pioreactor heater_20ml BOM R12–R28 @ ca40a91e',
   },
+  {
+    manufacturer: 'ams-OSRAM',
+    partNumber: 'BPW34S',
+    symbolId: 'Forge_Manufacturer:BPW34S',
+    footprint: { library: 'OptoDevice', footprint: 'Osram_BPW34S-SMD' },
+    pins: [
+      { number: '1', name: 'K', kind: 'passive' },
+      { number: '2', name: 'A', kind: 'passive' },
+    ],
+    provenance: 'ams-OSRAM BPW34S SMD PIN photodiode two-terminal K/A; KiCad OptoDevice:Osram_BPW34S-SMD; Eye-Spy OD densify companion',
+  },
 ] as const
 
 function normalized(value: string): string {
