@@ -110,7 +110,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins, scrubInstrumentIndustrialPartVerifications } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns, reopenMispinnedActiveMachineWords, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins, scrubInstrumentIndustrialPartVerifications } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 // Stage 10.6 synchronous part-verification leg. The live call is delegated to
 // background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
 // needs the type here — verifyProposedParts is dynamically imported in-stage.
@@ -5982,6 +5982,26 @@ async function main() {
     try {
       const tFill = Date.now()
       setInstrumentDeviceContext(isInstrumentDevice)
+      // ── RE-OPEN mispinned active-machine slots (F3 source fix, 2026-07-21) ──
+      // An active machine (pump/motor/valve/…) left holding a CONSUMABLE/stock SKU
+      // (its own tubing/gasket/o-ring — the organoid dosing pump P-101 held
+      // Watson-Marlow TUB-SAN-6.4) still carries that fake SKU on the WORD at this
+      // point (stripUnverifiedParts runs LATER), so fillBlankWordMpns below would
+      // skip it as "already has a real MPN" and never resolve the real ingested
+      // pump. Clear the type-wrong pin FIRST so the slot re-opens blank and the
+      // DB-first lookup (whose F3 type-coherence bar now refuses the consumable row
+      // for an active-machine slot) lands the correct Kamoer/Welco metering pump.
+      const reopen = reopenMispinnedActiveMachineWords(design.modules ?? [])
+      if (reopen.reopened.length > 0) {
+        console.error(
+          `[chain] fill-blank-mpn re-open: cleared ${reopen.reopened.length} active-machine slot(s) ` +
+          `mispinned to a consumable SKU (F3) — will re-resolve`,
+        )
+        for (const r of reopen.reopened.slice(0, 5)) {
+          console.error(`  ↻ ${r.module_id}::${r.sub_module_id} (${r.word_name}) — removed ${r.removed_manufacturer ?? ''} ${r.removed_part_number ?? ''}`.trimEnd())
+        }
+        logAction({ step: 'fill_blank_reopen_mispin', reopened_count: reopen.reopened.length, reopened: reopen.reopened })
+      }
       const fill = await fillBlankWordMpns(
         design.modules ?? [],
         currentProductClass ?? 'unknown',

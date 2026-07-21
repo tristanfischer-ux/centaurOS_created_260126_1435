@@ -223,6 +223,13 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   'accelerometer', 'magnetometer', 'altimeter', 'camera', 'lidar', 'sonar', 'encoder',
   'amplifier', 'oscillator', 'led', 'display', 'gimbal', 'bearing', 'gearbox',
   'coupling', 'compressor', 'chiller', 'heater', 'thermocouple', 'solenoid',
+  // LEXICON (2026-07-21, organoid-bioreactor H10 mispin-resolve): a PCB mounting
+  // STANDOFF is a purchased Würth/Keystone fastener (970060354), not a fabricated
+  // structure — 'standoff' is unambiguous (always a bought board-hardware item, never
+  // civil/structural, unlike 'spacer' which also names a concrete/rebar spacer, so
+  // 'spacer' is deliberately NOT admitted). 'tachometer' is the rpm-pickup SENSOR family
+  // (Optek OPB715Z / Melexis US5881 Hall pickup), a real catalogue sensor.
+  'standoff', 'tachometer',
   // ── BAR-A LEXICON EXTENSION (2026-07-03). 52 engineered TBD lines on codema
   // v59 while their verified parts sat embedded in forge-truth.db — the candidacy
   // gate refused whole industrial-catalogue families. These are ALL purchased
@@ -1254,6 +1261,61 @@ export function isAccessoryRow(partName: string | null | undefined): boolean {
   return /\baccessor(?:y|ies)\b/i.test(partNameLeadSegment(partName, 8))
 }
 
+// ── PART-TYPE COHERENCE (F3 mirror, 2026-07-21): an ACTIVE-MACHINE slot must not
+// resolve to (or keep a pin on) a CONSUMABLE/stock identity — a pump's tubing, a
+// valve's o-ring, a motor's coupling. This is the TypeScript mirror of the F3
+// authority in scripts/deterministic_checks_lib.py (`_ACTIVE_MACHINE_RX`,
+// `_PIECE_OF_STOCK_RX`, `_CONSUMABLE_SKU_PREFIX`, `_part_is_consumable_stock`) —
+// the SAME token families + SKU alpha-prefixes, so the check (flag a pump pinned
+// to its tubing) and the resolver (never PIN a pump to its tubing, and re-open a
+// mispinned one) can never diverge. The organoid dosing pump P-101 held
+// Watson-Marlow TUB-SAN-6.4 ("dosing pump tubing", component_class fluid_path) —
+// a length of sanitary tubing whose part_name carries the token "pump", so it
+// out-ranked the real Kamoer KDS / Welco WPX1 metering pumps on head-noun hit.
+// Universal, no per-class table: keyed off the slot's own head-noun family + the
+// candidate identity's stock-noun/SKU-prefix signal.
+const _ACTIVE_MACHINE_RE =
+  /\b(pumps?|motors?|drives?|actuators?|solenoids?|valves?|fans?|blowers?|compressors?|mixers?|agitators?|stirrers?|impellers?|heaters?|peltiers?|chillers?|spindles?|gearbox(?:es)?|servos?|steppers?)\b/i
+const _PIECE_OF_STOCK_RE =
+  /\b(pads?|gaskets?|shims?|labels?|seals?|die[- ]?cut|decals?|stickers?|tapes?|foils?|films?|liners?|membranes?|wires?|cables?|tub(?:e|es|ing)|hoses?|sleev(?:e|es|ing)|heat[- ]?shrink|braid(?:ed|ing)?|cords?|lacing|webbing|per[- ]?met(?:re|er))\b/i
+const _CONSUMABLE_SKU_PREFIX = new Set<string>([
+  'tub', 'tube', 'hose', 'hos', 'seal', 'gsk', 'gskt', 'gask', 'oring', 'orng',
+  'ferr', 'grom', 'grmt', 'slv', 'sleev', 'clmp', 'lbl', 'tape', 'film', 'memb',
+  'filt', 'crt', 'gasket', 'ptfe', 'silic',
+])
+const _SKU_PREFIX_RE = /^([A-Za-z]{2,6})[-_ ]/
+
+/** True when the slot NAME/head-noun family is an active machine (pump / motor /
+ * valve / fan / heater …) — mirrors Python `_ACTIVE_MACHINE_RX`. */
+export function isActiveMachineSlot(name: string | null | undefined): boolean {
+  const s = String(name ?? '')
+  if (!_ACTIVE_MACHINE_RE.test(s)) return false
+  // A requirement that is ITSELF a piece of stock (a 'Media Tubing Set', a
+  // 'Pump Seal Kit') is a genuine consumable, not an active machine — never fire.
+  if (_PIECE_OF_STOCK_RE.test(s)) return false
+  return true
+}
+
+/** True when a part IDENTITY (manufacturer + part_number + part_name) reads as a
+ * consumable/stock item — by stock-noun match OR consumable SKU alpha-prefix.
+ * Mirrors Python `_part_is_consumable_stock` (extended to the mfr + PN surfaces,
+ * so 'Watson-Marlow TUB-SAN-6.4' matches on the TUB- prefix even when the name is
+ * absent). */
+export function partIdentityIsConsumableStock(
+  manufacturer?: string | null,
+  partNumber?: string | null,
+  partName?: string | null,
+): boolean {
+  const blob = `${partName ?? ''}`
+  if (_PIECE_OF_STOCK_RE.test(blob)) return true
+  const skuBlob = `${manufacturer ?? ''} ${partNumber ?? ''} ${partName ?? ''}`
+  for (const tok of skuBlob.split(/\s+/)) {
+    const m = _SKU_PREFIX_RE.exec(tok)
+    if (m && _CONSUMABLE_SKU_PREFIX.has(m[1].toLowerCase())) return true
+  }
+  return false
+}
+
 // Hobby / maker-electronics + small-board vendors. Their catalogue rows are
 // real, but they do not supply utility-scale wind / industrial heavy plant —
 // pinning one into a blade/gearbox/tower/foundation slot is a mis-pin. When a
@@ -1378,7 +1440,17 @@ export function pickBestDbCandidate(
   // category tails), then head-noun anywhere in the lead segment, then non-accessory,
   // total distinct hits; on a FULL tie a class-tagged verified-ingest row outranks sweep.
   const rankOf = (v: { row: DbPart; nameHits: Set<string>; headHit: boolean; headLeads: boolean }): number[] => [
-    v.headLeads ? 1 : 0,
+    // PRIORITY-LANE PROMOTION (2026-07-21): the deliberate per-class web_verified_ingest
+    // harvest is the priority lane (DATABASES.md). A verified-ingest row that HEAD-HITS
+    // the slot family ranks at the top tier alongside a head-LEADING row — so a class-
+    // seeded Kamoer KDS / Welco WPX1 ('Dosing peristaltic pump — …', head 'pump' mid-name
+    // → not leading) is not beaten by a generic backfill seed ('Peristaltic pump', head
+    // leading) merely because the shorter generic name puts the family noun first. Without
+    // this, the organoid dosing-pump slot resolved to a Watson-Marlow backfill row instead
+    // of the ingested organoid-class metering pump. A verified row that does NOT head-hit
+    // gains nothing here (still gated by the head-noun bars below); a non-verified row is
+    // unchanged — so no other class's ranking moves.
+    (v.headLeads || (v.headHit && isVerifiedIngestRow(v.row))) ? 1 : 0,
     v.headHit ? 1 : 0,
     isAccessoryRow(v.row.part_name) ? 0 : 1,
     v.nameHits.size,
@@ -1548,6 +1620,20 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   const SENSE = new Set(['sensor', 'imu', 'gyro', 'gyroscope', 'accelerometer', 'magnetometer', 'thermocouple', 'altimeter', 'encoder', 'pitot'])
   if (toks.some((t) => MOTION.has(t)) && cls && !/motor_actuator|mechanical_assembly/.test(cls)) return false
   if (toks.some((t) => SENSE.has(t)) && cls && !/sensor|optical/.test(cls)) return false
+  // ACTIVE-MACHINE vs CONSUMABLE-STOCK (F3 mirror, 2026-07-21): an active machine
+  // slot (pump / motor / valve / fan / heater …) must NOT accept a consumable-stock
+  // candidate (its own tubing, gasket, o-ring, sleeve …). The organoid dosing pump
+  // slot out-ranked the real Kamoer/Welco pumps on Watson-Marlow TUB-SAN-6.4 whose
+  // part_name "dosing pump tubing" carries the token 'pump' — so the head-noun bar
+  // below wrongly passed it. Reject the consumable identity here (BOTH the row's
+  // stock-noun name AND its consumable SKU prefix) so the pump slot falls through to
+  // the type-correct pump row (or an honest TBD). Universal — a genuine consumable
+  // requirement ('Media Tubing Set') is not an active machine, so isActiveMachineSlot
+  // returns false and this never fires.
+  if (isActiveMachineSlot(name)
+      && partIdentityIsConsumableStock(dbHit.manufacturer, dbHit.part_number, dbHit.part_name)) {
+    return false
+  }
   // TYPE-COHERENCE (2026-07-03, gate-15 spirit): the word's HEAD NOUN — its
   // component FAMILY, the LAST distinguishing token — must appear in the
   // candidate's LEADING FAMILY SEGMENT (fold/synonym-tolerant). The previous
@@ -2158,6 +2244,86 @@ function setWordMpn(
     source === 'db'
       ? 'Discover-on-miss: DB-first library match'
       : 'Discover-on-miss: generated on the fly (MPN deferred to detailed design)'
+}
+
+export interface ReopenedMispin {
+  module_id: string
+  sub_module_id: string
+  word_name: string
+  removed_manufacturer: string | null
+  removed_part_number: string | null
+}
+
+export interface ReopenMispinResult {
+  reopened: ReopenedMispin[]
+  modulesMutated: boolean
+}
+
+/**
+ * RE-OPEN a slot whose SKU is a proven type-mispin so fillBlankWordMpns can resolve
+ * the real part (F3 source fix, 2026-07-21).
+ *
+ * fillBlankWordMpns only fills words whose part_number is BLANK/placeholder — a word
+ * that still carries a FAKE, type-wrong SKU (the organoid dosing pump P-101 held
+ * Watson-Marlow TUB-SAN-6.4 — a length of tubing pinned to an active machine) is
+ * SKIPPED as "already has a real MPN", so the real ingested Kamoer/Welco pump never
+ * lands. stripUnverifiedParts runs LATER in the chain (after fill-blank), so at fill
+ * time the fake SKU is still on the word.
+ *
+ * This pass clears the manufacturer + part_number modifiers on any ACTIVE-MACHINE
+ * slot (pump / motor / valve / fan / heater …) whose pinned IDENTITY reads as a
+ * CONSUMABLE STOCK item (its own tubing / gasket / o-ring, or a consumable SKU
+ * alpha-prefix) — the SAME F3 predicates the ⚠Checks tab reads (isActiveMachineSlot
+ * + partIdentityIsConsumableStock, the TS mirror of deterministic_checks_lib). After
+ * the clear the word is BLANK, so fillBlankWordMpns treats it as a candidate and the
+ * paired dbHitAcceptableForWord F3 bar (which now refuses the consumable row for an
+ * active-machine slot) lands the type-correct pump. All non-mispinned words are
+ * byte-identical (a real pump SKU, a genuine consumable requirement, a placeholder —
+ * none matches both predicates). MUST run BEFORE fillBlankWordMpns in the chain.
+ *
+ * Non-catalogue placeholders (TBD, "requirement stated") are never touched — they are
+ * already blank, so there is nothing to re-open.
+ */
+export function reopenMispinnedActiveMachineWords(
+  modules: DesignModuleLike[],
+): ReopenMispinResult {
+  const reopened: ReopenedMispin[] = []
+  let mutated = false
+  const safeModules = Array.isArray(modules) ? modules : []
+  for (const m of safeModules) {
+    const moduleId = String(m?.module ?? 'unknown_module')
+    for (const sm of Array.isArray(m?.sub_modules) ? m.sub_modules! : []) {
+      const subId = String(sm?.id ?? 'unknown_sub_module')
+      for (const w of Array.isArray(sm?.words) ? sm.words! : []) {
+        const mcs = w.modifier_characters ?? []
+        const pn = mcs.find((mc) => mc.kind === 'part_number')?.value
+        const mfr = mcs.find((mc) => mc.kind === 'manufacturer')?.value
+        // Only a RESOLVED pin can be a mispin: a blank/placeholder slot is already open.
+        if (isBlankOrPlaceholderMpn(pn)) continue
+        const slotName = w.content_character?.name_human || w.name_human || w.content_character?.character_id || subId
+        const altName = w.name_human || w.content_character?.name_human || ''
+        const isActiveMachine = isActiveMachineSlot(slotName) || isActiveMachineSlot(altName)
+        if (!isActiveMachine) continue
+        // The pinned identity must read as a consumable stock item (its tubing / gasket / SKU prefix).
+        if (!partIdentityIsConsumableStock(mfr, pn, `${slotName} ${altName}`.trim() || null)) {
+          // The name is the machine, not the consumable — inspect the SKU/mfr surfaces alone
+          // (Watson-Marlow TUB-SAN-6.4 has NO stock-noun in the pump slot name, only in the SKU).
+          if (!partIdentityIsConsumableStock(mfr, pn, null)) continue
+        }
+        // Clear the fake manufacturer + part_number modifiers → the slot re-opens BLANK.
+        w.modifier_characters = mcs.filter((mc) => mc.kind !== 'manufacturer' && mc.kind !== 'part_number')
+        mutated = true
+        reopened.push({
+          module_id: moduleId,
+          sub_module_id: subId,
+          word_name: String(slotName),
+          removed_manufacturer: mfr ?? null,
+          removed_part_number: pn ?? null,
+        })
+      }
+    }
+  }
+  return { reopened, modulesMutated: mutated }
 }
 
 export interface FillBlankWordsResult {

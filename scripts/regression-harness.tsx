@@ -115,7 +115,7 @@ import { gatherModuleOpenItems, questionHasProcurementLeak } from '../src/lib/pd
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { scanEmitterForBriefLiterals, scanContractForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily, extractOccurrences as gate18ExtractOccurrences, cluster as gate18Cluster, buildFindings as gate18BuildFindings, currentCalcSignatureOf, constraintRoleOf } from './lib/cross-page-numeric-consistency-audit'
-import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, isNodeAbiMismatchError, describeNodeAbiMismatch, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, reopenMispinnedActiveMachineWords, pickBestDbCandidate, tokenize as emitterTokenize, isNodeAbiMismatchError, describeNodeAbiMismatch, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, existingPartHasRealPrice, type CorpusPriceRow } from './estimate-missing-prices'
 import { auditCostSanity as _auditCostSanityForCorpus } from './lib/cost-self-assessment'
 import { keywordCeilingGbp, PRICE_CEILING_BY_COMPONENT_CLASS, isConsumable, classCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
@@ -9837,6 +9837,47 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ok,
       (v: boolean) => v === true,
       () => `structOk=${structOk} catOk=${catOk} blankOk=${blankOk} realOk=${realOk}`,
+    ))
+  }
+
+  // ── UNIVERSAL.active_machine_reopens_off_consumable_and_resolves_real_pump ──
+  // Guards the F3 mispin-resolve fix (2026-07-21): an ACTIVE-MACHINE slot left holding
+  // a CONSUMABLE SKU (the organoid dosing PUMP on Watson-Marlow TUB-SAN-6.4 tubing)
+  // must (1) re-open blank so fillBlankWordMpns can resolve it, (2) never accept the
+  // consumable row back, and (3) prefer the deliberate web_verified_ingest pump over a
+  // generic backfill seed. Deterministic (fixture rows, no DB) so it always runs.
+  {
+    const mods: any = [{ module: 'm', sub_modules: [{ id: 's', words: [
+      { id: 'pump', content_character: { name_human: 'Dosing Peristaltic Pump' },
+        modifier_characters: [ { kind: 'manufacturer', value: 'Watson-Marlow' }, { kind: 'part_number', value: 'TUB-SAN-6.4' } ] },
+      { id: 'real', content_character: { name_human: 'Recirculation Pump' },
+        modifier_characters: [ { kind: 'part_number', value: 'WPX1' } ] },
+      { id: 'tub', content_character: { name_human: 'Media Tubing Set' },
+        modifier_characters: [ { kind: 'part_number', value: 'AY242408' } ] },
+    ] }] }]
+    const reopen = reopenMispinnedActiveMachineWords(mods)
+    const reopenedOnce = reopen.reopened.length === 1 && reopen.reopened[0]?.removed_part_number === 'TUB-SAN-6.4'
+    const pumpBlank = !(mods[0].sub_modules[0].words[0].modifier_characters as any[]).some((x) => x.kind === 'part_number')
+    const realKept = (mods[0].sub_modules[0].words[1].modifier_characters as any[]).some((x) => x.value === 'WPX1')
+    const tubKept = (mods[0].sub_modules[0].words[2].modifier_characters as any[]).some((x) => x.value === 'AY242408')
+    const tubRow: DbPart = { part_name: 'dosing pump tubing', manufacturer: 'Watson-Marlow', part_number: 'TUB-SAN-6.4', component_class: 'fluid_path', unit_price_gbp: 20.7, confidence: 0.95, discovery_source: 'backfill:pre-timestamp-seed' }
+    const welcoRow: DbPart = { part_name: 'Dosing peristaltic pump — ultra-compact OEM peristaltic pump', manufacturer: 'Welco', part_number: 'WPX1', component_class: 'motor_actuator', unit_price_gbp: 55, confidence: 0.9, discovery_source: 'web_verified_ingest' }
+    const backfillRow: DbPart = { part_name: 'Peristaltic pump', manufacturer: 'Watson Marlow', part_number: '102R', component_class: 'mechanical_assembly', unit_price_gbp: 300, confidence: 1.0, discovery_source: 'backfill:pre-timestamp-seed' }
+    const kamoerRow: DbPart = { part_name: 'Dosing peristaltic pump — micro stepper-driven metering peristaltic pump', manufacturer: 'Kamoer', part_number: 'KDS', component_class: 'motor_actuator', unit_price_gbp: 48, confidence: 0.9, discovery_source: 'web_verified_ingest' }
+    const refusesTubing = !dbHitAcceptableForWord(tubRow, 'Dosing Peristaltic Pump')
+    const acceptsPump = dbHitAcceptableForWord(welcoRow, 'Dosing Peristaltic Pump')
+    const toks = emitterTokenize('Dosing Peristaltic Pump')
+    const winner = pickBestDbCandidate([backfillRow, kamoerRow], toks, toks[toks.length - 1])
+    const verifiedWins = winner?.discovery_source === 'web_verified_ingest'
+    const standoffCatalogue = isCatalogueComponent('Pcb Mounting Standoff') === true
+    const spacerNotOverfired = isCatalogueComponent('Concrete Spacer') === false
+    const ok = reopenedOnce && pumpBlank && realKept && tubKept && refusesTubing && acceptsPump && verifiedWins && standoffCatalogue && spacerNotOverfired
+    assertions.push(assertEq(
+      'UNIVERSAL.active_machine_reopens_off_consumable_and_resolves_real_pump',
+      'F3 mispin-resolve: an active-machine slot pinned to a consumable SKU (pump on tubing) re-opens blank (real pump SKU + genuine consumable requirement untouched); dbHitAcceptableForWord refuses the consumable row for the active-machine slot but accepts a real pump; pickBestDbCandidate prefers the web_verified_ingest pump over a backfill seed; standoff is catalogue but a concrete spacer is not — guards the 2026-07-21 organoid dosing-pump → Welco WPX1 / standoff → Würth fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `reopenedOnce=${reopenedOnce} pumpBlank=${pumpBlank} realKept=${realKept} tubKept=${tubKept} refusesTubing=${refusesTubing} acceptsPump=${acceptsPump} verifiedWins=${verifiedWins} standoffCatalogue=${standoffCatalogue} spacerNotOverfired=${spacerNotOverfired}`,
     ))
   }
 

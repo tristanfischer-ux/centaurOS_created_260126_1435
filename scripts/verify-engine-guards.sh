@@ -55,6 +55,7 @@ run "instrument-proxy F1b device-scale geometry"  "$PY" scripts/blender-universa
 run "main-incomer F1d device-scale electrical"    npx tsx scripts/lib/orchestrator/generic/main-incomer-selftest.ts
 run "device-commodity price ceilings (est-default)" npx tsx scripts/estimate-missing-prices.tsx --selftest
 run "strip-unverified pv-consistency (R1 F3/F4)"    npx tsx scripts/lib/strip-unverified-pv-consistency-selftest.ts
+run "re-open mispin resolve (F3 pump→real pump)"    npx tsx scripts/lib/reopen-mispin-resolve-selftest.ts
 run "gate-25 brief-literal scanner (mains vs £)"  npx tsx scripts/lib/brief-value-literal-scanner.ts --selftest
 run "interconnect F1e device-scale tubing"        "$PY" scripts/blender-universal/interconnect_device_scale_selftest.py
 run "F1a cartridge-heater homonym guard"          npx tsx scripts/lib/orchestrator/generic/f1a-cartridge-heater-selftest.ts
