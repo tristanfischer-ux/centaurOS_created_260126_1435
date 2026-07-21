@@ -35,12 +35,16 @@ function cacheHit(manufacturer: string, mpn: string, description: string): DbCas
   return {
     found: true,
     result: {
-      source: 'curated_gold_seed',
+      source: 'mouser',
       mpn,
       manufacturer,
       description,
       priceGBP: [{ qty: 1, unitPriceGbp: 1 }],
       stockUK: 1,
+      datasheetUrl: null,
+      productUrl: 'https://example.test/mpn',
+      leadWeeks: null,
+      fetchedAt: '2026-07-21T00:00:00.000Z',
     },
     source: 'cache_hit',
     ageHours: 1,

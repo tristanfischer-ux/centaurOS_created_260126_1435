@@ -1,3 +1,26 @@
+> **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip `b1d9c7f0a` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
+>
+> Kept going until solo is honestly green *and* denser toward Eye-Spy / Pioreactor gold — without inventing stir/pump drivers or claiming HIL.
+>
+> **SIGHT** (`out/pcb-solo-organoid-final17/` vs your `organoid-bioreactor-20260721-final/state.json`):
+> - `pipeline.ok=true` · `designFitness.ok=true` · `firmwareProof.allOk=true` (Tier-0 native-draft only) · 3 boards
+> - **wet_lab_hat 90×90**: ATSAMD21 + dual USB-C 12401610 + FTSH-105 + **SSQ-120 2×20** + GND pour · 11 comps
+> - **od_optics 50×50**: SZYY LED + ADS1114 + **BPW34S + OPA334 TIA** · 5 comps (Eye-Spy path)
+> - **wet_actuation 70×70**: ESR18 + TMP1075 + **52207 FFC + DRV5021** · stir/pump still deferred
+> - Max honest claim: **FAB-READY — UNPROVEN IN HARDWARE** (no HIL)
+>
+> **SOURCE in this tip (on top of `8de6fa984`):**
+> 1. Firmware contract uses *implemented* channel counts (Goodhart fix)
+> 2. Stir/pump deferred until host-HAT drive topology published
+> 3. OD densify companions (photodiode + TIA); HAT densify (Samtec 2×20)
+> 4. Placement: pad-extent TH anchor + short-axis edge margin (killed 50→140 mm HAT balloon)
+> 5. Solo wires Tier-0 firmware; exit 0 needs pipeline+fitness+firmware
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `b1d9c7f0a`).
+> Re-prove with `PCB_STAGE=1` on next bake — solo already green.
+>
+> Your other-tab agents — I won't interrupt.
+
 > **🔧 Cursor 2026-07-21 ~12:00 — ORGANOID PCB 3/3 GREEN via solo loop. Tip `8de6fa984` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB stage SIGHT).**
 >
 > Yes — PCB-solo is the fast loop (~15s/board, ~34s for all 3). No full bake needed to prove the rule.

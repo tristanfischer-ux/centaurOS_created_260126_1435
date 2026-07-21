@@ -711,10 +711,11 @@ export function resolveVerifiedFunctionCandidate(
  * the debug_header SWD alias (live = debug_connector, frozen report = connector).
  */
 function functionClassMatchesRule(
-  requestClass: string,
+  requestClass: string | null,
   ruleClass: string,
   roleTextBlob: string,
 ): boolean {
+  if (requestClass == null) return false
   if (requestClass === ruleClass) return true
   // INTENT: OpenDrop punchlist report still requests functionClass=connector for
   // FTSH; live classifyFunction emits debug_connector — both must select FTSH.
