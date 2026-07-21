@@ -695,8 +695,26 @@ function pinIdentifier(pin: PcbPinSpec): string {
   return `${sanitizePinName(pin.name) ?? 'PIN'}_${sanitizeIdentifier(pin.number)}`
 }
 
+// INTENT: Structured rating modifiers only. `form` prose routinely embeds parent
+// board-rail narrative ("12v/5v distribution board") that is NOT a datasheet
+// demand for the fitted part — parsing it floored USB-C (5 V), ESD arrays (5 V)
+// and indicator LEDs (3.3 V) on every wet-lab HAT that reused that boilerplate
+// (organoid rebake3: all four interface roles → unresolved / P7).
+const RATING_BEARING_MODIFIER_KINDS = new Set([
+  'rating_primary',
+  'capacity',
+  'voltage',
+  'current',
+  'power',
+  'rating',
+])
+
 function requiredRatings(word: ElectronicWordRef): VerifiedCandidateRequest['requiredRatings'] {
-  const text = Object.values(word.modifiers).join(' ')
+  const text = Object.entries(word.modifiers)
+    .filter(([kind]) => RATING_BEARING_MODIFIER_KINDS.has(kind))
+    .map(([, value]) => value)
+    .join(' ')
+  if (!text.trim()) return {}
   const voltageValues = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(?:v|volt(?:s)?)\b/gi)]
     .map((match) => Number(match[1]))
     .filter(Number.isFinite)

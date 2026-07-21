@@ -459,4 +459,32 @@ describe('derivePcbArchitecture', () => {
     expect(plan.boards.find((item) => item.boardId === 'hv_controller_main')?.requiredWordIds)
       .toEqual(['microcontroller_word'])
   })
+
+  // proveCatch: bare MCU role (no SAMD/ESP/STM token in name) still owns firmware.
+  it('treats bare microcontroller_mcu role as integrated firmware owner', () => {
+    const state = withElectronicWords(stateWithQuantities({ working_volume_ml: 20 }), [
+      {
+        id: 'microcontroller_mcu_word',
+        nameHuman: 'Microcontroller Mcu',
+        characterId: 'microcontroller_mcu',
+      },
+      {
+        id: 'firmware_storage_word',
+        nameHuman: 'Firmware Storage',
+        characterId: 'firmware_storage',
+      },
+    ])
+
+    const plan = derivePcbArchitecture(state)
+
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wordId: 'firmware_storage_word',
+        placement: 'functional_requirement',
+        boardId: 'wet_lab_hat',
+      }),
+    ]))
+    expect(plan.boards.find((item) => item.boardId === 'wet_lab_hat')?.requiredWordIds)
+      .not.toContain('firmware_storage_word')
+  })
 })

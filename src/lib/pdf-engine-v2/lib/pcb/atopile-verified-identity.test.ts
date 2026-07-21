@@ -200,4 +200,89 @@ describe('Atopile verified identity integration', () => {
       expect(unresolved?.reason).toMatch(/panel indicator|deny|4-2489541-7/i)
     }
   })
+
+  // proveCatch (organoid rebake3): form prose "(12v/5v) distribution board" must
+  // NOT floor USB/ESD/LED candidates — ratings come from structured modifiers only.
+  it('does not let form-prose board-rail voltages block interface-critical candidates', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      const hits: Record<string, DbCascadeResult> = {
+        '12401610E4#2A': cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C receptacle'),
+        PESD5V0L5UY: cacheHit('Nexperia', 'PESD5V0L5UY', '5-line ESD array'),
+        'KPT-1608CGCK': cacheHit('Kingbright', 'KPT-1608CGCK', '0603 green LED'),
+        'CC0603KRX7R9BB104': cacheHit('YAGEO', 'CC0603KRX7R9BB104', '100nF 0603'),
+      }
+      return hits[mpn] ?? {
+        found: false,
+        result: null,
+        source: 'unknown',
+        ageHours: null,
+      }
+    })
+
+    const boardRailForm =
+      'representative low-voltage dc power distribution board (12v/5v) component'
+    const state = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'hat',
+          sub_modules: [{
+            id: 'hat__power',
+            words: [
+              {
+                id: 'usb_power_entry_word',
+                name_human: 'Usb Power Entry',
+                content_character: { character_id: 'usb_power_entry' },
+                modifier_characters: [
+                  { kind: 'form', value: `Usb Power Entry — ${boardRailForm}` },
+                  { kind: 'part_number', value: 'TBD (detailed design)' },
+                ],
+              },
+              {
+                id: 'esd_protection_network_word',
+                name_human: 'Esd Protection Network',
+                content_character: { character_id: 'esd_protection_network' },
+                modifier_characters: [
+                  { kind: 'form', value: `Esd Protection Network — ${boardRailForm}` },
+                  { kind: 'part_number', value: 'TBD (detailed design)' },
+                ],
+              },
+              {
+                id: 'power_indicator_led_word',
+                name_human: 'Power Indicator LED',
+                content_character: { character_id: 'power_indicator_led' },
+                modifier_characters: [
+                  { kind: 'form', value: `Power Indicator LED — ${boardRailForm}` },
+                  { kind: 'manufacturer', value: 'TE Connectivity' },
+                  { kind: 'part_number', value: '4-2489541-7' },
+                ],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const outDir = mkdtempSync(join(tmpdir(), 'atopile-form-rail-ratings-'))
+    tmpDirs.push(outDir)
+
+    const result = generateAtopileProject(state, outDir, {
+      requiredWordIds: [
+        'usb_power_entry_word',
+        'esd_protection_network_word',
+        'power_indicator_led_word',
+      ],
+    })
+
+    const usb = result.components.find((c) => c.wordId === 'usb_power_entry_word')
+    const esd = result.components.find((c) => c.wordId === 'esd_protection_network_word')
+    const led = result.components.find((c) => c.wordId === 'power_indicator_led_word')
+
+    expect(usb?.mpnVerified).toBe(true)
+    expect(usb?.partNumber).toMatch(/12401610E4/i)
+    expect(esd?.mpnVerified).toBe(true)
+    expect(esd?.partNumber).toBe('PESD5V0L5UY')
+    expect(led?.mpnVerified).toBe(true)
+    expect(led?.partNumber).toBe('KPT-1608CGCK')
+    expect(result.unresolved.map((u) => u.wordId)).toEqual([])
+  })
 })

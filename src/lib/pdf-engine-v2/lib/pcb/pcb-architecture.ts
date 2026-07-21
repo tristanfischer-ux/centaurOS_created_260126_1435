@@ -283,8 +283,15 @@ function nonBoardPlacement(
   const hasCotsComputeHost =
     /\b(?:raspberry\s*pi|single.board.computer|itsybitsy|pybadge|compute.ui.module)\b/i
       .test(evidence)
+  // DECISION: chip-family tokens in the brief OR any bare MCU role word on the
+  // board. Organoid emits `microcontroller_mcu` + name "Microcontroller Mcu"
+  // with no SAMD/ESP/STM token — requiring a named silicon family left
+  // firmware_storage as on_board → P7 unresolved forever.
+  const hasBareMcuRole = allWords.some((candidate) =>
+    /(?:^|[_ -])(?:microcontroller(?:[_ -]?mcu)?|main[_ -]?controller)(?:$|[_ -])/i
+      .test(candidate.characterId))
   const hasIntegratedFirmwareMcu =
-    /\b(?:samd21|esp8266|esp32|stm32)\b/i.test(evidence)
+    /\b(?:samd21|esp8266|esp32|stm32)\b/i.test(evidence) || hasBareMcuRole
   const hasPhysicalUsbEntry = allWords.some((candidate) =>
     /usb[_ -]?(?:power[_ -]?entry|connector|receptacle|port)/i.test(
       `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
