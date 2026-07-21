@@ -38,3 +38,31 @@ FLOOR = 0, set by **PCB 0** (+ Exec/Quality 0 cascade from it).
 
 ## COMMITS THIS SESSION
 3cdc32aaa · 88242a720 · 71c9692ee · c8b8476de · a83bc6f35 · 9d55c49f4 · 84dedeb46 + catalogue/inbox docs.
+
+## final4 VALIDATION (Financial + hazard fixes both landed)
+- Financial Energy/yr = **£27.3** (was £0) ✓ · Risk working-at-height hazard **GONE** ✓
+- Risk 7.5→**6.7**: removing a legit hazard shrank the denominator (scorer = 10×non-defect/total),
+  exposing the ONE real open-defect row as the blocker.
+
+## ⚠ THE HONEST PICTURE (fake-goods caught+fixed; remainder is REAL, not gamed)
+Almost scale-gated the capex flag away as a device-leak — SIGHT of the full message stopped it:
+it is a **REAL cost overrun**, not a fake-good. NAMED DECISIONS for Tristan:
+
+### DECISION 1 — Cost: £475 ex-works > £385 brief ceiling (1.23×)
+The honest BoM (real prices, fake £186 pad removed) is £286 raw → £475 ex-works, breaching the
+brief's £385 ceiling. The earlier "£256 ex-works < £385" was propped by the Goodharted penny-BoM.
+- **A — value-engineer** to ≤ £385 ex-works (genuinely cheaper parts / fewer lines).
+- **B — revise the £385 ceiling.** £475 ex-works is CHEAP for a benchtop bioreactor (retail
+  £2k–20k); £385 may be unrealistically low. Recommend B (revisit the brief number) unless
+  £385 is a hard commercial constraint.
+Do NOT game this — it is an honest finding the cost-sanity gate correctly caught.
+
+### DECISION 2 — Naming: anonymous "Sensing Instrumentation Subcomponent N"
+A synthesis decomposition gap (2 unnamed sensing children = the OD/DO sensors the module lacks
+explicit words for). Options A (name-by-canonical-function, recommended) / B (emitter decomposition) /
+C (accept one honest unspecified). See the naming section above.
+
+## POST-SESSION STATE
+Fake-goods: CAUGHT (plausibility layer, floor-bound) + FIXED at source (BoM, cable, Financial,
+hazard). Remaining sub-9 = HONEST: Risk (real cost overrun → DECISION 1), ⚠ Checks 6 + Renders 7
+(decomposition/geometry → DECISION 2 + B-lane), PCB 0 (Cursor coverage 0/16). No Goodhart remains.
