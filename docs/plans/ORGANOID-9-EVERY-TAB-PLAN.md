@@ -8,6 +8,19 @@ ONE genuine 9/10 organoid benchtop-bioreactor dossier: **every scored tab ≥8 (
 - **Now:** the engine scores itself HONESTLY (no fake-9). Cost blocker CRACKED (2.08×→1.11×, materials £484→£191). Drawings at 9. But 12 tabs still <8 — the honest remaining gap.
 - **Going:** fix each of the 12 sub-8 tabs at SOURCE (the punchlist routes each), parallel where file-disjoint, then ONE final re-bake + adversarial SIGHT. Ship only when every tab honestly ≥8.
 
+## GROUND TRUTH — rebake3 (2026-07-21, first real dossier.xlsx; 5 roots + Excel-save landed)
+12 sub-8 tabs → **9 sub-8** (⚠Checks 2→6, workbook now SAVES). Ownership:
+- **PCB (Cursor's lane — formally handed over):** PCB 0. Terminal does NOT touch pcb/* or the pcb stage; integrates Cursor's board when ready.
+- **AUTO-CLEAR (floor mirrors — lift when the rest pass):** Executive Summary 0, Quality & Audit 0.
+- **TERMINAL — 6 remaining tabs (do ALL of these):**
+  1. **Brief 4.0** — R6: brief scorer ran ZERO content checks → emit brief↔contract reconciliation.
+  2. **Bill of Materials 7.1** — 10/35 rows still no-MPN (Pcb Mounting Standoff, Stir Tachometer Sense, Sensor Cable) — the R2-ingested parts (Würth/Optek/Melexis) did NOT LAND on the slots (name-match/type-coherence gap) → make them resolve DB-first OR mark OEM-proprietary-with-evidence.
+  3. **Risk & Regulatory 7.5** — 1/4 rows: "Capex per output unit outside typical" (the cost 1.11× flag) → R6 honest cost framing.
+  4. **⚠ Checks 6** — 1 of 92 invariants still FAILs (was 3; R1 fixed 2) → find + fix the last one.
+  5. **Renders 4** — NEW (R4 fixed the phenotype): FOREIGN_SAMPLE_INTERFACE — the colorimeter OPTICAL bench (u_se_le_od_led_source) leaked onto a bioreactor. Either the check mis-classifies a bioreactor's OD sensor as "foreign optical", or the full colorimeter cuvette-bench leaked → give the bioreactor its OWN sample interface (OD sensor on the vessel, not a colorimeter deck).
+  6. **Verification 4.0** — 3 HARD open: Temperature Control Stability (derive the ±K figure), coverage_partial (Terminal), PCB pipeline ok (Cursor's).
+- Method: batch all 6 SOURCE fixes → ONE final re-bake → adversarial SIGHT of every tab + heroes.
+
 ## CORRECTIONS (Cursor audit, accepted 2026-07-21)
 - **Materials = £259** (`costStack.raw_materials_bom_gbp`), NOT £191 (that was the partVerifications sum). Use £259 for the ceiling decision. `factory_cogs_gbp`=£343, ex-works=£429.
 - **Do NOT say "cost cracked"** — still 1.11× on ex-works until the COGS-vs-ex-works ceiling basis (R6) is decided. No more ceiling-cutting.
