@@ -1346,6 +1346,45 @@ function _normalisePumpSizingInput(
   return payload
 }
 
+// ── THERMAL-STABILITY INPUT INJECTION (council H9, 2026-07-21) ───────────────
+// The control-systems PID tool computes a DERIVED closed-loop `temperature_stability_k`
+// (the achieved ±K a thermal loop holds) FROM the real thermal-subsystem parameters —
+// but the bootstrap planner wires it only the placeholder plant TF, so those thermal
+// inputs never reach the tool and the stability prediction never fires. Deterministically
+// inject the thermal contract keys the tool reads (setpoint, ambient, heat-loss, actuator
+// authority) into a control-systems payload when the live contract carries them. UNIVERSAL:
+// keyed on the tool being a control/PID tool + the contract self-describing thermal keys
+// (a setpoint temp OR a heat-loss OR a heating/Peltier duty) — no product class. A non-
+// thermal control loop (an attitude/pointing servo with none of these keys) injects nothing
+// and the tool stays exactly as before (honest ABSENT — no stability minted).
+const _CONTROL_SYSTEMS_TOOL_RE = /(^|[:_-])(control[_-]?systems|pid)([:_-]|$)/i
+/** contract-key candidates → the control_systems_run.py thermal input param it feeds. */
+const _THERMAL_STABILITY_INPUT_MAP: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ['culture_temperature_c', ['culture_temperature_c', 'setpoint_temperature_c', 'incubation_temperature_c', 'target_temperature_c']],
+  ['ambient_temperature_c', ['enclosure_internal_temp_c', 'ambient_temperature_c', 'ambient_c']],
+  ['vessel_heat_loss_w', ['vessel_heat_loss_w', 'heat_loss_w']],
+  ['heating_duty_w', ['heating_duty_w', 'peltier_power_w', 'tec_power_w', 'actuator_power_w', 'net_heating_required_w']],
+]
+function _injectThermalStabilityInputs(
+  step: ToolPlanStepSpec, c: ContractInProgress, payload: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!_CONTROL_SYSTEMS_TOOL_RE.test(step.tool_id)) return payload
+  const qs = (c.quantities ?? {}) as Record<string, { value?: unknown } | number>
+  const readQty = (key: string): number | undefined => {
+    const qv = qs[key]
+    const v = qv && typeof qv === 'object' ? Number((qv as { value?: unknown }).value) : Number(qv)
+    return Number.isFinite(v) ? v : undefined
+  }
+  for (const [param, keys] of _THERMAL_STABILITY_INPUT_MAP) {
+    if (payload[param] !== undefined) continue // never overwrite a plan-set value
+    for (const k of keys) {
+      const v = readQty(k)
+      if (v !== undefined) { payload[param] = v; break }
+    }
+  }
+  return payload
+}
+
 // ── ECONOMICS REVENUE-BASIS VETO (2026-07-02, the v55 £580M phantom NPV) ─────
 // The yield-economics NPV tool minted plant_npv_gbp = £580M on a WATER plant from
 // FABRICATED revenue inputs: annual_yield_kg = 100,000 @ market_price = £1,000/kg —
@@ -1440,7 +1479,7 @@ export function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): R
       payload[inp.param] = inp.constant
     }
   }
-  return _normalisePumpSizingInput(step, c, payload)
+  return _injectThermalStabilityInputs(step, c, _normalisePumpSizingInput(step, c, payload))
 }
 
 /**
@@ -1523,6 +1562,32 @@ export function applyStepOutputs(
     }
     quantities[o.contract_key] = mkQty(v, o.unit, o.family, p(o.tool_output_field), o.condition ?? 'rated')
   }
+
+  // DERIVED THERMAL-STABILITY WRITE (council H9, 2026-07-21): the control-systems
+  // PID tool emits a first-principles `temperature_stability_k` (achieved ±K) that
+  // the LLM-authored bootstrap plan does NOT declare as an output — so it would be
+  // computed and thrown away, leaving the Verification spine's HARD stability
+  // requirement UNVERIFIED. Deterministically carry the tool's own derived field to
+  // the contract under the exact key the spine reads, WHEN the tool produced it and
+  // no stability quantity is already present (a first-principles calculator seed, if
+  // any, wins). UNIVERSAL — keyed on the control/PID tool + its own output field, no
+  // product class; a run whose payload had no thermal basis produces no such field
+  // (honest ABSENT), so nothing is written.
+  if (_CONTROL_SYSTEMS_TOOL_RE.test(step.tool_id)) {
+    const ts = num(output, 'temperature_stability_k')
+    const already = (c.quantities as Record<string, any> | undefined)?.['temperature_stability_k']
+    if (ts !== undefined && !(already && Number.isFinite(already.value))) {
+      const measured = (output as Record<string, unknown> | null)?.['temperature_stability_k_measured']
+      const basis = (output as Record<string, unknown> | null)?.['temperature_stability_k_basis']
+      const qty = mkQty(ts, 'K', 'temperature', p('temperature_stability_k'), 'predicted')
+      // Carry the derived-not-measured flag + basis note so the dossier + audits can
+      // see this is a control-loop DESIGN PREDICTION, not a HIL-measured figure.
+      ;(qty as Record<string, unknown>).measured = measured === true
+      if (typeof basis === 'string') (qty as Record<string, unknown>).prediction_basis = basis
+      quantities['temperature_stability_k'] = qty
+    }
+  }
+
   return { contract: { ...c, quantities }, skipped, protected_keys: protectedKeys }
 }
 

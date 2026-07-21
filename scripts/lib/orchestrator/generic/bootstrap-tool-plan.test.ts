@@ -201,6 +201,72 @@ function pureTests(): void {
     && (r.protected_keys?.length ?? 0) === 1,
     `got ${r.contract.quantities['total_water_storage_volume_m3']?.value}; protected=${JSON.stringify(r.protected_keys)}`)
 
+  // ── DERIVED THERMAL-STABILITY WIRING (council H9, 2026-07-21) ───────────────
+  // ADVERSARIAL INPUT: a control-systems PID step whose LLM-authored plan declares
+  // ONLY kp/ki as outputs (never temperature_stability_k). The mapper must (a) inject
+  // the contract's thermal keys into the payload so the tool CAN compute the ±K, and
+  // (b) carry the tool's own derived temperature_stability_k to the contract under the
+  // exact key the Verification spine reads — else the brief's HARD stability row stays
+  // UNVERIFIED (the whole gap H9 closes).
+  const thermalContract: ContractInProgress = {
+    ...baseContract,
+    quantities: {
+      culture_temperature_c: { value: 37, unit: 'C', family: 'temperature' } as any,
+      enclosure_internal_temp_c: { value: 28.45, unit: 'degC', family: 'temperature' } as any,
+      vessel_heat_loss_w: { value: 0.954, unit: 'W', family: 'power' } as any,
+      heating_duty_w: { value: 5, unit: 'W', family: 'power' } as any,
+    },
+  }
+  const pidStep: ToolPlanStepSpec = {
+    tool_id: 'control-systems:pid-tuning',
+    inputs: [{ param: 'tuning_method', constant: 'imc' } as any],
+    outputs: [
+      { contract_key: 'temp_pid_kp', tool_output_field: 'kp', unit: '', family: 'dimensionless' },
+      { contract_key: 'temp_pid_ki', tool_output_field: 'ki', unit: '', family: 'dimensionless' },
+    ],
+  }
+  // (a) the payload picks up the thermal contract keys the tool reads.
+  const pidPayload = buildStepInput(pidStep, thermalContract)
+  check('control-systems payload gets injected thermal inputs (setpoint + ambient + heat-loss + duty)',
+    pidPayload.culture_temperature_c === 37 && pidPayload.ambient_temperature_c === 28.45
+    && pidPayload.vessel_heat_loss_w === 0.954 && pidPayload.heating_duty_w === 5,
+    JSON.stringify(pidPayload))
+  // (b) the tool's derived stability field is carried to the contract though undeclared.
+  const pidOut = {
+    kp: 1.08, ki: 0.66,
+    temperature_stability_k: 0.1327, temperature_stability_k_measured: false,
+    temperature_stability_k_basis: 'DERIVED DESIGN ESTIMATE — a first-principles closed-loop control prediction, NOT a HIL-measured value.',
+  }
+  const rts = applyStepOutputs(pidStep, thermalContract, pidOut)
+  const tq = rts.contract.quantities['temperature_stability_k'] as any
+  check('DERIVED temperature_stability_k carried to contract from an undeclared control-systems output',
+    tq?.value === 0.1327 && tq?.unit === 'K' && tq?.family === 'temperature',
+    JSON.stringify(tq))
+  check('carried temperature_stability_k is labelled a DESIGN PREDICTION (measured=false, basis note)',
+    tq?.measured === false && /DERIVED DESIGN ESTIMATE/.test(String(tq?.prediction_basis ?? '')),
+    JSON.stringify({ measured: tq?.measured, basis: tq?.prediction_basis }))
+  check('carried temperature_stability_k provenance names the control-systems tool',
+    /control-systems/.test(String(tq?.provenance?.tool_id ?? '')))
+  // (c) a NON-control tool with the same output field must NOT get the deterministic write.
+  const nonCtrl: ToolPlanStepSpec = {
+    tool_id: 'process:pump-sizing', inputs: [],
+    outputs: [{ contract_key: 'recirc_pump_motor_kw', tool_output_field: 'motor_power_kw', unit: 'kW', family: 'power' }],
+  }
+  const rnc = applyStepOutputs(nonCtrl, thermalContract, { motor_power_kw: 5, temperature_stability_k: 0.9 })
+  check('non-control tool does NOT get the temperature_stability_k deterministic write',
+    rnc.contract.quantities['temperature_stability_k'] === undefined)
+  // (d) an existing (calculator-seed) stability value WINS — the tool must not clobber it.
+  const seededStab: ContractInProgress = {
+    ...thermalContract,
+    quantities: {
+      ...thermalContract.quantities,
+      temperature_stability_k: { value: 0.2, unit: 'K', family: 'temperature', source: 'calculator' } as any,
+    },
+  }
+  const rss = applyStepOutputs(pidStep, seededStab, pidOut)
+  check('existing temperature_stability_k seed is NOT clobbered by the tool write',
+    (rss.contract.quantities['temperature_stability_k'] as any)?.value === 0.2)
+
   // ── candidate-store boundary (security item 18) ─────────────────────────
   let threw = false
   try { assertCandidateSlug(`x'; DROP TABLE class_tool_plan_candidates;--`) } catch { threw = true }

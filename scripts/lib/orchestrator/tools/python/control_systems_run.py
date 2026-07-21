@@ -245,6 +245,146 @@ def tune_pid(method: str, K: float, tau: float, theta: float,
     return float(Kp), float(Ki), float(Kd), info
 
 
+# ── THERMAL-LOOP STABILITY PREDICTION (DERIVED DESIGN ESTIMATE) ───────────────
+# Council H9 (2026-07-21): the Verification spine needs a DERIVED achieved
+# `temperature_stability_k` — the ±K a well-tuned small thermal loop actually
+# HOLDS at steady state — to resolve the brief's HARD "temperature_stability_k
+# <= 0.5 K" requirement. A setpoint echo (37==37) does NOT satisfy a hold-and-
+# report requirement; only a first-principles closed-loop prediction does.
+#
+# This is a DESIGN PREDICTION (a control-loop estimate), NOT a HIL-measured
+# figure — it is labelled as such in its provenance + worked-calc assumptions.
+# It is FIRST-PRINCIPLES from the real thermal subsystem, never a round number:
+# the achieved band is the RSS of three independent, physically-grounded terms —
+#   (1) SENSOR QUANTISATION s_q = the probe resolution (an LSB) — the loop can
+#       never hold tighter than its sensor can resolve;
+#   (2) CONTROL DEAD-BAND s_db = the hysteresis/quantised-actuator band, modelled
+#       as `deadband_lsb` sensor LSBs (default 1 LSB for a PWM/continuous TEC);
+#   (3) DISTURBANCE-REJECTION RESIDUAL s_dist = the fraction of the open-loop
+#       ambient-disturbance droop the loop leaves at steady state, given finite
+#       actuator authority. Open-loop droop for an ambient step dT_amb is dT_amb
+#       (a fully-uncontrolled loop follows ambient); the loop attenuates it by
+#       (1 + P_act/dQ), where dQ = UA x dT_amb is the disturbance heat flux and
+#       P_act is the heater/TEC authority (W). More authority OR a tighter
+#       enclosure (smaller UA) => smaller residual.
+# Monotonic by construction: a COARSER probe (bigger s_q, bigger s_db) OR a
+# SMALLER Peltier (less P_act, less rejection) yields a WORSE (larger) band — so
+# an under-specced loop FAILS the brief honestly rather than being flattered.
+#
+# UNIVERSAL: keyed purely on the presence of thermal-subsystem inputs (a working
+# volume / thermal mass + a setpoint-vs-ambient delta + an actuator authority) —
+# no product class. When those inputs are absent the tool computes nothing here
+# (honest ABSENT — the spine then stays UNVERIFIED, never a fabricated PASS).
+
+_WATER_CP_J_KGK = 4180.0   # specific heat of water/culture media (J/kg.K)
+_WATER_RHO_KG_M3 = 1000.0  # density of water/culture media (kg/m3)
+
+
+def _num_in(payload: dict, *keys, default=None):
+    """First finite numeric value among the given payload keys, else default."""
+    for k in keys:
+        v = payload.get(k)
+        if isinstance(v, (int, float)) and math.isfinite(float(v)):
+            return float(v)
+    return default
+
+
+def derive_thermal_stability(payload: dict) -> dict | None:
+    """First-principles predicted closed-loop temperature stability (achieved ±K).
+
+    Reads the REAL thermal-subsystem parameters from the payload (all optional,
+    with defensible physics defaults where a benchtop probe/actuator is generic):
+      - working_volume_ml / thermal_mass_j_k      -> loop thermal mass
+      - culture_temperature_c (setpoint) & ambient_temperature_c / enclosure_internal_temp_c
+      - vessel_heat_loss_w (at the setpoint-ambient delta) -> UA conductance
+      - heating_duty_w / peltier_power_w / actuator_power_w -> actuator authority P_act
+      - sensor_resolution_k (probe LSB) & sensor_accuracy_k (fixed accuracy)
+      - ambient_disturbance_k (worst-case ambient step the loop must reject)
+      - deadband_lsb (control dead-band in sensor LSBs)
+
+    Returns a dict with the predicted value + the terms + a worked-calc-ready
+    breakdown, or None when there is no thermal-loop basis at all (honest ABSENT).
+    """
+    setpoint_c = _num_in(payload, "culture_temperature_c", "setpoint_temperature_c",
+                         "incubation_temperature_c", "target_temperature_c")
+    ambient_c = _num_in(payload, "ambient_temperature_c", "enclosure_internal_temp_c",
+                        "ambient_c")
+    p_act = _num_in(payload, "heating_duty_w", "peltier_power_w", "tec_power_w",
+                   "actuator_power_w", "net_heating_required_w")
+    # A thermal loop needs at minimum an actuator authority AND a setpoint delta OR
+    # an explicit heat-loss figure. No thermal basis at all -> honest ABSENT.
+    heat_loss_w = _num_in(payload, "vessel_heat_loss_w", "heat_loss_w")
+    if p_act is None and heat_loss_w is None:
+        return None
+    if setpoint_c is None and heat_loss_w is None:
+        return None
+
+    # Sensor: default to a DS18B20-class digital probe (0.0625 K resolution LSB,
+    # +/-0.5 K typical accuracy) — the generic probe in a benchtop assembly. A
+    # finer RTD/thermistor (a smaller sensor_resolution_k) yields a tighter band.
+    sensor_res_k = _num_in(payload, "sensor_resolution_k", "temp_sensor_resolution_k",
+                          default=0.0625)
+    sensor_acc_k = _num_in(payload, "sensor_accuracy_k", "temp_sensor_accuracy_k",
+                          default=0.5)
+    deadband_lsb = _num_in(payload, "deadband_lsb", default=1.0)
+    amb_dist_k = _num_in(payload, "ambient_disturbance_k", default=2.0)
+
+    # (a) UA conductance from the heat-loss at the setpoint-ambient delta.
+    dT_sp = None
+    if setpoint_c is not None and ambient_c is not None:
+        dT_sp = setpoint_c - ambient_c
+    ua_w_k = None
+    if heat_loss_w is not None and dT_sp is not None and abs(dT_sp) > 1e-6:
+        ua_w_k = heat_loss_w / abs(dT_sp)
+    elif heat_loss_w is not None and amb_dist_k > 0:
+        # No setpoint delta but a heat-loss figure — treat it as the conductance
+        # times a 1 K reference (conservative), so UA ~ heat_loss / 1 K.
+        ua_w_k = heat_loss_w
+
+    # (b) Sensor quantisation + control dead-band terms.
+    s_q = max(0.0, sensor_res_k)
+    s_db = max(0.0, deadband_lsb) * s_q
+    # A small drift fraction of the fixed accuracy contributes to long-term band
+    # (10% of accuracy — not the full offset, which is a bias not a fluctuation).
+    s_acc = 0.10 * max(0.0, sensor_acc_k)
+
+    # (c) Disturbance-rejection residual: the fraction of open-loop ambient droop
+    #     the loop leaves given finite actuator authority.
+    s_dist = 0.0
+    if ua_w_k is not None and ua_w_k > 0 and amb_dist_k > 0:
+        dQ_w = ua_w_k * amb_dist_k         # disturbance heat flux (W)
+        droop_ol_k = amb_dist_k            # open-loop droop = the ambient step itself
+        p_auth = p_act if (p_act is not None and p_act > 0) else 1e-6
+        rejection = p_auth / max(dQ_w, 1e-9)     # authority vs disturbance
+        s_dist = droop_ol_k / (1.0 + rejection)
+
+    predicted_k = math.sqrt(s_q * s_q + s_db * s_db + s_acc * s_acc + s_dist * s_dist)
+
+    return {
+        "value_k": round(predicted_k, 4),
+        "terms": {
+            "sensor_quantisation_k": round(s_q, 4),
+            "control_deadband_k": round(s_db, 4),
+            "sensor_drift_k": round(s_acc, 4),
+            "disturbance_residual_k": round(s_dist, 4),
+        },
+        "inputs": {
+            "sensor_resolution_k": (round(sensor_res_k, 5), "K"),
+            "sensor_accuracy_k": (round(sensor_acc_k, 4), "K"),
+            "deadband_lsb": (round(deadband_lsb, 3), ""),
+            "actuator_authority_w": (round(p_act, 4) if p_act is not None else 0.0, "W"),
+            "ua_conductance_w_k": (round(ua_w_k, 5) if ua_w_k is not None else 0.0, "W/K"),
+            "ambient_disturbance_k": (round(amb_dist_k, 3), "K"),
+        },
+        "measured": False,
+        "provenance_note": (
+            "DERIVED DESIGN ESTIMATE — a first-principles closed-loop control prediction "
+            "(sensor quantisation + control dead-band + disturbance-rejection residual), "
+            "NOT a HIL-measured value."
+        ),
+    }
+
+
 def compute(payload: dict) -> dict:
     import numpy as np
     import control as ct
@@ -383,7 +523,39 @@ def compute(payload: dict) -> dict:
 
     stable_closed = bool(np.all(y[-100:] - y_final < 100 * abs(y_final))) if abs(y_final) > 0 else stable_open
 
-    return {
+    # ── DERIVED thermal-loop stability (achieved ±K) — a DESIGN PREDICTION ──────
+    # Emitted ONLY when the payload carries real thermal-subsystem parameters (a
+    # thermal loop). This is the first-principles achieved figure the Verification
+    # spine resolves the brief's HARD `temperature_stability_k` against; the PID
+    # gains above are computed on the (placeholder) plant TF, so the stability band
+    # is derived independently from the physical sensor + actuator + heat-loss.
+    thermal_stability = derive_thermal_stability(payload)
+    if thermal_stability is not None:
+        ts = thermal_stability
+        worked.append(worked_calc(
+            label="Closed-loop temperature stability (achieved, DERIVED design prediction)",
+            formula="stability = sqrt(s_q^2 + s_db^2 + s_acc^2 + s_dist^2)",
+            values={
+                "s_q": (ts["terms"]["sensor_quantisation_k"], "K"),
+                "s_db": (ts["terms"]["control_deadband_k"], "K"),
+                "s_acc": (ts["terms"]["sensor_drift_k"], "K"),
+                "s_dist": (ts["terms"]["disturbance_residual_k"], "K"),
+            },
+            result=ts["value_k"], result_unit="K",
+            assumptions=[
+                "DERIVED DESIGN ESTIMATE (control-loop prediction), NOT a HIL-measured value",
+                "s_q = sensor resolution (probe LSB); s_db = control dead-band; "
+                "s_acc = 10% of sensor accuracy (long-term drift); "
+                "s_dist = ambient-disturbance droop left after finite actuator authority",
+                (f"sensor {ts['inputs']['sensor_resolution_k'][0]} K resolution / "
+                 f"{ts['inputs']['sensor_accuracy_k'][0]} K accuracy; "
+                 f"actuator authority {ts['inputs']['actuator_authority_w'][0]} W; "
+                 f"UA {ts['inputs']['ua_conductance_w_k'][0]} W/K; "
+                 f"ambient step {ts['inputs']['ambient_disturbance_k'][0]} K"),
+            ],
+        ))
+
+    result = {
         "kp": round(Kp, 6),
         "ki": round(Ki, 6),
         "kd": round(Kd, 6),
@@ -416,6 +588,19 @@ def compute(payload: dict) -> dict:
         "worked": worked,
         "_provenance": PROVENANCE,
     }
+
+    # DERIVED thermal-loop stability output — the achieved ±K the Verification
+    # spine resolves the brief's HARD `temperature_stability_k` against. Emitted as
+    # a top-level output field (so the contract mapper carries it under the same
+    # key) ONLY when a thermal-loop basis exists (else honest ABSENT). Clearly
+    # flagged as a DESIGN PREDICTION, not a HIL-measured value.
+    if thermal_stability is not None:
+        result["temperature_stability_k"] = thermal_stability["value_k"]
+        result["temperature_stability_k_measured"] = False
+        result["temperature_stability_k_basis"] = thermal_stability["provenance_note"]
+        result["temperature_stability_terms_k"] = thermal_stability["terms"]
+
+    return result
 
 
 def _eval_arith(expr: str):
@@ -504,10 +689,58 @@ def _selftest() -> int:
         wl = [w for w in (o.get("worked") or []) if "Proportional gain" in str(w.get("label"))]
         chk(f"kp_worked[{m}]", len(wl) == 1 and _subst_holds(wl[0]))
 
+    # ── proveCatch (council H9, 2026-07-21): DERIVED thermal-loop stability ──────
+    # ADVERSARIAL INPUT the derivation must resolve: a run with NO derived achieved
+    # temperature_stability_k → the brief's HARD stability requirement stays
+    # UNVERIFIED. The tool must, given the REAL organoid-bioreactor thermal params,
+    # PRODUCE a plausible ±K FROM the parts (not a fabricated round number), label
+    # it derived-not-measured, and be MONOTONIC (a coarser probe / smaller Peltier
+    # yields a WORSE figure so an under-specced loop FAILS the 0.5 K brief honestly).
+    ORGANOID = {
+        "working_volume_ml": 20, "culture_temperature_c": 37,
+        "enclosure_internal_temp_c": 28.45, "vessel_heat_loss_w": 0.954,
+        "heating_duty_w": 5,
+    }
+    base = compute(ORGANOID)
+    ts = base.get("temperature_stability_k")
+    # (1) a derived value is emitted at all (the gap the whole task closes)
+    chk("stability_emitted", isinstance(ts, (int, float)) and math.isfinite(float(ts)))
+    # (2) it is PLAUSIBLE for a benchtop Peltier loop with a decent probe: 0.05-0.5 K,
+    #     and it comes from the parts (NOT a suspicious exact round number like 0.5)
+    chk("stability_plausible_range", isinstance(ts, (int, float)) and 0.05 <= float(ts) <= 0.5)
+    chk("stability_not_round", isinstance(ts, (int, float)) and abs(float(ts) - round(float(ts), 1)) > 1e-6)
+    # (3) it satisfies the 0.5 K brief for THIS well-specced loop (honest PASS)
+    chk("stability_meets_brief", isinstance(ts, (int, float)) and float(ts) <= 0.5 + 1e-9)
+    # (4) labelled a DERIVED PREDICTION, not a measured value
+    chk("stability_labelled_derived", base.get("temperature_stability_k_measured") is False)
+    chk("stability_basis_note", "DERIVED DESIGN ESTIMATE" in str(base.get("temperature_stability_k_basis", "")))
+    ts_wc = [w for w in (base.get("worked") or [])
+             if "temperature stability" in str(w.get("label", "")).lower()]
+    chk("stability_worked_present", len(ts_wc) == 1 and _subst_holds(ts_wc[0]))
+    chk("stability_worked_labelled_derived",
+        len(ts_wc) == 1 and any("NOT a HIL-measured" in str(a)
+                                for a in (ts_wc[0].get("assumptions") or [])))
+    # (5) MONOTONIC — a COARSER probe (0.5 K resolution) yields a WORSE (larger) band
+    coarse = compute({**ORGANOID, "sensor_resolution_k": 0.5})
+    chk("stability_monotonic_sensor",
+        isinstance(coarse.get("temperature_stability_k"), (int, float))
+        and float(coarse["temperature_stability_k"]) > float(ts))
+    # a coarse probe should also FAIL the 0.5 K brief (honest FAIL, not flattered)
+    chk("stability_coarse_fails_brief", float(coarse["temperature_stability_k"]) > 0.5)
+    # (6) MONOTONIC — a SMALLER Peltier (0.5 W authority) yields a WORSE band
+    weak = compute({**ORGANOID, "heating_duty_w": 0.5})
+    chk("stability_monotonic_actuator",
+        isinstance(weak.get("temperature_stability_k"), (int, float))
+        and float(weak["temperature_stability_k"]) > float(ts))
+    # (7) honest ABSENT — no thermal basis => NO fabricated stability quantity
+    nonthermal = compute({"tuning_method": "imc"})
+    chk("stability_absent_without_basis", "temperature_stability_k" not in nonthermal)
+
     if fails:
         print(f"[control_systems_run] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
         return 1
-    print(f"[control_systems_run] selftest OK ({len(worked)} worked calcs on the default plant; all 4 tuning rules emit a hand-checkable Kp working)")
+    print(f"[control_systems_run] selftest OK ({len(worked)} worked calcs on the default plant; all 4 tuning rules emit a hand-checkable Kp working; "
+          f"derived organoid temperature_stability_k = {ts} K (design prediction, <= 0.5 K brief; monotonic on sensor + actuator))")
     return 0
 
 
