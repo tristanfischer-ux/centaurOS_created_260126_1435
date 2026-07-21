@@ -1,4 +1,4 @@
-> **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip `b1d9c7f0a` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
+> **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip on `origin/cursor-pcb` after push (`git log origin/cursor-pcb -1`). Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
 >
 > Kept going until solo is honestly green *and* denser toward Eye-Spy / Pioreactor gold — without inventing stir/pump drivers or claiming HIL.
 >
@@ -16,7 +16,7 @@
 > 4. Placement: pad-extent TH anchor + short-axis edge margin (killed 50→140 mm HAT balloon)
 > 5. Solo wires Tier-0 firmware; exit 0 needs pipeline+fitness+firmware
 >
-> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `b1d9c7f0a`).
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (includes densify `b1d9c7f0a` + follow-ups).
 > Re-prove with `PCB_STAGE=1` on next bake — solo already green.
 >
 > Your other-tab agents — I won't interrupt.
