@@ -1232,7 +1232,7 @@ YOUR JOB — four concerns, applied to the ENTIRE design:
 
 3. **DENSITY + DESCRIPTIVE RICHNESS (CRITICAL — the BoM-grade gate)** —
 
-   3a. WORD COUNT: every existing sub-module with fewer than 5 words is UNDER-DETAILED for a real BoM. Scan every sub-module; if it has 1-4 words, ADD WORDS via add_word_to_sub_module patches to bring it up to 5-7 specific parts.
+   3a. WORD COUNT: a thin sub-module (1-4 words) is acceptable when those are its REAL parts — the sub_module_word_density gate forgives faithful partitions + the single-thin case, so DO NOT pad a sub-module with new words just to hit a count. NEVER emit a nameless / "filler" / placeholder word to reach a word target — a prose-only placeholder becomes a costed "Filler word N" BoM line that pollutes the bill of materials (2026-06-05 doctrine). Only add a NEW word when a genuinely-missing REAL part exists (rule 2 completeness), and it MUST carry a concrete name_human + part identity, never a placeholder. To make a thin sub-module BoM-grade, ENRICH its existing words with modifier_characters (3b), do not inflate the count.
 
    3b. MODIFIER RICHNESS: every existing word with fewer than 5 modifier_characters is UNDER-SPECIFIED for procurement. Each word is a BoM line; a BoM line with only "×4896" is unsourceable. Every word needs modifier_characters populated across these ALLOWED kinds where applicable:
        quantity, manufacturer, part_number, material, rating_primary, rating_secondary, dimensions, mass, operating_temp_range, regulatory, ip_rating.
@@ -8702,6 +8702,38 @@ async function main() {
           priced_lines: bomPricedLines,
           unpriced_lines: bomUnpricedLines,
           order_of_magnitude: Math.round(orderOfMag * 10) / 10,
+        }
+      }
+      // ── PLACEHOLDER / FILLER WORDS NEVER PRICE (2026-07-21, CORE-FIX guard for the
+      // organoid exit-32 cost blocker): the Phase-2 density-repair reviewer can emit a
+      // nameless prose-only "filler_word_N" / "placeholder_N" to pad a thin sub-module to a
+      // word count (the 2026-06-05 prompt doctrine forbids this — fixed at rule 3a — but this
+      // is the defence-in-depth GUARD so a filler from ANY path can never inflate cost). Such a
+      // word has NO real part identity and must carry £0. On the organoid it was 4 fillers ×
+      // ~£22 = £87.25, 18% of the £484 BoM, pushing ex-works £799 over the £385 ceiling.
+      {
+        const _isFillerPv = (v: any): boolean => {
+          const wid = String(v.word_id ?? '').toLowerCase()
+          // word_id is the reliable signal (a real part is never named filler/placeholder/slot):
+          if (/^(?:filler[_\s-]?word|placeholder|slot|tbd|tba)[_\s-]?\d*$/.test(wid)) return true
+          // secondary: a totally identity-less line (no name AND no MPN/mfr/part_number) is padding
+          const hasName = !!(v.name ?? v.name_human)
+          const hasId = !!(v.mpn ?? v.part_number ?? v.manufacturer)
+          return !hasName && !hasId
+        }
+        let _fillerExcluded = 0
+        for (const v of (pv as any[])) {
+          if (v.cost_repair_excluded_from_subtotal) continue
+          if (!_isFillerPv(v)) continue
+          v.cost_repair_excluded_from_subtotal = true
+          v.cost_provenance = 'placeholder-filler (word-count padding — no real part identity, £0)'
+          _fillerExcluded += 1
+        }
+        if (_fillerExcluded > 0) {
+          bomTotalGbp = (pv as any[]).reduce((s, v) => s + (v.cost_repair_excluded_from_subtotal ? 0 : Number(v.cost_repair_corrected_price_gbp ?? v.price_estimate_gbp ?? 0) * (qtyByWordId.get(String(v.word_id ?? '')) ?? 1)), 0)
+          bomPricedLines = (pv as any[]).filter((v: any) => !v.cost_repair_excluded_from_subtotal && Number(v.cost_repair_corrected_price_gbp ?? v.price_estimate_gbp ?? 0) > 0).length
+          liveState.cost_reality = { ...(liveState.cost_reality ?? {}), bom_total_gbp: Math.round(bomTotalGbp), priced_lines: bomPricedLines }
+          console.error(`[chain] placeholder-filler pricing exclusion: ${_fillerExcluded} nameless padding line(s) → £0; raw BoM £${Math.round(bomTotalGbp).toLocaleString()}`)
         }
       }
       liveState.cost_reality_status = cost_reality_status

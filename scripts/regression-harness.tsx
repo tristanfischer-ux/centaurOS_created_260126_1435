@@ -5720,7 +5720,14 @@ function checkAdvisorEngagementInvariants(): Assertion[] {
       const chainSrc = readFileSync(resolve(__dirname, 'serial-design-chain-v2.tsx'), 'utf-8')
       const repairSrc = readFileSync(resolve(__dirname, '../src/lib/pdf-engine-v2/radical/universal-repair.ts'), 'utf-8')
       if (/NEW words until each reaches/.test(chainSrc)) bad.push('serial-design-chain-v2.tsx still orders "NEW words until each reaches >=5" (filler-padding instruction)')
+      // 2026-07-21: the original invariant checked ONE phrasing and MISSED rule 3a's
+      // "ADD WORDS ... to bring it up to 5-7 specific parts" — which regressed the filler bug
+      // (organoid ex-works £799: 4 nameless filler_word_N carried £87). Catch the broader
+      // word-count-padding pattern so any re-phrasing of "pad a thin sub-module to a count" trips.
+      if (/ADD WORDS via add_word_to_sub_module patches to bring it up to/.test(chainSrc)) bad.push('serial-design-chain-v2.tsx rule 3a still orders "ADD WORDS ... to bring it up to N" (word-count padding → filler words)')
       if (/with NEW words and full modifier sets/.test(repairSrc)) bad.push('universal-repair.ts still instructs emitting NEW words for sub_module_word_density failures (filler padding)')
+      // GUARD must exist: even if a filler slips through, it must never PRICE into the BoM.
+      if (!/placeholder-filler pricing exclusion/.test(chainSrc)) bad.push('serial-design-chain-v2.tsx lost the placeholder-filler pricing exclusion guard (a nameless padding word could inflate the BoM total again)')
     } catch (err) {
       bad.push(`could not read density-repair sources: ${String(err).slice(0, 100)}`)
     }
