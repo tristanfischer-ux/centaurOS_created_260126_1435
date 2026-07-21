@@ -48,3 +48,21 @@ service domain). On the delivered state P2+P3 FIRE (the 16 mm²/0 kg cable).
   partVerifications/connection-schedule and missed the display-tab instances).
 - SOURCE fixes for #4 (Financial energy>0 + unit), #8 (assembly archetype), #9 (risk hazards),
   #5 (emitter naming — no "…Subcomponent N").
+
+## META-FINDING (the dominant systemic root) — 2026-07-21 SIGHT
+The single largest source of fake-goods is **PLANT TEMPLATES APPLIED WHOLESALE TO A BENCHTOP
+INSTRUMENT**, each scoring 10 because the plant template is internally consistent:
+- **Design basis (10)** — steam velocity 30 m/s, DN15–DN300 pipe ladder, HVAC duct sizing — a
+  20 ml device has no steam, no DN pipes, no ducts.
+- **Risk & Regulatory (7.5)** — "working at height / confined space / tank tops fall hazard".
+- **Calculations (10)** — 16 mm² (~90 A) cable [FIXED]; plant cable/feeder defaults.
+- **Assembly (10)** — colorimeter optical-bench story.
+The device-scale signal (`isInstrumentDevice` / `isWattScaleInstrument` / enclosure < 1 m³)
+already exists. The systemic fix: a benchtop instrument must SCOPE-OUT or DEVICE-SIZE the
+plant-scope tabs (like Engineering Analysis already prints "OUT OF SCOPE"), not fill them with
+plant constants that score 10. Two-pronged: (a) PLAUSIBILITY checks that FAIL plant content on
+a device (floor the dossier); (b) source: gate plant-template tabs behind `not isInstrumentDevice`
+or render a device-appropriate basis. This is the [[forgeos_device_scale_fix_family]] extended
+from the BoM/geometry to the NARRATIVE/BASIS tabs.
+
+Catalogue entry #10: Design basis (10) — plant process-piping/steam/HVAC basis on a benchtop device.
