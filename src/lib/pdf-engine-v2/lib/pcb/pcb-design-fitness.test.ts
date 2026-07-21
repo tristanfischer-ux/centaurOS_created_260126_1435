@@ -35,4 +35,38 @@ describe('evaluatePcbDesignFitness', () => {
       'partial_board_scope', 'unresolved_component', 'channel_under_implementation',
     ]))
   })
+
+  it('proveCatch: deferred stir/pump at 0 are medium and do not fail fitness.ok', () => {
+    const wetPlan: PcbArchitecturePlan = {
+      ...plan(),
+      systemDisposition: 'multi_board',
+      boards: [{
+        boardId: 'wet_actuation',
+        role: 'heater_stir_actuation_board',
+        requiredWordIds: ['heater'],
+        domains: ['power'],
+        channelRequirements: [
+          { role: 'heater_channel', count: 1 },
+          { role: 'stir_channel', count: 1 },
+          { role: 'pump_channel', count: 1 },
+        ],
+        workPerformed: ['drive_heater_stir_pumps'],
+        shape: {
+          shapeFamily: 'wet_actuation_base',
+          outlineBasis: 'wet_connector_edge',
+          mountingHoles: 4,
+          rationale: 'function',
+        },
+        requiresKiCadDeliverable: true,
+      }],
+    }
+    const result = evaluatePcbDesignFitness(wetPlan, {
+      resolvedWordIds: ['heater'],
+      unresolvedWordIds: [],
+      implementedChannels: { heater_channel: 1, stir_channel: 0, pump_channel: 0 },
+    })
+    expect(result.ok).toBe(true)
+    expect(result.findings.filter((f) => f.severity === 'high')).toEqual([])
+    expect(result.findings.filter((f) => f.severity === 'medium')).toHaveLength(2)
+  })
 })

@@ -457,7 +457,7 @@ const AREA_MM2_BY_CLASS: Partial<Record<FunctionClass, number>> = {
   microcontroller: 64, sensor_ic: 20, op_amp: 20, connectivity_ic: 25,
   io_connector: 60, regulator: 15, gate_driver_ic: 20, power_module: 80,
   passive_c: 1.3, passive_r: 1.3, passive_l: 1.3, fuse_protection: 4, diode_protection: 2,
-  memory_ic: 20, usb_connector: 32, debug_connector: 20, battery_connector: 32, display_module: 600,
+  memory_ic: 20, usb_connector: 120, debug_connector: 20, battery_connector: 32, display_module: 600,
   led: 1.3, switch: 12, connector: 40,
 }
 const DEFAULT_AREA_MM2 = 25
@@ -1477,7 +1477,7 @@ function hasInstrumentOpticalSourceBoard(
 
 function computeBoardOutline(
   components: AtopileComponentRecord[],
-  opts: { isInstrumentSourceBoard?: boolean } = {},
+  opts: { isInstrumentSourceBoard?: boolean; isHostInterfaceBoard?: boolean } = {},
 ): PcbBoardGeometry {
   const AREA_MULTIPLIER = 5.0 // matches prior-art pcb_chain.py's validated constant
   const totalAreaMm2 = components.reduce(
@@ -1485,7 +1485,9 @@ function computeBoardOutline(
     0,
   )
   const rawSide = Math.sqrt(Math.max(totalAreaMm2, 1) * AREA_MULTIPLIER)
-  const minSide = opts.isInstrumentSourceBoard ? 25 : 50
+  // DECISION (2026-07-21): MCU+USB-C host boards need ≥80 mm edge keepout for
+  // dual receptacles + TQFP — the generic 50 mm plant floor still soups placement.
+  const minSide = opts.isInstrumentSourceBoard ? 25 : opts.isHostInterfaceBoard ? 80 : 50
   const maxSide = opts.isInstrumentSourceBoard ? 40 : 250
   const roundTo = opts.isInstrumentSourceBoard ? 5 : 10
   const side = Math.max(minSide, Math.min(maxSide, Math.ceil(rawSide / roundTo) * roundTo))
@@ -1499,9 +1501,12 @@ function computeBoardOutline(
       ? `Phase B compact instrument board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
         `over ${components.length} on-board components after COTS off-board filtering, clamped [25,40]mm, rounded to 5mm. ` +
         'Host peripherals / purchased assemblies stay off-board; this outline is the control/source daughterboard.'
-      : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
-        `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
-        'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
+      : opts.isHostInterfaceBoard
+        ? `Phase B host-interface board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+          `over ${components.length} components, clamped [80,250]mm (MCU+USB edge keepout), rounded to 10mm.`
+        : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+          `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
+          'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
   }
   const findings = validateBoardGeometry(geometry)
   if (findings.length) {
@@ -1653,9 +1658,17 @@ export function generateAtopileProject(
   // GOTCHA (Poseidon 2026-07-16): actuation-drive boards (MCU + stepper driver +
   // polyfuses) cannot pack under a 40 mm ceiling — keep them on the [50,250]
   // plant floor so Freerouting/placement can converge DRC-clean.
+  // GOTCHA (organoid HAT 2026-07-21 solo): MCU + USB-C host-edge connectors also
+  // cannot pack under 40 mm — ≤12 parts alone was wrongly clamping wet_lab_hat
+  // to 30 mm → placement/DRC soup. Host-interface density forces the plant floor.
+  const hasHostInterfaceEdge =
+    allComponents.some((c) => c.functionClass === 'microcontroller') &&
+    allComponents.some((c) =>
+      c.functionClass === 'usb_connector' || c.functionClass === 'debug_connector')
   const isCompactInstrumentBoard =
     instrumentDeviceContext(state, electronicWords) &&
     !hasActuationDriveBoard(state, electronicWords) &&
+    !hasHostInterfaceEdge &&
     (hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents) ||
       allComponents.length <= 12)
   // DECISION: Board-plan geometry wins only when it carries complete dimensional
@@ -1667,6 +1680,7 @@ export function generateAtopileProject(
       : null) ??
     computeBoardOutline(allComponents, {
       isInstrumentSourceBoard: isCompactInstrumentBoard,
+      isHostInterfaceBoard: hasHostInterfaceEdge,
     })
 
   mkdirSync(outDir, { recursive: true })

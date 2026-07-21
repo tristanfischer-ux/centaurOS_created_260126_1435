@@ -107,12 +107,17 @@ export function runBespokeMultiBoardPcb(
     const projectDir = useLegacySingleDir
       ? resolve(outDir, 'pcb-project')
       : resolve(outDir, 'pcb-project', board.boardId)
+    // GOTCHA (2026-07-21 solo): every board used the same runDir/pcb/ and the
+    // last board clobbered HAT DRC artefacts — SIGHT looked at wet_actuation.
+    const chainOutDir = useLegacySingleDir
+      ? outDir
+      : resolve(outDir, 'pcb-boards', board.boardId)
     const genResult = generateAtopileProject(state, projectDir, {
       requiredWordIds: board.requiredWordIds.length > 0 ? board.requiredWordIds : undefined,
       boardShape: board.shape,
       requiredFunctionRoles: board.channelRequirements.map((r) => r.role),
     })
-    const pipelineResult = runPipeline(projectDir, outDir)
+    const pipelineResult = runPipeline(projectDir, chainOutDir)
     const record: PcbPipelineRecord = {
       ...pipelineResult,
       generator: toGeneratorSummary(genResult),

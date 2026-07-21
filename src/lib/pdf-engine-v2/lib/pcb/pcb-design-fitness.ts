@@ -45,9 +45,17 @@ export function evaluatePcbDesignFitness(
     for (const requirement of board.channelRequirements) {
       const implemented = evidence.implementedChannels[requirement.role] ?? 0
       if (implemented < requirement.count) {
+        // DECISION (2026-07-21): stir/pump at 0 is honest DRAFT until a HAT
+        // drive topology exists — medium, not HIGH. Heater/OD under-count stays HIGH.
+        const isDeferredActuation =
+          implemented === 0
+          && (requirement.role === 'stir_channel' || requirement.role === 'pump_channel')
         findings.push({
-          severity: 'high', code: 'channel_under_implementation',
-          message: `${board.boardId} requires ${requirement.count} ${requirement.role}, implements ${implemented}`,
+          severity: isDeferredActuation ? 'medium' : 'high',
+          code: 'channel_under_implementation',
+          message: isDeferredActuation
+            ? `${board.boardId} defers ${requirement.role} until host HAT drive topology exists (implements 0)`
+            : `${board.boardId} requires ${requirement.count} ${requirement.role}, implements ${implemented}`,
           fixStage: 'atopile-generator',
         })
       }
@@ -60,5 +68,7 @@ export function evaluatePcbDesignFitness(
       fixStage: 'component-resolution',
     })
   }
-  return { ok: findings.length === 0, findings }
+  // GOTCHA: medium deferred-actuation findings must not block fitness.ok /
+  // firmware-proof entry — only HIGH findings do.
+  return { ok: !findings.some((finding) => finding.severity === 'high'), findings }
 }
