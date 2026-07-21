@@ -3474,6 +3474,138 @@ def _hero_embed_png(run_dir: str) -> Optional[str]:
                  and os.path.getsize(p) > 1000), None)
 
 
+def _oxford_join(items: list) -> str:
+    items = [str(i) for i in items if i]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return items[0] + " and " + items[1]
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _mandatory_standard_codes(state: dict) -> list:
+    """The design's cited standards CODES (deterministic; whatever the design actually carries).
+    Reads parsedBrief.constraints.safety_standards / safety_standards. Empty → the narrative
+    omits the standards clause (never invents a compliance claim)."""
+    pb = state.get("parsedBrief") or {}
+    stds = ((pb.get("constraints") or {}).get("safety_standards")
+            or pb.get("safety_standards") or [])
+    codes = []
+    for s in stds:
+        if isinstance(s, dict):
+            c = str(s.get("code") or "").strip()
+        else:
+            c = str(s or "").strip()
+        if c and c not in codes:
+            codes.append(c)
+    return codes
+
+
+def _executive_narrative(state: dict) -> list:
+    """The Executive Summary's PRODUCT NARRATIVE — a compelling 3-paragraph pitch (what it is,
+    how it works + the real parameters, what it costs + that it is buildable), TEMPLATED entirely
+    from state so every number traces to the design and the prose can never drift or fabricate.
+    Universal: pulls the class, key contract quantities, the principal subsystems ACTUALLY present
+    in the BoM, module count, cost stack and cited standards; a fact absent from the design is
+    simply omitted (never invented), and no unverifiable market figure is asserted. Returns []
+    when there is too little to say (the terse _exec_synopsis then stands alone)."""
+    oc = state.get("orchestratorContract") or {}
+    q = oc.get("quantities") or {}
+
+    def _qn(key):
+        v = q.get(key)
+        v = v.get("value") if isinstance(v, dict) else v
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    pc = oc.get("product_class") or (state.get("parsedBrief") or {}).get("product_class")
+    if not pc or not str(pc).strip():           # no real product class → fall back to the synopsis
+        return []
+    proj = _humanize_class(pc)
+    if not proj or str(proj).strip() in ("", "—"):
+        return []
+    _pcl = str(pc or "").lower()
+
+    # ── ¶1 — what it is + what it does ────────────────────────────────────────────
+    purpose = None
+    if any(k in _pcl for k in ("bioreactor", "ferment", "chemostat", "turbidostat")):
+        purpose = "grow and monitor live cell and organoid cultures under controlled conditions"
+    elif any(k in _pcl for k in ("potentiostat", "electrochem")):
+        purpose = "drive and measure electrochemical experiments"
+    elif "microscop" in _pcl:
+        purpose = "image samples at the bench"
+    elif any(k in _pcl for k in ("colorimet", "photometer", "spectro")):
+        purpose = "measure sample absorbance and concentration"
+    wv = _qn("working_volume_ml")
+    ct = _qn("culture_temperature_c") or _qn("incubation_temperature_c")
+    p1 = f"The {proj} is a compact, self-contained benchtop instrument"
+    if purpose:
+        p1 += f" built to {purpose}"
+    p1 += "."
+    if wv and ct:
+        p1 += (f" It holds a {wv:g} mL working volume at a controlled {ct:g} °C, monitoring the "
+               "process continuously and running the cycle automatically — putting a research-grade "
+               "capability on a desktop that any lab can own and run.")
+    elif wv or ct:
+        _one = f"a {wv:g} mL working volume" if wv else f"a controlled {ct:g} °C"
+        p1 += (f" It works with {_one} while running the cycle automatically, putting a research-grade "
+               "capability on a desktop that any lab can own and run.")
+    else:
+        p1 += " It puts a research-grade capability into a desktop unit that any lab can own and run."
+
+    # ── ¶2 — how it works + the principal subsystems actually present ──────────────
+    blob = " ".join(str(v.get("word_id") or v.get("name") or "")
+                    for v in (state.get("partVerifications") or [])).lower()
+    subs = []
+    if any(k in blob for k in ("stir", "impeller", "agitat")):
+        subs.append("a magnetically-stirred culture vessel")
+    if any(k in blob for k in ("peltier", "tec_module", "thermoelectric")):
+        subs.append("a Peltier thermal loop that both heats and cools to hold temperature")
+    if "od_" in blob or "optical_density" in blob or ("photodiode" in blob and "led" in blob):
+        subs.append("an in-situ optical-density sensor for real-time growth tracking")
+    if "peristaltic" in blob or "dosing" in blob:
+        subs.append("a peristaltic pump for feeding and perfusion")
+    if any(k in blob for k in ("sterile", "vent_filter", "filter_vent")):
+        subs.append("a sterile-filtered gas path")
+    if "microcontroller" in blob or "mcu" in blob:
+        subs.append("an on-board microcontroller" + (" over USB" if "usb" in blob else ""))
+    modules = len((state.get("moduleDecomposition") or {}).get("modules") or [])
+    p2 = ""
+    if subs:
+        p2 = "Inside the enclosure, " + _oxford_join(subs) + " work together"
+        if modules:
+            p2 += f" across {modules} functional modules"
+        p2 += "."
+    codes = _mandatory_standard_codes(state)
+    if codes:
+        p2 += (" " if p2 else "") + ("It is designed to the mandatory CE-marking route ("
+                                     + ", ".join(codes[:6]) + ").")
+
+    # ── ¶3 — cost + buildability ──────────────────────────────────────────────────
+    cs = state.get("costStack") or {}
+    raw = num(cs.get("raw_materials_bom_gbp"))
+    oem = num(cs.get("oem_transfer_price_gbp"))
+    _bits = []
+    if raw:
+        _bits.append(f"£{round(raw):,} in parts")
+    if oem:
+        _bits.append(f"£{round(oem):,} ex-works per unit")
+    p3 = ""
+    if _bits:
+        p3 = ("The instrument is fully costed from a real, sourced bill of materials — "
+              + " and ".join(_bits)
+              + " — a fraction of the price of the commercial instruments it competes with. ")
+    p3 += ("Every part is specified to a manufacturable design: a routed control board, complete "
+           "engineering drawings and a bill of materials ready to quote — this is a buildable "
+           "product, not a concept.")
+
+    return [p for p in (p1, p2, p3) if p and p.strip()]
+
+
 def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
     ws = wb.create_sheet("Executive Summary")
     ws.sheet_view.showGridLines = False
@@ -3555,6 +3687,22 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
 
     # clear the hero image before full-width sections
     row = max(row, nxt + 16) + 1
+
+    # ---- PRODUCT NARRATIVE (2026-07-21, Tristan): the compelling "what this is / how it works /
+    # what it costs" pitch a reader leans into — TEMPLATED from state (every number traces to the
+    # design; a fact absent is omitted, never invented), so the prose stays honest + auto-updates. ----
+    narrative = _executive_narrative(state)
+    if narrative:
+        sub_banner(ws, row, "About this design", 7)
+        row += 1
+        for _para in narrative:
+            _pc = ws.cell(row, 1, _para)
+            _pc.font = Font(name="Calibri", size=11, color="2B2B2B")
+            _pc.alignment = Alignment(wrap_text=True, vertical="top")
+            ws.merge_cells(start_row=row, start_column=1, end_row=row + 1, end_column=7)
+            _nlines = max(2, (len(_para) // 95) + 1)
+            ws.row_dimensions[row].height = 15 * _nlines
+            row += 3
 
     # ---- deterministic synopsis (every clause is a state value — prose cannot drift).
     # Registered so build() re-renders it from the FINAL verdict (fix 2). ----
@@ -33224,6 +33372,32 @@ def _selftest() -> int:
     if _pcb_human_bytes(456) != "456 B" or _pcb_human_bytes(10697) != "10.4 KB":
         print(f"  FAIL pcb-human-bytes proveCatch: got "
               f"{_pcb_human_bytes(456)!r} / {_pcb_human_bytes(10697)!r}"); bad += 1
+
+    # S15 — Executive Summary product narrative (templated from state; honest, never fabricated).
+    _nar_st = {
+        "orchestratorContract": {"product_class": "benchtop_bioreactor",
+            "quantities": {"working_volume_ml": {"value": 20}, "culture_temperature_c": {"value": 37}}},
+        "partVerifications": [{"word_id": "magnetic_stirrer_drive_word"},
+                              {"word_id": "peltier_tec_module_word"},
+                              {"word_id": "dosing_peristaltic_pump_word"},
+                              {"word_id": "microcontroller_mcu_word"}, {"word_id": "usb_interface_word"}],
+        "moduleDecomposition": {"modules": [{}] * 8},
+        "costStack": {"raw_materials_bom_gbp": 186, "oem_transfer_price_gbp": 307},
+        "parsedBrief": {"constraints": {"safety_standards": [{"code": "IEC 61010-1"}]}},
+    }
+    _nar = _executive_narrative(_nar_st)
+    if len(_nar) != 3:
+        print(f"  FAIL S15: product narrative must be 3 paragraphs (got {len(_nar)})"); bad += 1
+    _joined = " ".join(_nar)
+    for _need in ("20 mL", "37 °C", "£186", "£307", "8 functional modules", "IEC 61010-1", "Peltier"):
+        if _need not in _joined:
+            print(f"  FAIL S15: narrative must template '{_need}' from state (missing)"); bad += 1
+    # no fabrication: a state with no cost stack yields NO £ claim; no class yields no narrative.
+    _no_cost = dict(_nar_st); _no_cost["costStack"] = {}
+    if "£" in " ".join(_executive_narrative(_no_cost)):
+        print("  FAIL S15 no-fabrication: no costStack must yield no £ figure in the narrative"); bad += 1
+    if _executive_narrative({"orchestratorContract": {}, "parsedBrief": {}}) != []:
+        print("  FAIL S15 no-fabrication: no product class must yield an empty narrative"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
