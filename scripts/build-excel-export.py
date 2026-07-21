@@ -11082,8 +11082,14 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
         rows.append(("energy_price", "Energy price", 0.15, "£/kWh",
                      "UK industrial net of the planned on-site renewable micro-grid; "
                      "grid alone ~£0.22/kWh", FMT_GBP2))
-        rows.append(("load_kw", "Connected electrical load", round(load_kw, 1), "kW",
-                     load_basis, FMT_DEC1))
+        rows.append(("load_kw", "Connected electrical load",
+                     # WATT-SCALE PRECISION (2026-07-21, the organoid £0 energy/yr): a 35 W
+                     # (0.035 kW) benchtop load rounded to 1 dp → 0.0 kW, and the live energy
+                     # formula (=load×hours×lf×price) then multiplied by ZERO → £0 energy on a
+                     # 24/7 powered device. Keep 3 dp for a sub-kW load so the stored value the
+                     # formula reads is non-zero; a plant load (≥1 kW) keeps 1 dp unchanged.
+                     round(load_kw, 3) if abs(load_kw) < 1 else round(load_kw, 1), "kW",
+                     load_basis, "0.000" if abs(load_kw) < 1 else FMT_DEC1))
         rows.append(("load_factor", "Electrical load factor", 0.65, "avg/peak",
                      "continuous RAS duty, average/peak", FMT_DEC2))
         rows.append(("hours", "Operating hours", 8760.0, "h/yr", "continuous",
@@ -11097,8 +11103,14 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     else:
         rows.append(("energy_price", "Energy price", round(gen["energy_price"], 4),
                      "£/kWh", gen["energy_basis"], FMT_GBP2))
-        rows.append(("load_kw", "Connected electrical load", round(load_kw, 1), "kW",
-                     load_basis, FMT_DEC1))
+        rows.append(("load_kw", "Connected electrical load",
+                     # WATT-SCALE PRECISION (2026-07-21, the organoid £0 energy/yr): a 35 W
+                     # (0.035 kW) benchtop load rounded to 1 dp → 0.0 kW, and the live energy
+                     # formula (=load×hours×lf×price) then multiplied by ZERO → £0 energy on a
+                     # 24/7 powered device. Keep 3 dp for a sub-kW load so the stored value the
+                     # formula reads is non-zero; a plant load (≥1 kW) keeps 1 dp unchanged.
+                     round(load_kw, 3) if abs(load_kw) < 1 else round(load_kw, 1), "kW",
+                     load_basis, "0.000" if abs(load_kw) < 1 else FMT_DEC1))
         rows.append(("load_factor", "Electrical load factor",
                      round(gen["load_factor"], 3), "avg/peak",
                      gen["load_factor_basis"], FMT_DEC2))
