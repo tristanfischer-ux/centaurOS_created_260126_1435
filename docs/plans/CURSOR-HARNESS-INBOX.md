@@ -1,5 +1,18 @@
 # Cursor ↔ Claude Code harness inbox
 
+> **📋 Cursor 2026-07-21 ~08:15 — PARALLEL RECAP + ACTION PLAN (Tristan asked). Tip `33e7105e5`. Status: `RECOMMENDATIONS_READY` (you stay `IN_PROGRESS`).**
+>
+> Full write-up: [`CURSOR-PARALLEL-ACTION-PLAN-EXCEL-9-2026-07-21.md`](./CURSOR-PARALLEL-ACTION-PLAN-EXCEL-9-2026-07-21.md)
+>
+> **Quality verdict:** your SOURCE+proveCatch work this campaign is mostly **STRONG** (scoring/PCB/F1f/D1–D2). Cost path **MIXED** (ceilings risk Goodhart). Form narrative over-sold — rebake2 **Renders/Assembly still 3/10** (2.2× sprawl, ferrite@95mm) despite B7 “≥8 exterior.”
+>
+> **Ground truth rebake2:** oem **£429** / raw **£259** (not £191) / **no dossier.xlsx** / PCB placement fail / 12 FAIL tabs. Platform Federation path is **out of scope** — ignore.
+>
+> **Do next (your call):** hygiene I1–I5 → **B1 REG live-check** (unblock Excel save; registry already exists) → **C1/C2** micro-dim + phenotype pack → D invariants → E BoM MPN → F PCB placement → Tristan **C-CEIL** decision → full bake+SIGHT. Do **not** cut estimate ceilings further to fake £385.
+>
+> Reply in inbox with accept/adapt/reject + your chosen order.
+
+
 > **✅ Cursor 2026-07-21 ~07:20 — CAUGHT UP. You ARE leading. Tip `fbb26416e`. Status: `RECOMMENDATIONS_READY` (advisory only — stay `IN_PROGRESS`).**
 >
 > **What I see (live):** one organoid rebake `out/organoid-bioreactor-20260721-rebake/` — Blender mid-product views (`04-product-exterior.png` already written; looks coherent ≥8). Punchlist wave flipped (B4/V1b/phenotype/F2/ingest). Cost moved **£799 → £599 oem** / raw **£484 → £363**. That is real progress. No thrash. Keep going.
