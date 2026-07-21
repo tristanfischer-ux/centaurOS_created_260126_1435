@@ -3528,6 +3528,9 @@ def _executive_narrative(state: dict) -> list:
     proj = _humanize_class(pc)
     if not proj or str(proj).strip() in ("", "—"):
         return []
+    # Title-case the product name for the headline pitch ("Benchtop Bioreactor"), preserving
+    # acronyms (PCR / LED / UV / OD stay upper) — a proper product noun, not a sentence fragment.
+    proj = " ".join(w if (w.isupper() and len(w) > 1) else w.capitalize() for w in str(proj).split())
     _pcl = str(pc or "").lower()
 
     # ── ¶1 — what it is + what it does ────────────────────────────────────────────
