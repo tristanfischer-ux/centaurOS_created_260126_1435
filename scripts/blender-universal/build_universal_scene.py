@@ -7333,6 +7333,26 @@ def write_connection_schedule(out_dir):
     # schedule + bom .md with 'No such file or directory').
     os.makedirs(out_dir, exist_ok=True)
     specs = list(_CONN_SPECS)
+    # DEVICE-SCALE LENGTH CLAMP (2026-07-21, the organoid 2.37 m runs in a 281 mm box):
+    # reconcile_route_specs' detour cap can be BYPASSED on the sealed-instrument path (its
+    # _CONN_SPECS is empty when it runs, so it no-ops), leaving metre-scale intra-enclosure
+    # runs → a £874 connection cost + PLAUSIBILITY P9 fails. Clamp each run's COSTED length to
+    # 1.5× the enclosure/scene diagonal read from the parts-manifest already on disk — an
+    # internal wire/tube cannot exceed the box that contains it. Universal + robust to route
+    # ordering: only bites when a small real bbox exists (a plant's metre-scale bbox is
+    # untouched); the DRAWN geometry is left as-is (only the costed/scheduled length is cut).
+    try:
+        _pm = json.load(open(os.path.join(out_dir, "parts-manifest.json")))
+        _bb = (_pm.get("bbox_mm") or {}) if isinstance(_pm, dict) else {}
+        _L, _W, _H = _bb.get("length_mm"), _bb.get("width_mm"), _bb.get("height_mm")
+        if all(isinstance(x, (int, float)) and x > 0 for x in (_L, _W, _H)):
+            _cap_m = math.sqrt(_L * _L + _W * _W + _H * _H) / 1000.0 * 1.5
+            for s in specs:
+                if float(s.get("length_m") or 0.0) > _cap_m + 0.01:
+                    s["length_capped_from_m"] = round(float(s["length_m"]), 2)
+                    s["length_m"] = round(_cap_m, 2)
+    except Exception:  # noqa: BLE001 — never block the schedule on a missing/partial manifest
+        pass
     rows = cs.connection_schedule(specs)
 
     # roll-up totals by size, per kind, summing the run length.

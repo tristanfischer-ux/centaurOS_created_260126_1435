@@ -1385,6 +1385,33 @@ function _injectThermalStabilityInputs(
   return payload
 }
 
+// EMC POWER INJECTION (2026-07-21, the -30 dB EMC margin on a 35 W device): enclosure_emc
+// derives a POWER-AWARE unshielded emission (a low-power benchtop instrument passes CISPR-B
+// without a shielded enclosure) — but only if it is GIVEN the device power; the bootstrap
+// planner otherwise wires a flat 60 dBuV/m source and demands 30 dB of shielding a plastic
+// case can't give. Inject total_power_w from the contract so the tool sees the real scale.
+// UNIVERSAL: keyed on the tool being an EMC/shielding tool + the contract self-describing a
+// power; a plan that already set a power is untouched.
+const _EMC_TOOL_RE = /(^|[:_-])(emc|enclosure[_-]?emc|emi|shielding)([:_-]|$)/i
+function _injectEmcPowerInputs(
+  step: ToolPlanStepSpec, c: ContractInProgress, payload: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!_EMC_TOOL_RE.test(step.tool_id)) return payload
+  if (payload['total_power_w'] !== undefined) return payload
+  const qs = (c.quantities ?? {}) as Record<string, { value?: unknown } | number>
+  const readQty = (key: string): number | undefined => {
+    const qv = qs[key]
+    const v = qv && typeof qv === 'object' ? Number((qv as { value?: unknown }).value) : Number(qv)
+    return Number.isFinite(v) ? v : undefined
+  }
+  const w = readQty('total_power_w') ?? readQty('peak_power_w') ?? readQty('nameplate_power_w')
+  const kw = readQty('connected_electrical_load_kw') ?? readQty('nameplate_power_kw')
+    ?? readQty('total_electrical_load_kw')
+  const p_w = w !== undefined ? w : (kw !== undefined ? kw * 1000 : undefined)
+  if (p_w !== undefined) payload['total_power_w'] = p_w
+  return payload
+}
+
 // ── ECONOMICS REVENUE-BASIS VETO (2026-07-02, the v55 £580M phantom NPV) ─────
 // The yield-economics NPV tool minted plant_npv_gbp = £580M on a WATER plant from
 // FABRICATED revenue inputs: annual_yield_kg = 100,000 @ market_price = £1,000/kg —
@@ -1479,7 +1506,8 @@ export function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): R
       payload[inp.param] = inp.constant
     }
   }
-  return _injectThermalStabilityInputs(step, c, _normalisePumpSizingInput(step, c, payload))
+  return _injectEmcPowerInputs(step, c,
+    _injectThermalStabilityInputs(step, c, _normalisePumpSizingInput(step, c, payload)))
 }
 
 /**
