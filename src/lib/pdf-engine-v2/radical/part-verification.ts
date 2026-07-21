@@ -1127,6 +1127,15 @@ export function stripUnverifiedParts(
   }
   if (stripSet.size === 0 && patternStripDetails.size === 0) return { stripped: 0, details: [] }
 
+  // PV-CONSISTENCY (2026-07-21, organoid R1): the strip below removes the fake part_number
+  // from the WORD, but the matching partVerification ROW must be cleared TOO — otherwise the
+  // BoM/⚠Checks (which read the pv) still see the proven-fake SKU and keep flagging it as an
+  // IDENTIFIED line over an `unverified` SKU (F4) AND an active machine pinned to a consumable
+  // (F3 — e.g. the dosing pump left holding Watson-Marlow TUB-SAN-6.4 tubing). A word-only strip
+  // is an incomplete strip. Build a pv-by-key index so we can clear the pv in lockstep.
+  const pvByKey = new Map<string, PartVerification>()
+  for (const v of verifications) pvByKey.set(`${v.module}::${v.sub_module_id}::${v.word_id}`, v)
+
   const details: Array<{ word_id: string; removed_pn: string; reasoning: string }> = []
   let stripped = 0
   for (const m of modules ?? []) {
@@ -1144,6 +1153,14 @@ export function stripUnverifiedParts(
         if (filtered.length < before) {
           w.modifier_characters = filtered
           stripped++
+          // Clear the matching pv row IN LOCKSTEP so the BoM shows an honest UNRESOLVED line
+          // (no fake SKU) — never a resolved line pinning a proven-fake part. Keep the price
+          // estimate (the part still exists, we just don't have a real SKU for it yet).
+          const pvRow = pvByKey.get(key)
+          if (pvRow && pvRow.part_number) {
+            ;(pvRow as any).part_number = ''
+            ;(pvRow as any).stripped_fake_pn = pnBefore || pvRow.part_number
+          }
           details.push({
             word_id: key,
             removed_pn: v?.part_number ?? pnBefore,
