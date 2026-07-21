@@ -614,6 +614,11 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
         txt = data["choices"][0]["message"]["content"]
     except Exception as exc:  # noqa: BLE001
         return {"broken": None, "defects": [], "model": model, "ok": False, "error": str(exc)[:160]}
+    # ROBUSTNESS (2026-07-21): a flaky provider can return content=None / non-string (or an empty
+    # body) — treat it as a failed call (ok:False → the caller skips), never crash the re.sub below.
+    if not isinstance(txt, str) or not txt.strip():
+        return {"broken": None, "defects": [], "model": model, "ok": False,
+                "error": f"empty/non-string content: {type(txt).__name__}"}
     # Robust parse: the model may wrap the JSON in a ```json fence and/or TRUNCATE it mid-string. Strip
     # fences, try full JSON, else fall back to extracting the broken flag + any quoted defect strings
     # (a truncated '{"broken": true, "defects": ["red pipe …' still yields the verdict).
