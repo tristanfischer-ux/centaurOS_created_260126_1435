@@ -72,10 +72,21 @@ CLASS_SIGNATURE_PATTERNS: dict[str, str] = {
 }
 
 # R4 FOREIGN_SAMPLE_INTERFACE — the "colorimeter deck applied to everything" bug (Cursor
-# 2026-07-18). A NON-optical instrument must not wear an optical-bench sample interface
-# (cuvette / optical cube / beam / the instrument_story optical cutaway). Classes whose
-# sample interface is genuinely optical are exempt.
-_OPTICAL_STORY_RE = re.compile(r"instrument_story|cuvette|optical_cube|_beam(_|$)|baffle|led_source")
+# 2026-07-18). A NON-optical instrument must not wear a foreign optical-BENCH sample
+# interface — a colorimeter cuvette + collimated optical path + monochromator (the
+# `instrument_story` optical cutaway: cuvette / optical cube / beam / baffle). Classes
+# whose whole sample interface is genuinely optical are exempt.
+_OPTICAL_STORY_RE = re.compile(r"instrument_story|cuvette|optical_cube|_beam(_|$)|baffle")
+# An OD (optical-DENSITY) sensor — an LED + photodiode straddling a culture vessel — is a
+# device's OWN LEGITIMATE sample interface (a benchtop/vial bioreactor monitors turbidity
+# optically; it is NOT a colorimeter cuvette-bench leak). The bare mesh `od_led_source` /
+# `od_photodiode_det` / `od_src` / `od_det` is that in-situ OD probe. Exempted per-mesh so
+# a genuine colorimeter deck (instrument_story cuvette/beam) STILL fires the gate — the OD
+# probe is the noun signal (never a class-name table), so any culture/monitoring device
+# whose optical interface is just an OD LED/photodiode is not a foreign-bench leak.
+# 2026-07-21: organoid/benchtop bioreactor rebake3 (R4 phenotype already fixed) — the OD
+# LED was wrongly read as the colorimeter deck; the fix is here (the CHECK), not the render.
+_OD_SENSOR_RE = re.compile(r"(^|_)od_(led|source|src|photodiode|det|sensor|arm)(_|$)")
 _OPTICAL_CLASSES = {"optical_instrument", "optical_handheld", "colorimeter",
                     "spectrophotometer", "photometer", "fluorometer", "turbidity_meter",
                     "lab_microscope"}  # microscope legitimately has an optical path
@@ -172,9 +183,14 @@ def evaluate_form_signature(meshes: list[str], product_class: str | None) -> dic
 
     cls = (product_class or "").strip().lower()
 
-    # R4 — foreign (optical) sample interface on a non-optical instrument.
+    # R4 — foreign (optical) sample interface on a non-optical instrument. An OD
+    # (optical-density) LED/photodiode probe is a device's OWN legitimate optical
+    # sample interface (a bioreactor monitors culture turbidity in situ), so it is
+    # NEVER counted as a foreign colorimeter-bench leak — only the instrument_story
+    # cuvette/beam optical deck is.
     if cls and cls not in _OPTICAL_CLASSES:
-        offby = [m for m in meshes if _OPTICAL_STORY_RE.search(m)]
+        offby = [m for m in meshes
+                 if _OPTICAL_STORY_RE.search(m) and not _OD_SENSOR_RE.search(m)]
         if offby:
             findings.append({
                 "code": "FOREIGN_SAMPLE_INTERFACE",
@@ -289,6 +305,25 @@ def _selftest() -> int:
         ["u_se_instrument_story_cuvette", "u_se_product_body"], "optical_instrument")
     if "FOREIGN_SAMPLE_INTERFACE" in [f["code"] for f in r4ok["findings"]]:
         print("  FAIL R4: an optical instrument's cuvette must NOT fire FOREIGN_SAMPLE_INTERFACE"); bad += 1
+    # R4 OD-SENSOR PROVECATCH (2026-07-21) — a benchtop/vial bioreactor's OWN OD probe (an
+    # LED + photodiode straddling the culture vial) is its LEGITIMATE optical sample
+    # interface, NOT a colorimeter cuvette-bench leak — it must NOT fire. Mirrors the real
+    # organoid-bioreactor rebake3 form-meshes.json (vial + stir + heater + OD LED/PD).
+    r4od = evaluate_form_signature(
+        ["u_se_le_vial", "u_se_le_vial_fluid", "u_se_le_stir_motor", "u_se_le_heater_block",
+         "u_se_le_od_led_source", "u_se_le_od_photodiode_det", "u_se_le_od_src",
+         "u_se_le_od_det"], "benchtop_bioreactor")
+    if "FOREIGN_SAMPLE_INTERFACE" in [f["code"] for f in r4od["findings"]]:
+        print("  FAIL R4: a bioreactor's own OD LED/photodiode is its legitimate sample "
+              "interface — must NOT fire FOREIGN_SAMPLE_INTERFACE"); bad += 1
+    # …but a GENUINE colorimeter cuvette bench leaking onto that SAME non-optical bioreactor
+    # (not just an OD probe) must STILL fire — the OD exemption must not blind the real leak.
+    r4leak = evaluate_form_signature(
+        ["u_se_le_vial", "u_se_le_stir_motor", "u_se_le_od_led_source",
+         "u_se_instrument_story_cuvette", "u_se_instrument_story_beam"], "benchtop_bioreactor")
+    if "FOREIGN_SAMPLE_INTERFACE" not in [f["code"] for f in r4leak["findings"]]:
+        print("  FAIL R4: a real colorimeter cuvette bench on a bioreactor must STILL fire "
+              "FOREIGN_SAMPLE_INTERFACE despite the OD-sensor exemption"); bad += 1
     # R5 proveCatch — an EWOD device with a flow manifold must fire WRONG_TRANSPORT_PHYSICS.
     r5 = evaluate_form_signature(
         ["u_se_ewod_electrode_grid", "u_se_dmf_cartridge", "u_se_distribution_manifold"],
