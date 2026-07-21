@@ -283,8 +283,17 @@ function nonBoardPlacement(
   const hasCotsComputeHost =
     /\b(?:raspberry\s*pi|single.board.computer|itsybitsy|pybadge|compute.ui.module)\b/i
       .test(evidence)
+  // INTENT: named flash-bearing MCU families OR a bare MCU role word when no
+  // COTS host owns persistence. Organoid emits `microcontroller_mcu` with no
+  // SAMD/ESP/STM token — without the role check, firmware_storage stays
+  // on_board and P7-unresolved forever. COTS-host path above still parks
+  // firmware off-board first when a Pi/PyBadge-class host is present.
+  const hasBareMcuRole = allWords.some((candidate) =>
+    /(?:^|[_ -])(?:microcontroller(?:[_ -]?mcu)?|main[_ -]?controller)(?:$|[_ -])/i
+      .test(candidate.characterId))
   const hasIntegratedFirmwareMcu =
     /\b(?:samd21|esp8266|esp32|stm32)\b/i.test(evidence)
+    || (!hasCotsComputeHost && hasBareMcuRole)
   const hasPhysicalUsbEntry = allWords.some((candidate) =>
     /usb[_ -]?(?:power[_ -]?entry|connector|receptacle|port)/i.test(
       `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,

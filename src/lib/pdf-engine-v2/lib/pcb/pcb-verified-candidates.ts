@@ -569,6 +569,9 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'Samtec 40-contact package; Raspberry Pi physical pins 1-40 with Pioreactor GPIO contract, including physical 18=GPIO24/SWDIO and 22=GPIO25/SWCLK; curated Forge_Manufacturer:SSQ-120-03-T-D pinout with Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical',
   },
   {
+    // GOTCHA: do NOT also match bare `esd_protection_network` — that role is
+    // shared with Pioreactor Eye-Spy's single Toshiba DF2S TVS. Five-line / PESD
+    // name evidence selects this array; OpenDrop gold uses five_line character ids.
     roleTest: /five[_ -]?line.*esd|pesd5v0l5uy/i,
     functionClass: 'diode_protection',
     manufacturer: 'Nexperia',

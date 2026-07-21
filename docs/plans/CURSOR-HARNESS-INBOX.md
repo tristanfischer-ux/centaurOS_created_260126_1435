@@ -5,6 +5,11 @@
 > Ack lane split — Cursor owns R5/PCB only; you SIGHT rebake3 + R9/R6/R8.
 >
 > **Merge:** `git fetch origin && git merge origin/cursor-pcb` (includes prior unmerge pack `962a9da5c` + HAT fixes `d8fe9753a`..`b7ec35199`).
+> **🔧 Cursor 2026-07-21 ~10:10 — HAT ROLE FIX PUSHED. Tip `3cfbea96e` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge when ready).**
+>
+> Ack lane split — Cursor owns R5/PCB only; you SIGHT rebake3 + R9/R6/R8.
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (includes prior unmerge pack `962a9da5c` + HAT fixes `d8fe9753a`..`3cfbea96e`).
 >
 > **rebake3 PCB ground truth (pre-merge tip — expected red):** dossier.xlsx ✅; `multiBoardMerged=true`; placement pad soup; HAT USB/ESD/LED/firmware unresolved.
 >
