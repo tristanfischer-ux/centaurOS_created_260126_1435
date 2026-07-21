@@ -68,6 +68,12 @@ MV_11000_V = 11_000.0         # MV above ~15 MW (UK 11 kV primary)
 POWER_FACTOR = 0.95           # assumed displacement pf for kW↔A (stated)
 
 # --- Load thresholds that drive the voltage choice (stated, not hidden) --------
+# SINGLE-PHASE APPLIANCE ceiling (2026-07-21): a load a standard single-phase wall
+# socket can supply (13 A × 230 V ≈ 3 kW in the UK) is a 230 V 1-phase appliance /
+# benchtop instrument — NOT a 400 V 3-phase distribution board, and it has NO incomer
+# transformer. Below this the 3-phase LV/MV ladder does not apply.
+SINGLE_PHASE_VOLTAGE_V = 230.0
+SINGLE_PHASE_MAX_KW = 3.0
 # At/under this connected load a 400 V LV board is normal practice.
 LV_MAX_CONNECTED_KW = 250.0
 # Between LV_MAX and MV_MIN we stay LV (400 V) UNLESS the LV current would exceed
@@ -249,6 +255,25 @@ def select_distribution_voltage(connected_load_kw: Optional[float],
         kw = _3ph_power_kw(lv_design_current_a, lv_voltage_v)
     if kw is None or kw <= 0:
         return None
+
+    # --- SINGLE-PHASE APPLIANCE / INSTRUMENT ----------------------------------
+    # A 35 W USB benchtop device was being "sized" to a 400 V 3-phase LV board fed by
+    # a 25 kVA transformer. Any load a single-phase socket supplies (≤ ~3 kW) is a
+    # 230 V 1-ph appliance: no 3-phase board, no incomer transformer. Universal,
+    # magnitude-keyed — the 3-phase LV/MV ladder below is unchanged (byte-identical)
+    # for real distributed loads above the socket ceiling.
+    if kw <= SINGLE_PHASE_MAX_KW:
+        sp_current = (kw * 1000.0) / (SINGLE_PHASE_VOLTAGE_V * POWER_FACTOR)
+        return VoltagePlan(
+            board_voltage_v=SINGLE_PHASE_VOLTAGE_V,
+            board_current_a=round(sp_current, 2),
+            is_mv=False,
+            connected_load_kw=round(kw, 3),
+            lv_voltage_v=SINGLE_PHASE_VOLTAGE_V,
+            lv_current_a=round(sp_current, 2),
+            rationale=(f"{kw*1000:,.0f} W ≤ {SINGLE_PHASE_MAX_KW:g} kW single-phase socket "
+                       f"ceiling → 230 V 1-phase supply (no 3-phase board, no incomer transformer)"),
+        )
 
     lv_current = lv_design_current_a
     if lv_current is None or lv_current <= 0:
