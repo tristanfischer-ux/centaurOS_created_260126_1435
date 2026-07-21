@@ -359,27 +359,70 @@ def _form_signature_verdict(run_dir: str):
 _PHENOTYPE_CACHE: dict = {}
 
 
+def _real_enclosure_edge_mm(state: dict):
+    """The LONGEST REAL placed-enclosure dimension (mm) for a sealed instrument, or None.
+
+    SOURCE-CORRECT denominator for the phenotype gate (2026-07-21): mirror the SAME
+    envelope the Blender placer sized the enclosure to, instead of a cube of
+    `enclosure_volume_m3`. `resolve_design_envelope_mm` (scripts/lib/render_view_contract.py)
+    is the ONE authoritative precedence chain the placer's `_sealed_enclosure_env_mm` calls —
+    brief `max_dimensions_mm` / the minimum-working pack wins (the customer's real box), and
+    even its volume fallback reshapes to the instrument landscape aspect rather than a naive
+    cube. So the organoid whose placer logged a 102×66×34 mm sealed-enclosure override yields a
+    102 mm proxy here, NOT the 159 mm cube of 0.00403 m³ that OVERSTATED the enclosure and let
+    a sprawling scene slip through at a fake 1.08×.
+
+    Falls back to the `enclosure_volume_m3` cube edge ONLY when the resolver returns nothing
+    (real dims absent), preserving the old behaviour for that case. Never raises."""
+    try:
+        _lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        from render_view_contract import resolve_design_envelope_mm as _rde  # type: ignore
+        env = _rde(state)
+        if env:
+            longest = max(float(v) for v in env)
+            if longest > 0:
+                return longest
+    except Exception:  # noqa: BLE001 — a phenotype read must never crash the build
+        pass
+    # fallback: cube edge from the contract volume (the old proxy)
+    try:
+        _sq = (state.get("engineeringContract") or {}).get("shared_quantities") or {}
+        _ev = num(_sq.get("enclosure_volume_m3"))
+        if _ev is not None and _ev > 0:
+            return (_ev ** (1.0 / 3.0)) * 1000.0
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 def _phenotype_containment_verdict(run_dir: str):
     """SIGHT / B5 (2026-07-20): a DETERMINISTIC phenotype-containment check for an instrument
     device — do the rendered parts FIT inside the product enclosure, or do they SPRAWL far
     outside it (the Lego-in-a-box hero: a floating vertical PCB + metre-scale primitives around
-    a 160 mm device)? Reads the delivered parts-manifest scene bbox vs the enclosure envelope
-    (cube edge from enclosure_volume_m3). A scene grossly larger than the enclosure means the
-    parts are not packed into the product body → the render is phenotypically wrong, whatever a
-    lenient form-signature / vision verdict says. Only fires for a device (a plant legitimately
-    sprawls). Returns {ok, ratio, scene_edge_mm, enclosure_edge_mm} or None (not applicable).
-    Cached per run_dir. Composes with F1b (which fixes the geometry at source — a fresh device
-    manifest fits, so this stays silent); this is the SIGHT backstop for any sprawl that slips."""
+    a 160 mm device)? Reads the delivered parts-manifest scene bbox vs the enclosure envelope.
+
+    ENCLOSURE DENOMINATOR (2026-07-21, gate-intent fix): the enclosure proxy is the LONGEST
+    REAL placed dimension via `_real_enclosure_edge_mm` (the SAME envelope resolver the placer
+    used), NOT a cube of `enclosure_volume_m3`. The cube OVERSTATED the enclosure (organoid:
+    0.00403 m³ → a 159 mm cube vs the real ~102 mm placed box) and passed a sprawling render at
+    a fake 1.08×; the real longest edge is the honest denominator so a genuine sprawl is caught.
+
+    A scene grossly larger than the enclosure means the parts are not packed into the product
+    body → the render is phenotypically wrong, whatever a lenient form-signature / vision verdict
+    says. Only fires for a device (a plant legitimately sprawls). Returns {ok, ratio,
+    scene_edge_mm, enclosure_edge_mm} or None (not applicable). Cached per run_dir. Composes with
+    F1b (which fixes the geometry at source — a fresh device manifest fits, so this stays silent);
+    this is the SIGHT backstop for any sprawl that slips."""
     if run_dir in _PHENOTYPE_CACHE:
         return _PHENOTYPE_CACHE[run_dir]
     res = None
     try:
         state = load_json(os.path.join(run_dir, "state.json")) or {}
         if state.get("isInstrumentDevice"):
-            _sq = (state.get("engineeringContract") or {}).get("shared_quantities") or {}
-            _ev = num(_sq.get("enclosure_volume_m3"))
-            if _ev is not None and _ev > 0:
-                _encl_edge = (_ev ** (1.0 / 3.0)) * 1000.0     # cube-edge proxy for the enclosure, mm
+            _encl_edge = _real_enclosure_edge_mm(state)   # longest REAL placed dim, mm
+            if _encl_edge is not None and _encl_edge > 0:
                 pm = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
                 bb = pm.get("bbox_mm") or {}
                 _scene_edge = max(num(bb.get("length_mm")) or 0.0,
@@ -389,7 +432,10 @@ def _phenotype_containment_verdict(run_dir: str):
                     ratio = _scene_edge / _encl_edge
                     # a coherent device render packs the parts INTO the enclosure (scene ≈ the
                     # enclosure); >1.8× means parts sprawl outside the product body. 1.8× tol
-                    # absorbs a legitimate lid/handle/port that pokes just proud of the shell.
+                    # absorbs a legitimate lid/handle/port that pokes just proud of the shell —
+                    # e.g. the vial_bioreactor signature that stands the culture vial PROUD on
+                    # the sealed base (build_universal_scene.py `_z_top = base_z + H`), which
+                    # legitimately extends the scene bbox above the enclosure but stays ≤1.8×.
                     res = {"ok": ratio <= 1.8, "ratio": round(ratio, 1),
                            "scene_edge_mm": round(_scene_edge), "enclosure_edge_mm": round(_encl_edge)}
     except Exception:  # noqa: BLE001 — a phenotype read must never crash the build
@@ -29037,32 +29083,80 @@ def _selftest() -> int:
     # SPRAWL far outside the enclosure (the Lego-in-a-box hero) must FAIL, whatever a lenient
     # form-signature / vision verdict says. ═══
     import tempfile as _tfp
-    def _write_run(_td, encl_v, scene_edge, instrument=True):
+    def _write_run(_td, encl_v, scene_edge, instrument=True, brief_dims=None):
         _PHENOTYPE_CACHE.pop(_td, None)
+        _st = {"isInstrumentDevice": instrument,
+               "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": encl_v}}}
+        if brief_dims is not None:
+            # pin the REAL placed enclosure box (mirrors brief max_dimensions_mm — the
+            # customer's own envelope, which the placer + gate size the enclosure to)
+            _st["parsedBrief"] = {"constraints": {"max_dimensions_mm": brief_dims}}
         with open(os.path.join(_td, "state.json"), "w") as _f:
-            json.dump({"isInstrumentDevice": instrument,
-                       "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": encl_v}}}, _f)
+            json.dump(_st, _f)
         with open(os.path.join(_td, "parts-manifest.json"), "w") as _f:
             json.dump({"bbox_mm": {"length_mm": scene_edge, "width_mm": scene_edge * 0.8, "height_mm": scene_edge * 0.6}}, _f)
     with _tfp.TemporaryDirectory() as _tdph:
-        # (1) SPRAWL: 0.004 m³ enclosure (~159 mm) but an 1800 mm scene (11×) → phenotype FAIL.
+        # (1) SPRAWL: 0.004 m³ enclosure but an 1800 mm scene → phenotype FAIL (the frozen
+        #     out/organoid-bioreactor-20260719-2150 shape: scene ~1800 mm; real enclosure edge
+        #     ~102-138 mm ⇒ ratio ≫ 1.8×, regardless of which denominator).
         _write_run(_tdph, 0.00403, 1800.0)
         _pv = _phenotype_containment_verdict(_tdph)
         if not (isinstance(_pv, dict) and _pv.get("ok") is False):
-            print(f"  FAIL B5: a device whose scene (1800 mm) sprawls 11× its ~159 mm enclosure "
-                  f"must FAIL the phenotype-containment check (got {_pv})"); bad += 1
-        # (2) CONTAINED: the same enclosure with a ~180 mm scene → PASS (parts fit the body).
+            print(f"  FAIL B5: a device whose scene (1800 mm) sprawls far past its ~102-138 mm "
+                  f"enclosure must FAIL the phenotype-containment check (got {_pv})"); bad += 1
+        # (2) CONTAINED: the same enclosure with a ~180 mm scene → PASS (parts fit the body;
+        #     the real placed edge is ~138 mm here, so 180/138 ≈ 1.3× ≤ 1.8×).
         _write_run(_tdph, 0.00403, 180.0)
         _pv2 = _phenotype_containment_verdict(_tdph)
         if not (isinstance(_pv2, dict) and _pv2.get("ok") is True):
             print(f"  FAIL B5 proveNoFalsePositive: a device whose parts FIT the enclosure "
-                  f"(~180 mm scene vs ~159 mm) must PASS (got {_pv2})"); bad += 1
+                  f"(~180 mm scene vs ~138 mm) must PASS (got {_pv2})"); bad += 1
         # (3) A PLANT (not an instrument device) legitimately sprawls → not applicable (None).
         _write_run(_tdph, 40.0, 8000.0, instrument=False)
         _pv3 = _phenotype_containment_verdict(_tdph)
         if _pv3 is not None:
             print(f"  FAIL B5: a non-instrument (plant) must be N/A for the device phenotype "
                   f"gate (got {_pv3})"); bad += 1
+    # ═══ V1a-DENOM (2026-07-21, gate-intent fix): the OVERSTATED enclosure denominator must not
+    # let a genuine sprawl slip. The old gate read a cube of enclosure_volume_m3 (0.00403 m³ →
+    # 159 mm), which OVERSTATES the real placed enclosure the resolver sizes (here 138.3 mm — the
+    # instrument landscape reshape; a REAL organoid with module words + a 102×66×34 brief box packs
+    # to ~102 mm). A scene ~280 mm reads 1.76× off the 159 mm cube (PASS — the walk-through bug) but
+    # 2.02× off the real 138.3 mm edge (FAIL — right). The denominator MUST be the real longest
+    # placed dim so this scene FAILs; and the vial-proud signature (a culture vial standing PROUD of
+    # the sealed base) must NOT false-FAIL. ═══
+    with _tfp.TemporaryDirectory() as _tdd:
+        # (4) OVERSTATE-CATCH: scene 280 mm on a device whose REAL placed edge is 138.3 mm. Off the
+        #     OLD 159 mm volume-cube that is 1.76× (a walk-through PASS — the bug); off the real
+        #     placed edge it is 2.02× → must FAIL. Proves the gate no longer reads the overstated
+        #     cube. (brief_dims are pinned to document the customer-envelope source; for this
+        #     word-less synthetic state the packed landscape edge wins, 138.3 mm < the 159 mm cube.)
+        _write_run(_tdd, 0.00403, 280.0, brief_dims={"w": 102, "d": 66, "h": 34})
+        _pv4 = _phenotype_containment_verdict(_tdd)
+        _real4 = _real_enclosure_edge_mm(load_json(os.path.join(_tdd, "state.json")) or {})
+        _cube4 = (0.00403 ** (1.0 / 3.0)) * 1000.0
+        if not (isinstance(_pv4, dict) and _pv4.get("ok") is False
+                and isinstance(_real4, (int, float)) and _real4 < _cube4):
+            print(f"  FAIL V1a-DENOM: a 280 mm scene over a {_real4} mm real enclosure must FAIL — "
+                  f"the gate must use the REAL placed edge ({_real4} mm), NOT the overstated "
+                  f"{round(_cube4)} mm volume-cube that passes it at 1.76× (got {_pv4})"); bad += 1
+        # (5) VIAL-PROUD proveNoFalsePositive: a pioreactor-style vial_bioreactor stands the culture
+        #     vial PROUD on the sealed base, so the scene bbox legitimately pokes ~1.1-1.3× above the
+        #     enclosure. That must PASS (the 1.8× tol absorbs a proud lid/vessel). Real edge ~138 mm
+        #     (landscape reshape), scene 175 mm ⇒ 1.27× ≤ 1.8×.
+        _PHENOTYPE_CACHE.pop(_tdd, None)
+        _stv = {"isInstrumentDevice": True,
+                "moduleDecomposition": {"product_class": "benchtop_bioreactor"},
+                "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 0.00403,
+                                                              "working_volume_ml": 50}}}
+        json.dump(_stv, open(os.path.join(_tdd, "state.json"), "w"))
+        json.dump({"bbox_mm": {"length_mm": 175.0, "width_mm": 140.0, "height_mm": 175.0}},
+                  open(os.path.join(_tdd, "parts-manifest.json"), "w"))
+        _pv5 = _phenotype_containment_verdict(_tdd)
+        if not (isinstance(_pv5, dict) and _pv5.get("ok") is True):
+            print(f"  FAIL V1a-DENOM proveNoFalsePositive: a vial-proud pioreactor render (~1.3× the "
+                  f"real enclosure) must NOT false-FAIL — the 1.8× tol absorbs a proud vessel "
+                  f"(got {_pv5})"); bad += 1
     # ═══ V2 (2026-07-20): ledger coverage + a flaky vision-clean verdict must NOT mint ≥8 on a
     # DEVICE whose containment could not be positively verified (no parts-manifest bbox). The 2150
     # proved the vision critic returns broken=false + 8 checks on a Lego hero — only a DETERMINISTIC
