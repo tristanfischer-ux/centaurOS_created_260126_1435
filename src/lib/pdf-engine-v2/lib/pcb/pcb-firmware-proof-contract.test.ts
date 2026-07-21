@@ -40,4 +40,33 @@ describe('buildFirmwareProofContract', () => {
     })
     expect((fat.mcu as { pin_contract_complete: boolean }).pin_contract_complete).toBe(true)
   })
+
+  it('proveCatch: instances come from implementedChannels, never requiredCount', () => {
+    const actuation: PcbFirmwareProofSpec = {
+      ...thin,
+      proofTargetId: 'wet_actuation',
+      boardRole: 'heater_stir_actuation_board',
+      channels: [
+        { role: 'heater_channel', requiredCount: 1 },
+        { role: 'stir_channel', requiredCount: 1 },
+        { role: 'pump_channel', requiredCount: 1 },
+      ],
+    }
+    const fat = buildFirmwareProofContract({
+      thin: actuation,
+      designFitnessOk: true,
+      mcu: { mpn: 'ATSAMD21G18A-AU' },
+      components: [],
+      implementedChannels: { heater_channel: 1, stir_channel: 0, pump_channel: 0 },
+    })
+    const channels = fat.channels as Array<{
+      role: string
+      required_count: number
+      instances: unknown[]
+    }>
+    expect(channels.find((c) => c.role === 'heater_channel')?.instances).toHaveLength(1)
+    expect(channels.find((c) => c.role === 'stir_channel')?.instances).toHaveLength(0)
+    expect(channels.find((c) => c.role === 'pump_channel')?.instances).toHaveLength(0)
+    expect(channels.find((c) => c.role === 'stir_channel')?.required_count).toBe(1)
+  })
 })

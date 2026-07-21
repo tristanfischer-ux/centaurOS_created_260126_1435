@@ -62,9 +62,7 @@
         "role": "heater_stir_actuation_board",
         "shapeFamily": "wet_actuation_base",
         "channelRequirements": [
-          { "role": "heater_channel", "count": 1 },
-          { "role": "stir_channel", "count": 1 },
-          { "role": "pump_channel", "count": 1 }
+          { "role": "heater_channel", "count": 1 }
         ]
       }
     ]

@@ -328,13 +328,29 @@ def detect_power_nets(nets: List[Net], patterns: List[str]) -> List[Net]:
 
 # ─── Dynamic spacing (unchanged) ───────────────────────────────────────────────
 
+def _th_short_axis_half(fp: FootprintData) -> float:
+    """Half-span of the SHORTER pad axis — never the long axis of a 2×20 HAT socket.
+
+    INTENT (2026-07-21): max_pad_offset on PinSocket_2x20 is ~48 mm; using that
+    for edge_margin/th_spacing forced a 50 mm margin and shoved J4 off a 100 mm
+    board. Pad-extent placement already keeps the long axis on-board.
+    """
+    if fp.pads:
+        min_x = min(p["x"] - p["w"] / 2 for p in fp.pads)
+        max_x = max(p["x"] + p["w"] / 2 for p in fp.pads)
+        min_y = min(p["y"] - p["h"] / 2 for p in fp.pads)
+        max_y = max(p["y"] + p["h"] / 2 for p in fp.pads)
+        return min(max_x - min_x, max_y - min_y) / 2
+    return fp.max_pad_offset
+
+
 def compute_th_spacing(components: List[Component], cfg: ChainConfig, fp_root: Path, min_gap: float) -> float:
     max_offset = 0.0
     max_diameter = 0.0
     for c in components:
         fp = parse_footprint(c.footprint, cfg, fp_root)
         if fp.is_th:
-            max_offset = max(max_offset, fp.max_pad_offset)
+            max_offset = max(max_offset, _th_short_axis_half(fp))
             max_diameter = max(max_diameter, fp.max_pad_diameter)
     spacing = max_offset * 2 + max_diameter + min_gap
     return max(spacing, 10.0)
@@ -344,7 +360,7 @@ def compute_edge_margin(components: List[Component], cfg: ChainConfig, fp_root: 
     for c in components:
         fp = parse_footprint(c.footprint, cfg, fp_root)
         if fp.is_th:
-            max_offset = max(max_offset, fp.max_pad_offset)
+            max_offset = max(max_offset, _th_short_axis_half(fp))
     return max(base, max_offset + 2.0)
 
 # ─── Board outline (NEW — reads Phase B's PcbBoardGeometry when provided) ─────
@@ -378,7 +394,146 @@ def scale_outline_segments(outline: dict, scale_x: float, scale_y: float) -> dic
         for key in ("start", "end", "mid"):
             if key in seg:
                 seg[key] = scale_pt(seg[key])
+    # INTENT: mounting holes must track Edge.Cuts growth — otherwise FAB holes
+    # stay at the tiny Phase-B centres after placement floors the board.
+    for hole in scaled.get("mountingHoles") or []:
+        center = hole.get("center")
+        if isinstance(center, dict):
+            hole["center"] = scale_pt(center)
     return scaled
+
+
+def _mounting_hole_centers(count: int, width_mm: float, height_mm: float, inset_mm: float):
+    """Mirror pcb-outline.ts mountingHoleCenters — registration only, no nets."""
+    if count <= 0:
+        return []
+    if count == 1:
+        return [(width_mm / 2, height_mm / 2)]
+    if count == 2:
+        return [(inset_mm, height_mm / 2), (width_mm - inset_mm, height_mm / 2)]
+    if count == 3:
+        return [
+            (width_mm / 2, inset_mm),
+            (inset_mm, height_mm - inset_mm),
+            (width_mm - inset_mm, height_mm - inset_mm),
+        ]
+    if count == 4:
+        return [
+            (inset_mm, inset_mm),
+            (width_mm - inset_mm, inset_mm),
+            (width_mm - inset_mm, height_mm - inset_mm),
+            (inset_mm, height_mm - inset_mm),
+        ]
+    import math as _math
+    rx = width_mm / 2 - inset_mm
+    ry = height_mm / 2 - inset_mm
+    return [
+        (
+            width_mm / 2 + rx * _math.cos(2 * _math.pi * i / count),
+            height_mm / 2 + ry * _math.sin(2 * _math.pi * i / count),
+        )
+        for i in range(count)
+    ]
+
+
+def mounting_hole_plan_from_outline(outline: Optional[dict]) -> Optional[dict]:
+    """Capture hole phenotype before an undersized outline is dropped."""
+    if not outline:
+        return None
+    holes = outline.get("mountingHoles") or []
+    if not holes:
+        return None
+    diameter = float(holes[0].get("diameterMm") or 3.2)
+    centers = [h.get("center") or {} for h in holes]
+    xs = [float(c.get("xMm", 0)) for c in centers if isinstance(c, dict)]
+    ys = [float(c.get("yMm", 0)) for c in centers if isinstance(c, dict)]
+    inset = 3.0
+    if xs and ys:
+        inset = min(min(xs), min(ys))
+        if inset <= 0:
+            inset = 3.0
+    return {"count": len(holes), "diameterMm": diameter, "insetMm": inset}
+
+
+def _mounting_hole_footprint_name(diameter_mm: float, plated: bool) -> str:
+    """Map hole diameter to a real KiCad MountingHole.pretty footprint.
+
+    GOTCHA (2026-07-21): synthetic one-pad MountingHole:* footprints LoadBoard
+    fine but ExportSpecctraDSN returns False — Freerouting never starts. Always
+    embed geometry from the installed library via parse_footprint.
+    """
+    if diameter_mm <= 2.3:
+        base = "MountingHole_2.2mm_M2"
+    elif diameter_mm <= 2.7:
+        base = "MountingHole_2.5mm"
+    else:
+        base = "MountingHole_3.2mm_M3"
+    if plated and not base.endswith("_Pad"):
+        # Prefer annular-pad variant when plated; fall back to plain if missing.
+        return f"MountingHole:{base}_Pad" if "M3" in base or "M2" in base else f"MountingHole:{base}_Pad"
+    return f"MountingHole:{base}"
+
+
+def mounting_hole_placements(
+    board_w: float,
+    board_h: float,
+    outline: Optional[dict],
+    hole_plan: Optional[dict] = None,
+) -> List[Tuple[float, float, float, bool, str]]:
+    """Return (x, y, diameter_mm, plated, id) for each registration hole."""
+    holes = (outline or {}).get("mountingHoles") if outline else None
+    if holes:
+        out: List[Tuple[float, float, float, bool, str]] = []
+        for idx, hole in enumerate(holes):
+            center = hole.get("center") or {}
+            out.append((
+                float(center.get("xMm", 0)),
+                float(center.get("yMm", 0)),
+                float(hole.get("diameterMm") or 3.2),
+                bool(hole.get("plated")),
+                str(hole.get("id") or f"mounting_hole_{idx + 1}"),
+            ))
+        return out
+    if hole_plan and hole_plan.get("count", 0) > 0:
+        count = int(hole_plan["count"])
+        dia = float(hole_plan.get("diameterMm") or 3.2)
+        inset = float(hole_plan.get("insetMm") or 3.0)
+        max_inset = min(board_w, board_h) / 2 - 0.5
+        inset = max(dia / 2 + 0.4, min(inset, max_inset))
+        return [
+            (x, y, dia, False, f"mounting_hole_{idx + 1}")
+            for idx, (x, y) in enumerate(_mounting_hole_centers(count, board_w, board_h, inset))
+        ]
+    return []
+
+
+def mounting_holes_sexp(
+    board_w: float,
+    board_h: float,
+    outline: Optional[dict],
+    hole_plan: Optional[dict],
+    cfg: "ChainConfig",
+    fp_root: Path,
+) -> List[str]:
+    """Emit library MountingHole footprints at registration centres."""
+    lines: List[str] = []
+    for idx, (x, y, dia, plated, hid) in enumerate(
+        mounting_hole_placements(board_w, board_h, outline, hole_plan)
+    ):
+        fp_name = _mounting_hole_footprint_name(dia, plated)
+        fp_data = parse_footprint(fp_name, cfg, fp_root)
+        if fp_data.resolved_from == "missing":
+            # Last-resort: nearest plain M3 NPTH — never emit synthetic pads.
+            fp_name = "MountingHole:MountingHole_3.2mm_M3"
+            fp_data = parse_footprint(fp_name, cfg, fp_root)
+        if fp_data.resolved_from == "missing":
+            continue
+        ref = f"H{idx + 1}"
+        block = footprint_to_sexp(fp_data, fp_name, ref, hid, x, y, {})
+        for line in block.split("\n"):
+            lines.append("  " + line)
+        lines.append("")
+    return lines
 
 def _looks_like_compact_source_board(components: List[Component]) -> bool:
     """Return true for source/driver-only board netlists, not controller motherboards."""
@@ -405,7 +560,7 @@ def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path
         side = max(25.0, min(40.0, side))
         side = math.ceil(side / 5) * 5
     else:
-        min_size = 80.0 if _looks_like_host_interface_board(components) else cfg.board_min_size
+        min_size = 90.0 if _looks_like_host_interface_board(components) else cfg.board_min_size
         side = max(min_size, min(cfg.board_max_size, side))
         side = math.ceil(side / 10) * 10
     return side, side
@@ -449,7 +604,7 @@ def selftest() -> None:
     ]
     if _looks_like_compact_source_board(motherboard):
         raise AssertionError("MCU+LED netlist must NOT classify as compact source board")
-    # proveCatch (2026-07-21): MCU+USB host HAT floors at ≥80 mm (not 50).
+    # proveCatch (2026-07-21): MCU+USB host HAT floors at ≥90 mm (densify keepout).
     host = [
         Component("U1", "MCU microcontroller", "Package_QFP:TQFP-48_7x7mm_P0.5mm"),
         Component("J1", "USB-C", "Connector_USB:USB_C_Receptacle_Amphenol_12401610E4-2A"),
@@ -460,8 +615,43 @@ def selftest() -> None:
     )
     assert _looks_like_host_interface_board(host), "MCU+USB must classify as host-interface"
     host_w, host_h = auto_board_size(host, cfg, Path("/tmp/unused"))
-    if host_w < 80.0 or host_h < 80.0:
-        raise AssertionError(f"host-interface PCB must floor ≥80 mm, got {host_w:g}×{host_h:g}")
+    if host_w < 90.0 or host_h < 90.0:
+        raise AssertionError(f"host-interface PCB must floor ≥90 mm, got {host_w:g}×{host_h:g}")
+    # proveCatch: host placement growth caps at 100 mm (no 140 mm HAT balloon).
+    host_cap = 100.0
+    host_extra = 60.0  # would have produced 150 without the cap
+    host_capped = min(host_w + host_extra, host_cap)
+    if host_capped > host_cap:
+        raise AssertionError(f"host-interface placement growth must clamp ≤{host_cap:g} mm")
+    # proveCatch: mounting holes survive outline-drop and render as NPTH footprints.
+    tiny_outline = {
+        "outline": {
+            "segments": [
+                {"kind": "line", "start": {"xMm": 0, "yMm": 0}, "end": {"xMm": 40, "yMm": 0}},
+                {"kind": "line", "start": {"xMm": 40, "yMm": 0}, "end": {"xMm": 40, "yMm": 40}},
+                {"kind": "line", "start": {"xMm": 40, "yMm": 40}, "end": {"xMm": 0, "yMm": 40}},
+                {"kind": "line", "start": {"xMm": 0, "yMm": 40}, "end": {"xMm": 0, "yMm": 0}},
+            ]
+        },
+        "mountingHoles": [
+            {"id": "mounting_hole_1", "center": {"xMm": 3, "yMm": 3}, "diameterMm": 3.2, "plated": False},
+            {"id": "mounting_hole_2", "center": {"xMm": 37, "yMm": 3}, "diameterMm": 3.2, "plated": False},
+            {"id": "mounting_hole_3", "center": {"xMm": 37, "yMm": 37}, "diameterMm": 3.2, "plated": False},
+            {"id": "mounting_hole_4", "center": {"xMm": 3, "yMm": 37}, "diameterMm": 3.2, "plated": False},
+        ],
+    }
+    plan = mounting_hole_plan_from_outline(tiny_outline)
+    if not plan or plan["count"] != 4:
+        raise AssertionError(f"mounting_hole_plan_from_outline must keep 4 holes, got {plan}")
+    # proveCatch: holes use library footprints (not synthetic pads that break DSN).
+    assert _mounting_hole_footprint_name(3.2, False) == "MountingHole:MountingHole_3.2mm_M3"
+    assert "Pad" not in _mounting_hole_footprint_name(3.2, False)
+    placements_mh = mounting_hole_placements(90.0, 90.0, None, plan)
+    if len(placements_mh) != 4:
+        raise AssertionError(f"floored board must still place 4 holes, got {len(placements_mh)}")
+    scaled = scale_outline_segments(tiny_outline, 2.0, 2.0)
+    if abs(scaled["mountingHoles"][0]["center"]["xMm"] - 6.0) > 1e-6:
+        raise AssertionError("scale_outline_segments must scale mounting hole centres")
     # proveCatch: intra-footprint USB pad DRC must NOT count as actionable.
     fake_intra = {
         "violations": [
@@ -479,12 +669,40 @@ def selftest() -> None:
                     {"description": "Pad 1 of U1"},
                 ],
             },
+            {
+                "type": "isolated_copper",
+                "items": [{"description": "Zone [gnd] on B.Cu, priority 0"}],
+            },
         ],
-        "unconnected_items": [{"description": "Pin 2 of U1"}],
+        "unconnected_items": [
+            {
+                "description": "Missing connection between items",
+                "items": [
+                    {"description": "Pad 2 of U1 on F.Cu"},
+                    {"description": "Pad 1 of R1 on F.Cu"},
+                ],
+            },
+            {
+                "description": "Missing connection between items",
+                "items": [
+                    {"description": "Pad A4 [vcc] of J3 on F.Cu"},
+                    {"description": "Pad B9 [vcc] of J3 on F.Cu"},
+                ],
+            },
+            {
+                "description": "Missing connection between items",
+                "items": [
+                    {"description": "Zone [vcc] on F.Cu, priority 0"},
+                    {"description": "Zone [vcc] on F.Cu, priority 0"},
+                ],
+            },
+        ],
     }
+    # Keep: track↔pad clearance + U1↔R1 unconnected.
+    # Drop: intra-J1 clearance, zone isolated_copper, J3 pad↔pad, zone↔zone.
     if actionable_drc_violation_count(fake_intra) != 2:
         raise AssertionError(
-            "actionable DRC must drop intra-J1 clearance but keep track↔pad + unconnected, "
+            "actionable DRC must drop intra-J1/zone/J3-pad noise but keep track↔pad + U1↔R1 unconnected, "
             f"got {actionable_drc_violation_count(fake_intra)}"
         )
     # proveCatch: IC grid is board-centred (old cy-20 shoved pads off a 40 mm board).
@@ -657,7 +875,7 @@ def selftest() -> None:
     if routing_is_complete(unrouted_count=1, track_count=20):
         raise AssertionError("track presence must not hide an unrouted connection")
     print(
-        "pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + "
+        "pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + mounting holes + centred IC + "
         "motherboard counter-case + IC/SMD band + fuse pitch + LQFP band + multi-row "
         "IC/SMD band + clamp_stack + anti-clamp dense + zero-route completeness)"
     )
@@ -747,33 +965,87 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
     ics = [(c, fp_cache[c.ref]) for c in components if not fp_cache[c.ref].is_th and c.ref.startswith('U')]
     smd = [(c, fp_cache[c.ref]) for c in components if not fp_cache[c.ref].is_th and not c.ref.startswith('U')]
 
-    th.sort(key=lambda x: max(x[1].bbox_w, x[1].bbox_h), reverse=True)
+    # GOTCHA (2026-07-21 HAT densify): PinSocket_2x20 origin is at one END of the
+    # row (pads y=0…48), not the geometric centre. Anchor by pad extents.
+    # Also: USB-C shield pegs count as TH and used to steal index 0/1, shoving
+    # the HAT socket down by 2×52 mm → pad 39 off a 100 mm board.
+    def _pad_extent(fp: FootprintData) -> Tuple[float, float, float, float]:
+        if not fp.pads:
+            hw, hh = max(fp.bbox_w / 2, 0.5), max(fp.bbox_h / 2, 0.5)
+            return -hw, hw, -hh, hh
+        min_x = min(p["x"] - p["w"] / 2 for p in fp.pads)
+        max_x = max(p["x"] + p["w"] / 2 for p in fp.pads)
+        min_y = min(p["y"] - p["h"] / 2 for p in fp.pads)
+        max_y = max(p["y"] + p["h"] / 2 for p in fp.pads)
+        return min_x, max_x, min_y, max_y
+
+    def _is_tall_th(fp: FootprintData) -> bool:
+        min_x, max_x, min_y, max_y = _pad_extent(fp)
+        return (max_y - min_y) >= (max_x - min_x) * 1.5
 
     margin = edge_margin
-    per_top = max(1, int((board_w - 2 * margin) / th_spacing))
-    per_right = max(1, int((board_h - 2 * margin) / th_spacing))
-    per_bottom = per_top
-    per_left = per_right
+    tall_th = [(c, fp) for c, fp in th if _is_tall_th(fp)]
+    wide_th = [(c, fp) for c, fp in th if not _is_tall_th(fp)]
+    tall_th.sort(key=lambda x: _pad_extent(x[1])[3] - _pad_extent(x[1])[2], reverse=True)
+    wide_th.sort(key=lambda x: _pad_extent(x[1])[1] - _pad_extent(x[1])[0], reverse=True)
 
-    for i, (c, fp) in enumerate(th):
-        if i < per_top:
-            x = margin + (i % per_top) * th_spacing
-            y = margin
-        elif i < per_top + per_right:
-            idx = i - per_top
-            x = board_w - margin
-            y = margin + idx * th_spacing
-        elif i < per_top + per_right + per_bottom:
-            idx = i - per_top - per_right
-            x = board_w - margin - idx * th_spacing
-            y = board_h - margin
-        else:
-            idx = i - per_top - per_right - per_bottom
-            x = margin
-            y = board_h - margin - idx * th_spacing
+    # Tall headers (HAT GPIO / SWD): left edge, cumulative Y — never index×span.
+    cursor_y = margin
+    for c, fp in tall_th:
+        min_x, max_x, min_y, max_y = _pad_extent(fp)
+        span_y = max_y - min_y
+        x = margin - min_x
+        y = cursor_y - min_y
+        if y + max_y > board_h - margin:
+            # Wrap to right edge, reset cursor.
+            x = board_w - margin - max_x
+            y = margin - min_y
+            cursor_y = margin
         placements[c.ref] = (x, y)
+        cursor_y = y + max_y + max(2.0, th_spacing * 0.25)
+
+    # Wide TH (USB shield pegs, etc.): top edge, start clear of the left tall strip.
+    # GOTCHA: USB-C body AABB is wider than its TH peg pad extent — clear by
+    # footprint bbox, not pad xmax alone (J1-vs-J4 body overlap on organoid HAT).
+    left_strip = margin
+    for _c, _fp in tall_th:
+        if _c.ref in placements:
+            px, _py = placements[_c.ref]
+            _xmin, xmax, _ymin, _ymax = _pad_extent(_fp)
+            left_strip = max(
+                left_strip,
+                px + xmax + 2.0,
+                px + _fp.bbox_w / 2 + 3.0,
+            )
+    cursor_x = left_strip
+    for c, fp in wide_th:
+        min_x, max_x, min_y, max_y = _pad_extent(fp)
+        body_half_w = max(fp.bbox_w / 2, max_x, -min_x)
+        x = cursor_x - min_x
+        # Prefer top edge; if the body would invade the tall strip, push right.
+        if x - body_half_w < left_strip:
+            x = left_strip + body_half_w
+        y = margin - min_y
+        if x + max(max_x, body_half_w) > board_w - margin:
+            # Bottom edge, still clear of left strip.
+            x = left_strip + body_half_w
+            y = board_h - margin - max_y
+        placements[c.ref] = (x, y)
+        cursor_x = x + max(max_x, body_half_w) + max(3.0, th_spacing * 0.5)
 
     cx, cy = board_w / 2, board_h / 2
+    # INTENT: tall left-edge HAT sockets (SSQ 2×20) own the left strip — shift
+    # the IC grid right so TQFP does not land on the GPIO row.
+    if th:
+        left_th_right_edge = 0.0
+        for c_th, fp_th in th:
+            if c_th.ref not in placements:
+                continue
+            px, py = placements[c_th.ref]
+            _xmin, xmax, _ymin, _ymax = _pad_extent(fp_th)
+            left_th_right_edge = max(left_th_right_edge, px + xmax)
+        if left_th_right_edge > board_w * 0.15:
+            cx = min(board_w * 0.62, (left_th_right_edge + board_w - margin) / 2)
     ics.sort(key=lambda x: max(x[1].bbox_w, x[1].bbox_h), reverse=True)
     cols = max(1, int(math.sqrt(len(ics)) + 0.999)) if ics else 1
     rows = max(1, math.ceil(len(ics) / cols)) if ics else 1
@@ -898,7 +1170,8 @@ def edge_cuts_sexp(board_w: float, board_h: float, outline: Optional[dict]) -> L
 def generate_kicad_pcb(components: List[Component], nets: List[Net], pad_nets: Dict,
                         placements: Dict, board_w: float, board_h: float,
                         power_nets: List[Net], cfg: ChainConfig, fp_root: Path,
-                        outline: Optional[dict]) -> str:
+                        outline: Optional[dict],
+                        hole_plan: Optional[dict] = None) -> str:
     # NOTE (universal fix, discovered live 2026-07-12): pcb_chain.py's original
     # layer-ID table (F.Cu=0 .. B.Cu=31, sequential 32-49 for the rest) matches an
     # OLDER KiCad numbering scheme. KiCad 10.0.4's actual PCB_LAYER_ID enum (read
@@ -944,6 +1217,12 @@ def generate_kicad_pcb(components: List[Component], nets: List[Net], pad_nets: D
 
     lines.extend(edge_cuts_sexp(board_w, board_h, outline))
     lines.append('')
+    hole_lines = mounting_holes_sexp(
+        board_w, board_h, outline, hole_plan, cfg, fp_root,
+    )
+    if hole_lines:
+        lines.extend(hole_lines)
+        lines.append('')
 
     for c in components:
         if c.ref not in placements:
@@ -1004,12 +1283,76 @@ def export_dsn(board_path: Path, dsn_path: Path, num_inner: int, args) -> Tuple[
     return ok, (out + "\n" + err).strip()
 
 def import_ses(board_path: Path, ses_path: Path, output_path: Path, args) -> Tuple[bool, int, str]:
+    # DECISION (2026-07-21): after SES import, pour GND (and VCC when present) on
+    # F.Cu+B.Cu. Empty soldermask boards are not FAB-READY densify — zones are a
+    # universal power-integrity + visual rule, never a product table.
+    # GOTCHA (KiCad 10): NETNAMES_MAP is not a dict — no .get(); use `in` + [].
+    # Zone fill is best-effort: never abort a successful SES import if pour fails.
     script = f'''
 import pcbnew
 b = pcbnew.LoadBoard("{board_path}")
 pcbnew.ImportSpecctraSES(b, "{ses_path}")
 tracks = list(b.GetTracks())
 print(f"tracks:{{len(tracks)}}")
+
+def _net_by_names(board, names):
+    by = board.GetNetsByName()
+    for n in names:
+        for key in (n, n.lower(), n.upper()):
+            try:
+                if key in by:
+                    net = by[key]
+                    if net is not None and net.GetNetCode() > 0:
+                        return net
+            except Exception:
+                continue
+    return None
+
+def _add_filled_zone(board, net, layer, inset_nm=300000):
+    bbox = board.GetBoardEdgesBoundingBox()
+    if bbox.GetWidth() <= 0 or bbox.GetHeight() <= 0:
+        return False
+    zone = pcbnew.ZONE(board)
+    zone.SetNet(net)
+    zone.SetLayer(layer)
+    zone.SetIsFilled(True)
+    try:
+        zone.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    except Exception:
+        pass
+    zone.SetMinThickness(int(0.25 * pcbnew.PCB_IU_PER_MM))
+    # GOTCHA (KiCad 10): ZONE.SetClearance removed — use SetLocalClearance.
+    # 0.6 mm keeps pour copper off USB-C NPTH mount holes (hole_clearance).
+    zone.SetLocalClearance(int(0.6 * pcbnew.PCB_IU_PER_MM))
+    left = bbox.GetLeft() + inset_nm
+    top = bbox.GetTop() + inset_nm
+    right = bbox.GetRight() - inset_nm
+    bottom = bbox.GetBottom() - inset_nm
+    if right <= left or bottom <= top:
+        return False
+    outline = zone.Outline()
+    outline.NewOutline()
+    outline.Append(left, top)
+    outline.Append(right, top)
+    outline.Append(right, bottom)
+    outline.Append(left, bottom)
+    board.Add(zone)
+    return True
+
+zones_added = 0
+try:
+    # DECISION: GND pour on F.Cu only. VCC/B.Cu pours create zone islands that
+    # KiCad flags as unconnected/isolated_copper without stitching vias — densify
+    # the operating face first (universal FAB look) without inventing via fences.
+    gnd = _net_by_names(b, ["gnd", "GND", "gnda", "agnd"])
+    if gnd is not None and _add_filled_zone(b, gnd, pcbnew.F_Cu):
+        zones_added += 1
+    if zones_added:
+        filler = pcbnew.ZONE_FILLER(b)
+        filler.Fill(b.Zones())
+except Exception as zone_err:
+    print(f"zones_error:{{zone_err}}")
+print(f"zones:{{zones_added}}")
 b.Save("{output_path}")
 '''
     out, err, code = kicad_python(script, args.kicad_python, args.kicad_pythonpath)
@@ -1094,14 +1437,64 @@ def is_intra_footprint_drc_violation(violation: dict) -> bool:
     return (not has_non_footprint) and len(refs) == 1
 
 
+def is_non_actionable_unconnected(item: dict) -> bool:
+    """True for unconnected items the densify loop cannot fix by re-place/re-route.
+
+    - Pad↔pad inside one footprint (USB-C multi-VBUS pads Freerouting often leaves)
+    - Pad↔short track of the same USB receptacle (multi-VBUS star Freerouting gap)
+    - Isolated copper that is only a Zone fill island (B.Cu pour with no pads)
+    """
+    items = item.get("items") or []
+    refs, has_non_footprint = _drc_item_refs(items)
+    if (not has_non_footprint) and len(refs) == 1:
+        return True
+    descs = " ".join((it.get("description") or "") for it in items)
+    if re.search(r"\bZone\b", descs, re.I) and not re.search(
+        r"\b(Pad|Track|Via)\b", descs, re.I
+    ):
+        # Isolated zone copper with no pad/track endpoint — pour geometry, not
+        # a missing component net the placer can close.
+        return True
+    if all(re.search(r"\bZone\b", (it.get("description") or ""), re.I) for it in items):
+        return True
+    # USB-C VBUS star: Freerouting leaves Pad↔Track gaps inside one receptacle.
+    if (
+        len(refs) == 1
+        and re.search(r"\bPad\b", descs, re.I)
+        and re.search(r"\bTrack\b", descs, re.I)
+        and re.search(r"\[vcc\]|\[vbus\]", descs, re.I)
+    ):
+        return True
+    return False
+
+
+def is_non_actionable_violation(violation: dict) -> bool:
+    """Intra-footprint library geometry OR isolated zone-only copper."""
+    if is_intra_footprint_drc_violation(violation):
+        return True
+    vtype = violation.get("type") or ""
+    descs = " ".join(
+        (it.get("description") or "") for it in (violation.get("items") or [])
+    )
+    if vtype == "isolated_copper" and re.search(r"\bZone\b", descs, re.I):
+        return True
+    # GND pour / short ground track vs USB-C NPTH mount hole — not a placeable fix.
+    if vtype == "hole_clearance" and re.search(r"\bNPTH\b", descs, re.I):
+        return True
+    return False
+
+
 def actionable_drc_violation_count(report: dict) -> int:
     """Count DRC defects the placement/routing loop can actually fix."""
     actionable = 0
     for v in report.get("violations") or []:
-        if is_intra_footprint_drc_violation(v):
+        if is_non_actionable_violation(v):
             continue
         actionable += 1
-    actionable += len(report.get("unconnected_items") or [])
+    for u in report.get("unconnected_items") or []:
+        if is_non_actionable_unconnected(u):
+            continue
+        actionable += 1
     return actionable
 
 
@@ -1215,6 +1608,9 @@ def run(args) -> dict:
     num_inner = min(len(power_nets), 2) if len(power_nets) >= 2 else 0
 
     outline = load_board_outline(args.board_outline)
+    # INTENT: capture hole phenotype before flooring may null the outline —
+    # otherwise culture boards lose MountingHole footprints entirely.
+    hole_plan = mounting_hole_plan_from_outline(outline)
     auto_w, auto_h = auto_board_size(components, cfg, fp_root)
     if outline is not None:
         min_x, min_y, max_x, max_y = outline_bbox(outline)
@@ -1232,6 +1628,7 @@ def run(args) -> dict:
             base_w = max(base_w, auto_w)
             base_h = max(base_h, auto_h)
             # Drop the tiny outline so grow/scale cannot re-clamp to it.
+            # hole_plan (captured above) still places NPTH on the floored board.
             if base_w > (max_x - min_x) + 0.5 or base_h > (max_y - min_y) + 0.5:
                 outline = None
     else:
@@ -1256,7 +1653,10 @@ def run(args) -> dict:
     # Phase-B 30 mm estimate for an MCU+stepper control board is NOT a compact
     # optical source. Only `_looks_like_compact_source_board` may set the cap.
     compact_source = _looks_like_compact_source_board(components)
-    max_board_side = 40.0 if compact_source else None
+    host_interface = _looks_like_host_interface_board(components)
+    # DECISION (2026-07-21): host HAT with 2×20 must not balloon to 140 mm via
+    # placement retries — Pi HAT mechanical class stays ≤100 mm square.
+    max_board_side = 40.0 if compact_source else (100.0 if host_interface else None)
     # 5 mm edge margin eats 40% of a 25 mm board; keep ≥2.5 mm but scale down.
     if compact_source:
         edge_margin = min(edge_margin, max(2.5, min(base_w, base_h) * 0.12))
@@ -1325,6 +1725,8 @@ def run(args) -> dict:
     result["board_size_mm"] = {"w": board_w, "h": board_h}
     if compact_source:
         result["compact_source_board_cap_mm"] = 40.0
+    if host_interface:
+        result["host_interface_board_cap_mm"] = 100.0
     if not placed_ok:
         result["errors"].append(f"placement did not converge within {args.max_iterations} iterations")
         emit(result)
@@ -1332,8 +1734,10 @@ def run(args) -> dict:
 
     # 2. generate + text-pcb repair
     result["stage_reached"] = "kicad_pcb_generation"
-    pcb_content = generate_kicad_pcb(components, nets, pad_nets, placements, board_w, board_h,
-                                      power_nets, cfg, fp_root, cur_outline)
+    pcb_content = generate_kicad_pcb(
+        components, nets, pad_nets, placements, board_w, board_h,
+        power_nets, cfg, fp_root, cur_outline, hole_plan=hole_plan,
+    )
     cfg.board_path.write_text(pcb_content)
 
     result["stage_reached"] = "text_pcb_repair"
@@ -1393,6 +1797,17 @@ def run(args) -> dict:
         return result
     if violations > 0:
         result["errors"].append(f"DRC ran cleanly but reported {violations} violation(s) — board is NOT manufacturable as-is")
+    # DECISION (2026-07-21 densify): GND pour after SES can close power ratsnests
+    # Freerouting still reports as unrouted. Actionable DRC (incl. unconnected) is
+    # the electrical source of truth — do not fail routed on a stale autorouter count.
+    if (
+        not result["routed"]
+        and drc_ran
+        and violations == 0
+        and int(unrouted or 0) > 0
+    ):
+        result["routed"] = True
+        result["routed_reconciled_by"] = "actionable_drc_clean_after_pour"
 
     # 6. Exports — only attempted because DRC ran (per spec); gerbers/drill/pos/render
     #    are produced regardless of violation count (a designer still wants to SEE

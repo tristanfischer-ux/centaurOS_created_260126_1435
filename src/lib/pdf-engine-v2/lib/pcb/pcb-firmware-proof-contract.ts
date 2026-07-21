@@ -20,6 +20,8 @@ export interface FirmwareProofContractComponent {
  * @param args.designFitnessOk Whether PCB design fitness already passed
  * @param args.mcu Optional MCU identity from generator components
  * @param args.components On-board components with optional MPNs
+ * @param args.implementedChannels Design-evidence counts from
+ *   `deriveImplementedChannelCounts` — NEVER invent instances from requiredCount
  * @returns Fat contract object for firmware_proof.py
  */
 export function buildFirmwareProofContract(args: {
@@ -27,18 +29,25 @@ export function buildFirmwareProofContract(args: {
   designFitnessOk: boolean
   mcu?: { mpn: string; manufacturer?: string }
   components: FirmwareProofContractComponent[]
+  implementedChannels?: Record<string, number>
 }): Record<string, unknown> {
-  const { thin, designFitnessOk, mcu, components } = args
-  const channels = thin.channels.map((ch, i) => ({
-    channel_id: `${ch.role}_${i}`,
-    role: ch.role,
-    required_count: ch.requiredCount,
-    instances: Array.from({ length: Math.max(0, ch.requiredCount) }, (_, k) => ({
-      instance_id: `${ch.role}_${k}`,
-      enable_net: `${ch.role.toUpperCase()}_EN_${k}`,
-      output_net: `${ch.role.toUpperCase()}_OUT_${k}`,
-    })),
-  }))
+  const { thin, designFitnessOk, mcu, components, implementedChannels = {} } = args
+  // INTENT (2026-07-21): Tier-0 previously minted instances.length === requiredCount
+  // even when design evidence said stir/pump=0 — firmware "PASS implemented=1" was
+  // Goodhart. Instances must mirror real topology evidence; under-count fails proof.
+  const channels = thin.channels.map((ch, i) => {
+    const implemented = Math.max(0, Math.floor(implementedChannels[ch.role] ?? 0))
+    return {
+      channel_id: `${ch.role}_${i}`,
+      role: ch.role,
+      required_count: ch.requiredCount,
+      instances: Array.from({ length: implemented }, (_, k) => ({
+        instance_id: `${ch.role}_${k}`,
+        enable_net: `${ch.role.toUpperCase()}_EN_${k}`,
+        output_net: `${ch.role.toUpperCase()}_OUT_${k}`,
+      })),
+    }
+  })
 
   // GOTCHA: pin_contract_complete requires both a real MCU MPN and design fitness.
   // Native Tier-0 never invents pin headers — incomplete → fail closed in validate_spec.

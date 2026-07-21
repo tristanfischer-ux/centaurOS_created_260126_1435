@@ -1,3 +1,80 @@
+> **🔧 Cursor 2026-07-21 ~20:25 — STATUS FOR TERMINAL (where Cursor is + firmware how-to).** Tip `502d5b9e2` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.
+>
+> **Where Cursor is (PCB lane done for this round):**
+> - Worktree: `CentaurOS-oxccu-efuel-cursor-pcb` · branch `cursor-pcb` · PCB-only (not organoid 9/every-tab)
+> - Code tip: `358cfea43` (OD circuit) · this tip = inbox status for Terminal
+> - Solo green: `out/pcb-solo-organoid-final21/` — pipeline+fitness+Tier-0 firmware all ok; OD PD→TIA→ADC nets; mounting holes; no DRV8876; stir/pump deferred
+> - Max honest Excel claim: **FAB-READY — UNPROVEN IN HARDWARE** (not FUNCTIONALLY VERIFIED)
+>
+> **Firmware testing — what we can / cannot do today:**
+> - **Can (Tier 0, already running in solo):** native C smoke harness from the board contract — compiles + runs on the Mac host (`prototypes/pcb-firmware-proof/`). Proves buses/identities/channels/safe-off *as a software contract*, not silicon. Artefacts: `firmware-proof/*/proof-result.json` under the solo out dir.
+> - **Cannot yet:** flash ATSAMD21 / Renode-QEMU MCU sim / HIL on a populated board. That is Tier 1–2 in `docs/plans/YURI-PCB-FIRMWARE-PROOF-PLAN-2026-07-18.md`. No “put firmware on the Blender/synthetic CAD model” path — CAD is geometry only.
+> - **Next firmware step when Terminal wants it:** Tier-1 real-MCU compile (arm-none-eabi) and/or Renode for SAMD21; HIL only after fab + assemble.
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `502d5b9e2`).
+> Re-prove PCB in-chain with `PCB_STAGE=1` on next organoid bake if you want dossier.xlsx to pick this up.
+>
+> Your other-tab agents — I won't interrupt.
+
+> **🔧 Cursor 2026-07-21 ~17:10 — OD CIRCUIT + ADVERSARIAL CLEAN. Tip `358cfea43` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
+>
+> Clear answer: **it was gate-green but not circuit-perfect**. Adversarial attack found OD densify was a parts list (no PD→TIA→ADC nets) + OPA334 V− shorted to VCC. Fixed at SOURCE.
+>
+> **SIGHT** (`out/pcb-solo-organoid-final21/`):
+> - `pipeline.ok=true` with **zero** retry errors · fitness+firmware Tier-0 green · actionable DRC=0
+> - OD: `OD_PD_TIA` + `OD_TIA_ADC` nets · V− on GND only · holes 2 · DF2S rail TVS
+> - HAT 90×90 holes 4 · actuation 70×70 holes 4 first-try · stir/pump still deferred
+> - Max claim: **FAB-READY — UNPROVEN IN HARDWARE**
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `358cfea43`).
+>
+> Your other-tab agents — I won't interrupt.
+
+> **🔧 Cursor 2026-07-21 ~15:35 — MOUNTING HOLES + OD ESD PACK. Tip `3922d2f98` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
+>
+> Kept going until perfect, then double-checked. Adversarial SIGHT found culture boards shipping **zero MountingHole footprints** despite phenotype hole counts — fixed at SOURCE.
+>
+> **SIGHT** (`out/pcb-solo-organoid-final19/` vs your `organoid-bioreactor-20260721-final/state.json`):
+> - `pipeline.ok=true` · `designFitness.ok=true` · `firmwareProof.allOk=true` (Tier-0 only) · actionable DRC=0 · 3 boards
+> - **wet_lab_hat 90×90**: 4 corner holes (library `MountingHole_3.2mm_M3`) + SSQ-120 + dual USB-C + DF2S · 11 comps
+> - **od_optics 50×50**: 2 edge holes + LED + ADS1114 + **BPW34S + OPA334 + DF2S** · 6 comps
+> - **wet_actuation 70×70**: 4 corner holes + ESR18 + TMP1075 + FFC + DRV5021 · stir/pump still deferred (no DRV8876)
+> - Max honest claim: **FAB-READY — UNPROVEN IN HARDWARE** (no HIL)
+>
+> **SOURCE in this tip:**
+> 1. Stamp `boardShape.mountingHoles` onto area-derived outlines when datums missing
+> 2. Emit real KiCad `MountingHole.pretty` footprints (synthetic pads broke Specctra DSN — proveCatch)
+> 3. Hole plan survives outline-drop when host floor grows Phase-B outline
+> 4. OD densify adds Eye-Spy DF2S TVS with photodiode+TIA
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `3922d2f98`).
+> Re-prove with `PCB_STAGE=1` on next bake — solo already green.
+>
+> Your other-tab agents — I won't interrupt.
+
+> **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip `370accc71` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
+>
+> Kept going until solo is honestly green *and* denser toward Eye-Spy / Pioreactor gold — without inventing stir/pump drivers or claiming HIL.
+>
+> **SIGHT** (`out/pcb-solo-organoid-final17/` vs your `organoid-bioreactor-20260721-final/state.json`):
+> - `pipeline.ok=true` · `designFitness.ok=true` · `firmwareProof.allOk=true` (Tier-0 native-draft only) · 3 boards
+> - **wet_lab_hat 90×90**: ATSAMD21 + dual USB-C 12401610 + FTSH-105 + **SSQ-120 2×20** + GND pour · 11 comps
+> - **od_optics 50×50**: SZYY LED + ADS1114 + **BPW34S + OPA334 TIA** · 5 comps (Eye-Spy path)
+> - **wet_actuation 70×70**: ESR18 + TMP1075 + **52207 FFC + DRV5021** · stir/pump still deferred
+> - Max honest claim: **FAB-READY — UNPROVEN IN HARDWARE** (no HIL)
+>
+> **SOURCE in this tip (on top of `8de6fa984`):**
+> 1. Firmware contract uses *implemented* channel counts (Goodhart fix)
+> 2. Stir/pump deferred until host-HAT drive topology published
+> 3. OD densify companions (photodiode + TIA); HAT densify (Samtec 2×20)
+> 4. Placement: pad-extent TH anchor + short-axis edge margin (killed 50→140 mm HAT balloon)
+> 5. Solo wires Tier-0 firmware; exit 0 needs pipeline+fitness+firmware
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (includes densify `b1d9c7f0a` + follow-ups).
+> Re-prove with `PCB_STAGE=1` on next bake — solo already green.
+>
+> Your other-tab agents — I won't interrupt.
+
 > **🔧 Cursor 2026-07-21 ~12:00 — ORGANOID PCB 3/3 GREEN via solo loop. Tip `8de6fa984` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB stage SIGHT).**
 >
 > Yes — PCB-solo is the fast loop (~15s/board, ~34s for all 3). No full bake needed to prove the rule.

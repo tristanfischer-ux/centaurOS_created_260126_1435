@@ -498,6 +498,8 @@ export interface PcbStageResult {
     ok: boolean
     findings: Array<{ severity?: string; code?: string; message?: string; fixStage?: string }>
   }
+  /** Design-evidence channel counts — firmware contracts must use this, not requiredCount. */
+  implementedChannels?: Record<string, number>
   /** True when architecture needs >1 KiCad deliverable but chain emitted one project (P5). */
   multiBoardMerged?: boolean
   /**

@@ -161,6 +161,21 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'TI DGS-10 pinout; local KiCad Analog_ADC:ADS1114IDGS with Package_SO:TSSOP-10_3x3mm_P0.5mm',
   },
   {
+    // INTENT: Eye-Spy / OD path needs a real photodiode package, not ADC-as-detector.
+    // GOTCHA: must NOT match photodiode_adc / optical_adc — those stay ADS1114.
+    roleTest: /(?:^|[_ -])(?:od[_ -]?)?photodiode(?:$|[_ -])|optical[_ -]?detector|bpw34/i,
+    excludedRoleTest: /photodiode[_ -]?(?:adc|converter)|optical[_ -]?(?:adc|measurement)|tia|transimpedance|amplifier/i,
+    functionClass: 'sensor_ic',
+    manufacturer: 'ams-OSRAM',
+    partNumber: 'BPW34S',
+    footprint: { library: 'OptoDevice', footprint: 'Osram_BPW34S-SMD' },
+    symbol: { library: 'Device', symbol: 'D_Photo' },
+    ratings: { voltageV: 32, currentA: 0.00005 },
+    packageEvidence: 'ams-OSRAM BPW34S: silicon PIN photodiode in SMD package (BPW34 family)',
+    referenceEvidence: 'Yuri Eye-Spy OD gold path (ADS1114 + op-amp + photodiode); ams-OSRAM BPW34S datasheet; KiCad OptoDevice:Osram_BPW34S-SMD',
+    pinoutEvidence: 'two-terminal photodiode anode/cathode; local KiCad Device:D_Photo with OptoDevice:Osram_BPW34S-SMD',
+  },
+  {
     // INTENT: Gold heater_20ml temperature sense — function-keyed, never product-named.
     roleTest: /(?:culture[_ -]?)?temperature[_ -]?(?:sensor|probe|ic)|tmp1075/i,
     excludedRoleTest: /(?:stir|pump|motor|photodiode|optical)/i,
@@ -282,7 +297,10 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'ST SO-8 pinout 1=OUT1, 2=IN1-, 3=IN1+, 4=VCC-, 5=IN2+, 6=IN2-, 7=OUT2, 8=VCC+; local KiCad Amplifier_Operational:TL072 with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
   },
   {
-    roleTest: /opa334|zero[_ -]?drift[_ -]?(?:shutdown[_ -]?)?(?:op[_ -]?amp|amplifier)/i,
+    // INTENT: OD densify synthesizes od_photodiode_tia; zero-drift TIA is the
+    // published Eye-Spy-class front-end (not Rodeostat TL072 current TIA).
+    roleTest: /opa334|zero[_ -]?drift[_ -]?(?:shutdown[_ -]?)?(?:op[_ -]?amp|amplifier)|(?:^|[_ -])(?:od[_ -]?)?(?:photodiode[_ -]?)?(?:tia|transimpedance)(?:$|[_ -])|optical[_ -]?(?:tia|front[_ -]?end)/i,
+    excludedRoleTest: /current[_ -]?measurement[_ -]?tia|selectable[_ -]?gain[_ -]?tia|droplet[_ -]?feedback/i,
     functionClass: 'op_amp',
     manufacturer: 'Texas Instruments',
     partNumber: 'OPA334AIDBVR',
@@ -290,7 +308,7 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     symbol: { library: 'Amplifier_Operational', symbol: 'OPA334' },
     ratings: { voltageV: 5.5 },
     packageEvidence: 'TI OPA334AIDBVR: shutdown version in 6-pin SOT-23 DBV',
-    referenceEvidence: 'Texas Instruments OPA334 Data Sheet SBOS213D and active OPA334AIDBVR product record',
+    referenceEvidence: 'Texas Instruments OPA334 Data Sheet SBOS213D and active OPA334AIDBVR product record; Eye-Spy OD gold path wants ADC + op-amp + photodiode',
     pinoutEvidence: 'TI DBV-6 pins 1=OUT, 2=V-, 3=+IN, 4=-IN, 5=ENABLE, 6=V+; curated local Forge_Manufacturer:OPA334AIDBVR with Package_TO_SOT_SMD:SOT-23-6',
   },
   {
@@ -453,9 +471,13 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'pads 1=K, 2=A on LED_0603_1608Metric',
   },
   {
+    // DECISION (2026-07-21): classifyFunction('debug_header') → debug_connector.
+    // Tagging this rule as `connector` made every live HAT fall through to
+    // PinHeader_1x04 (no-mpn). Keep connector as an alias in candidateRuleForRequest
+    // for the frozen OpenDrop report requests that still say functionClass=connector.
     roleTest: /(?:^|[_ -])debug[_ -]?header[_ -]?word(?:$|[_ -])|ftsh[_ -]?105[_ -]?01[_ -]?l[_ -]?dv/i,
-    excludedRoleTest: /pioreactor|wet[_ -]?lab[_ -]?hat|debug[_ -]?uart/i,
-    functionClass: 'connector',
+    excludedRoleTest: /debug[_ -]?uart/i,
+    functionClass: 'debug_connector',
     manufacturer: 'Samtec',
     partNumber: 'FTSH-105-01-L-DV',
     footprint: {
@@ -526,7 +548,9 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'Microchip SOT-23 pinout 1=GND, 2=VOUT, 3=VIN; local KiCad Regulator_Linear:MCP1700x-330xxTT with Package_TO_SOT_SMD:SOT-23',
   },
   {
-    roleTest: /usb[_ -]?(?:c[_ -]?)?(?:power[_ -]?entry|receptacle)|type[_ -]?c[_ -]?receptacle/i,
+    // GOTCHA: include usb_interface — mid-mount 12401548 from briefs must not win
+    // over this SMT land (see atopile 12401548→12401610 remap).
+    roleTest: /usb[_ -]?(?:c[_ -]?)?(?:power[_ -]?entry|interface|receptacle)|type[_ -]?c[_ -]?receptacle/i,
     functionClass: 'usb_connector',
     manufacturer: 'Amphenol ICC',
     partNumber: '12401610E4#2A',
@@ -650,7 +674,7 @@ export function resolveVerifiedFunctionCandidate(
   // not license product-slug branching or promotion of uncached-looking MPNs.
   const text = roleText(request)
   const rule = CANDIDATE_RULES.find((candidate) =>
-    candidate.functionClass === request.functionClass
+    functionClassMatchesRule(request.functionClass, candidate.functionClass, text)
     && candidate.roleTest.test(text)
     && !candidate.excludedRoleTest?.test(text))
   if (!rule) return null
@@ -682,10 +706,33 @@ export function resolveVerifiedFunctionCandidate(
   }
 }
 
+/**
+ * @description True when curated rule class matches the request class, including
+ * the debug_header SWD alias (live = debug_connector, frozen report = connector).
+ */
+function functionClassMatchesRule(
+  requestClass: string | null,
+  ruleClass: string,
+  roleTextBlob: string,
+): boolean {
+  if (requestClass == null) return false
+  if (requestClass === ruleClass) return true
+  // INTENT: OpenDrop punchlist report still requests functionClass=connector for
+  // FTSH; live classifyFunction emits debug_connector — both must select FTSH.
+  if (
+    ruleClass === 'debug_connector'
+    && requestClass === 'connector'
+    && /debug[_ -]?header|ftsh/i.test(roleTextBlob)
+  ) {
+    return true
+  }
+  return false
+}
+
 function candidateRuleForRequest(request: VerifiedCandidateRequest): CandidateRule | null {
   const text = roleText(request)
   return CANDIDATE_RULES.find((candidate) =>
-    candidate.functionClass === request.functionClass
+    functionClassMatchesRule(request.functionClass, candidate.functionClass, text)
     && candidate.roleTest.test(text)
     && !candidate.excludedRoleTest?.test(text)) ?? null
 }

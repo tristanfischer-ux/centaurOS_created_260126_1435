@@ -32,15 +32,42 @@ export interface PcbBoardShapeContract {
   rationale: string
 }
 
+export interface PcbDeferredChannelRequirement {
+  role: string
+  count: number
+  /** Why this is not yet a fitted KiCad channel requirement. */
+  reason: string
+}
+
 export interface PcbBoardPlan {
   boardId: string
   role: string
   requiredWordIds: string[]
   domains: Array<'logic' | 'analog' | 'power' | 'high_voltage' | 'wet_interface' | 'thermal_actuation' | 'motion_actuation'>
   channelRequirements: Array<{ role: string; count: number }>
+  /**
+   * Product need kept honest without minting fitted drivers.
+   * INTENT: stir/pump remain here until published HAT electrical topology exists
+   * (Pioreactor gold @ ca40a91e — inventing DRV8876 fails proveCatch).
+   */
+  deferredChannelRequirements?: PcbDeferredChannelRequirement[]
   workPerformed: string[]
   shape: PcbBoardShapeContract
   requiresKiCadDeliverable: boolean
+}
+
+/**
+ * @description True when a curated host-HAT drive topology is published for
+ * stir/pump (or equivalent culture actuation). Universal — no product name.
+ * Today: always false; gold HAT KiCad/BOM is unpublished.
+ */
+export function isHostHatActuationDrivePublished(
+  _state: Record<string, unknown> = {},
+): boolean {
+  void _state
+  // GOTCHA: Pioreactor hats/ submodule is EEPROM utils, not drive schematics.
+  // Flip only when a curated topology fixture + evidence lands (CORE FIX + guard).
+  return false
 }
 
 export interface PcbWordAssignment {
@@ -227,7 +254,7 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
     // DECISION: heater/stir/temp roles are matched before OD optics so culture
     // temperature probes cannot be stolen by an OD channel sibling blurb.
     if (candidate.role === 'heater_stir_actuation_board') {
-      return /heat(?:er|ing)?|stir|agitat|pump|peltier|\btec\b|cartridge[_ -]?heater|temperature[_ -]?(?:sensor|probe)|culture[_ -]?temperature/i.test(text)
+      return /heat(?:er|ing)?|stir|agitat|pump|peltier|\btec\b|cartridge[_ -]?heater|temperature[_ -]?(?:sensor|probe)|culture[_ -]?temperature|(?:host[_ -]?)?ffc[_ -]?connector|magnetic[_ -]?lid|hall[_ -]?sense|drv5021/i.test(text)
     }
     // GOTCHA: bare `led` / `sensor` / `adc` used to steal host power-indicator +
     // rail-protection words onto the OD daughterboard (organoid 1546 token board).
@@ -505,35 +532,51 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
         1,
       ),
     })
-    boards[2].channelRequirements.push(
-      {
-        role: 'heater_channel',
-        count: derivedChannelCount(
-          state,
-          ['heater_channel_count', 'heater_count'],
-          /heat(?:er|ing)|thermal.?actuat/i,
-          1,
-        ),
-      },
-      {
-        role: 'stir_channel',
-        count: derivedChannelCount(
-          state,
-          ['stir_channel_count', 'stirrer_count'],
-          /stir|agitat/i,
-          1,
-        ),
-      },
-      {
-        role: 'pump_channel',
-        count: derivedChannelCount(
-          state,
-          ['dosing_pump_count', 'pump_channel_count'],
-          /dosing.?pump|metering.?pump/i,
-          1,
-        ),
-      },
+    boards[2].channelRequirements.push({
+      role: 'heater_channel',
+      count: derivedChannelCount(
+        state,
+        ['heater_channel_count', 'heater_count'],
+        /heat(?:er|ing)|thermal.?actuat/i,
+        1,
+      ),
+    })
+    // DECISION (2026-07-21): stir/pump are product needs, not fitted channels,
+    // until host-HAT drive topology is published. Minting count=1 forced fitness
+    // medium-deferral + firmware Goodhart (invented instances). Keep the need in
+    // deferredChannelRequirements for SIGHT / punchlist — never invent DRV8876.
+    const stirNeed = derivedChannelCount(
+      state,
+      ['stir_channel_count', 'stirrer_count'],
+      /stir|agitat/i,
+      1,
     )
+    const pumpNeed = derivedChannelCount(
+      state,
+      ['dosing_pump_count', 'pump_channel_count'],
+      /dosing.?pump|metering.?pump/i,
+      1,
+    )
+    if (isHostHatActuationDrivePublished(state)) {
+      boards[2].channelRequirements.push(
+        { role: 'stir_channel', count: stirNeed },
+        { role: 'pump_channel', count: pumpNeed },
+      )
+    } else {
+      boards[2].deferredChannelRequirements = [
+        {
+          role: 'stir_channel',
+          count: stirNeed,
+          reason: 'blocked_until_host_hat_drive_topology_published',
+        },
+        {
+          role: 'pump_channel',
+          count: pumpNeed,
+          reason: 'blocked_until_host_hat_drive_topology_published',
+        },
+      ]
+      rationale.push('stir_pump_deferred_until_host_hat_drive_topology_published')
+    }
     rationale.push('culture_volume_requires_host_optics_and_wet_actuation_split')
   } else if ((quantity(state, 'compliance_voltage_v') ?? 0) > 0) {
     systemDisposition = 'daughterboard'
