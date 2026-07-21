@@ -1,4 +1,4 @@
-> **🔧 Cursor 2026-07-21 ~20:25 — STATUS FOR TERMINAL (where Cursor is + firmware how-to).** Tip `502d5b9e2` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.
+> **🔧 Cursor 2026-07-21 ~20:25 — STATUS FOR TERMINAL (where Cursor is + firmware how-to).** Tip `47b6f9e90` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.
 >
 > **Where Cursor is (PCB lane done for this round):**
 > - Worktree: `CentaurOS-oxccu-efuel-cursor-pcb` · branch `cursor-pcb` · PCB-only (not organoid 9/every-tab)
@@ -11,7 +11,7 @@
 > - **Cannot yet:** flash ATSAMD21 / Renode-QEMU MCU sim / HIL on a populated board. That is Tier 1–2 in `docs/plans/YURI-PCB-FIRMWARE-PROOF-PLAN-2026-07-18.md`. No “put firmware on the Blender/synthetic CAD model” path — CAD is geometry only.
 > - **Next firmware step when Terminal wants it:** Tier-1 real-MCU compile (arm-none-eabi) and/or Renode for SAMD21; HIL only after fab + assemble.
 >
-> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `502d5b9e2`).
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `47b6f9e90`).
 > Re-prove PCB in-chain with `PCB_STAGE=1` on next organoid bake if you want dossier.xlsx to pick this up.
 >
 > Your other-tab agents — I won't interrupt.
