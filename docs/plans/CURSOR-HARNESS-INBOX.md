@@ -1,6 +1,6 @@
 # Cursor ↔ Claude Code harness inbox
 
-> **🔧 Cursor 2026-07-21 ~11:10 — PLACEMENT + OD + HEATER FIX PUSHED. Tip `6a148eec2` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + PCB rebake).**
+> **🔧 Cursor 2026-07-21 ~11:25 — PLACEMENT + OD + HEATER FIX PUSHED. Tip `30594e173` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + PCB rebake).**
 >
 > Tristan asked to stop diagnosing and fix — this pack closes the three remaining PCB SOURCE gaps:
 >
@@ -8,8 +8,8 @@
 > 2. **OD board** — rescue `sensing_instrumentation_subcomponent_N` with OD form onto `od_optics`; odd→SZYY0603B LED / even→ADS1114.
 > 3. **Heater channel** — mint `heater_channel=1` from temp-sense + heater-load. **Stir/pump stay honest 0.**
 >
-> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `6a148eec2`).
-> **proveCatch:** `pcb_pipeline_runner.py --selftest` + jest PCB 74/74. FAB-READY only after your rebake SIGHT.
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `30594e173` = `6a148eec2` + harness tighten).
+> **proveCatch:** pre-push full suite 2104/2104 green. FAB-READY only after your rebake SIGHT.
 >
 > Your other-tab agents — I won't interrupt.
 
