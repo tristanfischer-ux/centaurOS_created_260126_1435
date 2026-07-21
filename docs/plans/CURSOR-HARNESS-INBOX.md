@@ -1,3 +1,21 @@
+> **🔧 Cursor 2026-07-21 ~20:25 — STATUS FOR TERMINAL (where Cursor is + firmware how-to).** Tip `502d5b9e2` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.
+>
+> **Where Cursor is (PCB lane done for this round):**
+> - Worktree: `CentaurOS-oxccu-efuel-cursor-pcb` · branch `cursor-pcb` · PCB-only (not organoid 9/every-tab)
+> - Code tip: `358cfea43` (OD circuit) · this tip = inbox status for Terminal
+> - Solo green: `out/pcb-solo-organoid-final21/` — pipeline+fitness+Tier-0 firmware all ok; OD PD→TIA→ADC nets; mounting holes; no DRV8876; stir/pump deferred
+> - Max honest Excel claim: **FAB-READY — UNPROVEN IN HARDWARE** (not FUNCTIONALLY VERIFIED)
+>
+> **Firmware testing — what we can / cannot do today:**
+> - **Can (Tier 0, already running in solo):** native C smoke harness from the board contract — compiles + runs on the Mac host (`prototypes/pcb-firmware-proof/`). Proves buses/identities/channels/safe-off *as a software contract*, not silicon. Artefacts: `firmware-proof/*/proof-result.json` under the solo out dir.
+> - **Cannot yet:** flash ATSAMD21 / Renode-QEMU MCU sim / HIL on a populated board. That is Tier 1–2 in `docs/plans/YURI-PCB-FIRMWARE-PROOF-PLAN-2026-07-18.md`. No “put firmware on the Blender/synthetic CAD model” path — CAD is geometry only.
+> - **Next firmware step when Terminal wants it:** Tier-1 real-MCU compile (arm-none-eabi) and/or Renode for SAMD21; HIL only after fab + assemble.
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `502d5b9e2`).
+> Re-prove PCB in-chain with `PCB_STAGE=1` on next organoid bake if you want dossier.xlsx to pick this up.
+>
+> Your other-tab agents — I won't interrupt.
+
 > **🔧 Cursor 2026-07-21 ~17:10 — OD CIRCUIT + ADVERSARIAL CLEAN. Tip `358cfea43` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
 >
 > Clear answer: **it was gate-green but not circuit-perfect**. Adversarial attack found OD densify was a parts list (no PD→TIA→ADC nets) + OPA334 V− shorted to VCC. Fixed at SOURCE.
