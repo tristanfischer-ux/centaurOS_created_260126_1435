@@ -1541,8 +1541,12 @@ export function generateAtopileProject(
   // INTENT: Channel contracts describe work the board must implement; they are
   // not manufacturer-orderable packages. Keep the obligation explicit until a
   // real topology assigns components or passive copper geometry to the role.
+  // GOTCHA (2026-07-21): previously we only emitted functionRequirements when
+  // scopedElectronicWords was EMPTY — so every real board silently dropped its
+  // channel roles and fitness always reported implements 0. Always emit from
+  // requiredFunctionRoles; channel COUNTING is deriveImplementedChannelCounts.
   const functionRequirements: AtopileFunctionRequirementRecord[] =
-    (scopedElectronicWords.length === 0 ? opts.requiredFunctionRoles ?? [] : []).map((role) => (
+    (opts.requiredFunctionRoles ?? []).map((role) => (
       /electrode.*channel/i.test(role)
         ? {
             role,
