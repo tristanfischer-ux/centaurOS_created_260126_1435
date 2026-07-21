@@ -111,8 +111,10 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
   {
     // INTENT (2026-07-21): OD source LED without a brief-pinned 470 nm token —
     // sensing_instrumentation_subcomponent proxies synthesize od_source_led.
-    roleTest: /od[_ -]?source(?:[_ -]?led)?|optical[_ -]?density[_ -]?(?:source|emitter|led)|(?:^|[_ -])optical[_ -]?source[_ -]?led(?:$|[_ -])/i,
-    excludedRoleTest: /power[_ -]?indicator|status[_ -]?indicator|annunciator/,
+    // GOTCHA: do NOT match bare "optical source LED" / led_source — that is the
+    // underspecified generic role the harness keeps null until wavelength is pinned.
+    roleTest: /(?:^|[_ -])od[_ -]?source(?:[_ -]?led)?(?:$|[_ -])|optical[_ -]?density[_ -]?(?:source|emitter|led)|\bod600\b.*(?:led|emitter|source)/i,
+    excludedRoleTest: /power[_ -]?indicator|status[_ -]?indicator|annunciator|(?:^|[_ -])led[_ -]?source(?:$|[_ -])/,
     functionClass: 'led',
     manufacturer: 'Yongyu Photoelectric',
     partNumber: 'SZYY0603B',
