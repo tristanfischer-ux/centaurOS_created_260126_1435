@@ -2105,6 +2105,152 @@ def _checks_part_status_honesty(state: dict, run_dir: str) -> List[Check]:
     return out
 
 
+# ============================================================================
+# PLAUSIBILITY — the "would a chartered engineer BELIEVE this number?" family
+# (2026-07-21, Tristan: "just because you have a high score number doesn't mean
+# it's necessarily true … catch all of these fake-good tabs"). Every OTHER check
+# family verifies CONSISTENCY (does the arithmetic reconcile / is the value USED /
+# is provenance present). NONE attacks MAGNITUDE PLAUSIBILITY — so a £0.01 MCU, a
+# 16 mm² power cable on a 35 W device, a 0 kg cable, and fluid services on
+# electronic parts all shipped in tabs scored 10/10 (consistency ≠ correctness).
+# This family attacks the magnitudes/semantics directly. UNIVERSAL — keyed on
+# scale signals + noun classes, no per-archetype table; a line matching nothing is
+# untouched. Each invariant has a proveCatch in _selftest.
+# ============================================================================
+# Cu ampacity ladder is _CU_AMPACITY (above). A conductor grossly LARGER than the
+# duty needs is a plant-scale leak on a benchtop instrument (the 16 mm² = ~90 A
+# cable spec'd for a 35 W / ~1.5 A USB device). Symmetric to _checks_cable_csa,
+# which only catches UNDER-sizing.
+_FLUID_MECHANISMS = {"water", "air", "gas", "media", "coolant", "fluid", "liquid",
+                     "steam", "vent", "perfusion", "hydraulic", "pneumatic"}
+# a part that legitimately touches a fluid service (a fluid edge must have >=1 of these)
+_FLUID_PART_RE = re.compile(
+    r"vessel|tank|tube|tubing|pump|filter|valve|reservoir|manifold|\bvent\b|media|"
+    r"culture|perfusion|jacket|chamber|nozzle|port|inlet|outlet|drain|sparger|"
+    r"impeller|stirrer|degas|aerat|bioreactor|column|nutrient|waste|bottle|flask|"
+    r"cartridge|membrane|syringe|needle|coupler|fitting|hose|line\b", re.I)
+
+
+def _watt_scale_device(state: dict) -> bool:
+    """True for a benchtop/handheld INSTRUMENT drawing < ~100 W — the scale where a
+    plant-sized cable/feeder is a magnitude leak. Reuses the chain's own signals."""
+    if state.get("isInstrumentDevice") is True or state.get("isWattScaleInstrument") is True:
+        return True
+    oc = state.get("orchestratorContract") or {}
+    q = oc.get("quantities") or {}
+    load_kw = _first_qval(q, ["connected_electrical_load_kw", "total_electrical_load_kw",
+                              "nameplate_power_kw"])
+    if load_kw is not None and load_kw < 0.1:
+        return True
+    w = _first_qval(q, ["total_power_w", "peak_power_w", "nameplate_power_w"])
+    return w is not None and w < 100.0
+
+
+def _checks_plausibility(state: dict, run_dir: str) -> List[Check]:
+    out: List[Check] = []
+    oc = state.get("orchestratorContract") or {}
+    q: Dict[str, Any] = oc.get("quantities") or {}
+    watt_scale = _watt_scale_device(state)
+
+    # -- P3. CABLE-CSA SCALE COHERENCE (the 16 mm² on a 35 W device) --------------
+    csa = _first_qval(q, ["power_cable_csa_mm2", "cable_csa_mm2", "conductor_csa_mm2"])
+    load_kw = _first_qval(q, ["connected_electrical_load_kw", "total_electrical_load_kw",
+                              "nameplate_power_kw"])
+    if csa is not None and csa > 0:
+        # required CSA from the actual duty: I = P / V, at a conservative low DC bus
+        # (24 V) so we never OVER-state the requirement (a smaller V → more amps → a
+        # bigger required CSA → a more FORGIVING check). load unknown → assume a token
+        # 5 W handheld draw so a wattage device still can't justify a 16 mm² cable.
+        p_w = (load_kw * 1000.0) if (load_kw is not None) else 5.0
+        amps = p_w / 24.0
+        req = _csa_required_for_current(max(amps, 0.1)) or 0.5
+        # FAIL when the chosen conductor is a gross over-size on a wattage device: a
+        # real cable is picked one-or-two sizes above the duty, never 8x+. Only fire
+        # on the watt-scale regime (a plant bus is legitimately large).
+        gross = watt_scale and csa >= max(4.0, req * 6.0)
+        out.append(Check(
+            name="Cable CSA is scale-plausible for the load",
+            category="PLAUSIBILITY", relation="le",
+            status=FAIL if gross else PASS,
+            actual=csa, expected=max(req, 2.5), tol=0.0, unit="mm2",
+            producer="plausibility:cable_csa_scale",
+            quantity_key="power_cable_csa_mm2",
+            detail=(f"chosen {csa:g} mm2 conductor vs a {p_w:g} W duty (~{amps:.1f} A @ 24 V "
+                    f"→ needs ~{req:g} mm2). A benchtop/USB instrument cannot carry a "
+                    f"{csa:g} mm2 (~90 A-class) cable — a plant-scale leak. Size the "
+                    f"conductor from the real duty, not a plant default."
+                    if gross else
+                    f"{csa:g} mm2 is plausible for a ~{amps:.1f} A duty.")))
+
+    # -- P2. A SIZED CABLE HAS MASS (0 kg cable) ----------------------------------
+    mass = _first_qval(q, ["cable_mass_kg", "cabling_mass_kg", "wiring_mass_kg"])
+    if csa is not None and csa > 0 and mass is not None and mass <= 0:
+        out.append(Check(
+            name="Sized cable has non-zero mass",
+            category="PLAUSIBILITY", relation="ge",
+            status=FAIL, actual=mass, expected=0.001, tol=0.0, unit="kg",
+            producer="plausibility:cable_mass_nonzero",
+            quantity_key="cable_mass_kg",
+            detail=(f"a {csa:g} mm2 conductor is spec'd but cable_mass_kg = 0 — a cable "
+                    f"with cross-section cannot be massless. Derive mass from CSA x length "
+                    f"x copper density, never leave it 0.")))
+
+    # -- P6. FLUID SERVICE MUST CONNECT A FLUID PART (water on a debug header) -----
+    cs = _load_json(os.path.join(run_dir, "connection-schedule.json")) or {}
+    rows = cs.get("rows") if isinstance(cs, dict) else None
+    if isinstance(rows, list):
+        bad_fluid = []
+        for r in rows:
+            mech = str(r.get("mechanism") or "").lower().strip()
+            if mech not in _FLUID_MECHANISMS:
+                continue
+            frm = str(r.get("from") or "")
+            to = str(r.get("to") or "")
+            if not (_FLUID_PART_RE.search(frm) or _FLUID_PART_RE.search(to)):
+                bad_fluid.append(f"{mech}: {frm[:20]}->{to[:20]}")
+        n = len(bad_fluid)
+        out.append(Check(
+            name="Fluid services connect fluid-handling parts",
+            category="PLAUSIBILITY", relation="eq",
+            status=PASS if n == 0 else FAIL,
+            actual=float(n), expected=0.0, tol=0.0, unit="edges",
+            producer="plausibility:fluid_service_domain",
+            detail=(f"{n} connection edge(s) carry a FLUID service (water/air/media) between "
+                    f"two NON-fluid parts (an electronic/mechanical pair) — a nonsensical "
+                    f"service assignment. " + (f"e.g. {bad_fluid[0]}. " if bad_fluid else "")
+                    + "A fluid edge must touch a vessel/tube/pump/valve/filter; fix the "
+                      "connection-graph service typing at its source."
+                    if n else "Every fluid edge touches a fluid-handling part.")))
+
+    # -- P5. PART NAMES ARE NOT DUPLICATE/GENERIC PLACEHOLDERS --------------------
+    # names come from partVerifications (reliable) — a duplicated generic
+    # "…Subcomponent"/"…Subc" placeholder shipping as a distinct BoM line is a naming
+    # gap the register/part-names tab score never sees.
+    pvs = state.get("partVerifications") or []
+    if isinstance(pvs, list) and pvs:
+        names = [str(p.get("name") or p.get("word_name") or "") for p in pvs]
+        generic = sorted({n for n in names
+                          if re.search(r"subcomponent|instrumentation subc|\bsubc\b|"
+                                       r"placeholder|component \d+$|part \d+$", n, re.I)})
+        from collections import Counter as _Counter
+        dups = sorted({n for n, c in _Counter(n for n in names if n).items() if c > 1})
+        offenders = sorted(set(generic) | set(dups))
+        n = len(offenders)
+        out.append(Check(
+            name="Part names are specific, not generic/duplicate",
+            category="PLAUSIBILITY", relation="eq",
+            status=PASS if n == 0 else FAIL,
+            actual=float(n), expected=0.0, tol=0.0, unit="names",
+            producer="plausibility:name_honesty",
+            detail=(f"{n} part name(s) are generic placeholders or duplicates "
+                    + (f"(e.g. {offenders[0]!r}) " if offenders else "")
+                    + "— a real BoM names each part by its function, never "
+                      "'…Subcomponent N'. Name the part at emission."
+                    if n else "Every part name is specific.")))
+
+    return out
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -2125,6 +2271,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_brief_compliance(state, run_dir))
     checks.extend(_checks_tool_provenance(state, run_dir))
     checks.extend(_checks_module_integrity(state, run_dir))
+    checks.extend(_checks_plausibility(state, run_dir))
     _apply_cross_check_join(checks, state)     # no PASS may bless a flagged quantity
     return checks
 
@@ -2998,6 +3145,59 @@ def _selftest() -> int:
         checks = run_all_checks(d)
         _, fcount, _ = summarise(checks)
         check(fcount == 0, "SPARSE class must produce zero FAIL (universal skip)")
+
+    # ---- PLAUSIBILITY family (2026-07-21) — proveCatch both directions --------
+    # DEFECTIVE: a watt-scale instrument with a 16 mm2 cable, 0 kg cable mass, a
+    # water edge between two electronic parts, and a duplicated generic part name.
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_state = {
+            "isInstrumentDevice": True,
+            "orchestratorContract": {"quantities": {
+                "connected_electrical_load_kw": {"value": 0.035, "unit": "kW"},
+                "power_cable_csa_mm2": {"value": 16, "unit": "mm2"},
+                "cable_mass_kg": {"value": 0, "unit": "kg"},
+            }},
+            "partVerifications": [
+                {"name": "Sensing Instrumentation Subcomponent"},
+                {"name": "Sensing Instrumentation Subcomponent"},
+            ],
+        }
+        bad_conns = {"rows": [
+            {"mechanism": "water", "from": "Debug Header", "to": "Cable Strain Relief"},
+            {"mechanism": "signal", "from": "Sensor", "to": "Mcu"},
+        ]}
+        d = _write_run(tmp, bad_state, {}, bad_conns)
+        pc = _checks_plausibility(bad_state, d)
+        check(_has(pc, "Cable CSA is scale-plausible", FAIL),
+              "P3: a 16 mm2 cable on a 35 W device must FAIL")
+        check(_has(pc, "Sized cable has non-zero mass", FAIL),
+              "P2: a sized cable with 0 kg mass must FAIL")
+        check(_has(pc, "Fluid services connect fluid-handling", FAIL),
+              "P6: a water edge between two non-fluid parts must FAIL")
+        check(_has(pc, "Part names are specific", FAIL),
+              "P5: a duplicated generic '…Subcomponent' name must FAIL")
+    # CLEAN: a plausibly-sized instrument — every plausibility check PASSes.
+    with tempfile.TemporaryDirectory() as tmp:
+        good_state = {
+            "isInstrumentDevice": True,
+            "orchestratorContract": {"quantities": {
+                "connected_electrical_load_kw": {"value": 0.035, "unit": "kW"},
+                "power_cable_csa_mm2": {"value": 0.75, "unit": "mm2"},
+                "cable_mass_kg": {"value": 0.02, "unit": "kg"},
+            }},
+            "partVerifications": [
+                {"name": "Culture Temperature Probe"},
+                {"name": "Magnetic Stirrer Drive"},
+            ],
+        }
+        good_conns = {"rows": [
+            {"mechanism": "water", "from": "Media Tubing Set", "to": "Culture Vessel"},
+            {"mechanism": "signal", "from": "Temperature Sensor", "to": "Mcu"},
+        ]}
+        d = _write_run(tmp, good_state, {}, good_conns)
+        pc = _checks_plausibility(good_state, d)
+        check(not any(c.status == FAIL for c in pc),
+              "PLAUSIBILITY clean instrument must produce zero FAIL")
 
     if failures:
         print("SELFTEST FAILED:")
