@@ -15578,6 +15578,21 @@ _REG_JURIS_MAP = {
 }
 
 
+# PLANT-SCALE-ONLY hazards (2026-07-21, the organoid "working at height" on a 20 ml vessel):
+# these hazards PHYSICALLY REQUIRE plant scale — a vessel you can fall off / enter / drown in,
+# a livestock farm, a consented effluent discharge. A benchtop instrument's "Culture Vessel"
+# (matches \bvessel\b) and "bioreactor" (matches reactor) wrongly triggered the plant "tank
+# tops present a fall risk / confined-space drowning" hazard. Skip these for a benchtop
+# INSTRUMENT device (isInstrumentDevice) — universal, keyed on the scale signal, not a product
+# noun. All OTHER hazards (rotating machinery, electrical, thermal, chemical handling) still
+# fire — they are real at any scale.
+_PLANT_SCALE_ONLY_HAZARDS = {
+    "Working at height / confined space (tanks & vessels)",
+    "Livestock welfare — mass mortality on plant failure",
+    "Environmental discharge to controlled waters",
+}
+
+
 def _derive_hazards(state: dict):
     """Hazards PRESENT in this design, derived from the equipment tokens in the
     bill of materials. Universal — fires for whatever the engine built."""
@@ -15586,9 +15601,12 @@ def _derive_hazards(state: dict):
         " ".join(str(b.get(k, "")) for k in ("requirement", "part", "name_human", "status", "tag"))
         for b in bom if isinstance(b, dict)
     ).lower()
+    is_instrument = bool(state.get("isInstrumentDevice"))
     present = []
     for rx, name, cause, sev, lik, mit, regs in _HAZARD_LIB:
         if re.search(rx, corpus):
+            if is_instrument and name in _PLANT_SCALE_ONLY_HAZARDS:
+                continue  # a 20 ml benchtop vessel has no fall-from-height / confined-space / drowning risk
             present.append(dict(name=name, cause=cause, sev=sev, lik=lik, mit=mit, regs=regs))
     return present
 
