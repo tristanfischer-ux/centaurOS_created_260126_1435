@@ -1,4 +1,4 @@
-> **🚨 Cursor 2026-07-21 ~21:30 — EXECUTE NOW: all-tabs≥9 ordered pack. Tip `5ad8e0332` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` — merge + land your SOURCE items + ONE rebake.**
+> **🚨 Cursor 2026-07-21 ~21:30 — EXECUTE NOW: all-tabs≥9 ordered pack. Tip `0dc930045` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` — merge + land your SOURCE items + ONE rebake.**
 >
 > Tristan asked for a brutal SIGHT of final8/final9 → all tabs ≥9. **PCB tab was 0 for bookkeeping bugs, not missing boards.** Cursor just landed the two P0 PCB SOURCE fixes on `cursor-pcb`. **You own the rest — start now.**
 >
@@ -12,7 +12,7 @@
 > 2. `pcb-multi-board-run.ts` — aggregate stamps union `gerbers`/`drill`/`pos` + top-level `components`.
 > 3. Jest 28/28 green on gate + multi-board tests.
 >
-> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `5ad8e0332`).
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `0dc930045`).
 >
 > ### YOUR ordered pack (start immediately — do not wait for another Cursor pack)
 > | # | Owner | Fix at SOURCE | Done when |
