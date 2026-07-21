@@ -645,17 +645,32 @@ export function computeCostSanity(state: any): CostSanityResult {
   if (denom.family === 'unit') {
     const _ucc = (state?.parsedBrief?.constraints?.unit_cost_ceiling ?? {}) as { value?: unknown }
     const _ceiling = Number(typeof _ucc === 'object' && _ucc ? (_ucc as { value?: unknown }).value : _ucc)
-    const _oem = Number((state?.costStack as { oem_transfer_price_gbp?: unknown } ?? {})?.oem_transfer_price_gbp)
-    if (Number.isFinite(_ceiling) && _ceiling > 0 && Number.isFinite(_oem) && _oem > 0 && _oem > _ceiling * 1.02) {
+    // COST-LAYER BY PRODUCT NATURE (2026-07-21, the organoid £475 ex-works vs a £385 BILL-OF-
+    // MATERIALS ceiling): the S6 guard compares the brief's unit-cost ceiling against the
+    // EX-WORKS transfer price — correct for a COMMERCIAL product SOLD by an OEM. But a self-
+    // build INSTRUMENT KIT (isInstrumentDevice; the brief here: "bill of materials within
+    // £275–£385", target "DIY-bio / teaching labs … a second engineer could assemble") is never
+    // sold ex-works — the end user BUILDS it from the BoM, so the real "unit cost" the brief
+    // ceilings IS the bill of materials, and an ex-works figure (materials + factory COGS + OEM
+    // margin) is a fiction for it. So for a self-build instrument, compare the ceiling against
+    // raw_materials_bom_gbp; a commercial/plant product keeps the ex-works basis unchanged
+    // (byte-identical). This honours the brief's DECLARED basis, not a laxer layer picked to pass.
+    const _cs = (state?.costStack ?? {}) as { oem_transfer_price_gbp?: unknown; raw_materials_bom_gbp?: unknown }
+    const _isKit = state?.isInstrumentDevice === true
+    const _oem = Number(_cs?.oem_transfer_price_gbp)
+    const _mat = Number(_cs?.raw_materials_bom_gbp)
+    const _cmp = (_isKit && Number.isFinite(_mat) && _mat > 0) ? _mat : _oem
+    const _cmpLabel = (_isKit && Number.isFinite(_mat) && _mat > 0) ? 'bill-of-materials build cost' : 'ex-works unit price'
+    if (Number.isFinite(_ceiling) && _ceiling > 0 && Number.isFinite(_cmp) && _cmp > 0 && _cmp > _ceiling * 1.02) {
       return {
         ...base,
         ...common,
         verdict: 'high',
-        ratio_to_nearest_edge: _oem / _ceiling,
+        ratio_to_nearest_edge: _cmp / _ceiling,
         direction: 'over',
         message:
-          `Independent cost sanity HIGH: the ex-works unit price ${fmtGbp(_oem)} exceeds the brief's ` +
-          `${fmtGbp(_ceiling)} unit-cost ceiling (${(_oem / _ceiling).toFixed(2)}×) — the wide ` +
+          `Independent cost sanity HIGH: the ${_cmpLabel} ${fmtGbp(_cmp)} exceeds the brief's ` +
+          `${fmtGbp(_ceiling)} unit-cost ceiling (${(_cmp / _ceiling).toFixed(2)}×) — the wide ` +
           `${bandRange} industry band for per-unit output does NOT apply when the brief states a ` +
           `per-unit budget (S6; agrees with the S4 ship bind). Not viable at the stated price point.`,
       }
