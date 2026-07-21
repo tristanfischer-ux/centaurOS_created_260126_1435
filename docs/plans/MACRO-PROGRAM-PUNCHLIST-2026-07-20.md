@@ -17,8 +17,16 @@ The fresh full bake **correctly refused to ship (exit 32, cost-sanity enforcing)
   - **B4 ✅** (`e94d272d1`): lab_electronics interior split by `_LE_SIGNATURE` — potentiostat(AFE+BNC) / vial_bioreactor(stir+OD+heater, no BNC) / ewod(HV+ribbon+fanout). proveCatch `lab_electronics_signature_selftest.py`.
   - **V1b ✅** (`64084e907`+`7dc3d7764`): vision-critic rubric strengthened + a deterministic INCOHERENCE FLOOR (`verdict_from_model_output`) — a named floating/Lego/featureless defect forces broken=true even if the flaky model set broken=false. proveCatch 6 floor-catches. + None-content robustness guard.
   - **Phenotype gate-intent ✅** (`2cf2ec64b`): `_phenotype_containment_verdict` now uses the REAL placed enclosure edge (`resolve_design_envelope_mm`) not the overstated volume-cube; proveCatch adds the OVERSTATE-CATCH + vial-proud no-false-FAIL.
-- **RE-BAKE RUNNING** (`out/organoid-bioreactor-20260721-rebake`, PCB_STAGE=1) with all cost fixes — SIGHT on completion: does it clear £385 + produce dossier.xlsx?
-- **Decision (remaining if still over ceiling):** design-to-target convergence, or reconsider ex-works-vs-COGS ceiling basis.
+- **RE-BAKE 1** (`-rebake`): ex-works £599 (raw £363), 1.56× — filler+F2+ingest landed −25%. Still exit 32.
+- **C-COST-3 scale-aware commodity ceilings ✅** (`221ab9633`): `deviceScaleCeilingGbp` device-commodity nouns (TIM pad→£4, fan→£10, heater→£12, tachometer→£8, sensor £25→£12, generic £30→£15) + guards vs under-pricing (Peltier→£32, pump→£40, optical→£40, PCB→£55). proveCatch `estimate-missing-prices.tsx --selftest`.
+- **RE-BAKE 2** (`-rebake2`): **raw £484→£190.84 (−60% total)**, ex-works **£429 (1.11×)**. COST BLOCKER ESSENTIALLY CRACKED. **KEY: materials are now LEAN (£191); ex-works £429 = £191 materials + £238 labour/overhead/margin — the £44 gap to £385 is the MARGIN STRUCTURE, not the design.** Cutting further would under-price real parts → STOP cost-cutting.
+- **NEXT-LAYER BLOCKERS (surfaced now cost isn't the sole hard-stop — the real remaining punchlist, exit 38):**
+  - **C-CEIL: £385 vs £429 (1.11×) is now a CEILING-BASIS decision** — materials £191 is well under; is £385 an ex-works target (unmeetable w/o under-pricing) or a materials/COGS target (already met), or a volume target a single-unit concept BoM exceeds? Tristan's call.
+  - **REG: missing mandatory regulatory standards** — LVD 2014/35/EU, EMC 2014/30/EU, RoHS, IEC 61010-1, IEC 61326-1 (a mains/USB lab instrument MUST cite the CE-marking route). ⚠Checks LIVE-CHECK GATE fired → build-excel-export refused to save (no dossier.xlsx). SOURCE: the standards emitter for a lab-instrument class.
+  - **DECOMP: 8 sub-modules, expected ≥16** — the design is under-decomposed (thin). G3 review-completeness WARN.
+  - **EXEC/tabs: Exec Summary 0/10, 12 tabs <8** — broad quality (likely downstream of REG/DECOMP).
+  - **SELF-AUDIT: brief_compliance false "All 6 PASS" over high-severity engineering + physics_fidelity optical-path dimension mismatch.**
+  - **PCB not fab-ready.**
 
 Legend: ✅ done · �doing · ⬜ open
 
