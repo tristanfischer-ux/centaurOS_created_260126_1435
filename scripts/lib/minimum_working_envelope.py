@@ -108,6 +108,78 @@ def _roles_present(names: Iterable[str]) -> dict[str, bool]:
     }
 
 
+# ── FUNCTIONAL PART-STACK PACK (organoid-bioreactor 2150, R4 2026-07-21) ──────
+# INTENT: the optical/UI pack above sizes a box for a display + optical path +
+# electronics slab ONLY. A benchtop instrument that ALSO carries large mechanical /
+# fluidic parts (a magnetic stir drive, a peristaltic pump, a vial-holder fixture,
+# a culture vessel) does NOT fit that pocket box — the real placed part stack then
+# sprawls FAR outside the declared enclosure (the organoid: a 102 mm packed envelope
+# vs a 221 mm placed part stack = 2.2× phenotype sprawl; the parts are correctly
+# device-scaled, the ENVELOPE was blind to them). The honest envelope is the smallest
+# box that packs EVERY functional part, so the delivered scene ≈ the enclosure.
+#
+# UNIVERSAL: keyed on functional-role nouns (the SAME role vocabulary the render
+# placer sizes parts from in build_universal_scene._instrument_proxy_dim), never a
+# product-name table. A design with only pocket electronics packs to the same small
+# box as before (the mechanical rules match nothing → no growth); a design carrying
+# a stir drive / pump / vial holder grows the envelope to honestly contain them.
+
+# Role → representative device-scale footprint (w_mm, d_mm) for the LARGER mechanical
+# / fluidic / thermal parts an instrument's optical-UI pack ignores. Mirrors the
+# device-scale sizes in build_universal_scene._instrument_proxy_dim (F1b) so the
+# envelope and the placer agree on ONE part size. Only parts that materially drive
+# the footprint (≥ ~40 mm long edge) are listed — small SMD parts never grow a box.
+_MECHANICAL_PART_FOOTPRINTS_MM: tuple[tuple[str, tuple[float, float]], ...] = (
+    (r"magnetic\s*stir|stir(?:rer)?\s*(?:drive|bar|plate)|stirrer\b", (120.0, 100.0)),
+    (r"peristaltic\s*pump|dosing\s*pump|metering\s*pump|micro\s*pump", (110.0, 80.0)),
+    (r"vial\s*holder|tube\s*(?:rack|holder)|vial\s*rack|sample\s*rack|holder\s*fixture", (90.0, 60.0)),
+    (r"heatsink|heat\s*sink", (50.0, 40.0)),
+    (r"sample\s*block|thermal\s*block|tube\s*block", (60.0, 40.0)),
+    (r"culture\s*vessel|bioreactor\s*vessel|glass\s*vessel|reaction\s*vessel", (38.0, 38.0)),
+    (r"culture\s*(?:vial|tube|flask)|erlenmeyer|conical\s*flask", (25.0, 25.0)),
+    (r"media\s*tubing|tubing\s*set|perfusion\s*line|fluid\s*line|dosing\s*line", (60.0, 40.0)),
+    (r"thermal\s*insulation|insulation\s*(?:jacket|sleeve|wrap)|lagging", (60.0, 40.0)),
+    (r"front\s*panel\s*connector|connector\s*ports|panel\s*ports", (99.0, 8.0)),
+    (r"low\s*voltage\s*dc\s*supply|dc\s*supply|power\s*supply\s*brick", (48.0, 32.0)),
+    (r"flexure\s*stage|stage\s*body|flexure\s*body", (85.0, 85.0)),
+)
+
+
+def _functional_stack_footprint_mm(names: Iterable[str]) -> Optional[tuple[float, float]]:
+    """Landscape (width_mm, depth_mm) that shelf-packs the design's LARGE functional
+    parts, or None when the design carries no footprint-driving mechanical/fluidic part.
+
+    Deterministic area shelf-pack: sum each matched part's footprint area, take a
+    landscape box of that area at a ~1.4:1 aspect, but never narrower than the widest
+    single part (a 120 mm stir drive must fit on one shelf). Universal, no product
+    table — a pocket electronics instrument matches nothing here and stays small."""
+    foots: list[tuple[float, float]] = []
+    for nm in names:
+        low = str(nm or "").lower()
+        for pattern, (w_mm, d_mm) in _MECHANICAL_PART_FOOTPRINTS_MM:
+            if re.search(pattern, low, re.I):
+                foots.append((float(w_mm), float(d_mm)))
+                break
+    if not foots:
+        return None
+    total_area = sum(w * d for w, d in foots)
+    widest = max(w for w, _ in foots)
+    deepest = max(d for _, d in foots)
+    # Shelf-pack allowance: the render placer lays these parts (plus the smaller SMD
+    # kit) on a compact grid whose extent tracks the SUMMED footprint area closely
+    # (verified on the organoid: Σ large-part area 35,236 mm² vs the placed 221×165 mm
+    # = 36,465 mm² stack — ~1:1). So reserve only a small ~1.05× tessellation slack and
+    # shape it to the instrument landscape aspect (W:D ≈ 1.34, the placed stack's own
+    # ratio). The box must still be at least as wide/deep as the widest single part.
+    packed_area = total_area * 1.05
+    import math as _math
+    width = max(widest, _math.sqrt(packed_area * 1.34))
+    depth = max(deepest, packed_area / max(width, 1.0))
+    if depth > width:
+        width, depth = depth, width
+    return (round(width, 1), round(depth, 1))
+
+
 def minimum_working_envelope_mm(
     *,
     optical_path_mm: float = 10.0,
@@ -188,11 +260,37 @@ def minimum_working_envelope_from_state(state: dict) -> Optional[tuple[float, fl
     }
     # A device flagged instrument with empty BoM still packs the default work
     # (optical + display) — never falls back to mass air.
-    return minimum_working_envelope_mm(
+    body = minimum_working_envelope_mm(
         optical_path_mm=_optical_path_mm_from_state(state),
         has_optical=roles.get("optical", True),
         has_display=roles.get("display", True) or roles.get("compute", True),
     )
+    # R4 (2026-07-21): grow the envelope to honestly PACK the design's large
+    # mechanical / fluidic parts (stir drive, pump, vial holder, culture vessel) —
+    # otherwise the placed part stack sprawls outside the declared enclosure (the
+    # organoid phenotype 2.2× sprawl). Universal: a pocket-electronics instrument
+    # carries no such part → stack is None → body is unchanged. The 155 mm handheld
+    # cap in minimum_working_envelope_mm is a POCKET floor for the optical-UI pack;
+    # a benchtop device whose real parts exceed it is benchtop-scale, not handheld,
+    # so the part-stack pack legitimately raises W/D above the handheld cap.
+    stack = _functional_stack_footprint_mm(names)
+    if stack is not None:
+        bw, bd, bh = body
+        sw, sd = stack
+        # Body clearance walls around the packed part stack (both faces).
+        sw += _CLEARANCE_MM * 2.0
+        sd += _CLEARANCE_MM * 2.0
+        w = max(bw, sw)
+        d = max(bd, sd)
+        # Height: the mechanical stack (stir drive ~60 mm etc.) sits in the body, so
+        # the enclosure body is taller than the thin electronics slab. Scale the body
+        # height with how much the footprint grew, capped so a wide-flat pack does not
+        # mint a cube; the proud vessel on TOP is handled by the 1.8× phenotype tol.
+        h = max(bh, min(0.42 * min(w, d), 90.0))
+        if d > w:
+            w, d = d, w
+        body = (round(w, 1), round(d, 1), round(h, 1))
+    return body
 
 
 def apply_brief_ceiling(
@@ -262,6 +360,53 @@ def _selftest() -> None:
     # proveCatch: mass-air 183×145 must LOSE to packed when wired (caller test).
     mass_air = (182.7, 144.9, 75.6)
     assert env[0] < mass_air[0] and env[1] < mass_air[1], (env, mass_air)
+
+    # ── R4 (2026-07-21): functional part-stack pack ──────────────────────────
+    # proveCatch (organoid-bioreactor 2150): a benchtop bioreactor carries large
+    # mechanical/fluidic parts (stir drive, pump, vial holder). The envelope MUST grow
+    # to pack them — otherwise the placed stack sprawls ~2.2× outside the enclosure.
+    _bio = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"requirement": "Magnetic Stirrer Drive"},
+            {"requirement": "Dosing Peristaltic Pump"},
+            {"requirement": "Vial Holder Fixture"},
+            {"requirement": "Culture Vessel"},
+            {"requirement": "Front Panel Connector Ports"},
+            {"requirement": "Microcontroller Mcu"},
+            {"requirement": "Heatsink Fan"},
+            {"requirement": "Media Tubing Set"},
+        ],
+    }
+    _bio_env = minimum_working_envelope_from_state(_bio)
+    assert _bio_env is not None
+    # The design's placed part stack is ~221 mm on its long edge; the enclosure must be
+    # in the SAME class (≥ ~180 mm), not the 102 mm pocket box that sprawled at 2.2×.
+    assert max(_bio_env) >= 180.0, (
+        f"bioreactor envelope must pack its mechanical stack (≥180 mm), got {_bio_env}")
+    # And it must not massively over-shoot the real stack (would render an empty box):
+    assert max(_bio_env) <= 300.0, (
+        f"bioreactor envelope must not inflate far past the part stack, got {_bio_env}")
+    _stack = _functional_stack_footprint_mm(
+        [b["requirement"] for b in _bio["requirementsBom"]])
+    assert _stack is not None and max(_stack) >= 180.0, _stack
+    # proveNoFalsePositive: a POCKET electronics instrument (no mechanical part) stays
+    # pocket-scale — the part-stack pack must not fire on it.
+    _pocket = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"requirement": "Compute UI Module"},
+            {"requirement": "Microcontroller Mcu"},
+            {"requirement": "USB Interface"},
+            {"requirement": "Status LED"},
+        ],
+    }
+    _pocket_env = minimum_working_envelope_from_state(_pocket)
+    assert _pocket_env is not None and max(_pocket_env) < 160.0, (
+        f"pocket electronics must stay small (no mechanical stack), got {_pocket_env}")
+    assert _functional_stack_footprint_mm(
+        [b["requirement"] for b in _pocket["requirementsBom"]]) is None, (
+        "pocket electronics must carry NO footprint-driving mechanical part")
 
     print(
         f"minimum_working_envelope _selftest: OK "

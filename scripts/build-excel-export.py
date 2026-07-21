@@ -29157,6 +29157,43 @@ def _selftest() -> int:
             print(f"  FAIL V1a-DENOM proveNoFalsePositive: a vial-proud pioreactor render (~1.3× the "
                   f"real enclosure) must NOT false-FAIL — the 1.8× tol absorbs a proud vessel "
                   f"(got {_pv5})"); bad += 1
+        # (6) R4 ENVELOPE-FROM-PART-STACK (2026-07-21, source fix): the organoid FAILED because the
+        #     resolver's minimum-working envelope packed ONLY the optical/UI work (102 mm) and was
+        #     BLIND to the design's large mechanical/fluidic parts (a 120 mm stir drive, 110 mm pump,
+        #     90 mm vial holder) — so the placed part stack (~221 mm) sprawled at 2.2×. The SOURCE fix
+        #     grows the envelope to PACK those parts (minimum_working_envelope._functional_stack_
+        #     footprint_mm), so the REAL enclosure edge is ~235 mm and the ~243 mm placed scene fits at
+        #     ~1.0×. Proves the fix: a bioreactor-BoM instrument's real edge is ≥180 mm (NOT the 102 mm
+        #     pocket box), and a scene at the placed-stack scale PASSES. ═══
+        _PHENOTYPE_CACHE.pop(_tdd, None)
+        _st6 = {"isInstrumentDevice": True,
+                "moduleDecomposition": {"product_class": "benchtop_bioreactor"},
+                "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 0.00403,
+                                                              "working_volume_ml": 20}},
+                "requirementsBom": [
+                    {"requirement": "Magnetic Stirrer Drive"},
+                    {"requirement": "Dosing Peristaltic Pump"},
+                    {"requirement": "Vial Holder Fixture"},
+                    {"requirement": "Culture Vessel"},
+                    {"requirement": "Front Panel Connector Ports"},
+                    {"requirement": "Microcontroller Mcu"},
+                    {"requirement": "Heatsink Fan"},
+                    {"requirement": "Media Tubing Set"}]}
+        json.dump(_st6, open(os.path.join(_tdd, "state.json"), "w"))
+        _real6 = _real_enclosure_edge_mm(_st6)
+        if not (isinstance(_real6, (int, float)) and _real6 >= 180.0):
+            print(f"  FAIL V1a-DENOM R4: a bioreactor-BoM instrument's REAL enclosure edge must pack "
+                  f"its mechanical stack (≥180 mm), not the 102 mm pocket box that sprawled "
+                  f"(got {_real6})"); bad += 1
+        # scene at the placed-stack scale (~243 mm) must PASS against the packed real edge
+        json.dump({"bbox_mm": {"length_mm": 243.0, "width_mm": 230.0, "height_mm": 84.0}},
+                  open(os.path.join(_tdd, "parts-manifest.json"), "w"))
+        _PHENOTYPE_CACHE.pop(_tdd, None)
+        _pv6 = _phenotype_containment_verdict(_tdd)
+        if not (isinstance(_pv6, dict) and _pv6.get("ok") is True
+                and float(_pv6.get("ratio", 9)) <= 1.8):
+            print(f"  FAIL V1a-DENOM R4: with the envelope packed from the part stack, the ~243 mm "
+                  f"placed scene must FIT (≤1.8×) the real ~235 mm enclosure (got {_pv6})"); bad += 1
     # ═══ V2 (2026-07-20): ledger coverage + a flaky vision-clean verdict must NOT mint ≥8 on a
     # DEVICE whose containment could not be positively verified (no parts-manifest bbox). The 2150
     # proved the vision critic returns broken=false + 8 checks on a Lego hero — only a DETERMINISTIC

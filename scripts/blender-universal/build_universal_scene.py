@@ -6925,6 +6925,53 @@ def write_parts_manifest(out_dir, parts, state=None):
                   f"(Compute UI / LED Source Board)")
     except Exception as _sse:  # noqa: BLE001 — never block the export
         print(f"[parts-manifest] spine principal seat skipped: {_sse}")
+    # MICRO-COMPONENT DIMS CLAMP — FINAL PASS (organoid 2150, R4 2026-07-21).
+    # resolved_dims_mm + the per-word manifest clamp (~L6647) already cap discrete
+    # electronics, but a part that is the WIRING LOAD HUB (a shared-tray fan-out node —
+    # the organoid Ferrite Emc Bead fans 13 power spurs) has its prefix world-bbox
+    # UNIONED with the 13 spur/trunk meshes → a 95×48×39 mm "bead" in the manifest even
+    # though its own body is < 24 mm. That default-size litter floors the Assembly tab.
+    # Re-cap every micro-component ROW here, after all seating, so no source path can
+    # leave a bead / fuse / ESD network at product-envelope scale. Universal noun-keyed
+    # (same family as resolved_dims_mm's clamp); a part that legitimately IS large
+    # (stir drive, pump, vessel) matches nothing here and is untouched.
+    _n_reclamped = 0
+    for r in rows:
+        _rnm = str(r.get("name") or "")
+        if not re.search(
+            r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|poly[_ -]?fuse|tvs\b|"
+            r"esd[_ -]?protect(?:ion)?|esd[_ -]?network|inrush|varistor|mov\b|"
+            r"input[_ -]?fuse|dc[_ -]?input[_ -]?fuse|input[_ -]?protection|"
+            r"reverse[_ -]?polarity|polarity[_ -]?protection|blocking[_ -]?diode|"
+            r"current[_ -]?limit|overcurrent|thermal[_ -]?cutoff|thermal[_ -]?fuse|"
+            r"galvanic[_ -]?isolat(?:or)?|\bfuse\b|decoupling|bulk[_ -]?cap|"
+            r"strain[_ -]?relief|standoff|\bemc\b)\b",
+            _rnm, re.I,
+        ):
+            continue
+        _d = r.get("dims_mm") or {}
+        if "dia" in _d:
+            continue  # round micro-parts already report a small shell
+        _mx = max(float(_d.get("w", 0) or 0), float(_d.get("d", 0) or 0),
+                  float(_d.get("h", 0) or 0))
+        if _mx <= 34.0:
+            continue  # already device-scale
+        # Prefer the role-proxy dim (differentiates a bead from a fuse from an ESD net,
+        # so the re-cap does not mint a fresh single-size litter cluster); else hard cap.
+        _px = _instrument_proxy_dim(_rnm, str(r.get("module") or ""), {})
+        if isinstance(_px, dict) and _px.get("kind") == "box" \
+                and max(_px["w_mm"], _px["d_mm"], _px["h_mm"]) <= 34.0:
+            r["dims_mm"] = {"w": round(float(_px["w_mm"]), 1),
+                            "d": round(float(_px["d_mm"]), 1),
+                            "h": round(float(_px["h_mm"]), 1)}
+        else:
+            r["dims_mm"] = {"w": round(min(float(_d.get("w", 24) or 24), 24.0), 1),
+                            "d": round(min(float(_d.get("d", 18) or 18), 18.0), 1),
+                            "h": round(min(float(_d.get("h", 8) or 8), 8.0), 1)}
+        _n_reclamped += 1
+    if _n_reclamped:
+        print(f"[parts-manifest] micro-component dims re-clamped: {_n_reclamped} row(s) "
+              f"(wiring-hub bbox union / litter guard)")
     # PROCESS-ORDER rows (Tristan 2026-07-02: "the GA equipment schedule lists parts in no
     # meaningful order"): region rank (the process sequence), then the FINAL equipment tag
     # (letter, numeric), then name — so every manifest consumer that keeps row order (the
