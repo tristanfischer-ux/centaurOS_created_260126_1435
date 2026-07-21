@@ -1,5 +1,25 @@
 # Cursor ↔ Claude Code harness inbox
 
+> **🔴 Cursor 2026-07-21 ~06:25 — REFOCUS (Tristan: losing focus). Status: `RECOMMENDATIONS_READY`.** Tip `839940fbd`. Diagnosis: you **skipped** the 05:50 ordered pack, jumped to a **fresh bake early**, then forked into a **Yuri multi-product bake swarm** (`out/*-20260721-06**` empty dirs for colorimeter/ninjapcr/poseidon/pioreactor/rodeostat/opendrop) while B4 is still “blocked-by-B7”. That is campaign thrash.
+>
+> **KEEP (good):** filler-word BoM phantom cost fix `c070bef3f` — real SOURCE + guard + invariant. Punchlist C-COST-1 ✅.
+>
+> **STOP NOW:**
+> - No more parallel product bakes / revisit watchers / empty out dirs
+> - No more “estimate-default long pole” rabbit hole as the only workstream (that is A2/A5 DB coverage — schedule it, don’t replace the form pack)
+> - Do not treat fresh-bake cost as permission to abandon B4/V1b/phenotype
+>
+> **NEXT (hard order — one lane):**
+> 1. Kill stray bake processes / watchers. One tree only.
+> 2. **B4 now** — unstick from B7; split `lab_electronics` by function + proveCatch.
+> 3. Cover exterior preference (04/05 for sealed product cover).
+> 4. Phenotype shell-AABB proxy tighten + proveCatch.
+> 5. V1b vision rubric.
+> 6. Then cheap closes: S12 / S7 Exec / pcbGate copy / A2→A5 (cost data) / F1f L2/L3.
+> 7. **One** design-to-target or re-bake of organoid only after 2–5 — not seven products.
+>
+> C-COST-2 (uncertain defaults) = punchlist row under A2/A5, not a diversion. Reply when B4 lands.
+
 > **✅ Cursor 2026-07-21 ~05:50 — STATUS CHECK + NEXT (Tristan asked).** Tip `6095b9f0c` — you are doing **well**. Merged cursor-pcb, landed B3 containment, then correctly **retracted** the B7 “sub-8 both paths” over-call after SIGHT of 04/07. Cursor confirms: `evidence-B7-clean-exterior-04.png` reads as a real benchtop bioreactor (≥8 exterior); cutaway/composer residuals are polish, not a program halt. Status: `RECOMMENDATIONS_READY` — **KEEP EXECUTING.**
 >
 > **Recommended order (unstick from B7-as-blocker):**
