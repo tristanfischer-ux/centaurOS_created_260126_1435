@@ -14800,6 +14800,46 @@ def _place_composed_form(W: float, D: float, H: float, base_z: float, MO: dict) 
     return n > 0
 
 
+# ── LAB-ELECTRONICS INTERIOR PART-SET, by SIGNATURE (Tristan B4 2026-07-21) ──
+# The lab_electronics family covers three morphologically-DIFFERENT products that
+# used to share ONE PCB-first cutaway (main board + AFE chips + USB + dual BNC +
+# coin cell). Dual BNC is an ELECTROCHEMISTRY cue — wrong inside a culture vessel
+# or a droplet-actuation deck. This pure function returns the SIGNATURE-DISTINCTIVE
+# interior story parts (role tags) so each sub-type reads as its own product in the
+# cutaway, while the shared chassis (PCB base + coin cell + USB face) stays common.
+# Keyed ONLY off the contract-derived `_LE_SIGNATURE` signal (never a product-name
+# table) per the CORE FIX PRINCIPLE. proveCatch: lab_electronics_signature_selftest.py.
+_LE_INTERIOR_SIGNATURE_PARTS = {
+    # Potentiostat: three-electrode analogue front-end — AFE gain chips + the twin
+    # BNC (electrode / cell) coax that IS the electrochemistry interface.
+    "potentiostat": ("afe_chip", "afe_chip", "bnc_electrode", "bnc_cell"),
+    # Vial bioreactor: a stirred, thermally-held OPTICAL-DENSITY culture station —
+    # magnetic stir-drive motor + OD LED source & photodiode detector + heater
+    # block hugging the vial. NO BNC coax (there is no electrode cell here).
+    "vial_bioreactor": ("stir_motor", "od_led_source", "od_photodiode_det", "heater_block"),
+    # EWOD / digital microfluidics: a high-VOLTAGE droplet-actuation driver — HV
+    # boost/driver stack + the ribbon/FFC cartridge connector feeding the planar
+    # electrode grid. NO BNC coax (droplets are actuated, not measured on coax).
+    "ewod": ("hv_driver", "hv_driver", "ribbon_connector", "electrode_fanout"),
+    # Generic sealed AFE box: the original shared PCB/USB/BNC story.
+    "generic": ("afe_chip", "afe_chip", "afe_chip", "bnc_electrode", "bnc_cell"),
+}
+
+
+def _le_interior_partset(signature: str) -> tuple[str, ...]:
+    """Pure: SIGNATURE-distinctive interior role tags for a lab_electronics sub-type.
+
+    @description No bpy — the geometry-free decision the interior builder consumes,
+                 so the "each signature is its own morphology" rule has ONE source
+                 and one proveCatch. Unknown/blank signature → generic AFE story.
+    @param signature One of potentiostat / vial_bioreactor / ewod / generic.
+    @returns Ordered tuple of interior part role tags for that sub-type.
+    """
+    return _LE_INTERIOR_SIGNATURE_PARTS.get(
+        (signature or "generic"), _LE_INTERIOR_SIGNATURE_PARTS["generic"]
+    )
+
+
 def _place_lab_electronics_interior_layout(
     W: float,
     D: float,
@@ -14826,6 +14866,20 @@ def _place_lab_electronics_interior_layout(
         "m_se_le_conn", fl._to_linear((0.55, 0.55, 0.58)), metallic=0.55, roughness=0.35)
     usb_mat = fl.make_mat(
         "m_se_le_usb", fl._to_linear((0.12, 0.12, 0.14)), metallic=0.4, roughness=0.4)
+    # Signature-specific interior materials (vial_bioreactor / ewod guts).
+    motor_mat = fl.make_mat(
+        "m_se_le_motor", fl._to_linear((0.16, 0.16, 0.18)), metallic=0.6, roughness=0.4)
+    led_mat = fl.make_mat(
+        "m_se_le_od_led", fl._to_linear((0.95, 0.45, 0.10)),
+        kind="led_emissive", emission_strength=2.4)
+    pd_mat = fl.make_mat(
+        "m_se_le_od_pd", fl._to_linear((0.10, 0.11, 0.16)), metallic=0.3, roughness=0.4)
+    heater_mat = fl.make_mat(
+        "m_se_le_heater", fl._to_linear((0.55, 0.20, 0.12)), metallic=0.35, roughness=0.5)
+    hv_mat = fl.make_mat(
+        "m_se_le_hv", fl._to_linear((0.28, 0.10, 0.12)), metallic=0.3, roughness=0.5)
+    ribbon_mat = fl.make_mat(
+        "m_se_le_ribbon", fl._to_linear((0.78, 0.64, 0.20)), metallic=0.55, roughness=0.4)
 
     n_story = 0
     n_plain_box = 0
@@ -14866,18 +14920,7 @@ def _place_lab_electronics_interior_layout(
     else:
         _count(_pcb, "cad")
 
-    # AFE / MCU chips proud of the board.
-    for _ci, (_cx, _cy) in enumerate(((-pcb_w * 0.22, 0.0), (pcb_w * 0.18, pcb_d * 0.12),
-                                      (pcb_w * 0.18, -pcb_d * 0.14))):
-        _chip = fl.add_box(
-            f"u_se_le_chip_{_ci}",
-            _mm3((_cx, _cy, pcb_z + pcb_t * 0.5 + 1.2)),
-            _mm3((max(6.0, pcb_w * 0.18), max(5.0, pcb_d * 0.16), 2.2)),
-            chip_mat, module=story_mod, module_objects=MO)
-        _chip.dimensions = _mm3((max(6.0, pcb_w * 0.18), max(5.0, pcb_d * 0.16), 2.2))
-        _count(_chip, "box")
-
-    # Front-face USB + dual BNC (electrode / cell) — product language for AFE boxes.
+    # Shared USB / host port on the front face — every sealed lab box exposes one.
     _usb = fl.add_box(
         "u_se_le_usb",
         _mm3((-W * 0.22, -D / 2 + tt + 3.0, base_z + H * 0.45)),
@@ -14885,15 +14928,98 @@ def _place_lab_electronics_interior_layout(
         usb_mat, module=story_mod, module_objects=MO)
     _usb.dimensions = _mm3((12.0, 8.0, 5.0))
     _count(_usb, "box")
-    for _bi, _bx in enumerate((-W * 0.02, W * 0.18)):
-        _bnc = fl.add_cyl(
-            f"u_se_le_bnc_{_bi}",
-            _mm3((_bx, -D / 2 + tt + 4.0, base_z + H * 0.55)),
-            3.5 * fl.MM, 10.0 * fl.MM, conn_mat,
-            module=story_mod, module_objects=MO,
-            rotation=(math.radians(90), 0.0, 0.0),
-        )
-        _count(_bnc, "auth")
+
+    # ── SIGNATURE-DISTINCTIVE INTERIOR STORY (Tristan B4 2026-07-21) ──
+    # Each lab_electronics sub-type gets its OWN coherent cutaway guts from the
+    # pure `_le_interior_partset` decision, so a potentiostat ≠ a bioreactor ≠ an
+    # ewod device inside — not one shared PCB+BNC story. Keyed off _LE_SIGNATURE
+    # (contract-derived), never a product name. `role` counters below feed the
+    # authenticity stats; each role names its OWN u_se_le_* mesh.
+    _sig = _LE_SIGNATURE
+    _parts = _le_interior_partset(_sig)
+    _face_y = -D / 2 + tt + 4.0
+    _z_top = base_z + H
+    _seen_role: dict[str, int] = {}
+    _placed_roles: list[str] = []
+    for _role in _parts:
+        _idx = _seen_role.get(_role, 0)
+        _seen_role[_role] = _idx + 1
+        _placed_roles.append(_role)
+        if _role == "afe_chip":
+            # Analogue front-end / MCU chip proud of the board (potentiostat/generic).
+            _cx = (-pcb_w * 0.22, pcb_w * 0.18, pcb_w * 0.18)[_idx % 3]
+            _cy = (0.0, pcb_d * 0.12, -pcb_d * 0.14)[_idx % 3]
+            _cs = (max(6.0, pcb_w * 0.18), max(5.0, pcb_d * 0.16), 2.2)
+            _chip = fl.add_box(f"u_se_le_afe_chip_{_idx}",
+                               _mm3((_cx, _cy, pcb_z + pcb_t * 0.5 + 1.2)),
+                               _mm3(_cs), chip_mat, module=story_mod, module_objects=MO)
+            _chip.dimensions = _mm3(_cs)
+            _count(_chip, "box")
+        elif _role in ("bnc_electrode", "bnc_cell"):
+            # BNC coax = the electrochemistry electrode / cell interface (potentiostat).
+            _bx = W * 0.18 if _role == "bnc_cell" else -W * 0.02
+            _bnc = fl.add_cyl(f"u_se_le_{_role}",
+                              _mm3((_bx, _face_y, base_z + H * 0.55)),
+                              3.5 * fl.MM, 10.0 * fl.MM, conn_mat,
+                              module=story_mod, module_objects=MO,
+                              rotation=(math.radians(90), 0.0, 0.0))
+            _count(_bnc, "auth")
+        elif _role == "stir_motor":
+            # Magnetic stir-drive motor under the vessel axis (vial_bioreactor).
+            _mtr = fl.add_cyl("u_se_le_stir_motor",
+                              _mm3((0.0, 0.0, base_z + H * 0.16)),
+                              min(W, D) * 0.14 * fl.MM, max(10.0, H * 0.18) * fl.MM,
+                              motor_mat, module=story_mod, module_objects=MO)
+            _count(_mtr, "auth")
+        elif _role == "od_led_source":
+            # OD optical source — LED aimed across the culture vial (vial_bioreactor).
+            _led = fl.add_cyl("u_se_le_od_led_source",
+                              _mm3((-min(W, D) * 0.20, 0.0, base_z + H * 0.52)),
+                              3.0 * fl.MM, 8.0 * fl.MM, led_mat,
+                              module=story_mod, module_objects=MO,
+                              rotation=(0.0, math.radians(90), 0.0))
+            _count(_led, "auth")
+        elif _role == "od_photodiode_det":
+            # OD detector — photodiode opposite the source (vial_bioreactor).
+            _pd = fl.add_cyl("u_se_le_od_photodiode_det",
+                             _mm3((min(W, D) * 0.20, 0.0, base_z + H * 0.52)),
+                             3.4 * fl.MM, 7.0 * fl.MM, pd_mat,
+                             module=story_mod, module_objects=MO,
+                             rotation=(0.0, math.radians(90), 0.0))
+            _count(_pd, "auth")
+        elif _role == "heater_block":
+            # Thermally-controlled block hugging the vial base (vial_bioreactor).
+            _hb = fl.add_box("u_se_le_heater_block",
+                             _mm3((0.0, -D * 0.12, base_z + H * 0.30)),
+                             _mm3((W * 0.26, D * 0.20, H * 0.14)),
+                             heater_mat, module=story_mod, module_objects=MO)
+            _hb.dimensions = _mm3((W * 0.26, D * 0.20, H * 0.14))
+            _count(_hb, "box")
+        elif _role == "hv_driver":
+            # High-voltage droplet-actuation driver stack (ewod).
+            _hx = (-pcb_w * 0.20, pcb_w * 0.20)[_idx % 2]
+            _hv = fl.add_box(f"u_se_le_hv_driver_{_idx}",
+                             _mm3((_hx, pcb_d * 0.10, pcb_z + pcb_t * 0.5 + 3.0)),
+                             _mm3((pcb_w * 0.20, pcb_d * 0.18, 6.0)),
+                             hv_mat, module=story_mod, module_objects=MO)
+            _hv.dimensions = _mm3((pcb_w * 0.20, pcb_d * 0.18, 6.0))
+            _count(_hv, "box")
+        elif _role == "ribbon_connector":
+            # FFC / ribbon cartridge connector to the top electrode grid (ewod).
+            _rb = fl.add_box("u_se_le_ribbon_connector",
+                             _mm3((0.0, -pcb_d * 0.24, pcb_z + pcb_t * 0.5 + 2.0)),
+                             _mm3((pcb_w * 0.44, 3.0, 3.5)),
+                             ribbon_mat, module=story_mod, module_objects=MO)
+            _rb.dimensions = _mm3((pcb_w * 0.44, 3.0, 3.5))
+            _count(_rb, "auth")
+        elif _role == "electrode_fanout":
+            # Fan-out trace strip feeding the planar pad matrix (ewod).
+            _ef = fl.add_box("u_se_le_electrode_fanout",
+                             _mm3((0.0, pcb_d * 0.02, _z_top - 1.2)),
+                             _mm3((pcb_w * 0.58, pcb_d * 0.44, 1.2)),
+                             ribbon_mat, module=story_mod, module_objects=MO)
+            _ef.dimensions = _mm3((pcb_w * 0.58, pcb_d * 0.44, 1.2))
+            _count(_ef, "box")
 
     # Coin cell / backup under the board edge.
     try:
@@ -14930,9 +15056,15 @@ def _place_lab_electronics_interior_layout(
         "n_plain_box": n_plain_box,
         "n_authentic": n_authentic,
     }
-    form = {"interior_authenticity": stats, "form_id": "lab_electronics"}
+    form = {
+        "interior_authenticity": stats,
+        "form_id": "lab_electronics",
+        "le_signature": _sig,
+        "interior_roles": _placed_roles,
+    }
     print(
-        f"[univ][sealed] lab_electronics interior: PCB/AFE/USB/BNC "
+        f"[univ][sealed] lab_electronics interior [{_sig}]: PCB + USB + "
+        f"{'/'.join(_placed_roles)} "
         f"({n_story} meshes, plain_box={n_plain_box}, authentic={n_authentic}) "
         f"— NOT optical bench"
     )
