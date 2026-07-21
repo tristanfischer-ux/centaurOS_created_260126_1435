@@ -2154,6 +2154,16 @@ _COMMODITY_CEILING_TIERS = [
     (re.compile(r"differential[_ -]?pressure[_ -]?switch|\bdp[_ -]?switch\b|"
                 r"network[_ -]?switch|ethernet[_ -]?switch|\bgateway\b|i/?o[_ -]?module|"
                 r"signal[_ -]?conditioner", re.I), 500.0),
+    # THERMAL-INTERFACE PAD / GAP PAD (2026-07-21, the organoid £186 pad): a thermal-
+    # interface / gap / TIM pad for a SINGLE device is a die-cut consumable (~£1-5 a
+    # piece). The catalogue/DB match returns the per-SHEET / per-roll price (a Henkel
+    # Bergquist Gap Pad GP1000 SHEET is £40-186), applied per-piece — the same
+    # reel/sheet-priced-per-unit family the pack-micro band fixes for cell insulation
+    # pads (line ~853). A single piece cannot exceed this per-unit cap. Universal,
+    # noun-keyed; a genuine bulk sheet purchase would carry a qty in the hundreds so
+    # the PER-UNIT price stays the die-cut piece cost.
+    (re.compile(r"thermal[_ -]?interface[_ -]?(?:pad|material)|\bgap[_ -]?pad\b|"
+                r"thermal[_ -]?pad\b|\btim[_ -]?pad\b", re.I), 5.0),
 ]
 # A BARE generic instrument noun ("Temperature Sensor", "Voltage Sensor") with NO
 # process/context qualifier is a catalogue commodity too (the mis-pinned RAS
@@ -2404,7 +2414,20 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
     for r in parametric:
         qy = max(1, int(r.get("qty") or 1))
         old_line = float(r.get("line_gbp") or 0)
-        new_line = max(0.01, round(old_line * scale, 2))
+        # HONEST PER-PART FLOOR (2026-07-21, the organoid penny-BoM): the gold rescale
+        # used to crush every parametric line to £0.01 when catalogue pins alone met the
+        # target (the `needed_param <= 0` branch above → scale ≈ 0). A £0.01 unit price
+        # for a real MCU / stirrer drive / probe / tubing set is FAKE PRECISION — a lie,
+        # not a price. A rescale (down OR up) may never push a purchasable component
+        # below its CONSERVATIVE noun-keyed minimum (`_commodity_zero_floor`: £1 label,
+        # £3 generic part, £60 filter, …). So the line floors at floor_unit × qty, never
+        # a penny. Universal — the same 'no £0 line' commodity floor, applied to the
+        # rescale residue. (When the crush trigger is a MIS-priced catalogue pin — the
+        # £186 gap-pad sheet — the per-piece ceiling above removes it, needed_param goes
+        # positive, and this branch scales the residue UP toward gold instead.)
+        _rnm = str(r.get("part") or r.get("name") or r.get("label") or r.get("item") or "")
+        _floor_unit = _commodity_zero_floor(_rnm)[0] if _rnm else _COMMODITY_GENERIC_FLOOR_GBP
+        new_line = max(round(_floor_unit * qy, 2), round(old_line * scale, 2))
         r["line_gbp"] = new_line
         r["unit_gbp"] = round(new_line / qy, 2)
         # C3 roll-up invariant (H-101 fix 2026-07-19): the sub-component breakdown_gbp
@@ -3535,6 +3558,29 @@ def _selftest() -> int:
         print(f"  FAIL catalogue pin must not gold-rescale (want £1.41, got £{_fuse_u})"); bad += 1
     if not (_b_cat is not None and _a_cat is not None and 150 <= _a_cat <= 220):
         print(f"  FAIL catalogue-hold rescale still lands gold band, got before={_b_cat} after={_a_cat}"); bad += 1
+    # proveCatch (organoid 2026-07-21): when catalogue pins ALONE already exceed the
+    # gold target (needed_param <= 0), the parametric residue must NOT be crushed to
+    # £0.01 — a real MCU / stirrer / probe floors at its noun-keyed commodity minimum
+    # (fake-penny prices are what made the BoM tab look broken). The trigger here (a
+    # mis-priced £300 pin) is the residual case AFTER the thermal-pad ceiling; the
+    # honest floor keeps every real line credible.
+    _saved_crush = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _crush_rows = [
+        {"requirement": "Over-priced Catalogue Pin", "part": "Over-priced Catalogue Pin",
+         "unit_gbp": 300.0, "line_gbp": 300.0, "qty": 1, "status": "IDENTIFIED",
+         "basis": "catalogue · Digi-Key £300"},
+        {"requirement": "Microcontroller Mcu", "part": "Microcontroller Mcu",
+         "unit_gbp": 40.0, "line_gbp": 40.0, "qty": 1, "status": "NOT FOUND",
+         "basis": "class-reference parametric"},
+    ]
+    _rescale_instrument_materials_to_gold(
+        _crush_rows, {"moduleDecomposition": {"product_class": "syringe_pump"}})
+    _mcu_line = float(_crush_rows[1]["line_gbp"])
+    _IS_INSTRUMENT_DEVICE = _saved_crush
+    if _mcu_line < 3.0 - 0.001:
+        print(f"  FAIL penny-crush: parametric MCU crushed below commodity floor "
+              f"(want ≥£3, got £{_mcu_line})"); bad += 1
     # proveCatch (colorimeter 2036): distributor_price_gbp as a cascade REFERENCE on
     # a parametric unit must NOT freeze gold rescale (materials stuck at £255).
     _saved_ref = _IS_INSTRUMENT_DEVICE
@@ -4740,6 +4786,16 @@ def _selftest() -> int:
     g, b = _apply_commodity_ceiling("Temperature Sensor", {}, 752.0)
     if not (g == 500.0 and b):
         print(f"  FAIL bare Temperature-Sensor mis-pin not capped: £{g}"); bad += 1
+    # THERMAL-INTERFACE PAD per-piece ceiling (2026-07-21, the organoid £186 gap-pad
+    # sheet that crushed 23 real lines to £0.01). A die-cut thermal/gap/TIM pad for a
+    # single device cannot ship at the per-SHEET catalogue price.
+    for _padnm in ("Thermal Interface Pad", "Peltier Gap Pad", "Thermal Pad", "TIM Pad"):
+        g, b = _apply_commodity_ceiling(_padnm, {}, 186.25)
+        if not (g is not None and g <= 5.0 and b):
+            print(f"  FAIL thermal pad {_padnm!r} not per-piece capped: £{g}"); bad += 1
+    # …but a genuine RATED thermal instrument is NOT a bare pad (exempt guard)
+    if _apply_commodity_ceiling("in-line thermal mass flow meter", {}, 900.0)[1] is not None:
+        print("  FAIL rated thermal instrument wrongly pad-capped"); bad += 1
 
     # ── PN-OVER-DESCRIPTION COMMODITY CLASS (council 2026-06-17 — the gate-21
     # mis-PIN that SURVIVED). The ceiling tier must come from the PART NUMBER, not
