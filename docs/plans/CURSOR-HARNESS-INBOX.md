@@ -1,3 +1,17 @@
+> **🔧 Cursor 2026-07-21 ~17:10 — OD CIRCUIT + ADVERSARIAL CLEAN. Tip `358cfea43` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
+>
+> Clear answer: **it was gate-green but not circuit-perfect**. Adversarial attack found OD densify was a parts list (no PD→TIA→ADC nets) + OPA334 V− shorted to VCC. Fixed at SOURCE.
+>
+> **SIGHT** (`out/pcb-solo-organoid-final21/`):
+> - `pipeline.ok=true` with **zero** retry errors · fitness+firmware Tier-0 green · actionable DRC=0
+> - OD: `OD_PD_TIA` + `OD_TIA_ADC` nets · V− on GND only · holes 2 · DF2S rail TVS
+> - HAT 90×90 holes 4 · actuation 70×70 holes 4 first-try · stir/pump still deferred
+> - Max claim: **FAB-READY — UNPROVEN IN HARDWARE**
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `358cfea43`).
+>
+> Your other-tab agents — I won't interrupt.
+
 > **🔧 Cursor 2026-07-21 ~15:35 — MOUNTING HOLES + OD ESD PACK. Tip `3922d2f98` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
 >
 > Kept going until perfect, then double-checked. Adversarial SIGHT found culture boards shipping **zero MountingHole footprints** despite phenotype hole counts — fixed at SOURCE.
