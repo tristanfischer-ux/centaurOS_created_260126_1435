@@ -29,6 +29,20 @@ try:
 except Exception:           # pragma: no cover  (defensive — keeps --selftest standalone)
     canonical_tags = None   # type: ignore
 
+# SHARED part-type-coherence authority (deterministic_checks_lib): the F3 check that
+# flags an active-machine line pinned to a consumable/stock SKU reads the SAME
+# `_ACTIVE_MACHINE_RX` + `_part_is_consumable_stock` predicates this bill-of-materials
+# builder uses to REJECT that pin at source — so the fix (never pin a pump to its
+# tubing) and the check (flag a pump pinned to its tubing) can never diverge (the
+# two-truths asymmetry that let TUB-SAN-6.4 survive on the requirementsBom cache after
+# the partVerification was stripped). Guarded so --selftest stays standalone. dcl does
+# NOT import this module, so there is no circular import.
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import deterministic_checks_lib as _dcl  # type: ignore
+except Exception:           # pragma: no cover  (defensive — keeps --selftest standalone)
+    _dcl = None             # type: ignore
+
 # SHARED phase authority (scripts/blender-universal/connection_sizing.py): the SAME
 # liquid/gas/steam classifier the universal Blender connection-sizer uses, so the
 # bill-of-materials sizes a fluid edge by its PHYSICAL phase rather than assuming
@@ -2828,6 +2842,37 @@ def _is_rotating_equipment_noun(name: str) -> bool:
     """True when the line's noun is rotating / power-rated kit for which a named
     consumer-grade MPN can be undersized for the duty. Universal, no class table."""
     return bool(_ROTATING_EQUIP_NOUN_RE.search(name or ""))
+
+
+def _reject_consumable_pin_on_active_machine(requirement: str, part: str, status: str):
+    """PART-TYPE COHERENCE (F3 source fix, 2026-07-21). Returns (new_status, new_part,
+    rejected_pin) when an ACTIVE-MACHINE requirement (pump / motor / valve / fan /
+    heater …) is PINNED to a CONSUMABLE/stock SKU (its tubing, o-ring, gasket …) — the
+    machine's OWN MPN did not resolve, so present the line HONESTLY as an unresolved OEM
+    component rather than pin it to its consumable (never fabricate an MPN, never relabel
+    to dodge the check). Returns (None, None, None) — a no-op — for every other line.
+
+    Uses the SAME predicates the F3 check reads (`deterministic_checks_lib._ACTIVE_MACHINE_RX`
+    + `_part_is_consumable_stock`), so the fix (never pin a pump to its tubing) and the
+    check (flag a pump pinned to its tubing) can never diverge — the two-truths asymmetry
+    that let TUB-SAN-6.4 survive on the requirementsBom cache after the partVerification
+    was stripped. Fires ONLY on a resolved pin (IDENTIFIED); a genuine consumable
+    requirement (a 'Media Tubing Set' → tubing SKU) is not an active machine so it never
+    fires; a placeholder part never fires. Inert when dcl is unimportable (--selftest
+    standalone) — the predicates are the single authority, never re-implemented here."""
+    if _dcl is None:
+        return (None, None, None)
+    if status != "IDENTIFIED":
+        return (None, None, None)
+    if not _dcl._ACTIVE_MACHINE_RX.search(requirement or ""):
+        return (None, None, None)
+    if _dcl._PIECE_OF_STOCK_RX.search(requirement or ""):
+        return (None, None, None)
+    if _dcl._part_is_placeholder(part):
+        return (None, None, None)
+    if not _dcl._part_is_consumable_stock(part):
+        return (None, None, None)
+    return ("NOT FOUND", "requirement stated — OEM component (procurement TBD)", part)
 _SHAFT_SIBLING_SUFFIXES = ("_power_kw", "_shaft_power_kw", "_shaft_kw",
                            "_hydraulic_power_kw", "_brake_power_kw")
 
@@ -5704,6 +5749,42 @@ def _selftest() -> int:
         print("  FAIL civils-derivation: a row with no parseable volume must never get a "
               "fabricated civils line"); bad += 1
 
+    # ── PART-TYPE COHERENCE (F3 source fix, 2026-07-21) proveCatch: the org-bioreactor
+    # 2150 shipped "P-101 Dosing Peristaltic Pump = Watson-Marlow TUB-SAN-6.4" — a pump
+    # PINNED to its sanitary TUBING. The row-builder must REJECT that pin at source
+    # (present the machine as an unresolved OEM component, never its consumable, never a
+    # fabricated MPN), and must NOT touch a genuine consumable line, a real-machine pin,
+    # or a placeholder. Exercises `_reject_consumable_pin_on_active_machine` directly. ──
+    if _dcl is not None:
+        # (a) proveCatch: a pump pinned to its tubing SKU is rejected to honest-unresolved
+        _st, _pt, _rej = _reject_consumable_pin_on_active_machine(
+            "Dosing Peristaltic Pump", "Watson-Marlow TUB-SAN-6.4", "IDENTIFIED")
+        if not (_st == "NOT FOUND" and _pt == "requirement stated — OEM component (procurement TBD)"
+                and _rej == "Watson-Marlow TUB-SAN-6.4"):
+            print(f"  FAIL part-type-coherence proveCatch: a pump pinned to a tubing SKU must "
+                  f"become honest-unresolved OEM; got ({_st!r}, {_pt!r}, {_rej!r})"); bad += 1
+        # a valve pinned to its o-ring SKU is the same family (o-ring stock-noun) → rejected
+        _vst, _vpt, _vrej = _reject_consumable_pin_on_active_machine(
+            "Isolation Valve", "Trelleborg O-Ring Seal Kit", "IDENTIFIED")
+        if _vrej is None:
+            print("  FAIL part-type-coherence proveCatch: a valve pinned to an o-ring must be "
+                  "rejected as active-machine-on-consumable"); bad += 1
+        # (b) proveNoFalsePositive: a GENUINE consumable requirement pinned to a consumable
+        # (a Media Tubing Set → tubing) is NOT an active machine → untouched
+        if _reject_consumable_pin_on_active_machine(
+                "Media Tubing Set", "Watson-Marlow TUB-SAN-6.4", "IDENTIFIED")[2] is not None:
+            print("  FAIL part-type-coherence: a genuine consumable requirement (Tubing Set → "
+                  "tubing) must NOT be rejected"); bad += 1
+        # a real MACHINE SKU on an active machine (a pump → a real pump model) is untouched
+        if _reject_consumable_pin_on_active_machine(
+                "Dosing Peristaltic Pump", "Kamoer KDS", "IDENTIFIED")[2] is not None:
+            print("  FAIL part-type-coherence: a pump pinned to a REAL pump SKU must NOT be "
+                  "rejected"); bad += 1
+        # a placeholder / non-IDENTIFIED line is untouched (nothing to reject)
+        if _reject_consumable_pin_on_active_machine(
+                "Dosing Peristaltic Pump", "requirement stated", "NOT FOUND")[2] is not None:
+            print("  FAIL part-type-coherence: a placeholder line must NOT be rejected"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -8160,6 +8241,32 @@ def assemble(out_dir: str):
                              f"sub-system and is not this component's true SKU, so this "
                              f"line is priced from its own independent estimate rather "
                              f"than pinned to that catalogue reference")
+                # ── PART-TYPE COHERENCE REJECTION (F3 source fix, 2026-07-21): an ACTIVE
+                # MACHINE requirement (pump / motor / valve / fan / heater …) must never
+                # be PINNED to a CONSUMABLE/stock SKU (its tubing, o-ring, gasket …). The
+                # frozen organoid-bioreactor shipped "P-101 Dosing Peristaltic Pump =
+                # Watson-Marlow TUB-SAN-6.4" — a length of sanitary tubing presented as a
+                # resolved pump. A prior fix stripped the fake PN off the partVerification
+                # but this requirementsBom CACHE re-composed `part` from the design word's
+                # own (still-wrong) modifier_characters. Rather than relabel the line to
+                # dodge the check (forbidden) or fabricate a real pump MPN (forbidden — no
+                # verified pump landed on this class-scoped slot), present the line HONESTLY
+                # as an unresolved OEM component: the machine's own MPN is procurement-TBD,
+                # never its consumable. Uses the SAME predicates F3 reads, so the fix and
+                # the check cannot diverge. Deterministic + universal (no per-class table);
+                # a genuine consumable requirement (a 'Tubing Set' → tubing SKU) is NOT an
+                # active machine so it never fires; a placeholder part never fires. ──
+                _tc_status, _tc_part, _rejected_pin = _reject_consumable_pin_on_active_machine(
+                    requirement, part, status)
+                if _rejected_pin is not None:
+                    status, part = _tc_status, _tc_part
+                    basis = (basis + f" · part-type-coherence: the design named "
+                             f"{_rejected_pin!r} for this active machine, but that identity "
+                             f"reads as a CONSUMABLE/stock SKU (a pump's tubing, a valve's "
+                             f"o-ring), not the machine itself — the machine's own MPN did "
+                             f"not resolve on this class's parts, so the line is presented "
+                             f"as an unresolved OEM component rather than pinned to its "
+                             f"consumable")
                 row = {"tag": tag, "requirement": requirement, "status": status,
                        "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
                        "basis": basis}
