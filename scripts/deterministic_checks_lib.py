@@ -2248,6 +2248,106 @@ def _checks_plausibility(state: dict, run_dir: str) -> List[Check]:
                       "'…Subcomponent N'. Name the part at emission."
                     if n else "Every part name is specific.")))
 
+    # -- P7. A SAFETY / COMPLIANCE MARGIN MUST NOT BE NEGATIVE ---------------------
+    # (2026-07-21, the 4-agent review: emc_compliance_margin_dB = -30, electronics
+    # junction 92.65 °C = -7.65 K over Tj_max — both shipped as a green 10/10 cell). A
+    # negative margin/headroom/clearance means the DESIGN EXCEEDS A LIMIT — a hard
+    # engineering failure, never a PASS. Universal: any quantity whose key names a
+    # margin/headroom/clearance and whose value is < 0. (A limit-vs-value pair with no
+    # explicit margin quantity is out of scope here — this catches the emitted margins.)
+    neg_margins = []
+    for _k, _qv in q.items():
+        if not re.search(r"margin|headroom|clearance", str(_k), re.I):
+            continue
+        _v = _qv.get("value") if isinstance(_qv, dict) else _qv
+        try:
+            if _v is not None and float(_v) < 0:
+                neg_margins.append((str(_k), float(_v)))
+        except (TypeError, ValueError):
+            continue
+    if neg_margins:
+        out.append(Check(
+            name="Safety / compliance margins are non-negative",
+            category="PLAUSIBILITY", relation="ge",
+            status=FAIL, actual=float(min(v for _, v in neg_margins)), expected=0.0,
+            tol=0.0, unit="", producer="plausibility:negative_margin",
+            detail=(f"{len(neg_margins)} margin/headroom quantity(ies) are NEGATIVE — the design "
+                    f"EXCEEDS a stated limit (e.g. {neg_margins[0][0]} = {neg_margins[0][1]:g}). A "
+                    f"negative safety/compliance margin is a hard failure, never a PASS. Fix the "
+                    f"design (more shielding / lower dissipation / larger derate) at its source.")))
+
+    # -- P8. NO PART MAY BE LARGER THAN ITS ENCLOSURE -----------------------------
+    # (2026-07-21: Culture Temperature Probe 260x309x240 mm inside a 221x165x82 mm shell —
+    # a geometric impossibility a geometry-proxy plant-default produced). Every internal
+    # part's bounding box must fit inside the enclosure shell. Universal — reads the
+    # parts-manifest the render + drawings share; skips cleanly when there is no shell.
+    pm = _load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+    parts = pm.get("parts") if isinstance(pm, dict) else None
+    if isinstance(parts, list) and parts:
+        def _dims(p):
+            d = p.get("dims_mm") or {}
+            if isinstance(d, dict):
+                return (num(d.get("w")), num(d.get("d")), num(d.get("h")))
+            if isinstance(d, list) and len(d) == 3:
+                return (num(d[0]), num(d[1]), num(d[2]))
+            return (None, None, None)
+        shell = next((p for p in parts if re.search(r"enclosure|shell|housing|chassis|cabinet",
+                     str(p.get("name") or ""), re.I)), None)
+        if shell is not None:
+            sw, sd, sh = _dims(shell)
+            if all(isinstance(x, (int, float)) and x > 0 for x in (sw, sd, sh)):
+                s_sorted = sorted([sw, sd, sh], reverse=True)  # orientation-free: a part fits if
+                oversized = []                                 # its sorted extents all <= the shell's
+                for p in parts:
+                    if p is shell:
+                        continue
+                    pw, pd, ph = _dims(p)
+                    if not all(isinstance(x, (int, float)) and x > 0 for x in (pw, pd, ph)):
+                        continue
+                    p_sorted = sorted([pw, pd, ph], reverse=True)
+                    if any(p_sorted[i] > s_sorted[i] * 1.02 for i in range(3)):
+                        oversized.append(f"{p.get('name','?')} "
+                                         f"({pw:.0f}x{pd:.0f}x{ph:.0f} > shell {sw:.0f}x{sd:.0f}x{sh:.0f})")
+                if oversized:
+                    out.append(Check(
+                        name="Every part fits inside the enclosure",
+                        category="PLAUSIBILITY", relation="eq",
+                        status=FAIL, actual=float(len(oversized)), expected=0.0, tol=0.0,
+                        unit="parts", producer="plausibility:part_containment",
+                        detail=(f"{len(oversized)} part(s) are LARGER than the enclosure shell they "
+                                f"sit inside — a geometric impossibility (e.g. {oversized[0]}). A "
+                                f"geometry-proxy fell through to a plant-scale default; size the part "
+                                f"from its real datasheet footprint / a device-scale TYPE_DEFAULT.")))
+
+    # -- P9. NO INTERNAL RUN MAY EXCEED THE ENCLOSURE DIAGONAL ---------------------
+    # (2026-07-21: 2.37 m signal cables + 15.1 m interconnect inside a 281 mm box →
+    # a £874 connection cost). With no site/room, an intra-enclosure wire/tube run cannot
+    # exceed roughly the device's bounding-box diagonal. Universal — reads the same
+    # connection-schedule + parts-manifest bbox; only fires when a real bbox exists.
+    bbox = pm.get("bbox_mm") if isinstance(pm, dict) else None
+    if isinstance(rows, list) and isinstance(bbox, dict):
+        L = num(bbox.get("length_mm")); W = num(bbox.get("width_mm")); H = num(bbox.get("height_mm"))
+        if all(isinstance(x, (int, float)) and x > 0 for x in (L, W, H)):
+            diag_m = math.sqrt(L * L + W * W + H * H) / 1000.0
+            # generous 1.5x allowance for routing slack around the envelope
+            cap_m = diag_m * 1.5
+            long_runs = []
+            for r in rows:
+                lm = num(r.get("length_m"))
+                if lm is not None and lm > cap_m:
+                    long_runs.append(f"{str(r.get('from','?'))[:16]}->{str(r.get('to','?'))[:16]} "
+                                     f"{lm:.2f} m")
+            if long_runs:
+                out.append(Check(
+                    name="Internal runs fit within the device envelope",
+                    category="PLAUSIBILITY", relation="le",
+                    status=FAIL, actual=float(len(long_runs)), expected=0.0, tol=0.0,
+                    unit="runs", producer="plausibility:run_length_scale",
+                    detail=(f"{len(long_runs)} wire/tube run(s) exceed {cap_m:.2f} m — 1.5x the "
+                            f"{diag_m*1000:.0f} mm enclosure diagonal — yet sit INSIDE the device "
+                            f"(e.g. {long_runs[0]}). A plant point-to-point router leaked onto a "
+                            f"benchtop device; clamp intra-enclosure runs to the bbox diagonal.")))
+
     return out
 
 
@@ -3176,6 +3276,32 @@ def _selftest() -> int:
               "P6: a water edge between two non-fluid parts must FAIL")
         check(_has(pc, "Part names are specific", FAIL),
               "P5: a duplicated generic '…Subcomponent' name must FAIL")
+    # P7/P8/P9 (2026-07-21, the 4-agent review): negative margin, a part bigger than the
+    # enclosure, and a metre-scale run inside a benchtop box.
+    with tempfile.TemporaryDirectory() as tmp:
+        bad2_state = {
+            "isInstrumentDevice": True,
+            "orchestratorContract": {"quantities": {
+                "emc_compliance_margin_dB": {"value": -30, "unit": "dB"},
+            }},
+        }
+        d = _write_run(tmp, bad2_state, {}, {"rows": [
+            {"mechanism": "signal", "from": "Probe", "to": "Mcu", "length_m": 2.37},
+        ]})
+        # oversized part + a small enclosure bbox → P8 + P9 fire
+        with open(os.path.join(d, "parts-manifest.json"), "w") as _f:
+            json.dump({"bbox_mm": {"length_mm": 281, "width_mm": 165, "height_mm": 82},
+                       "parts": [
+                           {"name": "Enclosure Shell", "dims_mm": {"w": 221, "d": 165, "h": 82}},
+                           {"name": "Culture Temperature Probe", "dims_mm": {"w": 260, "d": 309, "h": 240}},
+                       ]}, _f)
+        pc = _checks_plausibility(bad2_state, d)
+        check(_has(pc, "margins are non-negative", FAIL),
+              "P7: a negative EMC/compliance margin must FAIL")
+        check(_has(pc, "fits inside the enclosure", FAIL),
+              "P8: a part larger than its enclosure must FAIL")
+        check(_has(pc, "Internal runs fit within", FAIL),
+              "P9: a 2.37 m run in a 281 mm box must FAIL")
     # CLEAN: a plausibly-sized instrument — every plausibility check PASSes.
     with tempfile.TemporaryDirectory() as tmp:
         good_state = {
@@ -3184,6 +3310,7 @@ def _selftest() -> int:
                 "connected_electrical_load_kw": {"value": 0.035, "unit": "kW"},
                 "power_cable_csa_mm2": {"value": 0.75, "unit": "mm2"},
                 "cable_mass_kg": {"value": 0.02, "unit": "kg"},
+                "emc_compliance_margin_dB": {"value": 6, "unit": "dB"},
             }},
             "partVerifications": [
                 {"name": "Culture Temperature Probe"},
@@ -3191,10 +3318,16 @@ def _selftest() -> int:
             ],
         }
         good_conns = {"rows": [
-            {"mechanism": "water", "from": "Media Tubing Set", "to": "Culture Vessel"},
-            {"mechanism": "signal", "from": "Temperature Sensor", "to": "Mcu"},
+            {"mechanism": "water", "from": "Media Tubing Set", "to": "Culture Vessel", "length_m": 0.15},
+            {"mechanism": "signal", "from": "Temperature Sensor", "to": "Mcu", "length_m": 0.2},
         ]}
         d = _write_run(tmp, good_state, {}, good_conns)
+        with open(os.path.join(d, "parts-manifest.json"), "w") as _f:
+            json.dump({"bbox_mm": {"length_mm": 221, "width_mm": 165, "height_mm": 82},
+                       "parts": [
+                           {"name": "Enclosure Shell", "dims_mm": {"w": 221, "d": 165, "h": 82}},
+                           {"name": "Culture Temperature Probe", "dims_mm": {"w": 6, "d": 6, "h": 50}},
+                       ]}, _f)
         pc = _checks_plausibility(good_state, d)
         check(not any(c.status == FAIL for c in pc),
               "PLAUSIBILITY clean instrument must produce zero FAIL")
