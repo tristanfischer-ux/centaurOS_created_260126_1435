@@ -5982,6 +5982,14 @@ def reconcile_route_specs(parts):
         _ROUTE_LOG[:] = [r for r in _ROUTE_LOG if r.get("name") not in set(dropped_run_names)]
 
     # DEFECT 2 — cap the COSTED length of any detour at straight-line × factor + pad.
+    # SCALE-AWARE DETOUR PAD (2026-07-21, the organoid 2.37 m runs in a 281 mm box): the
+    # flat 5 m pad is plant scale — on a benchtop where every part is within ~0.2 m of the
+    # next, cap = 0.2×2.5 + 5 = 5.5 m let a 2.37 m intra-enclosure run through. When the
+    # WHOLE scene is small (max straight-line < 0.5 m, an instrument), shrink the pad to a
+    # device-scale value so an internal wire/tube can't exceed roughly the enclosure. A real
+    # plant (metre-scale hops) keeps the 5 m pad unchanged.
+    _max_sl = max(straight_m_by_name.values(), default=0.0)
+    _pad_m = ROUTE_LENGTH_DETOUR_PAD_M if _max_sl >= 0.5 else max(0.15, _max_sl * 0.5)
     n_capped = 0
     saved_m = 0.0
     for s in _CONN_SPECS:
@@ -5989,7 +5997,7 @@ def reconcile_route_specs(parts):
         sl = straight_m_by_name.get(s.get("run_name"))
         if sl is None or sl <= 0.0 or L <= 0.0:
             continue
-        cap = sl * ROUTE_LENGTH_DETOUR_FACTOR + ROUTE_LENGTH_DETOUR_PAD_M
+        cap = sl * ROUTE_LENGTH_DETOUR_FACTOR + _pad_m
         if L > cap + 0.01:
             s["length_capped_from_m"] = round(L, 2)         # disclose the original
             s["length_straight_m"] = round(sl, 2)
@@ -6006,7 +6014,7 @@ def reconcile_route_specs(parts):
           + ("".join(f"\n[univ][route-reconcile]   drop  {a!r}→{b!r}  {sz} {L:.0f} m"
                      for a, b, sz, L in dropped_instr) if dropped_instr else ""))
     print(f"[univ][route-reconcile] DEFECT 2: capped {n_capped} detour route(s) at "
-          f"{ROUTE_LENGTH_DETOUR_FACTOR:g}× straight-line + {ROUTE_LENGTH_DETOUR_PAD_M:g} m "
+          f"{ROUTE_LENGTH_DETOUR_FACTOR:g}× straight-line + {_pad_m:g} m "
           f"({saved_m:.0f} m of routed length removed)")
     print(f"[univ][route-reconcile] costed £ {cost_before:,.0f} → {cost_after:,.0f} "
           f"(saved £{gbp_saved:,.0f})")
