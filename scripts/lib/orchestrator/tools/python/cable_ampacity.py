@@ -121,6 +121,20 @@ def compute(payload: dict) -> dict:
     else:
         table = AMPACITY_CU_XLPE_F  # default
 
+    # COMPLETE THE SMALL-CSA LADDER (2026-07-21, the organoid 16 mm² on a 35 W device):
+    # the free-air (F) and buried tables START at 16 mm² — their smallest entry — so a
+    # SMALL duty (a 1.5 A benchtop/USB instrument) is floored to a 16 mm² (~90 A) cable,
+    # a plant-scale leak. The small standard sizes (1.5-10 mm²) exist in every
+    # installation; free-air ampacity is HIGHER than enclosed, so borrowing the more-
+    # CONSERVATIVE enclosed (B1) ratings for the small end under-states free-air capacity
+    # (safe, never over-states). Merge B1's sub-16 mm² entries beneath the chosen table so
+    # the selection ladder starts at 1.5 mm². Universal — a large plant duty still selects
+    # its large CSA unchanged (byte-identical above 16 mm²); only a duty a real small
+    # conductor can carry is affected.
+    _min_csa = min(table.keys())
+    if _min_csa > 1.5:
+        table = {**{k: v for k, v in AMPACITY_CU_XLPE_B1.items() if k < _min_csa}, **table}
+
     temp_factor = get_temp_derating(ambient_c)
     is_aluminium = material == "aluminium"
 
@@ -183,8 +197,11 @@ def compute(payload: dict) -> dict:
     res_r = round(resistance_ohm_km, 4)
     v_drop_r = round(v_drop, 2)
     v_drop_pct_r = round(v_drop_pct, 3)
-    mass_per_m_r = round(cable_mass_per_m_kg, 3)
-    total_mass_r = round(cable_mass_per_m_kg * length_m, 2)
+    mass_per_m_r = round(cable_mass_per_m_kg, 4)
+    # A short internal jumper (a 13 mm benchtop link) has a tiny but NON-ZERO mass — a
+    # 2-dp round showed 0.00 kg (the "0 kg cable" fake-good). Keep enough precision that
+    # a real conductor never displays as massless.
+    total_mass_r = round(cable_mass_per_m_kg * length_m, 5)
 
     worked = [
         worked_calc(
