@@ -2335,8 +2335,13 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     if _pcb.get("isPcbBearing"):
         try:
             _rd = str(_pcb_two_axis_assessment(_pcb, run_dir or "").get("readiness") or "")
+            # DETAIL must be descriptive, never a BARE verdict word: a failing board's readiness
+            # string is literally "FAIL", which the no-cheating LIVE-CHECK gate flags as a bare
+            # verdict literal (Quality & Audit!D11) → build-excel-export refuses to save the whole
+            # workbook. Prefix it so the detail reads "readiness: FAIL" (the axis Verdict cell col C
+            # is the real live formula; this is just its human note). 2026-07-21.
             axes.append({"axis": "PCB readiness — fab-ready", "applicable": True,
-                         "passed": _rd.startswith("FAB-READY"), "detail": _rd or "—"})
+                         "passed": _rd.startswith("FAB-READY"), "detail": f"readiness: {_rd or '—'}"})
         except Exception:  # noqa: BLE001 — never let the axis crash the verdict
             axes.append({"axis": "PCB readiness — fab-ready", "applicable": True,
                          "passed": False, "detail": "readiness not computed"})
