@@ -228,12 +228,24 @@ function deviceScaleCeilingGbp(cls: string, name: string): number | undefined {
   if (/\bfuse\b|polyfuse|\bptc\b|resettable|tvs|esd.protect/.test(n)) return 6
   if (/batter|\bcell\b|\blipo\b|li.?ion|rechargeable/.test(n)) return 25
   if (/connector|header|\bcable\b|jumper|ribbon|jst|qwiic|stemma/.test(n)) return 8
+  // DEVICE-COMMODITY noun ceilings (2026-07-21, organoid £25×9-default over-pricing): a
+  // benchtop-instrument commodity is a cheap COTS item, NOT a plant part. A £25/£30 flat
+  // clamp over-billed 9 unresolved lines (£225 of a £363 BoM). Real device-commodity prices:
+  if (/thermal.?(interface|pad)|\btim\b|gap.?(filler|pad)|heatsink.compound/.test(n)) return 4
+  if (/\bfan\b|blower|axial.?fan|heatsink.?fan/.test(n)) return 10
+  if (/\bheater\b|cartridge.?heat|film.?heat|resistive.?heat|kapton.?heat|silicone.?heat/.test(n)) return 12
+  if (/tachomet|\bencoder\b|hall.?(effect|sensor)?|rpm.?sens/.test(n)) return 8
+  // a Peltier/TEC + a small pump/vent/filter are pricier commodities — keep them honest so
+  // the lowering never UNDER-prices a real part (the CP30238 £28 lesson).
+  if (/peltier|thermo.?electric|\btec\b.?module|\btec1\b/.test(n)) return 32
+  if (/peristaltic|dosing.?pump|syringe.?pump/.test(n)) return 40
+  if (/sterile.?filter|vent.?filter|membrane.?filter|0\.2.?.?m|ptfe.?filter/.test(n)) return 18
   // class-keyed fallback
   if (cls === 'oem_subsystem' || cls === 'electronic_pcb') return 55
   if (cls === 'optical') return 40
-  if (cls === 'sensor') return 25
+  if (cls === 'sensor') return 12       // a benchtop temp probe / thermistor / small sensor is £2-12 (was £25)
   if (cls === 'electronic_passive') return 6
-  return 30 // generic estimated device part
+  return 15 // generic estimated device part (was £30 — too plant-ish for a benchtop commodity)
 }
 
 function getProductClassSlug(state: any): string {
@@ -2177,9 +2189,39 @@ async function main() {
   }
 }
 
+// proveCatch (2026-07-21): the device-commodity ceilings must be realistic for a benchtop
+// instrument (the organoid £25×9-default over-pricing) WITHOUT under-pricing a genuinely
+// pricier commodity (the CP30238 £28 Peltier lesson). Off an instrument device it is a strict
+// no-op (undefined). Run: npx tsx scripts/estimate-missing-prices.tsx --selftest
+function _deviceCeilingSelftest(): number {
+  let bad = 0
+  const check = (name: string, cond: boolean) => { if (!cond) { console.error(`  FAIL ${name}`); bad++ } }
+  RUN_IS_INSTRUMENT_DEVICE = false
+  check('off-instrument is a strict no-op', deviceScaleCeilingGbp('sensor', 'Temperature Sensor') === undefined)
+  RUN_IS_INSTRUMENT_DEVICE = true
+  // cheap device commodities clamp LOW (were £25/£30)
+  check('thermal interface pad ≤5', (deviceScaleCeilingGbp('', 'Thermal Interface Pad') ?? 99) <= 5)
+  check('heatsink fan ≤10', (deviceScaleCeilingGbp('', 'Heatsink Fan') ?? 99) <= 10)
+  check('cartridge heater ≤12', (deviceScaleCeilingGbp('', 'Cartridge Heater') ?? 99) <= 12)
+  check('stir tachometer ≤8', (deviceScaleCeilingGbp('sensor', 'Stir Tachometer') ?? 99) <= 8)
+  check('temperature sensor ≤12 (was 25)', (deviceScaleCeilingGbp('sensor', 'Culture Temperature Probe') ?? 99) <= 12)
+  check('generic device part ≤15 (was 30)', (deviceScaleCeilingGbp('', 'Some Bracket') ?? 99) <= 15)
+  // pricier commodities must NOT be under-priced
+  check('Peltier/TEC stays ≥30 (not under-priced)', (deviceScaleCeilingGbp('', 'Peltier TEC Module') ?? 0) >= 30)
+  check('peristaltic pump stays ≥35', (deviceScaleCeilingGbp('', 'Dosing Peristaltic Pump') ?? 0) >= 35)
+  check('optical stays ≥40', (deviceScaleCeilingGbp('optical', 'OD Photodiode') ?? 0) >= 40)
+  check('controller PCB stays ≥55', (deviceScaleCeilingGbp('electronic_pcb', 'Main Board') ?? 0) >= 55)
+  RUN_IS_INSTRUMENT_DEVICE = false
+  if (bad === 0) console.log('estimate-missing-prices device-ceiling --selftest OK (device commodities realistic; pricier parts not under-priced; off-instrument no-op)')
+  return bad
+}
+
 // Only auto-run as a CLI; guarded so the module can be imported (e.g. by the
 // regression harness, which exercises classifyByRules) without executing main().
 if ((process.argv[1] ?? '').includes('estimate-missing-prices')) {
+  if (process.argv.includes('--selftest')) {
+    process.exit(_deviceCeilingSelftest() === 0 ? 0 : 1)
+  }
   main().catch((err) => {
     console.error('[estimate] fatal:', err)
     process.exit(1)
