@@ -6,6 +6,13 @@
 
 **Fixture:** `out/organoid-bioreactor-20260719-2150/` (frozen known-bad). Every item: SOURCE fix + proveCatch on 2150 + no `if organoid`. Update status + SHA as items land. Acceptance: re-scoring frozen 2150 → `ships=false`, PCB not FAB-READY, cost refuses, vision fails blockout; a fresh bake claims ≥8 only when the adversarial checks pass.
 
+## FRESH BAKE 2026-07-21 (`out/organoid-bioreactor-20260721-0546`, PCB_STAGE=1) — the REAL ships-blocker is COST, not render
+The fresh full bake **correctly refused to ship (exit 32, cost-sanity enforcing)** — no dossier.xlsx produced (exited at the cost gate). Honest verdict:
+- **Blocker = ex-works £799 / raw-materials BoM £484 vs the £385 brief ceiling (2.08×).** COST/DESIGN, not render (render is ~8, see B7-corrected) or scoring (scoring caught it honestly). The engine caught its own off-target design + redirected to `design-to-target-run.ts`.
+- **C-COST-1 filler phantom cost — FIXED (c070bef3f).** 4 nameless `filler_word_N` carried £87.25 (18% of £484) — the known 2026-06-05 Phase-2 density-padding bug, which had REGRESSED at rule 3a (`serial-design-chain-v2.tsx:1235` still ordered "ADD WORDS … to bring it up to 5-7"; the 2026-06-05 invariant only checked one other phrasing so missed it). SOURCE: rewrote 3a (no word-count padding; enrich existing words). GUARD: placeholder/filler words marked `cost_repair_excluded_from_subtotal` before costStack → never price. INVARIANT strengthened to catch the broader padding pattern + assert the guard. proveCatch on 0546: raw £478→£391. |
+- **C-COST-2 estimate-default over-pricing — OPEN (the AIM long pole).** After the filler fix the design is still **~£646 ex-works vs £385**. ALL 40 priced lines are provenance `uncertain` (0 distributor-verified); prices cluster on round-number defaults (£25×9, £30×3, £15×3 = £270). The real lever is DB-first REAL price coverage for lab-instrument commodity parts (Stage 17.6 RAG-fill / branded-parts ingest — [[forgeos_the_aim]] "long pole = BoM data coverage, not code"), NOT a code fix. Secondary: F2 redundant Peltier+heater (£25 saveable, already a ⚠ Check), reduce redundant sensors.
+- **Decision needed:** close the remaining cost gap via (a) `design-to-target` convergence loop, (b) real lab-part price ingest (long pole), (c) F2 thermal + part-count reduction, or (d) reconsider whether £385 should compare vs ex-works or COGS.
+
 Legend: ✅ done · �doing · ⬜ open
 
 ## Scoring / verdict honesty (Terminal — build-excel-export.py + chain verdict)
