@@ -460,7 +460,7 @@ describe('derivePcbArchitecture', () => {
       .toEqual(['microcontroller_word'])
   })
 
-  // proveCatch: bare MCU role (no SAMD/ESP/STM token in name) still owns firmware.
+  // proveCatch: bare MCU role (no SAMD/ESP/STM token) still owns firmware.
   it('treats bare microcontroller_mcu role as integrated firmware owner', () => {
     const state = withElectronicWords(stateWithQuantities({ working_volume_ml: 20 }), [
       {

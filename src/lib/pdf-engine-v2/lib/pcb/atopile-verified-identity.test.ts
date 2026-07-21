@@ -207,7 +207,7 @@ describe('Atopile verified identity integration', () => {
     mockedLookup.mockImplementation((_manufacturer, mpn) => {
       const hits: Record<string, DbCascadeResult> = {
         '12401610E4#2A': cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C receptacle'),
-        PESD5V0L5UY: cacheHit('Nexperia', 'PESD5V0L5UY', '5-line ESD array'),
+        'DF2S6.8MFS,L3M': cacheHit('Toshiba', 'DF2S6.8MFS,L3M', '5V TVS SOD-923'),
         'KPT-1608CGCK': cacheHit('Kingbright', 'KPT-1608CGCK', '0603 green LED'),
         'CC0603KRX7R9BB104': cacheHit('YAGEO', 'CC0603KRX7R9BB104', '100nF 0603'),
       }
@@ -280,7 +280,9 @@ describe('Atopile verified identity integration', () => {
     expect(usb?.mpnVerified).toBe(true)
     expect(usb?.partNumber).toMatch(/12401610E4/i)
     expect(esd?.mpnVerified).toBe(true)
-    expect(esd?.partNumber).toBe('PESD5V0L5UY')
+    // Shared esd_protection_network role → Toshiba DF2S (Pioreactor Eye-Spy);
+    // five-line / PESD name evidence selects the Nexperia array instead.
+    expect(esd?.partNumber).toBe('DF2S6.8MFS,L3M')
     expect(led?.mpnVerified).toBe(true)
     expect(led?.partNumber).toBe('KPT-1608CGCK')
     expect(result.unresolved.map((u) => u.wordId)).toEqual([])

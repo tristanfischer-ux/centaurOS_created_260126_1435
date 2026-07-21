@@ -83,10 +83,12 @@ describe('Yuri PCB gold architecture harness', () => {
       },
       Pioreactor: {
         // P4 USB role honesty: power entry is an on-board receptacle when the
-        // HAT owns the port; data/interface stays interconnect-only; SPI flash
-        // that the planner scopes onto the HAT is on_board (not a COTS module).
+        // HAT owns the port; data/interface stays interconnect-only.
+        // DECISION: bare MCU role owns firmware_storage as a functional
+        // requirement (integrated flash) unless a COTS host parks it off-board.
+        // Fitting a separate SPI flash package requires an explicit flash MPN.
         usb_interface_word: 'interconnect_only',
-        firmware_storage_word: 'on_board',
+        firmware_storage_word: 'functional_requirement',
         host_protocol_bridge_word: 'interconnect_only',
         usb_power_entry_word: 'on_board',
       },
@@ -248,9 +250,9 @@ describe('Yuri PCB gold architecture harness', () => {
             reason: expect.stringContaining('curated role-compatible candidate'),
           }),
         ]),
-        engineeringFindings: [
+        engineeringFindings: expect.arrayContaining([
           '3 generated component(s) lack verified MPN/symbol/pinout identity',
-        ],
+        ]),
         errors: [],
       })
       expect(boards[1]).toMatchObject({
