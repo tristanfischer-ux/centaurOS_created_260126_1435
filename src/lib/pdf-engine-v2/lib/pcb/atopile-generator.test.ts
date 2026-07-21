@@ -1304,4 +1304,54 @@ describe('atopile-generator', () => {
     ])
     expect(mainAto).not.toContain('Part_required_')
   })
+
+  it('proveCatch: OD-form sensing_instrumentation proxies classify as LED + sensor_ic', () => {
+    // GOTCHA: this suite mocks lookupCached → found:false, so MPNs stay null.
+    // Full MPN promotion is proveCaught in atopile-verified-identity.test.ts.
+    // Here we only prove the OD-proxy role synthesis (odd→led, even→sensor_ic).
+    const outDir = makeTmpDir('atopile-od-proxies-')
+    tmpDirs.push(outDir)
+    const result = generateAtopileProject({
+      moduleDecomposition: {
+        modules: [{
+          module: 'sensing_instrumentation',
+          sub_modules: [{
+            id: 'od_path',
+            words: [
+              {
+                id: 'sensing_instrumentation_subcomponent_1_word',
+                name_human: 'Sensing Instrumentation Subcomponent 1',
+                content_character: { character_id: 'sensing_instrumentation_subcomponent_1' },
+                modifier_characters: [{
+                  kind: 'form',
+                  value: 'representative optical density (od600) sensor & temperature probe assembly',
+                }],
+              },
+              {
+                id: 'sensing_instrumentation_subcomponent_2_word',
+                name_human: 'Sensing Instrumentation Subcomponent 2',
+                content_character: { character_id: 'sensing_instrumentation_subcomponent_2' },
+                modifier_characters: [{
+                  kind: 'form',
+                  value: 'representative optical density (od600) sensor & temperature probe assembly',
+                }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }, outDir)
+
+    const led = result.components.find((c) => c.wordId === 'sensing_instrumentation_subcomponent_1_word')
+    const adc = result.components.find((c) => c.wordId === 'sensing_instrumentation_subcomponent_2_word')
+    expect(led?.functionClass).toBe('led')
+    expect(adc?.functionClass).toBe('sensor_ic')
+    expect(result.unresolved.map((u) => u.wordId)).not.toEqual(
+      expect.arrayContaining([
+        'sensing_instrumentation_subcomponent_1_word',
+        'sensing_instrumentation_subcomponent_2_word',
+      ]),
+    )
+  })
 })

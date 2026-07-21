@@ -140,14 +140,16 @@ describe('Yuri PCB gold architecture harness', () => {
       NinjaPCR: [],
       Poseidon: [],
       OpenFlexure: [],
-      Pioreactor: ['unresolved_components', 'empty_generated_project'],
+      // INTENT (2026-07-21): OD proxies + heater minimal topology fill od_optics /
+      // wet_actuation — empty_generated_project clears; residual unresolved HAT
+      // interface roles remain the honesty signal.
+      Pioreactor: ['unresolved_components'],
       Rodeostat: ['unresolved_components'],
       OpenDrop: ['unresolved_components', 'empty_generated_project'],
     })
     const pioreactor = report.products.find((product) => product.product === 'Pioreactor')
     const openDrop = report.products.find((product) => product.product === 'OpenDrop')
-    // wet_actuation now emits real heater/stir drive footprints (componentCount > 0).
-    // The remaining unimplemented board function is OD optics on its own board.
+    // wet_actuation + od_optics now emit real footprints (componentCount > 0).
     expect(pioreactor?.generatedBoards.find((board) => board.boardId === 'wet_actuation'))
       .toMatchObject({
         componentCount: expect.any(Number),
@@ -156,16 +158,10 @@ describe('Yuri PCB gold architecture harness', () => {
       (pioreactor?.generatedBoards.find((board) => board.boardId === 'wet_actuation')
         ?.componentCount ?? 0) > 0,
     ).toBe(true)
-    expect(pioreactor?.generatedBoards.find((board) => board.boardId === 'od_optics'))
-      .toMatchObject({
-        componentCount: 0,
-        functionRequirements: [
-          expect.objectContaining({
-            role: 'od_measurement_channel',
-            implementation: 'unresolved_board_function',
-          }),
-        ],
-      })
+    expect(
+      (pioreactor?.generatedBoards.find((board) => board.boardId === 'od_optics')
+        ?.componentCount ?? 0) > 0,
+    ).toBe(true)
     expect(openDrop?.generatedBoards.find((board) => board.boardId === 'electrode_cartridge'))
       .toMatchObject({
         componentCount: 0,

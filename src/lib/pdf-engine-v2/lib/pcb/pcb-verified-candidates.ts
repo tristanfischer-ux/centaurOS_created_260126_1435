@@ -109,6 +109,23 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'Yongyu 0603 polarity drawing; local KiCad Device:LED with LED_SMD:LED_0603_1608Metric',
   },
   {
+    // INTENT (2026-07-21): OD source LED without a brief-pinned 470 nm token —
+    // sensing_instrumentation_subcomponent proxies synthesize od_source_led.
+    // GOTCHA: do NOT match bare "optical source LED" / led_source — that is the
+    // underspecified generic role the harness keeps null until wavelength is pinned.
+    roleTest: /(?:^|[_ -])od[_ -]?source(?:[_ -]?led)?(?:$|[_ -])|optical[_ -]?density[_ -]?(?:source|emitter|led)|\bod600\b.*(?:led|emitter|source)/i,
+    excludedRoleTest: /power[_ -]?indicator|status[_ -]?indicator|annunciator|(?:^|[_ -])led[_ -]?source(?:$|[_ -])/,
+    functionClass: 'led',
+    manufacturer: 'Yongyu Photoelectric',
+    partNumber: 'SZYY0603B',
+    footprint: { library: 'LED_SMD', footprint: 'LED_0603_1608Metric' },
+    symbol: { library: 'Device', symbol: 'LED' },
+    ratings: { voltageV: 3.3, currentA: 0.03 },
+    packageEvidence: 'Yongyu SZYY0603B: blue water-clear LED in 0603 (1.6 x 0.8 x 0.6 mm), 469 nm peak, 460-475 nm dominant wavelength',
+    referenceEvidence: 'Open Colorimeter frozen 470 nm source board specifies one 0603 LED at 3.1 V / 15 mA, revision b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7; Yongyu SZYY0603B manufacturer data distributed as LCSC C434421',
+    pinoutEvidence: 'Yongyu 0603 polarity drawing; local KiCad Device:LED with LED_SMD:LED_0603_1608Metric',
+  },
+  {
     roleTest: /wi[_ -]?fi[_ -]?module|esp8266[_ -]?module/i,
     functionClass: 'connectivity_ic',
     manufacturer: 'Espressif Systems',

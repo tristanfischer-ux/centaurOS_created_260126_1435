@@ -8,6 +8,7 @@
 import { collectElectronicWords } from './pcb-stage'
 
 import type { ElectronicWordRef } from './pcb-stage'
+import { hasOdOpticalFormEvidence } from './pcb-stage'
 
 export type PcbSystemDisposition =
   | 'not_applicable'
@@ -231,7 +232,16 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
     // GOTCHA: bare `led` / `sensor` / `adc` used to steal host power-indicator +
     // rail-protection words onto the OD daughterboard (organoid 1546 token board).
     if (candidate.role === 'od_optics_board') {
-      return /(?:^|[_ -])(?:od|optical[_ -]?density)(?:[_ -]|$)|photodiode|od[_ -]?sensor|density[_ -]?sensor|optical[_ -]?(?:adc|measurement)/i.test(text)
+      if (/(?:^|[_ -])(?:od|optical[_ -]?density)(?:[_ -]|$)|photodiode|od[_ -]?sensor|density[_ -]?sensor|optical[_ -]?(?:adc|measurement)/i.test(text)) {
+        return true
+      }
+      // INTENT (2026-07-21): anonymous sensing_instrumentation_subcomponent_N
+      // carries OD only in form. Allow form match for that proxy alone — heater/
+      // temp/stir identity already routed above, so sibling OD-form smear cannot
+      // steal culture_temperature_probe onto optics.
+      const isSensingProxy = /sensing[_ -]?instrumentation[_ -]?subcomponent[_ -]?\d+/i.test(text)
+      const formBlob = Object.values(word.modifiers).join(' ')
+      return isSensingProxy && hasOdOpticalFormEvidence(formBlob)
     }
     if (candidate.role === 'wet_lab_hat') {
       return /hat|host|microcontroller|compute|raspberry|interface|usb|firmware|debug|esd|ferrite|polyfuse|reverse[_ -]?polarity|power[_ -]?indicator/i.test(text)

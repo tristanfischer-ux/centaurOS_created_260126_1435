@@ -390,6 +390,52 @@ describe('derivePcbArchitecture', () => {
       ]))
   })
 
+  it('proveCatch: OD-form sensing_instrumentation proxies route to od_optics, not wet_actuation', () => {
+    // INTENT: organoid emits OD emitter/detector only as anonymous
+    // sensing_instrumentation_subcomponent_N with OD in form — must populate
+    // od_optics.requiredWordIds without stealing culture_temperature_probe.
+    const state = withElectronicWords(stateWithQuantities({ working_volume_ml: 20 }), [
+      {
+        id: 'sensing_instrumentation_subcomponent_1_word',
+        nameHuman: 'Sensing Instrumentation Subcomponent 1',
+        characterId: 'sensing_instrumentation_subcomponent_1',
+        modifiers: [{
+          kind: 'form',
+          value: 'representative optical density (od600) sensor & temperature probe assembly',
+        }],
+      },
+      {
+        id: 'sensing_instrumentation_subcomponent_2_word',
+        nameHuman: 'Sensing Instrumentation Subcomponent 2',
+        characterId: 'sensing_instrumentation_subcomponent_2',
+        modifiers: [{
+          kind: 'form',
+          value: 'representative optical density (od600) sensor & temperature probe assembly',
+        }],
+      },
+      {
+        id: 'culture_temperature_probe_word',
+        nameHuman: 'Culture Temperature Probe',
+        characterId: 'culture_temperature_probe',
+        modifiers: [{
+          kind: 'form',
+          value: 'representative optical density (od600) sensor & temperature probe assembly',
+        }],
+      },
+    ])
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.boards.find((item) => item.role === 'od_optics_board')?.requiredWordIds)
+      .toEqual(expect.arrayContaining([
+        'sensing_instrumentation_subcomponent_1_word',
+        'sensing_instrumentation_subcomponent_2_word',
+      ]))
+    expect(plan.boards.find((item) => item.role === 'heater_stir_actuation_board')?.requiredWordIds)
+      .toEqual(expect.arrayContaining(['culture_temperature_probe_word']))
+    expect(plan.boards.find((item) => item.role === 'od_optics_board')?.requiredWordIds)
+      .not.toContain('culture_temperature_probe_word')
+  })
+
   it('collapses a duplicate USB-interface concept while retaining the physical USB entry', () => {
     const state = withElectronicWords(stateWithQuantities({ electrode_count: 64 }), [
       {
