@@ -77,6 +77,36 @@ function toGeneratorSummary(gen: GenerateAtopileProjectResult): PcbPipelineRecor
 }
 
 /**
+ * INTENT: Excel `_pcb_two_axis_assessment` sets gerbers_ok from
+ * `state.pcb.pipeline.gerbers.files` only. Per-board runs write Gerbers under
+ * `pcb-boards/<id>/pcb/gerbers/` but the aggregate previously dropped them →
+ * every organoid multi-board bake scored "no Gerber set" / PCB tab 0 despite
+ * full fab packs on disk.
+ *
+ * @description Union gerber/drill file groups across board pipelines.
+ * @param boardPipelines - Per-board pipeline runs
+ * @param key - Which file group to aggregate
+ * @returns Combined file group, or undefined when no board exported any files
+ */
+export function aggregatePipelineFileGroup(
+  boardPipelines: ReadonlyArray<BoardPipelineRun>,
+  key: 'gerbers' | 'drill',
+): PcbPipelineResult['gerbers'] {
+  const files: string[] = []
+  let dir: string | undefined
+  for (const b of boardPipelines) {
+    const group = b.pipeline[key]
+    if (!group || !Array.isArray(group.files) || group.files.length === 0) continue
+    if (!dir) dir = group.dir
+    for (const f of group.files) {
+      if (typeof f === 'string' && f.length > 0) files.push(f)
+    }
+  }
+  if (files.length === 0) return undefined
+  return { dir: dir ?? 'pcb-boards', files }
+}
+
+/**
  * @description Boards that must receive a KiCad deliverable (filter empty-scope).
  */
 export function kicadDeliverableBoards(architecture: PcbArchitecturePlan): PcbBoardPlan[] {
@@ -169,8 +199,14 @@ export function runBespokeMultiBoardPcb(
   }
 
   const primary = boardPipelines[0]
+  const gerbers = aggregatePipelineFileGroup(boardPipelines, 'gerbers')
+  const drill = aggregatePipelineFileGroup(boardPipelines, 'drill')
+  // First board with a pick-and-place path — Excel reads a single pos.path today.
+  const pos = boardPipelines.map((b) => b.pipeline.pos).find((p) => p?.path)
   // DECISION: pipeline.ok is TOOLCHAIN hygiene only — designFitness is a separate
   // axis (Gate38 / Excel). Do not AND them here or a fitness gap looks like DRC.
+  // GOTCHA: stamp top-level `components` so pcb-gate coverage does not read 0
+  // when only generator.componentCount is populated (organoid final9 shape).
   const pipeline: PcbPipelineRecord = {
     ok: allPipelinesOk,
     stageReached: allPipelinesOk ? (primary?.pipeline.stageReached ?? 'done') : String(worstStage),
@@ -187,6 +223,10 @@ export function runBespokeMultiBoardPcb(
       : (allPipelinesOk
         ? []
         : [`${boardPipelines.filter((b) => !b.pipeline.ok).length}/${boardPipelines.length} board pipeline(s) failed`]),
+    components: allComponents.length,
+    ...(gerbers ? { gerbers } : {}),
+    ...(drill ? { drill } : {}),
+    ...(pos ? { pos } : {}),
     generator: primary
       ? toGeneratorSummary({
           ...primary.generator,

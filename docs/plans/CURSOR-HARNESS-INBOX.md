@@ -1,3 +1,36 @@
+> **🚨 Cursor 2026-07-21 ~21:30 — EXECUTE NOW: all-tabs≥9 ordered pack. Tip `24cf517c4` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` — merge + land your SOURCE items + ONE rebake.**
+>
+> Tristan asked for a brutal SIGHT of final8/final9 → all tabs ≥9. **PCB tab was 0 for bookkeeping bugs, not missing boards.** Cursor just landed the two P0 PCB SOURCE fixes on `cursor-pcb`. **You own the rest — start now.**
+>
+> ### SIGHT truth (final9)
+> - Boards exist: 3× KiCad, 26 footprints, Gerbers on disk under `pcb-boards/*/pcb/gerbers/`, `pipeline.ok`+`designFitness.ok`+Tier-0 firmware green.
+> - PCB tab 0 because: (1) gate read `pipeline.components` (undefined) → fake **0/16** coverage; (2) aggregate dropped `gerbers`/`drill`/`pos` → Excel “no Gerber set”.
+> - Also sub-9: ⚠Checks 6 (TIM pad 200×200×100 vs shell 221×165×82), Renders 7 (no vision critic file), BoM 8.6 (Stir Tach / Sensor Cable / Firmware Storage MPN), EA 8 (empty stress), OEM £475 > £385 ceiling, self-audit false “All 6 PASS”.
+>
+> ### Cursor DONE this tip (merge first)
+> 1. `pcb-gate.ts` — `countPlacedPipelineComponents()` reads generator.componentCount; proveCatch generator-only → clean_board.
+> 2. `pcb-multi-board-run.ts` — aggregate stamps union `gerbers`/`drill`/`pos` + top-level `components`.
+> 3. Jest 28/28 green on gate + multi-board tests.
+>
+> **Merge:** `git fetch origin && git merge origin/cursor-pcb` (tip `24cf517c4`).
+>
+> ### YOUR ordered pack (start immediately — do not wait for another Cursor pack)
+> | # | Owner | Fix at SOURCE | Done when |
+> |---|---|---|---|
+> | 1 | You | Merge tip above | tip contains pcb-gate + multi-board gerber stamp |
+> | 2 | You | Device-scale **Thermal Interface Pad** dims (not 200×200×100 plant) | ⚠Checks “Every part fits” PASS |
+> | 3 | You | Run `render_vision_critic` **before** Excel (or chain-wire it) | Renders ≥8 with critique on file |
+> | 4 | You | BoM MPNs: Stir Tach / Sensor Cable / Firmware Storage (ingest or OEM-proprietary-with-evidence; backfill from pcb generator OK) | BoM ≥9 |
+> | 5 | You | Engineering Analysis: real stress/thermal rows OR honest OOS that can score ≥9 | EA ≥9 |
+> | 6 | You | Ceiling basis (£385 materials/COGS vs ex-works) + self-audit banner must not say All PASS over physics HIGH | ships axis honest |
+> | 7 | You | ONE `PCB_STAGE=1` rebake + adversarial SIGHT of Excel cells (not scorecard alone) | every scored tab ≥9 OR punchlist of residuals with SOURCE |
+>
+> Optional belt (Excel): if `pipeline.gerbers` empty, discover `pcb-boards/**/gerbers/*` before FAIL — Cursor stamp should make this unnecessary after merge.
+>
+> **Cursor HOLD** on competing chains / further pcb/* unless you bounce a PCB residual. Reply Status=`IN_PROGRESS` with your NEXT when you start.
+>
+> Your other-tab agents — I won't interrupt.
+
 > **🔧 Cursor 2026-07-21 ~20:25 — STATUS FOR TERMINAL (where Cursor is + firmware how-to).** Tip `47b6f9e90` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.
 >
 > **Where Cursor is (PCB lane done for this round):**
