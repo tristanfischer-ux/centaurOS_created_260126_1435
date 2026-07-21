@@ -121,9 +121,11 @@ describe('pcb-multi-board-run', () => {
       // Stub generate by ensuring electronic words resolve enough to write ato —
       // runBespokeMultiBoardPcb calls real generateAtopileProject. Footprints may
       // leave unresolved; that is fine — we only assert directory fan-out.
-      const seenDirs: string[] = []
-      const result = runBespokeMultiBoardPcb(state, root, (projectDir) => {
-        seenDirs.push(projectDir)
+      const seenProjectDirs: string[] = []
+      const seenRunDirs: string[] = []
+      const result = runBespokeMultiBoardPcb(state, root, (projectDir, runDir) => {
+        seenProjectDirs.push(projectDir)
+        seenRunDirs.push(runDir)
         mkdirSync(projectDir, { recursive: true })
         // generateAtopileProject already wrote main.ato before pipeline is called
         if (!existsSync(join(projectDir, 'main.ato'))) {
@@ -134,13 +136,18 @@ describe('pcb-multi-board-run', () => {
 
       expect(result.multiBoardMerged).toBe(false)
       expect(result.boardPipelines.length).toBe(kicad.length)
-      expect(seenDirs.length).toBe(kicad.length)
+      expect(seenProjectDirs.length).toBe(kicad.length)
       // Distinct dirs under pcb-project/<boardId>
-      const unique = new Set(seenDirs)
+      const unique = new Set(seenProjectDirs)
       expect(unique.size).toBe(kicad.length)
-      for (const dir of seenDirs) {
+      for (const dir of seenProjectDirs) {
         expect(dir.includes(`${join('pcb-project')}`)).toBe(true)
         expect(existsSync(join(dir, 'main.ato')) || existsSync(dir)).toBe(true)
+      }
+      // proveCatch: per-board run dirs so pcb/ artefacts are not clobbered
+      expect(new Set(seenRunDirs).size).toBe(kicad.length)
+      for (const dir of seenRunDirs) {
+        expect(dir.includes(`${join('pcb-boards')}`)).toBe(true)
       }
     } finally {
       rmSync(root, { recursive: true, force: true })

@@ -387,6 +387,14 @@ def _looks_like_compact_source_board(components: List[Component]) -> bool:
     has_motherboard_roles = bool(re.search(r"\b(mcu|microcontroller|processor|controller|display|screen|detector|photodiode|sensor)\b", text))
     return has_source and not has_motherboard_roles and len(components) <= 32
 
+def _looks_like_host_interface_board(components: List[Component]) -> bool:
+    """MCU + USB receptacle netlists need edge keepout the 50 mm plant floor lacks."""
+    text = " ".join(f"{c.ref} {c.value} {c.footprint}" for c in components).lower()
+    has_mcu = bool(re.search(r"\b(qfp|lqfp|tqfp|qfn|bga|mcu|microcontroller)\b", text))
+    has_usb = bool(re.search(r"\busb[_ ]?c|usb_c_receptacle\b", text))
+    return has_mcu and has_usb
+
+
 def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path) -> Tuple[float, float]:
     total_area = 0.0
     for c in components:
@@ -397,7 +405,8 @@ def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path
         side = max(25.0, min(40.0, side))
         side = math.ceil(side / 5) * 5
     else:
-        side = max(cfg.board_min_size, min(cfg.board_max_size, side))
+        min_size = 80.0 if _looks_like_host_interface_board(components) else cfg.board_min_size
+        side = max(min_size, min(cfg.board_max_size, side))
         side = math.ceil(side / 10) * 10
     return side, side
 
@@ -440,6 +449,44 @@ def selftest() -> None:
     ]
     if _looks_like_compact_source_board(motherboard):
         raise AssertionError("MCU+LED netlist must NOT classify as compact source board")
+    # proveCatch (2026-07-21): MCU+USB host HAT floors at ≥80 mm (not 50).
+    host = [
+        Component("U1", "MCU microcontroller", "Package_QFP:TQFP-48_7x7mm_P0.5mm"),
+        Component("J1", "USB-C", "Connector_USB:USB_C_Receptacle_Amphenol_12401610E4-2A"),
+    ]
+    _footprint_cache[host[0].footprint] = FootprintData(bbox_w=10.0, bbox_h=10.0, resolved_from="fixture")
+    _footprint_cache[host[1].footprint] = FootprintData(
+        bbox_w=11.0, bbox_h=10.0, resolved_from="fixture", is_th=True,
+    )
+    assert _looks_like_host_interface_board(host), "MCU+USB must classify as host-interface"
+    host_w, host_h = auto_board_size(host, cfg, Path("/tmp/unused"))
+    if host_w < 80.0 or host_h < 80.0:
+        raise AssertionError(f"host-interface PCB must floor ≥80 mm, got {host_w:g}×{host_h:g}")
+    # proveCatch: intra-footprint USB pad DRC must NOT count as actionable.
+    fake_intra = {
+        "violations": [
+            {
+                "type": "clearance",
+                "items": [
+                    {"description": "PTH pad B1 [<no net>] of J1"},
+                    {"description": "PTH pad B2 [<no net>] of J1"},
+                ],
+            },
+            {
+                "type": "clearance",
+                "items": [
+                    {"description": "Track on F.Cu"},
+                    {"description": "Pad 1 of U1"},
+                ],
+            },
+        ],
+        "unconnected_items": [{"description": "Pin 2 of U1"}],
+    }
+    if actionable_drc_violation_count(fake_intra) != 2:
+        raise AssertionError(
+            "actionable DRC must drop intra-J1 clearance but keep track↔pad + unconnected, "
+            f"got {actionable_drc_violation_count(fake_intra)}"
+        )
     # proveCatch: IC grid is board-centred (old cy-20 shoved pads off a 40 mm board).
     _footprint_cache["Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"] = FootprintData(
         bbox_w=6.0, bbox_h=5.0, resolved_from="fixture",
@@ -1013,6 +1060,51 @@ def run_freerouter(dsn_path: Path, ses_path: Path, args, strategy: str = "Hybrid
 
 # ─── DRC (JSON format — robust, no substring counting) ─────────────────────────
 
+_FOOTPRINT_REF_RE = re.compile(r"\bof ([A-Z]{1,4}\d+)\b")
+_NON_FOOTPRINT_ITEM_RE = re.compile(r"\b(Track|Via|Zone|Filled copper|Silk|Courtyard|Edge\.Cuts)\b", re.I)
+
+
+def _drc_item_refs(items: List[dict]) -> Tuple[set, bool]:
+    """Return (footprint refs named in items, whether any non-footprint copper/geometry)."""
+    refs: set = set()
+    has_non_footprint = False
+    for it in items:
+        desc = it.get("description") or ""
+        m = _FOOTPRINT_REF_RE.search(desc)
+        if m:
+            refs.add(m.group(1))
+        elif _NON_FOOTPRINT_ITEM_RE.search(desc) or not desc:
+            has_non_footprint = True
+        else:
+            # Unknown item shape — keep it actionable rather than silently drop.
+            has_non_footprint = True
+    return refs, has_non_footprint
+
+
+def is_intra_footprint_drc_violation(violation: dict) -> bool:
+    """True when every item is pad/hole geometry inside ONE footprint instance.
+
+    INTENT: KiCad library mid-mount USB-C (and similar) footprints routinely
+    fail default annular/hole-to-hole/clearance rules *inside the same part*.
+    Growing the board or re-routing cannot fix vendor land patterns — those
+    defects must not block pipeline.ok. Track/via/zone and cross-ref clearances
+    remain actionable.
+    """
+    refs, has_non_footprint = _drc_item_refs(violation.get("items") or [])
+    return (not has_non_footprint) and len(refs) == 1
+
+
+def actionable_drc_violation_count(report: dict) -> int:
+    """Count DRC defects the placement/routing loop can actually fix."""
+    actionable = 0
+    for v in report.get("violations") or []:
+        if is_intra_footprint_drc_violation(v):
+            continue
+        actionable += 1
+    actionable += len(report.get("unconnected_items") or [])
+    return actionable
+
+
 def run_drc(board_path: Path, drc_json_path: Path, kicad_cli: str) -> Tuple[bool, int, dict]:
     result = subprocess.run(
         [kicad_cli, "pcb", "drc", str(board_path),
@@ -1027,7 +1119,11 @@ def run_drc(board_path: Path, drc_json_path: Path, kicad_cli: str) -> Tuple[bool
     if not drc_json_path.exists():
         return False, -1, {"stdout": result.stdout, "stderr": result.stderr}
     report = json.loads(drc_json_path.read_text())
-    violations = len(report.get("violations", [])) + len(report.get("unconnected_items", []))
+    # DECISION (2026-07-21 organoid HAT solo): gate on actionable defects only.
+    # Raw KiCad totals still live in the report JSON for SIGHT.
+    report["actionable_violations"] = actionable_drc_violation_count(report)
+    report["raw_violation_count"] = len(report.get("violations") or [])
+    violations = report["actionable_violations"]
     return True, violations, report
 
 # ─── Manufacturing outputs ──────────────────────────────────────────────────
@@ -1119,11 +1215,27 @@ def run(args) -> dict:
     num_inner = min(len(power_nets), 2) if len(power_nets) >= 2 else 0
 
     outline = load_board_outline(args.board_outline)
+    auto_w, auto_h = auto_board_size(components, cfg, fp_root)
     if outline is not None:
         min_x, min_y, max_x, max_y = outline_bbox(outline)
         base_w, base_h = max_x - min_x, max_y - min_y
+        # DECISION (2026-07-21): a Phase-B compact outline must never starve a
+        # non-compact netlist (MCU+USB HAT). Floor the placement bbox to auto size.
+        if not _looks_like_compact_source_board(components):
+            if base_w < auto_w or base_h < auto_h:
+                print(
+                    f"[pcb] outline {base_w:g}×{base_h:g} mm undersized vs auto "
+                    f"{auto_w:g}×{auto_h:g} mm — flooring placement base",
+                    file=sys.stderr,
+                    flush=True,
+                )
+            base_w = max(base_w, auto_w)
+            base_h = max(base_h, auto_h)
+            # Drop the tiny outline so grow/scale cannot re-clamp to it.
+            if base_w > (max_x - min_x) + 0.5 or base_h > (max_y - min_y) + 0.5:
+                outline = None
     else:
-        base_w, base_h = auto_board_size(components, cfg, fp_root)
+        base_w, base_h = auto_w, auto_h
 
     th_spacing = compute_th_spacing(components, cfg, fp_root, cfg.pad_min_gap)
     edge_margin = compute_edge_margin(components, cfg, fp_root, cfg.edge_margin_base)
