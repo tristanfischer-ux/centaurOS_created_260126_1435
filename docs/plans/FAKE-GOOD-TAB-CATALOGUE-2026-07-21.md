@@ -66,3 +66,16 @@ or render a device-appropriate basis. This is the [[forgeos_device_scale_fix_fam
 from the BoM/geometry to the NARRATIVE/BASIS tabs.
 
 Catalogue entry #10: Design basis (10) — plant process-piping/steam/HVAC basis on a benchtop device.
+
+## SOURCE-FIX TARGETS traced (ready to apply post-bake)
+- **#4 Financial Energy/yr = £0** — build-excel-export.py:10451 `energy = _ECON_LOAD_KW * ratio *
+  hours * load_factor * energy_price`. `_ECON_LOAD_KW` resolves to 0 (reads continuous_power_kw/
+  rated_power_kw, ABSENT for a benchtop) instead of falling back to `connected_electrical_load_kw`
+  (0.035 kW). FIX: fall back to connected_electrical_load_kw / total_power_w so a powered device
+  never shows £0 energy. (hours=8760, lf=0.65, price=0.15 → ~£30/yr honest.)
+- **#4b m³/ml unit confusion** — the Financial `out_unit`/`out_qty` reads the primary output metric
+  as "20 m³" when the working volume is 20 ml. FIX: unit-family-coherence on the divisor
+  (P4) — the annual-volume denominator unit must match the working-volume unit family.
+- **#5 duplicate "…Subcomponent" names** — generic fallback name minted across component_engineering.py
+  / deterministic_finalize.py when a sub-module word has no specific function name. FIX: name by
+  function at emission; never mint "{Module} Subcomponent {N}".
