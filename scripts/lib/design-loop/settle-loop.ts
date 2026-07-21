@@ -180,6 +180,14 @@ export function resizeFromConvergedDemand(
   const sup = q.total_supply_demand_kw
   const kw = (sup && typeof sup === 'object') ? Number(sup.value) : Number(sup)
   if (!Number.isFinite(kw) || kw <= 0) return null
+  // SINGLE-PHASE APPLIANCE — NO incomer transformer (2026-07-21, the 35 W device that
+  // carried a 25 kVA ladder-floor transformer). A load a single-phase socket supplies
+  // (≤ ~3 kW = 13 A × 230 V) is a 230 V appliance / benchtop instrument with no
+  // distribution transformer to size — suppress the incomer-kVA mint entirely so
+  // total_supply_demand_kva never appears for it. Universal, magnitude-keyed (mirrors
+  // electrical_distribution_model.SINGLE_PHASE_MAX_KW); real distributed loads above the
+  // socket ceiling are unchanged (byte-identical).
+  if (kw <= 3.0) return null
   const margin = opts.margin ?? INCOMER_KVA_MARGIN
   const sReq = Math.round(kw * margin * 1000) / 1000
   const kva = nextStandardKva(sReq)

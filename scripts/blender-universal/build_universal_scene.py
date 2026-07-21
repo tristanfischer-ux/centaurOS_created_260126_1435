@@ -1879,6 +1879,12 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"led\s*source|light\s*source|emitter|kingbright|\bnm\s*led\b|(?<!status\s)(?<!power\sindicator\s)(?<!indicator\s)\bled\b",
          (12.0, 10.0, 8.0)),
         (r"detector|photodiode|photo\s*sensor", (30.0, 22.0, 8.0)),
+        # INTENT (organoid-bioreactor 2026-07-21): a temperature probe/RTD/thermistor is a
+        # thin ~ø8×60 mm stick, NEVER a plant sensor housing (a proxy-echo gave 260×309×240
+        # mm — bigger than the whole enclosure). Placed before the culture-vessel rules so
+        # "Culture Temperature Probe" sizes as a probe, not a vessel.
+        (r"temperature\s*probe|temp\s*probe|\brtd\b|thermocouple|thermistor|"
+         r"pt100|pt1000|ds18b20|temperature\s*sensor|culture\s*temperature", (8.0, 8.0, 60.0)),
         (r"microcontroller|mcu|processor|firmware|logic\s*board|main\s*board|"
          r"feather|arduino|pico|esp32|teensy|rp2040", (42.0, 34.0, 5.0)),
         # INTENT (Rodeostat 0201): AFE / ADC / DAC / UI / standoff must NOT share
