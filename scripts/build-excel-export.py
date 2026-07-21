@@ -13514,39 +13514,53 @@ def _design_basis_rows(state: dict) -> List[dict]:
     def add(disc, item, value, unit, source):
         rows.append(dict(disc=disc, item=item, value=value, unit=unit, source=source))
 
+    # SCALE GATE (2026-07-21, the 4-agent review: a 20 mL / 35 W benchtop device shipped a
+    # steam-velocity / DN15–DN300 pipe / HVAC-duct / 400 V-3-ph "design basis" scored 10/10).
+    # A benchtop INSTRUMENT has no process piping, no steam/gas lines, no ductwork and no
+    # 3-phase distribution board — its fluid transport is small-bore lab tubing and its supply
+    # is single-phase / USB. Suppress the plant discipline rows for an instrument (universal,
+    # keyed on isInstrumentDevice — a real plant is byte-identical).
+    is_instrument = bool(state.get("isInstrumentDevice"))
+
     # ── Process & piping — connection_sizing's OWN constants (the module that
     # sized every line on the Line & velocity tab) ──
     cs = conn_sizing
-    add("Process & piping", "Pipe sizing basis — target velocity, liquid lines",
-        cs.DEFAULT_LIQUID_VELOCITY_MS, "m/s",
-        "connection_sizing.DEFAULT_LIQUID_VELOCITY_MS — D = √(4Q/πv), next standard DN up")
-    add("Process & piping", "Target velocity, gas / vapour lines",
-        cs.DEFAULT_GAS_VELOCITY_MS, "m/s", "connection_sizing.DEFAULT_GAS_VELOCITY_MS")
-    add("Process & piping", "Target velocity, steam lines",
-        cs.DEFAULT_STEAM_VELOCITY_MS, "m/s", "connection_sizing.DEFAULT_STEAM_VELOCITY_MS")
-    add("Process & piping", "Velocity limit, liquid lines (line-list spec)",
-        cs.LIQUID_VELOCITY_LIMIT_MS, "m/s",
-        "connection_sizing.LIQUID_VELOCITY_LIMIT_MS — the ≤ limit every line is checked against")
-    add("Process & piping", "Velocity limit, gas lines (erosion)",
-        cs.GAS_VELOCITY_LIMIT_MS, "m/s",
-        "connection_sizing.GAS_VELOCITY_LIMIT_MS (API RP 14E erosion ballpark)")
-    add("Process & piping", "Velocity limit, steam lines (erosion)",
-        cs.STEAM_VELOCITY_LIMIT_MS, "m/s", "connection_sizing.STEAM_VELOCITY_LIMIT_MS")
-    add("Process & piping", "Standard pipe size ladder",
-        f"{cs.PIPE_DN_LADDER[0][0]}–{cs.PIPE_DN_LADDER[-1][0]} "
-        f"({len(cs.PIPE_DN_LADDER)} standard bores)", "DN",
-        "connection_sizing.PIPE_DN_LADDER — the ONE ladder the sizer, line list and BoM share")
+    if not is_instrument:
+        add("Process & piping", "Pipe sizing basis — target velocity, liquid lines",
+            cs.DEFAULT_LIQUID_VELOCITY_MS, "m/s",
+            "connection_sizing.DEFAULT_LIQUID_VELOCITY_MS — D = √(4Q/πv), next standard DN up")
+        add("Process & piping", "Target velocity, gas / vapour lines",
+            cs.DEFAULT_GAS_VELOCITY_MS, "m/s", "connection_sizing.DEFAULT_GAS_VELOCITY_MS")
+        add("Process & piping", "Target velocity, steam lines",
+            cs.DEFAULT_STEAM_VELOCITY_MS, "m/s", "connection_sizing.DEFAULT_STEAM_VELOCITY_MS")
+        add("Process & piping", "Velocity limit, liquid lines (line-list spec)",
+            cs.LIQUID_VELOCITY_LIMIT_MS, "m/s",
+            "connection_sizing.LIQUID_VELOCITY_LIMIT_MS — the ≤ limit every line is checked against")
+        add("Process & piping", "Velocity limit, gas lines (erosion)",
+            cs.GAS_VELOCITY_LIMIT_MS, "m/s",
+            "connection_sizing.GAS_VELOCITY_LIMIT_MS (API RP 14E erosion ballpark)")
+        add("Process & piping", "Velocity limit, steam lines (erosion)",
+            cs.STEAM_VELOCITY_LIMIT_MS, "m/s", "connection_sizing.STEAM_VELOCITY_LIMIT_MS")
+        add("Process & piping", "Standard pipe size ladder",
+            f"{cs.PIPE_DN_LADDER[0][0]}–{cs.PIPE_DN_LADDER[-1][0]} "
+            f"({len(cs.PIPE_DN_LADDER)} standard bores)", "DN",
+            "connection_sizing.PIPE_DN_LADDER — the ONE ladder the sizer, line list and BoM share")
+    else:
+        add("Fluid transport", "Fluid lines", "small-bore lab tubing (peristaltic / gravity feed)",
+            "", "benchtop instrument — no DN process piping, steam or gas lines; media moves "
+                "through mm-bore silicone/TPE tubing sized by the pump/tubing take-off")
 
-    # ── HVAC — the duct sizer's design conditions ──
-    try:
-        import draw_hvac as _dh
-        add("HVAC", "Duct sizing basis — target air velocity",
-            _dh.DEFAULT_DUCT_VELOCITY_MS, "m/s",
-            "draw_hvac.DEFAULT_DUCT_VELOCITY_MS — duct area = airflow ÷ target velocity")
-        add("HVAC", "Duct velocity ceiling (flagged above)",
-            _dh.DUCT_VELOCITY_MAX_MS, "m/s", "draw_hvac.DUCT_VELOCITY_MAX_MS")
-    except Exception:  # noqa: BLE001 — the HVAC module is optional for a non-ducted class
-        pass
+    # ── HVAC — the duct sizer's design conditions (a benchtop instrument has no ducts) ──
+    if not is_instrument:
+        try:
+            import draw_hvac as _dh
+            add("HVAC", "Duct sizing basis — target air velocity",
+                _dh.DEFAULT_DUCT_VELOCITY_MS, "m/s",
+                "draw_hvac.DEFAULT_DUCT_VELOCITY_MS — duct area = airflow ÷ target velocity")
+            add("HVAC", "Duct velocity ceiling (flagged above)",
+                _dh.DUCT_VELOCITY_MAX_MS, "m/s", "draw_hvac.DUCT_VELOCITY_MAX_MS")
+        except Exception:  # noqa: BLE001 — the HVAC module is optional for a non-ducted class
+            pass
 
     # ── Electrical — the distribution model's BS 7671 constants + THIS design's
     # chosen board voltage (magnitude-keyed off the connected load) ──
@@ -13562,18 +13576,23 @@ def _design_basis_rows(state: dict) -> List[dict]:
                     f"{vp.board_voltage_v:g} V" + (" (MV)" if vp.is_mv else " 3-ph LV"),
                     "", f"electrical_distribution_model.select_distribution_voltage"
                         f"({conn_kw:g} kW) — {vp.rationale}")
-        add("Electrical", "Cable conductor sizes — preferred ladder",
-            f"{edm.CABLE_CSA_LADDER[0]:g}–{edm.CABLE_CSA_LADDER[-1]:g} "
-            f"({len(edm.CABLE_CSA_LADDER)} sizes)", "mm²",
-            "electrical_distribution_model.CABLE_CSA_LADDER — BS 7671 / IEC 60228 preferred sizes")
-        add("Electrical", "Cable ampacity basis",
-            "BS 7671 Method C (conservative single-core copper)", "",
-            "electrical_distribution_model._CSA_AMPACITY_A")
+        # A benchtop instrument's supply is single-phase / USB — the plant cable ladder to
+        # 400 mm² and the 2500 A LV-board ceiling are meaningless on it; keep only the power
+        # factor (a universal kW↔A basis). A real plant keeps the full ladder unchanged.
+        if not is_instrument:
+            add("Electrical", "Cable conductor sizes — preferred ladder",
+                f"{edm.CABLE_CSA_LADDER[0]:g}–{edm.CABLE_CSA_LADDER[-1]:g} "
+                f"({len(edm.CABLE_CSA_LADDER)} sizes)", "mm²",
+                "electrical_distribution_model.CABLE_CSA_LADDER — BS 7671 / IEC 60228 preferred sizes")
+            add("Electrical", "Cable ampacity basis",
+                "BS 7671 Method C (conservative single-core copper)", "",
+                "electrical_distribution_model._CSA_AMPACITY_A")
         add("Electrical", "Assumed displacement power factor",
             edm.POWER_FACTOR, "", "electrical_distribution_model.POWER_FACTOR (stated, kW↔A)")
-        add("Electrical", "Practical LV main-board current ceiling",
-            edm.PRACTICAL_LV_BOARD_CURRENT_A, "A",
-            "electrical_distribution_model.PRACTICAL_LV_BOARD_CURRENT_A — past this the model steps up")
+        if not is_instrument:
+            add("Electrical", "Practical LV main-board current ceiling",
+                edm.PRACTICAL_LV_BOARD_CURRENT_A, "A",
+                "electrical_distribution_model.PRACTICAL_LV_BOARD_CURRENT_A — past this the model steps up")
     except Exception:  # noqa: BLE001
         pass
 
