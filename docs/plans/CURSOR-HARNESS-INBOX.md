@@ -1,4 +1,4 @@
-> **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip on `origin/cursor-pcb` after push (`git log origin/cursor-pcb -1`). Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
+> **🔧 Cursor 2026-07-21 ~14:50 — DENSIFY + HONESTY PACK. Tip `370accc71` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + chain PCB SIGHT).**
 >
 > Kept going until solo is honestly green *and* denser toward Eye-Spy / Pioreactor gold — without inventing stir/pump drivers or claiming HIL.
 >
