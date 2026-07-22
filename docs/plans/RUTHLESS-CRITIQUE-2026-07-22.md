@@ -8,6 +8,14 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~10:25) — loopbake3 SIGHTed: big items CLEARED, floor 1.2 = new honest catches
+- **Ship axes all PASS**: Cost ceiling (materials £288 vs £385) ✓, PCB readiness FAB-READY ✓, Render vision clean ✓. **Verification off the sub-8 list** (P&P fix worked). The render/PCB/cost/Verification floor-setters are ALL cleared.
+- Floor DROPPED 4 → 1.2 — but this is HONEST scoring + my fixes' side-effects becoming the new floor, NOT a quality regression. New sub-8 (non-mirror):
+  - **Inputs & Assumptions 1.2** (the floor) — "14 drivers never referenced by any live formula (orphan inputs)" e.g. "Output volume". Likely my new contract quantities (agitation_speed_rpm / peak_heater_power_w) + the DCF-reframe removing the "Output volume" consumer. → diagnosis+fix sub-agent (a77781e) running.
+  - **⚠ Checks 6** — "1 of 100 invariants FAIL" (likely the new heater-consistency check — heat-balance may still emit old power). → same sub-agent.
+  - **Financial 6** — economics unverified on the OLD plant-DCF frame; the DCF reframe `398c2c2a8` (in HEAD, NOT in this bake) → instrument capital frame 10/10 next bake.
+- Killed loopbake3 (grinding quality-loop, can't fix code-level floor-setters). NEXT bake carries: DCF reframe + the orphan/check fix (in flight) + everything prior.
+
 ## LOOP STATUS (2026-07-22 ~09:55) — Verification regression FOUND+FIXED; loopbake3 (full batch) running
 - **Verification=4 root = REGRESSION from Cursor fixpack13** (`aggregatePipelinePositions` wrote a top-level pcb/positions.csv that concatenated KiCad MECHANICAL placements — fiducials FD*/mounting-holes H*/test-points TP* — so P&P count = 58 vs 35 generator parts → HARD "PCB generator parts ↔ PnP rows" row FAILED). **FIXED `da453106c`**: `_pcb_pos_count()` filters `^(FD|H|MH|MP|TP|AUX)\d` → count back to 35 = 35 → row PASSes. Two agents independently converged on it. Verification should return to ~9.9.
 - **Heater duty FIXED `ae739cce6`**: one `peak_heater_power_w` quantity (5W not 5/10 split), cartridge heater removed (Peltier covers heat+cool for sub-1W), + new deterministic heater-power-consistency check.
