@@ -124,47 +124,59 @@ def _roles_present(names: Iterable[str]) -> dict[str, bool]:
 # box as before (the mechanical rules match nothing → no growth); a design carrying
 # a stir drive / pump / vial holder grows the envelope to honestly contain them.
 
-# Role → representative device-scale footprint (w_mm, d_mm) for the LARGER mechanical
-# / fluidic / thermal parts an instrument's optical-UI pack ignores. Mirrors the
-# device-scale sizes in build_universal_scene._instrument_proxy_dim (F1b) so the
-# envelope and the placer agree on ONE part size. Only parts that materially drive
-# the footprint (≥ ~40 mm long edge) are listed — small SMD parts never grow a box.
-_MECHANICAL_PART_FOOTPRINTS_MM: tuple[tuple[str, tuple[float, float]], ...] = (
-    (r"magnetic\s*stir|stir(?:rer)?\s*(?:drive|bar|plate)|stirrer\b", (120.0, 100.0)),
-    (r"peristaltic\s*pump|dosing\s*pump|metering\s*pump|micro\s*pump", (110.0, 80.0)),
-    (r"vial\s*holder|tube\s*(?:rack|holder)|vial\s*rack|sample\s*rack|holder\s*fixture", (90.0, 60.0)),
-    (r"heatsink|heat\s*sink", (50.0, 40.0)),
-    (r"sample\s*block|thermal\s*block|tube\s*block", (60.0, 40.0)),
-    (r"culture\s*vessel|bioreactor\s*vessel|glass\s*vessel|reaction\s*vessel", (38.0, 38.0)),
-    (r"culture\s*(?:vial|tube|flask)|erlenmeyer|conical\s*flask", (25.0, 25.0)),
-    (r"media\s*tubing|tubing\s*set|perfusion\s*line|fluid\s*line|dosing\s*line", (60.0, 40.0)),
-    (r"thermal\s*insulation|insulation\s*(?:jacket|sleeve|wrap)|lagging", (60.0, 40.0)),
-    (r"front\s*panel\s*connector|connector\s*ports|panel\s*ports", (99.0, 8.0)),
-    (r"low\s*voltage\s*dc\s*supply|dc\s*supply|power\s*supply\s*brick", (48.0, 32.0)),
-    (r"flexure\s*stage|stage\s*body|flexure\s*body", (85.0, 85.0)),
+# Role → representative device-scale footprint (w_mm, d_mm, h_mm) for the LARGER
+# mechanical / fluidic / thermal parts an instrument's optical-UI pack ignores. Mirrors
+# the device-scale sizes in build_universal_scene._instrument_proxy_dim (F1b) so the
+# envelope and the placer agree on ONE part size. The height column was added 2026-07-22
+# (organoid bioreactor 1603 fix) so the enclosure height is bounded by the TALLEST real
+# part in the stack, not just the 0.42×min(w,d) heuristic that ignored it.
+# Only parts that materially drive the footprint (≥ ~40 mm long edge) are listed —
+# small SMD parts never grow a box.
+_MECHANICAL_PART_FOOTPRINTS_MM: tuple[tuple[str, tuple[float, float, float]], ...] = (
+    (r"magnetic\s*stir|stir(?:rer)?\s*(?:drive|bar|plate)|stirrer\b", (120.0, 100.0, 60.0)),
+    (r"peristaltic\s*pump|dosing\s*pump|metering\s*pump|micro\s*pump", (110.0, 80.0, 60.0)),
+    (r"vial\s*holder|tube\s*(?:rack|holder)|vial\s*rack|sample\s*rack|holder\s*fixture", (90.0, 60.0, 40.0)),
+    (r"heatsink|heat\s*sink", (80.0, 80.0, 96.0)),   # heatsink+fan combo; real organoid FAN is 80×78×96.5mm
+    (r"sample\s*block|thermal\s*block|tube\s*block", (60.0, 40.0, 18.0)),
+    (r"culture\s*vessel|bioreactor\s*vessel|glass\s*vessel|reaction\s*vessel", (38.0, 38.0, 70.0)),
+    (r"culture\s*(?:vial|tube|flask)|erlenmeyer|conical\s*flask", (25.0, 25.0, 80.0)),
+    (r"media\s*tubing|tubing\s*set|perfusion\s*line|fluid\s*line|dosing\s*line", (60.0, 40.0, 15.0)),
+    (r"thermal\s*insulation|insulation\s*(?:jacket|sleeve|wrap)|lagging", (60.0, 40.0, 12.0)),
+    (r"front\s*panel\s*connector|connector\s*ports|panel\s*ports", (99.0, 8.0, 28.0)),
+    (r"low\s*voltage\s*dc\s*supply|dc\s*supply|power\s*supply\s*brick", (48.0, 32.0, 22.0)),
+    (r"flexure\s*stage|stage\s*body|flexure\s*body", (85.0, 85.0, 35.0)),
 )
 
 
-def _functional_stack_footprint_mm(names: Iterable[str]) -> Optional[tuple[float, float]]:
-    """Landscape (width_mm, depth_mm) that shelf-packs the design's LARGE functional
+def _functional_stack_footprint_mm(names: Iterable[str]) -> Optional[tuple[float, float, float]]:
+    """Landscape (width_mm, depth_mm, height_mm) that packs the design's LARGE functional
     parts, or None when the design carries no footprint-driving mechanical/fluidic part.
+
+    W×D from area shelf-pack (as before). H = tallest matched part's height — the
+    enclosure must be at least this tall to contain the real mechanical stack.
 
     Deterministic area shelf-pack: sum each matched part's footprint area, take a
     landscape box of that area at a ~1.4:1 aspect, but never narrower than the widest
     single part (a 120 mm stir drive must fit on one shelf). Universal, no product
-    table — a pocket electronics instrument matches nothing here and stays small."""
-    foots: list[tuple[float, float]] = []
+    table — a pocket electronics instrument matches nothing here and stays small.
+
+    Height column added 2026-07-22 (organoid bioreactor 1603): the heatsink+fan in the
+    organoid is 80×78×96mm — the enclosure MUST be ≥ 96+12mm = 108mm tall, but the old
+    0.42×min(w,d) formula only produced 74.8mm (too short). The tallest matched part now
+    sets a HARD FLOOR for the enclosure height."""
+    foots: list[tuple[float, float, float]] = []
     for nm in names:
         low = str(nm or "").lower()
-        for pattern, (w_mm, d_mm) in _MECHANICAL_PART_FOOTPRINTS_MM:
+        for pattern, (w_mm, d_mm, h_mm) in _MECHANICAL_PART_FOOTPRINTS_MM:
             if re.search(pattern, low, re.I):
-                foots.append((float(w_mm), float(d_mm)))
+                foots.append((float(w_mm), float(d_mm), float(h_mm)))
                 break
     if not foots:
         return None
-    total_area = sum(w * d for w, d in foots)
-    widest = max(w for w, _ in foots)
-    deepest = max(d for _, d in foots)
+    total_area = sum(w * d for w, d, h in foots)
+    widest = max(w for w, d, h in foots)
+    deepest = max(d for w, d, h in foots)
+    tallest = max(h for w, d, h in foots)
     # Shelf-pack allowance: the render placer lays these parts (plus the smaller SMD
     # kit) on a compact grid whose extent tracks the SUMMED footprint area closely
     # (verified on the organoid: Σ large-part area 35,236 mm² vs the placed 221×165 mm
@@ -177,7 +189,7 @@ def _functional_stack_footprint_mm(names: Iterable[str]) -> Optional[tuple[float
     depth = max(deepest, packed_area / max(width, 1.0))
     if depth > width:
         width, depth = depth, width
-    return (round(width, 1), round(depth, 1))
+    return (round(width, 1), round(depth, 1), round(tallest, 1))
 
 
 def minimum_working_envelope_mm(
@@ -276,17 +288,19 @@ def minimum_working_envelope_from_state(state: dict) -> Optional[tuple[float, fl
     stack = _functional_stack_footprint_mm(names)
     if stack is not None:
         bw, bd, bh = body
-        sw, sd = stack
+        sw, sd, sh = stack   # sh = tallest mechanical part height
         # Body clearance walls around the packed part stack (both faces).
         sw += _CLEARANCE_MM * 2.0
         sd += _CLEARANCE_MM * 2.0
         w = max(bw, sw)
         d = max(bd, sd)
-        # Height: the mechanical stack (stir drive ~60 mm etc.) sits in the body, so
-        # the enclosure body is taller than the thin electronics slab. Scale the body
-        # height with how much the footprint grew, capped so a wide-flat pack does not
-        # mint a cube; the proud vessel on TOP is handled by the 1.8× phenotype tol.
-        h = max(bh, min(0.42 * min(w, d), 90.0))
+        # Height: enclosure must contain the tallest part + clearance on both faces.
+        # The 0.42×min(w,d) formula is a MINIMUM structural floor for flat benchtop
+        # instruments; the tallest mechanical part sets a HARD FLOOR.
+        # (2026-07-22: organoid heatsink+fan is 80mm tall → old formula gave 74.8mm,
+        # parts bbox was 96.4mm tall → coherence failure. Now: max(formula, sh+2×clr).)
+        h_formula = min(0.42 * min(w, d), 90.0)
+        h = max(bh, h_formula, sh + _CLEARANCE_MM * 2.0)
         if d > w:
             w, d = d, w
         body = (round(w, 1), round(d, 1), round(h, 1))
@@ -387,9 +401,17 @@ def _selftest() -> None:
     # And it must not massively over-shoot the real stack (would render an empty box):
     assert max(_bio_env) <= 300.0, (
         f"bioreactor envelope must not inflate far past the part stack, got {_bio_env}")
+    # 2026-07-22 (organoid 1603 fix): the enclosure height must contain the tallest
+    # mechanical part (heatsink+fan combo = 80mm) + 2×clearance = 92mm minimum.
+    assert _bio_env[2] >= 92.0, (
+        f"bioreactor envelope height must contain tallest part (heatsink 80mm + clearance), "
+        f"got {_bio_env[2]}")
+    assert _bio_env[2] <= 200.0, (
+        f"bioreactor envelope height must not over-inflate, got {_bio_env[2]}")
     _stack = _functional_stack_footprint_mm(
         [b["requirement"] for b in _bio["requirementsBom"]])
-    assert _stack is not None and max(_stack) >= 180.0, _stack
+    # _stack is now (W, D, H) — check W,D only for the ≥180 mm floor (height is separate)
+    assert _stack is not None and max(_stack[:2]) >= 180.0, _stack
     # proveNoFalsePositive: a POCKET electronics instrument (no mechanical part) stays
     # pocket-scale — the part-stack pack must not fire on it.
     _pocket = {
@@ -410,7 +432,8 @@ def _selftest() -> None:
 
     print(
         f"minimum_working_envelope _selftest: OK "
-        f"(10 mm path → {w}×{d}×{h} mm body; state → {env[0]}×{env[1]}×{env[2]} mm)"
+        f"(10 mm path → {w}×{d}×{h} mm body; state → {env[0]}×{env[1]}×{env[2]} mm; "
+        f"bioreactor → {_bio_env[0]}×{_bio_env[1]}×{_bio_env[2]} mm)"
     )
 
 

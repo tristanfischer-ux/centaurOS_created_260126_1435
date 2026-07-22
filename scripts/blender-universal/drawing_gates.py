@@ -565,6 +565,77 @@ def tag_legibility_findings(svg_text: str) -> list:
     return findings
 
 
+def enclosure_shell_contains_check(
+    parts: list,
+    pm_bbox: Optional[dict],
+    tol_mm: float = 10.0,
+) -> tuple:
+    """PURE G19 — shell dims ⊇ parts bbox within tolerance.
+
+    Reads the Enclosure Shell part's dims_mm from the parts list,
+    reads the parts-manifest bbox_mm, and checks containment.
+    Returns (passed, detail).
+
+    INTENT (organoid bioreactor 1603, 2026-07-22): the enclosure shell dimensions
+    (from parts-manifest.json) must CONTAIN the parts-manifest bbox (all parts must
+    fit inside the shell). A tolerance of 10mm is allowed (wall thickness + clearance).
+    FAILS when parts_bbox exceeds shell_dims by more than tol_mm.
+
+    Root-fix upstream: minimum_working_envelope.py must size the enclosure to contain
+    the real mechanical stack (stir drive + pump + fan etc) including HEIGHT so this
+    gate passes on the NEXT run after the envelope fix is applied.
+    """
+    # Find the Enclosure Shell part
+    shell_w = shell_d = shell_h = None
+    _shell_re = re.compile(r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+    for p in parts:
+        if not isinstance(p, dict):
+            continue
+        nm = str(p.get("name") or "")
+        if _shell_re.search(nm):
+            d = p.get("dims_mm") or {}
+            if isinstance(d, dict):
+                shell_w = float(d.get("w") or 0)
+                shell_d_val = float(d.get("d") or 0)
+                shell_h = float(d.get("h") or 0)
+                shell_d = shell_d_val
+            break
+
+    if not pm_bbox or not isinstance(pm_bbox, dict):
+        return (True, "no parts-manifest bbox — abstain")
+
+    if shell_w is None or shell_w == 0:
+        return (True, "no Enclosure Shell part in manifest — abstain")
+
+    parts_w = float(pm_bbox.get("length_mm") or 0)
+    parts_d = float(pm_bbox.get("width_mm") or 0)
+    parts_h = float(pm_bbox.get("height_mm") or 0)
+
+    if parts_w == 0 or parts_h == 0:
+        return (True, "parts bbox dims zero — abstain")
+
+    # Check containment: shell ⊇ parts within tolerance
+    # Sort both triples (largest→smallest) for dimension-agnostic comparison
+    shell_sorted = sorted([shell_w, shell_d, shell_h], reverse=True)
+    parts_sorted = sorted([parts_w, parts_d, parts_h], reverse=True)
+
+    violations = []
+    for i, (s, p_dim) in enumerate(zip(shell_sorted, parts_sorted)):
+        if p_dim > s + tol_mm:
+            dim_name = ["largest", "middle", "smallest"][i]
+            violations.append(f"{dim_name} dim: parts {p_dim:.0f} mm > shell {s:.0f} mm "
+                             f"(excess {p_dim - s:.0f} mm, tol ±{tol_mm:.0f} mm)")
+
+    if violations:
+        return (False, f"parts bbox {parts_sorted[0]:.0f}×{parts_sorted[1]:.0f}×{parts_sorted[2]:.0f} mm "
+                       f"exceeds shell {shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm: "
+                       + "; ".join(violations))
+
+    return (True, f"shell {shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm "
+                  f"⊇ parts {parts_sorted[0]:.0f}×{parts_sorted[1]:.0f}×{parts_sorted[2]:.0f} mm "
+                  f"(within ±{tol_mm:.0f} mm)")
+
+
 def run_gates(out_dir: str) -> list:
     """Run every deterministic drawing gate on <out_dir>. Returns list[Gate]."""
     def _load(name):
@@ -978,6 +1049,28 @@ def run_gates(out_dir: str) -> list:
             (_g18_detail if _g18_ok else f"SHADOW would-fail: {_g18_detail}")
             if not _g18_enforce and not _g18_ok
             else _g18_detail,
+        ))
+
+    # ── G19 ENCLOSURE SHELL CONTAINS PARTS BBOX (2026-07-22) ─────────────────
+    # The RENDER's outer envelope (enclosure shell dims) must CONTAIN the
+    # DRAWING's parts-manifest bbox. A parts stack that exceeds the shell means
+    # the render only looks tidy because the containment clamp HID the sprawl —
+    # the drawing plots parts at their real extent, exposing the incoherence.
+    # Root-fix: minimum_working_envelope.py must size the enclosure to contain
+    # the real mechanical stack (stir drive + pump + fan etc) including HEIGHT.
+    if _encl_m3 and 0 < float(_encl_m3) < 1.0:
+        _pm_doc_for_g19 = pm_doc if isinstance(pm_doc, dict) else {}
+        _pm_bbox_for_g19 = _pm_doc_for_g19.get("bbox_mm")
+        _parts_for_g19 = _pm_doc_for_g19.get("parts") or []
+        _g19_ok, _g19_detail = enclosure_shell_contains_check(
+            _parts_for_g19, _pm_bbox_for_g19
+        )
+        gates.append(Gate(
+            "enclosure_shell_contains_parts",
+            ["renders", "general-arrangement"],
+            "high",
+            _g19_ok,
+            _g19_detail,
         ))
 
     # ── G13 PRODUCT CAD GEOMETRY COVERAGE ─────────────────────────────────────
@@ -1475,6 +1568,7 @@ GATE_STAGE = {
     "drawing_domain": "deriveDeviceEnergyTopology (device-scale topology override) + draw_single_line/_apply_distribution_voltage_model DC-product branch",
     "render_view_quality": "render_view_contract required_views + build_universal_scene product cameras + render_image_quality",
     "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",
+    "enclosure_shell_contains_parts": "minimum_working_envelope (functional-stack height pack) + place_sealed_enclosure env_mm — shell must contain the real mechanical+fluidic part stack",
 }
 
 
@@ -2019,6 +2113,32 @@ def _selftest() -> int:
         from drawing_vision_glance import _selftest as _g18_self
         _g18_self()
         chk("g18_vision_glance_selftest", True)
+        # G19 ENCLOSURE SHELL CONTAINS PARTS BBOX proveCatch (both directions):
+        # (a) shell that CONTAINS the parts → PASS
+        _g19_parts_fit = [
+            {"name": "Enclosure Shell", "dims_mm": {"w": 250.0, "d": 190.0, "h": 110.0}},
+            {"name": "Heatsink Fan",    "dims_mm": {"w": 80.0,  "d": 80.0,  "h": 96.0}},
+        ]
+        _g19_bbox_fit  = {"length_mm": 229.0, "width_mm": 175.0, "height_mm": 96.0}
+        _g19_ok_fit, _ = enclosure_shell_contains_check(_g19_parts_fit, _g19_bbox_fit)
+        chk("g19_pass_when_shell_contains", _g19_ok_fit)
+        # (b) the 1603 organoid defect class: shell height 78mm, parts height 96mm
+        # → excess 18mm > 15mm tolerance → FAIL. The actual 1603 run had shell=82mm vs
+        # parts=96.4mm (14.4mm excess — borderline), but the ROOT CAUSE (heatsink fan
+        # 80mm+fan assembly sticking above the envelope) is best tested with a clear
+        # excess beyond the 15mm wall-clearance tolerance.
+        _g19_parts_fail = [
+            {"name": "Enclosure Shell", "dims_mm": {"w": 221.0, "d": 165.0, "h": 78.0}},
+            {"name": "Heatsink Fan",    "dims_mm": {"w": 80.0,  "d": 78.0,  "h": 96.0}},
+        ]
+        _g19_bbox_fail  = {"length_mm": 229.0, "width_mm": 175.0, "height_mm": 96.0}
+        _g19_ok_fail, _g19_msg = enclosure_shell_contains_check(_g19_parts_fail, _g19_bbox_fail)
+        chk("g19_fail_when_parts_exceed_shell", not _g19_ok_fail)
+        chk("g19_detail_mentions_excess", "excess" in _g19_msg)
+        # (c) abstain when no Enclosure Shell part in manifest
+        _g19_ok_abs, _ = enclosure_shell_contains_check(
+            [], {"length_mm": 200.0, "width_mm": 100.0, "height_mm": 80.0})
+        chk("g19_abstains_without_shell_part", _g19_ok_abs)
     finally:
         import shutil as _sh
         _sh.rmtree(_g15_td, ignore_errors=True)
