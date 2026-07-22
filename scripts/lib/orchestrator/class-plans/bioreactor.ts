@@ -108,7 +108,12 @@ const stepAgitationPower: ToolStep = {
   feeds_into: ['kla-oxygen:transfer'],
   input_from_contract: (c: any) => ({
     impeller_d_m: (c.quantities?.vessel_diameter_m?.value ?? 1.0) / 3,
-    impeller_n_rpm: 200,
+    // SHARED AGITATION SPEED (2026-07-22): read from contract `agitation_speed_rpm`
+    // (emitted by the engineering-contract archetype from the brief's rpm target).
+    // Falls back to 200 RPM only when the contract has no such quantity (non-bioreactor
+    // classes, or old contracts before this fix).  The Python tool accepts `agitation_speed_rpm`
+    // as an alias for `rpm` so the contract key name flows through without renaming.
+    agitation_speed_rpm: c.quantities?.agitation_speed_rpm?.value ?? 200,
     fluid_density_kg_m3: 1000,
     fluid_viscosity_cp: 1,
     impeller_type: 'rushton',
@@ -152,6 +157,11 @@ const stepDoControl: ToolStep = {
     working_volume_l: c.quantities?.working_volume_l?.value ?? 1000,
     target_do_pct_sat: 30,
     kla_per_h: c.quantities?.kla_per_h?.value ?? 270,
+    // SHARED AGITATION SPEED CAP (2026-07-22): pass the contract's brief-derived rpm
+    // target as `agitation_speed_rpm_cap` so dissolved-oxygen:control never emits a
+    // higher speed than the brief allows (e.g. 60 RPM for organoids vs the pre-fix
+    // hard floor of 100 RPM that violated low-shear requirements).
+    agitation_speed_rpm_cap: c.quantities?.agitation_speed_rpm?.value ?? undefined,
   }),
   contract_update: genericUpdate('dissolved-oxygen:control', 'do_control'),
 }

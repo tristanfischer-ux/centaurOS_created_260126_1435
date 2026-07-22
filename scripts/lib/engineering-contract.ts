@@ -15547,6 +15547,26 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
   const cultureTempC = Math.round(
     extractRangeFromDesc(desc, /(\d{2})\s*(?:±\s*[\d.]+\s*)?°?\s*c\b/i, 37),
   )
+  // AGITATION SPEED — single shared contract quantity (2026-07-22 bug fix).
+  // ROOT: without this quantity the bootstrap tool plan for benchtop_bioreactor gave
+  // agitation:power an LLM-generated 1000 RPM and dissolved-oxygen:control independently
+  // computed 100 RPM — both internally consistent but mutually contradictory.  For organoid
+  // culture this is also physically dangerous (1000 RPM × 15 mm impeller = 0.785 m/s tip
+  // speed, gross shear violation vs the brief's ≤0.1 Pa requirement).
+  // FIX: extract RPM from the brief (regex: "60 RPM", "30-100 RPM", "60 rpm"); default 60
+  // (low-shear mammalian/organoid bench target). Both consumers (agitation:power +
+  // dissolved-oxygen:control) read this key from the contract via from_contract_key mapping.
+  // A fermenter brief that states 800 RPM gets 800 — the fix is UNIVERSAL, not organoid-only.
+  const agitationSpeedRpm = Math.max(
+    10,
+    Math.round(
+      extractRangeFromDesc(
+        desc,
+        /(\d{1,4})\s*(?:to\s*\d+\s*)?rpm\b/i,
+        60, // low-shear mammalian/organoid default; overridden by brief
+      ),
+    ),
+  )
   // INTENT (Pioreactor 0327 calc-coverage): source_detail MUST carry an operator
   // (×/=) so check_calc_coverage counts the L×W×H derivation as SHOWN — a bare
   // prose phrase ("benchtop instrument envelope") hid the number at 97% coverage.
@@ -15585,6 +15605,14 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
         source_detail:
           `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m compact benchtop envelope`,
         formula: 'enclosure_length_m*enclosure_width_m*enclosure_height_m',
+      }),
+      // SHARED agitation speed — the single source of truth for ALL tools in the plan.
+      // agitation:power reads this as `rpm` (via from_contract_key); dissolved-oxygen:control
+      // reads it as `agitation_speed_rpm_cap` to cap its internally-derived rpm.
+      // Source is 'brief' so it is never overwritten by a calculator default and so the
+      // brief-value-literal-scanner (gate 25) can verify no tool uses a different literal.
+      agitation_speed_rpm: q(agitationSpeedRpm, 'RPM', 'frequency', 'rated', 'system', 'brief', {
+        source_detail: `agitation speed from brief (rpm regex) — shared across agitation:power + dissolved-oxygen:control; default 60 RPM (low-shear mammalian/organoid)`,
       }),
     },
     topology: [
@@ -15641,6 +15669,7 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
       working_volume_ml: workingVolumeMl,
       connected_electrical_load_kw: connectedElectricalLoadKw,
       enclosure_volume_m3: enclosureVolumeM3,
+      agitation_speed_rpm: agitationSpeedRpm,
       ambient_design_temp_c: 30,
       regulatory_standard_spine:
         'LVD + EMC + RoHS + IEC 61010-1 — research-use, not IVDR',

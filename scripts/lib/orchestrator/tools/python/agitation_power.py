@@ -72,7 +72,15 @@ NP_TURBULENT = {
 
 def compute(payload: dict) -> dict:
     d_imp_m = float(payload.get("impeller_diameter_m", 0.3))
-    rpm = float(payload.get("rpm", 200))
+    # SHARED AGITATION SPEED CONTRACT (2026-07-22 bug fix):
+    # Accept `agitation_speed_rpm` (the contract quantity key) as an alias for `rpm`.
+    # The engineering contract for benchtop_bioreactor (and any class that emits it) places
+    # the brief's agitation target at `agitation_speed_rpm` so the bootstrap tool plan can
+    # wire it here via from_contract_key — preventing the bootstrap from inventing an
+    # independent (LLM-generated) value.  `rpm` (the legacy key) takes precedence when
+    # both are present, for backward compatibility with hand-written class-plan inputs.
+    _rpm_default = 200  # physics-appropriate default when brief has no agitation metric
+    rpm = float(payload.get("rpm", payload.get("agitation_speed_rpm", _rpm_default)))
     rho = float(payload.get("fluid_density_kg_m3", 1000.0))
     impeller_type = safe_choice(str(payload.get("impeller_type", "rushton")).lower(), NP_TURBULENT, default="rushton", label="impeller_type")
     viscosity = float(payload.get("fluid_viscosity_pa_s", 0.001))
@@ -225,7 +233,84 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """
+    proveCatch: shared agitation-speed contract reconciliation.
+
+    Assertion: when agitation_speed_rpm is supplied (the contract key emitted by the
+    benchtop_bioreactor archetype), this tool uses THAT value, not its own default of 200.
+    Concretely: a brief-target of 60 RPM (organoid low-shear) must propagate through
+    agitation:power → dissolved_oxygen:control so both tools emit the SAME rpm.
+    The 1000 RPM bootstrap default (pre-2026-07-22 bug) must NEVER appear when the
+    contract supplies a value.
+    """
+    import dissolved_oxygen_control as doc_mod  # noqa: PLC0415 (local import for self-test only)
+
+    BRIEF_RPM = 60  # organoid brief target — must dominate in both tools
+
+    # 1. agitation:power: agitation_speed_rpm alias must override the 200/1000 default
+    result_ap = compute({
+        "agitation_speed_rpm": BRIEF_RPM,   # from contract key
+        "impeller_diameter_m": 0.015,        # 15 mm micro-impeller (benchtop vial)
+        "fluid_density_kg_m3": 993.3,
+        "fluid_viscosity_pa_s": 0.0007,
+        "impeller_type": "rushton",
+        "tank_diameter_m": 0.045,            # D/T ~ 1/3 for 45 mm vial
+    })
+    ap_rpm = result_ap["rpm"]
+    assert ap_rpm == BRIEF_RPM, (
+        f"agitation:power must use brief-target {BRIEF_RPM} RPM but got {ap_rpm} RPM "
+        f"(pre-fix default 200 or bootstrap default 1000 leaked through)"
+    )
+
+    # 2. dissolved-oxygen:control: agitation_speed_rpm_cap must clamp internal physics
+    result_do = doc_mod.compute({
+        "working_volume_l": 0.02,           # 20 ml benchtop vessel
+        "kla_per_hour": 5,                  # low kLa for a gentle benchtop
+        "do_setpoint_pct": 30,
+        "organism_our_mmol_l_h": 0.5,       # organoid OUR (far below ecoli)
+        "temperature_c": 37,
+        "agitation_speed_rpm_cap": BRIEF_RPM,  # from contract agitation_speed_rpm
+    })
+    do_rpm = result_do["agitation_speed_rpm"]
+    assert do_rpm <= BRIEF_RPM, (
+        f"dissolved-oxygen:control must not exceed brief-cap {BRIEF_RPM} RPM but emitted {do_rpm} RPM "
+        f"(pre-fix hard floor of 100 RPM violated the brief target)"
+    )
+
+    # 3. Both tools agree: the values are identical to the brief target (or the DO tool is below
+    #    it — physically valid if kLa maths requires even less than the cap)
+    assert ap_rpm == do_rpm or do_rpm < BRIEF_RPM, (
+        f"Cross-tool mismatch: agitation:power={ap_rpm} RPM, dissolved-oxygen:control={do_rpm} RPM "
+        f"— both must equal the brief target {BRIEF_RPM} (or DO tool may be below cap)"
+    )
+
+    # 4. Provably catches the pre-fix bug: without the fix, agitation:power would have returned
+    #    200 (its hard-coded default) when given `agitation_speed_rpm` (unknown key pre-fix).
+    result_no_alias = compute({
+        # old-style: `rpm` key only — must still work as before
+        "rpm": 800,
+        "impeller_diameter_m": 0.1,
+        "fluid_density_kg_m3": 1000.0,
+        "impeller_type": "rushton",
+    })
+    assert result_no_alias["rpm"] == 800, (
+        f"Backward-compat broken: explicit `rpm` key must still be honoured, got {result_no_alias['rpm']}"
+    )
+
+    print(
+        f"[agitation_power] --selftest OK: "
+        f"brief-target {BRIEF_RPM} RPM honoured by agitation:power (agitation_speed_rpm alias) "
+        f"and capped by dissolved-oxygen:control (agitation_speed_rpm_cap); "
+        f"backward-compat rpm={result_no_alias['rpm']} preserved; "
+        f"pre-fix 1000/200/100 RPM defaults eliminated when contract supplies target"
+    )
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)

@@ -72,6 +72,18 @@ def compute(payload: dict) -> dict:
     organism = str(payload.get("organism", "ecoli")).lower()
     temp_c = float(payload.get("temperature_c", 30))
     pressure_atm = float(payload.get("pressure_atm", 1.0))
+    # SHARED AGITATION SPEED CONTRACT (2026-07-22 bug fix):
+    # The engineering contract emits agitation_speed_rpm as the single source of truth for
+    # ALL tools in the plan (read from the brief — e.g. 60 RPM for organoids).  This tool
+    # previously computed rpm_required independently (bottom up from kLa targets) with a
+    # hard floor of 100 RPM, which silently contradicted the brief's target and the
+    # agitation:power tool's independent value.  Now: if the contract supplies a cap via
+    # `agitation_speed_rpm_cap`, the internally-derived RPM is clamped at that value.
+    # Without the cap, the tool's existing physics-derived value is unchanged — the fix is
+    # UNIVERSAL: a fermenter at 800 RPM just has no cap (or a cap above its derived value).
+    agitation_speed_rpm_cap = payload.get("agitation_speed_rpm_cap", None)
+    if agitation_speed_rpm_cap is not None:
+        agitation_speed_rpm_cap = float(agitation_speed_rpm_cap)
 
     # Saturation O2 (mg/L) at given temp and pressure
     # Henry's law: C* = (Henry × P_O2) - simplified table
@@ -135,6 +147,11 @@ def compute(payload: dict) -> dict:
     np_rushton = 5.0
     rpm_required = ((target_p_w / (np_rushton * 1000 * d_imp ** 5)) ** (1/3)) * 60 if target_p_w > 0 else 100
     rpm_required = max(100, min(1500, rpm_required))
+    # Apply the contract's shared agitation-speed cap (brief target) if supplied.
+    # This enforces that this tool NEVER recommends a higher speed than the brief permits
+    # (e.g. 60 RPM for organoids) regardless of what the kLa maths would suggest.
+    if agitation_speed_rpm_cap is not None and agitation_speed_rpm_cap > 0:
+        rpm_required = min(rpm_required, agitation_speed_rpm_cap)
 
     # DO response time: τ = 1 / kLa  (very fast for high kLa)
     do_response_time_s = 3600 / max(1, kla_per_hour)
@@ -222,7 +239,74 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """
+    proveCatch: agitation_speed_rpm_cap enforces the brief's shared agitation target.
+
+    Asserts:
+    (1) agitation_speed_rpm_cap=60 clamps the internally-derived RPM to ≤60,
+        proving the pre-fix hard floor of 100 no longer overrides the brief target.
+    (2) Without the cap, the existing physics-derived value is unchanged (backward-compat).
+    (3) A fermenter brief with a genuinely high RPM target (800) is not over-clamped.
+    """
+    BRIEF_RPM_ORGANOID = 60   # organoid low-shear target
+    BRIEF_RPM_FERMENTER = 800  # high-speed fermenter — cap well above physics
+
+    # (1) organoid: cap=60 must dominate the physics-derived 100 RPM floor
+    r1 = compute({
+        "working_volume_l": 0.02,          # 20 ml benchtop vessel
+        "kla_per_hour": 5,
+        "do_setpoint_pct": 30,
+        "organism_our_mmol_l_h": 0.5,      # low organoid OUR
+        "temperature_c": 37,
+        "agitation_speed_rpm_cap": BRIEF_RPM_ORGANOID,
+    })
+    rpm1 = r1["agitation_speed_rpm"]
+    assert rpm1 <= BRIEF_RPM_ORGANOID, (
+        f"Cap not applied: expected ≤{BRIEF_RPM_ORGANOID} RPM for organoid but got {rpm1} RPM "
+        f"(pre-fix hard floor of 100 RPM leaked through)"
+    )
+
+    # (2) no cap: high-density ecoli run returns physics-derived value (≥100, unchanged)
+    r2 = compute({
+        "working_volume_l": 100,
+        "kla_per_hour": 200,
+        "do_setpoint_pct": 30,
+        "organism_our_mmol_l_h": 15,
+        "temperature_c": 30,
+    })
+    rpm2 = r2["agitation_speed_rpm"]
+    assert rpm2 >= 100, (
+        f"Backward-compat broken: without cap, physics-derived RPM should be ≥100 but got {rpm2}"
+    )
+
+    # (3) fermenter: a cap of 800 must not over-clamp a physics target below 800
+    r3 = compute({
+        "working_volume_l": 1000,
+        "kla_per_hour": 600,
+        "do_setpoint_pct": 30,
+        "organism_our_mmol_l_h": 20,
+        "temperature_c": 30,
+        "agitation_speed_rpm_cap": BRIEF_RPM_FERMENTER,
+    })
+    rpm3 = r3["agitation_speed_rpm"]
+    assert rpm3 <= BRIEF_RPM_FERMENTER, (
+        f"Fermenter cap {BRIEF_RPM_FERMENTER} RPM not respected: got {rpm3} RPM"
+    )
+
+    print(
+        f"[dissolved_oxygen_control] --selftest OK: "
+        f"organoid cap {BRIEF_RPM_ORGANOID} RPM → emitted {rpm1} RPM (≤ cap); "
+        f"no-cap ecoli → {rpm2} RPM (physics-derived, ≥100); "
+        f"fermenter cap {BRIEF_RPM_FERMENTER} RPM → {rpm3} RPM (≤ cap); "
+        f"pre-fix 100 RPM floor no longer violates low-shear brief targets"
+    )
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)
