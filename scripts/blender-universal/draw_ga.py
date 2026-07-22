@@ -486,7 +486,32 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                 except Exception:  # noqa: BLE001
                     pass
                 bbox = _instrument_envelope_bbox(ww, dd, hh)
-                meta["envelope_source"] = "resolve_design_envelope_mm"
+                meta.setdefault("envelope_source", "resolve_design_envelope_mm")
+                # INTENT (2026-07-22 G20 routing fix): the CANONICAL envelope is the
+                # post-placement Enclosure Shell dims_mm in parts-manifest.json — it
+                # grows at render time to contain the placed parts. Prefer it ALWAYS
+                # when present (it supersedes the pre-placement resolve_design_envelope_mm
+                # estimate and makes the GA caption equal to the manifest shell, so G20's
+                # backstop check can confirm they agree).
+                try:
+                    _shell_re_ga = re.compile(
+                        r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b",
+                        re.I)
+                    for _sp in (man.get("parts") or []):
+                        if not isinstance(_sp, dict):
+                            continue
+                        if _shell_re_ga.search(str(_sp.get("name") or "")):
+                            _sd = _sp.get("dims_mm") or {}
+                            _sw = float(_sd.get("w") or 0)
+                            _sdp = float(_sd.get("d") or 0)
+                            _sh = float(_sd.get("h") or 0)
+                            if _sw > 0 and _sdp > 0 and _sh > 0:
+                                ww, dd, hh = _sw, _sdp, _sh
+                                bbox = _instrument_envelope_bbox(ww, dd, hh)
+                                meta["envelope_source"] = "manifest_enclosure_shell"
+                                break
+                except Exception:  # noqa: BLE001
+                    pass
                 try:
                     _op = _q("optical_path_mm") or _q("optical_path_length_mm")
                     if _op is not None:

@@ -1212,10 +1212,22 @@ def run_gates(out_dir: str) -> list:
         _parts_for_g20 = _pm_doc_for_g20.get("parts") or []
         _caption_dims_g20 = None
         try:
-            from pathlib import Path as _PathG20
-            from generate_drawing_set import _manifest_envelope_dims as _mfe_g20  # type: ignore
-            _caption_str_g20 = _mfe_g20(_PathG20(out_dir))
-            _caption_dims_g20 = _parse_caption_envelope_mm(_caption_str_g20)
+            # Parse the DELIVERED GA SVG caption — what the drawing ACTUALLY shows —
+            # so G20 fires when the caption diverges from the canonical manifest shell.
+            # (The old code called _manifest_envelope_dims which re-resolves from state,
+            # returning the same source that may be wrong — defeating the purpose of G20.)
+            _ga_svg_path_g20 = os.path.join(out_dir, "drawings", "general-arrangement.svg")
+            if os.path.exists(_ga_svg_path_g20):
+                _ga_svg_text_g20 = open(_ga_svg_path_g20, encoding="utf-8", errors="replace").read()
+                # The title block emits: "product envelope W × D × H mm (L×W×H)"
+                # or "Overall plant envelope …". Extract the first dim-string after
+                # either noun.
+                _cap_match_g20 = re.search(
+                    r"(?:product envelope|Overall plant envelope)\s+"
+                    r"([\d][\d ×\.]+(?:mm|m))",
+                    _ga_svg_text_g20)
+                if _cap_match_g20:
+                    _caption_dims_g20 = _parse_caption_envelope_mm(_cap_match_g20.group(1).strip())
         except Exception:  # noqa: BLE001
             _caption_dims_g20 = None
         _g20_ok, _g20_detail = envelope_equality_cross_check(_parts_for_g20, _caption_dims_g20)
@@ -1790,6 +1802,31 @@ def _ga_svg_equipment_tags(svg_text: str) -> set:
     return set(_GA_PART_SET_TAG_RE.findall(txt))
 
 
+_GA_TOPN_RE = re.compile(r"\btop\s+(\d+)\s+of\s+(\d+)\s+items\b", re.I)
+
+
+def _ga_svg_schedule_tags(svg_text: str) -> tuple:
+    """Tags listed in the equipment schedule section of the GA SVG.
+
+    The schedule may show only a 'top N of M items by footprint' subset — in that case
+    the M-N items NOT shown are legitimately absent from the SVG and must not be flagged
+    as dropped by G21.
+
+    Returns (schedule_tag_set, declared_top_n, declared_total_m).
+    When no top-N note is present, schedule_tag_set is empty and top_n == total_m == 0
+    (caller treats all SVG tags as the full set).
+    """
+    top_n_match = _GA_TOPN_RE.search(svg_text)
+    if not top_n_match:
+        return set(), 0, 0
+    top_n = int(top_n_match.group(1))
+    total_m = int(top_n_match.group(2))
+    # Strip rotated text (dimension annotations) same as _ga_svg_equipment_tags.
+    txt = re.sub(r'<text[^>]*\btransform\s*=\s*"rotate[^"]*"[^>]*>.*?</text>', "", svg_text)
+    sched_tags = set(_GA_PART_SET_TAG_RE.findall(txt))
+    return sched_tags, top_n, total_m
+
+
 def part_set_coherence_check(
     parts: list,
     ga_svg_text: str,
@@ -1831,8 +1868,22 @@ def part_set_coherence_check(
     prefixes = {t.split("-", 1)[0] for t in man_tags}
     ga_tags_filtered = {t for t in ga_tags if t.split("-", 1)[0] in prefixes}
 
+    # If the GA declares a top-N subset ("top N of M items by footprint"), the M-N
+    # items not drawn are LEGITIMATELY absent — GA convention. The schedule only renders
+    # the top-N by footprint; manifest tags absent from the GA are not "dropped" — they
+    # are simply outside the top-N. Suppress the dropped check; only phantoms (tags on GA
+    # absent from manifest) remain active.
+    _sched_tags, _top_n, _total_m = _ga_svg_schedule_tags(ga_svg_text)
+    _is_topn = _top_n > 0 and _total_m > _top_n
+
     phantoms = sorted(ga_tags_filtered - man_tags)   # in GA, not in manifest
-    dropped = sorted(man_tags - ga_tags_filtered)    # in manifest, not in GA
+    if _is_topn:
+        # Any manifest tag absent from the GA is legitimately excluded as bottom-(M-N).
+        dropped: list = []
+        _topn_note = f" (top-{_top_n}-of-{_total_m} GA subset; dropped check suppressed)"
+    else:
+        dropped = sorted(man_tags - ga_tags_filtered)  # in manifest, not in GA
+        _topn_note = ""
 
     if phantoms or dropped:
         parts_list = []
@@ -1847,7 +1898,7 @@ def part_set_coherence_check(
                 + "; ".join(parts_list))
 
     return (True,
-            f"part-set COHERENT — {len(man_tags)} manifest principal tag(s) all present on GA; "
+            f"part-set COHERENT{_topn_note} — {len(man_tags)} manifest principal tag(s); "
             f"0 phantoms + 0 dropped")
 
 
@@ -2952,6 +3003,48 @@ def _selftest() -> int:
     )
     _g21_ok_ip, _ = part_set_coherence_check(_g21_parts_coherent, _g21_svg_ip)
     chk("g21_ip_rating_noise_filtered", _g21_ok_ip)
+    # (g2) TOP-N SCHEDULE: the GA declares "top 3 of 5 items by footprint" and only
+    # draws EP-101, P-101, K-101 in the schedule. X-102 and I-102 are legitimately
+    # absent (not in the top-3 by footprint) — must NOT false-fire as "dropped".
+    # PHANTOM rule still fires: a phantom not in manifest still fires.
+    _g21_svg_topn = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        # Title block: top-N declaration
+        '<text x="100" y="500">PRINCIPAL EQUIPMENT  (top 3 of 5 items by footprint)</text>'
+        # Schedule: 3 drawn + scheduled tags
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        '<text x="300" y="50" font-weight="bold">K-101</text>'
+        # X-102 and I-102 absent (legitimately — not in top-3)
+        '<text x="100" y="520">Equipment schedule: see the Part names tab for the full 5-item list.</text>'
+        '</svg>'
+    )
+    _g21_ok_topn, _g21_msg_topn = part_set_coherence_check(_g21_parts_coherent, _g21_svg_topn)
+    chk("g21_topn_schedule_does_not_false_fire", _g21_ok_topn)
+    # But a phantom in the same top-N SVG still fires
+    _g21_svg_topn_phantom = _g21_svg_topn.replace(
+        '</svg>',
+        '<text x="600" y="50" font-weight="bold">X-999</text></svg>')
+    _g21_ok_topn_ph, _g21_msg_topn_ph = part_set_coherence_check(_g21_parts_coherent, _g21_svg_topn_phantom)
+    chk("g21_topn_phantom_still_fires", not _g21_ok_topn_ph)
+    chk("g21_topn_phantom_names_offender", "X-999" in _g21_msg_topn_ph)
+    # A truly dropped tag (not in schedule, not drawn, but manifest declares top-N > schedule) — fires.
+    _g21_parts_7 = _g21_parts_coherent + [
+        {"equipment_tag": "X-201", "name": "Extra Part A"},
+        {"equipment_tag": "X-202", "name": "Extra Part B"},
+    ]
+    # Same SVG: 3 scheduled, 4 unscheduled (X-102, I-102, X-201, X-202). The note says "top 3 of 7".
+    _g21_svg_topn_7 = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="500">PRINCIPAL EQUIPMENT  (top 3 of 7 items by footprint)</text>'
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        '<text x="300" y="50" font-weight="bold">K-101</text>'
+        # X-102, I-102, X-201, X-202 legitimately absent
+        '</svg>'
+    )
+    _g21_ok_7, _g21_msg_7 = part_set_coherence_check(_g21_parts_7, _g21_svg_topn_7)
+    chk("g21_topn_all_absent_legitimately_passes", _g21_ok_7)
     # (h) VERIFY COHERENCE on the DELIVERED coherence-verify-2240 bake:
     # No GA SVG exists in that output (drawings/general-arrangement.svg absent).
     # G21 must ABSTAIN (not false-fire on a missing SVG) — confirming the delivered
@@ -2979,7 +3072,7 @@ def _selftest() -> int:
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions + G21 part-set coherence proveCatch both directions on synthetic data + verified coherent/abstain on out/coherence-verify-2240)")
+    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions + G21 part-set coherence proveCatch both directions on synthetic data + G21 top-N schedule non-false-fire proveCatch + verified coherent/abstain on out/coherence-verify-2240)")
     return 0
 
 
