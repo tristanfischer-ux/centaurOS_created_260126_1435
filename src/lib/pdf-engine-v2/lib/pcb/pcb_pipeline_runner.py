@@ -814,6 +814,34 @@ def selftest() -> None:
         raise AssertionError(
             f"dense densify host must floor ≥110 mm, got {dense_w:g}×{dense_h:g}"
         )
+    # proveCatch (fixpack16): horizontal SMD col-cap — a 50 mm board must not
+    # place a 7-wide 0603 band that puts the last pad at X≈51.
+    tiny_smd = [
+        Component(f"R{i}", "0603", "Resistor_SMD:R_0603_1608Metric") for i in range(1, 8)
+    ]
+    for c in tiny_smd:
+        _footprint_cache[c.footprint] = FootprintData(
+            bbox_w=1.6, bbox_h=0.8, resolved_from="fixture",
+            pads=[
+                {"num": "1", "x": -0.5, "y": 0.0, "w": 0.5, "h": 0.5},
+                {"num": "2", "x": 0.5, "y": 0.0, "w": 0.5, "h": 0.5},
+            ],
+        )
+    place_smd = place_components(
+        tiny_smd, cfg, Path("/tmp/unused"), 50.0, 50.0, 8.0, 5.0, smd_spacing=4.0,
+    )
+    max_x = max(xy[0] for xy in place_smd.values())
+    min_x = min(xy[0] for xy in place_smd.values())
+    if max_x > 50.0 - 5.0 + 1.0 or min_x < 5.0 - 1.0:
+        # Centres may sit inside while pads peek — validate is the hard bar.
+        ok_smd, reason_smd = validate_placement(
+            place_smd, tiny_smd, cfg, Path("/tmp/unused"), 50.0, 50.0,
+        )
+        if not ok_smd and "off-board" in reason_smd:
+            raise AssertionError(
+                f"SMD col-cap must keep 7×0603 on 50 mm board or fail honestly "
+                f"without X>50 centres; got place={place_smd} valid={ok_smd} ({reason_smd})"
+            )
     # proveCatch: mounting holes survive outline-drop and render as NPTH footprints.
     tiny_outline = {
         "outline": {
@@ -1403,6 +1431,14 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
         if smd_rows > max_rows_fit:
             smd_cols = max(smd_cols, math.ceil(len(smd) / max_rows_fit))
             smd_rows = math.ceil(len(smd) / smd_cols)
+    # GOTCHA (fixpack16): vertical column-widen made OD SMD band 7-wide on a
+    # 50 mm board (J1 at X=-1.4, D2 pad at 51.8). Cap cols by usable width.
+    if smd and smd_spacing > 0:
+        usable_w = max(0.0, board_w - 2 * margin - 2 * max_smd_half_h)
+        max_cols_fit = max(1, int(usable_w / smd_spacing) + 1)
+        if smd_cols > max_cols_fit:
+            smd_cols = max_cols_fit
+            smd_rows = math.ceil(len(smd) / smd_cols)
     for i, (c, fp) in enumerate(smd):
         col = i % smd_cols
         row = i // smd_cols
@@ -1425,19 +1461,23 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
                     px, py = placements[c.ref]
                     placements[c.ref] = (px, py - overflow)
 
-    # INTENT (fixpack15): dense HAT SMD/IC grids also overflow east/west
-    # (D2 pad at X=109.7 on a 110 mm board → needless grow to 120). Shift the
-    # non-TH cluster when only one side overflows; if both sides overflow the
-    # board is genuinely too small and validate→grow stays honest.
+    # INTENT (fixpack15/16): SMD/IC grids overflow east/west (HAT D2@109.7 on
+    # 110 mm; OD D2@51 on ~50 mm). Shift using ACTUAL pad coords — same truth
+    # as validate_placement — not radial extent (asymmetric pads under-estimate).
+    # One-side overflow only; both sides → board genuinely too small → grow.
     movable = [(c, fp) for c, fp in ics + smd if c.ref in placements]
     if movable:
-        def _extent_x(c_fp: Tuple[Component, FootprintData]) -> Tuple[float, float]:
-            c, fp = c_fp
+        pad_xs: List[float] = []
+        for c, fp in movable:
             px, _py = placements[c.ref]
-            r = _pad_radial_extent(fp)
-            return px - r, px + r
-        leftmost = min(_extent_x(cf)[0] for cf in movable)
-        rightmost = max(_extent_x(cf)[1] for cf in movable)
+            if fp.pads:
+                for p in fp.pads:
+                    pad_xs.append(px + p["x"])
+            else:
+                r = _pad_radial_extent(fp)
+                pad_xs.extend([px - r, px + r])
+        leftmost = min(pad_xs)
+        rightmost = max(pad_xs)
         overflow_l = margin - leftmost
         overflow_r = rightmost - (board_w - margin)
         shift_x = 0.0
@@ -1445,6 +1485,12 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
             shift_x = -overflow_r
         elif overflow_l > 0.05 and overflow_r <= 0.05:
             shift_x = overflow_l
+        elif overflow_r > 0.05 and overflow_l > 0.05:
+            # Both sides: centre if the span fits; else leave for validate→grow.
+            span = rightmost - leftmost
+            usable = board_w - 2 * margin
+            if span <= usable + 0.05:
+                shift_x = (margin + (usable - span) / 2.0) - leftmost
         if abs(shift_x) > 0.05:
             for c, _fp in movable:
                 px, py = placements[c.ref]

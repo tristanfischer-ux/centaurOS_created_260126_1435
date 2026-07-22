@@ -32802,6 +32802,50 @@ def _selftest() -> int:
         elif "architecture gap" not in str(_p5_a.get("readiness_why") or "").lower():
             print(f"  FAIL P5 multiBoardMerged: why must mention architecture gap, got "
                   f"{_p5_a.get('readiness_why')!r}"); bad += 1
+        # proveCatch (fixpack16): Tier-1 hygiene row surfaces when firmwareProof.tier1
+        # is recorded — ok → scored 1/1; hard-fail (ok=false,skipped=false) → 0/1;
+        # skipped alone must NOT floor (1/1 with skipped label).
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _p5_pcb["multiBoardMerged"] = False
+        _p5_pcb["firmwareProof"] = {
+            "schema": "pcb-firmware-proof-stage/v1",
+            "tier": 1,
+            "ok": True,
+            "allOk": True,
+            "results": [],
+            "tier1": {
+                "ok": True, "skipped": False, "tier": "tier1_mcu_compile",
+                "reason": "freestanding link OK", "toolchain": "/usr/bin/arm-none-eabi-gcc",
+            },
+        }
+        _t1_a = _pcb_two_axis_assessment(_p5_pcb, _p5_td)
+        _t1_hygiene = [c for c in (_t1_a.get("hygiene_components") or [])
+                       if "Tier-1" in str(c[0])]
+        if not _t1_hygiene or _t1_hygiene[0][1] != 1:
+            print(f"  FAIL fixpack16 Tier-1 hygiene: ok=true must append 1/1 row, got "
+                  f"{_t1_hygiene!r}"); bad += 1
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _p5_pcb["firmwareProof"]["tier1"] = {
+            "ok": False, "skipped": False, "tier": "tier1_mcu_compile",
+            "reason": "link failed", "toolchain": "/usr/bin/arm-none-eabi-gcc",
+        }
+        _t1_fail = _pcb_two_axis_assessment(_p5_pcb, _p5_td)
+        _t1_fail_h = [c for c in (_t1_fail.get("hygiene_components") or [])
+                      if "Tier-1" in str(c[0])]
+        if not _t1_fail_h or _t1_fail_h[0][1] != 0:
+            print(f"  FAIL fixpack16 Tier-1 hygiene: hard-fail must score 0/1, got "
+                  f"{_t1_fail_h!r}"); bad += 1
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _p5_pcb["firmwareProof"]["tier1"] = {
+            "ok": False, "skipped": True, "tier": "tier1_mcu_compile",
+            "reason": "no toolchain", "toolchain": None,
+        }
+        _t1_skip = _pcb_two_axis_assessment(_p5_pcb, _p5_td)
+        _t1_skip_h = [c for c in (_t1_skip.get("hygiene_components") or [])
+                      if "Tier-1" in str(c[0])]
+        if not _t1_skip_h or _t1_skip_h[0][1] != 1 or "skipped" not in str(_t1_skip_h[0][0]).lower():
+            print(f"  FAIL fixpack16 Tier-1 hygiene: skipped must score 1/1 with "
+                  f"skipped label, got {_t1_skip_h!r}"); bad += 1
     finally:
         _PCB_ASSESS_CACHE.pop(_p5_td, None)
         _shutil_p5.rmtree(_p5_td, ignore_errors=True)
