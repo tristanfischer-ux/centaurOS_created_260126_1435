@@ -8,6 +8,14 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~14:30) — 🎯 FLOOR = 8 (0→2.4→4→6→8); every non-mirror tab ≥8
+- loopbake6 (1405): internal-runs invariant CLEARED (delivered schedule length capped 1.07m→0.313m). **Floor 8**, CHECKS FAIL=0, all 4 ship axes PASS (cost/PCB/render/self-audit). ZERO non-mirror tabs below 8.
+- Tab scores: 26 tabs, most 9-10 (Verification/PCB/Risk/Holds 9.9; Assembly/Drawings/Interconnect/Renders 9; ⚠Checks/Financial/Inputs/Overview/Brief/Calculations… 10). 
+- **8→9 targets (the last mile) — 2 tabs at 8, both narrow fixes dispatched:**
+  1. **Drawing gates: 8** — "1 of 12 drawing gates failing" (4 correctly skipped for fluid-less instrument). Agent af0424f: find the 1 real FAIL + fix at source or scale-gate a benchtop false-fail.
+  2. **Bill of Materials: 8.3** — "6/35 rows fail the column contract" (likely catalogue-electronic parts labelled "bespoke fabrication to drawing" with UNRESOLVED MPN — invalid identity for a buyable part). Agent a6f982e: correct identity/status honestly (no fabricated MPNs); note genuine data-coverage blockers → BLOCKERS.md.
+- Killed loopbake6. Next bake carries both 8→9 fixes → target floor ≥9.
+
 ## LOOP STATUS (2026-07-22 ~13:40) — loopbake5: internal-runs fix DIDN'T REACH the delivered value
 - loopbake5 (1258) floor still **6** — the internal-runs invariant STILL fails: delivered connection-schedule.json length_m = 1.07-1.13m (over 0.44m cap). The prior fix `1e468d65a` changed `_record_logical` (route mesh) + passed its selftest, but the SCHEDULE length_m is written by a DIFFERENT path still using the 450mm overhead-rack length. Classic "fixed a path that isn't REACHED" — SIGHT the DELIVERED value, not the selftest.
 - **Progress though**: Overview 7.5 → **8 PASS** (section-scores 9/12 → 10/12). ⚠Checks is now the SOLE floor-setter (6, from the one invariant). Everything else ≥8.
