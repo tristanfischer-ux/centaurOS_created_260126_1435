@@ -8,6 +8,11 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~08:40) — floor 2.4 → 4
+- loopbake1 (0814) SIGHTed: **render/vision BARRIER worked** (sentinel landed +274s, critique ON DISK → honest scoring). **PCB cleared ≥8** (fab-zip + cost fixes); Renders is now the SOLE non-mirror floor-setter (floor 4). CHECKS FAIL=0.
+- **Render B7 form-gate WORKED for the body** — 04-product-exterior.png is now a coherent sealed instrument (opaque chassis + fascia display/buttons/LED/port/lid). Defects 5→1.
+- **REMAINING render defect (iter-2, IN PROGRESS sub-agent):** a translucent glass VIAL floats ~30mm ABOVE the top deck on the EXTERIOR view (04) — a cuvette-style exterior detail leaking onto a vial_bioreactor. The cutaway-cue form-gate (17494) did NOT cover this exterior-view placement, and the containment clamp did not catch it (either wrong name prefix, or the exterior product views bypass the clamp). Fix: gate/flush the exterior top-deck vessel cue for lab_electronics (short OPAQUE port flush with deck, not a floating translucent cuvette).
+
 ## LOOP STATUS (2026-07-22 ~08:25)
 - Autonomous cron `c79ad92e` every :09/:39. Render B7 fix LANDED (`d0dcdbec3`, form-gate 17494 + containment clamp + 4-assertion proveCatch). **Verification bake running** (loopbake1) — SIGHT `00-hero.png` when it lands; expect NO floating PCB / cuvette tower (form-gated for lab_electronics). Then re-attack + pick next item (device-scale content family: RPM/WRAS/DCF/heater).
 
