@@ -1,5 +1,13 @@
 # Universal cross-artefact geometry-coherence system (2026-07-22)
 
+## ✅✅✅ COHERENCE STACK DELIVERED-GREEN END-TO-END (2026-07-23 ~01:05) — DONE
+Fresh full bake `out/organoid-bioreactor-20260723-0050` (caption-H fix accd379c2 in). ALL THREE gates PASS on the DELIVERED artefacts (not selftest — the trap is beaten):
+- **G19 PASS** — shell 367×335×126 ⊇ parts.
+- **G20 PASS** — DELIVERED GA caption "367 × 335 × 126 mm" == manifest shell 367×335×126 (caption now routes all 3 axes W,D,H from the canonical shell; the optics-tower form-rule no longer leaks into the caption).
+- **G21 PASS** — top-10-of-25 coherent, 0 dropped/phantom.
+- Positions coherent by construction. All floor-wired (gate 35), proveCatch both directions, universal, OPERATING-FRAME documented.
+**The universal cross-artefact coherence MECHANISM is COMPLETE + DELIVERED-VERIFIED end-to-end.** An incoherent dossier cannot ship (gates floor it) AND a coherent design passes the gates on a real full bake. floor ≥9 remains gated ONLY by the two non-coherence workstreams (Tristan's call): PLACER SPRAWL (packing, task #38) + COST under-spec.
+
 ## ⚠ FRESH-BAKE END-TO-END (2026-07-23 ~00:40) — G19+G21 PASS on delivered dossier; G20 caught a REAL residual (caption HEIGHT not routed)
 Fresh full bake `out/organoid-bioreactor-20260723-0025` (ALL fixes in: reorder+centering+G20/G21). Ran the 3 gates on the DELIVERED artefacts:
 - **G19 PASS** ✓ — shell 367×335×126 ⊇ parts 367×335×126 (centering fix REACHED delivered value; shell = manifest bbox exactly).
