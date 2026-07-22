@@ -70,6 +70,11 @@ Then: write the invariant into the operating frame + regression harness so it ca
 - Verified on REAL state.json: 138×66×34 → **248×188×108 ⊇ parts 229×175×96** (W 248≥229, D 188≥175, H 108≥96). G19 should PASS.
 - **loopbake10 running** (pyc cleared) → confirm DELIVERED render + GA read 248×188×108, G19 PASS, floor ≥9, render==drawings on SIGHT.
 
+## PROGRESS (2026-07-22 ~22:45) — firmware top-level DONE; coherence reorder agent still tracing
+- **Firmware promote to top-level DONE** (`c9c58980a`, selftest OK, pushed): bundle now writes top-level `firmware/` (sibling of pcb/) — `README.txt` (VIRTUAL BRING-UP — UNPROVEN IN HARDWARE, never FUNCTIONALLY VERIFIED), `mcu-bringup/` (_tier1/2/3 MCU sources+ELF+transcripts), `boards/<id>/` (Tier-0 proofs); gerbers stay under `pcb/<board>/`. proveCatch HARD-FAILS if firmware appears under pcb/. Satisfies Tristan's "firmware not in the main tree." SIGHT on next real bake's delivered folder pending.
+- **Coherence REORDER agent `afea612518fa21265` STILL RUNNING** (the council-approved place→measure→size→build fix in build_universal_scene.py) — no code edits landed yet (still tracing _place_instrument_interior_layout's bounds assumptions before flipping call order — correct diligence for a 5th attempt). CRITICAL PATH. When it lands: **single render pass + SIGHT the delivered pixels** (04-product-exterior vs inspect-front) — NOT a selftest (4 prior fixes passed selftests and shipped Goodhart). It will also report the exact single-render command so I stop using the grinding run-loop.
+- HEAD `c9c58980a`; working tree clean; cursor-pcb 0 ahead.
+
 ## PROGRESS (2026-07-22 ~22:15) — fa113262a CONFIRMED Goodhart (code-proven); COUNCIL #2 → reorder; implementation dispatched
 - **Bake 2139 = wash** — run-loop GROUND 35min on the cost under-spec floor (£255 vs £3500), killed by the watcher BEFORE a clean render (no parts-manifest.json, no PNGs). No SIGHT obtained. **PROCESS FIX for next time: verify coherence via a SINGLE render/chain pass, NOT run-loop.sh** (it iterates + grinds on cost floors it can't fix by re-baking).
 - **fa113262a CONFIRMED Goodhart (code-proven, no bake needed):** shell mesh built at :16677/:18051 in place_sealed_enclosure from pre-placement env_mm (248×188×108); the grow at write_parts_manifest :24102 runs AFTER → corrects manifest number + camera only, NOT the mesh. 4th miss.
