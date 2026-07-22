@@ -39,3 +39,9 @@ Then: write the invariant into the operating frame + regression harness so it ca
 - **Deliverable bundle LANDED `c8386e52f`**: every run now writes <run>/<slug>-deliverable/ + .zip (dossier + all PCB boards + renders + drawings + MANIFEST, 0 absolute paths). Verified on 1603 (87 files). (84MB — offer compressed/PCB-only variant for direct email.)
 - **loopbake9 running** (stale .pyc cleared) → verify render + drawings read the SAME 240.9×182.8×108 envelope end-to-end + G19 PASS + floor ≥9 + bundle produced. SIGHT render vs inspect-front/top side by side.
 - STILL TO BUILD (the full universal system): promote parts-manifest to canonical model; route drawing views + Equipment&Dimensions Register from it; generalise gate to cross-check ALL artefact pairs (envelope + part-set + positions), wire into chain to FLOOR on mismatch; write invariant into OPERATING-FRAME + regression harness.
+
+## PROGRESS (2026-07-22 ~19:15) — G19 GATE WORKS; reconciliation attempt #1 did NOT reach delivered value
+- **G19 is functioning as the permanent guard** — bake 1848 SIGHT: G19 `enclosure_shell_contains_parts` correctly FIRED on general-arrangement AND renders (delivered shell 221×165×82 < parts 229×175×96; height short by 14mm). The gate catches the incoherence on the DELIVERED artefact = exactly what we want. It also floors the dossier (drawing gate fails).
+- **BUT the reconciliation (7c457292a, minimum_working_envelope.py → 240.9×182.8×108) did NOT reach the delivered shell** — the render + GA still use 221×165×82. minimum_working_envelope's output is OVERRIDDEN by another sizing path (the "fix didn't reach delivered value" trap, 3rd time this session). The delivered 82mm height ignores the 96mm heatsink+fan.
+- Attempt #2 (agent a82c940a): TRACE where the delivered 221×165×82 actually comes from (the path render+GA read), fix THAT, verify against the delivered path not a selftest. If it misses → 6-model council.
+- Killed bake 1848.
