@@ -535,6 +535,134 @@ def mounting_holes_sexp(
         lines.append("")
     return lines
 
+
+def fiducial_placements(
+    board_w: float,
+    board_h: float,
+    count: int = 3,
+    inset_mm: float = 10.0,
+) -> List[Tuple[float, float, str]]:
+    """Pick-and-place fiducial centres — ≥2 required for fab; 3 for orientation.
+
+    INTENT: mounting holes alone are not PnP fiducials. Place copper+mask
+    Fiducial footprints inset farther than M3 holes so they do not collide.
+    Skipped on postage-stamp boards (<40 mm) where keepout cannot fit.
+
+    DECISION: skip the top-left corner by default — host HATs park USB-C +
+    2×20 GPIO there; a TL fiducial at 8 mm collided with J4 (clearance 0).
+    Prefer TR / BR / BL so rotation stays unambiguous without fighting the
+    connector edge.
+    """
+    if min(board_w, board_h) < 40.0 or count < 2:
+        return []
+    max_inset = min(board_w, board_h) / 2 - 1.0
+    inset = max(8.0, min(inset_mm, max_inset))
+    # Order: TR, BR, BL (skip TL — connector-heavy on host boards).
+    corners = [
+        (board_w - inset, inset),
+        (board_w - inset, board_h - inset),
+        (inset, board_h - inset),
+        (inset, inset),  # TL only if count==4
+    ]
+    if count == 2:
+        chosen = [corners[0], corners[1]]  # TR + BR
+    elif count >= 4:
+        chosen = corners
+    else:
+        chosen = corners[:3]
+    return [
+        (x, y, f"fiducial_{idx + 1}")
+        for idx, (x, y) in enumerate(chosen)
+    ]
+
+
+def fiducials_sexp(
+    board_w: float,
+    board_h: float,
+    cfg: "ChainConfig",
+    fp_root: Path,
+) -> List[str]:
+    """Emit library Fiducial footprints for pick-and-place."""
+    lines: List[str] = []
+    fp_name = "Fiducial:Fiducial_1mm_Mask2mm"
+    for idx, (x, y, fid) in enumerate(fiducial_placements(board_w, board_h)):
+        fp_data = parse_footprint(fp_name, cfg, fp_root)
+        if fp_data.resolved_from == "missing":
+            fp_name = "Fiducial:Fiducial_0.75mm_Mask1.5mm"
+            fp_data = parse_footprint(fp_name, cfg, fp_root)
+        if fp_data.resolved_from == "missing":
+            continue
+        ref = f"FD{idx + 1}"
+        block = footprint_to_sexp(fp_data, fp_name, ref, fid, x, y, {})
+        for line in block.split("\n"):
+            lines.append("  " + line)
+        lines.append("")
+    return lines
+
+
+def _find_named_power_net(nets: List[Net], names: Tuple[str, ...]) -> Optional[Net]:
+    wanted = {n.lower() for n in names}
+    for net in nets:
+        if net.name.lower() in wanted:
+            return net
+    return None
+
+
+def test_point_placements(
+    board_w: float,
+    board_h: float,
+) -> List[Tuple[float, float, str, str]]:
+    """Return (x, y, ref_suffix, rail) for VCC + GND probe pads.
+
+    INTENT: fab bring-up needs probeable power rails. Place on the left edge
+    mid-height (away from TL connectors and BL fiducial).
+    """
+    if min(board_w, board_h) < 40.0:
+        return []
+    x = 12.0 if board_w >= 40.0 else board_w / 2
+    y_mid = board_h / 2
+    return [
+        (x, y_mid - 4.0, "1", "vcc"),
+        (x, y_mid + 4.0, "2", "gnd"),
+    ]
+
+
+def test_points_sexp(
+    board_w: float,
+    board_h: float,
+    nets: List[Net],
+    cfg: "ChainConfig",
+    fp_root: Path,
+) -> List[str]:
+    """Emit TestPoint footprints tied to VCC and GND when those nets exist."""
+    vcc = _find_named_power_net(nets, ("vcc", "3v3", "3v3a", "vdd", "+3v3"))
+    gnd = _find_named_power_net(nets, ("gnd", "ground", "pgnd", "agnd"))
+    if not vcc or not gnd:
+        return []
+    fp_name = "TestPoint:TestPoint_Pad_D1.5mm"
+    fp_data = parse_footprint(fp_name, cfg, fp_root)
+    if fp_data.resolved_from == "missing":
+        fp_name = "TestPoint:TestPoint_Pad_D2.0mm"
+        fp_data = parse_footprint(fp_name, cfg, fp_root)
+    if fp_data.resolved_from == "missing":
+        return []
+    rail_net = {"vcc": vcc, "gnd": gnd}
+    lines: List[str] = []
+    for x, y, suffix, rail in test_point_placements(board_w, board_h):
+        net = rail_net[rail]
+        ref = f"TP{suffix}"
+        pad_num = fp_data.pads[0]["num"] if fp_data.pads else "1"
+        local_nets = {
+            (ref, pad_num): PadNet(ref, pad_num, net.code, net.name),
+        }
+        block = footprint_to_sexp(
+            fp_data, fp_name, ref, f"{rail.upper()}_TP", x, y, local_nets,
+        )
+        for line in block.split("\n"):
+            lines.append("  " + line)
+        lines.append("")
+    return lines
+
 def _looks_like_compact_source_board(components: List[Component]) -> bool:
     """Return true for source/driver-only board netlists, not controller motherboards."""
     text = " ".join(f"{c.ref} {c.value} {c.footprint}" for c in components).lower()
@@ -705,6 +833,92 @@ def selftest() -> None:
             "actionable DRC must drop intra-J1/zone/J3-pad noise but keep track↔pad + U1↔R1 unconnected, "
             f"got {actionable_drc_violation_count(fake_intra)}"
         )
+    # proveCatch: stamp "?" values from libsource MPN.
+    import tempfile  # local — selftest-only
+    with tempfile.TemporaryDirectory() as tmp:
+        net_path = Path(tmp) / "default.net"
+        net_path.write_text(
+            '(export (version "E")\n'
+            '  (components\n'
+            '    (comp (ref "U1")\n'
+            '      (value "?")\n'
+            '      (footprint "Package_QFP:TQFP-48")\n'
+            '      (libsource (lib "lib") (part "Microchip ATSAMD21G18A-AU") '
+            '(description "main.ato:Part_mcu")))\n'
+            '    (comp (ref "R1")\n'
+            '      (value "?")\n'
+            '      (footprint "Resistor_SMD:R_0603")\n'
+            '      (libsource (lib "lib") (part "TBD (detailed design)") '
+            '(description "draft"))))\n',
+            encoding="utf-8",
+        )
+        n = stamp_netlist_component_values(net_path)
+        stamped_text = net_path.read_text(encoding="utf-8")
+        if n != 1 or 'ATSAMD21G18A-AU' not in stamped_text or '(value "?")' not in stamped_text:
+            raise AssertionError(
+                f"stamp_netlist_component_values proveCatch failed: stamped={n} text={stamped_text!r}"
+            )
+        # proveCatch: atopile SOT-23 MPN smear — sheetpath says heater, libsource BSS84.
+        ato_path = Path(tmp) / "main.ato"
+        ato_path.write_text(
+            'component Part_reverse_polarity_protection_word:\n'
+            '    mpn = "Diodes Incorporated BSS84-7-F"\n'
+            '    value = "BSS84-7-F"\n'
+            '\n'
+            'component Part_heater_pwm_switch_word:\n'
+            '    mpn = "Alpha & Omega Semiconductor Inc. AO3400A"\n'
+            '    value = "AO3400A"\n'
+            '\n'
+            'module App:\n'
+            '    reverse_polarity_protection_word = new Part_reverse_polarity_protection_word\n'
+            '    heater_pwm_switch_word = new Part_heater_pwm_switch_word\n',
+            encoding="utf-8",
+        )
+        smear_path = Path(tmp) / "smear.net"
+        smear_path.write_text(
+            '(export (version "E")\n'
+            '  (components\n'
+            '    (comp (ref "D2")\n'
+            '      (value "BSS84-7-F")\n'
+            '      (footprint "Package_TO_SOT_SMD:SOT-23")\n'
+            '      (libsource (lib "lib") (part "Diodes Incorporated BSS84-7-F") '
+            '(description "main.ato:Part_reverse_polarity_protection_word"))\n'
+            '      (sheetpath (names "/tmp/main.ato:App::reverse_polarity_protection_word") '
+            '(tstamps "a"))\n'
+            '      (tstamps "a"))\n'
+            '    (comp (ref "SW1")\n'
+            '      (value "BSS84-7-F")\n'
+            '      (footprint "Package_TO_SOT_SMD:SOT-23")\n'
+            '      (libsource (lib "lib") (part "Diodes Incorporated BSS84-7-F") '
+            '(description "main.ato:Part_reverse_polarity_protection_word"))\n'
+            '      (sheetpath (names "/tmp/main.ato:App::heater_pwm_switch_word") '
+            '(tstamps "b"))\n'
+            '      (tstamps "b"))\n',
+            encoding="utf-8",
+        )
+        n_fix = reconcile_netlist_identities_from_ato(smear_path, ato_path)
+        fixed_text = smear_path.read_text(encoding="utf-8")
+        if n_fix < 1 or "AO3400A" not in fixed_text:
+            raise AssertionError(
+                f"reconcile_netlist_identities_from_ato must restore AO3400A from ato, "
+                f"got fixed={n_fix} text={fixed_text!r}"
+            )
+        if re.search(
+            r'ref "SW1"[\s\S]*?part "Diodes Incorporated BSS84-7-F"',
+            fixed_text,
+        ):
+            raise AssertionError("SW1 must not keep BSS84 libsource after reconcile")
+    # proveCatch: fiducials on fab-sized boards, skipped on postage stamps.
+    if len(fiducial_placements(90.0, 90.0)) < 2:
+        raise AssertionError("fab-sized board must place ≥2 fiducials")
+    if fiducial_placements(30.0, 30.0):
+        raise AssertionError("postage-stamp board must skip fiducials")
+    # proveCatch: TL corner is NOT used (host connector keepout).
+    tls = [(x, y) for x, y, _ in fiducial_placements(90.0, 90.0) if x < 20 and y < 20]
+    if tls:
+        raise AssertionError(f"fiducials must skip top-left keepout, got {tls}")
+    if len(test_point_placements(90.0, 90.0)) != 2:
+        raise AssertionError("fab-sized board must place VCC+GND test points")
     # proveCatch: IC grid is board-centred (old cy-20 shoved pads off a 40 mm board).
     _footprint_cache["Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"] = FootprintData(
         bbox_w=6.0, bbox_h=5.0, resolved_from="fixture",
@@ -1223,6 +1437,14 @@ def generate_kicad_pcb(components: List[Component], nets: List[Net], pad_nets: D
     if hole_lines:
         lines.extend(hole_lines)
         lines.append('')
+    fid_lines = fiducials_sexp(board_w, board_h, cfg, fp_root)
+    if fid_lines:
+        lines.extend(fid_lines)
+        lines.append('')
+    tp_lines = test_points_sexp(board_w, board_h, nets, cfg, fp_root)
+    if tp_lines:
+        lines.extend(tp_lines)
+        lines.append('')
 
     for c in components:
         if c.ref not in placements:
@@ -1424,6 +1646,155 @@ def _drc_item_refs(items: List[dict]) -> Tuple[set, bool]:
     return refs, has_non_footprint
 
 
+def parse_ato_component_identities(ato_path: Path) -> Dict[str, Dict[str, str]]:
+    """Map instance name → {mpn, value, type_name} from a generated main.ato.
+
+    INTENT: atopile 0.2.69 smears libsource/value across distinct SOT-23 (and
+    same-MPN) parts — sheetpath stays correct (`App::heater_pwm_switch_word`)
+    while value/libsource copy a sibling MOSFET. The .ato we emitted is the
+    SOURCE of truth for identity.
+    """
+    if not ato_path.is_file():
+        return {}
+    text = ato_path.read_text(encoding="utf-8", errors="replace")
+    types: Dict[str, Dict[str, str]] = {}
+    for m in re.finditer(
+        r"^component\s+(Part_\w+)\s*:\s*\n"
+        r"((?:[ \t]+.+\n)*)",
+        text,
+        flags=re.MULTILINE,
+    ):
+        type_name = m.group(1)
+        body = m.group(2)
+        mpn_m = re.search(r'^\s*mpn\s*=\s*"([^"]*)"', body, flags=re.MULTILINE)
+        val_m = re.search(r'^\s*value\s*=\s*"([^"]*)"', body, flags=re.MULTILINE)
+        types[type_name] = {
+            "type_name": type_name,
+            "mpn": (mpn_m.group(1).strip() if mpn_m else ""),
+            "value": (val_m.group(1).strip() if val_m else ""),
+        }
+    out: Dict[str, Dict[str, str]] = {}
+    for m in re.finditer(
+        r"^\s*(\w+)\s*=\s*new\s+(Part_\w+)\s*$",
+        text,
+        flags=re.MULTILINE,
+    ):
+        instance, type_name = m.group(1), m.group(2)
+        identity = types.get(type_name)
+        if identity:
+            out[instance] = dict(identity)
+    return out
+
+
+def reconcile_netlist_identities_from_ato(
+    netlist_path: Path,
+    ato_path: Path,
+) -> int:
+    """Rewrite netlist value/libsource/description from main.ato via sheetpath.
+
+    Returns the number of components whose identity fields were corrected.
+    """
+    identities = parse_ato_component_identities(ato_path)
+    if not identities:
+        return 0
+    text = netlist_path.read_text(encoding="utf-8", errors="replace")
+    parts = re.split(r"(?=\(comp \(ref )", text)
+    out: List[str] = []
+    fixed = 0
+    for chunk in parts:
+        if not chunk.startswith("(comp (ref "):
+            out.append(chunk)
+            continue
+        path_m = re.search(
+            r'\(sheetpath\s+\(names\s+"[^"]*::(\w+)"\)',
+            chunk,
+        )
+        if not path_m:
+            out.append(chunk)
+            continue
+        instance = path_m.group(1)
+        identity = identities.get(instance)
+        if not identity:
+            out.append(chunk)
+            continue
+        mpn = identity.get("mpn") or ""
+        value = identity.get("value") or ""
+        if not value and mpn:
+            tokens = mpn.split()
+            value = tokens[-1] if tokens else mpn
+        if not mpn and not value:
+            out.append(chunk)
+            continue
+        type_name = identity.get("type_name") or f"Part_{instance}"
+        new_chunk = chunk
+        changed = False
+        if value:
+            replaced, n = re.subn(
+                r'\(value\s+"[^"]*"\)',
+                f'(value "{value}")',
+                new_chunk,
+                count=1,
+            )
+            if n:
+                new_chunk = replaced
+                changed = True
+        if mpn:
+            replaced, n = re.subn(
+                r'\(libsource\s+\(lib\s+"[^"]*"\)\s+\(part\s+"[^"]*"\)\s+'
+                r'\(description\s+"[^"]*"\)\)',
+                f'(libsource (lib "lib") (part "{mpn}") '
+                f'(description "main.ato:{type_name}"))',
+                new_chunk,
+                count=1,
+            )
+            if n:
+                new_chunk = replaced
+                changed = True
+        if changed and new_chunk != chunk:
+            fixed += 1
+        out.append(new_chunk)
+    if fixed:
+        netlist_path.write_text("".join(out), encoding="utf-8")
+    return fixed
+
+
+def stamp_netlist_component_values(netlist_path: Path) -> int:
+    """Replace `(value "?")` with the libsource part MPN when present.
+
+    INTENT: atopile 0.2.69 leaves schematic value as "?" while already writing the
+    verified manufacturer+MPN into `(libsource (part "…"))`. Fab netlists that
+    show "?" on every line look unfinished even when identities are real.
+    Returns the number of components stamped.
+    """
+    text = netlist_path.read_text(encoding="utf-8", errors="replace")
+    stamped = 0
+    # Split on `(comp (ref` so each chunk is one component (first chunk is preamble).
+    parts = re.split(r"(?=\(comp \(ref )", text)
+    out: List[str] = []
+    for chunk in parts:
+        if not chunk.startswith("(comp (ref ") or '(value "?")' not in chunk:
+            out.append(chunk)
+            continue
+        part_m = re.search(
+            r'\(libsource\s+\(lib\s+"[^"]*"\)\s+\(part\s+"([^"]+)"\)',
+            chunk,
+        )
+        if not part_m:
+            out.append(chunk)
+            continue
+        part = part_m.group(1).strip()
+        if not part or part.lower().startswith("tbd"):
+            out.append(chunk)
+            continue
+        tokens = part.split()
+        value = tokens[-1] if len(tokens) >= 2 else part
+        stamped += 1
+        out.append(chunk.replace('(value "?")', f'(value "{value}")', 1))
+    if stamped:
+        netlist_path.write_text("".join(out), encoding="utf-8")
+    return stamped
+
+
 def is_intra_footprint_drc_violation(violation: dict) -> bool:
     """True when every item is pad/hole geometry inside ONE footprint instance.
 
@@ -1581,6 +1952,18 @@ def run(args) -> dict:
         result["errors"].append(f"ato build did not produce a netlist ({cfg.netlist_path}); stderr: {build.stderr[-800:]}")
         emit(result)
         return result
+
+    # INTENT (2026-07-22 adversarial SIGHT): atopile smears libsource/value
+    # across distinct SOT-23 MOSFETs (heater AO3400A ← BSS84) while sheetpath
+    # stays correct. Reconcile identity from main.ato BEFORE value stamping.
+    ato_path = cfg.project_dir / "main.ato"
+    reconciled = reconcile_netlist_identities_from_ato(cfg.netlist_path, ato_path)
+    result["netlist_identities_reconciled"] = reconciled
+    # INTENT (2026-07-22 Terminal M1): atopile emits (value "?") even when
+    # libsource already carries the verified MPN. Stamp remaining "?" from
+    # libsource so the fab pack is not unfinished-looking.
+    stamped = stamp_netlist_component_values(cfg.netlist_path)
+    result["netlist_values_stamped"] = stamped
 
     components, nets, pad_nets = parse_netlist(cfg.netlist_path)
     result["components"] = len(components)

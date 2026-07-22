@@ -87,6 +87,7 @@ import {
 import type { PcbBoardGeometry } from './pcb-contract'
 import type { PcbBoardShapeContract } from './pcb-architecture'
 import { isHostHatActuationDrivePublished } from './pcb-architecture'
+import { resolveMcuReferencePad } from './pcb-mcu-reference-pinmap'
 import type { PcbPinSpec } from './pcb-component-resolution'
 import type { VerifiedCandidateRequest } from './pcb-verified-candidates'
 
@@ -1604,7 +1605,13 @@ function resolveComponent(
       identityBlocker: identityVerified ? null : identityBlocker,
       resolutionTier: tier,
       footprint,
-      designatorPrefix: fallback?.designatorPrefix ?? 'U',
+      // INTENT: reverse-polarity MOSFETs resolve as diode_protection (D) from
+      // the ESD/diode role table — use Q so the designator matches the part.
+      designatorPrefix: (() => {
+        const roleBlob = `${word.wordId} ${word.characterId} ${word.nameHuman}`
+        if (/reverse[_ -]?polarity/i.test(roleBlob)) return 'Q'
+        return fallback?.designatorPrefix ?? 'U'
+      })(),
       pins: resolvedPins,
       powerPin: identityVerified
         ? (resolvedPowerPin ? pinIdentifier(resolvedPowerPin) : null)
@@ -1877,7 +1884,10 @@ function wirePeripheralNets(
     addMember(ensureNet('USB_DM', 'signal'), esd.instanceName, io2)
   }
 
-  // ── VBUS → polyfuse → ferrite → VCC (series power path) ─────────────────
+  // ── VBUS → reverse-pol → polyfuse → ferrite → VCC (series power path) ───
+  const reversePol = components.find((c) =>
+    /reverse[_ -]?polarity/i.test(componentRoleBlob(c)),
+  )
   const polyfuse = components.find(
     (c) =>
       c.functionClass === 'fuse_protection'
@@ -1888,7 +1898,7 @@ function wirePeripheralNets(
       c.functionClass === 'passive_l'
       || /ferrite|emc[_ -]?bead/i.test(componentRoleBlob(c)),
   )
-  if ((polyfuse || ferrite) && usbs.length > 0) {
+  if ((reversePol || polyfuse || ferrite) && usbs.length > 0) {
     const vbus = ensureNet('VBUS', 'power')
     let anyVbus = false
     for (const usb of usbs) {
@@ -1912,12 +1922,34 @@ function wirePeripheralNets(
       }
     }
     if (anyVbus) {
-      const seriesParts = [polyfuse, ferrite].filter(
+      let upstream: AtopileNetRecord = vbus
+      let seriesIndex = 0
+
+      // INTENT: BSS84-class P-MOSFET high-side reverse protection —
+      // Source←VBUS, Drain→downstream, Gate→GND (on when polarity correct).
+      if (reversePol) {
+        const gate = findPinMatching(reversePol, [/^G$/i, /^G__/i])
+        const source = findPinMatching(reversePol, [/^S$/i, /^S__/i])
+        const drain = findPinMatching(reversePol, [/^D$/i, /^D__/i])
+        if (gate && source && drain) {
+          for (const pin of [gate, source, drain]) {
+            detachNetMember(vcc, reversePol.instanceName, pin)
+            detachNetMember(gnd, reversePol.instanceName, pin)
+          }
+          const downstream = ensureNet('VBUS_REVOK', 'power')
+          addMember(upstream, reversePol.instanceName, source)
+          addMember(downstream, reversePol.instanceName, drain)
+          addMember(gnd, reversePol.instanceName, gate)
+          upstream = downstream
+          seriesIndex += 1
+        }
+      }
+
+      const twoTermSeries = [polyfuse, ferrite].filter(
         (c): c is AtopileComponentRecord => Boolean(c),
       )
-      let upstream: AtopileNetRecord = vbus
-      for (let i = 0; i < seriesParts.length; i += 1) {
-        const part = seriesParts[i]!
+      for (let i = 0; i < twoTermSeries.length; i += 1) {
+        const part = twoTermSeries[i]!
         const pins = twoTerminalPins(part)
         if (!pins) continue
         const [a, b] = pins
@@ -1925,10 +1957,15 @@ function wirePeripheralNets(
         detachNetMember(vcc, part.instanceName, b)
         detachNetMember(gnd, part.instanceName, a)
         detachNetMember(gnd, part.instanceName, b)
-        const downstream =
-          i === seriesParts.length - 1
-            ? vcc
-            : ensureNet(i === 0 ? 'VBUS_FUSED' : `VBUS_SERIES_${i}`, 'power')
+        const isLast = i === twoTermSeries.length - 1
+        const downstream = isLast
+          ? vcc
+          : ensureNet(
+            /polyfuse|fuse/i.test(componentRoleBlob(part))
+              ? 'VBUS_FUSED'
+              : `VBUS_SERIES_${seriesIndex + i}`,
+            'power',
+          )
         addMember(upstream, part.instanceName, a)
         addMember(downstream, part.instanceName, b)
         upstream = downstream
@@ -1961,10 +1998,14 @@ function wirePeripheralNets(
       detachNetMember(vcc, indicatorLed.instanceName, ledA)
       detachNetMember(vcc, ledBallast.instanceName, r1)
       detachNetMember(vcc, ledBallast.instanceName, r2)
-      // Prefer a free SAMD GPIO; else synthesise LED_CTRL on the MCU.
-      let gpio =
-        findPinMatching(mcu, [/^PA08(?:_|$)/i, /^PA07(?:_|$)/i, /^GPIO1$/i])
-      if (!gpio) gpio = ensureComponentPin(mcu, 'LED_CTRL')
+      // PREREQ-0: MCU reference pin-map (not a guessed GPIO label).
+      const mcuBlob = `${mcu.manufacturer ?? ''} ${mcu.partNumber ?? ''} ${mcu.characterId}`
+      const refPad = resolveMcuReferencePad(mcuBlob, 'status_led')
+      const gpio = refPad
+        ? (findPinMatching(mcu, [new RegExp(`^${refPad}(?:_|$)`, 'i')])
+          ?? ensureComponentPin(mcu, refPad))
+        : (findPinMatching(mcu, [/^PA07(?:_|$)/i, /^GPIO1$/i])
+          ?? ensureComponentPin(mcu, 'LED_CTRL'))
       const ledCtrl = ensureNet('LED_CTRL', 'signal')
       addMember(ledCtrl, mcu.instanceName, gpio)
       addMember(ledCtrl, ledBallast.instanceName, r1)
@@ -2328,6 +2369,7 @@ function buildNets(
     if (
       component.functionClass === 'fuse_protection'
       || (component.functionClass === 'passive_l' && /ferrite|emc[_ -]?bead/i.test(blob))
+      || /reverse[_ -]?polarity/i.test(blob)
       || (
         component.functionClass === 'led'
         && /power[_ -]?indicator|status[_ -]?indicator/i.test(blob)
@@ -2516,6 +2558,14 @@ function emitComponentBlock(component: AtopileComponentRecord): string {
     ? `${component.manufacturer ?? ''} ${component.partNumber}`.trim()
     : `TBD (detailed design) - ${component.functionClass ?? 'part'}`
   lines.push(`    mpn = "${mpnComment.replace(/"/g, "'")}"`)
+  // INTENT: KiCad netlists were emitting (value "?") for every part — populate
+  // an honest schematic value only from a *verified* MPN (never promote draft PNs).
+  const valueText = (
+    component.mpnVerified && component.partNumber?.trim()
+      ? component.partNumber.trim()
+      : (component.functionClass || component.characterId || 'TBD')
+  ).replace(/"/g, "'")
+  lines.push(`    value = "${valueText}"`)
   component.pins.forEach((pin, index) => {
     const padNumber = component.pinPadMap[pin] ?? String(index + 1)
     lines.push(`    signal ${pin} ~ pin ${padNumber}`)

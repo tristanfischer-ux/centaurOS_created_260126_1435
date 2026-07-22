@@ -430,6 +430,19 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
       'AOS AO3400A SOT-23 N-channel MOSFET pinout 1=G, 2=S, 3=D; Forge host-HAT heater PWM low-side switch (never on heater_20ml gold)',
   },
   {
+    manufacturer: 'Diodes Incorporated',
+    partNumber: 'BSS84-7-F',
+    symbolId: 'Forge_Manufacturer:BSS84-7-F',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    pins: [
+      { number: '1', name: 'G', kind: 'input' },
+      { number: '2', name: 'S', kind: 'passive' },
+      { number: '3', name: 'D', kind: 'passive' },
+    ],
+    provenance:
+      'Diodes BSS84-7-F SOT-23 P-channel MOSFET pinout 1=G, 2=S, 3=D; high-side reverse-polarity switch on USB VBUS',
+  },
+  {
     manufacturer: 'Texas Instruments',
     partNumber: 'DRV8876PWPR',
     symbolId: 'Forge_Manufacturer:DRV8876PWPR',

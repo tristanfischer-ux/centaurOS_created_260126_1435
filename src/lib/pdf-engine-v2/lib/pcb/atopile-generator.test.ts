@@ -1489,7 +1489,7 @@ describe('atopile-generator', () => {
     expect(netNames.has('PUMP_MOTOR_A')).toBe(true)
   })
 
-  it('wirePeripheralNets: polyfuse+ferrite series on VBUS; LED via ballast R', () => {
+  it('wirePeripheralNets: VBUS rev-pol+polyfuse+ferrite; LED on SAMD21 PA07', () => {
     mockedLookup.mockImplementation((_manufacturer, mpn) => {
       if (/12401610/i.test(mpn ?? '')) {
         return cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C')
@@ -1502,6 +1502,9 @@ describe('atopile-generator', () => {
       }
       if (/BLM18PG121/i.test(mpn ?? '')) {
         return cacheHit('Murata Manufacturing', 'BLM18PG121SN1D', 'ferrite')
+      }
+      if (/BSS84/i.test(mpn ?? '')) {
+        return cacheHit('Diodes Incorporated', 'BSS84-7-F', 'rev-pol')
       }
       if (/KPT-1608CGCK/i.test(mpn ?? '')) {
         return cacheHit('Kingbright', 'KPT-1608CGCK', 'power LED')
@@ -1536,6 +1539,12 @@ describe('atopile-generator', () => {
                 modifier_characters: [{ kind: 'quantity', value: '×1' }],
               },
               {
+                id: 'reverse_polarity_protection_word',
+                name_human: 'Reverse polarity protection',
+                content_character: { character_id: 'reverse_polarity_protection' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
                 id: 'current_limit_polyfuse_word',
                 name_human: 'Current limit polyfuse',
                 content_character: { character_id: 'current_limit_polyfuse' },
@@ -1563,6 +1572,7 @@ describe('atopile-generator', () => {
       requiredWordIds: [
         'microcontroller_mcu_word',
         'usb_power_entry_word',
+        'reverse_polarity_protection_word',
         'current_limit_polyfuse_word',
         'ferrite_emc_bead_word',
         'power_indicator_led_word',
@@ -1573,9 +1583,12 @@ describe('atopile-generator', () => {
       .toBe(true)
     const netNames = new Set(result.nets.map((n) => n.name))
     expect(netNames.has('VBUS')).toBe(true)
+    expect(netNames.has('VBUS_REVOK')).toBe(true)
     expect(netNames.has('LED_CTRL')).toBe(true)
-    const vbus = result.nets.find((n) => n.name === 'VBUS')
-    expect(vbus?.members.some((m) => /usb/i.test(m.instanceName))).toBe(true)
+    const ato = readFileSync(result.mainAtoPath, 'utf8')
+    expect(ato).toMatch(/value = "ATSAMD21G18A-AU"/)
+    expect(ato).toMatch(/reverse_polarity_protection_word\.\w+ ~ VBUS/)
+    expect(ato).toMatch(/PA07/)
     const ledCtrl = result.nets.find((n) => n.name === 'LED_CTRL')
     expect(ledCtrl && ledCtrl.members.length >= 2).toBe(true)
   })
