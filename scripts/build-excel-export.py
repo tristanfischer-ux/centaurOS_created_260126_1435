@@ -17813,19 +17813,37 @@ def _pcb_write_fab_zip(run_dir: str, pipeline: dict) -> Optional[str]:
     never drift stale against the gerbers it packages. Returns the run_dir-relative
     path, or None when there is nothing to pack."""
     import zipfile
+    # The fab pack is assembled from the pipeline's OWN gerber/drill/pos paths (absolute,
+    # carried in `pipeline.*.files`), so it must be written for a MULTI-BOARD run too — where
+    # artefacts live under run_dir/pcb-boards/*/pcb/ and a top-level run_dir/pcb/ never exists.
+    # The real "nothing to pack" guard is `if not members` below; here we just ensure the
+    # destination dir exists rather than bailing (the bug that zeroed the PCB tab — hence the
+    # whole dossier floor — on every multi-board product: no zip → 'fab pack zip written'=0).
     pcb_dir = os.path.join(run_dir, "pcb")
-    if not os.path.isdir(pcb_dir):
-        return None
+    os.makedirs(pcb_dir, exist_ok=True)
     zip_path = os.path.join(pcb_dir, "pcb-fab.zip")
+
+    def _board_ns(path: str) -> str:
+        """The board sub-namespace for a multi-board fab pack: the `pcb-boards/<board>/`
+        segment if present, else '' (single-board run). Without this, three boards' gerbers
+        share basenames (board-routed-F_Cu.gtl ×3) and silently COLLIDE into one flat
+        gerbers/ dir — the fab pack would ship one board's copper for all three."""
+        parts = os.path.normpath(path).split(os.sep)
+        if "pcb-boards" in parts:
+            i = parts.index("pcb-boards")
+            if i + 1 < len(parts):
+                return parts[i + 1]
+        return ""
+
     members: List[Tuple[str, str]] = []   # (abs_src, arcname)
     gerbers = pipeline.get("gerbers") or {}
     for f in (gerbers.get("files") or []):
         if f and os.path.exists(f):
-            members.append((f, os.path.join("gerbers", os.path.basename(f))))
+            members.append((f, os.path.join("gerbers", _board_ns(f), os.path.basename(f))))
     drill = pipeline.get("drill") or {}
     for f in (drill.get("files") or []):
         if f and os.path.exists(f):
-            members.append((f, os.path.join("drill", os.path.basename(f))))
+            members.append((f, os.path.join("drill", _board_ns(f), os.path.basename(f))))
     pos = pipeline.get("pos") or {}
     if pos.get("path") and os.path.exists(pos["path"]):
         members.append((pos["path"], os.path.basename(pos["path"])))
@@ -33301,6 +33319,31 @@ def _selftest() -> int:
         print(f"  FAIL gate2: an unimplemented required stir channel must be 1 gap 'stir_channel 0/1', got {_ccn2} {_ccd2}"); bad += 1
     if _pcb_channel_coverage_gaps({"architecture": {"boards": []}, "implementedChannels": {}})[0] != 0:
         print("  FAIL gate2: no channel requirements must report 0 gaps (no fabricated gap)"); bad += 1
+    # ── fab-pack ZIP proveCatch (Terminal 2026-07-22): a MULTI-BOARD run (gerbers under
+    # run_dir/pcb-boards/<board>/pcb/, no top-level run_dir/pcb/) must STILL write the zip
+    # (the bug that zeroed 'fab pack zip written' → the whole PCB tab → the dossier floor),
+    # and the three boards' identically-named gerbers must NOT collide (each in gerbers/<board>/).
+    import tempfile as _tf_z, shutil as _sh_z, zipfile as _zf_z
+    _z_td = _tf_z.mkdtemp(prefix="pcb-fabzip-mb-")
+    try:
+        _gp = []
+        for _bd in ("wet_lab_hat", "od_optics"):
+            _gd = os.path.join(_z_td, "pcb-boards", _bd, "pcb", "gerbers")
+            os.makedirs(_gd, exist_ok=True)
+            _fp = os.path.join(_gd, "board-routed-F_Cu.gtl")  # SAME basename on both boards
+            with open(_fp, "w") as _fz: _fz.write("G04*\n")
+            _gp.append(_fp)
+        _rel = _pcb_write_fab_zip(_z_td, {"gerbers": {"files": _gp}})
+        if not _rel:
+            print("  FAIL fabzip: a multi-board run (no top-level pcb/ dir) must still write the zip"); bad += 1
+        else:
+            _names = _zf_z.ZipFile(os.path.join(_z_td, _rel)).namelist()
+            if len(_names) != len(set(_names)):
+                print(f"  FAIL fabzip: identical gerber basenames collided across boards: {_names}"); bad += 1
+            if not (any("wet_lab_hat" in n for n in _names) and any("od_optics" in n for n in _names)):
+                print(f"  FAIL fabzip: each board must get its own gerbers/<board>/ namespace: {_names}"); bad += 1
+    finally:
+        _sh_z.rmtree(_z_td, ignore_errors=True)
     if _pcb_effective_tier({"resolutionTier": "package_family",
                             "partNumber": "TLC5916IDR",
                             "manufacturer": "Texas Instruments"}) != "mpn_package":
