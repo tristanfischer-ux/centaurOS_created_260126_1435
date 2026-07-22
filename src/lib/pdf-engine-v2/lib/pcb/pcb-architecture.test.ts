@@ -410,6 +410,73 @@ describe('derivePcbArchitecture', () => {
       ]))
   })
 
+  it('proveCatch: bare NTC temperature_sensor parks when digital culture probe is present', () => {
+    // INTENT (fixpack14): dual NTCG+TMP1075 on heater_20ml is half-wired junk —
+    // NTC has VCC/GND only once TMP1075 owns the sense channel.
+    const state = withElectronicWords(stateWithQuantities({ working_volume_ml: 20 }), [
+      {
+        id: 'temperature_sensor_word',
+        nameHuman: 'Temperature Sensor',
+        characterId: 'temperature_sensor',
+        modifiers: [{ kind: 'part_number', value: 'NTCG163JF103FT1S' }],
+      },
+      {
+        id: 'culture_temperature_probe_word',
+        nameHuman: 'Culture Temperature Probe',
+        characterId: 'culture_temperature_probe',
+        modifiers: [{ kind: 'part_number', value: 'TMP1075DSGR' }],
+      },
+      {
+        id: 'cartridge_heater_word',
+        nameHuman: 'Cartridge Heater',
+        characterId: 'cartridge_heater',
+      },
+    ])
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wordId: 'temperature_sensor_word',
+        placement: 'off_board_module',
+        reasons: expect.arrayContaining(['superseded_by_on_board_digital_temperature_ic']),
+      }),
+      expect.objectContaining({
+        wordId: 'culture_temperature_probe_word',
+        placement: 'on_board',
+        boardId: 'wet_actuation',
+      }),
+    ]))
+    expect(plan.boards.find((item) => item.role === 'heater_stir_actuation_board')?.requiredWordIds)
+      .toEqual(expect.arrayContaining(['culture_temperature_probe_word', 'cartridge_heater_word']))
+    expect(plan.boards.find((item) => item.role === 'heater_stir_actuation_board')?.requiredWordIds)
+      .not.toContain('temperature_sensor_word')
+  })
+
+  it('proveCatch: lone NTC temperature_sensor stays on_board when no digital temp IC', () => {
+    const state = withElectronicWords(stateWithQuantities({ working_volume_ml: 20 }), [
+      {
+        id: 'temperature_sensor_word',
+        nameHuman: 'Temperature Sensor',
+        characterId: 'temperature_sensor',
+        modifiers: [{ kind: 'part_number', value: 'NTCG163JF103FT1S' }],
+      },
+      {
+        id: 'cartridge_heater_word',
+        nameHuman: 'Cartridge Heater',
+        characterId: 'cartridge_heater',
+      },
+    ])
+
+    const plan = derivePcbArchitecture(state)
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wordId: 'temperature_sensor_word',
+        placement: 'on_board',
+        boardId: 'wet_actuation',
+      }),
+    ]))
+  })
+
   it('proveCatch: OD-form sensing_instrumentation proxies route to od_optics, not wet_actuation', () => {
     // INTENT: organoid emits OD emitter/detector only as anonymous
     // sensing_instrumentation_subcomponent_N with OD in form — must populate

@@ -66,6 +66,16 @@ function main(): void {
     target: string
     result: ReturnType<typeof runTier0FirmwareProof>
   }> = []
+  // INTENT (fixpack14): Tier-1 compiles the pinmap-bound freestanding project for
+  // the first custom_board that has an MCU + buses — never interconnect_only.
+  let tier1Buses: Array<{
+    bus_id: string
+    protocol: 'i2c' | 'uart' | 'swd'
+    pins: Record<string, string>
+    expected_devices: string[]
+  }> = []
+  let tier1Target: string | undefined
+  let tier1Mcu: string | undefined
   for (const thin of thinSpecs) {
     // INTENT: scope identity checks to THIS board's fitted parts — dumping every
     // board's MPNs into each proof hid empty boards behind the HAT BOM.
@@ -97,6 +107,22 @@ function main(): void {
       })),
       implementedChannels: multi.implementedChannels,
     })
+    const fatView = fat as {
+      kind?: string
+      mcu?: { mpn?: string } | null
+      buses?: typeof tier1Buses
+    }
+    if (
+      !tier1Target
+      && fatView.kind !== 'interconnect_only'
+      && fatView.mcu?.mpn
+      && fatView.buses
+      && fatView.buses.length > 0
+    ) {
+      tier1Target = thin.proofTargetId
+      tier1Mcu = fatView.mcu.mpn
+      tier1Buses = fatView.buses
+    }
     const proofOut = resolve(proofOutRoot, thin.proofTargetId)
     const result = designFitness.ok === true
       ? runTier0FirmwareProof(fat, proofOut, process.cwd())
@@ -109,8 +135,16 @@ function main(): void {
   }
   const firmwareAllOk =
     proofResults.length > 0 && proofResults.every((r) => r.result.ok === true)
-  const tier1 = probeTier1McuCompile(resolve(proofOutRoot, '_tier1'))
-  console.error(`[pcb-solo] firmwareTier1: skipped=${tier1.skipped} (${tier1.reason.slice(0, 120)})`)
+  const tier1 = probeTier1McuCompile(resolve(proofOutRoot, '_tier1'), {
+    proofTargetId: tier1Target,
+    mcuMpn: tier1Mcu,
+    buses: tier1Buses,
+  })
+  console.error(
+    `[pcb-solo] firmwareTier1: ok=${tier1.ok} skipped=${tier1.skipped}` +
+      ` (${tier1.reason.slice(0, 140)})` +
+      (tier1Target ? ` target=${tier1Target}` : ''),
+  )
   const firmwareProof = {
     schema: 'pcb-firmware-proof-stage/v1' as const,
     tier: 0 as const,

@@ -1,12 +1,16 @@
 /**
- * @file Tier-0 firmware proof runner — spawn isolated prototype (P9b).
- * @description Invokes `prototypes/pcb-firmware-proof/firmware_proof.py prove`
- * without importing live distributor code. Fail closed on spawn/validate errors.
+ * @file Tier-0 / Tier-1 firmware proof runners (P9b + fixpack14).
+ * @description Tier-0 spawns the isolated native prototype. Tier-1 emits a
+ * freestanding MCU project from the pin-map and compiles with arm-none-eabi-gcc
+ * when present — never fabricates ok without a real toolchain + project.
  */
 
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+
+import type { FirmwareBusPinMap } from './pcb-firmware-pinmap-from-nets'
+import { emitTier1McuProject } from './pcb-firmware-tier1-project'
 
 export interface FirmwareProofRunResult {
   ok: boolean
@@ -73,36 +77,99 @@ export interface FirmwareTier1CompileResult {
   tier: 'tier1_mcu_compile'
   reason: string
   toolchain: string | null
+  projectDir?: string
+  elfPath?: string
+}
+
+export type Tier1CompileOpts = {
+  /** When set, emit + compile a freestanding project from this pin contract. */
+  proofTargetId?: string
+  mcuMpn?: string
+  buses?: FirmwareBusPinMap[]
 }
 
 /**
- * @description Honest Tier-1 real-MCU compile probe. Never claims PASS without
- * arm-none-eabi-gcc (or equivalent) + a generated MCU project. Today the
- * prototype only ships native Tier-0 — report skipped, not fabricated ok.
- * @param outDir Directory for tier1-status.json
- * @returns skipped=true until a real MCU toolchain + project exists
+ * @description Honest Tier-1 real-MCU compile probe. Emits a pinmap-bound
+ * freestanding project when buses+MCU are provided, then runs arm-none-eabi-gcc.
+ * Never claims PASS without toolchain + successful link.
+ * @param outDir Directory for tier1-status.json + mcu-project/
+ * @param opts Optional pin-map emit inputs (from HAT custom_board contract)
+ * @returns ok=true only when .elf links; skipped when toolchain/project absent
  */
-export function probeTier1McuCompile(outDir: string): FirmwareTier1CompileResult {
+export function probeTier1McuCompile(
+  outDir: string,
+  opts: Tier1CompileOpts = {},
+): FirmwareTier1CompileResult {
   fs.mkdirSync(outDir, { recursive: true })
   const which = spawnSync('which', ['arm-none-eabi-gcc'], { encoding: 'utf8' })
   const hasToolchain = which.status === 0 && Boolean(which.stdout?.trim())
-  const result: FirmwareTier1CompileResult = hasToolchain
-    ? {
-        ok: false,
-        skipped: true,
-        tier: 'tier1_mcu_compile',
-        reason:
-          'arm-none-eabi-gcc present but no MCU project generator is wired yet — Tier-1 remains ENGINEERING DRAFT',
-        toolchain: which.stdout.trim(),
-      }
-    : {
-        ok: false,
-        skipped: true,
-        tier: 'tier1_mcu_compile',
-        reason:
-          'arm-none-eabi-gcc not on PATH — Tier-1 MCU compile not attempted (native Tier-0 only)',
-        toolchain: null,
-      }
+  const toolchain = hasToolchain ? which.stdout.trim() : null
+
+  const canEmit =
+    Boolean(opts.proofTargetId)
+    && Boolean(opts.mcuMpn)
+    && Array.isArray(opts.buses)
+    && (opts.buses?.length ?? 0) > 0
+
+  let projectDir: string | undefined
+  if (canEmit && opts.proofTargetId && opts.mcuMpn && opts.buses) {
+    const emitted = emitTier1McuProject({
+      outDir,
+      proofTargetId: opts.proofTargetId,
+      mcuMpn: opts.mcuMpn,
+      buses: opts.buses,
+    })
+    projectDir = emitted.projectDir
+  }
+
+  let result: FirmwareTier1CompileResult
+  if (!hasToolchain) {
+    result = {
+      ok: false,
+      skipped: true,
+      tier: 'tier1_mcu_compile',
+      reason: projectDir
+        ? 'arm-none-eabi-gcc not on PATH — Tier-1 project emitted but compile not attempted'
+        : 'arm-none-eabi-gcc not on PATH — Tier-1 MCU compile not attempted (native Tier-0 only)',
+      toolchain: null,
+      projectDir,
+    }
+  } else if (!projectDir) {
+    result = {
+      ok: false,
+      skipped: true,
+      tier: 'tier1_mcu_compile',
+      reason:
+        'arm-none-eabi-gcc present but no MCU pin-map available to emit a Tier-1 project (need custom_board + buses)',
+      toolchain,
+    }
+  } else {
+    const make = spawnSync('make', ['-C', projectDir], {
+      encoding: 'utf8',
+      timeout: 120_000,
+    })
+    const elfPath = path.join(projectDir, 'tier1_proof.elf')
+    const linked = make.status === 0 && fs.existsSync(elfPath)
+    result = linked
+      ? {
+          ok: true,
+          skipped: false,
+          tier: 'tier1_mcu_compile',
+          reason: 'freestanding Cortex-M0+ link OK from generated pinmap',
+          toolchain,
+          projectDir,
+          elfPath,
+        }
+      : {
+          ok: false,
+          skipped: false,
+          tier: 'tier1_mcu_compile',
+          reason: `Tier-1 compile failed: ${(make.stderr || make.stdout || '').slice(0, 400)}`,
+          toolchain,
+          projectDir,
+        }
+  }
+
   fs.writeFileSync(
     path.join(outDir, 'tier1-status.json'),
     JSON.stringify(result, null, 2),
