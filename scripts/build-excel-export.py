@@ -9435,8 +9435,26 @@ def _realisation_bill(state: dict) -> Tuple[List[dict], str]:
     return [], "requirementsBom"
 
 
+_PCB_MECH_REF_RX = re.compile(
+    # KiCad reference designators that are mechanical/alignment features, NOT
+    # electronic components placed by the PnP machine.  Fiducials (FD*), mounting
+    # holes (H*, MH*, MP*), test points (TP*), and board-edge markers (AUX*) are
+    # written into positions.csv by kicad-cli but must NOT be compared against
+    # pipeline.generator.components (which counts only electronic parts).
+    # GOTCHA (fixpack13): aggregatePipelinePositions() concatenates all boards'
+    # positions.csv files including these rows → n_pos inflated 35→58 → FAIL.
+    # Fix: skip any first-token that matches this prefix set.
+    r"^(?:FD|H|MH|MP|TP|AUX)\d",
+)
+
+
 def _pcb_pos_count(run_dir: str) -> Optional[int]:
-    """Count KiCad PnP data rows — skip `#` comments / blank lines (not part rows)."""
+    """Count KiCad PnP data rows — electronic components only.
+
+    Skips `#`-comment lines, blank lines, and mechanical/alignment placements
+    (fiducials FD*, mounting holes H*/MH*/MP*, test points TP*, aux markers AUX*)
+    so the count matches pipeline.generator.components (electronic parts only).
+    """
     if not run_dir:
         return None
     for rel in ("pcb/positions.csv", "pcb/pos.csv"):
@@ -9449,6 +9467,10 @@ def _pcb_pos_count(run_dir: str) -> Optional[int]:
                 for ln in fh:
                     s = ln.strip()
                     if not s or s.startswith("#"):
+                        continue
+                    # Skip mechanical/alignment reference designators
+                    ref = s.split()[0] if s.split() else ""
+                    if _PCB_MECH_REF_RX.match(ref):
                         continue
                     n += 1
             return n
@@ -33795,6 +33817,93 @@ def _selftest() -> int:
         print("  FAIL S15 no-fabrication: no costStack must yield no £ figure in the narrative"); bad += 1
     if _executive_narrative({"orchestratorContract": {}, "parsedBrief": {}}) != []:
         print("  FAIL S15 no-fabrication: no product class must yield an empty narrative"); bad += 1
+
+    # ═══ proveCatch _pcb_pos_count fiducial/hole/testpoint filtering (2026-07-22)
+    # REGRESSION (fixpack13 / 94fe125cb): aggregatePipelinePositions() now writes
+    # a top-level pcb/positions.csv that concatenates ALL boards' KiCad pos exports,
+    # which include non-electronic placements (FD*/H*/TP*).  _pcb_pos_count must skip
+    # those so n_pos matches pipeline.generator.components (electronic-only = 35).
+    # DIRECTION 1 — consistent state: n_pos == n_gen → PASS
+    # DIRECTION 2 — inflated count (pre-fix): n_pos > n_gen → FAIL ═══
+    import tempfile as _tmpfile
+    import shutil as _sh_pcb
+    _pcb_td = _tmpfile.mkdtemp(prefix="bex_pcb_selftest_")
+    try:
+        _pcb_dir = os.path.join(_pcb_td, "pcb")
+        os.makedirs(_pcb_dir, exist_ok=True)
+        # Simulate the aggregate positions.csv produced by fixpack13:
+        # 3 electronic rows + 3 non-electronic (fiducials + mounting hole + test point)
+        _pcb_csv_content = (
+            "### Footprint positions — multi-board aggregate (ForgeOS)\n"
+            "### Board order matches pipeline.generator.components flatMap\n"
+            "## Unit = inches, Angle = deg.\n"
+            "## Side : All\n"
+            "# Ref     Val                Package    PosX    PosY    Rot  Side\n"
+            "U1        ATSAMD21G18A-AU    TQFP-48   1.00    1.00    0.0  top\n"
+            "C1        CC0603KRX7R9BB104  C_0603    1.10    1.00    0.0  top\n"
+            "J1        52207-0760         Molex_1x7 1.20    1.00    0.0  top\n"
+            # non-electronic — must NOT be counted
+            "FD1       fiducial_1         Fiducial  2.00    2.00    0.0  top\n"
+            "H1        mounting_hole_1    MH_3.2mm  2.10    2.00    0.0  top\n"
+            "TP1       VCC_TP             TestPoint 2.20    2.00    0.0  top\n"
+        )
+        with open(os.path.join(_pcb_dir, "positions.csv"), "w") as _pf:
+            _pf.write(_pcb_csv_content)
+        _n_pos_fixed = _pcb_pos_count(_pcb_td)
+        if _n_pos_fixed != 3:
+            print(f"  FAIL _pcb_pos_count proveCatch: fiducials/holes/testpoints must be"
+                  f" excluded — want 3, got {_n_pos_fixed}"); bad += 1
+        # DIRECTION 2 — verify row is PASS when n_gen == 3, n_pos == 3
+        _pcb_pass_state = {
+            "parsedBrief": {"constraints": {}},
+            "orchestratorContract": {"quantities": {}},
+            "costStack": {},
+            "toolsUsedPage": {"tools": []},
+            "requirementsBom": [{"tag": "X-1", "requirement": "MCU", "qty": 1}],
+            "isInstrumentDevice": True,
+            "pcb": {
+                "isPcbBearing": True,
+                "pipeline": {
+                    "ok": True,
+                    "generator": {"components": [
+                        {"instanceName": "U1", "footprint": {"footprint": "TQFP-48"}},
+                        {"instanceName": "C1", "footprint": {"footprint": "C_0603"}},
+                        {"instanceName": "J1", "footprint": {"footprint": "Molex_1x7"}},
+                    ]},
+                },
+            },
+        }
+        _pcb_pass_rows = _assemble_verification_rows(_pcb_pass_state, _pcb_td)
+        _pcb_pnp_row = next(
+            (r for r in _pcb_pass_rows if "PnP" in str(r.get("claim") or "")), None
+        )
+        if not _pcb_pnp_row or _pcb_pnp_row.get("status") != "PASS":
+            print(f"  FAIL _pcb_pos_count proveCatch PASS direction: consistent "
+                  f"3-parts generator vs filtered positions.csv must PASS "
+                  f"(got {_pcb_pnp_row})"); bad += 1
+        # DIRECTION 3 — prove a genuinely-inconsistent state (4-parts generator, 3-pos) FAILs
+        _pcb_fail_state = dict(_pcb_pass_state)
+        _pcb_fail_state["pcb"] = {
+            "isPcbBearing": True,
+            "pipeline": {
+                "ok": True,
+                "generator": {"components": [
+                    {"instanceName": "U1", "footprint": {"footprint": "TQFP-48"}},
+                    {"instanceName": "C1", "footprint": {"footprint": "C_0603"}},
+                    {"instanceName": "J1", "footprint": {"footprint": "Molex_1x7"}},
+                    {"instanceName": "U2", "footprint": {"footprint": "SOT-23"}},  # extra — no match in CSV
+                ]},
+            },
+        }
+        _pcb_fail_rows = _assemble_verification_rows(_pcb_fail_state, _pcb_td)
+        _pcb_pnp_fail = next(
+            (r for r in _pcb_fail_rows if "PnP" in str(r.get("claim") or "")), None
+        )
+        if not _pcb_pnp_fail or _pcb_pnp_fail.get("status") != "FAIL":
+            print(f"  FAIL _pcb_pos_count proveCatch FAIL direction: 4-parts generator vs "
+                  f"3-pos must still FAIL (got {_pcb_pnp_fail})"); bad += 1
+    finally:
+        _sh_pcb.rmtree(_pcb_td, ignore_errors=True)
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
