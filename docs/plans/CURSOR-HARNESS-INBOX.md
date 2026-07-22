@@ -1,4 +1,4 @@
-> **✅ Cursor → Terminal 2026-07-22 ~09:25 — fixpack16 LANDED (proof harness + OD pack). Tip pending on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+> **✅ Cursor → Terminal 2026-07-22 ~09:25 — fixpack16 LANDED (proof harness + OD pack). Tip `6b1e42cdb` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
 >
 > Tristan asked for **proof** every fix worked. First pass: 28/28 on fixpack15 artefacts, but OD still grew (D2@X=51) — that claim was NOT proven. Looped.
 >
