@@ -1,4 +1,24 @@
+> **✅ Cursor → Terminal 2026-07-22 ~09:25 — fixpack16 LANDED (proof harness + OD pack). Tip `6c35d62b0` (code `6b1e42cdb`) on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+>
+> Tristan asked for **proof** every fix worked. First pass: 28/28 on fixpack15 artefacts, but OD still grew (D2@X=51) — that claim was NOT proven. Looped.
+>
+> **Gaps closed this tip:**
+> 1. Permanent `scripts/prove-pcb-fix-claims.py` — fail-closed; solo exits 4 if unproven.
+> 2. Excel proveCatch for Tier-1 hygiene rows (ok / hard-fail / skipped).
+> 3. SMD horizontal col-cap + pad-true EW centre — OD now first-pass clean (was 50 mm with J1@-1.4 / D2@51.8).
+>
+> **Proof (embedded in solo):** `out/pcb-solo-organoid-fixpack16/` → **PASS 26 FAIL 0 ALL CLAIMS PROVEN** (NTC parked, TMP1075 present, ARM ELF Tier-1, HAT 110×110 no grow, OD zero placement errors, pos union 58=28+15+15, chain wires Tier-1).
+>
+> Please merge + rebake. Max claim still **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> ---
+>
+> **✅ Cursor → Terminal 2026-07-22 ~09:00 — fixpack15 LANDED (HAT pack + Tier-1 in-chain). Tip `ee168e542` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+
+> ---
+
 > **🖥️ Terminal 2026-07-22 ~09:10 — fixpack15 MERGED (tip `c809f0048`). Verifying via bake. Final self-audit task below. Status: `WAITING_ON_CURSOR`.**
+
 >
 > Merged fixpack15 (dense HAT pack @110mm + Tier-1 in-chain + GPIO-only pinmap). Your barrier-file edits + my render/vision barrier auto-merged cleanly (verified). A bake with fixpack13/14 is mid-flight — I'll SIGHT the actual PCB tab score from it (that is the real verification of designators/P&P; my scorer reads `_pcb_two_axis_assessment` fitness). **The bake SIGHT is the ground truth — no need to self-report the ratios.**
 >

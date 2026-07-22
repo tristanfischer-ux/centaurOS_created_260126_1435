@@ -12,6 +12,7 @@
  *       2 toolchain missing
  */
 
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -261,11 +262,33 @@ function main(): void {
     summary.pipeline.ok && summary.designFitness.ok && summary.firmwareProof.allOk
   console.error(`[pcb-solo] wrote ${resolve(outDir, 'pcb-solo-summary.json')}`)
   console.error(`[pcb-solo] wrote ${resolve(outDir, 'pcb-solo-sight.md')}`)
+  // INTENT (fixpack16): never trust green summary alone — proveCatch against
+  // delivered artefacts (designators, pos union, NTC, Tier-1 ELF, HAT 110).
+  const prove = spawnSync(
+    'python3',
+    [
+      resolve(process.cwd(), 'scripts/prove-pcb-fix-claims.py'),
+      resolve(outDir),
+      '--state',
+      resolve(statePath),
+      '--repo',
+      process.cwd(),
+    ],
+    { encoding: 'utf8' },
+  )
+  if (prove.stdout) process.stderr.write(prove.stdout)
+  if (prove.stderr) process.stderr.write(prove.stderr)
+  const proveOk = prove.status === 0
+  console.error(
+    `[pcb-solo] prove-pcb-fix-claims: ${proveOk ? 'ALL PROVEN' : 'UNPROVEN'} (exit ${prove.status ?? 'n/a'})`,
+  )
   console.error(
     `[pcb-solo] DONE fitness.ok=${summary.designFitness.ok} pipeline.ok=${summary.pipeline.ok} ` +
-      `firmware.allOk=${summary.firmwareProof.allOk} boards=${summary.kicadBoardCount}`,
+      `firmware.allOk=${summary.firmwareProof.allOk} prove.ok=${proveOk} boards=${summary.kicadBoardCount}`,
   )
-  process.exit(allGreen ? 0 : 3)
+  if (!allGreen) process.exit(3)
+  if (!proveOk) process.exit(4)
+  process.exit(0)
 }
 
 main()
