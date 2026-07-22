@@ -96,6 +96,20 @@ def _part_names_from_state(state: dict) -> list[str]:
         nm = str(b.get("requirement") or b.get("name_human") or "").split("·")[0].strip()
         if nm:
             names.append(nm)
+    # Fallback: moduleDecomposition (some states — e.g. organoid-bioreactor — store
+    # parts ONLY here; requirementsBom is absent entirely). Walk
+    # modules[].sub_modules[].words[].name_human to collect part names.
+    # Added 2026-07-22: the organoid state had NO requirementsBom, so
+    # _functional_stack_footprint_mm received [] → returned None → envelope shrank
+    # to pocket optical-display (138×66×34) even though the real placed part stack
+    # is 221×165×96mm (heatsink+fan 96.5mm, peristaltic pump 60mm, stir drive 60mm).
+    if not names:
+        for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+            for sm in (m.get("sub_modules") or []):
+                for w in (sm.get("words") or []):
+                    nm = str(w.get("name_human") or "").strip()
+                    if nm:
+                        names.append(nm)
     return names
 
 
@@ -429,6 +443,44 @@ def _selftest() -> None:
     assert _functional_stack_footprint_mm(
         [b["requirement"] for b in _pocket["requirementsBom"]]) is None, (
         "pocket electronics must carry NO footprint-driving mechanical part")
+
+    # proveCatch: moduleDecomposition path (organoid real state shape — no requirementsBom)
+    # Root-cause 2026-07-22: the organoid state stores parts ONLY in moduleDecomposition;
+    # the old _part_names_from_state returned [] → envelope was 138×66×34mm → placed
+    # part stack (221×165×96mm) sprawled far outside → G19 gate fired (height excess 14mm).
+    _bio_md = {
+        "isInstrumentDevice": True,
+        # NO requirementsBom key — parts are in moduleDecomposition only
+        "moduleDecomposition": {
+            "modules": [
+                {"sub_modules": [{"words": [
+                    {"name_human": "Magnetic Stirrer Drive"},
+                    {"name_human": "Dosing Peristaltic Pump"},
+                    {"name_human": "Vial Holder Fixture"},
+                    {"name_human": "Culture Vessel"},
+                ]}]},
+                {"sub_modules": [{"words": [
+                    {"name_human": "Front Panel Connector Ports"},
+                    {"name_human": "Microcontroller Mcu"},
+                    {"name_human": "Heatsink Fan"},
+                    {"name_human": "Media Tubing Set"},
+                ]}]},
+            ]
+        },
+    }
+    _bio_md_names = _part_names_from_state(_bio_md)
+    assert len(_bio_md_names) >= 4, (
+        f"moduleDecomposition fallback must collect part names, got {_bio_md_names}")
+    assert any("heatsink" in n.lower() or "heat" in n.lower() for n in _bio_md_names), (
+        f"Heatsink Fan must be in names, got {_bio_md_names}")
+    _bio_md_env = minimum_working_envelope_from_state(_bio_md)
+    assert _bio_md_env is not None
+    assert _bio_md_env[2] >= 92.0, (
+        f"moduleDecomposition path: enclosure height must contain heatsink (≥92mm), "
+        f"got {_bio_md_env}")
+    assert max(_bio_md_env[:2]) >= 180.0, (
+        f"moduleDecomposition path: long edge must pack mechanical stack (≥180mm), "
+        f"got {_bio_md_env}")
 
     print(
         f"minimum_working_envelope _selftest: OK "
