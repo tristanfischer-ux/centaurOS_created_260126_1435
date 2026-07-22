@@ -4,6 +4,7 @@ import {
   boardIsOdOptics,
   boardSkipsUsbHostDensify,
   planSystemNets,
+  type CrossBoardTaggableNet,
 } from './pcb-cross-board-nets'
 
 import type { PcbBoardPlan } from './pcb-architecture'
@@ -51,15 +52,16 @@ describe('pcb-cross-board-nets', () => {
   })
 
   it('stamps crossBoard on matching net names', () => {
-    const tagged = applySystemNetTags(
-      [{ name: 'HEATER_I2C_SCL' }, { name: 'USB_DP' }],
-      {
-        crossBoardNetNames: ['HEATER_I2C_SCL'],
-        hasHeaterFfc: true,
-        hasOdHostI2c: false,
-        boardIds: [],
-      },
-    )
+    const nets: CrossBoardTaggableNet[] = [
+      { name: 'HEATER_I2C_SCL' },
+      { name: 'USB_DP' },
+    ]
+    const tagged = applySystemNetTags(nets, {
+      crossBoardNetNames: ['HEATER_I2C_SCL'],
+      hasHeaterFfc: true,
+      hasOdHostI2c: false,
+      boardIds: [],
+    })
     expect(tagged[0]?.crossBoard).toBe(true)
     expect(tagged[1]?.crossBoard).toBeUndefined()
   })
