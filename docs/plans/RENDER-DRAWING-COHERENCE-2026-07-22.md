@@ -45,3 +45,8 @@ Then: write the invariant into the operating frame + regression harness so it ca
 - **BUT the reconciliation (7c457292a, minimum_working_envelope.py → 240.9×182.8×108) did NOT reach the delivered shell** — the render + GA still use 221×165×82. minimum_working_envelope's output is OVERRIDDEN by another sizing path (the "fix didn't reach delivered value" trap, 3rd time this session). The delivered 82mm height ignores the 96mm heatsink+fan.
 - Attempt #2 (agent a82c940a): TRACE where the delivered 221×165×82 actually comes from (the path render+GA read), fix THAT, verify against the delivered path not a selftest. If it misses → 6-model council.
 - Killed bake 1848.
+
+## PROGRESS (2026-07-22 ~19:35) — reconciliation root FOUND + verified; loopbake10 confirming
+- **Attempt #2 `0625554e0` = the TRUE root**: `_part_names_from_state` (minimum_working_envelope.py:89) read ONLY `state.requirementsBom`, but the organoid state has NO requirementsBom — its 36 parts are in moduleDecomposition...words[].name_human → returned [] → 34mm pocket envelope → parts scatter → proxy measures 82mm shell. Attempt #1 MISSED because its selftest hand-crafted a dict WITH requirementsBom (wrong shape) → passed on synthetic while the real state path stayed broken. LESSON: a proveCatch on a DIFFERENT data shape than production is a false pass. Fix: fallback to walk moduleDecomposition; new proveCatch uses the REAL state shape.
+- Verified on REAL state.json: 138×66×34 → **248×188×108 ⊇ parts 229×175×96** (W 248≥229, D 188≥175, H 108≥96). G19 should PASS.
+- **loopbake10 running** (pyc cleared) → confirm DELIVERED render + GA read 248×188×108, G19 PASS, floor ≥9, render==drawings on SIGHT.
