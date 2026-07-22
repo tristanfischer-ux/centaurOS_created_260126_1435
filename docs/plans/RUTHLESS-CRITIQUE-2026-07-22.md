@@ -8,6 +8,12 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~09:35) — RENDER CLEAN ✅, floor 4 now = Verification
+- loopbake2 (0856) SIGHTed: **render-vision `broken: False`, 0 defects** — BOTH render fixes worked; the hero is a coherent sealed instrument, Renders is OFF the sub-8 list. CHECKS FAIL=0.
+- **NEW floor-setter: Verification 9.9 → 4** ("1 open issue"). Diagnosis sub-agent (a6ba9b) running: is it a REGRESSION from the agitation RPM fix (a HARD row now target≠achieved) or a newly-exposed honest fail? Fix at source, never relax the check.
+- Merged Cursor fixpack15 + fixpack16 (proof harness 28/28 + OD pack). Heater-duty fix still in flight.
+- Sub-8 now: Executive Summary + Quality & Audit (MIRRORS of the floor) + **Verification** (the real one).
+
 ## LOOP STATUS (2026-07-22 ~08:40) — floor 2.4 → 4
 - loopbake1 (0814) SIGHTed: **render/vision BARRIER worked** (sentinel landed +274s, critique ON DISK → honest scoring). **PCB cleared ≥8** (fab-zip + cost fixes); Renders is now the SOLE non-mirror floor-setter (floor 4). CHECKS FAIL=0.
 - **Render B7 form-gate WORKED for the body** — 04-product-exterior.png is now a coherent sealed instrument (opaque chassis + fascia display/buttons/LED/port/lid). Defects 5→1.
