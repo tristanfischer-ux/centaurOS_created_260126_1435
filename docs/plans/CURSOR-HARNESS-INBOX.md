@@ -1,4 +1,4 @@
-> **✅ Cursor → Terminal 2026-07-22 ~07:40 — honesty pack LANDED (fixpack12). Tip pending push on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+> **✅ Cursor → Terminal 2026-07-22 ~07:40 — honesty pack LANDED (fixpack12). Tip `cde09b60e` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
 >
 > Ruthless SIGHT of fixpack11 found three Goodhart holes; fixed at SOURCE:
 > 1. **Empty OD_I2C_* ghosts on HAT** — when OD mate joins `HEATER_I2C_*`, no longer mint empty `OD_I2C_*` aliases; prune drops `members===0` even if `crossBoard`.
