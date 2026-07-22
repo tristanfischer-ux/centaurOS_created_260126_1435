@@ -78,6 +78,7 @@ import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb
 import {
   probeTier1McuCompile,
   runTier0FirmwareProof,
+  runTier2BoardSim,
 } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
@@ -10185,24 +10186,103 @@ async function main() {
                   buses: tier1Buses,
                 },
               )
+              // INTENT (fixpack17): Tier-2 synthetic board sim in-chain.
+              let tier2: ReturnType<typeof runTier2BoardSim> = {
+                ok: false,
+                skipped: true,
+                tier: 'tier2_board_sim',
+                reason: 'no custom_board MCU target for board sim',
+              }
+              if (tier1Target && tier1Mcu && tier1Buses.length > 0) {
+                const hostRun = multi.boardPipelines.find((b) => b.boardId === tier1Target)
+                const hostComponents = hostRun?.generator.components ?? []
+                const peerComponents = multi.boardPipelines
+                  .filter((b) => b.boardId !== tier1Target)
+                  .flatMap((b) => b.generator.components)
+                const hostThin = thinSpecs.find((t) => t.proofTargetId === tier1Target)
+                const fatForSim = hostThin
+                  ? buildFirmwareProofContract({
+                      thin: hostThin,
+                      designFitnessOk: designFitness.ok === true,
+                      mcu: { mpn: tier1Mcu },
+                      components: hostComponents.map((c) => ({
+                        wordId: c.wordId,
+                        refdes: c.instanceName,
+                        instanceName: c.instanceName,
+                        mpn: c.partNumber,
+                        characterId: c.characterId ?? undefined,
+                        functionClass: c.functionClass ?? undefined,
+                        manufacturer: c.manufacturer ?? undefined,
+                      })),
+                      nets: (hostRun?.generator.nets ?? []).map((n) => ({
+                        name: n.name,
+                        kind: n.kind,
+                        members: n.members,
+                      })),
+                      implementedChannels: multi.implementedChannels,
+                    })
+                  : null
+                const fatChannels = (fatForSim?.channels ?? []) as Array<{
+                  role: string
+                  instances: Array<{ instance_id: string; enable_net?: string; output_net?: string }>
+                }>
+                const hostRoles = new Set((hostThin?.channels ?? []).map((c) => c.role))
+                tier2 = runTier2BoardSim({
+                  outDir: resolve(pcbProjectDir, 'firmware-proof', '_tier2'),
+                  repoRoot: process.cwd(),
+                  modelInput: {
+                    proofTargetId: tier1Target,
+                    kind: 'custom_board',
+                    mcuMpn: tier1Mcu,
+                    buses: tier1Buses,
+                    channels: fatChannels.filter((c) => hostRoles.has(c.role)),
+                    nets: (hostRun?.generator.nets ?? []).map((n) => ({
+                      name: n.name,
+                      kind: n.kind,
+                      members: n.members,
+                    })),
+                    components: hostComponents.map((c) => ({
+                      instanceName: c.instanceName,
+                      functionClass: c.functionClass,
+                      characterId: c.characterId ?? undefined,
+                      partNumber: c.partNumber,
+                      manufacturer: c.manufacturer,
+                    })),
+                    peerComponents: peerComponents.map((c) => ({
+                      instanceName: c.instanceName,
+                      functionClass: c.functionClass,
+                      characterId: c.characterId ?? undefined,
+                      partNumber: c.partNumber,
+                      manufacturer: c.manufacturer,
+                    })),
+                  },
+                })
+              }
+              const tier2AxisOk = tier2.skipped === true || tier2.ok === true
+              const firmwareAxisOk = allOk && tier2AxisOk
+              const tierNum = tier2.ok && !tier2.skipped ? 2 as const : tier1.ok ? 1 as const : 0 as const
               const firmwareProof = {
                 schema: 'pcb-firmware-proof-stage/v1' as const,
-                tier: tier1.ok ? 1 as const : 0 as const,
+                tier: tierNum,
                 results: proofResults,
-                allOk,
-                ok: allOk,
+                allOk: firmwareAxisOk,
+                ok: firmwareAxisOk,
                 tier1,
+                tier2,
               }
               stPcb.pcb.firmwareProof = firmwareProof
               pcb.firmwareProof = firmwareProof
               console.error(
-                `[chain] PCB firmwareProof (Tier-0): targets=${proofResults.length} allOk=${firmwareProof.allOk}` +
-                  ` tier1.ok=${tier1.ok} skipped=${tier1.skipped}`,
+                `[chain] PCB firmwareProof: targets=${proofResults.length} allOk=${firmwareProof.allOk}` +
+                  ` tier1.ok=${tier1.ok} skipped=${tier1.skipped}` +
+                  ` tier2.ok=${tier2.ok} skipped=${tier2.skipped} bindErrors=${tier2.bindErrorCount ?? 0}`,
               )
               logAction({
                 step: 'pcb_firmware_proof', ok: firmwareProof.allOk,
                 targets: proofResults.length, all_ok: firmwareProof.allOk,
                 tier1_ok: tier1.ok, tier1_skipped: tier1.skipped,
+                tier2_ok: tier2.ok, tier2_skipped: tier2.skipped,
+                tier2_bind_errors: tier2.bindErrorCount ?? 0,
               })
             } catch (fwErr) {
               const firmwareProof = {

@@ -5,6 +5,7 @@
  * evidence sets `pin_contract_complete:false` (fail closed). Never claims HIL.
  */
 
+import { resolveChannelNetNames } from './pcb-firmware-board-sim-model'
 import { buildFirmwareBusesFromNets } from './pcb-firmware-pinmap-from-nets'
 
 import type { PcbFirmwareProofSpec } from './pcb-firmware-proof-spec'
@@ -62,17 +63,22 @@ export function buildFirmwareProofContract(args: {
   // INTENT (2026-07-21): Tier-0 previously minted instances.length === requiredCount
   // even when design evidence said stir/pump=0 — firmware "PASS implemented=1" was
   // Goodhart. Instances must mirror real topology evidence; under-count fails proof.
+  // DECISION (fixpack17): enable/output nets prefer real netlist names (STIR_MOTOR_CTRL)
+  // over invented STIR_CHANNEL_EN_0 — synthetic board sim binds against copper truth.
   const channels = thin.channels.map((ch, i) => {
     const implemented = Math.max(0, Math.floor(implementedChannels[ch.role] ?? 0))
     return {
       channel_id: `${ch.role}_${i}`,
       role: ch.role,
       required_count: ch.requiredCount,
-      instances: Array.from({ length: implemented }, (_, k) => ({
-        instance_id: `${ch.role}_${k}`,
-        enable_net: `${ch.role.toUpperCase()}_EN_${k}`,
-        output_net: `${ch.role.toUpperCase()}_OUT_${k}`,
-      })),
+      instances: Array.from({ length: implemented }, (_, k) => {
+        const resolved = resolveChannelNetNames(ch.role, nets, k)
+        return {
+          instance_id: `${ch.role}_${k}`,
+          enable_net: resolved?.enable_net ?? `${ch.role.toUpperCase()}_EN_${k}`,
+          output_net: resolved?.output_net ?? `${ch.role.toUpperCase()}_OUT_${k}`,
+        }
+      }),
     }
   })
 
