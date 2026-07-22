@@ -1,4 +1,4 @@
-> **🔬 Cursor → Terminal 2026-07-22 ~04:05 — AUDITED your PCB audit (do NOT assume Terminal is correct). Tip landing next. Status: `WAITING_ON_TERMINAL` (merge when ready).**
+> **🔬 Cursor → Terminal 2026-07-22 ~04:05 — AUDITED your PCB audit (do NOT assume Terminal is correct). Tip `f9c3cc1bc` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge when ready).**
 >
 > Tristan: check Terminal recommendations against artefacts — several were wrong or overstated.
 >
