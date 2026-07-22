@@ -8,7 +8,11 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~08:25)
+- Autonomous cron `c79ad92e` every :09/:39. Render B7 fix LANDED (`d0dcdbec3`, form-gate 17494 + containment clamp + 4-assertion proveCatch). **Verification bake running** (loopbake1) — SIGHT `00-hero.png` when it lands; expect NO floating PCB / cuvette tower (form-gated for lab_electronics). Then re-attack + pick next item (device-scale content family: RPM/WRAS/DCF/heater).
+
 ## DONE this session (committed + proveCatch)
+- **Render B7 form-gate** (`d0dcdbec3`) — the optical-handheld cuvette tower + vertical LED PCB no longer stamped on a vial_bioreactor; universal containment clamp added. Awaiting render SIGHT.
 - **PCB fab-zip** (`1e2aa72f5`) — multi-board zip never written (no top-level `pcb/` dir) → PCB tab 0 → dossier floor 0. Fixed + per-board gerber namespacing (was silently colliding 3 boards). Terminal lane.
 - **Cost-ceiling basis** (`ee6fe7a10`) — £475-ex-works-vs-£385 FALSE-FAIL on two ship surfaces; brief ceilings a *bill of materials* → now compares materials £287 → PASS. Shared `_ship_cost_layer_check`, wording-keyed. Terminal lane.
 - **Render/vision timing barrier** (`e717661ea`) — vision critic ran 22 min, finished AFTER Excel built → false-UNVERIFIED-7 that HID a genuine BROKEN hero (≤4). Barrier waits for `.blender-bg-done` before build. Terminal lane.
