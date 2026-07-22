@@ -58,7 +58,6 @@ function main(): void {
   const multi = runBespokeMultiBoardPcb(state, outDir, runPcbPipeline)
   const architecture = multi.architecture
   const designFitness = multi.designFitness
-  const genComponents = multi.allComponents
 
   // FLOW: same as chain P9b — thin specs → fat contract (implementedChannels) → prove
   const thinSpecs = deriveFirmwareProofSpecs(architecture)
@@ -67,18 +66,20 @@ function main(): void {
     target: string
     result: ReturnType<typeof runTier0FirmwareProof>
   }> = []
-  const mcuComp = genComponents.find((c) =>
-    /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
   for (const thin of thinSpecs) {
     // INTENT: scope identity checks to THIS board's fitted parts — dumping every
     // board's MPNs into each proof hid empty boards behind the HAT BOM.
+    // GOTCHA (fixpack12): MCU must be board-scoped — HAT SAMD21 must not mint
+    // pin_contract_complete on od_optics / wet_actuation.
     const boardRun = multi.boardPipelines.find((b) => b.boardId === thin.proofTargetId)
     const boardComponents = boardRun?.generator.components ?? []
+    const boardMcu = boardComponents.find((c) =>
+      /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
     const fat = buildFirmwareProofContract({
       thin,
       designFitnessOk: designFitness.ok === true,
-      mcu: mcuComp?.partNumber
-        ? { mpn: mcuComp.partNumber, manufacturer: mcuComp.manufacturer ?? undefined }
+      mcu: boardMcu?.partNumber
+        ? { mpn: boardMcu.partNumber, manufacturer: boardMcu.manufacturer ?? undefined }
         : undefined,
       components: boardComponents.map((c) => ({
         wordId: c.wordId,

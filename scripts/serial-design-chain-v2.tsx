@@ -10001,7 +10001,6 @@ async function main() {
             // per-board generateAtopileProject + pipeline → aggregate fitness/channels.
             const multi = runBespokeMultiBoardPcb(stPcb, outDir, runPcbPipeline)
             const { architecture, designFitness, pipeline: record } = multi
-            const genComponents = multi.allComponents
             const pcbProjectDir = multi.boardPipelines[0]?.projectDir ?? resolve(outDir, 'pcb-project')
             stPcb.pcb.architecture = architecture
             pcb.architecture = architecture
@@ -10058,16 +10057,17 @@ async function main() {
                 target: string
                 result: ReturnType<typeof runTier0FirmwareProof>
               }> = []
-              const mcuComp = genComponents.find((c) =>
-                /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
               for (const thin of thinSpecs) {
                 const boardRun = multi.boardPipelines.find((b) => b.boardId === thin.proofTargetId)
                 const boardComponents = boardRun?.generator.components ?? []
+                // GOTCHA (fixpack12): board-scoped MCU only — never inherit HAT MPN.
+                const boardMcu = boardComponents.find((c) =>
+                  /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
                 const fat = buildFirmwareProofContract({
                   thin,
                   designFitnessOk: designFitness.ok === true,
-                  mcu: mcuComp?.partNumber
-                    ? { mpn: mcuComp.partNumber, manufacturer: mcuComp.manufacturer ?? undefined }
+                  mcu: boardMcu?.partNumber
+                    ? { mpn: boardMcu.partNumber, manufacturer: boardMcu.manufacturer ?? undefined }
                     : undefined,
                   components: boardComponents.map((c) => ({
                     wordId: c.wordId,

@@ -42,7 +42,19 @@ function mcuBlob(mcu: FirmwareComponentLike | undefined): string {
 }
 
 function findMcu(components: FirmwareComponentLike[]): FirmwareComponentLike | undefined {
-  return components.find((c) => c.functionClass === 'microcontroller')
+  return components.find(
+    (c) =>
+      c.functionClass === 'microcontroller'
+      || /mcu|microcontroller/i.test(`${c.characterId ?? ''} ${c.instanceName ?? ''}`),
+  )
+}
+
+/**
+ * @description Strip KiCad uniquify suffixes (`PA22__31` → `PA22`) for firmware
+ * headers. Leaves single-underscore aliases (`PA22_1`) intact.
+ */
+export function normalizeFirmwarePadName(pin: string): string {
+  return pin.replace(/__\d+$/, '')
 }
 
 function mcuPinOnNet(
@@ -53,7 +65,7 @@ function mcuPinOnNet(
   const net = nets.find((n) => n.name.toUpperCase() === netName.toUpperCase())
   if (!net) return null
   const member = net.members.find((m) => m.instanceName === mcu.instanceName)
-  return member?.pin ?? null
+  return member?.pin ? normalizeFirmwarePadName(member.pin) : null
 }
 
 function padOrNet(
@@ -80,15 +92,11 @@ export function buildFirmwareBusesFromNets(args: {
   components: FirmwareComponentLike[]
   mcuMpn?: string
 }): FirmwareBusPinMap[] {
-  const mcu =
-    findMcu(args.components)
-    ?? (args.mcuMpn
-      ? {
-          instanceName: '_mcu',
-          functionClass: 'microcontroller',
-          partNumber: args.mcuMpn,
-        }
-      : undefined)
+  // DECISION (fixpack12): never invent an MCU from mcuMpn alone. Daughterboards
+  // (OD / heater) previously inherited the HAT MPN and claimed SAMD21 I2C/SWD
+  // pads with no microcontroller on the board — Goodhart Tier-0 PASS.
+  const mcu = findMcu(args.components)
+  if (!mcu) return []
 
   const buses: FirmwareBusPinMap[] = []
 
@@ -102,14 +110,17 @@ export function buildFirmwareBusesFromNets(args: {
     'OD_I2C_SCL',
     'I2C_SCL',
   ])
-  const hasI2cEvidence = args.nets.some((n) =>
-    /^(?:HEATER_I2C_|OD_I2C_|I2C_)/i.test(n.name),
-  )
-  if (sda && scl && (hasI2cEvidence || Boolean(mcu))) {
+  // INTENT: when the board has a real MCU, reference-map I2C pads are honest
+  // even before nets are wired; the Goodhart we killed was inventing the MCU.
+  if (sda && scl) {
     buses.push({
       bus_id: 'i2c0',
       protocol: 'i2c',
-      pins: { sda, scl, gnd: 'GND' },
+      pins: {
+        sda: normalizeFirmwarePadName(sda),
+        scl: normalizeFirmwarePadName(scl),
+        gnd: 'GND',
+      },
       expected_devices: [],
     })
   }
@@ -117,12 +128,16 @@ export function buildFirmwareBusesFromNets(args: {
   const tx = padOrNet(mcu, args.nets, 'uart_tx', ['UART_TX', 'TX'])
   const rx = padOrNet(mcu, args.nets, 'uart_rx', ['UART_RX', 'RX'])
   if (tx && rx && buses.length === 0) {
-    // INTENT: only emit synthetic UART when no I2C bus was derived — avoids
-    // the old TX/RX placeholder theatre when the board is I2C-native.
+    // INTENT: only emit UART when no I2C bus was derived — avoids TX/RX
+    // placeholder theatre when the board is I2C-native.
     buses.push({
       bus_id: 'uart0',
       protocol: 'uart',
-      pins: { tx, rx, gnd: 'GND' },
+      pins: {
+        tx: normalizeFirmwarePadName(tx),
+        rx: normalizeFirmwarePadName(rx),
+        gnd: 'GND',
+      },
       expected_devices: [],
     })
   }
@@ -133,25 +148,22 @@ export function buildFirmwareBusesFromNets(args: {
     buses.push({
       bus_id: 'swd0',
       protocol: 'swd',
-      pins: { swdio, swclk, gnd: 'GND' },
+      pins: {
+        swdio: normalizeFirmwarePadName(swdio),
+        swclk: normalizeFirmwarePadName(swclk),
+        gnd: 'GND',
+      },
       expected_devices: [],
     })
   }
 
-  if (buses.length === 0) {
-    buses.push({
-      bus_id: 'uart0',
-      protocol: 'uart',
-      pins: { tx: 'TX', rx: 'RX', gnd: 'GND' },
-      expected_devices: [],
-    })
-  }
-
+  // GOTCHA: no synthetic TX/RX fallback — empty buses means "no bus evidence".
   return buses
 }
 
 /**
- * @description proveCatch: SAMD21 + HEATER_I2C nets → I2C pads PA22/PA23.
+ * @description proveCatch: SAMD21 + HEATER_I2C nets → I2C pads PA22/PA23;
+ * uniquify suffixes stripped; no MCU on board → zero buses.
  */
 export function proveCatchFirmwarePinmapFromNets(): void {
   const buses = buildFirmwareBusesFromNets({
@@ -167,11 +179,11 @@ export function proveCatchFirmwarePinmapFromNets(): void {
     nets: [
       {
         name: 'HEATER_I2C_SDA',
-        members: [{ instanceName: 'mcu', pin: 'PA22' }],
+        members: [{ instanceName: 'mcu', pin: 'PA22__31' }],
       },
       {
         name: 'HEATER_I2C_SCL',
-        members: [{ instanceName: 'mcu', pin: 'PA23' }],
+        members: [{ instanceName: 'mcu', pin: 'PA23__32' }],
       },
     ],
   })
@@ -179,6 +191,20 @@ export function proveCatchFirmwarePinmapFromNets(): void {
   if (!i2c || i2c.pins.sda !== 'PA22' || i2c.pins.scl !== 'PA23') {
     throw new Error(
       `proveCatch expected I2C PA22/PA23, got ${JSON.stringify(i2c?.pins)}`,
+    )
+  }
+  const ghost = buildFirmwareBusesFromNets({
+    mcuMpn: 'ATSAMD21G18A-AU',
+    components: [
+      { instanceName: 'tmp1075', functionClass: 'temperature_sensor', partNumber: 'TMP1075DSGR' },
+    ],
+    nets: [
+      { name: 'HEATER_I2C_SDA', members: [{ instanceName: 'tmp1075', pin: 'SDA' }] },
+    ],
+  })
+  if (ghost.length !== 0) {
+    throw new Error(
+      `proveCatch: daughterboard without MCU must emit 0 buses, got ${JSON.stringify(ghost)}`,
     )
   }
 }

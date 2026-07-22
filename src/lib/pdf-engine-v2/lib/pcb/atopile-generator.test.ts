@@ -1553,6 +1553,11 @@ describe('atopile-generator', () => {
     const heaterScl = result.nets.find((n) => n.name === 'HEATER_I2C_SCL')
     expect(heaterScl?.crossBoard).toBe(true)
     expect((heaterScl?.members.length ?? 0) >= 2).toBe(true)
+    // proveCatch (fixpack12): shared-bus HAT must not emit empty OD_I2C_* ghosts.
+    const odGhosts = result.nets.filter(
+      (n) => /^OD_I2C_/i.test(n.name) && n.members.length === 0,
+    )
+    expect(odGhosts).toEqual([])
   })
 
   it('wirePeripheralNets: VBUS rev-pol+polyfuse+ferrite; LED on SAMD21 PA07', () => {

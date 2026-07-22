@@ -30,14 +30,44 @@ describe('buildFirmwareProofContract', () => {
     expect(i2c?.pins).toEqual({ sda: 'PA22', scl: 'PA23', gnd: 'GND' })
   })
 
-  it('marks pin contract complete only when fitness OK and MCU present', () => {
+  it('marks pin contract complete only when fitness OK and on-board MCU present', () => {
     const fat = buildFirmwareProofContract({
       thin,
       designFitnessOk: true,
       mcu: { mpn: 'ATSAMD21G18A-AU' },
-      components: [],
+      components: [{
+        wordId: 'main_controller_mcu_word',
+        mpn: 'ATSAMD21G18A-AU',
+        refdes: 'U1',
+        functionClass: 'microcontroller',
+      }],
     })
     expect((fat.mcu as { pin_contract_complete: boolean }).pin_contract_complete).toBe(true)
+    expect(fat.kind).toBe('custom_board')
+  })
+
+  it('proveCatch: daughterboard without MCU is interconnect_only (no HAT MCU theatre)', () => {
+    const odThin: PcbFirmwareProofSpec = {
+      ...thin,
+      proofTargetId: 'od_optics',
+      boardRole: 'od_optics_board',
+      channels: [{ role: 'od_measurement_channel', requiredCount: 1 }],
+    }
+    const fat = buildFirmwareProofContract({
+      thin: odThin,
+      designFitnessOk: true,
+      // GOTCHA: callers used to pass the HAT MCU here — must be ignored.
+      mcu: { mpn: 'ATSAMD21G18A-AU' },
+      components: [{
+        wordId: 'optical_adc_word',
+        mpn: 'ADS1114IDGSR',
+        functionClass: 'adc',
+      }],
+      implementedChannels: { od_measurement_channel: 1 },
+    })
+    expect(fat.kind).toBe('interconnect_only')
+    expect(fat.mcu).toBeNull()
+    expect(fat.buses).toEqual([])
   })
 
   it('prefers netlist MCU pads over reference fallback when nets are supplied', () => {
@@ -53,14 +83,14 @@ describe('buildFirmwareProofContract', () => {
         functionClass: 'microcontroller',
       }],
       nets: [
-        { name: 'HEATER_I2C_SDA', members: [{ instanceName: 'mcu', pin: 'PA22_1' }] },
-        { name: 'HEATER_I2C_SCL', members: [{ instanceName: 'mcu', pin: 'PA23_1' }] },
+        { name: 'HEATER_I2C_SDA', members: [{ instanceName: 'mcu', pin: 'PA22__31' }] },
+        { name: 'HEATER_I2C_SCL', members: [{ instanceName: 'mcu', pin: 'PA23__32' }] },
       ],
     })
     const i2c = (fat.buses as Array<{ protocol: string; pins: Record<string, string> }>)
       .find((b) => b.protocol === 'i2c')
-    expect(i2c?.pins.sda).toBe('PA22_1')
-    expect(i2c?.pins.scl).toBe('PA23_1')
+    expect(i2c?.pins.sda).toBe('PA22')
+    expect(i2c?.pins.scl).toBe('PA23')
   })
 
   it('proveCatch: instances come from implementedChannels, never requiredCount', () => {
@@ -78,9 +108,14 @@ describe('buildFirmwareProofContract', () => {
       thin: actuation,
       designFitnessOk: true,
       mcu: { mpn: 'ATSAMD21G18A-AU' },
-      components: [],
+      components: [{
+        wordId: 'temperature_sensor_word',
+        mpn: 'TMP1075DSGR',
+        functionClass: 'temperature_sensor',
+      }],
       implementedChannels: { heater_channel: 1, stir_channel: 0, pump_channel: 0 },
     })
+    expect(fat.kind).toBe('interconnect_only')
     const channels = fat.channels as Array<{
       role: string
       required_count: number

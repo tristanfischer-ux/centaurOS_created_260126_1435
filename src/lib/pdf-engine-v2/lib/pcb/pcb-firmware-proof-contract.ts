@@ -25,6 +25,13 @@ export interface FirmwareProofContractNet {
   members: Array<{ instanceName: string; pin: string }>
 }
 
+function componentLooksLikeMcu(c: FirmwareProofContractComponent): boolean {
+  return (
+    c.functionClass === 'microcontroller'
+    || /mcu|microcontroller/i.test(`${c.characterId ?? ''} ${c.wordId ?? ''} ${c.instanceName ?? ''}`)
+  )
+}
+
 /**
  * @description Expand a thin architecture proof target into a fat prove-able contract.
  * @param args.thin Thin board-level proof sketch from architecture
@@ -69,50 +76,63 @@ export function buildFirmwareProofContract(args: {
     }
   })
 
-  // GOTCHA: pin_contract_complete requires both a real MCU MPN and design fitness.
-  // Native Tier-0 never invents pin headers — incomplete → fail closed in validate_spec.
-  const pinComplete = Boolean(mcu?.mpn) && designFitnessOk
+  // DECISION (fixpack12): MCU identity is board-scoped. Passing the HAT SAMD21
+  // into od_optics / wet_actuation made pin_contract_complete:true with no MCU
+  // fitted — Tier-0 PASS was theatre. No on-board MCU → interconnect_only.
+  const boardHasMcu = components.some(componentLooksLikeMcu)
+  const effectiveMcu = boardHasMcu ? mcu : undefined
+  const kind =
+    thin.kind === 'cots_host_integration'
+      ? 'cots_host_integration'
+      : boardHasMcu
+        ? 'custom_board'
+        : 'interconnect_only'
+
+  // GOTCHA: pin_contract_complete requires on-board MCU evidence + MPN + fitness.
+  const pinComplete = Boolean(effectiveMcu?.mpn) && boardHasMcu && designFitnessOk
 
   const busComponents = components.map((c) => ({
     instanceName: c.instanceName ?? c.refdes ?? c.wordId,
     functionClass: c.functionClass
-      ?? (/mcu|microcontroller/i.test(c.characterId ?? '') ? 'microcontroller' : null),
+      ?? (componentLooksLikeMcu(c) ? 'microcontroller' : null),
     characterId: c.characterId,
-    manufacturer: c.manufacturer ?? mcu?.manufacturer ?? null,
+    manufacturer: c.manufacturer ?? effectiveMcu?.manufacturer ?? null,
     partNumber: c.mpn ?? null,
   }))
-  if (mcu?.mpn && !busComponents.some((c) => c.functionClass === 'microcontroller')) {
+  if (
+    boardHasMcu
+    && effectiveMcu?.mpn
+    && !busComponents.some((c) => c.functionClass === 'microcontroller')
+  ) {
     busComponents.push({
       instanceName: '_mcu',
       functionClass: 'microcontroller',
       characterId: 'main_controller_mcu',
-      manufacturer: mcu.manufacturer ?? null,
-      partNumber: mcu.mpn,
+      manufacturer: effectiveMcu.manufacturer ?? null,
+      partNumber: effectiveMcu.mpn,
     })
   }
 
-  const buses = buildFirmwareBusesFromNets({
-    nets,
-    components: busComponents,
-    mcuMpn: mcu?.mpn,
-  })
+  const buses = boardHasMcu
+    ? buildFirmwareBusesFromNets({
+        nets,
+        components: busComponents,
+        mcuMpn: effectiveMcu?.mpn,
+      })
+    : []
 
   return {
     schema: 'pcb-firmware-proof-spec/v1',
     proof_target_id: thin.proofTargetId,
-    kind: thin.kind === 'cots_host_integration' ? 'cots_host_integration' : 'custom_board',
+    kind,
     design_fitness_ok: designFitnessOk,
-    mcu: mcu
+    mcu: effectiveMcu
       ? {
-          mpn: mcu.mpn,
+          mpn: effectiveMcu.mpn,
           toolchain: 'native-draft',
           pin_contract_complete: pinComplete,
         }
-      : {
-          mpn: 'UNKNOWN',
-          toolchain: 'native-draft',
-          pin_contract_complete: false,
-        },
+      : null,
     buses,
     components: components
       .filter((c) => Boolean(c.mpn))

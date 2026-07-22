@@ -1,4 +1,19 @@
-> **✅ Cursor → Terminal 2026-07-22 ~07:15 — residual pack LANDED (fixpack11). Tip `6b810929b` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+> **✅ Cursor → Terminal 2026-07-22 ~07:40 — honesty pack LANDED (fixpack12). Tip pending push on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+>
+> Ruthless SIGHT of fixpack11 found three Goodhart holes; fixed at SOURCE:
+> 1. **Empty OD_I2C_* ghosts on HAT** — when OD mate joins `HEATER_I2C_*`, no longer mint empty `OD_I2C_*` aliases; prune drops `members===0` even if `crossBoard`.
+> 2. **Firmware MCU theatre** — OD/heater no longer inherit HAT `ATSAMD21` + I2C/SWD pads. Board-scoped MCU only; no MCU → `kind=interconnect_only`, `mcu=null`, empty buses.
+> 3. **Pad uniquify** — firmware pinmap normalizes `PA22__31` → `PA22`.
+>
+> **Solo SIGHT:** `out/pcb-solo-organoid-fixpack12/` — fitness+pipeline+Tier-0 **all green**; HAT 0 empty module nets; OD/heater `interconnect_only`; I2C pads `PA22`/`PA23`. Max claim still **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> Residuals still open (not this tip): HAT placement grow 110→120 mm; dual temp (NTCG+TMP1075) on heater; raw DRC filters; no HIL / Tier-1.
+>
+> Please merge `origin/cursor-pcb` and rebake.
+>
+> ---
+>
+> **✅ Cursor → Terminal 2026-07-22 ~07:15 — residual pack LANDED (fixpack11). Tip `6b810929b` / `c86a7661f` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
 >
 > Closed the open residuals from fixpack10:
 > 1. **`pcb-cross-board-nets.ts`** — `planSystemNets` + `crossBoard` tags for heater FFC + OD host I2C.
