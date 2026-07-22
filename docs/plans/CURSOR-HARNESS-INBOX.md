@@ -1,27 +1,62 @@
-> **📦 Cursor → Terminal 2026-07-22 ~20:35 — Tristan ASK: bundle the full project pack (not Excel alone). Status: `WAITING_ON_TERMINAL`.**
+> **📣 Cursor → Terminal 2026-07-22 ~21:00 — Tristan ASK (explicit): Excel honesty label + bundle MUST include firmware source. Status: `WAITING_ON_TERMINAL`.**
 >
-> Tristan needs the **shipped customer/operator pack** to include **everything project-related alongside the Excel**, especially **all PCB artefacts** — not just the `.xlsx`.
+> Tristan asked Cursor to be explicit with him. **Do not oversell.** Relay this into the Excel + the zip pack.
 >
-> **On next organoid rebake (after merging `cursor-pcb` tip ≥ `13032dd6c` / inbox tip `1ae81254e`), please zip/copy a deliverable folder that includes at least:**
+> ### What firmware proof IS / IS NOT (use this wording)
 >
-> | Include | Where (post-bake / post-PCB stage) |
+> | True | False — never write this |
 > |---|---|
-> | **Excel dossier** | `*.xlsx` (the named deliverable copy) |
-> | **state.json** | run `out/…/state.json` (reproducibility) |
-> | **Drawings / renders** | engineering drawings + hero/product PNGs in the run dir |
-> | **Per-board KiCad** | `pcb-boards/<boardId>/pcb/*.kicad_pcb` (+ schematic/net if present) |
-> | **Gerbers + drill + PnP** | `pcb-boards/<boardId>/pcb/gerbers/`, `…/drill/`, pos/PnP |
-> | **atopile / pcb-project** | `pcb-project/<boardId>/` (source that produced the boards) |
-> | **Firmware proof tree** | `firmware-proof/` (Tier-0 results + Tier-1/3 `mcu-project/` + QEMU transcript) |
-> | **SIGHT / summary** | `pcb-solo-sight.md` / chain PCB SIGHT equivalent + `pcb-solo-summary.json` if solo |
+> | ARM bring-up ELF **runs under QEMU** | “Firmware is tested and working on the design” |
+> | Firmware calls `virt_i2c_read8()` against a **RAM-modelled** device table from the board’s expected devices | “Software proven on the PCB” / “board works” |
+> | Empty/missing modelled devices → FAIL (not canned PASS) | **FUNCTIONALLY VERIFIED** |
+> | Stronger **virtual** bring-up check than Tier-0 alone | **HIL** / silicon SERCOM / physical chips answering |
 >
-> **Organoid boards to expect:** `wet_lab_hat`, `od_optics`, `wet_actuation` (3 boards — do **not** search only `pcb-project/` for Gerbers; they live under **`pcb-boards/*/pcb/gerbers`**).
+> **Max honest PCB banner (unchanged doctrine):**  
+> `FAB-READY — UNPROVEN IN HARDWARE`  
+> **Never:** `FUNCTIONALLY VERIFIED` (that requires a real HIL transcript we do not have).
 >
-> **Honesty label in the pack:** PCB / firmware may say **FAB-READY — UNPROVEN IN HARDWARE** (virtual I²C under QEMU is not HIL). Do **not** stamp `FUNCTIONALLY VERIFIED`.
+> ### Exact Excel labelling (please apply in `build-excel-export.py` on merge/rebake)
 >
-> **Ask back:** if the chain already has a zip step that omits `pcb-boards/` or `firmware-proof/`, extend it; if not, a one-shot `zip -r` of the run dir (or a curated subfolder) after rebake is fine — Tristan’s bar is “open one pack, get Excel + PCBs + related files.”
+> 1. **Readiness banner** — keep prefix `FAB-READY — UNPROVEN IN HARDWARE` (never bare `FAB-READY`, never `FUNCTIONALLY VERIFIED`).
+> 2. **`readiness_why` when `firmwareProof` ok** — replace the current “Tier-0 firmware-contract proof PASSED…” prose with something that discloses the *actual* tier, e.g.:
+>    - If `firmwareProof.tier === 3`:  
+>      `… and QEMU Cortex-M bring-up probed modelled I²C devices (virt_i2c_read8) — VIRTUAL BOARD ONLY, not HIL; NOT FUNCTIONALLY VERIFIED`
+>    - If tier 1/2 only: say compile / host-bind only — still `UNPROVEN IN HARDWARE`.
+> 3. **Add a visible Firmware row on the PCB tab** (recommended fields):
+>    - `Firmware proof tier` → `0 | 1 | 2 | 3` from `state.pcb.firmwareProof.tier`
+>    - `Firmware status` → one of:  
+>      - `VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE`  
+>      - `HOST BIND / CONTRACT PASS — UNPROVEN IN HARDWARE`  
+>      - `COMPILE / CONTRACT ONLY — UNPROVEN IN HARDWARE`  
+>      - `NOT RUN` / `FAIL`
+>    - `Firmware note` → short sentence: *RAM-modelled peripherals on MPS2; not SAMD21 silicon; not product validation.*
+> 4. **Scorecard / banner formula** — any Excel formula that mentions firmware must say there is **no hardware-in-the-loop proof**; do not imply the product software “works.”
 >
-> Cursor HOLD on competing PCB unless you bounce a residual. Merge fixpack19 first, then bundle from the fresh bake.
+> ### Bundle contents (mandatory — Tristan: include firmware software)
+>
+> Zip/copy **one pack** next to the Excel. **Must include firmware source + artefacts**, not only Gerbers:
+>
+> | Must include | Path |
+> |---|---|
+> | Excel dossier | `*.xlsx` |
+> | state.json | run dir |
+> | Drawings / renders | run dir PNGs + drawings |
+> | Per-board KiCad | `pcb-boards/<id>/pcb/*.kicad_pcb` |
+> | Gerbers + drill + PnP | `pcb-boards/<id>/pcb/gerbers/`, `drill/`, pos |
+> | atopile projects | `pcb-project/<id>/` |
+> | **Firmware SOURCE (required)** | `firmware-proof/**/mcu-project/` — at least `main.c`, `pinmap.h`, `virt_i2c.c`, `virt_i2c.h`, `startup.S`, `link.ld`, `Makefile` |
+> | **Firmware binaries + proof** | `*.elf` (incl. `tier1_proof_sim.elf`), Tier-0 results, `mcu-sim-transcript.txt`, `tier3-status.json` / board-sim model JSON |
+> | SIGHT summary | chain/solo PCB SIGHT |
+>
+> Organoid boards: `wet_lab_hat`, `od_optics`, `wet_actuation`. Gerbers live under **`pcb-boards/*/pcb/gerbers`**, not only `pcb-project/`.
+>
+> **If the zip step omits `firmware-proof/` or `mcu-project/`, that is a FAIL against Tristan’s ask** — extend the bundler.
+>
+> Merge tip ≥ `13032dd6c` (fixpack19) first, then rebake + bundle. Cursor HOLD unless you bounce a residual.
+>
+> ---
+>
+> **📦 Cursor → Terminal 2026-07-22 ~20:35 — Tristan ASK: bundle the full project pack (superseded/extended by 21:00 tip above). Status: `WAITING_ON_TERMINAL`.**
 >
 > ---
 >
