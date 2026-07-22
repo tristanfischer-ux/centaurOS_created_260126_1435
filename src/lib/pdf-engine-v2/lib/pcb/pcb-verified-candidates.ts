@@ -300,7 +300,8 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     // INTENT: OD densify synthesizes od_photodiode_tia; zero-drift TIA is the
     // published Eye-Spy-class front-end (not Rodeostat TL072 current TIA).
     roleTest: /opa334|zero[_ -]?drift[_ -]?(?:shutdown[_ -]?)?(?:op[_ -]?amp|amplifier)|(?:^|[_ -])(?:od[_ -]?)?(?:photodiode[_ -]?)?(?:tia|transimpedance)(?:$|[_ -])|optical[_ -]?(?:tia|front[_ -]?end)/i,
-    excludedRoleTest: /current[_ -]?measurement[_ -]?tia|selectable[_ -]?gain[_ -]?tia|droplet[_ -]?feedback/i,
+    // GOTCHA: od_tia_feedback_resistor contains "…tia…" and would steal OPA334.
+    excludedRoleTest: /current[_ -]?measurement[_ -]?tia|selectable[_ -]?gain[_ -]?tia|droplet[_ -]?feedback|feedback[_ -]?resistor|series[_ -]?resistor/i,
     functionClass: 'op_amp',
     manufacturer: 'Texas Instruments',
     partNumber: 'OPA334AIDBVR',
@@ -324,7 +325,38 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     symbol: { library: 'Driver_Motor', symbol: 'DRV8876' },
     ratings: { voltageV: 37, currentA: 3.5 },
     packageEvidence: 'forge-truth cache: DRV8876PWPR, 16-HTSSOP brushed-DC driver',
-    referenceEvidence: 'Pioreactor frozen actuation role manifest, revision ca40a91e728801b139b1086853f7cf74ce76def9',
+    referenceEvidence: 'Forge host-HAT actuation drive fixture + TI DRV8876 datasheet SLVSF05; Pioreactor GPIO PWM1–4 stir/media contract',
+    pinoutEvidence: 'TI PWP-16 pins 1=EN/IN1, 2=PH/IN2, 3=nSLEEP, 8=OUT1, 10=OUT2, 11=VM, 15=GND; curated Forge_Manufacturer:DRV8876PWPR',
+  },
+  {
+    // INTENT: Host-HAT heater PWM low-side switch — NEVER matches heater_element /
+    // ESR18 roles (those stay resistive loads on the FFC daughterboard).
+    roleTest: /heater[_ -]?pwm[_ -]?(?:switch|mosfet)|(?:host[_ -]?hat[_ -]?)?heater[_ -]?drive[_ -]?mosfet|ao3400a/i,
+    excludedRoleTest: /(?:cartridge|resistive)[_ -]?heater|heater[_ -]?element|esr18|reverse[_ -]?polarity/i,
+    functionClass: 'switch',
+    // GOTCHA: forge-truth library row is "Alpha & Omega Semiconductor Inc." —
+    // "and" vs "&" must match includes() in resolveVerifiedFunctionCandidate.
+    manufacturer: 'Alpha & Omega Semiconductor Inc.',
+    partNumber: 'AO3400A',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    symbol: { library: 'Transistor_FET', symbol: 'Q_NMOS_GSD' },
+    ratings: { voltageV: 30, currentA: 5.7 },
+    packageEvidence: 'AOS AO3400A: N-channel 30 V logic-level MOSFET in SOT-23',
+    referenceEvidence: 'Forge host-HAT actuation drive fixture heater_pwm_switch; AOS AO3400A datasheet',
+    pinoutEvidence: 'SOT-23 1=G, 2=S, 3=D; curated Forge_Manufacturer:AO3400A',
+  },
+  {
+    roleTest: /(?:od[_ -]?)?(?:led[_ -]?)?series[_ -]?resistor|od[_ -]?(?:front[_ -]?end[_ -]?)?feedback[_ -]?resistor|tia[_ -]?feedback[_ -]?r\b/i,
+    excludedRoleTest: /(?:cartridge|resistive)[_ -]?heater|esr18|shunt/i,
+    functionClass: 'passive_r',
+    manufacturer: 'YAGEO',
+    partNumber: 'RC0603FR-101KL',
+    footprint: { library: 'Resistor_SMD', footprint: 'R_0603_1608Metric' },
+    symbol: { library: 'Device', symbol: 'R' },
+    ratings: { voltageV: 75 },
+    packageEvidence: 'YAGEO RC0603FR-101KL: 100 kΩ 1% thick-film 0603',
+    referenceEvidence: 'Universal OD densify companion for LED series / TIA feedback; forge-truth library row',
+    pinoutEvidence: 'two-terminal 0603; local KiCad Device:R with Resistor_SMD:R_0603_1608Metric',
   },
   {
     roleTest: /bulk[_ -]?capacitor[_ -]?word|cs1e102m[_ -]?cri13/i,

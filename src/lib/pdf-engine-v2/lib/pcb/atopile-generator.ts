@@ -86,6 +86,7 @@ import {
 } from './pcb-outline'
 import type { PcbBoardGeometry } from './pcb-contract'
 import type { PcbBoardShapeContract } from './pcb-architecture'
+import { isHostHatActuationDrivePublished } from './pcb-architecture'
 import type { PcbPinSpec } from './pcb-component-resolution'
 import type { VerifiedCandidateRequest } from './pcb-verified-candidates'
 
@@ -132,6 +133,9 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // "photodiode" and would otherwise mis-classify as sensor_ic (no OPA334 match).
   // INTENT (Rodeostat 0201): dac_output_stage is a real SOIC DAC IC — without
   // this it landed in unresolved[] ELECTRONIC gap and capped PCB at DRAFT/5.
+  // GOTCHA: od_*_feedback_resistor / series_resistor contain "tia"/"amplifier"
+  // substrings — passive_r must win for ballast/Rf densify companions.
+  { id: 'passive_r', test: /(?:led[_-]?series|series|feedback|front[_-]?end[_-]?feedback)[_-]?resistor|(?:^|[_-])(?:ballast|feedback)[_-]?r(?:$|[_-])/i },
   { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance/i },
   { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
@@ -156,6 +160,7 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // GOTCHA: do not bare-match `current_sense` alone — that can be an amplifier IC.
   // INTENT (Pioreactor heater_20ml): cartridge/resistive heater loads are SMD
   // resistor packages on the actuation daughterboard — not gate-driver ICs.
+  // (series/feedback resistor densify is matched earlier, before op_amp.)
   { id: 'passive_r', test: /resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor|cartridge[_-]?heater|resistive[_-]?heater|heater[_-]?element/i },
   { id: 'passive_l', test: /ferrite|inductor|choke/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
@@ -1128,6 +1133,32 @@ function ensureOdGoldCompanionWords(
       quantity: 1,
     })
   }
+  // INTENT: LED series R + TIA feedback R turn densify parts into a circuit
+  // (source → ballast → LED; TIA OUT↔−IN feedback), not a lonely IC list.
+  if (!/od[_ -]?led[_ -]?series[_ -]?resistor|led[_ -]?series[_ -]?r\b/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'od_led_series_resistor_word',
+      nameHuman: 'OD LED series resistor',
+      characterId: 'od_led_series_resistor',
+      modifiers: {},
+      categories: ['passive'],
+      quantity: 1,
+    })
+  }
+  if (!/od[_ -]?(?:front[_ -]?end[_ -]?)?feedback[_ -]?resistor|tia[_ -]?feedback[_ -]?r\b/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'od_front_end_feedback_resistor_word',
+      nameHuman: 'OD front-end feedback resistor',
+      characterId: 'od_front_end_feedback_resistor',
+      modifiers: {},
+      categories: ['passive'],
+      quantity: 1,
+    })
+  }
   return out
 }
 
@@ -1161,6 +1192,66 @@ function ensureHatHostConnectorWords(
       quantity: 1,
     },
   ]
+}
+
+/**
+ * @description Host-HAT densify: heater PWM MOSFET + stir/pump DRV8876 when the
+ * Forge host-HAT drive fixture is published. Never densifies onto heater_stir boards.
+ */
+function ensureHostHatActuationDriveWords(
+  words: ElectronicWordRef[],
+  boardRole: string | undefined,
+  requiredFunctionRoles: string[] | undefined,
+): ElectronicWordRef[] {
+  if (boardRole !== 'wet_lab_hat') return words
+  if (!isHostHatActuationDrivePublished()) return words
+  const blob = words.map((w) => `${w.wordId} ${w.characterId} ${w.nameHuman}`).join(' ')
+  // GOTCHA: need host connector / MCU evidence so we never invent drive on an empty board.
+  if (!/hat[_ -]?host|_mcu|microcontroller|ssq[_ -]?120|usb[_ -]?(?:interface|power|connector)/i.test(blob)) {
+    return words
+  }
+  const anchor = words[0]
+  const moduleId = anchor?.moduleId ?? 'host_interface'
+  const subModuleId = anchor?.subModuleId ?? 'hat_actuation'
+  const out = [...words]
+  if (!/heater[_ -]?pwm[_ -]?(?:switch|mosfet)|ao3400/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'heater_pwm_switch_word',
+      nameHuman: 'Heater PWM MOSFET',
+      characterId: 'heater_pwm_switch',
+      modifiers: {},
+      categories: ['switch'],
+      quantity: 1,
+    })
+  }
+  const roles = requiredFunctionRoles ?? []
+  if (roles.includes('stir_channel') && !/stir[_ -]?motor[_ -]?driver|stir[_ -]?channel[_ -]?driver/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'stir_motor_driver_word',
+      nameHuman: 'Stir motor driver',
+      characterId: 'stir_motor_driver',
+      modifiers: {},
+      categories: ['driver'],
+      quantity: 1,
+    })
+  }
+  if (roles.includes('pump_channel') && !/pump[_ -]?motor[_ -]?driver|pump[_ -]?channel[_ -]?driver/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'pump_motor_driver_word',
+      nameHuman: 'Pump motor driver',
+      characterId: 'pump_motor_driver',
+      modifiers: {},
+      categories: ['driver'],
+      quantity: 1,
+    })
+  }
+  return out
 }
 
 /**
@@ -1741,6 +1832,216 @@ function wireOdOpticalFrontEndNets(
       addMember(gnd, esd.instanceName, a2)
     }
   }
+
+  // LED series ballast: VCC → R → LED anode (cathode already on rail via tieSupply).
+  const led = components.find((c) => c.functionClass === 'led' || /od[_ -]?source|szyy/i.test(roleBlob(c)))
+  const ledSeriesR = components.find((c) => /od[_ -]?led[_ -]?series[_ -]?resistor|led[_ -]?series/i.test(roleBlob(c)))
+  if (led && ledSeriesR) {
+    // GOTCHA: bare pin names "1"/"2" emit as illegal atopile `signal 1` — use P1/P2.
+    const r1 =
+      findPinMatching(ledSeriesR, [/^P1$/i, /^___?1/i, /^1__/i, /^A$/i])
+      ?? ensureComponentPin(ledSeriesR, 'P1')
+    const r2 =
+      findPinMatching(ledSeriesR, [/^P2$/i, /^___?2/i, /^2__/i, /^B$/i])
+      ?? ensureComponentPin(ledSeriesR, 'P2')
+    const ledA =
+      findPinMatching(led, [/^A$/i, /^ANODE/i]) ?? ensureComponentPin(led, 'A')
+    const ledDrive = ensureNet('OD_LED_DRIVE', 'signal')
+    addMember(vcc, ledSeriesR.instanceName, r1)
+    addMember(ledDrive, ledSeriesR.instanceName, r2)
+    addMember(ledDrive, led.instanceName, ledA)
+  }
+
+  // TIA feedback resistor straddles existing OUT (−IN) nets — do NOT put both
+  // IC pins on a third net (that would short OD_TIA_ADC to OD_PD_TIA).
+  const tiaRf = components.find((c) =>
+    /od[_ -]?(?:front[_ -]?end[_ -]?)?feedback[_ -]?resistor|tia[_ -]?feedback/i.test(roleBlob(c)))
+  if (tia && tiaRf && tiaOut && tiaNeg) {
+    const rf1 =
+      findPinMatching(tiaRf, [/^P1$/i, /^___?1/i, /^1__/i])
+      ?? ensureComponentPin(tiaRf, 'P1')
+    const rf2 =
+      findPinMatching(tiaRf, [/^P2$/i, /^___?2/i, /^2__/i])
+      ?? ensureComponentPin(tiaRf, 'P2')
+    addMember(ensureNet('OD_TIA_ADC', 'signal'), tiaRf.instanceName, rf1)
+    addMember(ensureNet('OD_PD_TIA', 'signal'), tiaRf.instanceName, rf2)
+  }
+}
+
+/**
+ * @description Wire Pioreactor heater_20ml gold nets: FFC ↔ TMP1075 I²C ↔
+ * DRV5021 HALL ↔ ESR18 between RES_A/RES_B. Power switch stays off-board (HAT).
+ */
+function wireHeaterDaughterboardNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+  vcc: AtopileNetRecord,
+  gnd: AtopileNetRecord,
+): void {
+  const roleBlob = (c: AtopileComponentRecord): string =>
+    `${c.characterId} ${c.wordId} ${c.nameHuman} ${c.partNumber ?? ''}`
+
+  const ffc = components.find((c) => /52207|host[_ -]?ffc|heater[_ -]?ffc/i.test(roleBlob(c)))
+  const tmp = components.find((c) => /tmp1075|temperature[_ -]?sense|culture[_ -]?temperature/i.test(roleBlob(c)))
+  const hall = components.find((c) => /drv5021|magnetic[_ -]?lid|hall[_ -]?sense/i.test(roleBlob(c)))
+  const heaters = components.filter(
+    (c) =>
+      c.functionClass === 'passive_r'
+      && /esr18|cartridge[_ -]?heater|resistive[_ -]?heater|heater[_ -]?element/i.test(roleBlob(c)),
+  )
+  if (!ffc && !tmp && heaters.length === 0) return
+
+  const resA = ensureNet('HEATER_RES_A', 'power')
+  const resB = ensureNet('HEATER_RES_B', 'power')
+  const i2cSda = ensureNet('HEATER_I2C_SDA', 'signal')
+  const i2cScl = ensureNet('HEATER_I2C_SCL', 'signal')
+  const hallNet = ensureNet('HEATER_HALL', 'signal')
+
+  if (ffc) {
+    const pResA =
+      findPinMatching(ffc, [/^RES_A$/i, /^1$/i, /^Pin_1$/i]) ?? ensureComponentPin(ffc, 'RES_A')
+    const pResB =
+      findPinMatching(ffc, [/^RES_B$/i, /^2$/i, /^Pin_2$/i]) ?? ensureComponentPin(ffc, 'RES_B')
+    const p3v3 =
+      findPinMatching(ffc, [/^3V3$/i, /^3$/i, /^Pin_3$/i]) ?? ensureComponentPin(ffc, '3V3')
+    const pGnd =
+      findPinMatching(ffc, [/^GND$/i, /^4$/i, /^Pin_4$/i]) ?? ensureComponentPin(ffc, 'GND')
+    const pScl =
+      findPinMatching(ffc, [/^I2C_SCL$/i, /^SCL$/i, /^5$/i]) ?? ensureComponentPin(ffc, 'I2C_SCL')
+    const pSda =
+      findPinMatching(ffc, [/^I2C_SDA$/i, /^SDA$/i, /^6$/i]) ?? ensureComponentPin(ffc, 'I2C_SDA')
+    const pHall =
+      findPinMatching(ffc, [/^HALL_OUT$/i, /^7$/i]) ?? ensureComponentPin(ffc, 'HALL_OUT')
+    addMember(resA, ffc.instanceName, pResA)
+    addMember(resB, ffc.instanceName, pResB)
+    addMember(vcc, ffc.instanceName, p3v3)
+    addMember(gnd, ffc.instanceName, pGnd)
+    addMember(i2cScl, ffc.instanceName, pScl)
+    addMember(i2cSda, ffc.instanceName, pSda)
+    addMember(hallNet, ffc.instanceName, pHall)
+  }
+
+  if (tmp) {
+    const sda = findPinMatching(tmp, [/^SDA$/i])
+    const scl = findPinMatching(tmp, [/^SCL$/i])
+    const vp = findPinMatching(tmp, [/^\+?V\+$/i, /^VDD$/i, /^VCC$/i])
+    const tgnd = findPinMatching(tmp, [/^GND$/i])
+    if (sda) addMember(i2cSda, tmp.instanceName, sda)
+    if (scl) addMember(i2cScl, tmp.instanceName, scl)
+    if (vp) addMember(vcc, tmp.instanceName, vp)
+    if (tgnd) addMember(gnd, tmp.instanceName, tgnd)
+  }
+
+  if (hall) {
+    const out = findPinMatching(hall, [/^OUT$/i])
+    const hvcc = findPinMatching(hall, [/^VCC$/i, /^VDD$/i])
+    const hgnd = findPinMatching(hall, [/^GND$/i])
+    if (out) addMember(hallNet, hall.instanceName, out)
+    if (hvcc) addMember(vcc, hall.instanceName, hvcc)
+    if (hgnd) addMember(gnd, hall.instanceName, hgnd)
+  }
+
+  for (const heater of heaters) {
+    const p1 =
+      findPinMatching(heater, [/^P1$/i, /^___?1/i, /^1__/i, /^_1__/i])
+      ?? ensureComponentPin(heater, 'P1')
+    const p2 =
+      findPinMatching(heater, [/^P2$/i, /^___?2/i, /^2__/i, /^_2__/i])
+      ?? ensureComponentPin(heater, 'P2')
+    addMember(resA, heater.instanceName, p1)
+    addMember(resB, heater.instanceName, p2)
+  }
+}
+
+/**
+ * @description Wire Forge host-HAT drive: GPIO18 → heater MOSFET; PWM GPIOs →
+ * DRV8876 IN pins; nSLEEP to VCC (awake). MOSFET drain is the off-board heater rail.
+ */
+function wireHostHatActuationDriveNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+  vcc: AtopileNetRecord,
+  gnd: AtopileNetRecord,
+): void {
+  const roleBlob = (c: AtopileComponentRecord): string =>
+    `${c.characterId} ${c.wordId} ${c.nameHuman} ${c.partNumber ?? ''}`
+
+  const hatConn = components.find((c) => /hat[_ -]?host|ssq[_ -]?120/i.test(roleBlob(c)))
+  const mosfet = components.find((c) => /heater[_ -]?pwm|ao3400/i.test(roleBlob(c)))
+  const stirDrv = components.find((c) => /stir[_ -]?motor[_ -]?driver/i.test(roleBlob(c)))
+  const pumpDrv = components.find((c) => /pump[_ -]?motor[_ -]?driver/i.test(roleBlob(c)))
+  if (!hatConn && !mosfet && !stirDrv && !pumpDrv) return
+
+  if (hatConn && mosfet) {
+    const pwm =
+      findPinMatching(hatConn, [/GPIO18_PWM5_HEATER/i, /PWM5_HEATER/i])
+      ?? ensureComponentPin(hatConn, 'GPIO18_PWM5_HEATER')
+    const gate = findPinMatching(mosfet, [/^G$/i, /^GATE$/i]) ?? ensureComponentPin(mosfet, 'G')
+    const source = findPinMatching(mosfet, [/^S$/i, /^SOURCE$/i]) ?? ensureComponentPin(mosfet, 'S')
+    const drain = findPinMatching(mosfet, [/^D$/i, /^DRAIN$/i]) ?? ensureComponentPin(mosfet, 'D')
+    const pwmNet = ensureNet('HAT_HEATER_PWM', 'signal')
+    const heaterDrive = ensureNet('HAT_HEATER_DRIVE', 'power')
+    addMember(pwmNet, hatConn.instanceName, pwm)
+    addMember(pwmNet, mosfet.instanceName, gate)
+    addMember(gnd, mosfet.instanceName, source)
+    addMember(heaterDrive, mosfet.instanceName, drain)
+  }
+
+  const wireMotorDriver = (
+    drv: AtopileComponentRecord | undefined,
+    gpioPat: RegExp,
+    synthGpio: string,
+    outNet: string,
+  ): void => {
+    if (!drv || !hatConn) return
+    const gpio =
+      findPinMatching(hatConn, [gpioPat]) ?? ensureComponentPin(hatConn, synthGpio)
+    const in1 =
+      findPinMatching(drv, [/^EN_IN1$/i, /^IN1$/i, /^EN\/IN1$/i])
+      ?? ensureComponentPin(drv, 'EN_IN1')
+    const in2 =
+      findPinMatching(drv, [/^PH_IN2$/i, /^IN2$/i, /^PH\/IN2$/i])
+      ?? ensureComponentPin(drv, 'PH_IN2')
+    const nSleep =
+      findPinMatching(drv, [/^nSLEEP$/i, /^NSLEEP$/i]) ?? ensureComponentPin(drv, 'nSLEEP')
+    const out1 =
+      findPinMatching(drv, [/^OUT1$/i]) ?? ensureComponentPin(drv, 'OUT1')
+    const out2 =
+      findPinMatching(drv, [/^OUT2$/i]) ?? ensureComponentPin(drv, 'OUT2')
+    const vm = findPinMatching(drv, [/^VM$/i])
+    const dgnd = findPinMatching(drv, [/^GND$/i])
+    const pgnd = findPinMatching(drv, [/^PGND$/i])
+    const ctrl = ensureNet(`${outNet}_CTRL`, 'signal')
+    const motorA = ensureNet(`${outNet}_A`, 'signal')
+    const motorB = ensureNet(`${outNet}_B`, 'signal')
+    addMember(ctrl, hatConn.instanceName, gpio)
+    addMember(ctrl, drv.instanceName, in1)
+    addMember(gnd, drv.instanceName, in2)
+    addMember(vcc, drv.instanceName, nSleep)
+    addMember(motorA, drv.instanceName, out1)
+    addMember(motorB, drv.instanceName, out2)
+    if (vm) addMember(vcc, drv.instanceName, vm)
+    if (dgnd) addMember(gnd, drv.instanceName, dgnd)
+    if (pgnd) addMember(gnd, drv.instanceName, pgnd)
+  }
+
+  wireMotorDriver(stirDrv, /GPIO17_PWM1/i, 'GPIO17_PWM1', 'STIR_MOTOR')
+  wireMotorDriver(pumpDrv, /GPIO13_PWM2/i, 'GPIO13_PWM2', 'PUMP_MOTOR')
+
+  if (hatConn) {
+    const hallGpio =
+      findPinMatching(hatConn, [/GPIO21_HALL/i]) ?? ensureComponentPin(hatConn, 'GPIO21_HALL')
+    const hallNet = ensureNet('HEATER_HALL', 'signal')
+    addMember(hallNet, hatConn.instanceName, hallGpio)
+    const sda =
+      findPinMatching(hatConn, [/GPIO2_SDA/i]) ?? ensureComponentPin(hatConn, 'GPIO2_SDA')
+    const scl =
+      findPinMatching(hatConn, [/GPIO3_SCL/i]) ?? ensureComponentPin(hatConn, 'GPIO3_SCL')
+    addMember(ensureNet('HEATER_I2C_SDA', 'signal'), hatConn.instanceName, sda)
+    addMember(ensureNet('HEATER_I2C_SCL', 'signal'), hatConn.instanceName, scl)
+  }
 }
 
 /**
@@ -1802,6 +2103,8 @@ function buildNets(
   tieSupplyRails(components, addMember, vcc, gnd, skipRails)
   wireHostInterfaceNets(components, ensureNet, addMember)
   wireOdOpticalFrontEndNets(components, ensureNet, addMember, vcc, gnd)
+  wireHeaterDaughterboardNets(components, ensureNet, addMember, vcc, gnd)
+  wireHostHatActuationDriveNets(components, ensureNet, addMember, vcc, gnd)
 
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
@@ -2027,17 +2330,22 @@ export function generateAtopileProject(
   const scopedElectronicWords = requiredWordIds
     ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
     : allElectronicWords
-  // INTENT: densify with published gold companions only — heater FFC+hall,
-  // OD photodiode+TIA, HAT 2×20 host socket. Stir/pump stay deferred.
-  const electronicWords = ensureHatHostConnectorWords(
-    ensureOdGoldCompanionWords(
-      ensureHeaterGoldCompanionWords(
-        scopedElectronicWords,
+  // INTENT: densify with published gold companions — heater FFC+hall, OD
+  // photodiode+TIA+passives, HAT 2×20 socket, and (when fixture publishes)
+  // host-HAT heater MOSFET + stir/pump DRV8876.
+  const electronicWords = ensureHostHatActuationDriveWords(
+    ensureHatHostConnectorWords(
+      ensureOdGoldCompanionWords(
+        ensureHeaterGoldCompanionWords(
+          scopedElectronicWords,
+          opts.requiredFunctionRoles,
+        ),
         opts.requiredFunctionRoles,
       ),
-      opts.requiredFunctionRoles,
+      opts.boardRole,
     ),
     opts.boardRole,
+    opts.requiredFunctionRoles,
   )
   // INTENT: Channel contracts describe work the board must implement; they are
   // not manufacturer-orderable packages. Keep the obligation explicit until a

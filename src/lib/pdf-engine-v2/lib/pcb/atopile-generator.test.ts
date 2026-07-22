@@ -1304,6 +1304,16 @@ describe('atopile-generator', () => {
       .toMatch(/52207-0760/i)
     expect(result.components.find((c) => c.wordId === 'magnetic_lid_sense_word')?.partNumber)
       .toMatch(/DRV5021/i)
+    // proveCatch: gold heater_20ml nets — FFC ↔ I²C ↔ hall ↔ RES_A/B loads.
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('HEATER_RES_A')).toBe(true)
+    expect(netNames.has('HEATER_RES_B')).toBe(true)
+    expect(netNames.has('HEATER_I2C_SDA')).toBe(true)
+    expect(netNames.has('HEATER_I2C_SCL')).toBe(true)
+    expect(netNames.has('HEATER_HALL')).toBe(true)
+    const resA = result.nets.find((n) => n.name === 'HEATER_RES_A')!
+    expect(resA.members.some((m) => m.instanceName.includes('ffc'))).toBe(true)
+    expect(resA.members.some((m) => m.instanceName.includes('heater'))).toBe(true)
   })
 
   it('densify: od_measurement_channel synthesizes photodiode + TIA gold companions', () => {
@@ -1317,7 +1327,7 @@ describe('atopile-generator', () => {
       if (/DF2S/i.test(mpn ?? '')) {
         return cacheHit('Toshiba', 'DF2S6.8MFS,L3M', 'Eye-Spy OD TVS')
       }
-      if (/SZYY0603B|ADS1114|CC0603/i.test(mpn ?? '')) {
+      if (/SZYY0603B|ADS1114|CC0603|RC0603/i.test(mpn ?? '')) {
         return cacheHit('TI', mpn ?? '', 'OD densify companion')
       }
       return { found: false, result: null, source: 'unknown', ageHours: null }
@@ -1366,6 +1376,8 @@ describe('atopile-generator', () => {
     expect(ids.has('od_photodiode_word')).toBe(true)
     expect(ids.has('od_photodiode_tia_word')).toBe(true)
     expect(ids.has('od_esd_protection_network_word')).toBe(true)
+    expect(ids.has('od_led_series_resistor_word')).toBe(true)
+    expect(ids.has('od_front_end_feedback_resistor_word')).toBe(true)
     expect(result.components.find((c) => c.wordId === 'od_photodiode_word')?.partNumber)
       .toMatch(/BPW34S/i)
     expect(result.components.find((c) => c.wordId === 'od_photodiode_tia_word')?.partNumber)
@@ -1419,7 +1431,13 @@ describe('atopile-generator', () => {
       if (/SSQ-120-03-T-D/i.test(mpn ?? '')) {
         return cacheHit('Samtec', 'SSQ-120-03-T-D', '2x20 HAT socket')
       }
-      if (/ATSAMD21|12401610|CC0603|DF2S/i.test(mpn ?? '')) {
+      if (/AO3400A/i.test(mpn ?? '')) {
+        return cacheHit('Alpha & Omega Semiconductor Inc.', 'AO3400A', 'heater PWM MOSFET')
+      }
+      if (/DRV8876/i.test(mpn ?? '')) {
+        return cacheHit('Texas Instruments', 'DRV8876PWPR', 'stir/pump driver')
+      }
+      if (/ATSAMD21|12401610|CC0603|DF2S|RC0603/i.test(mpn ?? '')) {
         return cacheHit('Microchip', mpn ?? '', 'HAT densify companion')
       }
       return { found: false, result: null, source: 'unknown', ageHours: null }
@@ -1454,10 +1472,21 @@ describe('atopile-generator', () => {
     const result = generateAtopileProject(design, outDir, {
       requiredWordIds: ['microcontroller_mcu_word', 'usb_interface_word'],
       boardRole: 'wet_lab_hat',
+      requiredFunctionRoles: ['stir_channel', 'pump_channel'],
     })
     expect(result.components.some((c) => c.wordId === 'hat_host_connector_word')).toBe(true)
     expect(result.components.find((c) => c.wordId === 'hat_host_connector_word')?.partNumber)
       .toMatch(/SSQ-120-03-T-D/i)
+    expect(result.components.find((c) => c.wordId === 'heater_pwm_switch_word')?.partNumber)
+      .toMatch(/AO3400A/i)
+    expect(result.components.find((c) => c.wordId === 'stir_motor_driver_word')?.partNumber)
+      .toMatch(/DRV8876/i)
+    expect(result.components.find((c) => c.wordId === 'pump_motor_driver_word')?.partNumber)
+      .toMatch(/DRV8876/i)
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('HAT_HEATER_PWM')).toBe(true)
+    expect(netNames.has('STIR_MOTOR_A')).toBe(true)
+    expect(netNames.has('PUMP_MOTOR_A')).toBe(true)
   })
 
   it('P4: usb_power_entry never resolves to PinHeader_*', () => {

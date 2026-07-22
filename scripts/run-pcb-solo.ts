@@ -16,7 +16,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
-import { runTier0FirmwareProof } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
+import {
+  probeTier1McuCompile,
+  runTier0FirmwareProof,
+} from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
 import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-spec'
 import { runBespokeMultiBoardPcb } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-multi-board-run'
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
@@ -97,12 +100,15 @@ function main(): void {
   }
   const firmwareAllOk =
     proofResults.length > 0 && proofResults.every((r) => r.result.ok === true)
+  const tier1 = probeTier1McuCompile(resolve(proofOutRoot, '_tier1'))
+  console.error(`[pcb-solo] firmwareTier1: skipped=${tier1.skipped} (${tier1.reason.slice(0, 120)})`)
   const firmwareProof = {
     schema: 'pcb-firmware-proof-stage/v1' as const,
     tier: 0 as const,
     results: proofResults,
     allOk: firmwareAllOk,
     ok: firmwareAllOk,
+    tier1,
   }
 
   const summary = {

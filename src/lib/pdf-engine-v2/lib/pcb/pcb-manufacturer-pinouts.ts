@@ -393,6 +393,72 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
     ],
     provenance: 'ams-OSRAM BPW34S SMD PIN photodiode two-terminal K/A; KiCad OptoDevice:Osram_BPW34S-SMD; Eye-Spy OD densify companion',
   },
+  {
+    // INTENT: Gold Heater - SCH.pdf @ ca40a91e labels J1 pins 1/2/5/6/7 as
+    // RES_A/RES_B/I2C_SCL/I2C_SDA/HALL_OUT. Pins 3/4 are the only remaining
+    // contacts and are the sole power entry for TMP1075+DRV5021 → +3V3/GND.
+    manufacturer: 'Molex',
+    partNumber: '52207-0760',
+    symbolId: 'Forge_Manufacturer:52207-0760',
+    footprint: {
+      library: 'Connector_FFC-FPC',
+      footprint: 'Molex_200528-0070_1x07-1MP_P1.00mm_Horizontal',
+    },
+    pins: [
+      { number: '1', name: 'RES_A', kind: 'passive' },
+      { number: '2', name: 'RES_B', kind: 'passive' },
+      { number: '3', name: '3V3', kind: 'power_in' },
+      { number: '4', name: 'GND', kind: 'power_in' },
+      { number: '5', name: 'I2C_SCL', kind: 'bidirectional' },
+      { number: '6', name: 'I2C_SDA', kind: 'bidirectional' },
+      { number: '7', name: 'HALL_OUT', kind: 'output' },
+    ],
+    provenance:
+      'Pioreactor heater_20ml Heater - SCH.pdf J1 0522070760 @ ca40a91e: RES_A/RES_B/I2C_SCL/I2C_SDA/HALL_OUT on pins 1/2/5/6/7; pins 3/4 inferred +3V3/GND (no other power connector on daughterboard)',
+  },
+  {
+    manufacturer: 'Alpha & Omega Semiconductor Inc.',
+    partNumber: 'AO3400A',
+    symbolId: 'Forge_Manufacturer:AO3400A',
+    footprint: { library: 'Package_TO_SOT_SMD', footprint: 'SOT-23' },
+    pins: [
+      { number: '1', name: 'G', kind: 'input' },
+      { number: '2', name: 'S', kind: 'passive' },
+      { number: '3', name: 'D', kind: 'passive' },
+    ],
+    provenance:
+      'AOS AO3400A SOT-23 N-channel MOSFET pinout 1=G, 2=S, 3=D; Forge host-HAT heater PWM low-side switch (never on heater_20ml gold)',
+  },
+  {
+    manufacturer: 'Texas Instruments',
+    partNumber: 'DRV8876PWPR',
+    symbolId: 'Forge_Manufacturer:DRV8876PWPR',
+    footprint: {
+      library: 'Package_SO',
+      footprint: 'HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm',
+    },
+    pins: [
+      { number: '1', name: 'EN_IN1', kind: 'input' },
+      { number: '2', name: 'PH_IN2', kind: 'input' },
+      { number: '3', name: 'nSLEEP', kind: 'input' },
+      { number: '4', name: 'nFAULT', kind: 'output' },
+      { number: '5', name: 'VREF', kind: 'input' },
+      { number: '6', name: 'IPROPI', kind: 'output' },
+      { number: '7', name: 'IMODE', kind: 'input' },
+      { number: '8', name: 'OUT1', kind: 'output' },
+      { number: '9', name: 'PGND', kind: 'power_in' },
+      { number: '10', name: 'OUT2', kind: 'output' },
+      { number: '11', name: 'VM', kind: 'power_in' },
+      { number: '12', name: 'VCP', kind: 'passive' },
+      { number: '13', name: 'CPH', kind: 'passive' },
+      { number: '14', name: 'CPL', kind: 'passive' },
+      { number: '15', name: 'GND', kind: 'power_in' },
+      { number: '16', name: 'PMODE', kind: 'input' },
+      { number: '17', name: 'EP', kind: 'passive' },
+    ],
+    provenance:
+      'TI DRV8876 datasheet SLVSF05 PWP (HTSSOP-16) pinout; Forge host-HAT stir/pump drive — https://www.ti.com/lit/ds/symlink/drv8876.pdf',
+  },
 ] as const
 
 function normalized(value: string): string {

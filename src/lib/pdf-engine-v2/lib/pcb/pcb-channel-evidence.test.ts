@@ -113,4 +113,17 @@ describe('pcb-channel-evidence', () => {
     })
     expect(counts.electrode_channel).toBe(1)
   })
+
+  it('proveCatch: host-HAT DRV8876 instances mint stir/pump channels', () => {
+    const counts = deriveImplementedChannelCounts({
+      components: [
+        { partNumber: 'DRV8876PWPR', characterId: 'stir_motor_driver' },
+        { partNumber: 'DRV8876PWPR', characterId: 'pump_motor_driver' },
+      ],
+      functionRequirements: [],
+      requiredRoles: ['stir_channel', 'pump_channel'],
+    })
+    expect(counts.stir_channel).toBe(1)
+    expect(counts.pump_channel).toBe(1)
+  })
 })

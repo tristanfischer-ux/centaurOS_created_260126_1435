@@ -128,8 +128,33 @@ export function deriveImplementedChannelCounts(args: {
     counts.od_measurement_channel = 1
   }
 
-  // GOTCHA: stir_channel / pump_channel intentionally stay 0 here until a
-  // curated HAT electrical topology exists (see pcb-pioreactor-wet-actuation-topology).
+  // Stir/pump: DRV8876 (or named motor driver) on the host HAT — never a bare role.
+  if ((counts.stir_channel ?? 0) === 0 && hasStirChannelTopology(components)) {
+    counts.stir_channel = 1
+  }
+  if ((counts.pump_channel ?? 0) === 0 && hasPumpChannelTopology(components)) {
+    counts.pump_channel = 1
+  }
 
   return counts
+}
+
+/**
+ * @description True when a stir motor driver IC is present (host-HAT DRV8876 path).
+ */
+export function hasStirChannelTopology(components: ChannelEvidenceComponent[]): boolean {
+  return components.some((c) => {
+    const blob = `${c.characterId ?? ''} ${c.nameHuman ?? ''} ${c.partNumber ?? ''}`
+    return /stir[_ -]?motor[_ -]?driver/i.test(blob) && /DRV8876/i.test(c.partNumber ?? '')
+  })
+}
+
+/**
+ * @description True when a pump motor driver IC is present (host-HAT DRV8876 path).
+ */
+export function hasPumpChannelTopology(components: ChannelEvidenceComponent[]): boolean {
+  return components.some((c) => {
+    const blob = `${c.characterId ?? ''} ${c.nameHuman ?? ''} ${c.partNumber ?? ''}`
+    return /pump[_ -]?motor[_ -]?driver/i.test(blob) && /DRV8876/i.test(c.partNumber ?? '')
+  })
 }
