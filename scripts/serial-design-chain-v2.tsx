@@ -75,7 +75,10 @@ import { runBespokeMultiBoardPcb } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-mu
 import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
 import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-spec'
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
-import { runTier0FirmwareProof } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
+import {
+  probeTier1McuCompile,
+  runTier0FirmwareProof,
+} from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -10124,21 +10127,82 @@ async function main() {
               // (legacy); also emit allOk for chain logs. Keep both in sync.
               const allOk = proofResults.length > 0
                 && proofResults.every((r) => r.result.ok === true)
+              // INTENT (fixpack15): Tier-1 must run in-chain too — solo-only
+              // green was Goodhart (bakes never compiled the pinmap).
+              let tier1Buses: Array<{
+                bus_id: string
+                protocol: 'i2c' | 'uart' | 'swd'
+                pins: Record<string, string>
+                expected_devices: string[]
+              }> = []
+              let tier1Target: string | undefined
+              let tier1Mcu: string | undefined
+              for (const thin of thinSpecs) {
+                const boardRun = multi.boardPipelines.find((b) => b.boardId === thin.proofTargetId)
+                const boardComponents = boardRun?.generator.components ?? []
+                const boardMcu = boardComponents.find((c) =>
+                  /mcu|microcontroller/i.test(String(c.characterId ?? c.functionClass ?? '')))
+                if (!boardMcu?.partNumber) continue
+                const fat = buildFirmwareProofContract({
+                  thin,
+                  designFitnessOk: designFitness.ok === true,
+                  mcu: {
+                    mpn: boardMcu.partNumber,
+                    manufacturer: boardMcu.manufacturer ?? undefined,
+                  },
+                  components: boardComponents.map((c) => ({
+                    wordId: c.wordId,
+                    refdes: c.instanceName,
+                    instanceName: c.instanceName,
+                    mpn: c.partNumber,
+                    characterId: c.characterId ?? undefined,
+                    functionClass: c.functionClass ?? undefined,
+                    manufacturer: c.manufacturer ?? undefined,
+                  })),
+                  nets: (boardRun?.generator.nets ?? []).map((n) => ({
+                    name: n.name,
+                    kind: n.kind,
+                    members: n.members,
+                  })),
+                  implementedChannels: multi.implementedChannels,
+                }) as {
+                  kind?: string
+                  mcu?: { mpn?: string } | null
+                  buses?: typeof tier1Buses
+                }
+                if (fat.kind === 'interconnect_only') continue
+                if (!fat.mcu?.mpn || !fat.buses?.length) continue
+                tier1Target = thin.proofTargetId
+                tier1Mcu = fat.mcu.mpn
+                tier1Buses = fat.buses
+                break
+              }
+              const tier1 = probeTier1McuCompile(
+                resolve(pcbProjectDir, 'firmware-proof', '_tier1'),
+                {
+                  proofTargetId: tier1Target,
+                  mcuMpn: tier1Mcu,
+                  buses: tier1Buses,
+                },
+              )
               const firmwareProof = {
                 schema: 'pcb-firmware-proof-stage/v1' as const,
-                tier: 0 as const,
+                tier: tier1.ok ? 1 as const : 0 as const,
                 results: proofResults,
                 allOk,
                 ok: allOk,
+                tier1,
               }
               stPcb.pcb.firmwareProof = firmwareProof
               pcb.firmwareProof = firmwareProof
               console.error(
-                `[chain] PCB firmwareProof (Tier-0): targets=${proofResults.length} allOk=${firmwareProof.allOk}`,
+                `[chain] PCB firmwareProof (Tier-0): targets=${proofResults.length} allOk=${firmwareProof.allOk}` +
+                  ` tier1.ok=${tier1.ok} skipped=${tier1.skipped}`,
               )
               logAction({
                 step: 'pcb_firmware_proof', ok: firmwareProof.allOk,
                 targets: proofResults.length, all_ok: firmwareProof.allOk,
+                tier1_ok: tier1.ok, tier1_skipped: tier1.skipped,
               })
             } catch (fwErr) {
               const firmwareProof = {
