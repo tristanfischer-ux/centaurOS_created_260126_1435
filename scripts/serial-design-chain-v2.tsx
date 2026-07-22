@@ -7960,10 +7960,13 @@ async function main() {
   // Blender bg-pipeline spawn (BESS L25 fix — moved here from after Stage 8.5
   // because the original location referenced statePath + state before they
   // existed, hitting JS temporal-dead-zone on every run and silently falling
-  // back to in-line synchronous Blender). Detached child writes a sentinel
-  // that generate-hero-images.tsx polls. By the time [hero] fires the Blender
-  // PNGs are typically complete, so the chain finishes faster than the
-  // serial path. Disable via CHAIN_SKIP_BLENDER_BG=1.
+  // back to in-line synchronous Blender). Detached child renders the PNGs, runs
+  // render_vision_critic, and writes the `.blender-bg-done` sentinel when done.
+  // The Excel build waits on that sentinel via the RENDER/VISION BARRIER just
+  // before buildExcelOnce() (2026-07-22 — the prior "generate-hero-images polls
+  // it" claim was false; NOTHING consumed the sentinel, so the workbook raced
+  // ahead of the vision glance and scored a broken render UNVERIFIED). Disable
+  // via CHAIN_SKIP_BLENDER_BG=1.
   // Drawer: drawer_forgeos_decisions_3f18c3cae92fe29e.
   if (process.env.CHAIN_SKIP_BLENDER_BG !== '1') {
     try {
@@ -7978,6 +7981,10 @@ async function main() {
         env: process.env,
       })
       bgChild.unref()
+      // The bg-runner writes .blender-bg-done ONLY after render + render_vision_critic land;
+      // the Excel-build barrier (before buildExcelOnce) waits on that sentinel so the workbook
+      // never scores the render from an absent vision critique. Flag that a sentinel is expected.
+      ;(globalThis as Record<string, any>).__blenderBgSpawned = true
       console.error(`[chain] phase 5: blender bg pipeline spawned (PID ${bgChild.pid}) → ${bgLog}`)
       logAction({ step: 'blender_bg_spawned', ok: true, pid: bgChild.pid })
     } catch (err) {
@@ -10644,6 +10651,40 @@ async function main() {
     ;(globalThis as Record<string, any>).__stateHashAtExcel = _stateHashAtExcel
     ;(globalThis as Record<string, any>).__rebuildExcel = buildExcelOnce
     console.error(`[chain] state freeze: workbook built from state sha256 ${_stateHashAtExcel.slice(0, 12)}…`)
+    // ── RENDER/VISION BARRIER (2026-07-22) ──────────────────────────────────────
+    // The blender bg-runner writes `.blender-bg-done` ONLY after the render PNGs AND
+    // render_vision_critic land. build-excel-export.py scores the Renders tab + the vision
+    // ship-axis from `render-vision-critique.json`. If the workbook builds before the glance
+    // lands (the observed 07:22-xlsx-vs-07:25-critique race), it reads an ABSENT critique and
+    // scores the render a false UNVERIFIED — which HID a hero the critic had correctly flagged
+    // BROKEN (a ≤4). So wait (bounded) for the sentinel before building. Only when the bg
+    // pipeline actually spawned (else the in-line [hero] fallback never writes a sentinel and
+    // we would wait forever). If it times out we proceed — the UNVERIFIED is then honest, not a
+    // race. Ceiling via RENDER_BARRIER_MS (default 30 min, the render+vision budget); bypass
+    // with CHAIN_SKIP_BLENDER_BG=1 (no bg pipeline, no barrier).
+    if ((globalThis as Record<string, any>).__blenderBgSpawned === true) {
+      const _sentinel = resolve(outDir, '.blender-bg-done')
+      const _critique = resolve(outDir, 'render-vision-critique.json')
+      const _ceilingMs = Number(process.env.RENDER_BARRIER_MS || 1_800_000)
+      if (!existsSync(_sentinel)) {
+        console.error(`[chain] render/vision barrier: waiting up to ${Math.round(_ceilingMs / 60000)} min for .blender-bg-done before building the workbook…`)
+        const _sab = new Int32Array(new SharedArrayBuffer(4))
+        const _t0 = Date.now()
+        while (!existsSync(_sentinel) && (Date.now() - _t0) < _ceilingMs) {
+          Atomics.wait(_sab, 0, 0, 3000)   // synchronous 3 s sleep
+        }
+        const _waited = Math.round((Date.now() - _t0) / 1000)
+        if (existsSync(_sentinel)) {
+          console.error(`[chain] render/vision barrier: sentinel landed after ${_waited}s (vision critique ${existsSync(_critique) ? 'ON DISK' : 'still absent — honest UNVERIFIED'})`)
+          logAction({ step: 'render_vision_barrier', ok: true, waited_s: _waited, critique_on_disk: existsSync(_critique) })
+        } else {
+          console.error(`[chain] render/vision barrier: TIMED OUT after ${_waited}s — building anyway; the render scores its HONEST UNVERIFIED (not a hidden race)`)
+          logAction({ step: 'render_vision_barrier', ok: false, timed_out: true, waited_s: _waited })
+        }
+      } else {
+        logAction({ step: 'render_vision_barrier', ok: true, waited_s: 0, critique_on_disk: existsSync(_critique) })
+      }
+    }
     let beforeMtimeMs = xlsxMtimeMs()
     buildExcelOnce()
     if (isExcelArtefactStale(beforeMtimeMs)) {
