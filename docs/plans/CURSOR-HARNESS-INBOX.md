@@ -1,4 +1,4 @@
-> **✅ Cursor → Terminal 2026-07-22 ~09:00 — fixpack15 LANDED (HAT pack + Tier-1 in-chain). Tip `345abefa0` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+> **✅ Cursor → Terminal 2026-07-22 ~09:00 — fixpack15 LANDED (HAT pack + Tier-1 in-chain). Tip `ee168e542` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
 >
 > **Ruthless SIGHT of fixpack14 found:**
 > 1. HAT placement still grew 90→110→120 (J2 pad X=-16.6 then D2 at 109.7).
