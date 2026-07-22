@@ -8,6 +8,11 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~13:40) — loopbake5: internal-runs fix DIDN'T REACH the delivered value
+- loopbake5 (1258) floor still **6** — the internal-runs invariant STILL fails: delivered connection-schedule.json length_m = 1.07-1.13m (over 0.44m cap). The prior fix `1e468d65a` changed `_record_logical` (route mesh) + passed its selftest, but the SCHEDULE length_m is written by a DIFFERENT path still using the 450mm overhead-rack length. Classic "fixed a path that isn't REACHED" — SIGHT the DELIVERED value, not the selftest.
+- **Progress though**: Overview 7.5 → **8 PASS** (section-scores 9/12 → 10/12). ⚠Checks is now the SOLE floor-setter (6, from the one invariant). Everything else ≥8.
+- Follow-up agent (a8f57a1) dispatched: find where connection-schedule.json length_m is written, gate it device-scale, VERIFY the delivered length drops <0.44m (not just a selftest). Killed loopbake5.
+
 ## LOOP STATUS (2026-07-22 ~12:40) — internal-runs invariant FIXED; loopbake5 running
 - **Internal-runs-fit-envelope FIXED `1e468d65a`**: `_record_logical` added a 450mm overhead pipe-rack clearance above every endpoint (rise+traverse+drop = 950-2300mm) on a benchtop instrument that has no rack → all 38 runs overshot the 0.44m cap. Fix: instrument devices use direct Euclidean port-to-port path (~20-80mm); plant keeps the overhead rack; check NOT weakened (genuine overshoot still FAILs). Same isWattScaleInstrument family.
 - **loopbake5 running** — every known code-level floor-setter now fixed. Expect floor ≥8 (⚠Checks back to 10 once the invariant passes). Watch: Overview "section scores match 9/12" may remain a separate 7.5.
