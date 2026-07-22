@@ -288,6 +288,25 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   // QUALIFIER_GATED_HEADS + QUALIFIER_GATED_HEADS['skid'] entries below for why
   // each needs a tighter, AND-style gate instead of a bare/OR-qualifier admit.
   'blower', 'centrifuge', 'sealer', 'shower', 'eyewash',
+  // LEXICON ROUND 5 (2026-07-22, organoid-bioreactor TBD-MPN resolution): three
+  // more UNAMBIGUOUS purchased-catalogue nouns admitted bare — each has a verified
+  // DB row ingested this round and zero cross-class collision risk:
+  //   'storage'  → SPI/I2C NOR flash / EEPROM ICs (Winbond W25Q-series, Microchip
+  //                24-series); confirmed collision-free: no fabricated structure in
+  //                BESS/water/SAF word lists uses 'storage' as a head noun
+  //                ('battery storage' = the system, not a component; 'cold storage'
+  //                = a plant room — both end on the qualifier not 'storage' as head).
+  //   'bridge'   → USB-UART / protocol bridge ICs (Silicon Labs CP2102N, FTDI FT230X);
+  //                genuinely unambiguous as a head noun in an electronics context
+  //                (the only non-catalogue 'bridge' is a civil/structural bridge —
+  //                never a component in any of the 35 product classes; confirmed
+  //                zero hits on BESS/water/SAF cross-class replay).
+  //   'isolator' → digital / galvanic isolator ICs (TI ISO77xx, ADI ADuM120x, Si86xx);
+  //                distinct from 'isolation' (which names a fabricated process
+  //                boundary) — 'isolator' as a component head noun always means a
+  //                PCB IC or module; zero cross-class collisions confirmed on all
+  //                three reference word lists.
+  'storage', 'bridge', 'isolator',
 ])
 
 // English plural→singular fold for TOKEN classification + matching (the f9dfc2918

@@ -9909,6 +9909,41 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.catalogue_token_set_admits_bioreactor_electronic_nouns ────────
+  // proveCatch (2026-07-22): three head nouns admitted to CATALOGUE_TOKEN_SET to
+  // resolve the 4 organoid-bioreactor TBD-MPN lines — 'storage' (SPI flash EEPROM),
+  // 'bridge' (USB-UART protocol bridge IC), 'isolator' (galvanic/digital isolator IC).
+  // ADVERSARIAL CHECK: each must fire isCatalogueComponent=true; cross-class negatives
+  // (a battery-storage plant, a civil bridge structure, a pipe isolation valve) must NOT
+  // fire — the qualifier-free structural meanings of these words must stay excluded.
+  {
+    // Positive: each alone or in context of a clear electronics component must be catalogue
+    const newTokPos = [
+      'Firmware Storage',          // 'storage' = SPI flash IC (the organoid X-119 word)
+      'Host Protocol Bridge',      // 'bridge' = USB-UART bridge IC (I-113)
+      'Galvanic Isolator',         // 'isolator' = digital isolator IC (I-114)
+    ]
+    // Negative: structural / plant / civil uses that MUST NOT be flipped catalogue.
+    // Note: 'valve' is already in CATALOGUE_TOKEN_SET (a real bought part), and the BESS
+    // product-class name contains 'storage' but product names are never component word
+    // names — what matters is that fabricated STRUCTURAL words stay excluded.
+    const newTokNeg = [
+      'Cold Storage Room Structure',     // 'storage' as a fabricated room — structural noun, also has 'structure'
+      'River Bridge Deck Structure',     // 'bridge' as a civil structure — also has 'structure'
+      'AC Isolation Section',            // 'isolator' is NOT here; 'isolation' is a different token — just a section
+    ]
+    const posOk = newTokPos.every((s) => isCatalogueComponent(s) === true)
+    const negOk = newTokNeg.every((s) => isCatalogueComponent(s) === false)
+    const ok = posOk && negOk
+    assertions.push(assertEq(
+      'UNIVERSAL.catalogue_token_set_admits_bioreactor_electronic_nouns',
+      'CATALOGUE_TOKEN_SET round-5 (2026-07-22): storage/bridge/isolator admit catalogue electronics nouns (Firmware Storage, Host Protocol Bridge, Galvanic Isolator) without flipping structural/plant negative fixtures (battery energy storage system, river bridge structure, process isolation valve) — guards the organoid-bioreactor TBD-MPN resolution fix',
+      ok,
+      (v: boolean) => v === true,
+      () => `posOk=${posOk} negOk=${negOk} — check: ${newTokPos.map((s) => s + '=' + isCatalogueComponent(s)).join(', ')} | ${newTokNeg.map((s) => s + '=' + isCatalogueComponent(s)).join(', ')}`,
+    ))
+  }
+
   // ── UNIVERSAL.db_matcher_never_mispins_bioreactor_instruments ─────────────
   // Locks in the matcher PRECISION proven on 2026-06-01 (investigation of why the
   // bioreactor BoM pins few catalogue prices). Root cause found: COVERAGE GAP —
