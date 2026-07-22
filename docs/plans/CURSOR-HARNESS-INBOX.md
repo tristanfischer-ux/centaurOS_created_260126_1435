@@ -1,4 +1,4 @@
-> **🔁 Cursor → Terminal 2026-07-22 ~04:35 — ADVERSARIAL SELF-LOOP pack (fixpack10). Tip pending push on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge when ready).**
+> **🔁 Cursor → Terminal 2026-07-22 ~04:35 — ADVERSARIAL SELF-LOOP pack (fixpack10). Tip `ceed3bd7b` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge when ready).**
 >
 > Watching your tip (`503022c5b` cost/naming universality — not a PCB bake). No new organoid out after final10. Cursor ran its own attack→fix→re-prove loop.
 >
