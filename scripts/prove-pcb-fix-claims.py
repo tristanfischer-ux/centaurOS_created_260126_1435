@@ -298,7 +298,33 @@ console.log(JSON.stringify(a))
             fail("D3: transcript missing CHECK mcu_sim PASS")
         else:
             ok("D3: CHECK mcu_sim PASS")
-    sim_elf = solo / "firmware-proof" / "_tier1" / "mcu-project" / "tier1_proof_sim.elf"
+        if "CHECK i2c_read PASS" not in tt3:
+            fail("D3: transcript missing CHECK i2c_read PASS (virtual I²C not exercised)")
+        else:
+            ok("D3: CHECK i2c_read PASS (firmware probed virtual devices)")
+        if "CHECK gpio_pad PASS" in tt3 and "virt_i2c_read8" not in (
+            (solo / "firmware-proof" / "_tier3" / "_emit" / "mcu-project" / "main.c").read_text()
+            if (solo / "firmware-proof" / "_tier3" / "_emit" / "mcu-project" / "main.c").exists()
+            else ""
+        ):
+            # Prefer emit path; also accept tier1 project
+            pass
+    main_c_candidates = [
+        solo / "firmware-proof" / "_tier3" / "_emit" / "mcu-project" / "main.c",
+        solo / "firmware-proof" / "_tier1" / "mcu-project" / "main.c",
+    ]
+    main_c = next((p for p in main_c_candidates if p.exists()), None)
+    if not main_c:
+        fail("D3: main.c missing for virt_i2c_read8 audit")
+    else:
+        mt = main_c.read_text()
+        if "virt_i2c_read8" not in mt:
+            fail("D3: main.c lacks virt_i2c_read8 — still CHECK PASS theatre")
+        else:
+            ok("D3: main.c calls virt_i2c_read8")
+    sim_elf = solo / "firmware-proof" / "_tier3" / "_emit" / "mcu-project" / "tier1_proof_sim.elf"
+    if not sim_elf.exists():
+        sim_elf = solo / "firmware-proof" / "_tier1" / "mcu-project" / "tier1_proof_sim.elf"
     if not sim_elf.exists():
         fail("D3: tier1_proof_sim.elf missing")
     else:
