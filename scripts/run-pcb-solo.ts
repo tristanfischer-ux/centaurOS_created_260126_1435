@@ -147,7 +147,7 @@ function main(): void {
   )
   const firmwareProof = {
     schema: 'pcb-firmware-proof-stage/v1' as const,
-    tier: 0 as const,
+    tier: tier1.ok ? 1 as const : 0 as const,
     results: proofResults,
     allOk: firmwareAllOk,
     ok: firmwareAllOk,

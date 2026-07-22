@@ -16,13 +16,13 @@ describe('emitTier1McuProject', () => {
           {
             bus_id: 'host_i2c',
             protocol: 'i2c',
-            pins: { sda: 'PA22', scl: 'PA23' },
+            pins: { sda: 'PA22', scl: 'PA23', gnd: 'GND' },
             expected_devices: ['tmp1075'],
           },
           {
             bus_id: 'swd',
             protocol: 'swd',
-            pins: { swdio: 'PA31', swclk: 'PA30' },
+            pins: { swdio: 'PA31', swclk: 'PA30', gnd: 'GND' },
             expected_devices: [],
           },
         ],
@@ -31,9 +31,13 @@ describe('emitTier1McuProject', () => {
         expect.arrayContaining(['pinmap.h', 'main.c', 'Makefile', 'startup.S', 'link.ld']),
       )
       const pinmap = fs.readFileSync(path.join(result.projectDir, 'pinmap.h'), 'utf8')
+      const main = fs.readFileSync(path.join(result.projectDir, 'main.c'), 'utf8')
       expect(pinmap).toContain('PIN_HOST_I2C_SDA_TOKEN PA22')
       expect(pinmap).toContain('PIN_HOST_I2C_SCL_TOKEN PA23')
       expect(pinmap).not.toMatch(/PA22__\d+/)
+      // GOTCHA: GND must not become a TOKEN typedef (power ≠ MCU pad).
+      expect(pinmap).not.toMatch(/GND_TOKEN|typedef struct \{ char _; \} GND/)
+      expect(main).toMatch(/static PIN_HOST_I2C_SDA_TOKEN \*_forge_pin_/)
       expect(fs.existsSync(path.join(result.projectDir, 'Makefile'))).toBe(true)
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true })

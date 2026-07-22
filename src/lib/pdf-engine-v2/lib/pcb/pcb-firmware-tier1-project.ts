@@ -38,6 +38,14 @@ function pinMacroName(busId: string, pinRole: string): string {
 }
 
 /**
+ * @description True when a pad name is an MCU GPIO-style token (PA22), not a
+ * power net (GND/VCC) — Tier-1 must not typedef power rails as MCU pads.
+ */
+export function isMcuGpioPadToken(pad: string): boolean {
+  return /^P[A-Z]\d{1,3}$/i.test(pad)
+}
+
+/**
  * @description Emit a freestanding Tier-1 MCU project bound to the pin-map.
  * @param input proof target + buses from buildFirmwareBusesFromNets
  * @returns projectDir + written relative file paths
@@ -49,16 +57,20 @@ export function emitTier1McuProject(input: Tier1ProjectEmitInput): Tier1ProjectE
 
   const pinDefines: string[] = []
   const pinAsserts: string[] = []
+  const gpioPads = new Set<string>()
   for (const bus of input.buses) {
     for (const [role, pad] of Object.entries(bus.pins)) {
       if (!pad || !/^[A-Za-z][A-Za-z0-9_]*$/.test(pad)) continue
       const macro = pinMacroName(bus.bus_id, role)
-      // Encode pad as a string token the compiler must accept — proves the
-      // pinmap emitted legal C identifiers (PA22, not PA22__31).
+      // NAME is always recorded (incl. GND for documentation).
       pinDefines.push(`#define ${macro}_NAME "${pad}"`)
+      // DECISION (fixpack15): only GPIO pads become TOKEN typedefs + compile
+      // checks. sizeof("GND") was Goodhart — power nets are not MCU pads.
+      if (!isMcuGpioPadToken(pad)) continue
       pinDefines.push(`#define ${macro}_TOKEN ${pad}`)
+      gpioPads.add(pad)
       pinAsserts.push(
-        `  (void)sizeof(${macro}_NAME); /* ${bus.protocol} ${role} → ${pad} */`,
+        `  { static ${macro}_TOKEN *_forge_pin_${macro.toLowerCase()}; (void)_forge_pin_${macro.toLowerCase()}; } /* ${bus.protocol} ${role} → ${pad} */`,
       )
     }
   }
@@ -73,12 +85,8 @@ export function emitTier1McuProject(input: Tier1ProjectEmitInput): Tier1ProjectE
 
 ${pinDefines.join('\n') || '/* no bus pins — interconnect-only board */'}
 
-/* Pad tokens as empty structs so the compiler rejects illegal identifiers. */
-${input.buses.flatMap((bus) =>
-    Object.values(bus.pins)
-      .filter((pad): pad is string => Boolean(pad) && /^[A-Za-z][A-Za-z0-9_]*$/.test(pad))
-      .map((pad) => `typedef struct { char _; } ${pad};`),
-  ).filter((line, i, arr) => arr.indexOf(line) === i).join('\n')}
+/* GPIO pad tokens as empty structs — illegal identifiers fail the compile. */
+${[...gpioPads].map((pad) => `typedef struct { char _; } ${pad};`).join('\n')}
 
 #endif /* FORGE_TIER1_PINMAP_H */
 `
@@ -89,7 +97,7 @@ ${input.buses.flatMap((bus) =>
 void Reset_Handler(void);
 
 void Reset_Handler(void) {
-${pinAsserts.join('\n') || '  /* no pins */'}
+${pinAsserts.join('\n') || '  /* no GPIO pins */'}
   for (;;) { }
 }
 `

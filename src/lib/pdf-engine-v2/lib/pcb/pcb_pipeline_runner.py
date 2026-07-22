@@ -715,7 +715,14 @@ def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path
         side = max(25.0, min(40.0, side))
         side = math.ceil(side / 5) * 5
     else:
-        min_size = 90.0 if _looks_like_host_interface_board(components) else cfg.board_min_size
+        # INTENT (fixpack15): dense densify HAT (2×20 + DRV + cable mates) cannot
+        # pack at the sparse 90 mm floor — starting there wastes grow iters
+        # (90→110→120) with off-board pads. Floor near the dense packable size.
+        if _looks_like_host_interface_board(components):
+            dense_cap = _host_interface_max_side_mm(components)
+            min_size = 110.0 if dense_cap >= 120.0 else 90.0
+        else:
+            min_size = cfg.board_min_size
         side = max(min_size, min(cfg.board_max_size, side))
         side = math.ceil(side / 10) * 10
     return side, side
@@ -796,6 +803,17 @@ def selftest() -> None:
     dense_cap = _host_interface_max_side_mm(dense_host)
     if dense_cap != 120.0:
         raise AssertionError(f"dense host densify cap must be 120 mm, got {dense_cap:g}")
+    # proveCatch (fixpack15): dense host auto-size floors at 110 mm (not sparse 90).
+    for c in dense_host:
+        if c.footprint not in _footprint_cache:
+            _footprint_cache[c.footprint] = FootprintData(
+                bbox_w=5.0, bbox_h=5.0, resolved_from="fixture",
+            )
+    dense_w, dense_h = auto_board_size(dense_host, cfg, Path("/tmp/unused"))
+    if dense_w < 110.0 or dense_h < 110.0:
+        raise AssertionError(
+            f"dense densify host must floor ≥110 mm, got {dense_w:g}×{dense_h:g}"
+        )
     # proveCatch: mounting holes survive outline-drop and render as NPTH footprints.
     tiny_outline = {
         "outline": {
@@ -1260,6 +1278,13 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
             x = board_w - margin - max_x
             y = margin - min_y
             cursor_y = margin
+            # GOTCHA (fixpack15): inflated max_x (or a too-narrow board) made
+            # wrap origin negative — J2 pad 1 at X=-16.6. Keep leftmost pad ≥ margin.
+            if x + min_x < margin:
+                x = margin - min_x
+        # Same guard on the primary left-edge path (defensive).
+        if x + min_x < margin:
+            x = margin - min_x
         placements[c.ref] = (x, y)
         cursor_y = y + max_y + max(2.0, th_spacing * 0.25)
 
@@ -1399,6 +1424,31 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
                 if c.ref in placements:
                     px, py = placements[c.ref]
                     placements[c.ref] = (px, py - overflow)
+
+    # INTENT (fixpack15): dense HAT SMD/IC grids also overflow east/west
+    # (D2 pad at X=109.7 on a 110 mm board → needless grow to 120). Shift the
+    # non-TH cluster when only one side overflows; if both sides overflow the
+    # board is genuinely too small and validate→grow stays honest.
+    movable = [(c, fp) for c, fp in ics + smd if c.ref in placements]
+    if movable:
+        def _extent_x(c_fp: Tuple[Component, FootprintData]) -> Tuple[float, float]:
+            c, fp = c_fp
+            px, _py = placements[c.ref]
+            r = _pad_radial_extent(fp)
+            return px - r, px + r
+        leftmost = min(_extent_x(cf)[0] for cf in movable)
+        rightmost = max(_extent_x(cf)[1] for cf in movable)
+        overflow_l = margin - leftmost
+        overflow_r = rightmost - (board_w - margin)
+        shift_x = 0.0
+        if overflow_r > 0.05 and overflow_l <= 0.05:
+            shift_x = -overflow_r
+        elif overflow_l > 0.05 and overflow_r <= 0.05:
+            shift_x = overflow_l
+        if abs(shift_x) > 0.05:
+            for c, _fp in movable:
+                px, py = placements[c.ref]
+                placements[c.ref] = (px + shift_x, py)
 
     return placements
 

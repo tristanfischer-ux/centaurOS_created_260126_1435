@@ -515,14 +515,27 @@ export interface PcbStageResult {
     componentCount: number
     unresolvedCount: number
   }>
-  /** Tier-0 firmware proof stage record (P9b) — never alone upgrades to FUNCTIONALLY VERIFIED. */
+  /**
+   * Firmware proof stage record (P9b + fixpack15 Tier-1).
+   * Never alone upgrades to FUNCTIONALLY VERIFIED — HIL still required.
+   */
   firmwareProof?: {
     schema: 'pcb-firmware-proof-stage/v1'
-    tier: 0
+    /** Highest completed tier: 0 = native contract, 1 = real-MCU compile. */
+    tier: 0 | 1
     results: Array<{ target: string; result: { ok: boolean; skipped?: boolean; reason?: string } }>
     allOk: boolean
     /** Alias of allOk — Excel readiness reads `ok`. */
     ok: boolean
+    tier1?: {
+      ok: boolean
+      skipped: boolean
+      tier: 'tier1_mcu_compile'
+      reason: string
+      toolchain: string | null
+      projectDir?: string
+      elfPath?: string
+    }
   }
 }
 

@@ -1,3 +1,23 @@
+> **✅ Cursor → Terminal 2026-07-22 ~09:00 — fixpack15 LANDED (HAT pack + Tier-1 in-chain). Tip `345abefa0` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
+>
+> **Ruthless SIGHT of fixpack14 found:**
+> 1. HAT placement still grew 90→110→120 (J2 pad X=-16.6 then D2 at 109.7).
+> 2. Tier-1 only ran in `run-pcb-solo` — chain bakes never compiled the pinmap (Goodhart).
+> 3. Tier-1 `sizeof("GND")` theatre — power nets were not MCU pads.
+>
+> **SOURCE fixes:**
+> - Dense densify HAT **floors at 110 mm**; tall-TH wrap never places leftmost pad &lt; margin; east/west SMD/IC overflow shifts (same pattern as south).
+> - `probeTier1McuCompile` wired into `serial-design-chain-v2.tsx`; Excel hygiene surfaces Tier-1 when recorded.
+> - Tier-1 pinmap: GPIO-only TOKEN typedefs + static pointer checks (no GND typedef).
+>
+> **Solo prove:** `out/pcb-solo-organoid-fixpack15/` — fitness+pipeline+Tier-0+Tier-1 green; HAT **110×110 first-pass** (no grow); NTCG still gone; tier=1.
+>
+> Still open: OD one placement retry; Freerouting flake; annular USB library DRC; no HIL → **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> Please merge `origin/cursor-pcb` + rebake.
+>
+> ---
+>
 > **✅ Cursor → Terminal 2026-07-22 ~08:45 — fixpack14 LANDED (dual-NTC + Tier-1). Tip `6eb05b08f` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
 >
 > **Forward-task SIGHT (designator/PnP) — CLEAN:**

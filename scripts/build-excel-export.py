@@ -17730,6 +17730,20 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
          (resolved_n if resolved_n else 1)),
         ("fab pack zip written (relative path)", 1 if fab_zip_rel else 0, 1),
     ]
+    # INTENT (fixpack15): surface Tier-1 MCU compile when the chain recorded it.
+    # Skipped (no toolchain / no MCU buses) must NOT floor the tab — only a
+    # hard fail (ok=false, skipped=false) counts against hygiene.
+    _tier1 = _fw.get("tier1") if isinstance(_fw, dict) else None
+    if isinstance(_tier1, dict) and "ok" in _tier1:
+        _t1_ok = bool(_tier1.get("ok"))
+        _t1_skip = bool(_tier1.get("skipped"))
+        if _t1_skip and not _t1_ok:
+            hygiene_components.append(
+                ("Tier-1 MCU compile (skipped — toolchain or pinmap absent)", 1, 1))
+        else:
+            hygiene_components.append(
+                ("Tier-1 MCU compile (arm-none-eabi link from pinmap)",
+                 1 if _t1_ok else 0, 1))
     fitness_components: List[Tuple[str, float, float]] = []
     if resolved_n:
         fitness_components.append(
