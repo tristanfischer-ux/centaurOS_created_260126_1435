@@ -2096,6 +2096,65 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
     return facts, advisory
 
 
+def _ship_cost_layer_check(state: dict) -> dict:
+    """SHARED cost-ceiling ship check (2026-07-22): pick the compared cost LAYER from the
+    brief's OWN wording (materials vs ex-works vs list) via _cost_ceiling_stack_field — the
+    SAME mechanism the HARD Verification row uses — so the ship axis (compute_ship_axes S4),
+    the verdict bind (compute_verdict S4), and the HARD row can never disagree. A brief that
+    ceilings a "bill of materials" compares MATERIALS (the self-build kit the buyer assembles,
+    never sold ex-works), NOT the ex-works price; a brief that ceilings a "unit/sale/ex-works
+    price" still compares ex-works (the author's original intent, preserved). Universal,
+    wording-keyed, no per-class table. Returns {applicable, passed, verified, key, label,
+    achieved, ceiling, detail}."""
+    cons = (state.get("parsedBrief") or {}).get("constraints") or {}
+    ucc = cons.get("unit_cost_ceiling") or {}
+    ceiling = num(ucc.get("value")) if isinstance(ucc, dict) else num(ucc)
+    if ceiling is None or ceiling <= 0:
+        return {"applicable": False, "passed": True, "verified": True,
+                "detail": "no unit-cost ceiling in the brief"}
+    pb = state.get("parsedBrief") or {}
+    brief_text = pb.get("original_text") or pb.get("revised_text") or ""
+    quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    _encl_q = quantities.get("enclosure_volume_m3")
+    _encl_v = num(_encl_q.get("value")) if isinstance(_encl_q, dict) else num(_encl_q)
+    dev_scale = bool(state.get("isInstrumentDevice")) or (
+        _encl_v is not None and 0 < float(_encl_v) < 1.0)
+    key, label = _cost_ceiling_stack_field(brief_text, ucc, is_device_scale=dev_scale)
+    _short = {"raw_materials_bom_gbp": "materials", "oem_transfer_price_gbp": "ex-works",
+              "channel_list_price_gbp": "list price"}
+    cs = state.get("costStack") or {}
+    achieved = num(cs.get(key))
+    # EXPLICIT vs SILENT basis: did the brief NAME a layer, or is `key` just the device-scale
+    # default? On an EXPLICIT basis we honour it strictly — an absent price is UNVERIFIED, never
+    # a silent fall-through to a different layer (preserves the "sale-price ceiling, no ex-works
+    # computed → UNVERIFIED" honesty). On a SILENT brief we may fall back to whatever price the
+    # engine did produce (legacy tolerance) rather than newly failing a clean state.
+    _blob = " ".join(str(x) for x in (
+        brief_text or "", (ucc.get("basis") if isinstance(ucc, dict) else ""),
+        (ucc.get("note") if isinstance(ucc, dict) else ""),
+        (ucc.get("label") if isinstance(ucc, dict) else ""))).lower()
+    _explicit = bool(re.search(
+        r"\bex[\s-]?works\b|\boem\b|factory[\s-]?gate|transfer\s+price|"
+        r"\blist(?:ing)?\b|\basp\b|\bretail\b|product[\s-]?only|channel\s+list|"
+        r"\bmaterials?\b|\bbom\b|\braw\b", _blob))
+    if (achieved is None or achieved <= 0) and not _explicit:
+        for _fk in ("raw_materials_bom_gbp", "oem_transfer_price_gbp", "channel_list_price_gbp"):
+            _fv = num(cs.get(_fk))
+            if _fv is not None and _fv > 0:
+                key, label, achieved = _fk, _cost_ceiling_stack_field("", {"basis": _fk})[1], _fv
+                break
+    short = _short.get(key, key)
+    if achieved is None or achieved <= 0:
+        # the (explicitly-named, or only-available) layer has no price → UNVERIFIED (absent ≠ pass)
+        return {"applicable": True, "passed": False, "verified": False, "key": key,
+                "label": label, "achieved": None, "ceiling": ceiling,
+                "detail": f"no {short} price computed vs £{ceiling:,.0f} ceiling — viability UNVERIFIED"}
+    passed = achieved <= ceiling * 1.02
+    return {"applicable": True, "passed": passed, "verified": True, "key": key, "label": label,
+            "achieved": achieved, "ceiling": ceiling,
+            "detail": f"{short} £{achieved:,.0f} vs £{ceiling:,.0f} ceiling"}
+
+
 def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                     rendered_sheets: Optional[List[str]] = None) -> dict:
     """The ONE dossier verdict. Pure — the floor ranges over the DETERMINISTIC
@@ -2213,40 +2272,32 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 print(f"  ! process-plant word leak on a DEVICE-SCALE product blocked "
                       f"SHIPS ({len(_plant)} words: "
                       f"{[f.get('name') for f in _plant[:3]]})")
-        # ── S4: EX-WORKS PRICE OVER THE UNIT-COST CEILING (2026-07-20) ──────────
-        # The brief-wording layer (S2) picks WHICH cost the HARD verification row
-        # measures (materials vs ex-works vs list) — so a brief that says "bill of
-        # materials ≤ £X" passes its HARD row on materials even when the ex-works
-        # (oem_transfer_price) EXCEEDS the customer's unit budget (2150: oem £429 >
-        # ceiling £385, materials passed → false SHIP). But the ex-works price is
-        # what the factory gate must charge; if even the customer's stated per-unit
-        # budget cannot cover it, the product is NOT viable at that price point —
-        # a ship-relevant fact no brief wording can paper over. Bind it directly.
-        # UNIVERSAL (oem is always ≥ materials, so this can only fire when the true
-        # sellable price busts the budget); fires only when BOTH numbers are real.
-        _cons = (state.get("parsedBrief") or {}).get("constraints") or {}
-        _ucc = _cons.get("unit_cost_ceiling") or {}
-        _ceiling = num(_ucc.get("value")) if isinstance(_ucc, dict) else num(_ucc)
-        _oem = num((state.get("costStack") or {}).get("oem_transfer_price_gbp"))
-        if _ceiling is not None and _ceiling > 0:
-            if _oem is not None and _oem > 0 and _oem > _ceiling * 1.02:
-                ships = False
-                # (one-truth reconcile) refuse via ships+floor; open_n stays cell-backed.
-                if floor is None or floor > 4.0:
-                    floor = 4.0
-                print(f"  ! ex-works price £{_oem:,.0f} exceeds the £{_ceiling:,.0f} unit-cost "
-                      f"ceiling ({_oem / _ceiling:.2f}×) — not viable at the stated budget; "
-                      f"blocked SHIPS (S4)")
-            elif _oem is None or not (_oem > 0):
-                # MISSING-OEM DODGE (Cursor afternoon audit, 2026-07-20): the brief states a
-                # unit-cost ceiling but the engine produced NO sellable ex-works price — the
-                # viability constraint is UNVERIFIED, not satisfied. A HARD brief cost ceiling
-                # with no price to check against it cannot ship (an absent number is not a pass).
+        # ── S4: COST CEILING OVER THE BRIEF-WORDING LAYER (2026-07-22) ──────────
+        # Pick WHICH cost layer the ceiling is measured against from the brief's OWN
+        # wording (materials vs ex-works vs list) via _ship_cost_layer_check — the SAME
+        # helper the HARD Verification row + the ship axis use, so all three surfaces
+        # agree by construction. This corrects the prior always-ex-works bind (a
+        # false-FAIL for a brief that ceilings a "bill of materials": the organoid's
+        # materials £287 ≤ £385 PASSES, but ex-works £475 wrongly floored it to 4.0).
+        # A self-build instrument kit is assembled by the buyer from its BoM — it is
+        # never sold ex-works, so the ex-works figure is a fiction for its ceiling. A
+        # brief that ceilings a "unit/sale/ex-works price" STILL compares ex-works
+        # (the 2150 intent, preserved). UNIVERSAL, wording-keyed, no per-class table.
+        _cc = _ship_cost_layer_check(state)
+        if _cc.get("applicable"):
+            _ceiling = _cc.get("ceiling")
+            if not _cc.get("verified"):
+                # the wording-selected layer has NO price → viability UNVERIFIED (absent ≠ pass)
                 ships = False
                 if floor is None or floor > 4.0:
                     floor = 4.0
-                print(f"  ! brief states a £{_ceiling:,.0f} unit-cost ceiling but NO ex-works "
-                      f"price was computed — viability UNVERIFIED; blocked SHIPS (S4)")
+                print(f"  ! {_cc.get('detail')}; blocked SHIPS (S4)")
+            elif not _cc.get("passed"):
+                ships = False
+                if floor is None or floor > 4.0:
+                    floor = 4.0
+                print(f"  ! cost ceiling busted — {_cc.get('detail')} "
+                      f"(brief-wording layer '{_cc.get('key')}'); blocked SHIPS (S4)")
         # ── S7: VISION AXIS BIND (2026-07-20) ──────────────────────────────────
         # The tab floor already folds the PCB + Renders tab scores, but a DELIVERED
         # vision critique that flags the render BROKEN must block ships directly —
@@ -2318,16 +2369,18 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     axes.append({"axis": "Self-audit — no blocking defects", "applicable": True,
                  "passed": not _bd,
                  "detail": ("clean" if not _bd else f"{len(_bd)} blocking defect(s)")})
-    # 3. EX-WORKS vs UNIT-COST CEILING (S4) — only when the brief states a ceiling.
-    _ucc = ((st.get("parsedBrief") or {}).get("constraints") or {}).get("unit_cost_ceiling") or {}
-    _ceiling = num(_ucc.get("value")) if isinstance(_ucc, dict) else num(_ucc)
-    _oem = num((st.get("costStack") or {}).get("oem_transfer_price_gbp"))
-    if _ceiling is not None and _ceiling > 0 and _oem is not None and _oem > 0:
-        axes.append({"axis": "Ex-works ≤ unit-cost ceiling", "applicable": True,
-                     "passed": _oem <= _ceiling * 1.02,
-                     "detail": f"£{_oem:,.0f} vs £{_ceiling:,.0f} ceiling"})
+    # 3. COST CEILING over the BRIEF-WORDING layer (S4) — the SAME shared check the
+    #    verdict bind + the HARD Verification row use, so the three surfaces cannot
+    #    disagree. A "bill of materials ≤ £X" brief compares materials (organoid £287
+    #    vs £385 → PASS), not the ex-works price it is never sold at; a "unit/sale/
+    #    ex-works ≤ £X" brief still compares ex-works. Wording-keyed, universal.
+    _cc = _ship_cost_layer_check(st)
+    if _cc.get("applicable"):
+        axes.append({"axis": "Cost ceiling (brief-wording layer)", "applicable": True,
+                     "passed": bool(_cc.get("passed")) and bool(_cc.get("verified")),
+                     "detail": _cc.get("detail")})
     else:
-        axes.append({"axis": "Ex-works ≤ unit-cost ceiling", "applicable": False,
+        axes.append({"axis": "Cost ceiling (brief-wording layer)", "applicable": False,
                      "passed": True, "detail": "no unit-cost ceiling in the brief"})
     # 4. PCB READINESS — only when the design is PCB-bearing; fab-ready (any disclosed
     #    FAB-READY string) passes, ENGINEERING DRAFT / FAIL does not.
@@ -29794,11 +29847,34 @@ def _selftest() -> int:
             print(f"  FAIL S7: a clean state (floor 9, no blocking defects, oem<ceiling, no "
                   f"PCB, no vision file) must pass every applicable axis "
                   f"(got {[(a['axis'], a['applicable'], a['passed']) for a in _axes_ok]})"); bad += 1
-        # the oem axis is applicable (ceiling present) and passes (£300 < £385)
-        _oem_axis = next(a for a in _axes_ok if a["axis"].startswith("Ex-works"))
+        # the cost-ceiling axis is applicable (ceiling present) and passes (silent brief →
+        # falls back to the only price present, oem £300 < £385)
+        _oem_axis = next(a for a in _axes_ok if a["axis"].startswith("Cost ceiling"))
         if not (_oem_axis["applicable"] and _oem_axis["passed"]):
-            print(f"  FAIL S7: the ex-works axis must be applicable+pass at £300 vs £385 "
+            print(f"  FAIL S7: the cost-ceiling axis must be applicable+pass at £300 vs £385 "
                   f"(got {_oem_axis})"); bad += 1
+        # ── S4 BRIEF-WORDING BASIS proveCatch (2026-07-22): the organoid false-FAIL.
+        # A brief that ceilings a "bill of materials within £275-£385" must compare MATERIALS
+        # (£287 ≤ £385 → PASS), NOT the ex-works price (£475) it is never sold at. Both the
+        # ship axis AND the verdict bind must agree — the false-FAIL floored the whole dossier.
+        _mat_st = {"parsedBrief": {"original_text": "honest prototype bill of materials within £275-£385",
+                                   "constraints": {"unit_cost_ceiling": {"value": 385}}},
+                   "isInstrumentDevice": True,
+                   "costStack": {"raw_materials_bom_gbp": 287, "oem_transfer_price_gbp": 475},
+                   "selfAudit": {"blocking_defects": []}, "pcb": {"isPcbBearing": False}}
+        _mat_cc = _ship_cost_layer_check(_mat_st)
+        if not (_mat_cc["passed"] and _mat_cc["key"] == "raw_materials_bom_gbp" and _mat_cc["verified"]):
+            print(f"  FAIL S4-basis: a 'bill of materials ≤ £385' brief must PASS on materials "
+                  f"£287 (not ex-works £475) — got {_mat_cc}"); bad += 1
+        with _tf7.TemporaryDirectory() as _td4:
+            _mat_axes = compute_ship_axes(_mat_st, _td4, {"floor": 9})
+            _mat_axis = next(a for a in _mat_axes if a["axis"].startswith("Cost ceiling"))
+            if not _mat_axis["passed"]:
+                print(f"  FAIL S4-basis: ship axis must pass on materials basis (got {_mat_axis})"); bad += 1
+            _mat_v = compute_verdict(_mat_st, {}, _td4)
+            if _mat_v.get("floor") == 4.0 and _mat_v.get("ships") is False:
+                print("  FAIL S4-basis: verdict must NOT floor-to-4/block on ex-works when the "
+                      "brief ceilings a bill of materials that PASSES"); bad += 1
         # PCB axis is NOT applicable (no PCB) → does not block.
         _pcb_axis = next(a for a in _axes_ok if a["axis"].startswith("PCB"))
         if _pcb_axis["applicable"]:
