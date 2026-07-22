@@ -637,92 +637,127 @@ def enclosure_shell_contains_check(
 
 
 _SHELL_RE_G20 = re.compile(r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+_CAPTION_NUM_RE = re.compile(r"[-+]?\d*\.?\d+")
 
 
-def envelope_equality_cross_check(
-    parts: list,
-    state: dict,
-    tol_frac: float = 0.02,
-    tol_mm: float = 2.0,
-) -> tuple:
-    """PURE G20 — manifest shell dims EQUAL resolve_design_envelope_mm (pre-estimate) or abstain.
-
-    INTENT (2026-07-22, envelope-equality coherence): the canonical envelope is the
-    Enclosure Shell dims_mm in parts-manifest.json, which grows at render time to
-    contain the placed parts (council-approved reorder, commit 439e2bc91). The drawing
-    caption and the Equipment & Dimensions Register are now BOTH routed to read the
-    manifest shell (canonical), so they are equal by construction. This gate is the
-    BACKSTOP that proves the two sources still agree within tolerance — it fires when
-    the state-derived pre-estimate diverges from the placed manifest shell by more than
-    tol_frac (2%) OR tol_mm (2mm), whichever is larger on each dimension.
-
-    Abstains when:
-    - No Enclosure Shell part in the manifest (non-enclosure / plant-scale archetypes).
-    - resolve_design_envelope_mm returns None (no contract dims / no enclosure_volume_m3).
-
-    UNIVERSAL — keyed on the Enclosure Shell presence, never on a product class slug.
-    """
-    # Find manifest canonical shell dims
-    shell_w = shell_d = shell_h = None
-    for p in parts:
+def _canonical_shell_dims_mm(parts: list):
+    """(w, d, h) mm from the manifest 'Enclosure Shell' part's dims_mm, or None."""
+    for p in parts or []:
         if not isinstance(p, dict):
             continue
         if _SHELL_RE_G20.search(str(p.get("name") or "")):
             d = p.get("dims_mm") or {}
             if isinstance(d, dict):
-                shell_w = float(d.get("w") or 0)
-                shell_d = float(d.get("d") or 0)
-                shell_h = float(d.get("h") or 0)
-            break
+                w = float(d.get("w") or 0)
+                depth = float(d.get("d") or 0)
+                h = float(d.get("h") or 0)
+                if w > 0 and depth > 0 and h > 0:
+                    return (w, depth, h)
+    return None
 
-    if shell_w is None or shell_w == 0:
+
+def _parse_caption_envelope_mm(caption: str):
+    """Parse the drawing-caption envelope string into an (a, b, c) mm triple, or None.
+
+    The drawing emits either 'W × D × H mm' (manifest-shell path, canonical) or
+    'L × W × H m' (metre fallback path). Detects the unit from the trailing token and
+    converts metres→mm so the comparison is always in mm. Returns None if it can't
+    parse three numbers (nothing to compare — abstain).
+    """
+    if not caption:
+        return None
+    nums = [float(x) for x in _CAPTION_NUM_RE.findall(caption)]
+    if len(nums) < 3:
+        return None
+    a, b, c = nums[0], nums[1], nums[2]
+    # Metre string ('… m' but NOT '… mm') → convert to mm.
+    tail = caption.strip().lower()
+    is_mm = tail.endswith("mm")
+    is_m = tail.endswith(" m") or (tail.endswith("m") and not is_mm)
+    if is_m and not is_mm:
+        a, b, c = a * 1000.0, b * 1000.0, c * 1000.0
+    if a <= 0 or b <= 0 or c <= 0:
+        return None
+    return (a, b, c)
+
+
+def envelope_equality_cross_check(
+    parts: list,
+    caption_dims,
+    tol_frac: float = 0.02,
+    tol_mm: float = 2.0,
+) -> tuple:
+    """PURE G20 — the DELIVERED drawing-caption envelope must EQUAL the canonical shell.
+
+    INTENT (2026-07-22, envelope-equality coherence): the canonical envelope is the
+    Enclosure Shell dims_mm in parts-manifest.json, which grows at render time to
+    contain the placed parts (council-approved reorder, commit 439e2bc91). The Equipment
+    & Dimensions Register reads dims_mm directly; the drawing caption is now routed
+    (generate_drawing_set._manifest_envelope_dims) to read the SAME manifest shell — so
+    both surfaces equal the canonical shell BY CONSTRUCTION.
+
+    This gate compares the value the DRAWING ACTUALLY EMITS (`caption_dims` — the parsed
+    output of the drawing's own `_manifest_envelope_dims` resolver, NOT the superseded
+    state pre-estimate) against the canonical manifest shell. On a coherent bake they are
+    identical (the caption reads the shell). If a future regression makes the caption
+    resolver fall back to the state pre-estimate — or any other source — the emitted
+    value diverges from the manifest shell and G20 FIRES. THAT is the real regression
+    guard: it proves the delivered artefacts stay routed to the one canonical model.
+
+    Args:
+        parts:        parts-manifest 'parts' list (source of the canonical shell dims).
+        caption_dims: the drawing's DELIVERED envelope as an (a, b, c) mm triple —
+                      parse the drawing caption string via `_parse_caption_envelope_mm`.
+
+    Abstains when:
+    - No Enclosure Shell part in the manifest (non-enclosure / plant-scale archetypes).
+    - caption_dims is None (the drawing emitted no parseable envelope — nothing to check).
+
+    UNIVERSAL — keyed on the Enclosure Shell presence, never on a product class slug.
+    """
+    canonical = _canonical_shell_dims_mm(parts)
+    if canonical is None:
         return (True, "no Enclosure Shell in manifest — abstain (non-enclosure product)")
 
-    # Resolve the state-derived pre-estimate (same path as drawing caption fallback)
-    try:
-        from render_view_contract import resolve_design_envelope_mm as _rde  # type: ignore
-        pre_est = _rde(state)
-    except Exception:  # noqa: BLE001
-        pre_est = None
+    if not caption_dims or len(caption_dims) < 3:
+        return (True, "no parseable drawing-caption envelope — abstain")
 
-    if pre_est is None:
-        return (True, "resolve_design_envelope_mm returned None — abstain")
+    cap_w, cap_d, cap_h = float(caption_dims[0]), float(caption_dims[1]), float(caption_dims[2])
+    if cap_w <= 0 or cap_d <= 0 or cap_h <= 0:
+        return (True, "drawing-caption envelope has non-positive dims — abstain")
 
-    est_w, est_d, est_h = pre_est
-    if est_w == 0 or est_d == 0 or est_h == 0:
-        return (True, "resolve_design_envelope_mm returned zero dims — abstain")
-
-    # Compare sorted triples (dimension-agnostic — avoids W/D axis-flip false positives)
-    shell_sorted = sorted([shell_w, shell_d, shell_h], reverse=True)
-    est_sorted = sorted([est_w, est_d, est_h], reverse=True)
+    # Compare sorted triples (dimension-agnostic — avoids W/D axis-flip false positives).
+    canon_sorted = sorted(canonical, reverse=True)
+    cap_sorted = sorted([cap_w, cap_d, cap_h], reverse=True)
 
     violations = []
     dim_names = ["largest", "middle", "smallest"]
-    for i, (s, e) in enumerate(zip(shell_sorted, est_sorted)):
-        allowed = max(tol_mm, s * tol_frac)
-        diff = abs(s - e)
+    for i, (c, cap) in enumerate(zip(canon_sorted, cap_sorted)):
+        allowed = max(tol_mm, c * tol_frac)
+        diff = abs(c - cap)
         if diff > allowed:
             violations.append(
-                f"{dim_names[i]} dim: manifest shell {s:.1f} mm vs pre-estimate {e:.1f} mm "
+                f"{dim_names[i]} dim: canonical shell {c:.1f} mm vs drawing caption {cap:.1f} mm "
                 f"(diff {diff:.1f} mm > tol {allowed:.1f} mm)"
             )
 
     if violations:
         return (False,
-                f"envelope MISMATCH — manifest shell "
-                f"{shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm "
-                f"vs state pre-estimate "
-                f"{est_sorted[0]:.0f}×{est_sorted[1]:.0f}×{est_sorted[2]:.0f} mm: "
+                f"envelope MISMATCH — drawing caption "
+                f"{cap_sorted[0]:.0f}×{cap_sorted[1]:.0f}×{cap_sorted[2]:.0f} mm "
+                f"≠ canonical manifest shell "
+                f"{canon_sorted[0]:.0f}×{canon_sorted[1]:.0f}×{canon_sorted[2]:.0f} mm: "
                 + "; ".join(violations)
-                + " — fix: route drawing caption / register to canonical manifest shell dims "
-                "(canonical source = parts-manifest Enclosure Shell dims_mm, not state resolver)")
+                + " — fix: route generate_drawing_set._manifest_envelope_dims to read the "
+                "canonical parts-manifest Enclosure Shell dims_mm (it fell back to another "
+                "source — e.g. the superseded state pre-estimate)")
 
     return (True,
-            f"envelope MATCH — manifest shell "
-            f"{shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm "
-            f"agrees with state pre-estimate "
-            f"{est_sorted[0]:.0f}×{est_sorted[1]:.0f}×{est_sorted[2]:.0f} mm "
-            f"(within ±{max(tol_mm, shell_sorted[0] * tol_frac):.1f} mm / {tol_frac*100:.0f}%)")
+            f"envelope MATCH — drawing caption "
+            f"{cap_sorted[0]:.0f}×{cap_sorted[1]:.0f}×{cap_sorted[2]:.0f} mm "
+            f"equals canonical manifest shell "
+            f"{canon_sorted[0]:.0f}×{canon_sorted[1]:.0f}×{canon_sorted[2]:.0f} mm "
+            f"(within ±{max(tol_mm, canon_sorted[0] * tol_frac):.1f} mm / {tol_frac*100:.0f}%)")
 
 
 def run_gates(out_dir: str) -> list:
@@ -1163,17 +1198,27 @@ def run_gates(out_dir: str) -> list:
         ))
 
     # ── G20 ENVELOPE EQUALITY CROSS-CHECK (2026-07-22) ────────────────────────
-    # The manifest Enclosure Shell dims (canonical, post-placement) must EQUAL the
-    # state-derived pre-estimate within ±2% / ±2mm. Both the drawing caption and the
-    # Equipment & Dimensions Register now read the canonical manifest shell, so they
-    # are equal by construction. This gate is the BACKSTOP: if the state resolver's
-    # pre-estimate diverges from the placed shell (e.g. a stale contract dim or a new
-    # archetype that bypassed the reorder), the incoherence is caught before the dossier
-    # ships. Abstains on non-enclosure / plant-scale products (no Enclosure Shell part).
+    # The value the DRAWING ACTUALLY EMITS (its own _manifest_envelope_dims resolver
+    # output) must EQUAL the canonical manifest Enclosure Shell dims within ±2% / ±2mm.
+    # After the routing fix the caption reads the manifest shell, so on a coherent bake
+    # they are identical. This gate is the BACKSTOP: if a future regression makes the
+    # caption resolver fall back to the superseded state pre-estimate (or any other
+    # source), the emitted value diverges from the placed shell and the gate fires before
+    # the dossier ships. Compares the DELIVERED artefact, NOT the state pre-estimate (a
+    # legitimate upstream input the reorder is designed to supersede). Abstains on
+    # non-enclosure / plant-scale products (no Enclosure Shell part).
     if _encl_m3 and 0 < float(_encl_m3) < 1.0:
         _pm_doc_for_g20 = pm_doc if isinstance(pm_doc, dict) else {}
         _parts_for_g20 = _pm_doc_for_g20.get("parts") or []
-        _g20_ok, _g20_detail = envelope_equality_cross_check(_parts_for_g20, state)
+        _caption_dims_g20 = None
+        try:
+            from pathlib import Path as _PathG20
+            from generate_drawing_set import _manifest_envelope_dims as _mfe_g20  # type: ignore
+            _caption_str_g20 = _mfe_g20(_PathG20(out_dir))
+            _caption_dims_g20 = _parse_caption_envelope_mm(_caption_str_g20)
+        except Exception:  # noqa: BLE001
+            _caption_dims_g20 = None
+        _g20_ok, _g20_detail = envelope_equality_cross_check(_parts_for_g20, _caption_dims_g20)
         gates.append(Gate(
             "envelope_equality",
             ["renders", "general-arrangement"],
@@ -1678,7 +1723,7 @@ GATE_STAGE = {
     "render_view_quality": "render_view_contract required_views + build_universal_scene product cameras + render_image_quality",
     "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",
     "enclosure_shell_contains_parts": "minimum_working_envelope (functional-stack height pack) + place_sealed_enclosure env_mm — shell must contain the real mechanical+fluidic part stack",
-    "envelope_equality": "generate_drawing_set._manifest_envelope_dims (route to canonical manifest shell dims, not state resolver) + build-excel-export tab_equipment_register (already canonical) — both must read parts-manifest Enclosure Shell dims_mm",
+    "envelope_equality": "generate_drawing_set._manifest_envelope_dims (must read the canonical parts-manifest Enclosure Shell dims_mm — a fallback to the superseded state pre-estimate makes the emitted caption diverge from the shell) + build-excel-export tab_equipment_register (already canonical)",
 }
 
 
@@ -2611,46 +2656,43 @@ def _selftest() -> int:
     c_render = scorecard(gs_render, _inst)
     chk("d2_renders_pseudo_stays_fail", c_render["drawings"]["renders"]["status"] == "fail")
 
-    # G20 ENVELOPE EQUALITY proveCatch (2026-07-22):
-    # The canonical envelope is the manifest Enclosure Shell dims_mm (post-placement);
-    # the drawing caption fallback is resolve_design_envelope_mm(state) (pre-estimate).
-    # After the council-approved reorder the shell GROWS (248×188×108 pre → 274×251×126
-    # placed). G20 catches when state's pre-estimate diverges from the manifest shell.
-    # (a) PASS direction: manifest shell matches pre-estimate within ±2% / ±2mm.
-    _g20_state_match = {"orchestratorContract": {"quantities": {
-        "enclosure_volume_m3": {"value": 0.00403, "unit": "m³"},
-        "design_envelope_width_mm": {"value": 275.0},
-        "design_envelope_depth_mm": {"value": 252.0},
-        "design_envelope_height_mm": {"value": 127.0},
-    }}}
-    _g20_parts_match = [
-        {"name": "Enclosure Shell", "dims_mm": {"w": 274.0, "d": 251.0, "h": 126.0}},
-    ]
-    _g20_ok_match, _g20_msg_match = envelope_equality_cross_check(
-        _g20_parts_match, _g20_state_match)
-    chk("g20_pass_when_shell_matches_estimate", _g20_ok_match)
-    chk("g20_pass_detail_says_match", "MATCH" in _g20_msg_match)
-    # (b) FAIL direction: manifest shell grew from pre-estimate (248×188×108 → 274×251×126).
-    # Difference on largest dim: 274 vs 248 = 26mm > max(2mm, 274×2%) = 5.5mm → FIRES.
-    _g20_state_stale = {"orchestratorContract": {"quantities": {
-        "enclosure_volume_m3": {"value": 0.00403, "unit": "m³"},
-        "design_envelope_width_mm": {"value": 248.2},
-        "design_envelope_depth_mm": {"value": 188.2},
-        "design_envelope_height_mm": {"value": 108.0},
-    }}}
-    _g20_parts_grown = [
+    # G20 ENVELOPE EQUALITY proveCatch (2026-07-22, corrected):
+    # The canonical envelope is the manifest Enclosure Shell dims_mm (post-placement,
+    # 274×252×126). G20 compares the value the DRAWING ACTUALLY EMITS (its own
+    # _manifest_envelope_dims resolver output, parsed to mm) against that canonical shell
+    # — NOT the superseded state pre-estimate (248×188×108), which the reorder is designed
+    # to grow beyond. After the routing fix the caption reads the manifest shell, so on a
+    # coherent bake they are identical.
+    _g20_parts = [
         {"name": "Enclosure Shell", "dims_mm": {"w": 274.3, "d": 251.6, "h": 126.0}},
+        {"name": "Heatsink Fan",    "dims_mm": {"w": 80.0,  "d": 80.0,  "h": 96.0}},
     ]
+    # (a) PASS: the drawing caption reads the manifest shell (the delivered coherent case).
+    #     _parse_caption_envelope_mm of the emitted 'W × D × H mm' string returns the shell.
+    _g20_caption_coherent = _parse_caption_envelope_mm("274 × 252 × 126 mm")
+    _g20_ok_match, _g20_msg_match = envelope_equality_cross_check(
+        _g20_parts, _g20_caption_coherent)
+    chk("g20_pass_when_caption_reads_shell", _g20_ok_match)
+    chk("g20_pass_detail_says_match", "MATCH" in _g20_msg_match)
+    # (b) FAIL: a regression makes the caption resolver fall back to the stale state
+    #     pre-estimate — the emitted metre string '0.248 × 0.188 × 0.108 m' parses to
+    #     248×188×108 mm, which diverges from the 274×252×126 manifest shell → FIRES.
+    _g20_caption_stale = _parse_caption_envelope_mm("0.248 × 0.188 × 0.108 m")
+    chk("g20_metre_string_parses_to_mm",
+        _g20_caption_stale is not None and abs(_g20_caption_stale[0] - 248.0) < 1.0)
     _g20_ok_fail, _g20_msg_fail = envelope_equality_cross_check(
-        _g20_parts_grown, _g20_state_stale)
-    chk("g20_fail_when_shell_diverges_from_estimate", not _g20_ok_fail)
+        _g20_parts, _g20_caption_stale)
+    chk("g20_fail_when_caption_diverges_from_shell", not _g20_ok_fail)
     chk("g20_fail_detail_says_mismatch", "MISMATCH" in _g20_msg_fail)
     chk("g20_fail_detail_mentions_fix", "canonical" in _g20_msg_fail.lower())
-    # (c) abstain when no Enclosure Shell part in manifest (plant-scale / non-enclosure).
+    # (c) ABSTAIN: no Enclosure Shell part in manifest (plant-scale / non-enclosure).
     _g20_ok_abs, _g20_msg_abs = envelope_equality_cross_check(
-        [], _g20_state_stale)
+        [], _g20_caption_coherent)
     chk("g20_abstains_without_shell_part", _g20_ok_abs)
     chk("g20_abstain_detail_says_abstain", "abstain" in _g20_msg_abs.lower())
+    # (d) ABSTAIN: no parseable caption (drawing emitted nothing) — nothing to compare.
+    _g20_ok_nocap, _g20_msg_nocap = envelope_equality_cross_check(_g20_parts, None)
+    chk("g20_abstains_without_caption", _g20_ok_nocap)
 
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
