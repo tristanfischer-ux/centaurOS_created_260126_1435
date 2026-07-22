@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -352,8 +353,56 @@ _RENDER_VIEWS = [
 _SHEET_NAME_MAX = 31          # Excel hard limit — names are asserted under it here
 
 
+_SHELL_RE = re.compile(r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+
+
+def _shell_dims_from_manifest(man: dict) -> tuple:
+    """Return (w_mm, d_mm, h_mm) from the 'Enclosure Shell' part's dims_mm, or None.
+
+    The Enclosure Shell part is the CANONICAL post-placement envelope written by
+    place_sealed_enclosure after it grows the shell to contain the placed parts.
+    Reading from here guarantees the drawing caption matches the Equipment & Dimensions
+    Register (which also reads parts-manifest dims_mm directly), making the two
+    surfaces equal BY CONSTRUCTION — not just by coincidence.
+    """
+    for p in (man.get("parts") or []):
+        if not isinstance(p, dict):
+            continue
+        if _SHELL_RE.search(str(p.get("name") or "")):
+            d = p.get("dims_mm") or {}
+            if isinstance(d, dict):
+                w = float(d.get("w") or 0)
+                depth = float(d.get("d") or 0)
+                h = float(d.get("h") or 0)
+                if w > 0 and depth > 0 and h > 0:
+                    return (w, depth, h)
+    return None
+
+
 def _manifest_envelope_dims(out_dir: Path) -> str:
-    """'L × W × H m' from parts-manifest.json bbox, or ''."""
+    """'W × D × H mm' from the canonical Enclosure Shell part in parts-manifest.json.
+
+    PRIMARY (canonical): reads the Enclosure Shell's dims_mm from the manifest — the
+    same source the Equipment & Dimensions Register uses, so both surfaces are equal by
+    construction. The shell dims grow at render time to contain the placed parts
+    (council-approved reorder, commit 439e2bc91), so this is always the post-placement
+    truth.
+
+    FALLBACK 1: resolve_design_envelope_mm(state) — the pre-placement contract estimate,
+    used only when no sealed Enclosure Shell part is in the manifest (plant-scale
+    products, non-enclosure archetypes).
+
+    FALLBACK 2: parts-manifest bbox_mm extents — absolute last resort when state is also
+    unavailable.
+    """
+    try:
+        man = json.loads((out_dir / "parts-manifest.json").read_text())
+        shell = _shell_dims_from_manifest(man)
+        if shell is not None:
+            w, d, h = shell
+            return f"{w:.0f} × {d:.0f} × {h:.0f} mm"
+    except Exception:  # noqa: BLE001
+        pass
     try:
         state = json.loads((out_dir / "state.json").read_text())
         envelope = resolve_design_envelope_mm(state)
