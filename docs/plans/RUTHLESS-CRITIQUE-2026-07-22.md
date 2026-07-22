@@ -8,6 +8,11 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~11:05) — ALL known floor-setters fixed; loopbake4 (clean full batch) running
+- **Both loopbake3 regressions FIXED `a7e6f5820`**: (1) Inputs orphan drivers — the 14 were DCF drivers left consumerless by the Financial instrument-reframe gate; now suppressed on the instrument path (only load_factor+hours emit, both consumed) → 10/10. (2) ⚠Check fail was an HONEST catch (not the heater check): a TDK NTC floored to £1.00 by `round(0.12)=0` vs £0.12 distributor = 8.3× → commodity floor now skips parts with a confirmed distributor price + 2dp sub-£1.
+- **loopbake4 running** with EVERY known code-level floor-setter fixed: render ✅ PCB ✅ cost ✅ Verification ✅ Financial-reframe ✅ orphan-drivers ✅ price-floor ✅ heater ✅ RPM ✅ WRAS ✅ + Cursor fixpack13-16. This is the bake I expect to show the real floor climb. All 29 regression guards pass.
+- NOTE: I over-scoped one sub-agent (2 regressions in one) → it ran 35 min / 1.65MB before I bounded it via SendMessage. LESSON: one well-scoped fix per agent.
+
 ## LOOP STATUS (2026-07-22 ~10:25) — loopbake3 SIGHTed: big items CLEARED, floor 1.2 = new honest catches
 - **Ship axes all PASS**: Cost ceiling (materials £288 vs £385) ✓, PCB readiness FAB-READY ✓, Render vision clean ✓. **Verification off the sub-8 list** (P&P fix worked). The render/PCB/cost/Verification floor-setters are ALL cleared.
 - Floor DROPPED 4 → 1.2 — but this is HONEST scoring + my fixes' side-effects becoming the new floor, NOT a quality regression. New sub-8 (non-mirror):
