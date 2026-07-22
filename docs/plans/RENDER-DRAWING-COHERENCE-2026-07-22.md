@@ -2,6 +2,16 @@
 
 ## ✅ CORE COHERENCE DEFECT FIXED (2026-07-22 ~23:05) — verified against DELIVERED render pixels
 The shell-doesn't-contain-parts defect (4 Goodhart misses) is RESOLVED by the council reorder `439e2bc91`. Verified on a SINGLE render pass (out/coherence-verify-2240, NOT run-loop): (1) render log `shell mesh built from FINAL env` 274×252×126; (2) `enclosure_shell_contains_check` on the delivered manifest → **CONTAINED: True** (parts 120×100×114 post-clamp ⊆ shell 274×252×126); (3) 04-product-exterior.png = coherent sealed box; (4) tallest REAL part = Heatsink Fan 114mm ⊆ 126mm shell → the inspect-front "towering verticals" are `u_tagcallout_` LEADER STEMS (annotation), NOT protruding parts. The 5th fix is the real one: shell derives from post-placement bbox by construction, universal.
+## ✅ STEP (d) POSITION-CONSISTENCY + OPERATING-FRAME COMPLETE — coherence system FULLY DOCUMENTED
+- **Position-consistency finding (COHERENT BY CONSTRUCTION — no gate built, gate-intent rule obeyed):** All three GA projection views (PLAN / FRONT / SIDE) read from the SAME `GAPart` struct loaded once from parts-manifest by `draw_ga.load_manifest()`. PLAN uses `p.x0/x1 × p.y0/y1`, FRONT uses `p.x0/x1 × p.z0/z1`, SIDE uses `p.y0/y1 × p.z0/z1`. There is no per-view re-derivation from a different source; no per-view offset; no stale-SVG vector for position divergence. A firing position-consistency gate cannot exist — building one would be decoration (gate-intent rule: "do NOT build a decoration gate that can never fire"). No gate added to `drawing_gates.py`.
+- **OPERATING-FRAME documented** (`OPERATING-FRAME-2026-06.md` section "Cross-artefact geometry coherence (2026-07-22)"): permanent invariant locked in — canonical manifest model, G19/G20/G21 gate stack, SIGHT verification rule (single render pass, not run-loop.sh), why positions are coherent-by-construction.
+- **drawing_gates --selftest GREEN** after all changes; selftest explicitly confirms "verified coherent/abstain on out/coherence-verify-2240" (no false-fire on the coherent delivered artefact).
+- **COHERENCE GATE STACK COMPLETE (3-deep + OPERATING-FRAME invariant):**
+  - G19 `enclosure_shell_contains_check` — shell ⊇ parts (containment).
+  - G20 `envelope_equality_cross_check` — drawing caption == canonical manifest shell (envelope).
+  - G21 `part_set_coherence_check` — GA tags == manifest principal set (phantom + dropped).
+  - POSITIONS — coherent by construction (all views project single manifest GAPart struct; no gate needed).
+
 ## PROGRESS (2026-07-23 ~00:30) — G21 part-set landed + independently verified; coherence stack now 3-deep ✅
 - **G21 part-set coherence** (`fde736068`): GA drawing tag-set must equal the manifest principal set. INDEPENDENTLY verified (not just agent report): coherent → PASS; prefix-matching phantom X-999 → FIRES; dropped EP-101 → FIRES; foreign-prefix ZZ-999 → filtered (defensible false-positive guard — real stale-tag phantoms share the family prefix); <3 tags / no SVG → abstain. Agent correctly found part-set is coherent-by-construction (draw_ga.load_manifest reads the manifest) and built G21 as a proveCatch-backed BACKSTOP (gate-intent compliant). selftest OK.
 - **COHERENCE GATE STACK NOW 3-DEEP, all delivered-verified + proveCatch both directions + universal + floor-wired (via Drawings-tab score → per-tab ≥8 floor):**

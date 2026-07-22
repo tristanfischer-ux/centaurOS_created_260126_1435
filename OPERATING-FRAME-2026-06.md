@@ -353,6 +353,23 @@ scored honestly, and traced end-to-end. That is the genuine 8: *"wow, I can rely
 
 ---
 
+## Cross-artefact geometry coherence (2026-07-22)
+
+**Principle — ONE canonical geometry model.** The parts-manifest (written by `build_universal_scene.py` after placement) is the single source of truth for all geometry. Every downstream artefact derives from it and may not compute geometry independently:
+- The sealed-enclosure render shell is sized from the post-placement part bbox (council-approved reorder `439e2bc91`): `place_sealed_enclosure` measures the placed bbox → sets env = bbox + 2×6mm clearance → builds the shell mesh from those FINAL dims. Never the pre-placement estimate patched after the mesh is built (that was 4 Goodhart misses).
+- Every GA drawing view (PLAN / FRONT / SIDE) is a pure projection of the single `GAPart` struct loaded from parts-manifest by `draw_ga.load_manifest()`. PLAN uses X×Y, FRONT uses X×Z, SIDE uses Y×Z — all from the same struct, same source, no per-view re-derivation. **Positions are coherent by construction** — a position-consistency gate cannot fire on a live divergence and is not built (decoration gate rule).
+- The Equipment & Dimensions Register and drawing caption both read the canonical manifest Enclosure Shell `dims_mm` directly.
+
+**Gate stack — `scripts/blender-universal/drawing_gates.py`, wired via gate 35, floors the Drawings tab:**
+- **G19 `enclosure_shell_contains_check`** — manifest Enclosure Shell dims ⊇ parts-manifest bbox (±10mm tol). Fires when shell < parts (the organoid 1603 defect class). proveCatch both directions.
+- **G20 `envelope_equality_cross_check`** — the delivered drawing caption envelope must equal the canonical manifest shell (±2% / 2mm). Fires when the caption resolver falls back to any non-manifest source. proveCatch both directions. Abstains on non-enclosure archetypes.
+- **G21 `part_set_coherence_check`** — GA drawing tag-set must equal the manifest principal tag-set. Fires on phantom tags (stale SVG) and dropped parts (placer omit / generator skip). proveCatch both directions. Abstains when <3 principal tags or no GA SVG.
+All three are universal (keyed on manifest content, never a product-class slug), run `drawing_gates.py --selftest` to verify proveCatch GREEN.
+
+**Verification rule — SIGHT the delivered pixels, not stdout alone.** Selftests passed while 4 coherence fixes shipped Goodhart (the mesh was stale while the manifest number was updated). The closing check is: (1) run a SINGLE render pass (`scripts/render-blender-scene.py --state <state.json> --out-dir <dir>`), NOT `run-loop.sh`; (2) SIGHT `00-hero.png` + `04-product-exterior.png` (sealed product view) — does the rendered shell contain the parts? (3) check `drawing-gates.json` for G19/G20/G21 PASS; (4) SIGHT inspect-front/top against the render — same envelope, same parts? Only then is coherence confirmed.
+
+---
+
 ## 5. THE ONE BEHAVIOURAL CHANGE (if nothing else changes, change this)
 
 **Stop running as the author who fixes what's flagged. Run as the adversarial chartered engineer who
