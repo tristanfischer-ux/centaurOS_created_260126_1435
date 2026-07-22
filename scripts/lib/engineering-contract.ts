@@ -15527,6 +15527,27 @@ registerArchetype('lab_microscope', (brief: any) => {
 
 // INTENT (2026-07-16 Yuri 05): compact continuous-culture / turbidostat —
 // device-scale ml working volume + USB/bench watts. Never plant sterilisation.
+
+/** Read a numeric value from `brief.constraints.derived_requirements[]` by key.
+ *  Falls back to `brief_expansion.derived_requirements[]` (the expanded form).
+ *  Returns undefined when the key is absent or the value is non-positive. */
+function _getDerivedReqValue(brief: any, key: string): number | undefined {
+  const candidates: any[][] = [
+    brief?.constraints?.derived_requirements ?? [],
+    brief?.brief_expansion?.derived_requirements ?? [],
+    brief?.constraints?.brief_expansion?.derived_requirements ?? [],
+  ]
+  for (const arr of candidates) {
+    if (!Array.isArray(arr)) continue
+    const entry = arr.find((r: any) => r?.key === key)
+    if (entry !== undefined) {
+      const v = Number(entry?.value)
+      if (Number.isFinite(v) && v > 0) return v
+    }
+  }
+  return undefined
+}
+
 registerArchetype('benchtop_bioreactor', (brief: any) => {
   const desc = String(
     `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
@@ -15566,6 +15587,24 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
         60, // low-shear mammalian/organoid default; overridden by brief
       ),
     ),
+  )
+  // PEAK HEATER POWER — single shared contract quantity (2026-07-22 bug fix).
+  // ROOT: the bootstrap tool plan had `from_contract_key: "heating_power_w"` / fallback 10 W.
+  // Since "heating_power_w" was absent from the contract, the tool used the 10 W default even
+  // though the brief states 5 W and the actual net thermal load is ~0.93 W — producing a
+  // 90.66% heating margin and a 5 W vs 10 W split between the brief-compliance row and the
+  // Calculations tab P_heat substitution.
+  // FIX: emit `peak_heater_power_w` from the brief's derived requirement if present; otherwise
+  // derive it from the brief's stated steady_state_heat_loss_w × 2× sane margin; default 5 W
+  // (≈5× the 0.93 W organoid net load — covers cold startup transient; physic-sized, not a
+  // round-10 default). The tool plan reads this via from_contract_key="peak_heater_power_w".
+  const peakHeaterPowerW = Number(
+    (
+      _getDerivedReqValue(brief, 'peak_heater_power_w') ??
+      ((_getDerivedReqValue(brief, 'steady_state_heat_loss_w') ?? 0) > 0
+        ? Math.min((_getDerivedReqValue(brief, 'steady_state_heat_loss_w')! * 2), 10)
+        : 5)
+    ).toFixed(2),
   )
   // INTENT (Pioreactor 0327 calc-coverage): source_detail MUST carry an operator
   // (×/=) so check_calc_coverage counts the L×W×H derivation as SHOWN — a bare
@@ -15613,6 +15652,15 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
       // brief-value-literal-scanner (gate 25) can verify no tool uses a different literal.
       agitation_speed_rpm: q(agitationSpeedRpm, 'RPM', 'frequency', 'rated', 'system', 'brief', {
         source_detail: `agitation speed from brief (rpm regex) — shared across agitation:power + dissolved-oxygen:control; default 60 RPM (low-shear mammalian/organoid)`,
+      }),
+      // PEAK HEATER POWER — shared contract quantity so bioreactor-thermal:heat-balance reads
+      // the SAME value that the brief-compliance row shows (no 5W/10W split). Source is 'brief'
+      // (derived requirement) when stated, else physics-sized default. The tool plan reads this
+      // via from_contract_key="peak_heater_power_w" / fallback=5.
+      peak_heater_power_w: q(peakHeaterPowerW, 'W', 'power', 'peak', 'module', 'brief', {
+        source_detail:
+          `thermal actuator authority = brief peak_heater_power_w derived req (${peakHeaterPowerW} W); `
+          + `sized from brief or steady_state_heat_loss_w×2 — never a 10 W default fallback`,
       }),
     },
     topology: [

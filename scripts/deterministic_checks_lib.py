@@ -2351,6 +2351,62 @@ def _checks_plausibility(state: dict, run_dir: str) -> List[Check]:
     return out
 
 
+
+
+def _checks_heater_power_contract_consistency(state: dict, run_dir: str) -> List[Check]:
+    # Heater-power reconciliation (2026-07-22): the contract's `peak_heater_power_w` quantity
+    # (what the brief-compliance row shows) MUST equal the P_heat value the bioreactor-thermal
+    # heat-balance calc uses in its Heating Margin substitution — a split causes the 5W/10W
+    # discrepancy seen in the organoid-bioreactor run. Universal: only fires when BOTH the
+    # contract quantity AND the heat-balance worked calc are present.
+    out: List[Check] = []
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    contract_w_entry = q.get("peak_heater_power_w")
+    if not isinstance(contract_w_entry, dict):
+        return out  # no contract quantity — cannot check
+    contract_w = float(contract_w_entry.get("value", float("nan")))
+    if not math.isfinite(contract_w) or contract_w <= 0:
+        return out
+    # Find the Heating Margin step in the bioreactor-thermal:heat-balance worked calculations
+    wc = (state.get("orchestratorContract") or {}).get("worked_calculations") or {}
+    hb_steps = wc.get("bioreactor-thermal:heat-balance") or []
+    calc_w: Optional[float] = None
+    for step in hb_steps:
+        if not isinstance(step, dict):
+            continue
+        if "heating margin" in str(step.get("label", "")).lower():
+            # substitution format: "(P_heat - Q_req) / P_heat * 100" e.g. "(10.0 - 0.9340) / 10.0 * 100"
+            subst = str(step.get("substitution", ""))
+            m = re.match(r"\(([0-9.]+)\s*-", subst)
+            if m:
+                try:
+                    calc_w = float(m.group(1))
+                except ValueError:
+                    pass
+            break
+    if calc_w is None:
+        return out  # no calc to compare against — conservative
+    tol = 0.1  # W tolerance
+    mismatch = abs(contract_w - calc_w) > tol
+    out.append(Check(
+        name="Heater-power reconciliation: contract quantity must match heat-balance calc",
+        category="CONSISTENCY", relation="le",
+        status=FAIL if mismatch else PASS,
+        actual=round(calc_w, 3), expected=round(contract_w, 3), tol=tol, unit="W",
+        producer="consistency:heater_power_reconciliation",
+        detail=(
+            f"Contract `peak_heater_power_w` = {contract_w:.2f} W but the bioreactor-thermal "
+            f"heat-balance calc uses P_heat = {calc_w:.2f} W — a {abs(contract_w - calc_w):.2f} W "
+            f"split means the brief-compliance row and the Calculations tab disagree. "
+            f"Fix: emit `peak_heater_power_w` from the brief into the contract so the tool plan "
+            f"reads it (not a 10 W default fallback)."
+            if mismatch else
+            f"Contract `peak_heater_power_w` = {contract_w:.2f} W agrees with heat-balance "
+            f"calc P_heat = {calc_w:.2f} W (within {tol:.1f} W tolerance)."
+        ),
+    ))
+    return out
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -2364,6 +2420,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_part_type_coherence(state, run_dir))
     checks.extend(_checks_thermal_actuator_redundancy(state, run_dir))
     checks.extend(_checks_part_status_honesty(state, run_dir))
+    checks.extend(_checks_heater_power_contract_consistency(state, run_dir))
     checks.extend(_checks_adequacy(state, run_dir))
     checks.extend(_checks_balance(state, run_dir))
     checks.extend(_checks_cost(state, run_dir))
@@ -2562,6 +2619,41 @@ def _selftest() -> int:
     tr_noduty = _checks_thermal_actuator_redundancy(_therm(two_actuators), "")
     check(len(tr_noduty) == 0,
           f"THERMAL-REDUNDANCY: no thermal-duty quantity -> no check emitted; got {len(tr_noduty)}")
+
+    # ---- HEATER-POWER RECONCILIATION (2026-07-22): contract quantity must match what the
+    #      heat-balance calc uses. (a) contract 5W + calc 5W = PASS; (b) contract 5W + calc 10W
+    #      (the pre-fix bug) = FAIL; (c) no contract quantity -> no check emitted. ----
+    def _hpr(contract_w, calc_p_heat_w):
+        subst = f"({calc_p_heat_w} - 0.9340) / {calc_p_heat_w} * 100"
+        return {
+            "orchestratorContract": {
+                "quantities": {
+                    "peak_heater_power_w": {"value": contract_w, "unit": "W"},
+                    "net_heating_required_w": {"value": 0.934, "unit": "W"},
+                },
+                "worked_calculations": {
+                    "bioreactor-thermal:heat-balance": [
+                        {"label": "Heating Margin",
+                         "formula": "(P_heat - Q_req) / P_heat * 100",
+                         "substitution": subst,
+                         "result": round((calc_p_heat_w - 0.934) / calc_p_heat_w * 100, 4),
+                         "result_unit": "%"}
+                    ]
+                }
+            }
+        }
+    # (a) contract 5 W, calc uses 5 W -> PASS
+    hpr_match = _checks_heater_power_contract_consistency(_hpr(5.0, 5.0), "")
+    check(len(hpr_match) == 1 and hpr_match[0].status == PASS,
+          f"HEATER-PWR-RECONCILE: contract 5W, calc 5W must PASS; got {[(c.status,c.actual) for c in hpr_match]}")
+    # (b) contract 5 W, calc uses 10 W (the pre-fix bug) -> FAIL
+    hpr_mismatch = _checks_heater_power_contract_consistency(_hpr(5.0, 10.0), "")
+    check(len(hpr_mismatch) == 1 and hpr_mismatch[0].status == FAIL,
+          f"HEATER-PWR-RECONCILE: contract 5W, calc 10W must FAIL; got {[(c.status,c.actual) for c in hpr_mismatch]}")
+    # (c) no contract quantity -> no check emitted (conservative)
+    hpr_none = _checks_heater_power_contract_consistency({"orchestratorContract": {"quantities": {}}}, "")
+    check(len(hpr_none) == 0,
+          f"HEATER-PWR-RECONCILE: no contract quantity -> no check; got {len(hpr_none)}")
 
     # ---- PART-STATUS HONESTY (F4, 2026-07-20): an IDENTIFIED BoM line pinned to a SKU the
     #      verification stage proved `unverified` FAILs (the frozen 2150 P-101 IDENTIFIED over

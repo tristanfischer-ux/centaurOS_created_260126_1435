@@ -537,8 +537,13 @@ const LAB_ELECTRONICS_HMI_FLOOR = [
 // HEATING_DUTY_RE and emitted industrial heat_pump + scroll compressor +
 // access ladder (£81k vs gold £259). Device thermal = TEC/heater; culture
 // fluid = vial + dosing — never ASHP plant kit.
+// cartridge_heater removed (2026-07-22): a Peltier/TEC already heats AND cools the
+// sub-1W watt-scale loop — a separate resistive heater is provably redundant (F2 collapse
+// rule). The floor must not pre-populate what F2 collapses; doing so caused the cartridge
+// heater to appear in module prose/rad_syntax on every benchtop bioreactor run even after
+// F2 demoted it from words[], because the floor was written into prose BEFORE the collapse.
 const LAB_DEVICE_THERMAL_FLOOR = [
-  'peltier_tec_module', 'cartridge_heater', 'temperature_sensor',
+  'peltier_tec_module', 'temperature_sensor',
   'heatsink_fan', 'thermal_insulation', 'thermal_interface_pad',
 ]
 const LAB_CULTURE_FLUID_FLOOR = [
