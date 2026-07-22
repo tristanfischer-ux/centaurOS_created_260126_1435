@@ -52,7 +52,7 @@ import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isD
 import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal, deriveInstrumentTopology, instrumentRole } from './lib/orchestrator/generic/derive-topology'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
-import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
+import { computeCostSanity, resolveClassOutputBand, costCeilingBasis } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
 import {
   computeScorecardFloor,
@@ -736,6 +736,34 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       return o.rasHeadline === 10_668_668 && o.rasOutput === 204 && o.rasVerdict === 'pass' &&
         o.rasBandBasis === 'class:aquaculture_ras' && o.rasBandLow === 10_000 && o.rasBandHigh === 55_000 &&
         o.absurdVerdict === 'high' && o.co2Verdict === 'high' && o.co2BandLow === 1_500
+    },
+    (v) => `result=${v}`,
+  ))
+
+  // ── cost-ceiling BASIS is read from the BRIEF'S OWN WORDS, not the isInstrumentDevice proxy
+  // (2026-07-22, universality fix for the S6 unit-cost-ceiling guard). The organoid brief
+  // ceilings a "bill of materials within £275–£385" → the guard MUST compare against the
+  // materials basis, and must do so on the WORDING (so a plant brief that ceilings its BoM is
+  // covered too, and an instrument brief that quotes a SALE price is compared ex-works). Proves:
+  // (a) "bill of materials" → materials even for a NON-instrument state (the old proxy would have
+  // said sale); (b) "sells for … unit price" → sale even WITH isInstrumentDevice=true (the old
+  // proxy would have said materials); (c) a silent brief → null (caller falls back to the proxy).
+  const _basisMaterials = costCeilingBasis({
+    isInstrumentDevice: false,
+    parsedBrief: { original_text: 'Honest prototype bill of materials within £275–£385 for a benchtop unit.' },
+  })
+  const _basisSale = costCeilingBasis({
+    isInstrumentDevice: true,
+    parsedBrief: { original_text: 'Target a unit price the lab sells for under £900 retail.' },
+  })
+  const _basisSilent = costCeilingBasis({ isInstrumentDevice: true, parsedBrief: { original_text: 'A tidy compact benchtop instrument for teaching labs.' } })
+  out.push(assertEq(
+    'UNIVERSAL.cost_ceiling_basis_from_brief_wording_not_device_proxy',
+    'costCeilingBasis reads the brief text: "bill of materials within £X" → materials (even when isInstrumentDevice=false, defeating the old proxy); "unit price … sells for … retail" → sale (even when isInstrumentDevice=true); a brief with no cost-basis wording → null so the caller falls back to the isInstrumentDevice heuristic. Keyed on wording → universal across archetypes with no per-class table.',
+    JSON.stringify({ mat: _basisMaterials, sale: _basisSale, silent: _basisSilent }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.mat === 'materials' && o.sale === 'sale' && o.silent === null
     },
     (v) => `result=${v}`,
   ))

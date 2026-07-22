@@ -583,6 +583,37 @@ export interface CostSanityResult {
 }
 
 /**
+ * UNIVERSAL cost-ceiling BASIS classifier — reads the BRIEF'S OWN WORDS, not a device proxy.
+ * A brief that ceilings a "bill of materials" / "parts cost" / "component budget" declares a
+ * MATERIALS basis (the buyer builds it from the BoM); a brief that ceilings a "unit price" /
+ * "sale/retail/list price" / "ex-works" figure declares a SALE basis (an OEM sells it built).
+ * The comparison numerator the S6 guard uses must match the DECLARED basis — else a materials
+ * ceiling is falsely checked against an ex-works price (materials + COGS + margin), a fiction.
+ * Returns 'materials' | 'sale' | null (silent → caller falls back to the isInstrumentDevice
+ * heuristic). Keyed on wording, so it is universal across archetypes with no per-class table.
+ * "bill of materials"/"BoM" is the STRONGEST signal (the ceiling is explicitly on the BoM);
+ * a bare "materials"/"parts"/"component" + budget word is next; sale-price wording otherwise.
+ */
+const _MATERIALS_CEILING_RX =
+  /\bbills?\s+of\s+materials?\b|\bbom\b|\b(?:raw[- ]?)?materials?\s+(?:cost|budget|spend|price|within|under|below|of|≤|<=|<)\b|\bparts?\s+(?:cost|budget|spend)\b|\bcomponents?\s+(?:cost|budget|spend)\b|\bbuild\s+cost\b|\bkit\s+(?:cost|price|budget)\b/i
+const _SALE_CEILING_RX =
+  /\bunit\s+(?:price|cost|sale)\b|\bsale\s+price\b|\bselling\s+price\b|\bsells?\s+(?:for|at)\b|\bretail\b|\brrp\b|\blist\s+price\b|\bex[- ]?works\b|\bprice\s+point\b|\basp\b|\btransfer\s+price\b/i
+export function costCeilingBasis(state: any): 'materials' | 'sale' | null {
+  const txt = String(
+    state?.parsedBrief?.original_text ?? state?.brief?.original_text ?? state?.parsedBrief?.raw_text ?? ''
+  )
+  if (!txt) return null
+  // "bill of materials" is unambiguous → materials, even if a stray "price" appears elsewhere.
+  if (/\bbills?\s+of\s+materials?\b|\bbom\b/i.test(txt)) return 'materials'
+  const mat = _MATERIALS_CEILING_RX.test(txt)
+  const sale = _SALE_CEILING_RX.test(txt)
+  if (mat && !sale) return 'materials'
+  if (sale && !mat) return 'sale'
+  // Both or neither present → not classifiable from wording; let the caller fall back.
+  return null
+}
+
+/**
  * PURE: compute the independent cost-sanity verdict from state. No I/O, no LLM.
  * Severity (per the gate spec):
  *   HIGH  ratio to nearest band edge > 2.5×  OR  < 0.4× (1/2.5)
@@ -656,11 +687,17 @@ export function computeCostSanity(state: any): CostSanityResult {
     // raw_materials_bom_gbp; a commercial/plant product keeps the ex-works basis unchanged
     // (byte-identical). This honours the brief's DECLARED basis, not a laxer layer picked to pass.
     const _cs = (state?.costStack ?? {}) as { oem_transfer_price_gbp?: unknown; raw_materials_bom_gbp?: unknown }
-    const _isKit = state?.isInstrumentDevice === true
     const _oem = Number(_cs?.oem_transfer_price_gbp)
     const _mat = Number(_cs?.raw_materials_bom_gbp)
-    const _cmp = (_isKit && Number.isFinite(_mat) && _mat > 0) ? _mat : _oem
-    const _cmpLabel = (_isKit && Number.isFinite(_mat) && _mat > 0) ? 'bill-of-materials build cost' : 'ex-works unit price'
+    // BASIS is taken from the BRIEF'S OWN WORDING first (universal, no per-class table); only if
+    // the brief is silent do we fall back to the isInstrumentDevice heuristic (a self-build kit's
+    // "unit cost" is its BoM; a sold/plant product's is ex-works). This fixes the proxy: a plant
+    // brief that says "bill of materials ≤ £X" now correctly compares against materials, and an
+    // instrument brief that says "sells for ≤ £X" correctly compares against ex-works.
+    const _basis = costCeilingBasis(state) ?? (state?.isInstrumentDevice === true ? 'materials' : 'sale')
+    const _useMat = _basis === 'materials' && Number.isFinite(_mat) && _mat > 0
+    const _cmp = _useMat ? _mat : _oem
+    const _cmpLabel = _useMat ? 'bill-of-materials build cost' : 'ex-works unit price'
     if (Number.isFinite(_ceiling) && _ceiling > 0 && Number.isFinite(_cmp) && _cmp > 0 && _cmp > _ceiling * 1.02) {
       return {
         ...base,

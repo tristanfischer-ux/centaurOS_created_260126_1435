@@ -2161,10 +2161,17 @@ _COMMODITY_CEILING_TIERS = [
     # reel/sheet-priced-per-unit family the pack-micro band fixes for cell insulation
     # pads (line ~853). A single piece cannot exceed this per-unit cap. Universal,
     # noun-keyed; a genuine bulk sheet purchase would carry a qty in the hundreds so
-    # the PER-UNIT price stays the die-cut piece cost.
-    (re.compile(r"thermal[_ -]?interface[_ -]?(?:pad|material)|\bgap[_ -]?pad\b|"
+    # the PER-UNIT price stays the die-cut piece cost. The base cap here is the WATT-
+    # SCALE (small Peltier/IC pad) figure; _apply_commodity_ceiling RELAXES it for a
+    # plant-scale product (a large power-module die-cut pad is £15-40) via _THERMAL_PAD_RE
+    # — scale-keyed, so the flat cap no longer false-caps a genuinely large industrial pad.
+    (_THERMAL_PAD_RE := re.compile(r"thermal[_ -]?interface[_ -]?(?:pad|material)|\bgap[_ -]?pad\b|"
                 r"thermal[_ -]?pad\b|\btim[_ -]?pad\b", re.I), 5.0),
 ]
+# Per-piece cap for a large-format thermal-interface pad on a PLANT-scale product (mates to a
+# big power module / cold plate) — bounds a hallucinated per-SHEET price while allowing a
+# genuine single large die-cut pad. Watt-scale instruments keep the tighter £5 piece cap.
+_THERMAL_PAD_PLANT_CAP_GBP = 40.0
 # A BARE generic instrument noun ("Temperature Sensor", "Voltage Sensor") with NO
 # process/context qualifier is a catalogue commodity too (the mis-pinned RAS
 # Mitsubishi/TI sensor lines). But a QUALIFIED instrument ("reactor temperature
@@ -2225,6 +2232,19 @@ def _apply_commodity_ceiling(name: str, md: dict, gbp: float, requirement: str =
         and re.search(r"\bmcu\b|microcontroller|main\s*controller", name or "", re.I)
     ):
         cap = min(cap, 40.0)
+    # THERMAL-INTERFACE PAD scale gate (2026-07-22 universality fix): the £5 per-piece tier is
+    # the WATT-SCALE figure (a small Peltier/IC die-cut pad, e.g. the organoid). On a plant-scale
+    # product the same pad noun mates to a large power module — a genuine single large die-cut pad
+    # is £15-40 — so the cap relaxes to £40 (still bounds a per-SHEET price of £40-186 applied
+    # per-piece). Scale-keyed on the established device-vs-plant signal (NOT the pad geometry,
+    # which can be wrong — the containment clamp fixed exactly that), so no per-class table and no
+    # regression of the organoid (a watt-scale instrument keeps the £5 cap).
+    if (
+        not _IS_INSTRUMENT_DEVICE
+        and cap is not None
+        and _THERMAL_PAD_RE.search(name or "")
+    ):
+        cap = max(cap, _THERMAL_PAD_PLANT_CAP_GBP)
     if cap is not None and gbp > cap:
         return (cap, f"commodity ceiling · capped at £{cap:,.0f} for a bare "
                      f"{name.strip().lower()} (was £{gbp:,.0f}; no kW/duty rating — "
@@ -4788,11 +4808,22 @@ def _selftest() -> int:
         print(f"  FAIL bare Temperature-Sensor mis-pin not capped: £{g}"); bad += 1
     # THERMAL-INTERFACE PAD per-piece ceiling (2026-07-21, the organoid £186 gap-pad
     # sheet that crushed 23 real lines to £0.01). A die-cut thermal/gap/TIM pad for a
-    # single device cannot ship at the per-SHEET catalogue price.
+    # single device cannot ship at the per-SHEET catalogue price. SCALE-KEYED (2026-07-22
+    # universality fix): a WATT-SCALE instrument keeps the tight £5 piece cap (the organoid);
+    # a PLANT-scale product's large power-module pad relaxes to £40 (still bounds the £186
+    # per-sheet price) — proves the flat £5 no longer false-caps a genuinely large industrial pad.
+    # (_IS_INSTRUMENT_DEVICE already declared global at the top of _selftest.)
+    _saved_pad_dev = _IS_INSTRUMENT_DEVICE
     for _padnm in ("Thermal Interface Pad", "Peltier Gap Pad", "Thermal Pad", "TIM Pad"):
+        _IS_INSTRUMENT_DEVICE = True    # watt-scale instrument (the organoid) → £5 piece cap
         g, b = _apply_commodity_ceiling(_padnm, {}, 186.25)
         if not (g is not None and g <= 5.0 and b):
-            print(f"  FAIL thermal pad {_padnm!r} not per-piece capped: £{g}"); bad += 1
+            print(f"  FAIL thermal pad {_padnm!r} on instrument not £5-capped: £{g}"); bad += 1
+        _IS_INSTRUMENT_DEVICE = False   # plant-scale product → relaxed £40 (still bounds £186)
+        g, b = _apply_commodity_ceiling(_padnm, {}, 186.25)
+        if not (g == 40.0 and b):
+            print(f"  FAIL thermal pad {_padnm!r} on plant not relaxed to £40 (was £{g})"); bad += 1
+    _IS_INSTRUMENT_DEVICE = _saved_pad_dev
     # …but a genuine RATED thermal instrument is NOT a bare pad (exempt guard)
     if _apply_commodity_ceiling("in-line thermal mass flow meter", {}, 900.0)[1] is not None:
         print("  FAIL rated thermal instrument wrongly pad-capped"); bad += 1

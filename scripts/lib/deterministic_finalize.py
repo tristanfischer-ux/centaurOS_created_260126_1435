@@ -278,19 +278,82 @@ def rename_class_alien_control(state) -> int:
 # CANONICAL component FUNCTIONS per module role — used to name an anonymous
 # "{Module} Subcomponent {N}" coverage proxy by the Nth function that role provides
 # but the design has not already named. Keyed on a module-role TOKEN, not a product
-# class. Honest: a bioreactor's sensing module genuinely needs optical-density +
-# dissolved-oxygen sensing (the brief states OD / growth monitoring), so these are
-# REAL functions the role must carry — not fabricated parts.
+# class. The control/power lists are FUNCTION-generic (any electronic instrument has an
+# auxiliary controller I/O, a power regulator) so they carry no domain bias. The SENSING
+# functions are NOT a fixed list — they are derived from the BRIEF'S OWN measured quantities
+# (see _brief_sensed_functions) so a bioprocess brief yields OD/DO/pH, a spectrometer yields
+# wavelength/absorbance, a pressure rig yields pressure — never a fabricated dissolved-oxygen
+# probe on a brief that never asks to measure oxygen.
 _CANONICAL_MODULE_FUNCTIONS = [
-    (re.compile(r"sensing|instrumentation", re.I),
-     ["Optical Density Sensor", "Dissolved Oxygen Probe", "pH Probe",
-      "Level Sensor", "Turbidity Sensor", "Conductivity Sensor"]),
+    (re.compile(r"sensing|instrumentation", re.I), "__BRIEF_DERIVED_SENSING__"),
     (re.compile(r"control|compute|communication", re.I),
      ["Auxiliary Controller I/O", "Expansion Header", "Watchdog Supervisor"]),
     (re.compile(r"power|distribution", re.I),
      ["Auxiliary Power Regulator", "Power Filter Stage", "Bulk Decoupling Bank"]),
 ]
 _SUBCOMPONENT_NAME_RE = re.compile(r"\bsubcomponent\s*\d+\b", re.I)
+
+# UNIVERSAL sensed-quantity → sensor-name vocabulary. Each entry maps a PHYSICAL QUANTITY
+# (not a product class) mentioned in the brief to the canonical name of the sensor that
+# measures it. Ordered most-specific-first so e.g. "dissolved oxygen" wins before a bare
+# "oxygen". A sensing-module placeholder is named after the Nth quantity the BRIEF actually
+# asks to MEASURE and the design has not already named — so the naming follows the brief,
+# not a hardcoded bioprocess assumption. No per-class table; works on any archetype.
+_SENSED_QUANTITY_VOCAB = [
+    # NB: every token is word-boundary-anchored and where a bare abbreviation would collide with
+    # a common English word (DO ↔ "do") it REQUIRES a measurement context — so "Do NOT specify"
+    # and "constraints" never trip a sensor. Word-family substrings (turbidit/conductivit) are
+    # deliberate (turbidity/turbidimeter; conductivity/conductance) and don't collide.
+    (re.compile(r"optical\s+density|\bod\b|turbidit|absorbance|light\s+scatter", re.I), "Optical Density Sensor"),
+    (re.compile(r"dissolved\s+oxygen|\bd\.?o\.?\s*(?:probe|sensor|reading|control|set-?point|%|mg)|oxygen\s+(?:sensor|probe|tension|saturation)", re.I), "Dissolved Oxygen Probe"),
+    (re.compile(r"\bph\b|\bacidity\b|\balkalinit", re.I), "pH Probe"),
+    (re.compile(r"dissolved\s+co2|\bpco2\b|dissolved\s+carbon\s+dioxide", re.I), "Dissolved CO₂ Probe"),
+    (re.compile(r"\bconductivit|\bsalinit|\btds\b", re.I), "Conductivity Sensor"),
+    (re.compile(r"\bperfusion\b|flow[\s-]*rate|flow\s+(?:sensor|meter|monitor)|\bflowmeter\b", re.I), "Flow Sensor"),
+    (re.compile(r"liquid\s+level|reservoir\s+level|\blevel\s+(?:sensor|switch|monitor)\b|fill\s+level", re.I), "Level Sensor"),
+    (re.compile(r"\bagitation\b|\bstir(?:ring|rer)?\b|impeller\s+speed|\brpm\b|rotational\s+speed|\btachomet", re.I), "Agitation Speed Sensor"),
+    (re.compile(r"\btemperature\b|thermal\s+(?:probe|sensor)|\bthermocouple\b|\brtd\b|\bthermistor\b", re.I), "Temperature Probe"),
+    (re.compile(r"\bpressure\b|vacuum\s+(?:sensor|gauge)|\bmanomet", re.I), "Pressure Sensor"),
+    (re.compile(r"\bhumidit|\bmoisture\b|relative\s+humidity", re.I), "Humidity Sensor"),
+    (re.compile(r"\bwavelength\b|\bspectral\b|\bspectromet|colou?r\s+(?:sensor|measure)", re.I), "Spectral Sensor"),
+    (re.compile(r"\bstrain\s+(?:gauge|sensor)|\bforce\s+(?:sensor|transducer)|\btorque\s+(?:sensor|measure)|load\s+cell|\bweigh", re.I), "Force/Strain Sensor"),
+    (re.compile(r"\bposition\s+(?:sensor|feedback)|\bdisplacement\b|\bencoder\b|\blinear\s+position\b", re.I), "Position Sensor"),
+    (re.compile(r"\bco2\b|carbon\s+dioxide", re.I), "CO₂ Gas Sensor"),
+]
+
+
+def _brief_measured_text(state) -> str:
+    """Accumulate the brief's own statement of WHAT IT MEASURES: the raw brief text plus
+    every target-performance metric label/key and derived-requirement label. Universal —
+    no per-class assumption; the caller matches this against _SENSED_QUANTITY_VOCAB."""
+    pb = (state.get("parsedBrief") or {}) if isinstance(state, dict) else {}
+    parts = [
+        str(pb.get("original_text") or ""),
+        str((state.get("brief") or {}).get("original_text") or "") if isinstance(state, dict) else "",
+        str(pb.get("raw_text") or ""),
+    ]
+    tp = ((pb.get("constraints") or {}).get("target_performance") or {})
+    for mt in (tp.get("metrics") or []):
+        if isinstance(mt, dict):
+            parts.append(" ".join(str(mt.get(k) or "") for k in ("key_metric", "key", "label", "name")))
+    for dr in (pb.get("derived_requirements") or state.get("derived_requirements") or []):
+        if isinstance(dr, dict):
+            parts.append(" ".join(str(dr.get(k) or "") for k in ("label", "name", "key")))
+    return "  ".join(p for p in parts if p)
+
+
+def _brief_sensed_functions(state) -> list:
+    """The ordered, de-duplicated list of sensor names the BRIEF asks to measure (vocab order).
+    Empty when the brief names no measurable quantity → the caller leaves the generic name
+    (honest: an unnamed sensing channel, never a fabricated probe)."""
+    txt = _brief_measured_text(state)
+    if not txt:
+        return []
+    out = []
+    for rx, name in _SENSED_QUANTITY_VOCAB:
+        if rx.search(txt) and name not in out:
+            out.append(name)
+    return out
 
 
 def rename_generic_subcomponents(state) -> int:
@@ -306,6 +369,13 @@ def rename_generic_subcomponents(state) -> int:
         mname = str(m.get("name_human") or mid).replace("_", " ")
         funcs = next((fl for rx, fl in _CANONICAL_MODULE_FUNCTIONS
                       if rx.search(mid) or rx.search(mname)), None)
+        if funcs is None:
+            continue
+        # A sensing module's functions are BRIEF-DERIVED (not a fixed bioprocess list): the Nth
+        # physical quantity the brief actually asks to measure. If the brief names none, funcs is
+        # empty and every placeholder stays generic (honest) — never a fabricated probe.
+        if funcs == "__BRIEF_DERIVED_SENSING__":
+            funcs = _brief_sensed_functions(state)
         if not funcs:
             continue
         used = set()   # names already used by NAMED (non-subcomponent) siblings
@@ -1399,9 +1469,45 @@ def _selftest() -> int:
     trace_untouched_ok = _tv_clean_bytes_before == _tv_clean_bytes_after
     trace_ok = valid_names_exclude_demoted_ok and trace_catch_ok and trace_idem_ok and trace_untouched_ok
 
+    # ── brief-derived sensing rename (universality fix 2026-07-22): a sensing-module
+    # placeholder is named from the BRIEF'S measured quantities, NOT a fixed bioprocess list.
+    # An organoid brief that measures OD + temperature + perfusion must NOT mint a fabricated
+    # "Dissolved Oxygen Probe" (it never asks to measure oxygen); a brief that DOES mention
+    # dissolved oxygen must. And a brief naming no measurable quantity leaves the generic name.
+    # Omission is the honest signal: the organoid brief simply does not mention oxygen or pH
+    # (it does not negate them) — so the vocab must not surface a DO/pH probe when the brief
+    # is silent on those quantities.
+    _od_brief = {"parsedBrief": {"original_text":
+        "Monitor optical density for growth, hold culture temperature at 37 C, and set the "
+        "perfusion flow rate through the vessel."}}
+    _sensed_od = _brief_sensed_functions(_od_brief)
+    sensed_follows_brief_ok = (
+        "Optical Density Sensor" in _sensed_od and "Temperature Probe" in _sensed_od
+        and "Flow Sensor" in _sensed_od
+        and "Dissolved Oxygen Probe" not in _sensed_od and "pH Probe" not in _sensed_od)
+    _do_brief = {"parsedBrief": {"original_text":
+        "The probe measures dissolved oxygen and pH in the fermenter."}}
+    _sensed_do = _brief_sensed_functions(_do_brief)
+    sensed_do_when_asked_ok = ("Dissolved Oxygen Probe" in _sensed_do and "pH Probe" in _sensed_do
+                               and "Optical Density Sensor" not in _sensed_do)
+    _silent_brief = {"parsedBrief": {"original_text": "A tidy benchtop enclosure for teaching labs."}}
+    sensed_silent_ok = _brief_sensed_functions(_silent_brief) == []
+    # end-to-end: a sensing module with a placeholder gets named an OD sensor (brief-derived),
+    # never a Dissolved Oxygen Probe, on the OD/temp/perfusion brief.
+    _rn_state = {"moduleDecomposition": {"modules": [{
+        "module": "sensing_instrumentation",
+        "sub_modules": [{"id": "s1", "words": [
+            {"id": "sc1", "name_human": "Sensing Instrumentation Subcomponent 1", "modifier_characters": []}]}]}]}}
+    _rn_state.update(_od_brief)
+    rename_generic_subcomponents(_rn_state)
+    _renamed = _rn_state["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"][0]["name_human"]
+    sensed_rename_e2e_ok = _renamed == "Optical Density Sensor"
+    sensing_brief_derived_ok = (sensed_follows_brief_ok and sensed_do_when_asked_ok
+                                and sensed_silent_ok and sensed_rename_e2e_ok)
+
     if (ok and idem and named and one_dim and merge_ok and loop_ok and exempt_ok and partition_ok
             and domain_ok and rename_ok and rename_none_ok and home_ok and non_telemetry_ok
-            and extract_ok and role_ok and scope_ok and trace_ok):
+            and extract_ok and role_ok and scope_ok and trace_ok and sensing_brief_derived_ok):
         print("deterministic_finalize selftest OK (class-alien-rename / scope-word-demotion / "
               "density-merge / modifier / prose / overview / trace-layer-reconcile / idempotent)")
         return 0
@@ -1418,6 +1524,7 @@ def _selftest() -> int:
           f"no_match_untouched_ok={no_match_untouched_ok} "
           f"trace_ok={trace_ok} (names_ok={valid_names_exclude_demoted_ok} catch_ok={trace_catch_ok} "
           f"idem_ok={trace_idem_ok} untouched_ok={trace_untouched_ok}) "
+          f"sensing_brief_derived_ok={sensing_brief_derived_ok} "
           f"before={before} after={after}")
     return 1
 
