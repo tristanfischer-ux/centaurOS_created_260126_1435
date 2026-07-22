@@ -8,6 +8,12 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~16:00) — both 8->9 fixes landed; loopbake8 = the ≥9 verification
+- **BoM MPNs FIXED `e1e19435b`**: NOT a data gap — a CODE gap. Head nouns `storage`/`bridge`/`isolator` were absent from `CATALOGUE_TOKEN_SET` (emitter-completion.ts) → isCatalogueComponent()=false → fill gate never hit dbFirstLookup. Fixed the token set + seeded/promoted 4 REAL verified MPNs: US5881LUA (Melexis Hall tach), W25Q16JV (Winbond flash), CP2102N (SiLabs USB-UART, live-verified Digi-Key £1.09), ADuM1201 (ADI isolator). Sensor Cable already had Amphenol MPN. proveCatch UNIVERSAL.catalogue_token_set_admits_bioreactor_electronic_nouns PASS. Next bake: BoM 9/13→13/13 resolved.
+- **Drawing gates G12 FIXED `6d16dd684`** (landscape dominant-dim occupancy, honest).
+- **loopbake8 running** — both fixes in. Expect every non-mirror tab ≥9. WATCH: plan_render_coherence (hero-embed staleness) — should be fresh on this bake.
+- If loopbake8 SIGHT = every tab ≥9, ⚠Checks FAIL=0, ship_ok=True → DONE → write handover.
+
 ## LOOP STATUS (2026-07-22 ~15:45) — G12 render fixed HONESTLY; BoM MPNs in flight
 - **Drawing gates G12 FIXED `6d16dd684`** (2nd attempt, honest): SIGHT confirmed the render is WELL-FRAMED (96% width occupancy, front panel visible) — just a wide/flat rack unit. Root was the METRIC (height-biased): for landscape (width ≥ height×1.25) the floor now checks max(width_occ, height_occ)=0.96≥0.45 → PASS; a genuinely tiny render still FAILs (both dims low); portrait unchanged. Verified on DELIVERED image + 4 proveCatch. (First attempt 514a59ae6 camera-tweak was wrong-direction; this supersedes it.)
 - WATCH: the G12 agent noted a separate gate `plan_render_coherence` = "hero-embed.png stale by 294s" — almost certainly a re-run artifact on the stale 1507 dir (fresh bake regenerates hero-embed.png). Confirm on next bake; if real, it's the next fix.
