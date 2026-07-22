@@ -71,6 +71,7 @@ run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --s
 # must fire HIGH; a clean fixture must be silent.
 run "ooxml_strict_check.py --selftest"       "$PY" scripts/lib/ooxml_strict_check.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
+run "P9 instrument direct logical routing"    "$PY" scripts/blender-universal/instrument_direct_routing_selftest.py
 run "growing_db_freshness.py --selftest"      "$PY" scripts/lib/growing_db_freshness.py --selftest
 run "prove_growing_db_loop.py (A8)"           "$PY" scripts/ingest/prove_growing_db_loop.py
 run "functional_form.py --selftest (B2)"      "$PY" scripts/lib/functional_form.py --selftest

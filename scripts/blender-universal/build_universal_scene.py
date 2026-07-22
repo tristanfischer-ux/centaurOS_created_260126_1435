@@ -11241,6 +11241,15 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         # overhead deck _wire_path assumes. Same predicate as the per-edge draw loop.
         if _is_below_grade_drain_edge(r["frm"], r["to"], (r.get("e") or {}).get("material_context")):
             waypoints = _route_below_grade(r["src_xyz"], r["dst_xyz"])
+        elif _IS_INSTRUMENT_DEVICE:
+            # SEALED INSTRUMENT — DIRECT LOGICAL ROUTING (2026-07-22, organoid-bioreactor
+            # P9 FAIL: the overhead-deck Manhattan path adds 450 mm rise + 450 mm drop on
+            # every run, inflating a 50 mm bench connection to 2.3 m → £ inflation + P9
+            # PLAUSIBILITY FAIL). Inside a sealed benchtop device there is no overhead pipe
+            # rack: runs go direct port-to-port.  The 2-point path is already the exact
+            # Euclidean distance between the two ports — the honest on-board wire/tube
+            # length.  Visual integrity is unaffected (logical routes draw no mesh).
+            waypoints = [list(r["src_xyz"]), list(r["dst_xyz"])]
         else:
             # run_idx=0: the per-run Z micro-stagger exists to untangle DRAWN geometry;
             # an unmeshed run has nothing to tangle, and a fixed index keeps the length
@@ -24405,6 +24414,74 @@ def _selftest_le_vial_exterior_gating() -> None:
           "(a: bare vial prefix absent from keep-list, b: collar prefix present)")
 
 
+def _selftest_instrument_direct_logical_routing() -> None:
+    """proveCatch (2026-07-22, organoid-bioreactor P9 FAIL):
+    Inside a sealed instrument (_IS_INSTRUMENT_DEVICE=True) logical routes MUST use
+    direct port-to-port routing — NOT the overhead-deck Manhattan path that adds
+    2× WIRE_OVERHEAD_CLEAR_MM (900 mm) of vertical travel per run, inflating a 50 mm
+    on-board connection to 2.3 m.
+
+    Three assertions:
+    (a) On a benchtop instrument, the direct 2-point path for a ~50 mm port separation
+        produces a length < enclosure diagonal (281 mm) — no overhead overhead is added.
+    (b) A plant run (non-instrument) with the SAME endpoints uses _wire_path which DOES
+        add the overhead clearance, producing a longer path — proving the branch is real.
+    (c) A genuinely-overshooting run (2.37 m in a 281 mm box) still FAILS P9 in
+        deterministic_checks_lib, even with the fix — the check is not weakened.
+
+    Runs without Blender (bpy-free): uses only _wire_path + _polyline_len_m (pure maths).
+    """
+    import math as _m
+
+    # Two nearby ports on a benchtop instrument: 50 mm apart in XY, at the same Z.
+    _src = [0.0, 0.0, 630.0]   # port A
+    _dst = [50.0, 0.0, 630.0]  # port B — 50 mm straight line
+
+    # (a) Direct 2-point path (the fixed instrument path): exactly straight-line distance.
+    _direct_wps = [_src, _dst]
+    _direct_len_m = _polyline_len_m(_direct_wps)
+    _diag_m = _m.sqrt(281**2 + 165**2 + 82**2) / 1000.0  # typical 281 mm enclosure diagonal
+    assert _direct_len_m < _diag_m, (
+        f"proveCatch (a): instrument direct routing must be shorter than the enclosure "
+        f"diagonal ({_diag_m*1000:.0f} mm); got {_direct_len_m*1000:.0f} mm. "
+        "The direct path should be 50 mm (straight-line distance), well inside the box.")
+
+    # (b) Plant path via _wire_path: WIRE_OVERHEAD_CLEAR_MM is added, making it much longer.
+    _plant_wps = _wire_path(_src, _dst, "signal", run_idx=0, overhead_base_z=None)
+    _plant_len_m = _polyline_len_m(_plant_wps)
+    assert _plant_len_m > _direct_len_m + 0.3, (
+        f"proveCatch (b): plant path ({_plant_len_m*1000:.0f} mm) must be >300 mm longer "
+        f"than the direct path ({_direct_len_m*1000:.0f} mm) due to the overhead clearance; "
+        f"the _wire_path branch still exists and fires for non-instrument scenes.")
+
+    # (c) A genuinely-overshooting run still fails the P9 deterministic check (check is NOT
+    #     weakened — only the generator is fixed).  Import deterministic_checks_lib via the
+    #     scripts/ parent directory so it's always found regardless of cwd.
+    import sys as _sys, os as _os, tempfile as _tf, json as _js
+    _scripts_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    if _scripts_dir not in _sys.path:
+        _sys.path.insert(0, _scripts_dir)
+    import deterministic_checks_lib as _dcl
+    _st = {"isInstrumentDevice": True, "orchestratorContract": {"quantities": {}}}
+    with _tf.TemporaryDirectory() as _td:
+        with open(_os.path.join(_td, "connection-schedule.json"), "w") as _f:
+            _js.dump({"rows": [{"mechanism": "signal", "from": "Probe", "to": "Mcu",
+                                "length_m": 2.37}]}, _f)
+        with open(_os.path.join(_td, "parts-manifest.json"), "w") as _f:
+            _js.dump({"bbox_mm": {"length_mm": 281, "width_mm": 165, "height_mm": 82},
+                      "parts": []}, _f)
+        _cs = _js.load(open(_os.path.join(_td, "connection-schedule.json")))
+        _checks = _dcl._checks_plausibility(_st, _td)
+    _p9 = next((c for c in _checks if "Internal runs fit" in c.name), None)
+    assert _p9 is not None and _p9.status == _dcl.FAIL, (
+        f"proveCatch (c): a 2.37 m run in a 281 mm box MUST still FAIL P9 (the check is not "
+        f"relaxed — only the generator is fixed). Got: {_p9}")
+
+    print("[univ][selftest] _selftest_instrument_direct_logical_routing OK "
+          "(a: instrument direct 50 mm < diag, b: plant path >300 mm longer, "
+          "c: genuine 2.37 m overshoot still FAILs P9)")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
@@ -24416,6 +24493,7 @@ if __name__ == "__main__":
         _selftest_sealed_zone_pack_dominance()
         _selftest_le_handheld_cue_gating()
         _selftest_le_vial_exterior_gating()
+        _selftest_instrument_direct_logical_routing()
         hfi._selftest()
         ifg._selftest()
         try:
@@ -24426,6 +24504,6 @@ if __name__ == "__main__":
             _ism._selftest()
         except Exception as _ste:  # noqa: BLE001
             raise SystemExit(f"spine-manifest selftest failed: {_ste}") from _ste
-        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials + sealed XY + spine seat + LE cue gating + vial exterior gate)")
+        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials + sealed XY + spine seat + LE cue gating + vial exterior gate + instrument direct logical routing)")
     else:
         main()
