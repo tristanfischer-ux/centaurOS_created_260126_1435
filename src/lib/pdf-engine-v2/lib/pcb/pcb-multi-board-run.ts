@@ -8,6 +8,7 @@
  * project dir per requiresKiCadDeliverable board and aggregates fitness/pipeline.
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import {
@@ -105,6 +106,74 @@ export function aggregatePipelineFileGroup(
   }
   if (files.length === 0) return undefined
   return { dir: dir ?? 'pcb-boards', files }
+}
+
+/**
+ * INTENT (fixpack13): Excel `_pcb_two_axis_assessment` matches
+ * `pipeline.generator.components` (ALL boards) against a single `pos.path`.
+ * Taking only the HAT positions.csv made designators 9/34 and PnP 26/34 —
+ * footprint-group counts diverged because OD/heater parts were in the BoM but
+ * not in the positions file. Concatenate per-board positions in the SAME order
+ * as `flatMap` components so footprint-group zip matching recovers 100%.
+ *
+ * @description Write `pcb/positions.csv` unioning every board's KiCad pos export.
+ * @param boardPipelines - Per-board runs (order = component flatMap order)
+ * @param outDir - Chain/solo out dir
+ * @returns Aggregated pos path, or the sole board path when only one exists
+ */
+export function aggregatePipelinePositions(
+  boardPipelines: ReadonlyArray<BoardPipelineRun>,
+  outDir: string,
+): PcbPipelineResult['pos'] {
+  const declared = boardPipelines
+    .map((b) => ({
+      boardId: b.boardId,
+      path: b.pipeline.pos?.path,
+    }))
+    .filter((s): s is { boardId: string; path: string } =>
+      typeof s.path === 'string' && s.path.length > 0,
+    )
+  const sources = declared.filter((s) => existsSync(s.path))
+  // GOTCHA: unit tests / early stubs declare pos.path before files exist — keep
+  // the first declared path so pipeline.pos is never silently dropped.
+  if (sources.length === 0) {
+    return declared[0] ? { path: declared[0].path } : undefined
+  }
+  if (sources.length === 1) return { path: sources[0].path }
+
+  const pcbDir = resolve(outDir, 'pcb')
+  mkdirSync(pcbDir, { recursive: true })
+  const outPath = resolve(pcbDir, 'positions.csv')
+  const chunks: string[] = [
+    '### Footprint positions — multi-board aggregate (ForgeOS)',
+    '### Board order matches pipeline.generator.components flatMap',
+    '## Unit = inches, Angle = deg.',
+    '## Side : All',
+    '# Ref     Val                Package                                       PosX       PosY       Rot  Side',
+  ]
+  for (const src of sources) {
+    chunks.push(`### board=${src.boardId} source=${src.path}`)
+    let text = ''
+    try {
+      text = readFileSync(src.path, 'utf8')
+    } catch (err) {
+      console.error('[pcb-multi-board] failed to read positions.csv:', {
+        boardId: src.boardId,
+        path: src.path,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      continue
+    }
+    for (const ln of text.split(/\r?\n/)) {
+      const s = ln.trim()
+      if (!s || s.startsWith('#')) continue
+      const parts = s.split(/\s+/)
+      if (parts.length < 7) continue
+      chunks.push(ln.replace(/\s+$/, ''))
+    }
+  }
+  writeFileSync(outPath, `${chunks.join('\n')}\n`, 'utf8')
+  return { path: outPath }
 }
 
 /**
@@ -209,8 +278,8 @@ export function runBespokeMultiBoardPcb(
   const primary = boardPipelines[0]
   const gerbers = aggregatePipelineFileGroup(boardPipelines, 'gerbers')
   const drill = aggregatePipelineFileGroup(boardPipelines, 'drill')
-  // First board with a pick-and-place path — Excel reads a single pos.path today.
-  const pos = boardPipelines.map((b) => b.pipeline.pos).find((p) => p?.path)
+  // GOTCHA (fixpack13): must union ALL boards' positions.csv — not first-only.
+  const pos = aggregatePipelinePositions(boardPipelines, outDir)
   // DECISION: pipeline.ok is TOOLCHAIN hygiene only — designFitness is a separate
   // axis (Gate38 / Excel). Do not AND them here or a fitness gap looks like DRC.
   // GOTCHA: stamp top-level `components` so pcb-gate coverage does not read 0
