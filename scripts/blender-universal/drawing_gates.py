@@ -865,6 +865,20 @@ def run_gates(out_dir: str) -> list:
     # Filename existence is not evidence: run 79's 02-corner-FR was a nearly
     # blank backdrop and the forced product top/side views were meaningless.
     # Evaluate exactly the form-factor views the workbook contract requests.
+    # ASPECT-AWARE (organoid bioreactor 2026-07-22): pass the product's own
+    # bbox (width=length_mm, height=height_mm from parts-manifest) so a correctly-
+    # framed wide/landscape product is not height-penalised.  See render_image_quality
+    # evaluate_image product_bbox_mm for the full rationale.
+    _pm_bbox = pm_doc.get("bbox_mm") if isinstance(pm_doc, dict) else None
+    _product_bbox_mm: tuple[float, float] | None = None
+    if isinstance(_pm_bbox, dict):
+        try:
+            _bw = float(_pm_bbox.get("length_mm") or 0)  # x-span = width in plan
+            _bh = float(_pm_bbox.get("height_mm") or 0)  # z-span = height
+            if _bw > 0 and _bh > 0:
+                _product_bbox_mm = (_bw, _bh)
+        except (TypeError, ValueError):
+            pass
     view_failures = []
     checked_views = 0
     for view in required_views(state):
@@ -876,7 +890,12 @@ def run_gates(out_dir: str) -> list:
         checked_views += 1
         # pass the enclosure volume so a compact benchtop product's smooth (low-edge but
         # frame-filling) service view is not failed as "blank" — occupancy floors still guard.
-        quality = evaluate_image(path, enclosure_volume_m3=float(_encl_m3) if _encl_m3 else None)
+        # pass product_bbox_mm so a landscape product is scored on its dominant axis.
+        quality = evaluate_image(
+            path,
+            enclosure_volume_m3=float(_encl_m3) if _encl_m3 else None,
+            product_bbox_mm=_product_bbox_mm,
+        )
         if not quality.passed:
             view_failures.append(
                 f"{view.view_id}: " + "; ".join(quality.reasons))
@@ -2066,20 +2085,38 @@ def _selftest() -> int:
         im.save(buf, format="PNG")
         return buf.getvalue()
     _tf = tempfile.mkdtemp(prefix="g12-img-")
-    # Low occupancy: 43% height (organoid bioreactor before fix) → must FAIL gate.
+    # Low occupancy: 43% height (non-landscape product) → must FAIL gate.
     _img_low = os.path.join(_tf, "low-hocc.png")
     with open(_img_low, "wb") as _f:
         _f.write(_make_png(200, 200, edge_rows_frac=0.43, edge_cols_frac=0.70))
     _res_low = evaluate_image(_img_low, enclosure_volume_m3=0.004)
     chk("g12_height_occ_0_43_fires",
         not _res_low.passed and any("height occupancy" in r for r in _res_low.reasons))
-    # Adequate occupancy: 50% height → must PASS gate.
+    # Adequate occupancy: 50% height (non-landscape) → must PASS gate.
     _img_ok = os.path.join(_tf, "ok-hocc.png")
     with open(_img_ok, "wb") as _f:
         _f.write(_make_png(200, 200, edge_rows_frac=0.50, edge_cols_frac=0.70))
     _res_ok = evaluate_image(_img_ok, enclosure_volume_m3=0.004)
     chk("g12_height_occ_0_50_passes",
         _res_ok.passed or not any("height occupancy" in r for r in _res_ok.reasons))
+    # ASPECT-AWARE proveCatch (organoid bioreactor 2026-07-22):
+    # (A) Well-framed LANDSCAPE product: high width_occ (96%), low height_occ (41%).
+    #     With product_bbox_mm=(221, 96) the dominant occupancy = max(0.96, 0.41) = 0.96 → PASS.
+    #     Without the fix, height_occ=0.41 < 0.45 → FAIL (the original bug).
+    _img_wide_ok = os.path.join(_tf, "wide-well-framed.png")
+    with open(_img_wide_ok, "wb") as _f:
+        # 96% width, 41% height — mirrors the real organoid exterior view metrics
+        _f.write(_make_png(400, 200, edge_rows_frac=0.41, edge_cols_frac=0.96))
+    _res_wide_ok = evaluate_image(
+        _img_wide_ok, enclosure_volume_m3=0.004, product_bbox_mm=(221.0, 96.4))
+    chk("g12_landscape_well_framed_passes", _res_wide_ok.passed)
+    # (B) Genuinely tiny LANDSCAPE product: both dims low (20%) → must still FAIL.
+    _img_wide_tiny = os.path.join(_tf, "wide-tiny.png")
+    with open(_img_wide_tiny, "wb") as _f:
+        _f.write(_make_png(400, 200, edge_rows_frac=0.20, edge_cols_frac=0.20))
+    _res_wide_tiny = evaluate_image(
+        _img_wide_tiny, enclosure_volume_m3=0.004, product_bbox_mm=(221.0, 96.4))
+    chk("g12_landscape_tiny_render_fails", not _res_wide_tiny.passed)
     import shutil as _sh2; _sh2.rmtree(_tf, ignore_errors=True)
     chk("g13_three_cad_families_still_fires", len({"fan", "pcb", "gland"}) < 4)
     chk("g13_four_cad_families_pass",
