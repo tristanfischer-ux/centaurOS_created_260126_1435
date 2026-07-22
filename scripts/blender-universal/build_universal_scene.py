@@ -6744,6 +6744,29 @@ def build_parts_manifest(parts):
                     "h": round(min(float((r.get("dims_mm") or {}).get("h", 8)), 8.0), 1),
                 }
 
+    # ENCLOSURE SHELL DIMS CORRECTION (2026-07-22, G19 fix attempt #3):
+    # The "Enclosure Shell" part row gets its dims_mm from _instrument_proxy_dim which reads
+    # design_envelope_*_mm from orchestratorContract.quantities — keys that are ABSENT for many
+    # instrument archetypes (e.g. organoid-bioreactor) → falls back to hardcoded defaults
+    # (180×140×80). But place_sealed_enclosure already set _SEALED_ENV_MM = (W, D, H) = the
+    # ACTUAL outer envelope (e.g. 248×188×108).  Overwrite the shell row HERE, before the
+    # containment clamp, so the clamp sees the correct shell size and scales internal parts
+    # to fit inside it rather than inside the wrong-defaulted 180×140 box.
+    # Universal: only fires for sealed-enclosure renders (_SEALED_ENV_MM is None otherwise).
+    if _SEALED_ENV_MM is not None:
+        _se_W, _se_D, _se_H = _SEALED_ENV_MM
+        _shell_nm_re = re.compile(r"enclosure\s*shell|housing\s*shell|cabinet\s*shell", re.I)
+        for _r in rows:
+            if _shell_nm_re.search(str(_r.get("name") or "")):
+                _r["dims_mm"] = {
+                    "w": round(float(_se_W), 1),
+                    "d": round(float(_se_D), 1),
+                    "h": round(float(_se_H), 1),
+                }
+                print(f"[parts-manifest] Enclosure Shell dims corrected to _SEALED_ENV_MM: "
+                      f"{_se_W:.0f}×{_se_D:.0f}×{_se_H:.0f} mm (was proxy/default)")
+                break   # only one shell row expected
+
     # CONTAINMENT CLAMP (2026-07-21, PLAUSIBILITY P8): NO part may be larger than the
     # enclosure shell it sits inside — a geometric impossibility a competent engineer rejects
     # on sight. A wrong dim modifier (an LLM "200×200×100 mm" thermal pad) or a world-bbox echo
