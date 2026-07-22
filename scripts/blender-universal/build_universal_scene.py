@@ -12826,6 +12826,17 @@ def _sealed_product_camera_specs(env_mm):
     # Form-keyed cam packs (never product nouns): tip-back PCR vs OPEN syringe array
     # / lab microscope vs generic optical handheld. OPEN forms skip optical h×1.92
     # inflation that left height occupancy below drawing_gates floors.
+    # LAB-ELECTRONICS (bioreactor/potentiostat/EWOD) do NOT have a tall cuvette
+    # column — the 1.92× inflation and raised centre/ext_z are for optical handhelds
+    # only. Using the optical-handheld params on a compact sealed box (organoid
+    # bioreactor 180×140×160 mm) produced height_occupancy 0.43 < 0.45 gate floor
+    # because the camera stood far back to frame a fictitious tall column.
+    # Fix (2026-07-22): key optical-column inflation on _IS_OPTICAL_HANDHELD_FORM;
+    # for _IS_LAB_ELECTRONICS_FORM use tighter box-centric params (centre at 0.5,
+    # _h_eff 1.1×, _ext_z 0.9, _frame 0.90, _dist_k 1.05).  Universal — any new
+    # lab-electronics form (keyed on contract signal, never a product noun) inherits
+    # the correct box-centric framing without touching this block.
+    _le = bool(_IS_LAB_ELECTRONICS_FORM)
     _tc = bool(_IS_THERMOCYCLER_FORM)
     _sp = bool(_IS_SYRINGE_PUMP_FORM)
     _lm = bool(_IS_LAB_MICROSCOPE_FORM)
@@ -12857,8 +12868,11 @@ def _sealed_product_camera_specs(env_mm):
     _open_cam = _lm_cam if _lm else _sp_cam
     # raise the look-at centre for an instrument so the body + the protruding cuvette
     # port both sit inside the frame (port top ≈ 1.4·H); a plain cabinet stays at mid-H.
+    # LAB-ELECTRONICS: sealed box without a tall optical column — centre at 0.5 (mid).
     if _open:
         _centre_frac = float(_open_cam.get("centre_frac", 0.42 if _sp else 0.45))
+    elif _le:
+        _centre_frac = 0.5      # compact box; no elevated cuvette port
     else:
         _centre_frac = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
     centre = (0.0, 0.0, (DECK_Z_MM + float(env_mm[2]) * _centre_frac) * fl.MM)
@@ -12868,10 +12882,15 @@ def _sealed_product_camera_specs(env_mm):
     # fits an extent VERTICALLY; the render frame is ~1.5:1, so a horizontal extent
     # fits 1.5× more — the vertical-equivalent controlling extent is max(h, w/1.5, d/1.5).
     _fa = 1.5  # render frame aspect (3000×2000)
-    # instrument devices carry a cuvette/optical port that protrudes ~0.4·H above the
-    # top — inflate the vertical extent so the port is not cropped out of frame.
+    # Optical handheld instruments carry a cuvette/optical port that protrudes ~0.4·H
+    # above the top — inflate the vertical extent so the port is not cropped.
+    # Lab-electronics (bioreactor/potentiostat/EWOD): sealed box, at most a short
+    # vial/tube above the lid (~0.1·H) — 1.92× was for optical handhelds only and
+    # produced height_occupancy 0.43 < gate floor 0.45 on the organoid bioreactor.
     if _open:
         _h_eff = h * float(_open_cam.get("h_eff_scale", 1.05 if _sp else 1.35))
+    elif _le:
+        _h_eff = h * 1.1        # short vial/tube, no tall optical column
     else:
         _h_eff = h * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
     _ctrl = max(_h_eff, w / _fa, d / _fa)
@@ -12881,6 +12900,9 @@ def _sealed_product_camera_specs(env_mm):
     if _open:
         _frame = float(_open_cam.get("frame", 0.90))
         _dist_k = float(_open_cam.get("dist_k", 0.98))
+    elif _le:
+        _frame = 0.90           # fill frame more for compact box
+        _dist_k = 1.05          # moderate pull-in
     else:
         _frame = 0.92 if not _IS_INSTRUMENT_DEVICE else 0.84
         _dist_k = 1.02 if not _IS_INSTRUMENT_DEVICE else 1.16
@@ -12906,6 +12928,14 @@ def _sealed_product_camera_specs(env_mm):
         _tgt_z = float(_open_cam.get("tgt_z", 0.0))
         _tgt_y = 0.0
         _front_ds = float(_open_cam.get("front_dist_scale", 0.88))
+    elif _le:
+        # Lab-electronics: compact sealed box, camera at ~0.9·H above centre, target
+        # at mid-height — no tall optical-column framing (which left height occ 0.43).
+        _ext_z = 0.9
+        _side_z = 0.75
+        _tgt_z = 0.0
+        _tgt_y = 0.0
+        _front_ds = 1.0
     else:
         _ext_z = _tl.get("ext_z", 1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
         _side_z = _tl.get("side_z", 1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
@@ -24243,7 +24273,11 @@ def main():
             # frame the PRODUCT in the corner/top views too — the mounting wall
             # dominates compute_scene_bbox() (run 73: corner shot = a plate on a slab)
             _sw, _sd, _sh = _SEALED_ENV_MM
-            _spatial_z_top = DECK_Z_MM + _sh * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
+            # Match _sealed_product_camera_specs: lab-electronics use 1.1× (no tall
+            # optical column); optical handhelds keep 1.92× for cuvette port clearance.
+            _h_eff_scale = (1.1 if _IS_LAB_ELECTRONICS_FORM
+                            else (1.92 if _IS_INSTRUMENT_DEVICE else 1.0))
+            _spatial_z_top = DECK_Z_MM + _sh * _h_eff_scale
             _spatial_bb = ((-_sw / 2 * fl.MM, _sw / 2 * fl.MM),
                            (-_sd / 2 * fl.MM, _sd / 2 * fl.MM),
                            (DECK_Z_MM * fl.MM, _spatial_z_top * fl.MM))

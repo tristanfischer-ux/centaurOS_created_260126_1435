@@ -2042,6 +2042,45 @@ def _selftest() -> int:
     chk("g12_product_requires_five_views", len(_g12_required) == 5)
     chk("g12_legacy_hero_only_fires",
         len([view for view in _g12_required if view.filename not in {"00-hero.png"}]) == 4)
+    # G12 render_view_quality proveCatch (2026-07-22): organoid bioreactor height_occupancy
+    # was 0.43 — below the 0.45 floor.  Verify evaluate_image correctly fires on 0.43
+    # and passes on ≥0.45.  Build synthetic grayscale PNGs with controlled edge spans.
+    import tempfile, struct, zlib as _zlib
+    def _make_png(width, height, edge_rows_frac, edge_cols_frac):
+        """Minimal valid PNG: white bg, black edge strip to control occupancy."""
+        from io import BytesIO
+        # Use Pillow directly — it's already imported by render_image_quality.
+        from PIL import Image as _PI
+        im = _PI.new("L", (width, height), 255)
+        pix = im.load()
+        # Draw a black rectangle that spans (edge_cols_frac × width) and
+        # (edge_rows_frac × height) to produce predictable occupancy.
+        ec = max(1, int(width * edge_cols_frac))
+        er = max(1, int(height * edge_rows_frac))
+        x0 = (width - ec) // 2
+        y0 = (height - er) // 2
+        for y in range(y0, y0 + er):
+            for x in range(x0, x0 + ec):
+                pix[x, y] = 0
+        buf = BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+    _tf = tempfile.mkdtemp(prefix="g12-img-")
+    # Low occupancy: 43% height (organoid bioreactor before fix) → must FAIL gate.
+    _img_low = os.path.join(_tf, "low-hocc.png")
+    with open(_img_low, "wb") as _f:
+        _f.write(_make_png(200, 200, edge_rows_frac=0.43, edge_cols_frac=0.70))
+    _res_low = evaluate_image(_img_low, enclosure_volume_m3=0.004)
+    chk("g12_height_occ_0_43_fires",
+        not _res_low.passed and any("height occupancy" in r for r in _res_low.reasons))
+    # Adequate occupancy: 50% height → must PASS gate.
+    _img_ok = os.path.join(_tf, "ok-hocc.png")
+    with open(_img_ok, "wb") as _f:
+        _f.write(_make_png(200, 200, edge_rows_frac=0.50, edge_cols_frac=0.70))
+    _res_ok = evaluate_image(_img_ok, enclosure_volume_m3=0.004)
+    chk("g12_height_occ_0_50_passes",
+        _res_ok.passed or not any("height occupancy" in r for r in _res_ok.reasons))
+    import shutil as _sh2; _sh2.rmtree(_tf, ignore_errors=True)
     chk("g13_three_cad_families_still_fires", len({"fan", "pcb", "gland"}) < 4)
     chk("g13_four_cad_families_pass",
         len({"fan", "pcb", "gland", "cell"}) >= 4)
