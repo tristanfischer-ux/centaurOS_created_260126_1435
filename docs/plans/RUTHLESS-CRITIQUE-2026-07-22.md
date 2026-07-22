@@ -8,6 +8,10 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~12:40) — internal-runs invariant FIXED; loopbake5 running
+- **Internal-runs-fit-envelope FIXED `1e468d65a`**: `_record_logical` added a 450mm overhead pipe-rack clearance above every endpoint (rise+traverse+drop = 950-2300mm) on a benchtop instrument that has no rack → all 38 runs overshot the 0.44m cap. Fix: instrument devices use direct Euclidean port-to-port path (~20-80mm); plant keeps the overhead rack; check NOT weakened (genuine overshoot still FAILs). Same isWattScaleInstrument family.
+- **loopbake5 running** — every known code-level floor-setter now fixed. Expect floor ≥8 (⚠Checks back to 10 once the invariant passes). Watch: Overview "section scores match 9/12" may remain a separate 7.5.
+
 ## LOOP STATUS (2026-07-22 ~12:35) — loopbake4 SIGHTed: FLOOR 4 → 6, sole floor-setter = 1 invariant
 - loopbake4 (1153) delivered floor **6** (up from 1.2/4). Ship axes ALL PASS: cost (materials £288 vs £385) ✓, PCB FAB-READY ✓, render clean ✓, self-audit clean ✓. Inputs/Financial/BoM-price all FIXED (off sub-8). Big cumulative jump.
 - **SOLE non-mirror floor-setter: ONE deterministic invariant FAILS** — "**Internal runs fit within the device envelope**" (drags ⚠Checks → 6, Overview → 7.5). Some internal cable/pipe run overshoots the 180×140×160 enclosure. → NARROW sub-agent (afd3d6b9) dispatched (well-scoped, one invariant).
