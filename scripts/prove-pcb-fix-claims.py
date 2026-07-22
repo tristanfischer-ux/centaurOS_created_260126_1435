@@ -238,6 +238,42 @@ console.log(JSON.stringify(a))
     else:
         ok("D: chain wires probeTier1McuCompile")
 
+    # ── D2: Tier-2 synthetic board sim (pre-fab) ───────────────────────
+    t2 = (summary.get("firmwareProof") or {}).get("tier2") or {}
+    if t2.get("skipped") and not t2.get("ok"):
+        fail(f"D2: tier2 skipped-without-ok: {t2}")
+    elif not t2.get("ok"):
+        fail(f"D2: tier2.ok false: {t2.get('reason') or t2}")
+    else:
+        ok("D2: tier2.ok true (synthetic board sim)")
+    model = solo / "firmware-proof" / "_tier2" / "board-sim-model.json"
+    transcript = solo / "firmware-proof" / "_tier2" / "board-sim-transcript.txt"
+    if not model.exists():
+        fail("D2: board-sim-model.json missing")
+    else:
+        mj = json.loads(model.read_text())
+        if mj.get("schema") != "pcb-firmware-board-sim-model/v1":
+            fail(f"D2: bad model schema {mj.get('schema')}")
+        else:
+            ok("D2: board-sim-model schema")
+        errs = mj.get("bind_errors") or []
+        if errs and not mj.get("skipped"):
+            fail(f"D2: model still has bind_errors: {errs[:3]}")
+        else:
+            ok("D2: model bind_errors empty (or skipped)")
+    if not transcript.exists():
+        fail("D2: board-sim-transcript.txt missing")
+    else:
+        tt = transcript.read_text()
+        if "CHECK board_sim PASS" not in tt and "CHECK skip_interconnect PASS" not in tt:
+            fail(f"D2: transcript missing board_sim PASS: {tt[:200]}")
+        else:
+            ok("D2: transcript has board_sim/skip PASS")
+    if "runTier2BoardSim" not in chain:
+        fail("D2: chain missing runTier2BoardSim")
+    else:
+        ok("D2: chain wires runTier2BoardSim")
+
     # ── E: HAT first-pass 110 ──────────────────────────────────────────
     errs = (summary.get("pipeline") or {}).get("errors") or []
     hat_errs = [e for e in errs if "wet_lab_hat" in e]

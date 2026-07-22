@@ -1,14 +1,19 @@
 /**
- * @file Tier-0 / Tier-1 firmware proof runners (P9b + fixpack14).
+ * @file Tier-0 / Tier-1 / Tier-2 firmware proof runners (P9b + fixpack14/17).
  * @description Tier-0 spawns the isolated native prototype. Tier-1 emits a
  * freestanding MCU project from the pin-map and compiles with arm-none-eabi-gcc
- * when present — never fabricates ok without a real toolchain + project.
+ * when present. Tier-2 runs a pre-fab synthetic board model (imagined
+ * peripherals) — never fabricates ok without bind+sim evidence; never HIL.
  */
 
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
+import {
+  buildBoardSimModel,
+  type BoardSimModel,
+} from './pcb-firmware-board-sim-model'
 import type { FirmwareBusPinMap } from './pcb-firmware-pinmap-from-nets'
 import { emitTier1McuProject } from './pcb-firmware-tier1-project'
 
@@ -174,5 +179,101 @@ export function probeTier1McuCompile(
     path.join(outDir, 'tier1-status.json'),
     JSON.stringify(result, null, 2),
   )
+  return result
+}
+
+export interface FirmwareTier2BoardSimResult {
+  ok: boolean
+  skipped: boolean
+  tier: 'tier2_board_sim'
+  reason: string
+  modelPath?: string
+  resultPath?: string
+  transcriptPath?: string
+  bindErrorCount?: number
+}
+
+/**
+ * @description Run pre-fab synthetic board sim (Tier-2). Builds a board model
+ * from nets/buses/channels, fail-closes on bind_errors, then executes
+ * board_sim_prove.py. Never claims HIL / FUNCTIONALLY VERIFIED.
+ */
+export function runTier2BoardSim(args: {
+  outDir: string
+  repoRoot: string
+  modelInput: Parameters<typeof buildBoardSimModel>[0]
+}): FirmwareTier2BoardSimResult {
+  const { outDir, repoRoot, modelInput } = args
+  fs.mkdirSync(outDir, { recursive: true })
+  const model: BoardSimModel = buildBoardSimModel(modelInput)
+  const modelPath = path.join(outDir, 'board-sim-model.json')
+  fs.writeFileSync(modelPath, JSON.stringify(model, null, 2))
+
+  const py = path.join(repoRoot, 'prototypes/pcb-firmware-proof/board_sim_prove.py')
+  if (!fs.existsSync(py)) {
+    const result: FirmwareTier2BoardSimResult = {
+      ok: false,
+      skipped: true,
+      tier: 'tier2_board_sim',
+      reason: 'board_sim_prove.py missing',
+      modelPath,
+      bindErrorCount: model.bind_errors.length,
+    }
+    fs.writeFileSync(path.join(outDir, 'tier2-status.json'), JSON.stringify(result, null, 2))
+    return result
+  }
+
+  const r = spawnSync('python3', [py, modelPath, '--out', outDir], {
+    encoding: 'utf8',
+    timeout: 120_000,
+  })
+  const resultPath = path.join(outDir, 'board-sim-result.json')
+  const transcriptPath = path.join(outDir, 'board-sim-transcript.txt')
+
+  let result: FirmwareTier2BoardSimResult
+  if (fs.existsSync(resultPath)) {
+    try {
+      const j = JSON.parse(fs.readFileSync(resultPath, 'utf8')) as {
+        ok?: boolean
+        skipped?: boolean
+        reason?: string
+      }
+      result = {
+        ok: j.ok === true,
+        skipped: j.skipped === true,
+        tier: 'tier2_board_sim',
+        reason: j.reason
+          ?? (j.ok === true
+            ? 'synthetic board sim PASS — UNPROVEN IN HARDWARE'
+            : `board_sim exit ${r.status ?? 'n/a'}`),
+        modelPath,
+        resultPath,
+        transcriptPath: fs.existsSync(transcriptPath) ? transcriptPath : undefined,
+        bindErrorCount: model.bind_errors.length,
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      result = {
+        ok: false,
+        skipped: false,
+        tier: 'tier2_board_sim',
+        reason: `board-sim-result.json unparseable: ${message}`,
+        modelPath,
+        resultPath,
+        bindErrorCount: model.bind_errors.length,
+      }
+    }
+  } else {
+    result = {
+      ok: false,
+      skipped: false,
+      tier: 'tier2_board_sim',
+      reason: `board_sim_prove exit ${r.status ?? 'n/a'}: ${(r.stderr || r.stdout || '').slice(0, 400)}`,
+      modelPath,
+      bindErrorCount: model.bind_errors.length,
+    }
+  }
+
+  fs.writeFileSync(path.join(outDir, 'tier2-status.json'), JSON.stringify(result, null, 2))
   return result
 }

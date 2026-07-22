@@ -20,6 +20,7 @@ import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb
 import {
   probeTier1McuCompile,
   runTier0FirmwareProof,
+  runTier2BoardSim,
 } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
 import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-spec'
 import { runBespokeMultiBoardPcb } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-multi-board-run'
@@ -146,13 +147,102 @@ function main(): void {
       ` (${tier1.reason.slice(0, 140)})` +
       (tier1Target ? ` target=${tier1Target}` : ''),
   )
+
+  // INTENT (fixpack17): Tier-2 synthetic board sim — firmware against imagined
+  // peripherals bound to real nets. Peer I²C devices (TMP1075/ADS…) ride the loom.
+  let tier2: ReturnType<typeof runTier2BoardSim> = {
+    ok: false,
+    skipped: true,
+    tier: 'tier2_board_sim',
+    reason: 'no custom_board MCU target for board sim',
+  }
+  if (tier1Target && tier1Mcu && tier1Buses.length > 0) {
+    const hostRun = multi.boardPipelines.find((b) => b.boardId === tier1Target)
+    const hostComponents = hostRun?.generator.components ?? []
+    const peerComponents = multi.boardPipelines
+      .filter((b) => b.boardId !== tier1Target)
+      .flatMap((b) => b.generator.components)
+    const hostThin = thinSpecs.find((t) => t.proofTargetId === tier1Target)
+    const fatForSim = hostThin
+      ? buildFirmwareProofContract({
+          thin: hostThin,
+          designFitnessOk: designFitness.ok === true,
+          mcu: { mpn: tier1Mcu },
+          components: hostComponents.map((c) => ({
+            wordId: c.wordId,
+            refdes: c.instanceName,
+            instanceName: c.instanceName,
+            mpn: c.partNumber,
+            characterId: c.characterId ?? undefined,
+            functionClass: c.functionClass ?? undefined,
+            manufacturer: c.manufacturer ?? undefined,
+          })),
+          nets: (hostRun?.generator.nets ?? []).map((n) => ({
+            name: n.name,
+            kind: n.kind,
+            members: n.members,
+          })),
+          implementedChannels: multi.implementedChannels,
+        })
+      : null
+    const fatChannels = (fatForSim?.channels ?? []) as Array<{
+      role: string
+      instances: Array<{ instance_id: string; enable_net?: string; output_net?: string }>
+    }>
+    // GOTCHA: only host-local channel roles — stir/pump live on HAT; heater/od
+    // on peers would unbound against HAT nets if we passed every role.
+    const hostRoles = new Set((hostThin?.channels ?? []).map((c) => c.role))
+    const simChannels = fatChannels.filter((c) => hostRoles.has(c.role))
+    tier2 = runTier2BoardSim({
+      outDir: resolve(proofOutRoot, '_tier2'),
+      repoRoot: process.cwd(),
+      modelInput: {
+        proofTargetId: tier1Target,
+        kind: 'custom_board',
+        mcuMpn: tier1Mcu,
+        buses: tier1Buses,
+        channels: simChannels,
+        nets: (hostRun?.generator.nets ?? []).map((n) => ({
+          name: n.name,
+          kind: n.kind,
+          members: n.members,
+        })),
+        components: hostComponents.map((c) => ({
+          instanceName: c.instanceName,
+          functionClass: c.functionClass,
+          characterId: c.characterId ?? undefined,
+          partNumber: c.partNumber,
+          manufacturer: c.manufacturer,
+        })),
+        peerComponents: peerComponents.map((c) => ({
+          instanceName: c.instanceName,
+          functionClass: c.functionClass,
+          characterId: c.characterId ?? undefined,
+          partNumber: c.partNumber,
+          manufacturer: c.manufacturer,
+        })),
+      },
+    })
+  }
+  console.error(
+    `[pcb-solo] firmwareTier2: ok=${tier2.ok} skipped=${tier2.skipped}` +
+      ` bindErrors=${tier2.bindErrorCount ?? 0}` +
+      ` (${tier2.reason.slice(0, 160)})`,
+  )
+
+  // DECISION: Tier-2 bind/sim failure fails the firmware axis — Tier-0 theatre
+  // alone must not green-light "software works on the imagined board".
+  const tier2AxisOk = tier2.skipped === true || tier2.ok === true
+  const firmwareAxisOk = firmwareAllOk && tier2AxisOk
+  const tierNum = tier2.ok && !tier2.skipped ? 2 as const : tier1.ok ? 1 as const : 0 as const
   const firmwareProof = {
     schema: 'pcb-firmware-proof-stage/v1' as const,
-    tier: tier1.ok ? 1 as const : 0 as const,
+    tier: tierNum,
     results: proofResults,
-    allOk: firmwareAllOk,
-    ok: firmwareAllOk,
+    allOk: firmwareAxisOk,
+    ok: firmwareAxisOk,
     tier1,
+    tier2,
   }
 
   const summary = {
@@ -212,7 +302,7 @@ function main(): void {
     `- kicadBoardCount: **${summary.kicadBoardCount}**`,
     `- designFitness.ok: **${summary.designFitness.ok}**`,
     `- implementedChannels: \`${JSON.stringify(summary.implementedChannels)}\``,
-    `- firmwareProof.allOk: **${summary.firmwareProof.allOk}** (tier-0 native-draft, not HIL)`,
+    `- firmwareProof.allOk: **${summary.firmwareProof.allOk}** (tier=${summary.firmwareProof.tier}; not HIL)`,
     `- aggregate pipeline.ok: **${summary.pipeline.ok}** (stage=${summary.pipeline.stageReached})`,
     '',
     '## Boards',
@@ -254,6 +344,18 @@ function main(): void {
       `- ${r.target}: ok=${r.result.ok}` +
         (r.result.skipped ? ' (skipped)' : '') +
         (r.result.reason ? ` — ${r.result.reason.slice(0, 160)}` : ''),
+    )
+  }
+  const t2 = summary.firmwareProof.tier2 as {
+    ok?: boolean
+    skipped?: boolean
+    reason?: string
+    bindErrorCount?: number
+  } | undefined
+  if (t2) {
+    lines.push(
+      `- tier2_board_sim: ok=${t2.ok} skipped=${t2.skipped} bindErrors=${t2.bindErrorCount ?? 0}` +
+        (t2.reason ? ` — ${String(t2.reason).slice(0, 200)}` : ''),
     )
   }
   writeFileSync(resolve(outDir, 'pcb-solo-sight.md'), `${lines.join('\n')}\n`)
