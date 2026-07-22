@@ -13233,6 +13233,103 @@ def _storage_revenue_and_dcf(state: dict) -> Optional[Dict[str, Any]]:
     }
 
 
+def _render_instrument_capital_section(ws, state: dict, r: int) -> int:
+    """INSTRUMENT-SCALE CAPITAL ECONOMICS (isInstrumentDevice = True).
+
+    A benchtop instrument is a CAPITAL PRODUCT, not a production plant.  It has no
+    annual throughput to levelise against, no 20-year project life, and no per-unit-volume
+    LCOE.  The correct economic frame is:
+
+        BoM / raw materials → factory COGS → ex-works (OEM transfer) → list price
+
+    plus an honest disclaimer that levelised production cost does not apply.
+
+    Every cell is live off the costStack; the section sets state['_instrumentCapital']
+    so _sc_financial can credit the correct frame instead of penalising a missing LCOE."""
+    cs = state.get("costStack") or {}
+    raw   = num(cs.get("raw_materials_bom_gbp"))
+    cogs  = num(cs.get("factory_cogs_gbp"))
+    oem   = num(cs.get("oem_transfer_price_gbp"))
+    list_ = num(cs.get("channel_list_price_gbp"))
+    asp   = num(cs.get("installed_asp_gbp"))   # alias: list price when the above absent
+
+    # Normalise — fallback chain so the section renders whatever costStack has.
+    effective_list = list_ or asp or oem or cogs or raw or 0.0
+
+    sub_banner(ws, r, "CAPITAL COST SUMMARY — one-off build cost (not a production plant)", 8)
+    r += 1
+
+    note = ws.cell(r, 1,
+        "This is a BENCH-SCALE CAPITAL INSTRUMENT (isInstrumentDevice = True).  "
+        "A levelised production cost (£/ml, £/unit/yr) is NOT APPLICABLE — the working "
+        "volume is a design specification, not an annual delivered production volume.  "
+        "The correct frame is the one-off unit build cost and its commercial stack below.")
+    note.font = Font(italic=True, size=9, color="9C6500", bold=True)
+    note.alignment = WRAP_TOP
+    note.fill = FILL_ADVISORY
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 40
+    r += 2
+
+    header(ws, r, ["Cost layer", "£ (one-off)", "", "Basis"])
+    r += 1
+
+    cost_rows = []
+    if raw:
+        cost_rows.append(("Raw materials (BoM)", raw,
+                          "engine · costStack.raw_materials_bom_gbp"))
+    if cogs:
+        cost_rows.append(("Factory COGS (materials + assembly + overhead)", cogs,
+                          "engine · costStack.factory_cogs_gbp"))
+    if oem:
+        cost_rows.append(("Ex-works / OEM transfer price", oem,
+                          "engine · costStack.oem_transfer_price_gbp"))
+    if list_:
+        cost_rows.append(("Channel list price (ex-works + channel margin)", list_,
+                          "engine · costStack.channel_list_price_gbp"))
+    elif asp and asp != oem:
+        cost_rows.append(("Installed ASP (list price proxy)", asp,
+                          "engine · costStack.installed_asp_gbp"))
+
+    if not cost_rows:
+        cost_rows.append(("All-in unit cost (proxy)", effective_list,
+                          "engine · costStack (best available field)"))
+
+    for label, val, basis in cost_rows:
+        bold = label.startswith(("Ex-works", "Channel list", "Installed ASP", "All-in"))
+        ws.cell(r, 1, label).font = Font(bold=bold)
+        vc = ws.cell(r, 2, round(val) if val else "—")
+        if isinstance(val, (int, float)) and val:
+            vc.number_format = FMT_INT
+        if bold:
+            vc.font = Font(bold=True)
+        bc = ws.cell(r, 4, basis)
+        bc.font = Font(size=9, color="555555")
+        r += 1
+
+    r += 1
+    # Honest summary cell
+    summary = ws.cell(r, 1,
+        f"Unit economics summary: ex-works ≈ £{round(oem or cogs or raw or 0):,}  |  "
+        f"list price ≈ £{round(effective_list):,}  |  "
+        "20-year DCF / levelised-cost model: NOT APPLICABLE for a capital instrument — "
+        "no recurring production revenue stream to model.")
+    summary.font = Font(italic=True, size=9, color="555555")
+    summary.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 28
+    r += 1
+
+    state["_instrumentCapital"] = {
+        "raw_materials_bom_gbp": raw,
+        "factory_cogs_gbp": cogs,
+        "oem_transfer_price_gbp": oem,
+        "channel_list_price_gbp": list_ or asp,
+        "effective_list_price_gbp": effective_list,
+    }
+    return r
+
+
 def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
     """COST-OF-SERVICE economics for a no-market-revenue infrastructure / utility plant (water /
     treatment / fertigation): the HONEST, COMPLETE economic model is capex + annual opex + the
@@ -13241,7 +13338,15 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
     drivers on the Inputs tab; records state['_costOfService'] so the scorer treats this as the
     class-appropriate model (a real cost-recovery tariff, not a fake-8 over an 'UNVERIFIED revenue'
     banner). Returns the next row, or None (caller renders the revenue model) when no capex/output
-    is derivable. UNIVERSAL — keyed on the no-verified-price + infrastructure signal, no class table."""
+    is derivable. UNIVERSAL — keyed on the no-verified-price + infrastructure signal, no class table.
+
+    INSTRUMENT GATE: returns None immediately when isInstrumentDevice is True — a bench
+    instrument has no annual throughput to levelise against (its 'working volume' is a
+    design spec, not a production rate) so the plant LCOE frame is the wrong model.
+    The caller (tab_financial_model) dispatches to _render_instrument_capital_section instead."""
+    # Device-scale gate — a benchtop instrument must never get a 20-year plant LCOE.
+    if bool(state.get("isInstrumentDevice")):
+        return None
     cs = state.get("costStack") or {}
     capex = num(cs.get("all_in_capex_gbp")) or num(cs.get("installed_asp_gbp"))
     if not capex or capex <= 0:
@@ -13468,6 +13573,16 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     if not _ECON_INPUT_ADDR:
         return False  # Inputs tab didn't build -> no economic model
 
+    # ── DEVICE-SCALE GATE (isInstrumentDevice) — the recurring plant-LCOE-on-a-bench-device bug ──
+    # A benchtop instrument (organoid bioreactor, colorimeter, benchtop bioreactor, etc.) is a
+    # CAPITAL PRODUCT, not a production plant.  Its "working volume" (e.g. 20 ml) is a design
+    # specification, NOT an annual delivered production volume — so a 20-year LCOE/DCF frame
+    # ("Annual delivered volume 20 ml → levelised cost £5.94/ml") is a CATEGORY ERROR.
+    # When isInstrumentDevice=True: render only the instrument capital-cost summary and return.
+    # A genuine production plant (isInstrumentDevice=False, real throughput t/yr or m³/h) is
+    # byte-identical — it still gets the full 20-year DCF/LCOE/Scenarios/Investment sections.
+    is_instrument = bool(state.get("isInstrumentDevice"))
+
     unverified = _econ_sale_unverified()
     out_qty, out_unit, _pu, out_noun = _econ_output_metric(state)
 
@@ -13475,6 +13590,22 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     # widest of the three sections (Scenarios uses A..M = 13 cols) sets the widths.
     set_widths(ws, {"A": 30, "B": 18, "C": 16, "D": 16, "E": 16, "F": 12,
                     "G": 14, "H": 16, "I": 16, "J": 16, "K": 16, "L": 16, "M": 16})
+
+    if is_instrument:
+        # Instrument path: capital-cost summary only, no plant LCOE/DCF.
+        title_row(
+            ws, "Financial model — capital instrument unit economics", 8,
+            "This is a CAPITAL INSTRUMENT (isInstrumentDevice = True). The valid economic "
+            "frame is the one-off unit build cost (BoM → COGS → ex-works → list price), "
+            "not a 20-year plant LCOE/DCF. Every value cell is driven from the engine "
+            "costStack. Money £#,##0.",
+        )
+        r = 4
+        r = _render_instrument_capital_section(ws, state, r)
+        ws.freeze_panes = "A5"
+        back_link(ws, 8)
+        return True
+
     title_row(
         ws, "Financial model — cost of service first · speculative model in the appendix"
         if unverified else
@@ -13512,6 +13643,7 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     # UNVERIFIABLE by construction (the prior fake-8 / capped-6). Its real economics are capex +
     # opex + the levelised cost of delivered water. Render that FIRST when no per-unit market price
     # is verified; it sets state['_costOfService'] so the scorer credits the cost-of-service model.
+    # NOTE: _render_cost_of_service_section already returns None on isInstrumentDevice (belt+braces).
     if unverified:
         cos_next = _render_cost_of_service_section(ws, state, r)
         if cos_next is not None:
@@ -23853,6 +23985,9 @@ _dt(["Driver", "Value", "Unit", "Basis / source"], "drivers",
     ["Driver", "Value", "Basis / source"], unit=["Unit"])
 _dt(["Item", "Value (£)", "", "Basis"], "fin-item", ["Item", "Value (£)", "Basis"],
     numeric=["Value (£)"])
+# Instrument capital-cost summary table (isInstrumentDevice path — replaces the plant LCOE/DCF)
+_dt(["Cost layer", "£ (one-off)", "", "Basis"], "fin-instrument",
+    ["Cost layer", "£ (one-off)", "Basis"], numeric=["£ (one-off)"])
 _dt(["Recommended operating point", "Value", "", "", "", "", "", ""], "fin-oppoint",
     ["Recommended operating point", "Value"])
 _dt(["Output (m³/yr)", "Capex (£)", "£/m³/yr", "", "", "", "", ""], "fin-curve",
@@ -24973,7 +25108,7 @@ def _is_input_fill(cell) -> bool:
 
 _FIN_FAMILIES = ("fin-item", "fin-lines", "fin-cashflow", "fin-opex", "fin-scenarios",
                  "fin-curve", "fin-chart", "fin-range", "fin-tornado", "fin-recommend",
-                 "fin-oppoint")
+                 "fin-oppoint", "fin-instrument")
 
 
 def _sc_financial(wb, ws, state, run_dir):
@@ -24981,6 +25116,46 @@ def _sc_financial(wb, ws, state, run_dir):
     iss = []
     checked = passed = 0
     orphan_rows = []
+
+    # ── FRAME-VALIDITY CHECK (isInstrumentDevice — the device-scale-regime leak) ──
+    # A benchtop instrument must present the instrument capital-cost summary frame
+    # (BoM → COGS → ex-works → list price + "LCOE not applicable" note).  If the
+    # Financial model tab still contains a "LEVELISED COST" row or an "Annual delivered
+    # volume" row, the plant LCOE frame leaked onto a bench device — FRAME DEFECT.
+    # Formula integrity (the only prior check) cannot catch this: cells can reference
+    # drivers correctly AND still present the wrong economic frame.
+    is_instrument = bool(state.get("isInstrumentDevice"))
+    if is_instrument:
+        _all_cell_texts = [
+            str(c.value) for row in ws.iter_rows() for c in row
+            if c.value is not None and not isinstance(c.value, (int, float))
+        ]
+        _has_lcoe = any("LEVELISED COST" in t or "Annual delivered volume" in t
+                        for t in _all_cell_texts)
+        _has_capital_summary = (
+            bool(state.get("_instrumentCapital"))
+            or any("CAPITAL COST SUMMARY" in t or "CAPITAL INSTRUMENT" in t
+                   or "one-off build cost" in t for t in _all_cell_texts)
+        )
+        comps.append(("instrument frame: capital cost summary present (not a plant LCOE)",
+                      1 if _has_capital_summary else 0, 1))
+        if not _has_capital_summary:
+            iss.append("isInstrumentDevice=True but the Financial model tab does not present "
+                       "a capital cost summary — the instrument capital frame is missing")
+        comps.append(("instrument frame: no plant LCOE / 'Annual delivered volume' row",
+                      0 if _has_lcoe else 1, 1))
+        if _has_lcoe:
+            iss.append("isInstrumentDevice=True but the Financial model tab contains a "
+                       "'LEVELISED COST' or 'Annual delivered volume' row — the plant LCOE "
+                       "frame must not appear on a bench-scale instrument (category error: "
+                       "working volume ≠ annual production volume; fix: _render_instrument_"
+                       "capital_section must replace _render_cost_of_service_section)")
+        return {"components": comps, "issues": iss,
+                "mech": "frame validity (instrument capital summary present; no plant LCOE frame) "
+                        "+ formula integrity",
+                "fix": "ensure tab_financial_model dispatches isInstrumentDevice=True to "
+                       "_render_instrument_capital_section and never to _render_cost_of_service_section"}
+
     hdr_rows = {tt["row"] for tt in _RENDERED_TABLES if tt["sheet"] == ws.title}
     for fam in _FIN_FAMILIES:
         for t in _tables_of(wb, ws.title, fam):
@@ -26944,11 +27119,16 @@ def build(run_dir: str, out_path: str) -> dict:
     #    EVERY source: a tab's score is capped by the CAVEATS IT ITSELF DECLARES in its issues. ──
     _apply_universal_honest_cap(_TAB_SCORES)
     # X2 (Tristan 2026-06-27): the Financial model tab must NOT be a green 10 while it renders its own
-    # '⚠ UNVERIFIED ECONOMICS' banner — unless it presents the class-appropriate COST-OF-SERVICE model.
+    # '⚠ UNVERIFIED ECONOMICS' banner — unless it presents the class-appropriate model.
+    # Class-appropriate models that satisfy X2 (cap does NOT apply):
+    #   (a) _costOfService: the infrastructure cost-of-service model (water/fertigation plant);
+    #   (b) _instrumentCapital: the instrument capital-cost summary (isInstrumentDevice=True).
+    # Presenting either of these is the "capex/opex/payback model for this class" the issue text asks for.
     try:
         _fm = _TAB_SCORES.get("Financial model")
         _has_cos = isinstance(state.get("_costOfService"), dict) and (state["_costOfService"].get("capex_gbp") or 0) > 0
-        if _econ_sale_unverified() and not _has_cos and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
+        _has_inst_cap = isinstance(state.get("_instrumentCapital"), dict) and bool(state["_instrumentCapital"])
+        if _econ_sale_unverified() and not _has_cos and not _has_inst_cap and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
             _fm["score"] = 6
             _fm["status"] = "FAIL"
             _fm["issues"] = (["the economics are UNVERIFIED — no per-unit market sale price is derivable, "
@@ -31753,6 +31933,109 @@ def _selftest() -> int:
         _ECON_INPUT_ADDR.update(_save_addr_d)
         globals()["_ECON_GENERIC"] = _save_gen_d
         _TAB_SCORES.clear(); _TAB_SCORES.update(_save_scores_d)
+
+    # (D1b) INSTRUMENT-FRAME GATE proveCatch (2026-07-22) — the device-scale-regime leak:
+    # a benchtop instrument (isInstrumentDevice=True, 20 ml working volume, no production
+    # rate) must NOT receive a 20-year plant LCOE/DCF frame on the Financial model tab.
+    # Direction (a): instrument state → capital summary present, NO LEVELISED COST row.
+    # Direction (b): plant state (isInstrumentDevice=False, real throughput) → full DCF
+    #   unchanged — the instrument gate must NOT suppress the plant economics path.
+    _save_addr_d1b = dict(_ECON_INPUT_ADDR)
+    _save_gen_d1b = _ECON_GENERIC
+    _save_scores_d1b = dict(_TAB_SCORES)
+    try:
+        # (a) instrument direction: organoid bioreactor-like state
+        _inst_state = {
+            "isInstrumentDevice": True,
+            "costStack": {
+                "raw_materials_bom_gbp": 287,
+                "factory_cogs_gbp": 380,
+                "oem_transfer_price_gbp": 475,
+                "channel_list_price_gbp": 546,
+                "installed_asp_gbp": 546,
+            },
+            "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+                {"value": 20, "unit": "ml", "key_metric": "working_volume"}]}}},
+            "orchestratorContract": {"quantities": {
+                "working_volume_ml": {"value": 20, "unit": "ml", "family": "volume"},
+            }},
+        }
+        _ECON_INPUT_ADDR.clear()
+        _wbi_inst = Workbook(); _wbi_inst.remove(_wbi_inst.active)
+        _inst_built = (tab_inputs_assumptions(_wbi_inst, _inst_state)
+                       and tab_financial_model(_wbi_inst, _inst_state))
+        if not _inst_built:
+            print("  FAIL instrument-frame: Inputs + Financial model must build on the "
+                  "instrument fixture"); bad += 1
+        else:
+            _wsi = _wbi_inst["Financial model"]
+            _inst_texts = [str(c.value) for row in _wsi.iter_rows() for c in row
+                           if c.value is not None and isinstance(c.value, str)]
+            # (a-1) NO plant LCOE frame on a bench device
+            _lcoe_texts = [t for t in _inst_texts
+                           if "LEVELISED COST" in t or "Annual delivered volume" in t]
+            if _lcoe_texts:
+                print(f"  FAIL instrument-frame (a-1): isInstrumentDevice=True must NOT "
+                      f"produce a LEVELISED COST / 'Annual delivered volume' row "
+                      f"(got: {_lcoe_texts[:2]})"); bad += 1
+            # (a-2) capital summary IS present
+            _cap_texts = [t for t in _inst_texts
+                          if "CAPITAL COST SUMMARY" in t or "CAPITAL INSTRUMENT" in t
+                          or "one-off build cost" in t or "isInstrumentDevice = True" in t]
+            if not _cap_texts:
+                print("  FAIL instrument-frame (a-2): isInstrumentDevice=True must present "
+                      "the CAPITAL COST SUMMARY frame"); bad += 1
+            # (a-3) the _instrumentCapital state key is set (scorer reads it)
+            if not _inst_state.get("_instrumentCapital"):
+                print("  FAIL instrument-frame (a-3): _render_instrument_capital_section "
+                      "must set state['_instrumentCapital'] so _sc_financial can score it"); bad += 1
+            # (a-4) working volume (20 ml) must NOT appear as 'Annual delivered volume'
+            _wv_as_vol = [t for t in _inst_texts
+                          if re.search(r"Annual delivered volume.*20\b", t, re.I)
+                          or re.search(r"20.*ml.*Annual delivered", t, re.I)]
+            if _wv_as_vol:
+                print(f"  FAIL instrument-frame (a-4): the 20 ml working volume must NOT "
+                      f"appear as 'Annual delivered volume' (got: {_wv_as_vol[:1]})"); bad += 1
+        # (b) plant direction: real production plant must still get full DCF
+        _plant_state = {
+            "isInstrumentDevice": False,
+            "costStack": {"all_in_capex_gbp": 1_148_141, "installed_asp_gbp": 951_000},
+            "orchestratorContract": {"quantities": {
+                "peak_irrigation_flow_m3_h": {"value": 90, "unit": "m³/h",
+                                              "family": "flow_rate"},
+                "connected_electrical_load_kw": {"value": 53, "unit": "kW",
+                                                 "family": "power"}}},
+            "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+                {"value": 6000, "unit": "trays"}]}}},
+        }
+        _ECON_INPUT_ADDR.clear()
+        _wbi_plant = Workbook(); _wbi_plant.remove(_wbi_plant.active)
+        _plant_built = (tab_inputs_assumptions(_wbi_plant, _plant_state)
+                        and tab_financial_model(_wbi_plant, _plant_state))
+        if not _plant_built:
+            print("  FAIL instrument-frame (b): Inputs + Financial model must build on "
+                  "the plant fixture"); bad += 1
+        else:
+            _wsp2 = _wbi_plant["Financial model"]
+            _plant_texts = [str(c.value) for row in _wsp2.iter_rows() for c in row
+                            if c.value is not None and isinstance(c.value, str)]
+            # plant must keep its LEVELISED COST / cost-of-service model
+            _plant_lcoe = [t for t in _plant_texts
+                           if "LEVELISED COST" in t or "COST-OF-SERVICE MODEL" in t]
+            if not _plant_lcoe:
+                print("  FAIL instrument-frame (b): isInstrumentDevice=False + real plant "
+                      "must still present a LEVELISED COST / COST-OF-SERVICE MODEL "
+                      "(instrument gate must not suppress the plant economics path)"); bad += 1
+            # plant must NOT show the instrument capital summary header
+            _plant_cap = [t for t in _plant_texts if "CAPITAL COST SUMMARY" in t]
+            if _plant_cap:
+                print("  FAIL instrument-frame (b): isInstrumentDevice=False plant must "
+                      "NOT show the 'CAPITAL COST SUMMARY' instrument frame"); bad += 1
+    finally:
+        _ECON_INPUT_ADDR.clear()
+        _ECON_INPUT_ADDR.update(_save_addr_d1b)
+        globals()["_ECON_GENERIC"] = _save_gen_d1b
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_save_scores_d1b)
 
     # (D2) DESIGN-BASIS STATEMENT: ≤40 rows, every line value+source, and the values
     # are DERIVED from the owning module's constants (never hand-typed — proven by
