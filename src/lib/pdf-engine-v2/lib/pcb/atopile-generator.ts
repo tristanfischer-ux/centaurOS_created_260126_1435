@@ -1899,7 +1899,7 @@ function wirePeripheralNets(
             ...(usb.pinSpecs ?? []).map((p) => pinIdentifier(p)),
             usb.powerPin,
           ].filter((p): p is string =>
-            Boolean(p) && /^(?:VBUS|A4|B4|A9|B9)(?:_|$)/i.test(p)),
+            typeof p === 'string' && /^(?:VBUS|A4|B4|A9|B9)(?:_|$)/i.test(p)),
         ),
       ]
       if (vbusPins.length === 0 && usb.powerPin && /^VBUS/i.test(usb.powerPin)) {
