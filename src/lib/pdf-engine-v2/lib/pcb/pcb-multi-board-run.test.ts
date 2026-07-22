@@ -262,13 +262,13 @@ describe('pcb-multi-board-run', () => {
             functionRequirements: [],
             offBoard: [],
             nets: [],
-          } as BoardPipelineRun['generator'],
+          },
           pipeline: {
             ...fakePipeline(true, 'complete', bid),
             pos: { path: posPath },
           },
           record: fakePipeline(true, 'complete', bid),
-        })
+        } as unknown as BoardPipelineRun)
       }
       const pos = aggregatePipelinePositions(boards, root)
       expect(pos?.path).toBeTruthy()
