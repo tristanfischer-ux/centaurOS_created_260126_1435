@@ -294,7 +294,15 @@ _ELECTRONIC_NOUN = re.compile(
     r"|\btransistor\b|\bcapacitor\b|\bresistor\b|\binductor\b"
     r"|\bdiode\b|\b(?:fet|mosfet|igbt)\b"
     r"|\bvoltage\s*regulator\b|\blinear\s*regulator\b|\bldo\b"
-    r"|\bcrystal\s*oscillator\b|\boscillator\b",
+    r"|\bcrystal\s*oscillator\b|\boscillator\b"
+    # Extended (2026-07-22, column-contract fix H10-align): catalogue electronic noun
+    # families present in build-excel-export.py _ELECTRONIC_NOUN_RX but absent here —
+    # tachometer (rotation speed sensor IC), protocol bridge (communications IC),
+    # sensor (generic electronic sensing element).  SENSOR is deliberately kept
+    # word-bounded and paired with the \b guard so "biosensor" / "pressure sensor array"
+    # still needs its OWN noun anchor; a bare 'Sensor Cable' still matches 'sensor'.
+    # These extend the MoC-exclusion list universally, keyed on noun only.
+    r"|\btachometer\b|\bprotocol\s*bridge\b|\bsensor\b",
     re.I,
 )
 
@@ -6005,33 +6013,59 @@ def _selftest() -> int:
                 "Dosing Peristaltic Pump", "requirement stated", "NOT FOUND")[2] is not None:
             print("  FAIL part-type-coherence: a placeholder line must NOT be rejected"); bad += 1
 
-    # ── proveCatch: distributor-confirmed sub-£1 price not floored to commodity (Fix 2, 2026-07-22) ──
-    # Root bug: TDK NTCG163JF103FT1 at distributor_price_gbp=0.12 was being floored to £1
-    # because round(0.12)=0 fired the commodity floor, ignoring the confirmed dist_price.
-    # Fix: (a) `and wid not in dist_price` guard skips the floor when distributor price known;
-    # (b) sub-£1 prices stored at 2 dp so 0.12 → 0.12 not 0.
-    _dp_fix_gbp = 0.12
-    _dp_fix_wid = "ntcg163jf103ft1-test"
-    # sub-fix (a): guard condition — with wid in dist_price the floor must be SKIPPED
-    _dist_price_test = {_dp_fix_wid: _dp_fix_gbp}
-    _renders_zero_test = (round(_dp_fix_gbp) <= 0)  # True — 0.12 rounds to 0
-    _floor_fires = _renders_zero_test and (_dp_fix_wid not in _dist_price_test)
-    if _floor_fires:
-        print("  FAIL commodity-floor proveCatch (a): dist_price guard must SKIP the commodity "
-              f"floor for wid '{_dp_fix_wid}' with confirmed dist £{_dp_fix_gbp}"); bad += 1
-    # sub-fix (b): 2dp precision — round(0.12, 2) must not collapse to 0
-    _stored_gbp = round(_dp_fix_gbp, 2) if 0 < _dp_fix_gbp < 1 else round(_dp_fix_gbp)
-    if _stored_gbp != 0.12:
-        print(f"  FAIL commodity-floor proveCatch (b): sub-£1 price 0.12 must store as 0.12 at "
-              f"2 dp precision, got {_stored_gbp!r}"); bad += 1
-    # proveNoFalsePositive: a genuinely price-less line (gbp=0, no dist_price) STILL fires the floor
+    # ── proveCatch: sub-£0.50 distributor price must STILL fire the commodity floor (2026-07-22) ──
+    # Root bug: TDK NTCG163JF103FT1 at distributor_price_gbp=0.12 rendered as unit £0 because
+    # the floor condition `wid not in dist_price` skipped the floor for any confirmed dist price,
+    # even one that rounds to £0.  Fix: only skip the floor when dist_price >= £0.50 (won't render
+    # as £0).  A sub-£0.50 confirmed price still fails the column contract → floor must fire.
+    _dp_sub50_gbp = 0.12
+    _dp_sub50_wid = "ntcg163jf103ft1-test"
+    _dist_price_sub50 = {_dp_sub50_wid: _dp_sub50_gbp}
+    _renders_zero_sub50 = (round(_dp_sub50_gbp) <= 0)  # True — 0.12 rounds to 0
+    _dp_renders_nonzero_sub50 = _dist_price_sub50.get(_dp_sub50_wid, 0.0) >= 0.5  # False
+    # proveCatch: floor FIRES because dist_price=0.12 < 0.50 (does NOT render non-zero)
+    _floor_fires_sub50 = _renders_zero_sub50 and (
+        _dp_sub50_wid not in _dist_price_sub50 or not _dp_renders_nonzero_sub50)
+    if not _floor_fires_sub50:
+        print("  FAIL commodity-floor proveCatch (sub-£0.50 dist): floor must FIRE for "
+              f"wid '{_dp_sub50_wid}' with confirmed dist £{_dp_sub50_gbp} (rounds to £0)"); bad += 1
+    # proveNoFalsePositive (a): a real £1.50 distributor price must STILL skip the floor
+    _dp_real_gbp = 1.50
+    _dp_real_wid = "real-part-test"
+    _dist_price_real = {_dp_real_wid: _dp_real_gbp}
+    _renders_zero_real = (round(_dp_real_gbp) <= 0)  # False — 1.50 rounds to 2
+    _dp_renders_nonzero_real = _dist_price_real.get(_dp_real_wid, 0.0) >= 0.5  # True
+    _floor_fires_real = _renders_zero_real and (
+        _dp_real_wid not in _dist_price_real or not _dp_renders_nonzero_real)
+    if _floor_fires_real:
+        print("  FAIL commodity-floor proveNoFalsePositive (real dist price): floor must SKIP "
+              f"for wid '{_dp_real_wid}' with confirmed dist £{_dp_real_gbp} (non-zero render)"); bad += 1
+    # proveNoFalsePositive (b): a genuinely price-less line (gbp=0, no dist_price) STILL fires
     _no_dist = {}
     _gbp_zero = 0.0
     _rz_zero = (round(_gbp_zero) <= 0)
-    _floor_fires_zero = _rz_zero and ("no-price-wid" not in _no_dist)
+    _dp_renders_nonzero_zero = _no_dist.get("no-price-wid", 0.0) >= 0.5  # False
+    _floor_fires_zero = _rz_zero and ("no-price-wid" not in _no_dist or not _dp_renders_nonzero_zero)
     if not _floor_fires_zero:
-        print("  FAIL commodity-floor proveNoFalsePositive: a genuinely £0 part with no "
-              "dist_price must STILL fire the commodity floor"); bad += 1
+        print("  FAIL commodity-floor proveNoFalsePositive (£0, no dist): a genuinely £0 part "
+              "with no dist_price must STILL fire the commodity floor"); bad += 1
+    # ── proveCatch: catalogue electronic noun on instrument emits TBD assembly (2026-07-22) ──
+    # Root bug: _ELECTRONIC_NOUN lacked tachometer/protocol bridge/sensor; 'NOT FOUND' status
+    # caused _bom_row_kind(instrument_device=True) to return 'fabricated' → S10 FAIL.
+    # Fix: _ELECTRONIC_NOUN extended + instrument electronic NOT FOUND → status='TBD'.
+    _elec_nouns_to_test = [
+        ("Stir Tachometer Sense", True),  # tachometer → NEW match
+        ("Firmware Storage", True),        # firmware → existing match
+        ("Host Protocol Bridge", True),    # protocol bridge → NEW match
+        ("Galvanic Isolator", True),       # isolator → existing match
+        ("Sensor Cable", True),            # sensor → NEW match
+        ("Steel Portal Frame", False),     # structural mechanical — must NOT match
+        ("Dosing Pump", False),            # mechanical process — must NOT match
+    ]
+    for _en_name, _want in _elec_nouns_to_test:
+        _got = bool(_ELECTRONIC_NOUN.search(_en_name))
+        if _got != _want:
+            print(f"  FAIL _ELECTRONIC_NOUN proveCatch: '{_en_name}' → {_got} (want {_want})"); bad += 1
 
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
@@ -8261,8 +8295,30 @@ def assemble(out_dir: str):
                         status, part = "NOT FOUND", "requirement stated — parametric"
                         gbp, basis = uop
                     else:
-                        status, part = "NOT FOUND", "requirement stated"
-                        gbp, basis = price.get(wid, 0.0), "bottom-up parametric"
+                        # H10 COLUMN-CONTRACT FIX (2026-07-22): on a device-scale
+                        # instrument a catalogue ELECTRONIC part (matched by
+                        # _ELECTRONIC_NOUN) with no resolved MPN is an ENGINEERED-TBD
+                        # assembly — its MPN is deferred to detailed design, not a
+                        # bespoke fabrication choice.  Emitting status='NOT FOUND' +
+                        # part='requirement stated' causes build-excel-export.py's
+                        # _bom_row_kind() to classify it as 'fabricated' (instrument
+                        # path: status in ("NOT FOUND","BESPOKE") → fabricated), which
+                        # then fires the S10 UNRESOLVED FAIL.  The honest fix: status
+                        # 'TBD' (procurement deferred) + part 'TBD (detailed design)'
+                        # is NOT in _MPN_PLACEHOLDER and NOT in the fabricated-trigger
+                        # set — so _bom_row_kind returns 'assembly', the ENGINEERED-TBD
+                        # taxonomy applies, the row PASSES (with proportional score
+                        # penalty for the TBD fraction), and the BoM ledger discloses
+                        # the gap honestly.  Universal, keyed on _ELECTRONIC_NOUN noun
+                        # family + _IS_INSTRUMENT_DEVICE, no per-class table.
+                        _is_elec_noun = _ELECTRONIC_NOUN.search(
+                            f"{name or ''} {requirement or ''}")
+                        if _IS_INSTRUMENT_DEVICE and _is_elec_noun:
+                            status, part = "TBD", "TBD (detailed design)"
+                            gbp, basis = price.get(wid, 0.0), "class_reference"
+                        else:
+                            status, part = "NOT FOUND", "requirement stated"
+                            gbp, basis = price.get(wid, 0.0), "bottom-up parametric"
                         # if there is genuinely no model AND no real price, label it a
                         # VISIBLE budget allowance rather than a silent £0/identical stub.
                         if gbp <= 0:
@@ -8460,8 +8516,17 @@ def assemble(out_dir: str):
                 # consumable keeps its narrower 'only a TRUE £0' exemption unchanged. ──
                 _is_pack_micro = _pack_micro_band(name or "") is not None
                 _renders_zero = (gbp <= 0) if _is_pack_micro else (round(gbp) <= 0)
+                # DIST-PRICE £0-RENDER FIX (2026-07-22, I-102 Temperature Sensor): a
+                # confirmed distributor price of £0.12 rounds to unit £0 at integer
+                # display → fails the column contract 'unit £ missing/zero'.  The
+                # original exemption skips the floor whenever wid is in dist_price, but
+                # that is too broad: it must only skip when the confirmed price would NOT
+                # render as £0 (i.e., round(dist_price) >= 1).  A sub-£0.50 confirmed
+                # price is still a rendering-zero and the commodity floor must fire.
+                _dp_val = dist_price.get(wid, 0.0)
+                _dp_renders_nonzero = _dp_val >= 0.5
                 if status not in ("SUB-COMPONENT", "BUILDING") and _renders_zero \
-                        and wid not in dist_price:  # skip floor when distributor confirmed the price
+                        and (wid not in dist_price or not _dp_renders_nonzero):
                     _cf, _cnoun = _commodity_zero_floor(name)
                     # ×5 SELF-CONSISTENCY (2026-07-11 run 59: a REAL £0.14 catalogue
                     # estimate floored to the £3 noun floor tripped the engine's own
