@@ -17496,6 +17496,23 @@ def _pcb_fitness_axis(tiers: Dict[str, int]) -> Tuple[float, int, int]:
     return round(10.0 * weighted / resolved_n, 2), resolved_n, verified_n
 
 
+def _pcb_firmware_status_string(tier: Optional[int], fw_ok: Optional[bool]) -> str:
+    """Canonical tier → Firmware status cell string (honest, NEVER 'FUNCTIONALLY VERIFIED').
+    Called from tab_pcb (Firmware proof row) and proveCatch. Universal — keyed solely on
+    the integer tier value and the ok/allOk flag from state.pcb.firmwareProof."""
+    if fw_ok is False:
+        return "FAIL"
+    if tier is None or fw_ok is None:
+        return "NOT RUN"
+    if tier >= 3:
+        return "VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE"
+    if tier == 2:
+        return "HOST BIND / CONTRACT PASS — UNPROVEN IN HARDWARE"
+    if tier == 1:
+        return "COMPILE / CONTRACT ONLY — UNPROVEN IN HARDWARE"
+    return "CONTRACT ONLY — UNPROVEN IN HARDWARE"
+
+
 def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, gerbers_ok: bool,
                            bespoke_missing: bool, fitness_score: float,
                            n_electronic_gap: int,
@@ -17505,7 +17522,8 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                            n_non_fab_tier: int = 0,
                            all_on_board_fab_tier: bool = True,
                            n_architecture_gaps: int = 0,
-                           firmware_proof_ok: Optional[bool] = None) -> Tuple[str, str]:
+                           firmware_proof_ok: Optional[bool] = None,
+                           firmware_proof_tier: Optional[int] = None) -> Tuple[str, str]:
     """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
     board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
     unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
@@ -17576,17 +17594,30 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                 f"hygiene + fitness clean but {n_non_fab_tier} on-board part(s) carry no "
                 f"catalogue MPN (package_family/function_class only) — FAB-READY requires "
                 f"mpn_symbol_footprint / mpn_package / mpn_package_only on EVERY on-board part")
-    # FIRMWARE / HARDWARE HONESTY (Cursor Fix 9 half, 2026-07-20, per CLAUDE.md doctrine):
+    # FIRMWARE / HARDWARE HONESTY (Cursor Fix 9 + tier-aware rework 2026-07-22):
     # a board is fabricable, but "FAB-READY" bare implies more than we can prove. There is
-    # never a HIL result in-chain, so the MAX honest verdict is "FAB-READY — UNPROVEN IN
-    # HARDWARE"; "FUNCTIONALLY VERIFIED" requires a HIL transcript we never have. If a
-    # Tier-0 firmware-contract proof PASSED (firmware_proof_ok True) the software contract
-    # is at least compile+contract-proven; if it was never run (None) we say so.
+    # NEVER a HIL result in-chain, so the MAX honest verdict is "FAB-READY — UNPROVEN IN
+    # HARDWARE"; "FUNCTIONALLY VERIFIED" requires a HIL transcript we never have.
+    # The readiness_why discloses the ACTUAL firmware proof tier so reviewers understand
+    # exactly what was (and was not) validated. Banner ALWAYS stays "FAB-READY — UNPROVEN
+    # IN HARDWARE" — tier only changes the why prose, never weakens the honesty ceiling.
+    _t = firmware_proof_tier
     if firmware_proof_ok is True:
-        return ("FAB-READY — UNPROVEN IN HARDWARE",
-                "DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and a Tier-0 "
-                "firmware-contract proof PASSED (compile + pin/bus/channel contract) — but no "
-                "hardware-in-the-loop test exists, so it is NOT 'FUNCTIONALLY VERIFIED'")
+        if _t is not None and _t >= 3:
+            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
+                    "QEMU Cortex-M bring-up probed modelled I²C devices (virt_i2c_read8) — "
+                    "VIRTUAL BOARD ONLY, not HIL; NOT FUNCTIONALLY VERIFIED")
+        elif _t == 2:
+            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
+                    "host-bind / board-sim contract PASS — compile+bind only, UNPROVEN IN HARDWARE")
+        elif _t == 1:
+            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
+                    "firmware compiles for target — compile only, UNPROVEN IN HARDWARE")
+        else:
+            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
+                    "Tier-0 firmware contract proof PASSED (compile + pin/bus/channel contract) — "
+                    "but no hardware-in-the-loop test exists, UNPROVEN IN HARDWARE")
+        return "FAB-READY — UNPROVEN IN HARDWARE", _why
     return ("FAB-READY — UNPROVEN IN HARDWARE",
             "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier — but NO "
             "firmware-contract proof has been run and there is no hardware-in-the-loop test, "
@@ -18319,17 +18350,23 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     _fw = pcb.get("firmwareProof") if isinstance(pcb.get("firmwareProof"), dict) else None
     # P9b: chain writes both `ok` and `allOk` (alias); accept either. None = never run.
     _fw_ok = None
+    _fw_tier: Optional[int] = None
     if isinstance(_fw, dict):
         if "ok" in _fw:
             _fw_ok = bool(_fw.get("ok"))
         elif "allOk" in _fw:
             _fw_ok = bool(_fw.get("allOk"))
+        # Extract the integer proof tier (0–3) — written by the QEMU firmware harness.
+        _raw_tier = _fw.get("tier")
+        if isinstance(_raw_tier, int):
+            _fw_tier = _raw_tier
     readiness, readiness_why = _pcb_readiness_verdict(
         pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
         n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope,
         n_electronic_full=n_electronic_design,
         n_non_fab_tier=_n_non_fab_tier, all_on_board_fab_tier=_all_on_board_fab,
-        n_architecture_gaps=_n_arch_gaps, firmware_proof_ok=_fw_ok)
+        n_architecture_gaps=_n_arch_gaps, firmware_proof_ok=_fw_ok,
+        firmware_proof_tier=_fw_tier)
 
     hygiene_components: List[Tuple[str, float, float]] = [
         ("DRC clean (0 violations)", 1 if drc_ok else 0, 1),
@@ -18395,6 +18432,8 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         "fab_zip_rel": fab_zip_rel, "fab_zip_toc": fab_zip_toc,
         "hygiene_components": hygiene_components,
         "fitness_components": fitness_components,
+        # Firmware proof metadata — used by tab_pcb for the Firmware proof block.
+        "fw_tier": _fw_tier, "fw_ok": _fw_ok,
     }
     _PCB_ASSESS_CACHE[run_dir] = result
     return result
@@ -18503,6 +18542,44 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         ("Toolchain — can verify + export (KiCad DRC/Gerbers)", "Yes" if pcb.get("canVerifyAndExport") else "No"),
     ])
     r += 1
+
+    # ── Firmware proof — honest tier disclosure (Cursor QEMU harness, 2026-07-22) ────
+    # Cursor's QEMU harness is VIRTUAL (RAM-modelled I²C on a Cortex-M sim), not HIL.
+    # Banner ALWAYS stays "FAB-READY — UNPROVEN IN HARDWARE"; this block surfaces the
+    # actual tier so reviewers understand what was and was not validated. Degrades
+    # gracefully when state.pcb.firmwareProof is absent (non-PCB runs: no crash).
+    sub_banner(ws, r, "Firmware proof", 8)
+    r += 1
+    _fw_tier_val = a.get("fw_tier")
+    _fw_ok_val = a.get("fw_ok")
+    _fw_tier_display = str(_fw_tier_val) if _fw_tier_val is not None else "—"
+    _fw_status = _pcb_firmware_status_string(_fw_tier_val, _fw_ok_val)
+    header(ws, r, ["Field", "Value"])
+    r += 1
+    ws.cell(r, 1, "Firmware proof tier").font = FONT_SUB
+    _ftc = ws.cell(r, 2, clean_cell(_fw_tier_display))
+    if _fw_tier_val is None or _fw_ok_val is None:
+        _ftc.font = FONT_NOTE
+    r += 1
+    ws.cell(r, 1, "Firmware status").font = FONT_SUB
+    _fsc = ws.cell(r, 2, clean_cell(_fw_status))
+    if _fw_ok_val is False or _fw_ok_val is None:
+        _fsc.font = FONT_FAIL if _fw_ok_val is False else FONT_NOTE
+    else:
+        # ok=True: advisory colouring — pass-ish but NOT a green PASS (still UNPROVEN IN HARDWARE)
+        _fsc.font = FONT_ADVISORY
+    r += 1
+    # Honesty note — always present, never lets the reviewer forget the HIL ceiling.
+    _fw_note = ws.cell(r, 1, clean_cell(
+        "HONESTY CEILING: 'FUNCTIONALLY VERIFIED' requires a real hardware-in-the-loop (HIL) "
+        "transcript on the populated PCBA — that does NOT exist in-chain. "
+        "Tier 3 (QEMU) = virtual ARM Cortex-M core with RAM-modelled I²C, NOT real silicon. "
+        "The MAX honest verdict for any in-chain proof is 'FAB-READY — UNPROVEN IN HARDWARE'."))
+    _fw_note.font = FONT_NOTE
+    _fw_note.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 44
+    r += 2
 
     # ── Board summary — real pipeline result ────────────────────────────────────────
     sub_banner(ws, r, "Board summary — real pipeline result", 8)
@@ -33791,6 +33868,64 @@ def _selftest() -> int:
     finally:
         _PCB_ASSESS_CACHE.pop(_p5_td, None)
         _shutil_p5.rmtree(_p5_td, ignore_errors=True)
+
+    # ── proveCatch: HONEST FIRMWARE LABELS (Cursor QEMU harness, 2026-07-22) ─────────
+    # 1. tier-3 (QEMU + modelled I²C): banner must be "FAB-READY — UNPROVEN IN HARDWARE"
+    #    (never bare "FAB-READY" and never "FUNCTIONALLY VERIFIED"), why must mention
+    #    "VIRTUAL" / "not HIL", and the firmware status cell = the tier-3 string.
+    # 2. tier-0: status cell = "CONTRACT ONLY — UNPROVEN IN HARDWARE".
+    # 3. no firmwareProof: no crash and status cell = "NOT RUN" (or "—").
+    # Pure decision functions + _pcb_firmware_status_string — no file I/O. ─────────────
+
+    # Case 1: tier 3, ok=True
+    _fh_r3, _fh_why3 = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
+        n_on_board=10, n_electronic_design=10, n_electronic_full=10,
+        n_non_fab_tier=0, all_on_board_fab_tier=True,
+        firmware_proof_ok=True, firmware_proof_tier=3)
+    if not _fh_r3.startswith("FAB-READY — UNPROVEN IN HARDWARE"):
+        print(f"  FAIL firmware-honesty tier3: banner must be FAB-READY — UNPROVEN IN HARDWARE, got {_fh_r3!r}"); bad += 1
+    if "FUNCTIONALLY VERIFIED" in _fh_r3:
+        print(f"  FAIL firmware-honesty tier3: banner must NEVER contain FUNCTIONALLY VERIFIED, got {_fh_r3!r}"); bad += 1
+    if "VIRTUAL" not in _fh_why3 and "not HIL" not in _fh_why3:
+        print(f"  FAIL firmware-honesty tier3: readiness_why must mention VIRTUAL or not HIL, got {_fh_why3!r}"); bad += 1
+    # "NOT FUNCTIONALLY VERIFIED" is the correct disavowal; detect bare affirmative claim only
+    import re as _fh_re
+    if _fh_re.search(r"(?<!NOT\s)FUNCTIONALLY VERIFIED", _fh_why3):
+        print(f"  FAIL firmware-honesty tier3: readiness_why must NEVER AFFIRM FUNCTIONALLY VERIFIED (NOT ... is OK), got {_fh_why3!r}"); bad += 1
+    _fh_status3 = _pcb_firmware_status_string(3, True)
+    if _fh_status3 != "VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE":
+        print(f"  FAIL firmware-honesty tier3: status cell wrong, got {_fh_status3!r}"); bad += 1
+
+    # Case 2: tier 0, ok=True
+    _fh_r0, _fh_why0 = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
+        n_on_board=10, n_electronic_design=10, n_electronic_full=10,
+        n_non_fab_tier=0, all_on_board_fab_tier=True,
+        firmware_proof_ok=True, firmware_proof_tier=0)
+    if not _fh_r0.startswith("FAB-READY — UNPROVEN IN HARDWARE"):
+        print(f"  FAIL firmware-honesty tier0: banner must be FAB-READY — UNPROVEN IN HARDWARE, got {_fh_r0!r}"); bad += 1
+    if "FUNCTIONALLY VERIFIED" in _fh_r0 or "FUNCTIONALLY VERIFIED" in _fh_why0:
+        print(f"  FAIL firmware-honesty tier0: must never claim FUNCTIONALLY VERIFIED"); bad += 1
+    _fh_status0 = _pcb_firmware_status_string(0, True)
+    if _fh_status0 != "CONTRACT ONLY — UNPROVEN IN HARDWARE":
+        print(f"  FAIL firmware-honesty tier0: status cell wrong, got {_fh_status0!r}"); bad += 1
+
+    # Case 3: no firmwareProof at all — must not crash and must give NOT RUN / —
+    _fh_r_none, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0,
+        n_on_board=10, n_electronic_design=10, n_electronic_full=10,
+        n_non_fab_tier=0, all_on_board_fab_tier=True,
+        firmware_proof_ok=None, firmware_proof_tier=None)
+    if not _fh_r_none.startswith("FAB-READY"):
+        print(f"  FAIL firmware-honesty no-proof: must still be FAB-READY (absent proof ≠ FAIL), got {_fh_r_none!r}"); bad += 1
+    _fh_status_none = _pcb_firmware_status_string(None, None)
+    if _fh_status_none not in ("NOT RUN", "—"):
+        print(f"  FAIL firmware-honesty no-proof: status cell must be NOT RUN or —, got {_fh_status_none!r}"); bad += 1
+
     # ── GATE #1 proveCatch (Terminal 2026-07-22): Gerber-existence-on-disk ──────────
     # A stamped `files` list whose paths do NOT exist on disk must read gerbers_ok=False
     # (→ FAIL), a real file on disk reads True, and a dir with a *.g* reads True.
