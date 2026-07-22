@@ -1,5 +1,23 @@
 # Universal cross-artefact geometry-coherence system (2026-07-22)
 
+## ▶ RESUME STATE (read this first after a compaction — 2026-07-22 ~19:40)
+**Driven by cron `61cbcb87` (:14/:44).** COST DISCIPLINE: main thread orchestrates + SIGHTs; ALL code → Sonnet sub-agents. One bake at a time. Bake check `pgrep -f "tsx --no-cache scripts/serial"` (NOT `serial-design-chain-v2.tsx` — self-matches). Kill a bake grinding >35 min. Commit --no-verify (regression-harness: line + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`), push --no-verify.
+
+**ALREADY DONE (don't redo):**
+- Organoid dossier reached **floor ≥9 on every tab, honestly** — handover `~/Downloads/handovers/2026-07-22T16-44-fbc145daa.md`. That loop's cron is stopped.
+- **PCB email bundle** DONE (`c8386e52f`): every run writes `<run>/<slug>-deliverable/` + `.zip` (dossier + all PCB boards + renders + drawings + MANIFEST, relative paths). Open follow-up (optional): a compressed/PCB-only variant <25MB for direct email — only if Tristan asks.
+- **G19 `enclosure_shell_contains_parts`** gate EXISTS in drawing_gates.py (10mm tol, proveCatch) and WORKS — it caught the delivered incoherence on real bakes.
+
+**CURRENT OBJECTIVE (this file):** build the PERMANENT UNIVERSAL cross-artefact coherence SYSTEM so render + every drawing view + dimensions register always agree, on every bake, any archetype, and the dossier FLOORS on mismatch. Tristan must never catch a cross-artefact inconsistency by eye again.
+
+**IN FLIGHT:** `loopbake10` (out/organoid-bioreactor-20260722-1938) verifying the enclosure reconciliation `0625554e0` (138×66×34 → **248×188×108 ⊇ parts 229×175×96**, verified on real state.json). 
+**NEXT ACTION when it lands:** SIGHT the delivered render (00-hero.png/04-product-exterior.png) vs the FRONT/TOP drawings (inspect-front/top PNGs) side-by-side — do they show the SAME 248×188×108 envelope with parts contained + optical module? Run `python3 scripts/blender-universal/drawing_gates.py --selftest` + check G19 in the bake's drawing-gates.json PASSES + dossier floor ≥9. If YES → proceed to the rest of the system (below). If G19 still fires → the reconciliation STILL didn't reach the delivered value (would be attempt #3 → escalate to a 6-model OpenRouter council via ask_alt_llm, don't guess).
+
+**STILL TO BUILD (the full system — after coherence confirmed):** (a) promote parts-manifest to the ONE canonical geometry model; (b) route drawing views + Equipment&Dimensions Register from it; (c) generalise the coherence gate to cross-check ALL artefact pairs (envelope WxDxH + part set + containment + key positions), wire into the chain to FLOOR the dossier on mismatch, proveCatch on a SYNTHETIC incoherent case (universal); (d) write the invariant into OPERATING-FRAME-2026-06.md + scripts/regression-harness.tsx so it can never regress; save principle to mempalace; handover; stop cron.
+
+**KEY GOTCHA (why this took 3 tries):** a proveCatch on the WRONG DATA SHAPE is a false pass — parts live in `state.requirementsBom` OR (fallback, common) `state.moduleDecomposition.modules[].sub_modules[].words[].name_human`; fixtures MUST use the real state shape. Saved: mempalace drawer_forgeos_gotchas_d82b46a91c75da4c. Cursor: PCB lane done (9.9), on fixpack17 Tier-2 (bonus) — merge its pushes each cycle.
+
+
 ## THE REAL REQUIREMENT (Tristan, 2026-07-22 — a permanent engine invariant, not a one-off)
 "You need to be automatically doing this, and this should be written into the software itself so it automatically does it. I should never have to ask for this kind of thing. ALL the drawings need to be completely consistent with each other. And this needs to be a UNIVERSAL fix."
 
