@@ -8,6 +8,12 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~14:55) — both 8->9 fixes landed; loopbake7 verifying
+- **Drawing gates FIXED `514a59ae6`**: G12 render_view_quality false-failed — `_sealed_product_camera_specs` applied optical-handheld framing (h×1.92 for a cuvette column) to ALL instrument devices → organoid (no optical column) camera too far back → height_occupancy 0.43 < 0.45. Fix: lab_electronics forms use box-centric framing (centre 0.5, h×1.1); optical handhelds keep 1.92×. proveCatch fires@0.43/passes@0.50.
+- **BoM column-contract FIXED `7e4ab793b`**: 6/35 FAIL → 0/35. Instrument electronic parts w/ no MPN now read "TBD (detailed design)" (engineered-assembly, honest for a prototype) not "bespoke fabrication"; sub-£0.50 price-floor. BUT score only 8.3 → **8.8** — a SEPARATE BoM sub-check (likely MPN-resolution COVERAGE on the 5 still-unresolved electronic parts: Stir Tach I-109, Sensor Cable I-106, Firmware Storage X-116, Host Protocol Bridge I-113, Galvanic Isolator I-114) caps it.
+- **loopbake7 running** with both fixes → SIGHT to confirm Drawing gates ≥9 + the exact BoM cap.
+- **Likely last blocker = HONEST data-coverage: 5 BoM electronic parts need real MPNs** (all standard, resolvable: Hall/optical tach, flash IC, USB-UART bridge e.g. CP2102, digital isolator e.g. ADuM1201, cable assy). This is the "BoM data coverage long pole". Honest path to BoM ≥9 = RESOLVE the MPNs (DB seed / Cursor PCB-electronics lane), NOT soften the coverage scorer. Confirm on loopbake7 SIGHT, then dispatch/route.
+
 ## LOOP STATUS (2026-07-22 ~14:30) — 🎯 FLOOR = 8 (0→2.4→4→6→8); every non-mirror tab ≥8
 - loopbake6 (1405): internal-runs invariant CLEARED (delivered schedule length capped 1.07m→0.313m). **Floor 8**, CHECKS FAIL=0, all 4 ship axes PASS (cost/PCB/render/self-audit). ZERO non-mirror tabs below 8.
 - Tab scores: 26 tabs, most 9-10 (Verification/PCB/Risk/Holds 9.9; Assembly/Drawings/Interconnect/Renders 9; ⚠Checks/Financial/Inputs/Overview/Brief/Calculations… 10). 
