@@ -1,5 +1,13 @@
 # Universal cross-artefact geometry-coherence system (2026-07-22)
 
+## ⚠ FRESH-BAKE END-TO-END (2026-07-23 ~00:40) — G19+G21 PASS on delivered dossier; G20 caught a REAL residual (caption HEIGHT not routed)
+Fresh full bake `out/organoid-bioreactor-20260723-0025` (ALL fixes in: reorder+centering+G20/G21). Ran the 3 gates on the DELIVERED artefacts:
+- **G19 PASS** ✓ — shell 367×335×126 ⊇ parts 367×335×126 (centering fix REACHED delivered value; shell = manifest bbox exactly).
+- **G21 PASS** ✓ — top-10-of-25 recognized, 0 dropped/phantom.
+- **G20 FAILS — but CORRECTLY (gate working):** caption "367 × 335 × **174** mm" ≠ shell 367×335×**126**. The caption-routing fix worked for W,D (both now = shell 367,335) but NOT height (174≠126). G19 confirms parts are 126 tall, so the caption's 174 is the wrong value. RESIDUAL BUG: draw_ga.py:509 `ww,dd,hh = _sw,_sdp,_sh` should set hh from the shell but the delivered caption H=174. Likely a settle-timing divergence (draw_ga runs on the EARLY settled model pre-cost-stack; shell H may resize 174→126 later) OR `_sh` fell back while w,d took. Note: contract H=160, shell H=126, caption H=174 — three heights (the sprawl/contract issue is separate).
+- **This is the fresh-bake end-to-end verification WORKING:** it caught a real residual the render-only + old-bake checks missed. G19+G21 confirmed reaching delivered values; G20 residual = caption-H routing.
+- **DISPATCHED:** caption-HEIGHT routing fix (caption H must = canonical shell H like W,D → G20 PASS on a fresh bake).
+
 ## ✅✅ COHERENCE MECHANISM COMPLETE (2026-07-23 ~01:40) — handover written
 The universal cross-artefact coherence GATE MECHANISM is COMPLETE + correct + delivered-verified: G19 containment (by construction) + G20 envelope-equality (reads real GA caption, routed to canonical) + G21 part-set (top-N aware) + positions (coherent by construction). Wired gate-35 (floors dossier), OPERATING-FRAME documented, proveCatch in verify-engine-guards.sh. Council REORDER 439e2bc91 + centering dac3912a3 = shell contains parts by construction (ended 4 Goodhart misses). G20/G21 correctness dac3.. + 1db1bd3cf verified on delivered 2335. **HANDOVER:** ~/Downloads/handovers/2026-07-23T00-22-1db1bd3cf.md.
 **floor ≥9 BLOCKED BY (not coherence defects — Tristan's call):** (1) PLACER SPRAWL — 367×326×126 box for a 180×140×160 contract device (packing = task #38, council-deferred, overlap-risk; interim = a contract-vs-delivered gate to force it); (2) COST under-spec £255 vs £3500. NEXT in-scope coherence building block if the loop continues: the contract-vs-delivered envelope gate (makes the sprawl impossible-to-ship).
