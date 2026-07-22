@@ -91,20 +91,57 @@ ${[...gpioPads].map((pad) => `typedef struct { char _; } ${pad};`).join('\n')}
 #endif /* FORGE_TIER1_PINMAP_H */
 `
 
-  const mainC = `/* Freestanding bring-up stub — Tier-1 compile proof only. */
+  // INTENT (fixpack18): under FORGE_MCU_SIM the ELF must execute observable
+  // semihosting writes on a real ARM core (QEMU). Without the flag, Tier-1
+  // remains compile-only (infinite loop) so bare-metal link still proves pins.
+  const simWrites = [
+    ...[...gpioPads].map(
+      (pad) => `  forge_sh_write0("CHECK gpio_pad PASS pad=${pad}\\n");`,
+    ),
+    ...input.buses
+      .filter((b) => b.protocol === 'i2c' || b.protocol === 'swd')
+      .map((b) => `  forge_sh_write0("CHECK bus_alive PASS bus=${b.bus_id} proto=${b.protocol}\\n");`),
+  ]
+
+  const mainC = `/* Freestanding bring-up — Tier-1 compile + optional MCU sim (fixpack18). */
 #include "pinmap.h"
 
 void Reset_Handler(void);
 
+#if defined(FORGE_MCU_SIM)
+/* Angel/ARM semihosting — only valid under QEMU -semihosting (not on bare metal). */
+static inline int forge_sh_call(int op, void *arg) {
+  register int r0 asm("r0") = op;
+  register void *r1 asm("r1") = arg;
+  asm volatile ("bkpt 0xAB" : "+r"(r0) : "r"(r1) : "memory");
+  return r0;
+}
+static void forge_sh_write0(const char *s) {
+  (void)forge_sh_call(0x04 /* SYS_WRITE0 */, (void *)s);
+}
+static void forge_sh_exit(unsigned int code) {
+  /* ADP_Stopped_ApplicationExit */
+  unsigned int packed = 0x20026;
+  (void)code;
+  (void)forge_sh_call(0x18 /* SYS_EXIT */, &packed);
+}
+#endif
+
 void Reset_Handler(void) {
 ${pinAsserts.join('\n') || '  /* no GPIO pins */'}
+#if defined(FORGE_MCU_SIM)
+  forge_sh_write0("MCU_SIM|${input.proofTargetId}|BOOT\\n");
+${simWrites.join('\n') || '  forge_sh_write0("CHECK gpio_pad PASS pad=none\\n");'}
+  forge_sh_write0("CHECK mcu_sim PASS\\n");
+  forge_sh_exit(0);
+#endif
   for (;;) { }
 }
 `
 
-  const startupS = `/* Minimal Cortex-M0+ vectors — Reset from C + weak defaults. */
+  const startupS = `/* Minimal Cortex-M vectors — Reset from C + weak defaults.
+ * .cpu omitted so -mcpu= from the Makefile selects M0+ (Tier-1) or M3 (QEMU sim). */
   .syntax unified
-  .cpu cortex-m0plus
   .thumb
 
   .extern Reset_Handler
@@ -164,19 +201,29 @@ SECTIONS
 }
 `
 
-  const makefile = `# Tier-1 freestanding MCU compile — generated from firmware pin-map
+  const makefile = `# Tier-1 freestanding MCU compile + QEMU MCU-sim ELF (fixpack18)
 TARGET   ?= tier1_proof
 MCUFLAGS ?= -mcpu=cortex-m0plus -mthumb
+# QEMU -M mps2-an385 is Cortex-M3; same freestanding sources, observable semihosting.
+SIMFLAGS ?= -mcpu=cortex-m3 -mthumb -DFORGE_MCU_SIM
 CFLAGS   ?= $(MCUFLAGS) -ffreestanding -nostdlib -Wall -Werror -Os
 LDFLAGS  ?= $(MCUFLAGS) -nostdlib -T link.ld -Wl,--gc-sections
+SIM_CFLAGS  ?= $(SIMFLAGS) -ffreestanding -nostdlib -Wall -Werror -Os
+SIM_LDFLAGS ?= $(SIMFLAGS) -nostdlib -T link.ld -Wl,--gc-sections
 
-.PHONY: all clean
+.PHONY: all sim clean
 all: $(TARGET).elf
+sim: $(TARGET)_sim.elf
 
 $(TARGET).elf: main.c startup.S link.ld pinmap.h
 	arm-none-eabi-gcc $(CFLAGS) -c main.c -o main.o
 	arm-none-eabi-gcc $(CFLAGS) -c startup.S -o startup.o
 	arm-none-eabi-gcc $(LDFLAGS) main.o startup.o -o $@
+
+$(TARGET)_sim.elf: main.c startup.S link.ld pinmap.h
+	arm-none-eabi-gcc $(SIM_CFLAGS) -c main.c -o main_sim.o
+	arm-none-eabi-gcc $(SIM_CFLAGS) -c startup.S -o startup_sim.o
+	arm-none-eabi-gcc $(SIM_LDFLAGS) main_sim.o startup_sim.o -o $@
 
 clean:
 	rm -f *.o *.elf

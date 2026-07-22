@@ -521,8 +521,8 @@ export interface PcbStageResult {
    */
   firmwareProof?: {
     schema: 'pcb-firmware-proof-stage/v1'
-    /** Highest completed tier: 0 native, 1 MCU compile, 2 synthetic board sim. */
-    tier: 0 | 1 | 2
+    /** Highest completed: 0 native, 1 MCU compile, 2 host bind, 3 QEMU MCU sim. */
+    tier: 0 | 1 | 2 | 3
     results: Array<{ target: string; result: { ok: boolean; skipped?: boolean; reason?: string } }>
     allOk: boolean
     /** Alias of allOk — Excel readiness reads `ok`. */
@@ -536,15 +536,26 @@ export interface PcbStageResult {
       projectDir?: string
       elfPath?: string
     }
+    /** Host net/device bind harness (NOT MCU execution — honesty rename from board_sim). */
     tier2?: {
       ok: boolean
       skipped: boolean
-      tier: 'tier2_board_sim'
+      tier: 'tier2_board_sim' | 'tier2_board_bind'
       reason: string
       modelPath?: string
       resultPath?: string
       transcriptPath?: string
       bindErrorCount?: number
+    }
+    /** Real Cortex-M ELF under QEMU semihosting — still not HIL. */
+    tier3?: {
+      ok: boolean
+      skipped: boolean
+      tier: 'tier3_mcu_sim'
+      reason: string
+      qemu?: string | null
+      simElfPath?: string
+      transcriptPath?: string
     }
   }
 }

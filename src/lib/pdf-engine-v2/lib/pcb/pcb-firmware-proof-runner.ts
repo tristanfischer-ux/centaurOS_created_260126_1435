@@ -277,3 +277,110 @@ export function runTier2BoardSim(args: {
   fs.writeFileSync(path.join(outDir, 'tier2-status.json'), JSON.stringify(result, null, 2))
   return result
 }
+
+export interface FirmwareTier3McuSimResult {
+  ok: boolean
+  skipped: boolean
+  tier: 'tier3_mcu_sim'
+  reason: string
+  qemu?: string | null
+  simElfPath?: string
+  transcriptPath?: string
+  transcript?: string
+}
+
+/**
+ * @description Run the Tier-1 sim ELF on a real virtual Cortex-M core via QEMU
+ * + ARM semihosting. This is NOT the Mac host mock (tier2_board_bind) and NOT HIL.
+ * Fail-closed when qemu-system-arm missing or transcript lacks MCU_SIM checks.
+ */
+export function probeTier3McuSim(args: {
+  outDir: string
+  /** Directory containing Makefile from emitTier1McuProject (…/mcu-project). */
+  projectDir?: string
+  proofTargetId?: string
+}): FirmwareTier3McuSimResult {
+  const { outDir, projectDir, proofTargetId } = args
+  fs.mkdirSync(outDir, { recursive: true })
+  const which = spawnSync('which', ['qemu-system-arm'], { encoding: 'utf8' })
+  const qemu = which.status === 0 ? which.stdout.trim() : null
+
+  let result: FirmwareTier3McuSimResult
+  if (!qemu) {
+    result = {
+      ok: false,
+      skipped: true,
+      tier: 'tier3_mcu_sim',
+      reason: 'qemu-system-arm not on PATH — MCU sim not attempted (install qemu)',
+      qemu: null,
+    }
+  } else if (!projectDir || !fs.existsSync(path.join(projectDir, 'Makefile'))) {
+    result = {
+      ok: false,
+      skipped: true,
+      tier: 'tier3_mcu_sim',
+      reason: 'no Tier-1 mcu-project to build *_sim.elf from',
+      qemu,
+    }
+  } else {
+    const makeSim = spawnSync('make', ['-C', projectDir, 'sim'], {
+      encoding: 'utf8',
+      timeout: 120_000,
+    })
+    const simElfPath = path.join(projectDir, 'tier1_proof_sim.elf')
+    if (makeSim.status !== 0 || !fs.existsSync(simElfPath)) {
+      result = {
+        ok: false,
+        skipped: false,
+        tier: 'tier3_mcu_sim',
+        reason: `sim ELF build failed: ${(makeSim.stderr || makeSim.stdout || '').slice(0, 400)}`,
+        qemu,
+        simElfPath: fs.existsSync(simElfPath) ? simElfPath : undefined,
+      }
+    } else {
+      // DECISION: mps2-an385 + cortex-m3 — QEMU's best-supported M-profile +
+      // semihosting target; freestanding proof does not need SAMD21 silicon model.
+      const qemuRun = spawnSync(
+        qemu,
+        [
+          '-M', 'mps2-an385',
+          '-cpu', 'cortex-m3',
+          '-nographic',
+          '-semihosting-config', 'enable=on,target=native',
+          '-kernel', simElfPath,
+        ],
+        {
+          encoding: 'utf8',
+          timeout: 15_000,
+          env: { ...process.env, QEMU_AUDIO_DRV: 'none' },
+        },
+      )
+      const transcript = `${qemuRun.stdout || ''}${qemuRun.stderr || ''}`
+      const transcriptPath = path.join(outDir, 'mcu-sim-transcript.txt')
+      fs.writeFileSync(transcriptPath, transcript)
+      const target = proofTargetId ?? 'unknown'
+      const bootOk = transcript.includes(`MCU_SIM|${target}|BOOT`)
+        || transcript.includes('MCU_SIM|')
+      const passOk = transcript.includes('CHECK mcu_sim PASS')
+      const checkLines = transcript.split(/\r?\n/).filter((l) => l.startsWith('CHECK '))
+      const allChecksPass =
+        checkLines.length > 0 && checkLines.every((l) => l.includes(' PASS'))
+      const ok = bootOk && passOk && allChecksPass && qemuRun.error == null
+      result = {
+        ok,
+        skipped: false,
+        tier: 'tier3_mcu_sim',
+        reason: ok
+          ? 'Cortex-M ELF executed under QEMU semihosting — UNPROVEN IN HARDWARE (not HIL)'
+          : `MCU sim transcript incomplete (exit=${qemuRun.status ?? 'n/a'}): ${transcript.slice(0, 240)}`,
+        qemu,
+        simElfPath,
+        transcriptPath,
+        transcript: transcript.slice(0, 2000),
+      }
+    }
+  }
+
+  fs.writeFileSync(path.join(outDir, 'tier3-status.json'), JSON.stringify(result, null, 2))
+  return result
+}

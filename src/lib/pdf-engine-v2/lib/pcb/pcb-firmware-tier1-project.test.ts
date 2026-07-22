@@ -38,6 +38,11 @@ describe('emitTier1McuProject', () => {
       // GOTCHA: GND must not become a TOKEN typedef (power ≠ MCU pad).
       expect(pinmap).not.toMatch(/GND_TOKEN|typedef struct \{ char _; \} GND/)
       expect(main).toMatch(/static PIN_HOST_I2C_SDA_TOKEN \*_forge_pin_/)
+      expect(main).toContain('FORGE_MCU_SIM')
+      expect(main).toContain('bkpt 0xAB')
+      const makefile = fs.readFileSync(path.join(result.projectDir, 'Makefile'), 'utf8')
+      expect(makefile).toMatch(/^\s*sim:/m)
+      expect(makefile).toContain('$(TARGET)_sim.elf')
       expect(fs.existsSync(path.join(result.projectDir, 'Makefile'))).toBe(true)
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true })
