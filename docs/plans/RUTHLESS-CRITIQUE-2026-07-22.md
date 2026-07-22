@@ -1,0 +1,41 @@
+# Ruthless critique — organoid dossier (2026-07-22)
+
+SIGHT target: `out/organoid-bioreactor-20260722-0657/` (post fixpack10 merge). Three adversarial
+subagents (cost / render-vision / tab-honesty) + my own PCB SIGHT. **Unifying root cause:** the
+scorer grades **column-contract arithmetic** (are the right cell-types populated + do formulas
+reference drivers), NOT **engineering correctness** — so a well-formed but physically-wrong or
+empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime leak**
+(`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
+frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
+
+## DONE this session (committed + proveCatch)
+- **PCB fab-zip** (`1e2aa72f5`) — multi-board zip never written (no top-level `pcb/` dir) → PCB tab 0 → dossier floor 0. Fixed + per-board gerber namespacing (was silently colliding 3 boards). Terminal lane.
+- **Cost-ceiling basis** (`ee6fe7a10`) — £475-ex-works-vs-£385 FALSE-FAIL on two ship surfaces; brief ceilings a *bill of materials* → now compares materials £287 → PASS. Shared `_ship_cost_layer_check`, wording-keyed. Terminal lane.
+- **Render/vision timing barrier** (`e717661ea`) — vision critic ran 22 min, finished AFTER Excel built → false-UNVERIFIED-7 that HID a genuine BROKEN hero (≤4). Barrier waits for `.blender-bg-done` before build. Terminal lane.
+- **PCB honesty gates** (`153886f3d`) — Gerber-on-disk + per-peripheral channel coverage. Terminal lane.
+
+## BACKLOG — by priority + lane
+
+### A. Scoring-honesty (Terminal lane — the through-line theme)
+1. **`#DIV/0!` in Calculations 10/10** (B74/F74). V_tank=0 divisor. Two fixes: (a) CONTENT — the `P_V = P_w/V_tank` worked-calc must derive V_tank from the real 20–30 ml vessel volume, not `pi/4·T³` with T unset; (b) SCORING — a post-recalc scan must FAIL any scored tab carrying an Excel error string (`#DIV/0! #REF! #VALUE! #NAME? #N/A #NUM! #NULL!`). Recalc happens at `recalc_and_cache` (build-excel-export.py:23588) AFTER scoring — so the scan must run post-recalc and feed the ⚠Checks/floor (ordering work).
+2. **Falsified-fault laundering** (Risk&Reg 9.9): a physics-critic finding with `corroboration:"falsified"` (24 V motor on 12 V board, no boost) is parked as non-scoring advisory. **VERIFY FIRST** — "falsified" may mean the critic's claim was *refuted* (NOT a real fault → advisory is correct; the determinism-treadmill warning applies). Read `7-5-physics-critique.json` + confirm the Nidec Copal F280A-24 voltage vs the board rail before acting. If genuinely a real fault → a corroborated finding must down-score its tab.
+3. **Empty tabs scored 9** (Interconnect, Assembly): 3 rows each (title + badge + pointer); scored on "SVG present + coverage count", not on-tab content. Scorer should require substantive on-tab content, not a coverage-count proxy.
+4. **Verified-out-of-scope scored 8** (Engineering Analysis): empty stress table; a verified-OOS tab should be EXCLUDED from the positive mean, not contribute an 8.
+5. **Verification path-length row** target=1 achieved=2 stamped PASS (noun-count floor, not equality) — an over/under-provision passes. Make quantity rows equality-checked where the brief states a count.
+
+### B. Device-scale-regime content leaks (Terminal lane — one root: isWattScaleInstrument)
+6. **Agitation RPM contradiction** 60 (brief) / 100 (DO-control calc) / **1000** (agitation:power calc, 15 mm impeller). 1000 RPM violates the organoid shear limit (≤0.1 Pa). Need ONE shared agitation-speed contract quantity consumed by both tools; the 1000 RPM default was never overridden by the 60 RPM brief target.
+7. **WRAS/irrigation-water MoC on electronic/lab parts** — "PVC-U / 304 stainless (WRAS) for process/irrigation water service" tagged on a **Debug Header** (PCB pin header), **Sterile Filter Vent**, **Dosing Pump**. Material-family resolver must not assign WRAS-water MoC to device electronic/lab-consumable parts.
+8. **Plant DCF/LCOE on a benchtop instrument** (Financial 9.9): 20-year discounted cashflow treating 20 ml working volume as annual production; "£5.94/ml", 8000 h/yr @ 0 kW, NPV −£1,011. Device-scale should suppress the plant LCOE/DCF frame (same signal that gates 230 V-1φ).
+9. **Heater duty 5 W (brief) vs 10 W (calc)** + redundant Peltier TEC **and** cartridge heater on a 0.93 W load (F2 recurrence with a different pair). Cross-tab duty reconcile + single actuator.
+10. **All-in capex £546 vs BoM £286 unreconciled** (Financial). Show the reconciliation (materials→+labour+overhead+margin+channel) on the tab.
+
+### C. Cursor lane (PCB) — routed to inbox
+11. **KiCad designators 9/34** + **P&P 26/34** on the PCB tab (the remaining sub-8 after fab-zip). Real U1/C3/J2 designators from the generated netlist, and P&P extraction for all placed parts.
+
+### D. Render long-pole (Terminal render lane — B7)
+12. **The hero render is genuinely broken** (floating vertical PCB, exploded translucent geometry, featureless slab — the vision critic is RIGHT). This is the B7 `build_universal_scene.py` sealed-bioreactor-story long pole. Biggest single item; now correctly scored (barrier fix) so it can't hide.
+
+## Notes
+- Excel-only fixes (A1-scoring, cost, fab-zip, PCB gates) RE-SCORE from an existing state.json by re-running `build-excel-export.py <run_dir>` — no full re-bake needed. The vision barrier + content fixes (B) need a fresh bake.
+- Cost/render numbers are HONEST — the cost stack is internally coherent (£287 materials in-band), only the gate basis was wrong; the render is honestly broken.
