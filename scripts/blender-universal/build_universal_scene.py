@@ -7077,49 +7077,12 @@ def write_parts_manifest(out_dir, parts, state=None):
         bbox["height_mm"] = round(bbox["z_max_mm"] - max(0.0, bbox["z_min_mm"]), 1)
     else:
         bbox = {}
-    # G19 COHERENCE FIX (organoid-bioreactor 2026-07-22): after placement the real part
-    # stack bbox may exceed the pre-placement _SEALED_ENV_MM (the placer positions parts at
-    # XY coordinates that spread beyond the pre-estimated envelope — the containment-clamp at
-    # build_parts_manifest:L6770 only scales individual part DIMS, not their POSITIONS, so a
-    # part placed at y=+157mm with D=30mm still reaches y+15=172mm, beyond a 188mm-wide shell
-    # centred at y=0: y_max - y_min = 157+94 = 251mm > 188mm shell). G19 checks
-    # shell_dims ⊇ pm_bbox so the shell MUST contain the ACTUAL placed extent.
-    # Fix: after computing the true placed-parts bbox, grow shell dims to
-    # max(current_shell_dim, placed_bbox_dim + 2×clearance). NO hardcoded part sizes —
-    # reads the SAME pm_bbox that G19 reads (length_mm / width_mm / height_mm).
-    # Universal: only fires for sealed-enclosure renders (_SEALED_ENV_MM is not None).
-    if _SEALED_ENV_MM is not None and bbox:
-        global _SEALED_ENV_MM
-        _g19_clr = 6.0   # same wall clearance as minimum_working_envelope._CLEARANCE_MM
-        _g19_pm_w = float(bbox.get("length_mm") or 0.0)
-        _g19_pm_d = float(bbox.get("width_mm") or 0.0)
-        _g19_pm_h = float(bbox.get("height_mm") or 0.0)
-        _g19_cur_W, _g19_cur_D, _g19_cur_H = _SEALED_ENV_MM
-        _g19_need_W = max(_g19_cur_W, _g19_pm_w + 2 * _g19_clr)
-        _g19_need_D = max(_g19_cur_D, _g19_pm_d + 2 * _g19_clr)
-        _g19_need_H = max(_g19_cur_H, _g19_pm_h + 2 * _g19_clr)
-        if (_g19_need_W > _g19_cur_W + 0.5
-                or _g19_need_D > _g19_cur_D + 0.5
-                or _g19_need_H > _g19_cur_H + 0.5):
-            print(f"[parts-manifest][G19-coherence] placed bbox "
-                  f"{_g19_pm_w:.0f}×{_g19_pm_d:.0f}×{_g19_pm_h:.0f} mm exceeds "
-                  f"_SEALED_ENV_MM {_g19_cur_W:.0f}×{_g19_cur_D:.0f}×{_g19_cur_H:.0f} mm — "
-                  f"growing shell to contain placed extent: "
-                  f"{_g19_need_W:.0f}×{_g19_need_D:.0f}×{_g19_need_H:.0f} mm "
-                  f"(placed_bbox + 2×{_g19_clr:.0f} mm wall clearance)")
-            _SEALED_ENV_MM = (_g19_need_W, _g19_need_D, _g19_need_H)
-            _g19_shell_re = re.compile(
-                r"enclosure\s*shell|housing\s*shell|cabinet\s*shell", re.I)
-            for _g19_r in rows:
-                if _g19_shell_re.search(str(_g19_r.get("name") or "")):
-                    _g19_r["dims_mm"] = {
-                        "w": round(float(_g19_need_W), 1),
-                        "d": round(float(_g19_need_D), 1),
-                        "h": round(float(_g19_need_H), 1),
-                    }
-                    print(f"[parts-manifest][G19-coherence] Enclosure Shell dims → "
-                          f"{_g19_need_W:.1f}×{_g19_need_D:.1f}×{_g19_need_H:.1f} mm")
-                    break
+    # G19 COHERENCE: the post-hoc grow that was here (fa113262a, 2026-07-22) was a Goodhart:
+    # it updated _SEALED_ENV_MM and the manifest shell-row AFTER the mesh was already built
+    # at the pre-placement estimate → G19 passed on the number while pixels still protruded.
+    # REORDER FIX (council #2): the shell mesh is now built from the post-placement bbox
+    # inside place_sealed_enclosure itself (before write_parts_manifest runs), so the mesh
+    # dims already == the final _SEALED_ENV_MM by construction. No post-hoc grow needed here.
     # SITE UTILISATION — hull ÷ deck, the deterministic "empty deck" signal (G7 reads it).
     site = None
     try:
@@ -16654,6 +16617,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
 
     # 2. the cabinet SHELL — thin walls named u_skid_* so the INSPECT recolour renders
     #    them as the faint wireframe the internal equipment shows through.
+    #    REORDER FIX (council #2, 2026-07-22): shell mesh is built AFTER placement so its
+    #    dims come from the ACTUAL placed-part bbox, not the pre-placement estimate.
+    #    The u_skid_encl_* build is deferred to the post-placement resize block below.
     sid = STRUCTURE_MODULE_ID
     if sid not in MO:
         MO[sid] = []
@@ -16662,20 +16628,6 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
 
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
-
-    # Instrument devices skip the wireframe u_skid shell — the u_se_product cutaway body
-    # is the only enclosure read in the hero; a duplicate structure shell painted steel-grey
-    # by run_render_pipeline drowned the coloured optical-bench story (2026-07-13).
-    if not _IS_INSTRUMENT_DEVICE:
-        for snm, loc, size in [
-            ("u_skid_encl_back",   (0.0, D / 2 - t / 2, base_z + H / 2), (W, t, H)),
-            ("u_skid_encl_left",   (-W / 2 + t / 2, 0.0, base_z + H / 2), (t, D, H)),
-            ("u_skid_encl_right",  (W / 2 - t / 2, 0.0, base_z + H / 2), (t, D, H)),
-            ("u_skid_encl_top",    (0.0, 0.0, base_z + H - t / 2), (W, D, t)),
-            ("u_skid_encl_bottom", (0.0, 0.0, base_z + t / 2), (W, D, t)),
-        ]:
-            _o = fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
-            _o.dimensions = _mm3(size)   # add_box halves; set true size
 
     # Equipment module for the stylized interior — MUST NOT be structure_containment
     # (hero pass repaints structure objects ghost/steel and erases story colours).
@@ -17010,6 +16962,93 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
 
     if _IS_INSTRUMENT_DEVICE:
         _suppress_instrument_boilerplate_meshes()
+
+    # ── POST-PLACEMENT ENVELOPE RESIZE (council fix #2, 2026-07-22) ──────────────
+    # INTENT (REORDER): the cabinet shell mesh is built below in `if _SEALED_HERO_PRODUCT:`
+    # using W, D, H. Those were the PRE-PLACEMENT estimate. After placement the manifest
+    # proxies' placed_xyz_mm values (already containment-clamped above) give the ACTUAL
+    # functional-stack bbox. Size the shell to CONTAIN it (+clearance, centred) BEFORE the
+    # shell mesh is built so mesh dims == envelope parts actually occupy. This is the fix:
+    #   place parts → measure actual bbox → size env to contain → THEN build shell mesh.
+    # The u_se_product_* panels (instrument) and u_skid_encl_* walls (non-instrument) both
+    # use W, D, H directly — updating those here makes the mesh correct BY CONSTRUCTION.
+    _post_clr = 6.0   # wall clearance — same as the now-deleted write_parts_manifest grow
+    _post_xs, _post_ys, _post_zs_lo, _post_zs_hi = [], [], [], []
+    for _pp in parts:
+        _pxyz = getattr(_pp, "placed_xyz_mm", None)
+        if _pxyz is None:
+            continue
+        _pdim = _pp.dim if isinstance(getattr(_pp, "dim", None), dict) else None
+        _phw = float(_pdim.get("w_mm") or _pdim.get("dia_mm") or 20.0) / 2.0 if _pdim else 10.0
+        _phd = float(_pdim.get("d_mm") or _pdim.get("dia_mm") or 16.0) / 2.0 if _pdim else 8.0
+        _phh = float(_pdim.get("h_mm") or _pdim.get("len_mm") or 12.0) / 2.0 if _pdim else 6.0
+        _post_xs += [float(_pxyz[0]) - _phw, float(_pxyz[0]) + _phw]
+        _post_ys += [float(_pxyz[1]) - _phd, float(_pxyz[1]) + _phd]
+        _post_zs_lo.append(float(_pxyz[2]) - _phh)
+        _post_zs_hi.append(float(_pxyz[2]) + _phh)
+    if _post_xs:
+        _post_bbox_w = max(_post_xs) - min(_post_xs)
+        _post_bbox_d = max(_post_ys) - min(_post_ys)
+        _post_bbox_h = max(_post_zs_hi) - min(_post_zs_lo)
+        _post_need_W = max(W, _post_bbox_w + 2 * _post_clr)
+        _post_need_D = max(D, _post_bbox_d + 2 * _post_clr)
+        _post_need_H = max(H, _post_bbox_h + 2 * _post_clr)
+        # UNBOUNDED-GROWTH GUARD (council risk #2): instrument / benchtop devices
+        # (enclosure < 1 m³) must not silently grow to comical dimensions. A part
+        # placed at y=+1000mm is a PLACER BUG, not a real size need. Surface it
+        # loudly; still contain (coherence first, bug is exposed not hidden).
+        _post_max_axis_mm = (600.0
+                             if (_IS_INSTRUMENT_DEVICE
+                                 or (W * D * H) < 1e9)  # mm³ < 1m³
+                             else 6000.0)  # plant-scale: generous
+        for _ax_nm, _ax_val in (("W", _post_need_W), ("D", _post_need_D), ("H", _post_need_H)):
+            if _ax_val > _post_max_axis_mm:
+                print(
+                    f"[univ][sealed][SPRAWL-WARN] post-placement {_ax_nm}={_ax_val:.0f}mm "
+                    f"exceeds {_post_max_axis_mm:.0f}mm guard — placer is generating "
+                    f"out-of-bounds positions; containing anyway but THIS IS A PLACER BUG "
+                    f"(fix instrument_role_xy.py or _instrument_proxy_geometry)",
+                    flush=True,
+                )
+        if (_post_need_W > W + 0.5 or _post_need_D > D + 0.5 or _post_need_H > H + 0.5):
+            print(
+                f"[univ][sealed][post-placement resize] placed bbox "
+                f"{_post_bbox_w:.0f}×{_post_bbox_d:.0f}×{_post_bbox_h:.0f} mm "
+                f"exceeds pre-estimate {W:.0f}×{D:.0f}×{H:.0f} mm — "
+                f"resizing shell to {_post_need_W:.0f}×{_post_need_D:.0f}×{_post_need_H:.0f} mm "
+                f"(placed_bbox + 2×{_post_clr:.0f}mm clearance); "
+                f"shell mesh built from FINAL env (REORDER council fix #2)",
+                flush=True,
+            )
+            W, D, H = _post_need_W, _post_need_D, _post_need_H
+            _SEALED_ENV_MM = (W, D, H)
+            # Recompute interior dims — the u_se_product_* and u_skid_encl_* panels
+            # use t, iw, idep, ih derived from W, D, H. Update them now so the shell
+            # mesh uses the final (post-placement) envelope.
+            margin = max(8.0, min(W, D, H) * 0.05)
+            t = max(3.0, min(W, D) * 0.012)
+            iw, idep, ih = W - 2 * margin, D - 2 * margin, H - 2 * margin
+            print(
+                f"[univ][sealed][post-placement resize] final env "
+                f"{W:.0f}×{D:.0f}×{H:.0f} mm "
+                f"(interior {iw:.0f}×{idep:.0f}×{ih:.0f} mm, t={t:.1f}mm)",
+                flush=True,
+            )
+
+    # Now build the non-instrument wireframe shell (u_skid_encl_*) from the FINAL W,D,H.
+    # DEFERRED from the old position (before placement) so the mesh dims == the actual
+    # placed-part bbox. Instrument devices skip this shell (they use u_se_product_* below).
+    if not _IS_INSTRUMENT_DEVICE:
+        for snm, loc, size in [
+            ("u_skid_encl_back",   (0.0, D / 2 - t / 2, base_z + H / 2), (W, t, H)),
+            ("u_skid_encl_left",   (-W / 2 + t / 2, 0.0, base_z + H / 2), (t, D, H)),
+            ("u_skid_encl_right",  (W / 2 - t / 2, 0.0, base_z + H / 2), (t, D, H)),
+            ("u_skid_encl_top",    (0.0, 0.0, base_z + H - t / 2), (W, D, t)),
+            ("u_skid_encl_bottom", (0.0, 0.0, base_z + t / 2), (W, D, t)),
+        ]:
+            _o = fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
+            _o.dimensions = _mm3(size)   # add_box halves; set true size
+    # ── END POST-PLACEMENT ENVELOPE RESIZE ───────────────────────────────────────
 
     # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
     #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's

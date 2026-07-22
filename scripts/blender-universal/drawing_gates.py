@@ -2139,16 +2139,18 @@ def _selftest() -> int:
         _g19_ok_abs, _ = enclosure_shell_contains_check(
             [], {"length_mm": 200.0, "width_mm": 100.0, "height_mm": 80.0})
         chk("g19_abstains_without_shell_part", _g19_ok_abs)
-        # (d) proveCatch for the G19-COHERENCE fix (write_parts_manifest 2026-07-22):
+        # (d) proveCatch for the REORDER fix (place_sealed_enclosure council fix #2, 2026-07-22):
         # The organoid-bioreactor-20260722-2050 defect: the pre-placement _SEALED_ENV_MM
-        # (248×188×108 mm from minimum_working_envelope) was set as the shell dims, but the
-        # PLACER spread parts to a bbox of 262×251×116 mm — containment-clamp only scales
-        # individual part DIMS, not POSITIONS, so parts placed at y=+157mm with D=30mm still
-        # reach y+15=172mm, making y_span = 157+94 = 251mm > 188mm shell depth.
-        # Fix: write_parts_manifest's G19-coherence block grows the shell AFTER placement to
-        # max(cur_shell_dim, placed_bbox_dim + 2×clearance) so shell ⊇ placed_parts BY
-        # CONSTRUCTION for any archetype.
-        # Direction 1 (FAIL): the REAL 2050 state — shell=248×188×108, placed bbox=262×251×116
+        # (248×188×108 mm) was used to build the MESH; the placer then spread parts to a bbox
+        # of 262×251×116 mm. Goodhart patches (fa113262a, c55d66ff7) updated the NUMBER in
+        # the manifest but left the MESH at 248×188×108 — G19 read the manifest number (PASS)
+        # while pixels still protruded (FAIL). Council #2 fix: place_sealed_enclosure now
+        # measures the post-placement bbox from placed_xyz_mm, resizes W,D,H,_SEALED_ENV_MM
+        # to contain it, THEN builds the shell mesh from those final dims. G19 is the
+        # last-resort backstop for cases where the reorder couldn't fire (headless/mock bpy
+        # where placed_xyz_mm was never populated, or a new placer that escapes the fix).
+        #
+        # Direction 1 (FAIL): pre-fix state — shell=248×188×108, placed bbox=262×251×116
         # → parts exceed shell on W and D → G19 FIRES.
         _g19_shell_nm_re = re.compile(r"enclosure\s*shell|housing\s*shell|cabinet\s*shell", re.I)
         _g19_real_bbox = {"length_mm": 262.3, "width_mm": 251.2, "height_mm": 116.5}
@@ -2161,8 +2163,9 @@ def _selftest() -> int:
             _g19_real_rows, _g19_real_bbox)
         chk("g19_real_2050_fails_before_fix", not _g19_before_ok)
         chk("g19_real_2050_detail_mentions_excess", "excess" in _g19_before_msg)
-        # Direction 2 (PASS): apply the G19-coherence rule from write_parts_manifest:
-        # new_shell_dim = max(cur, placed_bbox_dim + 2 × clearance=6mm)
+        # Direction 2 (PASS): after the REORDER fix, place_sealed_enclosure resizes
+        # W,D,H to max(cur, placed_bbox_dim + 2×clearance=6mm) BEFORE building the mesh.
+        # This produces the same math — verify the shell that would be built contains the bbox.
         _g19_clr = 6.0
         _g19_pm_w = float(_g19_real_bbox["length_mm"])
         _g19_pm_d = float(_g19_real_bbox["width_mm"])
@@ -2171,33 +2174,44 @@ def _selftest() -> int:
         _g19_need_W = max(_g19_cur_W, _g19_pm_w + 2 * _g19_clr)
         _g19_need_D = max(_g19_cur_D, _g19_pm_d + 2 * _g19_clr)
         _g19_need_H = max(_g19_cur_H, _g19_pm_h + 2 * _g19_clr)
-        # Verify the computation produces a shell that contains the bbox
-        chk("g19_new_shell_W_gte_bbox_plus_clr", _g19_need_W >= _g19_pm_w + 2 * _g19_clr - 0.1)
-        chk("g19_new_shell_D_gte_bbox_plus_clr", _g19_need_D >= _g19_pm_d + 2 * _g19_clr - 0.1)
-        chk("g19_new_shell_H_gte_bbox_plus_clr", _g19_need_H >= _g19_pm_h + 2 * _g19_clr - 0.1)
-        # Apply the new shell dims and verify G19 passes
-        _g19_fixed_rows = list(_g19_real_rows)  # same rows, updated shell
-        for _r in _g19_fixed_rows:
+        # Verify the reorder computation produces a shell that contains the bbox
+        chk("g19_reorder_shell_W_gte_bbox_plus_clr", _g19_need_W >= _g19_pm_w + 2 * _g19_clr - 0.1)
+        chk("g19_reorder_shell_D_gte_bbox_plus_clr", _g19_need_D >= _g19_pm_d + 2 * _g19_clr - 0.1)
+        chk("g19_reorder_shell_H_gte_bbox_plus_clr", _g19_need_H >= _g19_pm_h + 2 * _g19_clr - 0.1)
+        # Simulate the reorder: apply the final W,D,H as the shell dims, verify G19 passes.
+        # This proves: when place_sealed_enclosure correctly resizes before building the mesh,
+        # G19 passes (shell ⊇ parts). The shell built with FINAL dims ≡ what the mesh produces.
+        _g19_fixed_rows = list(_g19_real_rows)  # shallow copy, will replace shell row
+        for _g19_i, _r in enumerate(_g19_fixed_rows):
             if _g19_shell_nm_re.search(str(_r.get("name") or "")):
-                _r = dict(_r)
-                _r["dims_mm"] = {
-                    "w": round(float(_g19_need_W), 1),
-                    "d": round(float(_g19_need_D), 1),
-                    "h": round(float(_g19_need_H), 1),
+                _g19_fixed_rows[_g19_i] = {
+                    **_r,
+                    "dims_mm": {
+                        "w": round(float(_g19_need_W), 1),
+                        "d": round(float(_g19_need_D), 1),
+                        "h": round(float(_g19_need_H), 1),
+                    },
                 }
-                _g19_fixed_rows[_g19_fixed_rows.index(next(
-                    x for x in _g19_fixed_rows
-                    if _g19_shell_nm_re.search(str(x.get("name") or ""))
-                ))] = _r
                 break
         _g19_after_ok, _ = enclosure_shell_contains_check(_g19_fixed_rows, _g19_real_bbox)
-        chk("g19_passes_after_g19_coherence_fix", _g19_after_ok)
-        # Sanity: the new shell must be LARGER than the old one (the fix grew it)
+        chk("g19_passes_after_reorder_fix", _g19_after_ok)
+        # Sanity: the reordered shell must be strictly larger than the old pre-estimate
         _g19_new_shell = next(
             r for r in _g19_fixed_rows
             if _g19_shell_nm_re.search(str(r.get("name") or "")))
-        chk("g19_shell_grew_from_248_to_gte_274",
+        chk("g19_reorder_shell_grew_from_248_to_gte_274",
             float(_g19_new_shell["dims_mm"]["w"]) >= 274.0 - 0.5)
+        # Direction 3 (FAIL-STILL-CATCHES): verify G19 still catches even when the reorder
+        # produced only a partial fix (e.g., measurement used wrong proxy dims → under-sized).
+        # A shell that grew to 260×240×120 but parts span 262×251×116 still fails W and D.
+        _g19_partial_rows = [
+            {"name": "Enclosure Shell", "dims_mm": {"w": 260.0, "d": 240.0, "h": 120.0}},
+            {"name": "Heatsink Fan",    "dims_mm": {"w": 80.4,  "d": 77.9,  "h": 96.5}},
+        ]
+        _g19_partial_ok, _g19_partial_msg = enclosure_shell_contains_check(
+            _g19_partial_rows, _g19_real_bbox)
+        chk("g19_still_catches_partial_fix", not _g19_partial_ok)
+        chk("g19_partial_fix_detail_mentions_excess", "excess" in _g19_partial_msg)
     finally:
         import shutil as _sh
         _sh.rmtree(_g15_td, ignore_errors=True)
