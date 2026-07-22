@@ -8,6 +8,12 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~12:35) — loopbake4 SIGHTed: FLOOR 4 → 6, sole floor-setter = 1 invariant
+- loopbake4 (1153) delivered floor **6** (up from 1.2/4). Ship axes ALL PASS: cost (materials £288 vs £385) ✓, PCB FAB-READY ✓, render clean ✓, self-audit clean ✓. Inputs/Financial/BoM-price all FIXED (off sub-8). Big cumulative jump.
+- **SOLE non-mirror floor-setter: ONE deterministic invariant FAILS** — "**Internal runs fit within the device envelope**" (drags ⚠Checks → 6, Overview → 7.5). Some internal cable/pipe run overshoots the 180×140×160 enclosure. → NARROW sub-agent (afd3d6b9) dispatched (well-scoped, one invariant).
+- Secondary (Overview also 7.5): "dashboard integrity — section scores match 9/12" — 3 section scores on Overview ≠ the engine scorecard. SIGHT next bake; may be a display-sync issue.
+- Killed loopbake4 (grinding quality-loop). NEXT bake carries the internal-runs fix → expect floor ≥8 (only ⚠Checks/Overview left, both driven by the 1 invariant).
+
 ## LOOP STATUS (2026-07-22 ~11:05) — ALL known floor-setters fixed; loopbake4 (clean full batch) running
 - **Both loopbake3 regressions FIXED `a7e6f5820`**: (1) Inputs orphan drivers — the 14 were DCF drivers left consumerless by the Financial instrument-reframe gate; now suppressed on the instrument path (only load_factor+hours emit, both consumed) → 10/10. (2) ⚠Check fail was an HONEST catch (not the heater check): a TDK NTC floored to £1.00 by `round(0.12)=0` vs £0.12 distributor = 8.3× → commodity floor now skips parts with a confirmed distributor price + 2dp sub-£1.
 - **loopbake4 running** with EVERY known code-level floor-setter fixed: render ✅ PCB ✅ cost ✅ Verification ✅ Financial-reframe ✅ orphan-drivers ✅ price-floor ✅ heater ✅ RPM ✅ WRAS ✅ + Cursor fixpack13-16. This is the bake I expect to show the real floor climb. All 29 regression guards pass.
