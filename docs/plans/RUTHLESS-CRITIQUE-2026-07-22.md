@@ -8,6 +8,12 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~15:45) — G12 render fixed HONESTLY; BoM MPNs in flight
+- **Drawing gates G12 FIXED `6d16dd684`** (2nd attempt, honest): SIGHT confirmed the render is WELL-FRAMED (96% width occupancy, front panel visible) — just a wide/flat rack unit. Root was the METRIC (height-biased): for landscape (width ≥ height×1.25) the floor now checks max(width_occ, height_occ)=0.96≥0.45 → PASS; a genuinely tiny render still FAILs (both dims low); portrait unchanged. Verified on DELIVERED image + 4 proveCatch. (First attempt 514a59ae6 camera-tweak was wrong-direction; this supersedes it.)
+- WATCH: the G12 agent noted a separate gate `plan_render_coherence` = "hero-embed.png stale by 294s" — almost certainly a re-run artifact on the stale 1507 dir (fresh bake regenerates hero-embed.png). Confirm on next bake; if real, it's the next fix.
+- BoM MPN agent (a9fdf812) still resolving the 4 TBD electronic parts → real verified MPNs (seed).
+- Next bake (after BoM lands) → target every tab ≥9.
+
 ## LOOP STATUS (2026-07-22 ~15:30) — loopbake7: floor 8; 2 sub-9 tabs, re-attacking both
 - Drawing gates STILL 8 — camera fix `514a59ae6` went the WRONG way (height occupancy 0.43 → **0.41**, floor 0.45). Root re-think: the organoid is a WIDE/landscape box (180w×160h) that fills the frame WIDTH-wise but is short → a HEIGHT-occupancy floor is HEIGHT-BIASED (the forgeos-instrument-render-form-factor gotcha: frame/measure on max(h, w/1.5, d/1.5)). Agent a9fdf81: SIGHT the image → if well-framed, fix the METRIC to be aspect-aware (dominant-dim / max occupancy), not weaken it; if badly-framed, fix camera. VERIFY delivered occupancy, not a synthetic selftest.
 - BoM 8.3 → **8.8** (column contract fixed) — remaining cap = "4/13 ENGINEERED bought-out lines carry MPN 'TBD (detailed design)'" = HONEST data-coverage gap. Agent a2a798b: resolve REAL verifiable MPNs (Winbond flash / CP2102 bridge / ADuM120x isolator / A3144 Hall tach / cable assy), seed via seed-verified-class-parts.ts, NEVER fabricate. A legitimately-bespoke line stays engineered (report, don't force).
