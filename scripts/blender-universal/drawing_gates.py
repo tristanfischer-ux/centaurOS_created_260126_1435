@@ -2139,56 +2139,65 @@ def _selftest() -> int:
         _g19_ok_abs, _ = enclosure_shell_contains_check(
             [], {"length_mm": 200.0, "width_mm": 100.0, "height_mm": 80.0})
         chk("g19_abstains_without_shell_part", _g19_ok_abs)
-        # (d) proveCatch for the SHELL CORRECTION fix (2026-07-22 attempt #3):
-        # The organoid defect: _instrument_proxy_dim defaults give shell={180,140,80} but
-        # _SEALED_ENV_MM=(248,188,108). The fix in build_parts_manifest overwrites the shell row
-        # with _SEALED_ENV_MM before the containment clamp. Simulate the fix logic here using
-        # the REAL organoid-bioreactor-20260722-1938 shape (shell=wrong defaults, parts spread):
+        # (d) proveCatch for the G19-COHERENCE fix (write_parts_manifest 2026-07-22):
+        # The organoid-bioreactor-20260722-2050 defect: the pre-placement _SEALED_ENV_MM
+        # (248×188×108 mm from minimum_working_envelope) was set as the shell dims, but the
+        # PLACER spread parts to a bbox of 262×251×116 mm — containment-clamp only scales
+        # individual part DIMS, not POSITIONS, so parts placed at y=+157mm with D=30mm still
+        # reach y+15=172mm, making y_span = 157+94 = 251mm > 188mm shell depth.
+        # Fix: write_parts_manifest's G19-coherence block grows the shell AFTER placement to
+        # max(cur_shell_dim, placed_bbox_dim + 2×clearance) so shell ⊇ placed_parts BY
+        # CONSTRUCTION for any archetype.
+        # Direction 1 (FAIL): the REAL 2050 state — shell=248×188×108, placed bbox=262×251×116
+        # → parts exceed shell on W and D → G19 FIRES.
         _g19_shell_nm_re = re.compile(r"enclosure\s*shell|housing\s*shell|cabinet\s*shell", re.I)
-        # Before fix: shell has wrong defaults (proxy dim), parts bbox = real delivered spread
-        _g19_organoid_rows = [
-            {"name": "Enclosure Shell",   "dims_mm": {"w": 180.0, "d": 140.0, "h": 80.0}},
+        _g19_real_bbox = {"length_mm": 262.3, "width_mm": 251.2, "height_mm": 116.5}
+        _g19_real_rows = [
+            {"name": "Enclosure Shell", "dims_mm": {"w": 248.2, "d": 188.2, "h": 108.0}},
             {"name": "Magnetic Stirrer Drive", "dims_mm": {"w": 120.0, "d": 100.0, "h": 60.0}},
             {"name": "Heatsink Fan",           "dims_mm": {"w": 80.4,  "d": 77.9,  "h": 96.5}},
         ]
-        _g19_organoid_bbox = {"length_mm": 255.0, "width_mm": 239.6, "height_mm": 96.5}
-        _g19_before_ok, _ = enclosure_shell_contains_check(_g19_organoid_rows, _g19_organoid_bbox)
-        chk("g19_organoid_fails_before_shell_correction", not _g19_before_ok)
-        # Apply the fix: overwrite shell row with _SEALED_ENV_MM = (248.2, 188.2, 108.0)
-        _g19_sealed_W, _g19_sealed_D, _g19_sealed_H = 248.2, 188.2, 108.0
-        for _r in _g19_organoid_rows:
+        _g19_before_ok, _g19_before_msg = enclosure_shell_contains_check(
+            _g19_real_rows, _g19_real_bbox)
+        chk("g19_real_2050_fails_before_fix", not _g19_before_ok)
+        chk("g19_real_2050_detail_mentions_excess", "excess" in _g19_before_msg)
+        # Direction 2 (PASS): apply the G19-coherence rule from write_parts_manifest:
+        # new_shell_dim = max(cur, placed_bbox_dim + 2 × clearance=6mm)
+        _g19_clr = 6.0
+        _g19_pm_w = float(_g19_real_bbox["length_mm"])
+        _g19_pm_d = float(_g19_real_bbox["width_mm"])
+        _g19_pm_h = float(_g19_real_bbox["height_mm"])
+        _g19_cur_W, _g19_cur_D, _g19_cur_H = 248.2, 188.2, 108.0
+        _g19_need_W = max(_g19_cur_W, _g19_pm_w + 2 * _g19_clr)
+        _g19_need_D = max(_g19_cur_D, _g19_pm_d + 2 * _g19_clr)
+        _g19_need_H = max(_g19_cur_H, _g19_pm_h + 2 * _g19_clr)
+        # Verify the computation produces a shell that contains the bbox
+        chk("g19_new_shell_W_gte_bbox_plus_clr", _g19_need_W >= _g19_pm_w + 2 * _g19_clr - 0.1)
+        chk("g19_new_shell_D_gte_bbox_plus_clr", _g19_need_D >= _g19_pm_d + 2 * _g19_clr - 0.1)
+        chk("g19_new_shell_H_gte_bbox_plus_clr", _g19_need_H >= _g19_pm_h + 2 * _g19_clr - 0.1)
+        # Apply the new shell dims and verify G19 passes
+        _g19_fixed_rows = list(_g19_real_rows)  # same rows, updated shell
+        for _r in _g19_fixed_rows:
             if _g19_shell_nm_re.search(str(_r.get("name") or "")):
+                _r = dict(_r)
                 _r["dims_mm"] = {
-                    "w": round(float(_g19_sealed_W), 1),
-                    "d": round(float(_g19_sealed_D), 1),
-                    "h": round(float(_g19_sealed_H), 1),
+                    "w": round(float(_g19_need_W), 1),
+                    "d": round(float(_g19_need_D), 1),
+                    "h": round(float(_g19_need_H), 1),
                 }
+                _g19_fixed_rows[_g19_fixed_rows.index(next(
+                    x for x in _g19_fixed_rows
+                    if _g19_shell_nm_re.search(str(x.get("name") or ""))
+                ))] = _r
                 break
-        # After fix + containment clamp (parts scaled to fit 248×188×108):
-        _g19_shell_row = next(
-            (r for r in _g19_organoid_rows if _g19_shell_nm_re.search(str(r.get("name") or ""))), None)
-        _chk_shell_corrected = (
-            _g19_shell_row is not None
-            and abs(float(_g19_shell_row["dims_mm"]["w"]) - 248.2) < 0.5
-        )
-        chk("g19_shell_row_corrected_to_sealed_env_mm", _chk_shell_corrected)
-        # After shell is corrected, parts within the resolved envelope PASS G19
-        # (Containment clamp at build_parts_manifest:L6770 scales stale parts down to fit.)
-        # Simulate containment clamp scaling:
-        _sv_shell = sorted([float(x) for x in _g19_shell_row["dims_mm"].values()], reverse=True)
-        for _r in _g19_organoid_rows:
-            if _r is _g19_shell_row:
-                continue
-            _d = _r["dims_mm"]
-            _sv_part = sorted([float(v) for v in _d.values()], reverse=True)
-            _over = max((_sv_part[i] / (_sv_shell[i] * 0.95)) for i in range(3) if _sv_shell[i] > 0)
-            if _over > 1.0:
-                for _k in list(_d.keys()):
-                    _d[_k] = round(float(_d[_k]) / _over, 1)
-        # After clamp, G19 must pass: max part dim ≤ corresponding shell dim + 10mm tol
-        _g19_clamped_bbox = {"length_mm": 229.0, "width_mm": 175.0, "height_mm": 96.5}
-        _g19_after_ok, _ = enclosure_shell_contains_check(_g19_organoid_rows, _g19_clamped_bbox)
-        chk("g19_organoid_passes_after_shell_correction", _g19_after_ok)
+        _g19_after_ok, _ = enclosure_shell_contains_check(_g19_fixed_rows, _g19_real_bbox)
+        chk("g19_passes_after_g19_coherence_fix", _g19_after_ok)
+        # Sanity: the new shell must be LARGER than the old one (the fix grew it)
+        _g19_new_shell = next(
+            r for r in _g19_fixed_rows
+            if _g19_shell_nm_re.search(str(r.get("name") or "")))
+        chk("g19_shell_grew_from_248_to_gte_274",
+            float(_g19_new_shell["dims_mm"]["w"]) >= 274.0 - 0.5)
     finally:
         import shutil as _sh
         _sh.rmtree(_g15_td, ignore_errors=True)

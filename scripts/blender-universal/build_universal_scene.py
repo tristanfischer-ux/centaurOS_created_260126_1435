@@ -7077,6 +7077,49 @@ def write_parts_manifest(out_dir, parts, state=None):
         bbox["height_mm"] = round(bbox["z_max_mm"] - max(0.0, bbox["z_min_mm"]), 1)
     else:
         bbox = {}
+    # G19 COHERENCE FIX (organoid-bioreactor 2026-07-22): after placement the real part
+    # stack bbox may exceed the pre-placement _SEALED_ENV_MM (the placer positions parts at
+    # XY coordinates that spread beyond the pre-estimated envelope — the containment-clamp at
+    # build_parts_manifest:L6770 only scales individual part DIMS, not their POSITIONS, so a
+    # part placed at y=+157mm with D=30mm still reaches y+15=172mm, beyond a 188mm-wide shell
+    # centred at y=0: y_max - y_min = 157+94 = 251mm > 188mm shell). G19 checks
+    # shell_dims ⊇ pm_bbox so the shell MUST contain the ACTUAL placed extent.
+    # Fix: after computing the true placed-parts bbox, grow shell dims to
+    # max(current_shell_dim, placed_bbox_dim + 2×clearance). NO hardcoded part sizes —
+    # reads the SAME pm_bbox that G19 reads (length_mm / width_mm / height_mm).
+    # Universal: only fires for sealed-enclosure renders (_SEALED_ENV_MM is not None).
+    if _SEALED_ENV_MM is not None and bbox:
+        global _SEALED_ENV_MM
+        _g19_clr = 6.0   # same wall clearance as minimum_working_envelope._CLEARANCE_MM
+        _g19_pm_w = float(bbox.get("length_mm") or 0.0)
+        _g19_pm_d = float(bbox.get("width_mm") or 0.0)
+        _g19_pm_h = float(bbox.get("height_mm") or 0.0)
+        _g19_cur_W, _g19_cur_D, _g19_cur_H = _SEALED_ENV_MM
+        _g19_need_W = max(_g19_cur_W, _g19_pm_w + 2 * _g19_clr)
+        _g19_need_D = max(_g19_cur_D, _g19_pm_d + 2 * _g19_clr)
+        _g19_need_H = max(_g19_cur_H, _g19_pm_h + 2 * _g19_clr)
+        if (_g19_need_W > _g19_cur_W + 0.5
+                or _g19_need_D > _g19_cur_D + 0.5
+                or _g19_need_H > _g19_cur_H + 0.5):
+            print(f"[parts-manifest][G19-coherence] placed bbox "
+                  f"{_g19_pm_w:.0f}×{_g19_pm_d:.0f}×{_g19_pm_h:.0f} mm exceeds "
+                  f"_SEALED_ENV_MM {_g19_cur_W:.0f}×{_g19_cur_D:.0f}×{_g19_cur_H:.0f} mm — "
+                  f"growing shell to contain placed extent: "
+                  f"{_g19_need_W:.0f}×{_g19_need_D:.0f}×{_g19_need_H:.0f} mm "
+                  f"(placed_bbox + 2×{_g19_clr:.0f} mm wall clearance)")
+            _SEALED_ENV_MM = (_g19_need_W, _g19_need_D, _g19_need_H)
+            _g19_shell_re = re.compile(
+                r"enclosure\s*shell|housing\s*shell|cabinet\s*shell", re.I)
+            for _g19_r in rows:
+                if _g19_shell_re.search(str(_g19_r.get("name") or "")):
+                    _g19_r["dims_mm"] = {
+                        "w": round(float(_g19_need_W), 1),
+                        "d": round(float(_g19_need_D), 1),
+                        "h": round(float(_g19_need_H), 1),
+                    }
+                    print(f"[parts-manifest][G19-coherence] Enclosure Shell dims → "
+                          f"{_g19_need_W:.1f}×{_g19_need_D:.1f}×{_g19_need_H:.1f} mm")
+                    break
     # SITE UTILISATION — hull ÷ deck, the deterministic "empty deck" signal (G7 reads it).
     site = None
     try:
