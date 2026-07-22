@@ -33,3 +33,9 @@ Then: write the invariant into the operating frame + regression harness so it ca
 ## Building blocks (iterate)
 - [in flight, agent ab805a17] containment gate (enclosure contains parts) + reconcile render shell to parts envelope — building block #1.
 - next: promote parts-manifest to the canonical model; route the render-shell sizing + drawing views + dimensions register through it; generalise the gate to cross-check ALL artefact pairs (envelope + part-set + positions), wire into the chain/Checks; proveCatch on a synthetic incoherent case (universal).
+
+## PROGRESS (2026-07-22 ~17:15)
+- **Building block #1 LANDED `7c457292a`**: root was the mechanical-part footprint table missing the HEIGHT dim → enclosure height came from a 0.42×min(w,d) heuristic that ignored the tallest part (96mm heatsink+fan). Now enclosure = max(body_h, floor, tallest_part+2×clearance): organoid 240.9×182.8×108 ⊇ parts 229.2×175.2×96.4. + **G19 enclosure_shell_contains_parts gate** (10mm tol, proveCatch both ways, FIRES on the 1603 defect). Universal, parts-keyed.
+- **Deliverable bundle LANDED `c8386e52f`**: every run now writes <run>/<slug>-deliverable/ + .zip (dossier + all PCB boards + renders + drawings + MANIFEST, 0 absolute paths). Verified on 1603 (87 files). (84MB — offer compressed/PCB-only variant for direct email.)
+- **loopbake9 running** (stale .pyc cleared) → verify render + drawings read the SAME 240.9×182.8×108 envelope end-to-end + G19 PASS + floor ≥9 + bundle produced. SIGHT render vs inspect-front/top side by side.
+- STILL TO BUILD (the full universal system): promote parts-manifest to canonical model; route drawing views + Equipment&Dimensions Register from it; generalise gate to cross-check ALL artefact pairs (envelope + part-set + positions), wire into chain to FLOOR on mismatch; write invariant into OPERATING-FRAME + regression harness.
