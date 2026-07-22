@@ -2,12 +2,13 @@
  * @file proveCatch — multi-board PCB runner does NOT merge N boards into one project.
  */
 
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
   aggregatePipelineFileGroup,
+  aggregatePipelinePositions,
   kicadDeliverableBoards,
   runBespokeMultiBoardPcb,
   type BoardPipelineRun,
@@ -230,5 +231,61 @@ describe('pcb-multi-board-run', () => {
     expect(g?.files).toHaveLength(4)
     expect(g?.files.some((f) => f.includes('/a/'))).toBe(true)
     expect(g?.files.some((f) => f.includes('/b/'))).toBe(true)
+  })
+
+  it('proveCatch: aggregatePipelinePositions unions all boards (Excel designator/PnP)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pcb-multi-pos-'))
+    try {
+      const boards: BoardPipelineRun[] = []
+      for (const bid of ['hat', 'od']) {
+        const posDir = join(root, 'pcb-boards', bid, 'pcb')
+        mkdirSync(posDir, { recursive: true })
+        const posPath = join(posDir, 'positions.csv')
+        writeFileSync(
+          posPath,
+          [
+            '### Footprint positions',
+            '## Unit = inches, Angle = deg.',
+            '# Ref Val Package PosX PosY Rot Side',
+            `U1 PART FP_${bid.toUpperCase()} 0.0 0.0 0.0 top`,
+            'C1 CAP C_0603_1608Metric 1.0 1.0 0.0 top',
+            '',
+          ].join('\n'),
+        )
+        boards.push({
+          boardId: bid,
+          role: bid,
+          projectDir: join(root, 'pcb-project', bid),
+          generator: {
+            components: [],
+            unresolved: [],
+            functionRequirements: [],
+            offBoard: [],
+            nets: [],
+          },
+          pipeline: {
+            ...fakePipeline(true, 'complete', bid),
+            pos: { path: posPath },
+          },
+          record: fakePipeline(true, 'complete', bid),
+        } as unknown as BoardPipelineRun)
+      }
+      const pos = aggregatePipelinePositions(boards, root)
+      expect(pos?.path).toBeTruthy()
+      expect(pos!.path.includes(`${join('pcb', 'positions.csv')}`)).toBe(true)
+      const text = readFileSync(pos!.path, 'utf8')
+      expect(text).toContain('board=hat')
+      expect(text).toContain('board=od')
+      expect(text).toContain('FP_HAT')
+      expect(text).toContain('FP_OD')
+      // Two data rows per board → 4 placement lines (comments excluded by Excel parser).
+      const dataLines = text.split('\n').filter((ln) => {
+        const s = ln.trim()
+        return s && !s.startsWith('#') && s.split(/\s+/).length >= 7
+      })
+      expect(dataLines).toHaveLength(4)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

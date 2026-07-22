@@ -17476,6 +17476,44 @@ def _pcb_parse_positions(pos_path: str) -> List[dict]:
     return rows
 
 
+def _pcb_collect_pos_rows(pcb: dict, run_dir: str, pos: dict) -> List[dict]:
+    """INTENT (fixpack13): multi-board runs flatMap ALL boards' components into
+    `pipeline.generator.components` but historically pointed `pos.path` at only the
+    HAT positions.csv → designator match 9/34 and PnP 26/34. Prefer concatenating
+    every `pcb-boards/<id>/pcb/positions.csv` (boardPipelines / architecture order)
+    so footprint-group zip matching recovers; fall back to aggregate/single pos.path.
+    """
+    board_ids: List[str] = []
+    bps = pcb.get("boardPipelines")
+    if isinstance(bps, list):
+        for b in bps:
+            if isinstance(b, dict) and b.get("boardId"):
+                board_ids.append(str(b["boardId"]))
+    if not board_ids:
+        arch = pcb.get("architecture") if isinstance(pcb.get("architecture"), dict) else {}
+        for b in (arch.get("boards") or []):
+            if isinstance(b, dict) and b.get("boardId") and b.get("requiresKiCadDeliverable") is not False:
+                board_ids.append(str(b["boardId"]))
+
+    rows: List[dict] = []
+    if run_dir and len(board_ids) > 1:
+        for bid in board_ids:
+            cand = os.path.join(run_dir, "pcb-boards", bid, "pcb", "positions.csv")
+            if os.path.exists(cand):
+                rows.extend(_pcb_parse_positions(cand))
+        if rows:
+            return rows
+
+    # Aggregate written by pcb-multi-board-run (pcb/positions.csv) or legacy single path.
+    for cand in (
+        (pos.get("path") if isinstance(pos, dict) else None),
+        (os.path.join(run_dir, "pcb", "positions.csv") if run_dir else None),
+    ):
+        if cand and os.path.exists(str(cand)):
+            return _pcb_parse_positions(str(cand))
+    return []
+
+
 def _pcb_designator_map(components: List[dict], pos_rows: List[dict]) -> Dict[str, Optional[str]]:
     """Map each engine component (in generation order) to its REAL KiCad reference
     designator (U1/C3/J2), by matching FOOTPRINT-GROUP order: the generator instantiates
@@ -17998,8 +18036,7 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         drc_rows, unconnected_n = _pcb_parse_drc_report(drc["reportPath"])
     drc_ignored_rows = _pcb_drc_ignored_rows(drc_report)
 
-    pos_rows = (_pcb_parse_positions(pos["path"])
-                if pos.get("path") and os.path.exists(pos["path"]) else [])
+    pos_rows = _pcb_collect_pos_rows(pcb, run_dir, pos if isinstance(pos, dict) else {})
     components = gen.get("components") if isinstance(gen.get("components"), list) else []
     off_board = gen.get("offBoard") if isinstance(gen.get("offBoard"), list) else []
     designators = _pcb_designator_map(components, pos_rows)
@@ -33587,6 +33624,39 @@ def _selftest() -> int:
     if _match_map.get("a") != "U7":
         print(f"  FAIL pcb-designator-map proveNoFalsePositive: a 1:1 footprint-group "
               f"match must resolve the real KiCad ref, got {_match_map!r}"); bad += 1
+
+    # proveCatch (fixpack13): multi-board pos collection must union every board's
+    # positions.csv — HAT-only was the 9/34 designator + 26/34 PnP Goodhart.
+    import tempfile as _tf_pos
+    import shutil as _sh_pos
+    _mb_td = _tf_pos.mkdtemp(prefix="pcb-pos-mb-")
+    try:
+        for _bid, _body in (
+            ("hat", "# Ref Val Package PosX PosY Rot Side\n"
+                    "U1 MCU TQFP-48 0 0 0 top\nC1 CAP C_0603 1 1 0 top\n"),
+            ("od", "# Ref Val Package PosX PosY Rot Side\n"
+                   "U1 ADC TSSOP-10 0 0 0 top\nC1 CAP C_0603 1 1 0 top\n"),
+        ):
+            _bd = os.path.join(_mb_td, "pcb-boards", _bid, "pcb")
+            os.makedirs(_bd, exist_ok=True)
+            with open(os.path.join(_bd, "positions.csv"), "w") as _pf:
+                _pf.write(_body)
+        _mb_rows = _pcb_collect_pos_rows(
+            {"boardPipelines": [{"boardId": "hat"}, {"boardId": "od"}],
+             "pipeline": {"pos": {"path": os.path.join(_mb_td, "pcb-boards", "hat", "pcb", "positions.csv")},
+                          "generator": {"components": []}}},
+            _mb_td,
+            {"path": os.path.join(_mb_td, "pcb-boards", "hat", "pcb", "positions.csv")},
+        )
+        if len(_mb_rows) != 4:
+            print(f"  FAIL pcb-collect-pos-rows proveCatch: multi-board must union "
+                  f"all positions.csv rows (expected 4, got {len(_mb_rows)})"); bad += 1
+        _mb_pkgs = sorted(r["package"] for r in _mb_rows)
+        if _mb_pkgs.count("C_0603") != 2:
+            print(f"  FAIL pcb-collect-pos-rows proveCatch: expected 2× C_0603 across "
+                  f"boards, got {_mb_pkgs!r}"); bad += 1
+    finally:
+        _sh_pos.rmtree(_mb_td, ignore_errors=True)
 
     # ═══ proveCatch PCB-TAB inline artefacts (2026-07-14) — DRC ignored checks, drill
     # tool table, gbrjob stackup, PnP←BoM value fill, human byte sizes. Pure helpers so
