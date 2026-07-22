@@ -1,3 +1,11 @@
 # BLOCKERS — organoid-to-9 autonomous loop
 
 (none yet — items needing Tristan: a credential, a subjective call, or a decision only he can make)
+
+---
+## 2026-07-22 — Render↔drawing coherence: sealed shell doesn't contain placed parts (4 fixes failed → council resolved)
+**Symptom:** G19 `enclosure_shell_contains_parts` FAILS on delivered organoid bakes — shell 248×188×108 vs placed-parts bbox 262×251×116 (parts poke out 44-63mm). inspect-front drawing shows parts towering over a small base; sealed render is a clean box → cross-artefact incoherence Tristan catches by eye.
+**Root (code-confirmed, no bake needed):** `place_sealed_enclosure(env_mm)` builds the shell MESH (u_skid_encl_* :16677, u_se_product_* :18051) from a PRE-PLACEMENT estimate env_mm=248×188×108, THEN `_place_instrument_interior_layout` positions parts, some landing OUTSIDE the envelope (y=+157 beyond ±94). `write_parts_manifest` (:24102) later grows `_SEALED_ENV_MM` + rewrites the manifest shell row — but the MESH is already built → Goodhart (G19 reads the manifest number & passes; pixels still protrude).
+**4 failed fixes (all patched the NUMBER after mesh-build):** 7c457292a, 0625554e0, c55d66ff7 (council #1, manifest-row overwrite), fa113262a (grow _SEALED_ENV_MM in write_parts_manifest).
+**COUNCIL #2 (gemini-3.1-pro, grok-4.3, deepseek-v4-pro, mimo-v2.5-pro — UNANIMOUS): Option (a) REORDER.** place parts first → measure actual world-bbox → env=bbox+symmetric clearance → recenter parts so bbox centred in env → THEN build shell mesh → _SEALED_ENV_MM=final → camera/drawings/manifest read it AFTER. DELETE the post-hoc grows. Reject (b) clamp (part overlap / per-archetype packing) + hybrid (early mesh build). RISKS: (1) audit `_place_instrument_interior_layout` — may use W,D,H as slot walls (give generous working volume, then size shell to actual bbox); (2) UNBOUNDED GROWTH — add a scale-sanity guard hard-failing if env exceeds a plausible max for the scale regime (benchtop ~≤600mm) — this surfaces the placer-sprawl root instead of hiding it; (3) move all _SEALED_ENV_MM consumers after the reorder.
+**STATUS:** implementation agent dispatched. VERIFY via a SINGLE render pass (NOT run-loop.sh — it grinds 35min on the cost under-spec floor). Also open: cost under-spec (BoM £255 vs £3500, missing pH/DO/vessel/agitation/sparger/jacket).
