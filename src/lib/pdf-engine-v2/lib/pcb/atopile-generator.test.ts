@@ -1489,6 +1489,97 @@ describe('atopile-generator', () => {
     expect(netNames.has('PUMP_MOTOR_A')).toBe(true)
   })
 
+  it('wirePeripheralNets: polyfuse+ferrite series on VBUS; LED via ballast R', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/12401610/i.test(mpn ?? '')) {
+        return cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C')
+      }
+      if (/ATSAMD21/i.test(mpn ?? '')) {
+        return cacheHit('Microchip', 'ATSAMD21G18A-AU', 'MCU')
+      }
+      if (/0603L300/i.test(mpn ?? '')) {
+        return cacheHit('Littelfuse', '0603L300/9SLYR', 'polyfuse')
+      }
+      if (/BLM18PG121/i.test(mpn ?? '')) {
+        return cacheHit('Murata Manufacturing', 'BLM18PG121SN1D', 'ferrite')
+      }
+      if (/KPT-1608CGCK/i.test(mpn ?? '')) {
+        return cacheHit('Kingbright', 'KPT-1608CGCK', 'power LED')
+      }
+      if (/RC0603FR/i.test(mpn ?? '')) {
+        return cacheHit('YAGEO', 'RC0603FR-101KL', 'LED ballast')
+      }
+      if (/CC0603|DF2S|FTSH|SSQ/i.test(mpn ?? '')) {
+        return cacheHit('Generic', mpn ?? '', 'companion')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-peripheral-nets-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'host',
+          sub_modules: [{
+            id: 'host__pwr',
+            words: [
+              {
+                id: 'microcontroller_mcu_word',
+                name_human: 'Host MCU',
+                content_character: { character_id: 'microcontroller_mcu' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'usb_power_entry_word',
+                name_human: 'USB Power Entry',
+                content_character: { character_id: 'usb_power_entry' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'current_limit_polyfuse_word',
+                name_human: 'Current limit polyfuse',
+                content_character: { character_id: 'current_limit_polyfuse' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'ferrite_emc_bead_word',
+                name_human: 'Ferrite EMC bead',
+                content_character: { character_id: 'ferrite_emc_bead' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'power_indicator_led_word',
+                name_human: 'Power indicator LED',
+                content_character: { character_id: 'power_indicator_led' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: [
+        'microcontroller_mcu_word',
+        'usb_power_entry_word',
+        'current_limit_polyfuse_word',
+        'ferrite_emc_bead_word',
+        'power_indicator_led_word',
+      ],
+      boardRole: 'wet_lab_hat',
+    })
+    expect(result.components.some((c) => c.wordId === 'power_indicator_led_series_resistor_word'))
+      .toBe(true)
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('VBUS')).toBe(true)
+    expect(netNames.has('LED_CTRL')).toBe(true)
+    const vbus = result.nets.find((n) => n.name === 'VBUS')
+    expect(vbus?.members.some((m) => /usb/i.test(m.instanceName))).toBe(true)
+    const ledCtrl = result.nets.find((n) => n.name === 'LED_CTRL')
+    expect(ledCtrl && ledCtrl.members.length >= 2).toBe(true)
+  })
+
   it('P4: usb_power_entry never resolves to PinHeader_*', () => {
     mockedLookup.mockImplementation((_manufacturer, mpn) => {
       if (/12401610/i.test(mpn ?? '')) {

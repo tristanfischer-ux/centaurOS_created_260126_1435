@@ -1195,6 +1195,44 @@ function ensureHatHostConnectorWords(
 }
 
 /**
+ * @description When a power/status indicator LED is on-board (not riding a
+ * purchased COTS UI kit), densify a series ballast resistor so
+ * wirePeripheralNets can form GPIO→R→LED→GND (never LED hard-tied across VCC).
+ * GOTCHA: require an MCU/HAT host word so compact-instrument off-board LED roles
+ * do not grow a phantom resistor in offBoard[].
+ */
+function ensurePowerIndicatorBallastWords(
+  words: ElectronicWordRef[],
+): ElectronicWordRef[] {
+  const blob = words.map((w) => `${w.wordId} ${w.characterId} ${w.nameHuman}`).join(' ')
+  if (!/power[_ -]?indicator[_ -]?led|status[_ -]?indicator/i.test(blob)) return words
+  if (!/microcontroller|(?:^|[_ -])mcu(?:$|[_ -])|wet[_ -]?lab[_ -]?hat|hat[_ -]?host/i.test(blob)) {
+    return words
+  }
+  if (/power[_ -]?indicator[_ -]?led[_ -]?series|status[_ -]?led[_ -]?series|led[_ -]?ballast/i.test(blob)) {
+    return words
+  }
+  const anchor = words.find((w) =>
+    /power[_ -]?indicator[_ -]?led|status[_ -]?indicator/i.test(
+      `${w.wordId} ${w.characterId} ${w.nameHuman}`,
+    ),
+  ) ?? words[0]
+  return [
+    ...words,
+    {
+      moduleId: anchor?.moduleId ?? 'host_interface',
+      subModuleId: anchor?.subModuleId ?? 'power_indicator',
+      wordId: 'power_indicator_led_series_resistor_word',
+      nameHuman: 'Power indicator LED series resistor',
+      characterId: 'power_indicator_led_series_resistor',
+      modifiers: {},
+      categories: ['passive'],
+      quantity: 1,
+    },
+  ]
+}
+
+/**
  * @description Host-HAT densify: heater PWM MOSFET + stir/pump DRV8876 when the
  * Forge host-HAT drive fixture is published. Never densifies onto heater_stir boards.
  */
@@ -1756,6 +1794,189 @@ function wireHostInterfaceNets(
 }
 
 /**
+ * @description Remove one pin membership from a net (used when rewiring parts
+ * that tieSupplyRails initially parked on VCC/GND).
+ */
+function detachNetMember(
+  net: AtopileNetRecord,
+  instanceName: string,
+  pin: string,
+): void {
+  net.members = net.members.filter(
+    (m) => !(m.instanceName === instanceName && m.pin === pin),
+  )
+}
+
+function componentRoleBlob(c: AtopileComponentRecord): string {
+  return `${c.characterId} ${c.wordId} ${c.nameHuman} ${c.partNumber ?? ''}`
+}
+
+function twoTerminalPins(
+  component: AtopileComponentRecord,
+): [string, string] | null {
+  const p1 =
+    findPinMatching(component, [/^P1$/i, /^___?1/i, /^1__/i, /^A$/i, /^ANODE$/i])
+    ?? component.pins[0]
+  const p2 =
+    findPinMatching(component, [/^P2$/i, /^___?2/i, /^2__/i, /^K$/i, /^CATHODE$/i, /^B$/i])
+    ?? component.pins[1]
+  if (!p1 || !p2 || p1 === p2) return null
+  return [p1, p2]
+}
+
+/**
+ * @description Wire host peripherals that tieSupplyRails alone leaves as
+ * floating footprints: USB ESD on the data lines (when the part has I/O pins),
+ * polyfuse+ferrite in series on VBUS→VCC, power-indicator LED via ballast R
+ * from an MCU GPIO. Universal — functionClass / characterId keyed.
+ *
+ * DECISION: 2-pin rail TVS (DF2S-class) stays on VCC/GND — that IS a connected
+ * peripheral; do NOT short USB_DP to USB_DM through a 2-pin device.
+ * DECISION: do NOT implement a net-fraction connectivity gate here (Terminal
+ * corrected: unused MCU GPIOs are legitimate single-node nets).
+ */
+function wirePeripheralNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+  vcc: AtopileNetRecord,
+  gnd: AtopileNetRecord,
+): void {
+  const mcu = components.find((c) => c.functionClass === 'microcontroller')
+  const usbs = components.filter((c) => c.functionClass === 'usb_connector')
+
+  // ── USB data-line ESD (multi-I/O arrays only) ────────────────────────────
+  for (const esd of components.filter(
+    (c) =>
+      c.functionClass === 'diode_protection'
+      && /esd|tvs|transient/i.test(componentRoleBlob(c))
+      && !/reverse[_ -]?polarity/i.test(componentRoleBlob(c)),
+  )) {
+    // GOTCHA: Toshiba DF2S / Device:D_TVS expose pads as A1/A2 — that is a
+    // 2-pin *rail* TVS, not a USB data-line array. Shorting A1→DP + A2→DM
+    // would clamp the differential pair through the diode. Keep rail clamp.
+    if (esd.pins.length <= 2) {
+      const a =
+        findPinMatching(esd, [/^A1$/i, /^A$/i, /^1$/i, /^K$/i])
+        ?? esd.pins[0]
+      const b =
+        findPinMatching(esd, [/^A2$/i, /^K$/i, /^2$/i, /^C$/i])
+        ?? esd.pins[1]
+      if (a) addMember(vcc, esd.instanceName, a)
+      if (b) addMember(gnd, esd.instanceName, b)
+      continue
+    }
+    const io1 = findPinMatching(esd, [/USB_?DP/i, /^D\+$/i, /^IO1$/i, /^D1$/i])
+    const io2 = findPinMatching(esd, [/USB_?DM/i, /^D-$/i, /^IO2$/i, /^D2$/i])
+    if (!io1 || !io2) continue
+    detachNetMember(vcc, esd.instanceName, io1)
+    detachNetMember(vcc, esd.instanceName, io2)
+    detachNetMember(gnd, esd.instanceName, io1)
+    detachNetMember(gnd, esd.instanceName, io2)
+    addMember(ensureNet('USB_DP', 'signal'), esd.instanceName, io1)
+    addMember(ensureNet('USB_DM', 'signal'), esd.instanceName, io2)
+  }
+
+  // ── VBUS → polyfuse → ferrite → VCC (series power path) ─────────────────
+  const polyfuse = components.find(
+    (c) =>
+      c.functionClass === 'fuse_protection'
+      || /polyfuse|current[_ -]?limit/i.test(componentRoleBlob(c)),
+  )
+  const ferrite = components.find(
+    (c) =>
+      c.functionClass === 'passive_l'
+      || /ferrite|emc[_ -]?bead/i.test(componentRoleBlob(c)),
+  )
+  if ((polyfuse || ferrite) && usbs.length > 0) {
+    const vbus = ensureNet('VBUS', 'power')
+    let anyVbus = false
+    for (const usb of usbs) {
+      const vbusPins = [
+        ...new Set(
+          [
+            ...usb.pins,
+            ...(usb.pinSpecs ?? []).map((p) => pinIdentifier(p)),
+            usb.powerPin,
+          ].filter((p): p is string =>
+            Boolean(p) && /^(?:VBUS|A4|B4|A9|B9)(?:_|$)/i.test(p)),
+        ),
+      ]
+      if (vbusPins.length === 0 && usb.powerPin && /^VBUS/i.test(usb.powerPin)) {
+        vbusPins.push(usb.powerPin)
+      }
+      for (const pin of vbusPins) {
+        detachNetMember(vcc, usb.instanceName, pin)
+        addMember(vbus, usb.instanceName, pin)
+        anyVbus = true
+      }
+    }
+    if (anyVbus) {
+      const seriesParts = [polyfuse, ferrite].filter(
+        (c): c is AtopileComponentRecord => Boolean(c),
+      )
+      let upstream: AtopileNetRecord = vbus
+      for (let i = 0; i < seriesParts.length; i += 1) {
+        const part = seriesParts[i]!
+        const pins = twoTerminalPins(part)
+        if (!pins) continue
+        const [a, b] = pins
+        detachNetMember(vcc, part.instanceName, a)
+        detachNetMember(vcc, part.instanceName, b)
+        detachNetMember(gnd, part.instanceName, a)
+        detachNetMember(gnd, part.instanceName, b)
+        const downstream =
+          i === seriesParts.length - 1
+            ? vcc
+            : ensureNet(i === 0 ? 'VBUS_FUSED' : `VBUS_SERIES_${i}`, 'power')
+        addMember(upstream, part.instanceName, a)
+        addMember(downstream, part.instanceName, b)
+        upstream = downstream
+      }
+    }
+  }
+
+  // ── Power / status LED: MCU GPIO → ballast R → LED → GND ────────────────
+  const indicatorLed = components.find(
+    (c) =>
+      c.functionClass === 'led'
+      && /power[_ -]?indicator|status[_ -]?indicator/i.test(componentRoleBlob(c))
+      && !/od[_ -]?source|szyy/i.test(componentRoleBlob(c)),
+  )
+  const ledBallast = components.find((c) =>
+    /power[_ -]?indicator[_ -]?led[_ -]?series|status[_ -]?led[_ -]?series|led[_ -]?ballast/i.test(
+      componentRoleBlob(c),
+    ),
+  )
+  if (mcu && indicatorLed && ledBallast) {
+    const ledA =
+      findPinMatching(indicatorLed, [/^A$/i, /^ANODE$/i, /^2$/i, /^P2$/i])
+      ?? indicatorLed.powerPin
+    const ledK =
+      findPinMatching(indicatorLed, [/^K$/i, /^CATHODE$/i, /^1$/i, /^P1$/i])
+      ?? indicatorLed.groundPin
+    const rPins = twoTerminalPins(ledBallast)
+    if (ledA && ledK && rPins) {
+      const [r1, r2] = rPins
+      detachNetMember(vcc, indicatorLed.instanceName, ledA)
+      detachNetMember(vcc, ledBallast.instanceName, r1)
+      detachNetMember(vcc, ledBallast.instanceName, r2)
+      // Prefer a free SAMD GPIO; else synthesise LED_CTRL on the MCU.
+      let gpio =
+        findPinMatching(mcu, [/^PA08(?:_|$)/i, /^PA07(?:_|$)/i, /^GPIO1$/i])
+      if (!gpio) gpio = ensureComponentPin(mcu, 'LED_CTRL')
+      const ledCtrl = ensureNet('LED_CTRL', 'signal')
+      addMember(ledCtrl, mcu.instanceName, gpio)
+      addMember(ledCtrl, ledBallast.instanceName, r1)
+      const ledAnode = ensureNet('LED_ANODE', 'signal')
+      addMember(ledAnode, ledBallast.instanceName, r2)
+      addMember(ledAnode, indicatorLed.instanceName, ledA)
+      addMember(gnd, indicatorLed.instanceName, ledK)
+    }
+  }
+}
+
+/**
  * @description Wire photodiode → TIA → optical ADC when all three roles exist.
  * INTENT: densify companions must form a circuit, not a lonely parts list —
  * Eye-Spy-class OD path is otherwise FAB-theatre (parts present, nets only VCC).
@@ -2100,8 +2321,27 @@ function buildNets(
     skipRails.add(regulator)
   }
 
+  // INTENT: series power-path parts + indicator LEDs must NOT be hard-tied
+  // across VCC by tieSupplyRails — wirePeripheralNets places them in circuit.
+  for (const component of components) {
+    const blob = componentRoleBlob(component)
+    if (
+      component.functionClass === 'fuse_protection'
+      || (component.functionClass === 'passive_l' && /ferrite|emc[_ -]?bead/i.test(blob))
+      || (
+        component.functionClass === 'led'
+        && /power[_ -]?indicator|status[_ -]?indicator/i.test(blob)
+        && !/od[_ -]?source|szyy/i.test(blob)
+      )
+      || /power[_ -]?indicator[_ -]?led[_ -]?series|status[_ -]?led[_ -]?series|led[_ -]?ballast/i.test(blob)
+    ) {
+      skipRails.add(component)
+    }
+  }
+
   tieSupplyRails(components, addMember, vcc, gnd, skipRails)
   wireHostInterfaceNets(components, ensureNet, addMember)
+  wirePeripheralNets(components, ensureNet, addMember, vcc, gnd)
   wireOdOpticalFrontEndNets(components, ensureNet, addMember, vcc, gnd)
   wireHeaterDaughterboardNets(components, ensureNet, addMember, vcc, gnd)
   wireHostHatActuationDriveNets(components, ensureNet, addMember, vcc, gnd)
@@ -2334,15 +2574,17 @@ export function generateAtopileProject(
   // photodiode+TIA+passives, HAT 2×20 socket, and (when fixture publishes)
   // host-HAT heater MOSFET + stir/pump DRV8876.
   const electronicWords = ensureHostHatActuationDriveWords(
-    ensureHatHostConnectorWords(
-      ensureOdGoldCompanionWords(
-        ensureHeaterGoldCompanionWords(
-          scopedElectronicWords,
+    ensurePowerIndicatorBallastWords(
+      ensureHatHostConnectorWords(
+        ensureOdGoldCompanionWords(
+          ensureHeaterGoldCompanionWords(
+            scopedElectronicWords,
+            opts.requiredFunctionRoles,
+          ),
           opts.requiredFunctionRoles,
         ),
-        opts.requiredFunctionRoles,
+        opts.boardRole,
       ),
-      opts.boardRole,
     ),
     opts.boardRole,
     opts.requiredFunctionRoles,

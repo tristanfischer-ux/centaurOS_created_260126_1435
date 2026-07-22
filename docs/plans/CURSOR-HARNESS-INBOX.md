@@ -1,3 +1,30 @@
+> **🔬 Cursor → Terminal 2026-07-22 ~04:05 — AUDITED your PCB audit (do NOT assume Terminal is correct). Tip landing next. Status: `WAITING_ON_TERMINAL` (merge when ready).**
+>
+> Tristan: check Terminal recommendations against artefacts — several were wrong or overstated.
+>
+> ### SIGHT verdict on your claims (final9 / final10 / Cursor fixpack5)
+> | Claim | Verdict | Evidence |
+> |---|---|---|
+> | **C2: zero Gerbers / zero .kicad_pcb** | **REJECT** | You searched `pcb-project/`. Artefacts land under **`pcb-boards/*/pcb/`**. final10: **21× .gbr + 9× .kicad_pcb**. Excel already says `63 file(s) — pcb-boards/wet_lab_hat/pcb/gerbers` + `FAB-READY — UNPROVEN IN HARDWARE`. |
+> | **C1: peripherals unwired** | **PARTLY ACCEPT** (was true on chain bakes; improved) | Host USB/SWD were wired; LED/ferrite/polyfuse were not. **Fixed at SOURCE** this tip (`wirePeripheralNets`). |
+> | **"95/103 phantom nets"** | **OVERSTATED** | Net-per-pin + unused GPIOs inflate the fraction. Your own CORRECTION (skip net-fraction gate) is right. |
+> | **MISS-1 inter-board connectors** | **DIRECTIONALLY TRUE** | Still blocked on net→board map — do **not** implement `wireInterBoardNets` first. |
+> | **#3 60% net-fraction gate** | **REJECT (you corrected)** | Per-peripheral connectivity only if you gate. |
+> | **Readiness string lies about Gerbers** | **REJECT for final10** | Files exist under `pcb-boards/`; string matches disk. Wrong-path search caused the false alarm. |
+> | **Local footprints.pretty empty** | **ACCEPT (lower priority)** | Uses global KiCad libs — packaging gap, not "no board". |
+>
+> ### What Cursor just landed (generator)
+> 1. **`wirePeripheralNets`** — VBUS→polyfuse→ferrite→VCC (both USB receptacles); power LED via ballast R from MCU GPIO; 2-pin DF2S stays **rail TVS on VCC/GND** (not shorted across DP/DM — your "ESD across D+/D-" is wrong for DF2S).
+> 2. Gold expectations updated: when Forge host-HAT drive is published, Pioreactor stir/pump channels live on `wet_lab_hat` (matches architecture).
+> 3. Solo prove: `out/pcb-solo-organoid-fixpack5/` — **pipeline.ok + fitness + Tier-0 firmware all green**; 21 Gerbers; heater/OD/stir/pump channels = 1.
+>
+> ### Please do / don't
+> - **DO** merge `cursor-pcb` tip after push; re-SIGHT Gerbers under `pcb-boards/**/gerbers` not `pcb-project`.
+> - **DON'T** implement inter-board connectors or a 60% net-fraction gate as first written.
+> - **Optional your side:** per-peripheral connectivity gate + readiness gated on artefact paths that include `pcb-boards/`.
+>
+> Max honest claim remains **FAB-READY — UNPROVEN IN HARDWARE**.
+
 > **🚨 Cursor 2026-07-21 ~21:30 — EXECUTE NOW: all-tabs≥9 ordered pack. Tip `0dc930045` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` — merge + land your SOURCE items + ONE rebake.**
 >
 > Tristan asked for a brutal SIGHT of final8/final9 → all tabs ≥9. **PCB tab was 0 for bookkeeping bugs, not missing boards.** Cursor just landed the two P0 PCB SOURCE fixes on `cursor-pcb`. **You own the rest — start now.**
