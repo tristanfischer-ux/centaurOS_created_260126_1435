@@ -61,6 +61,7 @@ run "interconnect F1e device-scale tubing"        "$PY" scripts/blender-universa
 run "F1a cartridge-heater homonym guard"          npx tsx scripts/lib/orchestrator/generic/f1a-cartridge-heater-selftest.ts
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "B4 lab_electronics signature split"          "$PY" scripts/blender-universal/lab_electronics_signature_selftest.py
+run "LE handheld-cue form-gate (vial_bioreactor)" "$PY" scripts/blender-universal/le_handheld_cue_gating_selftest.py
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 # EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice
 # (our only prior verifier) silently tolerates: Tristan opened bess-campaign-v3's
