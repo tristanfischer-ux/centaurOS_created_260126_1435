@@ -13214,8 +13214,17 @@ def _prepare_sealed_product_view(view_name, entering):
             # wire that floated as a red/blue stub) is interior/cutaway and MUST be hidden
             # here — mirrors how the working forms hide-all-but-keep. Non-u_se_ meshes
             # (ground slab, backdrop) and lights/cameras are left untouched.
+            # FIX (2026-07-22, floating-vial defect on 04-product-exterior):
+            # "u_se_le_vial" prefix matched BOTH the transparent glass culture
+            # vessel (u_se_le_vial, u_se_le_vial_fluid) AND the opaque holder
+            # ring (u_se_le_vial_collar).  On the sealed exterior the translucent
+            # vial/fluid must be hidden (they are above-deck cutaway features);
+            # only the opaque collar acts as the sealed sample-port face.
+            # Changed "u_se_le_vial" → "u_se_le_vial_collar" so the prefix-match
+            # keeps the collar only and the bare vial+fluid fall to the hide pass.
+            # proveCatch: _selftest_le_vial_exterior_gating (below in selftest block).
             _keep = ("u_se_le_lead", "u_se_le_electrode", "u_se_le_grid",
-                     "u_se_le_cartridge", "u_se_le_vial", "u_se_le_od",
+                     "u_se_le_cartridge", "u_se_le_vial_collar", "u_se_le_od",
                      "u_se_le_enclosure", "u_se_le_face")
             _shell_ids = {id(o) for o in _SEALED_SHELL_OBJECTS if o}
             if _SEALED_FRONT_COVER is not None:
@@ -24344,6 +24353,58 @@ def _selftest_le_handheld_cue_gating() -> None:
           "(a: LE suppressed, b: optical_handheld allowed, c: source gate verified)")
 
 
+def _selftest_le_vial_exterior_gating() -> None:
+    """proveCatch (2026-07-22 iter-2): on the 04–07 sealed exterior product views,
+    vial_bioreactor must NOT expose the translucent glass culture vessel
+    (u_se_le_vial / u_se_le_vial_fluid) above the sealed top deck.  Only the opaque
+    holder collar (u_se_le_vial_collar) is a legitimate exterior feature.
+
+    Root cause: the exterior keep-list in _prepare_sealed_product_view used the
+    broad prefix "u_se_le_vial" which matched the transparent glass cylinders AS WELL
+    as the opaque collar.  On the exterior Cycles render the glass vial floated ~30 mm
+    above the centre of the sealed top deck (translucent glass cylinder against the
+    white studio backdrop).
+
+    Two proveCatch assertions:
+    (a) "u_se_le_vial" (the bare glass vessel name-prefix) is NOT in the keep-list
+        — the transparent vial is never kept visible on the exterior view.
+    (b) "u_se_le_vial_collar" IS covered by the keep-list (the opaque sample-port
+        ring must remain visible as the sealed product's top-deck feature).
+
+    Source-code checks only (no bpy needed).  Also verifies the sealed exterior path
+    for the optical_handheld form still has a cuvette-port feature so the photometer
+    exterior is not accidentally suppressed.
+    """
+    import inspect as _ins
+    import re as _re_veg
+    _src = _ins.getsource(_prepare_sealed_product_view)
+
+    # (a) The BARE vial prefix must NOT appear as a standalone _keep tuple element.
+    # Search for the exact element pattern (comma or closing paren follow the quote)
+    # to avoid false-positive matches in comments that mention the old prefix.
+    _bare_vial_in_tuple = bool(
+        _re_veg.search(r'"u_se_le_vial"(?:\s*[,)])', _src)
+    )
+    assert not _bare_vial_in_tuple, (
+        "REGRESSION: \"u_se_le_vial\" found as a keep-list tuple element in "
+        "_prepare_sealed_product_view — the broad prefix was restored and will make "
+        "the translucent glass culture vessel visible on view 04 again. "
+        "The keep-list must use 'u_se_le_vial_collar' (opaque ring only).")
+
+    # (b) The collar prefix MUST appear as a keep-list tuple element so the opaque
+    # sample-port ring is kept visible on the exterior view.
+    _collar_in_tuple = bool(
+        _re_veg.search(r'"u_se_le_vial_collar"(?:\s*[,)])', _src)
+    )
+    assert _collar_in_tuple, (
+        "REGRESSION: \"u_se_le_vial_collar\" not found as a keep-list tuple element "
+        "in _prepare_sealed_product_view — the opaque holder collar was removed. "
+        "The vial_bioreactor exterior must show the collar as the sealed sample-port.")
+
+    print("[univ][sealed] _selftest_le_vial_exterior_gating OK "
+          "(a: bare vial prefix absent from keep-list, b: collar prefix present)")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
@@ -24354,6 +24415,7 @@ if __name__ == "__main__":
         _selftest_sealed_role_xy()
         _selftest_sealed_zone_pack_dominance()
         _selftest_le_handheld_cue_gating()
+        _selftest_le_vial_exterior_gating()
         hfi._selftest()
         ifg._selftest()
         try:
@@ -24364,6 +24426,6 @@ if __name__ == "__main__":
             _ism._selftest()
         except Exception as _ste:  # noqa: BLE001
             raise SystemExit(f"spine-manifest selftest failed: {_ste}") from _ste
-        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials + sealed XY + spine seat + LE cue gating)")
+        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials + sealed XY + spine seat + LE cue gating + vial exterior gate)")
     else:
         main()

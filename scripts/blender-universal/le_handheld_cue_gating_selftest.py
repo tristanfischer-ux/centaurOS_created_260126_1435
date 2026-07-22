@@ -119,6 +119,44 @@ if '"vial_bioreactor"' not in _sig_src and "'vial_bioreactor'" not in _sig_src:
         "has been removed"
     )
 
+# ── (e) vial exterior gate: translucent glass must NOT be in exterior keep-list ──
+# ROOT: The old keep-list prefix "u_se_le_vial" matched the transparent culture
+# vessel (u_se_le_vial, u_se_le_vial_fluid) AND the opaque collar
+# (u_se_le_vial_collar), causing the glass cylinder to float above the sealed
+# product top deck on view 04 (2026-07-22 organoid-bioreactor defect, iter-2).
+# FIX: keep-list uses "u_se_le_vial_collar" (collar only), not the broad
+# "u_se_le_vial" (which also catches the glass vial + fluid).
+_psp_src = inspect.getsource(b._prepare_sealed_product_view)
+
+# (e1) The _keep tuple assignment must NOT include the bare "u_se_le_vial" as a
+# standalone element (without the _collar suffix).  We search for the tuple element
+# exactly — either '"u_se_le_vial",' or '"u_se_le_vial")' — NOT '"u_se_le_vial_collar"'.
+# This avoids false-positive matches in comments that explain the change.
+import re as _re
+_bare_vial_in_tuple = bool(
+    _re.search(r'"u_se_le_vial"(?:\s*[,)])', _psp_src)
+)
+if _bare_vial_in_tuple:
+    fails.append(
+        "REGRESSION (iter-2 vial-exterior): \"u_se_le_vial\" found as a keep-list "
+        "tuple element in _prepare_sealed_product_view — the broad prefix was "
+        "restored and will make the translucent glass culture vessel visible on "
+        "view 04 again.  The keep-list must use 'u_se_le_vial_collar' (opaque ring)."
+    )
+
+# (e2) The collar prefix MUST appear in a tuple element so the opaque sample-port
+# ring is kept visible on the exterior view.
+_collar_in_tuple = bool(
+    _re.search(r'"u_se_le_vial_collar"(?:\s*[,)])', _psp_src)
+)
+if not _collar_in_tuple:
+    fails.append(
+        "REGRESSION (iter-2 vial-exterior): \"u_se_le_vial_collar\" NOT found as a "
+        "keep-list tuple element in _prepare_sealed_product_view — the opaque holder "
+        "collar was removed.  The vial_bioreactor exterior must show the collar as "
+        "the sealed sample-port face on views 04–07."
+    )
+
 # ── Report ────────────────────────────────────────────────────────────────────
 if fails:
     for f in fails:
@@ -129,5 +167,6 @@ if fails:
 print(
     "le_handheld_cue_gating selftest: OK "
     "(a: LE suppressed, b: optical_handheld allowed, c: gate text present, "
-    "d: vial_bioreactor signature recognised as lab_electronics)"
+    "d: vial_bioreactor signature recognised as lab_electronics, "
+    "e: translucent vial absent from exterior keep-list / collar present)"
 )
