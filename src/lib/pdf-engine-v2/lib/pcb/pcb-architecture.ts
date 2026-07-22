@@ -301,6 +301,46 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
   return undefined
 }
 
+/**
+ * @description Identity blob for temperature-role routing (word + MPN + character).
+ */
+function temperatureIdentityBlob(word: ElectronicWordRef): string {
+  return [
+    word.wordId,
+    word.nameHuman,
+    word.characterId,
+    word.modifiers.part_number ?? '',
+    word.modifiers.manufacturer ?? '',
+    word.modifiers.form ?? '',
+  ].join(' ').toLowerCase()
+}
+
+/**
+ * @description True when the word is an on-board digital temperature IC
+ * (I²C/SPI TMP-class or culture_temperature_probe), not a bare NTC/thermistor.
+ */
+export function isDigitalTemperatureIc(word: ElectronicWordRef): boolean {
+  const blob = temperatureIdentityBlob(word)
+  return (
+    /culture[_ -]?temperature[_ -]?probe/i.test(blob)
+    || /\btmp\d{3,}/i.test(blob)
+    || /digital[_ -]?temp(?:erature)?[_ -]?(?:ic|sensor|probe)/i.test(blob)
+  )
+}
+
+/**
+ * @description True when the word is a bare NTC/thermistor-class temperature
+ * sensor (analogue, typically 2-pin) — not a digital IC.
+ */
+export function isBareThermistorTemperatureSensor(word: ElectronicWordRef): boolean {
+  if (isDigitalTemperatureIc(word)) return false
+  const blob = temperatureIdentityBlob(word)
+  return (
+    /(?:^|[_ -])(?:temperature[_ -]?sensor|thermistor|\bntc\b)(?:$|[_ -])/i.test(blob)
+    || /\bntcg?\d/i.test(blob)
+  )
+}
+
 function nonBoardPlacement(
   word: ElectronicWordRef,
   state: Record<string, unknown>,
@@ -473,6 +513,20 @@ function nonBoardPlacement(
       placement: 'functional_requirement',
       ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
       reasons: ['integrated_mcu_owns_firmware_or_protocol_function'],
+    }
+  }
+  // INTENT (fixpack14): when a digital temp IC (TMP1075 / culture_temperature_probe)
+  // is already on the board plan, a bare NTC/thermistor sibling is half-wired junk
+  // (VCC/GND only — no sense net). Park it off-board rather than minting a ghost.
+  // DECISION: supersede only when a digital IC is present among allWords — a lone
+  // NTC remains a legitimate on-board analogue sensor.
+  if (
+    isBareThermistorTemperatureSensor(word)
+    && allWords.some((candidate) => isDigitalTemperatureIc(candidate))
+  ) {
+    return {
+      placement: 'off_board_module',
+      reasons: ['superseded_by_on_board_digital_temperature_ic'],
     }
   }
   return null
