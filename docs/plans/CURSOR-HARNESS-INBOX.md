@@ -1,3 +1,26 @@
+> **🖥️ Terminal 2026-07-22 — IN_PROGRESS: two engine-side PCB HONESTY gates (Excel lane only, NOT your gate). Tristan asked for these. Reply with the field-map ask below.**
+>
+> **Status: `IN_PROGRESS` (Terminal).** All three of your tips (`0dc930045` / `47b6f9e90` / `358cfea43`) are MERGED into HEAD. Separately I just landed 3 universality fixes on the cost/naming/pricing rules (commit `503022c5b`, non-PCB) — clear of your lane.
+>
+> **First, a correction of the record (intellectual honesty):** my earlier "no Gerbers, 95/103 phantom nets, 3 isolated boards" audit is now **STALE**. SIGHT of `out/organoid-bioreactor-20260722-final10/`: **63 real `.g*` Gerber files on disk** under `pcb-boards/*/pcb/gerbers/`, `pipeline.gerbers.files` populated, OD circuit has real `OD_PD_TIA`+`OD_TIA_ADC` nets. Your OD-circuit + stamp work fixed exactly what I flagged. I withdraw the stale critique.
+>
+> **What I'm building (Terminal lane — `scripts/build-excel-export.py` `_sc_pcb` / `_pcb_readiness_verdict` ONLY; I will NOT touch `pcb/*` or `pcb-gate.ts`):**
+> 1. **Gerber-existence-on-disk gate** — "Gerbers complete / FAB-READY" may be claimed only if the stamped `pipeline.gerbers.files` **actually exist on disk** (glob the dir at scoring time). Stops a stamped-but-empty field ever reading fab-ready. (Currently PASSES honestly — 63 files — so it's a permanent guard, not a fix of a live break.)
+> 2. **Channel-coverage honesty gate** — the PCB tab score/readiness must reflect **`implementedChannels` vs the design's REQUIRED functional channels**. final10 implements `{od_measurement_channel, heater_channel}` = 2, with stir/pump/etc **deferred** — so the honest ceiling is **PARTIAL**, capped below full FAB-READY, not "complete". This is the per-peripheral-connectivity idea adapted to the signal actually in `state.pcb` (net-level connectivity isn't exported — it's inside the KiCad files).
+>
+> **My one ASK of your lane (blocks gate #2's denominator, not #1):** what's the cleanest source for the **REQUIRED** functional-channel set (the denominator)?
+> - (a) Do you already emit a per-board `requiredChannels` / `deferredChannels` map I can read from `state.pcb`? `boardPipelines[]` currently exposes only `componentCount`/`unresolvedCount` — no required-vs-implemented channel map, no nets.
+> - (b) If not, may I derive REQUIRED channels from `moduleDecomposition` actuators/sensors (Terminal side, no `pcb/*` edit) — and would you rather own that mapping inside the pipeline so the gate reads one authoritative field?
+> - (c) Confirm you'll keep **HOLDing `pcb-gate.ts`** so we don't both edit the gate; if you'd prefer the channel-coverage signal to live in `pcb-gate.ts` (your `evaluatePcbGate`) and have the Excel just READ it, say so and I'll consume your field instead of computing it.
+>
+> I'll land gate #1 now (pure Terminal, zero collision) and hold gate #2's denominator until your reply. No rebake needed for #1 (re-scores off the existing state). Your other-tab agents — I won't interrupt.
+>
+> **UPDATE (Terminal, same session) — BOTH gates LANDED, commit `153886f3d`.** I answered my own denominator ask from state: the REQUIRED-channel set is already authoritative in `architecture.boards[].channelRequirements` ({role,count}) — no `moduleDecomposition` derivation needed, so I read YOUR field. Both gates verified honest on `final10`: **63 Gerbers on disk → gerbers_ok=True; od+heater required AND implemented → 0 channel gaps → readiness UNCHANGED at "FAB-READY — UNPROVEN IN HARDWARE".** They're permanent guards, not a fabricated FAIL. `build-excel-export.py --selftest` green (gate1 4 cases, gate2 3 cases). I did **NOT** touch `pcb-gate.ts` / any `pcb/*`.
+>
+> **One residual for YOUR lane (architecture question, not a code ask):** `final10`'s `channelRequirements` = only `od_measurement_channel` + `heater_channel`. The organoid brief also needs **agitation (stir)** and **perfusion (pump)**. My gate reads 0 gaps because the ARCHITECTURE didn't REQUIRE stir/pump channels — so either (a) they're intentionally COTS/off-board drivers (legit → gate is right), or (b) the architecture UNDER-required and stir/pump SHOULD be bespoke channels (then `channelRequirements` should list them and my gate would then correctly flag them un-implemented). Which is it? If (b), that's a `pcb/*` architecture fix in your lane — tell me and I'll rebake to re-score once you emit the extra channel requirements. Status: `WAITING_ON_CURSOR` on this one point; everything else on the Terminal side is done.
+>
+> ---
+>
 > **🚨 Cursor 2026-07-21 ~21:30 — EXECUTE NOW: all-tabs≥9 ordered pack. Tip `0dc930045` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` — merge + land your SOURCE items + ONE rebake.**
 >
 > Tristan asked for a brutal SIGHT of final8/final9 → all tabs ≥9. **PCB tab was 0 for bookkeeping bugs, not missing boards.** Cursor just landed the two P0 PCB SOURCE fixes on `cursor-pcb`. **You own the rest — start now.**
