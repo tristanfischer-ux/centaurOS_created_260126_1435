@@ -24,11 +24,10 @@ describe('buildFirmwareProofContract', () => {
     expect(fat.design_fitness_ok).toBe(false)
     expect((fat.mcu as { pin_contract_complete: boolean }).pin_contract_complete).toBe(false)
     expect(fat.schema).toBe('pcb-firmware-proof-spec/v1')
-    expect((fat.buses as Array<{ pins: Record<string, string> }>)[0].pins).toEqual({
-      tx: 'TX',
-      rx: 'RX',
-      gnd: 'GND',
-    })
+    // SAMD21 reference map → real I2C pads (not synthetic TX/RX theatre).
+    const i2c = (fat.buses as Array<{ protocol: string; pins: Record<string, string> }>)
+      .find((b) => b.protocol === 'i2c')
+    expect(i2c?.pins).toEqual({ sda: 'PA22', scl: 'PA23', gnd: 'GND' })
   })
 
   it('marks pin contract complete only when fitness OK and MCU present', () => {
@@ -39,6 +38,29 @@ describe('buildFirmwareProofContract', () => {
       components: [],
     })
     expect((fat.mcu as { pin_contract_complete: boolean }).pin_contract_complete).toBe(true)
+  })
+
+  it('prefers netlist MCU pads over reference fallback when nets are supplied', () => {
+    const fat = buildFirmwareProofContract({
+      thin,
+      designFitnessOk: true,
+      mcu: { mpn: 'ATSAMD21G18A-AU' },
+      components: [{
+        wordId: 'main_controller_mcu_word',
+        mpn: 'ATSAMD21G18A-AU',
+        refdes: 'mcu',
+        instanceName: 'mcu',
+        functionClass: 'microcontroller',
+      }],
+      nets: [
+        { name: 'HEATER_I2C_SDA', members: [{ instanceName: 'mcu', pin: 'PA22_1' }] },
+        { name: 'HEATER_I2C_SCL', members: [{ instanceName: 'mcu', pin: 'PA23_1' }] },
+      ],
+    })
+    const i2c = (fat.buses as Array<{ protocol: string; pins: Record<string, string> }>)
+      .find((b) => b.protocol === 'i2c')
+    expect(i2c?.pins.sda).toBe('PA22_1')
+    expect(i2c?.pins.scl).toBe('PA23_1')
   })
 
   it('proveCatch: instances come from implementedChannels, never requiredCount', () => {

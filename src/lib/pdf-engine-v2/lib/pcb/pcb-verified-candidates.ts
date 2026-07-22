@@ -612,7 +612,9 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'Molex three through-hole contacts; local KiCad Connector_Generic:Conn_01x03 with exact 6410-03A footprint',
   },
   {
-    roleTest: /source[_ -]?board[_ -]?connector/i,
+    // INTENT: OD optics host 4P and HAT-side OD mate share the BOOMELE 1.0T-4P
+    // land (Open Colorimeter J1/J2 pinout: GND/3V3/SDA/SCL).
+    roleTest: /source[_ -]?board[_ -]?connector|od[_ -]?host[_ -]?mate/i,
     functionClass: 'connector',
     manufacturer: 'BOOMELE (Boom Precision Elec)',
     partNumber: '1.0T-4P',

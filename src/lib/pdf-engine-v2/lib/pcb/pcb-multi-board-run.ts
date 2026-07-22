@@ -19,6 +19,7 @@ import {
   type PcbArchitecturePlan,
   type PcbBoardPlan,
 } from './pcb-architecture'
+import { planSystemNets } from './pcb-cross-board-nets'
 import { deriveImplementedChannelCounts } from './pcb-channel-evidence'
 import {
   evaluatePcbDesignFitness,
@@ -131,6 +132,11 @@ export function runBespokeMultiBoardPcb(
   const boards = kicadDeliverableBoards(architecture)
   const useLegacySingleDir = boards.length <= 1
   const boardPipelines: BoardPipelineRun[] = []
+  // INTENT: plan cable families once so every board densifies matching mates
+  // and stamps the same crossBoard net names (multiBoardMerged stays false).
+  const systemNets = planSystemNets(
+    boards.length > 0 ? boards : architecture.boards,
+  )
 
   const targets = boards.length > 0
     ? boards
@@ -149,6 +155,8 @@ export function runBespokeMultiBoardPcb(
       requiredWordIds: board.requiredWordIds.length > 0 ? board.requiredWordIds : undefined,
       boardShape: board.shape,
       boardRole: board.role,
+      boardId: board.boardId,
+      systemNets,
       requiredFunctionRoles: board.channelRequirements.map((r) => r.role),
     })
     const pipelineResult = runPipeline(projectDir, chainOutDir)

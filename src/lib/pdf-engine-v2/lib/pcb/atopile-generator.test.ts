@@ -1485,8 +1485,74 @@ describe('atopile-generator', () => {
       .toMatch(/DRV8876/i)
     const netNames = new Set(result.nets.map((n) => n.name))
     expect(netNames.has('HAT_HEATER_PWM')).toBe(true)
+    expect(netNames.has('HEATER_RES_A')).toBe(true)
     expect(netNames.has('STIR_MOTOR_A')).toBe(true)
     expect(netNames.has('PUMP_MOTOR_A')).toBe(true)
+  })
+
+  it('inter-board: HAT densifies heater FFC mate + OD mate; tags crossBoard nets', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/ATSAMD21/i.test(mpn ?? '')) {
+        return cacheHit('Microchip', 'ATSAMD21G18A-AU', 'MCU')
+      }
+      if (/12401610|SSQ|52207|1\.0T-4P|AO3400|DRV8876|CC0603|DF2S|FTSH/i.test(mpn ?? '')) {
+        return cacheHit('Generic', mpn ?? '', 'companion')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-interboard-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'host',
+          sub_modules: [{
+            id: 'host__mcu',
+            words: [
+              {
+                id: 'microcontroller_mcu_word',
+                name_human: 'Host MCU',
+                content_character: { character_id: 'microcontroller_mcu' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'usb_interface_word',
+                name_human: 'USB interface',
+                content_character: { character_id: 'usb_interface' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['microcontroller_mcu_word', 'usb_interface_word'],
+      boardId: 'wet_lab_hat',
+      boardRole: 'wet_lab_hat',
+      systemNets: {
+        crossBoardNetNames: [
+          'HEATER_I2C_SCL',
+          'HEATER_I2C_SDA',
+          'HEATER_HALL',
+          'HEATER_RES_A',
+          'HEATER_RES_B',
+          'OD_I2C_SCL',
+          'OD_I2C_SDA',
+          'OD_I2C_VCC',
+          'OD_I2C_GND',
+        ],
+        hasHeaterFfc: true,
+        hasOdHostI2c: true,
+        boardIds: ['wet_lab_hat', 'od_optics', 'wet_actuation'],
+      },
+    })
+    expect(result.components.some((c) => c.wordId === 'heater_ffc_host_mate_word')).toBe(true)
+    expect(result.components.some((c) => c.wordId === 'od_host_mate_connector_word')).toBe(true)
+    const heaterScl = result.nets.find((n) => n.name === 'HEATER_I2C_SCL')
+    expect(heaterScl?.crossBoard).toBe(true)
+    expect((heaterScl?.members.length ?? 0) >= 2).toBe(true)
   })
 
   it('wirePeripheralNets: VBUS rev-pol+polyfuse+ferrite; LED on SAMD21 PA07', () => {

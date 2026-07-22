@@ -83,8 +83,16 @@ function main(): void {
       components: boardComponents.map((c) => ({
         wordId: c.wordId,
         refdes: c.instanceName,
+        instanceName: c.instanceName,
         mpn: c.partNumber,
         characterId: c.characterId ?? undefined,
+        functionClass: c.functionClass ?? undefined,
+        manufacturer: c.manufacturer ?? undefined,
+      })),
+      nets: (boardRun?.generator.nets ?? []).map((n) => ({
+        name: n.name,
+        kind: n.kind,
+        members: n.members,
       })),
       implementedChannels: multi.implementedChannels,
     })
