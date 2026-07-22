@@ -15,7 +15,10 @@ import {
   type BoardSimModel,
 } from './pcb-firmware-board-sim-model'
 import type { FirmwareBusPinMap } from './pcb-firmware-pinmap-from-nets'
-import { emitTier1McuProject } from './pcb-firmware-tier1-project'
+import {
+  emitTier1McuProject,
+  type Tier1SimDevice,
+} from './pcb-firmware-tier1-project'
 
 export interface FirmwareProofRunResult {
   ok: boolean
@@ -91,6 +94,8 @@ export type Tier1CompileOpts = {
   proofTargetId?: string
   mcuMpn?: string
   buses?: FirmwareBusPinMap[]
+  /** Virtual I²C devices for QEMU MCU-sim (fixpack19). */
+  simDevices?: Tier1SimDevice[]
 }
 
 /**
@@ -123,6 +128,7 @@ export function probeTier1McuCompile(
       proofTargetId: opts.proofTargetId,
       mcuMpn: opts.mcuMpn,
       buses: opts.buses,
+      simDevices: opts.simDevices,
     })
     projectDir = emitted.projectDir
   }
@@ -299,11 +305,29 @@ export function probeTier3McuSim(args: {
   /** Directory containing Makefile from emitTier1McuProject (…/mcu-project). */
   projectDir?: string
   proofTargetId?: string
+  /** When set, re-emit project with these virtual devices before make sim. */
+  simDevices?: Tier1SimDevice[]
+  mcuMpn?: string
+  buses?: FirmwareBusPinMap[]
 }): FirmwareTier3McuSimResult {
-  const { outDir, projectDir, proofTargetId } = args
+  const { outDir, proofTargetId, simDevices, mcuMpn, buses } = args
+  let { projectDir } = args
   fs.mkdirSync(outDir, { recursive: true })
   const which = spawnSync('which', ['qemu-system-arm'], { encoding: 'utf8' })
   const qemu = which.status === 0 ? which.stdout.trim() : null
+
+  // INTENT (fixpack19): always re-emit when devices/buses provided so the
+  // virtual board matches the latest board-sim model (not a stale theatre ELF).
+  if (proofTargetId && mcuMpn && buses && buses.length > 0) {
+    const emitted = emitTier1McuProject({
+      outDir: path.join(outDir, '_emit'),
+      proofTargetId,
+      mcuMpn,
+      buses,
+      simDevices: simDevices ?? [],
+    })
+    projectDir = emitted.projectDir
+  }
 
   let result: FirmwareTier3McuSimResult
   if (!qemu) {
@@ -323,6 +347,24 @@ export function probeTier3McuSim(args: {
       qemu,
     }
   } else {
+    const mainSrc = fs.readFileSync(path.join(projectDir, 'main.c'), 'utf8')
+    const virtSrc = fs.existsSync(path.join(projectDir, 'virt_i2c.c'))
+      ? fs.readFileSync(path.join(projectDir, 'virt_i2c.c'), 'utf8')
+      : ''
+    // Fail closed on fixpack18 theatre: PASS strings without virt_i2c_read8.
+    if (!mainSrc.includes('virt_i2c_read8') || !virtSrc.includes('virt_i2c_read8')) {
+      result = {
+        ok: false,
+        skipped: false,
+        tier: 'tier3_mcu_sim',
+        reason:
+          'MCU sim source lacks virt_i2c_read8 — hardcoded CHECK PASS is not a virtual board test',
+        qemu,
+      }
+      fs.writeFileSync(path.join(outDir, 'tier3-status.json'), JSON.stringify(result, null, 2))
+      return result
+    }
+
     const makeSim = spawnSync('make', ['-C', projectDir, 'sim'], {
       encoding: 'utf8',
       timeout: 120_000,
@@ -338,8 +380,8 @@ export function probeTier3McuSim(args: {
         simElfPath: fs.existsSync(simElfPath) ? simElfPath : undefined,
       }
     } else {
-      // DECISION: mps2-an385 + cortex-m3 — QEMU's best-supported M-profile +
-      // semihosting target; freestanding proof does not need SAMD21 silicon model.
+      // DECISION: mps2-an385 + cortex-m3 — best QEMU M-profile + semihosting;
+      // virtual I²C lives in firmware RAM models (not full SAMD21 SERCOM).
       const qemuRun = spawnSync(
         qemu,
         [
@@ -362,17 +404,25 @@ export function probeTier3McuSim(args: {
       const bootOk = transcript.includes(`MCU_SIM|${target}|BOOT`)
         || transcript.includes('MCU_SIM|')
       const passOk = transcript.includes('CHECK mcu_sim PASS')
+      const i2cReadOk = /CHECK i2c_read PASS/.test(transcript)
+      const i2cFail = /CHECK i2c_read FAIL|CHECK i2c_bus FAIL/.test(transcript)
       const checkLines = transcript.split(/\r?\n/).filter((l) => l.startsWith('CHECK '))
       const allChecksPass =
         checkLines.length > 0 && checkLines.every((l) => l.includes(' PASS'))
-      const ok = bootOk && passOk && allChecksPass && qemuRun.error == null
+      const ok =
+        bootOk
+        && passOk
+        && i2cReadOk
+        && !i2cFail
+        && allChecksPass
+        && qemuRun.error == null
       result = {
         ok,
         skipped: false,
         tier: 'tier3_mcu_sim',
         reason: ok
-          ? 'Cortex-M ELF executed under QEMU semihosting — UNPROVEN IN HARDWARE (not HIL)'
-          : `MCU sim transcript incomplete (exit=${qemuRun.status ?? 'n/a'}): ${transcript.slice(0, 240)}`,
+          ? 'Cortex-M ELF probed virtual I²C devices under QEMU — UNPROVEN IN HARDWARE (not HIL)'
+          : `MCU sim virtual-I²C incomplete (exit=${qemuRun.status ?? 'n/a'}): ${transcript.slice(0, 280)}`,
         qemu,
         simElfPath,
         transcriptPath,

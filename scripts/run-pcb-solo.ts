@@ -16,6 +16,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { buildBoardSimModel } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-board-sim-model'
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
 import {
   probeTier1McuCompile,
@@ -138,62 +139,109 @@ function main(): void {
   }
   const firmwareAllOk =
     proofResults.length > 0 && proofResults.every((r) => r.result.ok === true)
+
+  // Shared host + peer context for Tier-2 bind + Tier-3 virtual I²C devices.
+  const hostRun = tier1Target
+    ? multi.boardPipelines.find((b) => b.boardId === tier1Target)
+    : undefined
+  const hostComponents = hostRun?.generator.components ?? []
+  const peerComponents = tier1Target
+    ? multi.boardPipelines
+        .filter((b) => b.boardId !== tier1Target)
+        .flatMap((b) => b.generator.components)
+    : []
+  const hostThin = thinSpecs.find((t) => t.proofTargetId === tier1Target)
+  const hostNets = (hostRun?.generator.nets ?? []).map((n) => ({
+    name: n.name,
+    kind: n.kind,
+    members: n.members,
+  }))
+  const hostCompLike = hostComponents.map((c) => ({
+    instanceName: c.instanceName,
+    functionClass: c.functionClass,
+    characterId: c.characterId ?? undefined,
+    partNumber: c.partNumber,
+    manufacturer: c.manufacturer,
+  }))
+  const peerCompLike = peerComponents.map((c) => ({
+    instanceName: c.instanceName,
+    functionClass: c.functionClass,
+    characterId: c.characterId ?? undefined,
+    partNumber: c.partNumber,
+    manufacturer: c.manufacturer,
+  }))
+
+  let simChannels: Array<{
+    role: string
+    instances: Array<{ instance_id: string; enable_net?: string; output_net?: string }>
+  }> = []
+  if (tier1Target && tier1Mcu && hostThin) {
+    const fatForSim = buildFirmwareProofContract({
+      thin: hostThin,
+      designFitnessOk: designFitness.ok === true,
+      mcu: { mpn: tier1Mcu },
+      components: hostComponents.map((c) => ({
+        wordId: c.wordId,
+        refdes: c.instanceName,
+        instanceName: c.instanceName,
+        mpn: c.partNumber,
+        characterId: c.characterId ?? undefined,
+        functionClass: c.functionClass ?? undefined,
+        manufacturer: c.manufacturer ?? undefined,
+      })),
+      nets: hostNets,
+      implementedChannels: multi.implementedChannels,
+    })
+    const fatChannels = (fatForSim?.channels ?? []) as typeof simChannels
+    const hostRoles = new Set((hostThin?.channels ?? []).map((c) => c.role))
+    simChannels = fatChannels.filter((c) => hostRoles.has(c.role))
+  }
+
+  const boardModel =
+    tier1Target && tier1Mcu && tier1Buses.length > 0
+      ? buildBoardSimModel({
+          proofTargetId: tier1Target,
+          kind: 'custom_board',
+          mcuMpn: tier1Mcu,
+          buses: tier1Buses,
+          channels: simChannels,
+          nets: hostNets,
+          components: hostCompLike,
+          peerComponents: peerCompLike,
+        })
+      : null
+  const simDevices =
+    boardModel?.buses
+      .filter((b) => b.protocol === 'i2c')
+      .flatMap((b) =>
+        b.expected_devices.map((d) => ({
+          address: d.address,
+          mpn: d.mpn,
+          word_id: d.word_id,
+        })),
+      ) ?? []
+
   const tier1 = probeTier1McuCompile(resolve(proofOutRoot, '_tier1'), {
     proofTargetId: tier1Target,
     mcuMpn: tier1Mcu,
     buses: tier1Buses,
+    simDevices,
   })
   console.error(
     `[pcb-solo] firmwareTier1: ok=${tier1.ok} skipped=${tier1.skipped}` +
       ` (${tier1.reason.slice(0, 140)})` +
-      (tier1Target ? ` target=${tier1Target}` : ''),
+      (tier1Target ? ` target=${tier1Target}` : '') +
+      ` simDevices=${simDevices.length}`,
   )
 
-  // INTENT (fixpack17): Tier-2 synthetic board sim — firmware against imagined
-  // peripherals bound to real nets. Peer I²C devices (TMP1075/ADS…) ride the loom.
+  // INTENT (fixpack17): Tier-2 = host net/device bind (NOT MCU execution).
   let tier2: ReturnType<typeof runTier2BoardSim> = {
     ok: false,
     skipped: true,
     tier: 'tier2_board_sim',
     reason: 'no custom_board MCU target for board sim',
   }
-  if (tier1Target && tier1Mcu && tier1Buses.length > 0) {
-    const hostRun = multi.boardPipelines.find((b) => b.boardId === tier1Target)
-    const hostComponents = hostRun?.generator.components ?? []
-    const peerComponents = multi.boardPipelines
-      .filter((b) => b.boardId !== tier1Target)
-      .flatMap((b) => b.generator.components)
-    const hostThin = thinSpecs.find((t) => t.proofTargetId === tier1Target)
-    const fatForSim = hostThin
-      ? buildFirmwareProofContract({
-          thin: hostThin,
-          designFitnessOk: designFitness.ok === true,
-          mcu: { mpn: tier1Mcu },
-          components: hostComponents.map((c) => ({
-            wordId: c.wordId,
-            refdes: c.instanceName,
-            instanceName: c.instanceName,
-            mpn: c.partNumber,
-            characterId: c.characterId ?? undefined,
-            functionClass: c.functionClass ?? undefined,
-            manufacturer: c.manufacturer ?? undefined,
-          })),
-          nets: (hostRun?.generator.nets ?? []).map((n) => ({
-            name: n.name,
-            kind: n.kind,
-            members: n.members,
-          })),
-          implementedChannels: multi.implementedChannels,
-        })
-      : null
-    const fatChannels = (fatForSim?.channels ?? []) as Array<{
-      role: string
-      instances: Array<{ instance_id: string; enable_net?: string; output_net?: string }>
-    }>
-    // GOTCHA: only host-local channel roles — stir/pump live on HAT; heater/od
-    // on peers would unbound against HAT nets if we passed every role.
-    const hostRoles = new Set((hostThin?.channels ?? []).map((c) => c.role))
-    const simChannels = fatChannels.filter((c) => hostRoles.has(c.role))
+  if (tier1Target && tier1Mcu && tier1Buses.length > 0 && boardModel) {
     tier2 = runTier2BoardSim({
       outDir: resolve(proofOutRoot, '_tier2'),
       repoRoot: process.cwd(),
@@ -203,25 +251,9 @@ function main(): void {
         mcuMpn: tier1Mcu,
         buses: tier1Buses,
         channels: simChannels,
-        nets: (hostRun?.generator.nets ?? []).map((n) => ({
-          name: n.name,
-          kind: n.kind,
-          members: n.members,
-        })),
-        components: hostComponents.map((c) => ({
-          instanceName: c.instanceName,
-          functionClass: c.functionClass,
-          characterId: c.characterId ?? undefined,
-          partNumber: c.partNumber,
-          manufacturer: c.manufacturer,
-        })),
-        peerComponents: peerComponents.map((c) => ({
-          instanceName: c.instanceName,
-          functionClass: c.functionClass,
-          characterId: c.characterId ?? undefined,
-          partNumber: c.partNumber,
-          manufacturer: c.manufacturer,
-        })),
+        nets: hostNets,
+        components: hostCompLike,
+        peerComponents: peerCompLike,
       },
     })
   }
@@ -231,11 +263,14 @@ function main(): void {
       ` (${tier2.reason.slice(0, 160)})`,
   )
 
-  // INTENT (fixpack18): Tier-3 = real Cortex-M ELF under QEMU — not Mac puts().
+  // INTENT (fixpack19): Tier-3 firmware must virt_i2c_read8 under QEMU.
   const tier3 = probeTier3McuSim({
     outDir: resolve(proofOutRoot, '_tier3'),
     projectDir: tier1.projectDir,
     proofTargetId: tier1Target,
+    mcuMpn: tier1Mcu,
+    buses: tier1Buses,
+    simDevices,
   })
   console.error(
     `[pcb-solo] firmwareTier3(mcu-sim): ok=${tier3.ok} skipped=${tier3.skipped}` +
