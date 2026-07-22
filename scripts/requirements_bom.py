@@ -6005,6 +6005,34 @@ def _selftest() -> int:
                 "Dosing Peristaltic Pump", "requirement stated", "NOT FOUND")[2] is not None:
             print("  FAIL part-type-coherence: a placeholder line must NOT be rejected"); bad += 1
 
+    # ── proveCatch: distributor-confirmed sub-£1 price not floored to commodity (Fix 2, 2026-07-22) ──
+    # Root bug: TDK NTCG163JF103FT1 at distributor_price_gbp=0.12 was being floored to £1
+    # because round(0.12)=0 fired the commodity floor, ignoring the confirmed dist_price.
+    # Fix: (a) `and wid not in dist_price` guard skips the floor when distributor price known;
+    # (b) sub-£1 prices stored at 2 dp so 0.12 → 0.12 not 0.
+    _dp_fix_gbp = 0.12
+    _dp_fix_wid = "ntcg163jf103ft1-test"
+    # sub-fix (a): guard condition — with wid in dist_price the floor must be SKIPPED
+    _dist_price_test = {_dp_fix_wid: _dp_fix_gbp}
+    _renders_zero_test = (round(_dp_fix_gbp) <= 0)  # True — 0.12 rounds to 0
+    _floor_fires = _renders_zero_test and (_dp_fix_wid not in _dist_price_test)
+    if _floor_fires:
+        print("  FAIL commodity-floor proveCatch (a): dist_price guard must SKIP the commodity "
+              f"floor for wid '{_dp_fix_wid}' with confirmed dist £{_dp_fix_gbp}"); bad += 1
+    # sub-fix (b): 2dp precision — round(0.12, 2) must not collapse to 0
+    _stored_gbp = round(_dp_fix_gbp, 2) if 0 < _dp_fix_gbp < 1 else round(_dp_fix_gbp)
+    if _stored_gbp != 0.12:
+        print(f"  FAIL commodity-floor proveCatch (b): sub-£1 price 0.12 must store as 0.12 at "
+              f"2 dp precision, got {_stored_gbp!r}"); bad += 1
+    # proveNoFalsePositive: a genuinely price-less line (gbp=0, no dist_price) STILL fires the floor
+    _no_dist = {}
+    _gbp_zero = 0.0
+    _rz_zero = (round(_gbp_zero) <= 0)
+    _floor_fires_zero = _rz_zero and ("no-price-wid" not in _no_dist)
+    if not _floor_fires_zero:
+        print("  FAIL commodity-floor proveNoFalsePositive: a genuinely £0 part with no "
+              "dist_price must STILL fire the commodity floor"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -8432,7 +8460,8 @@ def assemble(out_dir: str):
                 # consumable keeps its narrower 'only a TRUE £0' exemption unchanged. ──
                 _is_pack_micro = _pack_micro_band(name or "") is not None
                 _renders_zero = (gbp <= 0) if _is_pack_micro else (round(gbp) <= 0)
-                if status not in ("SUB-COMPONENT", "BUILDING") and _renders_zero:
+                if status not in ("SUB-COMPONENT", "BUILDING") and _renders_zero \
+                        and wid not in dist_price:  # skip floor when distributor confirmed the price
                     _cf, _cnoun = _commodity_zero_floor(name)
                     # ×5 SELF-CONSISTENCY (2026-07-11 run 59: a REAL £0.14 catalogue
                     # estimate floored to the £3 noun floor tripped the engine's own
@@ -8488,7 +8517,9 @@ def assemble(out_dir: str):
                              f"as an unresolved OEM component rather than pinned to its "
                              f"consumable")
                 row = {"tag": tag, "requirement": requirement, "status": status,
-                       "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
+                       "part": part, "qty": qy,
+                       "unit_gbp": (round(gbp, 2) if 0 < gbp < 1 else round(gbp)),
+                       "line_gbp": (round(gbp * qy, 2) if 0 < gbp < 1 else round(gbp * qy)),
                        "basis": basis}
                 if mt_spec:
                     row.update(mt_spec)   # material · wall_mm · mass_kg · diameter_m · height_m

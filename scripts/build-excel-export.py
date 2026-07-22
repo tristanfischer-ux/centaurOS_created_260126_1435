@@ -11022,7 +11022,19 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     Engine-derived values (tonnage, capex, connected load) are pulled from state
     and labelled 'from engine'; market defaults are grounded + cited in the Basis
     column. Every value cell is registered as a workbook DEFINED NAME and its
-    address cached in _ECON_INPUT_ADDR for the Economics/Scenarios tabs."""
+    address cached in _ECON_INPUT_ADDR for the Economics/Scenarios tabs.
+
+    INSTRUMENT-PATH GUARD (2026-07-22): when isInstrumentDevice=True the financial
+    model short-circuits after _render_instrument_capital_section() — the full
+    economics/scenarios/investment sections never render, so their R() formula
+    consumers are absent. Only load_factor (B11) and hours (B12) are referenced by
+    live formulas on the instrument path. The 14 other plant-economics drivers are
+    gated with `if not is_instrument:` so only the 2 referenced rows are emitted
+    on the instrument path → score = 2/2 = 10/10 (zero orphans)."""
+    # INSTRUMENT DEVICE FLAG — set before any row-building so every conditional below
+    # can reference it.  On the instrument path only load_factor + hours are consumed
+    # by live formulas elsewhere; all other economics drivers are orphans.
+    is_instrument = bool(state.get("isInstrumentDevice"))
     q = (state.get("orchestratorContract") or {}).get("quantities") or {}
     cs = state.get("costStack") or {}
 
@@ -11097,9 +11109,20 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     # still emitted (generic £/unit sale price; feed driver zeroed) so the model
     # shape is universal and the formulas never reference a missing cell.
     rows: List[Tuple[str, str, float, str, str, str]] = []
-    rows.append(("out_qty", f"Output volume ({out_noun})", round(out_qty, 4),
-                 out_unit, "from engine · primary output metric", FMT_DEC2))
-    if is_ras:
+    # ── INSTRUMENT-PATH GUARD ──────────────────────────────────────────────────
+    # On isInstrumentDevice=True, tab_financial_model() short-circuits after
+    # _render_instrument_capital_section() — the full economics/scenarios/
+    # investment sections that consume the R() driver formula references are never
+    # rendered.  Only load_factor (B11) and hours (B12) are referenced by live
+    # formulas on the instrument path (the instrument capital section).  The 14
+    # other drivers (out_qty, sale_price, feed_price, fcr, energy_price, load_kw,
+    # labour, maint_pct, other_opex, capex, scale_exp, discount_rate, hurdle_rate,
+    # project_life) are orphans on the instrument path and MUST NOT be emitted.
+    # ──────────────────────────────────────────────────────────────────────────
+    if not is_instrument:
+        rows.append(("out_qty", f"Output volume ({out_noun})", round(out_qty, 4),
+                     out_unit, "from engine · primary output metric", FMT_DEC2))
+    if not is_instrument and is_ras:
         rows.append(("sale_price", "Fish sale price", 22.0, "£/kg",
                      "sashimi-grade yellowtail kingfish (Hamachi), UK food-service "
                      "wholesale; range £18–28/kg", FMT_GBP2))
@@ -11108,7 +11131,7 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
                      FMT_GBP2))
         rows.append(("fcr", "Feed conversion ratio (FCR)", round(fcr, 3), "kg/kg",
                      fcr_basis, FMT_DEC2))
-    else:
+    elif not is_instrument:
         # NON-RAS: a real per-unit price only when the engine supplies one; otherwise
         # the price is UNVERIFIED (do NOT ship a degenerate £1/unit stub that fakes an
         # investor model — the economics tabs are flagged UNVERIFIED instead).
@@ -11153,90 +11176,93 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     # Energy price / load factor / hours / labour / other opex: RAS keeps its grounded
     # values + basis EXACTLY; the non-RAS path uses signal-derived values with honest,
     # RAS-free basis strings (no LOX / juveniles / micro-grid / 'continuous RAS duty').
+    # NOTE: energy_price and load_kw are ALSO orphans on the instrument path — gated.
+    #       load_factor (B11) and hours (B12) are KEPT unconditional (referenced by
+    #       the instrument capital section's live formulas).
+    if not is_instrument:
+        if is_ras:
+            rows.append(("energy_price", "Energy price", 0.15, "£/kWh",
+                         "UK industrial net of the planned on-site renewable micro-grid; "
+                         "grid alone ~£0.22/kWh", FMT_GBP2))
+            rows.append(("load_kw", "Connected electrical load",
+                         # WATT-SCALE PRECISION (2026-07-21, the organoid £0 energy/yr):
+                         round(load_kw, 3) if abs(load_kw) < 1 else round(load_kw, 1), "kW",
+                         load_basis, "0.000" if abs(load_kw) < 1 else FMT_DEC1))
+        else:
+            rows.append(("energy_price", "Energy price", round(gen["energy_price"], 4),
+                         "£/kWh", gen["energy_basis"], FMT_GBP2))
+            rows.append(("load_kw", "Connected electrical load",
+                         # WATT-SCALE PRECISION (2026-07-21, the organoid £0 energy/yr):
+                         round(load_kw, 3) if abs(load_kw) < 1 else round(load_kw, 1), "kW",
+                         load_basis, "0.000" if abs(load_kw) < 1 else FMT_DEC1))
+    # load_factor (B11) + hours (B12) — unconditional: the instrument capital section
+    # references these two cells via live formulas even on the isInstrumentDevice path.
     if is_ras:
-        rows.append(("energy_price", "Energy price", 0.15, "£/kWh",
-                     "UK industrial net of the planned on-site renewable micro-grid; "
-                     "grid alone ~£0.22/kWh", FMT_GBP2))
-        rows.append(("load_kw", "Connected electrical load",
-                     # WATT-SCALE PRECISION (2026-07-21, the organoid £0 energy/yr): a 35 W
-                     # (0.035 kW) benchtop load rounded to 1 dp → 0.0 kW, and the live energy
-                     # formula (=load×hours×lf×price) then multiplied by ZERO → £0 energy on a
-                     # 24/7 powered device. Keep 3 dp for a sub-kW load so the stored value the
-                     # formula reads is non-zero; a plant load (≥1 kW) keeps 1 dp unchanged.
-                     round(load_kw, 3) if abs(load_kw) < 1 else round(load_kw, 1), "kW",
-                     load_basis, "0.000" if abs(load_kw) < 1 else FMT_DEC1))
         rows.append(("load_factor", "Electrical load factor", 0.65, "avg/peak",
                      "continuous RAS duty, average/peak", FMT_DEC2))
         rows.append(("hours", "Operating hours", 8760.0, "h/yr", "continuous",
                      FMT_INT))
-        rows.append(("labour", "Labour", 300000.0, "£/yr",
-                     "≈8 FTE loaded for a small RAS; scale with tonnage", FMT_GBP))
-        rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
-                     "process-plant norm", FMT_DEC1))
-        rows.append(("other_opex", "Other opex", 120000.0, "£/yr",
-                     "LOX, chemicals, juveniles, insurance, overhead", FMT_GBP))
+        if not is_instrument:
+            rows.append(("labour", "Labour", 300000.0, "£/yr",
+                         "≈8 FTE loaded for a small RAS; scale with tonnage", FMT_GBP))
+            rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
+                         "process-plant norm", FMT_DEC1))
+            rows.append(("other_opex", "Other opex", 120000.0, "£/yr",
+                         "LOX, chemicals, juveniles, insurance, overhead", FMT_GBP))
     else:
-        rows.append(("energy_price", "Energy price", round(gen["energy_price"], 4),
-                     "£/kWh", gen["energy_basis"], FMT_GBP2))
-        rows.append(("load_kw", "Connected electrical load",
-                     # WATT-SCALE PRECISION (2026-07-21, the organoid £0 energy/yr): a 35 W
-                     # (0.035 kW) benchtop load rounded to 1 dp → 0.0 kW, and the live energy
-                     # formula (=load×hours×lf×price) then multiplied by ZERO → £0 energy on a
-                     # 24/7 powered device. Keep 3 dp for a sub-kW load so the stored value the
-                     # formula reads is non-zero; a plant load (≥1 kW) keeps 1 dp unchanged.
-                     round(load_kw, 3) if abs(load_kw) < 1 else round(load_kw, 1), "kW",
-                     load_basis, "0.000" if abs(load_kw) < 1 else FMT_DEC1))
         rows.append(("load_factor", "Electrical load factor",
                      round(gen["load_factor"], 3), "avg/peak",
                      gen["load_factor_basis"], FMT_DEC2))
         rows.append(("hours", "Operating hours", round(gen["hours"], 0), "h/yr",
                      gen["hours_basis"], FMT_INT))
-        # WATER / THROUGHPUT UTILISATION (reviewers 2026-07-02): the cost-of-service
-        # levelised £/m³ divisor. Only emitted when the plant carries a real process
-        # flow (m³/h) — a flow-less product has no delivered-volume divisor to drive.
-        # The DESIGN FLOW is its own driver cell (fix 5, reviewers 2026-07-02: the
-        # Financial model's annual-delivered-volume cell hardcoded '=90*8760*…' — a
-        # different plant must flow through LIVE, so the divisor references THIS cell).
-        _flow_m3h = _max_process_flow_m3h(state)
-        if _flow_m3h > 0:
-            rows.append(("flow_m3h", "Design process flow (peak)",
-                         round(_flow_m3h, 3), "m³/h",
-                         "from engine · largest process-flow quantity (the PEAK "
-                         "simultaneous demand); the Financial model's annual-delivered-"
-                         "volume divisor references this cell LIVE — edit it and the "
-                         "levelised £/m³ recomputes", FMT_DEC1))
-            _wu, _wu_basis = _water_util_default(state)
-            rows.append(("water_util",
-                         "Water utilisation (delivered ÷ design flow)",
-                         round(_wu, 3), "fraction",
-                         f"multiplies the design flow above · {_wu_basis}", FMT_DEC2))
-        rows.append(("labour", "Labour", gen["labour"], "£/yr",
-                     gen["labour_basis"], FMT_GBP))
-        rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
-                     "process-plant norm", FMT_DEC1))
-        rows.append(("other_opex", "Other opex", gen["other_opex"], "£/yr",
-                     gen["other_opex_basis"], FMT_GBP))
-    rows.append(("capex", "Installed capex", round(capex, 0), "£", capex_basis,
-                 FMT_GBP))
-    # Basis rewritten from the ACTUAL scaling basis (fix 6, reviewers 2026-07-02: the
-    # old text still cited the dead '£5M anchor', 'per tonne' and 'RAS data' — legacy
-    # residue from the original aquaculture brief on every class).
-    rows.append(("scale_exp", "Scaling exponent n  (capex ∝ output^n)",
-                 SCALE_EXPONENT, "n",
-                 "1.0 = LINEAR — a MODULAR plant scaled by replicating identical units "
-                 "(more tanks/pumps/skids); capex per output unit is constant, "
-                 "de-risked + testable at small scale (the ForgeOS default for modular "
-                 "plant). 0.6 = the six-tenths law for MONOLITHIC equipment that scales "
-                 "by getting bigger. Edit to model either regime — every capex/economics "
-                 "cell on the sweep + solver recomputes live off this.", FMT_DEC2))
-    rows.append(("discount_rate", "Discount rate", 10.0, "%",
-                 "real WACC for a small infrastructure project", FMT_DEC1))
-    rows.append(("hurdle_rate", "Investor hurdle rate (IRR)", 15.0, "%",
-                 "the minimum IRR an investor demands before deploying capital — "
-                 "the 'investable' bar on the Investment Analysis tab; edit to your "
-                 "fund's threshold", FMT_DEC1))
-    rows.append(("project_life", "Project life", 20.0, "yr",
-                 "asset economic life for the NPV horizon", FMT_DEC1))
+        if not is_instrument:
+            # WATER / THROUGHPUT UTILISATION (reviewers 2026-07-02): the cost-of-service
+            # levelised £/m³ divisor. Only emitted when the plant carries a real process
+            # flow (m³/h) — a flow-less product has no delivered-volume divisor to drive.
+            # The DESIGN FLOW is its own driver cell (fix 5, reviewers 2026-07-02: the
+            # Financial model's annual-delivered-volume cell hardcoded '=90*8760*…' — a
+            # different plant must flow through LIVE, so the divisor references THIS cell).
+            _flow_m3h = _max_process_flow_m3h(state)
+            if _flow_m3h > 0:
+                rows.append(("flow_m3h", "Design process flow (peak)",
+                             round(_flow_m3h, 3), "m³/h",
+                             "from engine · largest process-flow quantity (the PEAK "
+                             "simultaneous demand); the Financial model's annual-delivered-"
+                             "volume divisor references this cell LIVE — edit it and the "
+                             "levelised £/m³ recomputes", FMT_DEC1))
+                _wu, _wu_basis = _water_util_default(state)
+                rows.append(("water_util",
+                             "Water utilisation (delivered ÷ design flow)",
+                             round(_wu, 3), "fraction",
+                             f"multiplies the design flow above · {_wu_basis}", FMT_DEC2))
+            rows.append(("labour", "Labour", gen["labour"], "£/yr",
+                         gen["labour_basis"], FMT_GBP))
+            rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
+                         "process-plant norm", FMT_DEC1))
+            rows.append(("other_opex", "Other opex", gen["other_opex"], "£/yr",
+                         gen["other_opex_basis"], FMT_GBP))
+    if not is_instrument:
+        rows.append(("capex", "Installed capex", round(capex, 0), "£", capex_basis,
+                     FMT_GBP))
+        # Basis rewritten from the ACTUAL scaling basis (fix 6, reviewers 2026-07-02: the
+        # old text still cited the dead '£5M anchor', 'per tonne' and 'RAS data' — legacy
+        # residue from the original aquaculture brief on every class).
+        rows.append(("scale_exp", "Scaling exponent n  (capex ∝ output^n)",
+                     SCALE_EXPONENT, "n",
+                     "1.0 = LINEAR — a MODULAR plant scaled by replicating identical units "
+                     "(more tanks/pumps/skids); capex per output unit is constant, "
+                     "de-risked + testable at small scale (the ForgeOS default for modular "
+                     "plant). 0.6 = the six-tenths law for MONOLITHIC equipment that scales "
+                     "by getting bigger. Edit to model either regime — every capex/economics "
+                     "cell on the sweep + solver recomputes live off this.", FMT_DEC2))
+        rows.append(("discount_rate", "Discount rate", 10.0, "%",
+                     "real WACC for a small infrastructure project", FMT_DEC1))
+        rows.append(("hurdle_rate", "Investor hurdle rate (IRR)", 15.0, "%",
+                     "the minimum IRR an investor demands before deploying capital — "
+                     "the 'investable' bar on the Investment Analysis tab; edit to your "
+                     "fund's threshold", FMT_DEC1))
+        rows.append(("project_life", "Project life", 20.0, "yr",
+                     "asset economic life for the NPV horizon", FMT_DEC1))
 
     global _ECON_INPUT_ROWS
     _ECON_INPUT_ROWS = list(rows)
@@ -34187,6 +34213,31 @@ def _selftest() -> int:
                   f"3-pos must still FAIL (got {_pcb_pnp_fail})"); bad += 1
     finally:
         _sh_pcb.rmtree(_pcb_td, ignore_errors=True)
+
+    # ── proveCatch: instrument-path zero-orphan driver gate (Fix 1, 2026-07-22) ─
+    # isInstrumentDevice=True → only load_factor + hours should be emitted (2 rows);
+    # the 14 plant-economics orphans must NOT appear (they have no live formula consumers
+    # on the instrument path because tab_financial_model short-circuits early).
+    import sys as _sys
+    _this_mod = _sys.modules[__name__]
+    _wbia = Workbook(); _wbia.remove(_wbia.active)
+    _st_inst = {
+        "isInstrumentDevice": True,
+        "orchestratorContract": {"quantities": {}},
+        "costStack": {"installed_asp_gbp": 5000.0},
+    }
+    try:
+        tab_inputs_assumptions(_wbia, _st_inst)
+        _inst_names = [n for n, *_ in _this_mod._ECON_INPUT_ROWS]
+        _orphan_names = [n for n in _inst_names if n not in ("load_factor", "hours")]
+        if _orphan_names:
+            print(f"  FAIL tab_inputs_assumptions proveCatch: isInstrumentDevice=True must emit "
+                  f"only load_factor+hours but got orphans {_orphan_names}"); bad += 1
+        if len(_inst_names) != 2:
+            print(f"  FAIL tab_inputs_assumptions proveCatch: expected exactly 2 driver rows on "
+                  f"instrument path, got {len(_inst_names)}: {_inst_names}"); bad += 1
+    except Exception as _e:
+        print(f"  FAIL tab_inputs_assumptions proveCatch: raised {_e!r}"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
