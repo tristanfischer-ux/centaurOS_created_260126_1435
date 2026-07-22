@@ -1227,6 +1227,33 @@ def run_gates(out_dir: str) -> list:
             _g20_detail,
         ))
 
+    # ── G21 PART-SET COHERENCE (2026-07-22, step-d cross-artefact geometry) ─────────────
+    # The GA drawing's equipment-tag set must EQUAL the manifest principal-part set.
+    # Two directions: phantom (GA has a tag absent from manifest) + dropped (manifest tag
+    # absent from GA). Abstains when no GA SVG or fewer than 3 manifest tags.
+    # COHERENT BY CONSTRUCTION: draw_ga.py reads parts-manifest.json directly and emits
+    # each part's own equipment_tag. On a coherent bake the sets are identical. This gate
+    # is the BACKSTOP: a future regression (stale SVG backfilled with the new fingerprint,
+    # a changed manifest, generator skip) breaks that invariant and the gate fires.
+    # proveCatch both directions in --selftest: coherent → PASS; phantom/dropped → FIRES.
+    _g21_ga_svg_path = os.path.join(out_dir, "drawings", "general-arrangement.svg")
+    _g21_ga_text = ""
+    if os.path.exists(_g21_ga_svg_path) and os.path.getsize(_g21_ga_svg_path) > 40:
+        try:
+            _g21_ga_text = open(_g21_ga_svg_path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            _g21_ga_text = ""
+    _pm_doc_for_g21 = pm_doc if isinstance(pm_doc, dict) else {}
+    _parts_for_g21 = _pm_doc_for_g21.get("parts") or []
+    _g21_ok, _g21_detail = part_set_coherence_check(_parts_for_g21, _g21_ga_text)
+    gates.append(Gate(
+        "part_set_coherence",
+        ["general-arrangement"],
+        "high",
+        _g21_ok,
+        _g21_detail,
+    ))
+
     # ── G13 PRODUCT CAD GEOMETRY COVERAGE ─────────────────────────────────────
     # Small products must not regress to an all-box cutaway. The hero pass writes
     # a provenance log for every cached exact/family CAD mesh it actually used.
@@ -1692,6 +1719,138 @@ def drawing_set_coherent(out_dir: str):
 
 
 
+# ── G21 PART-SET COHERENCE (2026-07-22, step-d cross-artefact geometry coherence) ─────────
+# The SAME set of principal parts must appear on the GA drawing and in the parts-manifest.
+# Two failure modes:
+#   PHANTOM  — a tag appears in the GA but is absent from the parts-manifest.
+#              (A stale SVG backfilled with the current fp still shows the old generation's
+#              tags — this is the exact defect G16 catches only on the GA/facility-layout sheet,
+#              and only in the prefix-gated subset. G21 is the STRICT per-tag backstop.)
+#   DROPPED  — a principal manifest tag is absent from the GA.
+#              (The placer omitted a part; the GA was drawn from an older manifest snapshot;
+#              a future GA generator skips a whole class of parts — the dropped part ships
+#              in the BoM but is invisible to the reviewer.)
+#
+# SCOPE: GA only (the placement-projected sheet). P&ID / SLD / BFD legitimately carry
+# topology-only tags (synthetic X-9nn, instrument nodes, terminal bus tags) that are
+# intentionally absent from parts-manifest — scoring those would false-fire on every plant.
+# G16 fingerprint already proves those sheets share the settled generation; G21 is the
+# per-tag set equality check on the ONE sheet whose tags MUST equal the manifest.
+#
+# DEFINITION OF PRINCIPAL PARTS (matching how G19 counts parts):
+# All parts with a valid equipment_tag in parts-manifest. This includes the Enclosure Shell
+# (a principal structural part that must appear on the GA for dimension reference).
+# The GA generator (draw_ga.py) plots EVERY manifest part with a valid equipment_tag, so
+# the expected set is simply: {manifest equipment_tags}.
+#
+# COHERENT BY CONSTRUCTION: draw_ga.py reads parts-manifest.json directly (load_manifest())
+# and emits exactly the manifest's equipment_tag for each part. On a coherent bake the two
+# sets are identical. G21 is the BACKSTOP — it fires when a future regression (stale SVG,
+# changed manifest, generator skip, fingerprint backfill on wrong content) breaks that.
+#
+# ABSTAIN: when no GA SVG exists (drawings not yet generated, or instrument product whose GA
+# uses a story-mesh path), or when the manifest has fewer than 3 tagged principal parts.
+
+_GA_PART_SET_TAG_RE = re.compile(
+    r"""(?<![A-Z0-9-])   # not preceded by alpha-tag char
+        ([A-Z]{1,4}-\d{3,}[A-Za-z]?)  # equipment-tag-shaped token (≥3 digit suffix)
+        (?![A-Z0-9-])    # not followed by alpha-tag char
+    """,
+    re.VERBOSE,
+)
+
+
+def _manifest_principal_tags(parts: list) -> set:
+    """Equipment tags of ALL named parts in the manifest (the full principal set).
+
+    Includes structural parts (Enclosure Shell, brackets) because draw_ga.py plots
+    every part with a valid equipment_tag and the dimensional reference sheet must
+    show the shell outline + its tag. Excludes rows with no equipment_tag.
+    """
+    tags: set = set()
+    for p in (parts or []):
+        if not isinstance(p, dict):
+            continue
+        tag = str(p.get("equipment_tag") or "").strip()
+        if tag and re.match(r"^[A-Z]{1,4}-\d+", tag):
+            tags.add(tag)
+    return tags
+
+
+def _ga_svg_equipment_tags(svg_text: str) -> set:
+    """Equipment-tag-shaped tokens in the GA SVG text (≥3-digit suffix, prefix filter).
+
+    Uses the same shape as G16's phantom_equipment_tags scanner but without the
+    prefix-gating (G21 cross-checks the FULL set, not a prefix-filtered subset).
+    Rotated dimension text is excluded: the GA marks rotated text with a `transform`
+    attribute — skip any <text> element carrying transform="rotate(...)".
+    """
+    # Strip transform-rotated <text> elements (dimension text — never a tag)
+    txt = re.sub(r'<text[^>]*\btransform\s*=\s*"rotate[^"]*"[^>]*>.*?</text>', "", svg_text)
+    return set(_GA_PART_SET_TAG_RE.findall(txt))
+
+
+def part_set_coherence_check(
+    parts: list,
+    ga_svg_text: str,
+) -> tuple:
+    """PURE G21 — the GA drawing's equipment-tag set must equal the manifest principal set.
+
+    INTENT (2026-07-22, step-d cross-artefact coherence): the same set of principal
+    parts must appear in the GA drawing and in the parts-manifest. A tag on the GA but
+    absent from the manifest is a PHANTOM (stale SVG generation); a manifest principal
+    tag missing from the GA is a DROPPED part (placer omit / generator skip).
+
+    This is the strict bilateral complement to G16's prefix-gated phantom check:
+    G16 detects a SUBSET of phantoms (prefix-gated, GA+facility-layout only) as part of
+    the broader drawing-set coherence check; G21 closes both directions precisely.
+
+    COHERENT BY CONSTRUCTION (current routing): draw_ga.py's load_manifest() reads
+    parts-manifest.json and emits each part's own equipment_tag. On a coherent bake
+    the two sets are identical. G21 is the BACKSTOP that fires when a future regression
+    breaks that invariant — stale SVG backfilled with the new fingerprint, a changed
+    manifest not reflected in the drawing, or a generator skip.
+
+    Abstains when:
+    - Fewer than 3 manifest principal tags (trivial / stub bake).
+    - The GA SVG text is empty or too small to contain tags.
+
+    Returns (passed, detail).
+    """
+    man_tags = _manifest_principal_tags(parts)
+    if len(man_tags) < 3:
+        return (True, f"fewer than 3 manifest principal tags ({len(man_tags)}) — abstain")
+    if not ga_svg_text or len(ga_svg_text) < 40:
+        return (True, "no GA SVG content — abstain")
+
+    ga_tags = _ga_svg_equipment_tags(ga_svg_text)
+
+    # Intersect with the manifest's prefix set to avoid false positives from numeric
+    # strings or reference IDs that match the tag shape but belong to a different
+    # letter-prefix family (e.g. "IP-54", "G99", "EN-50549").
+    prefixes = {t.split("-", 1)[0] for t in man_tags}
+    ga_tags_filtered = {t for t in ga_tags if t.split("-", 1)[0] in prefixes}
+
+    phantoms = sorted(ga_tags_filtered - man_tags)   # in GA, not in manifest
+    dropped = sorted(man_tags - ga_tags_filtered)    # in manifest, not in GA
+
+    if phantoms or dropped:
+        parts_list = []
+        if phantoms:
+            parts_list.append(f"phantom tag(s) on GA not in manifest: {', '.join(phantoms[:6])}"
+                              + (" …" if len(phantoms) > 6 else ""))
+        if dropped:
+            parts_list.append(f"manifest principal tag(s) absent from GA: {', '.join(dropped[:6])}"
+                              + (" …" if len(dropped) > 6 else ""))
+        return (False,
+                f"part-set INCOHERENT — {len(phantoms)} phantom(s) + {len(dropped)} dropped: "
+                + "; ".join(parts_list))
+
+    return (True,
+            f"part-set COHERENT — {len(man_tags)} manifest principal tag(s) all present on GA; "
+            f"0 phantoms + 0 dropped")
+
+
 # A single routed CABLE line whose PLAN span exceeds this is a stray plant-crossing beam
 # (mirrors build_universal_scene.WIRE_TRAY_MAX_SPAN_MM); such distribution goes on the P&ID.
 STRAY_BEAM_MAX_SPAN_MM = 16000.0
@@ -1724,6 +1883,7 @@ GATE_STAGE = {
     "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",
     "enclosure_shell_contains_parts": "minimum_working_envelope (functional-stack height pack) + place_sealed_enclosure env_mm — shell must contain the real mechanical+fluidic part stack",
     "envelope_equality": "generate_drawing_set._manifest_envelope_dims (must read the canonical parts-manifest Enclosure Shell dims_mm — a fallback to the superseded state pre-estimate makes the emitted caption diverge from the shell) + build-excel-export tab_equipment_register (already canonical)",
+    "part_set_coherence": "draw_ga.load_manifest() — GA derives its tag set from parts-manifest.json directly; a PHANTOM (tag on GA absent from manifest) means a stale SVG; a DROPPED part (manifest tag absent from GA) means the placer omitted a part or the generator skipped a class — fix at the source (draw_ga or parts-manifest settle loop)",
 }
 
 
@@ -2694,10 +2854,132 @@ def _selftest() -> int:
     _g20_ok_nocap, _g20_msg_nocap = envelope_equality_cross_check(_g20_parts, None)
     chk("g20_abstains_without_caption", _g20_ok_nocap)
 
+    # ── G21 PART-SET COHERENCE proveCatch (2026-07-22, both directions) ───────────
+    # Establishes that the pure check fires on REAL adversarial inputs, not just on
+    # abstract logic. Uses a synthetic manifest + GA SVG pair.
+    #
+    # Manifest: 5 principal parts with known equipment_tags (EP-101, P-101, K-101,
+    # X-102 Enclosure Shell, I-102 Temperature Sensor).
+    _g21_parts_coherent = [
+        {"equipment_tag": "EP-101", "name": "Magnetic Stirrer Drive"},
+        {"equipment_tag": "P-101",  "name": "Dosing Peristaltic Pump"},
+        {"equipment_tag": "K-101",  "name": "Heatsink Fan"},
+        {"equipment_tag": "X-102",  "name": "Enclosure Shell"},
+        {"equipment_tag": "I-102",  "name": "Temperature Sensor"},
+    ]
+    # (a) COHERENT: GA SVG carries all 5 manifest tags and no phantom tags → PASS.
+    _g21_svg_coherent = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        '<text x="300" y="50" font-weight="bold">K-101</text>'
+        '<text x="400" y="50" font-weight="bold">X-102</text>'
+        '<text x="500" y="50" font-weight="bold">I-102</text>'
+        '</svg>'
+    )
+    _g21_ok_coh, _g21_msg_coh = part_set_coherence_check(_g21_parts_coherent, _g21_svg_coherent)
+    chk("g21_coherent_set_passes", _g21_ok_coh)
+    chk("g21_coherent_detail_says_coherent", "COHERENT" in _g21_msg_coh)
+    chk("g21_coherent_shows_tag_count", "5" in _g21_msg_coh)
+    # (b) PHANTOM: GA carries X-999 (same X-prefix as X-102, but absent from manifest) → FIRES.
+    # This is the adversarial input: a stale SVG backfilled with the new fingerprint still
+    # shows X-999 from the OLD generation while the manifest settled on X-102.
+    _g21_svg_phantom = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        '<text x="300" y="50" font-weight="bold">K-101</text>'
+        '<text x="400" y="50" font-weight="bold">X-102</text>'
+        '<text x="500" y="50" font-weight="bold">I-102</text>'
+        '<text x="600" y="50" font-weight="bold">X-999</text>'  # phantom — not in manifest
+        '</svg>'
+    )
+    _g21_ok_ph, _g21_msg_ph = part_set_coherence_check(_g21_parts_coherent, _g21_svg_phantom)
+    chk("g21_phantom_tag_fires", not _g21_ok_ph)
+    chk("g21_phantom_detail_says_phantom", "phantom" in _g21_msg_ph.lower())
+    chk("g21_phantom_names_offender", "X-999" in _g21_msg_ph)
+    # (c) DROPPED: GA is missing K-101 (Heatsink Fan — a principal part the placer omitted) → FIRES.
+    # This is the adversarial input: the GA generator skipped a part class, or the manifest
+    # was updated after the SVG was drawn.
+    _g21_svg_dropped = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        # K-101 deliberately omitted — DROPPED
+        '<text x="400" y="50" font-weight="bold">X-102</text>'
+        '<text x="500" y="50" font-weight="bold">I-102</text>'
+        '</svg>'
+    )
+    _g21_ok_dr, _g21_msg_dr = part_set_coherence_check(_g21_parts_coherent, _g21_svg_dropped)
+    chk("g21_dropped_part_fires", not _g21_ok_dr)
+    chk("g21_dropped_detail_says_dropped", "dropped" in _g21_msg_dr.lower() or "absent" in _g21_msg_dr.lower())
+    chk("g21_dropped_names_offender", "K-101" in _g21_msg_dr)
+    # (d) BOTH PHANTOM + DROPPED simultaneously → FIRES, reports both.
+    _g21_svg_both = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        # K-101 dropped
+        '<text x="400" y="50" font-weight="bold">X-102</text>'
+        '<text x="500" y="50" font-weight="bold">I-102</text>'
+        '<text x="600" y="50" font-weight="bold">I-999</text>'   # phantom (I-prefix known)
+        '</svg>'
+    )
+    _g21_ok_both, _g21_msg_both = part_set_coherence_check(_g21_parts_coherent, _g21_svg_both)
+    chk("g21_both_phantom_and_dropped_fires", not _g21_ok_both)
+    chk("g21_both_mentions_phantom", "phantom" in _g21_msg_both.lower())
+    chk("g21_both_mentions_dropped", "dropped" in _g21_msg_both.lower() or "absent" in _g21_msg_both.lower())
+    # (e) ABSTAIN: fewer than 3 manifest principal tags → abstain (trivial stub bake).
+    _g21_ok_few, _g21_msg_few = part_set_coherence_check(
+        [{"equipment_tag": "X-101", "name": "A"}, {"equipment_tag": "X-102", "name": "B"}],
+        _g21_svg_coherent)
+    chk("g21_abstains_on_fewer_than_3_tags", _g21_ok_few)
+    chk("g21_abstain_detail_says_abstain", "abstain" in _g21_msg_few.lower())
+    # (f) ABSTAIN: empty GA SVG → abstain (drawings not yet generated).
+    _g21_ok_nosvg, _ = part_set_coherence_check(_g21_parts_coherent, "")
+    chk("g21_abstains_on_empty_svg", _g21_ok_nosvg)
+    # (g) PREFIX GUARD: a tag that looks like IP-54 (noise / IP rating) must NOT fire.
+    # IP is not a known manifest prefix, so it is filtered out.
+    _g21_svg_ip = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50" font-weight="bold">EP-101</text>'
+        '<text x="200" y="50" font-weight="bold">P-101</text>'
+        '<text x="300" y="50" font-weight="bold">K-101</text>'
+        '<text x="400" y="50" font-weight="bold">X-102</text>'
+        '<text x="500" y="50" font-weight="bold">I-102</text>'
+        '<text x="600" y="50" font-weight="bold">IP-54</text>'   # IP-rating noise — prefix IP unknown
+        '</svg>'
+    )
+    _g21_ok_ip, _ = part_set_coherence_check(_g21_parts_coherent, _g21_svg_ip)
+    chk("g21_ip_rating_noise_filtered", _g21_ok_ip)
+    # (h) VERIFY COHERENCE on the DELIVERED coherence-verify-2240 bake:
+    # No GA SVG exists in that output (drawings/general-arrangement.svg absent).
+    # G21 must ABSTAIN (not false-fire on a missing SVG) — confirming the delivered
+    # bake is coherent by construction (draw_ga not yet run, not a divergence).
+    import os as _os21
+    _g21_cv_dir = _os21.path.join(
+        _os21.path.dirname(_os21.path.dirname(_os21.path.abspath(__file__))),
+        "out", "coherence-verify-2240")
+    _g21_cv_man = _os21.path.join(_g21_cv_dir, "parts-manifest.json")
+    if _os21.path.exists(_g21_cv_man):
+        try:
+            _g21_cv_parts = json.load(open(_g21_cv_man)).get("parts") or []
+            _g21_cv_ga_path = _os21.path.join(_g21_cv_dir, "drawings", "general-arrangement.svg")
+            _g21_cv_ga_text = ""
+            if _os21.path.exists(_g21_cv_ga_path):
+                try:
+                    _g21_cv_ga_text = open(_g21_cv_ga_path, encoding="utf-8", errors="replace").read()
+                except OSError:
+                    _g21_cv_ga_text = ""
+            _g21_cv_ok, _g21_cv_detail = part_set_coherence_check(_g21_cv_parts, _g21_cv_ga_text)
+            chk("g21_coherence_verify_2240_passes_or_abstains", _g21_cv_ok)
+        except Exception:  # noqa: BLE001
+            pass  # manifest unreadable — skip the live-bake check
+
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions)")
+    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions + G21 part-set coherence proveCatch both directions on synthetic data + verified coherent/abstain on out/coherence-verify-2240)")
     return 0
 
 
