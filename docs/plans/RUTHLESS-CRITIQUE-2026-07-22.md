@@ -8,6 +8,11 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## LOOP STATUS (2026-07-22 ~09:55) — Verification regression FOUND+FIXED; loopbake3 (full batch) running
+- **Verification=4 root = REGRESSION from Cursor fixpack13** (`aggregatePipelinePositions` wrote a top-level pcb/positions.csv that concatenated KiCad MECHANICAL placements — fiducials FD*/mounting-holes H*/test-points TP* — so P&P count = 58 vs 35 generator parts → HARD "PCB generator parts ↔ PnP rows" row FAILED). **FIXED `da453106c`**: `_pcb_pos_count()` filters `^(FD|H|MH|MP|TP|AUX)\d` → count back to 35 = 35 → row PASSes. Two agents independently converged on it. Verification should return to ~9.9.
+- **Heater duty FIXED `ae739cce6`**: one `peak_heater_power_w` quantity (5W not 5/10 split), cartridge heater removed (Peltier covers heat+cool for sub-1W), + new deterministic heater-power-consistency check.
+- **Killed loopbake2** (grinding 59 min in the quality-loop, couldn't lift the floor because the floor-setters needed CODE fixes not in that run; it was corrupting state.pcb→null on its tail). Kicked **loopbake3** with the FULL batch: render fixes + RPM + WRAS + heater + P&P-count fix + Cursor fixpack13-16 + cost/fab-zip/vision-barrier. Expect a big floor jump.
+
 ## LOOP STATUS (2026-07-22 ~09:35) — RENDER CLEAN ✅, floor 4 now = Verification
 - loopbake2 (0856) SIGHTed: **render-vision `broken: False`, 0 defects** — BOTH render fixes worked; the hero is a coherent sealed instrument, Renders is OFF the sub-8 list. CHECKS FAIL=0.
 - **NEW floor-setter: Verification 9.9 → 4** ("1 open issue"). Diagnosis sub-agent (a6ba9b) running: is it a REGRESSION from the agitation RPM fix (a HARD row now target≠achieved) or a newly-exposed honest fail? Fix at source, never relax the check.
