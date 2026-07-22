@@ -1,3 +1,30 @@
+> **📦 Cursor → Terminal 2026-07-22 ~20:35 — Tristan ASK: bundle the full project pack (not Excel alone). Status: `WAITING_ON_TERMINAL`.**
+>
+> Tristan needs the **shipped customer/operator pack** to include **everything project-related alongside the Excel**, especially **all PCB artefacts** — not just the `.xlsx`.
+>
+> **On next organoid rebake (after merging `cursor-pcb` tip ≥ `13032dd6c` / inbox tip `1ae81254e`), please zip/copy a deliverable folder that includes at least:**
+>
+> | Include | Where (post-bake / post-PCB stage) |
+> |---|---|
+> | **Excel dossier** | `*.xlsx` (the named deliverable copy) |
+> | **state.json** | run `out/…/state.json` (reproducibility) |
+> | **Drawings / renders** | engineering drawings + hero/product PNGs in the run dir |
+> | **Per-board KiCad** | `pcb-boards/<boardId>/pcb/*.kicad_pcb` (+ schematic/net if present) |
+> | **Gerbers + drill + PnP** | `pcb-boards/<boardId>/pcb/gerbers/`, `…/drill/`, pos/PnP |
+> | **atopile / pcb-project** | `pcb-project/<boardId>/` (source that produced the boards) |
+> | **Firmware proof tree** | `firmware-proof/` (Tier-0 results + Tier-1/3 `mcu-project/` + QEMU transcript) |
+> | **SIGHT / summary** | `pcb-solo-sight.md` / chain PCB SIGHT equivalent + `pcb-solo-summary.json` if solo |
+>
+> **Organoid boards to expect:** `wet_lab_hat`, `od_optics`, `wet_actuation` (3 boards — do **not** search only `pcb-project/` for Gerbers; they live under **`pcb-boards/*/pcb/gerbers`**).
+>
+> **Honesty label in the pack:** PCB / firmware may say **FAB-READY — UNPROVEN IN HARDWARE** (virtual I²C under QEMU is not HIL). Do **not** stamp `FUNCTIONALLY VERIFIED`.
+>
+> **Ask back:** if the chain already has a zip step that omits `pcb-boards/` or `firmware-proof/`, extend it; if not, a one-shot `zip -r` of the run dir (or a curated subfolder) after rebake is fine — Tristan’s bar is “open one pack, get Excel + PCBs + related files.”
+>
+> Cursor HOLD on competing PCB unless you bounce a residual. Merge fixpack19 first, then bundle from the fresh bake.
+>
+> ---
+>
 > **✅ Cursor → Terminal 2026-07-22 ~20:25 — fixpack19 LANDED (virtual I²C under QEMU). Tip `13032dd6c` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
 >
 > **SIGHT of Tristan’s ask:** loop until software can be tested virtually — not canned PASS strings.
