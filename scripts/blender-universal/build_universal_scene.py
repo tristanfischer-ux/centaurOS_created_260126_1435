@@ -7357,26 +7357,44 @@ def write_connection_schedule(out_dir):
     # schedule + bom .md with 'No such file or directory').
     os.makedirs(out_dir, exist_ok=True)
     specs = list(_CONN_SPECS)
-    # DEVICE-SCALE LENGTH CLAMP (2026-07-21, the organoid 2.37 m runs in a 281 mm box):
-    # reconcile_route_specs' detour cap can be BYPASSED on the sealed-instrument path (its
-    # _CONN_SPECS is empty when it runs, so it no-ops), leaving metre-scale intra-enclosure
-    # runs → a £874 connection cost + PLAUSIBILITY P9 fails. Clamp each run's COSTED length to
-    # 1.5× the enclosure/scene diagonal read from the parts-manifest already on disk — an
-    # internal wire/tube cannot exceed the box that contains it. Universal + robust to route
-    # ordering: only bites when a small real bbox exists (a plant's metre-scale bbox is
-    # untouched); the DRAWN geometry is left as-is (only the costed/scheduled length is cut).
-    try:
-        _pm = json.load(open(os.path.join(out_dir, "parts-manifest.json")))
-        _bb = (_pm.get("bbox_mm") or {}) if isinstance(_pm, dict) else {}
-        _L, _W, _H = _bb.get("length_mm"), _bb.get("width_mm"), _bb.get("height_mm")
-        if all(isinstance(x, (int, float)) and x > 0 for x in (_L, _W, _H)):
-            _cap_m = math.sqrt(_L * _L + _W * _W + _H * _H) / 1000.0 * 1.5
-            for s in specs:
-                if float(s.get("length_m") or 0.0) > _cap_m + 0.01:
-                    s["length_capped_from_m"] = round(float(s["length_m"]), 2)
-                    s["length_m"] = round(_cap_m, 2)
-    except Exception:  # noqa: BLE001 — never block the schedule on a missing/partial manifest
-        pass
+    # DEVICE-SCALE LENGTH CLAMP — PRIMARY (2026-07-22, organoid-bioreactor P9 FAIL fix):
+    # The overhead-rack tray path (WIRE_OVERHEAD_CLEAR_MM=450 rise + traverse + drop) inflates
+    # an on-board 50 mm bench-top wire to 1.07–1.13 m → P9 plausibility FAIL.  For a SEALED
+    # INSTRUMENT the enclosure EXTERIOR dims are already available as the `_SEALED_ENV_MM`
+    # module global (set by `_sealed_enclosure_env_mm` before wiring runs) — use them directly
+    # rather than reading the parts-manifest that may not exist yet on Pass 1.  Cap = 2× the
+    # 3-D enclosure diagonal (a generous upper bound for any internal wire/tube route).
+    # Plant runs are unaffected (_IS_INSTRUMENT_DEVICE=False).
+    if _IS_INSTRUMENT_DEVICE and _SEALED_ENV_MM is not None:
+        _eW, _eD, _eH = _SEALED_ENV_MM
+        _inst_cap_m = math.sqrt(_eW * _eW + _eD * _eD + _eH * _eH) / 1000.0 * 2.0
+        _n_inst_capped = 0
+        for s in specs:
+            _lm = float(s.get("length_m") or 0.0)
+            if _lm > _inst_cap_m + 0.01:
+                s["length_capped_from_m"] = round(_lm, 2)
+                s["length_m"] = round(_inst_cap_m, 2)
+                _n_inst_capped += 1
+        if _n_inst_capped:
+            print(f"[conn-schedule] INSTRUMENT-SCALE clamp: {_n_inst_capped} run(s) capped "
+                  f"to {_inst_cap_m:.3f} m (enclosure {_eW:.0f}×{_eD:.0f}×{_eH:.0f} mm, "
+                  f"diagonal × 2); plant-scale clamp skipped")
+    else:
+        # DEVICE-SCALE LENGTH CLAMP — SECONDARY / FALLBACK (2026-07-21, the organoid
+        # 2.37 m runs in a 281 mm box): read bbox from the parts-manifest already on disk
+        # — only applies when _SEALED_ENV_MM is unavailable (non-sealed path).
+        try:
+            _pm = json.load(open(os.path.join(out_dir, "parts-manifest.json")))
+            _bb = (_pm.get("bbox_mm") or {}) if isinstance(_pm, dict) else {}
+            _L, _W, _H = _bb.get("length_mm"), _bb.get("width_mm"), _bb.get("height_mm")
+            if all(isinstance(x, (int, float)) and x > 0 for x in (_L, _W, _H)):
+                _cap_m = math.sqrt(_L * _L + _W * _W + _H * _H) / 1000.0 * 1.5
+                for s in specs:
+                    if float(s.get("length_m") or 0.0) > _cap_m + 0.01:
+                        s["length_capped_from_m"] = round(float(s["length_m"]), 2)
+                        s["length_m"] = round(_cap_m, 2)
+        except Exception:  # noqa: BLE001 — never block the schedule on a missing/partial manifest
+            pass
     rows = cs.connection_schedule(specs)
 
     # roll-up totals by size, per kind, summing the run length.
@@ -11294,6 +11312,20 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     for (frm, service), grp in groups.items():
         _thr = 3 if _is_cable(service) else WIRE_FANOUT_MIN
         if len(grp) >= _thr:
+            # ── INSTRUMENT-SCALE CABLE FAN-OUT (2026-07-22, organoid-bioreactor P9 FAIL):
+            #    Inside a sealed benchtop device there is NO overhead cable tray rack. The
+            #    overhead-deck trunk+spur path (WIRE_OVERHEAD_CLEAR_MM=450 mm rise + traverse
+            #    + drop) inflates a 50 mm on-board wire to 1.07–1.13 m, breaking the P9
+            #    "Internal runs fit within the device envelope" invariant. Demote ALL cable
+            #    fan-outs to logical (direct port-to-port) on device-scale instruments — the
+            #    connection is retained in the schedule at its honest Euclidean length.
+            if _IS_INSTRUMENT_DEVICE and _is_cable(service):
+                for r in grp:
+                    _record_logical(r, "instrument-scale cable fan-out → direct logical "
+                                       "(no overhead tray in a sealed device)")
+                print(f"[univ][wire]   INSTRUMENT-TRAY-BYPASS {frm} → {len(grp)}× {service}: "
+                      f"no overhead rack in a sealed device → logical direct routes")
+                continue
             # ── PLANT-SPANNING CABLE FAN-OUT (2026-07-01): a cable tray is a PHYSICAL overhead
             #    channel with a realistic reach. When one source fans out to loads scattered
             #    across the WHOLE plant (dest plan-span > WIRE_TRAY_MAX_SPAN_MM), a single spine
