@@ -2,6 +2,15 @@
 
 ## ✅ CORE COHERENCE DEFECT FIXED (2026-07-22 ~23:05) — verified against DELIVERED render pixels
 The shell-doesn't-contain-parts defect (4 Goodhart misses) is RESOLVED by the council reorder `439e2bc91`. Verified on a SINGLE render pass (out/coherence-verify-2240, NOT run-loop): (1) render log `shell mesh built from FINAL env` 274×252×126; (2) `enclosure_shell_contains_check` on the delivered manifest → **CONTAINED: True** (parts 120×100×114 post-clamp ⊆ shell 274×252×126); (3) 04-product-exterior.png = coherent sealed box; (4) tallest REAL part = Heatsink Fan 114mm ⊆ 126mm shell → the inspect-front "towering verticals" are `u_tagcallout_` LEADER STEMS (annotation), NOT protruding parts. The 5th fix is the real one: shell derives from post-placement bbox by construction, universal.
+## PROGRESS (2026-07-23 ~00:30) — G21 part-set landed + independently verified; coherence stack now 3-deep ✅
+- **G21 part-set coherence** (`fde736068`): GA drawing tag-set must equal the manifest principal set. INDEPENDENTLY verified (not just agent report): coherent → PASS; prefix-matching phantom X-999 → FIRES; dropped EP-101 → FIRES; foreign-prefix ZZ-999 → filtered (defensible false-positive guard — real stale-tag phantoms share the family prefix); <3 tags / no SVG → abstain. Agent correctly found part-set is coherent-by-construction (draw_ga.load_manifest reads the manifest) and built G21 as a proveCatch-backed BACKSTOP (gate-intent compliant). selftest OK.
+- **COHERENCE GATE STACK NOW 3-DEEP, all delivered-verified + proveCatch both directions + universal + floor-wired (via Drawings-tab score → per-tab ≥8 floor):**
+  - G19 `enclosure_shell_contains_check` — shell ⊇ parts (containment).
+  - G20 `envelope_equality_cross_check` — drawing caption == canonical manifest shell (envelope).
+  - G21 `part_set_coherence_check` — GA tags == manifest principal set (phantom + dropped).
+- **STEP (d) REMAINING:** key-POSITION consistency across projection views (likely coherent-by-construction — all views project the same 3D manifest positions; build only if a real divergence is possible, else backstop). Then: document the coherence system in OPERATING-FRAME; full-dossier SIGHT (single chain pass) — deferred, needs care re the cost-grind; floor ≥9 blocked by the separate cost under-spec.
+- **DISPATCHED:** position-consistency (gate-intent: real catch only) + OPERATING-FRAME coherence-system doc.
+
 ## PROGRESS (2026-07-23 ~00:05) — G20 envelope-equality CORRECTED + independently verified both directions ✅
 - **G20 fixed** (`b23743590`): now compares the DELIVERED drawing-caption resolver output vs the canonical manifest shell (not the superseded state pre-estimate). INDEPENDENTLY verified (not just agent report): COHERENT (caption 274×252×126 == shell) → PASS; DIVERGENT (caption 248×188×108 stale) → FIRES with routed fix msg; non-enclosure → ABSTAIN. drawing_gates --selftest OK incl G20 proveCatch both directions.
 - **Step (d) envelope piece DONE:** drawing caption + register + G19 all read the canonical manifest shell; G20 floors the dossier (gate-35) if any delivered caption diverges. Universal, abstains non-enclosure.
