@@ -509,6 +509,16 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                                 ww, dd, hh = _sw, _sdp, _sh
                                 bbox = _instrument_envelope_bbox(ww, dd, hh)
                                 meta["envelope_source"] = "manifest_enclosure_shell"
+                                # INTENT (2026-07-23 G20 height fix): store the
+                                # canonical shell triple so _draw_title_block can
+                                # print the SHELL H, not the form-rule-inflated H
+                                # (instrument_form_rule_mm extends total_height_mm
+                                # to include the optics tower — correct for the SVG
+                                # drawing extents but WRONG for the caption, which
+                                # must match the enclosure dims a reader can measure).
+                                meta["envelope_ww"] = ww
+                                meta["envelope_dd"] = dd
+                                meta["envelope_hh"] = hh
                                 break
                 except Exception:  # noqa: BLE001
                     pass
@@ -2524,15 +2534,24 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
     # GOTCHA: {:.1f} m rounds a 183×145×120 mm handheld to "0.2×0.1×0.1 m" —
     # the title block then fails a glance against the mm dimensions on the views
     # (ga_glance_audit envelope_vs_dimension_mismatch). Products under 1 m print mm.
+    # INTENT (2026-07-23 G20 height fix): when the canonical shell dims are available
+    # (envelope_source == "manifest_enclosure_shell"), use them for the caption triple
+    # (W×D×H) — NOT L/W/H from build_ga_svg, which may be inflated by
+    # instrument_form_rule_mm (total_height_mm includes the optics tower added on top
+    # of the body, correct for drawing extents but wrong for the enclosure caption).
+    # All three axes come from the same canonical source; H never diverges.
+    _cap_L = float(meta.get("envelope_ww") or L)
+    _cap_W = float(meta.get("envelope_dd") or W)
+    _cap_H = float(meta.get("envelope_hh") or H)
     if (meta.get("is_instrument_device") or meta.get("is_product_scale")) and max(L, W, H) < 1000.0:
         _env_line = (
-            f"{_env_noun} {L:.0f} × {W:.0f} × {H:.0f} mm (L×W×H) · "
+            f"{_env_noun} {_cap_L:.0f} × {_cap_W:.0f} × {_cap_H:.0f} mm (L×W×H) · "
             f"{meta.get('count', 0)} equipment items."
         )
     else:
         _env_line = (
-            f"{_env_noun} {L/1000:.1f} m (L) × {W/1000:.1f} m (W) × "
-            f"{H/1000:.1f} m (H) · {meta.get('count', 0)} equipment items."
+            f"{_env_noun} {_cap_L/1000:.1f} m (L) × {_cap_W/1000:.1f} m (W) × "
+            f"{_cap_H/1000:.1f} m (H) · {meta.get('count', 0)} equipment items."
         )
     svg.text(x0, y0 + 61, _env_line, size=9.5, fill=MUTED)
     if meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway"):
@@ -3323,6 +3342,60 @@ def _selftest() -> int:
         print("  FAIL ga-colocated-fp: two parts at genuinely DIFFERENT plan "
               "positions must never collapse into one box")
         bad += 1
+    # 9 — proveCatch (2026-07-23 G20 height fix): GA caption triple W×D×H must
+    #     read CANONICAL manifest Enclosure Shell dims — NOT the form-rule-inflated
+    #     total_height_mm. Adversarial input: a manifest whose Enclosure Shell is
+    #     367×335×126 mm and whose state has isInstrumentDevice=True + an optical_path
+    #     long enough that instrument_form_rule_mm yields total_height_mm >> 126. The
+    #     caption's H must be 126 (shell), not the form-rule total. Bug: 174 was
+    #     printed (total_height for optical_path=13 mm) while shell was 126.
+    import tempfile as _tf_sh
+    _sh_td = _tf_sh.mkdtemp(prefix="ga-shell-h-")
+    _shell_w, _shell_d, _shell_h = 367.0, 335.0, 126.0
+    _sh_man = {
+        "schema": "parts-manifest/1", "count": 1,
+        "is_instrument_device": True,
+        "parts": [
+            {"equipment_tag": "X-100", "name": "Enclosure Shell",
+             "module": "m", "shape": "box", "qty": 1,
+             "pos_mm": [0.0, 0.0, 650.0],
+             "dims_mm": {"w": _shell_w, "d": _shell_d, "h": _shell_h}},
+        ],
+    }
+    json.dump(_sh_man, open(os.path.join(_sh_td, "parts-manifest.json"), "w"))
+    json.dump({
+        "isInstrumentDevice": True,
+        "orchestratorContract": {"quantities": {
+            "enclosure_volume_m3": {"value": 0.015},
+            # optical_path long enough to push total_height_mm well above shell h
+            "optical_path_length_mm": {"value": 13.0},
+            "design_envelope_width_mm": {"value": _shell_w},
+            "design_envelope_depth_mm": {"value": _shell_d},
+            "design_envelope_height_mm": {"value": _shell_h},
+        }},
+    }, open(os.path.join(_sh_td, "state.json"), "w"))
+    _sh_parts, _sh_bbox, _sh_meta = load_manifest(_sh_td)
+    if _sh_meta.get("envelope_source") != "manifest_enclosure_shell":
+        print("  FAIL ga-shell-caption-h: fixture must classify as "
+              "manifest_enclosure_shell (envelope_source mismatch)")
+        bad += 1
+    if (_sh_meta.get("envelope_hh") or 0) != _shell_h:
+        print(f"  FAIL ga-shell-caption-h: meta.envelope_hh must be {_shell_h}, "
+              f"got {_sh_meta.get('envelope_hh')}")
+        bad += 1
+    _sh_svg = build_ga_svg(_sh_parts, _sh_bbox, "bioreactor", _sh_meta)
+    _expect_triple = f"{_shell_w:.0f} × {_shell_d:.0f} × {_shell_h:.0f} mm"
+    if _expect_triple not in _sh_svg:
+        # extract the actual caption for a useful error message
+        import re as _re_sh
+        _cap_hit = _re_sh.search(r"product envelope[^<\"]{0,120}", _sh_svg)
+        _cap_actual = _cap_hit.group(0) if _cap_hit else "(not found)"
+        print(f"  FAIL ga-shell-caption-h: caption triple must be '{_expect_triple}' "
+              f"(shell W×D×H), got: '{_cap_actual}'\n"
+              f"    — form-rule total_height must NOT inflate the caption H")
+        bad += 1
+    else:
+        print(f"  PASS ga-shell-caption-h: caption '{_expect_triple}' == shell dims")
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0
 
