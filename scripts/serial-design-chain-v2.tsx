@@ -10072,8 +10072,16 @@ async function main() {
                   components: boardComponents.map((c) => ({
                     wordId: c.wordId,
                     refdes: c.instanceName,
+                    instanceName: c.instanceName,
                     mpn: c.partNumber,
                     characterId: c.characterId ?? undefined,
+                    functionClass: c.functionClass ?? undefined,
+                    manufacturer: c.manufacturer ?? undefined,
+                  })),
+                  nets: (boardRun?.generator.nets ?? []).map((n) => ({
+                    name: n.name,
+                    kind: n.kind,
+                    members: n.members,
                   })),
                   // GOTCHA: must pass design evidence — inventing instances from
                   // requiredCount made stir/pump "PASS" while PCB implemented 0.

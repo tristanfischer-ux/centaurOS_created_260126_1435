@@ -87,6 +87,12 @@ import {
 import type { PcbBoardGeometry } from './pcb-contract'
 import type { PcbBoardShapeContract } from './pcb-architecture'
 import { isHostHatActuationDrivePublished } from './pcb-architecture'
+import {
+  boardIsHostHat,
+  boardIsOdOptics,
+  type SystemNetPlan,
+  applySystemNetTags,
+} from './pcb-cross-board-nets'
 import { resolveMcuReferencePad } from './pcb-mcu-reference-pinmap'
 import type { PcbPinSpec } from './pcb-component-resolution'
 import type { VerifiedCandidateRequest } from './pcb-verified-candidates'
@@ -648,6 +654,8 @@ export interface AtopileNetRecord {
   name: string
   kind: 'power' | 'ground' | 'signal'
   members: Array<{ instanceName: string; pin: string }>
+  /** True when this net name is a multi-board cable conductor (system plan). */
+  crossBoard?: boolean
 }
 
 export interface AtopileUnresolvedRecord {
@@ -692,6 +700,10 @@ export interface GenerateAtopileProjectOptions {
   requiredFunctionRoles?: string[]
   /** Architecture board role (e.g. wet_lab_hat) — densify companions key off this. */
   boardRole?: string
+  /** Architecture board id (e.g. wet_actuation) — inter-board mates key off this. */
+  boardId?: string
+  /** System-level cable plan from planSystemNets (multi-board runs). */
+  systemNets?: SystemNetPlan
   boardShape?: PcbBoardShapeContract
 }
 
@@ -1074,6 +1086,21 @@ function ensureHeaterGoldCompanionWords(
       quantity: 1,
     })
   }
+  // INTENT: temp-sense alone is not a heater channel — densify the resistive
+  // load (ESR18 gold) when architecture requires heater_channel but the scoped
+  // BoM omitted the cartridge heater word (final10 wet_actuation under-count).
+  if (!/(?:cartridge|resistive)[_ -]?heater|heater[_ -]?element|esr18/i.test(blob)) {
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId: 'cartridge_heater_word',
+      nameHuman: 'Cartridge heater element',
+      characterId: 'cartridge_heater',
+      modifiers: {},
+      categories: ['heater'],
+      quantity: 1,
+    })
+  }
   return out
 }
 
@@ -1290,6 +1317,75 @@ function ensureHostHatActuationDriveWords(
       quantity: 1,
     })
   }
+  return out
+}
+
+/**
+ * @description Densify cable-mate connectors implied by the system net plan.
+ * INTENT: heater FFC + OD 4P host are separate KiCad projects but one product —
+ * each side needs the mate footprint so the cable story is real, not prose.
+ */
+function ensureInterBoardConnectorWords(
+  words: ElectronicWordRef[],
+  opts: {
+    boardId?: string
+    boardRole?: string
+    systemNets?: SystemNetPlan
+  },
+): ElectronicWordRef[] {
+  const plan = opts.systemNets
+  if (!plan) return words
+  const blob = words.map((w) => `${w.wordId} ${w.characterId} ${w.nameHuman}`).join(' ')
+  const anchor = words[0]
+  const moduleId = anchor?.moduleId ?? 'interconnect'
+  const subModuleId = anchor?.subModuleId ?? 'cable_mates'
+  const out = [...words]
+
+  if (plan.hasHeaterFfc && boardIsHostHat(opts.boardId, opts.boardRole)) {
+    if (!/(?:host[_ -]?)?ffc[_ -]?connector|heater[_ -]?ffc|52207/i.test(blob)) {
+      out.push({
+        moduleId,
+        subModuleId,
+        wordId: 'heater_ffc_host_mate_word',
+        nameHuman: 'Heater FFC host mate',
+        characterId: 'host_ffc_connector',
+        modifiers: {},
+        categories: ['connector'],
+        quantity: 1,
+      })
+    }
+  }
+
+  if (plan.hasOdHostI2c && boardIsOdOptics(opts.boardId, opts.boardRole)) {
+    if (!/source[_ -]?board[_ -]?connector|od[_ -]?host/i.test(blob)) {
+      out.push({
+        moduleId,
+        subModuleId,
+        wordId: 'source_board_connector_word',
+        nameHuman: 'OD host board connector',
+        characterId: 'source_board_connector',
+        modifiers: {},
+        categories: ['connector'],
+        quantity: 1,
+      })
+    }
+  }
+
+  if (plan.hasOdHostI2c && boardIsHostHat(opts.boardId, opts.boardRole)) {
+    if (!/od[_ -]?host[_ -]?mate|source[_ -]?board[_ -]?connector/i.test(blob)) {
+      out.push({
+        moduleId,
+        subModuleId,
+        wordId: 'od_host_mate_connector_word',
+        nameHuman: 'OD host mate connector',
+        characterId: 'od_host_mate_connector',
+        modifiers: {},
+        categories: ['connector'],
+        quantity: 1,
+      })
+    }
+  }
+
   return out
 }
 
@@ -2244,7 +2340,9 @@ function wireHostHatActuationDriveNets(
     const source = findPinMatching(mosfet, [/^S$/i, /^SOURCE$/i]) ?? ensureComponentPin(mosfet, 'S')
     const drain = findPinMatching(mosfet, [/^D$/i, /^DRAIN$/i]) ?? ensureComponentPin(mosfet, 'D')
     const pwmNet = ensureNet('HAT_HEATER_PWM', 'signal')
-    const heaterDrive = ensureNet('HAT_HEATER_DRIVE', 'power')
+    // DECISION: drain uses HEATER_RES_A — same cross-board name as the heater
+    // FFC RES_A conductor (not a HAT-local HAT_HEATER_DRIVE alias).
+    const heaterDrive = ensureNet('HEATER_RES_A', 'power')
     addMember(pwmNet, hatConn.instanceName, pwm)
     addMember(pwmNet, mosfet.instanceName, gate)
     addMember(gnd, mosfet.instanceName, source)
@@ -2307,6 +2405,190 @@ function wireHostHatActuationDriveNets(
 }
 
 /**
+ * @description Wire inter-board cable mates (heater FFC on HAT, OD 4P on OD+HAT)
+ * and attach MCU I²C pads from the reference pin-map when present.
+ *
+ * DECISION: When both heater FFC and OD host cables exist, HAT joins OD mate
+ * SDA/SCL onto HEATER_I2C_* (one SERCOM bus) — never the same MCU pad on two nets.
+ */
+function wireInterBoardConnectorNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+  vcc: AtopileNetRecord,
+  gnd: AtopileNetRecord,
+  opts: {
+    boardId?: string
+    boardRole?: string
+    systemNets?: SystemNetPlan
+  },
+): void {
+  const plan = opts.systemNets
+  if (!plan) return
+  const roleBlob = (c: AtopileComponentRecord): string =>
+    `${c.characterId} ${c.wordId} ${c.nameHuman} ${c.partNumber ?? ''}`
+
+  const mcu = components.find((c) => c.functionClass === 'microcontroller')
+  const mcuBlob = mcu
+    ? `${mcu.manufacturer ?? ''} ${mcu.partNumber ?? ''} ${mcu.characterId}`
+    : ''
+
+  const attachMcuI2c = (sdaNet: AtopileNetRecord, sclNet: AtopileNetRecord): void => {
+    if (!mcu) return
+    const sdaPad = resolveMcuReferencePad(mcuBlob, 'i2c_sda')
+    const sclPad = resolveMcuReferencePad(mcuBlob, 'i2c_scl')
+    const sda =
+      (sdaPad
+        ? findPinMatching(mcu, [new RegExp(`^${sdaPad}(?:_|$)`, 'i')])
+        : null)
+      ?? findPinMatching(mcu, [/^PA22(?:_|$)/i, /^SDA/i])
+      ?? (sdaPad ? ensureComponentPin(mcu, sdaPad) : null)
+    const scl =
+      (sclPad
+        ? findPinMatching(mcu, [new RegExp(`^${sclPad}(?:_|$)`, 'i')])
+        : null)
+      ?? findPinMatching(mcu, [/^PA23(?:_|$)/i, /^SCL/i])
+      ?? (sclPad ? ensureComponentPin(mcu, sclPad) : null)
+    if (sda) addMember(sdaNet, mcu.instanceName, sda)
+    if (scl) addMember(sclNet, mcu.instanceName, scl)
+  }
+
+  // ── HAT-side heater FFC mate (Molex 52207) ───────────────────────────────
+  if (plan.hasHeaterFfc && boardIsHostHat(opts.boardId, opts.boardRole)) {
+    const ffc = components.find((c) =>
+      /52207|host[_ -]?ffc|heater[_ -]?ffc|heater_ffc_host_mate/i.test(roleBlob(c)),
+    )
+    if (ffc) {
+      const pResA =
+        findPinMatching(ffc, [/^RES_A$/i, /^1$/i, /^Pin_1$/i]) ?? ensureComponentPin(ffc, 'RES_A')
+      const pResB =
+        findPinMatching(ffc, [/^RES_B$/i, /^2$/i, /^Pin_2$/i]) ?? ensureComponentPin(ffc, 'RES_B')
+      const p3v3 =
+        findPinMatching(ffc, [/^3V3$/i, /^3$/i, /^Pin_3$/i]) ?? ensureComponentPin(ffc, '3V3')
+      const pGnd =
+        findPinMatching(ffc, [/^GND$/i, /^4$/i, /^Pin_4$/i]) ?? ensureComponentPin(ffc, 'GND')
+      const pScl =
+        findPinMatching(ffc, [/^I2C_SCL$/i, /^SCL$/i, /^5$/i]) ?? ensureComponentPin(ffc, 'I2C_SCL')
+      const pSda =
+        findPinMatching(ffc, [/^I2C_SDA$/i, /^SDA$/i, /^6$/i]) ?? ensureComponentPin(ffc, 'I2C_SDA')
+      const pHall =
+        findPinMatching(ffc, [/^HALL_OUT$/i, /^7$/i]) ?? ensureComponentPin(ffc, 'HALL_OUT')
+      const resA = ensureNet('HEATER_RES_A', 'power')
+      const resB = ensureNet('HEATER_RES_B', 'power')
+      const i2cSda = ensureNet('HEATER_I2C_SDA', 'signal')
+      const i2cScl = ensureNet('HEATER_I2C_SCL', 'signal')
+      const hallNet = ensureNet('HEATER_HALL', 'signal')
+      addMember(resA, ffc.instanceName, pResA)
+      addMember(resB, ffc.instanceName, pResB)
+      addMember(vcc, ffc.instanceName, p3v3)
+      addMember(gnd, ffc.instanceName, pGnd)
+      addMember(i2cScl, ffc.instanceName, pScl)
+      addMember(i2cSda, ffc.instanceName, pSda)
+      addMember(hallNet, ffc.instanceName, pHall)
+      attachMcuI2c(i2cSda, i2cScl)
+    }
+  }
+
+  // ── OD ↔ HAT 4P host (BOOMELE: 1=GND, 2=3V3, 3=SDA, 4=SCL) ─────────────
+  // GOTCHA: only densify/ensure OD_* nets on OD + HAT boards — never on heater.
+  if (plan.hasOdHostI2c && boardIsOdOptics(opts.boardId, opts.boardRole)) {
+    const odConn = components.find((c) =>
+      /source[_ -]?board[_ -]?connector|od[_ -]?host[_ -]?mate|1\.0T-4P/i.test(roleBlob(c)),
+    )
+    const odSda = ensureNet('OD_I2C_SDA', 'signal')
+    const odScl = ensureNet('OD_I2C_SCL', 'signal')
+    const odVcc = ensureNet('OD_I2C_VCC', 'power')
+    const odGnd = ensureNet('OD_I2C_GND', 'ground')
+    if (odConn) {
+      const pGnd =
+        findPinMatching(odConn, [/^1$/i, /^Pin_1$/i, /^GND$/i, /^P1$/i])
+        ?? ensureComponentPin(odConn, 'GND')
+      const pVcc =
+        findPinMatching(odConn, [/^2$/i, /^Pin_2$/i, /^3V3$/i, /^VCC$/i, /^P2$/i])
+        ?? ensureComponentPin(odConn, '3V3')
+      const pSda =
+        findPinMatching(odConn, [/^3$/i, /^Pin_3$/i, /^SDA$/i, /^P3$/i])
+        ?? ensureComponentPin(odConn, 'SDA')
+      const pScl =
+        findPinMatching(odConn, [/^4$/i, /^Pin_4$/i, /^SCL$/i, /^P4$/i])
+        ?? ensureComponentPin(odConn, 'SCL')
+      addMember(odGnd, odConn.instanceName, pGnd)
+      addMember(odVcc, odConn.instanceName, pVcc)
+      addMember(odSda, odConn.instanceName, pSda)
+      addMember(odScl, odConn.instanceName, pScl)
+      addMember(gnd, odConn.instanceName, pGnd)
+      addMember(vcc, odConn.instanceName, pVcc)
+    }
+    const adc = components.find((c) =>
+      /ads111|optical[_ -]?adc|(?:^|[_ -])adc(?:$|[_ -])/i.test(roleBlob(c)),
+    )
+    if (adc) {
+      const sda = findPinMatching(adc, [/^SDA$/i])
+      const scl = findPinMatching(adc, [/^SCL$/i])
+      if (sda) addMember(odSda, adc.instanceName, sda)
+      if (scl) addMember(odScl, adc.instanceName, scl)
+    }
+  } else if (plan.hasOdHostI2c && boardIsHostHat(opts.boardId, opts.boardRole)) {
+    const odConn = components.find((c) =>
+      /source[_ -]?board[_ -]?connector|od[_ -]?host[_ -]?mate|1\.0T-4P/i.test(roleBlob(c)),
+    )
+    if (odConn) {
+      // GOTCHA: shared I²C bus on HAT — join OD mate onto HEATER_I2C_* when the
+      // heater FFC is also present so MCU pads are never dual-homed.
+      const sdaName = plan.hasHeaterFfc ? 'HEATER_I2C_SDA' : 'OD_I2C_SDA'
+      const sclName = plan.hasHeaterFfc ? 'HEATER_I2C_SCL' : 'OD_I2C_SCL'
+      const i2cSda = ensureNet(sdaName, 'signal')
+      const i2cScl = ensureNet(sclName, 'signal')
+      const pGnd =
+        findPinMatching(odConn, [/^1$/i, /^Pin_1$/i, /^GND$/i, /^P1$/i])
+        ?? ensureComponentPin(odConn, 'GND')
+      const pVcc =
+        findPinMatching(odConn, [/^2$/i, /^Pin_2$/i, /^3V3$/i, /^VCC$/i, /^P2$/i])
+        ?? ensureComponentPin(odConn, '3V3')
+      const pSda =
+        findPinMatching(odConn, [/^3$/i, /^Pin_3$/i, /^SDA$/i, /^P3$/i])
+        ?? ensureComponentPin(odConn, 'SDA')
+      const pScl =
+        findPinMatching(odConn, [/^4$/i, /^Pin_4$/i, /^SCL$/i, /^P4$/i])
+        ?? ensureComponentPin(odConn, 'SCL')
+      addMember(gnd, odConn.instanceName, pGnd)
+      addMember(vcc, odConn.instanceName, pVcc)
+      addMember(i2cSda, odConn.instanceName, pSda)
+      addMember(i2cScl, odConn.instanceName, pScl)
+      // Publish OD_* names on HAT for SIGHT (empty when copper joins HEATER_I2C_*).
+      if (sdaName === 'OD_I2C_SDA') {
+        addMember(ensureNet('OD_I2C_SDA', 'signal'), odConn.instanceName, pSda)
+        addMember(ensureNet('OD_I2C_SCL', 'signal'), odConn.instanceName, pScl)
+      } else {
+        ensureNet('OD_I2C_SDA', 'signal')
+        ensureNet('OD_I2C_SCL', 'signal')
+        ensureNet('OD_I2C_VCC', 'power')
+        ensureNet('OD_I2C_GND', 'ground')
+      }
+      attachMcuI2c(i2cSda, i2cScl)
+    }
+  }
+}
+
+/**
+ * @description Drop empty nets and topology invent stubs (`NET_*`) that never
+ * got a second endpoint. Never prune power/ground, crossBoard cable nets, or
+ * intentional single-node actuator outputs (e.g. STIR_MOTOR_A → off-board motor).
+ *
+ * DECISION: a blanket "members < 2" prune killed legitimate HEATER_I2C_* stubs
+ * (mate on the other board) and HAT motor OUT nets — too aggressive.
+ */
+function pruneSingletonSignalNets(nets: AtopileNetRecord[]): AtopileNetRecord[] {
+  return nets.filter((n) => {
+    if (n.kind !== 'signal') return true
+    if (n.crossBoard === true) return true
+    if (n.members.length === 0) return false
+    if (/^NET_/i.test(n.name) && n.members.length < 2) return false
+    return true
+  })
+}
+
+/**
  * @description Builds VCC/GND global rails (battery → regulator → rails when both
  * exist, per the universal power topology every electronic product shares),
  * host-interface USB/SWD nets, OD photodiode→TIA→ADC front-end nets when present,
@@ -2321,6 +2603,11 @@ function buildNets(
   topology: TopologyEdge[],
   footprintsRoot: string,
   symbolsRoot: string,
+  opts: {
+    boardId?: string
+    boardRole?: string
+    systemNets?: SystemNetPlan
+  } = {},
 ): { nets: AtopileNetRecord[]; decouplingCaps: AtopileComponentRecord[] } {
   const nets = new Map<string, AtopileNetRecord>()
   const ensureNet = (name: string, kind: AtopileNetRecord['kind']): AtopileNetRecord => {
@@ -2387,6 +2674,7 @@ function buildNets(
   wireOdOpticalFrontEndNets(components, ensureNet, addMember, vcc, gnd)
   wireHeaterDaughterboardNets(components, ensureNet, addMember, vcc, gnd)
   wireHostHatActuationDriveNets(components, ensureNet, addMember, vcc, gnd)
+  wireInterBoardConnectorNets(components, ensureNet, addMember, vcc, gnd, opts)
 
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
@@ -2621,23 +2909,30 @@ export function generateAtopileProject(
     ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
     : allElectronicWords
   // INTENT: densify with published gold companions — heater FFC+hall, OD
-  // photodiode+TIA+passives, HAT 2×20 socket, and (when fixture publishes)
-  // host-HAT heater MOSFET + stir/pump DRV8876.
-  const electronicWords = ensureHostHatActuationDriveWords(
-    ensurePowerIndicatorBallastWords(
-      ensureHatHostConnectorWords(
-        ensureOdGoldCompanionWords(
-          ensureHeaterGoldCompanionWords(
-            scopedElectronicWords,
+  // photodiode+TIA+passives, HAT 2×20 socket, inter-board cable mates, and
+  // (when fixture publishes) host-HAT heater MOSFET + stir/pump DRV8876.
+  const electronicWords = ensureInterBoardConnectorWords(
+    ensureHostHatActuationDriveWords(
+      ensurePowerIndicatorBallastWords(
+        ensureHatHostConnectorWords(
+          ensureOdGoldCompanionWords(
+            ensureHeaterGoldCompanionWords(
+              scopedElectronicWords,
+              opts.requiredFunctionRoles,
+            ),
             opts.requiredFunctionRoles,
           ),
-          opts.requiredFunctionRoles,
+          opts.boardRole,
         ),
-        opts.boardRole,
       ),
+      opts.boardRole,
+      opts.requiredFunctionRoles,
     ),
-    opts.boardRole,
-    opts.requiredFunctionRoles,
+    {
+      boardId: opts.boardId,
+      boardRole: opts.boardRole,
+      systemNets: opts.systemNets,
+    },
   )
   // INTENT: Channel contracts describe work the board must implement; they are
   // not manufacturer-orderable packages. Keep the obligation explicit until a
@@ -2690,12 +2985,19 @@ export function generateAtopileProject(
   const topology = (
     (state.orchestratorContract as { topology?: TopologyEdge[] } | undefined)?.topology ?? []
   )
-  const { nets, decouplingCaps } = buildNets(
+  const { nets: rawNets, decouplingCaps } = buildNets(
     components,
     topology,
     footprintsRoot,
     symbolsRoot,
+    {
+      boardId: opts.boardId,
+      boardRole: opts.boardRole,
+      systemNets: opts.systemNets,
+    },
   )
+  const taggedNets = applySystemNetTags(rawNets, opts.systemNets)
+  const nets = pruneSingletonSignalNets(taggedNets)
   const allComponents = [...components, ...decouplingCaps]
 
   // DECISION (NinjaPCR 2026-07-15): compact instrument boards use the [25,40] mm

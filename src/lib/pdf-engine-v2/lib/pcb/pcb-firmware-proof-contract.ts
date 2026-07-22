@@ -5,6 +5,8 @@
  * evidence sets `pin_contract_complete:false` (fail closed). Never claims HIL.
  */
 
+import { buildFirmwareBusesFromNets } from './pcb-firmware-pinmap-from-nets'
+
 import type { PcbFirmwareProofSpec } from './pcb-firmware-proof-spec'
 
 export interface FirmwareProofContractComponent {
@@ -12,6 +14,15 @@ export interface FirmwareProofContractComponent {
   refdes?: string
   mpn?: string | null
   characterId?: string
+  functionClass?: string | null
+  instanceName?: string
+  manufacturer?: string | null
+}
+
+export interface FirmwareProofContractNet {
+  name: string
+  kind?: string
+  members: Array<{ instanceName: string; pin: string }>
 }
 
 /**
@@ -20,6 +31,7 @@ export interface FirmwareProofContractComponent {
  * @param args.designFitnessOk Whether PCB design fitness already passed
  * @param args.mcu Optional MCU identity from generator components
  * @param args.components On-board components with optional MPNs
+ * @param args.nets Optional generator nets — used to derive real MCU bus pads
  * @param args.implementedChannels Design-evidence counts from
  *   `deriveImplementedChannelCounts` — NEVER invent instances from requiredCount
  * @returns Fat contract object for firmware_proof.py
@@ -29,9 +41,17 @@ export function buildFirmwareProofContract(args: {
   designFitnessOk: boolean
   mcu?: { mpn: string; manufacturer?: string }
   components: FirmwareProofContractComponent[]
+  nets?: FirmwareProofContractNet[]
   implementedChannels?: Record<string, number>
 }): Record<string, unknown> {
-  const { thin, designFitnessOk, mcu, components, implementedChannels = {} } = args
+  const {
+    thin,
+    designFitnessOk,
+    mcu,
+    components,
+    nets = [],
+    implementedChannels = {},
+  } = args
   // INTENT (2026-07-21): Tier-0 previously minted instances.length === requiredCount
   // even when design evidence said stir/pump=0 — firmware "PASS implemented=1" was
   // Goodhart. Instances must mirror real topology evidence; under-count fails proof.
@@ -53,6 +73,30 @@ export function buildFirmwareProofContract(args: {
   // Native Tier-0 never invents pin headers — incomplete → fail closed in validate_spec.
   const pinComplete = Boolean(mcu?.mpn) && designFitnessOk
 
+  const busComponents = components.map((c) => ({
+    instanceName: c.instanceName ?? c.refdes ?? c.wordId,
+    functionClass: c.functionClass
+      ?? (/mcu|microcontroller/i.test(c.characterId ?? '') ? 'microcontroller' : null),
+    characterId: c.characterId,
+    manufacturer: c.manufacturer ?? mcu?.manufacturer ?? null,
+    partNumber: c.mpn ?? null,
+  }))
+  if (mcu?.mpn && !busComponents.some((c) => c.functionClass === 'microcontroller')) {
+    busComponents.push({
+      instanceName: '_mcu',
+      functionClass: 'microcontroller',
+      characterId: 'main_controller_mcu',
+      manufacturer: mcu.manufacturer ?? null,
+      partNumber: mcu.mpn,
+    })
+  }
+
+  const buses = buildFirmwareBusesFromNets({
+    nets,
+    components: busComponents,
+    mcuMpn: mcu?.mpn,
+  })
+
   return {
     schema: 'pcb-firmware-proof-spec/v1',
     proof_target_id: thin.proofTargetId,
@@ -69,14 +113,7 @@ export function buildFirmwareProofContract(args: {
           toolchain: 'native-draft',
           pin_contract_complete: false,
         },
-    buses: [
-      {
-        bus_id: 'uart0',
-        protocol: 'uart',
-        pins: { tx: 'TX', rx: 'RX', gnd: 'GND' },
-        expected_devices: [],
-      },
-    ],
+    buses,
     components: components
       .filter((c) => Boolean(c.mpn))
       .map((c) => ({
