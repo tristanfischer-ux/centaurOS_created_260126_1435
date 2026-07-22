@@ -2555,15 +2555,12 @@ function wireInterBoardConnectorNets(
       addMember(vcc, odConn.instanceName, pVcc)
       addMember(i2cSda, odConn.instanceName, pSda)
       addMember(i2cScl, odConn.instanceName, pScl)
-      // Publish OD_* names on HAT for SIGHT (empty when copper joins HEATER_I2C_*).
+      // DECISION: when the heater FFC already owns the HAT I²C bus, the OD mate
+      // joins HEATER_I2C_* copper — do NOT mint empty OD_I2C_* aliases. Empty
+      // cross-board signals were Goodhart SIGHT theatre (fixpack11).
       if (sdaName === 'OD_I2C_SDA') {
         addMember(ensureNet('OD_I2C_SDA', 'signal'), odConn.instanceName, pSda)
         addMember(ensureNet('OD_I2C_SCL', 'signal'), odConn.instanceName, pScl)
-      } else {
-        ensureNet('OD_I2C_SDA', 'signal')
-        ensureNet('OD_I2C_SCL', 'signal')
-        ensureNet('OD_I2C_VCC', 'power')
-        ensureNet('OD_I2C_GND', 'ground')
       }
       attachMcuI2c(i2cSda, i2cScl)
     }
@@ -2572,17 +2569,19 @@ function wireInterBoardConnectorNets(
 
 /**
  * @description Drop empty nets and topology invent stubs (`NET_*`) that never
- * got a second endpoint. Never prune power/ground, crossBoard cable nets, or
- * intentional single-node actuator outputs (e.g. STIR_MOTOR_A → off-board motor).
+ * got a second endpoint. Never prune power/ground, crossBoard cable nets with
+ * ≥1 member, or intentional single-node actuator outputs (e.g. STIR_MOTOR_A).
  *
  * DECISION: a blanket "members < 2" prune killed legitimate HEATER_I2C_* stubs
  * (mate on the other board) and HAT motor OUT nets — too aggressive.
+ * DECISION (fixpack12): empty nets (members===0) are always dropped, even when
+ * tagged crossBoard — zero-copper "cable" names are lies, not documentation.
  */
 function pruneSingletonSignalNets(nets: AtopileNetRecord[]): AtopileNetRecord[] {
   return nets.filter((n) => {
+    if (n.members.length === 0) return false
     if (n.kind !== 'signal') return true
     if (n.crossBoard === true) return true
-    if (n.members.length === 0) return false
     if (/^NET_/i.test(n.name) && n.members.length < 2) return false
     return true
   })
