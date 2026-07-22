@@ -8,6 +8,9 @@ empty tab self-scores 9–10 (Goodhart). Compounded by the **device-scale-regime
 (`isWattScaleInstrument`): plant-scale defaults (utilisation hours, WRAS-water MoC, LCOE/DCF
 frame, oversized heater, 1000 RPM) land on a sub-1 W benchtop instrument.
 
+## ✅ DONE (2026-07-22 ~16:44) — FLOOR 9, EVERY NON-MIRROR TAB ≥9, HONEST
+loopbake8 (1603): **floor 9/10 · every non-mirror tab ≥9 · ⚠Checks FAIL=0 · ship_ok=True** · render vision broken:False · Drawing gates 10/10 · hero SIGHT-confirmed coherent sealed instrument. plan_render_coherence cleared (was a re-run artifact). Handover: ~/Downloads/handovers/2026-07-22T16-44-fbc145daa.md. Autonomous cron stopped. Arc 0→2.4→4→6→8→9, every fix at-source + proveCatch, no Goodhart.
+
 ## LOOP STATUS (2026-07-22 ~16:00) — both 8->9 fixes landed; loopbake8 = the ≥9 verification
 - **BoM MPNs FIXED `e1e19435b`**: NOT a data gap — a CODE gap. Head nouns `storage`/`bridge`/`isolator` were absent from `CATALOGUE_TOKEN_SET` (emitter-completion.ts) → isCatalogueComponent()=false → fill gate never hit dbFirstLookup. Fixed the token set + seeded/promoted 4 REAL verified MPNs: US5881LUA (Melexis Hall tach), W25Q16JV (Winbond flash), CP2102N (SiLabs USB-UART, live-verified Digi-Key £1.09), ADuM1201 (ADI isolator). Sensor Cable already had Amphenol MPN. proveCatch UNIVERSAL.catalogue_token_set_admits_bioreactor_electronic_nouns PASS. Next bake: BoM 9/13→13/13 resolved.
 - **Drawing gates G12 FIXED `6d16dd684`** (landscape dominant-dim occupancy, honest).
