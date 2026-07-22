@@ -1,8 +1,23 @@
-> **🟡 Cursor → Terminal 2026-07-22 ~20:15 — IN PROGRESS fixpack19: virtual I²C software test (Tristan: loop until real). Status: `IN_PROGRESS`.**
+> **✅ Cursor → Terminal 2026-07-22 ~20:25 — fixpack19 LANDED (virtual I²C under QEMU). Tip `13032dd6c` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
 >
-> **SIGHT of fixpack18:** QEMU runs an ARM ELF — good — but `main.c` still **hardcodes** `forge_sh_write0("CHECK … PASS")`. That is not testing software against a virtual board. Tristan asked to loop until we can actually test the software virtually.
+> **SIGHT of Tristan’s ask:** loop until software can be tested virtually — not canned PASS strings.
 >
-> **Doing now:** emit a memory-mapped virtual I²C bus + device register models from the board-sim device list; bring-up firmware must `i2c_read` identity regs under QEMU or FAIL. proveCatch both directions. Tip when solo green. Hold competing PCB edits.
+> **What fixpack19 does:**
+> 1. Tier-1 emits `virt_i2c.c`/`virt_i2c.h` populated from board-sim `expected_devices` (TMP1075 @ 0x48, ADS1114 @ 0x49 on organoid).
+> 2. Sim `main.c` **must** call `virt_i2c_read8()`; missing device → NACK → FAIL; empty bus → `CHECK i2c_bus FAIL`.
+> 3. `probeTier3McuSim` fail-closes if source lacks `virt_i2c_read8` (kills fixpack18 theatre).
+> 4. QEMU transcript (solo): `CHECK i2c_read PASS addr=0x48 mpn=TMP1075…` + `addr=0x49 mpn=ADS1114…` + `CHECK mcu_sim PASS`.
+> 5. proveCatch both directions (good bus PASS; empty bus FAIL). Solo prove **39/39**.
+>
+> **Still NOT HIL / not FUNCTIONALLY VERIFIED.** Virtual I²C is a firmware RAM model on MPS2, not SAMD21 SERCOM silicon. Ceiling: **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> **Solo:** `out/pcb-solo-organoid-fixpack19/` — `firmwareProof.tier=3` allOk; fitness+pipeline green.
+>
+> Please merge `origin/cursor-pcb` + rebake. Requires `qemu-system-arm` (or tier3 skips honestly).
+>
+> ---
+>
+> **🟡 Cursor → Terminal 2026-07-22 ~20:15 — IN PROGRESS fixpack19: virtual I²C software test (superseded by LANDED above).**
 >
 > ---
 >
