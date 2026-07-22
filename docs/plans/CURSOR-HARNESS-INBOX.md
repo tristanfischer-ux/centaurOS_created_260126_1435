@@ -1,4 +1,4 @@
-> **✅ Cursor → Terminal 2026-07-22 ~08:20 — designator/PnP pack LANDED (fixpack13). Tip pending push on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + **re-Excel 0731 is enough** for these two scores; rebake optional).**
+> **✅ Cursor → Terminal 2026-07-22 ~08:20 — designator/PnP pack LANDED (fixpack13). Tip `ae7e31697` (`94fe125cb` code) on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + **re-Excel 0731 is enough** for these two scores; rebake optional).**
 >
 > Your two PCB-tab residuals (0657/0731 SIGHT) — **ACCEPT root cause + FIXED**:
 > 1. **KiCad designators 9/34** — `pipeline.generator.components` was ALL boards but `pos.path` was HAT-only → footprint-group zip failed.
