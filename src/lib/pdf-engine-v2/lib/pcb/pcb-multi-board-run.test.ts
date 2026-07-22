@@ -6,17 +6,39 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { kicadDeliverableBoards, runBespokeMultiBoardPcb } from './pcb-multi-board-run'
+import {
+  aggregatePipelineFileGroup,
+  kicadDeliverableBoards,
+  runBespokeMultiBoardPcb,
+  type BoardPipelineRun,
+} from './pcb-multi-board-run'
 import { derivePcbArchitecture } from './pcb-architecture'
 import type { PcbPipelineResult } from './pcb-pipeline'
 
-function fakePipeline(ok: boolean, stage: string): PcbPipelineResult {
+function fakePipeline(ok: boolean, stage: string, boardId = 'board'): PcbPipelineResult {
   return {
     ok,
     stageReached: stage,
     routed: ok,
     drc: { ran: ok, violations: ok ? 0 : null },
     errors: ok ? [] : ['fake fail'],
+    gerbers: ok
+      ? {
+          dir: `pcb-boards/${boardId}/pcb/gerbers`,
+          files: [
+            `pcb-boards/${boardId}/pcb/gerbers/board-routed-F_Cu.gtl`,
+            `pcb-boards/${boardId}/pcb/gerbers/board-routed-B_Cu.gbl`,
+          ],
+        }
+      : undefined,
+    drill: ok
+      ? {
+          dir: `pcb-boards/${boardId}/pcb/drill`,
+          files: [`pcb-boards/${boardId}/pcb/drill/board-routed.drl`],
+        }
+      : undefined,
+    pos: ok ? { path: `pcb-boards/${boardId}/pcb/positions.csv` } : undefined,
+    components: ok ? 3 : 0,
   }
 }
 
@@ -131,7 +153,8 @@ describe('pcb-multi-board-run', () => {
         if (!existsSync(join(projectDir, 'main.ato'))) {
           writeFileSync(join(projectDir, 'main.ato'), 'module App:\n  pass\n')
         }
-        return fakePipeline(false, 'placement')
+        const boardId = projectDir.split(/[/\\]/).pop() || 'board'
+        return fakePipeline(false, 'placement', boardId)
       })
 
       expect(result.multiBoardMerged).toBe(false)
@@ -152,5 +175,60 @@ describe('pcb-multi-board-run', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  it('proveCatch: aggregate pipeline stamps union gerbers + top-level components (Excel gerbers_ok)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pcb-multi-gerber-'))
+    try {
+      const state = wetLabState()
+      const plan = derivePcbArchitecture(state)
+      const kicad = kicadDeliverableBoards(plan)
+      expect(kicad.length).toBeGreaterThanOrEqual(2)
+
+      const result = runBespokeMultiBoardPcb(state, root, (projectDir, _runDir) => {
+        mkdirSync(projectDir, { recursive: true })
+        if (!existsSync(join(projectDir, 'main.ato'))) {
+          writeFileSync(join(projectDir, 'main.ato'), 'module App:\n  pass\n')
+        }
+        const boardId = projectDir.split(/[/\\]/).pop() || 'board'
+        return fakePipeline(true, 'complete', boardId)
+      })
+
+      expect(result.pipeline.ok).toBe(true)
+      expect(result.pipeline.gerbers?.files?.length).toBeGreaterThanOrEqual(kicad.length * 2)
+      expect(result.pipeline.drill?.files?.length).toBeGreaterThanOrEqual(kicad.length)
+      expect(result.pipeline.pos?.path).toBeTruthy()
+      // Top-level components must be set for pcb-gate (not generator-only).
+      expect(typeof result.pipeline.components).toBe('number')
+      expect(result.pipeline.components).toBe(result.allComponents.length)
+      expect(result.pipeline.generator?.componentCount).toBe(result.allComponents.length)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('proveCatch: aggregatePipelineFileGroup unions per-board gerber paths', () => {
+    const boards = [
+      {
+        boardId: 'a',
+        role: 'host',
+        projectDir: '/tmp/a',
+        generator: { components: [], unresolved: [], functionRequirements: [], offBoard: [], nets: [] },
+        pipeline: fakePipeline(true, 'complete', 'a'),
+        record: fakePipeline(true, 'complete', 'a'),
+      },
+      {
+        boardId: 'b',
+        role: 'od',
+        projectDir: '/tmp/b',
+        generator: { components: [], unresolved: [], functionRequirements: [], offBoard: [], nets: [] },
+        pipeline: fakePipeline(true, 'complete', 'b'),
+        record: fakePipeline(true, 'complete', 'b'),
+      },
+    ] as unknown as BoardPipelineRun[]
+    const g = aggregatePipelineFileGroup(boards, 'gerbers')
+    expect(g?.files).toHaveLength(4)
+    expect(g?.files.some((f) => f.includes('/a/'))).toBe(true)
+    expect(g?.files.some((f) => f.includes('/b/'))).toBe(true)
   })
 })

@@ -29,6 +29,43 @@ import type { PcbStageResult } from './pcb-stage'
  */
 export const PCB_MIN_FOOTPRINT_COVERAGE = 0.8
 
+/**
+ * INTENT: Multi-board aggregation (pcb-multi-board-run) historically stamped
+ * footprints under `pipeline.generator.components` / `componentCount` and left
+ * top-level `pipeline.components` undefined. Reading only `pipeline.components`
+ * reported 0/N coverage on every organoid bake (final3–final9) despite 26 real
+ * footprints — a bookkeeping Goodhart that floored the PCB tab at 0.
+ *
+ * @description Count placed footprints from a pipeline record, preferring the
+ * explicit top-level count then the generator summary.
+ * @param pipeline - `state.pcb.pipeline` (or a test stub)
+ * @returns Non-negative placed footprint count
+ */
+export function countPlacedPipelineComponents(pipeline: {
+  components?: number | null
+  generator?: {
+    componentCount?: number | null
+    components?: ReadonlyArray<unknown> | null
+  } | null
+} | null | undefined): number {
+  if (!pipeline) return 0
+  const top = pipeline.components
+  if (typeof top === 'number' && Number.isFinite(top) && top >= 0) {
+    return top
+  }
+  const gen = pipeline.generator
+  if (gen) {
+    const n = gen.componentCount
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) {
+      return n
+    }
+    if (Array.isArray(gen.components)) {
+      return gen.components.length
+    }
+  }
+  return 0
+}
+
 export interface PcbGateResult {
   /** False when the gate has nothing to say about this design (no PCB content,
    *  or a COTS/none disposition that never needed a bespoke pipeline run). */
@@ -86,7 +123,9 @@ export function evaluatePcbGate(pcb: PcbStageResult | null | undefined): PcbGate
     // footprint COVERAGE of the design's own claimed electronic parts is materially
     // incomplete is a token board, not a shippable PCBA → the gate fires.
     const expected = Number(pcb.electronicPartCount ?? 0)
-    const placed = Number(pipeline.components ?? 0)
+    // GOTCHA: do NOT use `pipeline.components ?? 0` alone — multi-board aggregates
+    // put the count under generator (see countPlacedPipelineComponents).
+    const placed = countPlacedPipelineComponents(pipeline)
     const coverage = expected > 0 ? placed / expected : 1
     if (expected >= 4 && coverage < PCB_MIN_FOOTPRINT_COVERAGE) {
       return {
@@ -203,6 +242,34 @@ if (require.main === module) {
     electronicPartCount: 14,
     pipeline: { ...clean.pipeline!, ok: true, components: 14 },
   }
+  // Multi-board aggregate shape (organoid final9): components only under generator.
+  const generatorOnly: PcbStageResult = {
+    ...clean,
+    electronicPartCount: 16,
+    pipeline: {
+      ok: true,
+      stageReached: 'complete',
+      routed: true,
+      drc: { ran: true, violations: 0 },
+      errors: [],
+      generator: {
+        componentCount: 26,
+        netCount: 13,
+        unresolvedCount: 0,
+        unresolved: [],
+        components: Array.from({ length: 26 }, (_, i) => ({
+          instanceName: `part_${i}`,
+          nameHuman: `Part ${i}`,
+          characterId: 'generic',
+          manufacturer: 'X',
+          partNumber: `PN-${i}`,
+          footprint: null,
+          resolutionTier: 'mpn_symbol_footprint',
+          quantityInDesign: 1,
+        })),
+      },
+    },
+  }
 
   // P6: clean pipeline + architecture unfit / multi-board smash must still fire.
   const unfit: PcbStageResult = {
@@ -226,6 +293,7 @@ if (require.main === module) {
   const rNone = evaluatePcbGate(null)
   const rToken = evaluatePcbGate(token)
   const rComplete = evaluatePcbGate(complete)
+  const rGeneratorOnly = evaluatePcbGate(generatorOnly)
   const rUnfit = evaluatePcbGate(unfit)
   const rMerged = evaluatePcbGate(merged)
 
@@ -236,6 +304,7 @@ if (require.main === module) {
     rNone.applicable === false && rNone.fires === false &&
     rToken.fires === true && rToken.reason === 'clean_toolchain_but_incomplete_board' &&
     rComplete.fires === false &&
+    rGeneratorOnly.fires === false && rGeneratorOnly.reason === 'clean_board' &&
     rUnfit.fires === true && rUnfit.reason === 'clean_toolchain_but_architecture_unfit' &&
     rMerged.fires === true && rMerged.reason === 'clean_toolchain_but_multi_board_merged'
 

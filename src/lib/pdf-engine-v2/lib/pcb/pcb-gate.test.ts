@@ -3,7 +3,11 @@
  * @description proveCatch both directions + the applicability short-circuits.
  */
 
-import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from './pcb-gate'
+import {
+  countPlacedPipelineComponents,
+  evaluatePcbGate,
+  pcbGateEnforceModeFromEnv,
+} from './pcb-gate'
 import type { PcbStageResult } from './pcb-stage'
 
 function baseState(overrides: Partial<PcbStageResult> = {}): PcbStageResult {
@@ -131,6 +135,73 @@ describe('evaluatePcbGate', () => {
     const r = evaluatePcbGate(state)
     expect(r.fires).toBe(true)
     expect(r.reason).toBe('clean_toolchain_but_multi_board_merged')
+  })
+
+  it('proveCatch: generator.componentCount alone must NOT fire incomplete_board (organoid multi-board shape)', () => {
+    // SIGHT final9: pipeline.components undefined, generator.componentCount=26, electronicPartCount=16
+    const state = baseState({
+      electronicPartCount: 16,
+      pipeline: {
+        ok: true,
+        stageReached: 'complete',
+        routed: true,
+        drc: { ran: true, violations: 0 },
+        errors: [],
+        generator: {
+          componentCount: 26,
+          netCount: 13,
+          unresolvedCount: 0,
+          unresolved: [],
+          components: Array.from({ length: 26 }, (_, i) => ({
+            instanceName: `c${i}`,
+            nameHuman: `C${i}`,
+            characterId: 'x',
+            manufacturer: null,
+            partNumber: `P${i}`,
+            footprint: null,
+            resolutionTier: 'mpn_symbol_footprint',
+            quantityInDesign: 1,
+          })),
+        },
+      },
+    })
+    expect(countPlacedPipelineComponents(state.pipeline)).toBe(26)
+    const r = evaluatePcbGate(state)
+    expect(r.fires).toBe(false)
+    expect(r.reason).toBe('clean_board')
+  })
+
+  it('proveCatch: sparse generator count still fires incomplete_board', () => {
+    const state = baseState({
+      electronicPartCount: 14,
+      pipeline: {
+        ok: true,
+        stageReached: 'export',
+        routed: true,
+        drc: { ran: true, violations: 0 },
+        errors: [],
+        generator: {
+          componentCount: 8,
+          netCount: 3,
+          unresolvedCount: 0,
+          unresolved: [],
+          components: Array.from({ length: 8 }, (_, i) => ({
+            instanceName: `c${i}`,
+            nameHuman: `C${i}`,
+            characterId: 'x',
+            manufacturer: null,
+            partNumber: null,
+            footprint: null,
+            resolutionTier: 'function_class',
+            quantityInDesign: 1,
+          })),
+        },
+      },
+    })
+    const r = evaluatePcbGate(state)
+    expect(r.fires).toBe(true)
+    expect(r.reason).toBe('clean_toolchain_but_incomplete_board')
+    expect(r.details.join(' ')).toContain('8/14')
   })
 })
 
