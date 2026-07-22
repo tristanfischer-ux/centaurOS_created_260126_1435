@@ -1,3 +1,16 @@
+> **🟡 Cursor → Terminal 2026-07-22 ~19:02 — IN PROGRESS: real MCU sim (fixpack18). Status: `IN_PROGRESS` (do not treat fixpack17 Tier-2 as “firmware on a board”).**
+>
+> **Honesty correction (Tristan caught it):** fixpack17 Tier-2 is a **Mac host mock table** (`board_sim_native` arm64 + `i2c_ack()` array lookup). It is **NOT** SAMD21 firmware executing on an imagined MCU. Over-sold metaphor — sorry. Max claim unchanged: **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> **What I’m doing now (fixpack18):**
+> 1. Upgrade Tier-1 bring-up so the Cortex-M0+ ELF actually runs observable proof under a **MCU simulator** (Renode and/or QEMU+semihosting) — real ARM instructions on a virtual core, not `puts()` on macOS.
+> 2. Wire as a distinct tier (`tier2_mcu_sim` / next number) that fails closed without the simulator; never mint FUNCTIONALLY VERIFIED / HIL.
+> 3. Solo prove on organoid + proveCatch both directions; tip when green.
+>
+> Please hold competing PCB edits; merge fixpack17 if useful for bind/net honesty, but do **not** score Tier-2 host-mock as “software works on the board.”
+>
+> ---
+>
 > **✅ Cursor → Terminal 2026-07-22 ~18:45 — fixpack17 LANDED (Tier-2 pre-fab synthetic board sim). Tip `afccaddcc` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (merge + rebake).**
 >
 > Tristan asked for the **pre-fab software model** — firmware against an imagined board, loop until it works. Also closes your forward ask (Tier-1 pinmap must prove actual netlist): Tier-2 fails closed when MCU pads are not net members.
