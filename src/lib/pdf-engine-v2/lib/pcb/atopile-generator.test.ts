@@ -1304,6 +1304,16 @@ describe('atopile-generator', () => {
       .toMatch(/52207-0760/i)
     expect(result.components.find((c) => c.wordId === 'magnetic_lid_sense_word')?.partNumber)
       .toMatch(/DRV5021/i)
+    // proveCatch: gold heater_20ml nets — FFC ↔ I²C ↔ hall ↔ RES_A/B loads.
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('HEATER_RES_A')).toBe(true)
+    expect(netNames.has('HEATER_RES_B')).toBe(true)
+    expect(netNames.has('HEATER_I2C_SDA')).toBe(true)
+    expect(netNames.has('HEATER_I2C_SCL')).toBe(true)
+    expect(netNames.has('HEATER_HALL')).toBe(true)
+    const resA = result.nets.find((n) => n.name === 'HEATER_RES_A')!
+    expect(resA.members.some((m) => m.instanceName.includes('ffc'))).toBe(true)
+    expect(resA.members.some((m) => m.instanceName.includes('heater'))).toBe(true)
   })
 
   it('densify: od_measurement_channel synthesizes photodiode + TIA gold companions', () => {
@@ -1317,7 +1327,7 @@ describe('atopile-generator', () => {
       if (/DF2S/i.test(mpn ?? '')) {
         return cacheHit('Toshiba', 'DF2S6.8MFS,L3M', 'Eye-Spy OD TVS')
       }
-      if (/SZYY0603B|ADS1114|CC0603/i.test(mpn ?? '')) {
+      if (/SZYY0603B|ADS1114|CC0603|RC0603/i.test(mpn ?? '')) {
         return cacheHit('TI', mpn ?? '', 'OD densify companion')
       }
       return { found: false, result: null, source: 'unknown', ageHours: null }
@@ -1366,6 +1376,8 @@ describe('atopile-generator', () => {
     expect(ids.has('od_photodiode_word')).toBe(true)
     expect(ids.has('od_photodiode_tia_word')).toBe(true)
     expect(ids.has('od_esd_protection_network_word')).toBe(true)
+    expect(ids.has('od_led_series_resistor_word')).toBe(true)
+    expect(ids.has('od_front_end_feedback_resistor_word')).toBe(true)
     expect(result.components.find((c) => c.wordId === 'od_photodiode_word')?.partNumber)
       .toMatch(/BPW34S/i)
     expect(result.components.find((c) => c.wordId === 'od_photodiode_tia_word')?.partNumber)
@@ -1419,7 +1431,13 @@ describe('atopile-generator', () => {
       if (/SSQ-120-03-T-D/i.test(mpn ?? '')) {
         return cacheHit('Samtec', 'SSQ-120-03-T-D', '2x20 HAT socket')
       }
-      if (/ATSAMD21|12401610|CC0603|DF2S/i.test(mpn ?? '')) {
+      if (/AO3400A/i.test(mpn ?? '')) {
+        return cacheHit('Alpha & Omega Semiconductor Inc.', 'AO3400A', 'heater PWM MOSFET')
+      }
+      if (/DRV8876/i.test(mpn ?? '')) {
+        return cacheHit('Texas Instruments', 'DRV8876PWPR', 'stir/pump driver')
+      }
+      if (/ATSAMD21|12401610|CC0603|DF2S|RC0603/i.test(mpn ?? '')) {
         return cacheHit('Microchip', mpn ?? '', 'HAT densify companion')
       }
       return { found: false, result: null, source: 'unknown', ageHours: null }
@@ -1454,10 +1472,125 @@ describe('atopile-generator', () => {
     const result = generateAtopileProject(design, outDir, {
       requiredWordIds: ['microcontroller_mcu_word', 'usb_interface_word'],
       boardRole: 'wet_lab_hat',
+      requiredFunctionRoles: ['stir_channel', 'pump_channel'],
     })
     expect(result.components.some((c) => c.wordId === 'hat_host_connector_word')).toBe(true)
     expect(result.components.find((c) => c.wordId === 'hat_host_connector_word')?.partNumber)
       .toMatch(/SSQ-120-03-T-D/i)
+    expect(result.components.find((c) => c.wordId === 'heater_pwm_switch_word')?.partNumber)
+      .toMatch(/AO3400A/i)
+    expect(result.components.find((c) => c.wordId === 'stir_motor_driver_word')?.partNumber)
+      .toMatch(/DRV8876/i)
+    expect(result.components.find((c) => c.wordId === 'pump_motor_driver_word')?.partNumber)
+      .toMatch(/DRV8876/i)
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('HAT_HEATER_PWM')).toBe(true)
+    expect(netNames.has('STIR_MOTOR_A')).toBe(true)
+    expect(netNames.has('PUMP_MOTOR_A')).toBe(true)
+  })
+
+  it('wirePeripheralNets: VBUS rev-pol+polyfuse+ferrite; LED on SAMD21 PA07', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/12401610/i.test(mpn ?? '')) {
+        return cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C')
+      }
+      if (/ATSAMD21/i.test(mpn ?? '')) {
+        return cacheHit('Microchip', 'ATSAMD21G18A-AU', 'MCU')
+      }
+      if (/0603L300/i.test(mpn ?? '')) {
+        return cacheHit('Littelfuse', '0603L300/9SLYR', 'polyfuse')
+      }
+      if (/BLM18PG121/i.test(mpn ?? '')) {
+        return cacheHit('Murata Manufacturing', 'BLM18PG121SN1D', 'ferrite')
+      }
+      if (/BSS84/i.test(mpn ?? '')) {
+        return cacheHit('Diodes Incorporated', 'BSS84-7-F', 'rev-pol')
+      }
+      if (/KPT-1608CGCK/i.test(mpn ?? '')) {
+        return cacheHit('Kingbright', 'KPT-1608CGCK', 'power LED')
+      }
+      if (/RC0603FR/i.test(mpn ?? '')) {
+        return cacheHit('YAGEO', 'RC0603FR-101KL', 'LED ballast')
+      }
+      if (/CC0603|DF2S|FTSH|SSQ/i.test(mpn ?? '')) {
+        return cacheHit('Generic', mpn ?? '', 'companion')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-peripheral-nets-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'host',
+          sub_modules: [{
+            id: 'host__pwr',
+            words: [
+              {
+                id: 'microcontroller_mcu_word',
+                name_human: 'Host MCU',
+                content_character: { character_id: 'microcontroller_mcu' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'usb_power_entry_word',
+                name_human: 'USB Power Entry',
+                content_character: { character_id: 'usb_power_entry' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'reverse_polarity_protection_word',
+                name_human: 'Reverse polarity protection',
+                content_character: { character_id: 'reverse_polarity_protection' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'current_limit_polyfuse_word',
+                name_human: 'Current limit polyfuse',
+                content_character: { character_id: 'current_limit_polyfuse' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'ferrite_emc_bead_word',
+                name_human: 'Ferrite EMC bead',
+                content_character: { character_id: 'ferrite_emc_bead' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'power_indicator_led_word',
+                name_human: 'Power indicator LED',
+                content_character: { character_id: 'power_indicator_led' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: [
+        'microcontroller_mcu_word',
+        'usb_power_entry_word',
+        'reverse_polarity_protection_word',
+        'current_limit_polyfuse_word',
+        'ferrite_emc_bead_word',
+        'power_indicator_led_word',
+      ],
+      boardRole: 'wet_lab_hat',
+    })
+    expect(result.components.some((c) => c.wordId === 'power_indicator_led_series_resistor_word'))
+      .toBe(true)
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('VBUS')).toBe(true)
+    expect(netNames.has('VBUS_REVOK')).toBe(true)
+    expect(netNames.has('LED_CTRL')).toBe(true)
+    const ato = readFileSync(result.mainAtoPath, 'utf8')
+    expect(ato).toMatch(/value = "ATSAMD21G18A-AU"/)
+    expect(ato).toMatch(/reverse_polarity_protection_word\.\w+ ~ VBUS/)
+    expect(ato).toMatch(/PA07/)
+    const ledCtrl = result.nets.find((n) => n.name === 'LED_CTRL')
+    expect(ledCtrl && ledCtrl.members.length >= 2).toBe(true)
   })
 
   it('P4: usb_power_entry never resolves to PinHeader_*', () => {

@@ -49,7 +49,10 @@
       {
         "role": "wet_lab_hat",
         "shapeFamily": "wet_lab_hat",
-        "channelRequirements": []
+        "channelRequirements": [
+          { "role": "pump_channel", "count": 1 },
+          { "role": "stir_channel", "count": 1 }
+        ]
       },
       {
         "role": "od_optics_board",

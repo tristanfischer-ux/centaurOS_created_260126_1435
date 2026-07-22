@@ -66,3 +66,46 @@ export function runTier0FirmwareProof(
     reason: `firmware_proof exit ${r.status ?? 'n/a'}: ${(r.stderr || r.stdout || '').slice(0, 400)}`,
   }
 }
+
+export interface FirmwareTier1CompileResult {
+  ok: boolean
+  skipped: boolean
+  tier: 'tier1_mcu_compile'
+  reason: string
+  toolchain: string | null
+}
+
+/**
+ * @description Honest Tier-1 real-MCU compile probe. Never claims PASS without
+ * arm-none-eabi-gcc (or equivalent) + a generated MCU project. Today the
+ * prototype only ships native Tier-0 — report skipped, not fabricated ok.
+ * @param outDir Directory for tier1-status.json
+ * @returns skipped=true until a real MCU toolchain + project exists
+ */
+export function probeTier1McuCompile(outDir: string): FirmwareTier1CompileResult {
+  fs.mkdirSync(outDir, { recursive: true })
+  const which = spawnSync('which', ['arm-none-eabi-gcc'], { encoding: 'utf8' })
+  const hasToolchain = which.status === 0 && Boolean(which.stdout?.trim())
+  const result: FirmwareTier1CompileResult = hasToolchain
+    ? {
+        ok: false,
+        skipped: true,
+        tier: 'tier1_mcu_compile',
+        reason:
+          'arm-none-eabi-gcc present but no MCU project generator is wired yet — Tier-1 remains ENGINEERING DRAFT',
+        toolchain: which.stdout.trim(),
+      }
+    : {
+        ok: false,
+        skipped: true,
+        tier: 'tier1_mcu_compile',
+        reason:
+          'arm-none-eabi-gcc not on PATH — Tier-1 MCU compile not attempted (native Tier-0 only)',
+        toolchain: null,
+      }
+  fs.writeFileSync(
+    path.join(outDir, 'tier1-status.json'),
+    JSON.stringify(result, null, 2),
+  )
+  return result
+}

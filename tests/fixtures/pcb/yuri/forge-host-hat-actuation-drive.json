@@ -1,0 +1,39 @@
+{
+  "schema": "forge-host-hat-actuation-drive/v1",
+  "sourceKind": "forge_curated_host_hat",
+  "goldConstraint": "Pioreactor heater_20ml @ ca40a91e keeps the resistive FFC daughterboard MOSFET-free; power switching and brushed-DC stir/pump drive live on the host HAT. Pioreactor hats/ submodule is EEPROM utils only — this fixture is ForgeOS engineering topology derived from the published GPIO contract, not a pasted gold HAT BOM.",
+  "gpioContractEvidence": [
+    "https://docs.pioreactor.com/developer-guide/pinout — GPIO18 PWM5 heating; GPIO21 hall; GPIO2/3 I2C; PWM1–4 mapped to stirring/media/waste in config.dev.ini"
+  ],
+  "constituents": [
+    {
+      "role": "heater_pwm_switch",
+      "manufacturer": "Alpha & Omega Semiconductor Inc.",
+      "partNumber": "AO3400A",
+      "package": "SOT-23 N-channel logic-level MOSFET",
+      "placement": "host_hat",
+      "evidence": "Low-side PWM switch for the off-board RES_A/RES_B heater rails carried on the 7-pos FFC; never fitted on heater_20ml gold."
+    },
+    {
+      "role": "stir_motor_driver",
+      "manufacturer": "Texas Instruments",
+      "partNumber": "DRV8876PWPR",
+      "package": "HTSSOP-16",
+      "placement": "host_hat",
+      "evidence": "Brushed-DC H-bridge for stir_channel — excluded from heater_channel by wet-actuation proveCatch."
+    },
+    {
+      "role": "pump_motor_driver",
+      "manufacturer": "Texas Instruments",
+      "partNumber": "DRV8876PWPR",
+      "package": "HTSSOP-16",
+      "placement": "host_hat",
+      "evidence": "Second brushed-DC H-bridge for pump_channel — same IC family, distinct instance."
+    }
+  ],
+  "forbiddenOnHeaterDaughterboard": ["AO3400A", "DRV8876PWPR", "BSS84-7-F"],
+  "notes": [
+    "Flip isHostHatActuationDrivePublished only while this fixture evaluates ok.",
+    "Heater gold topology fixture remains independently honest (powerSwitch off_board_host_hat)."
+  ]
+}

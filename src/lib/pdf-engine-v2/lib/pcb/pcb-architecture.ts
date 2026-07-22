@@ -9,6 +9,7 @@ import { collectElectronicWords } from './pcb-stage'
 
 import type { ElectronicWordRef } from './pcb-stage'
 import { hasOdOpticalFormEvidence } from './pcb-stage'
+import { isHostHatActuationDrivePublished as forgeHostHatDrivePublished } from './pcb-host-hat-actuation-drive'
 
 export type PcbSystemDisposition =
   | 'not_applicable'
@@ -59,15 +60,14 @@ export interface PcbBoardPlan {
 /**
  * @description True when a curated host-HAT drive topology is published for
  * stir/pump (or equivalent culture actuation). Universal — no product name.
- * Today: always false; gold HAT KiCad/BOM is unpublished.
+ * DECISION: Pioreactor gold HAT KiCad stays unpublished; Forge fixture
+ * `forge-host-hat-actuation-drive/v1` is the publication gate (proveCatch).
  */
 export function isHostHatActuationDrivePublished(
   _state: Record<string, unknown> = {},
 ): boolean {
   void _state
-  // GOTCHA: Pioreactor hats/ submodule is EEPROM utils, not drive schematics.
-  // Flip only when a curated topology fixture + evidence lands (CORE FIX + guard).
-  return false
+  return forgeHostHatDrivePublished()
 }
 
 export interface PcbWordAssignment {
@@ -541,10 +541,9 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
         1,
       ),
     })
-    // DECISION (2026-07-21): stir/pump are product needs, not fitted channels,
-    // until host-HAT drive topology is published. Minting count=1 forced fitness
-    // medium-deferral + firmware Goodhart (invented instances). Keep the need in
-    // deferredChannelRequirements for SIGHT / punchlist — never invent DRV8876.
+    // DECISION (2026-07-22): stir/pump drive ICs live on wet_lab_hat (host HAT),
+    // never on heater_20ml. When Forge host-HAT drive fixture publishes, mint
+    // fitted channels on boards[0]; otherwise keep deferred (honest DRAFT).
     const stirNeed = derivedChannelCount(
       state,
       ['stir_channel_count', 'stirrer_count'],
@@ -558,10 +557,11 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
       1,
     )
     if (isHostHatActuationDrivePublished(state)) {
-      boards[2].channelRequirements.push(
+      boards[0].channelRequirements.push(
         { role: 'stir_channel', count: stirNeed },
         { role: 'pump_channel', count: pumpNeed },
       )
+      rationale.push('stir_pump_published_on_host_hat_drive_topology')
     } else {
       boards[2].deferredChannelRequirements = [
         {

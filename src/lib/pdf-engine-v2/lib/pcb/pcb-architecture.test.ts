@@ -147,7 +147,7 @@ describe('derivePcbArchitecture', () => {
     [
       { working_volume_ml: 20 },
       'heater_stir_actuation_board',
-      // GOTCHA: stir/pump are deferredChannelRequirements until HAT drive published
+      // GOTCHA: stir/pump publish on wet_lab_hat (Forge host-HAT drive); actuation keeps heater only
       [{ role: 'heater_channel', count: 1 }],
     ],
     [
@@ -174,23 +174,19 @@ describe('derivePcbArchitecture', () => {
     },
   )
 
-  it('proveCatch: stir/pump deferred until host-HAT drive topology published', () => {
+  it('proveCatch: stir/pump publish on wet_lab_hat when Forge host-HAT drive fixture ok', () => {
     const plan = derivePcbArchitecture(stateWithQuantities({ working_volume_ml: 20 }))
+    const hat = plan.boards.find((item) => item.role === 'wet_lab_hat')
     const actuation = plan.boards.find((item) => item.role === 'heater_stir_actuation_board')
     expect(actuation?.channelRequirements).toEqual([{ role: 'heater_channel', count: 1 }])
-    expect(actuation?.deferredChannelRequirements).toEqual([
-      {
-        role: 'stir_channel',
-        count: 1,
-        reason: 'blocked_until_host_hat_drive_topology_published',
-      },
-      {
-        role: 'pump_channel',
-        count: 1,
-        reason: 'blocked_until_host_hat_drive_topology_published',
-      },
-    ])
-    expect(plan.rationale).toContain('stir_pump_deferred_until_host_hat_drive_topology_published')
+    expect(actuation?.deferredChannelRequirements ?? []).toEqual([])
+    expect(hat?.channelRequirements).toEqual(
+      expect.arrayContaining([
+        { role: 'stir_channel', count: 1 },
+        { role: 'pump_channel', count: 1 },
+      ]),
+    )
+    expect(plan.rationale).toContain('stir_pump_published_on_host_hat_drive_topology')
   })
 
   it('proveCatch: culture boards declare mounting-hole phenotypes (HAT 4 / OD 2 / actuation 4)', () => {

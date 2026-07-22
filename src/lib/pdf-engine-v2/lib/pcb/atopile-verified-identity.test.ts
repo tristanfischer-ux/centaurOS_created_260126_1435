@@ -141,9 +141,13 @@ describe('Atopile verified identity integration', () => {
       resolutionTier: 'package_family',
       identityBlocker: expect.stringContaining('no curated role-compatible candidate'),
     })
+    // INTENT: curated BSS84 pinout wins over generic Q_PMOS_GSD once the
+    // reverse-polarity MOSFET is in pcb-manufacturer-pinouts (adversarial pack).
     expect(reversePolarity).toMatchObject({
       identityVerified: true,
-      symbolId: 'Transistor_FET:Q_PMOS_GSD',
+      partNumber: 'BSS84-7-F',
+      symbolId: 'Forge_Manufacturer:BSS84-7-F',
+      designatorPrefix: 'Q',
       pins: ['G__1', 'S__2', 'D__3'],
       powerPin: null,
       groundPin: null,
