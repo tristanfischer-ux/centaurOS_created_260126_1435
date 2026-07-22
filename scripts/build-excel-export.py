@@ -34383,12 +34383,13 @@ def _selftest() -> int:
     except Exception as _e:
         print(f"  FAIL tab_inputs_assumptions proveCatch: raised {_e!r}"); bad += 1
 
-    # ── proveCatch _write_deliverable_bundle (2026-07-22) ─────────────────────────
+    # ── proveCatch _write_deliverable_bundle (2026-07-22, updated layout) ────────
     # Synthetic run dir with dossier.xlsx + render PNGs + drawing PDF + 3-board PCB
     # files + firmware-proof tree.
     # Asserts: folder + zip created, zip arcnames are relative (no '/Users/'),
     # all 3 boards' gerber sub-dirs present, MANIFEST.txt present,
-    # firmware source files land in pcb/firmware/ (relative arcname in zip),
+    # firmware lands at TOP-LEVEL firmware/ (NOT under pcb/), README.txt exists,
+    # mcu-bringup/main.c exists, boards/<boardId>/proof_main.c exists,
     # compiled binaries (proof_native, *.o) are excluded.
     import shutil as _sh_db, tempfile as _tf_db, zipfile as _zf_db, pathlib as _pl_db
     _db_td = _tf_db.mkdtemp(prefix="forge_db_selftest_")
@@ -34469,20 +34470,47 @@ def _selftest() -> int:
         # Assert MANIFEST.txt present
         if not (_db_dir / "MANIFEST.txt").exists():
             print("  FAIL _write_deliverable_bundle: MANIFEST.txt not in bundle"); bad += 1
-        # Assert firmware source files land in the correct locations:
-        #   pcb/<board>/firmware/ for per-peripheral proof (subdir name matches board)
-        #   pcb/firmware-mcu/    for shared _tier1 MCU project
-        _fw_proof_main = _db_dir / "pcb" / "wet_lab_hat" / "firmware" / "proof_main.c"
-        if not _fw_proof_main.exists():
-            print(f"  FAIL _write_deliverable_bundle: firmware peripheral proof_main.c missing from pcb/wet_lab_hat/firmware/ at {_fw_proof_main}"); bad += 1
-        _fw_mcu_main = _db_dir / "pcb" / "firmware-mcu" / "mcu-project" / "main.c"
+        # Assert firmware lands at TOP-LEVEL firmware/ (NOT under pcb/)
+        _fw_readme = _db_dir / "firmware" / "README.txt"
+        if not _fw_readme.exists():
+            print(f"  FAIL _write_deliverable_bundle: firmware/README.txt missing at {_fw_readme}"); bad += 1
+        else:
+            _fw_readme_content = _fw_readme.read_text(encoding="utf-8")
+            if "VIRTUAL BRING-UP" not in _fw_readme_content:
+                print("  FAIL _write_deliverable_bundle: firmware/README.txt missing VIRTUAL BRING-UP honesty text"); bad += 1
+            if "UNPROVEN IN HARDWARE" not in _fw_readme_content:
+                print("  FAIL _write_deliverable_bundle: firmware/README.txt missing UNPROVEN IN HARDWARE honesty text"); bad += 1
+            # README must warn against FUNCTIONALLY VERIFIED — it's allowed to SAY "never
+            # claim FUNCTIONALLY VERIFIED" (that IS the warning), but must not ASSERT it.
+            # Check: the word "NEVER" should precede any occurrence of FUNCTIONALLY VERIFIED.
+            import re as _re_fw
+            _fv_matches = list(_re_fw.finditer(r"FUNCTIONALLY VERIFIED", _fw_readme_content))
+            for _fvm in _fv_matches:
+                _fv_ctx = _fw_readme_content[max(0, _fvm.start() - 30):_fvm.start()]
+                if "NEVER" not in _fv_ctx and "must not" not in _fv_ctx.lower() and "never" not in _fv_ctx.lower():
+                    print("  FAIL _write_deliverable_bundle: firmware/README.txt claims FUNCTIONALLY VERIFIED without 'NEVER' guard"); bad += 1
+                    break
+        _fw_mcu_main = _db_dir / "firmware" / "mcu-bringup" / "mcu-project" / "main.c"
         if not _fw_mcu_main.exists():
-            print(f"  FAIL _write_deliverable_bundle: firmware-mcu main.c missing from pcb/firmware-mcu/ at {_fw_mcu_main}"); bad += 1
+            print(f"  FAIL _write_deliverable_bundle: firmware/mcu-bringup/main.c missing at {_fw_mcu_main}"); bad += 1
+        _fw_board_proof = _db_dir / "firmware" / "boards" / "wet_lab_hat" / "proof_main.c"
+        if not _fw_board_proof.exists():
+            print(f"  FAIL _write_deliverable_bundle: firmware/boards/wet_lab_hat/proof_main.c missing at {_fw_board_proof}"); bad += 1
+        # Assert firmware is NOT under pcb/ (the old layout that Tristan rejected)
+        _fw_old_pcb_board = _db_dir / "pcb" / "wet_lab_hat" / "firmware"
+        if _fw_old_pcb_board.exists():
+            print(f"  FAIL _write_deliverable_bundle: firmware MUST NOT appear under pcb/<board>/firmware/ — found {_fw_old_pcb_board}"); bad += 1
+        _fw_old_pcb_mcu = _db_dir / "pcb" / "firmware-mcu"
+        if _fw_old_pcb_mcu.exists():
+            print(f"  FAIL _write_deliverable_bundle: firmware MUST NOT appear under pcb/firmware-mcu/ — found {_fw_old_pcb_mcu}"); bad += 1
+        _fw_old_pcb_other = _db_dir / "pcb" / "firmware-other"
+        if _fw_old_pcb_other.exists():
+            print(f"  FAIL _write_deliverable_bundle: firmware MUST NOT appear under pcb/firmware-other/ — found {_fw_old_pcb_other}"); bad += 1
         # Assert compiled binaries are EXCLUDED from bundle folder
-        _fw_excl_bin = _db_dir / "pcb" / "wet_lab_hat" / "firmware" / "proof_native"
+        _fw_excl_bin = _db_dir / "firmware" / "boards" / "wet_lab_hat" / "proof_native"
         if _fw_excl_bin.exists():
             print("  FAIL _write_deliverable_bundle: proof_native binary should be excluded but was copied"); bad += 1
-        _fw_excl_obj = _db_dir / "pcb" / "firmware-mcu" / "mcu-project" / "main.o"
+        _fw_excl_obj = _db_dir / "firmware" / "mcu-bringup" / "mcu-project" / "main.o"
         if _fw_excl_obj.exists():
             print("  FAIL _write_deliverable_bundle: main.o object file should be excluded but was copied"); bad += 1
         # Assert zip has no absolute paths (no '/Users/' prefix in arcnames)
@@ -34492,35 +34520,45 @@ def _selftest() -> int:
                 _abs_names = [n for n in _zip_names if n.startswith("/") or "Users" in n]
                 if _abs_names:
                     print(f"  FAIL _write_deliverable_bundle: absolute arcnames in zip: {_abs_names[:3]}"); bad += 1
-                # Assert all 3 boards represented in zip
+                # Assert all 3 boards represented in zip under pcb/
                 for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
                     _board_entries = [n for n in _zip_names
                                       if _bname in n and n.startswith(f"{_slug}-deliverable/pcb/")]
                     if not _board_entries:
-                        print(f"  FAIL _write_deliverable_bundle: zip has no entries for board {_bname}"); bad += 1
-                # Assert per-peripheral firmware lands under pcb/<board>/firmware/ in zip
-                _fw_periph_zip = [n for n in _zip_names
-                                  if "wet_lab_hat/firmware/proof_main.c" in n]
-                if not _fw_periph_zip:
-                    print("  FAIL _write_deliverable_bundle: firmware proof_main.c not found under pcb/wet_lab_hat/firmware/ in zip"); bad += 1
-                else:
-                    _fw_arc = _fw_periph_zip[0]
-                    if _fw_arc.startswith("/") or "/Users/" in _fw_arc:
-                        print(f"  FAIL _write_deliverable_bundle: firmware zip arcname is absolute: {_fw_arc}"); bad += 1
-                    if not _fw_arc.startswith(f"{_slug}-deliverable/pcb/wet_lab_hat/firmware/"):
-                        print(f"  FAIL _write_deliverable_bundle: firmware arcname not under pcb/wet_lab_hat/firmware/: {_fw_arc}"); bad += 1
-                # Assert shared MCU project lands under pcb/firmware-mcu/ in zip
-                _fw_mcu_zip = [n for n in _zip_names if "firmware-mcu" in n and "main.c" in n]
+                        print(f"  FAIL _write_deliverable_bundle: zip has no pcb/ entries for board {_bname}"); bad += 1
+                # Assert firmware/mcu-bringup/main.c lands at pack root (top-level firmware/)
+                _fw_mcu_zip = [n for n in _zip_names
+                               if "firmware/mcu-bringup" in n and "main.c" in n]
                 if not _fw_mcu_zip:
-                    print("  FAIL _write_deliverable_bundle: firmware-mcu main.c not found in zip"); bad += 1
+                    print("  FAIL _write_deliverable_bundle: firmware/mcu-bringup/main.c not found in zip"); bad += 1
                 else:
                     _fw_mcu_arc = _fw_mcu_zip[0]
-                    if not _fw_mcu_arc.startswith(f"{_slug}-deliverable/pcb/firmware-mcu/"):
-                        print(f"  FAIL _write_deliverable_bundle: firmware-mcu arcname not under pcb/firmware-mcu/: {_fw_mcu_arc}"); bad += 1
+                    if _fw_mcu_arc.startswith("/") or "/Users/" in _fw_mcu_arc:
+                        print(f"  FAIL _write_deliverable_bundle: firmware zip arcname is absolute: {_fw_mcu_arc}"); bad += 1
+                    if not _fw_mcu_arc.startswith(f"{_slug}-deliverable/firmware/mcu-bringup/"):
+                        print(f"  FAIL _write_deliverable_bundle: mcu-bringup arcname not under firmware/mcu-bringup/: {_fw_mcu_arc}"); bad += 1
+                # Assert per-board proof lands under firmware/boards/<boardId>/
+                _fw_board_zip = [n for n in _zip_names
+                                 if "firmware/boards/wet_lab_hat/proof_main.c" in n]
+                if not _fw_board_zip:
+                    print("  FAIL _write_deliverable_bundle: firmware/boards/wet_lab_hat/proof_main.c not found in zip"); bad += 1
+                else:
+                    _fw_board_arc = _fw_board_zip[0]
+                    if not _fw_board_arc.startswith(f"{_slug}-deliverable/firmware/boards/wet_lab_hat/"):
+                        print(f"  FAIL _write_deliverable_bundle: board proof arcname not under firmware/boards/wet_lab_hat/: {_fw_board_arc}"); bad += 1
+                # Assert firmware is NOT under pcb/ in the zip
+                _fw_under_pcb = [n for n in _zip_names
+                                 if "/pcb/" in n and ("/firmware/" in n or "firmware-mcu" in n or "firmware-other" in n)]
+                if _fw_under_pcb:
+                    print(f"  FAIL _write_deliverable_bundle: firmware MUST NOT appear under pcb/ in zip: {_fw_under_pcb[:3]}"); bad += 1
                 # Assert compiled binaries are excluded from zip
                 _fw_bin_in_zip = [n for n in _zip_names if "proof_native" in n or n.endswith(".o")]
                 if _fw_bin_in_zip:
                     print(f"  FAIL _write_deliverable_bundle: binaries/objects should be excluded from zip: {_fw_bin_in_zip[:3]}"); bad += 1
+                # Assert firmware/README.txt is present in the zip
+                _fw_readme_zip = [n for n in _zip_names if n.endswith("firmware/README.txt")]
+                if not _fw_readme_zip:
+                    print("  FAIL _write_deliverable_bundle: firmware/README.txt not found in zip"); bad += 1
         if _db_res is None:
             print("  FAIL _write_deliverable_bundle: returned None (expected dict with paths)"); bad += 1
     except Exception as _dbe:
@@ -34649,17 +34687,21 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             if os.path.exists(_drc):
                 _cp(_drc, f"pcb/{_board}/drc-report.json")
 
-    # ── 3. PCB FIRMWARE ───────────────────────────────────────────────────────
-    # Discovers <run>/pcb-project/*/firmware-proof/ trees and groups firmware WITH
-    # its board so a recipient opens one folder per board and finds everything together.
+    # ── 3. FIRMWARE (TOP-LEVEL) ───────────────────────────────────────────────
+    # Discovers <run>/pcb-project/*/firmware-proof/ trees and places firmware in a
+    # TOP-LEVEL firmware/ directory (sibling of pcb/, NOT under it) so it reads as
+    # product software rather than PCB junk.
     #
     # Layout inside the bundle:
-    #   pcb/<board>/firmware/<files>   — per-peripheral proof files whose subdir name
-    #                                    matches a board dir name in pcb-boards/
-    #   pcb/firmware-mcu/<files>       — shared _tier1/ MCU project (cross-board)
-    #   pcb/firmware-other/<name>/...  — peripheral subdirs that don't match any board
-    #                                    (fallback so nothing is silently dropped)
+    #   firmware/README.txt            — honesty note: VIRTUAL BRING-UP — UNPROVEN IN HARDWARE
+    #   firmware/mcu-bringup/          — shared _tier1 MCU project (main.c, pinmap.h,
+    #                                    virt_i2c.*, startup.S, link.ld, Makefile, ELFs,
+    #                                    tier1-status.json) + _tier2/_tier3 transcripts/status
+    #   firmware/boards/<boardId>/     — per-board Tier-0 proof files (proof_main.c,
+    #                                    proof_config.h, proof-spec.json, proof-result.json,
+    #                                    transcript.txt, compile.log) — NOT proof_native/*.o
     #
+    # Gerbers/drill/positions/kicad STAY under pcb/<board>/ (unchanged).
     # Excludes compiled binaries (proof_native) and intermediate object files (*.o).
     _FIRMWARE_SKIP_NAMES = {"proof_native"}  # exact filenames to skip
     _FIRMWARE_SKIP_EXTS = {".o"}             # extensions to skip
@@ -34673,6 +34715,37 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
 
     _fw_roots = sorted(_glob.glob(os.path.join(run_dir, "pcb-project", "*", "firmware-proof")))
     if _fw_roots:
+        # Write firmware/README.txt — honesty ceiling paragraph
+        _fw_readme_text = (
+            "FIRMWARE BRING-UP PROOFS\n"
+            "========================\n"
+            "\n"
+            "This folder contains the virtual bring-up proofs generated by ForgeOS for\n"
+            "each board in this design. The proofs demonstrate that the firmware compiles\n"
+            "cleanly and satisfies the pin/bus/channel contract (Tier 0) and, where\n"
+            "present, that the MCU project builds and simulates under QEMU (Tier 1/2/3).\n"
+            "\n"
+            "HONESTY CEILING — READ BEFORE FORWARDING:\n"
+            "This is a VIRTUAL BRING-UP PASS only. The firmware has NEVER been run on\n"
+            "physical hardware. It is FAB-READY — UNPROVEN IN HARDWARE and must NEVER\n"
+            "be described as FUNCTIONALLY VERIFIED. Hardware-in-the-loop (HIL) testing\n"
+            "on the populated PCB is required before any functional verification claim\n"
+            "can be made. If you are emailing this pack to a manufacturer or investor,\n"
+            "make clear that the firmware proof is simulation-only.\n"
+            "\n"
+            "FOLDER LAYOUT:\n"
+            "  mcu-bringup/           Shared MCU project: sources, ELFs, tier status\n"
+            "  boards/<boardId>/      Per-board Tier-0 proof: C source + compile log\n"
+        )
+        _fw_readme_dest = os.path.join(bundle_dir, "firmware", "README.txt")
+        os.makedirs(os.path.dirname(_fw_readme_dest), exist_ok=True)
+        try:
+            with open(_fw_readme_dest, "w", encoding="utf-8") as _fwr:
+                _fwr.write(_fw_readme_text)
+            included.append("firmware/README.txt")
+        except Exception as _fwe:  # noqa: BLE001
+            skipped.append(f"firmware/README.txt ({_fwe})")
+
         for _fw_root in _fw_roots:
             # Walk each immediate child of firmware-proof/
             try:
@@ -34683,8 +34756,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 _fw_child_path = os.path.join(_fw_root, _fw_child)
                 if not os.path.isdir(_fw_child_path):
                     continue  # firmware-proof/ top-level files (rare) — skip
-                if _fw_child == "_tier1":
-                    # Shared cross-board MCU project → pcb/firmware-mcu/
+                if _fw_child in ("_tier1", "_tier2", "_tier3"):
+                    # Shared MCU project + simulation transcripts → firmware/mcu-bringup/
                     for _fw_dp, _fw_sd, _fw_fs in os.walk(_fw_child_path):
                         _fw_sd.sort()
                         for _fw_fn in sorted(_fw_fs):
@@ -34694,9 +34767,9 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                                 continue
                             _fw_abs = os.path.join(_fw_dp, _fw_fn)
                             _fw_rel = os.path.relpath(_fw_abs, _fw_child_path)
-                            _cp(_fw_abs, f"pcb/firmware-mcu/{_fw_rel}")
+                            _cp(_fw_abs, f"firmware/mcu-bringup/{_fw_rel}")
                 elif _fw_child in _known_boards:
-                    # Per-peripheral proof — group WITH the matching board
+                    # Per-board Tier-0 proof → firmware/boards/<boardId>/
                     for _fw_dp, _fw_sd, _fw_fs in os.walk(_fw_child_path):
                         _fw_sd.sort()
                         for _fw_fn in sorted(_fw_fs):
@@ -34706,9 +34779,10 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                                 continue
                             _fw_abs = os.path.join(_fw_dp, _fw_fn)
                             _fw_rel = os.path.relpath(_fw_abs, _fw_child_path)
-                            _cp(_fw_abs, f"pcb/{_fw_child}/firmware/{_fw_rel}")
+                            _cp(_fw_abs, f"firmware/boards/{_fw_child}/{_fw_rel}")
                 else:
-                    # Unknown peripheral subdir — fallback so nothing is silently dropped
+                    # Unknown peripheral subdir — fallback under firmware/boards/ so
+                    # nothing is silently dropped
                     for _fw_dp, _fw_sd, _fw_fs in os.walk(_fw_child_path):
                         _fw_sd.sort()
                         for _fw_fn in sorted(_fw_fs):
@@ -34718,11 +34792,10 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                                 continue
                             _fw_abs = os.path.join(_fw_dp, _fw_fn)
                             _fw_rel = os.path.relpath(_fw_abs, _fw_child_path)
-                            _cp(_fw_abs, f"pcb/firmware-other/{_fw_child}/{_fw_rel}")
+                            _cp(_fw_abs, f"firmware/boards/{_fw_child}/{_fw_rel}")
     else:
         skipped.append(
-            "pcb/*/firmware/ + pcb/firmware-mcu/"
-            " (no firmware-proof dir — PCB_STAGE may be off or firmware proof did not run)"
+            "firmware/ (no firmware-proof dir — PCB_STAGE may be off or firmware proof did not run)"
         )
 
     # ── 5. RENDERS ─────────────────────────────────────────────────────────────
@@ -34788,23 +34861,31 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 _desc = "Pick-and-place position file"
             elif _rel.endswith("drc-report.json"):
                 _desc = "DRC report (0 violations = clean)"
-            elif "/firmware/" in _rel or _rel.startswith("pcb/firmware-mcu/") or _rel.startswith("pcb/firmware-other/"):
-                if _base == "proof_main.c":
-                    _desc = "Per-peripheral bring-up firmware proof (C source)"
+            elif _rel.startswith("firmware/"):
+                if _base == "README.txt":
+                    _desc = "Firmware bring-up honesty note (VIRTUAL BRING-UP — UNPROVEN IN HARDWARE)"
+                elif _base == "proof_main.c":
+                    _desc = "Per-board Tier-0 bring-up proof (C source)"
+                elif _base == "proof_config.h":
+                    _desc = "Per-board Tier-0 proof configuration header"
                 elif _base == "transcript.txt":
-                    _desc = "Firmware proof run transcript"
+                    _desc = "Firmware proof run transcript (QEMU / compile)"
                 elif _base.endswith(".elf"):
-                    _desc = "Compiled firmware proof ELF (ARM Cortex-M)"
+                    _desc = "Compiled firmware proof ELF (ARM Cortex-M — VIRTUAL, not HIL)"
                 elif _base == "Makefile":
                     _desc = "Firmware build makefile"
                 elif _base in ("virt_i2c.c", "virt_i2c.h"):
-                    _desc = "Virtual I2C device model (QEMU sim)"
+                    _desc = "Virtual I2C device model (QEMU simulation)"
                 elif _base in ("proof-spec.json", "proof-result.json"):
                     _desc = "Firmware proof specification / result"
                 elif _base == "tier1-status.json":
                     _desc = "Tier-1 MCU integration status"
+                elif _base in ("tier2-status.json", "tier3-status.json"):
+                    _desc = "Tier-2/3 MCU simulation status"
+                elif _base == "compile.log":
+                    _desc = "Firmware compile log"
                 else:
-                    _desc = "PCB firmware source/proof file"
+                    _desc = "Firmware source / proof file (VIRTUAL BRING-UP)"
         _manifest_lines.append(f"  {_rel:<50}  {_desc}")
     if skipped:
         _manifest_lines += [
