@@ -17850,6 +17850,52 @@ def _pcb_write_fab_zip(run_dir: str, pipeline: dict) -> Optional[str]:
 _PCB_ASSESS_CACHE: dict = {}
 
 
+def _gerbers_present_on_disk(gerbers: dict) -> bool:
+    """HONEST Gerber check (Terminal 2026-07-22): a stamped `pipeline.gerbers.files`
+    field is worthless unless the files ACTUALLY exist on disk. A stamped-but-empty or
+    stale-path field must never let the PCB tab read 'Gerbers complete / FAB-READY'.
+    True iff ≥1 real Gerber layer file exists on disk — a listed file, or a *.g* / *.gbr
+    in the stamped dir. Universal, no per-board table; pure filesystem read."""
+    if not isinstance(gerbers, dict):
+        return False
+    for f in (gerbers.get("files") or []):
+        if isinstance(f, str) and os.path.exists(f):
+            return True
+    d = gerbers.get("dir")
+    if isinstance(d, str) and os.path.isdir(d):
+        import glob as _glob
+        return bool(_glob.glob(os.path.join(d, "*.g*")) or _glob.glob(os.path.join(d, "*.gbr")))
+    return False
+
+
+def _pcb_channel_coverage_gaps(pcb: dict) -> Tuple[int, List[str]]:
+    """PER-PERIPHERAL channel-coverage honesty gate (Terminal 2026-07-22, per Tristan).
+    The board set must IMPLEMENT every functional channel the architecture REQUIRES.
+    REQUIRED = union of `architecture.boards[].channelRequirements` ({role,count}), the
+    pipeline's OWN authoritative field; IMPLEMENTED = `pcb.implementedChannels` ({role:n}).
+    A required channel with fewer implemented than required (e.g. a stir/pump channel the
+    design needs but the generator deferred) is a per-peripheral coverage gap → the board
+    is PARTIAL, not FAB-READY. Returns (gap_count, ["role have/need", ...]). Universal —
+    reads pipeline fields, no per-class table, no pcb/* edit. Forward-compatible: if the
+    pipeline later exposes a richer `requiredChannels` map it can be merged here."""
+    arch = pcb.get("architecture") if isinstance(pcb.get("architecture"), dict) else {}
+    impl = pcb.get("implementedChannels") if isinstance(pcb.get("implementedChannels"), dict) else {}
+    req: Dict[str, int] = {}
+    for b in (arch.get("boards") or []):
+        if not isinstance(b, dict):
+            continue
+        for cr in (b.get("channelRequirements") or []):
+            if isinstance(cr, dict) and cr.get("role"):
+                req[str(cr["role"])] = req.get(str(cr["role"]), 0) + int(cr.get("count") or 1)
+    gaps, detail = 0, []
+    for role, need in req.items():
+        have = int(impl.get(role) or 0)
+        if have < need:
+            gaps += 1
+            detail.append(f"{role} {have}/{need}")
+    return gaps, detail
+
+
 def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     """ONE computation shared by tab_pcb() (render) and _sc_pcb() (score) so the tab's
     banner/tables and its score can never diverge (mirrors the file-wide 'two never
@@ -17868,7 +17914,9 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     drc_ok = bool(drc.get("ran")) and drc.get("violations") == 0
     unrouted = pipeline.get("unroutedAfterFreerouting")
     routed_ok = bool(pipeline.get("routed")) and (unrouted in (0, None))
-    gerbers_ok = bool(gerbers.get("files"))
+    # HONEST Gerber gate (Terminal 2026-07-22): the stamped file list must map to files
+    # that ACTUALLY exist on disk — a stamped-but-empty/stale field can never read fab-ready.
+    gerbers_ok = _gerbers_present_on_disk(gerbers)
     pipeline_ok = bool(pipeline.get("ok"))
 
     drc_rows: List[Tuple[str, str, str]] = []
@@ -17975,6 +18023,11 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     # P5: architecture needs N KiCad deliverables but chain emitted one merged project.
     if pcb.get("multiBoardMerged") is True:
         _n_arch_gaps += 1
+    # CHANNEL-COVERAGE honesty gate (Terminal 2026-07-22): a functional channel the design
+    # REQUIRES but the board set did NOT implement (required count > implemented) is a
+    # per-peripheral structural gap — same severity as an empty required board → not FAB-READY.
+    _n_channel_gaps, _channel_gap_detail = _pcb_channel_coverage_gaps(pcb)
+    _n_arch_gaps += _n_channel_gaps
     _fw = pcb.get("firmwareProof") if isinstance(pcb.get("firmwareProof"), dict) else None
     # P9b: chain writes both `ok` and `allOk` (alias); accept either. None = never run.
     _fw_ok = None
@@ -18024,6 +18077,7 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         "pipeline": pipeline, "drc": drc, "gen": gen,
         "drc_ok": drc_ok, "routed_ok": routed_ok, "gerbers_ok": gerbers_ok,
         "pipeline_ok": pipeline_ok,
+        "channel_gaps": _n_channel_gaps, "channel_gap_detail": _channel_gap_detail,
         "readiness": readiness, "readiness_why": readiness_why,
         "drc_violation_rows": drc_rows, "drc_unconnected_n": unconnected_n,
         "drc_report": drc_report, "drc_ignored_rows": drc_ignored_rows,
@@ -33163,6 +33217,11 @@ def _selftest() -> int:
     _p5_td = _tempfile_p5.mkdtemp(prefix="pcb-p5-merge-")
     try:
         _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        # gerbers must exist ON DISK now (gate #1 2026-07-22) — write a real one so this
+        # fixture still exercises the MERGE gap, not the gerber-existence gate.
+        _p5_gbr = os.path.join(_p5_td, "board-routed-F_Cu.gbr")
+        with open(_p5_gbr, "w") as _f5:
+            _f5.write("G04 synthetic gerber*\n")
         _p5_pcb = {
             "isPcbBearing": True,
             "disposition": "bespoke",
@@ -33174,7 +33233,7 @@ def _selftest() -> int:
                 "routed": True,
                 "unroutedAfterFreerouting": 0,
                 "drc": {"ran": True, "violations": 0},
-                "gerbers": {"files": ["synthetic.gbr"]},
+                "gerbers": {"dir": _p5_td, "files": [_p5_gbr]},
                 "drill": {"files": []},
                 "pos": {},
                 "generator": {
@@ -33203,6 +33262,45 @@ def _selftest() -> int:
     finally:
         _PCB_ASSESS_CACHE.pop(_p5_td, None)
         _shutil_p5.rmtree(_p5_td, ignore_errors=True)
+    # ── GATE #1 proveCatch (Terminal 2026-07-22): Gerber-existence-on-disk ──────────
+    # A stamped `files` list whose paths do NOT exist on disk must read gerbers_ok=False
+    # (→ FAIL), a real file on disk reads True, and a dir with a *.g* reads True.
+    import tempfile as _tf_g
+    import shutil as _sh_g
+    _g_td = _tf_g.mkdtemp(prefix="pcb-gerber-disk-")
+    try:
+        if _gerbers_present_on_disk({"files": [os.path.join(_g_td, "nope.gbr")]}):
+            print("  FAIL gate1: a stamped-but-missing gerber path must read NOT-present"); bad += 1
+        if _gerbers_present_on_disk({"files": []}):
+            print("  FAIL gate1: an empty gerbers field must read NOT-present"); bad += 1
+        _real_gbr = os.path.join(_g_td, "board-routed-F_Cu.gbr")
+        with open(_real_gbr, "w") as _fg:
+            _fg.write("G04*\n")
+        if not _gerbers_present_on_disk({"files": [_real_gbr]}):
+            print("  FAIL gate1: a real on-disk gerber file must read present"); bad += 1
+        if not _gerbers_present_on_disk({"dir": _g_td, "files": ["stale.gbr"]}):
+            print("  FAIL gate1: a dir containing a *.gbr must read present even if files[] is stale"); bad += 1
+    finally:
+        _sh_g.rmtree(_g_td, ignore_errors=True)
+    # ── GATE #2 proveCatch (Terminal 2026-07-22): per-peripheral channel coverage ───
+    # required od+heater, both implemented → 0 gaps; a required stir channel with no
+    # implemented count → 1 gap with "stir_channel 0/1" detail; no requirements → 0.
+    _cc_full = {"architecture": {"boards": [
+        {"channelRequirements": [{"role": "od_measurement_channel", "count": 1}]},
+        {"channelRequirements": [{"role": "heater_channel", "count": 1}]}]},
+        "implementedChannels": {"od_measurement_channel": 1, "heater_channel": 1}}
+    _ccn, _ccd = _pcb_channel_coverage_gaps(_cc_full)
+    if _ccn != 0:
+        print(f"  FAIL gate2: fully-covered channels must report 0 gaps, got {_ccn} {_ccd}"); bad += 1
+    _cc_short = {"architecture": {"boards": [
+        {"channelRequirements": [{"role": "od_measurement_channel", "count": 1},
+                                 {"role": "stir_channel", "count": 1}]}]},
+        "implementedChannels": {"od_measurement_channel": 1}}
+    _ccn2, _ccd2 = _pcb_channel_coverage_gaps(_cc_short)
+    if not (_ccn2 == 1 and any("stir_channel 0/1" in d for d in _ccd2)):
+        print(f"  FAIL gate2: an unimplemented required stir channel must be 1 gap 'stir_channel 0/1', got {_ccn2} {_ccd2}"); bad += 1
+    if _pcb_channel_coverage_gaps({"architecture": {"boards": []}, "implementedChannels": {}})[0] != 0:
+        print("  FAIL gate2: no channel requirements must report 0 gaps (no fabricated gap)"); bad += 1
     if _pcb_effective_tier({"resolutionTier": "package_family",
                             "partNumber": "TLC5916IDR",
                             "manufacturer": "Texas Instruments"}) != "mpn_package":
