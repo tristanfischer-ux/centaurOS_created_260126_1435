@@ -16987,11 +16987,19 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         _post_zs_lo.append(float(_pxyz[2]) - _phh)
         _post_zs_hi.append(float(_pxyz[2]) + _phh)
     if _post_xs:
-        _post_bbox_w = max(_post_xs) - min(_post_xs)
-        _post_bbox_d = max(_post_ys) - min(_post_ys)
+        # ASYMMETRIC-BBOX FIX (council, 2026-07-22): origin-centred shell must extend
+        # to the FURTHEST placed part on each axis, not just half the span.
+        # OLD (buggy): half-width = span/2  → misses asymmetric offsets (x_max > |x_min|).
+        # NEW: per-axis half-extent = max(|axis_min|, |axis_max|) + clearance.
+        # This is the half-extent of the origin-centred box that contains the furthest point.
+        # For the organoid 2335 bake (x_min=-157.2, x_max=+177.4):
+        #   OLD half_x = 334.6/2 = 167.3 → shell extends to ±167.3 but parts reach +177.4 ✗
+        #   NEW half_x = max(157.2, 177.4) = 177.4 → shell extends to ±(177.4+6) = ±183.4 ✓
+        _post_half_x = max(abs(min(_post_xs)), abs(max(_post_xs)))
+        _post_half_y = max(abs(min(_post_ys)), abs(max(_post_ys)))
         _post_bbox_h = max(_post_zs_hi) - min(_post_zs_lo)
-        _post_need_W = max(W, _post_bbox_w + 2 * _post_clr)
-        _post_need_D = max(D, _post_bbox_d + 2 * _post_clr)
+        _post_need_W = max(W, 2 * (_post_half_x + _post_clr))
+        _post_need_D = max(D, 2 * (_post_half_y + _post_clr))
         _post_need_H = max(H, _post_bbox_h + 2 * _post_clr)
         # UNBOUNDED-GROWTH GUARD (council risk #2): instrument / benchtop devices
         # (enclosure < 1 m³) must not silently grow to comical dimensions. A part
@@ -17012,11 +17020,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 )
         if (_post_need_W > W + 0.5 or _post_need_D > D + 0.5 or _post_need_H > H + 0.5):
             print(
-                f"[univ][sealed][post-placement resize] placed bbox "
-                f"{_post_bbox_w:.0f}×{_post_bbox_d:.0f}×{_post_bbox_h:.0f} mm "
-                f"exceeds pre-estimate {W:.0f}×{D:.0f}×{H:.0f} mm — "
-                f"resizing shell to {_post_need_W:.0f}×{_post_need_D:.0f}×{_post_need_H:.0f} mm "
-                f"(placed_bbox + 2×{_post_clr:.0f}mm clearance); "
+                f"[univ][sealed][post-placement resize] half-extents "
+                f"x=±{_post_half_x:.1f} y=±{_post_half_y:.1f} h={_post_bbox_h:.0f} mm "
+                f"(asymmetric bbox fix: half=max(|min|,|max|)+clr per axis); "
+                f"pre-estimate {W:.0f}×{D:.0f}×{H:.0f} mm → "
+                f"shell {_post_need_W:.0f}×{_post_need_D:.0f}×{_post_need_H:.0f} mm; "
                 f"shell mesh built from FINAL env (REORDER council fix #2)",
                 flush=True,
             )
