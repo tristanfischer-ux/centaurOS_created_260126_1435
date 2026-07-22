@@ -276,6 +276,45 @@ _NONWETTED_NOUN = re.compile(
     r"structur|building|\bduct\b|\bfan\b|blower|\bahu\b|hvac|controller|\bplc\b|gauge|light|ladder|"
     r"platform|walkway|sign|sensor|monitor|alarm|button|interlock|relay|probe", re.I)
 
+# Electronic catalogue parts NEVER carry a plumbing MoC regardless of the plant fluid service.
+# INTENT: a PCB pin header, connector, or IC matched '_WETTED_NOUN' via 'header' (a pipe/manifold
+# header noun) or via 'filter' / 'steril' — returning a WRAS water-plumbing MoC on an electronic
+# component is physically absurd. Keyed on catalogue electronic nouns only; not per-class.
+# Checked BEFORE _WETTED_NOUN so a false-match there never overwrites the electronic exclusion.
+_ELECTRONIC_NOUN = re.compile(
+    # Bare 'header' is intentionally EXCLUDED — it also means a pipe/manifold header in
+    # plumbing contexts.  Electronic pin-headers are caught via 'pin header', 'debug' (for
+    # 'Debug Header'), or 'connector' (for generic connector/header components).
+    r"\bconnector\b|\bpin\s*header\b|\bdebug\b"
+    r"|\bpcb\b|\bpwb\b|\bpcba\b"
+    r"|\bmicrocontroll|\bmicroprocess|\bfpga\b|\bcpld\b"
+    r"|\b(?:ic|mcu|mpu|soc|dsp|adc|dac)\b"
+    r"|\bfirmware\b|\beeprom\b|\bflash\s*mem|\bsram\b|\bdram\b"
+    r"|\bisolator\b|\boptocoupl|\bgate\s*driver\b"
+    r"|\btransistor\b|\bcapacitor\b|\bresistor\b|\binductor\b"
+    r"|\bdiode\b|\b(?:fet|mosfet|igbt)\b"
+    r"|\bvoltage\s*regulator\b|\blinear\s*regulator\b|\bldo\b"
+    r"|\bcrystal\s*oscillator\b|\boscillator\b",
+    re.I,
+)
+
+# Sterile / single-use lab consumables on a cell-culture instrument device are NOT plumbing
+# wetted parts — their MoC is PTFE/PVDF membrane + PP/PE housing (biocompatible), not
+# WRAS potable/irrigation water plumbing material.
+_STERILE_LAB_CONSUMABLE_NOUN = re.compile(
+    r"sterile\s*(?:filter|vent|membrane|sampling|luer|cap)|"
+    r"(?:filter|membrane)\s*vent|"
+    r"vent\s*(?:filter|cap)|"
+    r"syringe\s*filter|"
+    r"luer\s*(?:fitting|lock|slip|port)|"
+    r"cell\s*cultur|"
+    r"culture\s*(?:vessel|flask|well|dish|plate)|"
+    r"petri\s*dish|"
+    r"cryovial|"
+    r"microcentrifuge\s*tube|"
+    r"single[- ]use\s*(?:bioreactor|bag|vessel)",
+    re.I,
+)
 
 # A part whose NAME/requirement already DECLARES its material of construction keeps it —
 # the plant-level MoC default must never override a part's own stated material (a 'DN50 PVC
@@ -307,14 +346,55 @@ def _wetted_moc(name, requirement):
     """The material-of-construction for a WETTED part, derived from the part's OWN
     service/material context first, then the plant fluid service — else '' (no plant MoC
     context, or a clearly non-wetted part). The part's declared material always wins over
-    the plant default (universal: keyed on the part text + the FLUID, never a class)."""
+    the plant default (universal: keyed on the part text + the FLUID, never a class).
+
+    MoC EXCLUSIONS — universal, keyed on part-type nouns, never a per-product table:
+    1. _ELECTRONIC_NOUN: electronic catalogue parts (PCB headers, connectors, ICs, firmware
+       storage, isolators, transistors …) NEVER receive a plumbing MoC — even if 'header'
+       or 'filter' in their name also appears in _WETTED_NOUN.  A PCB debug header's MoC is
+       tin-plated brass contacts + nylon housing; a WRAS water-service label is absurd on it.
+    2. _STERILE_LAB_CONSUMABLE_NOUN: sterile/single-use lab consumables (sterile vent filters,
+       syringe filters, luer fittings, culture vessels …) are PTFE/PVDF membrane + PP housing —
+       not WRAS potable/irrigation plumbing material.
+    3. _IS_INSTRUMENT_DEVICE guard: on an instrument-device-scale plant (benchtop bioreactor,
+       lab analyser, colorimeter …) the WRAS/process-irrigation water MoC MUST NOT propagate
+       to pumps, filters, or sterilisation words — those parts use biocompatible lab materials
+       (silicone/PETG/PP), not potable-water plumbing material.  The MoC IS still applied on
+       a genuine plant-scale process (fertigation pump, water-treatment manifold) where
+       _IS_INSTRUMENT_DEVICE is False.
+    """
     if not _PLANT_MOC:
         return ""
     blob = (str(name or "") + " " + str(requirement or "")).lower()
+    # ① Electronic catalogue parts — never a plumbing MoC.
+    if _ELECTRONIC_NOUN.search(blob):
+        return ""
+    # ② Sterile / single-use lab consumables — biocompatible materials, not WRAS.
+    if _STERILE_LAB_CONSUMABLE_NOUN.search(blob):
+        return ""
+    # ③ Standard non-wetted machinery nouns.
     if _NONWETTED_NOUN.search(blob):
         return ""
     if not _WETTED_NOUN.search(blob):
         return ""
+    # ④ On an instrument-device-scale design the WRAS / process-irrigation water MoC must
+    #    not bleed onto pumps, filters, and sterilisation components — their materials are
+    #    biocompatible lab-grade (silicone, PP, PTFE), not potable-water plumbing material.
+    #    Genuine plant-scale designs (_IS_INSTRUMENT_DEVICE = False) are unaffected.
+    if _IS_INSTRUMENT_DEVICE and _PLANT_CORROSION and (
+        "water service" in _PLANT_CORROSION
+        or "irrigation" in _PLANT_CORROSION
+        or "potable" in _PLANT_CORROSION
+    ):
+        # Only genuine fabricated plumbing nouns keep the MoC on a device (pipe / valve /
+        # manifold / tank / vessel / column / sump / basin / reservoir / drum).
+        _DEVICE_PLUMBING_NOUN = re.compile(
+            r"\bpipe\b|\bpipework\b|\bvalve\b|\bmanifold\b|\btank\b|\bvessel\b|"
+            r"\bcolumn\b|\bsump\b|\bbasin\b|\breservoir\b|\bdrum\b|\bspool\b",
+            re.I,
+        )
+        if not _DEVICE_PLUMBING_NOUN.search(blob):
+            return ""
     return _own_material(blob) or _PLANT_MOC
 
 
@@ -3793,6 +3873,59 @@ def _selftest() -> int:
             print(f"  FAIL pump MoC on {_st.get('brief','')!r} → {got_pump!r} (want {_want_pump!r})"); bad += 1
         if got_pipe != _want_pipe:
             print(f"  FAIL PVC-pipe MoC on {_st.get('brief','')!r} → {got_pipe!r} (want {_want_pipe!r})"); bad += 1
+
+    # ── MoC ELECTRONIC/LAB-CONSUMABLE EXCLUSION (v57 MoC-leak, 2026-07-22) ──────────────
+    # proveCatch: electronic catalogue parts and sterile lab consumables MUST NOT receive
+    # a WRAS/process-water MoC even when _PLANT_MOC is set.
+    # proveNoFalsePositive: a genuine process-water pipe/manifold on a PLANT still gets it.
+    # AND: on an instrument-device-scale design, a dosing pump also must NOT get WRAS MoC
+    # (its material is silicone/PP lab-grade, not potable plumbing material).
+    _moc_exclusion_state = dict(
+        _poison, brief="A benchtop organoid bioreactor with nutrient media and cultivated spheroids."
+    )
+    _set_plant_corrosivity(_moc_exclusion_state)
+    # Confirm the organoid brief triggers a process-water MoC (the 'nutrient'/'cultivat' hit).
+    if not _PLANT_MOC:
+        print("  FAIL MoC-exclusion setup: organoid brief should set _PLANT_MOC "
+              f"(got {_PLANT_MOC!r})"); bad += 1
+    else:
+        # ① Electronic part: Debug Header (PCB pin connector) — must NEVER get WRAS MoC.
+        _got_hdr = _wetted_moc("Debug Header", "2×10 pin-header connector for JTAG debug")
+        if _got_hdr:
+            print(f"  FAIL MoC-exclusion proveCatch [electronic]: 'Debug Header' must return '' "
+                  f"(got {_got_hdr!r})"); bad += 1
+        # ② Sterile lab consumable: Sterile Filter Vent — must NOT get WRAS MoC.
+        _got_vent = _wetted_moc("Sterile Filter Vent", "0.22 µm PTFE membrane vent for cell culture flask")
+        if _got_vent:
+            print(f"  FAIL MoC-exclusion proveCatch [sterile-consumable]: 'Sterile Filter Vent' "
+                  f"must return '' (got {_got_vent!r})"); bad += 1
+        # ③ Instrument-device pump: Dosing Peristaltic Pump on instrument — must NOT get WRAS MoC.
+        _saved_iid = _IS_INSTRUMENT_DEVICE
+        _IS_INSTRUMENT_DEVICE = True
+        _got_pump_dev = _wetted_moc("Dosing Peristaltic Pump", "media dosing pump, peristaltic")
+        _IS_INSTRUMENT_DEVICE = _saved_iid
+        if _got_pump_dev:
+            print(f"  FAIL MoC-exclusion proveCatch [instrument-device pump]: "
+                  f"'Dosing Peristaltic Pump' on instrument-device must return '' "
+                  f"(got {_got_pump_dev!r})"); bad += 1
+        # ④ proveNoFalsePositive: on a plant-scale fertigation system the same pump IS wetted.
+        _saved_iid = _IS_INSTRUMENT_DEVICE
+        _IS_INSTRUMENT_DEVICE = False
+        _moc_fert = dict(_poison, brief="A fertigation and irrigation water plant with RO make-up.")
+        _set_plant_corrosivity(_moc_fert)
+        _got_pump_plant = _wetted_moc("Transfer Pump", "duty pump")
+        _IS_INSTRUMENT_DEVICE = _saved_iid
+        if _got_pump_plant != "PVC-U / 304 stainless (WRAS)":
+            print(f"  FAIL MoC-exclusion proveNoFalsePositive: plant-scale Transfer Pump must "
+                  f"retain WRAS MoC (got {_got_pump_plant!r})"); bad += 1
+        # ⑤ proveNoFalsePositive: a genuine process-water manifold on the instrument state
+        #    (no _IS_INSTRUMENT_DEVICE, plant-scale) still gets MoC.
+        _set_plant_corrosivity(_moc_exclusion_state)
+        _got_manifold = _wetted_moc("Distribution Manifold", "process water header manifold")
+        if not _got_manifold:
+            print(f"  FAIL MoC-exclusion proveNoFalsePositive: plant-scale 'Distribution Manifold' "
+                  f"must still receive MoC (got empty)"); bad += 1
+
     _set_plant_corrosivity({})  # reset the globals for anything after this block
 
     # ── CORPUS-MEDIAN LIFT (#172, 2026-06-20): a principal the engine's own forge-truth
