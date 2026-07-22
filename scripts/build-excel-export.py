@@ -27505,6 +27505,14 @@ def build(run_dir: str, out_path: str) -> dict:
         pass
 
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
+
+    # ── EMAIL-READY DELIVERABLE BUNDLE ────────────────────────────────────────
+    # Called AFTER wb.save + recalc + OOXML check so dossier.xlsx is fully baked.
+    # Produces <run>/<slug>-deliverable/ + <run>/<slug>-deliverable.zip — the one
+    # emailable file.  Never raises; failures are logged inside the function.
+    _slug = os.path.basename(os.path.normpath(run_dir))
+    _bundle_result = _write_deliverable_bundle(run_dir, _slug)
+
     return {
         "out_path": out_path,
         "size_mb": size_mb,
@@ -27522,6 +27530,7 @@ def build(run_dir: str, out_path: str) -> dict:
         "verdict": dict(_VERDICT),
         "recalc_cached": recalc_cached,
         "sha": sha,
+        "bundle": _bundle_result,
     }
 
 
@@ -34239,8 +34248,322 @@ def _selftest() -> int:
     except Exception as _e:
         print(f"  FAIL tab_inputs_assumptions proveCatch: raised {_e!r}"); bad += 1
 
+    # ── proveCatch _write_deliverable_bundle (2026-07-22) ─────────────────────────
+    # Synthetic run dir with dossier.xlsx + render PNGs + drawing PDF + 3-board PCB
+    # files.  Asserts: folder + zip created, zip arcnames are relative (no '/Users/'),
+    # all 3 boards' gerber sub-dirs present, MANIFEST.txt present.
+    import shutil as _sh_db, tempfile as _tf_db, zipfile as _zf_db, pathlib as _pl_db
+    _db_td = _tf_db.mkdtemp(prefix="forge_db_selftest_")
+    try:
+        # Build a synthetic run dir
+        _bd = _pl_db.Path(_db_td)
+        # dossier
+        (_bd / "dossier.xlsx").write_bytes(b"PK\x03\x04fake-xlsx")
+        # renders
+        for _rn in ("00-hero.png", "01-top.png", "blender-cover.png"):
+            (_bd / _rn).write_bytes(b"\x89PNG\r\nfake")
+        # drawing PDF
+        (_bd / "drawings").mkdir()
+        (_bd / "drawings" / "ga-A1.pdf").write_bytes(b"%PDF-1.4 fake")
+        # 3-board PCB files
+        for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
+            _bpcb = _bd / "pcb-boards" / _bname / "pcb"
+            (_bpcb / "gerbers").mkdir(parents=True)
+            (_bpcb / "drill").mkdir()
+            (_bpcb / "gerbers" / f"board-routed-F_Cu.gtl").write_bytes(b"G04 fake")
+            (_bpcb / "drill" / "board-routed.drl").write_bytes(b"; fake")
+            (_bpcb / "board-routed.kicad_pcb").write_bytes(b"(kicad_pcb fake)")
+            (_bpcb / "drc-report.json").write_bytes(b"{}")
+            (_bpcb / "positions.csv").write_bytes(b"Ref,Val,Package,PosX,PosY,Rot,Side\n")
+        # existing fab-zip (already written by _pcb_write_fab_zip in a real build)
+        (_bd / "pcb").mkdir()
+        _pre_fab = _bd / "pcb" / "pcb-fab.zip"
+        with _zf_db.ZipFile(str(_pre_fab), "w") as _pf:
+            for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
+                _pf.writestr(f"gerbers/{_bname}/board-routed-F_Cu.gtl", "G04 fake")
+                _pf.writestr(f"drill/{_bname}/board-routed.drl", "; fake")
+        # Run the bundle writer
+        _slug = "selftest-product-20260101-0000"
+        _db_res = _write_deliverable_bundle(str(_bd), _slug)
+        _db_dir = _bd / f"{_slug}-deliverable"
+        _db_zip = _bd / f"{_slug}-deliverable.zip"
+        # Assert folder created
+        if not _db_dir.is_dir():
+            print(f"  FAIL _write_deliverable_bundle: folder not created at {_db_dir}"); bad += 1
+        # Assert zip created
+        if not _db_zip.is_file():
+            print(f"  FAIL _write_deliverable_bundle: zip not created at {_db_zip}"); bad += 1
+        # Assert dossier.xlsx in folder
+        if not (_db_dir / "dossier.xlsx").exists():
+            print("  FAIL _write_deliverable_bundle: dossier.xlsx not in bundle folder"); bad += 1
+        # Assert all 3 boards' gerbers present in folder
+        for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
+            _bdir = _db_dir / "pcb" / _bname / "gerbers"
+            if not _bdir.is_dir():
+                print(f"  FAIL _write_deliverable_bundle: pcb/{_bname}/gerbers/ missing"); bad += 1
+        # Assert MANIFEST.txt present
+        if not (_db_dir / "MANIFEST.txt").exists():
+            print("  FAIL _write_deliverable_bundle: MANIFEST.txt not in bundle"); bad += 1
+        # Assert zip has no absolute paths (no '/Users/' prefix in arcnames)
+        if _db_zip.is_file():
+            with _zf_db.ZipFile(str(_db_zip)) as _dbzf:
+                _abs_names = [n for n in _dbzf.namelist() if n.startswith("/") or "Users" in n]
+                if _abs_names:
+                    print(f"  FAIL _write_deliverable_bundle: absolute arcnames in zip: {_abs_names[:3]}"); bad += 1
+                # Assert all 3 boards represented in zip
+                for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
+                    _board_entries = [n for n in _dbzf.namelist()
+                                      if _bname in n and n.startswith(f"{_slug}-deliverable/pcb/")]
+                    if not _board_entries:
+                        print(f"  FAIL _write_deliverable_bundle: zip has no entries for board {_bname}"); bad += 1
+        if _db_res is None:
+            print("  FAIL _write_deliverable_bundle: returned None (expected dict with paths)"); bad += 1
+    except Exception as _dbe:
+        print(f"  FAIL _write_deliverable_bundle selftest raised: {_dbe!r}"); bad += 1
+    finally:
+        _sh_db.rmtree(_db_td, ignore_errors=True)
+
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
+
+
+# ── EMAIL-READY DELIVERABLE BUNDLE ──────────────────────────────────────────────
+# Writes <run>/<slug>-deliverable/  (a portable self-contained folder) and zips it
+# to <run>/<slug>-deliverable.zip — the ONE emailable file that contains everything:
+# dossier.xlsx + all PCB fab files (per-board gerbers/drill/pos/kicad_pcb) + renders
+# + engineering-drawing PDFs.
+#
+# UNIVERSAL: a non-PCB run produces no pcb/ subfolder; a non-render run has no
+# renders/ subfolder; everything is keyed on what ACTUALLY exists on disk.
+# Called at the end of every Excel build — never a manual step.
+# ────────────────────────────────────────────────────────────────────────────────
+def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
+    """Create <run>/<slug>-deliverable/ and <run>/<slug>-deliverable.zip.
+
+    Copies into the folder (relative structure, no absolute paths in zip):
+      dossier.xlsx
+      pcb/<board>/gerbers/*.g*  + drill/*.drl  + positions.csv  + *.kicad_pcb
+      pcb/pcb-fab.zip           (the combined fab pack already written by _pcb_write_fab_zip)
+      renders/00-hero.png  01-top.png  blender-cover.png  04-07-product-*.png
+      drawings/*.pdf            (engineering A1 print sheets)
+      MANIFEST.txt              (one-line description of every included file)
+
+    Returns a dict with keys 'bundle_dir', 'bundle_zip', 'included', 'skipped'.
+    Never raises — errors are logged and skipped.
+    """
+    import shutil as _sh
+    import zipfile as _zf
+    import glob as _glob
+
+    bundle_name = f"{slug}-deliverable"
+    bundle_dir = os.path.join(run_dir, bundle_name)
+    bundle_zip = os.path.join(run_dir, f"{bundle_name}.zip")
+
+    # Remove stale bundle from a previous build (so we never ship stale + new mixed).
+    if os.path.exists(bundle_dir):
+        _sh.rmtree(bundle_dir, ignore_errors=True)
+    if os.path.exists(bundle_zip):
+        try:
+            os.remove(bundle_zip)
+        except Exception:  # noqa: BLE001
+            pass
+
+    os.makedirs(bundle_dir, exist_ok=True)
+
+    included: List[str] = []   # relative paths inside bundle_dir
+    skipped: List[str] = []    # paths that were absent / not copied
+
+    def _cp(src: str, rel_dest: str, description: str = "") -> bool:
+        """Copy src → bundle_dir/rel_dest.  Returns True on success."""
+        dest = os.path.join(bundle_dir, rel_dest)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        try:
+            _sh.copy2(src, dest)
+            included.append(rel_dest)
+            return True
+        except Exception as _e:  # noqa: BLE001
+            skipped.append(f"{rel_dest} ({_e})")
+            return False
+
+    # ── 1. DOSSIER ─────────────────────────────────────────────────────────────
+    _dossier = os.path.join(run_dir, "dossier.xlsx")
+    if os.path.exists(_dossier):
+        _cp(_dossier, "dossier.xlsx", "Excel review workbook (dossier)")
+    else:
+        skipped.append("dossier.xlsx (not found)")
+
+    # ── 2. PCB FAB FILES ───────────────────────────────────────────────────────
+    # 2a. Copy the combined pcb-fab.zip (already written by _pcb_write_fab_zip)
+    _fab_zip = os.path.join(run_dir, "pcb", "pcb-fab.zip")
+    if os.path.exists(_fab_zip):
+        _cp(_fab_zip, "pcb/pcb-fab.zip", "Combined Gerber/drill/pos fab pack (all boards)")
+    else:
+        skipped.append("pcb/pcb-fab.zip (not found — PCB pipeline may not have run)")
+
+    # 2b. Per-board exploded files under pcb-boards/<board>/pcb/ — gerbers/, drill/,
+    #     positions.csv, board-routed.kicad_pcb, drc-report.json.
+    _boards_root = os.path.join(run_dir, "pcb-boards")
+    if os.path.isdir(_boards_root):
+        for _board in sorted(os.listdir(_boards_root)):
+            _bpcb = os.path.join(_boards_root, _board, "pcb")
+            if not os.path.isdir(_bpcb):
+                skipped.append(f"pcb/{_board}/ (no pcb/ sub-dir)")
+                continue
+            # gerbers/
+            _gbr_dir = os.path.join(_bpcb, "gerbers")
+            if os.path.isdir(_gbr_dir):
+                for _gf in sorted(os.listdir(_gbr_dir)):
+                    _gfp = os.path.join(_gbr_dir, _gf)
+                    if os.path.isfile(_gfp):
+                        _cp(_gfp, f"pcb/{_board}/gerbers/{_gf}")
+            else:
+                skipped.append(f"pcb/{_board}/gerbers/ (absent)")
+            # drill/
+            _drl_dir = os.path.join(_bpcb, "drill")
+            if os.path.isdir(_drl_dir):
+                for _df in sorted(os.listdir(_drl_dir)):
+                    _dfp = os.path.join(_drl_dir, _df)
+                    if os.path.isfile(_dfp):
+                        _cp(_dfp, f"pcb/{_board}/drill/{_df}")
+            else:
+                skipped.append(f"pcb/{_board}/drill/ (absent)")
+            # positions.csv
+            _pos = os.path.join(_bpcb, "positions.csv")
+            if os.path.exists(_pos):
+                _cp(_pos, f"pcb/{_board}/positions.csv")
+            else:
+                skipped.append(f"pcb/{_board}/positions.csv (absent)")
+            # routed KiCad PCB
+            _kicad = os.path.join(_bpcb, "board-routed.kicad_pcb")
+            if os.path.exists(_kicad):
+                _cp(_kicad, f"pcb/{_board}/board-routed.kicad_pcb")
+            else:
+                skipped.append(f"pcb/{_board}/board-routed.kicad_pcb (absent)")
+            # DRC report (informational, helps the recipient know the board status)
+            _drc = os.path.join(_bpcb, "drc-report.json")
+            if os.path.exists(_drc):
+                _cp(_drc, f"pcb/{_board}/drc-report.json")
+
+    # ── 3. RENDERS ─────────────────────────────────────────────────────────────
+    _RENDER_NAMES = [
+        "00-hero.png", "01-top.png",
+        "04-product-exterior.png", "05-product-left.png",
+        "06-product-right.png", "07-product-service.png",
+        "blender-cover.png",
+    ]
+    _any_render = False
+    for _rn in _RENDER_NAMES:
+        _rp = os.path.join(run_dir, _rn)
+        if os.path.exists(_rp):
+            _cp(_rp, f"renders/{_rn}")
+            _any_render = True
+        else:
+            skipped.append(f"renders/{_rn} (absent)")
+    if not _any_render:
+        # Fallback: grab any product PNG at the run root
+        for _rp in sorted(_glob.glob(os.path.join(run_dir, "*.png"))):
+            _rn = os.path.basename(_rp)
+            if not _rn.startswith("inspect-") and not _rn.startswith("module-"):
+                _cp(_rp, f"renders/{_rn}")
+
+    # ── 4. ENGINEERING DRAWINGS ────────────────────────────────────────────────
+    _drawings_dir = os.path.join(run_dir, "drawings")
+    if os.path.isdir(_drawings_dir):
+        for _pf in sorted(_glob.glob(os.path.join(_drawings_dir, "*.pdf"))):
+            _cp(_pf, f"drawings/{os.path.basename(_pf)}")
+    else:
+        skipped.append("drawings/ (absent — fluid products / non-drawing run)")
+
+    # ── 5. MANIFEST.txt ────────────────────────────────────────────────────────
+    _manifest_lines: List[str] = [
+        f"ForgeOS Deliverable Bundle — {slug}",
+        "=" * 60,
+        "",
+        "This folder (and its zip) is the complete email-ready deliverable pack.",
+        "It is generated automatically at the end of every ForgeOS Excel build.",
+        "",
+        "CONTENTS",
+        "--------",
+    ]
+    _section_descs = {
+        "dossier.xlsx": "Excel review workbook — live-formula dossier with Checks, BoM, Calcs, Drawings, PCB tabs.",
+        "pcb/pcb-fab.zip": "Combined PCB fab pack (all boards) — Gerbers + drill + positions for the fab house.",
+    }
+    for _rel in sorted(included):
+        _base = os.path.basename(_rel)
+        _desc = _section_descs.get(_rel) or _section_descs.get(_base) or ""
+        if not _desc:
+            if _rel.startswith("renders/"):
+                _desc = "Product render (Blender)"
+            elif _rel.startswith("drawings/"):
+                _desc = "Engineering drawing A1 print sheet (PDF)"
+            elif _rel.startswith("pcb/") and "/gerbers/" in _rel:
+                _desc = "Gerber layer file"
+            elif _rel.startswith("pcb/") and "/drill/" in _rel:
+                _desc = "Drill file"
+            elif _rel.endswith(".kicad_pcb"):
+                _desc = "KiCad routed PCB file (native layout)"
+            elif _rel.endswith("positions.csv"):
+                _desc = "Pick-and-place position file"
+            elif _rel.endswith("drc-report.json"):
+                _desc = "DRC report (0 violations = clean)"
+        _manifest_lines.append(f"  {_rel:<50}  {_desc}")
+    if skipped:
+        _manifest_lines += [
+            "",
+            "SKIPPED (not present on disk this run)",
+            "---------------------------------------",
+        ]
+        for _s in skipped:
+            _manifest_lines.append(f"  {_s}")
+    _manifest_lines += [
+        "",
+        f"Generated by ForgeOS build-excel-export.py — {slug}",
+    ]
+    _manifest_path = os.path.join(bundle_dir, "MANIFEST.txt")
+    try:
+        with open(_manifest_path, "w", encoding="utf-8") as _mf:
+            _mf.write("\n".join(_manifest_lines) + "\n")
+        included.append("MANIFEST.txt")
+    except Exception as _me:  # noqa: BLE001
+        skipped.append(f"MANIFEST.txt ({_me})")
+
+    # ── 6. ZIP THE WHOLE FOLDER ────────────────────────────────────────────────
+    zip_ok = False
+    try:
+        with _zf.ZipFile(bundle_zip, "w", _zf.ZIP_DEFLATED) as _zfh:
+            for _root, _dirs, _files in os.walk(bundle_dir):
+                _dirs.sort()
+                for _fn in sorted(_files):
+                    _abs = os.path.join(_root, _fn)
+                    # arcname = relative to run_dir (not to bundle_dir) so the
+                    # top-level entry in the zip is slug-deliverable/...
+                    _arc = os.path.relpath(_abs, run_dir)
+                    _zfh.write(_abs, _arc)
+        zip_ok = True
+    except Exception as _ze:  # noqa: BLE001
+        print(f"  ! deliverable bundle zip failed: {_ze}")
+
+    # ── REPORT ─────────────────────────────────────────────────────────────────
+    _n_boards = len([d for d in (os.listdir(os.path.join(run_dir, "pcb-boards"))
+                                 if os.path.isdir(os.path.join(run_dir, "pcb-boards")) else [])
+                     if os.path.isdir(os.path.join(run_dir, "pcb-boards", d))])
+    print(f"  · deliverable bundle: {len(included)} files included"
+          f" | {len(skipped)} skipped"
+          f" | {_n_boards} PCB board(s)"
+          f" | zip: {'✓ ' + os.path.basename(bundle_zip) if zip_ok else '✗ FAILED'}")
+    if skipped:
+        for _s in skipped[:5]:
+            print(f"      skipped: {_s}")
+        if len(skipped) > 5:
+            print(f"      ... and {len(skipped) - 5} more")
+
+    return {
+        "bundle_dir": bundle_dir,
+        "bundle_zip": bundle_zip if zip_ok else None,
+        "included": included,
+        "skipped": skipped,
+    }
 
 
 def main() -> None:
