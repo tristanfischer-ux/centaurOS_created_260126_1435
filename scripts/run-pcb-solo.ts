@@ -19,6 +19,7 @@ import { resolve } from 'node:path'
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
 import {
   probeTier1McuCompile,
+  probeTier3McuSim,
   runTier0FirmwareProof,
   runTier2BoardSim,
 } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
@@ -225,16 +226,35 @@ function main(): void {
     })
   }
   console.error(
-    `[pcb-solo] firmwareTier2: ok=${tier2.ok} skipped=${tier2.skipped}` +
+    `[pcb-solo] firmwareTier2(host-bind): ok=${tier2.ok} skipped=${tier2.skipped}` +
       ` bindErrors=${tier2.bindErrorCount ?? 0}` +
       ` (${tier2.reason.slice(0, 160)})`,
   )
 
-  // DECISION: Tier-2 bind/sim failure fails the firmware axis — Tier-0 theatre
-  // alone must not green-light "software works on the imagined board".
+  // INTENT (fixpack18): Tier-3 = real Cortex-M ELF under QEMU — not Mac puts().
+  const tier3 = probeTier3McuSim({
+    outDir: resolve(proofOutRoot, '_tier3'),
+    projectDir: tier1.projectDir,
+    proofTargetId: tier1Target,
+  })
+  console.error(
+    `[pcb-solo] firmwareTier3(mcu-sim): ok=${tier3.ok} skipped=${tier3.skipped}` +
+      ` (${tier3.reason.slice(0, 180)})`,
+  )
+
+  // DECISION: firmware axis needs Tier-0 + host-bind + MCU-sim (when qemu present).
+  // If qemu missing → skipped (do not invent PASS); if present and fail → red.
   const tier2AxisOk = tier2.skipped === true || tier2.ok === true
-  const firmwareAxisOk = firmwareAllOk && tier2AxisOk
-  const tierNum = tier2.ok && !tier2.skipped ? 2 as const : tier1.ok ? 1 as const : 0 as const
+  const tier3AxisOk = tier3.skipped === true || tier3.ok === true
+  const firmwareAxisOk = firmwareAllOk && tier2AxisOk && tier3AxisOk
+  const tierNum =
+    tier3.ok && !tier3.skipped
+      ? 3 as const
+      : tier2.ok && !tier2.skipped
+        ? 2 as const
+        : tier1.ok
+          ? 1 as const
+          : 0 as const
   const firmwareProof = {
     schema: 'pcb-firmware-proof-stage/v1' as const,
     tier: tierNum,
@@ -243,6 +263,7 @@ function main(): void {
     ok: firmwareAxisOk,
     tier1,
     tier2,
+    tier3,
   }
 
   const summary = {
@@ -354,8 +375,20 @@ function main(): void {
   } | undefined
   if (t2) {
     lines.push(
-      `- tier2_board_sim: ok=${t2.ok} skipped=${t2.skipped} bindErrors=${t2.bindErrorCount ?? 0}` +
+      `- tier2_host_bind (NOT MCU): ok=${t2.ok} skipped=${t2.skipped} bindErrors=${t2.bindErrorCount ?? 0}` +
         (t2.reason ? ` — ${String(t2.reason).slice(0, 200)}` : ''),
+    )
+  }
+  const t3 = summary.firmwareProof.tier3 as {
+    ok?: boolean
+    skipped?: boolean
+    reason?: string
+    transcriptPath?: string
+  } | undefined
+  if (t3) {
+    lines.push(
+      `- tier3_mcu_sim (QEMU Cortex-M): ok=${t3.ok} skipped=${t3.skipped}` +
+        (t3.reason ? ` — ${String(t3.reason).slice(0, 220)}` : ''),
     )
   }
   writeFileSync(resolve(outDir, 'pcb-solo-sight.md'), `${lines.join('\n')}\n`)

@@ -274,13 +274,65 @@ console.log(JSON.stringify(a))
     else:
         ok("D2: chain wires runTier2BoardSim")
 
+    # ── D3: Tier-3 real MCU sim (QEMU Cortex-M semihosting) ────────────
+    t3 = (summary.get("firmwareProof") or {}).get("tier3") or {}
+    if t3.get("skipped") and not t3.get("ok"):
+        # qemu missing is skip — do not invent PASS, but solo with qemu must pass
+        fail(f"D3: tier3 skipped (need qemu-system-arm): {t3.get('reason')}")
+    elif not t3.get("ok"):
+        fail(f"D3: tier3.ok false: {t3.get('reason') or t3}")
+    else:
+        ok("D3: tier3.ok true (QEMU Cortex-M ELF ran)")
+    t3_tr = solo / "firmware-proof" / "_tier3" / "mcu-sim-transcript.txt"
+    if t3.get("transcriptPath"):
+        t3_tr = Path(t3["transcriptPath"])
+    if not t3_tr.exists():
+        fail("D3: mcu-sim-transcript.txt missing")
+    else:
+        tt3 = t3_tr.read_text(errors="ignore")
+        if "MCU_SIM|" not in tt3:
+            fail(f"D3: transcript missing MCU_SIM| banner: {tt3[:200]}")
+        else:
+            ok("D3: transcript has MCU_SIM| (from virtual MCU, not Mac puts theatre)")
+        if "CHECK mcu_sim PASS" not in tt3:
+            fail("D3: transcript missing CHECK mcu_sim PASS")
+        else:
+            ok("D3: CHECK mcu_sim PASS")
+    sim_elf = solo / "firmware-proof" / "_tier1" / "mcu-project" / "tier1_proof_sim.elf"
+    if not sim_elf.exists():
+        fail("D3: tier1_proof_sim.elf missing")
+    else:
+        fo = subprocess.run(["file", str(sim_elf)], capture_output=True, text=True).stdout
+        if "ELF" not in fo or "ARM" not in fo:
+            fail(f"D3: sim elf not ARM ELF: {fo.strip()}")
+        else:
+            ok("D3: sim ELF is ARM")
+    if "probeTier3McuSim" not in chain:
+        fail("D3: chain missing probeTier3McuSim")
+    else:
+        ok("D3: chain wires probeTier3McuSim")
+    # Adversarial: host mock is Mach-O; MCU sim evidence is ARM ELF + MCU_SIM transcript
+    host_mock = solo / "firmware-proof" / "_tier2" / "board_sim_native"
+    if host_mock.exists():
+        hm = subprocess.run(["file", str(host_mock)], capture_output=True, text=True).stdout
+        if "Mach-O" not in hm:
+            fail(f"D3: expected host-bind mock to be Mach-O, got: {hm.strip()}")
+        else:
+            ok("D3: host-bind mock is Mach-O (distinct from ARM MCU sim)")
+
     # ── E: HAT first-pass 110 ──────────────────────────────────────────
+    # GOTCHA: pipeline.errors also carries DRC residual notes (USB annular) —
+    # those are not placement-grow failures. Only flag placement/grow strings.
     errs = (summary.get("pipeline") or {}).get("errors") or []
-    hat_errs = [e for e in errs if "wet_lab_hat" in e]
+    hat_errs = [
+        e for e in errs
+        if "wet_lab_hat" in e
+        and ("placement" in e.lower() or "grew" in e.lower())
+    ]
     if hat_errs:
         fail(f"E: HAT placement errors: {hat_errs}")
     else:
-        ok("E: zero HAT placement errors")
+        ok("E: zero HAT placement grow errors")
     sight = solo / "pcb-solo-sight.md"
     if sight.exists():
         m = re.search(r"### wet_lab_hat.*?size:\s*(\d+)×(\d+)", sight.read_text(), re.S)

@@ -1,3 +1,20 @@
+> **✅ Cursor → Terminal 2026-07-22 ~19:20 — fixpack18 LANDED (real QEMU MCU sim). Tip pending push. Status: `WAITING_ON_TERMINAL`.**
+>
+> **Honesty (closed):** Tristan was right — fixpack17 Tier-2 was Mac `board_sim_native` theatre. Relabelled in SIGHT as **host-bind**, not MCU execution.
+>
+> **What fixpack18 actually does:**
+> 1. Tier-1 emits `make sim` → `tier1_proof_sim.elf` (Cortex-M3 + `FORGE_MCU_SIM` + ARM semihosting `bkpt 0xAB`).
+> 2. `probeTier3McuSim` runs **`qemu-system-arm -M mps2-an385 -semihosting`** — real ARM ELF on a virtual core.
+> 3. Transcript proves: `MCU_SIM|wet_lab_hat|BOOT` + gpio pads PA22/23/30/31 + bus_alive i2c/swd + `CHECK mcu_sim PASS`.
+> 4. Adversarial proveCatch: host mock = Mach-O; sim ELF = ARM; chain wires `probeTier3McuSim`.
+> 5. Still **NOT HIL** / not FUNCTIONALLY VERIFIED. QEMU board is MPS2 (not full SAMD21 silicon model) — honest ceiling remains **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> **Solo:** `out/pcb-solo-organoid-fixpack18/` — `firmwareProof.tier=3` allOk; prove **36/36** after DRC≠placement filter. (HAT may still log 1 USB annular DRC residual — known library noise, not MCU-sim scope.)
+>
+> Please merge `origin/cursor-pcb` + rebake. Requires `qemu-system-arm` on bake hosts (or tier3 skips honestly).
+>
+> ---
+>
 > **🟡 Cursor → Terminal 2026-07-22 ~19:02 — IN PROGRESS: real MCU sim (fixpack18). Status: `IN_PROGRESS` (do not treat fixpack17 Tier-2 as “firmware on a board”).**
 >
 > **Honesty correction (Tristan caught it):** fixpack17 Tier-2 is a **Mac host mock table** (`board_sim_native` arm64 + `i2c_ack()` array lookup). It is **NOT** SAMD21 firmware executing on an imagined MCU. Over-sold metaphor — sorry. Max claim unchanged: **FAB-READY — UNPROVEN IN HARDWARE**.

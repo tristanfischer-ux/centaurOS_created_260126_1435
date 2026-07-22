@@ -77,6 +77,7 @@ import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-f
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
 import {
   probeTier1McuCompile,
+  probeTier3McuSim,
   runTier0FirmwareProof,
   runTier2BoardSim,
 } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
@@ -10231,9 +10232,22 @@ async function main() {
                   },
                 })
               }
+              const tier3 = probeTier3McuSim({
+                outDir: resolve(pcbProjectDir, 'firmware-proof', '_tier3'),
+                projectDir: tier1.projectDir,
+                proofTargetId: tier1Target,
+              })
               const tier2AxisOk = tier2.skipped === true || tier2.ok === true
-              const firmwareAxisOk = allOk && tier2AxisOk
-              const tierNum = tier2.ok && !tier2.skipped ? 2 as const : tier1.ok ? 1 as const : 0 as const
+              const tier3AxisOk = tier3.skipped === true || tier3.ok === true
+              const firmwareAxisOk = allOk && tier2AxisOk && tier3AxisOk
+              const tierNum =
+                tier3.ok && !tier3.skipped
+                  ? 3 as const
+                  : tier2.ok && !tier2.skipped
+                    ? 2 as const
+                    : tier1.ok
+                      ? 1 as const
+                      : 0 as const
               const firmwareProof = {
                 schema: 'pcb-firmware-proof-stage/v1' as const,
                 tier: tierNum,
@@ -10242,13 +10256,15 @@ async function main() {
                 ok: firmwareAxisOk,
                 tier1,
                 tier2,
+                tier3,
               }
               stPcb.pcb.firmwareProof = firmwareProof
               pcb.firmwareProof = firmwareProof
               console.error(
                 `[chain] PCB firmwareProof: targets=${proofResults.length} allOk=${firmwareProof.allOk}` +
                   ` tier1.ok=${tier1.ok} skipped=${tier1.skipped}` +
-                  ` tier2.ok=${tier2.ok} skipped=${tier2.skipped} bindErrors=${tier2.bindErrorCount ?? 0}`,
+                  ` tier2.ok=${tier2.ok} skipped=${tier2.skipped} bindErrors=${tier2.bindErrorCount ?? 0}` +
+                  ` tier3.ok=${tier3.ok} skipped=${tier3.skipped}`,
               )
               logAction({
                 step: 'pcb_firmware_proof', ok: firmwareProof.allOk,
@@ -10256,6 +10272,7 @@ async function main() {
                 tier1_ok: tier1.ok, tier1_skipped: tier1.skipped,
                 tier2_ok: tier2.ok, tier2_skipped: tier2.skipped,
                 tier2_bind_errors: tier2.bindErrorCount ?? 0,
+                tier3_ok: tier3.ok, tier3_skipped: tier3.skipped,
               })
             } catch (fwErr) {
               const firmwareProof = {
