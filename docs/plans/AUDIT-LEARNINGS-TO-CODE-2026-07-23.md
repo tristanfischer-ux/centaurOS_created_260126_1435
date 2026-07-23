@@ -60,13 +60,17 @@ the ForgeOS self-correcting AIM.
 - **Demo DONE + emailed**: v3 dossier SHIPS floor 9, all tabs ≥8; two emailable zips sent
   (Part1 Dossier+PCB 21MB, Part2 Renders 12MB). All 3 spot-check issues fixed (#DIV, render
   contrast+tower-diagnosis, PCB DRC honesty).
-- **Translucent "see-inside" render**: agent `a798fac234646fa63` edited build_universal_scene.py
-  (translucent shell) + rendered to `out/ghost/` — UNVERIFIED, I never SIGHTed it. That edit is
-  STASHED (see below). Next session: unstash, SIGHT out/ghost/00-hero.png, iterate if the shell
-  isn't actually translucent, then drop a ghost image in Downloads for Tristan.
-- **Stashes**: `stash@{0}` = translucent-shell edit (this wrap-up) + the prior vial-tower geometry
-  (unverified). Don't discard.
-- HEAD `2968f6074` pushed. cursor-pcb 3 ahead (unmerged).
+- **Translucent "see-inside" render**: DONE + SIGHTed + pushed. Commit `77fefa4c9` adds the
+  8a-ghost render pass (smoked-glass shell, alpha 0.18, Cycles). `out/ghost/08-product-ghost-shell.png`
+  + `~/Downloads/Organoid-Bioreactor-SeeInside-GhostShell-2026-07-23.png`. Main-thread SIGHT verdict:
+  translucency CORRECT (see-through shell, internals visible, good contrast) — BUT the interior reads
+  SPARSE/toy-like (round vessel + 2 rails + a couple of bits in a mostly-empty box). FOLLOW-UP: populate
+  the full component story (vessel+impeller+Peltier+OD LED/photodetector+PCB+perfusion) so the see-inside
+  shot looks packed, not empty. Fine as a supplementary image; not hero-grade.
+- **Stashes**: `stash@{0}` = a STALE intermediate of the ghost-shell edit (22 lines differ from the
+  final committed `77fefa4c9`; superseded — safe to drop next session). `stash@{1}` = vial-tower
+  geometry (unverified — feeds the tower NAMED DECISION §B.5). `stash@{2}` = older temp-stability WIP.
+- HEAD `77fefa4c9` pushed. cursor-pcb 3 ahead (unmerged).
 
 ## E. Honest residuals on the organoid design (not demo-blocking, for later)
 - Enclosure ~321mm vs 180mm contract intent → deterministic pack-solver (task #59).
