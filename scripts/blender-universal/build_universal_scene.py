@@ -16411,6 +16411,53 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
 )
 
 
+# Names of meshes a signature builder DELIBERATELY places above the sealed lid
+# (exterior above-lid signature features, e.g. the vial_bioreactor optical tower,
+# an ewod deck). Populated at build time from each signature builder's _sig_new.
+# The interior containment clamp (place_sealed_enclosure ~L18408) exempts these:
+# their protrusion is INTENTIONAL, not a stray interior prop poking through the
+# shell. Role-keyed (provenance = "emitted as an exterior signature feature"),
+# never a product-class slug or a per-product table.
+_ABOVE_LID_SIGNATURE_MESHES: set = set()
+
+
+def _clamp_decision(name: str,
+                    z_max: float,
+                    z_min: float,
+                    interior_z_max: float,
+                    interior_z_min: float,
+                    registered_set,
+                    containment_prefixes,
+                    tol_mm: float = 0.5,
+                    over_tall_factor: float = 1.05) -> str:
+    """PURE per-mesh decision for the interior containment clamp (bpy-free).
+
+    Returns one of:
+      'skip'  — name is a registered above-lid signature mesh (intentional
+                protrusion) OR does not match any containment prefix → untouched.
+      'ok'    — matched a containment prefix but its z_max is within the ceiling
+                → no clamp needed.
+      'hide'  — matched, exceeds the ceiling, AND is taller than the interior
+                (a sizing bug) → hidden.
+      'clamp' — matched, exceeds the ceiling, fits the interior → translated down.
+
+    This mirrors the live loop in place_sealed_enclosure exactly so the selftest
+    can assert the invariant without a headless Blender run. The live loop routes
+    every per-mesh decision through this helper (single source of truth)."""
+    # Provenance exemption FIRST — an intentional above-lid signature feature is
+    # never clamped, even though its name matches a containment prefix.
+    if name in registered_set:
+        return "skip"
+    if not any(name.startswith(_pfx) for _pfx in containment_prefixes):
+        return "skip"
+    if z_max <= interior_z_max + tol_mm:
+        return "ok"
+    _obj_height = z_max - z_min
+    if _obj_height > (interior_z_max - interior_z_min) * over_tall_factor:
+        return "hide"
+    return "clamp"
+
+
 def _suppress_instrument_boilerplate_meshes() -> int:
     """Hide per-part BESS slabs and skin plates on instrument cutaways.
 
@@ -17404,6 +17451,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                    module=_skin_mod, module_objects=MO)
                 _port.dimensions = _mm3((14.0, 5.0, 9.0))
                 _sig_new.append(_port)
+            # Register the above-lid signature parts so the UNIVERSAL INTERIOR
+            # CONTAINMENT CLAMP (below, ~L18408) does NOT crush them back inside
+            # the sealed shell (the 2026-07-22 clamp buried the vial_bioreactor
+            # optical tower — vial/OD/collar placed at _z_top=base_z+H — flush
+            # with the ceiling, so the opaque shell occluded it on 00-hero + 04–07,
+            # the "lost the light tower" bug). Provenance-keyed: these meshes were
+            # emitted BY a signature builder as an exterior feature, so their
+            # protrusion is by design. The front fascia (u_se_le_face_*) sits below
+            # the ceiling and the clamp never fires on it, so registering the whole
+            # _sig_new set is safe. MUST run unconditionally (NOT gated on the
+            # BLENDER_OUT_DIR re-dump below), else an unset BLENDER_OUT_DIR would
+            # skip registration and the clamp would re-bury the tower.
+            for _so in _sig_new:
+                try:
+                    _ABOVE_LID_SIGNATURE_MESHES.add(_so.name)
+                except Exception:
+                    pass
             # Re-dump form-meshes.json to include the signature parts (the interior
             # builder dumped earlier, before these existed) so form_signature_gate sees them.
             try:
@@ -18449,6 +18513,13 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 if getattr(_co, "type", None) != "MESH":
                     continue
                 _cn = getattr(_co, "name", "") or ""
+                # Cheap pre-filter: a registered above-lid signature mesh, or a
+                # non-containment-prefix mesh, is untouched (avoids the bound_box
+                # matrix multiply for the common case). The authoritative decision
+                # is _clamp_decision (single source of truth, selftest-asserted).
+                if _cn in _ABOVE_LID_SIGNATURE_MESHES:
+                    continue  # intentional above-lid signature feature (e.g. the
+                              # optical tower) — protrusion is by design, not a ghost prop
                 if not any(_cn.startswith(_pfx) for _pfx in _CONTAINMENT_PREFIXES):
                     continue
                 # World-space Z extents via bound_box.
@@ -18460,23 +18531,25 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _obj_z_max = max(_z_vals)
                 _obj_z_min = min(_z_vals)
                 _obj_height = _obj_z_max - _obj_z_min
-                if _obj_z_max > _interior_z_max + 0.5:  # 0.5 mm tolerance
-                    if _obj_height > (_interior_z_max - _interior_z_min) * 1.05:
-                        # Mesh is taller than the interior — hide it (sizing bug).
-                        _co.hide_render = True
-                        _co.hide_viewport = True
-                        _hidden += 1
-                        print(f"[univ][sealed][clamp] HIDDEN {_cn!r}: "
-                              f"height {_obj_height:.1f} mm > interior "
-                              f"{_interior_z_max - _interior_z_min:.1f} mm")
-                    else:
-                        # Translate down so top edge meets the interior ceiling.
-                        _delta_mm = _interior_z_max - _obj_z_max
-                        _co.location.z += _delta_mm * fl.MM
-                        _clamped += 1
-                        print(f"[univ][sealed][clamp] CLAMPED {_cn!r}: "
-                              f"z_max {_obj_z_max:.1f} → {_interior_z_max:.1f} mm "
-                              f"(delta {_delta_mm:.1f} mm)")
+                _decision = _clamp_decision(
+                    _cn, _obj_z_max, _obj_z_min, _interior_z_max, _interior_z_min,
+                    _ABOVE_LID_SIGNATURE_MESHES, _CONTAINMENT_PREFIXES)
+                if _decision == "hide":
+                    # Mesh is taller than the interior — hide it (sizing bug).
+                    _co.hide_render = True
+                    _co.hide_viewport = True
+                    _hidden += 1
+                    print(f"[univ][sealed][clamp] HIDDEN {_cn!r}: "
+                          f"height {_obj_height:.1f} mm > interior "
+                          f"{_interior_z_max - _interior_z_min:.1f} mm")
+                elif _decision == "clamp":
+                    # Translate down so top edge meets the interior ceiling.
+                    _delta_mm = _interior_z_max - _obj_z_max
+                    _co.location.z += _delta_mm * fl.MM
+                    _clamped += 1
+                    print(f"[univ][sealed][clamp] CLAMPED {_cn!r}: "
+                          f"z_max {_obj_z_max:.1f} → {_interior_z_max:.1f} mm "
+                          f"(delta {_delta_mm:.1f} mm)")
         except Exception as _clamp_exc:
             print(f"[univ][sealed][clamp] WARN: containment clamp raised {_clamp_exc}")
         if _clamped or _hidden:
@@ -24755,6 +24828,101 @@ def _selftest_le_vial_exterior_gating() -> None:
           "c: vial_bioreactor camera frames the protruding tower)")
 
 
+def _selftest_containment_exempts_above_lid_signature() -> None:
+    """proveCatch (2026-07-23, Tristan "lost the light tower"): the UNIVERSAL
+    INTERIOR CONTAINMENT CLAMP must EXEMPT meshes a signature builder deliberately
+    placed ABOVE the sealed lid (registered in _ABOVE_LID_SIGNATURE_MESHES), while
+    still clamping genuine oversize INTERIOR props.
+
+    Root cause it guards: the 2026-07-22 clamp iterated every u_se_le_* mesh whose
+    world z_max exceeded the interior ceiling and translated it DOWN flush with the
+    lid — burying the vial_bioreactor optical tower (vial/OD/collar placed at
+    _z_top=base_z+H) inside the opaque shell, occluded on 00-hero + 04–07. Ground
+    truth: u_se_le_vial 526.8→422.55, u_se_le_od_* 492.5→422.55, collar 440→422.55.
+
+    Bpy-free: asserts the pure _clamp_decision predicate (the live loop routes every
+    per-mesh decision through the SAME helper, so this is the real invariant).
+    """
+    _CP = (
+        "u_se_le_",
+        "u_se_cutaway_cue_",
+        "u_se_instrument_story_",
+        "u_se_det_",
+    )
+    # Real geometry from the organoid-bioreactor ground-truth Z dump.
+    _interior_z_max = 422.55
+    _interior_z_min = 300.5
+
+    # (a) Registered above-lid signature meshes are SKIPPED (protrusion by design).
+    for _nm, _zmax, _zmin in (("u_se_le_vial", 526.8, 321.75),
+                              ("u_se_le_od_src", 492.5, 348.0),
+                              ("u_se_le_od_det", 492.5, 348.0),
+                              ("u_se_le_vial_collar", 440.0, 426.0)):
+        _d = _clamp_decision(_nm, _zmax, _zmin, _interior_z_max, _interior_z_min,
+                             {_nm}, _CP)
+        assert _d == "skip", (
+            f"proveCatch (a): registered above-lid signature mesh {_nm!r} "
+            f"(z_max {_zmax} > ceiling {_interior_z_max}) MUST be SKIPPED by the "
+            f"containment clamp (intentional protrusion), got {_d!r}. The optical "
+            "tower would be crushed back into the shell (the 'lost the light tower' bug).")
+
+    # (b) An UNREGISTERED interior prop that matches a containment prefix and
+    # exceeds the ceiling MUST still be clamped/hidden (real oversize-leak guard).
+    _d_pcb = _clamp_decision("u_se_le_pcb", 470.0, 300.0, _interior_z_max,
+                             _interior_z_min, set(), _CP)
+    assert _d_pcb in ("clamp", "hide"), (
+        f"proveCatch (b): an unregistered interior prop u_se_le_pcb "
+        f"(z_max 470 > ceiling {_interior_z_max}) MUST still be clamped/hidden — "
+        f"the clamp must not be weakened for genuine interior leaks. Got {_d_pcb!r}.")
+
+    # (c) A prop that fits under the ceiling is 'ok' (no needless clamp).
+    _d_ok = _clamp_decision("u_se_le_pcb", 400.0, 320.0, _interior_z_max,
+                            _interior_z_min, set(), _CP)
+    assert _d_ok == "ok", (
+        f"proveCatch (c): an interior prop within the ceiling must be 'ok', got {_d_ok!r}.")
+
+    # (d) A mesh matching NO containment prefix is skipped regardless of z.
+    _d_face = _clamp_decision("u_se_backplane_0", 900.0, 100.0, _interior_z_max,
+                              _interior_z_min, set(), _CP)
+    assert _d_face == "skip", (
+        f"proveCatch (d): a non-containment-prefix mesh must be skipped, got {_d_face!r}.")
+
+    # (e) A taller-than-interior registered signature is STILL skipped — the
+    # provenance exemption short-circuits BEFORE the over-tall hide branch, so a
+    # legitimately tall tower is never hidden as a "sizing bug".
+    _d_tall = _clamp_decision("u_se_le_vial", 900.0, 305.0, _interior_z_max,
+                              _interior_z_min, {"u_se_le_vial"}, _CP)
+    assert _d_tall == "skip", (
+        f"proveCatch (e): a registered above-lid signature mesh must be skipped even "
+        f"when taller than the interior (exemption precedes the over-tall test), got {_d_tall!r}.")
+
+    # (f) Source-inspection: the live clamp loop must consult the registered set
+    # BEFORE the containment-prefix test (the exemption must short-circuit).
+    import inspect as _ins_c
+    _src_c = _ins_c.getsource(place_sealed_enclosure)
+    _exempt_pos = _src_c.find("_cn in _ABOVE_LID_SIGNATURE_MESHES")
+    _prefix_pos = _src_c.find("_cn.startswith(_pfx) for _pfx in _CONTAINMENT_PREFIXES")
+    assert _exempt_pos != -1, (
+        "REGRESSION: place_sealed_enclosure no longer exempts "
+        "_ABOVE_LID_SIGNATURE_MESHES in the containment clamp — the optical tower "
+        "will be re-buried inside the sealed shell.")
+    assert _prefix_pos != -1 and _exempt_pos < _prefix_pos, (
+        "REGRESSION: the above-lid signature exemption must appear BEFORE the "
+        "_CONTAINMENT_PREFIXES match in the clamp loop (it must short-circuit).")
+
+    # (g) The signature builder must REGISTER _sig_new into the exemption set
+    # unconditionally (NOT gated on BLENDER_OUT_DIR) — a gated registration would
+    # skip when BLENDER_OUT_DIR is unset and the clamp would re-bury the tower.
+    _reg_pos = _src_c.find("_ABOVE_LID_SIGNATURE_MESHES.add(")
+    assert _reg_pos != -1, (
+        "REGRESSION: the signature builder no longer registers _sig_new into "
+        "_ABOVE_LID_SIGNATURE_MESHES — the containment clamp will crush the tower.")
+
+    print("[univ][sealed] _selftest_containment_exempts_above_lid_signature OK "
+          "(a: above-lid signature skipped, b: interior leak still clamped, "
+          "c-e: predicate edge cases, f-g: source wiring verified)")
+
+
 def _selftest_instrument_direct_logical_routing() -> None:
     """proveCatch (2026-07-22, organoid-bioreactor P9 FAIL):
     Inside a sealed instrument (_IS_INSTRUMENT_DEVICE=True) logical routes MUST use
@@ -24834,6 +25002,7 @@ if __name__ == "__main__":
         _selftest_sealed_zone_pack_dominance()
         _selftest_le_handheld_cue_gating()
         _selftest_le_vial_exterior_gating()
+        _selftest_containment_exempts_above_lid_signature()
         _selftest_instrument_direct_logical_routing()
         hfi._selftest()
         ifg._selftest()
