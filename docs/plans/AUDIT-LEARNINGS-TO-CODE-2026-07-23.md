@@ -101,6 +101,33 @@ post-clamp parts-manifest don't. So there are TWO coupled questions:
 - **Option C — accept the split:** closed box is the hero (Option A visual), the tower lives only
   in the GA cutaway + the translucent see-inside render, and we DISCLOSE that on the drawing.
 
+**DECISION (Tristan, 2026-07-23): Option B — the protruding tower is correct; the RENDER is wrong.**
+Implementation plan (the next focused increment — needs the render→SIGHT loop, do NOT mark done
+without SIGHTing the tower actually appear in `00-hero.png`):
+1. **Clamp exemption (Z only).** In `place_sealed_enclosure` (build_universal_scene.py ~16887, the
+   mesh-level containment clamp loop `for zp in parts`), skip the Z-axis containment (i==2 branch at
+   ~16908, `hi[i] > _int_hi[i]` → don't pull down) for parts flagged as a signature exterior
+   protrusion. KEEP X/Y containment (the tower must not sprawl sideways, only rise). Universal signal
+   — NOT a per-class table: key on a role/tag attribute (e.g. `zp.role in {'signature_protrusion',
+   'roof_feature','exterior_mount'}` or an explicit `zp.exterior_protrusion is True`), set where the
+   vial_bioreactor optical-tower/vessel is authored. If no such tag exists yet, add one at the
+   authoring site keyed on the part's function (an optical read-head / vessel neck that the design
+   marks as the instrument's signature feature), never on the class slug.
+2. **Grow the shell envelope** so the caption + G19 stay coherent: the enclosure envelope H must
+   include the protrusion (shell contains the tower base + the tower is an allowed exterior feature),
+   OR model the tower as lid-mounted (base at lid, rising above) with the shell reporting the tower
+   in its exterior-feature set.
+3. **G19 allowance:** `enclosure_shell_contains_check` must treat a designated exterior-protrusion
+   part as ALLOWED to sit proud of the lid (else G19 false-fires on the intended tower). Same
+   universal signal as (1). Keep the containment check for every non-signature part.
+4. **Re-render** (`render-blender-scene.py --state <run>/state.json --out-dir <dir>`, background it)
+   and **SIGHT** `00-hero.png` — the tower must now protrude, matching the GA. Confirm no sprawl
+   regression (other parts still contained; drawing-gates G19/G20/G21 PASS).
+5. Then build G22 (below) with BOTH artefacts now showing the tower — the gate fires if they diverge.
+   stash@{1} (`wip-vial-tower-geometry-unverified`) has prior tower-geometry placement — unstash and
+   compare; it placed geometry that "wasn't visible in any product render" — that invisibility was
+   almost certainly THIS clamp, so step 1 is likely the missing piece.
+
 **Q2 — the gate (independent of which option):** whichever geometry is canonical, build a
 cross-artefact FEATURE-consistency gate (G22) that FIRES when the set of protruding/exterior
 features differs between the DRAWING's geometry source and the RENDER's post-clamp geometry. This
