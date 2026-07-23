@@ -527,6 +527,23 @@ export interface PcbStageResult {
     allOk: boolean
     /** Alias of allOk — Excel readiness reads `ok`. */
     ok: boolean
+    /**
+     * Anvil honesty doctrine (pcb-firmware-honesty/v1) — required on every write.
+     * Excel MUST prefer honesty.statusLabel; never invent FUNCTIONALLY VERIFIED.
+     */
+    honesty: {
+      schema: 'pcb-firmware-honesty/v1'
+      tier: 0 | 1 | 2 | 3 | null
+      ok: boolean | null
+      statusLabel: string
+      fabReadyBanner: string
+      forbiddenClaim: string
+      readinessWhyFragment: string
+      isHil: false
+      claimsFunctionalVerification: false
+    }
+    /** Optional paths written under firmware-proof/ for artefact SIGHT. */
+    honestyArtefacts?: { contractPath: string; honestyPath: string }
     tier1?: {
       ok: boolean
       skipped: boolean

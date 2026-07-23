@@ -4,12 +4,15 @@ import path from 'node:path'
 import {
   PCB_FAB_READY_BANNER,
   PCB_FORBIDDEN_FUNCTIONAL_CLAIM,
+  PCB_FIRMWARE_HONESTY_CONTRACT,
   FIRMWARE_PCB_BRINGUP_REL_POSIX,
   FIRMWARE_PACK_README_BODY,
+  buildFirmwareHonestyRecord,
   claimsFunctionalVerificationIllegally,
   firmwareReadinessWhyFragment,
   firmwareStatusString,
   isHardcodedMcuSimTheatre,
+  writeFirmwareHonestyArtefacts,
 } from './pcb-firmware-honesty'
 
 describe('pcb-firmware-honesty doctrine', () => {
@@ -78,5 +81,35 @@ describe('pcb-firmware-honesty doctrine', () => {
     const main = fs.readFileSync(path.join(root, 'main.c'), 'utf8')
     expect(main).toContain('virt_i2c_read8')
     expect(isHardcodedMcuSimTheatre(main)).toBe(false)
+  })
+
+  it('proveCatch: buildFirmwareHonestyRecord is Anvil state shape (not docs-only)', () => {
+    const h = buildFirmwareHonestyRecord(3, true)
+    expect(h.schema).toBe('pcb-firmware-honesty/v1')
+    expect(h.isHil).toBe(false)
+    expect(h.claimsFunctionalVerification).toBe(false)
+    expect(h.statusLabel).toBe(PCB_FIRMWARE_HONESTY_CONTRACT.status.tier3)
+    expect(h.statusLabel).not.toContain(PCB_FORBIDDEN_FUNCTIONAL_CLAIM)
+    expect(h.readinessWhyFragment).toContain('virt_i2c_read8')
+  })
+
+  it('proveCatch: writeFirmwareHonestyArtefacts persists contract + honesty.json', () => {
+    const outBase = path.join(process.cwd(), 'out')
+    fs.mkdirSync(outBase, { recursive: true })
+    const dir = fs.mkdtempSync(path.join(outBase, 'honesty-artefacts-'))
+    try {
+      const h = buildFirmwareHonestyRecord(3, true)
+      const paths = writeFirmwareHonestyArtefacts(dir, h)
+      expect(fs.existsSync(paths.contractPath)).toBe(true)
+      expect(fs.existsSync(paths.honestyPath)).toBe(true)
+      const written = JSON.parse(fs.readFileSync(paths.honestyPath, 'utf8')) as {
+        statusLabel: string
+        isHil: boolean
+      }
+      expect(written.statusLabel).toBe(h.statusLabel)
+      expect(written.isHil).toBe(false)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

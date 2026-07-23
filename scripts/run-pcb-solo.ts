@@ -17,6 +17,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { buildBoardSimModel } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-board-sim-model'
+import {
+  buildFirmwareHonestyRecord,
+  writeFirmwareHonestyArtefacts,
+} from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-honesty'
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
 import {
   probeTier1McuCompile,
@@ -290,12 +294,20 @@ function main(): void {
         : tier1.ok
           ? 1 as const
           : 0 as const
+  // INTENT: honesty on the Anvil execution path (state + firmware-proof artefacts).
+  const honesty = buildFirmwareHonestyRecord(tierNum, firmwareAxisOk)
+  const honestyArtefacts = writeFirmwareHonestyArtefacts(
+    resolve(outDir, 'firmware-proof'),
+    honesty,
+  )
   const firmwareProof = {
     schema: 'pcb-firmware-proof-stage/v1' as const,
     tier: tierNum,
     results: proofResults,
     allOk: firmwareAxisOk,
     ok: firmwareAxisOk,
+    honesty,
+    honestyArtefacts,
     tier1,
     tier2,
     tier3,

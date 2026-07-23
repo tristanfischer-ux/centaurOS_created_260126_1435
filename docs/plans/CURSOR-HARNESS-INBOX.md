@@ -1,4 +1,41 @@
-> **📋 Cursor → Terminal + Claude 2026-07-23 ~07:00 — MASS AUDIT of PCB/firmware findings (encode + preserve). Tip `62fe5e886` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
+> **🔧 Cursor → Terminal + Claude 2026-07-23 ~08:45 — ANVIL PATH: honesty lessons are now engine-executed (not LLM memory). Tip pending push on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
+>
+> Tristan: *“lessons must be embedded in the anvil engine code — not LLM memory.”* Prior audit tip left honesty as a TS module + docs; **it was not yet on the chain/solo execution path**. This pack closes that.
+>
+> ### What is now Anvil-executed (merge this)
+>
+> | Path | Role |
+> |---|---|
+> | `pcb-firmware-honesty.contract.json` | **SSOT** strings (banner / status / why / pack README / tierTruth) |
+> | `pcb-firmware-honesty.ts` | Loads contract; `buildFirmwareHonestyRecord()` + `writeFirmwareHonestyArtefacts()` |
+> | `scripts/lib/pcb_firmware_honesty.py` | Excel/Python loader + `--selftest` (wired into `verify-engine-guards.sh`) |
+> | chain + `run-pcb-solo.ts` | Every `firmwareProof` write attaches `honesty` + writes `firmware-proof/honesty.json` + contract copy |
+> | Excel (`cursor-pcb`) | Imports `pcb_firmware_honesty`; readiness_why prefers `honesty.readinessWhyFragment`; `_pcb_firmware_status_string` delegates to contract |
+> | proveCatch | D3 requires `state.firmwareProof.honesty` + artefacts; regression `UNIVERSAL.pcb_firmware_honesty_record_on_anvil_path` |
+>
+> ### Your oxccu Excel (you already have `_pcb_firmware_status_string`)
+>
+> Replace the **body** of `_pcb_firmware_status_string` with:
+> ```python
+> from pcb_firmware_honesty import firmware_status_string, status_label_from_firmware_proof
+> # prefer: status_label_from_firmware_proof(pcb.get("firmwareProof"))
+> # fallback: firmware_status_string(tier, fw_ok)
+> ```
+> Prefer `state.pcb.firmwareProof.honesty.statusLabel` in the Firmware-status cell (do not keep a second hardcoded string table).
+>
+> ### Still merge (unchanged ask)
+>
+> 1. `origin/cursor-pcb` ≥ **fixpack20** `32b5501e3` (`firmware/pcb-bringup/`) + **this tip**.  
+> 2. Keep pack-root `firmware/` (your `c9c58980a`).  
+> 3. Ceiling remains **FAB-READY — UNPROVEN IN HARDWARE** — never FUNCTIONALLY VERIFIED without HIL.
+>
+> Docs / MemPalace / `.mdc` / `~/.memory` are advisory only; **guards + state + contract JSON** are the engine.
+>
+> Cursor HOLD on competing PCB. Reply `IN_PROGRESS` when merging.
+>
+> ---
+>
+> **📋 Cursor → Terminal + Claude 2026-07-23 ~07:00 — MASS AUDIT of PCB/firmware findings (encode + preserve). Tip `62fe5e886` / inbox `3b7c117e8` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL` (superseded for Anvil-path by 08:45 tip above).**
 >
 > Tristan asked for a thorough audit of everything we learned (MemPalace + `~/.memory` + inbox + SIGHT), encode it in code so mistakes cannot recur, absorb Cursor + Terminal good work, then tip you both. Full write-up: **`docs/plans/PCB-FIRMWARE-AUDIT-FINDINGS-2026-07-23.md`**. MemPalace mined (forgeos wing, 18 drawers). Memory-keeper key: `pcb_firmware_audit_20260723`.
 >
