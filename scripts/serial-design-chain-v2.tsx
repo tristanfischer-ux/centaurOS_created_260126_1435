@@ -82,6 +82,10 @@ import {
   runTier0FirmwareProof,
   runTier2BoardSim,
 } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-runner'
+import {
+  buildFirmwareHonestyRecord,
+  writeFirmwareHonestyArtefacts,
+} from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-honesty'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -10320,12 +10324,18 @@ async function main() {
                     : tier1.ok
                       ? 1 as const
                       : 0 as const
+              // INTENT: honesty is Anvil state, not a doc tip — Excel reads statusLabel.
+              const honesty = buildFirmwareHonestyRecord(tierNum, firmwareAxisOk)
+              const fwProofDir = resolve(pcbProjectDir, 'firmware-proof')
+              const honestyArtefacts = writeFirmwareHonestyArtefacts(fwProofDir, honesty)
               const firmwareProof = {
                 schema: 'pcb-firmware-proof-stage/v1' as const,
                 tier: tierNum,
                 results: proofResults,
                 allOk: firmwareAxisOk,
                 ok: firmwareAxisOk,
+                honesty,
+                honestyArtefacts,
                 tier1,
                 tier2,
                 tier3,
@@ -10334,6 +10344,7 @@ async function main() {
               pcb.firmwareProof = firmwareProof
               console.error(
                 `[chain] PCB firmwareProof: targets=${proofResults.length} allOk=${firmwareProof.allOk}` +
+                  ` status=${honesty.statusLabel}` +
                   ` tier1.ok=${tier1.ok} skipped=${tier1.skipped}` +
                   ` tier2.ok=${tier2.ok} skipped=${tier2.skipped} bindErrors=${tier2.bindErrorCount ?? 0}` +
                   ` tier3.ok=${tier3.ok} skipped=${tier3.skipped}`,
@@ -10341,12 +10352,14 @@ async function main() {
               logAction({
                 step: 'pcb_firmware_proof', ok: firmwareProof.allOk,
                 targets: proofResults.length, all_ok: firmwareProof.allOk,
+                honesty_status: honesty.statusLabel,
                 tier1_ok: tier1.ok, tier1_skipped: tier1.skipped,
                 tier2_ok: tier2.ok, tier2_skipped: tier2.skipped,
                 tier2_bind_errors: tier2.bindErrorCount ?? 0,
                 tier3_ok: tier3.ok, tier3_skipped: tier3.skipped,
               })
             } catch (fwErr) {
+              const honesty = buildFirmwareHonestyRecord(0, false)
               const firmwareProof = {
                 schema: 'pcb-firmware-proof-stage/v1' as const,
                 tier: 0 as const,
@@ -10359,6 +10372,7 @@ async function main() {
                 }],
                 allOk: false,
                 ok: false,
+                honesty,
               }
               stPcb.pcb.firmwareProof = firmwareProof
               pcb.firmwareProof = firmwareProof

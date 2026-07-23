@@ -354,35 +354,91 @@ console.log(JSON.stringify(a))
             fail("D3: emitted main.c not copied from firmware/pcb-bringup (still TS-embedded?)")
         elif main_c:
             ok("D3: emitted main.c sourced from firmware/pcb-bringup")
-    # INTENT (audit 2026-07-23): Cursor honesty module + Terminal Excel helper must lockstep.
+    # INTENT (audit 2026-07-23 / Anvil encode): honesty is engine contract + state, not docs.
     honesty_ts = (
         repo / "src" / "lib" / "pdf-engine-v2" / "lib" / "pcb" / "pcb-firmware-honesty.ts"
     )
+    honesty_contract = (
+        repo
+        / "src"
+        / "lib"
+        / "pdf-engine-v2"
+        / "lib"
+        / "pcb"
+        / "pcb-firmware-honesty.contract.json"
+    )
+    honesty_py = repo / "scripts" / "lib" / "pcb_firmware_honesty.py"
     excel_py = repo / "scripts" / "build-excel-export.py"
     _virt_status = (
         "VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE"
     )
+    if honesty_contract.is_file():
+        try:
+            cj = json.loads(honesty_contract.read_text(encoding="utf-8"))
+            if cj.get("status", {}).get("tier3") != _virt_status:
+                fail("D3: honesty.contract.json tier3 status drifted")
+            else:
+                ok("D3: honesty.contract.json tier3 status locked")
+        except json.JSONDecodeError as e:
+            fail(f"D3: honesty.contract.json unparseable: {e}")
+    else:
+        fail("D3: pcb-firmware-honesty.contract.json missing (Anvil SSOT)")
+    if honesty_py.is_file():
+        ok("D3: scripts/lib/pcb_firmware_honesty.py present (Excel loader)")
+    else:
+        fail("D3: scripts/lib/pcb_firmware_honesty.py missing")
     if honesty_ts.exists():
         ht = honesty_ts.read_text(errors="ignore")
-        if _virt_status not in ht:
-            fail("D3: pcb-firmware-honesty.ts missing canonical VIRTUAL BRING-UP status string")
+        if "buildFirmwareHonestyRecord" not in ht:
+            fail("D3: honesty TS missing buildFirmwareHonestyRecord (must write state)")
         else:
-            ok("D3: honesty module has VIRTUAL BRING-UP status string")
+            ok("D3: honesty TS exports buildFirmwareHonestyRecord")
         if "FUNCTIONALLY VERIFIED" not in ht:
             fail("D3: honesty module must name forbidden FUNCTIONALLY VERIFIED claim")
         else:
             ok("D3: honesty module forbids FUNCTIONALLY VERIFIED")
     else:
         fail("D3: pcb-firmware-honesty.ts missing")
+    fw_sum = summary.get("firmwareProof") or {}
+    h_state = fw_sum.get("honesty") if isinstance(fw_sum, dict) else None
+    if isinstance(h_state, dict) and h_state.get("schema") == "pcb-firmware-honesty/v1":
+        if h_state.get("statusLabel") and "UNPROVEN IN HARDWARE" in str(
+            h_state.get("statusLabel")
+        ):
+            ok("D3: state.firmwareProof.honesty.statusLabel present (Anvil path)")
+        else:
+            fail(f"D3: honesty.statusLabel weak/missing: {h_state.get('statusLabel')!r}")
+        if h_state.get("isHil") is not False:
+            fail("D3: honesty.isHil must be false in-chain")
+        else:
+            ok("D3: honesty.isHil is false")
+    elif fw_sum.get("ok") is not None or fw_sum.get("allOk") is not None:
+        fail("D3: firmwareProof present but honesty block missing (not on Anvil path)")
+    art_honesty = solo / "firmware-proof" / "honesty.json"
+    art_contract = solo / "firmware-proof" / "pcb-firmware-honesty.contract.json"
+    if not art_honesty.is_file():
+        # chain path nests under pcb-project/<id>/firmware-proof/
+        nested = list(solo.glob("pcb-project/*/firmware-proof/honesty.json"))
+        art_honesty = nested[0] if nested else art_honesty
+        nested_c = list(
+            solo.glob("pcb-project/*/firmware-proof/pcb-firmware-honesty.contract.json")
+        )
+        art_contract = nested_c[0] if nested_c else art_contract
+    if art_honesty.is_file() and art_contract.is_file():
+        ok("D3: firmware-proof honesty artefacts written")
+    elif fw_sum.get("ok") is not None or fw_sum.get("allOk") is not None:
+        fail("D3: firmware-proof/honesty.json artefacts missing")
     if excel_py.exists():
         et = excel_py.read_text(errors="ignore")
-        if "_pcb_firmware_status_string" in et and _virt_status not in et:
+        if "pcb_firmware_honesty" in et or "status_label_from_firmware_proof" in et:
+            ok("D3: Excel imports Anvil pcb_firmware_honesty helper")
+        elif "_pcb_firmware_status_string" in et and _virt_status not in et:
             fail(
-                "D3: build-excel-export.py drifted from honesty module "
+                "D3: build-excel-export.py drifted from honesty contract "
                 "(missing VIRTUAL BRING-UP status string)"
             )
         elif "_pcb_firmware_status_string" in et:
-            ok("D3: Excel _pcb_firmware_status_string lockstep with honesty module")
+            ok("D3: Excel _pcb_firmware_status_string present (migrate to contract loader)")
         # If Excel helper not yet merged into this worktree, skip — Terminal lane.
     # Adversarial: host mock is Mach-O; MCU sim evidence is ARM ELF + MCU_SIM transcript
     host_mock = solo / "firmware-proof" / "_tier2" / "board_sim_native"

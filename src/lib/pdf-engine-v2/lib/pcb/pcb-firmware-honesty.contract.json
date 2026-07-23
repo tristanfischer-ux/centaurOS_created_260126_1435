@@ -1,0 +1,45 @@
+{
+  "schema": "pcb-firmware-honesty/v1",
+  "fabReadyBanner": "FAB-READY — UNPROVEN IN HARDWARE",
+  "forbiddenFunctionalClaim": "FUNCTIONALLY VERIFIED",
+  "firmwarePcbBringupRelPosix": "firmware/pcb-bringup",
+  "deliverableFirmwareRoot": "firmware",
+  "status": {
+    "fail": "FAIL",
+    "notRun": "NOT RUN",
+    "tier0": "CONTRACT ONLY — UNPROVEN IN HARDWARE",
+    "tier1": "COMPILE / CONTRACT ONLY — UNPROVEN IN HARDWARE",
+    "tier2": "HOST BIND / CONTRACT PASS — UNPROVEN IN HARDWARE",
+    "tier3": "VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE"
+  },
+  "readinessWhyFragment": {
+    "tier0": "firmware-contract evidence present — UNPROVEN IN HARDWARE (not HIL)",
+    "tier1": "Tier-1 pinmap compile PASS — UNPROVEN IN HARDWARE (not running on silicon)",
+    "tier2": "host-bind / board-sim contract PASS — UNPROVEN IN HARDWARE (not MCU execution, not HIL)",
+    "tier3": "QEMU Cortex-M bring-up probed modelled I²C devices (virt_i2c_read8) — VIRTUAL BOARD ONLY, not HIL; NOT FUNCTIONALLY VERIFIED"
+  },
+  "packReadmeLines": [
+    "PCB firmware in this pack is VIRTUAL BRING-UP only.",
+    "QEMU (or host bind) exercises modelled peripherals — NOT SAMD21 silicon, NOT HIL.",
+    "Max claim: FAB-READY — UNPROVEN IN HARDWARE.",
+    "NEVER claim FUNCTIONALLY VERIFIED from these artefacts alone."
+  ],
+  "tierTruth": {
+    "0": {
+      "is": "Native host contract harness (buses/channels/safe-off as software contract)",
+      "isNot": "MCU execution, board silicon, HIL"
+    },
+    "1": {
+      "is": "arm-none-eabi link of pinmap-bound freestanding project from firmware/pcb-bringup",
+      "isNot": "Running firmware, peripheral I/O, HIL"
+    },
+    "2": {
+      "is": "Host net/device bind against board-sim model (pads/nets/expected I²C)",
+      "isNot": "Cortex-M execution — Mac/Mach-O mock only"
+    },
+    "3": {
+      "is": "QEMU Cortex-M ELF calls virt_i2c_read8 on RAM-modelled devices from expected_devices",
+      "isNot": "SAMD21 SERCOM silicon, physical chips, HIL, FUNCTIONALLY VERIFIED"
+    }
+  }
+}

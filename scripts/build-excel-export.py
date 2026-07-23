@@ -69,6 +69,7 @@ from openpyxl.worksheet.hyperlink import Hyperlink
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 import deterministic_checks_lib as dcl  # noqa: E402
+import pcb_firmware_honesty as pcb_fw_honesty  # noqa: E402
 from render_view_contract import (  # noqa: E402
     drawing_form_factor,
     form_factor_honesty_ok,
@@ -17528,7 +17529,8 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                            all_on_board_fab_tier: bool = True,
                            n_architecture_gaps: int = 0,
                            firmware_proof_ok: Optional[bool] = None,
-                           firmware_proof_tier: Optional[int] = None) -> Tuple[str, str]:
+                           firmware_proof_tier: Optional[int] = None,
+                           firmware_honesty_why: Optional[str] = None) -> Tuple[str, str]:
     """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
     board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
     unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
@@ -17599,34 +17601,34 @@ def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, ger
                 f"hygiene + fitness clean but {n_non_fab_tier} on-board part(s) carry no "
                 f"catalogue MPN (package_family/function_class only) — FAB-READY requires "
                 f"mpn_symbol_footprint / mpn_package / mpn_package_only on EVERY on-board part")
-    # FIRMWARE / HARDWARE HONESTY (Cursor Fix 9 + tier-aware rework 2026-07-22):
-    # a board is fabricable, but "FAB-READY" bare implies more than we can prove. There is
-    # NEVER a HIL result in-chain, so the MAX honest verdict is "FAB-READY — UNPROVEN IN
-    # HARDWARE"; "FUNCTIONALLY VERIFIED" requires a HIL transcript we never have.
-    # The readiness_why discloses the ACTUAL firmware proof tier so reviewers understand
-    # exactly what was (and was not) validated. Banner ALWAYS stays "FAB-READY — UNPROVEN
-    # IN HARDWARE" — tier only changes the why prose, never weakens the honesty ceiling.
-    _t = firmware_proof_tier
+    # FIRMWARE / HARDWARE HONESTY (Anvil SSOT via pcb_firmware_honesty.contract.json):
+    # Max banner FAB-READY — UNPROVEN IN HARDWARE; never FUNCTIONALLY VERIFIED in-chain.
+    # Prefer state.pcb.firmwareProof.honesty.readinessWhyFragment when present.
+    _banner = pcb_fw_honesty.fab_ready_banner()
     if firmware_proof_ok is True:
-        if _t is not None and _t >= 3:
-            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
-                    "QEMU Cortex-M bring-up probed modelled I²C devices (virt_i2c_read8) — "
-                    "VIRTUAL BOARD ONLY, not HIL; NOT FUNCTIONALLY VERIFIED")
-        elif _t == 2:
-            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
-                    "host-bind / board-sim contract PASS — compile+bind only, UNPROVEN IN HARDWARE")
-        elif _t == 1:
-            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
-                    "firmware compiles for target — compile only, UNPROVEN IN HARDWARE")
-        else:
-            _why = ("DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and "
-                    "Tier-0 firmware contract proof PASSED (compile + pin/bus/channel contract) — "
-                    "but no hardware-in-the-loop test exists, UNPROVEN IN HARDWARE")
-        return "FAB-READY — UNPROVEN IN HARDWARE", _why
-    return ("FAB-READY — UNPROVEN IN HARDWARE",
-            "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier — but NO "
-            "firmware-contract proof has been run and there is no hardware-in-the-loop test, "
-            "so the software/functional side is UNPROVEN (never 'FUNCTIONALLY VERIFIED')")
+        _frag = (firmware_honesty_why or "").strip()
+        if not _frag:
+            _frag = pcb_fw_honesty.firmware_readiness_why_fragment(firmware_proof_tier)
+        return (
+            _banner,
+            "DRC-clean, fully routed, Gerbers complete, verified-tier BoM, and " + _frag,
+        )
+    return (
+        _banner,
+        "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier — but NO "
+        "firmware-contract proof has been run and there is no hardware-in-the-loop test, "
+        "so the software/functional side is UNPROVEN (never 'FUNCTIONALLY VERIFIED')",
+    )
+
+
+def _pcb_firmware_status_string(tier: Optional[int], fw_ok: Optional[bool]) -> str:
+    """Canonical Firmware status cell — delegates to Anvil honesty contract (not LLM memory)."""
+    return pcb_fw_honesty.firmware_status_string(tier, fw_ok)
+
+
+def _pcb_firmware_status_from_proof(fw: Optional[dict]) -> str:
+    """Prefer state.pcb.firmwareProof.honesty.statusLabel written by chain/solo."""
+    return pcb_fw_honesty.status_label_from_firmware_proof(fw if isinstance(fw, dict) else None)
 
 
 def _pcb_readiness_style(readiness: str) -> Tuple[PatternFill, str, str]:
@@ -18356,23 +18358,26 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     # P9b: chain writes both `ok` and `allOk` (alias); accept either. None = never run.
     _fw_ok = None
     _fw_tier: Optional[int] = None
+    _fw_honesty_why: Optional[str] = None
     if isinstance(_fw, dict):
         if "ok" in _fw:
             _fw_ok = bool(_fw.get("ok"))
         elif "allOk" in _fw:
             _fw_ok = bool(_fw.get("allOk"))
-        # Extract the integer proof tier (0–3) — written by the QEMU firmware harness.
-        _raw_tier = _fw.get("tier")
-        if isinstance(_raw_tier, int):
-            _fw_tier = _raw_tier
+        try:
+            _fw_tier = int(_fw["tier"]) if _fw.get("tier") is not None else None
+        except (TypeError, ValueError):
+            _fw_tier = None
+        _h = _fw.get("honesty") if isinstance(_fw.get("honesty"), dict) else None
+        if isinstance(_h, dict) and isinstance(_h.get("readinessWhyFragment"), str):
+            _fw_honesty_why = _h["readinessWhyFragment"] or None
     readiness, readiness_why = _pcb_readiness_verdict(
         pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
         n_electronic_gap, n_on_board=n_on_board, n_electronic_design=n_on_board_scope,
         n_electronic_full=n_electronic_design,
         n_non_fab_tier=_n_non_fab_tier, all_on_board_fab_tier=_all_on_board_fab,
         n_architecture_gaps=_n_arch_gaps, firmware_proof_ok=_fw_ok,
-        firmware_proof_tier=_fw_tier)
-
+        firmware_proof_tier=_fw_tier, firmware_honesty_why=_fw_honesty_why)
     # HONESTY (2026-07-23, Tristan spot-check): _pcb_readiness_verdict hard-codes "DRC-clean"
     # in the FAB-READY prose, but a board can carry non-critical DRC residuals (e.g. a
     # connector shield-pad annular width under the board min). Read the REAL per-board

@@ -54,6 +54,7 @@ import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
 import {
   FIRMWARE_PCB_BRINGUP_REL_POSIX,
+  buildFirmwareHonestyRecord,
   firmwareStatusString,
   isHardcodedMcuSimTheatre,
 } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-honesty'
@@ -14317,6 +14318,22 @@ function checkPcbFirmwareHonestyInvariants(): Assertion[] {
       && s.includes('UNPROVEN IN HARDWARE')
       && !s.includes('FUNCTIONALLY VERIFIED'),
     () => `got: ${firmwareStatusString(3, true)}`,
+  ))
+  // INTENT: honesty must be Anvil state shape (chain/solo attach this), not docs-only.
+  const honestyRec = buildFirmwareHonestyRecord(3, true)
+  out.push(assertEq(
+    'UNIVERSAL.pcb_firmware_honesty_record_on_anvil_path',
+    'buildFirmwareHonestyRecord(3,true) isHil=false + statusLabel from contract',
+    honestyRec,
+    (h) =>
+      h != null
+      && typeof h === 'object'
+      && (h as { schema?: string }).schema === 'pcb-firmware-honesty/v1'
+      && (h as { isHil?: boolean }).isHil === false
+      && (h as { claimsFunctionalVerification?: boolean }).claimsFunctionalVerification === false
+      && String((h as { statusLabel?: string }).statusLabel || '').includes('VIRTUAL BRING-UP')
+      && String((h as { statusLabel?: string }).statusLabel || '').includes('UNPROVEN IN HARDWARE'),
+    () => `got: ${JSON.stringify(honestyRec)}`,
   ))
   return out
 }

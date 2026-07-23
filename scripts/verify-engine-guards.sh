@@ -132,6 +132,9 @@ run "scenario-planning.ts --selftest"         npx tsx scripts/lib/scenario-plann
 # PROVE-THE-CATCH: every registered gate must catch its own adversarial input (intent, not just
 # existence). A gate that can no longer block the exact failure it exists to catch fails here.
 run "gate-registry --selftest (prove-catch)"  npx tsx scripts/lib/gate-registry.ts --selftest
+# PCB firmware honesty doctrine (Anvil SSOT — not LLM memory / docs alone).
+# proveCatch: contract JSON loads; tier≥3 never FUNCTIONALLY VERIFIED; state prefer path.
+run "pcb-firmware-honesty.py --selftest"      "$PY" scripts/lib/pcb_firmware_honesty.py --selftest
 # VERIFY-BEFORE-WRITEBACK: an LLM-web spec/standard/product is persisted only with real evidence
 # (authoritative URL + an excerpt that supports the value) — a hallucinated value is rejected.
 run "web-extraction-verify --selftest"        npx tsx src/lib/pdf-engine-v2/lib/knowledge/web-extraction-verify.ts --selftest

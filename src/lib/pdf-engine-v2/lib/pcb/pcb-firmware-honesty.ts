@@ -1,43 +1,70 @@
 /**
- * @file Canonical PCB firmware honesty doctrine (shared labels + forbidden claims).
+ * @file Canonical PCB firmware honesty doctrine (Anvil engine — not LLM memory).
  * @description Tristan 2026-07-22/23: never oversell QEMU/host-bind as product validation.
- * Excel (`build-excel-export.py::_pcb_firmware_status_string`) MUST stay byte-aligned with
- * these strings — proveCatch in pcb-firmware-honesty.test.ts locks the contract.
+ * Machine-readable SSOT: `pcb-firmware-honesty.contract.json` (this module + Python
+ * `scripts/lib/pcb_firmware_honesty.py` both load it). Chain/solo MUST attach
+ * `buildFirmwareHonestyRecord()` onto `state.pcb.firmwareProof.honesty` every run.
  *
- * INTENT: one source of truth so Cursor TS + Terminal Excel + pack README cannot drift
- * into "firmware works" / FUNCTIONALLY VERIFIED theatre.
+ * INTENT: lessons live on the Anvil execution path (state + artefacts + guards),
+ * so Excel/pack/agents cannot drift into "firmware works" / FUNCTIONALLY VERIFIED theatre.
  */
 
-/** Max honest PCB readiness banner prefix (never bare FAB-READY). */
-export const PCB_FAB_READY_BANNER = 'FAB-READY — UNPROVEN IN HARDWARE' as const
+import fs from 'node:fs'
+import path from 'node:path'
 
-/** Forbidden claim — requires real HIL transcript we do not have in-chain. */
-export const PCB_FORBIDDEN_FUNCTIONAL_CLAIM = 'FUNCTIONALLY VERIFIED' as const
-
-/** First-class git tree for Cortex-M bring-up (fixpack20). */
-export const FIRMWARE_PCB_BRINGUP_REL_POSIX = 'firmware/pcb-bringup'
-
-/** Deliverable pack root for firmware (sibling of pcb/, not under it). */
-export const DELIVERABLE_FIRMWARE_ROOT = 'firmware'
+import contractJson from './pcb-firmware-honesty.contract.json'
 
 export type FirmwareProofTier = 0 | 1 | 2 | 3
 
+/** @description Committed contract object (schema pcb-firmware-honesty/v1). */
+export const PCB_FIRMWARE_HONESTY_CONTRACT = contractJson
+
+/** Max honest PCB readiness banner prefix (never bare FAB-READY). */
+export const PCB_FAB_READY_BANNER =
+  PCB_FIRMWARE_HONESTY_CONTRACT.fabReadyBanner as 'FAB-READY — UNPROVEN IN HARDWARE'
+
+/** Forbidden claim — requires real HIL transcript we do not have in-chain. */
+export const PCB_FORBIDDEN_FUNCTIONAL_CLAIM =
+  PCB_FIRMWARE_HONESTY_CONTRACT.forbiddenFunctionalClaim as 'FUNCTIONALLY VERIFIED'
+
+/** First-class git tree for Cortex-M bring-up (fixpack20). */
+export const FIRMWARE_PCB_BRINGUP_REL_POSIX =
+  PCB_FIRMWARE_HONESTY_CONTRACT.firmwarePcbBringupRelPosix as 'firmware/pcb-bringup'
+
+/** Deliverable pack root for firmware (sibling of pcb/, not under it). */
+export const DELIVERABLE_FIRMWARE_ROOT =
+  PCB_FIRMWARE_HONESTY_CONTRACT.deliverableFirmwareRoot as 'firmware'
+
+export interface FirmwareHonestyRecord {
+  schema: 'pcb-firmware-honesty/v1'
+  tier: FirmwareProofTier | null
+  ok: boolean | null
+  /** Excel "Firmware status" cell — never FUNCTIONALLY VERIFIED. */
+  statusLabel: string
+  fabReadyBanner: typeof PCB_FAB_READY_BANNER
+  forbiddenClaim: typeof PCB_FORBIDDEN_FUNCTIONAL_CLAIM
+  /** Fragment for readiness_why when ok; empty when not. */
+  readinessWhyFragment: string
+  /** Always false in-chain until a real HIL transcript exists. */
+  isHil: false
+  claimsFunctionalVerification: false
+}
+
 /**
  * @description Canonical Firmware-status cell for the Excel PCB tab.
- * Mirrors Terminal `_pcb_firmware_status_string` — keep in lockstep.
+ * Reads from the committed contract JSON — keep Python loader in lockstep.
  */
 export function firmwareStatusString(
   tier: number | null | undefined,
   fwOk: boolean | null | undefined,
 ): string {
-  if (fwOk === false) return 'FAIL'
-  if (tier == null || fwOk == null) return 'NOT RUN'
-  if (tier >= 3) {
-    return 'VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE'
-  }
-  if (tier === 2) return 'HOST BIND / CONTRACT PASS — UNPROVEN IN HARDWARE'
-  if (tier === 1) return 'COMPILE / CONTRACT ONLY — UNPROVEN IN HARDWARE'
-  return 'CONTRACT ONLY — UNPROVEN IN HARDWARE'
+  const s = PCB_FIRMWARE_HONESTY_CONTRACT.status
+  if (fwOk === false) return s.fail
+  if (tier == null || fwOk == null) return s.notRun
+  if (tier >= 3) return s.tier3
+  if (tier === 2) return s.tier2
+  if (tier === 1) return s.tier1
+  return s.tier0
 }
 
 /**
@@ -45,28 +72,59 @@ export function firmwareStatusString(
  * Never implies HIL or product validation.
  */
 export function firmwareReadinessWhyFragment(tier: number | null | undefined): string {
-  if (tier != null && tier >= 3) {
-    return (
-      'QEMU Cortex-M bring-up probed modelled I²C devices (virt_i2c_read8) — ' +
-      'VIRTUAL BOARD ONLY, not HIL; NOT FUNCTIONALLY VERIFIED'
-    )
-  }
-  if (tier === 2) {
-    return 'host-bind / board-sim contract PASS — UNPROVEN IN HARDWARE (not MCU execution, not HIL)'
-  }
-  if (tier === 1) {
-    return 'Tier-1 pinmap compile PASS — UNPROVEN IN HARDWARE (not running on silicon)'
-  }
-  return 'firmware-contract evidence present — UNPROVEN IN HARDWARE (not HIL)'
+  const w = PCB_FIRMWARE_HONESTY_CONTRACT.readinessWhyFragment
+  if (tier != null && tier >= 3) return w.tier3
+  if (tier === 2) return w.tier2
+  if (tier === 1) return w.tier1
+  return w.tier0
 }
 
 /** Pack README honesty paragraph (Terminal bundler + Cursor tip). */
-export const FIRMWARE_PACK_README_BODY = [
-  'PCB firmware in this pack is VIRTUAL BRING-UP only.',
-  'QEMU (or host bind) exercises modelled peripherals — NOT SAMD21 silicon, NOT HIL.',
-  `Max claim: ${PCB_FAB_READY_BANNER}.`,
-  `NEVER claim ${PCB_FORBIDDEN_FUNCTIONAL_CLAIM} from these artefacts alone.`,
-].join('\n')
+export const FIRMWARE_PACK_README_BODY =
+  PCB_FIRMWARE_HONESTY_CONTRACT.packReadmeLines.join('\n')
+
+/**
+ * @description Structured honesty block written onto every firmwareProof in state.
+ * Excel MUST prefer `honesty.statusLabel` over recomputing from tier alone.
+ */
+export function buildFirmwareHonestyRecord(
+  tier: number | null | undefined,
+  fwOk: boolean | null | undefined,
+): FirmwareHonestyRecord {
+  const normalizedTier: FirmwareProofTier | null =
+    tier == null || Number.isNaN(Number(tier))
+      ? null
+      : (Math.min(3, Math.max(0, Math.trunc(Number(tier)))) as FirmwareProofTier)
+  const okNorm = fwOk === true ? true : fwOk === false ? false : null
+  return {
+    schema: 'pcb-firmware-honesty/v1',
+    tier: normalizedTier,
+    ok: okNorm,
+    statusLabel: firmwareStatusString(normalizedTier, okNorm),
+    fabReadyBanner: PCB_FAB_READY_BANNER,
+    forbiddenClaim: PCB_FORBIDDEN_FUNCTIONAL_CLAIM,
+    readinessWhyFragment:
+      okNorm === true ? firmwareReadinessWhyFragment(normalizedTier) : '',
+    isHil: false,
+    claimsFunctionalVerification: false,
+  }
+}
+
+/**
+ * @description Persist contract + per-run honesty into a firmware-proof artefact dir.
+ * Fail-closed consumers (Excel, pack README, proveCatch) can load without re-deriving.
+ */
+export function writeFirmwareHonestyArtefacts(
+  artefactDir: string,
+  honesty: FirmwareHonestyRecord,
+): { contractPath: string; honestyPath: string } {
+  fs.mkdirSync(artefactDir, { recursive: true })
+  const contractPath = path.join(artefactDir, 'pcb-firmware-honesty.contract.json')
+  const honestyPath = path.join(artefactDir, 'honesty.json')
+  fs.writeFileSync(contractPath, JSON.stringify(PCB_FIRMWARE_HONESTY_CONTRACT, null, 2))
+  fs.writeFileSync(honestyPath, JSON.stringify(honesty, null, 2))
+  return { contractPath, honestyPath }
+}
 
 /**
  * @description True when a status/banner string illegally asserts product validation.
@@ -97,20 +155,8 @@ export function isHardcodedMcuSimTheatre(mainC: string): boolean {
  * @description What each firmware tier actually proves (for SIGHT / agents).
  */
 export const FIRMWARE_TIER_TRUTH = {
-  0: {
-    is: 'Native host contract harness (buses/channels/safe-off as software contract)',
-    isNot: 'MCU execution, board silicon, HIL',
-  },
-  1: {
-    is: 'arm-none-eabi link of pinmap-bound freestanding project from firmware/pcb-bringup',
-    isNot: 'Running firmware, peripheral I/O, HIL',
-  },
-  2: {
-    is: 'Host net/device bind against board-sim model (pads/nets/expected I²C)',
-    isNot: 'Cortex-M execution — Mac/Mach-O mock only',
-  },
-  3: {
-    is: 'QEMU Cortex-M ELF calls virt_i2c_read8 on RAM-modelled devices from expected_devices',
-    isNot: 'SAMD21 SERCOM silicon, physical chips, HIL, FUNCTIONALLY VERIFIED',
-  },
+  0: PCB_FIRMWARE_HONESTY_CONTRACT.tierTruth['0'],
+  1: PCB_FIRMWARE_HONESTY_CONTRACT.tierTruth['1'],
+  2: PCB_FIRMWARE_HONESTY_CONTRACT.tierTruth['2'],
+  3: PCB_FIRMWARE_HONESTY_CONTRACT.tierTruth['3'],
 } as const satisfies Record<FirmwareProofTier, { is: string; isNot: string }>
