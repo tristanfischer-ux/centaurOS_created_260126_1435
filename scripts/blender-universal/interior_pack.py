@@ -78,6 +78,109 @@ def _shelf_pack(items, fw, fd, floor_z, gap_mm):
     return pos, ztop, (y + row_depth)  # last y-edge used
 
 
+def _layer_shelf(items, fw, fd, z0, gap):
+    """Shelf-pack `items` onto ONE plane at height z0. Returns (pos, rot, ztop, placed, leftover).
+    Stops when the plane's depth (y) is exhausted; unплaced items are returned as leftover."""
+    oriented = []
+    for p in items:
+        w, d, h = p["dims"]
+        rot = d > w
+        oriented.append((p, max(w, d), min(w, d), h, rot))
+    oriented.sort(key=lambda t: (-t[2], -t[1], t[0]["tag"]))
+    pos = {}; rot = {}; x = -fw/2; y = -fd/2; row_d = 0.0; ztop = z0; placed = []; leftover = []
+    for p, ww, dd, h, r in oriented:
+        ww = min(ww, fw)
+        if x + ww > fw/2 + 1e-6:              # wrap to next row
+            x = -fw/2; y += row_d + gap; row_d = 0.0
+        if y + dd > fd/2 + 1e-6:               # plane full -> leftover to next layer
+            leftover.append(p); continue
+        pos[p["tag"]] = (round(x+ww/2, 2), round(y+dd/2, 2), round(z0+h/2, 2))
+        rot[p["tag"]] = r; x += ww + gap; row_d = max(row_d, dd); ztop = max(ztop, z0+h)
+        placed.append(p)
+    return pos, rot, ztop, placed, leftover
+
+
+def pack_interior_stacked(parts, base_z_mm, floor_w=None, floor_d=None, gap_mm=4.0,
+                          standoff_mm=14.0, plate_t=3.0):
+    """Multi-LAYER stacked pack + internal mounting FRAME. Mechanicals bolt to a base plate
+    (layer 0); the PCB + electronics ride a raised deck on standoffs (layer 1); overflow
+    stacks onto further decks. The enclosure resizes to contain the result. Returns
+    (pos{tag:(x,y,z)}, rot{tag:bool}, frame[list of {tag,name,dims,pos}], layers, bbox)."""
+    fasteners = [p for p in parts if _is_fastener(p["name"])]
+    rest = [p for p in parts if not _is_fastener(p["name"])]
+    mech = [p for p in rest if _is_chassis(p["name"], p["dims"]) or _is_baselayer(p["name"])]
+    onboard = [p for p in rest if _is_onboard(p["name"], p["dims"])]
+
+    # target floor: hold the two widest mechanicals side-by-side (keeps it compact -> stacks)
+    if floor_w is None:
+        ws = sorted((max(p["dims"][0], p["dims"][1]) for p in mech), reverse=True)
+        floor_w = (ws[0] + ws[1] + 3*gap_mm) if len(ws) >= 2 else (ws[0] + 2*gap_mm if ws else 120)
+    if floor_d is None:
+        floor_d = floor_w * 0.72
+    fw, fd = floor_w, floor_d
+
+    pos = {}; rot = {}; frame = []; layers = []
+    z = base_z_mm + plate_t                                   # layer-0 sits on the base plate
+    todo = mech[:]
+    layer_i = 0
+    while todo:
+        lp, lr, ztop, placed, todo = _layer_shelf(todo, fw, fd, z, gap_mm)
+        pos.update(lp); rot.update(lr)
+        layers.append({"z0": z, "ztop": ztop, "tags": [p["tag"] for p in placed]})
+        z = ztop + standoff_mm + plate_t                     # next deck rides standoffs
+        layer_i += 1
+        if layer_i > 8:
+            break
+    mech_top = layers[-1]["ztop"] if layers else base_z_mm
+
+    # PCB deck: a plate on standoffs above the mechanicals; electronics grid on it
+    pcb_z0 = mech_top + standoff_mm + plate_t
+    if onboard:
+        # a PCB sized to host the electronics grid, centred on the floor
+        ob_fp = sum(_footprint(p) for p in onboard)
+        pw = min(fw - 2*gap_mm, max(80.0, (ob_fp*2.0)**0.5))
+        pd = min(fd - 2*gap_mm, max(60.0, ob_fp*2.0/pw))
+        pos["__PCB_BASE__"] = (0.0, 0.0, round(pcb_z0 + plate_t/2, 2))
+        frame.append({"tag": "__PCB_BASE__", "name": "PCB (interior deck)",
+                      "dims": (round(pw, 1), round(pd, 1), plate_t), "role": "pcb"})
+        lp, lr, ztop, placed, leftover = _layer_shelf(onboard, pw, pd, pcb_z0 + plate_t, gap_mm)
+        pos.update(lp); rot.update(lr)
+        # any electronics that overflow the board grid: extra deck above
+        zz = ztop + standoff_mm + plate_t
+        while leftover:
+            lp, lr, ztop, placed, leftover = _layer_shelf(leftover, pw, pd, zz, gap_mm)
+            pos.update(lp); rot.update(lr); zz = ztop + standoff_mm + plate_t
+        layers.append({"z0": pcb_z0, "ztop": ztop, "tags": [p["tag"] for p in onboard]})
+
+    # frame: base plate + corner standoffs up to the top deck
+    top_z = max((c[2] for c in pos.values()), default=base_z_mm)
+    frame.append({"tag": "__BASE_PLATE__", "name": "Chassis base plate",
+                  "dims": (round(fw, 1), round(fd, 1), plate_t),
+                  "pos": (0.0, 0.0, round(base_z_mm + plate_t/2, 2)), "role": "plate"})
+    so_h = top_z - base_z_mm
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            frame.append({"tag": f"__STANDOFF_{sx}_{sy}__", "name": "Mounting standoff pillar",
+                          "dims": (6.0, 6.0, round(so_h, 1)),
+                          "pos": (round(sx*(fw/2-8), 2), round(sy*(fd/2-8), 2),
+                                  round(base_z_mm + so_h/2, 2)), "role": "standoff"})
+    # fasteners: on the base plate near a corner
+    fx = -fw/2 + gap_mm
+    for p in fasteners:
+        w, d, h = p["dims"]
+        pos[p["tag"]] = (round(fx+w/2, 2), round(fd/2-d, 2), round(base_z_mm+plate_t+h/2, 2))
+        fx += w + gap_mm
+    pos["__rot__"] = rot
+    # bbox
+    xs = []; ys = []; zs = []
+    for p in rest + fasteners:
+        c = pos[p["tag"]]; w, d, h = p["dims"]
+        if rot.get(p["tag"]): w, d = max(w, d), min(w, d)
+        xs += [c[0]-w/2, c[0]+w/2]; ys += [c[1]-d/2, c[1]+d/2]; zs += [c[2]-h/2, c[2]+h/2]
+    bbox = (max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs)) if xs else (0, 0, 0)
+    return pos, rot, frame, layers, bbox
+
+
 def pack_interior(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=3.0, wall_mm=6.0):
     """Hosting-aware pack: CHASSIS parts (vessel/pump/stirrer/fan/Peltier/vial/tubing +
     footprint>1500mm²) + a PCB base plane sit on the FLOOR; small ON-BOARD electronics
@@ -162,8 +265,39 @@ def count_clashes(parts, pos, iw_mm, idep_mm, ih_mm, base_z_mm, wall_mm=6.0):
     return clash, oob, worst
 
 
+def _selftest():
+    """proveCatch: the stacked pack places EVERY part with 0 pairwise clash + a mounting frame."""
+    demo = [
+        {"tag": "A", "name": "Magnetic Stirrer Drive", "dims": (120, 100, 60)},
+        {"tag": "B", "name": "Heatsink Fan", "dims": (95, 92, 114)},
+        {"tag": "C", "name": "Culture Vessel", "dims": (38, 100, 19)},
+        {"tag": "D", "name": "Peltier Tec Module", "dims": (40, 40, 20)},
+        {"tag": "E", "name": "Power Indicator LED", "dims": (8, 8, 5)},
+        {"tag": "F", "name": "Esd Protection Network", "dims": (9, 5, 3)},
+        {"tag": "G", "name": "Microcontroller Mcu", "dims": (18, 18, 4)},
+        {"tag": "H", "name": "Pcb Mounting Standoff", "dims": (8, 8, 12)},
+    ]
+    pos, rot, frame, layers, bbox = pack_interior_stacked(demo, 0.0)
+    placed = [p for p in demo if p["tag"] in pos]
+    assert len(placed) == len(demo), f"pack dropped parts: {len(placed)}/{len(demo)}"
+    nclash, _, worst = count_clashes(demo, pos, 10000, 10000, 10000, 0.0)
+    assert nclash == 0, f"pack produced {nclash} clash(es): {worst}"
+    assert any(f["role"] == "plate" for f in frame), "no base plate in the mounting frame"
+    assert any(f["role"] == "standoff" for f in frame), "no standoffs in the mounting frame"
+    assert len(layers) >= 2, "expected the demo to stack into >=2 layers"
+    # proveCatch: the OLD co-located layout (all at origin) MUST be caught as clashing
+    bad = {p["tag"]: (0, 0, 10) for p in demo}
+    bad["__rot__"] = {}
+    nbad, _, _ = count_clashes(demo, bad, 10000, 10000, 10000, 0.0)
+    assert nbad > 0, "clash oracle failed to catch a fully co-located layout"
+    print(f"interior_pack _selftest: OK (stacked {len(placed)} parts, {len(layers)} layers, 0 clash, "
+          f"frame=base-plate+standoffs; oracle catches co-location)")
+
+
 if __name__ == "__main__":
     import sys, json
+    if len(sys.argv) > 1 and sys.argv[1] in ("--selftest", "selftest"):
+        _selftest(); sys.exit(0)
     mf = sys.argv[1] if len(sys.argv) > 1 else "out/organoid-for-simon/parts-manifest.json"
     pm = json.load(open(mf))
     allp = pm.get("parts", [])
