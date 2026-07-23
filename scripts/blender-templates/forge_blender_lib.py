@@ -1382,6 +1382,17 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     _HERO_MAT_EXEMPT_PREFIXES = (
         "u_se_instrument_story_", "u_se_product_", "u_se_exterior_detail_",
         "u_se_cutaway_cue_",
+        # INSTRUMENT INTERIOR MESHES (2026-07-23 pale-hero fix): the enclosed-instrument
+        # hero repaints every structure_containment object with the near-white ghost skin
+        # (make_hero_ghost, alpha 0.18) UNLESS exempt. The real interior parts are named
+        # u_se_le_* (lab_electronics: OD tower / stir / vial collar / PCB), u_se_tc_*
+        # (thermocycler), u_se_sp_* (syringe pump), u_se_lm_* (microscope), + u_se_cad_/det_
+        # CAD/detail story meshes — none were exempt, so they ghosted to pale phantoms and
+        # the 00-hero/cover read washed-out (04-07 exterior views close the cover + hide
+        # internals, so they were unaffected). Exempt them so they keep their authored dark
+        # materials — matching the crisp 08-ghost-shell pass (which only ghosts the SHELL).
+        "u_se_le_", "u_se_tc_", "u_se_sp_", "u_se_lm_",
+        "u_se_cad_", "u_se_det_",
     )
     hero_snap = {}
     for obj in structure_objs:

@@ -34854,8 +34854,27 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "06-product-right.png", "07-product-service.png",
         "blender-cover.png",
     ]
+    # 01-top.png is the INTERIOR ANNOTATED PLAN — a real customer view for PLANT-scale
+    # products (it matches the GA), but for a SEALED INSTRUMENT it is only the INSPECT proxy
+    # pass (grey placeholder cylinders + a floating equipment tag like 'X-103', copied
+    # verbatim by generate_drawing_set._align_plan_render_to_manifest). Shipping that to a
+    # customer badged 'Product render' is a defect (Tristan 2026-07-23, "it's a mess").
+    # Sealed-product signal = the shaded product-skin exterior render exists on disk.
+    _is_sealed_product = os.path.exists(os.path.join(run_dir, "04-product-exterior.png"))
+    _RENDER_CAPTIONS = {
+        "00-hero.png": "Product hero — studio render",
+        "01-top.png": "Interior layout — annotated top-down plan (matches the GA)",
+        "04-product-exterior.png": "Product — exterior three-quarter view",
+        "05-product-left.png": "Product — left elevation",
+        "06-product-right.png": "Product — right elevation",
+        "07-product-service.png": "Product — service / rear view",
+        "blender-cover.png": "Product hero — cover render",
+    }
     _any_render = False
     for _rn in _RENDER_NAMES:
+        if _rn == "01-top.png" and _is_sealed_product:
+            skipped.append("renders/01-top.png (interior proxy plan — not a product view for a sealed instrument)")
+            continue
         _rp = os.path.join(run_dir, _rn)
         if os.path.exists(_rp):
             _cp(_rp, f"renders/{_rn}")
@@ -34897,7 +34916,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         _desc = _section_descs.get(_rel) or _section_descs.get(_base) or ""
         if not _desc:
             if _rel.startswith("renders/"):
-                _desc = "Product render (Blender)"
+                _desc = _RENDER_CAPTIONS.get(_base, "Product render (Blender)")
             elif _rel.startswith("drawings/"):
                 _desc = "Engineering drawing A1 print sheet (PDF)"
             elif _rel.startswith("pcb/") and "/gerbers/" in _rel:
