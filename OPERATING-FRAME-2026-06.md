@@ -368,6 +368,17 @@ All three are universal (keyed on manifest content, never a product-class slug),
 
 **Verification rule — SIGHT the delivered pixels, not stdout alone.** Selftests passed while 4 coherence fixes shipped Goodhart (the mesh was stale while the manifest number was updated). The closing check is: (1) run a SINGLE render pass (`scripts/render-blender-scene.py --state <state.json> --out-dir <dir>`), NOT `run-loop.sh`; (2) SIGHT `00-hero.png` + `04-product-exterior.png` (sealed product view) — does the rendered shell contain the parts? (3) check `drawing-gates.json` for G19/G20/G21 PASS; (4) SIGHT inspect-front/top against the render — same envelope, same parts? Only then is coherence confirmed.
 
+## Method wins — the demo sprint (2026-07-23)
+
+These are the durable working rules that came out of driving the organoid dossier to a genuine floor-9 SHIP under time pressure. They are now code guards where possible; hold them as method otherwise.
+
+- **The engine's own score is NOT trustworthy — SIGHT the DELIVERED artefact.** It self-scored 9/10 with a live `#DIV/0!`, a black-on-black render, AND a render↔drawing tower mismatch. A pass is a statement about the checks, not the dossier. Open the actual Excel cells + the actual PNGs.
+- **SIGHT render↔drawing SIDE BY SIDE.** The optical-tower miss (GA draws it, sealed render hides it via the containment clamp) slipped because I looked at each artefact alone. Compare the two directly. Coherence gate G22 for this is a NAMED DECISION (see `docs/plans/AUDIT-LEARNINGS-TO-CODE-2026-07-23.md` §F) — the manifest is post-clamp, so a manifest-only feature gate false-greens the miss.
+- **Do NOT trust a sub-agent's SIGHT / visual judgment.** A sub-agent twice green-lit a bad render (it "fixed" black-on-black by flipping AgX→Standard → a washed-out white-on-white, and called it correct). Keep visual judgment on the main thread. (drawer 10a55819dcd5336b)
+- **Fast iteration loop (don't re-run the chain):** Blender layout is deterministic — `render-blender-scene.py --state <state.json> --out-dir <dir>` (~6.5min) re-renders; `build-excel-export.py <run_dir>` recomputes checks + rebuilds the dossier + tab-scorecard in ~47s. Only a fresh DESIGN needs the full chain. Render exceeds the 2-min foreground Bash timeout → background it.
+- **AgX, never Standard, for product renders** — Standard has no highlight roll-off → light bodies bloom to a pale wash. Now guarded (`render_view_transform_selftest.py`).
+- **gate-36 (benchmark net): read the brief's cost band before relaying a cost alarm** — a DIY/open-hardware brief is legitimately far cheaper than the commercial benchmark; check the stated ceiling first. Now guarded (benchmark-cost brief-anchor).
+
 ---
 
 ## 5. THE ONE BEHAVIOURAL CHANGE (if nothing else changes, change this)
