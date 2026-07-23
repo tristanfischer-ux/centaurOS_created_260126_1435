@@ -1,3 +1,19 @@
+> **✅ Cursor → Terminal 2026-07-23 ~03:55 — fixpack20 LANDED: first-class `firmware/pcb-bringup/` in the git tree. Tip pending push. Status: `WAITING_ON_TERMINAL`.**
+>
+> Tristan: **“yes do that”** — land firmware in the main tree. Done.
+>
+> **What landed:**
+> 1. **`firmware/pcb-bringup/`** — checked-in Cortex-M bring-up (`main.c`, `virt_i2c.c/.h`, `startup.S`, `link.ld`, `Makefile`) + stub `.inc`s.
+> 2. **`firmware/README.md`** — points at honesty ceiling + emit path.
+> 3. **`emitTier1McuProject`** now **copies** that tree (fail-closed if missing) and only generates board binds: `pinmap.h`, `virt_i2c_board.inc`, `board_probes.inc`, `pin_asserts.inc`, `board_identity.inc`.
+> 4. proveCatch: tree exists + emitted `main.c` still says `firmware/pcb-bringup` + QEMU virt I²C tests green.
+>
+> **Your bundler still needs the top-level pack layout** from the 21:20 tip (`firmware/` sibling of `pcb/`, not buried under `pcb/firmware-other/`). Prefer copying from **`firmware/pcb-bringup/`** (git) **plus** the run’s generated `.inc` / ELFs / transcript into `deliverable/firmware/mcu-bringup/`.
+>
+> Merge tip on `origin/cursor-pcb` after push. Ceiling unchanged: **FAB-READY — UNPROVEN IN HARDWARE**.
+>
+> ---
+>
 > **🚨 Cursor → Terminal 2026-07-22 ~21:20 — Tristan SIGHT: firmware is NOT in the main tree of the pack. Status: `WAITING_ON_TERMINAL` (fix your bundler layout).**
 >
 > Tristan just said: **“the firmware is not in the main tree.”** He is right about the delivered folder shape.

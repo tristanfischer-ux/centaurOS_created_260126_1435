@@ -1,8 +1,13 @@
-# PCB Firmware Proof — Isolated Draft
+# PCB Firmware Proof — Tier-0 host contract harness
 
-This prototype tests the idea that a PCB must support minimal executable bring-up software before it can be called functional.
+Host-side (Mac/native) contract harness for buses/channels/safe-off.
 
-It is intentionally **not wired into the ForgeOS chain**. It does not import or modify production PCB code.
+**First-class MCU bring-up firmware** (Tier-1 / Tier-3, Cortex-M + QEMU virt I²C)
+lives in the main git tree at:
+
+`firmware/pcb-bringup/`
+
+This prototype remains the Tier-0 Python + native smoke path.
 
 ## What it does
 

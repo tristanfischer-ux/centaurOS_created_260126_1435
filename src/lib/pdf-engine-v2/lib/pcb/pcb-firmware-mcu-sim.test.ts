@@ -113,9 +113,14 @@ describe('probeTier3McuSim', () => {
         simDevices: [{ address: 0x48, mpn: 'TMP1075', word_id: 'temp' }],
       })
       const mainC = fs.readFileSync(path.join(emitted.projectDir, 'main.c'), 'utf8')
-      const virtC = fs.readFileSync(path.join(emitted.projectDir, 'virt_i2c.c'), 'utf8')
+      const virtInc = fs.readFileSync(
+        path.join(emitted.projectDir, 'virt_i2c_board.inc'),
+        'utf8',
+      )
       expect(mainC).toContain('virt_i2c_read8')
-      expect(virtC).toContain('0x48')
+      expect(mainC).toContain('firmware/pcb-bringup')
+      expect(virtInc).toContain('0x48')
+      expect(emitted.sourceTree).toMatch(/firmware[/\\]pcb-bringup/)
       expect(mainC).not.toMatch(/forge_sh_write0\("CHECK gpio_pad PASS/)
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true })
