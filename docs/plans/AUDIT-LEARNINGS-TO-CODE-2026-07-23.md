@@ -18,13 +18,19 @@ the ForgeOS self-correcting AIM.
 - Firmware bundle top-level `firmware/`; PCB firmware honesty labels (tier-aware readiness_why).
 
 ## B. Learnings that are MEMORY-ONLY → NEED a code guard (the real audit work)
-1. **Cross-artefact FEATURE consistency gate (BIGGEST GAP).** The coherence stack checks
-   envelope/part-set/containment/caption but NOT "does the render show the same protruding /
-   exterior features the GA drawing draws" — that's why the optical-tower miss slipped past all
-   gates AND my SIGHT. BUILD a new gate (G22): the set of named exterior/protruding features in
-   the render (form-meshes.json kept-on-exterior) must equal those the GA exterior views draw;
-   a feature on one side but not the other FAILS. proveCatch both directions. Drawer
-   `forgeos_gotchas_39791547a14c52c0`.
+1. **Cross-artefact FEATURE consistency gate (BIGGEST GAP) — ESCALATED, see §F NAMED DECISION.**
+   GROUNDED 2026-07-23: inspected the shipped manifest (`out/organoid-bioreactor-20260723-0442`)
+   — NO part protrudes above the shell (Culture Vessel top 9.5mm ≪ shell top 63mm). The
+   parts-manifest is written POST-clamp (build_universal_scene.py:7084), so a feature gate that
+   reads only the manifest would PASS on the exact tower miss it's meant to catch — a FALSE-GREEN
+   (the Goodhart trap). The tower appeared in the GA because the DRAWING plots a DIFFERENT geometry
+   source (pre-clamp). So the real gate must compare the DRAWING's geometry source vs the render's
+   POST-clamp geometry — AND it's entangled with the open sealed-box-vs-protruding-tower decision
+   (§B.5). Building it on the wrong artefact is worse than not building it. NAMED DECISION in §F.
+   Drawer `forgeos_gotchas_39791547a14c52c0`.
+   ✅ **§B.3 DONE** (`8fb9bafb4`): AgX-first view-transform proveCatch (`render_view_transform_selftest.py`,
+   wired into verify-engine-guards.sh) — fires on the flipped-to-Standard regression.
+   ✅ **§B.4 DONE** (`53d039c98`): run-loop.sh pre-bake better-sqlite3/node@22 ABI check + auto-rebuild.
 2. **Gate-36 benchmark-net must read the brief's cost band BEFORE crying "N× under".** It
    benchmarked a COMMERCIAL bioreactor (£3500) vs a DIY open-hardware brief (£275-385) → false
    "missing subsystems" alarm I wrongly relayed. Guard: gate-36 reads brief cost band +
@@ -76,3 +82,31 @@ the ForgeOS self-correcting AIM.
 - Enclosure ~321mm vs 180mm contract intent → deterministic pack-solver (task #59).
 - Front-panel hero contrast slightly softer than the 04 view.
 - Risk register honestly flags 1 copy-paste error in a part's 'form' field.
+
+## F. NAMED DECISION — the feature-consistency gate + the sealed-box-vs-tower question (needs Tristan)
+The tower miss (GA draws an optical tower; sealed render doesn't) has ONE root: the
+`place_sealed_enclosure` containment clamp forces every mesh `bbox_z_max ≤ base_z + H`, flattening
+any protrusion below the lid. The drawing plots pre-clamp geometry (tower shows); the render + the
+post-clamp parts-manifest don't. So there are TWO coupled questions:
+
+**Q1 — what SHOULD the product look like?** (design intent)
+- **Option A — sealed box is correct; the DRAWING is wrong to show a protruding tower.** Fix =
+  make the GA read the same post-clamp geometry as the render (tower drawn flush/internal). Cheapest;
+  the product is a clean sealed benchtop box. The tower becomes an internal feature seen only in the
+  cutaway / translucent view.
+- **Option B — the protruding tower is correct; the RENDER is wrong to hide it.** Fix = exempt
+  vial_bioreactor "signature" parts (optical tower / vessel neck) from the containment clamp, or
+  raise H so they fit. The product keeps its distinctive silhouette. More engine work + risks
+  re-introducing the sprawl the clamp was added to fix.
+- **Option C — accept the split:** closed box is the hero (Option A visual), the tower lives only
+  in the GA cutaway + the translucent see-inside render, and we DISCLOSE that on the drawing.
+
+**Q2 — the gate (independent of which option):** whichever geometry is canonical, build a
+cross-artefact FEATURE-consistency gate (G22) that FIRES when the set of protruding/exterior
+features differs between the DRAWING's geometry source and the RENDER's post-clamp geometry. This
+catches the mismatch REGARDLESS of the Q1 answer — it just needs to know which source is canonical
+so it compares the right two things. Do NOT build it against the post-clamp manifest alone (proven
+above to false-green the tower miss). proveCatch: plant a protruding feature in one source only →
+gate fires. Drawer `forgeos_gotchas_39791547a14c52c0`. Recommendation: **A or C** (sealed box is a
+more honest "product" shot; the tower is a genuine internal feature, well served by the translucent
+render just shipped), then build G22 with the render's post-clamp geometry as canonical.
