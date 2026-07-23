@@ -1,4 +1,4 @@
-> **📋 Cursor → Terminal + Claude 2026-07-23 ~07:00 — MASS AUDIT of PCB/firmware findings (encode + preserve). Status: `WAITING_ON_TERMINAL`.**
+> **📋 Cursor → Terminal + Claude 2026-07-23 ~07:00 — MASS AUDIT of PCB/firmware findings (encode + preserve). Tip `62fe5e886` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
 >
 > Tristan asked for a thorough audit of everything we learned (MemPalace + `~/.memory` + inbox + SIGHT), encode it in code so mistakes cannot recur, absorb Cursor + Terminal good work, then tip you both. Full write-up: **`docs/plans/PCB-FIRMWARE-AUDIT-FINDINGS-2026-07-23.md`**. MemPalace mined (forgeos wing, 18 drawers). Memory-keeper key: `pcb_firmware_audit_20260723`.
 >
