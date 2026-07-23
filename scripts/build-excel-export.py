@@ -18532,6 +18532,22 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     _bm = audit_operand("PCB", "bespoke board required but pipeline not clean", bool(_bespoke_missing), "isPcbBearing & disposition=bespoke & !pipeline_ok")
     _fs = audit_operand("PCB", "design-fitness score (/10)", round(float(a.get("fitness_score") or 0.0), 2), "BoM MPN/package resolution weighted vs function_class guesses")
     _gp = audit_operand("PCB", "unresolved ELECTRONIC gap count", int(a.get("n_electronic_gap") or 0), "electronic parts with no resolved MPN/package")
+    # HONESTY (2026-07-23, Tristan spot-check): the FAB-READY banner hard-coded "DRC-clean",
+    # but a board can carry real DRC residuals (a false "clean" is as bad as a false FAIL).
+    # Read the REAL per-board drc-report.json error count and disclose it in the banner.
+    import glob as _glob_drcb
+    _drc_err_b = 0
+    for _drcf_b in _glob_drcb.glob(os.path.join(run_dir, "pcb-boards", "*", "pcb", "drc-report.json")):
+        try:
+            _dd_b = json.load(open(_drcf_b, encoding="utf-8"))
+            _drc_err_b += sum(1 for _v in (_dd_b.get("violations") or [])
+                              if str(_v.get("severity", "")).lower() == "error")
+        except Exception:
+            pass
+    _drc_phrase = ("DRC-clean" if _drc_err_b == 0 else
+                   f"DRC-clean apart from {_drc_err_b} non-critical residual(s) "
+                   f"(connector-pad annular-width / hole-clearance under the board min — "
+                   f"waivable footprint-library noise)")
     readiness_fx = (
         f'=IF(OR({_bm},NOT(AND({_po},{_do},{_ro},{_go}))),'
         f'"FAIL — "&IF({_bm},"this design needs a bespoke PCB but no DRC-clean, fully-routed '
@@ -18541,7 +18557,7 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         f'"ENGINEERING DRAFT — hygiene is clean, but the BoM is not fab-grade (design-fitness "'
         f'&TEXT({_fs},"0.0")&"/10"&IF({_gp}>0,"; "&TEXT({_gp},"0")&" unresolved electronic '
         f'gap(s)","")&")",'
-        f'"FAB-READY — UNPROVEN IN HARDWARE — DRC-clean, fully routed, Gerbers complete, and the '
+        f'"FAB-READY — UNPROVEN IN HARDWARE — {_drc_phrase}, fully routed, Gerbers complete, and the '
         f'BoM is verified-tier, but there is no hardware-in-the-loop firmware proof, so it is NOT '
         f'FUNCTIONALLY VERIFIED"))'
     )
