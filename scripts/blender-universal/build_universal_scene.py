@@ -16529,6 +16529,15 @@ def _suppress_instrument_boilerplate_meshes() -> int:
         if getattr(obj, "type", None) != "MESH":
             continue
         name = obj.name
+        # PROVENANCE EXEMPTION (bug-class hardening 2026-07-23): a mesh a signature builder
+        # DELIBERATELY placed as an exterior above-lid feature (registered in
+        # _ABOVE_LID_SIGNATURE_MESHES) is NEVER clutter — skip by provenance, not by the
+        # hand-maintained _INSTRUMENT_MESH_KEEP_PREFIXES coincidence (a keep-tuple omission on a
+        # future signature family would otherwise re-hide it: the 'lost light tower' class). The
+        # 18408 containment clamp already honours this same set; every universal mesh-mutating
+        # pass must consult ONE provenance set, not per-pass prefix allow-lists that drift.
+        if name in _ABOVE_LID_SIGNATURE_MESHES:
+            continue
         if any(name.startswith(prefix) for prefix in _INSTRUMENT_MESH_KEEP_PREFIXES):
             continue
         if name.startswith("u_se_backplane_") or name.startswith("u_se_det_"):
@@ -16992,6 +17001,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     _int_hi = (iw / 2 * fl.MM, idep / 2 * fl.MM, (base_z + margin + ih) * fl.MM)
     for zp in parts:
         pref = _prefix_of(zp.name)
+        # PROVENANCE EXEMPTION (bug-class hardening 2026-07-23): structurally this mesh-level part
+        # clamp is the SAME defect the 18408 interior clamp had — it translates/scales any prefix
+        # whose union-bbox exceeds the interior. It does not bite an above-lid signature feature
+        # TODAY only by build-ORDER (it runs before the signature builder), but a future signature
+        # emitted as a `part` would be crushed. Exempt any prefix whose meshes are registered
+        # above-lid signature features — the same _ABOVE_LID_SIGNATURE_MESHES set every clamp honours.
+        if any(_rn.startswith(pref) for _rn in _ABOVE_LID_SIGNATURE_MESHES):
+            continue
         bb = _prefix_bbox(pref)
         if not bb:
             continue
@@ -24983,9 +25000,29 @@ def _selftest_containment_exempts_above_lid_signature() -> None:
         "REGRESSION: the signature builder no longer registers _sig_new into "
         "_ABOVE_LID_SIGNATURE_MESHES — the containment clamp will crush the tower.")
 
+    # (h) BUG-CLASS INVARIANT (2026-07-23 hardening sweep): EVERY universal mesh-mutating
+    # pass must consult the ONE provenance set _ABOVE_LID_SIGNATURE_MESHES — not per-pass
+    # prefix allow-lists that drift out of sync (the 'lost light tower' recurrence vector).
+    # (h1) the clutter-suppress pass must skip registered signature meshes BEFORE its
+    # keep-prefix / hide logic.
+    _src_sup = _ins_c.getsource(_suppress_instrument_boilerplate_meshes)
+    # match CODE substrings only (not the comment mentions, which would skew the order test)
+    _sup_exempt = _src_sup.find("if name in _ABOVE_LID_SIGNATURE_MESHES")
+    _sup_keep = _src_sup.find("for prefix in _INSTRUMENT_MESH_KEEP_PREFIXES")
+    assert _sup_exempt != -1 and _sup_keep != -1 and _sup_exempt < _sup_keep, (
+        "REGRESSION: _suppress_instrument_boilerplate_meshes must skip "
+        "_ABOVE_LID_SIGNATURE_MESHES BEFORE the keep-prefix test — else a future "
+        "signature family (new mesh prefix) is hidden by clutter-suppress (tower-bug class).")
+    # (h2) the mesh-level part containment clamp (also inside place_sealed_enclosure) must
+    # exempt registered above-lid signature prefixes.
+    assert _src_c.find("_rn.startswith(pref) for _rn in _ABOVE_LID_SIGNATURE_MESHES") != -1, (
+        "REGRESSION: the mesh-level part clamp no longer exempts _ABOVE_LID_SIGNATURE_MESHES "
+        "— structurally the same defect the 18408 clamp had (tower-bug class).")
+
     print("[univ][sealed] _selftest_containment_exempts_above_lid_signature OK "
           "(a: above-lid signature skipped, b: interior leak still clamped, "
-          "c-e: predicate edge cases, f-g: source wiring verified)")
+          "c-e: predicate edge cases, f-g: source wiring verified, "
+          "h: bug-class — suppress + mesh-clamp also honour the provenance set)")
 
 
 def _selftest_instrument_direct_logical_routing() -> None:
