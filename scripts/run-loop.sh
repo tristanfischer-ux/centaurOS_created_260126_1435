@@ -23,6 +23,19 @@ mkdir -p "$OUT"
 python3 scripts/lib/loop_board.py gate --board "$BOARD" || {
   echo "[run-loop] GATE CLOSED — disposition every board defect before launching (loop_board.py dispose <id> ...)"; exit 3; }
 
+# better-sqlite3 / node@22 ABI PRE-BAKE CHECK (recurring break, drawer 8744be60adfaa0b0):
+# a sub-agent `git push` fires the pre-push hook, which rebuilds better-sqlite3 for the SYSTEM
+# node (25 / ABI 141); the chain then runs on node@22 (ABI 127) and dies mid-bake with an
+# opaque native-module error. PATH=node@22 above does NOT fix an already-wrong-ABI binary.
+# Verify the native module actually LOADS under node@22; auto-rebuild once if it doesn't.
+if ! node -e "require('better-sqlite3')" >/dev/null 2>&1; then
+  echo "[run-loop] better-sqlite3 fails to load under node@22 (ABI mismatch — likely a stray system-node rebuild). Rebuilding…"
+  if ! npm rebuild better-sqlite3 >/dev/null 2>&1 || ! node -e "require('better-sqlite3')" >/dev/null 2>&1; then
+    echo "[run-loop] ABORT — better-sqlite3 still won't load under node@22 after rebuild. Fix: PATH=/opt/homebrew/opt/node@22/bin:\$PATH npm rebuild better-sqlite3"; exit 4
+  fi
+  echo "[run-loop] better-sqlite3 rebuilt for node@22 ✓"
+fi
+
 # DECISION: primary log under $OUT (campaign watch + durable nohup). Mirror to
 # repo-root out-*.log for existing greppers. PIPESTATUS[0] = chain exit.
 CHAIN_LOG="$OUT/chain.log"
