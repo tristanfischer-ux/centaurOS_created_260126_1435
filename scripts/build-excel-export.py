@@ -576,6 +576,25 @@ def _real_enclosure_edge_mm(state: dict):
     return None
 
 
+def _delivered_shell_longest_mm(pm: dict):
+    """Longest dimension (mm) of the DELIVERED enclosure body — the parts-manifest
+    'Enclosure Shell' / housing part, which the post-placement envelope resize sized to
+    contain the packed interior. This is the honest product body the phenotype gate judges
+    containment against. Returns None when the manifest has no shell part (synthetic states)."""
+    try:
+        for p in (pm.get("parts") or []):
+            nm = str(p.get("name") or "").lower()
+            if re.search(r"enclosure shell|housing shell|cabinet shell|product shell", nm):
+                d = p.get("dims_mm") or {}
+                edges = [num(d.get("w")), num(d.get("d")), num(d.get("h"))]
+                edges = [e for e in edges if e and e > 0]
+                if edges:
+                    return max(edges)
+    except Exception:  # noqa: BLE001 — never crash the build on a manifest read
+        pass
+    return None
+
+
 def _phenotype_containment_verdict(run_dir: str):
     """SIGHT / B5 (2026-07-20): a DETERMINISTIC phenotype-containment check for an instrument
     device — do the rendered parts FIT inside the product enclosure, or do they SPRAWL far
@@ -600,9 +619,19 @@ def _phenotype_containment_verdict(run_dir: str):
     try:
         state = load_json(os.path.join(run_dir, "state.json")) or {}
         if state.get("isInstrumentDevice"):
-            _encl_edge = _real_enclosure_edge_mm(state)   # longest REAL placed dim, mm
+            pm = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+            # DENOMINATOR = the DELIVERED product body (2026-07-24): when the manifest carries
+            # the real "Enclosure Shell" part, that IS the product body the parts must fit inside
+            # (the post-placement envelope resize sizes the shell to contain the packed parts, so
+            # a device with a large real BoM legitimately grows past the pre-estimate). Comparing
+            # the scene against a stale pre-estimate resolver (organoid: real body ~350-470 mm vs a
+            # 180 mm default) is a FALSE sprawl-fail. The delivered shell keeps the gate's INTENT —
+            # "do the rendered parts fit the product body?" — with the body correctly defined:
+            # a part placed OUTSIDE the shell still makes scene > shell → FAIL. Falls back to the
+            # placer's resolver when no shell part is present (synthetic/word-less states).
+            _shell_edge = _delivered_shell_longest_mm(pm)
+            _encl_edge = _shell_edge if (_shell_edge and _shell_edge > 0) else _real_enclosure_edge_mm(state)
             if _encl_edge is not None and _encl_edge > 0:
-                pm = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
                 bb = pm.get("bbox_mm") or {}
                 _scene_edge = max(num(bb.get("length_mm")) or 0.0,
                                   num(bb.get("width_mm")) or 0.0,
@@ -30333,6 +30362,35 @@ def _selftest() -> int:
                 and float(_pv6.get("ratio", 9)) <= 1.8):
             print(f"  FAIL V1a-DENOM R4: with the envelope packed from the part stack, the ~243 mm "
                   f"placed scene must FIT (≤1.8×) the real ~235 mm enclosure (got {_pv6})"); bad += 1
+        # (7) DELIVERED-SHELL DENOMINATOR (2026-07-24, interior-population): the interior packer
+        #     grows the product body to CONTAIN the packed parts, so the honest denominator is the
+        #     delivered 'Enclosure Shell' manifest part — NOT a stale pre-estimate. A device whose
+        #     scene EQUALS its delivered shell (parts packed IN the body) must PASS even when the
+        #     shell (470 mm) is far larger than the resolver's default (180 mm). Proves the fix that
+        #     stopped the organoid false-FAIL (2.6× off the 180 mm default → 1.0× off the real body).
+        _PHENOTYPE_CACHE.pop(_tdd, None)
+        _st7 = {"isInstrumentDevice": True,
+                "engineeringContract": {"shared_quantities": {"enclosure_volume_m3": 0.00403}}}
+        json.dump(_st7, open(os.path.join(_tdd, "state.json"), "w"))
+        json.dump({"bbox_mm": {"length_mm": 281.0, "width_mm": 470.0, "height_mm": 172.0},
+                   "parts": [{"name": "Enclosure Shell", "dims_mm": {"w": 281.0, "d": 470.0, "h": 126.0}}]},
+                  open(os.path.join(_tdd, "parts-manifest.json"), "w"))
+        _pv7 = _phenotype_containment_verdict(_tdd)
+        if not (isinstance(_pv7, dict) and _pv7.get("ok") is True):
+            print(f"  FAIL DELIVERED-SHELL: a device whose scene (470 mm) EQUALS its delivered shell "
+                  f"(470 mm — parts packed into the real body) must PASS, not false-FAIL off the "
+                  f"180 mm pre-estimate (got {_pv7})"); bad += 1
+        # (8) STILL CATCHES parts-outside-the-shell: a small delivered shell (120 mm) with a scene
+        #     that sprawls to 300 mm (a part placed OUTSIDE the body) must FAIL — the gate keeps its
+        #     intent with the body correctly defined as the delivered shell.
+        _PHENOTYPE_CACHE.pop(_tdd, None)
+        json.dump({"bbox_mm": {"length_mm": 300.0, "width_mm": 110.0, "height_mm": 90.0},
+                   "parts": [{"name": "Enclosure Shell", "dims_mm": {"w": 120.0, "d": 100.0, "h": 80.0}}]},
+                  open(os.path.join(_tdd, "parts-manifest.json"), "w"))
+        _pv8 = _phenotype_containment_verdict(_tdd)
+        if not (isinstance(_pv8, dict) and _pv8.get("ok") is False):
+            print(f"  FAIL DELIVERED-SHELL proveCatch: parts sprawling to 300 mm OUTSIDE a 120 mm "
+                  f"delivered shell must still FAIL the containment gate (got {_pv8})"); bad += 1
     # ═══ V2 (2026-07-20): ledger coverage + a flaky vision-clean verdict must NOT mint ≥8 on a
     # DEVICE whose containment could not be positively verified (no parts-manifest bbox). The 2150
     # proved the vision critic returns broken=false + 8 checks on a Lego hero — only a DETERMINISTIC
