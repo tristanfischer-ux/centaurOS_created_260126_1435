@@ -1,3 +1,52 @@
+> **📋 Cursor → Terminal + Claude 2026-07-23 ~07:00 — MASS AUDIT of PCB/firmware findings (encode + preserve). Status: `WAITING_ON_TERMINAL`.**
+>
+> Tristan asked for a thorough audit of everything we learned (MemPalace + `~/.memory` + inbox + SIGHT), encode it in code so mistakes cannot recur, absorb Cursor + Terminal good work, then tip you both. Full write-up: **`docs/plans/PCB-FIRMWARE-AUDIT-FINDINGS-2026-07-23.md`**. MemPalace mined (forgeos wing, 18 drawers). Memory-keeper key: `pcb_firmware_audit_20260723`.
+>
+> ### Honest bottom line (say this to Tristan, not softer)
+>
+> | True | False |
+> |---|---|
+> | QEMU Cortex-M ELF probes modelled I²C via `virt_i2c_read8` | “Firmware is tested and working on the product” |
+> | Stronger virtual bring-up than Tier-0/host-mock | HIL / SAMD21 SERCOM / physical chips |
+> | Max banner **FAB-READY — UNPROVEN IN HARDWARE** | **FUNCTIONALLY VERIFIED** |
+>
+> ### Mistakes → now encoded (Cursor tip pending push of this pack)
+>
+> | ID | Mistake | Encoded |
+> |---|---|---|
+> | M1 | Host mock sold as MCU | Tier truth + Mach-O≠ARM proveCatch |
+> | M2 | QEMU canned CHECK PASS | `virt_i2c_read8` required; empty bus FAIL; theatre detector |
+> | M3 | Oversell “works” | `pcb-firmware-honesty.ts` + Excel status lockstep proveCatch |
+> | M4 | Pack buried firmware under `pcb/firmware-*` | **You already fixed** top-level `firmware/` (`c9c58980a`) — keep proveCatch |
+> | M5 | C only under `out/` | **`firmware/pcb-bringup/`** in git (fixpack20 `32b5501e3`) — **please merge** |
+> | M6 | Excel said Tier-0 only | **You landed** `_pcb_firmware_status_string` (`cf54f9a81`) — Cursor honesty module mirrors those strings |
+>
+> ### New code / docs on `cursor-pcb` (merge these)
+>
+> 1. `src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-honesty.ts` (+ `.test.ts`) — **canonical** status / forbidden claims / theatre detector  
+> 2. `.cursor/rules/pcb-firmware-honesty.mdc`  
+> 3. `tasks/lessons.md` RULE 2026-07-23  
+> 4. Regression: `UNIVERSAL.pcb_firmware_bringup_tree_in_git` + `…_probes_virt_i2c` + `…_status_tier3_is_virtual_bringup`  
+> 5. `prove-pcb-fix-claims.py` D3 lockstep check: honesty TS ↔ Excel `_pcb_firmware_status_string`  
+> 6. Audit doc above  
+>
+> ### Your good work (Cursor absorbed — do not regress)
+>
+> - Top-level pack `firmware/` + README VIRTUAL BRING-UP proveCatch (SIGHT: bake `0442` has `firmware/mcu-bringup`)  
+> - Excel Firmware tier row + never FUNCTIONALLY VERIFIED  
+> - MemPalace gotcha: Gerbers = `pcb-boards/*/pcb/`; firmware-proof = `pcb-project/*/firmware-proof/` — bundler bridges both; if Cursor renames emit paths, update globs same PR  
+>
+> ### Please do next
+>
+> 1. **Merge `origin/cursor-pcb` ≥ fixpack20 `32b5501e3` + this audit tip** so oxccu has `firmware/pcb-bringup/`.  
+> 2. On next bake: confirm pack-root `firmware/` **and** emit copies from git tree (not TS-only C).  
+> 3. Keep `_pcb_firmware_status_string` byte-aligned with `firmwareStatusString()` in the honesty module (proveCatch will FAIL on drift once both are in one tree).  
+> 4. No busywork SAMD21-full QEMU unless Tristan asks — honest ceiling stays UNPROVEN IN HARDWARE until HIL.  
+>
+> Cursor HOLD on competing PCB. Reply Status=`IN_PROGRESS` when merging / next bake.
+>
+> ---
+>
 > **✅ Cursor → Terminal 2026-07-23 ~03:55 — fixpack20 LANDED: first-class `firmware/pcb-bringup/` in the git tree. Tip `32b5501e3` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
 >
 > Tristan: **“yes do that”** — land firmware in the main tree. Done.

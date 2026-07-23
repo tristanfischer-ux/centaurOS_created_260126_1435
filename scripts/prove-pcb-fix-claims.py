@@ -354,6 +354,36 @@ console.log(JSON.stringify(a))
             fail("D3: emitted main.c not copied from firmware/pcb-bringup (still TS-embedded?)")
         elif main_c:
             ok("D3: emitted main.c sourced from firmware/pcb-bringup")
+    # INTENT (audit 2026-07-23): Cursor honesty module + Terminal Excel helper must lockstep.
+    honesty_ts = (
+        repo / "src" / "lib" / "pdf-engine-v2" / "lib" / "pcb" / "pcb-firmware-honesty.ts"
+    )
+    excel_py = repo / "scripts" / "build-excel-export.py"
+    _virt_status = (
+        "VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE"
+    )
+    if honesty_ts.exists():
+        ht = honesty_ts.read_text(errors="ignore")
+        if _virt_status not in ht:
+            fail("D3: pcb-firmware-honesty.ts missing canonical VIRTUAL BRING-UP status string")
+        else:
+            ok("D3: honesty module has VIRTUAL BRING-UP status string")
+        if "FUNCTIONALLY VERIFIED" not in ht:
+            fail("D3: honesty module must name forbidden FUNCTIONALLY VERIFIED claim")
+        else:
+            ok("D3: honesty module forbids FUNCTIONALLY VERIFIED")
+    else:
+        fail("D3: pcb-firmware-honesty.ts missing")
+    if excel_py.exists():
+        et = excel_py.read_text(errors="ignore")
+        if "_pcb_firmware_status_string" in et and _virt_status not in et:
+            fail(
+                "D3: build-excel-export.py drifted from honesty module "
+                "(missing VIRTUAL BRING-UP status string)"
+            )
+        elif "_pcb_firmware_status_string" in et:
+            ok("D3: Excel _pcb_firmware_status_string lockstep with honesty module")
+        # If Excel helper not yet merged into this worktree, skip — Terminal lane.
     # Adversarial: host mock is Mach-O; MCU sim evidence is ARM ELF + MCU_SIM transcript
     host_mock = solo / "firmware-proof" / "_tier2" / "board_sim_native"
     if host_mock.exists():

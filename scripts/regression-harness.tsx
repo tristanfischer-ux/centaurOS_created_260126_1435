@@ -52,6 +52,11 @@ import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isD
 import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal, deriveInstrumentTopology, instrumentRole } from './lib/orchestrator/generic/derive-topology'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
+import {
+  FIRMWARE_PCB_BRINGUP_REL_POSIX,
+  firmwareStatusString,
+  isHardcodedMcuSimTheatre,
+} from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-honesty'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
 import {
@@ -14169,6 +14174,46 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     () => `instrument-topology cases failed: ${failedI.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-topology.ts (deriveInstrumentTopology / instrumentRole).`,
   ))
 
+  // INTENT (fixpack20 audit 2026-07-23): firmware honesty + first-class tree must not regress.
+  for (const a of checkPcbFirmwareHonestyInvariants()) out.push(a)
+
+  return out
+}
+
+/**
+ * @description Tristan 2026-07-22/23: QEMU/host-bind ≠ product working; firmware lives in
+ * firmware/pcb-bringup/; never mint FUNCTIONALLY VERIFIED from virtual bring-up.
+ */
+function checkPcbFirmwareHonestyInvariants(): Assertion[] {
+  const out: Assertion[] = []
+  const bringup = join(process.cwd(), FIRMWARE_PCB_BRINGUP_REL_POSIX, 'main.c')
+  const exists = existsSync(bringup)
+  out.push(assertEq(
+    'UNIVERSAL.pcb_firmware_bringup_tree_in_git',
+    'First-class firmware/pcb-bringup/main.c exists in the git tree (not only under out/)',
+    exists, (v) => v === true,
+    () => `missing ${bringup} — emitTier1McuProject must copy from this tree`,
+  ))
+  if (exists) {
+    const main = readFileSync(bringup, 'utf8')
+    out.push(assertEq(
+      'UNIVERSAL.pcb_firmware_bringup_probes_virt_i2c',
+      'firmware/pcb-bringup/main.c calls virt_i2c_read8 (no hardcoded CHECK PASS theatre)',
+      isHardcodedMcuSimTheatre(main), (v) => v === false,
+      () => 'main.c looks like fixpack18 theatre (PASS without virt_i2c_read8)',
+    ))
+  }
+  out.push(assertEq(
+    'UNIVERSAL.pcb_firmware_status_tier3_is_virtual_bringup',
+    'firmwareStatusString(3,true) is VIRTUAL BRING-UP — UNPROVEN IN HARDWARE (never FUNCTIONALLY VERIFIED)',
+    firmwareStatusString(3, true),
+    (s) =>
+      typeof s === 'string'
+      && s.includes('VIRTUAL BRING-UP')
+      && s.includes('UNPROVEN IN HARDWARE')
+      && !s.includes('FUNCTIONALLY VERIFIED'),
+    () => `got: ${firmwareStatusString(3, true)}`,
+  ))
   return out
 }
 

@@ -22,6 +22,22 @@ RELATED: [files or patterns]
 
 <!-- Add lessons below this line -->
 
+## 2026-07-23 - RULE: PCB firmware honesty + first-class tree
+
+**NEVER** claim the product firmware “works” / is **FUNCTIONALLY VERIFIED** from QEMU, host bind, or Tier-0 contract alone.
+
+**ALWAYS** use max banner **FAB-READY — UNPROVEN IN HARDWARE**; tier≥3 status **VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE**.
+
+**ALWAYS** keep Cortex-M bring-up source in git at `firmware/pcb-bringup/` — emit copies it; do not re-embed C only in TypeScript.
+
+**NEVER** treat Mac `board_sim_native` (Tier-2) as MCU execution; **NEVER** ship `CHECK … PASS` under QEMU without `virt_i2c_read8`.
+
+**ALWAYS** put emailable firmware at pack-root `firmware/` (sibling of `pcb/`), not buried under `pcb/firmware-*`.
+
+**REASON:** Tristan caught host-mock theatre (fixpack17), canned QEMU PASS (fixpack18), oversell of “tested and working”, and firmware missing from the main pack/git tree (fixpack19–20).
+
+**RELATED:** `pcb-firmware-honesty.ts`, `.cursor/rules/pcb-firmware-honesty.mdc`, `docs/plans/PCB-FIRMWARE-AUDIT-FINDINGS-2026-07-23.md`
+
 ## 2026-04-17 - RULE: Test users on prod Supabase must be deleted at session end
 
 **NEVER** leave a test user / test foundry sitting on prod Supabase after an agent-browser walkthrough session ends. Sandbox foundries (`is_sandbox=true`) are excluded from analytics, but they still count against RLS scans, authentication logs, and storage quota. Over time they accumulate.
