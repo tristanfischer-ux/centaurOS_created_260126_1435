@@ -177,6 +177,42 @@ def _positive_triplet(values: tuple[object, object, object]) -> Optional[tuple[f
     return parsed[0], parsed[1], parsed[2]
 
 
+def _volume_source_detail_triplet(state: dict) -> Optional[tuple[float, float, float]]:
+    """Parse explicit W×D×H m dimensions from enclosure_volume_m3.source_detail.
+
+    INTENT (2026-07-23): the engineer writes "0.18×0.14×0.16 m compact benchtop
+    envelope" in source_detail to express the CONTRACT design intent.  When no
+    brief max_dimensions_mm exists AND no explicit design_envelope_*_mm exists,
+    this is the tightest authoritative ceiling we have.  Convert to mm and return
+    as a (W, D, H) triplet so resolve_design_envelope_mm can cap the physics-computed
+    minimum_working_envelope when it grows wider than the stated contract footprint.
+
+    Matches: "0.18×0.14×0.16 m", "0.18x0.14x0.16m", "180×140×160 mm", etc.
+    Returns None when no parseable pattern is found.
+    """
+    raw = _quantity_raw(state, "enclosure_volume_m3")
+    if not isinstance(raw, dict):
+        return None
+    detail = str(raw.get("source_detail") or "")
+    # Try metres first: three floats separated by × or x followed by ' m' or 'm'
+    m = re.search(
+        r"([0-9]+(?:\.[0-9]+)?)\s*[×xX*]\s*([0-9]+(?:\.[0-9]+)?)\s*[×xX*]\s*([0-9]+(?:\.[0-9]+)?)\s*m\b",
+        detail,
+    )
+    if m:
+        vals = (float(m.group(1)) * 1000.0, float(m.group(2)) * 1000.0, float(m.group(3)) * 1000.0)
+        return _positive_triplet(vals)
+    # Try millimetres: three integers/floats followed by 'mm'
+    m2 = re.search(
+        r"([0-9]+(?:\.[0-9]+)?)\s*[×xX*]\s*([0-9]+(?:\.[0-9]+)?)\s*[×xX*]\s*([0-9]+(?:\.[0-9]+)?)\s*mm\b",
+        detail,
+    )
+    if m2:
+        vals2 = (float(m2.group(1)), float(m2.group(2)), float(m2.group(3)))
+        return _positive_triplet(vals2)
+    return None
+
+
 def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, float]]:
     """Resolve W/D/H from one authoritative precedence chain.
 
@@ -212,6 +248,18 @@ def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, floa
                 body = packed
             if brief_triplet:
                 body, _breached = apply_brief_ceiling(body, brief_triplet)
+            # Engineer-stated contract envelope from enclosure_volume_m3.source_detail
+            # (e.g. "0.18×0.14×0.16 m compact benchtop envelope").  Only applied when
+            # no explicit contract pin or brief ceiling is active — it is the fallback
+            # authoritative ceiling so the physics pack cannot balloon past the stated
+            # footprint.  Height is intentionally taken as min(packed_h, vol_h) so a
+            # tall heat-stack that fits the stated height is never silently truncated.
+            if not (contract_dims and not derived) and not brief_triplet:
+                vol_ceil = _volume_source_detail_triplet(state)
+                if vol_ceil:
+                    bw, bd, bh = body
+                    vw, vd, vh = vol_ceil
+                    body = (min(bw, vw), min(bd, vd), min(bh, vh))
             return body
 
     if contract_dims:
@@ -617,7 +665,39 @@ def _selftest() -> None:
     _plant_ok = {"orchestratorContract": {"quantities": {
         "enclosure_volume_m3": 40.0, "container_count": {"value": 1}}}}
     assert form_factor_honesty_ok(_plant_ok), "plant may claim containers"
-    print("render_view_contract _selftest: OK (instrument landscape + form-factor packs + honesty)")
+    # proveCatch (2026-07-23 organoid-bioreactor): source_detail ceiling must prevent
+    # physics-computed pack from ballooning past stated contract footprint.
+    # Organoid: source_detail "0.18×0.14×0.16 m compact benchtop envelope" = (180,140,160)mm.
+    # minimum_working_envelope returns (248.2, 188.2, 108.0) via functional stack.
+    # After ceiling: (min(248.2,180), min(188.2,140), min(108,160)) = (180, 140, 108).
+    _organoid_like = {
+        "isInstrumentDevice": True,
+        "parsedBrief": {"constraints": {"max_dimensions_mm": {"w": None, "d": None, "h": None, "source": "missing"}}},
+        "orchestratorContract": {
+            "quantities": {
+                "enclosure_volume_m3": {
+                    "value": 0.00403,
+                    "source_detail": "0.18×0.14×0.16 m compact benchtop envelope",
+                },
+            },
+        },
+        "moduleDecomposition": [
+            {"name": "Magnetic Stirrer Drive"},
+            {"name": "Peristaltic Pump"},
+            {"name": "Vial Holder"},
+            {"name": "Heatsink"},
+        ],
+    }
+    # _volume_source_detail_triplet must parse the pattern correctly
+    _vsd = _volume_source_detail_triplet(_organoid_like)
+    assert _vsd is not None, "must parse 0.18×0.14×0.16 m"
+    assert abs(_vsd[0] - 180.0) < 1 and abs(_vsd[1] - 140.0) < 1, f"triplet wrong: {_vsd}"
+    # resolve_design_envelope_mm must produce W ≤ 180 and D ≤ 140 (not 248×188)
+    _env = resolve_design_envelope_mm(_organoid_like)
+    assert _env is not None, "organoid-like must resolve envelope"
+    assert _env[0] <= 181.0, f"W must be clamped to ≤180 mm, got {_env[0]:.1f}"
+    assert _env[1] <= 141.0, f"D must be clamped to ≤140 mm, got {_env[1]:.1f}"
+    print("render_view_contract _selftest: OK (instrument landscape + form-factor packs + honesty + source_detail ceiling)")
 
 
 if __name__ == "__main__":
