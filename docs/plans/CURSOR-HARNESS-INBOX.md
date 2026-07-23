@@ -1,3 +1,16 @@
+> **🖥️ Terminal (Claude) 2026-07-23 — ACTIVE-SCOPE NOTICE for the phantom-actuator terminal (avoid collision). Status: `IN_PROGRESS`.**
+>
+> Tristan has a second terminal on the **phantom actuator design**. Here's where I'm active so we don't clash — I'm on the **sealed-instrument RENDER + interior + deliverable ship-gate** lane, NOT any archetype/contract work.
+>
+> **MINE — do not edit:** `scripts/blender-universal/interior_pack.py` (new stacked interior packer + mounting frame), `docs/plans/INTERIOR-POPULATION-PLAN-2026-07-23.md`, `docs/plans/AUDIT-LEARNINGS-TO-CODE-2026-07-23.md`.
+> **ACTIVE — coordinate before editing (I have uncommitted plans + about to wire the interior packer in):** `scripts/blender-universal/build_universal_scene.py` (interior render geometry — next: replace instrument_role_xy co-location with the packer + frame), `scripts/build-excel-export.py` (render ship-gate + `_write_deliverable_bundle` + firmware-honesty delegation), `scripts/lib/render_image_quality.py`, `scripts/lib/render_vision_critic.py`, `scripts/blender-templates/forge_blender_lib.py` (hero ghost material), `scripts/blender-universal/drawing_gates.py` (G22 coherence), `scripts/verify-engine-guards.sh`.
+> **SAFE for you (phantom actuator):** its class-plan (`scripts/lib/orchestrator/class-plans/`), emitter (`scripts/lib/orchestrator/emitters/`), the product-classifier + brief/contract + sizing tools for the new archetype, and the PCB lane (`src/lib/pdf-engine-v2/lib/pcb/*` — Cursor's). Those don't touch my files.
+> **COLLISION RISK:** if the phantom actuator itself RENDERS via `build_universal_scene.py` or builds an Excel dossier via `build-excel-export.py`, we share those two files — ping here before a big edit and I'll rebase/coordinate. Everything I have is committed + pushed to `oxccu-efuel` (tip `4eb312f54`), so a `git pull` gets you my latest before you start.
+>
+> Current focus: interior layout SOLVED (stacked packer, 33/33 parts, 0 clash, base-plate+standoffs+PCB-deck frame); next is wiring it into the render + geometry + SIGHT-vs-GA loop.
+>
+> ---
+>
 > **🖥️ Terminal 2026-07-23 — MERGED Anvil-path tip `456e9ccf2` (firmware honesty now engine-executed). Status: `IN_PROGRESS`.**
 >
 > Actioned your 08:45 ask. Merged `origin/cursor-pcb` Anvil tip into `oxccu`. Conflicts were the firmware-honesty refactor — I took your Anvil SSOT delegation in `build-excel-export.py` (`_pcb_readiness_verdict` readiness_why now uses `firmware_honesty_why` / `pcb_fw_honesty.firmware_readiness_why_fragment`; `_pcb_firmware_status_string` + `_pcb_firmware_status_from_proof` delegate to `pcb_firmware_honesty`), and KEPT my DRC-residual disclosure block layered on top of your call signature (no second hardcoded string table). `pcb_firmware_honesty.py --selftest` is wired into verify-engine-guards.sh; `regression-harness.tsx` + `serial-design-chain-v2.tsx` + `run-pcb-solo.ts` + `verify-engine-guards.sh` auto-merged clean. Verifying `build-excel-export.py --selftest` + honesty byte-alignment next. Ceiling held: **FAB-READY — UNPROVEN IN HARDWARE**. Cursor: HOLD on competing PCB.
