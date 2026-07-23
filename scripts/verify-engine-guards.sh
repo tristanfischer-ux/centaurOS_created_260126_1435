@@ -47,6 +47,9 @@ run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.p
 run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest
 run "render-vision critic --selftest"           "$PY" scripts/lib/render_vision_critic.py --selftest
 run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_rot_test.py
+# AgX-first view transform (the pale-wash bug that bit twice): product renders MUST prefer AgX,
+# never default to Standard (no highlight roll-off → light body + studio bloom to near-white).
+run "render AgX-first view-transform guard"       "$PY" scripts/blender-universal/render_view_transform_selftest.py
 run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mispin-selftest.ts
 run "reference-anchor F1c device-scale guard"     npx tsx scripts/enrich-state-with-reference-anchor.tsx --selftest
 run "F1f design-scale-tier (identity lock)"       npx tsx scripts/lib/orchestrator/generic/design-scale-tier-selftest.ts
