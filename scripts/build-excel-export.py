@@ -6852,7 +6852,11 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             if xl_live is not None:
                 # GENUINE live formula: recomputes when any bound input cell is edited; Δ
                 # (col F, = B-E) is now a MEANINGFUL live-vs-engine cross-check, not a tautology.
-                live_cell.value = "=" + xl_live
+                # IFERROR-guard: a live worked-calc whose input makes it uncomputable
+                # (e.g. a zero denominator — V_tank=0 → P/V) must show a clean "—", never
+                # a raw #DIV/0!/#VALUE! in the delivered sheet. Transparent for every calc
+                # that computes fine (IFERROR returns the value); only errors fall to "—".
+                live_cell.value = "=IFERROR(" + xl_live + ',"—")'
                 live_cell.fill = FILL_RESULT
                 produced_ok = True
                 live_count += 1
@@ -6902,8 +6906,9 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             # engine's stored value + delta
             ws.cell(r, 5, res_val)
             if isinstance(res_val, (int, float)):
-                # Δ = live - engine ; if live is a formula, reference it
-                ws.cell(r, 6, f"=B{r}-E{r}")
+                # Δ = live - engine ; if live is a formula, reference it. IFERROR-guard so
+                # an uncomputable result cell (B="—") never propagates a #VALUE! into Δ.
+                ws.cell(r, 6, f'=IFERROR(B{r}-E{r},"—")')
             ws.cell(r, 7, res_unit)
             for a in (w.get("assumptions") or [])[:1]:
                 ac = ws.cell(r, 8, str(a))
