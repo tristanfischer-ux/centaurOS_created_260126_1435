@@ -24473,6 +24473,95 @@ def main():
                                    if _SEALED_HERO_PRODUCT else None),
                                spatial_cycles=bool(_SEALED_HERO_PRODUCT),
                                hero_cycles=bool(_SEALED_HERO_PRODUCT))
+        # 8a-ghost. GHOST SHELL PASS — translucent enclosure so ALL internals are visible.
+        # Tristan 2026-07-23: "see-inside product image — an ADDITIONAL image, separate
+        # from the sealed hero." Shell panels and front cover get a smoked-glass material
+        # (alpha 0.18, slight charcoal tint) while all internal components stay opaque.
+        # Renders the same 3/4 hero camera angle → 08-product-ghost-shell.png.
+        # Does NOT replace the sealed hero (00-hero) or any existing view.
+        if _SEALED_HERO_PRODUCT and _SEALED_SHELL_OBJECTS and _SEALED_ENV_MM:
+            try:
+                # Smoked/frosted translucent polymer shell — charcoal tint, very low alpha,
+                # slight roughness so it reads as a real material (not pure clear glass).
+                _ghost_rgb = fl._to_linear(ifg.MAT_BODY_POLYMER)
+                _ghost_shell_mat = fl.make_mat(
+                    "m_se_product_ghost_shell",
+                    _ghost_rgb,
+                    metallic=0.05,
+                    roughness=0.18,
+                    alpha=0.18,
+                )
+                # Snapshot current materials on ALL shell objects + front cover.
+                _ghost_snap = {}
+                _ghost_objs = list(_SEALED_SHELL_OBJECTS)
+                if _SEALED_FRONT_COVER is not None:
+                    _ghost_objs.append(_SEALED_FRONT_COVER)
+                for _gob in _ghost_objs:
+                    if _gob and _gob.data and _gob.data.materials:
+                        _ghost_snap[_gob.name] = list(_gob.data.materials)
+                        _gob.data.materials.clear()
+                        _gob.data.materials.append(_ghost_shell_mat)
+                    elif _gob and _gob.data:
+                        _ghost_snap[_gob.name] = []
+                        _gob.data.materials.append(_ghost_shell_mat)
+                # Front cover: make visible so the product reads as a closed translucent box.
+                _ghost_front_cover_was_hidden = None
+                if _SEALED_FRONT_COVER is not None:
+                    _ghost_front_cover_was_hidden = _SEALED_FRONT_COVER.hide_render
+                    _SEALED_FRONT_COVER.hide_render = False
+                # Apply the cutaway baseline so all internal story/cue/product meshes
+                # are visible (same state as the open-front hero), then override the
+                # shell panels with the ghost material above.
+                if _prepare_sealed_product_view is not None:
+                    _prepare_sealed_product_view("00-hero", True)
+                # Re-apply ghost material (view preparer may have reset it via
+                # _SEALED_CUTAWAY_MATERIAL on _SEALED_SHELL_OBJECTS).
+                for _gob in _ghost_objs:
+                    if _gob and _gob.data:
+                        _gob.data.materials.clear()
+                        _gob.data.materials.append(_ghost_shell_mat)
+                # Front cover must be un-hidden for the ghost pass (closed translucent box).
+                if _SEALED_FRONT_COVER is not None:
+                    _SEALED_FRONT_COVER.hide_render = False
+                # Re-use the hero camera (already computed above as _hero_cam).
+                fl.clear_cameras()
+                if _hero_cam:
+                    fl.setup_camera(**_hero_cam)
+                    _ghc_loc, _ghc_tgt = _hero_cam["loc"], _hero_cam["target"]
+                else:
+                    # Fallback: compute a standard 3/4 hero camera.
+                    (gx0, gx1), (gy0, gy1), (gz0, gz1) = fl.compute_scene_bbox()
+                    _gcx, _gcy, _gcz = (gx0+gx1)/2, (gy0+gy1)/2, (gz0+gz1)/2
+                    _gmd = max(gx1-gx0, gy1-gy0, gz1-gz0)
+                    _gpd = _gmd * 2.0 / math.sqrt(2)
+                    _ghc_loc = (_gcx + _gpd, _gcy - _gpd, _gcz + _gmd * 0.45)
+                    _ghc_tgt = (_gcx, _gcy, _gcz)
+                    fl.setup_camera(loc=_ghc_loc, target=_ghc_tgt, ortho_scale=_gmd * 1.20)
+                fl.orient_billboards_to_camera(_ghc_loc, _ghc_tgt)
+                fl.disable_freestyle()
+                # Use Cycles for the ghost pass — EEVEE alpha-blend tends to wash out
+                # translucent materials; Cycles renders the smoked shell cleanly.
+                fl.init_scene_cycles_hero()
+                bpy.context.scene.render.filepath = str(
+                    Path(out_dir) / "08-product-ghost-shell.png")
+                bpy.ops.render.render(write_still=True)
+                fl.init_scene_back_to_eevee()
+                print(f"[univ][ghost] 08-product-ghost-shell.png → {out_dir}")
+                # Exit the view preparer state.
+                if _prepare_sealed_product_view is not None:
+                    _prepare_sealed_product_view("00-hero", False)
+                # Restore front cover hidden state.
+                if _SEALED_FRONT_COVER is not None and _ghost_front_cover_was_hidden is not None:
+                    _SEALED_FRONT_COVER.hide_render = _ghost_front_cover_was_hidden
+                # Restore original materials on all ghost objects.
+                for _gob in _ghost_objs:
+                    if _gob and _gob.data:
+                        _orig_mats = _ghost_snap.get(_gob.name, [])
+                        _gob.data.materials.clear()
+                        for _m in _orig_mats:
+                            _gob.data.materials.append(_m)
+            except Exception as _ghost_exc:
+                print(f"[univ][ghost] ghost-shell pass skipped: {_ghost_exc}")
         # 8b. EXTERIOR pass — add the building shell to the SAME scene + render again to a
         #     subdir, so the architectural exterior + the interior layout are the IDENTICAL
         #     plant (two separate processes diverge — placement isn't deterministic across
