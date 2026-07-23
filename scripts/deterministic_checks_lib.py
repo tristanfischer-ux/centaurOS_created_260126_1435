@@ -2325,6 +2325,19 @@ def _checks_plausibility(state: dict, run_dir: str) -> List[Check]:
     # exceed roughly the device's bounding-box diagonal. Universal — reads the same
     # connection-schedule + parts-manifest bbox; only fires when a real bbox exists.
     bbox = pm.get("bbox_mm") if isinstance(pm, dict) else None
+    # A "run" here means a PHYSICALLY DRAWN wire/tube (it has real geometry in the scene).
+    # A route the builder DEMOTED to logical (drawn:false) has no drawn geometry — its
+    # length_m is a routing ESTIMATE on the placed parts, not a physical run that must
+    # "fit". Judging a demoted/undrawn logical association's estimated length as a run
+    # that exceeds the envelope is a category error, so exclude undrawn routes (identified
+    # from wired-lengths.json's drawn flag, keyed on the same from/to part pair).
+    _wl = _load_json(os.path.join(run_dir, "wired-lengths.json")) or {}
+    _wl_rows = _wl.get("runs") if isinstance(_wl, dict) else (_wl if isinstance(_wl, list) else [])
+    _undrawn_pairs = {
+        (str(w.get("from_part") or ""), str(w.get("to_part") or ""))
+        for w in (_wl_rows or [])
+        if isinstance(w, dict) and w.get("drawn") is False
+    }
     if isinstance(rows, list) and isinstance(bbox, dict):
         L = num(bbox.get("length_mm")); W = num(bbox.get("width_mm")); H = num(bbox.get("height_mm"))
         if all(isinstance(x, (int, float)) and x > 0 for x in (L, W, H)):
@@ -2333,6 +2346,9 @@ def _checks_plausibility(state: dict, run_dir: str) -> List[Check]:
             cap_m = diag_m * 1.5
             long_runs = []
             for r in rows:
+                # skip demoted/undrawn logical routes — no physical geometry to "fit"
+                if (str(r.get("from") or ""), str(r.get("to") or "")) in _undrawn_pairs:
+                    continue
                 lm = num(r.get("length_m"))
                 if lm is not None and lm > cap_m:
                     long_runs.append(f"{str(r.get('from','?'))[:16]}->{str(r.get('to','?'))[:16]} "
