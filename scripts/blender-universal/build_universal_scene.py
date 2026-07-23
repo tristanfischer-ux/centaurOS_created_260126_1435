@@ -16420,6 +16420,65 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
 # never a product-class slug or a per-product table.
 _ABOVE_LID_SIGNATURE_MESHES: set = set()
 
+# The exterior-VISIBLE signature prefixes the sealed-product view keeps on 04–07
+# (mirrors _prepare_sealed_product_view LE `_keep` tuple ~L13348). An exterior
+# signature mesh is one that (a) is registered in _ABOVE_LID_SIGNATURE_MESHES
+# (emitted BY a signature builder as an above-lid feature) AND (b) matches one of
+# these keep prefixes (it SURVIVES the sealed-exterior hide pass — i.e. it is a
+# genuine exterior feature, not the deliberately-hidden translucent cutaway prop
+# such as the bare u_se_le_vial / u_se_le_vial_fluid, which are registered but hidden
+# on the exterior). This is the SAME provenance the containment-clamp exemption and
+# the sealed-view keep both honour — one predicate, never a per-product name guess.
+_EXTERIOR_KEEP_PREFIXES: tuple = (
+    "u_se_le_lead", "u_se_le_electrode", "u_se_le_grid", "u_se_le_cartridge",
+    "u_se_le_vial_collar", "u_se_le_od", "u_se_le_face",
+)
+
+
+def _exterior_signature_family(mesh_name: str) -> str | None:
+    """Normalise an exterior-visible signature mesh name to its FEATURE-FAMILY token.
+
+    The family token is the render↔drawing comparison key: the render encodes the
+    feature as a skin signature mesh (u_se_le_od*), the GA drawing as a form-rule
+    silhouette (tower_size/OPTICAL zone), and both map to the SAME family string so
+    the two artefacts are directly comparable. Universal across signature forms —
+    keyed on the u_se_le_ role token, never a product-class slug.
+
+    Returns None when the name is not an exterior-visible signature mesh (so the
+    deliberately-hidden translucent bare vial / fluid + interior boards are excluded
+    — diffing the raw form-meshes list would false-fire on those).
+    """
+    nm = str(mesh_name or "")
+    if not nm.startswith(_EXTERIOR_KEEP_PREFIXES):
+        return None
+    if nm.startswith("u_se_le_od"):
+        return "optical-tower"
+    if nm.startswith("u_se_le_vial_collar"):
+        return "sample-port"
+    if nm.startswith("u_se_le_face"):
+        return "hmi-fascia"
+    # lead / electrode / grid / cartridge → their own role token
+    token = nm[len("u_se_le_"):].split("_", 1)[0]
+    return token or None
+
+
+def _exterior_signature_features(mesh_names) -> list:
+    """Provenance list [{"family": tok, "mesh": name}, …] for the exterior-visible
+    subset of `mesh_names` that is ALSO registered in _ABOVE_LID_SIGNATURE_MESHES.
+
+    Serialised into form-meshes.json as `exterior_signature_features` so the drawing
+    gate (G22) consumes the render's OWN exterior-visibility decision rather than a
+    per-product prefix guess. Falsy → the render carried no exterior signature.
+    """
+    out = []
+    for nm in sorted(set(mesh_names or [])):
+        if nm not in _ABOVE_LID_SIGNATURE_MESHES:
+            continue
+        fam = _exterior_signature_family(nm)
+        if fam:
+            out.append({"family": fam, "mesh": nm})
+    return out
+
 
 def _clamp_decision(name: str,
                     z_max: float,
@@ -17478,7 +17537,13 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                     and o.name.startswith(("u_se_le_", "u_se_product_")))
                     Path(_out).joinpath("form-meshes.json").write_text(json.dumps(
                         {"form": "lab_electronics", "form_id": "lab_electronics",
-                         "le_signature": _LE_SIGNATURE, "meshes": _names}, indent=2))
+                         "le_signature": _LE_SIGNATURE, "meshes": _names,
+                         # G22 render↔drawing feature-consistency: the render's OWN
+                         # exterior-visibility decision (registered above-lid signature
+                         # ∩ exterior keep) as a provenance-tagged family list. Empty
+                         # ⇒ no exterior signature ⇒ G22 abstains.
+                         "exterior_signature_features":
+                             _exterior_signature_features(_names)}, indent=2))
                     print(f"[univ][sealed] LAB_ELECTRONICS signature={_LE_SIGNATURE}: "
                           f"placed {len(_sig_new)} exterior signature part(s)")
             except Exception as _sigexc:

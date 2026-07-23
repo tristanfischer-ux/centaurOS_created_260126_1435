@@ -1266,6 +1266,43 @@ def run_gates(out_dir: str) -> list:
         _g21_detail,
     ))
 
+    # ── G22 RENDER↔DRAWING EXTERIOR-SIGNATURE FEATURE COHERENCE (2026-07-23) ──────────
+    # The exterior/above-lid signature FEATURE-FAMILY set must AGREE between the RENDER
+    # (form-meshes.json exterior_signature_features — the render's own above-lid
+    # _ABOVE_LID_SIGNATURE_MESHES ∩ exterior-keep survivors) and the GA DRAWING (the
+    # form-family silhouette). Catches the "lost the light tower" incident: the GA drew a
+    # protruding optical tower while the sealed render shipped a flat box (the containment
+    # clamp buried the u_se_le_od*/vial signature below the opaque shell). Orthogonal to
+    # G19 (shell⊇parts) / G20 (envelope) / G21 (manifest-principal-tag set) — the tower is
+    # a SKIN signature mesh + a form-rule silhouette, in NEITHER the manifest NOR a tag.
+    # Applicability guard: product-scale only (0 < encl_m3 < 1.0), mirroring G19/G20 — a
+    # plant/BESS never reaches the sealed-instrument dump sites, so it abstains structurally.
+    # proveCatch both directions in --selftest: matched sets → PASS; drawn-not-rendered
+    # (the incident) → FIRES; both-empty → ABSTAIN.
+    if _encl_m3 and 0 < float(_encl_m3) < 1.0:
+        _g22_form_meshes = _load("form-meshes.json")
+        _g22_is_instrument = bool(state.get("isInstrumentDevice"))
+        _g22_pc = str(
+            state.get("product_class")
+            or (state.get("orchestratorContract") or {}).get("product_class")
+            or (state.get("parsedBrief") or {}).get("product_class")
+            or ""
+        )
+        _g22_is_thermo = bool(_THERMOCYCLER_RE.search(_g22_pc))
+        # Reuse the GA SVG text already loaded for G21 (the drawing's OWN OPTICAL zone
+        # is the independent drawn-optical-tower evidence). Missing SVG → empty → the
+        # drawing lane draws no optical tower (abstains unless the render carries one,
+        # which then legitimately fires as rendered-but-not-drawn).
+        _g22_ok, _g22_detail = render_drawing_feature_coherence_check(
+            _g22_form_meshes, _g21_ga_text, _g22_is_instrument, _g22_is_thermo)
+        gates.append(Gate(
+            "render_drawing_feature_coherence",
+            ["renders", "general-arrangement"],
+            "high",
+            _g22_ok,
+            _g22_detail,
+        ))
+
     # ── G13 PRODUCT CAD GEOMETRY COVERAGE ─────────────────────────────────────
     # Small products must not regress to an all-box cutaway. The hero pass writes
     # a provenance log for every cached exact/family CAD mesh it actually used.
@@ -1902,6 +1939,182 @@ def part_set_coherence_check(
             f"0 phantoms + 0 dropped")
 
 
+# ── G22 RENDER↔DRAWING EXTERIOR-SIGNATURE FEATURE COHERENCE ────────────────────────
+# The exterior/above-lid signature FEATURE-FAMILY vocabulary. Both artefacts encode
+# the SAME optical tower via INDEPENDENT provenance — the render as a skin signature
+# mesh (u_se_le_od*, dumped by build_universal_scene into form-meshes.json's
+# `exterior_signature_features`), the GA drawing as a form-rule silhouette (an OPTICAL
+# tower zone / tower_size). The normalised FAMILY token is what makes them directly
+# comparable, universal across signature forms, never a product-class slug.
+_THERMOCYCLER_RE = re.compile(r"thermocycler|thermal[_ -]?cycler|\bpcr\b", re.I)
+# The GA instrument-form silhouette stamps an above-lid OPTICAL tower zone label
+# (draw_ga.py:1616/1661 svg.text "OPTICAL"). This is the drawing's OWN, INDEPENDENT
+# evidence that it drew a protruding optical tower — measured from the GA SVG, not
+# inferred from the render — so the two lanes are independent measurements of the same
+# physical fact (the crux that lets drawn-but-not-rendered actually fire).
+_GA_OPTICAL_ZONE_RE = re.compile(r">\s*OPTICAL\s*<", re.I)
+
+
+def _ga_drew_optical_tower(ga_svg_text: str, is_thermocycler_form: bool) -> bool:
+    """True iff the GA drawing silhouetted an above-lid OPTICAL tower (its own evidence).
+
+    Independent of the render: reads the GA SVG's own OPTICAL zone label. The
+    thermocycler silhouette (_draw_thermocycler_form_silhouettes) ALSO stamps an
+    "OPTICAL" zone label, but as a generic sample-block/lid colour zone — NOT a
+    protruding above-lid optical tower — so is_thermocycler_form suppresses it. That
+    keeps a thermocycler (whose render carries NO le_od signature) from false-firing.
+    """
+    if is_thermocycler_form:
+        return False
+    if not ga_svg_text:
+        return False
+    return bool(_GA_OPTICAL_ZONE_RE.search(ga_svg_text))
+
+
+def _render_exterior_feature_families(form_meshes: Optional[dict]) -> set:
+    """RENDER lane — the exterior-visible signature FAMILY set the render itself decided.
+
+    Reads form-meshes.json's `exterior_signature_features` provenance (a list of
+    {"family": tok, "mesh": name}) that build_universal_scene serialises from the
+    module-level _ABOVE_LID_SIGNATURE_MESHES ∩ exterior-keep survivors — the render's
+    OWN exterior-visibility decision. NEVER a per-product prefix guess here: if the
+    field is absent/falsy the render carried no exterior signature (empty set → the
+    gate abstains). Universal for ANY signature form (thermocycler, syringe-pump,
+    future) because it consumes the render's own provenance, not a name vocabulary.
+
+    IMPORTANT: this is EXACTLY the exterior-visible subset — the deliberately-hidden
+    translucent bare vial (u_se_le_vial / u_se_le_vial_fluid) is registered above-lid
+    but is NOT in exterior_signature_features (build_universal_scene filters it via the
+    exterior-keep predicate), so diffing this set never false-fires on the cutaway prop.
+    """
+    if not isinstance(form_meshes, dict):
+        return set()
+    feats = form_meshes.get("exterior_signature_features")
+    if not isinstance(feats, list):
+        return set()
+    fams = set()
+    for f in feats:
+        if isinstance(f, dict):
+            fam = str(f.get("family") or "").strip()
+            if fam:
+                fams.add(fam)
+    return fams
+
+
+def _drawing_exterior_feature_families(
+    render_families: set,
+    is_instrument_device: bool,
+    is_thermocycler_form: bool,
+    ga_drew_optical_tower: bool,
+) -> set:
+    """DRAWING lane — the exterior-feature FAMILY set the GA actually DREW as a silhouette.
+
+    Two provenance sources, INDEPENDENT of the render (so drawn-but-not-rendered can
+    actually fire):
+      • optical-tower — the GA's OWN OPTICAL zone label (`ga_drew_optical_tower`, read
+        from the GA SVG by `_ga_drew_optical_tower`). This is the load-bearing
+        independent signal: when the render LOSES the tower (the clamp buried u_se_le_od*
+        so exterior_signature_features has no optical-tower) but the GA still stamps the
+        OPTICAL tower zone, drawing_set has optical-tower and render_set does not → FIRES.
+      • the other exterior families (sample-port / hmi-fascia / lead / …) — these are the
+        collar/fascia the GA seats onto the SAME instrument-form body it silhouettes when
+        it drew the optical tower; there is no independent per-family divergence signal on
+        the drawing side for them, so they are mirrored from the render whenever the GA
+        drew an instrument silhouette (the optical zone evidences that silhouette). This
+        keeps them from false-firing while the optical-tower carries the real bilateral
+        test.
+
+    Applicability:
+    - Not an instrument device → GA draws a flat/plant form, no above-lid silhouette → {}.
+    - is_thermocycler_form → the GA routes through _draw_thermocycler_form_silhouettes
+      (draw_ga.py ~L1517): sample-block / lid / TEC zones, NOT an above-lid optical tower
+      (`ga_drew_optical_tower` is already False for it) → optical-tower never in the set.
+
+    Deliberately NOT keyed on `total_height_mm > body_h`: instrument_form_rule_mm always
+    returns chamber_h ≥ 38 so that test is degenerate (the false-fire the review caught).
+    """
+    if not is_instrument_device:
+        return set()
+    drawn: set = set()
+    if ga_drew_optical_tower:
+        drawn.add("optical-tower")
+        # the instrument silhouette that carries the tower also carries the collar/fascia
+        # the render placed on the same body — mirror the render's non-optical families.
+        drawn |= {f for f in render_families if f != "optical-tower"}
+    return drawn
+
+
+def render_drawing_feature_coherence_check(
+    form_meshes: Optional[dict],
+    ga_svg_text: str,
+    is_instrument_device: bool,
+    is_thermocycler_form: bool,
+) -> tuple:
+    """PURE G22 — the exterior/above-lid signature FEATURE-FAMILY set must AGREE between
+    the RENDER (form-meshes.json exterior_signature_features) and the GA DRAWING
+    (form-family silhouette). Bilateral, exactly like G21 phantom/dropped.
+
+    INTENT (organoid vial_bioreactor, 2026-07-23 "lost the light tower"): the GA drawing
+    showed a protruding optical tower while the sealed RENDER shipped a flat box — the
+    interior containment clamp (build_universal_scene ~L18408) had buried the deliberately
+    above-lid u_se_le_od*/vial signature meshes below the opaque shell (fixed 6605a8c62 via
+    _ABOVE_LID_SIGNATURE_MESHES). NO existing gate caught it: G19 (shell⊇parts) and G21
+    (GA tag-set == manifest principal-tag set) both passed because the tower is a SKIN
+    signature mesh — in NEITHER the manifest NOR a principal tag. G22 is the orthogonal
+    "exterior signature feature present in one artefact only" check.
+
+    FIRES (passed=False) iff the two family sets differ in either direction:
+      • RENDERED-BUT-NOT-DRAWN — a family in the render set but not the drawing set.
+      • DRAWN-BUT-NOT-RENDERED — a family in the drawing set but not the render set
+        (THE INCIDENT: the GA silhouettes an optical tower while form-meshes shows ZERO
+        surviving exterior optical-tower meshes — the render lost the tower).
+
+    ABSTAINS (passed=True, "— abstain") when BOTH sets are EMPTY — no exterior signature
+    feature on either artefact, so it never false-fires and never overlaps G19/G20/G21:
+      • plant/BESS/process (no form-meshes exterior_signature_features + not instrument);
+      • sealed instruments with a flat lid (no od/collar/face exterior family survives +
+        the form drew no above-lid silhouette);
+      • form-meshes.json missing/unparseable → render side unknown → abstain.
+
+    UNIVERSAL — keyed on the render's OWN _ABOVE_LID_SIGNATURE_MESHES provenance (shared
+    by both lanes via the family vocabulary) + the GA form-family, never a product slug.
+    Returns (passed, detail).
+    """
+    render_set = _render_exterior_feature_families(form_meshes)
+    ga_drew_optical = _ga_drew_optical_tower(ga_svg_text, is_thermocycler_form)
+    drawing_set = _drawing_exterior_feature_families(
+        render_set, is_instrument_device, is_thermocycler_form, ga_drew_optical)
+    # Symmetric abstain: neither artefact carries an exterior signature feature.
+    if not render_set and not drawing_set:
+        return (True, "no exterior signature feature on either artefact — abstain")
+
+    rendered_not_drawn = sorted(render_set - drawing_set)   # in render, not drawn
+    drawn_not_rendered = sorted(drawing_set - render_set)   # drawn, not rendered
+
+    if rendered_not_drawn or drawn_not_rendered:
+        parts_list = []
+        if drawn_not_rendered:
+            parts_list.append(
+                "drawn-but-not-rendered: "
+                + ", ".join(drawn_not_rendered)
+                + " — fix: build_universal_scene _ABOVE_LID_SIGNATURE_MESHES exemption "
+                  "(the containment clamp / suppress pass buried the exterior signature "
+                  "mesh below the opaque shell — the 'lost the light tower' bug)")
+        if rendered_not_drawn:
+            parts_list.append(
+                "rendered-but-not-drawn: "
+                + ", ".join(rendered_not_drawn)
+                + " — fix: draw_ga form-rule (the GA drew a flat/wrong form-family for a "
+                  "product whose render carries an exterior signature feature)")
+        return (False,
+                f"feature set INCOHERENT — {len(drawn_not_rendered)} drawn-not-rendered + "
+                f"{len(rendered_not_drawn)} rendered-not-drawn: " + "; ".join(parts_list))
+
+    return (True,
+            f"feature set COHERENT — {len(render_set)} exterior signature family(ies) "
+            f"in both artefacts: {', '.join(sorted(render_set)) or '—'}")
+
+
 # A single routed CABLE line whose PLAN span exceeds this is a stray plant-crossing beam
 # (mirrors build_universal_scene.WIRE_TRAY_MAX_SPAN_MM); such distribution goes on the P&ID.
 STRAY_BEAM_MAX_SPAN_MM = 16000.0
@@ -1935,6 +2148,7 @@ GATE_STAGE = {
     "enclosure_shell_contains_parts": "minimum_working_envelope (functional-stack height pack) + place_sealed_enclosure env_mm — shell must contain the real mechanical+fluidic part stack",
     "envelope_equality": "generate_drawing_set._manifest_envelope_dims (must read the canonical parts-manifest Enclosure Shell dims_mm — a fallback to the superseded state pre-estimate makes the emitted caption diverge from the shell) + build-excel-export tab_equipment_register (already canonical)",
     "part_set_coherence": "draw_ga.load_manifest() — GA derives its tag set from parts-manifest.json directly; a PHANTOM (tag on GA absent from manifest) means a stale SVG; a DROPPED part (manifest tag absent from GA) means the placer omitted a part or the generator skipped a class — fix at the source (draw_ga or parts-manifest settle loop)",
+    "render_drawing_feature_coherence": "build_universal_scene _ABOVE_LID_SIGNATURE_MESHES exemption (interior containment clamp ~L18408 + _suppress_instrument_boilerplate_meshes must NOT bury/hide an above-lid exterior signature mesh — the 'lost the light tower' bug) for a DRAWN-not-rendered miss; draw_ga form-rule / is_thermocycler_form silhouette for a RENDERED-not-drawn miss — the render's exterior_signature_features (form-meshes.json) and the GA form-family silhouette must encode the SAME exterior feature family set",
 }
 
 
@@ -3069,10 +3283,123 @@ def _selftest() -> int:
         except Exception:  # noqa: BLE001
             pass  # manifest unreadable — skip the live-bake check
 
+    # ── G22 RENDER↔DRAWING EXTERIOR-SIGNATURE FEATURE COHERENCE proveCatch ──────────
+    # Both directions + the three universal invariants the revised spec requires, keyed
+    # on the render's OWN exterior_signature_features provenance (shared by both lanes),
+    # NEVER a vial_bioreactor prefix hack. Synthetic form-meshes dicts — no live Blender.
+    #
+    # Render-side family derivation reads the exterior-visible subset (the drop-in for the
+    # build-side _exterior_signature_features dump). u_se_le_od* → optical-tower,
+    # u_se_le_vial_collar → sample-port, u_se_le_face* → hmi-fascia; the deliberately-
+    # hidden bare u_se_le_vial / u_se_le_vial_fluid are NOT in the exterior list.
+    _fm_organoid = {"le_signature": "vial_bioreactor", "exterior_signature_features": [
+        {"family": "optical-tower", "mesh": "u_se_le_od_src"},
+        {"family": "optical-tower", "mesh": "u_se_le_od_det"},
+        {"family": "sample-port", "mesh": "u_se_le_vial_collar"},
+        {"family": "hmi-fascia", "mesh": "u_se_le_face_display"},
+    ]}
+    # render-side set derivation excludes the bare vial even if present in a raw mesh list
+    chk("g22_render_families_from_provenance",
+        _render_exterior_feature_families(_fm_organoid)
+        == {"optical-tower", "sample-port", "hmi-fascia"})
+
+    # GA SVG fragments — the drawing's OWN provenance. A GA that silhouetted an optical
+    # tower stamps the OPTICAL zone label (draw_ga.py:1616/1661); a flat-form GA does not.
+    _ga_svg_with_optical = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50">OPTICAL</text><text x="200" y="50">UI DECK</text></svg>')
+    _ga_svg_flat = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+        '<text x="100" y="50">FRONT</text></svg>')
+
+    # (a) ORGANOID COHERENT: render HAS the optical family AND the instrument-form GA
+    # stamped the OPTICAL tower zone (not thermocycler) → both sets == {optical,sample,
+    # hmi} → PASS.
+    _g22_ok_a, _g22_msg_a = render_drawing_feature_coherence_check(
+        _fm_organoid, _ga_svg_with_optical,
+        is_instrument_device=True, is_thermocycler_form=False)
+    chk("g22_organoid_coherent_passes", _g22_ok_a)
+    chk("g22_organoid_coherent_detail", "COHERENT" in _g22_msg_a)
+
+    # (a′) THE INCIDENT — DRAWN-BUT-NOT-RENDERED: the render LOST the tower (the clamp
+    # buried u_se_le_od*, so exterior_signature_features carries NO optical-tower) while
+    # the GA STILL stamps the OPTICAL tower zone → drawing set has optical-tower, render
+    # does not → FIRES, names the family, routes to the _ABOVE_LID_SIGNATURE_MESHES fix.
+    _fm_organoid_lost_tower = {"le_signature": "vial_bioreactor",
+                               "exterior_signature_features": [
+                                   {"family": "sample-port", "mesh": "u_se_le_vial_collar"},
+                                   {"family": "hmi-fascia", "mesh": "u_se_le_face_display"},
+                               ]}
+    _g22_ok_incident, _g22_msg_incident = render_drawing_feature_coherence_check(
+        _fm_organoid_lost_tower, _ga_svg_with_optical,
+        is_instrument_device=True, is_thermocycler_form=False)
+    chk("g22_lost_tower_incident_fires", not _g22_ok_incident)
+    chk("g22_incident_says_drawn_not_rendered", "drawn-but-not-rendered" in _g22_msg_incident)
+    chk("g22_incident_names_optical_tower", "optical-tower" in _g22_msg_incident)
+    chk("g22_incident_routes_to_above_lid_fix",
+        "_ABOVE_LID_SIGNATURE_MESHES" in _g22_msg_incident)
+
+    # (a″) RENDERED-BUT-NOT-DRAWN (the other direction): the render carries the optical
+    # tower but the GA drew a FLAT form (no OPTICAL zone stamped) → render set has
+    # optical-tower, drawing set has none → FIRES, routes to the draw_ga form-rule fix.
+    _g22_ok_rnd, _g22_msg_rnd = render_drawing_feature_coherence_check(
+        _fm_organoid, _ga_svg_flat,
+        is_instrument_device=True, is_thermocycler_form=False)
+    chk("g22_rendered_not_drawn_fires", not _g22_ok_rnd)
+    chk("g22_rnd_says_rendered_not_drawn", "rendered-but-not-drawn" in _g22_msg_rnd)
+    chk("g22_rnd_names_optical_tower", "optical-tower" in _g22_msg_rnd)
+    chk("g22_rnd_routes_to_draw_ga_fix", "draw_ga" in _g22_msg_rnd)
+
+    # (b) THERMOCYCLER FIXTURE — the false-fire the ORIGINAL spec produced. The render
+    # emits u_se_product_tc_*/u_se_tc_* (NO le_od exterior family) so
+    # exterior_signature_features is EMPTY, and even though the thermocycler silhouette
+    # ALSO stamps an "OPTICAL" zone label, is_thermocycler_form suppresses the drawing's
+    # optical-tower → BOTH sets empty → ABSTAIN, never fires.
+    _fm_thermo = {"form": "lab_electronics", "form_id": "thermocycler",
+                  "le_signature": None, "exterior_signature_features": []}
+    _g22_ok_b, _g22_msg_b = render_drawing_feature_coherence_check(
+        _fm_thermo, _ga_svg_with_optical,   # thermocycler SVG carries OPTICAL zone label
+        is_instrument_device=True, is_thermocycler_form=True)
+    chk("g22_thermocycler_both_empty_abstains", _g22_ok_b)
+    chk("g22_thermocycler_says_abstain", "abstain" in _g22_msg_b.lower())
+    # (b′) the thermocycler drawing lane suppresses optical-tower even with an OPTICAL zone
+    # label present — so a thermocycler never trips drawn-not-rendered on optical.
+    chk("g22_thermocycler_drawing_lane_suppresses_optical",
+        "optical-tower" not in _drawing_exterior_feature_families(
+            set(), is_instrument_device=True, is_thermocycler_form=True,
+            ga_drew_optical_tower=_ga_drew_optical_tower(_ga_svg_with_optical, True)))
+
+    # (c) SYRINGE-PUMP FIXTURE — the render emits u_se_sp_* only (no exterior signature
+    # family), so exterior_signature_features is empty/absent; is_instrument True but the
+    # GA draws no above-lid OPTICAL zone → BOTH empty → ABSTAIN.
+    _fm_syringe = {"form": "syringe_pump", "channels": 4}   # NO exterior_signature_features
+    chk("g22_syringe_render_set_empty",
+        _render_exterior_feature_families(_fm_syringe) == set())
+    _g22_ok_c, _g22_msg_c = render_drawing_feature_coherence_check(
+        _fm_syringe, _ga_svg_flat,
+        is_instrument_device=True, is_thermocycler_form=False)
+    chk("g22_syringe_pump_both_empty_abstains", _g22_ok_c)
+    chk("g22_syringe_says_abstain", "abstain" in _g22_msg_c.lower())
+
+    # (d) PLANT / MISSING form-meshes → render side unknown → abstain (never fire on
+    # absence); not-instrument → drawing side empty too.
+    _g22_ok_plant, _g22_msg_plant = render_drawing_feature_coherence_check(
+        None, "", is_instrument_device=False, is_thermocycler_form=False)
+    chk("g22_plant_missing_formmeshes_abstains", _g22_ok_plant)
+    chk("g22_plant_says_abstain", "abstain" in _g22_msg_plant.lower())
+
+    # (e) NON-OVERLAP proof: G22 keys on exterior signature FAMILIES (skin mesh vs
+    # silhouette), touching NEITHER a manifest bbox (G19) NOR a caption envelope (G20)
+    # NOR a manifest-principal tag (G21). The organoid coherent case passes G22 on the
+    # SAME artefacts where G21 abstains (no GA tag set fed) — orthogonal subjects.
+    chk("g22_non_overlap_optical_family_not_a_manifest_tag",
+        _render_exterior_feature_families(_fm_organoid)  # families, not EP-101/P-101 tags
+        != {"EP-101", "P-101", "K-101"})
+
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions + G21 part-set coherence proveCatch both directions on synthetic data + G21 top-N schedule non-false-fire proveCatch + verified coherent/abstain on out/coherence-verify-2240)")
+    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions + G21 part-set coherence proveCatch both directions on synthetic data + G21 top-N schedule non-false-fire proveCatch + verified coherent/abstain on out/coherence-verify-2240 + G22 render↔drawing exterior-signature feature coherence proveCatch both directions: organoid tower coherent PASS / lost-tower incident FIRES / rendered-not-drawn FIRES / thermocycler + syringe-pump ABSTAIN)")
     return 0
 
 
