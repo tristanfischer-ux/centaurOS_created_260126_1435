@@ -1,7 +1,8 @@
 /**
- * @file Minimal freestanding MCU project emitter for Tier-1 / Tier-3 firmware proof.
- * @description Emits pinmap + optional virtual-I²C board model. Tier-1 compiles
- * pin tokens. Tier-3 (FORGE_MCU_SIM) runs under QEMU and must virt_i2c_read8()
+ * @file MCU project emitter — copies first-class firmware/pcb-bringup + board binds.
+ * @description SOURCE OF TRUTH for C is firmware/pcb-bringup/ in the git tree.
+ * This module copies that tree into the run outDir, then writes only board-specific
+ * includes (pinmap, virt I²C device table, probes). Tier-3 QEMU must virt_i2c_read8()
  * each expected device — hardcoded CHECK PASS strings are forbidden theatre.
  */
 
@@ -23,13 +24,30 @@ export type Tier1ProjectEmitInput = {
   buses: FirmwareBusPinMap[]
   /** I²C devices on the virtual bus (from board-sim model). Required for MCU sim. */
   simDevices?: Tier1SimDevice[]
+  /** Override repo root (tests). Default: walk up from cwd / this file. */
+  repoRoot?: string
 }
 
 export type Tier1ProjectEmitResult = {
   projectDir: string
   files: string[]
   mcuFamily: 'cortex-m0plus' | 'unknown'
+  /** Absolute path of the first-class tree that was copied. */
+  sourceTree: string
 }
+
+/** Relative path of the checked-in bring-up firmware (must exist in git). */
+export const FIRMWARE_PCB_BRINGUP_REL = path.join('firmware', 'pcb-bringup')
+
+const COPY_FILES = [
+  'main.c',
+  'virt_i2c.c',
+  'virt_i2c.h',
+  'startup.S',
+  'link.ld',
+  'Makefile',
+  'README.md',
+] as const
 
 function inferMcuFamily(mcuMpn: string): Tier1ProjectEmitResult['mcuFamily'] {
   if (/\b(?:atsamd21|samd21|samd11)\b/i.test(mcuMpn)) return 'cortex-m0plus'
@@ -53,14 +71,45 @@ export function isMcuGpioPadToken(pad: string): boolean {
 export const FORGE_VIRT_I2C_MAGIC = 0xa5
 
 /**
- * @description Emit a freestanding Tier-1 MCU project bound to the pin-map.
- * When simDevices are provided, also emits virt_i2c.* for QEMU MCU-sim.
+ * @description Resolve the checked-in firmware/pcb-bringup directory.
+ * Fail closed if missing — firmware must live in the main git tree.
+ */
+export function resolveFirmwarePcbBringupRoot(repoRoot?: string): string {
+  const candidates: string[] = []
+  if (repoRoot) candidates.push(path.join(repoRoot, FIRMWARE_PCB_BRINGUP_REL))
+  candidates.push(path.join(process.cwd(), FIRMWARE_PCB_BRINGUP_REL))
+  // From src/lib/pdf-engine-v2/lib/pcb/ → repo root is 5 levels up
+  candidates.push(path.resolve(__dirname, '../../../../..', FIRMWARE_PCB_BRINGUP_REL))
+  for (const c of candidates) {
+    if (fs.existsSync(path.join(c, 'main.c')) && fs.existsSync(path.join(c, 'Makefile'))) {
+      return c
+    }
+  }
+  throw new Error(
+    `firmware/pcb-bringup not found in git tree (looked under cwd + repo). ` +
+      `Firmware must be a first-class directory — not only generated under out/.`,
+  )
+}
+
+/**
+ * @description Emit a freestanding Tier-1 MCU project by copying firmware/pcb-bringup
+ * and binding pinmap + virtual I²C devices for this board.
  */
 export function emitTier1McuProject(input: Tier1ProjectEmitInput): Tier1ProjectEmitResult {
+  const sourceTree = resolveFirmwarePcbBringupRoot(input.repoRoot)
   const projectDir = path.join(input.outDir, 'mcu-project')
   fs.mkdirSync(projectDir, { recursive: true })
   const mcuFamily = inferMcuFamily(input.mcuMpn)
   const simDevices = input.simDevices ?? []
+
+  // INTENT: C logic lives in firmware/pcb-bringup — copy, don't re-embed.
+  for (const name of COPY_FILES) {
+    const src = path.join(sourceTree, name)
+    if (!fs.existsSync(src)) {
+      throw new Error(`firmware/pcb-bringup missing required file: ${name}`)
+    }
+    fs.copyFileSync(src, path.join(projectDir, name))
+  }
 
   const pinDefines: string[] = []
   const pinAsserts: string[] = []
@@ -83,6 +132,7 @@ export function emitTier1McuProject(input: Tier1ProjectEmitInput): Tier1ProjectE
  * proof_target=${input.proofTargetId}
  * mcu=${input.mcuMpn}
  * family=${mcuFamily}
+ * source_tree=firmware/pcb-bringup
  */
 #ifndef FORGE_TIER1_PINMAP_H
 #define FORGE_TIER1_PINMAP_H
@@ -95,19 +145,6 @@ ${[...gpioPads].map((pad) => `typedef struct { char _; } ${pad};`).join('\n')}
 #endif /* FORGE_TIER1_PINMAP_H */
 `
 
-  // INTENT (fixpack19): virtual board = register models the firmware MUST read.
-  // Theatre (puts("PASS") without virt_i2c_read8) is explicitly rejected by
-  // proveCatch on source + by runtime NACK if a device is missing.
-  const virtI2cH = `/* Virtual I²C bus — imagined peripherals for QEMU MCU-sim (not HIL). */
-#ifndef FORGE_VIRT_I2C_H
-#define FORGE_VIRT_I2C_H
-#include <stdint.h>
-#define FORGE_VIRT_I2C_MAGIC 0xA5
-int virt_i2c_read8(uint8_t addr, uint8_t reg);
-int virt_i2c_device_count(void);
-#endif
-`
-
   const deviceInits = simDevices.map((d) => {
     const addr = d.address & 0xff
     const regs = Array.from({ length: 16 }, () => 0)
@@ -116,33 +153,10 @@ int virt_i2c_device_count(void);
     return `  { .addr = 0x${addr.toString(16).padStart(2, '0')}, .present = 1, .regs = { ${regs.map((v) => `0x${v.toString(16)}`).join(', ')} } }, /* ${d.mpn} ${d.word_id} */`
   })
 
-  const virtI2cC = `/* Virtual I²C peripheral models — filled from board-sim expected_devices. */
-#include "virt_i2c.h"
-
-typedef struct {
-  uint8_t addr;
-  uint8_t present;
-  uint8_t regs[16];
-} virt_dev_t;
-
-static virt_dev_t DEVS[] = {
-${deviceInits.join('\n') || '  /* no devices — i2c probes must NACK */'}
-};
-
-int virt_i2c_device_count(void) {
-  return (int)(sizeof(DEVS) / sizeof(DEVS[0]));
-}
-
-int virt_i2c_read8(uint8_t addr, uint8_t reg) {
-  int n = virt_i2c_device_count();
-  for (int i = 0; i < n; i++) {
-    if (DEVS[i].present && DEVS[i].addr == addr) {
-      return (int)DEVS[i].regs[reg & 0x0Fu];
-    }
-  }
-  return -1; /* NACK — device not on the virtual bus */
-}
-`
+  const virtI2cBoardInc =
+    deviceInits.length > 0
+      ? `/* Generated from board-sim expected_devices — do not edit. */\n${deviceInits.join('\n')}\n`
+      : `/* Generated empty bus — present=0 stub so count==0. */\n  { .addr = 0x00, .present = 0, .regs = {0} },\n`
 
   const probeLoops = simDevices.map((d) => {
     const addr = d.address & 0xff
@@ -159,154 +173,31 @@ int virt_i2c_read8(uint8_t addr, uint8_t reg) {
   }`
   })
 
-  const mainC = `/* Freestanding bring-up — Tier-1 compile + QEMU virtual-board test (fixpack19). */
-#include "pinmap.h"
-#if defined(FORGE_MCU_SIM)
-#include "virt_i2c.h"
-#endif
+  const pinAssertsInc =
+    (pinAsserts.join('\n') || '  /* no GPIO pins */') + '\n'
+  const boardProbesInc =
+    (probeLoops.join('\n') ||
+      '  forge_sh_write0("CHECK i2c_read FAIL no_devices_emitted\\n");\n  forge_sh_exit(1);') +
+    '\n'
+  const boardIdentityInc =
+    `/* Generated proof target — do not edit. */\n#define FORGE_PROOF_TARGET "${input.proofTargetId.replace(/"/g, '')}"\n`
 
-void Reset_Handler(void);
-
-#if defined(FORGE_MCU_SIM)
-/* Angel/ARM semihosting — only valid under QEMU -semihosting. */
-static inline int forge_sh_call(int op, void *arg) {
-  register int r0 asm("r0") = op;
-  register void *r1 asm("r1") = arg;
-  asm volatile ("bkpt 0xAB" : "+r"(r0) : "r"(r1) : "memory");
-  return r0;
-}
-static void forge_sh_write0(const char *s) {
-  (void)forge_sh_call(0x04 /* SYS_WRITE0 */, (void *)s);
-}
-static void forge_sh_exit(unsigned int code) {
-  unsigned int packed = 0x20026;
-  (void)code;
-  (void)forge_sh_call(0x18 /* SYS_EXIT */, &packed);
-}
-#endif
-
-void Reset_Handler(void) {
-${pinAsserts.join('\n') || '  /* no GPIO pins */'}
-#if defined(FORGE_MCU_SIM)
-  forge_sh_write0("MCU_SIM|${input.proofTargetId}|BOOT\\n");
-  /* GOTCHA: must call virt_i2c_read8 — do not invent CHECK PASS without a probe. */
-  if (virt_i2c_device_count() <= 0) {
-    forge_sh_write0("CHECK i2c_bus FAIL empty_virtual_board\\n");
-    forge_sh_exit(1);
-  }
-${probeLoops.join('\n') || '  forge_sh_write0("CHECK i2c_read FAIL no_devices_emitted\\n");\n  forge_sh_exit(1);'}
-  forge_sh_write0("CHECK mcu_sim PASS\\n");
-  forge_sh_exit(0);
-#endif
-  for (;;) { }
-}
-`
-
-  const startupS = `/* Minimal Cortex-M vectors — Reset from C + weak defaults. */
-  .syntax unified
-  .thumb
-
-  .extern Reset_Handler
-
-  .section .vectors, "a", %progbits
-  .globl __vectors
-__vectors:
-  .word _estack
-  .word Reset_Handler
-  .word Default_Handler /* NMI */
-  .word Default_Handler /* HardFault */
-  .word 0
-  .word 0
-  .word 0
-  .word 0
-  .word 0
-  .word 0
-  .word 0
-  .word Default_Handler /* SVCall */
-  .word 0
-  .word 0
-  .word Default_Handler /* PendSV */
-  .word Default_Handler /* SysTick */
-
-  .section .text.Default_Handler, "ax", %progbits
-  .weak Default_Handler
-  .thumb_func
-  .globl Default_Handler
-Default_Handler:
-  b .
-`
-
-  const linkLd = `MEMORY
-{
-  FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 256K
-  RAM (rwx)  : ORIGIN = 0x20000000, LENGTH = 32K
-}
-
-_estack = ORIGIN(RAM) + LENGTH(RAM);
-
-SECTIONS
-{
-  .text : {
-    KEEP(*(.vectors))
-    *(.text*)
-    *(.rodata*)
-  } > FLASH
-
-  .data : {
-    *(.data*)
-  } > RAM AT > FLASH
-
-  .bss : {
-    *(.bss*)
-    *(COMMON)
-  } > RAM
-}
-`
-
-  const makefile = `# Tier-1 compile + QEMU virtual-I²C MCU-sim (fixpack19)
-TARGET   ?= tier1_proof
-MCUFLAGS ?= -mcpu=cortex-m0plus -mthumb
-SIMFLAGS ?= -mcpu=cortex-m3 -mthumb -DFORGE_MCU_SIM
-CFLAGS   ?= $(MCUFLAGS) -ffreestanding -nostdlib -Wall -Werror -Os
-LDFLAGS  ?= $(MCUFLAGS) -nostdlib -T link.ld -Wl,--gc-sections
-SIM_CFLAGS  ?= $(SIMFLAGS) -ffreestanding -nostdlib -Wall -Werror -Os
-SIM_LDFLAGS ?= $(SIMFLAGS) -nostdlib -T link.ld -Wl,--gc-sections
-
-.PHONY: all sim clean
-all: $(TARGET).elf
-sim: $(TARGET)_sim.elf
-
-$(TARGET).elf: main.c startup.S link.ld pinmap.h
-	arm-none-eabi-gcc $(CFLAGS) -c main.c -o main.o
-	arm-none-eabi-gcc $(CFLAGS) -c startup.S -o startup.o
-	arm-none-eabi-gcc $(LDFLAGS) main.o startup.o -o $@
-
-$(TARGET)_sim.elf: main.c virt_i2c.c virt_i2c.h startup.S link.ld pinmap.h
-	arm-none-eabi-gcc $(SIM_CFLAGS) -c main.c -o main_sim.o
-	arm-none-eabi-gcc $(SIM_CFLAGS) -c virt_i2c.c -o virt_i2c_sim.o
-	arm-none-eabi-gcc $(SIM_CFLAGS) -c startup.S -o startup_sim.o
-	arm-none-eabi-gcc $(SIM_LDFLAGS) main_sim.o virt_i2c_sim.o startup_sim.o -o $@
-
-clean:
-	rm -f *.o *.elf
-`
-
-  const files: Array<[string, string]> = [
+  const generated: Array<[string, string]> = [
     ['pinmap.h', pinmapH],
-    ['main.c', mainC],
-    ['virt_i2c.h', virtI2cH],
-    ['virt_i2c.c', virtI2cC],
-    ['startup.S', startupS],
-    ['link.ld', linkLd],
-    ['Makefile', makefile],
+    ['virt_i2c_board.inc', virtI2cBoardInc],
+    ['pin_asserts.inc', pinAssertsInc],
+    ['board_probes.inc', boardProbesInc],
+    ['board_identity.inc', boardIdentityInc],
   ]
-  for (const [name, body] of files) {
+  for (const [name, body] of generated) {
     fs.writeFileSync(path.join(projectDir, name), body)
   }
 
+  const files = [...COPY_FILES, ...generated.map(([n]) => n)]
   return {
     projectDir,
-    files: files.map(([name]) => name),
+    files,
     mcuFamily,
+    sourceTree,
   }
 }

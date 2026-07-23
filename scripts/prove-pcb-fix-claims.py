@@ -212,6 +212,7 @@ console.log(JSON.stringify(a))
             ok(f"D: ARM ELF — {fo.strip().split(': ', 1)[-1][:80]}")
     pm = solo / "firmware-proof" / "_tier1" / "mcu-project" / "pinmap.h"
     main_c = solo / "firmware-proof" / "_tier1" / "mcu-project" / "main.c"
+    pin_asserts = solo / "firmware-proof" / "_tier1" / "mcu-project" / "pin_asserts.inc"
     if pm.exists():
         pmt = pm.read_text()
         if "PA22" not in pmt or "PA23" not in pmt:
@@ -228,10 +229,12 @@ console.log(JSON.stringify(a))
             ok("D: no uniquify leak")
     else:
         fail("D: pinmap.h missing")
-    if main_c.exists() and "_forge_pin_" in main_c.read_text():
-        ok("D: main.c TOKEN static checks")
+    # GOTCHA (fixpack20): TOKEN static checks live in pin_asserts.inc (copied tree + bind).
+    _pin_bind = pin_asserts if pin_asserts.exists() else main_c
+    if _pin_bind.exists() and "_forge_pin_" in _pin_bind.read_text():
+        ok("D: pin TOKEN static checks (pin_asserts.inc)")
     else:
-        fail("D: main.c missing TOKEN static checks")
+        fail("D: pin_asserts.inc / main.c missing TOKEN static checks")
     chain = (repo / "scripts" / "serial-design-chain-v2.tsx").read_text()
     if "probeTier1McuCompile" not in chain:
         fail("D: chain missing probeTier1McuCompile")
@@ -337,6 +340,50 @@ console.log(JSON.stringify(a))
         fail("D3: chain missing probeTier3McuSim")
     else:
         ok("D3: chain wires probeTier3McuSim")
+    # INTENT (fixpack20): firmware must live in the git main tree, not only under out/.
+    fw_tree = repo / "firmware" / "pcb-bringup"
+    if not (fw_tree / "main.c").exists() or not (fw_tree / "virt_i2c.c").exists():
+        fail("D3: firmware/pcb-bringup missing from git tree (first-class firmware required)")
+    else:
+        fw_main = (fw_tree / "main.c").read_text(errors="ignore")
+        if "virt_i2c_read8" not in fw_main:
+            fail("D3: firmware/pcb-bringup/main.c lacks virt_i2c_read8")
+        else:
+            ok("D3: firmware/pcb-bringup first-class tree present")
+        if main_c and "firmware/pcb-bringup" not in main_c.read_text(errors="ignore"):
+            fail("D3: emitted main.c not copied from firmware/pcb-bringup (still TS-embedded?)")
+        elif main_c:
+            ok("D3: emitted main.c sourced from firmware/pcb-bringup")
+    # INTENT (audit 2026-07-23): Cursor honesty module + Terminal Excel helper must lockstep.
+    honesty_ts = (
+        repo / "src" / "lib" / "pdf-engine-v2" / "lib" / "pcb" / "pcb-firmware-honesty.ts"
+    )
+    excel_py = repo / "scripts" / "build-excel-export.py"
+    _virt_status = (
+        "VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE"
+    )
+    if honesty_ts.exists():
+        ht = honesty_ts.read_text(errors="ignore")
+        if _virt_status not in ht:
+            fail("D3: pcb-firmware-honesty.ts missing canonical VIRTUAL BRING-UP status string")
+        else:
+            ok("D3: honesty module has VIRTUAL BRING-UP status string")
+        if "FUNCTIONALLY VERIFIED" not in ht:
+            fail("D3: honesty module must name forbidden FUNCTIONALLY VERIFIED claim")
+        else:
+            ok("D3: honesty module forbids FUNCTIONALLY VERIFIED")
+    else:
+        fail("D3: pcb-firmware-honesty.ts missing")
+    if excel_py.exists():
+        et = excel_py.read_text(errors="ignore")
+        if "_pcb_firmware_status_string" in et and _virt_status not in et:
+            fail(
+                "D3: build-excel-export.py drifted from honesty module "
+                "(missing VIRTUAL BRING-UP status string)"
+            )
+        elif "_pcb_firmware_status_string" in et:
+            ok("D3: Excel _pcb_firmware_status_string lockstep with honesty module")
+        # If Excel helper not yet merged into this worktree, skip — Terminal lane.
     # Adversarial: host mock is Mach-O; MCU sim evidence is ARM ELF + MCU_SIM transcript
     host_mock = solo / "firmware-proof" / "_tier2" / "board_sim_native"
     if host_mock.exists():

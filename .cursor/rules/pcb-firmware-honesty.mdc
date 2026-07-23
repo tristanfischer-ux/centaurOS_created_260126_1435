@@ -1,0 +1,56 @@
+---
+description: PCB firmware honesty — QEMU/host-bind ≠ product working; first-class firmware tree; never FUNCTIONALLY VERIFIED without HIL
+globs:
+  - "**/pcb-firmware*.ts"
+  - "**/firmware/**"
+  - "**/prove-pcb-fix-claims.py"
+  - "**/build-excel-export.py"
+  - "**/CURSOR-HARNESS-INBOX.md"
+alwaysApply: false
+---
+
+# PCB Firmware Honesty Doctrine
+
+**Tristan 2026-07-22/23 (mandatory):** Do not oversell virtual bring-up as “firmware tested and working on the design.”
+
+## Canonical source
+
+| Concern | Location |
+|---|---|
+| Status strings / forbidden claims | `src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-honesty.ts` |
+| Checked-in MCU bring-up | `firmware/pcb-bringup/` |
+| Emit (copy tree + board binds) | `pcb-firmware-tier1-project.ts` |
+| Excel labels (Terminal lane) | `build-excel-export.py::_pcb_firmware_status_string` |
+| Pack layout | top-level `firmware/` in deliverable (sibling of `pcb/`) |
+
+## NEVER
+
+- Claim **FUNCTIONALLY VERIFIED** without a real HIL transcript
+- Emit large C blobs only inside TypeScript — edit `firmware/pcb-bringup/`
+- Treat Tier-2 host bind (Mach-O / `board_sim_native`) as MCU execution
+- Print `CHECK … PASS` under QEMU without calling `virt_i2c_read8`
+- Bury the only firmware copy under `pcb/firmware-mcu` / `pcb/firmware-other` in the emailable pack
+
+## ALWAYS
+
+- Max banner: **FAB-READY — UNPROVEN IN HARDWARE**
+- Tier ≥3 status: **VIRTUAL BRING-UP PASS (QEMU + modelled I²C) — UNPROVEN IN HARDWARE**
+- Fail closed if `firmware/pcb-bringup/` is missing from the git tree
+- Empty modelled I²C bus → FAIL (not PASS)
+- Gerbers under `pcb-boards/*/pcb/gerbers` (not only `pcb-project/`)
+
+## Tier truth (quick)
+
+| Tier | Is | Is not |
+|---|---|---|
+| 0 | Host contract harness | Silicon |
+| 1 | Pinmap link from `firmware/pcb-bringup` | Running on MCU |
+| 2 | Host net/device bind | Cortex-M execution |
+| 3 | QEMU + `virt_i2c_read8` on RAM models | SAMD21 SERCOM / HIL |
+
+## proveCatch
+
+- `pcb-firmware-honesty.test.ts`
+- `pcb-firmware-mcu-sim.test.ts` (empty bus FAIL; good bus PASS)
+- `prove-pcb-fix-claims.py` D3
+- Regression: `UNIVERSAL.pcb_firmware_bringup_tree_in_git` + `…_probes_virt_i2c` + `…_status_tier3_is_virtual_bringup`
