@@ -13093,21 +13093,29 @@ def _selftest_thermocycler_exterior_keep() -> None:
 
 
 def _selftest_instrument_mesh_keep_prefixes() -> None:
-    """proveCatch: OPEN form meshes survive clutter-suppress (tc/lm/sp).
+    """proveCatch: OPEN form + lab_electronics meshes survive clutter-suppress.
 
-    Adversarial: a keep-list with only story/product/tc prefixes would hide
-    u_se_lm_body / u_se_sp_base and ship an empty sealed crate on any path that
-    does not re-unhide form meshes.
+    Adversarial: a keep-list missing u_se_le_* hides vial_bioreactor OD optical
+    tower (u_se_le_od_src / u_se_le_od_det) and ships an empty box — the "lost
+    light tower" defect (Tristan 2026-07-23). proveCatch: u_se_le_od_src must
+    match a keep prefix so clutter-suppress skips it.
     """
-    for pfx in ("u_se_tc_", "u_se_lm_", "u_se_sp_"):
+    for pfx in ("u_se_tc_", "u_se_lm_", "u_se_sp_", "u_se_le_"):
         assert pfx in _INSTRUMENT_MESH_KEEP_PREFIXES, (
-            f"clutter-suppress must keep {pfx}* OPEN form meshes")
+            f"clutter-suppress must keep {pfx}* form meshes")
     assert any(
         "u_se_lm_body".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
     ), "lab_microscope body must match a keep prefix"
     assert any(
         "u_se_sp_base".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
     ), "syringe_pump base must match a keep prefix"
+    # proveCatch OD tower (2026-07-23): exterior OD housing must survive suppress.
+    assert any(
+        "u_se_le_od_src".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
+    ), "vial_bioreactor OD optical tower must match a keep prefix"
+    assert any(
+        "u_se_le_vial_collar".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
+    ), "vial_bioreactor vial collar must match a keep prefix"
     assert not any(
         "u_power_distribution_slab".startswith(p)
         for p in _INSTRUMENT_MESH_KEEP_PREFIXES
@@ -16376,6 +16384,16 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
     "u_se_exterior_detail_",
     "u_se_cutaway_cue_",
     "u_skid_encl_",
+    # INTENT (vial_bioreactor OD tower 2026-07-23, Tristan: "lost the light tower"):
+    # lab_electronics exterior signature parts (u_se_le_vial, u_se_le_od_src/det,
+    # u_se_le_od_arm_*, u_se_le_vial_collar, u_se_le_face_*, u_se_le_pcb, etc.) all
+    # start with u_se_le_* but were NOT in the keep list → clutter-suppress hid them
+    # → 00-hero and 04-exterior shipped without the OD optical tower or the vial.
+    # The _prepare_sealed_product_view exterior branch already handles selective hiding
+    # (shows only _keep prefixes on 04–07), so adding u_se_le_* here is safe:
+    # suppress skips them → exterior view hides interior boards explicitly → correct.
+    # proveCatch: _selftest_le_vial_exterior_gating confirms collar kept, bare vial hidden.
+    "u_se_le_",
 )
 
 

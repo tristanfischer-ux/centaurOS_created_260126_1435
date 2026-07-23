@@ -150,41 +150,47 @@ def make_instrument_studio_world(strength: float = 0.22):
     """Soft product-photography backdrop for handheld instruments.
 
     INTENT: Nishita sky is correct for plant skids (metals reflect sky) but
-    washes a 150 mm charcoal instrument and never puts a specular kiss on dark
-    glass. Soft warm-grey studio world = Apple-product-shot language.
+    washes an instrument and never puts a specular kiss on dark glass.
+    Soft light-grey studio world = clean product-slide language.
     UNIVERSAL — call only when isInstrumentDevice.
 
-    GOTCHA: world strength ≥0.5 + softboxes lifted body crop median to ~150
-    (clay) vs gold ~103. Keep ambient low so polymer stays charcoal.
+    DEMO FIX (2026-07-23, Tristan: "black on black"): backdrop brightened from
+    dark mid-grey (0.38) to light studio grey (0.82) so the mid-light-grey body
+    reads clearly against it — matches body lightening in instrument_form_grammar.py.
     """
     world = bpy.data.worlds.new("world_instrument_studio")
     bpy.context.scene.world = world
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    # Slightly cool mid-grey — backdrop reads darker than the product silhouette.
-    bg.inputs["Color"].default_value = (*_to_linear((0.38, 0.39, 0.42)), 1.0)
+    # Light studio grey backdrop — reads slightly lighter than the product body.
+    # Was (0.38, 0.39, 0.42) dark mid-grey (charcoal era); now (0.82, 0.83, 0.85).
+    bg.inputs["Color"].default_value = (*_to_linear((0.82, 0.83, 0.85)), 1.0)
     bg.inputs["Strength"].default_value = float(strength)
     return world
 
 
 def apply_instrument_color_management(exposure_bias: float = 0.0):
-    """AgX high-contrast for charcoal polymer product shots.
+    """Standard view transform for light-grey polymer product shots.
 
-    INTENT: AgX Medium High + softboxes can lift mid-greys. High Contrast
-    restores silhouette. Exposure bias stays ≤0 — positive lift washes charcoal
-    to clay (2026-07-13); heavy negative crush makes polymer featureless black.
+    DEMO FIX (2026-07-23): body lightened from charcoal to mid-light grey
+    (MAT_BODY_POLYMER ~0.62 sRGB). AgX was tuned for near-black charcoal
+    (High Contrast crushes dark greys to black — wrong for a light body).
+    Standard view transform is linear and appropriate for a mid-grey product
+    on a light studio background; no look/contrast override needed.
+    Exposure bias stays 0 — body is already readable.
     """
     scene = bpy.context.scene
-    try:
-        scene.view_settings.view_transform = "AgX"
-    except (TypeError, ValueError):
-        pass
-    for look in ("AgX - High Contrast", "AgX - Medium High Contrast", "None"):
+    for transform in ("Standard", "Filmic", "AgX"):
         try:
-            scene.view_settings.look = look
+            scene.view_settings.view_transform = transform
             break
         except (TypeError, ValueError):
             continue
+    # No look override — Standard has no "looks"; Filmic/AgX look stays None/None.
+    try:
+        scene.view_settings.look = "None"
+    except (TypeError, ValueError, AttributeError):
+        pass
     try:
         scene.view_settings.exposure = float(exposure_bias)
     except (AttributeError, TypeError):

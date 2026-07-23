@@ -32,12 +32,13 @@ HANDHELD_MAX_EDGE_MM = hfi.HANDHELD_MAX_EDGE_MM
 VIEWING_DISTANCE_MM_DESIGN = hfi.VIEWING_DISTANCE_MM_DESIGN
 
 # ── Material honesty (sRGB 0–1) ───────────────────────────────────────────
-# GOTCHA: under product softboxes, display-sRGB ≥0.10 lifts to clay-grey after
-# AgX (2026-07-13: body crop median ~150 vs gold ~103). Gold open-photometer
-# charcoal is near-black polymer — keep body ≈0.06–0.07 display. Too dark
-# (≤0.04 + heavy negative exposure) crushes to featureless black.
-MAT_BODY_POLYMER = (0.065, 0.068, 0.075)
-MAT_DECK_A_SURFACE = (0.08, 0.084, 0.092)     # slightly lighter top operating plane
+# DEMO FIX (2026-07-23, Tristan: "black on black"): instrument body lightened
+# from near-black charcoal (0.065) to warm mid-light grey (0.62) for demo-slide
+# visibility. World background brightened to match (see forge_blender_lib.py).
+# View transform switched from AgX (designed for charcoal silhouette) to
+# Standard (linear — appropriate for a mid-grey product on a light backdrop).
+MAT_BODY_POLYMER = (0.62, 0.63, 0.65)         # warm mid-light grey; was (0.065, 0.068, 0.075) charcoal
+MAT_DECK_A_SURFACE = (0.55, 0.57, 0.60)       # slightly darker front panel for contrast; was (0.08, 0.084, 0.092)
 MAT_DISPLAY_GLASS = (0.012, 0.015, 0.028)
 MAT_DISPLAY_BEZEL = (0.045, 0.048, 0.055)
 # Keys must read against charcoal deck — gold PyBadge uses mid-grey tactile pads.
@@ -98,12 +99,14 @@ INSTRUMENT_STUDIO_BOUNCE_ENERGY = 2.5
 INSTRUMENT_STUDIO_WORLD_STRENGTH = 0.30
 INSTRUMENT_STUDIO_GROUND_SRGB = (0.52, 0.53, 0.55)
 # SIGHT band for a sealed exterior BODY-FACE patch (8-bit mean RGB).
-TARGET_BODY_LUM_MEAN_MAX = 130.0
-TARGET_BODY_LUM_MEAN_MIN = 70.0
+# Updated 2026-07-23: light-grey body (0.62 sRGB ≈ 158/255 8-bit) needs
+# higher floor than charcoal (was min=70, max=130 for ~20–80/255 dark body).
+TARGET_BODY_LUM_MEAN_MAX = 220.0
+TARGET_BODY_LUM_MEAN_MIN = 120.0
 # Legacy aliases (centre-crop stats — prefer body_luminance_ok mean band).
-TARGET_BODY_LUM_P50_MAX = 130
-TARGET_BODY_LUM_P50_MIN = 55
-TARGET_BODY_LUM_P10_MAX = 100
+TARGET_BODY_LUM_P50_MAX = 220
+TARGET_BODY_LUM_P50_MIN = 100
+TARGET_BODY_LUM_P10_MAX = 200
 TARGET_BODY_LUM_P10_MIN = 25
 
 # Silhouette: clear secondary volume (optical cube) ≥ this fraction of body height.
@@ -1089,12 +1092,12 @@ def _selftest() -> None:
     assert len(feet) == 4
     assert INTERIOR_BEAM_CROSS_MM >= 4.0, "beam must read at thumbnail"
     assert INTERIOR_MIN_STORY_MESHES >= 8
-    assert sum(MAT_BODY_POLYMER) / 3.0 <= 0.08, "body must stay charcoal under softboxes"
+    assert sum(MAT_BODY_POLYMER) / 3.0 >= 0.55, "body must be mid-light grey for demo slide visibility (2026-07-23)"
     assert INSTRUMENT_EXPOSURE_LIFT == 0.0, "never lift instrument exposure"
     assert INSTRUMENT_EXPOSURE_BIAS <= 0.0
-    assert INSTRUMENT_STUDIO_KEY_ENERGY <= 22.0, "softbox key must not wash charcoal"
-    assert TARGET_BODY_LUM_MEAN_MIN >= 60.0
-    assert TARGET_BODY_LUM_MEAN_MAX <= 135.0
+    assert INSTRUMENT_STUDIO_KEY_ENERGY <= 22.0, "softbox key must not blow out mid-grey body"
+    assert TARGET_BODY_LUM_MEAN_MIN >= 60.0, "light-grey body min lum floor"
+    assert TARGET_BODY_LUM_MEAN_MAX <= 240.0, "body must not blow out to paper white"
     # proveCatch: cuboid-dominated cutaway must fail; CAD-heavy must pass.
     assert not interior_authenticity_ok(
         {"n_story": 10, "n_plain_box": 9, "n_authentic": 1}
