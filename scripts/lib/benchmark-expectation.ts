@@ -553,13 +553,30 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
     let verdict: Verdict = 'ok'
     if (det.gbp < e.low_gbp) verdict = classify(e.low_gbp / det.gbp)
     else if (det.gbp > e.high_gbp) verdict = classify(det.gbp / e.high_gbp)
+    let cost_note = verdict === 'ok' ? 'within the benchmark envelope' : `${ratio.toFixed(1)}× the LLM mid-estimate — ${e.basis || ''}`
+    let cost_brief_anchor: string | undefined
+    // BRIEF-COST-ANCHOR (gate-36 — the organoid £255-vs-£3,500 false-RADICAL "missing subsystems"
+    // alarm, 2026-07-23, drawer b73c1d357aa5d538): the benchmark LLM estimates what a COMMERCIAL one
+    // costs; a DIY / open-hardware brief with a STATED cost ceiling is legitimately far cheaper (no
+    // gas train, no jacket, HEPES buffering instead of a CO₂ sparger…). If the engine's cost is UNDER
+    // the benchmark AND within the brief's OWN stated cost ceiling, the design MEETS the brief — the
+    // divergence is the benchmark re-framing a DIY brief as a commercial unit, NOT an engine absurdity.
+    // Downgrade radical→warn (mirrors the output-dimension brief-anchor). An OVER-ceiling design is NEVER
+    // downgraded (a real over-cost stays RADICAL). Reads the brief's own number → universal, no table.
+    const briefCeil = Number(state?.parsedBrief?.constraints?.unit_cost_ceiling?.value) || 0
+    if (verdict !== 'ok' && det.gbp < e.low_gbp && briefCeil > 0 && det.gbp <= briefCeil * 1.02) {
+      cost_brief_anchor = `within the brief's stated cost ceiling £${Math.round(briefCeil).toLocaleString()} — a cheaper DIY/open-hardware build than the commercial benchmark, by design`
+      if (verdict === 'radical') verdict = 'warn'
+      cost_note = `engine cost £${Math.round(det.gbp).toLocaleString()} is under the commercial benchmark but WITHIN the brief's £${Math.round(briefCeil).toLocaleString()} ceiling — benchmark framing differs, review note not a block`
+    }
     findings.push({
       dimension: 'all-in cost',
       expected: `£${Math.round(e.low_gbp).toLocaleString()}–${Math.round(e.high_gbp).toLocaleString()} (mid £${Math.round(e.expected_gbp).toLocaleString()})`,
       deterministic: `£${Math.round(det.gbp).toLocaleString()} (${det.source})`,
       ratio: Number(ratio.toFixed(2)),
       verdict,
-      note: verdict === 'ok' ? 'within the benchmark envelope' : `${ratio.toFixed(1)}× the LLM mid-estimate — ${e.basis || ''}`,
+      note: cost_note,
+      ...(cost_brief_anchor ? { brief_anchor: cost_brief_anchor } : {}),
     })
   }
 
@@ -1119,6 +1136,20 @@ function _selftest() {
   const r2 = compareToBenchmark(exp, { costStack: { oem_transfer_price_gbp: 1_050_000 }, keyMetrics: {}, requirementsBom: [] })
   const costF = r2.findings.find(f => f.dimension === 'all-in cost')
   if (!costF || costF.verdict !== 'ok') { console.log('FAIL: £1.05M within envelope should be OK'); bad++ }
+  // BRIEF-COST-ANCHOR proveCatch (the organoid £255-vs-£3,500 false-RADICAL, drawer b73c1d357aa5d538):
+  // a DIY brief with a STATED ceiling, engine cost UNDER the commercial benchmark AND within the
+  // ceiling → downgrade radical→warn (benchmark re-framing a DIY brief, not missing subsystems).
+  const expDiy: BenchmarkExpectation = { ...exp,
+    expected_cost: { low_gbp: 3_000, expected_gbp: 3_500, high_gbp: 4_000, per_output_unit: '£/unit', basis: 'commercial benchtop bioreactor' } }
+  const diyBrief = { parsedBrief: { constraints: { unit_cost_ceiling: { value: 385, currency: 'GBP' } } } }
+  const rDiy = compareToBenchmark(expDiy, { ...diyBrief, costStack: { oem_transfer_price_gbp: 255 }, keyMetrics: {}, requirementsBom: [] })
+  const diyF = rDiy.findings.find(f => f.dimension === 'all-in cost')
+  if (!diyF || diyF.verdict === 'radical' || !diyF.brief_anchor) { console.log('FAIL: £255 within the brief £385 ceiling but under the commercial benchmark should downgrade radical→warn (brief-cost-anchor)'); bad++ }
+  if (rDiy.worst === 'radical') { console.log('FAIL: brief-anchored cheap DIY build should not push worst=radical'); bad++ }
+  // NEGATIVE: an under-benchmark design that is STILL over its OWN brief ceiling is NOT excused.
+  const rOver = compareToBenchmark(expDiy, { ...diyBrief, costStack: { oem_transfer_price_gbp: 1_000 }, keyMetrics: {}, requirementsBom: [] })
+  const overF = rOver.findings.find(f => f.dimension === 'all-in cost')
+  if (!overF || overF.verdict !== 'radical') { console.log('FAIL: £1,000 (2.6× under the £3k benchmark low) but OVER the £385 ceiling must STAY radical — an over-budget design is not excused'); bad++ }
   // BoM concentration: one line 60% when max expected 55% → ratio 1.09 → ok; one line 90% → 1.6× → warn+
   const r3 = compareToBenchmark(exp, {
     costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {},
