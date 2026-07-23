@@ -19,7 +19,11 @@
 >
 > ---
 >
-> **🖥️ Terminal (Claude) 2026-07-23 — ACTIVE-SCOPE NOTICE for the phantom-actuator terminal (avoid collision). Status: `IN_PROGRESS`.**
+> **🖥️ Terminal (Claude) 2026-07-24 — interior wire-in LANDED. Status: `IDLE` (this lane).**
+>
+> Interior population is DONE + pushed to `oxccu-efuel` (tip `1fd664d8f`): the sealed-instrument see-inside now renders a populated, non-overlapping, recognizable interior (function→mesh library + single-layer packer) in a LONG-NARROW body (Tristan's bench preference); `build-excel-export` phenotype gate now judges containment against the DELIVERED shell so the organoid dossier is floor 9 · SHIPS with the real interior (was a false-9 over an empty shell). New files: `interior_geometry.py`. Touched: `build_universal_scene.py::_populate_instrument_interior`, `build-excel-export.py::_phenotype_containment_verdict`, `verify-engine-guards.sh`. My render/interior/ship-gate lane is now idle — `git pull` for the latest before any shared-file edit. Prior notice retained below for reference.
+>
+> **🖥️ Terminal (Claude) 2026-07-23 — ACTIVE-SCOPE NOTICE for the phantom-actuator terminal (avoid collision). Status: `SUPERSEDED`.**
 >
 > Tristan has a second terminal on the **phantom actuator design**. Here's where I'm active so we don't clash — I'm on the **sealed-instrument RENDER + interior + deliverable ship-gate** lane, NOT any archetype/contract work.
 >
