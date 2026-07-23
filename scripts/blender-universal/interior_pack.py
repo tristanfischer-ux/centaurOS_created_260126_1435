@@ -31,20 +31,24 @@ def _is_fastener(name: str) -> bool:
     return bool(re.search(r"standoff|screw|washer|\bnut\b|\bclip\b|bracket|label|cable\b|wire\b", name, re.I))
 
 
-def _is_onboard(name: str, dims, chassis_footprint_mm2=1500.0) -> bool:
-    """Small electronics that physically MOUNT ON THE PCB (not floor-standing): keyed on a
-    footprint threshold + the on-board electronics vocabulary. Universal, no product table."""
+def _is_chassis(name: str, dims, chassis_footprint_mm2=2500.0) -> bool:
+    """A big FLOOR-STANDING functional part (the mechanical chassis of the instrument):
+    keyed on the chassis-function vocabulary OR a large footprint. Everything else small is
+    on-board (mounts on the PCB). Universal, no product table."""
     if _is_baselayer(name):
-        return False
-    # a genuinely small chip/component: small footprint AND no side longer than ~40mm
-    # (a 99mm-wide front-panel connector strip is a face part, not a board-mounted chip).
-    small = dims[0] * dims[1] <= chassis_footprint_mm2 and max(dims[0], dims[1]) <= 40.0
-    elec = bool(re.search(
-        r"\bled\b|indicator|esd|ferrite|isolator|polyfuse|protection network|"
-        r"reverse polarity|current limit|input protection|emc|usb (power|entry)|"
-        r"connector|header|resistor|capacitor|regulator|mcu|microcontroller|"
-        r"galvanic|tachometer|\bic\b|diode|transistor|crystal|oscillator", name, re.I))
-    return small and elec
+        return False  # the PCB is its own base plane, handled separately
+    if re.search(r"vessel|culture|reactor|bioreactor|vial holder|"
+                 r"pump|stirrer|\bmotor\b|drive|fan|blower|heatsink|"
+                 r"tubing|manifold|peltier|\btec\b|heater|thermal|"
+                 r"filter|vent|reservoir|\btank\b|holder|fixture|display|deck", name, re.I):
+        return True
+    return dims[0] * dims[1] > chassis_footprint_mm2 or max(dims) > 70.0
+
+
+def _is_onboard(name: str, dims) -> bool:
+    """Small board-level part (sensor / IC / protection / connector-chip) that MOUNTS ON THE
+    PCB rather than the floor — everything that is neither a fastener, the PCB, nor chassis."""
+    return not (_is_fastener(name) or _is_baselayer(name) or _is_chassis(name, dims))
 
 
 def _shelf_pack(items, fw, fd, floor_z, gap_mm):
