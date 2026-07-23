@@ -45,6 +45,7 @@ run "build-excel-export.py --selftest"        "$PY" scripts/build-excel-export.p
 run "dossier_audit.py --selftest"            "$PY" scripts/lib/dossier_audit.py --selftest
 run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.py --selftest
 run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest
+run "render-image-quality --selftest"            "$PY" scripts/lib/render_image_quality.py --selftest
 run "render-vision critic --selftest"           "$PY" scripts/lib/render_vision_critic.py --selftest
 run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_rot_test.py
 # AgX-first view transform (the pale-wash bug that bit twice): product renders MUST prefer AgX,

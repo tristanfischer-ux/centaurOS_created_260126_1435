@@ -667,8 +667,52 @@ _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-he
 _INSTRUMENT_EXTERIOR_CANDIDATES = ("04-product-exterior.png",)
 
 
+# DELIVERABLE PRODUCT-RENDER names that must never be a byte-copy of a diagnostic
+# inspect-*.png proxy pass (the X-103 clay shipped as 01-top, Tristan 2026-07-23 defect #3).
+_DELIVERABLE_RENDER_GLOBS = (
+    "00-hero.png", "01-top.png", "blender-cover.png",
+    "04-product-exterior.png", "05-product-left.png",
+    "06-product-right.png", "07-product-service.png",
+    "08-product-ghost-shell.png",
+)
+
+
+def _md5_file(path: str):
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.md5(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def inspect_proxy_collisions(run_dir: str):
+    """Every deliverable product render that is a BYTE-COPY (md5 match) of a diagnostic
+    inspect-*.png proxy pass. Returns [(render_name, inspect_name), ...]. A diagnostic
+    pass (grey placeholder cylinders + a floating equipment tag like 'X-103') must NEVER
+    ship badged as a customer 'Product render' (Tristan 2026-07-23). Deterministic, £0."""
+    import glob as _glob
+    collisions = []
+    # md5 every inspect-*.png once.
+    inspect_md5: dict = {}
+    for ip in sorted(_glob.glob(os.path.join(run_dir, "inspect-*.png"))):
+        h = _md5_file(ip)
+        if h:
+            inspect_md5.setdefault(h, os.path.basename(ip))
+    if not inspect_md5:
+        return collisions
+    for rn in _DELIVERABLE_RENDER_GLOBS:
+        rp = os.path.join(run_dir, rn)
+        if not os.path.isfile(rp):
+            continue
+        h = _md5_file(rp)
+        if h and h in inspect_md5:
+            collisions.append((rn, inspect_md5[h]))
+    return collisions
+
+
 def _hero_is_inspect_clone(run_dir: str, hero_path: str) -> bool:
-    """True when 00-hero.png is byte-identical to inspect-hero (failed shaded pass)."""
+    """True when 00-hero.png is byte-identical to inspect-hero (failed shaded pass).
+    Thin wrapper over the generalised md5 proxy detector."""
     if os.path.basename(hero_path) not in ("00-hero.png", "blender-cover.png"):
         return False
     inspect = os.path.join(run_dir, "inspect-hero.png")
@@ -678,6 +722,50 @@ def _hero_is_inspect_clone(run_dir: str, hero_path: str) -> bool:
         return open(hero_path, "rb").read() == open(inspect, "rb").read()
     except OSError:
         return False
+
+
+# DELIVERABLE product-render set critiqued by the vision model (the customer-facing views).
+_DELIVERABLE_CRITIQUE_NAMES = (
+    "00-hero.png", "blender-cover.png",
+    "04-product-exterior.png", "05-product-left.png",
+    "06-product-right.png", "07-product-service.png",
+    "08-product-ghost-shell.png",
+)
+
+
+def critique_deliverable_set(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
+    """Run the single-image critique over EVERY customer-facing deliverable render present
+    (hero + exterior views + translucent see-inside), write render-vision-critique-<name>.json
+    per render, and an aggregate render-vision-critique.json with {broken: any_broken, per_image}.
+    So a broken NON-hero deliverable (a washed-out exterior, a buried-feature see-inside) now
+    binds ships — not just the hero. Reuses critique_render (one-retry + tiebreak intact)."""
+    per_image: dict = {}
+    any_broken = False
+    for name in _DELIVERABLE_CRITIQUE_NAMES:
+        p = os.path.join(run_dir, name)
+        if not os.path.isfile(p):
+            continue
+        if _hero_is_inspect_clone(run_dir, p):
+            continue  # an inspect-clone is caught deterministically upstream, not re-critiqued
+        res = critique_render(p, model)
+        res["image"] = name
+        per_image[name] = res
+        if isinstance(res, dict) and res.get("ok") and bool(res.get("broken")):
+            any_broken = True
+        try:
+            with open(os.path.join(run_dir, f"render-vision-critique-{name.rsplit('.', 1)[0]}.json"),
+                      "w", encoding="utf-8") as fh:
+                json.dump(res, fh, indent=2)
+        except OSError:
+            pass
+    agg = {"broken": any_broken, "per_image": per_image,
+           "images": sorted(per_image.keys()), "model": model, "ok": bool(per_image)}
+    try:
+        with open(os.path.join(run_dir, "render-vision-critique.json"), "w", encoding="utf-8") as fh:
+            json.dump(agg, fh, indent=2)
+    except OSError:
+        pass
+    return agg
 
 
 def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
@@ -793,13 +881,62 @@ def _selftest() -> int:
         if v.get("broken") is not False or v.get("incoherence_floor"):
             fails.append(f"FALSE POSITIVE: {c['defects']} → {v}")
 
+    # ── DELIVERABLE-SET FOLD (2026-07-23): the aggregate any_broken=True when ANY per-image
+    # verdict is broken (offline, drive with frozen rubric outputs → verdict_from_model_output).
+    _bad_set = {
+        "04-product-exterior.png": verdict_from_model_output(
+            {"broken": False, "defects": ["parts appear to be floating above the base"]}),
+        "05-product-left.png": verdict_from_model_output({"broken": False, "defects": []}),
+    }
+    if not any(v.get("broken") for v in _bad_set.values()):
+        fails.append("DELIVERABLE FOLD: a broken per-image verdict must make any_broken True")
+    _clean_set = {
+        "04-product-exterior.png": verdict_from_model_output({"broken": False, "defects": []}),
+        "08-product-ghost-shell.png": verdict_from_model_output(
+            {"broken": False, "defects": ["minor: cuvette port could be recessed"]}),
+    }
+    if any(v.get("broken") for v in _clean_set.values()):
+        fails.append("DELIVERABLE FOLD: an all-clean set must leave any_broken False")
+
+    # ── INSPECT-PROXY md5 collision proveCatch (defect #3, the X-103 clay shipped as 01-top).
+    # Uses the REAL fixture when present (out/organoid-for-simon 01-top == inspect-top), else
+    # synthesises a byte-identical pair in a temp dir.
+    import tempfile as _tf
+    _repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _real = os.path.join(_repo, "out", "organoid-for-simon")
+    if os.path.isfile(os.path.join(_real, "01-top.png")) and \
+       os.path.isfile(os.path.join(_real, "inspect-top.png")):
+        _cols = inspect_proxy_collisions(_real)
+        if not any(r == "01-top.png" for (r, _i) in _cols):
+            fails.append(f"INSPECT-PROXY: 01-top.png must be flagged a byte-copy of an "
+                         f"inspect-*.png (got {_cols})")
+    else:
+        _td = _tf.mkdtemp(prefix="rvc_proxy_")
+        try:
+            _blob = b"\x89PNG\r\nclay-proxy-bytes"
+            with open(os.path.join(_td, "inspect-top.png"), "wb") as fh:
+                fh.write(_blob)
+            with open(os.path.join(_td, "01-top.png"), "wb") as fh:
+                fh.write(_blob)  # byte-identical
+            with open(os.path.join(_td, "04-product-exterior.png"), "wb") as fh:
+                fh.write(b"\x89PNG\r\nDIFFERENT-crisp-render")  # NOT a proxy
+            _cols = inspect_proxy_collisions(_td)
+            if not any(r == "01-top.png" for (r, _i) in _cols):
+                fails.append(f"INSPECT-PROXY (synthetic): 01-top byte-copy must fire (got {_cols})")
+            if any(r == "04-product-exterior.png" for (r, _i) in _cols):
+                fails.append("INSPECT-PROXY (synthetic): a distinct render must NOT false-fire")
+        finally:
+            import shutil as _sh
+            _sh.rmtree(_td, ignore_errors=True)
+
     if fails:
         print("render_vision_critic _selftest: FAIL")
         for f in fails:
             print("  " + f)
         return 1
     print("render_vision_critic _selftest passed "
-          f"({len(known_bad)} incoherence-floor catches, 1 no-relax, {len(clean)} clean-pass)")
+          f"({len(known_bad)} incoherence-floor catches, 1 no-relax, {len(clean)} clean-pass, "
+          "deliverable-fold + inspect-proxy proveCatch)")
     return 0
 
 

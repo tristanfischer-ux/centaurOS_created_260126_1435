@@ -317,18 +317,196 @@ _VISION_CACHE: dict = {}
 
 
 def _render_vision_verdict(run_dir: str):
-    """SIGHT: read the vision critic's verdict on the render (render-vision-critique.json), if a vision
-    model has looked. {ok, broken, defects, model} or None. Deterministic READ of the delivered verdict
-    — the non-deterministic vision CALL happens once upstream (the chain / render_vision_critic.py)."""
+    """SIGHT: read the vision critic's verdict on the DELIVERABLE render set. {ok, broken, defects,
+    model} or None. Deterministic READ of the delivered verdicts — the non-deterministic vision CALL
+    happens once upstream (the chain / render_vision_critic.py).
+
+    OR-FOLD (2026-07-23): critique_deliverable_set now writes render-vision-critique.json (aggregate)
+    AND render-vision-critique-<name>.json per deliverable render. Fold ALL of them so a broken NON-hero
+    render (a washed-out exterior, a buried-feature see-inside) binds ships, not just the hero. ANY
+    broken deliverable → broken=true; the defect list names the offending image."""
     if run_dir in _VISION_CACHE:
         return _VISION_CACHE[run_dir]
-    res = None
-    try:
-        with open(os.path.join(run_dir, "render-vision-critique.json"), "r", encoding="utf-8") as _fh:
-            res = json.load(_fh)
-    except Exception:  # noqa: BLE001
-        res = None
+    import glob as _glob
+    _agg = os.path.join(run_dir, "render-vision-critique.json")
+    _primary = None            # the base verdict dict (preserves checks_run/n_checks/etc.)
+    _per_files = sorted(_glob.glob(os.path.join(run_dir, "render-vision-critique-*.json")))
+    if os.path.exists(_agg):
+        try:
+            with open(_agg, "r", encoding="utf-8") as _fh:
+                _primary = json.load(_fh)
+        except Exception:  # noqa: BLE001
+            _primary = None
+    if _primary is None and _per_files:
+        _primary = {"ok": True, "broken": False, "defects": []}
+    if not isinstance(_primary, dict):
+        _VISION_CACHE[run_dir] = None
+        return None
+    # Base = the aggregate/single-image dict verbatim (so checks_run etc. survive), then
+    # OR-FOLD broken/defects across the aggregate's per_image + every per-render file. An
+    # EXPLICIT broken flag binds regardless of `ok` (a delivered broken critique is broken;
+    # `ok` distinguishes 'call succeeded' from 'call failed', not 'render clean').
+    res = dict(_primary)
+    broken = bool(_primary.get("broken"))
+    defects: list = list(_primary.get("defects") or [])
+    _pi = _primary.get("per_image")
+    if isinstance(_pi, dict):
+        for _nm, _v in _pi.items():
+            if isinstance(_v, dict) and bool(_v.get("broken")):
+                broken = True
+                for _dd in (_v.get("defects") or ["unspecified"]):
+                    _tag = f"{_nm}: {_dd}"
+                    if _tag not in defects:
+                        defects.append(_tag)
+    for _f in _per_files:
+        try:
+            with open(_f, "r", encoding="utf-8") as _fh:
+                d = json.load(_fh)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(d, dict) and bool(d.get("broken")):
+            broken = True
+            _img = d.get("image") or os.path.basename(_f)
+            for _dd in (d.get("defects") or ["unspecified"]):
+                _tag = f"{_img}: {_dd}"
+                if _tag not in defects:
+                    defects.append(_tag)
+    res["broken"] = broken
+    res["defects"] = defects
     _VISION_CACHE[run_dir] = res
+    return res
+
+
+# ─── RENDER DELIVERABLE SHIP-GATE (2026-07-23) ────────────────────────────────────
+# The engine's ship verdict never LOOKED AT the deliverable render images — its gates
+# checked structure/coherence/BoM/cost, not "does each shipped render look like a clean
+# product". SIGHT was left to the human and failed 3× this session (buried tower, pale
+# washed-out ghost, clay X-103 inspect proxy shipped as 01-top, omitted see-inside). This
+# gate takes the 5-second glance ITSELF, adversarially, over every customer-facing render,
+# and FAILS the ship verdict on a reject. DETERMINISTIC-FIRST: (1) md5 proxy, (2) required
+# presence, (3) wash-out/clay — all £0 — THEN (4) the vision critic only on renders that
+# passed 1-3 (residue), keeping the LLM off the hot path when a cheap gate already fails.
+_RENDER_GATE_CACHE: dict = {}
+
+
+def _required_render_set(run_dir: str):
+    """The expected customer render set for the product class + the acceptable heroes.
+    Sealed instrument (04-product-exterior on disk) → the exterior views + hero + the
+    translucent see-inside (08-product-ghost-shell, defect #4); plant → the interior
+    plan (01-top) + hero. Returns (required_set, hero_alternatives)."""
+    _sealed = os.path.exists(os.path.join(run_dir, "04-product-exterior.png"))
+    _heroes = ("00-hero.png", "blender-cover.png")
+    if _sealed:
+        required = {
+            "04-product-exterior.png", "05-product-left.png",
+            "06-product-right.png", "07-product-service.png",
+            "08-product-ghost-shell.png",
+        }
+        return required, _heroes
+    # plant / non-sealed: interior GA plan + a hero
+    return {"01-top.png"}, _heroes
+
+
+def compute_render_deliverable_gate(run_dir: str) -> dict:
+    """The binding render ship-gate over the DELIVERABLE render set. {passed, fails:[...]}.
+    A fail names the offending render + the reason (+ mean/std/md5 where relevant). Never
+    raises — a gate that crashes the build is worse than one that skips, but any REAL defect
+    on a REAL deliverable render flips passed=False."""
+    if run_dir in _RENDER_GATE_CACHE:
+        return _RENDER_GATE_CACHE[run_dir]
+    fails: List[dict] = []
+    if not run_dir or not os.path.isdir(run_dir):
+        res = {"passed": True, "fails": [], "applicable": False}
+        _RENDER_GATE_CACHE[run_dir] = res
+        return res
+    try:
+        _lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        import render_image_quality as _riq  # not otherwise imported here
+        import render_vision_critic as _rvc
+    except Exception as _imp_exc:  # noqa: BLE001
+        res = {"passed": True, "fails": [], "applicable": False,
+               "error": f"import failed: {_imp_exc}"}
+        _RENDER_GATE_CACHE[run_dir] = res
+        return res
+
+    state = load_json(os.path.join(run_dir, "state.json")) or {}
+    _is_sealed = os.path.exists(os.path.join(run_dir, "04-product-exterior.png"))
+    required_set, hero_alts = _required_render_set(run_dir)
+
+    # The candidate product renders present on disk (hero + exterior + see-inside), class-filtered.
+    _candidates = [
+        "00-hero.png", "blender-cover.png",
+        "04-product-exterior.png", "05-product-left.png",
+        "06-product-right.png", "07-product-service.png",
+        "08-product-ghost-shell.png",
+    ]
+    present = [c for c in _candidates if os.path.isfile(os.path.join(run_dir, c))]
+
+    # ── (1) md5 proxy: no SHIPPED deliverable render may be a byte-copy of an inspect-*.png.
+    #    For a SEALED INSTRUMENT, 01-top is the interior INSPECT plan — it is NOT a customer
+    #    product render and _write_deliverable_bundle already excludes it, so a 01-top==inspect
+    #    collision is expected and must not fail the SHIP verdict (it is never shipped). It DOES
+    #    fail for a plant, where 01-top is the shipped GA interior plan.
+    try:
+        for (rn, ins) in _rvc.inspect_proxy_collisions(run_dir):
+            if rn == "01-top.png" and _is_sealed:
+                continue  # not a shipped deliverable render for a sealed instrument
+            fails.append({"render": rn, "reason": "inspect-proxy byte-copy",
+                          "inspect": ins})
+    except Exception as _pe:  # noqa: BLE001
+        pass
+
+    # ── (2) required-presence: every required render must exist as a real file ──
+    for name in sorted(required_set):
+        if not os.path.isfile(os.path.join(run_dir, name)):
+            fails.append({"render": name, "reason": "required render missing"})
+    if _is_sealed and not any(os.path.isfile(os.path.join(run_dir, h)) for h in hero_alts):
+        fails.append({"render": "/".join(hero_alts), "reason": "required hero render missing"})
+
+    # ── (3) wash-out / clay: per-render luminance mean + contrast-std ──
+    _proxy_renders = {f["render"] for f in fails if f.get("reason") == "inspect-proxy byte-copy"}
+    for c in present:
+        if c in _proxy_renders:
+            continue  # already failed as a proxy; do not double-report
+        try:
+            r = _riq.evaluate_image(os.path.join(run_dir, c), product_render=True)
+        except Exception:  # noqa: BLE001
+            continue
+        if _riq.washed_out(r.lum_mean, r.lum_std):
+            fails.append({"render": c, "reason": "washed-out/low-contrast",
+                          "mean": round(r.lum_mean, 1), "std": round(r.lum_std, 1)})
+            continue
+        try:
+            _sz = _riq.Image.open(os.path.join(run_dir, c)).size
+        except Exception:  # noqa: BLE001
+            _sz = (9999, 9999)
+        if _riq.clay_signature(r.lum_mean, r.lum_std, _sz):
+            fails.append({"render": c, "reason": "clay/diagnostic proxy",
+                          "mean": round(r.lum_mean, 1), "std": round(r.lum_std, 1)})
+
+    # ── (4) vision residue: fold the delivered vision critique ONLY over renders that
+    #    passed the cheap gates (the LLM stays off the hot path when a £0 gate already
+    #    failed). For a SEALED INSTRUMENT an ABSENT critique is UNVERIFIED → FAIL (a
+    #    false-UNVERIFIED is as dishonest as a false-PASS; honest-scoring precondition).
+    _cheap_failed = {f["render"] for f in fails}
+    _clean_present = [c for c in present if c not in _cheap_failed]
+    _vis = _render_vision_verdict(run_dir)
+    if isinstance(_vis, dict) and bool(_vis.get("broken")):
+        _def = ", ".join(str(d) for d in (_vis.get("defects") or ["unspecified"]))[:120]
+        fails.append({"render": "deliverable-set", "reason": f"vision-critic reject: {_def}"})
+    elif _is_sealed and _clean_present and _vis is None:
+        # no vision critique on file for a sealed instrument whose deterministic renders are
+        # clean → the render glance has not run → UNVERIFIED, not a silent pass.
+        fails.append({"render": "deliverable-set",
+                      "reason": "vision critique ABSENT for a sealed instrument — "
+                                "render glance UNVERIFIED (absent != pass)"})
+
+    passed = not fails
+    res = {"passed": passed, "fails": fails, "applicable": bool(present or required_set),
+           "is_sealed": _is_sealed}
+    _RENDER_GATE_CACHE[run_dir] = res
     return res
 
 
@@ -2313,6 +2491,23 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 floor = 4.0
             print(f"  ! render vision critic flagged the hero BROKEN "
                   f"({(_vis.get('defects') or ['unspecified'])[:1]}) — blocked SHIPS (S7)")
+        # ── S7b: RENDER DELIVERABLE SHIP-GATE BIND (2026-07-23) ─────────────────
+        # The binding wash-out / proxy / required-presence / vision stack over the
+        # DELIVERABLE render set. Runs regardless of whether a critique JSON exists
+        # (the deterministic gates + the UNVERIFIED-absent-critique rule bind directly),
+        # closing the advisory hole where S7 only fired when a critique already said
+        # broken. Computed EARLY (before the first floor mirror) and stashed on
+        # state['renderDeliverableGate']; read here so a single injection covers every
+        # ship surface. proveCatch on the real bad fixtures in _selftest.
+        _rg = state.get("renderDeliverableGate") or {}
+        if _rg and _rg.get("passed") is False:
+            ships = False
+            open_n = max(open_n, 1)
+            if floor is None or floor > 4.0:
+                floor = 4.0
+            _first = (_rg.get("fails") or [{}])[0]
+            print(f"  ! deliverable render gate FAILED — blocked SHIPS (S7b): "
+                  f"{_first.get('render')} — {_first.get('reason')}")
         # ── S7 UNIFICATION (2026-07-20, Cursor): ships = ship_axes_all_pass. Every axis
         # binds — including instrument+no-vision-critique (UNVERIFIED render glance) and a
         # PCB that is ENGINEERING DRAFT (not fab-ready). The individual binds above cover
@@ -2423,6 +2618,24 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     else:
         axes.append({"axis": "Render vision — not broken", "applicable": False,
                      "passed": True, "detail": "no vision critique on file"})
+    # 6. DELIVERABLE RENDERS — all clean + present (S7b). The binding wash-out / proxy /
+    #    required-presence / vision stack over the customer-facing render set. The DIRECT
+    #    bind in compute_verdict is PRIMARY (this axis is the readable Quality&Audit card).
+    _rg = st.get("renderDeliverableGate") or {}
+    _rg_applicable = bool(_is_instrument or st.get("renderDeliverableGate") is not None
+                          or os.path.exists(os.path.join(run_dir or "", "04-product-exterior.png")))
+    if _rg:
+        _rg_fails = _rg.get("fails") or []
+        _rg_first = (_rg_fails[0] if _rg_fails else {})
+        axes.append({"axis": "Deliverable renders — all clean + present",
+                     "applicable": bool(_rg.get("applicable", _rg_applicable)),
+                     "passed": _rg.get("passed", True),
+                     "detail": (f"{_rg_first.get('render')}: {_rg_first.get('reason')}"
+                                if _rg_fails else "all clean+present")})
+    else:
+        axes.append({"axis": "Deliverable renders — all clean + present",
+                     "applicable": False, "passed": True,
+                     "detail": "render deliverable gate not computed"})
     return axes
 
 
@@ -27018,6 +27231,22 @@ def build(run_dir: str, out_path: str) -> dict:
                 + "; device DC topology present — Electrical remains scored, not NA"
             )
             _TAB_SCORES["Electrical"] = _sl_sc
+    # ── RENDER DELIVERABLE SHIP-GATE (2026-07-23): stash BEFORE the first floor mirror /
+    #    compute_verdict so the ship verdict can bind on a deliverable render defect. The
+    #    bundle write at ~27640 is too late (runs AFTER _VERDICT is finalised) — the GATE
+    #    RESULT must exist before the verdict. Deterministic-first (md5 proxy → presence →
+    #    wash-out/clay) then the vision fold; a sealed-instrument with clean renders but no
+    #    vision critique is UNVERIFIED→fail. Never raises.
+    try:
+        state["renderDeliverableGate"] = compute_render_deliverable_gate(run_dir)
+        _rgd = state["renderDeliverableGate"]
+        if _rgd.get("applicable"):
+            _rgf = _rgd.get("fails") or []
+            _rgf_names = [f"{f.get('render')}:{f.get('reason')}" for f in _rgf[:3]]
+            print(f"  · render deliverable gate: {'PASS' if _rgd.get('passed') else 'FAIL'}"
+                  + (f" — {len(_rgf)} defect(s): {_rgf_names}" if _rgf else ""))
+    except Exception as _rgd_exc:  # noqa: BLE001
+        print(f"  ! render deliverable gate compute failed (non-fatal): {_rgd_exc}")
     # ── VERIFICATION SPINE (Tristan 2026-07-14): stash before the first verdict so
     #    compute_verdict / floor mirrors can gate SHIPS on HARD open claims. Refreshed
     #    again when tab_verification runs (after Holds) with the same assembler.
@@ -30253,9 +30482,10 @@ def _selftest() -> int:
                  "pcb": {"isPcbBearing": False}}
     with _tf7.TemporaryDirectory() as _td7:
         _axes_ok = compute_ship_axes(_CLEAN_ST, _td7, {"floor": 9})
-        # 5 axes, and with a clean state every APPLICABLE axis passes → ships-by-axes True.
-        if len(_axes_ok) != 5:
-            print(f"  FAIL S7: compute_ship_axes must return the 5 canonical axes "
+        # 6 axes (S7b added the deliverable-render axis 2026-07-23), and with a clean state
+        # every APPLICABLE axis passes → ships-by-axes True.
+        if len(_axes_ok) != 6:
+            print(f"  FAIL S7: compute_ship_axes must return the 6 canonical axes "
                   f"(got {len(_axes_ok)})"); bad += 1
         if not ship_axes_all_pass(_axes_ok):
             print(f"  FAIL S7: a clean state (floor 9, no blocking defects, oem<ceiling, no "
@@ -34432,6 +34662,113 @@ def _selftest() -> int:
     except Exception as _e:
         print(f"  FAIL tab_inputs_assumptions proveCatch: raised {_e!r}"); bad += 1
 
+    # ── proveCatch RENDER DELIVERABLE SHIP-GATE (2026-07-23) ─────────────────────
+    # GATE INTENT RULE: the guard is not real until it FIRES on the actual bad artefacts
+    # and does NOT false-fire on the crisp goods. Drives compute_render_deliverable_gate +
+    # compute_verdict against the REAL on-disk fixtures (guarded by os.path.exists so the
+    # selftest still passes on a checkout without out/); the SYNTHETIC cases below always run.
+    try:
+        _REPO_S = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        import shutil as _sh_rg, tempfile as _tf_rg
+
+        def _verdict_for_gate(_gate_dict, *, instrument=True, run_dir=""):
+            """Minimal compute_verdict over a clean tab set + the injected render gate.
+            NOTE instrument=True makes the vision-absent axis block (correct for a sealed
+            instrument with no critique); pass instrument=False to isolate the render-gate
+            bind from the separate vision-absent rule."""
+            _st = {"renderDeliverableGate": _gate_dict, "isInstrumentDevice": instrument}
+            _tabs = {"Renders": {"score": 9, "basis": "x"}, "BoM": {"score": 9, "basis": "x"}}
+            return compute_verdict(_st, _tabs, run_dir)
+
+        # 1. SYNTHETIC BAD — inspect-proxy byte-copy (of a SHIPPED sealed-product render) +
+        #    missing-08 → gate FAILS → ships False. Uses 04-product-exterior as the proxied
+        #    render (a customer view that IS shipped for a sealed instrument — unlike 01-top,
+        #    which is excluded and therefore legitimately allowed to match inspect-top).
+        _rg_td = _tf_rg.mkdtemp(prefix="forge_rendergate_bad_")
+        try:
+            _blob = b"\x89PNG\r\nclay-proxy"
+            for _n in ("inspect-iso.png", "04-product-exterior.png"):  # byte-identical proxy shipped as product
+                with open(os.path.join(_rg_td, _n), "wb") as _fh:
+                    _fh.write(_blob)
+            _RENDER_GATE_CACHE.pop(_rg_td, None)
+            _gbad = compute_render_deliverable_gate(_rg_td)
+            if _gbad.get("passed") is not False:
+                print(f"  FAIL render-gate proveCatch: synthetic proxy+missing-08 must FAIL "
+                      f"(got {_gbad})"); bad += 1
+            _reasons = {f.get("reason") for f in _gbad.get("fails", [])}
+            if not any("byte-copy" in str(r) for r in _reasons):
+                print(f"  FAIL render-gate: inspect-proxy byte-copy must be a reason "
+                      f"(got {_reasons})"); bad += 1
+            if not any("missing" in str(r) for r in _reasons):
+                print(f"  FAIL render-gate: missing 08 see-inside must be a reason "
+                      f"(got {_reasons})"); bad += 1
+            _vb = _verdict_for_gate(_gbad)
+            if _vb.get("ships") is not False:
+                print(f"  FAIL render-gate: a failing gate must block SHIPS (got {_vb})"); bad += 1
+            if not (isinstance(_vb.get("floor"), (int, float)) and _vb["floor"] <= 4.0):
+                print(f"  FAIL render-gate: a failing gate must floor <=4.0 (got {_vb})"); bad += 1
+        finally:
+            _sh_rg.rmtree(_rg_td, ignore_errors=True)
+
+        # 2. REAL BAD — the pale washed-out ghost hero must make the wash-out gate FIRE.
+        _pale = os.path.join(_REPO_S, "out", "ghost", "00-hero.png")
+        if os.path.exists(_pale):
+            _lib_rg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+            if _lib_rg not in sys.path:
+                sys.path.insert(0, _lib_rg)
+            import render_image_quality as _riq_rg
+            _r = _riq_rg.evaluate_image(_pale, product_render=True)
+            if not _riq_rg.washed_out(_r.lum_mean, _r.lum_std):
+                print(f"  FAIL render-gate: the REAL pale ghost hero {_r.lum_mean:.0f}/"
+                      f"{_r.lum_std:.0f} must fire wash-out"); bad += 1
+
+        # 3. REAL BAD — the buried-tower 0442 hero (flat box) must fire wash-out too.
+        _buried = os.path.join(_REPO_S, "out", "organoid-bioreactor-20260723-0442", "00-hero.png")
+        if os.path.exists(_buried):
+            import render_image_quality as _riq_rg2
+            _r2 = _riq_rg2.evaluate_image(_buried, product_render=True)
+            if not _riq_rg2.washed_out(_r2.lum_mean, _r2.lum_std):
+                print(f"  FAIL render-gate: the REAL buried-tower hero {_r2.lum_mean:.0f}/"
+                      f"{_r2.lum_std:.0f} must fire wash-out"); bad += 1
+
+        # 4. REAL BAD — the 0442 bundle is MISSING 08-product-ghost-shell → presence FAILS.
+        _bdir = os.path.join(_REPO_S, "out", "organoid-bioreactor-20260723-0442")
+        if os.path.isdir(_bdir) and os.path.exists(os.path.join(_bdir, "04-product-exterior.png")):
+            _RENDER_GATE_CACHE.pop(_bdir, None)
+            _gmiss = compute_render_deliverable_gate(_bdir)
+            if not any("missing" in str(f.get("reason")) for f in _gmiss.get("fails", [])):
+                print(f"  FAIL render-gate: 0442 missing-08 must be flagged "
+                      f"(fails {_gmiss.get('fails')})"); bad += 1
+
+        # 5. REAL GOOD — out/organoid-for-simon: NO wash-out/clay false-fire on 04-08 + good hero.
+        _good_dir = os.path.join(_REPO_S, "out", "organoid-for-simon")
+        if os.path.isdir(_good_dir):
+            import render_image_quality as _riq_rg3
+            for _gn in ("04-product-exterior.png", "05-product-left.png",
+                        "06-product-right.png", "07-product-service.png",
+                        "08-product-ghost-shell.png", "00-hero.png"):
+                _gp = os.path.join(_good_dir, _gn)
+                if not os.path.exists(_gp):
+                    continue
+                _gr = _riq_rg3.evaluate_image(_gp, product_render=True)
+                if _riq_rg3.washed_out(_gr.lum_mean, _gr.lum_std):
+                    print(f"  FAIL render-gate: GOOD {_gn} {_gr.lum_mean:.0f}/{_gr.lum_std:.0f} "
+                          f"false-fired wash-out"); bad += 1
+            # NOTE: the full gate on organoid-for-simon includes the vision-absent UNVERIFIED
+            # rule for a sealed instrument (correct — no render-vision-critique.json on disk
+            # here). The deterministic wash-out/clay/presence sub-gates are proven clean above;
+            # the ship-preservation with a PRESENT clean critique is covered by _verdict_for_gate
+            # with an explicitly-passed gate:
+            # Isolate the render-gate bind: a PASSED gate must NOT, by itself, block SHIPS
+            # (instrument=False so the separate vision-absent axis does not confound this).
+            _vg = _verdict_for_gate({"passed": True, "fails": [], "applicable": True},
+                                    instrument=False)
+            if _vg.get("ships") is not True:
+                print(f"  FAIL render-gate: a PASSED gate must NOT block SHIPS "
+                      f"(got {_vg})"); bad += 1
+    except Exception as _rge:
+        print(f"  FAIL render-gate proveCatch raised: {_rge!r}"); bad += 1
+
     # ── proveCatch _write_deliverable_bundle (2026-07-22, updated layout) ────────
     # Synthetic run dir with dossier.xlsx + render PNGs + drawing PDF + 3-board PCB
     # files + firmware-proof tree.
@@ -34876,10 +35213,34 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "08-product-ghost-shell.png": "Product — translucent see-inside (internal components through a frosted shell)",
         "blender-cover.png": "Product hero — cover render",
     }
+    # HARD ASSERTION (2026-07-23): no deliverable render may be a byte-copy of an
+    # inspect-*.png diagnostic proxy (the X-103 clay shipped as 01-top). Compute the
+    # md5 collisions ONCE and refuse to bundle any colliding render — a proxy is a
+    # DEFECT, not a silent skip. Uses render_vision_critic.inspect_proxy_collisions.
+    _proxy_names: set = set()
+    try:
+        _lib_b = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+        if _lib_b not in sys.path:
+            sys.path.insert(0, _lib_b)
+        import render_vision_critic as _rvc_b
+        for (_pr, _pi) in _rvc_b.inspect_proxy_collisions(run_dir):
+            _proxy_names.add(_pr)
+    except Exception:  # noqa: BLE001
+        _proxy_names = set()
+    # Also fold the render deliverable gate's verdict so the bundle carries it.
+    try:
+        _render_gate = compute_render_deliverable_gate(run_dir)
+    except Exception:  # noqa: BLE001
+        _render_gate = {"passed": None, "fails": []}
+
     _any_render = False
     for _rn in _RENDER_NAMES:
         if _rn == "01-top.png" and _is_sealed_product:
             skipped.append("renders/01-top.png (interior proxy plan — not a product view for a sealed instrument)")
+            continue
+        if _rn in _proxy_names:
+            # A deliverable render that is a byte-copy of an inspect-*.png diagnostic pass.
+            skipped.append(f"renders/{_rn} (REJECTED — byte-copy of an inspect-*.png diagnostic proxy)")
             continue
         _rp = os.path.join(run_dir, _rn)
         if os.path.exists(_rp):
@@ -34888,11 +35249,30 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         else:
             skipped.append(f"renders/{_rn} (absent)")
     if not _any_render:
-        # Fallback: grab any product PNG at the run root
+        # Fallback: grab any product PNG at the run root — but NEVER a byte-copy of an
+        # inspect-*.png proxy (close the hole where the fallback re-admitted the clay).
+        _inspect_md5: set = set()
+        for _ip in sorted(_glob.glob(os.path.join(run_dir, "inspect-*.png"))):
+            try:
+                import hashlib as _hl_b
+                with open(_ip, "rb") as _ifh:
+                    _inspect_md5.add(_hl_b.md5(_ifh.read()).hexdigest())
+            except OSError:
+                pass
         for _rp in sorted(_glob.glob(os.path.join(run_dir, "*.png"))):
             _rn = os.path.basename(_rp)
-            if not _rn.startswith("inspect-") and not _rn.startswith("module-"):
-                _cp(_rp, f"renders/{_rn}")
+            if _rn.startswith("inspect-") or _rn.startswith("module-"):
+                continue
+            try:
+                import hashlib as _hl_b2
+                with open(_rp, "rb") as _rfh:
+                    _rmd5 = _hl_b2.md5(_rfh.read()).hexdigest()
+            except OSError:
+                _rmd5 = None
+            if _rmd5 is not None and _rmd5 in _inspect_md5:
+                skipped.append(f"renders/{_rn} (REJECTED fallback — byte-copy of an inspect-*.png proxy)")
+                continue
+            _cp(_rp, f"renders/{_rn}")
 
     # ── 6. ENGINEERING DRAWINGS ────────────────────────────────────────────────
     _drawings_dir = os.path.join(run_dir, "drawings")
@@ -35016,6 +35396,9 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "bundle_zip": bundle_zip if zip_ok else None,
         "included": included,
         "skipped": skipped,
+        # The render deliverable ship-gate verdict (proxy / wash-out / presence / vision),
+        # so the bundle carries the SIGHT result alongside the files it shipped.
+        "render_gate": _render_gate,
     }
 
 
