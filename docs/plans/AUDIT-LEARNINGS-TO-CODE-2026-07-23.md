@@ -138,24 +138,27 @@ is NOT a build gap and NOT a suppress-hide. Confirmed:
   LAB_ELEC_FORM=True LE_SIG=vial_bioreactor` — so the `elif _LE_SIGNATURE=="vial_bioreactor"` signature
   builder (17285) runs and appends the vial+OD.
 - `_suppress_instrument_boilerplate_meshes` (16417) KEEPS them (u_se_le_ is in `_INSTRUMENT_MESH_KEEP_PREFIXES`).
-- **The bug: a Z-reference / envelope-resize mismatch.** The signature builder places the tower at
-  `_z_top = base_z + H` (17288) using the env passed to place_sealed_enclosure. But AFTER the builder,
-  a POST-PLACEMENT RESIZE grows the shell to contain the sprawled parts: log `pre-estimate 180×140×108
-  mm → shell 321×288×126 mm` (parts placed in a 164×124×92 interior, shell built at 321×288×126). The
-  tower was anchored to the OLD H (~92–108) and the opaque shell top is now at 126 — so the tower sits
-  BELOW/INSIDE the resized opaque shell and never protrudes. This is why 0442 (baked) ALSO shipped no
-  visible tower despite form-meshes having the tower meshes.
-- **This is entangled with residual §E (enclosure 321×288 sprawl vs 180×140 contract intent, task #59).**
-  If the shell were correctly sized (~108 tall, not over-grown by sprawl), the tower at base_z+H would
-  protrude correctly.
+- **Z-anchor hypothesis DISPROVEN:** the post-placement resize reassigns the local H (`W, D, H =
+  _post_need_...`, line 17063) BEFORE the signature builder runs (17225+), so the tower's `_z_top =
+  base_z + H` (17288) already uses the FINAL H (126). The tower is correctly placed ~100mm ABOVE the
+  final lid. So it is NOT a build gap, NOT a suppress-hide, NOT a Z-anchor bug.
+- **NARROWED to an above-lid render-visibility bug.** Decisive observation: in the re-render, the
+  `u_se_le_face_*` meshes (display/keys/LED, which sit ON the shell front face at z≈base_z+H·0.5) DO
+  render (visible in 00-hero + 04), but the `u_se_le_vial` / `u_se_le_od_src`/`od_det` / collar / arms
+  (which sit ABOVE the lid at z>base_z+H) do NOT. So specifically the geometry above the lid line
+  vanishes while same-prefix geometry on the shell renders. Candidate causes NOT yet checked: (i) the
+  product-view camera (build_universal_scene.py ~12919) frames off a PRE-resize env height and the
+  taller-than-expected tower falls outside the rendered frame despite centre_frac=0.82 (but the box is
+  not cropped, so weakly supported); (ii) a per-view hide/clip step that removes above-lid meshes; (iii)
+  the vial glass material (alpha 0.62) + amber fluid + dark OD reading invisible against the light
+  studio bg from these angles (least likely — dark OD housings would show). Next diagnostic: in a
+  render, temporarily give u_se_le_vial/od a bright opaque material + print each tower mesh's final
+  world-bbox and hide_render state right before the product-view render, to see if they're hidden,
+  off-frame, or just invisibly-transparent.
 
-**FIX OPTIONS (need render→SIGHT to verify; NOT yet done):**
-- (a) **Re-anchor the signature tower to the FINAL shell top** AFTER the post-placement resize — move the
-  vial/OD/collar/arm meshes so their base sits at `base_z + FINAL_H`, so they always protrude regardless
-  of resize. Most targeted; independent of the sprawl fix. RECOMMENDED first.
-- (b) **Fix the sprawl** (task #59 deterministic pack-solver) so the shell doesn't over-grow past the
-  tower — restores the tower AND fixes the oversized-enclosure residual in one move. Bigger, higher value.
-- After either, SIGHT `00-hero.png` shows the tower, then build G22.
+**FIX: root not yet isolated — needs one more focused render-diagnostic iteration (above). Do NOT
+claim Option B done until 00-hero SIGHTs the tower.** Likely entangled with §E sprawl (task #59): the
+oversized 321×288 shell also distorts the camera/scene. After the tower renders, build G22.
 
 **Q2 — the gate (independent of which option):** whichever geometry is canonical, build a
 cross-artefact FEATURE-consistency gate (G22) that FIRES when the set of protruding/exterior
