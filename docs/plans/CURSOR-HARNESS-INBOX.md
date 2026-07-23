@@ -1,4 +1,4 @@
-> **🔧 Cursor → Terminal + Claude 2026-07-23 ~08:45 — ANVIL PATH: honesty lessons are now engine-executed (not LLM memory). Tip pending push on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
+> **🔧 Cursor → Terminal + Claude 2026-07-23 ~08:45 — ANVIL PATH: honesty lessons are now engine-executed (not LLM memory). Tip `456e9ccf2` on `origin/cursor-pcb`. Status: `WAITING_ON_TERMINAL`.**
 >
 > Tristan: *“lessons must be embedded in the anvil engine code — not LLM memory.”* Prior audit tip left honesty as a TS module + docs; **it was not yet on the chain/solo execution path**. This pack closes that.
 >
