@@ -128,6 +128,35 @@ without SIGHTing the tower actually appear in `00-hero.png`):
    compare; it placed geometry that "wasn't visible in any product render" — that invisibility was
    almost certainly THIS clamp, so step 1 is likely the missing piece.
 
+**ROOT CAUSE FOUND (2026-07-23, deep diagnostic — SIGHT + form-meshes + runtime print):** the tower
+is NOT a build gap and NOT a suppress-hide. Confirmed:
+- SIGHT of a fresh re-render of the 0442 state (current code): `00-hero.png` AND `04-product-exterior.png`
+  BOTH show a flat box, no tower.
+- The tower meshes ARE built — `form-meshes.json` lists `u_se_le_vial`, `u_se_le_od_src`, `u_se_le_od_det`,
+  `u_se_le_vial_collar`, `u_se_le_od_arm_*`, `u_se_le_vial_fluid` (27 meshes total).
+- The gate fires: a runtime print at build_universal_scene.py:12817 showed `INSTRUMENT=True
+  LAB_ELEC_FORM=True LE_SIG=vial_bioreactor` — so the `elif _LE_SIGNATURE=="vial_bioreactor"` signature
+  builder (17285) runs and appends the vial+OD.
+- `_suppress_instrument_boilerplate_meshes` (16417) KEEPS them (u_se_le_ is in `_INSTRUMENT_MESH_KEEP_PREFIXES`).
+- **The bug: a Z-reference / envelope-resize mismatch.** The signature builder places the tower at
+  `_z_top = base_z + H` (17288) using the env passed to place_sealed_enclosure. But AFTER the builder,
+  a POST-PLACEMENT RESIZE grows the shell to contain the sprawled parts: log `pre-estimate 180×140×108
+  mm → shell 321×288×126 mm` (parts placed in a 164×124×92 interior, shell built at 321×288×126). The
+  tower was anchored to the OLD H (~92–108) and the opaque shell top is now at 126 — so the tower sits
+  BELOW/INSIDE the resized opaque shell and never protrudes. This is why 0442 (baked) ALSO shipped no
+  visible tower despite form-meshes having the tower meshes.
+- **This is entangled with residual §E (enclosure 321×288 sprawl vs 180×140 contract intent, task #59).**
+  If the shell were correctly sized (~108 tall, not over-grown by sprawl), the tower at base_z+H would
+  protrude correctly.
+
+**FIX OPTIONS (need render→SIGHT to verify; NOT yet done):**
+- (a) **Re-anchor the signature tower to the FINAL shell top** AFTER the post-placement resize — move the
+  vial/OD/collar/arm meshes so their base sits at `base_z + FINAL_H`, so they always protrude regardless
+  of resize. Most targeted; independent of the sprawl fix. RECOMMENDED first.
+- (b) **Fix the sprawl** (task #59 deterministic pack-solver) so the shell doesn't over-grow past the
+  tower — restores the tower AND fixes the oversized-enclosure residual in one move. Bigger, higher value.
+- After either, SIGHT `00-hero.png` shows the tower, then build G22.
+
 **Q2 — the gate (independent of which option):** whichever geometry is canonical, build a
 cross-artefact FEATURE-consistency gate (G22) that FIRES when the set of protruding/exterior
 features differs between the DRAWING's geometry source and the RENDER's post-clamp geometry. This
