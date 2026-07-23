@@ -163,8 +163,11 @@ def make_instrument_studio_world(strength: float = 0.22):
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
     # Light studio grey backdrop — reads slightly lighter than the product body.
-    # Was (0.38, 0.39, 0.42) dark mid-grey (charcoal era); now (0.82, 0.83, 0.85).
-    bg.inputs["Color"].default_value = (*_to_linear((0.82, 0.83, 0.85)), 1.0)
+    # DEMO FIX v3 (2026-07-23): 0.82 near-white washed out the LIGHT-grey body (0.62)
+    # — product melted into the backdrop (no luminance gap). A MEDIUM studio grey gives
+    # the light body a clear gap so it POPS (light product on medium studio = the classic
+    # clean product shot); the dark front panel + green LED read against the light body.
+    bg.inputs["Color"].default_value = (*_to_linear((0.40, 0.41, 0.44)), 1.0)
     bg.inputs["Strength"].default_value = float(strength)
     return world
 
@@ -180,15 +183,22 @@ def apply_instrument_color_management(exposure_bias: float = 0.0):
     Exposure bias stays 0 — body is already readable.
     """
     scene = bpy.context.scene
-    for transform in ("Standard", "Filmic", "AgX"):
+    # DEMO FIX v2 (2026-07-23): Standard was reintroducing the pale wash on the HERO
+    # pass (Standard has NO highlight roll-off → light body + bright studio bloom to
+    # near-white; the 00-hero read washed out). AgX (which the 04-07 spatial views use
+    # via configure_render, and which looked correct there on this SAME 0.62 body)
+    # compresses highlights so the mid-grey body + DARK front panel + green LED all read.
+    _chosen = None
+    for transform in ("AgX", "Filmic", "Standard"):
         try:
             scene.view_settings.view_transform = transform
+            _chosen = transform
             break
         except (TypeError, ValueError):
             continue
-    # No look override — Standard has no "looks"; Filmic/AgX look stays None/None.
     try:
-        scene.view_settings.look = "None"
+        # match the spatial-view look that read correctly on this body
+        scene.view_settings.look = "AgX - Medium High Contrast" if _chosen == "AgX" else "None"
     except (TypeError, ValueError, AttributeError):
         pass
     try:

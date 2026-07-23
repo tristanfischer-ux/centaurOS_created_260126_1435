@@ -12898,8 +12898,20 @@ def _sealed_product_camera_specs(env_mm):
     # raise the look-at centre for an instrument so the body + the protruding cuvette
     # port both sit inside the frame (port top ≈ 1.4·H); a plain cabinet stays at mid-H.
     # LAB-ELECTRONICS: sealed box without a tall optical column — centre at 0.5 (mid).
+    # VIAL-TOWER REACH (2026-07-23, Tristan "lost the light tower"): the
+    # vial_bioreactor signature places a transparent culture vial (~0.8·H tall)
+    # + OD source/detector housings PROTRUDING above the lid (see the signature
+    # builder ~L17271); its assembly reaches ≈1.8·H above the deck. Framing it as
+    # a flat box (centre 0.5, h_eff 1.1·H) crops the entire tower off the top of
+    # the frame — the render shows a flat lid while the GA drawing shows the tower.
+    # Only vial_bioreactor gets the tall frame; flat lab_electronics (potentiostat
+    # / ewod / generic sealed box) keep the compact framing so height_occupancy
+    # stays above the render_view_quality floor. See _le_above_deck_reach().
+    _le_vial_tower = _le and _LE_SIGNATURE == "vial_bioreactor"
     if _open:
         _centre_frac = float(_open_cam.get("centre_frac", 0.42 if _sp else 0.45))
+    elif _le_vial_tower:
+        _centre_frac = 0.82     # raise look-at so the protruding vial+OD tower are in frame
     elif _le:
         _centre_frac = 0.5      # compact box; no elevated cuvette port
     else:
@@ -12918,6 +12930,8 @@ def _sealed_product_camera_specs(env_mm):
     # produced height_occupancy 0.43 < gate floor 0.45 on the organoid bioreactor.
     if _open:
         _h_eff = h * float(_open_cam.get("h_eff_scale", 1.05 if _sp else 1.35))
+    elif _le_vial_tower:
+        _h_eff = h * 2.0        # vial (~0.8·H) + OD tower protrude ≈1.8·H above deck
     elif _le:
         _h_eff = h * 1.1        # short vial/tube, no tall optical column
     else:
@@ -17276,18 +17290,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
                 _vial_r = min(W, D) * 0.11
                 _vial_h = max(H * 0.8, 30.0)
-                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.80, 0.88, 0.92)),
-                                     metallic=0.0, roughness=0.05, kind="glass", alpha=0.35)
+                # VISIBILITY (2026-07-23, Tristan "lost the light tower"): a highly
+                # transparent glass vial (alpha 0.35) vanished against the light studio
+                # backdrop — the hero read as a flat lid. Raise alpha so the vessel reads
+                # as a real semi-opaque culture tube, and fill it most of the way with the
+                # amber media so the DOMINANT top silhouette is a solid coloured vessel.
+                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.82, 0.90, 0.94)),
+                                     metallic=0.0, roughness=0.08, kind="glass", alpha=0.62)
                 _vial = fl.add_cyl("u_se_le_vial",
                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.5)),
                                    _vial_r * fl.MM, _vial_h * fl.MM, _glass,
                                    module=_skin_mod, module_objects=MO)
                 _sig_new.append(_vial)
-                _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.80, 0.68, 0.30)),
+                _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.86, 0.62, 0.18)),
                                       metallic=0.0, roughness=0.3)
                 _fluid = fl.add_cyl("u_se_le_vial_fluid",
-                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.28)),
-                                    _vial_r * 0.85 * fl.MM, _vial_h * 0.52 * fl.MM, _fluidm,
+                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.40)),
+                                    _vial_r * 0.9 * fl.MM, _vial_h * 0.72 * fl.MM, _fluidm,
                                     module=_skin_mod, module_objects=MO)
                 _sig_new.append(_fluid)
                 # VESSEL HOLDER COLLAR (2026-07-19, vision-critic "cuvette + optical
@@ -17306,15 +17325,22 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 # to the vessel via a short arm — the pair previously floated at mid-vial
                 # height with a gap to the chassis (the flagged defect). Housing now runs
                 # from just above the collar up the vessel; the arm ties it to the glass.
+                # OD housings SIZED to read as a real optical assembly (2026-07-23):
+                # 8×11 mm blocks were specks on a 288 mm deck — invisible on the hero.
+                # Scale to the vessel so the paired source/detector clearly flank the
+                # vial as the GA "OPTICAL" assembly, seated outside the vial wall.
                 _od_h = _vial_h * 0.52
-                for _sx, _lbl in ((-(_vial_r + 5.0), "src"), (_vial_r + 5.0, "det")):
-                    _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.09, 0.09, 0.11)),
-                                       metallic=0.3, roughness=0.5)
+                _od_w = max(18.0, _vial_r * 0.7)     # radial thickness of each housing
+                _od_d = max(24.0, _vial_r * 0.9)      # along the beam axis (reads as a block)
+                for _sx, _lbl in ((-(_vial_r + _od_w * 0.5), "src"),
+                                  (_vial_r + _od_w * 0.5, "det")):
+                    _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.10, 0.10, 0.12)),
+                                       metallic=0.35, roughness=0.45)
                     _od = fl.add_box(f"u_se_le_od_{_lbl}",
                                      _mm3((_sx, 0.0, _z_top + _collar_h + _od_h * 0.5)),
-                                     _mm3((8.0, 11.0, _od_h)), _odm,
+                                     _mm3((_od_w, _od_d, _od_h)), _odm,
                                      module=_skin_mod, module_objects=MO)
-                    _od.dimensions = _mm3((8.0, 11.0, _od_h))
+                    _od.dimensions = _mm3((_od_w, _od_d, _od_h))
                     _sig_new.append(_od)
                     # Clamp arm: bridges the OD housing inner face to the vial wall at
                     # beam height, so the pair reads as mounted to the vessel, not adrift.
@@ -24360,6 +24386,14 @@ def main():
                 _cf = float(_open_cam.get("centre_frac", 0.36))
                 _dist_k = float(_open_cam.get("dist_k", 0.68))
                 _frame = float(_open_cam.get("frame", 0.96))
+            elif _IS_LAB_ELECTRONICS_FORM and _LE_SIGNATURE == "vial_bioreactor":
+                # Vial + OD tower protrude ≈1.8·H above the deck (2026-07-23 "lost
+                # the light tower"): frame the whole assembly + raise the look-at so
+                # the tower is not cropped off the top of the hero, matching the GA.
+                _h_eff = _sh * 2.0
+                _cf = 0.82
+                _dist_k = 1.16
+                _frame = 0.84
             else:
                 _h_eff = _sh * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
                 _cf = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
@@ -24406,8 +24440,11 @@ def main():
             _sw, _sd, _sh = _SEALED_ENV_MM
             # Match _sealed_product_camera_specs: lab-electronics use 1.1× (no tall
             # optical column); optical handhelds keep 1.92× for cuvette port clearance.
-            _h_eff_scale = (1.1 if _IS_LAB_ELECTRONICS_FORM
-                            else (1.92 if _IS_INSTRUMENT_DEVICE else 1.0))
+            _h_eff_scale = (
+                2.0 if (_IS_LAB_ELECTRONICS_FORM
+                        and _LE_SIGNATURE == "vial_bioreactor")
+                else (1.1 if _IS_LAB_ELECTRONICS_FORM
+                      else (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)))
             _spatial_z_top = DECK_Z_MM + _sh * _h_eff_scale
             _spatial_bb = ((-_sw / 2 * fl.MM, _sw / 2 * fl.MM),
                            (-_sd / 2 * fl.MM, _sd / 2 * fl.MM),
@@ -24607,8 +24644,26 @@ def _selftest_le_vial_exterior_gating() -> None:
         "in _prepare_sealed_product_view — the opaque holder collar was removed. "
         "The vial_bioreactor exterior must show the collar as the sealed sample-port.")
 
+    # (c) CAMERA FRAMING (2026-07-23, Tristan "lost the light tower"): the vial +
+    # OD tower protrude ≈1.8·H above the deck. If the sealed product / hero cameras
+    # frame vial_bioreactor as a flat box (centre 0.5, h_eff 1.1·H) the entire tower
+    # is cropped off the top of the frame and the render shows a flat lid while the
+    # GA drawing shows the tower. proveCatch: the camera-spec source must give
+    # vial_bioreactor a TALL frame (h_eff ≈ 2·H) + a raised look-at, not the flat-box
+    # 1.1·H that the other (potentiostat/ewod/generic) lab_electronics keep.
+    _cam_src = _ins.getsource(_sealed_product_camera_specs)
+    assert '_le_vial_tower' in _cam_src, (
+        "REGRESSION: _sealed_product_camera_specs no longer special-cases the "
+        "vial_bioreactor tall-tower framing (_le_vial_tower) — the protruding vial + "
+        "OD tower will be cropped off the top of 04–07 (the 'lost the light tower' bug).")
+    assert _re_veg.search(r'_le_vial_tower[\s\S]{0,80}_h_eff\s*=\s*h\s*\*\s*2', _cam_src) or \
+           _re_veg.search(r'_h_eff\s*=\s*h\s*\*\s*2\.0\s*#.*vial', _cam_src), (
+        "REGRESSION: vial_bioreactor camera h_eff dropped below the tall-tower reach "
+        "(~2·H) — the OD tower / vial will crop again.")
+
     print("[univ][sealed] _selftest_le_vial_exterior_gating OK "
-          "(a: bare vial prefix absent from keep-list, b: collar prefix present)")
+          "(a: bare vial prefix absent from keep-list, b: collar prefix present, "
+          "c: vial_bioreactor camera frames the protruding tower)")
 
 
 def _selftest_instrument_direct_logical_routing() -> None:

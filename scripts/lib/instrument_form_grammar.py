@@ -37,8 +37,8 @@ VIEWING_DISTANCE_MM_DESIGN = hfi.VIEWING_DISTANCE_MM_DESIGN
 # visibility. World background brightened to match (see forge_blender_lib.py).
 # View transform switched from AgX (designed for charcoal silhouette) to
 # Standard (linear — appropriate for a mid-grey product on a light backdrop).
-MAT_BODY_POLYMER = (0.62, 0.63, 0.65)         # warm mid-light grey; was (0.065, 0.068, 0.075) charcoal
-MAT_DECK_A_SURFACE = (0.55, 0.57, 0.60)       # slightly darker front panel for contrast; was (0.08, 0.084, 0.092)
+MAT_BODY_POLYMER = (0.47, 0.48, 0.50)         # true mid grey; 0.62 clipped to near-white on the hero top face under the softbox key (2026-07-23); reads clearly grey in BOTH hero + 04 while the dark front panel keeps contrast
+MAT_DECK_A_SURFACE = (0.40, 0.42, 0.45)       # front panel a touch darker than the body for contrast; was (0.08, 0.084, 0.092)
 MAT_DISPLAY_GLASS = (0.012, 0.015, 0.028)
 MAT_DISPLAY_BEZEL = (0.045, 0.048, 0.055)
 # Keys must read against charcoal deck — gold PyBadge uses mid-grey tactile pads.
@@ -99,13 +99,14 @@ INSTRUMENT_STUDIO_BOUNCE_ENERGY = 2.5
 INSTRUMENT_STUDIO_WORLD_STRENGTH = 0.30
 INSTRUMENT_STUDIO_GROUND_SRGB = (0.52, 0.53, 0.55)
 # SIGHT band for a sealed exterior BODY-FACE patch (8-bit mean RGB).
-# Updated 2026-07-23: light-grey body (0.62 sRGB ≈ 158/255 8-bit) needs
-# higher floor than charcoal (was min=70, max=130 for ~20–80/255 dark body).
-TARGET_BODY_LUM_MEAN_MAX = 220.0
-TARGET_BODY_LUM_MEAN_MIN = 120.0
+# Updated 2026-07-23: TRUE mid-grey body (0.47 sRGB ≈ 120/255 unlit; lit face
+# ~130–200 under the softbox key). Band must reject BOTH near-black (charcoal
+# regression) AND near-white (0.62 clipped the hero top face to ~230+).
+TARGET_BODY_LUM_MEAN_MAX = 210.0
+TARGET_BODY_LUM_MEAN_MIN = 90.0
 # Legacy aliases (centre-crop stats — prefer body_luminance_ok mean band).
-TARGET_BODY_LUM_P50_MAX = 220
-TARGET_BODY_LUM_P50_MIN = 100
+TARGET_BODY_LUM_P50_MAX = 215
+TARGET_BODY_LUM_P50_MIN = 80
 TARGET_BODY_LUM_P10_MAX = 200
 TARGET_BODY_LUM_P10_MIN = 25
 
@@ -1092,7 +1093,7 @@ def _selftest() -> None:
     assert len(feet) == 4
     assert INTERIOR_BEAM_CROSS_MM >= 4.0, "beam must read at thumbnail"
     assert INTERIOR_MIN_STORY_MESHES >= 8
-    assert sum(MAT_BODY_POLYMER) / 3.0 >= 0.55, "body must be mid-light grey for demo slide visibility (2026-07-23)"
+    assert 0.40 <= sum(MAT_BODY_POLYMER) / 3.0 <= 0.55, "body must be true mid grey — light enough for demo-slide visibility, dark enough not to clip white on the hero top face (2026-07-23)"
     assert INSTRUMENT_EXPOSURE_LIFT == 0.0, "never lift instrument exposure"
     assert INSTRUMENT_EXPOSURE_BIAS <= 0.0
     assert INSTRUMENT_STUDIO_KEY_ENERGY <= 22.0, "softbox key must not blow out mid-grey body"
