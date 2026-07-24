@@ -791,6 +791,38 @@ def main():
     A("| Rejected: 0.35p teeth | basins 3→2 | femm-variants + basin check |")
     A("| Rejected: gap40+deep+PM×1.5 | 4.3 mN cap, 1 basin | fix-alternatives.json |")
     A("")
+    A("### 8.9 Honeycomb cell array — structure and packing (Tony's CAD + prototypes, 24 Jul)")
+    A("")
+    A("Tony's CAD (received 24 Jul) fixes the cell lattice: hexagonal cells **3.1 mm "
+      "across-flats × 7.7 mm deep**, 3D-printed (metallised for RF duty), tiled as "
+      "**7-cell clusters** inside a round aperture; demo-scale prototypes (≈25–30 mm cells, "
+      "hex and square egg-crate) photographed working. Scope note: the cell-size↔band mapping "
+      "is RF and stays with Tony/Vlad — cell dimensions are treated as INPUTS here; only "
+      "structure, packing and mass are computed. Wall thickness is not readable off the "
+      "screenshots; 0.2 mm is assumed and every result below scales linearly with it.")
+    A("")
+    A("| Quantity | Formula | Substitution | Result |")
+    A("|---|---|---|---|")
+    A("| Hexagon side | AF/√3 | 3.1/√3 | 1.790 mm |")
+    A("| Cell area | (√3/2)·AF² | (√3/2)×3.1² | 8.32 mm² |")
+    A("| Cells per aperture | 7 × clusters | 7 × 19 (count from CAD) | 133 |")
+    A("| Relative density | 2t/AF (shared walls) | 2×0.2/3.1 | 0.129 |")
+    A("| Wall volume per cell | √3·AF·t·L | √3×3.1×0.2×7.7 | 8.27 mm³ |")
+    A("| Cell wall mass | V·ρ | 8.27 mm³ × 1.24 mg/mm³ (printed) | 10.3 mg |")
+    A("| Honeycomb, whole aperture | N·m | 133 × 10.3 mg | **1.4 g** (Al: 3.0 g) |")
+    A("| Widest fit at actuator height | (2·AF − h)/√3 | (6.2 − 2.634)/√3 | 2.06 mm ≥ 1.708 ✓ |")
+    A("| Actuator fit in the 3.1 mm cell | h ≤ AF and w ≤ (2AF−h)/√3 | 2.634 ≤ 3.1; 1.708 ≤ 2.06 | **FITS** |")
+    A("| Fit @80 GHz cell (1.9 mm) | same test | 2.634 > 1.9 | FAILS — needs ≥2-deep axial stagger |")
+    A("| One actuator, total mass | Mt + 3·(steel+PM+coil) | 157.7 + 3×(18.8+0.74+1.11) | 220 mg |")
+    A("| Actuators per aperture | N·m | 133 × 220 mg | **29.2 g** — dominates the lattice ≈20× |")
+    A("")
+    A("The hexagon fit rule (the corner cuts width as height grows) is why the 1.708 × 2.634 mm "
+      "actuator clears the 3.1 mm cell with 0.35 mm to spare but can never enter a 1.9 mm cell. "
+      "The square egg-crate alternative accepts the rectangular actuator whenever its pitch "
+      "≥ 2.634 mm with no corner check, at ≈15% fewer cells per area than hex at equal pitch. "
+      "All of §8.9 is live in PHANTM-CALC.xlsx §11 (yellow cells: wall thickness, cluster count, "
+      "material density).")
+    A("")
 
     # ------------------------------------------------------------------ §9
     A("## 9. Traceability")

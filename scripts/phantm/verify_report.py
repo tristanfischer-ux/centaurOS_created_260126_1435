@@ -146,6 +146,25 @@ check("reflector <2% of Mt", (m_foil + 2.0) / (mt_kg * 1e6) < 0.02,
 contains("reflector bound in report", "0.72 mg")
 contains("v4 title", "(v4 — 24 Jul feedback incorporated")
 
+# ---------------- honeycomb (§8.9) -----------------------------------------
+AF, T_HC, DEP = 3.1, 0.2, 7.7
+check("hex side 1.790", abs(AF / math.sqrt(3) - 1.790) < 2e-3)
+check("cell area 8.32", abs(math.sqrt(3) / 2 * AF**2 - 8.32) < 0.01)
+check("rel density 0.129", abs(2 * T_HC / AF - 0.129) < 1e-3)
+wall_v = math.sqrt(3) * AF * T_HC * DEP
+check("wall vol 8.27", abs(wall_v - 8.27) < 0.01)
+check("cell mass 10.3 (printed)", abs(wall_v * 1.24 - 10.3) < 0.05)
+check("aperture lattice 1.4 g @133", abs(133 * wall_v * 1.24 / 1000 - 1.364) < 0.01)
+wfit = (2 * AF - 2.634) / math.sqrt(3)
+check("fit width 2.06 ≥ 1.708", abs(wfit - 2.059) < 2e-3 and wfit >= 1.708)
+check("no fit @1.9 cell", 2.634 > 1.9)
+ssv = 2 * (1.16 * 1.708 * 0.465 - 3 * 0.155 * 0.232 * 1.708)
+brv = 0.348 * 1.162 * 2.634
+act_mg = mt_kg * 1e6 + 3 * ((ssv + brv) * 7.4 + 0.348 * 1.162 * 0.243 * 7.5 + 1.108)
+check("actuator total ≈220 mg", abs(act_mg - 219.7) < 1.5, f"{act_mg:.1f}")
+check("aperture actuators 29.2 g", abs(133 * act_mg / 1000 - 29.2) < 0.3)
+contains("§8.9 present", "8.9 Honeycomb", "3.1 mm", "7.7 mm", "7-cell clusters", "2.06 mm")
+
 # ---------------- blender model constants ----------------------------------
 bl = open(os.path.join(HERE, "blender_actuator.py")).read()
 for pat, want in ((r"^SPACING = ([0-9.]+)", 0.374), (r"^G = ([0-9.]+)", 0.020),
