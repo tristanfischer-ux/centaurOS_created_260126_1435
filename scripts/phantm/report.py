@@ -85,7 +85,11 @@ def fig_drive(fd_mn, step_um):
     ax.plot(fixed["xs_detent"] * 1e6, fixed["f_drive"] * 1e3, color=BLUE, linewidth=2,
             label=f"Fixed design, one coil at Ic = {float(fixed['ic_a']):.2f} A", zorder=3)
     ax.plot(fixed["xs_detent"] * 1e6, fixed["f_detent"] * 1e3, color=ORANGE,
-            linewidth=2, label="detent only (i = 0)", zorder=2)
+            linewidth=2, label="fixed design, detent only (i = 0)", zorder=2)
+    sw = load("pm-ic-sweeps.npz", binary=True)
+    if sw is not None and "baseline_drive_x_mm" in sw:
+        ax.plot(sw["baseline_drive_x_mm"] * 1e3, sw["baseline_drive_f_n"] * 1e3,
+                color=AQUA, linewidth=2, label="BASELINE, one coil at 4 A", zorder=2)
     ax.axvspan(0, step_um, color=GRID, alpha=0.5, zorder=0)
     ax.annotate("step path", xy=(step_um / 2, 0.02), xycoords=("data", "axes fraction"),
                 ha="center", color=MUTED, fontsize=9)
@@ -134,6 +138,60 @@ def fig_variants(fd_mn):
     plt.close(fig)
 
 
+def fig_pm_sweep(fd_mn):
+    d = load("pm-ic-sweeps.json")
+    if d is None:
+        return False
+    fig, ax = plt.subplots(figsize=(8, 4.2), dpi=150)
+    for name, color, label in (("fixed", BLUE, "Fixed design (gap 20 µm, bridge/PM ×1.5)"),
+                               ("baseline", ORANGE, "Baseline (as specified)")):
+        rows = d[name]["pm_sweep"]
+        ax.plot([r["pm_mm"] * 1e3 for r in rows], [r["breakaway_mn"] for r in rows],
+                color=color, linewidth=2, marker="o", markersize=5, label=label, zorder=3)
+    ax.axhline(fd_mn, color=MUTED, linewidth=1, linestyle="--", zorder=1)
+    ax.annotate(f"Fd = {fd_mn:.1f} mN (task-3 target)", xy=(0.99, fd_mn),
+                xycoords=("axes fraction", "data"), ha="right", va="bottom",
+                color=MUTED, fontsize=9)
+    base_plateau = d["baseline"]["pm_sweep"][-1]["breakaway_mn"]
+    ax.annotate(f"baseline plateaus at {base_plateau:.2f} mN — no Pm reaches Fd",
+                xy=(450, base_plateau), ha="right", va="bottom", color=ORANGE, fontsize=9)
+    style_ax(ax, "magnet length Pm (µm)", "net detent breakaway (mN)",
+             "Task 3 as asked: detent force vs magnet length — where Pm for Fd lives")
+    ax.legend(frameon=False, loc="center right", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, "fig-pm-sweep.png"))
+    plt.close(fig)
+    return True
+
+
+def fig_ic_sweep(fd_mn):
+    d = load("pm-ic-sweeps.json")
+    if d is None:
+        return False
+    fig, ax = plt.subplots(figsize=(8, 4.2), dpi=150)
+    for name, color, label in (("fixed", BLUE, "Fixed design (at Pm* = 243 µm)"),
+                               ("baseline", ORANGE, "Baseline (at its best Pm)")):
+        rows = d[name]["ic_sweep"]
+        ax.plot([r["ic_a"] for r in rows], [r["peak_mn"] for r in rows],
+                color=color, linewidth=2, marker="o", markersize=5, label=label, zorder=3)
+    ax.axhline(2 * fd_mn, color=MUTED, linewidth=1, linestyle="--", zorder=1)
+    ax.annotate(f"2·Fd = {2*fd_mn:.1f} mN (task-4 target)", xy=(0.99, 2 * fd_mn),
+                xycoords=("axes fraction", "data"), ha="right", va="bottom",
+                color=MUTED, fontsize=9)
+    ax.axvline(1.81, color=MUTED, linewidth=1, linestyle=":", zorder=1)
+    ax.annotate("1 V supply ceiling\nI∞ = 1.81 A", xy=(1.81, 0.30),
+                xycoords=("data", "axes fraction"), ha="left", va="bottom",
+                color=MUTED, fontsize=8, xytext=(4, 0), textcoords="offset points")
+    style_ax(ax, "coil current Ic (A), one coil (Nc = 20, Dc = 50 µm)",
+             "net drive-force peak over one pitch (mN)",
+             "Task 4 as asked: peak drive force vs coil current")
+    ax.legend(frameon=False, loc="upper left", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, "fig-ic-sweep.png"))
+    plt.close(fig)
+    return True
+
+
 def fig_rise():
     d = load("curves.npz", binary=True)
     if d is None or "t_rise" not in d:
@@ -159,6 +217,8 @@ def main():
     score = load("scorecard.json")
     fig_detent(fd_mn)
     fig_drive(fd_mn, geo.pole_phasing(p)[1][1] * 1000.0)  # mm → µm
+    fig_pm_sweep(fd_mn)
+    fig_ic_sweep(fd_mn)
     fig_variants(fd_mn)
     fig_rise()
 
@@ -195,47 +255,100 @@ def main():
       "tolerance at the 20 µm gap — the dominant cost/yield risk — and the "
       "drive needing ≈1.9 V for the full 2·Fd force (see task 4).")
     A("")
-    A("## The five numbers")
+    sweeps = load("pm-ic-sweeps.json")
+    A("## The five numbers — each of Tony's asks, answered as asked")
     A("")
-    A("| # | Quantity | Baseline (as specified) | Fixed design | Method |")
-    A("|---|---|---|---|---|")
-    A(f"| 1 | **Mt** | **{s.translator_mass_kg*1e3:.4f} g** | same | bar − 52 slots × "
-      f"slot volume, SMC 7.4 g/cm³ (26 slots/face). Matches Tony's ≈0.16 g |")
-    A(f"| 2 | **Wm** | **77.5 µm** | 20 µm (changed by fix F1) | (1.704 − 1.549)/2 |")
-    pm_line = (f"**no Pm achieves Fd** — net breakaway plateaus ≈0.5 mN "
-               f"(PM self-reluctance ceiling; ×16 short)")
-    fx_pm = (f"**Pm* = {fixed['pm_mm']*1e3:.0f} µm** → {fixed['breakaway_mn']:.2f} mN "
-             if fixed else "pending")
-    A(f"| 3 | **Pm** (detent Fd = {fd_mn:.2f} mN) | {pm_line} | {fx_pm} | nonlinear FE "
-      f"(femmcli), 3-pole superposition, breakaway = peak of net detent curve |")
-    ic_base = "**not reachable** — net drive ≈1.9 mN even at 4 A (weak modulation; ×8 short)"
-    if fixed:
-        fx_ic = (f"**Ic* = {fixed['ic_a']:.2f} A** for the literal 2·Fd peak "
-                 f"({fixed['drive_peak_mn']:.1f} mN; stall-min "
-                 f"{fixed['stall_min_mn']:.1f} mN) — needs ≈1.9 V. Within the "
-                 f"1 V budget (I∞ = 1.81 A): steps complete from ≈1.4 A; at "
-                 f"1.8 A worst-case path margin +1.5 mN. ½·Fd margin ≈ 2.5 A "
-                 f"(≈1.4 V). Note: 1 V caps the MMF at 36 A-turns regardless "
-                 f"of turns count (R ∝ N) — a voltage, not winding, limit")
-    else:
-        fx_ic = "pending"
-    A(f"| 4 | **Ic** (peak 2·Fd = {2*fd_mn:.1f} mN) | {ic_base} | {fx_ic} | FE force-vs-x "
-      f"with one coil aiding its pole's PM; net incl. other poles' detent |")
-    lc_b = f"{fe['lc_uh_fe']:.1f} µH" if fe else "—"
-    lc_f = f"{fixed['lc_uh']:.1f} µH" if fixed else "—"
-    A(f"| 5 | **Lc, Rc, tr** | Lc ≈ {lc_b} (FE), Rc = 0.55 Ω (63 mm of 50 µm Cu), "
-      f"τ = L/R ≈ 2–7 µs; 1 V reaches any solvable Ic in <10 µs | Lc ≈ {lc_f} | "
-      f"FE flux linkage dλ/di; wire length from coil fit (2 layers in the "
-      f"0.263 mm window) |")
+    A("### Task 1 — Mt, the translator mass")
+    A(f"**Mt = {s.translator_mass_kg*1e3:.4f} g** (density stated: 7.4 g/cm³). Solid bar "
+      f"1.549×1.55×12.5 mm minus 26 slots per face × 2 faces × (0.465×0.232×1.55 mm) "
+      f"= 21.32 mm³ net. Range over the 7.3–7.6 g/cm³ density band: 0.156–0.162 g. "
+      f"This reproduces and refines your ≈0.16 g hand-check.")
     A("")
-    A(f"*Supply note:* 1 V into 0.55 Ω gives I∞ = 1.81 A — above the fixed design's "
-      f"Ic*; electrical time constants are µs-scale, negligible vs the ms step.")
+    A("### Task 2 — Wm, the working gap")
+    A("**Wm = 77.5 µm per side, confirmed from the geometry**: (1.704 − 1.549)/2, and the "
+      "bridge length closes the loop exactly (2×0.465 + 2×0.0775 + 1.549 = 2.634 mm — "
+      "your §2 dimensions are self-consistent to the µm). This Wm is the single most "
+      "consequential number in the design — see task 3.")
     A("")
-    A("## Force curves (FE)")
+    A("### Task 3 — Pm for Fd = 5·g·Mt = " + f"{fd_mn:.2f} mN")
     A("")
-    A("![detent](fig-detent.png)")
+    A("![pm-sweep](fig-pm-sweep.png)")
+    A("")
+    if sweeps:
+        b_rows = sweeps["baseline"]["pm_sweep"]
+        plateau = b_rows[-1]
+        op = next((r for r in sweeps["fixed"]["pm_sweep"]
+                   if abs(r["pm_mm"] - 0.243) < 0.01), None)
+        A(f"**For your geometry the answer is: no Pm exists.** The curve you asked for is "
+          f"above — net zero-current breakaway force vs magnet length. It rises to only "
+          f"**{plateau['breakaway_mn']:.2f} mN and saturates** (at Pm = "
+          f"{plateau['pm_mm']*1e3:.0f} µm the magnet already operates at "
+          f"B = {plateau['b_pm_t']:.2f} T, H = {plateau['h_pm_ka_m']:.0f} kA/m on its load "
+          f"line; longer magnets just push themselves further down it — flux is capped at "
+          f"Φ → Br·A by the magnet's own internal reluctance). The target is missed "
+          f"≈×{fd_mn/plateau['breakaway_mn']:.0f} however much NdFeB you insert.")
+        A("")
+        A("**Why (the physics, not the model):** a reluctance detent needs the gap "
+          "permeance to *change* with position. At Wm/tooth-width = 77.5/232 ≈ 1/3, the "
+          "fringing field at the tooth corners conducts almost as well anti-aligned as the "
+          "faces do aligned — FE shows the flux crossing the gaps changes by only ~8 % "
+          "over a full pitch. On top of that, your three ⅓-pitch-offset poles cancel each "
+          "other's fundamental force component exactly (that is what makes three-phase "
+          "stepping work), so the net detent lives on the *harmonics* of the permeance "
+          "waveform — which this tooth profile barely produces (3rd/1st ≈ 4 %). Detent "
+          "force vs displacement for both designs is the figure in the next section.")
+        A("")
+        if op:
+            A(f"**What works instead:** gap → 20 µm and bridge+magnet cross-section ×1.5 "
+              f"(teeth, pitch, translator, stator slots unchanged). Then **Pm* = 243 µm** "
+              f"gives {op['breakaway_mn']:.2f} mN breakaway with the magnet at a healthy "
+              f"operating point (B = {op['b_pm_t']:.2f} T, H = {op['h_pm_ka_m']:.0f} kA/m) "
+              f"and the three ⅓-pitch detents intact.")
+    A("")
+    A("### Task 4 — Ic for a peak axial force of 2·Fd = " + f"{2*fd_mn:.1f} mN "
+      "(Nc = 20, Dc = 50 µm)")
+    A("")
+    A("![ic-sweep](fig-ic-sweep.png)")
+    A("")
+    if sweeps:
+        b_ic = sweeps["baseline"]["ic_sweep"]
+        top = b_ic[-1]
+        A(f"**For your geometry: no Ic exists either.** Peak net drive force vs coil "
+          f"current is above — it saturates near **{top['peak_mn']:.1f} mN even at "
+          f"{top['ic_a']:.0f} A** (400 A-turns), ×8 short of the 15.5 mN target, for the "
+          f"same reason as task 3: force needs permeance modulation, and current cannot "
+          f"add what the tooth geometry does not provide. (One subtlety your driver must "
+          f"respect: the coil has to be poled to AID its own pole's magnet — opposed, "
+          f"more current *reduces* the force.)")
+        A("")
+        if fixed:
+            A(f"**What works instead:** on the fixed design, **Ic* = {fixed['ic_a']:.2f} A** "
+              f"reaches the literal 2·Fd peak ({fixed['drive_peak_mn']:.1f} mN; worst force "
+              f"along the step path {fixed['stall_min_mn']:.1f} mN). Two practical notes: "
+              f"(a) 3.35 A through the 0.55 Ω coil needs ≈1.9 V — the 1 V case caps the "
+              f"MMF at 36 A-turns *regardless of turns count* (R scales with N, so "
+              f"voltage, not winding design, is the limit); (b) reliable stepping does "
+              f"not need the full 2·Fd — steps complete from ≈1.4 A, inside the 1 V "
+              f"budget. Force vs position with one coil energised:")
     A("")
     A("![drive](fig-drive.png)")
+    A("")
+    A("### Task 5 — Lc, Rc and the rise time on 1 V")
+    lc_b = f"{fe['lc_uh_fe']:.1f}" if fe else "—"
+    lc_f = f"{fixed['lc_uh']:.1f}" if fixed else "—"
+    A(f"**Rc = 0.552 Ω** (63 mm of 50 µm Cu at 20 °C; the 20 turns wind in 2 layers with "
+      f"0.116 mm build inside your 0.263 mm window — it fits with margin). "
+      f"**Lc ≈ {lc_b} µH (baseline) / {lc_f} µH (fixed), from FE flux linkage dλ/di at "
+      f"the drive point** — small, because the same weak gap modulation that limits force "
+      f"also limits inductance. **tr: with λ-based nonlinear integration onto 1 V, the "
+      f"current reaches 63 % of I∞ = 1.81 A in ≈4 µs** and any practical stepping current "
+      f"(1.4–1.8 A) in <15 µs; electrical time constants are microseconds against "
+      f"millisecond mechanics, so the coil never limits the step. (The fixed design's "
+      f"full Ic* = 3.35 A is unreachable on 1 V — it needs the ≈1.9 V supply above.)")
+    A("")
+    A("### The detent curves behind tasks 3–4")
+    A("")
+    A("![detent](fig-detent.png)")
     A("")
     A("## Why the baseline fails, quantified (§6 make-or-break)")
     A("")
