@@ -24380,7 +24380,12 @@ def main():
     # board is the control hub — tie it by signal to every sensor (data in) + actuator (command
     # out) so the board shows genuinely wired to its peripherals (fixes the missing board->parts
     # story that floor-set Interconnect). Instrument-only; plants keep the SCADA signal-closer.
-    _candidate = _candidate + cl.close_controller_signals(parts, _candidate, _IS_INSTRUMENT_DEVICE,
+    # Read the instrument flag from STATE, not the module global _IS_INSTRUMENT_DEVICE — the
+    # global is not set until place_sealed_enclosure (~L24527), which runs AFTER this topology-
+    # closing block, so the global is still its default False here (2026-07-24 bug: the closer
+    # silently no-op'd every run). state.isInstrumentDevice is set upstream by the chain.
+    _is_instrument_now = bool((state or {}).get("isInstrumentDevice")) or _IS_INSTRUMENT_DEVICE
+    _candidate = _candidate + cl.close_controller_signals(parts, _candidate, _is_instrument_now,
                                                           log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
     # actuator-host closer (2026-07-04, the X-124/FCV-201-202 orphan diagnosis): every
