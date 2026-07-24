@@ -16609,10 +16609,12 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
               f"mesh(es) (u_se_le_* interior — replaced by universal pack; exterior "
               f"signature kept)")
 
+    _bbw = (max(xs) - min(xs)) if xs else 0.0
+    _bbd = (max(ys) - min(ys)) if ys else 0.0
     print(f"[univ][sealed][interior] populated {n_vis} recognizable component(s) + "
-          f"mounting frame; long-narrow pack {width:.0f}×{depth:.0f} mm "
-          f"(D/W={_INTERIOR_BENCH_ASPECT_DW}), floor≈{tot_fp/1000:.0f}k-mm² "
-          f"@ {100*_INTERIOR_PACK_EFFICIENCY:.0f}% eff, {len(items)} parts placed")
+          f"mounting frame; TIGHT skyline pack {_bbw:.0f}W×{_bbd:.0f}D mm "
+          f"(D/W={(_bbd/_bbw if _bbw else 0):.2f}), floor≈{tot_fp/1000:.0f}k-mm² "
+          f"@ {100*_INTERIOR_PACK_EFFICIENCY:.0f}% target, {len(items)} parts placed")
     # DIAGNOSTIC: which parts drive the envelope-resize z-range? (my pack is single-layer
     # so all packed parts share a narrow z-band; an outlier means a stale non-packed part)
     _mine = {id(x["_p"]) for x in items}
