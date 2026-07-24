@@ -1218,6 +1218,18 @@ describe('atopile-generator', () => {
     expect(classifyFunction('debug_uart_header')).toBe('debug_connector')
   })
 
+  it('classify: galvanic/digital/usb isolator → isolator_ic (organoid pcbGate floor blocker)', () => {
+    // proveCatch (2026-07-24): before the isolator_ic rule these returned null → the
+    // wet_lab_hat isolate_wet_peripherals role stayed unfilled → pcbGate architecture_unfit.
+    expect(classifyFunction('galvanic_isolator')).toBe('isolator_ic')
+    expect(classifyFunction('digital_isolator')).toBe('isolator_ic')
+    expect(classifyFunction('usb_isolator')).toBe('isolator_ic')
+    // must NOT swallow neighbouring protection/connectivity roles
+    expect(classifyFunction('esd_protection')).toBe('diode_protection')
+    expect(classifyFunction('input_protection_network')).toBe('diode_protection')
+    expect(classifyFunction('host_protocol_bridge')).toBe('connectivity_ic')
+  })
+
   it('densify: debug_header resolves FTSH-105 (debug_connector), not PinHeader_1x04', () => {
     mockedLookup.mockImplementation((manufacturer, mpn) => {
       if (/FTSH-105/i.test(mpn ?? '')) {

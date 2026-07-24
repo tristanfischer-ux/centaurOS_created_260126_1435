@@ -149,6 +149,23 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     referenceEvidence: 'OpenDrop frozen source manifest, revision 934a44db3ed41c24ae4dddb5b805a22e4166284b',
   },
   {
+    // INTENT (organoid 2026-07-24): a USB / digital galvanic isolator is a real SOIC-8
+    // signal-isolation IC (ADuM1201). Without a curated candidate the BoM MPN
+    // ADUM1201ARZ-RL7 could not resolve a footprint (distributor package text "NSOIC,
+    // 8 Pins" missed the SOIC matcher) → wet_lab_hat's isolate_wet_peripherals role stayed
+    // unfilled → design-fitness FAIL → pcbGate architecture_unfit → PCB 0.
+    roleTest: /galvanic[_ -]?isolator|digital[_ -]?isolator|usb[_ -]?isolator|(?:^|[_ -])isolator(?:$|[_ -])|adum\d/i,
+    functionClass: 'isolator_ic',
+    manufacturer: 'Analog Devices',
+    partNumber: 'ADUM1201ARZ-RL7',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Isolator', symbol: 'ADuM1201AR' },
+    ratings: { voltageV: 5.5 },
+    packageEvidence: 'Analog Devices ADUM1201ARZ: dual-channel digital isolator (1 fwd / 1 rev) in 8-lead NSOIC (R-8), 2.7-5.5 V both sides',
+    referenceEvidence: 'Organoid bioreactor BoM X-124 USB Galvanic Isolator exact ADUM1201ARZ-RL7 (Analog Devices); ADuM1201 datasheet Rev K',
+    pinoutEvidence: 'ADuM1201 R-8 pinout 1=VDD1 2=VOA 3=VIB 4=GND1 5=GND2 6=VOB 7=VIA 8=VDD2; KiCad Isolator:ADuM1201AR with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  },
+  {
     roleTest: /photodiode[_ -]?(?:adc|converter)|optical[_ -]?(?:adc|measurement)/i,
     functionClass: 'sensor_ic',
     manufacturer: 'Texas Instruments',

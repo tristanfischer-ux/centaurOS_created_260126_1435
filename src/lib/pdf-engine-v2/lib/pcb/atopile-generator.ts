@@ -120,6 +120,7 @@ export type FunctionClass =
   | 'passive_l'
   | 'fuse_protection'
   | 'diode_protection'
+  | 'isolator_ic'
   | 'memory_ic'
   | 'usb_connector'
   | 'debug_connector'
@@ -154,7 +155,13 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
   { id: 'regulator', test: /controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
-  { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient/i },
+  { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient|input[_-]?protection(?:[_-]?network)?/i },
+  // INTENT (organoid 2026-07-24): a digital/USB galvanic isolator (ADuM120x/316x/416x) is a
+  // real SOIC signal-isolation IC. Without this it landed unresolved → the wet_lab_hat's
+  // `isolate_wet_peripherals` role stayed unfilled → design-fitness FAIL → pcbGate fired → PCB 0.
+  // Placed AFTER diode_protection so an "esd_isolation" TVS still classifies as diode_protection,
+  // but BEFORE connectivity_ic so "usb_isolator" isn't swallowed by the usb/level-shifter rule.
+  { id: 'isolator_ic', test: /galvanic[_-]?isolator|digital[_-]?isolator|usb[_-]?isolator|opto[_-]?isolator|(^|[_-])isolator($|[_-])|adum\d/i },
   // INTENT (2026-07-20): flash_storage is the engine's common character_id —
   // flash_memory alone left NinjaPCR thermal_controller unresolved after
   // role-only collection started seeing the word.
@@ -280,6 +287,18 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     pins: ['VCC', 'GND', 'IN_POS', 'IN_NEG', 'OUT'],
     powerPin: 'VCC',
     groundPin: 'GND',
+    decouple: true,
+    resolutionTier: 'package_family',
+  },
+  // A dual-channel digital/USB galvanic isolator (ADuM1201-class): 8-pin SOIC, two
+  // isolated supply domains (VDD1/GND1 ↔ VDD2/GND2). decouple on both rails.
+  isolator_ic: {
+    library: 'Package_SO',
+    filenameTest: /^SOIC-8_3\.9x4\.9mm_P1\.27mm\.kicad_mod$/,
+    designatorPrefix: 'U',
+    pins: ['VDD1', 'GND1', 'VIA', 'VOB', 'VDD2', 'GND2', 'VOA', 'VIB'],
+    powerPin: 'VDD1',
+    groundPin: 'GND1',
     decouple: true,
     resolutionTier: 'package_family',
   },
@@ -524,10 +543,25 @@ function resolveFootprintByPackageText(
     if (ref) return { ref, rule: 'sot23_family' }
   }
 
-  const soic = text.match(/\bsoic-?(8|14|16)\b/)
-  if (soic) {
-    const ref = resolveFootprintByGlob(root, 'Package_SO', new RegExp(`^SOIC-${soic[1]}_`))
-    if (ref) return { ref, rule: `soic_${soic[1]}_family` }
+  // SOIC family — accept N/W-SOIC and SO-N, and a pin count that is either ATTACHED
+  // ("SOIC-8") or stated SEPARATELY ("NSOIC, 8 Pins") the way distributor package text
+  // does (organoid ADuM1201ARZ-RL7 = "NSOIC, 8 Pins"; the old \bsoic-?8\b missed both the
+  // leading N and the detached pin count → the MPN path never got a footprint → PCB 0).
+  let soicPins: string | null = null
+  const soicMatch =
+    text.match(/\b[nw]?soic-?(8|14|16)\b/)          // SOIC-8 / NSOIC8 / WSOIC-16
+    || text.match(/\b(8|14|16)-?[nw]?soic\b/)        // 8-SOIC
+    || text.match(/\b[nw]?soic[\s,-]+(8|14|16)\b/)   // "NSOIC, 8" / "WSOIC 16"
+    || text.match(/\bso-?(8|14|16)\b/)               // SO-8
+  if (soicMatch) {
+    soicPins = soicMatch[1]
+  } else if (/\b[nw]?soic\b/.test(text)) {
+    const sep = text.match(/\b(8|14|16)\s*(?:pins?|-?pin)\b/) // "SOIC ... 8 Pins"
+    if (sep) soicPins = sep[1]
+  }
+  if (soicPins) {
+    const ref = resolveFootprintByGlob(root, 'Package_SO', new RegExp(`^SOIC-${soicPins}_`))
+    if (ref) return { ref, rule: `soic_${soicPins}_family` }
   }
 
   const qfn = text.match(/\bqfn-?(\d+)\b/)
