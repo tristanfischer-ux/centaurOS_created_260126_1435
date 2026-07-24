@@ -39,6 +39,33 @@
 600e62f3a harness→BoM · be60f26ae parity invariant · 1207c7a57 gold-spine reconcile ·
 09b9330b0 ledger power-protection · ef04bac5d containment bbox-floor · +docs.
 
+## ⭐ ACHIEVABILITY — the >9-on-EVERY-tab goal is BLOCKED by design (2026-07-24)
+After fixing the floor-setters (27/35 tabs >9), the remaining sub-9 tabs are NOT all
+fixable, because the scoring rubric DELIBERATELY caps instrument-scale tabs at 9:
+- **Interconnect** — `_sc_interconnect` line 1116: `sc = 9 if concerns==0 else 7`. For an
+  instrument the sheet IS the block diagram; "never 10 from a block diagram alone —
+  pin-level netlist lives on the PCB tab". HARD 9 by honest design.
+- **Assembly** — line 1026: "capped 9 (Assembly sheet earned, NOT fab pack)". >9 needs a
+  PCB fab pack (gerbers/drill/positions zip).
+- **Drawings** — line 891/898: "register alone never mints 10"; needs drawing_gates all-pass
+  + GA coverage, and even then caps unless a fab pack exists.
+- **PCB** — 0, pcbGate fires (galvanic_isolator role), Cursor's lane.
+- The fab-pack that would lift Assembly/Drawings/Interconnect above 9 comes from the PCB
+  pipeline — which is failing. So the whole cluster is gated on a working PCB (Cursor lane).
+
+CONCLUSION: strictly >9 on EVERY tab is NOT achievable for a benchtop instrument with the
+current HONEST rubric, without (a) a working PCB fab pack (Cursor lane) AND (b) the rubric
+allowing an instrument block-diagram/assembly sheet to score 10 (which would be DISHONEST —
+it isn't pin-level). This is a NAMED DECISION for Tristan (below), not something to fake.
+
+DECISION NEEDED FROM TRISTAN (options):
+  A. Accept 9 as the honest ceiling for instrument-scale tabs (Interconnect/Assembly/
+     Drawings) — i.e. target ≥9, not strictly >9, on those; drive everything else >9.
+  B. Get the PCB working (Cursor lane) so the fab pack exists → unlocks Assembly/Drawings
+     >9 and PCB itself; then only the honest-9 Interconnect cap remains.
+  C. Relax the rubric caps to allow instrument tabs to mint 10 (NOT recommended — breaks the
+     honest-scoring principle; a block diagram would claim pin-level fidelity it lacks).
+
 ## Honest verdict
 NOT yet all-tabs >9. The two deterministic floor-setters are FIXED and cascaded (26/35 >9).
 The remainder splits into: fixable rendering/content bugs (1,2,4 — Excel/draw layer, flow via
