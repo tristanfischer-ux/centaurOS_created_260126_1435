@@ -1994,6 +1994,23 @@ def _instrument_proxy_dim(name, module_id, quantities):
 def extract_parts(state):
     """Walk modules→sub_modules→words; return (parts, dropped, stats)."""
     parts, dropped = [], []
+    # UNIVERSAL POWER SUBSYSTEM (2026-07-24, Tristan "power on a universal basis at the right
+    # amount"): before walking, ensure a powered device carries a load-sized power inlet +
+    # supply (idempotent — no-op if already present / unpowered). Flows to render + BoM +
+    # drawings because they all read moduleDecomposition. Fixes the per-class REQUIRED_PARTS
+    # blind spot where a class not in the table (benchtop_bioreactor) got no PSU.
+    try:
+        import os as _os, sys as _sys
+        _libp = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "lib")
+        if _libp not in _sys.path:
+            _sys.path.insert(0, _libp)
+        from power_subsystem import augment_decomposition_with_power as _aug
+        _n = _aug(state)
+        if _n:
+            print(f"[univ][power] universal power subsystem: +{_n} part(s) "
+                  f"(load-sized inlet + supply) injected into the decomposition")
+    except Exception as _pe:  # noqa: BLE001 — never break the render on the augmentation
+        print(f"[univ][power] power-subsystem augmentation skipped: {_pe}")
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     quantities = ((state.get("orchestratorContract") or {}).get("quantities")) or {}
     instrument_device = bool(state.get("isInstrumentDevice"))
@@ -2005,6 +2022,13 @@ def extract_parts(state):
         rank = region_rank_for(display, module_id)
         for s in m.get("sub_modules", []):
             for w in s.get("words", []):
+                # EXTERNAL ACCESSORY (2026-07-24, universal power subsystem): a word marked
+                # `_internal: False` (e.g. the external DC power adapter/brick) is a SHIPPED
+                # accessory that lives OUTSIDE the product body — it must NOT become a physical
+                # placed/rendered/manifest part (else a 120 mm brick floats inside the case).
+                # It stays in moduleDecomposition so the BoM still costs it.
+                if w.get("_internal") is False:
+                    continue
                 # NAME FALLBACK (2026-07-06, the L&V-flagged "'Part' references no real
                 # part" Connection-trace HIGH): a malformed word entry with neither
                 # `name_human` nor a top-level `character_id` (a duplicate/partial patch
@@ -16382,6 +16406,217 @@ def _place_instrument_manifest_proxies(
     return n
 
 
+# Long-narrow bench preference (Tristan 2026-07-23): a benchtop instrument sits DEEP
+# and NARROW on the bench (small frontage, long front-to-back), not wide-and-shallow.
+# The interior pack targets this aspect; the post-placement envelope resize then sizes
+# the shell to the packed bbox → the exterior form follows the interior BY CONSTRUCTION.
+_INTERIOR_BENCH_ASPECT_DW = 1.7        # depth / width of the target interior footprint
+_INTERIOR_PACK_EFFICIENCY = 0.55       # shelf-pack fill fraction the target area assumes
+
+
+def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
+                                  story_mod, MO):
+    """Populate a sealed instrument's see-inside with RECOGNIZABLE, NON-OVERLAPPING
+    component meshes — the fix for the empty ghost render (drawer 3893cfc92e0fe812 →
+    0e474e5e25fd0d08). Deterministic + universal:
+
+      1. sanitise each interior part's dims (interior_geometry.sane_dims — clamps the
+         plant-scale TYPE_DEFAULTS leak, e.g. the 200×200×100 thermal pad);
+      2. single-layer PACK into a LONG-NARROW target footprint (interior_pack) → 0 clash;
+      3. OVERWRITE p.placed_xyz_mm + p.dim so the parts-manifest + GA drawing follow the
+         SAME positions (coherence by construction — drawings are downstream, Tristan);
+      4. build a recognizable component mesh per part (function→mesh library) under the
+         u_se_cutaway_cue_int_* prefix → shown on the ghost/cutaway, hidden on the closed
+         exterior views, kept through clutter-suppress;
+      5. emit an internal mounting FRAME (chassis base plate + corner standoffs) — the
+         "everything bolts onto" system Tristan asked for.
+
+    The post-placement envelope resize (just below the caller) then sizes the shell to the
+    packed bbox, so the exterior form becomes long-narrow too.
+
+    Returns the number of visible component meshes built."""
+    if not _IS_INSTRUMENT_DEVICE or not hasattr(bpy, "data"):
+        return 0
+    try:
+        import interior_pack as _ipack
+        import interior_geometry as _igeo
+    except Exception as _e:  # pragma: no cover — import guard
+        print(f"[univ][sealed][interior] library import failed: {_e}")
+        return 0
+
+    # Match ONLY the enclosure body itself — NOT interior parts that merely mention a
+    # panel/door (e.g. "Front Panel Connector Ports" is an interior connector, not skin).
+    # A too-broad regex left such parts with stale role-XY z, inflating the envelope resize.
+    _SKIN_RE = re.compile(
+        r"enclosure|\bhousing\b|\bshell\b|\bshroud\b|\bchassis\b|\bcasing\b|"
+        r"\benclosure cover\b|\btop lid\b|\bskin\b", re.I)
+
+    # 1. collect interior parts (+ sane dims). Skin/body parts stay the product shell.
+    # A shipped EXTERNAL accessory (e.g. the external DC power adapter/brick from the universal
+    # power subsystem) is NOT inside the product body — it must not be packed/rendered in the
+    # interior (it stays in the decomposition → the BoM still costs it). Keyed on the noun.
+    _EXTERNAL_ACCESSORY_RE = re.compile(
+        r"external\s+.*adapter|power\s+adapter|wall\s+adapter|line\s+cord|mains\s+lead", re.I)
+
+    items = []
+    for p in parts:
+        nm = str(getattr(p, "name", ""))
+        if not nm or _SKIN_RE.search(nm):
+            # the enclosure BODY is the container, not an interior part to CONTAIN — and
+            # its stale placed_xyz_mm (a bench-elevated datum, e.g. z=650 vs our DECK_Z_MM
+            # interior floor) would pollute the post-placement envelope resize, inflating H.
+            # Clear it so the resize sizes to the interior parts; the manifest shell row then
+            # takes its pos from the real shell-mesh bbox centre (correct) + _SEALED_ENV_MM dims.
+            p.placed_xyz_mm = None
+            continue
+        if _EXTERNAL_ACCESSORY_RE.search(nm):
+            p.placed_xyz_mm = None   # external accessory — BoM only, never in the interior
+            continue
+        own = p.dim if isinstance(getattr(p, "dim", None), dict) else None
+        if own:
+            raw = (float(own.get("w_mm") or own.get("dia_mm") or 20.0),
+                   float(own.get("d_mm") or own.get("dia_mm") or 16.0),
+                   float(own.get("h_mm") or own.get("len_mm") or 12.0))
+        else:
+            raw = (20.0, 16.0, 12.0)
+        sd = _igeo.sane_dims(nm, raw)
+        tag = str(getattr(p, "equipment_tag", None) or getattr(p, "tag", None) or nm)
+        items.append({"tag": tag, "name": nm, "dims": sd, "_p": p})
+    if not items:
+        return 0
+
+    # 2. long-narrow target footprint from the sane part footprints, then pack.
+    import math as _m
+    tot_fp = sum(x["dims"][0] * x["dims"][1] for x in items)
+    max_h = max(x["dims"][2] for x in items)
+    area = tot_fp / max(0.30, _INTERIOR_PACK_EFFICIENCY)
+    width = _m.sqrt(area / _INTERIOR_BENCH_ASPECT_DW)
+    depth = width * _INTERIOR_BENCH_ASPECT_DW
+    pack_h = max_h + 8.0
+    floor_z = base_z + margin
+    pack_parts = [{"tag": x["tag"], "name": x["name"], "dims": x["dims"]} for x in items]
+    # hosting=False → EVERY part single-layer on the floor (no PCB-mounting) so the pack is
+    # 3D-clash-free BY CONSTRUCTION (one z-plane). Tristan 2026-07-24: "are parts not clashing
+    # on a 3D basis?" — a guaranteed-0-clash layout beats the tighter hosted pack that left a
+    # small probe↔connector overlap.
+    pos = _ipack.pack_interior(pack_parts, width, depth, pack_h, floor_z,
+                               gap_mm=3.0, wall_mm=0.0, hosting=False)
+    rot = pos.get("__rot__", {})
+    nclash, oob, worst = _ipack.count_clashes(pack_parts, pos, width, depth, pack_h,
+                                              floor_z, wall_mm=0.0)
+    if nclash or oob:
+        # widen the floor + re-pack once: a clash/oob here means the target was too tight.
+        width *= 1.15
+        depth *= 1.15
+        pos = _ipack.pack_interior(pack_parts, width, depth, pack_h, floor_z,
+                                   gap_mm=4.0, wall_mm=0.0, hosting=False)
+        rot = pos.get("__rot__", {})
+        nclash, oob, worst = _ipack.count_clashes(pack_parts, pos, width, depth, pack_h,
+                                                  floor_z, wall_mm=0.0)
+    # HARD 3D-clash self-check on the FINAL placed AABBs (the answer to "do parts clash?").
+    if nclash or oob:
+        print(f"[univ][sealed][interior][CLASH] {nclash} clash + {oob} oob AFTER re-pack "
+              f"({worst[:3]}) — INVESTIGATE (should be 0 on a single-layer pack)")
+    else:
+        print(f"[univ][sealed][interior] 3D clash-check: 0 clashes, 0 out-of-bounds "
+              f"({len(pack_parts)} parts, single-layer)")
+
+    # 3+4. overwrite placement (manifest/GA follow) + build recognizable meshes.
+    mat_cache = {}
+    n_vis = 0
+    xs = []
+    ys = []
+    for x in items:
+        tag, p, nm, sd = x["tag"], x["_p"], x["name"], x["dims"]
+        c = pos.get(tag)
+        if not c:
+            continue
+        rsw = bool(rot.get(tag))
+        w, d, h = sd
+        if rsw:
+            w, d = max(w, d), min(w, d)
+        p.placed_xyz_mm = (round(c[0], 2), round(c[1], 2), round(c[2], 2))
+        p.shape = "box"
+        p.dim = parse_dimension(f"{w:.0f}x{d:.0f}x{h:.0f} mm")
+        p.anchors = {"centre": p.placed_xyz_mm}
+        xs += [c[0] - w / 2, c[0] + w / 2]
+        ys += [c[1] - d / 2, c[1] + d / 2]
+        if _igeo.is_hidden_fastener(nm):
+            continue   # visibility filter (council) — placed for manifest, not drawn
+        fam = _igeo.function_family(nm, getattr(p, "shape", None))
+        slug = re.sub(r"[^a-z0-9]+", "_", nm.lower()).strip("_")[:32]
+        _igeo.build_component(
+            fl, f"u_se_cutaway_cue_int_{slug}", fam, c, sd, mat_cache,
+            module=getattr(p, "module_id", None) or story_mod, module_objects=MO,
+            rot_swap=rsw)
+        n_vis += 1
+
+    # 5. internal mounting frame — chassis base plate + 4 corner standoffs (bolt-on).
+    if xs and ys:
+        fw = max(xs) - min(xs)
+        fd = max(ys) - min(ys)
+        fcx = (max(xs) + min(xs)) / 2.0
+        fcy = (max(ys) + min(ys)) / 2.0
+        plate_mat = _igeo._mat(fl, mat_cache, "alu")
+        _pt = 3.0
+        _bp = fl.add_box("u_se_cutaway_cue_int_frame_baseplate",
+                         ((fcx) * fl.MM, (fcy) * fl.MM, (floor_z - _pt / 2) * fl.MM),
+                         ((fw + 12) * fl.MM, (fd + 12) * fl.MM, _pt * fl.MM),
+                         plate_mat, module=story_mod, module_objects=MO)
+        _bp.dimensions = ((fw + 12) * fl.MM, (fd + 12) * fl.MM, _pt * fl.MM)
+        so_h = max_h * 0.5
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                fl.add_cyl(
+                    f"u_se_cutaway_cue_int_frame_standoff_{sx}_{sy}",
+                    ((fcx + sx * (fw / 2 - 6)) * fl.MM,
+                     (fcy + sy * (fd / 2 - 6)) * fl.MM,
+                     (floor_z + so_h / 2) * fl.MM),
+                    3.0 * fl.MM, so_h * fl.MM, plate_mat,
+                    module=story_mod, module_objects=MO)
+
+    # DE-DUPLICATE: the bespoke per-product interior story (u_se_le_pcb / stir_motor /
+    # heater_block / cell / chip, built earlier by _place_lab_electronics_interior_layout)
+    # is now REPLACED by this universal pack — hide those interior meshes so we don't render
+    # two PCBs / two motors. KEEP the exterior-signature families (OD optical tower, vial
+    # collar, HMI fascia — _EXTERIOR_KEEP_PREFIXES): they are the product's above-lid identity,
+    # not interior clutter. Universal (keyed on the exterior-keep prefix set, no product table).
+    n_hidden_story = 0
+    for _o in list(bpy.data.objects):
+        if getattr(_o, "type", None) != "MESH":
+            continue
+        _nm = _o.name
+        if _nm.startswith("u_se_le_") and not _nm.startswith(_EXTERIOR_KEEP_PREFIXES):
+            _o.hide_render = True
+            n_hidden_story += 1
+    if n_hidden_story:
+        print(f"[univ][sealed][interior] hid {n_hidden_story} redundant bespoke story "
+              f"mesh(es) (u_se_le_* interior — replaced by universal pack; exterior "
+              f"signature kept)")
+
+    print(f"[univ][sealed][interior] populated {n_vis} recognizable component(s) + "
+          f"mounting frame; long-narrow pack {width:.0f}×{depth:.0f} mm "
+          f"(D/W={_INTERIOR_BENCH_ASPECT_DW}), floor≈{tot_fp/1000:.0f}k-mm² "
+          f"@ {100*_INTERIOR_PACK_EFFICIENCY:.0f}% eff, {len(items)} parts placed")
+    # DIAGNOSTIC: which parts drive the envelope-resize z-range? (my pack is single-layer
+    # so all packed parts share a narrow z-band; an outlier means a stale non-packed part)
+    _mine = {id(x["_p"]) for x in items}
+    _zr = []
+    for _pp in parts:
+        _xyz = getattr(_pp, "placed_xyz_mm", None)
+        if not _xyz:
+            continue
+        _tag = "MINE" if id(_pp) in _mine else "OTHER"
+        _zr.append((float(_xyz[2]), _tag, str(getattr(_pp, "name", ""))[:26]))
+    _zr.sort()
+    if _zr:
+        print(f"[univ][sealed][interior][z-diag] floor_z={floor_z:.0f} "
+              f"z-range [{_zr[0][0]:.0f} ({_zr[0][1]}:{_zr[0][2]}) .. "
+              f"{_zr[-1][0]:.0f} ({_zr[-1][1]}:{_zr[-1][2]})]  "
+              f"OTHERs: {[(round(z),n) for z,t,n in _zr if t=='OTHER'][:6]}")
+    return n_vis
+
+
 _INSTRUMENT_MESH_KEEP_PREFIXES = (
     "u_se_instrument_story_",
     "u_se_product_",
@@ -17114,6 +17349,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     if _int_vol > 0:
         print(f"[univ][sealed] INTERIOR-FILL {100.0 * _fill_num / _int_vol:.0f}% "
               f"(Σ part bboxes / interior volume)")
+
+    # POPULATE the see-inside with recognizable, non-overlapping component meshes at a
+    # long-narrow pack (Tristan 2026-07-23). Runs BEFORE suppress (so the old role-XY
+    # zone boxes get hidden while these u_se_cutaway_cue_int_* meshes are kept) and BEFORE
+    # the post-placement resize (so the shell sizes to THIS packed bbox → long-narrow).
+    if _IS_INSTRUMENT_DEVICE:
+        _populate_instrument_interior(
+            parts, base_z, margin, ih, iw, idep, _story_mod, MO)
 
     if _IS_INSTRUMENT_DEVICE:
         _suppress_instrument_boilerplate_meshes()

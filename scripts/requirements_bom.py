@@ -7623,6 +7623,20 @@ def _word_requirement_name(word: dict) -> str:
 
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
+    # UNIVERSAL POWER SUBSYSTEM (2026-07-24): ensure a powered device's BoM carries a
+    # load-sized power inlet + supply (idempotent; the render's extract_parts injects the
+    # same into moduleDecomposition — both read it here). Fixes the per-class REQUIRED_PARTS
+    # blind spot (a class not in that table shipped an inlet with no supply, unsized to load).
+    try:
+        _pslib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+        if _pslib not in sys.path:
+            sys.path.insert(0, _pslib)
+        from power_subsystem import augment_decomposition_with_power as _aug_pwr
+        _npwr = _aug_pwr(st)
+        if _npwr:
+            print(f"[requirements-bom] universal power subsystem: +{_npwr} load-sized part(s)")
+    except Exception as _pwe:  # noqa: BLE001 — never break the BoM on the augmentation
+        print(f"[requirements-bom] power-subsystem augmentation skipped: {_pwe}")
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
                             # local `st` to a take-off tuple (~line 2449); the corpus-
                             # median-lift post-pass reads partVerifications from here.

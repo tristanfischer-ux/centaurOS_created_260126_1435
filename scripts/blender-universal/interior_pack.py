@@ -181,18 +181,28 @@ def pack_interior_stacked(parts, base_z_mm, floor_w=None, floor_d=None, gap_mm=4
     return pos, rot, frame, layers, bbox
 
 
-def pack_interior(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=3.0, wall_mm=6.0):
+def pack_interior(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=3.0, wall_mm=6.0,
+                  hosting=True):
     """Hosting-aware pack: CHASSIS parts (vessel/pump/stirrer/fan/Peltier/vial/tubing +
     footprint>1500mm²) + a PCB base plane sit on the FLOOR; small ON-BOARD electronics
     mount ON the PCB surface (matches reality + frees the floor). Returns {tag:(cx,cy,cz)}
-    enclosure-centred. Deterministic (sorted). Universal (function/footprint signal)."""
+    enclosure-centred. Deterministic (sorted). Universal (function/footprint signal).
+
+    `hosting=False` (2026-07-24): pack EVERY non-fastener part single-layer on the floor —
+    no PCB-mounting. Guarantees 0 pairwise clash (one z-plane, pure 2D shelf pack), at the
+    cost of the small electronics taking floor area rather than riding the board. Use when
+    3D-clash-free is the hard requirement (Tristan: 'are parts not clashing on a 3D basis?')."""
     fw = iw_mm - 2 * wall_mm
     fd = idep_mm - 2 * wall_mm
     floor_z = base_z_mm + wall_mm
     fasteners = [p for p in parts if _is_fastener(p["name"])]
     rest = [p for p in parts if not _is_fastener(p["name"])]
-    onboard = [p for p in rest if _is_onboard(p["name"], p["dims"])]
-    chassis = [p for p in rest if p not in onboard]
+    if not hosting:
+        onboard = []
+        chassis = rest[:]          # everything on the floor → one plane → 0 clash by construction
+    else:
+        onboard = [p for p in rest if _is_onboard(p["name"], p["dims"])]
+        chassis = [p for p in rest if p not in onboard]
 
     # PCB base plane: use a real PCB part if present, else SYNTHESISE one sized to host the
     # on-board electronics (the manifest lacks a real board — council PCB-coherence gap).
