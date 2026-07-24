@@ -297,7 +297,7 @@ for label, val, unit, art, inval in fe_rows:
         ws.cell(row=r, column=col).fill = GRY
 
 # ============================ honeycomb ======================================
-af_, t_, dep_, apw_, aph_ = 3.1, 0.2, 7.7, 100.0, 100.0
+af_, t_, dep_, apw_, aph_ = 3.1, 0.15, 7.7, 100.0, 100.0
 cella_ = math.sqrt(3) / 2 * af_ ** 2
 ncell_ = math.floor(apw_ * aph_ / cella_)
 wall_ = math.sqrt(3) * af_ * t_ * dep_
@@ -308,20 +308,20 @@ brv_ = 0.348 * 1.162 * 2.634
 pole_ = (ssv_ + brv_) * 7400 / 1000
 pmm_ = pma_ * 0.243 * 7500 / 1000
 act_ = mt_ + 3 * (pole_ + pmm_ + mcu_)
-banner("11 · HONEYCOMB CELL ARRAY — STRUCTURE ONLY (Tony's CAD + prototypes, 24 Jul)")
+banner("11 · HONEYCOMB CELL ARRAY — STRUCTURE ONLY (Tony's CAD, 24 Jul)")
 note("Structural/packing calculations for the cell lattice that houses one actuator per cell. "
-     "Dimensions from Tony's CAD: 3.1 mm across-flats × 7.7 mm deep, 3D-printed (metallised for "
-     "RF), tiled as 7-cell clusters inside a round aperture. The cell-size ↔ band mapping is RF "
-     "and stays with Tony/Vlad — cell sizes here are INPUTS. The large-cell photos are the "
-     "demo-scale prototypes (≈25–30 mm cells).")
+     "Dimensions from Tony's SketchUp file ('24-hex sub array, 3.1 mm between flats, 150 micron "
+     "wall'): 3.1 mm across-flats, 150 µm walls, cells 7.7 mm deep (earlier CAD), tiled as "
+     "24-hex sub-arrays. The cell-size ↔ band mapping is RF and stays with Tony/Vlad — cell "
+     "sizes here are INPUTS. The large-cell photos are the demo-scale prototypes (≈25–30 mm).")
 head()
-inp("af", "Hex cell across-flats", 3.1, "mm", "Tony CAD 24 Jul (dimension marked 3.1 mm)")
-inp("thc", "Cell wall thickness", 0.2, "mm", "SET FROM CAD — not readable off the screenshots")
-inp("dhc", "Cell depth", 7.7, "mm", "Tony CAD 24 Jul (dimension marked 7.7 mm)")
+inp("af", "Hex cell across-flats", 3.1, "mm", "Tony .skp 24 Jul: '3.1mm between flats'")
+inp("thc", "Cell wall thickness", 0.15, "mm", "Tony .skp 24 Jul: '150micron wall'")
+inp("dhc", "Cell depth", 7.7, "mm", "Tony CAD 24 Jul (dimension marked 7.7 mm; .skp is 2D-only)")
 inp("apw", "Aperture width", 100.0, "mm", "SET FROM CAD — round aperture: use its bounding square")
 inp("aph", "Aperture height", 100.0, "mm", "SET FROM CAD")
-inp("n7", "Number of 7-cell clusters", 19, "-",
-    "the CAD tiles 7-cell clusters; count them for the exact cell total")
+inp("csub", "Cells per sub-array", 24, "-", "Tony .skp: tileable 24-hex sub-array")
+inp("nsub", "Number of sub-arrays", 1, "-", "SET FROM CAD — how many 24-hex tiles the aperture uses")
 inp("dhcm", "Wall material density", 1240, "kg/m³",
     "3D-print resin/PLA ≈1240 (as prototyped); aluminium 2700; metallised print adds ≈5 %")
 inp("sqs", "Square-grid pitch (alt. prototype)", 3.0, "mm", "the square egg-crate array in photos 3–4")
@@ -330,16 +330,16 @@ der("cella", "Cell area", "=SQRT(3)/2*{af}^2", "mm²", "(√3/2)·AF²", cella_,
 der("ncell", "Cells per aperture (by area)", "=FLOOR({apw}*{aph}/{cella},1)", "-",
     "⌊A_aperture/A_cell⌋", float(ncell_),
     "edge effects ignored — the cluster count below is the exact method")
-der("ncl", "Cells from 7-cell clusters", "=7*{n7}", "-", "7 × clusters", 133.0,
-    "Tony's CAD tiling — USE THIS count when the cluster number is known")
+der("ncl", "Cells from sub-array tiling", "={csub}*{nsub}", "-", "cells/sub-array × sub-arrays",
+    24.0, "Tony's .skp tiling — USE THIS count once the sub-array number is known")
 der("rdhc", "Honeycomb relative density", "=2*{thc}/{af}", "-", "2t/AF (thin wall, shared)",
     2 * t_ / af_, "fraction of the slab that is metal")
 der("open", "Open-area fraction", "=1-2*{thc}/{af}", "-", "1 − 2t/AF", 1 - 2 * t_ / af_, "")
 der("wall", "Wall volume per cell", "=SQRT(3)*{af}*{thc}*{dhc}", "mm³",
     "½·perimeter·t·depth = √3·AF·t·L (walls shared)", wall_, "")
 der("cellm", "Wall mass per cell", "={wall}*{dhcm}/1000", "mg", "V·ρ ÷1000 → mg", cellm_, "")
-der("hcm", "Honeycomb mass (whole aperture)", "={ncl}*{cellm}/1000", "g", "N·m_cell ÷1000 → g",
-    133 * cellm_ / 1000, "uses the exact 7-cluster count")
+der("hcm", "Honeycomb lattice mass", "={ncl}*{cellm}/1000", "g", "N·m_cell ÷1000 → g",
+    24 * cellm_ / 1000, "per 24-hex sub-array at the default tile count")
 der("areal", "Areal density", "={dhcm}*{dhc}/1000*{rdhc}", "kg/m²", "ρ·depth·relative density",
     1240 * dep_ / 1000 * 2 * t_ / af_, "printed plastic; ×2.18 if aluminium")
 der("wfit", "Widest actuator that fits at full height",
@@ -369,10 +369,10 @@ der("pmm", "Magnet mass per pole", "={pma}*{pml}*{dpm}/1000", "mg", "A·Pm·ρ �
 der("actm", "ONE actuator, total mass",
     "={mt}+{np}*({polem}+{pmm}+{mcu})", "mg", "translator + 3·(steel + magnet + coil)", act_,
     "excludes reflector (<2 % — Tony 24 Jul), frame and bearing")
-der("apact", "Actuators per aperture, total mass", "={ncl}*{actm}/1000", "g", "N·m_act ÷1000",
-    133 * act_ / 1000, "one actuator per cell — DOMINATES the honeycomb mass ≈20×")
-der("aptot", "Aperture moving hardware total", "={hcm}+{apact}", "g", "honeycomb + actuators",
-    133 * (cellm_ / 1000 + act_ / 1000), "frame, feed, reflectors, electronics excluded")
+der("apact", "Actuators, total mass", "={ncl}*{actm}/1000", "g", "N·m_act ÷1000",
+    24 * act_ / 1000, "one actuator per cell — DOMINATES the lattice mass ≈29×")
+der("aptot", "Moving hardware total", "={hcm}+{apact}", "g", "lattice + actuators",
+    24 * (cellm_ / 1000 + act_ / 1000), "per sub-array; frame, feed, reflectors excluded")
 der("sqa", "Square-grid cell area", "={sqs}^2", "mm²", "s²", 9.0, "")
 der("sqrd", "Square-grid relative density", "=2*{thc}/{sqs}", "-", "2t/s — same form as hex",
     2 * t_ / 3.0, "")
