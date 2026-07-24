@@ -79,3 +79,47 @@ high-permeability yoke", and the accounting shows why the distinction matters:
   bore is consistent with his 3.0–3.2 mm band); λg at 70 GHz ≈ 6.92 mm on his 55 GHz
   assumption vs our 6.65 mm at fc 53.56 — same ballpark, Vlad to fix.
 - Step-size scenarios: S155 (current spec) and S108 (32 levels over λg/2 = 3.46 mm).
+
+---
+
+# EXTENSION v1.1 (same day, Tristan): manufacturing-variant tournament + outputs spec
+
+## Phase M — design variants for CHEAP MANUFACTURE (runs alongside Phase 1)
+
+The sweeps above optimise Tony's topology. Cheap-and-easy may be a DIFFERENT
+construction. Each variant below gets a fast feasibility FE + a DFM score, and a
+KILL/KEEP gate; keepers enter the Phase-2 optimiser. Scored on: parts count,
+joints in the flux path, process cost class, assembly steps (especially anything
+gauged like the 20 µm gap), and tolerance exposure (dF/dg).
+
+| V | Variant | The manufacturing win | The physics question to settle |
+|---|---|---|---|
+| V1 | Tony topology, monolithic MIM pole (baseline) | fewest yoke joints | Phase 1–2 output |
+| V2 | **Relaxed gap 40–50 µm, force recovered by breadth + duty + N52 + registration** | deletes the gauged-assembly step — the single most expensive operation | how much force the levers really recover (FE says gap alone: −8%/µm) |
+| V3 | **Etched-lamination stack** — translator + poles from photo-etched Fe-Si sheets, stacked | planar etch = cents/part at volume, ±25 µm, 155–232 µm teeth are EASY in etch (Precision Micro route); bonus: laminations kill the eddy question | stacking tolerance across the gap faces; interlaminar bonding in the flux path |
+| V4 | **Single-sided teeth** — teeth on one translator face only, C-pole | halves tooth features + one working gap to set, not two | net radial side-pull on the guide (was balanced); force/mass ratio |
+| V5 | **Round grooved-rod translator** — annular grooves on a turned rod, ring poles | the translator becomes a SCREW-MACHINE part (pennies); guide tube = bearing; axisymmetric | FEMM axisymmetric model (native support); detent from annular teeth; reflector mounting |
+| V6 | **Stamped/fine-blanked poles** from strip, progressive die | automotive-relay economics at 100k+/yr | fine-blank feature floor vs 155 µm slots; burr control at the gap faces |
+| V7 | PCB-winding stator (coils as copper traces) | no wound coils at all | expect KILL: 36–100 A-turns in PCB copper = resistance blow-up — kill with numbers, on record |
+| V8 | **Shared stator rail** — one long stator strip drives a ROW of translators | pole steel + coil formers amortised across cells | magnetic crosstalk between adjacent cells; per-cell force uniformity |
+| V9 | Insert-moulded bonded-NdFeB magnet (magnet moulded into the pole) | deletes magnet insertion + both seat joints | Br ≈ 0.7 T ⇒ force ≈ ×0.29 — probably KILL for 5 g, quantify honestly |
+| V10 | One-piece translator + reflector-standoff (single MIM/moulding) | deletes the reflector assembly step | mass + non-magnetic standoff region in one tool |
+
+Tournament order: V2, V3, V5 first (biggest cost deltas), then V4/V8, then V6/V10; V7/V9
+are kill-with-numbers entries so the record shows they were considered.
+
+## Outputs + layout (how every result lands)
+
+1. **One running scoreboard** — `out/opt/SCOREBOARD.md`, one row per variant/sweep point,
+   SAME columns always: `Variant | Knob setting | Fd mN (basins) | Drive peak/path-min mN |
+   P_elec @2Fd W | Moving mass mg | Stack mm | Fit margin vs 3.179 tile | B_max tip/core T |
+   Parts | Flux joints | Process class | VERDICT keep/kill + one-line why`.
+2. **Per-sweep figure sheet** — `out/opt/fig-opt-<knob>.png`: metric-vs-knob curves with
+   saturation flags and the baseline marked; every figure SIGHTed before it ships.
+3. **Per-sweep JSON artefact** — `out/opt/<knob>.json`; the deterministic verifier reads
+   the scoreboard numbers FROM the artefacts (same no-drift discipline as the report).
+4. **Phase gates** — at each phase end: scoreboard snapshot + a 5-line decision note
+   (what won, what died, why) appended to this plan; Tristan sees keep/kill calls, not raw logs.
+5. **Final deliverable** — report v5 gains §12 "Optimisation campaign" (scoreboard +
+   winner drawings + updated 3D render), Excel gains the winner's parameter set as a new
+   input column, council review before it goes to Tony. Same zip pipeline.
