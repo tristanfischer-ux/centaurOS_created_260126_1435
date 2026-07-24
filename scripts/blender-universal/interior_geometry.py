@@ -199,12 +199,15 @@ def _mat(fl, cache, role):
 
 
 def build_component(fl, prefix, family, centre_mm, dims_mm, mat_cache,
-                    module=None, module_objects=None, rot_swap=False):
+                    module=None, module_objects=None, rot_swap=False, orient="flat"):
     """Build a recognizable component at CENTRE `centre_mm` (Blender metres via fl.MM),
     sized parametrically from `dims_mm` (mm). Returns the list of created objects.
 
     ONE datum: centre. `rot_swap` (from the packer) means the long footprint axis was
-    swapped to run along +x — we swap w/d so the mesh matches the packed AABB."""
+    swapped to run along +x — we swap w/d so the mesh matches the packed AABB.
+    `orient="vertical_back"` (2026-07-24) stands a flat board UP against the back wall: every
+    primitive is rotated 90° about X (local y↔z: size (sx,sy,sz)→(sx,sz,sy), offset
+    (ox,oy,oz)→(ox,-oz,oy)), so the mesh matches the packer's vertical world_dims (w, thin, d)."""
     MM = fl.MM
     w, d, h = (float(dims_mm[0]), float(dims_mm[1]), float(dims_mm[2]))
     if rot_swap:
@@ -213,8 +216,16 @@ def build_component(fl, prefix, family, centre_mm, dims_mm, mat_cache,
     role = material_role(family)
     mat = _mat(fl, mat_cache, role)
     objs = []
+    _vert = (orient == "vertical_back")
+
+    def _xf_size(s):
+        return (s[0], s[2], s[1]) if _vert else s
+
+    def _xf_off(o):
+        return (o[0], -o[2], o[1]) if _vert else o
 
     def box(sfx, size, off=(0, 0, 0), material=None):
+        size = _xf_size(size); off = _xf_off(off)
         o = fl.add_box(f"{prefix}_{sfx}",
                        (cx + off[0] * MM, cy + off[1] * MM, cz + off[2] * MM),
                        (size[0] * MM, size[1] * MM, size[2] * MM),
@@ -223,6 +234,9 @@ def build_component(fl, prefix, family, centre_mm, dims_mm, mat_cache,
         return o
 
     def cyl(sfx, radius, height, off=(0, 0, 0), rotation=(0, 0, 0), material=None):
+        off = _xf_off(off)
+        if _vert:  # stand the cylinder axis up-vs-into-wall: add a 90° X rotation
+            rotation = (rotation[0] + math.radians(90), rotation[1], rotation[2])
         o = fl.add_cyl(f"{prefix}_{sfx}",
                        (cx + off[0] * MM, cy + off[1] * MM, cz + off[2] * MM),
                        radius * MM, height * MM, material or mat,
