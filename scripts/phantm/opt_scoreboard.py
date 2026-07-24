@@ -17,6 +17,10 @@ import matplotlib.pyplot as plt
 OUT = os.path.join(os.path.dirname(__file__), "out", "opt")
 d = json.load(open(os.path.join(OUT, "opt-sweeps-1.json")))
 rows = d["rows"]
+try:
+    rows = rows + json.load(open(os.path.join(OUT, "opt-sweeps-2.json")))["rows"]
+except FileNotFoundError:
+    pass
 base = next(r for r in rows if r["family"] == "1A-duty" and r["setting"] == 0.50)
 
 INK, MUT, ACC, BAD = "#1a1a1a", "#666666", "#1a5fb4", "#c01c28"
@@ -39,7 +43,7 @@ def verdict(r):
 
 
 lines = [
-    "# Optimisation scoreboard — batch 1 (Phase 1A/1B + V2), " + f"PM {d['pm_study_mm']} mm, I {d['i_study_a']} A",
+    "# Optimisation scoreboard — batches 1+2 (Phase 1A/1B + stacks + V2), " + f"PM {d['pm_study_mm']} mm, I {d['i_study_a']} A",
     "",
     "Baseline row = duty 0.50p (the FIXED design). Margin-g = breakaway / (g·mass): the",
     "honest objective (force per moving weight). bk drawn/exact = the registration pair.",
