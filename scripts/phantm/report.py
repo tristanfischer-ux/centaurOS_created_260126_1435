@@ -292,7 +292,19 @@ def main():
       "today (§6 evidence rows). 20 µm assembled is industrially normal — it is a "
       "process-and-cost choice, not a feasibility wall — and it is the single "
       "decision this design cannot survive losing.")
-    A("5. **Manufacturing methods and cost** — §5 (route, incl. the pressed-SMC "
+    A("5. **Reflector mass — resolved (Tony, same day).** The reflector is mg-scale "
+      "plastic plus 20 µm copper foil, stood off from the (iron) translator by a "
+      "small distance (Vlad to advise). Bounding it: a generous 2×2 mm foil patch "
+      "at 20 µm is 0.72 mg of copper; with a 1–2 mg plastic standoff the moving "
+      "mass grows <2% — inside the ±1.5% solver band, so every force budget in "
+      "this report stands with Mt as the moving mass. The standoff adds one "
+      "assembly step (non-magnetic, no circuit impact) and its length is an RF "
+      "call that stays on Tony's side of the boundary.")
+    A("6. **Parameterisation.** Tony has parameterised his critical values for "
+      "fettling; this model is parameterised end-to-end the same way "
+      "(params.py → FE), so any parameter set he wants swept can be run through "
+      "the same validated loop — send values, get curves.")
+    A("7. **Manufacturing methods and cost** — §5 (route, incl. the pressed-SMC "
       "impossibility and the coil sequencing) and §6 (ten supplier entries with "
       "evidence) answer this directly; raw materials are indeed tiny "
       "($0.0014/unit, §8.1) — the unit price lives in process and gap-setting.")
@@ -650,8 +662,9 @@ def main():
     # ------------------------------------------------------------------ §7
     A("## 7. Open questions for Tony")
     A("")
-    A("1. Reflector mass: part of the translator (Mt complete) or added? (moves the "
-      "hold/step budget)")
+    A("1. ANSWERED 24 Jul: reflector = mg-scale plastic + 20 µm Cu foil on a standoff "
+      "(<2% of Mt — budgets stand; see §0.6). Remaining ask: the standoff distance "
+      "(Vlad), only because it sets the moving-mass tail and the cell stack-up.")
     A("2. ANSWERED 24 Jul: 5 g was the test minimum; ambition is 20–30 g — see §0.3 "
       "ladder. Remaining ask: confirm whether 20–30 g is HOLD (detent) or survive "
       "(shock) — they size differently.")

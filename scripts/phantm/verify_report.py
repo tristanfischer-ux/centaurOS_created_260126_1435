@@ -138,6 +138,12 @@ absent("no retired numbers", "400 A-turns", "×8 short", "7.92 mm",
        "FE-proven fixes", "steps 173/146/145; Tony CAD reads 400 µm — reconcile)")
 absent("no old title", "(v3)", "(v3.1")
 absent("no strikethrough tildes", "~")
+# reflector bound: 2x2 mm x 20 um Cu = 0.716 mg < 0.5% of Mt; +2 mg plastic < 2%
+m_foil = 8960 * 2e-3 * 2e-3 * 20e-6 * 1e6  # mg
+check("reflector foil bound 0.72 mg", abs(m_foil - 0.717) < 0.01, f"{m_foil:.3f}")
+check("reflector <2% of Mt", (m_foil + 2.0) / (mt_kg * 1e6) < 0.02,
+      f"{(m_foil + 2.0)/(mt_kg*1e6):.3%}")
+contains("reflector bound in report", "0.72 mg")
 contains("v4 title", "(v4 — 24 Jul feedback incorporated")
 
 # ---------------- blender model constants ----------------------------------
