@@ -146,3 +146,30 @@ force-per-watt objective. Not yet stacked: stator slots 2× (+≈5%), N52 (force
 **Open before OPTIMISED SET freezes:** tip/bridge |B| probes at Pm 0.5 + high drive
 (saturation check); sslot-2× + N52 stack run; gap-30 test; then full Ic*/scorecard +
 report v5 fold-in per plan Phase 5.
+
+---
+
+## PHASE GATE 2 — batch 3+4 + COUNCIL ROUND (2026-07-24 late)
+
+**Council (gpt-5.6-sol 9 findings, grok-4.5 6, glm-5.2 tabular: 0 real discrepancies across ~20 spot checks):**
+- ACCEPTED — d.40 was NOT the sole winner: after Pm re-centre d.45 overtakes on N42 (grok+sol,
+  independently). Batch 4 head-to-head at full stack (N52, Pm 0.5): worst-registration margins TIE
+  (d.40 14.3 g / d.45 14.1 g, inside noise); d.40 keeps +41% drive per amp → **OPTIMISED SET = d.40**
+  by the explicit multiobjective rule (tie on worst-reg detent ⇒ decide on drive power); d.45 recorded
+  as co-equal alternative.
+- ACCEPTED — the 16–21 g Br² extrapolation is retired; claims now MEASURED only: single 3-pole group,
+  full stack (duty 0.40, tslot 1.5×, sslot 2×, N52, gap 20, Pm 0.5): **19.1 g drawn / 14.3 g worst-
+  registration, 3 basins both, B_bridge 1.15 T**. Tony's 20–30 g ⇒ two groups (≈28 g worst-reg, band
+  ≥≈67 GHz) or single group + registration acceptance (19 g).
+- ACCEPTED — caveats strengthened: superposed single-pole nonlinear solutions, finite-width/3D leakage,
+  tooth-tip/corner |B| unprobed (bridge probe only), deep-slot structural stiffness, basin count is
+  necessary-not-sufficient (barrier depth/capture → Phase 3 dynamics on the finalists).
+- REFUTED (sol #9) — the 0/142/284 µm offsets are correct: pole CENTRE-TO-CENTRE = 1160+374 = 1534 µm;
+  1534 mod 464 = 142; cumulative 0/142/284. Derivation now explicit here.
+- HALF-REFUTED (sol #4) — the FE SMC is NONLINEAR (Somaloy-style B-H via mi_addbhpoint, lua_gen
+  ~163-166); the conditional "if constant µr" does not apply. The unprobed tip-peak point stands.
+
+**Gap decision for Tony:** 20 µm → 14.3 g worst-reg; 30 µm full stack → 7.7 g worst-reg (both specs met,
+tolerance 1.5× looser); 40 µm → dead (single-basin). His call: margin vs assembly cost.
+
+Next: Phase 3 dynamics (damper + capture) on the OPTIMISED SET; then report v5 §12 fold-in.
