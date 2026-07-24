@@ -13,7 +13,7 @@
  * template otherwise.
  *
  * Model selection (BLENDER_GEN_MODEL env override):
- *   default: openai/gpt-5.5    — best visual density, $0.36 / 137 s
+ *   default: openai/gpt-5.6-sol — 2026-07-24: supersedes gpt-5.5 (AA 58.9, 10x cheaper)
  *   cheap:   anthropic/claude-sonnet-4.6 — good quality, $0.21 / 125 s
  *   premium: anthropic/claude-opus-4.7   — marginal improvement, $1.30 / 126 s
  *   fast:    x-ai/grok-4.3              — 6× faster, slightly desaturated, $0.14 / 22 s
@@ -34,7 +34,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { execFileSync } from 'child_process'
 
-const DEFAULT_MODEL = process.env.BLENDER_GEN_MODEL || 'openai/gpt-5.5'
+const DEFAULT_MODEL = process.env.BLENDER_GEN_MODEL || 'openai/gpt-5.6-sol'
 const FALLBACK_MODEL = process.env.BLENDER_GEN_FALLBACK || 'anthropic/claude-sonnet-4.6'
 const TEMPLATES_DIR = resolve(__dirname, 'blender-templates')
 

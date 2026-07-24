@@ -350,7 +350,7 @@ export async function runSemanticSelfAudit(
     generatedAt?: string
   },
 ): Promise<SelfAuditResult> {
-  const model = opts.model ?? process.env.SELF_AUDIT_MODEL ?? 'x-ai/grok-4.3'
+  const model = opts.model ?? process.env.SELF_AUDIT_MODEL ?? 'x-ai/grok-4.5'
   const mode = opts.mode ?? 'shadow'
   const generated_at = opts.generatedAt ?? new Date().toISOString()
   const digest = buildAuditDigest(state, opts.productClass)
@@ -405,7 +405,7 @@ export async function runSemanticSelfAudit(
 // WRONGNESS hard-exits, a disclosed DESIGN-BREACH flags+renders). Only a positive false claim or a
 // broken core (blank headline, false-PASS banner, £0 BoM total) blocks.
 //
-// Tiers (graded for LLM-flake safety — the judge is the non-deterministic grok-4.3):
+// Tiers (graded for LLM-flake safety — the judge is the non-deterministic grok-4.5):
 //   'off'           — shadow only (default): never exits.
 //   'deterministic' — exits ONLY on a deterministic deception/broken hard-signal (computed in
 //                     buildAuditDigest WITHOUT the LLM, so zero judge-flake risk). Safe enforce default.

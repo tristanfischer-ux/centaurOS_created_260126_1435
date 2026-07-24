@@ -195,7 +195,7 @@ const FLASH_LITE = 'google/gemini-3.1-flash-lite'
 // wired into: brief plausibility critic + brief rewriter (this file) and
 // physics critic (src/lib/pdf-engine-v2/radical/physics-critic.ts:46).
 const FLASH_3_5 = 'google/gemini-3.5-flash'
-const GROK_4_3 = 'x-ai/grok-4.3'
+const GROK_4_5 = 'x-ai/grok-4.5'  // 2026-07-24: superseded grok-4.3 (GDPval Elo 1543, token-efficient)
 const GLM_5_2 = 'z-ai/glm-5.2'
 const HAIKU_4_5 = 'anthropic/claude-haiku-4.5'
 // R3 model — swapped from Haiku 4.5 to Qwen 3.6 Max (2026-05-15). Haiku's
@@ -214,7 +214,7 @@ const QWEN_3_7_MAX = 'qwen/qwen3.7-max'
 const MAX_TOKENS_BY_MODEL: Record<string, number> = {
   [GEMINI_3_1_PRO]:  80_000,   // iter-24: Gemini Pro truncated mid-string at 205KB (~50K tok). Cap output budget to keep it tighter.
   [FLASH_LITE]:      65_000,   // iter-18 R4 truncated at 30K; design after R3 needs ~60K output
-  [GROK_4_3]:       150_000,
+  [GROK_4_5]:       150_000,
   [GLM_5_2]:         60_000,   // iter-17 GLM truncated >64K (provider-side cap)
   [HAIKU_4_5]:       80_000,   // iter-38 HP hit 200K total-context cap (53K input + 150K requested out = 203K). With ~70K input after R1+R2 enrichment, 80K out keeps total ≤ 150K (well under cap).
   [QWEN_3_7_MAX]:   32_000,   // Qwen 3.6 Max output cap is ~32K; that's plenty for an R3 reviewer (which emits a delta, not a full design). 1M context window absorbs upstream R1+R2 enrichment without the Haiku total-context squeeze.
@@ -5043,7 +5043,7 @@ async function main() {
   // and only adds 1-2 score points over a single strong reviewer. Replaced
   // with one Grok 4.3 pass (fallback Qwen 3.6 Max). Loops 22-28 evidence:
   // the cascade's value-add was marginal. Saving the time/cost.
-  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics,     toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend + fixDirectivesBlock + emitterDirectivesBlock, libraryCandidatesBlock })
+  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.5)', model: GROK_4_5, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics,     toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend + fixDirectivesBlock + emitterDirectivesBlock, libraryCandidatesBlock })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
@@ -5153,7 +5153,7 @@ async function main() {
                 const j = await res.json() as any
                 return j?.choices?.[0]?.message?.content ?? ''
               }
-              try { return await callOnce(FLASH_3_5) } catch { return await callOnce(GROK_4_3) }
+              try { return await callOnce(FLASH_3_5) } catch { return await callOnce(GROK_4_5) }
             },
           })
           return value
@@ -5324,7 +5324,7 @@ async function main() {
       try {
         const r45 = await runReviewerStep({
           label: `STEP 8.5: R4.5 ${specialist.key} specialist`,
-          model: GROK_4_3,
+          model: GROK_4_5,
           fallbackModel: GLM_5_2,
           systemAppend: specialist.prompt,
           thinkingLevel: 'high',

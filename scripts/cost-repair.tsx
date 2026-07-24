@@ -42,7 +42,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? process.env.OPENROUTER_KEY
-const FIXER_MODEL = process.env.COST_REPAIR_MODEL || 'x-ai/grok-4.3'
+const FIXER_MODEL = process.env.COST_REPAIR_MODEL || 'x-ai/grok-4.5'
 const MAX_PARTS_PER_BATCH = 60
 const MAX_TOKENS = 16384
 

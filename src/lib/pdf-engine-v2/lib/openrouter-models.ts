@@ -30,6 +30,11 @@ export const GEMINI_3_1_PRO = 'google/gemini-3.1-pro-preview'
 export const CLAUDE_OPUS_4_7 = 'anthropic/claude-opus-4.7'
 
 /** Grok 4.3 — joint-lowest hallucination (25%), IFBench #1, +18 Omniscience. Honest workhorse. */
+// 2026-07-24 catalogue refresh (live-verified routable):
+export const GROK_4_5 = 'x-ai/grok-4.5'          // supersedes grok-4.3; GDPval Elo 1543; 500K ctx
+export const GPT_5_6_SOL = 'openai/gpt-5.6-sol'  // supersedes gpt-5.5; AA 58.9; $5/$30 (10x cheaper than 5.5)
+export const KIMI_K3 = 'moonshotai/kimi-k3'      // #1 Terminal-Bench coding; reasoning field, max_tokens>=4096
+export const MINIMAX_M3 = 'minimax/minimax-m3'   // 16.1% hallucination — lowest routable; cheap honest anchor
 export const GROK_4_3 = 'x-ai/grok-4.3'
 
 // ─── Asian-lineage models (training-data diversity) ─────────────────────────

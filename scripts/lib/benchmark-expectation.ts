@@ -49,7 +49,7 @@ const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || ''
 const BENCHMARK_MODEL = process.env.BENCHMARK_MODEL || 'z-ai/glm-5.2'  // most capable model in the stack (Tristan 2026-06-24)
 // The diagnose step (a fault-extraction over a big line-item list) is latency-sensitive and doesn't
 // need the deepest reasoning — a faster model avoids the GLM-5.2 reasoning-token timeout squeeze.
-const DIAGNOSE_MODEL = process.env.DIAGNOSE_MODEL || 'x-ai/grok-4.3'
+const DIAGNOSE_MODEL = process.env.DIAGNOSE_MODEL || 'x-ai/grok-4.5'
 // How far the deterministic number may stray from the LLM benchmark before we flag.
 // Tristan 2026-06-25: tighten the ACTIONABLE tolerance — a >20% delta on any line/output is a
 // warning the engine has to do something about (route to source rule + fix), not a pass. WARN at

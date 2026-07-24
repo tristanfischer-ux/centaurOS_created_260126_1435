@@ -46,7 +46,7 @@
  *   npx tsx scripts/author-blender-scene.tsx <state.json> [--out <dir>]
  *
  * Env:
- *   BLENDER_AUTHOR_MODEL     (default openai/gpt-5.5 — same as geom-gen)
+ *   BLENDER_AUTHOR_MODEL     (default openai/gpt-5.6-sol — same as geom-gen; 2026-07-24 refresh)
  *   BLENDER_AUTHOR_FALLBACK  (default google/gemini-3.5-flash; the pipeline
  *                             is Anthropic-free — do not add Claude models)
  *   BLENDER_BIN              (default /Applications/Blender.app/.../Blender)
@@ -59,7 +59,7 @@ import Database from 'better-sqlite3'
 
 const TEMPLATES_DIR = resolve(__dirname, 'blender-templates')
 const BLENDER = process.env.BLENDER_BIN || '/Applications/Blender.app/Contents/MacOS/Blender'
-const AUTHOR_MODEL = process.env.BLENDER_AUTHOR_MODEL || 'openai/gpt-5.5'
+const AUTHOR_MODEL = process.env.BLENDER_AUTHOR_MODEL || 'openai/gpt-5.6-sol'
 const AUTHOR_FALLBACK = process.env.BLENDER_AUTHOR_FALLBACK || 'google/gemini-3.5-flash'
 const MAX_ITERATIONS = 4 // G3: hard cap, then honest fallback
 const MAX_LLM_CALLS = 6  // cost guard (iterations + fallback retries)

@@ -37,7 +37,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_MODEL = os.environ.get("REDTEAM_MODEL", "x-ai/grok-4.3")
+DEFAULT_MODEL = os.environ.get("REDTEAM_MODEL", "x-ai/grok-4.5")
 
 
 def _key(name: str) -> str:

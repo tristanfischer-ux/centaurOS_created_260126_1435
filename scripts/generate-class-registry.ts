@@ -98,7 +98,7 @@ export const GENERATOR_PROMPT_VERSION = '2026-05-18-v1'
  * emits clean JSON when asked. Cap is one Grok call per generation per the
  * dispatch cost constraint.
  */
-export const GENERATOR_MODEL = 'x-ai/grok-4.3'
+export const GENERATOR_MODEL = 'x-ai/grok-4.5'
 
 /**
  * Curated classes the engine already covers. Used for the "alias check" step
