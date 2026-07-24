@@ -123,3 +123,26 @@ are kill-with-numbers entries so the record shows they were considered.
 5. **Final deliverable** — report v5 gains §12 "Optimisation campaign" (scoreboard +
    winner drawings + updated 3D render), Excel gains the winner's parameter set as a new
    input column, council review before it goes to Tony. Same zip pipeline.
+
+---
+
+## PHASE GATE — batches 1+2 + re-centre (2026-07-24 evening)
+
+**KILLED: V2 relaxed-gap-40.** The basin check exposed batch 2's "5.9 g" as a mirage —
+at the as-drawn registration the gap-40 stack has only ONE detent basin per pitch
+(not a stepper); the 3-basin registration (exact ⅓) gives only 3.6–4.3 g. Gap 40 µm
+honestly fails the 5 g spec at every magnet length tried. A gap-30 middle point is
+the remaining question, queued behind the winners.
+
+**WINNER (OPTIMISED-SET candidate): duty 0.40 × translator slots 1.5× × gap 20 µm.**
+3 basins on BOTH registrations at every Pm 0.15–0.50; detent grows monotonically with
+magnet length (no plateau yet): Pm 0.50 → 14.4 mN drawn / 10.7 exact on a 106 mg
+translator = **13.8 g / 10.2 g** (FIXED design was 5.0/3.8). Drive at 1.8 A ×1.75.
+d.45 variant is a near-tie on detent, weaker on drive — d.40 preferred for Tony's
+force-per-watt objective. Not yet stacked: stator slots 2× (+≈5%), N52 (force ≈ ∝Br²
+→ ≈1.5×): the 20–30 g ambition now plausibly reachable with a SINGLE 3-pole group
+(≈16–21 g) — to be verified, next batch.
+
+**Open before OPTIMISED SET freezes:** tip/bridge |B| probes at Pm 0.5 + high drive
+(saturation check); sslot-2× + N52 stack run; gap-30 test; then full Ic*/scorecard +
+report v5 fold-in per plan Phase 5.
