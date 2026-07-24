@@ -237,6 +237,67 @@ def pack_interior(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=3.0, wall_mm=6
     return pos
 
 
+def _skyline_pack(items, fw, gap, y_front, floor_z):
+    """TIGHT 2D pack (skyline bottom-left, 2026-07-24 — Tristan: 'all similar devices I have
+    seen are tightly packed'). Packs rectangles into a fixed WIDTH `fw`, growing DEPTH (+y from
+    `y_front`) to the minimum — denser than shelf-packing (which wastes the space under short
+    parts in each row). Long side runs along +x. Returns (pos{tag:(cx,cy,cz)}, rot{tag:bool},
+    used_depth). Deterministic (stable sort)."""
+    oriented = []
+    for p in items:
+        w, d, h = p["dims"]
+        r = d > w
+        oriented.append((p, max(w, d), min(w, d), h, r))
+    oriented.sort(key=lambda t: (-(t[1] * t[2]), -t[2], t[0]["tag"]))   # biggest area first
+    sky = [[-fw / 2.0, fw / 2.0, y_front]]     # segments [x0, x1, y_top]
+    pos = {}; rot = {}; used = y_front
+    for p, w, d, h, r in oriented:
+        w = min(w, fw)
+        # candidate left-edges: every skyline segment start (+ its right-minus-w)
+        cands = set([-fw / 2.0])
+        for s in sky:
+            cands.add(s[0])
+            cands.add(s[1] - w)
+        best = None                            # (y_top, x0)
+        for xc in sorted(cands):
+            if xc < -fw / 2.0 - 1e-6 or xc + w > fw / 2.0 + 1e-6:
+                continue
+            y = max((s[2] for s in sky if not (s[1] <= xc + 1e-9 or s[0] >= xc + w - 1e-9)),
+                    default=y_front)
+            if best is None or y < best[0] - 1e-9 or (abs(y - best[0]) < 1e-9 and xc < best[1]):
+                best = (y, xc)
+        if best is None:                       # too wide for the bin — force full width
+            best = (max(s[2] for s in sky), -fw / 2.0)
+        y0, x0 = best
+        cx = x0 + w / 2.0
+        cy = y0 + d / 2.0
+        pos[p["tag"]] = (round(cx, 2), round(cy, 2), round(floor_z + h / 2.0, 2))
+        rot[p["tag"]] = r
+        used = max(used, y0 + d + gap)
+        # raise the skyline over [x0, x0+w] to y0+d+gap
+        top = y0 + d + gap
+        new = []
+        for s in sky:
+            if s[1] <= x0 + 1e-9 or s[0] >= x0 + w - 1e-9:
+                new.append(s)                  # untouched
+                continue
+            if s[0] < x0:
+                new.append([s[0], x0, s[2]])   # left remainder
+            if s[1] > x0 + w:
+                new.append([x0 + w, s[1], s[2]])  # right remainder
+        new.append([x0, x0 + w, top])
+        new.sort()
+        # merge touching same-height segments
+        merged = [new[0]]
+        for s in new[1:]:
+            if abs(s[2] - merged[-1][2]) < 1e-6 and abs(s[0] - merged[-1][1]) < 1e-6:
+                merged[-1][1] = s[1]
+            else:
+                merged.append(s)
+        sky = merged
+    return pos, rot, used
+
+
 def _is_board(name: str) -> bool:
     """A flat circuit board that can stand VERTICALLY against a wall (Tristan 2026-07-24:
     'no reason PCBs + other components can't be vertically aligned')."""
@@ -254,50 +315,64 @@ def pack_interior_3d(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=4.0, wall_m
     Deterministic; 3D-clash-free by construction (verify with count_clashes)."""
     floor_z = base_z_mm + wall_mm
     fw = iw_mm - 2 * wall_mm
-    fd = idep_mm - 2 * wall_mm
     fasteners = [p for p in parts if _is_fastener(p["name"])]
     rest = [p for p in parts if not _is_fastener(p["name"])]
     boards = [p for p in rest if _is_board(p["name"])]
     floor = [p for p in rest if p not in boards]
     pos = {}; world = {}; orient = {}; rot = {}
 
-    # 1. VERTICAL boards along the back wall. A board (w×d×h, h thin) stands so its w×d face is
-    #    vertical → world extents (w, h, d): w along x, thin h into the room (y), d up (z).
-    strip_y = 0.0
-    x = -fw / 2 + gap_mm
-    for p in list(boards):
-        w, d, h = p["dims"]
-        vh = min(d, ih_mm - gap_mm)                 # the board's deep dim becomes vertical height
-        vy = max(2.0, min(h, w, d))                 # thinnest dim = thickness into the room
-        if x + w > fw / 2 - gap_mm:                 # no lateral room for another board → floor it
+    # which boards actually FIT side-by-side on the back wall (cumulative width ≤ fw)? overflow
+    # boards fall to the floor pack. Vertical board world extents = (w, thin, d-up).
+    fit_boards = []
+    _bx = -fw / 2 + gap_mm
+    for p in boards:
+        w = p["dims"][0]
+        if _bx + w <= fw / 2 - gap_mm:
+            fit_boards.append(p)
+            _bx += w + gap_mm
+        else:
             floor.append(p)
-            continue
+    strip_y = max((max(2.0, min(p["dims"])) for p in fit_boards), default=0.0)
+
+    # 1. FLOOR — TIGHT skyline pack from y=0 growing +y; its natural depth sets the box, so the
+    #    body HUGS the contents (Tristan: real instruments are tightly packed). No forced target.
+    fpos, frot, used_floor = _skyline_pack(floor, fw, gap_mm, 0.0, floor_z)
+    for p in floor:
+        if p["tag"] in fpos:
+            pos[p["tag"]] = fpos[p["tag"]]
+            rot[p["tag"]] = frot.get(p["tag"], False)
+            orient[p["tag"]] = "flat"
+
+    # 2. VERTICAL boards on the back wall, immediately BEHIND the floor pack (not a fixed wall).
+    board_y0 = used_floor + gap_mm
+    x = -fw / 2 + gap_mm
+    for p in fit_boards:
+        w, d, h = p["dims"]
+        vh = min(d, ih_mm - gap_mm)
+        vy = max(2.0, min(h, w, d))
         cx = x + w / 2
-        cy = fd / 2 - vy / 2 - gap_mm               # flush against the back wall
+        cy = board_y0 + vy / 2
         cz = floor_z + vh / 2
         pos[p["tag"]] = (round(cx, 2), round(cy, 2), round(cz, 2))
         world[p["tag"]] = (round(w, 1), round(vy, 1), round(vh, 1))
         orient[p["tag"]] = "vertical_back"
         x += w + gap_mm
-        strip_y = max(strip_y, vy)
 
-    # 2. FLOOR parts in the front region (depth reduced + shifted forward to clear the back strip)
-    front_fd = fd - strip_y - gap_mm if strip_y else fd
-    fpos, _ztop, _ = _shelf_pack(floor, fw, front_fd, floor_z, gap_mm)
-    frot = fpos.pop("__rot__", {})
-    y_shift = -(strip_y + gap_mm) / 2.0 if strip_y else 0.0
-    for p in floor:
-        if p["tag"] in fpos:
-            cx, cy, cz = fpos[p["tag"]]
-            pos[p["tag"]] = (cx, round(cy + y_shift, 2), cz)
-            rot[p["tag"]] = frot.get(p["tag"], False)
-            orient[p["tag"]] = "flat"
+    # 3. total depth = floor depth + board strip; RECENTRE the whole pack at the origin so the
+    #    post-placement resize sizes a symmetric body around it.
+    d_tot = used_floor + (gap_mm + strip_y if fit_boards else 0.0)
+    y_ctr = d_tot / 2.0
+    for tag in list(pos):
+        if tag.startswith("__"):
+            continue
+        c = pos[tag]
+        pos[tag] = (c[0], round(c[1] - y_ctr, 2), c[2])
 
-    # 3. fasteners near the front-left corner
+    # 4. fasteners tucked at the front-left corner (post-recentre frame)
     fx = -fw / 2 + gap_mm
     for p in fasteners:
         w, d, h = p["dims"]
-        pos[p["tag"]] = (round(fx + w / 2, 2), round(-fd / 2 + d, 2), round(floor_z + h / 2, 2))
+        pos[p["tag"]] = (round(fx + w / 2, 2), round(-y_ctr + d, 2), round(floor_z + h / 2, 2))
         fx += w + gap_mm
 
     pos["__rot__"] = rot
