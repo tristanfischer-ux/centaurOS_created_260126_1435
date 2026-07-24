@@ -12,7 +12,7 @@
  */
 
 import { registerTool } from '../registry'
-import type { Tool, ToolResult } from '../types'
+import type { Provenance, Tool, ToolResult } from '../types'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
 
@@ -39,7 +39,7 @@ export const magneticsCoilRlTool: Tool<any, any> = {
       timeout: 60_000,
     })
     const duration_ms = Date.now() - t0
-    const provenance = {
+    const provenance: Provenance = {
       source: 'tool:magnetics:coil-rl-risetime',
       tool_id: 'magnetics:coil-rl-risetime',
       tool_version: '1.0.0',

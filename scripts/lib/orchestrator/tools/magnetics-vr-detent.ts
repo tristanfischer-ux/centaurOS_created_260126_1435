@@ -12,7 +12,7 @@
  */
 
 import { registerTool } from '../registry'
-import type { Tool, ToolResult } from '../types'
+import type { Provenance, Tool, ToolResult } from '../types'
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
 
@@ -39,7 +39,7 @@ export const magneticsVrDetentTool: Tool<any, any> = {
       timeout: 60_000,
     })
     const duration_ms = Date.now() - t0
-    const provenance = {
+    const provenance: Provenance = {
       source: 'tool:magnetics:vr-detent-force',
       tool_id: 'magnetics:vr-detent-force',
       tool_version: '1.0.0',
