@@ -405,21 +405,21 @@ note("Manufacture note: at demo scale the lattice is conventional (bonded/folded
 banner("12 · DRIVE ELECTRONICS (per report §9.5; artefact drive-electronics.json)")
 note("UNIPOLAR drive (council-corrected): direction comes from the phase SEQUENCE, so each coil "
      "needs ONE low-side FET + clamp (72/tile) — no H-bridges. The buck RAIL VOLTAGE is the "
-     "current control (resistive coil, τ ≈ 1.1 µs): 1.15 V → 1.8 A step, 2.0 V → 3.35 A full "
-     "drive. TWO REGIMES — never mix step-energy with full-drive power. Idle power is ZERO. "
+     "current control (resistive coil, τ ≈ 1.1 µs): 1.07 V → 1.8 A step, 2.0 V → 3.35 A full "
+     "drive (total path 0.60 Ω). TWO REGIMES — never mix. Idle power is ZERO. "
      "Stack: aperture PCB (holes + pads + per-coil FETs) + driver PCB (burst-rated buck, MCU).")
 head()
-inp("vrail", "Buck rail voltage", 2.0, "V", "DAC-set 0.8–2.1 V; sets the coil current (V/R)")
-inp("vdrop", "Driver + trace drop", 0.15, "V", "indicative at 3.35 A")
+inp("vrail", "Buck rail voltage", 2.0, "V", "DAC-set 0.8–2.1 V; current = V/(rc+rext)")
+inp("rext", "FET + trace path resistance", 0.045, "Ω", "15 mΩ FET + 30 mΩ trace/web (sol-consistent)")
 inp("npar", "Cells stepped in parallel", 8, "-", "driver-board sizing knob")
 inp("nstp", "Average steps per re-point", 10, "-", "assumption — depends on the phase map")
 inp("tstp", "Time per completed step", 4, "ms", "1.5 ms pulse + settle (report §4.4 upper)")
 inp("napc", "Cells in a 10 cm aperture", 1093, "-", "100×100 mm / 9.15 mm² tiling area")
 der("irail", "Rail current, FULL-drive burst", "={npar}*{Ix}", "A", "n·Ic*", 8 * 3.35, "")
-der("burst", "Pulse power, FULL-drive (worst case)", "={npar}*{Ix}*({Ix}*{rc}+{vdrop})", "W",
-    "n·Ic*·(Ic*·R+drop)", 8 * 3.35 * (3.35 * 0.5518 + 0.15), "53.6 W at 8-parallel; ×0.375 duty ⇒ ≈20 W avg")
-der("bstep", "Pulse power, STEPPING", "={npar}*{Id}*({Id}*{rc}+{vdrop})", "W",
-    "n·Id·(Id·R+drop)", 8 * 1.8 * (1.8 * 0.5518 + 0.15), "16.4 W at 8-parallel; ≈6 W avg over a re-point")
+der("burst", "Pulse power, FULL-drive (worst case)", "={npar}*{Ix}^2*({rc}+{rext})", "W",
+    "n·Ic*²·(Rc+Rext)", 8 * 3.35**2 * 0.5968, "53.6 W at 8-parallel; ×0.375 duty ⇒ ≈20 W avg")
+der("bstep", "Pulse power, STEPPING", "={npar}*{Id}^2*({rc}+{rext})", "W",
+    "n·Id²·(Rc+Rext)", 8 * 1.8**2 * 0.5968, "15.5 W at 8-parallel; ≈5.8 W avg over a re-point")
 der("tilet", "24-cell tile re-point time", "=CEILING({csub}/{npar},1)*{nstp}*{tstp}/1000", "s",
     "⌈cells/n⌉·steps·t", math.ceil(24 / 8) * 10 * 4 / 1000, "")
 der("tilee", "24-cell tile re-point energy", "={csub}*{nstp}*{es}/1000", "J", "cells·steps·E_step",

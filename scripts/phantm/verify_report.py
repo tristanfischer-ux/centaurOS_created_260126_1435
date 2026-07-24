@@ -216,6 +216,8 @@ check("λg @70 = 6.651", abs(bt[70]["lamg_mm"] - 6.651) < 0.01)
 check("stroke need @60 = 5.542", abs(bt[60]["stroke_need_mm"] - 5.542) < 0.01)
 check("single group covers 60 GHz", bt[60]["stroke_need_mm"] < 8.27)
 check("two-group fails 60, passes 70", bt[60]["stroke_need_mm"] > 3.7 > bt[70]["stroke_need_mm"])
+check("levels floor @75 = 18", bt[75]["phase_levels_per_2pi"] == 18)
+contains("sol round-2 fixes", "57.4–58.0 GHz", "≈67.2", "1.07 V", "0.60 Ω")
 check("phase/step @70 = 16.7°", abs(bt[70]["phase_per_ideal_step_deg"] - 16.7) < 0.15)
 contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
          "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz", "BELOW CUTOFF",
@@ -234,7 +236,7 @@ contains("proto sizing in report", "≈3.95 mm")
 de = json.load(open(os.path.join(OUT, "drive-electronics.json")))
 p8 = next(r for r in de["parallelism_trade"] if r["parallel_cells"] == 8)
 check("8-par FULL pulse 53.6 W", abs(p8["full_drive"]["pulse_w"] - 53.6) < 0.1)
-check("8-par STEP pulse 16.4 W", abs(p8["stepping"]["pulse_w"] - 16.4) < 0.1)
+check("8-par STEP pulse 15.4 W", abs(p8["stepping"]["pulse_w"] - 15.4) < 0.1)
 check("8-par rail 26.8 A (full)", abs(p8["full_drive"]["rail_a"] - 26.8) < 0.1)
 check("tile re-point 0.12 s", abs(p8["tile_repoint_s"] - 0.12) < 0.01)
 check("panel energy 29.3 J (step)", abs(de["aperture_10cm"]["energy_j_stepping"] - 29.3) < 0.1)
@@ -248,7 +250,7 @@ for f_ in ("drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
 check("cell aspect ≈52:1", abs(7.75 / 0.15 - 51.7) < 0.1)
 check("fc sensitivity 17 MHz/µm", abs(hx["cutoff"]["fc_ghz"] / 3.1 - 17.3) < 0.1)
 contains("§9.5 present", "9.5 CAD", "drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
-         "render-3d-hexcell.png", "53.6 W pulses", "16.4 W", "29.3 J", "UNIPOLAR",
+         "render-3d-hexcell.png", "53.6 W pulses", "15.4 W", "29.3 J", "UNIPOLAR",
          "≤5 mΩ", "10 × 10 cm panel", "rail voltage IS the current control")
 absent("rejected H-bridge architecture not presented as chosen",
        "so the phase bridges are full-H", "dual select-FET per cell (10–20 mΩ, negligible")

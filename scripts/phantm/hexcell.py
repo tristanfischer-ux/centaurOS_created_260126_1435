@@ -156,7 +156,7 @@ def main():
                "phase_per_ideal_step_deg":
                    round(math.degrees(4 * math.pi * 0.15467 / lg), 1) if lg else None,
                "phase_levels_per_2pi":
-                   round(lg / 2 / 0.15467, 1) if lg else None}
+                   int(lg / 2 / 0.15467) if lg else None}  # FLOOR: full levels
         rows.append(row)
     out = {
         "geometry": {"af_interior_mm": AF, "wall_mm": 0.15, "pitch_mm": 3.25,

@@ -333,14 +333,14 @@ def d6_pcb():
                      "clamp per coil (72/tile) — no H-bridges, no select-FET sneak "
                      "paths (council fix). Coils wired so + current AIDS the PM"),
         ("Rail", "5 V → buck 0.8–2.1 V DAC-set = the current control (resistive "
-                 "coil): 1.15 V→1.8 A step, 2.0 V→3.35 A full. Shared path ≤5 mΩ "
-                 "(star routing) or current error ≈7% at 8-parallel"),
+                 "coil): 1.07 V→1.8 A step, 2.0 V→3.35 A full (path 0.60 Ω = coil + FET/trace). "
+                 "Shared path ≤5 mΩ star-routed; force penalty per the FE curve"),
         ("Per coil", "0.552 Ω · τ 1.1 µs · pulse 1.5 ms · 2.7 mJ (step) / 9.3 mJ "
                      "(full) · flyback 3.4 µJ"),
-        ("Per 24-cell tile", "STEP: 0.65 J, 16.4 W pulses (≈6 W avg), 0.12 s @8-par "
-                             "· FULL: 2.2 J, 53.6 W pulses (≈20 W avg) · idle 0 W"),
-        ("10×10 cm panel", "≈1,093 cells · STEP 29.3 J (5.5 s @8-par, 0.72 s @64-par "
-                           "at 131 W pulses) · FULL 102 J (429 W pulses @64-par)"),
+        ("Per 24-cell tile", "STEP: 0.65 J coil/0.70 rail, 15.4 W pulses (≈5.8 W avg), "
+                             "0.12 s @8-par · FULL: 2.2/2.4 J, 53.6 W pulses (≈20 W avg) · idle 0 W"),
+        ("10×10 cm panel", "≈1,093 cells · STEP 29.3/31.6 J (5.5 s @8-par, 0.72 s @64-par "
+                           "at 123 W pulses) · FULL 102/110 J (429 W pulses @64-par)"),
         ("Control", "per-tile MCU, open-loop step counting into detents; hold-then-"
                     "release capture (§4.4); tiles daisy-chained (CAN/SPI); host sends "
                     "per-cell target depth map"),

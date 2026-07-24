@@ -18,9 +18,11 @@ import math
 RC = 0.552          # Ω per coil (report §8.5)
 I_STEP = 1.8        # A — stepping begins ≈1.4 A; 1.8 A default pulse
 I_FULL = 3.35       # A — FE full-drive point (2·Fd) — the WORST-CASE regime
-DRIVER_DROP = 0.15  # V — low-side FET + trace at these currents (indicative)
-V_RAIL_STEP = round(I_STEP * RC + DRIVER_DROP, 2)   # 1.14 V rail for stepping
-V_RAIL_FULL = round(I_FULL * RC + DRIVER_DROP, 2)   # 2.00 V rail for full drive
+R_EXT = 0.045       # Ω — FET (15 mΩ) + trace/web (30 mΩ) resistive path (sol fix:
+                    # a fixed 0.15 V "drop" implied 83 mΩ, inconsistent with the FETs)
+R_TOT = RC + R_EXT  # 0.597 Ω total path
+V_RAIL_STEP = round(I_STEP * R_TOT, 2)   # 1.07 V rail for stepping
+V_RAIL_FULL = round(I_FULL * R_TOT, 2)   # 2.00 V rail for full drive
 T_PULSE = 1.5e-3    # s
 T_STEP = 4e-3       # s per completed step incl. settle (report §4.4 upper)
 DUTY = T_PULSE / T_STEP             # 0.375 — pulses are 37.5% of step time
@@ -58,9 +60,16 @@ out = {
     "per_tile": {"cells": CELLS_TILE, "coils": CELLS_TILE * COILS_CELL,
                  "duty": DUTY,
                  "stepping": {"e_step_mj": round(E_STEP * 1e3, 2),
-                              "e_repoint_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP, 2)},
+                              "e_repoint_coil_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP, 2),
+                              "e_repoint_rail_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP
+                                                        * V_RAIL_STEP / (I_STEP * RC), 2)},
                  "full_drive": {"e_step_mj": round(E_STEP_FULL * 1e3, 2),
-                                "e_repoint_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP_FULL, 2)}},
+                                "e_repoint_coil_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP_FULL, 2),
+                                "e_repoint_rail_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP_FULL
+                                                          * V_RAIL_FULL / (I_FULL * RC), 2)},
+                 "bookkeeping_note": "coil figures are I²·R_coil·t; RAIL figures add the "
+                                     "FET/trace drop (council catch, grok-4.5) — supply "
+                                     "sizing must use the rail numbers"},
     "parallelism_trade": [],
     "aperture_10cm": {},
     "pcb": {
@@ -128,6 +137,10 @@ for n_par in (8, 64):
     }
 out["aperture_10cm"]["energy_j_stepping"] = round(N_CELLS_10CM * STEPS_REPOINT * E_STEP, 1)
 out["aperture_10cm"]["energy_j_full"] = round(N_CELLS_10CM * STEPS_REPOINT * E_STEP_FULL, 1)
+out["aperture_10cm"]["energy_j_stepping_rail"] = round(
+    N_CELLS_10CM * STEPS_REPOINT * E_STEP * V_RAIL_STEP / (I_STEP * RC), 1)
+out["aperture_10cm"]["energy_j_full_rail"] = round(
+    N_CELLS_10CM * STEPS_REPOINT * E_STEP_FULL * V_RAIL_FULL / (I_FULL * RC), 1)
 out["aperture_10cm"]["idle_w"] = 0.0
 
 # sanity gates
@@ -135,7 +148,7 @@ assert abs(E_STEP * 1e3 - 2.68) < 0.03
 assert abs(E_STEP_FULL * 1e3 - 9.29) < 0.05
 assert abs(I_FULL * RC - 1.85) < 0.01
 p8 = out["parallelism_trade"][3]
-assert abs(p8["stepping"]["pulse_w"] - 16.4) < 0.3
+assert abs(p8["stepping"]["pulse_w"] - 15.4) < 0.3
 assert abs(p8["full_drive"]["pulse_w"] - 53.6) < 0.5
 json.dump(out, open("out/drive-electronics.json", "w"), indent=1)
 print(f"8-parallel: {out['parallelism_trade'][3]}")

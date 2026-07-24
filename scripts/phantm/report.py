@@ -937,35 +937,43 @@ def main():
       "printed-and-metallised cell's effective dimensions and surface loss are "
       "Vlad's to confirm.")
     A("")
-    A("| f (GHz) | λ0 (mm) | λg (mm) | stroke need λg/2 | phase/step (154.7 µm) | levels per 2π |")
+    A("| f (GHz) | λ0 (mm) | λg (mm) | stroke need λg/2 | phase/step (154.7 µm) | full levels per 2π (⌊(λg/2)/step⌋) |")
     A("|---|---|---|---|---|---|")
     A("| 50 | 6.00 | — BELOW CUTOFF | — | — | — |")
     A("| 55 | 5.45 | 23.96 | 11.98 mm — exceeds cell AND translator | 4.6° | 77 (λg hypersensitive this close to cutoff — ±0.1% in λc moves it ≈±2%) |")
-    A("| 60 | 5.00 | 11.08 | 5.54 mm | 10.0° | 36 |")
+    A("| 60 | 5.00 | 11.08 | 5.54 mm | 10.0° | 35 |")
     A("| 65 | 4.61 | 8.14 | 4.07 mm | 13.7° | 26 |")
     A("| 70 | 4.28 | 6.65 | 3.33 mm | 16.7° | 21 |")
-    A("| 75 | 4.00 | 5.71 | 2.86 mm | 19.5° | 19 |")
+    A("| 75 | 4.00 | 5.71 | 2.86 mm | 19.5° | 18 |")
     A("| 80 | 3.75 | 5.05 | 2.52 mm | 22.1° | 16 |")
-    A("| 85 | 3.53 | 4.54 | 2.27 mm | 24.5° | 15 |")
+    A("| 85 | 3.53 | 4.54 | 2.27 mm | 24.5° | 14 |")
     A("| 90 | 3.33 | 4.15 | 2.07 mm | 26.9° | 13 |")
     A("")
     A("![hexcell](fig-hexcell.png)")
     A("")
-    A("Three consequences, all new: **(a) this cell cannot operate at 50 GHz** (below "
-      "cutoff) and at the 55 GHz prototyping frequency it is so dispersive that full-2π "
+    A("Three consequences, all new: **(a) 50 GHz is below the dominant-mode cutoff** — operation there is not "
+      "supported by this model (any evanescent/short-backed scheme needs full-wave "
+      "validation, Vlad) and at the 55 GHz prototyping frequency it is so dispersive that full-2π "
       "would need a 12 mm stroke — the U-band COTS prototype in the UKDI bid must be a "
       "LARGER cell, as that bid indeed implies. **(b) Full 2π is available from ≈57 GHz upward — and "
       "near the band edge the BINDING limit is the CELL DEPTH (7.75 mm of travel "
       "inside the guide), not the actuator (8.27 mm stroke, which exceeds the cell "
       "anyway; council catch, gpt-5.5)**: λg/2 = 7.75 mm at 56.9 GHz. The whole "
-      "60–90 GHz target band is covered with margin, and DEEPER cells (with the "
-      "actuator's spare stroke) are the lever if Tony ever wants below ≈57 GHz. "
+      "60–90 GHz target band is covered with margin. Two refinements from the "
+      "second council pass (grok-4.5): the actuator's spare stroke is only "
+      "0.52 mm, so a deeper cell alone moves the edge merely 56.9 → ≈56.5 GHz — "
+      "going meaningfully below ≈57 GHz needs a LONGER TRANSLATOR (cheap: length "
+      "grows, nothing else changes) plus the deeper cell; and the usable travel "
+      "is really 7.75 mm MINUS the short-stack height and end margins (≈0.5–1 mm, "
+      "foil + standoff + nose), so the true edge sits nearer ≈57.4–58.0 GHz "
+      "(57.8 at 6.9 mm usable; sol recomputation) — the 60 GHz margin (5.54 of "
+      "≈6.9 usable mm) is untouched. "
       "Corollary for the UKDI bid's ≈55 GHz U-band prototype: scaling this cell so 55 GHz "
       "sits at the same operating point as 70 GHz does in production (f/fc = 1.307) gives "
       "an interior across-flats of **≈3.95 mm** and depth ≈9.9 mm (λg/2 = 4.23 mm at 55) — "
       "the unchanged actuator fits it with even more room. "
       "**(c) The §0.3 force-ladder's two-group "
-      "option (stroke 3.7 mm) only covers ≥67 GHz** — doubling the poles for 10 g "
+      "option (stroke 3.7 mm) only covers ≥≈67.2 GHz** — doubling the poles for 10 g "
       "trades away 60–67 GHz. Force and band coverage are coupled through stroke; "
       "any force upgrade must be checked against the lowest operating frequency.")
     A("")
@@ -982,14 +990,15 @@ def main():
       "to quantify) — so 'shielded' is a first-order claim pending that number, "
       "not an absolute (council catch, grok). The 1.708 × 2.634 mm envelope "
       "fitting the 3.1 mm interior (§8.9, 0.35 mm width margin) remains the "
-      "make-or-break packaging fact — and it fits.")
+      "make-or-break packaging fact — and it fits (0.35 mm is the WIDTH margin at "
+      "the actuator's 2.634 mm height; the height margin itself is 0.47 mm).")
     A("2. **Stroke budget** — table above: single-group covers the band (cell "
       "depth binding); the two-group option (§0.3's force-doubler: TWO 3-pole "
       "stator groups on one translator, halving usable stroke to ≈3.7 mm) is a "
       "≥67 GHz option only.")
     A("3. **Phase resolution** — 16.7°/step at 70 GHz in-guide (the free-space 26° "
       "of §8.7 was the upper bound). FE step unevenness (172.6/146.1/145.3 µm at "
-      "the as-drawn registration) maps to ≈±1.9° of per-step jitter at 70 GHz; the "
+      "the as-drawn registration) maps to −1.0/+1.9° of per-step deviation at 70 GHz (asymmetric — the 172.6 µm step is the outlier); the "
       "exact-⅓ registration option (§4 F3 trade) makes steps uniform at 154.7 µm.")
     A("4. **Foil-to-wall clearance is an RF interface, not just a mechanical one.** "
       "The moving foil needs running clearance to the guide wall; that annular gap "
@@ -1006,7 +1015,7 @@ def main():
       "gpt-5.5).** 3 coils per cell ⇒ 72 per 24-hex tile; ≈10 steps per cell per "
       "re-point; 8 cells at a time (3 groups × 10 steps × ≈4 ms) re-points a tile "
       "in ≈0.12–0.15 s. STEPPING regime (1.8 A): 2.7 mJ/step, tile ≈0.65 J, "
-      "16.4 W during the 1.5 ms pulses (37% duty ⇒ ≈6 W averaged over the "
+      "15.4 W during the 1.5 ms pulses (37% duty ⇒ ≈5.8 W averaged over the "
       "re-point). WORST-CASE FULL-DRIVE regime (3.35 A): 9.3 mJ/step, tile "
       "≈2.2 J, 53.6 W pulses (≈20 W averaged). Comfortably inside the bid's "
       "mechatronic-nulling claims at ms-per-step; large-aperture re-point time is "
@@ -1016,7 +1025,7 @@ def main():
     A("")
     A("| # | Requirement | Owner | Value today |")
     A("|---|---|---|---|")
-    A("| 1 | Travel ≥ λg/2 at lowest f — cell depth AND stroke both bound it | actuator + cell | min(7.75 cell, 8.27 stroke) = 7.75 mm ≥ 5.54 mm @60 GHz ✓; cell depth is the binding edge (≈57 GHz); two-group stroke fails <67 GHz |")
+    A("| 1 | Travel ≥ λg/2 at lowest f — cell depth AND stroke both bound it | actuator + cell | usable ≈ 7.75 − short-stack/margins (≈0.5–1 mm) ≈ 6.9 mm ≥ 5.54 mm @60 GHz ✓; cell depth binds the edge (≈57.4–58.0 GHz); two-group stroke fails below ≈67.2 GHz |")
     A("| 2 | Fit inside 3.10 mm interior | actuator | 1.708 × 2.634 mm ✓ (width margin 0.35 mm) |")
     A("| 3 | Step size / uniformity | actuator | 154.7 µm ideal; FE 172.6/146.1/145.3 — registration choice, §4 F3 |")
     A("| 4 | Zero-power hold ≥ platform vibration | actuator + Tony spec | 5.0 g now; ladder to 20–30 g (§0.3) — vibration envelope needed |")
@@ -1057,18 +1066,19 @@ def main():
       "sign convention). Facts that do the heavy lifting (drive-electronics.json):")
     A("")
     A("- **The rail voltage IS the current control.** The coil is resistive at every "
-      "timescale that matters (τ = L/R ≈ 1.1 µs ≪ 1.5 ms pulse): rail ≈1.15 V "
-      "delivers the 1.8 A step, ≈2.0 V the 3.35 A full drive — no per-channel "
-      "current loops. The care this buys: rail-sharing across parallel cells needs "
+      "timescale that matters (τ = L/R ≈ 1.1 µs ≪ 1.5 ms pulse): the total path is resistive (0.552 Ω coil + ≈45 mΩ FET/trace = 0.60 Ω), so "
+      "rail ≈1.07 V delivers the 1.8 A step and 2.0 V the 3.35 A full drive — no "
+      "per-channel current loops. The care this buys: rail-sharing across parallel cells needs "
       "star/kelvin routing with ≤5 mΩ of shared path (26.8 A × 5 mΩ ≈ 7% current "
-      "error, and force goes as I² — council item, gemini-3.1), and coil warming "
+      "error; the force penalty follows the FE force–current curve — the PM bias "
+      "makes it between linear and quadratic — council items, gemini-3.1 + sol), and coil warming "
       "(+0.39%/K) trims current a few percent within a burst.")
     A("- **Idle power is zero** (the PM detent holds); the budget is re-pointing "
       "bursts, quoted per regime. STEPPING (1.8 A): tile 0.65 J, 16.4 W pulses / "
       "≈6 W average, 0.12 s at 8-parallel; a 10 × 10 cm panel (≈1,093 cells) "
       "29.3 J, 5.5 s at 8-parallel or 0.72 s at 64-parallel (131 W pulses). "
       "WORST-CASE FULL-DRIVE (3.35 A): tile 2.2 J, 53.6 W pulses / ≈20 W average; "
-      "panel 102 J, 429 W pulses at 64-parallel. The parallelism knob is a "
+      "panel 102 J coil / 110 J rail, 429 W pulses at 64-parallel. The parallelism knob is a "
       "driver-board sizing choice, not a physics limit.")
     A("")
     A("Control is deliberately dumb: per-tile MCU, open-loop step counting into the "
