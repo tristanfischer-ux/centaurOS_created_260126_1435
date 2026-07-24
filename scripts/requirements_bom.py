@@ -7631,10 +7631,14 @@ def assemble(out_dir: str):
         _pslib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
         if _pslib not in sys.path:
             sys.path.insert(0, _pslib)
-        from power_subsystem import augment_decomposition_with_power as _aug_pwr
+        from power_subsystem import (augment_decomposition_with_power as _aug_pwr,
+                                      augment_decomposition_with_chassis_harness as _aug_ch)
         _npwr = _aug_pwr(st)
         if _npwr:
             print(f"[requirements-bom] universal power subsystem: +{_npwr} load-sized part(s)")
+        _nch = _aug_ch(st)
+        if _nch:
+            print(f"[requirements-bom] chassis + wiring harness: +{_nch} rendered part(s) → BoM")
     except Exception as _pwe:  # noqa: BLE001 — never break the BoM on the augmentation
         print(f"[requirements-bom] power-subsystem augmentation skipped: {_pwe}")
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
@@ -7838,9 +7842,12 @@ def assemble(out_dir: str):
                 name = _word_requirement_name(w)
                 if not name:
                     continue                          # no identity at all — cannot emit an auditable requirement
-                if re.search(r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
-                             r"lifting point|nameplate|mounting hardware|earthing boss\b", name, re.I):
+                if (not w.get("_chassis_harness")) and re.search(
+                        r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
+                        r"lifting point|nameplate|mounting hardware|earthing boss\b", name, re.I):
                     continue                          # hardware detail — not a requirement line
+                    # NB the injected chassis/harness parts (_chassis_harness) are RENDERED
+                    # top-level assemblies, not incidental hardware — they must emit a BoM row.
                 md = _mods(w)
                 tag = tag_by_name.get(name) or "—"
                 # ── REQUIREMENT (what it must do) ──

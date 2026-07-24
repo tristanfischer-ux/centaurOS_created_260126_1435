@@ -244,6 +244,94 @@ def augment_decomposition_with_power(state: dict) -> int:
     return added
 
 
+# ── chassis + wiring-harness parts (rendered → MUST be in the BoM) ──────────────
+# Tristan 2026-07-24 ("all of these parts need to be in the BOM!!"): the sealed-instrument render
+# draws a chassis base plate, an internal wiring harness (the loom of the power/signal runs), and
+# the interior shelf decks + standoffs of the mounting frame. Those are REAL physical parts, so
+# they must be BoM line items or the render + the bill contradict each other. Universal — every
+# assembled device with a populated interior has a chassis + a harness. `_structural: True` marks
+# them so the interior PACKER skips them (they are drawn by the frame/harness code, not packed).
+_CHASSIS_HARNESS = [
+    {"name": "Chassis Base Plate", "character_id": "chassis_base_plate", "category": "structure",
+     "form": "aluminium mounting base plate — the interior parts bolt onto it",
+     "dims_mm": (200.0, 140.0, 3.0), "mpn_hint": "custom 3 mm 5052-Al plate"},
+    {"name": "Interior Mounting Frame", "character_id": "interior_mounting_frame", "category": "structure",
+     "form": "standoff pillars + raised shelf/mezzanine deck(s) the sub-assemblies mount on",
+     "dims_mm": (160.0, 120.0, 90.0), "mpn_hint": "custom sheet-metal / standoff frame kit"},
+    {"name": "Internal Wiring Harness", "character_id": "internal_wiring_harness", "category": "electrical",
+     "form": "loomed cable harness — the power + signal runs between the interior parts",
+     "dims_mm": (120.0, 40.0, 15.0), "mpn_hint": "custom loom, JST/Molex-terminated"},
+]
+
+
+def _make_chassis_word(part: dict) -> dict:
+    cid = part["character_id"]
+    return {
+        "id": f"{cid}_word",
+        "name_human": part["name"],
+        "content_character": {
+            "character_id": cid, "name_human": part["name"],
+            "function_radical_primary": "structure", "function_radical_secondary": None,
+            "material_radical_primary": None, "material_radical_secondary": None,
+        },
+        "modifier_characters": [
+            {"kind": "quantity", "value": "×1"},
+            {"kind": "form", "value": part["form"]},
+            {"kind": "part_number", "value": f"TBD (detailed design) — {part['mpn_hint']}"},
+            {"kind": "dimensions",
+             "value": f"{part['dims_mm'][0]:.0f}×{part['dims_mm'][1]:.0f}×{part['dims_mm'][2]:.0f} mm"},
+            {"kind": "lifecycle", "value": "Concept design — chassis/harness (rendered → BoM'd)"},
+            {"kind": "installation", "value": "Internal — the interior mounting + wiring structure"},
+        ],
+        "_chassis_harness": True, "_structural": True, "_category": part["category"],
+    }
+
+
+def augment_decomposition_with_chassis_harness(state: dict) -> int:
+    """Ensure the chassis base plate, mounting frame (standoffs + shelf decks) and internal wiring
+    harness — all RENDERED by the interior/frame/harness code — are BoM line items. Idempotent; only
+    for a device that has a populated physical interior (≥3 placed-ish physical parts). Returns count
+    added. `_structural: True` on the words tells the interior packer to skip placing them."""
+    md = state.get("moduleDecomposition") or {}
+    modules = md.get("modules") or []
+    if not modules:
+        return 0
+    present = set()
+    _n_phys = 0
+    for m in modules:
+        for s in m.get("sub_modules", []) or []:
+            for w in s.get("words", []) or []:
+                cc = (w.get("content_character") or {}).get("character_id")
+                if cc:
+                    present.add(str(cc))
+                _n_phys += 1
+    if _n_phys < 3:
+        return 0   # not a populated assembly — no chassis/harness to render or bill
+    target = None
+    for m in modules:
+        for s in m.get("sub_modules", []) or []:
+            sid = str(s.get("sub_module_id") or s.get("id") or "")
+            if re.search(r"structure|chassis|enclos|frame|containment", sid, re.I):
+                target = s
+                break
+        if target:
+            break
+    if target is None:
+        first = modules[0]
+        subs = first.setdefault("sub_modules", [])
+        if not subs:
+            subs.append({"sub_module_id": "structure_containment", "words": []})
+        target = subs[0]
+    target.setdefault("words", [])
+    added = 0
+    for part in _CHASSIS_HARNESS:
+        if part["character_id"] in present:
+            continue
+        target["words"].append(_make_chassis_word(part))
+        added += 1
+    return added
+
+
 def _selftest():
     # tiering
     assert select_power_subsystem(0) == []
@@ -283,8 +371,36 @@ def _selftest():
     passive = {"engineeringContract": {"shared_quantities": {}}, "moduleDecomposition": {"modules": [{"sub_modules": []}]}}
     assert augment_decomposition_with_power(passive) == 0
     assert power_subsystem_ok(passive)["applicable"] is False
+
+    # --- chassis + wiring harness proveCatch -----------------------------------------
+    # A POPULATED assembly (≥3 physical parts) that is RENDERED with a base plate, mounting
+    # frame + wiring loom but has NONE of them as BoM words → the three structural parts get
+    # added, marked _structural (so the packer skips them), idempotent, and skipped when the
+    # interior is empty (<3 parts) or the parts are already present.
+    def _asm(nparts):
+        ws = [{"name_human": f"Part {i}", "content_character": {"character_id": f"part_{i}"},
+               "modifier_characters": []} for i in range(nparts)]
+        return {"moduleDecomposition": {"modules": [
+            {"sub_modules": [{"sub_module_id": "structure_containment", "words": ws}]}]}}
+    empty = _asm(1)
+    assert augment_decomposition_with_chassis_harness(empty) == 0, "empty interior → no chassis"
+    full = _asm(5)
+    nc = augment_decomposition_with_chassis_harness(full)
+    assert nc == 3, f"expected 3 chassis/harness parts, got {nc}"
+    added_ws = full["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"]
+    struct = [w for w in added_ws if w.get("_structural")]
+    assert len(struct) == 3 and all(w.get("_chassis_harness") for w in struct), struct
+    names = {w["name_human"] for w in struct}
+    assert names == {"Chassis Base Plate", "Interior Mounting Frame", "Internal Wiring Harness"}, names
+    # every chassis word carries a part_number + dimensions modifier → it renders as a real BoM line
+    for w in struct:
+        kinds = {m["kind"] for m in w["modifier_characters"]}
+        assert {"part_number", "dimensions", "quantity"} <= kinds, kinds
+    assert augment_decomposition_with_chassis_harness(full) == 0, "chassis augment not idempotent"
+
     print("power_subsystem _selftest: OK (tiering 6/35/180/600 W; organoid→60W external brick; "
-          "gate catches supply<load; augment idempotent; unpowered N/A)")
+          "gate catches supply<load; augment idempotent; unpowered N/A; "
+          "chassis+harness→3 BoM parts, _structural-flagged, idempotent, empty-interior skip)")
 
 
 if __name__ == "__main__":

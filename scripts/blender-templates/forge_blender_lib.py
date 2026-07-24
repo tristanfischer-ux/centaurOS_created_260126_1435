@@ -825,6 +825,40 @@ def add_pipe(name, points, radius, material, module=None, module_objects=None, b
     return obj
 
 
+def add_smooth_pipe(name, points, radius, material, module=None, module_objects=None,
+                    bevel_segments=6, resolution=12):
+    """SMOOTH curved tube (2026-07-24, Tristan "make sure tubing has decent curves, not right
+    angles"). Same as add_pipe but a NURBS spline interpolates SMOOTHLY through the control points
+    instead of straight POLY segments with hard corners. `points` = list of (x,y,z); pass a via/sag
+    point between the two real endpoints for a gentle arc."""
+    if len(points) < 2:
+        return None
+    curve_data = bpy.data.curves.new(name + "_curve", type="CURVE")
+    curve_data.dimensions = "3D"
+    curve_data.bevel_depth = radius
+    curve_data.bevel_resolution = bevel_segments
+    curve_data.resolution_u = resolution
+    spline = curve_data.splines.new("NURBS")
+    spline.points.add(len(points) - 1)
+    for i, (x, y, z) in enumerate(points):
+        spline.points[i].co = (x, y, z, 1.0)
+    spline.use_endpoint_u = True        # pass through the first + last control points (real endpoints)
+    try:
+        spline.order_u = min(4, len(points))
+    except Exception:
+        pass
+    obj = bpy.data.objects.new(name, curve_data)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.ops.object.convert(target="MESH")
+    if module and module_objects is not None:
+        module_objects[module].append(obj)
+    return obj
+
+
 def add_compound_motor(name, location, body_radius, body_length, material_body,
                        material_shaft=None, material_flange=None,
                        module=None, module_objects=None, rotation=(0, 0, 0)):

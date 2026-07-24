@@ -2004,11 +2004,16 @@ def extract_parts(state):
         _libp = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "lib")
         if _libp not in _sys.path:
             _sys.path.insert(0, _libp)
-        from power_subsystem import augment_decomposition_with_power as _aug
+        from power_subsystem import (augment_decomposition_with_power as _aug,
+                                      augment_decomposition_with_chassis_harness as _augch)
         _n = _aug(state)
         if _n:
             print(f"[univ][power] universal power subsystem: +{_n} part(s) "
                   f"(load-sized inlet + supply) injected into the decomposition")
+        _nc = _augch(state)
+        if _nc:
+            print(f"[univ][power] chassis + wiring-harness: +{_nc} rendered part(s) "
+                  f"(base plate / mounting frame / wiring loom) injected into the decomposition → BoM")
     except Exception as _pe:  # noqa: BLE001 — never break the render on the augmentation
         print(f"[univ][power] power-subsystem augmentation skipped: {_pe}")
     modules = state.get("moduleDecomposition", {}).get("modules", [])
@@ -16461,10 +16466,18 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     # interior (it stays in the decomposition → the BoM still costs it). Keyed on the noun.
     _EXTERNAL_ACCESSORY_RE = re.compile(
         r"external\s+.*adapter|power\s+adapter|wall\s+adapter|line\s+cord|mains\s+lead", re.I)
+    # STRUCTURAL / HARNESS parts (chassis base plate, mounting frame, wiring loom) are DRAWN by the
+    # frame + ledger-harness code — not packed as components (else double-rendered). They stay in the
+    # decomposition → the BoM costs them (Tristan "all of these parts need to be in the BOM").
+    _STRUCTURAL_RE = re.compile(
+        r"chassis base plate|mounting frame|wiring harness|wiring loom|shelf deck|base plate", re.I)
 
     items = []
     for p in parts:
         nm = str(getattr(p, "name", ""))
+        if _STRUCTURAL_RE.search(nm):
+            p.placed_xyz_mm = None   # drawn by the frame/harness pass, not the component packer
+            continue
         if not nm or _SKIN_RE.search(nm):
             # the enclosure BODY is the container, not an interior part to CONTAIN — and
             # its stale placed_xyz_mm (a bench-elevated datum, e.g. z=650 vs our DECK_Z_MM
@@ -16597,57 +16610,9 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
                     3.0 * fl.MM, so_h * fl.MM, plate_mat,
                     module=story_mod, module_objects=MO)
 
-    # 6. WIRING HARNESS + TUBING (Tristan 2026-07-24: "i cant see wires or pipes"). Fills the
-    #    interior with the REAL runs: a power rail along the base with a drop to every powered
-    #    part, thin signal wires, and translucent TUBING between the fluid parts (pump ↔ vessel ↔
-    #    filter). Universal — keyed on the function family, no product table. u_se_cutaway_cue_int_
-    #    prefix → shown on the ghost/cutaway, hidden on the closed exterior views.
-    if _harness_nodes and xs and ys:
-        _MM = fl.MM
-        _pwr_mat = fl.make_mat("m_se_int_pwr_wire", fl._to_linear((0.72, 0.14, 0.11)),
-                               metallic=0.1, roughness=0.5)                     # red power wire
-        _sig_mat = fl.make_mat("m_se_int_sig_wire", fl._to_linear((0.15, 0.16, 0.19)),
-                               metallic=0.1, roughness=0.55)                    # dark signal wire
-        _tube_mat = fl.make_mat("m_se_int_tube", fl._to_linear((0.55, 0.75, 0.88)),
-                                metallic=0.0, roughness=0.12, alpha=0.5, ior=1.4)  # clear-blue tubing
-        _bus_y = min(ys) + 5.0
-        _bus_z = floor_z + 5.0
-        fl.add_cyl("u_se_cutaway_cue_int_powerbus",
-                   (fcx * _MM, _bus_y * _MM, _bus_z * _MM),
-                   2.6 * _MM, (fw * 0.92) * _MM, _pwr_mat,
-                   rotation=(0.0, math.radians(90), 0.0),
-                   module=story_mod, module_objects=MO)
-        _POWERED = {"motor", "pump", "fan", "thermal", "pcb", "component", "led",
-                    "connector", "sensor", "panel", "valve"}
-        _HEAVY = {"motor", "pump", "fan", "thermal"}
-        _nw = 0
-        for _i, (_nm, _c, _fam) in enumerate(_harness_nodes):
-            if _fam not in _POWERED:
-                continue
-            # an L-drop: down from the part, then across to the bus (a real loomed wire)
-            _pts = [(_c[0] * _MM, _c[1] * _MM, _c[2] * _MM),
-                    (_c[0] * _MM, _c[1] * _MM, _bus_z * _MM),
-                    (_c[0] * _MM, _bus_y * _MM, _bus_z * _MM)]
-            fl.add_pipe(f"u_se_cutaway_cue_int_wire_{_i}", _pts,
-                        1.1 * _MM, _pwr_mat if _fam in _HEAVY else _sig_mat,
-                        module=story_mod, module_objects=MO)
-            _nw += 1
-        # tubing between the fluid parts, chained pump → vessel → filter/tubing (a fluid loop)
-        _fluid = [(_nm, _c) for _nm, _c, _fam in _harness_nodes
-                  if _fam in {"vessel", "pump", "tubing", "valve", "filter"}]
-        _fluid.sort(key=lambda t: t[1][0])   # left→right so the tube doesn't cross the whole box
-        _nt = 0
-        for _i in range(len(_fluid) - 1):
-            (_n0, _c0), (_n1, _c1) = _fluid[_i], _fluid[_i + 1]
-            _mid = ((_c0[0] + _c1[0]) / 2 * _MM, (_c0[1] + _c1[1]) / 2 * _MM,
-                    (max(_c0[2], _c1[2]) + 14) * _MM)                          # arc up over the gap
-            _tp = [(_c0[0] * _MM, _c0[1] * _MM, _c0[2] * _MM), _mid,
-                   (_c1[0] * _MM, _c1[1] * _MM, _c1[2] * _MM)]
-            fl.add_pipe(f"u_se_cutaway_cue_int_tube_{_i}", _tp, 2.4 * _MM, _tube_mat,
-                        module=story_mod, module_objects=MO)
-            _nt += 1
-        print(f"[univ][sealed][interior] harness: power rail + {_nw} wire drop(s) + "
-              f"{_nt} tubing run(s) between fluid parts")
+    # NOTE: the WIRING HARNESS + TUBING is drawn LATER (after the connection ledger is finalised),
+    # by _draw_ledger_harness — so every conduit joins two REAL connected parts (from the authored
+    # from_part→to_part edges), never a fabricated bus or a position-guessed run. See ~L24390.
 
     # DE-DUPLICATE: the bespoke per-product interior story (u_se_le_pcb / stir_motor /
     # heater_block / cell / chip, built earlier by _place_lab_electronics_interior_layout)
@@ -16691,6 +16656,82 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
               f"{_zr[-1][0]:.0f} ({_zr[-1][1]}:{_zr[-1][2]})]  "
               f"OTHERs: {[(round(z),n) for z,t,n in _zr if t=='OTHER'][:6]}")
     return n_vis
+
+
+def _draw_ledger_harness(topology, parts, MO):
+    """Draw the interior wiring HARNESS + TUBING from the REAL connection ledger — EVERY conduit
+    joins two REAL placed parts (an authored from_part→to_part edge). No conduit runs to a
+    fabricated bus or a position-guessed neighbour, and an edge whose endpoint is not a placed
+    interior part is SKIPPED — so there are no dangling / incomplete runs (Tristan 2026-07-24:
+    "guarantee ... no random pipes/tubing/wires ... not going anywhere"). Smooth NURBS curves
+    (add_smooth_pipe) — no right angles. Coloured by service: water/thermal → translucent blue
+    TUBING, power → red wire, signal → dark wire. Instruments only. Returns the conduit count."""
+    if not _IS_INSTRUMENT_DEVICE or not hasattr(bpy, "data"):
+        return 0
+    try:
+        import connection_ledger as _cl
+        _norm = _cl._norm_name
+        _svc_of = _cl._service_of
+    except Exception:  # pragma: no cover
+        _norm = lambda s: re.sub(r"[^a-z0-9]", "", str(s or "").lower())
+        _svc_of = lambda m: "signal"
+    posmap = {}
+    modmap = {}
+    for p in parts:
+        xyz = getattr(p, "placed_xyz_mm", None)
+        nm = str(getattr(p, "name", ""))
+        if nm and isinstance(xyz, (list, tuple)) and len(xyz) >= 3:
+            posmap[_norm(nm)] = (float(xyz[0]), float(xyz[1]), float(xyz[2]))
+            _m = getattr(p, "module_id", None)
+            modmap[_norm(nm)] = _m if _m in MO else None
+    if not posmap:
+        return 0
+    _pwr = fl.make_mat("m_se_harness_pwr", fl._to_linear((0.72, 0.14, 0.11)), metallic=0.1, roughness=0.5)
+    _sig = fl.make_mat("m_se_harness_sig", fl._to_linear((0.14, 0.15, 0.18)), metallic=0.1, roughness=0.55)
+    _tube = fl.make_mat("m_se_harness_tube", fl._to_linear((0.55, 0.75, 0.88)),
+                        metallic=0.0, roughness=0.12, alpha=0.5, ior=1.4)
+    MM = fl.MM
+    n_w = n_t = 0
+    seen = set()
+    for e in (topology or []):
+        f = _norm(e.get("from_part") or e.get("from") or "")
+        t = _norm(e.get("to_part") or e.get("to") or "")
+        if not f or not t or f == t:
+            continue
+        if f not in posmap or t not in posmap:
+            continue    # an endpoint is not a placed interior part → the run would go nowhere → SKIP
+        svc = str(e.get("_ledger_service") or e.get("service")
+                  or _svc_of(e.get("mechanism")) or "signal")
+        key = (min(f, t), max(f, t), svc)
+        if key in seen:
+            continue
+        seen.add(key)
+        a, b = posmap[f], posmap[t]
+        _mod = modmap.get(f) or modmap.get(t)
+        _is_fluid = svc in ("water", "thermal", "air", "gas", "fluid_loop")
+        _lift = 20.0 if _is_fluid else 12.0
+        mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, max(a[2], b[2]) + _lift)   # bow up over the gap
+        pts = [(a[0] * MM, a[1] * MM, a[2] * MM),
+               (mid[0] * MM, mid[1] * MM, mid[2] * MM),
+               (b[0] * MM, b[1] * MM, b[2] * MM)]
+        _sfx = f"{f[:8]}_{t[:8]}"
+        if _is_fluid:
+            # water/thermal → wider translucent tube; air/gas → narrower pneumatic line
+            _r = 2.3 if svc in ("water", "thermal", "fluid_loop") else 1.6
+            fl.add_smooth_pipe(f"u_se_cutaway_cue_int_tube_{_sfx}", pts, _r * MM, _tube,
+                               module=_mod, module_objects=MO)
+            n_t += 1
+        elif svc in ("power", "electrical_bus", "electrical"):
+            fl.add_smooth_pipe(f"u_se_cutaway_cue_int_wire_p_{_sfx}", pts, 1.1 * MM, _pwr,
+                               module=_mod, module_objects=MO)
+            n_w += 1
+        else:
+            fl.add_smooth_pipe(f"u_se_cutaway_cue_int_wire_s_{_sfx}", pts, 0.9 * MM, _sig,
+                               module=_mod, module_objects=MO)
+            n_w += 1
+    print(f"[univ][sealed][interior] LEDGER harness: {n_w} wire(s) + {n_t} tube(s) — each joins two "
+          f"REAL connected parts (authored edges), smooth NURBS curves, no dangling runs")
+    return n_w + n_t
 
 
 _INSTRUMENT_MESH_KEEP_PREFIXES = (
@@ -24489,6 +24530,9 @@ def main():
     elif family == "sealed_enclosure":
         bbox, region_centres, frame_h, routed, unresolved = place_sealed_enclosure(
             parts, regions, topology, MAT, MO, _se_env_mm)
+        # WIRING HARNESS + TUBING from the REAL ledger — after placement (positions set), using the
+        # authored topology edges; each conduit joins two REAL placed parts, smooth NURBS curves.
+        _draw_ledger_harness(topology, parts, MO)
     elif family == "rack_farm":
         global _RACKFARM_QUANTITIES
         _RACKFARM_QUANTITIES = quantities
