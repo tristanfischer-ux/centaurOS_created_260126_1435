@@ -6067,6 +6067,29 @@ def _selftest() -> int:
         if _got != _want:
             print(f"  FAIL _ELECTRONIC_NOUN proveCatch: '{_en_name}' → {_got} (want {_want})"); bad += 1
 
+    # GOLD-SPINE NAME RECONCILE proveCatch (2026-07-24) — the render/GA principal
+    # "Compute UI Module" must reconcile to a real BoM line, and the fix must never
+    # relabel a non-instrument's controller nor guess on ambiguity.
+    _gs_inst = {"isInstrumentDevice": True}
+    _gs_rows = _reconcile_gold_spine_principal_names(
+        [{"requirement": "STM32 Nucleo Development Board", "part": "ST NUCLEO-L4P5ZG",
+          "tag": "X-131", "status": "IDENTIFIED", "unit_gbp": 24, "line_gbp": 24}], _gs_inst)
+    if _gs_rows[0]["requirement"] != "Compute UI Module — STM32 Nucleo Development Board":
+        print(f"  FAIL gold-spine reconcile: did not prefix compute anchor → {_gs_rows[0]['requirement']}"); bad += 1
+    if _gs_rows[0].get("unit_gbp") != 24 or _gs_rows[0].get("part") != "ST NUCLEO-L4P5ZG":
+        print("  FAIL gold-spine reconcile: price/part MUST be untouched (name-only)"); bad += 1
+    if _reconcile_gold_spine_principal_names(_gs_rows, _gs_inst)[0]["requirement"].count("Compute UI Module") != 1:
+        print("  FAIL gold-spine reconcile: not idempotent"); bad += 1
+    _gs_bess = _reconcile_gold_spine_principal_names(
+        [{"requirement": "BESS Master Controller MCU", "status": "IDENTIFIED"}], {"isInstrumentDevice": False})
+    if _gs_bess[0]["requirement"] != "BESS Master Controller MCU":
+        print("  FAIL gold-spine reconcile: must NOT relabel a non-instrument controller"); bad += 1
+    _gs_amb = _reconcile_gold_spine_principal_names(
+        [{"requirement": "STM32 Nucleo Development Board", "status": "IDENTIFIED"},
+         {"requirement": "Arduino Compute Board", "status": "IDENTIFIED"}], _gs_inst)
+    if any(str(r["requirement"]).lower().startswith("compute ui") for r in _gs_amb):
+        print("  FAIL gold-spine reconcile: must SKIP on ambiguous (>1 compute anchor)"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -7621,6 +7644,57 @@ def _word_requirement_name(word: dict) -> str:
     return re.sub(r"[_\s]+", " ", raw).strip().title()
 
 
+# Gold-spine principal reconciliation (2026-07-24). The render/GA collapse an instrument's
+# compute+UI hosts (and optical source) onto NAMED principals — "Compute UI Module" (I-201) and
+# "LED Source Board" (X-201) — for a clean drawing, but the BoM lists the raw anchor part
+# ("STM32 Nucleo Development Board"). A reviewer then sees a hero part in the render with NO
+# matching BoM line — the exact render↔BoM parity break render_bom_parity CHECK A catches, and
+# the "Compute UI Module not in BoM" defect on the organoid. Universal SOURCE fix: on an
+# instrument device, PREFIX the anchor board's requirement name with its gold-spine principal so
+# the name the customer SEES renders as a real, single, already-costed BoM line (no roll-up, no
+# double-count — the part number, price and tag are untouched, only the display name gains the
+# principal). Skips when no UNAMBIGUOUS anchor exists (never invents a line, never guesses when
+# >1 candidate) and is idempotent. Kill: CHAIN_SKIP_SPINE_RECONCILE=1.
+_SPINE_ANCHOR_PATTERNS = [
+    ("Compute UI Module",
+     re.compile(r"nucleo|microcontroller|\bmcu\b|dev(?:elopment)?\s*board|single.?board|"
+                r"raspberry\s*pi|arduino|esp32|stm32|compute\s*board|main\s*controller\s*board",
+                re.I)),
+    ("LED Source Board",
+     re.compile(r"led\s*source|light\s*source|excitation\s*(?:led|source)|led\s*driver\s*board|"
+                r"\bsource\s*board\b", re.I)),
+]
+
+
+def _reconcile_gold_spine_principal_names(rows, state):
+    """PREFIX an instrument's compute / optical anchor BoM line with its gold-spine principal
+    name, so the render/GA principal reconciles to a real costed line. Idempotent; additive
+    (display name only); no-op off-instrument, killed by env, or when no unambiguous anchor."""
+    try:
+        if os.environ.get("CHAIN_SKIP_SPINE_RECONCILE", "") not in ("", "0", "false", "no"):
+            return rows
+        if not (isinstance(state, dict) and state.get("isInstrumentDevice")):
+            return rows
+        for principal, pat in _SPINE_ANCHOR_PATTERNS:
+            pl = principal.lower()
+            if any(str(r.get("requirement", "")).lower().startswith(pl)
+                   for r in rows if isinstance(r, dict)):
+                continue                                   # already reconciled
+            cands = [r for r in rows
+                     if isinstance(r, dict)
+                     and str(r.get("status", "")).upper() != "SUB-COMPONENT"
+                     and pat.search(f"{r.get('requirement','')} {r.get('part','')}")]
+            if len(cands) != 1:
+                continue                                   # 0 → don't invent; >1 → ambiguous
+            r = cands[0]
+            orig = str(r.get("requirement", "")).strip()
+            if orig and not orig.lower().startswith(pl):
+                r["requirement"] = f"{principal} — {orig}"
+    except Exception as _sre:  # noqa: BLE001 — never break the BoM on a display-name reconcile
+        print(f"[requirements-bom] gold-spine name reconcile skipped: {_sre}")
+    return rows
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     # UNIVERSAL POWER SUBSYSTEM (2026-07-24): ensure a powered device's BoM carries a
@@ -7631,10 +7705,14 @@ def assemble(out_dir: str):
         _pslib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
         if _pslib not in sys.path:
             sys.path.insert(0, _pslib)
-        from power_subsystem import augment_decomposition_with_power as _aug_pwr
+        from power_subsystem import (augment_decomposition_with_power as _aug_pwr,
+                                      augment_decomposition_with_chassis_harness as _aug_ch)
         _npwr = _aug_pwr(st)
         if _npwr:
             print(f"[requirements-bom] universal power subsystem: +{_npwr} load-sized part(s)")
+        _nch = _aug_ch(st)
+        if _nch:
+            print(f"[requirements-bom] chassis + wiring harness: +{_nch} rendered part(s) → BoM")
     except Exception as _pwe:  # noqa: BLE001 — never break the BoM on the augmentation
         print(f"[requirements-bom] power-subsystem augmentation skipped: {_pwe}")
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
@@ -7838,9 +7916,12 @@ def assemble(out_dir: str):
                 name = _word_requirement_name(w)
                 if not name:
                     continue                          # no identity at all — cannot emit an auditable requirement
-                if re.search(r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
-                             r"lifting point|nameplate|mounting hardware|earthing boss\b", name, re.I):
+                if (not w.get("_chassis_harness")) and re.search(
+                        r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
+                        r"lifting point|nameplate|mounting hardware|earthing boss\b", name, re.I):
                     continue                          # hardware detail — not a requirement line
+                    # NB the injected chassis/harness parts (_chassis_harness) are RENDERED
+                    # top-level assemblies, not incidental hardware — they must emit a BoM row.
                 md = _mods(w)
                 tag = tag_by_name.get(name) or "—"
                 # ── REQUIREMENT (what it must do) ──
@@ -8979,6 +9060,10 @@ def assemble(out_dir: str):
     # honour contract/gold materials midpoint when plant parametrics still overshoot.
     _zero_instrument_non_parts(rows)
     _rescale_instrument_materials_to_gold(rows, _pv_state if isinstance(_pv_state, dict) else {})
+    # LAST — after pricing/rescale (which read the raw part name): prefix the compute/optical
+    # anchor line with its gold-spine principal so the render/GA "Compute UI Module" reconciles
+    # to a real costed BoM line. Display-name only; price/part/tag untouched.
+    rows = _reconcile_gold_spine_principal_names(rows, _pv_state if isinstance(_pv_state, dict) else {})
     return rows
 
 

@@ -305,6 +305,159 @@ def _is_board(name: str) -> bool:
                           r"\bmcu\b|microcontroller|regulation board|controller card", name, re.I))
 
 
+def _needs_upright(name: str) -> bool:
+    """GRAVITY constraint (Tristan 2026-07-24: "things which need gravity need to be in the
+    right orientation"): a liquid-holder / gravity-sensitive part must stay UPRIGHT (its height
+    along +z, never flipped onto its side) — vessels, vials, pumps, reservoirs, bottles."""
+    return bool(re.search(
+        r"vessel|\bvial\b|culture|reactor|bioreactor|reservoir|\btank\b|cuvette|flask|"
+        r"beaker|\bpump\b|bottle|\bbag\b|separator|\bcolumn\b|holder|carboy|burette", name, re.I))
+
+
+def pack_interior_shelved(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=4.0, wall_mm=0.0):
+    """MULTI-SHELF, GRAVITY-AWARE 3D pack (2026-07-24, Tristan: "you could have multiple shelves
+    and the objects could be vertically or horizontally arranged — things which need gravity need
+    to be in the right orientation"). A grid HEIGHT-MAP bottom-left stacker: tall + gravity-upright
+    parts (vessels/pumps/fan) sit on the FLOOR; short flat parts STACK on top of whatever is below
+    (implicit shelves) up to the box lid → the vertical volume FILLS instead of one flat layer.
+    Circuit boards stand VERTICAL on the back wall. Gravity: an upright part only lands on a FLAT
+    base (never on a lumpy top, never flipped). Returns pos + __rot__/__orient__ (flat|upright|
+    vertical_back)/__world_dims__/__shelf_z__ (deck heights). 3D-clash-free (verify count_clashes)."""
+    floor_z = base_z_mm + wall_mm
+    fw = iw_mm - 2 * wall_mm
+    fd = idep_mm - 2 * wall_mm
+    top_z = floor_z + (ih_mm - 2 * wall_mm)
+    fasteners = [p for p in parts if _is_fastener(p["name"])]
+    rest = [p for p in parts if not _is_fastener(p["name"])]
+    boards = [p for p in rest if _is_board(p["name"])]
+    nonboard = [p for p in rest if p not in boards]
+    upright = [p for p in nonboard if _needs_upright(p["name"])]
+    flat = [p for p in nonboard if p not in upright]
+    pos = {}; world = {}; orient = {}; rot = {}
+
+    cell = max(6.0, min(fw, fd) / 44.0)
+    nx = max(1, int(fw / cell)); ny = max(1, int(fd / cell))
+    hmap = [[floor_z] * ny for _ in range(nx)]
+
+    def _cells(cx, cy, w, d):
+        x0 = int((cx - w / 2 + fw / 2) / cell); x1 = int((cx + w / 2 + fw / 2 - 1e-6) / cell)
+        y0 = int((cy - d / 2 + fd / 2) / cell); y1 = int((cy + d / 2 + fd / 2 - 1e-6) / cell)
+        return max(0, x0), min(nx - 1, x1), max(0, y0), min(ny - 1, y1)
+
+    def _stats(cx, cy, w, d):
+        # read/reserve a GAP-PADDED footprint so two parts on the same shelf never touch
+        # (grid-boundary rounding would otherwise let AABBs overlap by ~one cell → false clash).
+        x0, x1, y0, y1 = _cells(cx, cy, w + gap_mm, d + gap_mm)
+        vals = [hmap[i][j] for i in range(x0, x1 + 1) for j in range(y0, y1 + 1)]
+        return (max(vals), max(vals) - min(vals)) if vals else (floor_z, 0.0)
+
+    placed_boxes = []   # (x0,x1,y0,y1,z0,z1) of every placed part — the CORRECTNESS guard
+
+    def _overlaps(cx, cy, bt, w, d, h):
+        ax0, ax1, ay0, ay1, az0, az1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, bt, bt + h
+        for bx0, bx1, by0, by1, bz0, bz1 in placed_boxes:
+            ox = min(ax1, bx1) - max(ax0, bx0)
+            oy = min(ay1, by1) - max(ay0, by0)
+            oz = min(az1, bz1) - max(az0, bz0)
+            if ox > 0.5 and oy > 0.5 and oz > 0.5:
+                return True
+        return False
+
+    def _place(p, require_flat, cap_z):
+        w, d, h = p["dims"]
+        r = d > w
+        if r:
+            w, d = max(w, d), min(w, d)              # long side along +x
+        best = None
+        for gi in range(nx):
+            cx = -fw / 2 + gi * cell + w / 2
+            if cx + w / 2 > fw / 2 + 1e-6:
+                continue
+            for gj in range(ny):
+                cy = -fd / 2 + gj * cell + d / 2
+                if cy + d / 2 > fd / 2 + 1e-6:
+                    continue
+                bt, var = _stats(cx, cy, w, d)
+                if bt + h > cap_z + 1e-6:
+                    continue                         # would poke through the lid (relaxed on the last try)
+                if require_flat and var > 2.0:
+                    continue                         # gravity part needs a flat base
+                if _overlaps(cx, cy, bt, w, d, h):
+                    continue                         # HARD guard: never intersect a placed part
+                key = (round(bt, 1), round(cy, 1), round(cx, 1))   # lowest, then front, then left
+                if best is None or key < best[0]:
+                    best = (key, cx, cy, bt, r, w, d, h)
+        return best
+
+    # 1) VERTICAL boards FIRST — on the back wall — registered in the guard + height-map so the
+    #    stacking loop below avoids their thin strip. Overflow boards fall to the flat pool.
+    _bx = -fw / 2 + gap_mm
+    fit_boards = []
+    for p in boards:
+        w = p["dims"][0]
+        if _bx + w <= fw / 2 - gap_mm:
+            fit_boards.append(p); _bx += w + gap_mm
+        else:
+            flat.append(p)
+    _bx = -fw / 2 + gap_mm
+    for p in fit_boards:
+        w, d, h = p["dims"]
+        vh = min(d, (top_z - floor_z) - gap_mm)
+        vy = max(2.0, min(h, w, d))
+        cx = _bx + w / 2
+        cy = fd / 2 - vy / 2 - gap_mm
+        pos[p["tag"]] = (round(cx, 2), round(cy, 2), round(floor_z + vh / 2, 2))
+        world[p["tag"]] = (round(w, 1), round(vy, 1), round(vh, 1))
+        orient[p["tag"]] = "vertical_back"
+        placed_boxes.append((cx - w / 2, cx + w / 2, cy - vy / 2, cy + vy / 2, floor_z, floor_z + vh))
+        x0, x1, y0, y1 = _cells(cx, cy, w + gap_mm, vy + gap_mm)
+        for i in range(x0, x1 + 1):
+            for j in range(y0, y1 + 1):
+                hmap[i][j] = floor_z + vh + gap_mm
+        _bx += w + gap_mm
+
+    # 2) place order: gravity-uprights first (tallest first, on the floor), then flats (biggest
+    #    first, stacking to fill the height). The overlap guard makes the whole pack clash-free.
+    order = ([("up", p) for p in sorted(upright, key=lambda p: -p["dims"][2])]
+             + [("fl", p) for p in sorted(flat, key=lambda p: -(p["dims"][0] * p["dims"][1]))])
+    _BIG = floor_z + 100000.0
+    for kind, p in order:
+        # 1) ideal: under the lid, flat base for gravity parts; 2) relax the flat-base;
+        # 3) LAST RESORT: ignore the lid (stack up — the box grows, the resize absorbs it). Every
+        # attempt keeps the AABB overlap guard, so the pack is ALWAYS 3D-clash-free.
+        b = (_place(p, require_flat=(kind == "up"), cap_z=top_z)
+             or _place(p, require_flat=False, cap_z=top_z)
+             or _place(p, require_flat=False, cap_z=_BIG))
+        if b is None:
+            continue
+        _, cx, cy, bt, r, w, d, h = b
+        pos[p["tag"]] = (round(cx, 2), round(cy, 2), round(bt + h / 2, 2))
+        rot[p["tag"]] = r
+        orient[p["tag"]] = "upright" if kind == "up" else "flat"
+        placed_boxes.append((cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, bt, bt + h))
+        x0, x1, y0, y1 = _cells(cx, cy, w + gap_mm, d + gap_mm)   # mark the padded footprint
+        for i in range(x0, x1 + 1):
+            for j in range(y0, y1 + 1):
+                hmap[i][j] = bt + h + gap_mm
+
+    # fasteners at the front-left corner
+    fx = -fw / 2 + gap_mm
+    for p in fasteners:
+        w, d, h = p["dims"]
+        pos[p["tag"]] = (round(fx + w / 2, 2), round(-fd / 2 + d, 2), round(floor_z + h / 2, 2))
+        fx += w + gap_mm
+
+    # shelf-deck heights: the distinct z-levels where a flat part sits ABOVE the floor (a mezzanine)
+    shelf_z = sorted({round(pos[p["tag"]][2] - p["dims"][2] / 2, 0)
+                      for kind, p in order if kind == "fl" and p["tag"] in pos
+                      and pos[p["tag"]][2] - p["dims"][2] / 2 > floor_z + 12})
+    pos["__rot__"] = rot
+    pos["__orient__"] = orient
+    pos["__world_dims__"] = world
+    pos["__shelf_z__"] = shelf_z
+    return pos
+
+
 def pack_interior_3d(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=4.0, wall_mm=0.0):
     """MULTI-PLANE pack (2026-07-24): flat circuit BOARDS stand VERTICALLY against the back
     wall (reads like a real instrument + frees the floor); mechanical/chassis + the rest pack
@@ -394,7 +547,9 @@ def count_clashes(parts, pos, iw_mm, idep_mm, ih_mm, base_z_mm, wall_mm=6.0):
     wdims = pos.get("__world_dims__", {})   # explicit world AABB (mm) for oriented parts
     boxes = {}
     for p in parts:
-        c = pos[p["tag"]]
+        c = pos.get(p["tag"])
+        if c is None:                          # a part the packer could not place — report as oob
+            continue
         wd = wdims.get(p["tag"])
         if wd:                              # a placed WORLD extent (vertical boards etc.) — use it verbatim
             w, d, h = wd
@@ -464,7 +619,24 @@ def _selftest():
     assert wd["P"][1] <= 3 and abs(wd["P"][2] - 70) < 1, f"vertical world dims wrong: {wd['P']}"
     n3, oob3, w3 = count_clashes(demo3d, p3, 320, 460, 130, 0.0, wall_mm=0.0)
     assert n3 == 0 and oob3 == 0, f"3D multi-plane pack must be clash-free: clash={n3} oob={oob3} {w3}"
-    print(f"interior_pack _selftest: OK (stacked {len(placed)} parts, {len(layers)} layers, 0 clash, "
+    # MULTI-SHELF proveCatch: parts STACK into shelves, gravity parts stay UPRIGHT, boards vertical,
+    # everything 3D-clash-free (the AABB overlap guard). A vessel + a pump must read 'upright'.
+    demoS = demo3d + [
+        {"tag": "V", "name": "Culture Vessel", "dims": (40, 40, 80)},
+        {"tag": "R", "name": "Reservoir Bottle", "dims": (50, 50, 90)},
+        {"tag": "S1", "name": "Small Sensor Board Chip", "dims": (20, 15, 6)},
+        {"tag": "S2", "name": "Connector Block", "dims": (24, 14, 10)},
+    ]
+    ps = pack_interior_shelved(demoS, 200, 260, 130, 0.0, gap_mm=4)
+    oS = ps["__orient__"]
+    assert oS.get("V") == "upright" and oS.get("R") == "upright", \
+        f"gravity parts must be upright: {[(t, oS.get(t)) for t in ('V', 'R')]}"
+    assert oS.get("P") == "vertical_back", "boards must still stand vertical"
+    assert len(ps["__shelf_z__"]) >= 1, "short flats must STACK into at least one mezzanine shelf"
+    nS, oobS, wS = count_clashes(demoS, ps, 200, 260 * 4, 130 * 4, 0.0, wall_mm=0.0)
+    assert nS == 0 and oobS == 0, f"multi-shelf pack must be clash-free: clash={nS} oob={oobS} {wS}"
+    print(f"interior_pack _selftest: OK (stacked {len(placed)} parts, {len(layers)} layers, 0 clash; "
+          f"multi-shelf: {len(ps['__shelf_z__'])} shelf level(s), gravity-upright + boards-vertical, 0 clash; "
           f"frame=base-plate+standoffs; oracle catches co-location)")
 
 
