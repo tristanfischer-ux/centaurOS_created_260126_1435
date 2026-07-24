@@ -53,8 +53,10 @@ def main():
              f"12.5 mm length permits it). 160 GHz 0.94 mm: {area/0.88:.0f}× over — "
              f"not credible without a per-band redesign.")
     row("1. Fits cell cross-section",
-        "PASS @50 GHz / FAIL @80 GHz single-layer (MARGINAL with 2-deep stagger) / FAIL @160 GHz",
-        "same (fixed set does not change the envelope)", note1)
+        "magnetics-only PASS @50 GHz; but Tony's CAD frame (3.098 mm) exceeds even the "
+        "3.0 mm 50 GHz cell — fit UNRESOLVED at every band pending frame redesign; "
+        "FAIL @80/@160 GHz single-layer regardless",
+        "same (fixed set does not change the envelope; frame dominates)", note1)
 
     # 2. stroke
     row("2. Stroke ≥ 3.0 mm", f"PASS — usable {s.usable_stroke_mm:.2f} mm",
@@ -74,8 +76,8 @@ def main():
     if fe_base:
         bk_base = 0.47e-3  # FE plateau (see femm sweep: Pm→0.3 mm caps ~0.47 mN)
         g_base = bk_base / (mt * G_ACCEL)
-        base4 = (f"FAIL — FE net detent caps at ≈{bk_base*1e3:.2f} mN (={g_base:.1f} g) "
-                 f"for ANY Pm; spec Fd={fd*1e3:.2f} mN (5 g) missed ×{fd/bk_base:.0f}")
+        base4 = (f"FAIL — FE net detent plateaus ≈0.5 mN (≈0.3 g; 0.47–0.52 over the swept "
+                 f"Pm range); spec Fd={fd*1e3:.2f} mN (5 g) missed ≈×15")
     else:
         base4 = "UNVERIFIED"
     if fixed:
@@ -117,7 +119,7 @@ def main():
     row("7. 15-year outdoor reliability",
         "UNVERIFIED — no MTBF computable without bearing spec; dominant risks: "
         "guide/bearing wear + contamination in the 77.5 µm gap, NdFeB corrosion "
-        "(coating mandatory outdoors), coil static-fatigue low",
+        "(coating mandatory outdoors); low risk of coil static fatigue",
         "UNVERIFIED — 20 µm gap tightens contamination sensitivity ~4×",
         "flagged for Tony: bearing + sealing spec needed before any MTBF claim")
 

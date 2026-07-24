@@ -24,7 +24,7 @@ OUT = __file__.rsplit("/", 1)[0] + "/out"
 # fixed-design geometry (mm)
 P = 0.464; T = 0.232; G = 0.020; G0 = 0.0775
 HT = 1.549 / 2; SLOT_T = 0.465; SS_D = 0.465; SS_SLOT = 0.155
-POLE_AX = 1.16; SPACING = 0.390          # recommended (brief 0.374 / Tony CAD 0.400)
+POLE_AX = 1.16; SPACING = 0.374          # AS ANALYSED (brief); exact = 386.7/390 — see note
 BR_T = 0.348                              # bridge axial thickness ×1.5 (was 0.232)
 PM_L = 0.243
 
@@ -104,13 +104,14 @@ def d1_axial():
     dim(ax, 0.116, -HT - 0.9, 0.116 + P, -HT - 0.9, "pitch 464", offset=-0.12)
     dim(ax, 0, HT + G + SS_D + 0.32, POLE_AX, HT + G + SS_D + 0.32, "pole 1160")
     dim(ax, POLE_AX, HT + G + SS_D + 0.32, POLE_AX + SPACING, HT + G + SS_D + 0.32,
-        "gap 390*", color=DELTA)
+        "gap 374*", color=DELTA)
     dim(ax, 0, HT + G + SS_D + 0.78, 3 * POLE_AX + 2 * SPACING, HT + G + SS_D + 0.78,
-        "stator axial extent 4260")
-    ax.annotate("* spacing 390 µm RECOMMENDED for exact ⅓-pitch steps\n"
-                "  (brief: 374 µm → steps 173/146/145; Tony CAD reads 400 µm — reconcile)",
+        "stator axial extent 4228")
+    ax.annotate("* drawn at the AS-ANALYSED 374 µm spacing (steps 173/146/145 µm).\n"
+                "  Fix F3 recommends 386.7 µm (pitch 464) / 390 µm (pitch 465) for uniform steps;\n"
+                "  Tony CAD reads 400 µm — reconcile (report Q5/Q6).",
                 (x_left, -HT - 1.35), fontsize=8, color=DELTA, va="top")
-    ax.annotate("translator 1549×1550 ×12500 long (unchanged)", (4.3, -HT - 1.5),
+    ax.annotate("translator 1549×1550 ×12500 long (unchanged)", (4.5, -HT - 2.15),
                 fontsize=8, color=INK, ha="center")
     ax.set_xlim(x_left - 0.2, x_right + 0.2); ax.set_ylim(-3.0, 2.6)
     fig.tight_layout(); fig.savefig(f"{OUT}/drawing-D1-axial.png"); plt.close(fig)
@@ -189,8 +190,9 @@ def d3_tooth_detail():
     dim(ax, T / 2, HT - SLOT_T - 0.18, P - T / 2, HT - SLOT_T - 0.18, "232", offset=-0.08)
     dim(ax, 0.62, HT - SLOT_T, 0.62, HT, "465", offset=0.32)
     dim(ax, 0.62 + P, tipy, 0.62 + P, tipy + SS_SLOT, "155", offset=0.32)
-    ax.annotate("teeth, pitch, slot depths UNCHANGED from Tony's spec —\nonly the gap "
-                "closes (fix F1) and the bridge/PM section grows (fix F2)",
+    ax.annotate("teeth, pitch, slot depths UNCHANGED — the gap closes by moving the whole\n"
+                "stator body toward the translator at assembly (datum shift, fix F1);\n"
+                "tooth geometry is identical. Bridge/PM section grows out-of-plane (fix F2)",
                 (0.48, HT - 0.62), ha="center", fontsize=8.5, color=INK)
     ax.set_xlim(-0.85, 1.35); ax.set_ylim(HT - 0.85, HT + 0.62)
     fig.tight_layout(); fig.savefig(f"{OUT}/drawing-D3-tooth-detail.png"); plt.close(fig)
@@ -201,8 +203,7 @@ def d4_build_sequence():
     fig.suptitle("D4 — Build sequence (the coil problem drives the order)",
                  x=0.02, ha="left", fontsize=11, fontweight="bold", color=INK)
     steps = [
-        ("1. Press SMC parts", "translator + 6 slot-sections\n+ 3 bridge bars\n"
-         "(net-shape dies;\nteeth in the die)"),
+        ("1. Mould micro-MIM parts", "translator + 6 slot-sections\n+ 3 bridge bars in\nmicro-MIM Fe-3%Si\n(pressed SMC cannot form\n232 µm teeth — §5)"),
         ("2. Pre-wind coils", "20t × Ø50 µm on a\nremovable former →\nself-bonded coil\n"
          "(bondable magnet wire)"),
         ("3. Slip coil + PM\nonto OPEN bridge", "bridge is a straight bar\nBEFORE closing "
