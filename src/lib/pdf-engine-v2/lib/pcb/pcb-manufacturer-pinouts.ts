@@ -110,6 +110,25 @@ const CURATED_MANUFACTURER_SYMBOLS: readonly CuratedManufacturerSymbol[] = [
     provenance: 'Samtec FTSH-105-01-L-DV 2x5 1.27 mm SMD header; frozen OpenDrop J2 Conn_02x05 SWD nets; https://www.samtec.com/products/ftsh',
   },
   {
+    // Organoid USB galvanic isolator (X-124). ADuM1201 = dual-channel digital isolator,
+    // one forward (A) + one reverse (B) channel, two isolated supply domains.
+    manufacturer: 'Analog Devices',
+    partNumber: 'ADUM1201ARZ-RL7',
+    symbolId: 'Isolator:ADuM1201AR',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    pins: [
+      { number: '1', name: 'VDD1', kind: 'power_in' },
+      { number: '2', name: 'VOA', kind: 'output' },
+      { number: '3', name: 'VIB', kind: 'input' },
+      { number: '4', name: 'GND1', kind: 'power_in' },
+      { number: '5', name: 'GND2', kind: 'power_in' },
+      { number: '6', name: 'VOB', kind: 'output' },
+      { number: '7', name: 'VIA', kind: 'input' },
+      { number: '8', name: 'VDD2', kind: 'power_in' },
+    ],
+    provenance: 'Analog Devices ADuM1201 datasheet Rev K, 8-lead R-8 (NSOIC) pinout; organoid X-124 USB Galvanic Isolator; KiCad Isolator:ADuM1201AR with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  },
+  {
     manufacturer: 'Murata Manufacturing',
     partNumber: 'BLM18PG121SN1D',
     symbolId: 'Device:Ferrite_Bead',
