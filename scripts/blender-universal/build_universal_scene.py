@@ -8802,8 +8802,9 @@ def _load_required_services():
             tn = re.sub(r'[^a-z0-9]', '', f"{name} {function}".lower())
             if _GENERIC_PLACEHOLDER_PART_RE.search(str(name or "")):
                 return req
-            if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat'))
-                    or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
+            if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat',
+                                     'stir', 'drive', 'servo', 'actuator', 'solenoid', 'peltier', 'thermoelectric', 'heater', 'controller', 'display', 'regulator', 'regulation', 'converter', 'transducer', 'tachometer'))
+                    or _words & {'uv', 'ultraviolet', 'fan', 'fans', 'led', 'tec', 'mcu', 'pcb', 'psu'}):
                 req.add('power')
             # PROCESS-FLUID role gated on the WET-plant signal (M1, 2026-06-23 — keep in
             # sync with component_engineering._required_services). RAS-only tokens

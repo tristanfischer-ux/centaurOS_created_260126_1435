@@ -53,8 +53,15 @@ def _required_services(name, module, function, wet_plant=True):
     if _GENERIC_PLACEHOLDER_RE.search(str(name or '')):
         return req
     # ── (1) NAME-keyword roles (cross-module: a pump / sensor / valve anywhere) ──
-    if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat'))
-            or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
+    # ELECTRICAL ACTUATORS + ELECTRONICS (2026-07-24, Tristan "why were they not wired up?"):
+    # the list missed the benchtop-device families, so a Magnetic Stirrer DRIVE (a motor!),
+    # a Peltier/TEC, a heater, a controller/display got NO power requirement → the power-closer
+    # never fed them → they sat un-powered while a fluid closer wrongly tied the motor by 'water'.
+    # A stirrer/drive/servo/actuator/solenoid/peltier/heater/controller/display needs power in
+    # ANY archetype — universal. Short/ambiguous tokens (led/tec/mcu/pcb/psu) match whole words.
+    if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat',
+                             'stir', 'drive', 'servo', 'actuator', 'solenoid', 'peltier', 'thermoelectric', 'heater', 'controller', 'display', 'regulator', 'regulation', 'converter', 'transducer', 'tachometer'))
+            or _words & {'uv', 'ultraviolet', 'fan', 'fans', 'led', 'tec', 'mcu', 'pcb', 'psu'}):
         req.add('power')
     # PROCESS-FLUID role — ONLY on a WET plant. The bare tokens below describe parts
     # that sit in a fluid flow; on a DRY archetype (no fluid edges, not a process
