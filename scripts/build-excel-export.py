@@ -7259,13 +7259,27 @@ def _trace_tokens(s) -> List[str]:
     return [x for x in re.findall(r"[a-z0-9]+", t.lower())]
 
 
-def _build_real_part_index(state: dict) -> List[Tuple[str, set]]:
+def _build_real_part_index(state: dict, run_dir: Optional[str] = None) -> List[Tuple[str, set]]:
     """(display_name, token_set) for every REAL principal part in the bill of materials —
     skips connection/pipework lines (the '→' / 'connection' signal) and ↳ sub-components,
-    mirroring tab_parts_master's principal filter. The set the trace must resolve against."""
+    mirroring tab_parts_master's principal filter. The set the trace must resolve against.
+
+    SOURCE ROBUSTNESS (2026-07-24 organoid >9-drive): state.requirementsBom is EMPTY on some
+    runs (the BoM lives in requirements-bom.json but wasn't written back to state), which made
+    this index empty → _resolve_trace_endpoints dropped EVERY real part as a phantom → the
+    Connection trace sheet rendered only boundary rows (3.3/10). Fall back to the on-disk
+    requirements-bom.json rows when state carries no BoM, so the trace resolves against the
+    real parts on every run. Universal — same principal filter, just a second source."""
+    _rows = state.get("requirementsBom") or []
+    if not _rows and run_dir:
+        _rb = load_json(os.path.join(run_dir, "requirements-bom.json"))
+        if isinstance(_rb, dict):
+            _rows = _rb.get("rows") or []
+        elif isinstance(_rb, list):
+            _rows = _rb
     out: List[Tuple[str, set]] = []
     seen: set = set()
-    for b in (state.get("requirementsBom") or []):
+    for b in (_rows or []):
         if not isinstance(b, dict):
             continue
         req = str(b.get("requirement") or "")
@@ -7313,13 +7327,20 @@ def _resolve_endpoint_name(ep: str, real_index: List[Tuple[str, set]]) -> Option
     return best
 
 
-def _resolve_trace_endpoints(adj: dict, state: dict) -> dict:
+def _resolve_trace_endpoints(adj: dict, state: dict, run_dir: Optional[str] = None) -> dict:
     """Rewrite the trace adjacency so EVERY node + every input/output endpoint references a
     real bill-of-materials part (or an explicit process boundary): derived labels are mapped
     to the real part name, phantoms are dropped along with the edges that referenced them.
     Nodes whose own name is a phantom are removed entirely; resolved nodes are merged when two
     derived labels collapse onto the same real part. Pure transform — returns a fresh dict."""
-    real_index = _build_real_part_index(state)
+    real_index = _build_real_part_index(state, run_dir)
+    if not real_index:
+        # No BoM to validate against (neither state nor the on-disk file) — we CANNOT tell a
+        # phantom from a real part, so dropping everything is strictly worse than keeping the
+        # authored adjacency. Return it unchanged rather than nuke every node to a boundary.
+        return {k: {"inputs": list((v or {}).get("inputs") or []),
+                    "outputs": list((v or {}).get("outputs") or [])}
+                for k, v in (adj or {}).items()}
 
     def _canon(name: str) -> Optional[str]:
         s = str(name or "").strip()
@@ -7419,7 +7440,7 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
     # the real part name it came from, and a label that resolves to nothing real (and is not
     # an explicit process boundary) is DROPPED — never shown as a phantom. UNIVERSAL: keyed
     # purely on token-subset matching against state.requirementsBom, no per-class rename table.
-    adj = _resolve_trace_endpoints(adj, state)
+    adj = _resolve_trace_endpoints(adj, state, run_dir)
     comp = led.get("completeness") or {}
     ri = led.get("referential_integrity") or {}
     incomplete = {c.get("part"): c.get("missing", []) for c in (comp.get("concerns") or [])}
