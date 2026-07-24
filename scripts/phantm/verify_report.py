@@ -219,6 +219,15 @@ check("phase/step @70 = 16.7°", abs(bt[70]["phase_per_ideal_step_deg"] - 16.7) 
 contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
          "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz", "BELOW CUTOFF",
          "## 10. Traceability", "## 11. Supplier outreach")
+# U-band prototype scaling: 55 GHz at the production 70-GHz operating point
+_ratio = 70.0 / hx["cutoff"]["fc_ghz"]
+_fc_p = 55.0 / _ratio
+_af_p = 3.10 * hx["cutoff"]["fc_ghz"] / _fc_p
+check("proto cell ≈3.95 mm", abs(_af_p - 3.945) < 0.01, f"{_af_p:.3f}")
+_l0p, _lcp = 299.792458 / 55.0, 299.792458 / _fc_p
+_lgp = _l0p / math.sqrt(1 - (_l0p / _lcp) ** 2)
+check("proto λg/2 @55 = 4.23", abs(_lgp / 2 - 4.23) < 0.02, f"{_lgp/2:.3f}")
+contains("proto sizing in report", "≈3.95 mm")
 absent("no stale cutoff-request", "needs the cell's cutoff to pin down")
 absent("old 7-cluster reading retired", "7-cell clusters", "7 × 19")
 
