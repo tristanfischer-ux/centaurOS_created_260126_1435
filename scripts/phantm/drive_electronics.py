@@ -17,27 +17,50 @@ import math
 
 RC = 0.552          # Ω per coil (report §8.5)
 I_STEP = 1.8        # A — stepping begins ≈1.4 A; 1.8 A default pulse
-I_FULL = 3.35       # A — FE full-drive point (2·Fd)
-V_FULL = I_FULL * RC                # 1.85 V at the coil
-V_RAIL = 2.0        # V — buck rail; rail voltage IS the current limit (R load)
+I_FULL = 3.35       # A — FE full-drive point (2·Fd) — the WORST-CASE regime
 DRIVER_DROP = 0.15  # V — low-side FET + trace at these currents (indicative)
+V_RAIL_STEP = round(I_STEP * RC + DRIVER_DROP, 2)   # 1.14 V rail for stepping
+V_RAIL_FULL = round(I_FULL * RC + DRIVER_DROP, 2)   # 2.00 V rail for full drive
 T_PULSE = 1.5e-3    # s
 T_STEP = 4e-3       # s per completed step incl. settle (report §4.4 upper)
+DUTY = T_PULSE / T_STEP             # 0.375 — pulses are 37.5% of step time
 E_STEP = I_STEP**2 * RC * T_PULSE   # J (2.68 mJ)
-E_STEP_FULL = I_FULL**2 * RC * T_PULSE
+E_STEP_FULL = I_FULL**2 * RC * T_PULSE  # J (9.29 mJ)
+FLYBACK_UJ = 0.5 * 0.6e-6 * I_FULL**2 * 1e6  # µJ stored in Lc at turn-off
 CELLS_TILE = 24
 COILS_CELL = 3
 STEPS_REPOINT = 10  # average steps per cell for a re-point (assumption, stated)
 
 out = {
     "coil": {"rc_ohm": RC, "i_step_a": I_STEP, "i_full_a": I_FULL,
-             "v_at_full_v": round(V_FULL, 3), "rail_v": V_RAIL,
-             "note": "resistive load: the RAIL VOLTAGE is the current control — "
-                     "2.0 V rail → 3.6 A ceiling ≈ Ic*; a 1.0 V setting gives 1.8 A. "
-                     "τ = L/R ≈ 1.1 µs so current settles instantly vs the 1.5 ms pulse."},
+             "rail_v_step": V_RAIL_STEP, "rail_v_full": V_RAIL_FULL,
+             "note": "resistive load: the RAIL VOLTAGE is the current control (τ = L/R "
+                     "≈ 1.1 µs ≪ 1.5 ms pulse). TWO REGIMES, never mixed: STEPPING at "
+                     "1.8 A (rail ≈1.15 V, 2.68 mJ/step) and WORST-CASE FULL-DRIVE at "
+                     "3.35 A (rail ≈2.0 V, 9.29 mJ/step). Rail-sharing across n "
+                     "parallel cells needs star/kelvin routing: shared-path budget "
+                     "≤5 mΩ (26.8 A × 5 mΩ = 134 mV on a 2 V rail ≈ 7% current error; "
+                     "force ∝ I²). Flyback at turn-off is trivial: "
+                     f"{FLYBACK_UJ:.1f} µJ — one clamp diode per coil."},
+    "topology": {
+        "chosen": "UNIPOLAR drive (council fix, gemini-3.1): direction comes from the "
+                  "PHASE SEQUENCE (A→B→C vs C→B→A), not current polarity — so each "
+                  "coil needs only ONE low-side FET (72 per tile, 10–20 mΩ) + a "
+                  "flyback clamp; one shared DAC-set buck rail feeds all coil highs. "
+                  "No H-bridges, no select-FET sneak paths.",
+        "rejected": "3 shared full-H phase bridges + per-cell dual select FET — "
+                    "REJECTED: a dual FET cannot block a bipolar phase rail (body "
+                    "diodes conduct; deselected coils cross-feed).",
+        "option": "a reverse 'brake' pulse (§4.4 option) would need half-bridges — "
+                  "only add if the settle tests demand it",
+        "polarity_note": "wire every coil so positive rail current AIDS the PM "
+                        "(FE sign convention)"},
     "per_tile": {"cells": CELLS_TILE, "coils": CELLS_TILE * COILS_CELL,
-                 "e_step_mj": round(E_STEP * 1e3, 2),
-                 "e_repoint_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP, 2)},
+                 "duty": DUTY,
+                 "stepping": {"e_step_mj": round(E_STEP * 1e3, 2),
+                              "e_repoint_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP, 2)},
+                 "full_drive": {"e_step_mj": round(E_STEP_FULL * 1e3, 2),
+                                "e_repoint_j": round(CELLS_TILE * STEPS_REPOINT * E_STEP_FULL, 2)}},
     "parallelism_trade": [],
     "aperture_10cm": {},
     "pcb": {
@@ -48,27 +71,20 @@ out = {
             "web_current_note": "3.35 A pulses through 0.65 mm webs: use 2 oz copper; "
                                 "webs are 1–2 mm long so thermally fine (IPC-2221 "
                                 "continuous limit ≈2.5 A at 1 oz — pulsed duty is ≤40%)",
-            "content": "coil termination pads (6/cell) + cell-select FETs (dual "
-                       "10–20 mΩ, ≪ Rc) + board-to-board connector",
+            "content": "coil termination pads (6/cell) + 3 per-coil low-side FETs "
+                       "+ 3 flyback clamps per cell (1 mm-class DFN — fits the pitch "
+                       "now that no H-bridges are needed) + board-to-board connector",
             "layers": "4-layer, 2 oz outer",
         },
         "driver_board": {
-            "content": "3 phase half-bridge pairs (per-phase totem poles rated for "
-                       "the parallel-group current), buck converter 5 V→0.8–2.1 V "
-                       "DAC-set (the current control), bulk capacitance, MCU "
-                       "(STM32-class), CAN/SPI host interface",
-            "why_two_boards": "3 drivers/cell cannot fit inside 9.15 mm² of cell "
-                              "pitch even both-sides; select-FETs stay per-cell on "
-                              "the aperture board, power devices move behind",
-        },
-        "driver_architecture": {
-            "chosen": "3 shared phase rails + per-cell select FETs: 3 half-bridges "
-                      "+ 48 select FETs per tile (a cell's 3 coils share its select "
-                      "pair; only the addressed cells' coils see the phase rail)",
-            "alternative": "per-coil integrated H-bridge (72 ICs/tile) — simplest "
-                           "for the first prototype, more parts at volume",
-            "polarity": "phase bridges are full H per rail — coil polarity must "
-                        "AID the PM on the drive stroke (FE sign convention)",
+            "content": "DAC-set buck 5 V→0.8–2.1 V, BURST-RATED (VRM-class, ≥30 A "
+                       "at 2 V) + input bulk capacitance, MCU (STM32-class), "
+                       "gate-drive shift registers for the 72 low-side FETs, "
+                       "CAN/SPI host interface",
+            "why_two_boards": "the buck, bulk, MCU and connectors do not belong on "
+                              "the hole-perforated aperture board; the per-coil "
+                              "FETs DO fit the cell pitch under the unipolar "
+                              "topology (see topology.chosen)",
         },
     },
     "control": {
@@ -90,29 +106,37 @@ out = {
 }
 
 for n_par in (1, 2, 4, 8, 16):
-    burst_w = n_par * I_FULL * (V_RAIL + DRIVER_DROP)
     t_tile = math.ceil(CELLS_TILE / n_par) * STEPS_REPOINT * T_STEP
     out["parallelism_trade"].append({
         "parallel_cells": n_par,
-        "burst_w": round(burst_w, 1),
-        "rail_burst_a": round(n_par * I_FULL, 1),
         "tile_repoint_s": round(t_tile, 2),
+        "stepping": {"pulse_w": round(n_par * I_STEP * V_RAIL_STEP, 1),
+                     "rail_a": round(n_par * I_STEP, 1),
+                     "avg_w_during_repoint": round(n_par * I_STEP * V_RAIL_STEP * DUTY, 1)},
+        "full_drive": {"pulse_w": round(n_par * I_FULL * V_RAIL_FULL, 1),
+                       "rail_a": round(n_par * I_FULL, 1),
+                       "avg_w_during_repoint": round(n_par * I_FULL * V_RAIL_FULL * DUTY, 1)},
     })
 
-N_CELLS_10CM = 1093   # 100×100 mm / 9.15 mm² tiling area (§8.9)
+N_CELLS_10CM = 1093   # 100×100 mm square panel / 9.15 mm² tiling area (§8.9)
 for n_par in (8, 64):
     t_ap = math.ceil(N_CELLS_10CM / n_par) * STEPS_REPOINT * T_STEP
     out["aperture_10cm"][f"parallel_{n_par}"] = {
         "repoint_s": round(t_ap, 2),
-        "burst_w": round(n_par * I_FULL * (V_RAIL + DRIVER_DROP), 0),
+        "pulse_w_stepping": round(n_par * I_STEP * V_RAIL_STEP, 0),
+        "pulse_w_full": round(n_par * I_FULL * V_RAIL_FULL, 0),
     }
-out["aperture_10cm"]["energy_j"] = round(N_CELLS_10CM * STEPS_REPOINT * E_STEP, 1)
+out["aperture_10cm"]["energy_j_stepping"] = round(N_CELLS_10CM * STEPS_REPOINT * E_STEP, 1)
+out["aperture_10cm"]["energy_j_full"] = round(N_CELLS_10CM * STEPS_REPOINT * E_STEP_FULL, 1)
 out["aperture_10cm"]["idle_w"] = 0.0
 
 # sanity gates
 assert abs(E_STEP * 1e3 - 2.68) < 0.03
-assert abs(V_FULL - 1.85) < 0.01
-assert out["parallelism_trade"][3]["burst_w"] < 60  # 8-parallel stays bench-supply scale
+assert abs(E_STEP_FULL * 1e3 - 9.29) < 0.05
+assert abs(I_FULL * RC - 1.85) < 0.01
+p8 = out["parallelism_trade"][3]
+assert abs(p8["stepping"]["pulse_w"] - 16.4) < 0.3
+assert abs(p8["full_drive"]["pulse_w"] - 53.6) < 0.5
 json.dump(out, open("out/drive-electronics.json", "w"), indent=1)
 print(f"8-parallel: {out['parallelism_trade'][3]}")
 print(f"10 cm aperture: {out['aperture_10cm']}")

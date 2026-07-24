@@ -144,7 +144,8 @@ absent("coil closed-ring claim retired", "nothing can wind",
 absent("in-situ magnetisation as mandate retired", "**Magnetise in-situ**")
 contains("round-3 responses present", "open horseshoe", "monolithic", "Route A",
          "37,000", "flux-diffusion", "magnetise-after-assembly")
-contains("v4.3 title", "(v4.3 — 24 Jul feedback rounds 1–3")
+contains("v4.5 title", "(v4.5 — 24 Jul: feedback rounds 1–3 + hex-cell/PCB")
+absent("no v4.3 title", "(v4.3 — 24 Jul feedback rounds")
 # reflector bound: 2x2 mm x 20 um Cu = 0.716 mg < 0.5% of Mt; +2 mg plastic < 2%
 m_foil = 8960 * 2e-3 * 2e-3 * 20e-6 * 1e6  # mg
 check("reflector foil bound 0.72 mg", abs(m_foil - 0.717) < 0.01, f"{m_foil:.3f}")
@@ -232,19 +233,26 @@ contains("proto sizing in report", "≈3.95 mm")
 # ---------------- §9.5 drive electronics + §9.6 cells ----------------------
 de = json.load(open(os.path.join(OUT, "drive-electronics.json")))
 p8 = next(r for r in de["parallelism_trade"] if r["parallel_cells"] == 8)
-check("8-parallel burst 57.6 W", abs(p8["burst_w"] - 57.6) < 0.1)
-check("8-parallel rail 26.8 A", abs(p8["rail_burst_a"] - 26.8) < 0.1)
+check("8-par FULL pulse 53.6 W", abs(p8["full_drive"]["pulse_w"] - 53.6) < 0.1)
+check("8-par STEP pulse 16.4 W", abs(p8["stepping"]["pulse_w"] - 16.4) < 0.1)
+check("8-par rail 26.8 A (full)", abs(p8["full_drive"]["rail_a"] - 26.8) < 0.1)
 check("tile re-point 0.12 s", abs(p8["tile_repoint_s"] - 0.12) < 0.01)
-check("aperture energy 29.3 J", abs(de["aperture_10cm"]["energy_j"] - 29.3) < 0.1)
+check("panel energy 29.3 J (step)", abs(de["aperture_10cm"]["energy_j_stepping"] - 29.3) < 0.1)
+check("panel energy 101.6 J (full)", abs(de["aperture_10cm"]["energy_j_full"] - 101.6) < 0.2)
 check("64-parallel 0.72 s", abs(de["aperture_10cm"]["parallel_64"]["repoint_s"] - 0.72) < 0.01)
 check("idle 0 W", de["aperture_10cm"]["idle_w"] == 0.0)
+check("unipolar topology recorded", "UNIPOLAR" in de["topology"]["chosen"])
 for f_ in ("drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
            "render-3d-hexcell.png", "drive-electronics.json"):
     check(f"artefact {f_} exists", os.path.exists(os.path.join(OUT, f_)))
 check("cell aspect ≈52:1", abs(7.75 / 0.15 - 51.7) < 0.1)
 check("fc sensitivity 17 MHz/µm", abs(hx["cutoff"]["fc_ghz"] / 3.1 - 17.3) < 0.1)
 contains("§9.5 present", "9.5 CAD", "drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
-         "render-3d-hexcell.png", "57.6 W burst", "29.3 J", "rail voltage IS the current control")
+         "render-3d-hexcell.png", "53.6 W pulses", "16.4 W", "29.3 J", "UNIPOLAR",
+         "≤5 mΩ", "10 × 10 cm panel", "rail voltage IS the current control")
+absent("rejected H-bridge architecture not presented as chosen",
+       "so the phase bridges are full-H", "dual select-FET per cell (10–20 mΩ, negligible")
+absent("no mixed-regime power claim", "57.6 W burst (26.8 A on the rail) for 0.12 s")
 contains("§9.6 present", "9.6 How to make the cells", "17 MHz per µm", "52:1",
          "Thomas Keating", "Vitesse", "SWISSto12", "electroless copper",
          "Annex E", "K.Pike@terahertz.co.uk", "Sales@custommicrowave.com")

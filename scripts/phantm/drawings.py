@@ -320,32 +320,36 @@ def d6_pcb():
         "pitch 3.25", offset=0.5)
     a1.text(0, -1.05, "Ø2.6", ha="center", fontsize=7, color=INK)
     a1.text(0, -5.3, "per cell: Ø2.6 clearance hole (translator tail) · 3 coil-pad pairs (red)\n"
-            "· dual select-FET (green) · min web 0.65 mm, 2 oz Cu",
+            "· 3 per-coil low-side FETs + clamps (green) · min web 0.65 mm, 2 oz Cu",
             ha="center", fontsize=8, color=INK)
     a1.set_xlim(-6.2, 6.2); a1.set_ylim(-6.2, 6.2)
     a2.axis("off")
     a2.set_title("Stack + power/control budget (drive-electronics.json)", fontsize=9)
     rows = [
-        ("STACK", "hex lattice 7.75 → back skin → APERTURE PCB 1.6 (pads + select FETs)"
-                  " → board-to-board → DRIVER PCB (3 phase H-bridges, buck, MCU)"),
-        ("Rail", "5 V → buck 0.8–2.1 V, DAC-set — the RAIL VOLTAGE is the current "
-                 "control (resistive coil): 1.0 V→1.8 A step, 2.0 V→3.6 A ≈ Ic*"),
-        ("Per coil", "0.552 Ω · τ 1.1 µs · pulse 1.5 ms · 2.7 mJ/step"),
-        ("Per 24-cell tile", "72 coils · re-point 0.65 J · 8-parallel: 57.6 W burst "
-                             "(26.8 A rail), 0.12 s · idle 0 W (zero-power hold)"),
-        ("10 cm aperture", "≈1,093 cells · 29.3 J/re-point · 5.5 s @8-par (58 W) or "
-                           "0.72 s @64-par (461 W burst)"),
+        ("STACK", "hex lattice 7.75 → back skin → APERTURE PCB 1.6 (pads + per-coil "
+                  "FETs) → board-to-board → DRIVER PCB (burst-rated buck, MCU, "
+                  "gate shift registers)"),
+        ("Topology", "UNIPOLAR: direction = phase SEQUENCE, so ONE low-side FET + "
+                     "clamp per coil (72/tile) — no H-bridges, no select-FET sneak "
+                     "paths (council fix). Coils wired so + current AIDS the PM"),
+        ("Rail", "5 V → buck 0.8–2.1 V DAC-set = the current control (resistive "
+                 "coil): 1.15 V→1.8 A step, 2.0 V→3.35 A full. Shared path ≤5 mΩ "
+                 "(star routing) or current error ≈7% at 8-parallel"),
+        ("Per coil", "0.552 Ω · τ 1.1 µs · pulse 1.5 ms · 2.7 mJ (step) / 9.3 mJ "
+                     "(full) · flyback 3.4 µJ"),
+        ("Per 24-cell tile", "STEP: 0.65 J, 16.4 W pulses (≈6 W avg), 0.12 s @8-par "
+                             "· FULL: 2.2 J, 53.6 W pulses (≈20 W avg) · idle 0 W"),
+        ("10×10 cm panel", "≈1,093 cells · STEP 29.3 J (5.5 s @8-par, 0.72 s @64-par "
+                           "at 131 W pulses) · FULL 102 J (429 W pulses @64-par)"),
         ("Control", "per-tile MCU, open-loop step counting into detents; hold-then-"
                     "release capture (§4.4); tiles daisy-chained (CAN/SPI); host sends "
                     "per-cell target depth map"),
-        ("Polarity", "phase bridges full-H: drive current must AID the PM "
-                     "(FE sign convention)"),
     ]
     y = 0.95
     for head, body in rows:
         a2.text(0.01, y, head, fontsize=8.5, fontweight="bold", color=INK, va="top")
         a2.text(0.22, y, body, fontsize=8, color=INK, va="top", wrap=True)
-        y -= 0.135
+        y -= 0.125
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(f"{OUT}/drawing-D6-pcb.png"); plt.close(fig)
 

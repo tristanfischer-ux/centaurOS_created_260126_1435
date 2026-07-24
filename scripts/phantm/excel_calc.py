@@ -299,7 +299,7 @@ for label, val, unit, art, inval in fe_rows:
 
 # ============================ honeycomb ======================================
 af_, t_, dep_, apw_, aph_ = 3.1, 0.15, 7.75, 100.0, 100.0
-cella_ = math.sqrt(3) / 2 * af_ ** 2
+cella_ = math.sqrt(3) / 2 * (af_ + t_) ** 2
 ncell_ = math.floor(apw_ * aph_ / cella_)
 wall_ = math.sqrt(3) / 2 * ((af_ + t_) ** 2 - af_**2) * dep_
 cellm_ = wall_ * 1240 / 1000
@@ -403,10 +403,11 @@ note("Manufacture note: at demo scale the lattice is conventional (bonded/folded
 
 # ============================ 12 · drive electronics =========================
 banner("12 · DRIVE ELECTRONICS (per report §9.5; artefact drive-electronics.json)")
-note("The coil is resistive at every relevant timescale (τ ≈ 1.1 µs ≪ 1.5 ms pulse), so the buck "
-     "RAIL VOLTAGE is the current control: 1.0 V → 1.8 A step, 2.0 V → ≈3.6 A ≈ full drive. "
-     "Idle power is ZERO (detent holds). Two-board stack: aperture PCB (Ø2.6 mm clearance holes "
-     "on the 3.25 mm pitch + coil pads + select FETs) + driver PCB (3 phase H-bridges, buck, MCU).")
+note("UNIPOLAR drive (council-corrected): direction comes from the phase SEQUENCE, so each coil "
+     "needs ONE low-side FET + clamp (72/tile) — no H-bridges. The buck RAIL VOLTAGE is the "
+     "current control (resistive coil, τ ≈ 1.1 µs): 1.15 V → 1.8 A step, 2.0 V → 3.35 A full "
+     "drive. TWO REGIMES — never mix step-energy with full-drive power. Idle power is ZERO. "
+     "Stack: aperture PCB (holes + pads + per-coil FETs) + driver PCB (burst-rated buck, MCU).")
 head()
 inp("vrail", "Buck rail voltage", 2.0, "V", "DAC-set 0.8–2.1 V; sets the coil current (V/R)")
 inp("vdrop", "Driver + trace drop", 0.15, "V", "indicative at 3.35 A")
@@ -414,17 +415,21 @@ inp("npar", "Cells stepped in parallel", 8, "-", "driver-board sizing knob")
 inp("nstp", "Average steps per re-point", 10, "-", "assumption — depends on the phase map")
 inp("tstp", "Time per completed step", 4, "ms", "1.5 ms pulse + settle (report §4.4 upper)")
 inp("napc", "Cells in a 10 cm aperture", 1093, "-", "100×100 mm / 9.15 mm² tiling area")
-der("irail", "Rail current (burst)", "={npar}*{Ix}", "A", "n·Ic*", 8 * 3.35, "")
-der("burst", "Burst power (n-parallel)", "={npar}*{Ix}*({vrail}+{vdrop})", "W",
-    "n·Ic*·(Vrail+drop)", 8 * 3.35 * 2.15, "57.6 W at the default 8-parallel")
+der("irail", "Rail current, FULL-drive burst", "={npar}*{Ix}", "A", "n·Ic*", 8 * 3.35, "")
+der("burst", "Pulse power, FULL-drive (worst case)", "={npar}*{Ix}*({Ix}*{rc}+{vdrop})", "W",
+    "n·Ic*·(Ic*·R+drop)", 8 * 3.35 * (3.35 * 0.5518 + 0.15), "53.6 W at 8-parallel; ×0.375 duty ⇒ ≈20 W avg")
+der("bstep", "Pulse power, STEPPING", "={npar}*{Id}*({Id}*{rc}+{vdrop})", "W",
+    "n·Id·(Id·R+drop)", 8 * 1.8 * (1.8 * 0.5518 + 0.15), "16.4 W at 8-parallel; ≈6 W avg over a re-point")
 der("tilet", "24-cell tile re-point time", "=CEILING({csub}/{npar},1)*{nstp}*{tstp}/1000", "s",
     "⌈cells/n⌉·steps·t", math.ceil(24 / 8) * 10 * 4 / 1000, "")
 der("tilee", "24-cell tile re-point energy", "={csub}*{nstp}*{es}/1000", "J", "cells·steps·E_step",
     24 * 10 * 2.682 / 1000, "at the 1.8 A step energy")
 der("apt", "10 cm aperture re-point time", "=CEILING({napc}/{npar},1)*{nstp}*{tstp}/1000", "s",
     "⌈N/n⌉·steps·t", math.ceil(1093 / 8) * 10 * 4 / 1000, "5.5 s @8-par; set npar=64 → 0.69 s")
-der("ape", "10 cm aperture re-point energy", "={napc}*{nstp}*{es}/1000", "J", "N·steps·E_step",
+der("ape", "Panel re-point energy, STEPPING", "={napc}*{nstp}*{es}/1000", "J", "N·steps·E_step",
     1093 * 10 * 2.682 / 1000, "idle power between re-points is ZERO")
+der("apef", "Panel re-point energy, FULL-drive", "={napc}*{nstp}*{Ix}^2*{rc}*{tp}/1000", "J",
+    "N·steps·Ic*²·R·t", 1093 * 10 * 3.35**2 * 0.5518 * 1.5 / 1000, "the worst-case bound")
 
 for col, w in (("A", 36), ("B", 7), ("C", 14), ("D", 9), ("E", 40), ("F", 62)):
     ws.column_dimensions[col].width = w

@@ -226,7 +226,7 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v4.3 — 24 Jul feedback rounds 1–3 incorporated; pending 3D-FE/prototype validation)")
+    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v4.5 — 24 Jul: feedback rounds 1–3 + hex-cell/PCB work package, council-reviewed; pending 3D-FE/prototype validation)")
     A("")
     A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
@@ -971,15 +971,22 @@ def main():
     A("")
     A("### 9.3 The integration — one cell, one actuator")
     A("")
-    A("1. **The moving short shields its own actuator.** The reflector (mg-scale "
-      "plastic + 20 µm copper foil, §0.5) rides on the translator nose, stood off "
-      "from the iron. Everything behind a reflective short sees only evanescent "
-      "residue — so the actuator lives INSIDE the cell footprint, behind the plane "
-      "it controls, invisible to the RF by construction. This is why the "
-      "1.708 × 2.634 mm envelope fitting the 3.1 mm interior (§8.9, 0.35 mm margin) "
-      "is the make-or-break packaging fact — and it fits.")
-    A("2. **Stroke budget** — table above: single-group covers the band; two-group "
-      "is a ≥67 GHz option only.")
+    A("1. **The moving short shields its own actuator — to first order.** The "
+      "reflector (mg-scale plastic + 20 µm copper foil, §0.5) rides on the "
+      "translator nose, stood off from the iron. Behind a reflective short the "
+      "fields are evanescent, so the actuator hides behind the plane it controls: "
+      "it occupies the cell's CROSS-SECTION (footprint) and extends axially BEHIND "
+      "the cell, the translator tail passing out through the back wall (D5) — only "
+      "the foil, standoff and translator nose are ever inside the guide volume. "
+      "The one leak path is the foil-edge running clearance (item 4 below, Vlad's "
+      "to quantify) — so 'shielded' is a first-order claim pending that number, "
+      "not an absolute (council catch, grok). The 1.708 × 2.634 mm envelope "
+      "fitting the 3.1 mm interior (§8.9, 0.35 mm width margin) remains the "
+      "make-or-break packaging fact — and it fits.")
+    A("2. **Stroke budget** — table above: single-group covers the band (cell "
+      "depth binding); the two-group option (§0.3's force-doubler: TWO 3-pole "
+      "stator groups on one translator, halving usable stroke to ≈3.7 mm) is a "
+      "≥67 GHz option only.")
     A("3. **Phase resolution** — 16.7°/step at 70 GHz in-guide (the free-space 26° "
       "of §8.7 was the upper bound). FE step unevenness (172.6/146.1/145.3 µm at "
       "the as-drawn registration) maps to ≈±1.9° of per-step jitter at 70 GHz; the "
@@ -995,13 +1002,15 @@ def main():
       "zero-power hold must beat platform acceleration at the detent. This is the "
       "open Tony question (hold vs shock, §0.3) with a concrete route to the answer: "
       "the vehicle vibration envelope sets n·g, the §0.3 ladder buys it.")
-    A("6. **Drive electronics scale.** 3 coils per cell ⇒ 72 per 24-hex tile. At "
-      "2.7 mJ and 2.5–4 ms per step, a full re-point of a 24-cell tile (≈10 steps "
-      "per cell average) costs ≈0.65 J; stepping 8 cells at a time (3 groups × "
-      "10 steps × ≈4 ms) re-points a tile in ≈0.12–0.15 s, comfortably inside the bid's mechatronic-nulling claims "
-      "at ms-per-step but SERIAL re-pointing of large apertures needs the "
-      "parallelism budgeted in the driver design (peak supply current ≈8 × 3.35 A "
-      "at 1.9 V ≈ 51 W bursts).")
+    A("6. **Drive electronics scale — two regimes, never mixed (council catch, "
+      "gpt-5.5).** 3 coils per cell ⇒ 72 per 24-hex tile; ≈10 steps per cell per "
+      "re-point; 8 cells at a time (3 groups × 10 steps × ≈4 ms) re-points a tile "
+      "in ≈0.12–0.15 s. STEPPING regime (1.8 A): 2.7 mJ/step, tile ≈0.65 J, "
+      "16.4 W during the 1.5 ms pulses (37% duty ⇒ ≈6 W averaged over the "
+      "re-point). WORST-CASE FULL-DRIVE regime (3.35 A): 9.3 mJ/step, tile "
+      "≈2.2 J, 53.6 W pulses (≈20 W averaged). Comfortably inside the bid's "
+      "mechatronic-nulling claims at ms-per-step; large-aperture re-point time is "
+      "a driver parallelism budget, not physics.")
     A("")
     A("### 9.4 Interface requirements (the actuator ↔ cell contract)")
     A("")
@@ -1031,31 +1040,42 @@ def main():
     A("")
     A("![D6](drawing-D6-pcb.png)")
     A("")
-    A("**The PCB is a two-board stack, by necessity**: three coil drivers per cell do "
-      "not fit inside a 3.25 mm hex pitch (9.15 mm² per cell) even using both sides — "
-      "so the APERTURE board carries only the clearance holes, coil termination pads "
-      "and a dual select-FET per cell (10–20 mΩ, negligible against the 0.552 Ω coil), "
-      "and the DRIVER board behind carries three shared phase H-bridges, the buck "
-      "rail, bulk capacitance and the MCU. Two design facts do the heavy lifting "
-      "(artefact: drive-electronics.json):")
+    A("**The drive is UNIPOLAR — a council correction that simplified the whole "
+      "board.** The first-draft architecture (three shared full-H phase bridges + a "
+      "dual select-FET per cell) was killed in review (gemini-3.1): a dual FET "
+      "cannot block a bipolar phase rail — body diodes conduct and deselected coils "
+      "cross-feed. The fix is cheaper than the bug: step DIRECTION comes from the "
+      "phase SEQUENCE (A→B→C vs C→B→A), never from current polarity, so each coil "
+      "needs exactly ONE low-side FET (72 per tile, 10–20 mΩ, 1 mm-class DFN — "
+      "which now FITS the cell pitch) plus a flyback clamp (the 0.6 µH coil stores "
+      "a trivial 3.4 µJ). The APERTURE board carries the Ø2.6 mm clearance holes, "
+      "coil pads and those per-coil FETs; the DRIVER board behind carries the "
+      "DAC-set buck (burst-rated, VRM-class ≥30 A at 2 V, with input bulk), the "
+      "MCU and the gate-drive shift registers. A reverse 'brake' pulse (§4.4 "
+      "option) would need half-bridges — added only if settle tests demand it. "
+      "Coils are wired so positive rail current AIDS the permanent magnet (the FE "
+      "sign convention). Facts that do the heavy lifting (drive-electronics.json):")
     A("")
     A("- **The rail voltage IS the current control.** The coil is resistive at every "
-      "timescale that matters (τ = L/R ≈ 1.1 µs ≪ 1.5 ms pulse), so a DAC-set buck "
-      "rail of 1.0 V delivers the 1.8 A step current and 2.0 V delivers ≈3.6 A ≈ Ic* — "
-      "no per-channel current loops, no PWM chopping into a 0.6 µH load.")
-    A("- **Idle power is zero** (the PM detent holds), so the budget is entirely "
-      "re-pointing bursts: 2.7 mJ/step; a 24-cell tile re-points for 0.65 J — at "
-      "8-cells-parallel that is 57.6 W burst (26.8 A on the rail) for 0.12 s. A 10 cm "
-      "aperture (≈1,093 cells) re-points for 29.3 J: 5.5 s at 8-parallel (58 W) or "
-      "0.72 s at 64-parallel (461 W burst) — the parallelism knob is a driver-board "
-      "sizing choice, not a physics limit.")
+      "timescale that matters (τ = L/R ≈ 1.1 µs ≪ 1.5 ms pulse): rail ≈1.15 V "
+      "delivers the 1.8 A step, ≈2.0 V the 3.35 A full drive — no per-channel "
+      "current loops. The care this buys: rail-sharing across parallel cells needs "
+      "star/kelvin routing with ≤5 mΩ of shared path (26.8 A × 5 mΩ ≈ 7% current "
+      "error, and force goes as I² — council item, gemini-3.1), and coil warming "
+      "(+0.39%/K) trims current a few percent within a burst.")
+    A("- **Idle power is zero** (the PM detent holds); the budget is re-pointing "
+      "bursts, quoted per regime. STEPPING (1.8 A): tile 0.65 J, 16.4 W pulses / "
+      "≈6 W average, 0.12 s at 8-parallel; a 10 × 10 cm panel (≈1,093 cells) "
+      "29.3 J, 5.5 s at 8-parallel or 0.72 s at 64-parallel (131 W pulses). "
+      "WORST-CASE FULL-DRIVE (3.35 A): tile 2.2 J, 53.6 W pulses / ≈20 W average; "
+      "panel 102 J, 429 W pulses at 64-parallel. The parallelism knob is a "
+      "driver-board sizing choice, not a physics limit.")
     A("")
     A("Control is deliberately dumb: per-tile MCU, open-loop step counting into the "
       "detents (that is what the zero-power detent is FOR), hold-then-release capture "
       "per §4.4, tiles daisy-chained on CAN/SPI, and the host supplies only a per-cell "
       "target-depth map. The phase map itself — which depth pattern steers where — is "
-      "RF and stays with Tony/Vlad. One polarity trap carried over from the FE: drive "
-      "current must AID the permanent magnet, so the phase bridges are full-H.")
+      "RF and stays with Tony/Vlad.")
     A("")
 
     A("### 9.6 How to make the cells — the tutorial, and who can fabricate them")
