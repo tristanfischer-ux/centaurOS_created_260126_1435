@@ -16500,20 +16500,24 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     # WIDTH = the desk-frontage-premium narrow dimension. Choose it for the long-narrow aspect
     # BUT never below the widest floor part's short side (a part can't be wider than the box).
     _widest = max((min(x["dims"][0], x["dims"][1]) for x in _floor_items), default=40.0)
-    area = tot_fp / max(0.30, _INTERIOR_PACK_EFFICIENCY)
+    # MULTI-SHELF stacking (Tristan: "multiple shelves ... vertically or horizontally ... gravity")
+    # uses the HEIGHT, so the FOOTPRINT target is divided by an assumed layer count — the body
+    # hugs its contents in 3D, not one flat wasteful layer.
+    _STACK_LAYERS = 1.3
+    area = tot_fp / max(0.30, _INTERIOR_PACK_EFFICIENCY) / _STACK_LAYERS
     width = max(_m.sqrt(area / _INTERIOR_BENCH_ASPECT_DW), _widest + 8.0)
     pack_h = max_h + 8.0
+    stack_h = max(pack_h, max_h * 2.6)    # room to stack ~2-3 short parts (tall parts still fit)
     floor_z = base_z + margin
     pack_parts = [{"tag": x["tag"], "name": x["name"], "dims": x["dims"]} for x in items]
-    # MULTI-PLANE TIGHT pack: circuit BOARDS stand VERTICAL behind the floor pack; the floor uses
-    # a skyline (bottom-left) packer that MINIMISES depth → the body hugs its contents (Tristan:
-    # "tightly packed", "long+narrow — width is a premium, depth not"). The skyline self-determines
-    # DEPTH, so we pass a generous depth bound (the post-placement resize sizes the real shell);
-    # width is the only real target. 3D-clash-free by construction (verified below).
+    # MULTI-SHELF, GRAVITY-AWARE pack: gravity-uprights (vessels/pumps) on the floor, short flats
+    # STACK into shelves to fill the vertical volume, circuit boards stand vertical on the back
+    # wall. A height-map + AABB overlap guard keeps it 3D-clash-free. The pack self-determines the
+    # real bbox; we pass generous depth/height bounds and let the post-placement resize size the shell.
     def _do_pack(wd):
-        _dp = wd * 6.0   # generous bound — the skyline sets the true depth, the shell resizes to it
-        _p = _ipack.pack_interior_3d(pack_parts, wd, _dp, pack_h, floor_z, gap_mm=4.0, wall_mm=0.0)
-        _nc, _oob, _w = _ipack.count_clashes(pack_parts, _p, wd, _dp, pack_h, floor_z, wall_mm=0.0)
+        _dp = wd * _INTERIOR_BENCH_ASPECT_DW
+        _p = _ipack.pack_interior_shelved(pack_parts, wd, _dp, stack_h, floor_z, gap_mm=4.0, wall_mm=0.0)
+        _nc, _oob, _w = _ipack.count_clashes(pack_parts, _p, wd, _dp * 4.0, stack_h * 4.0, floor_z, wall_mm=0.0)
         return _p, _nc, _oob, _w
     pos, nclash, oob, worst = _do_pack(width)
     if nclash or oob:
