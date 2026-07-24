@@ -16495,31 +16495,29 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     pack_h = max_h + 8.0
     floor_z = base_z + margin
     pack_parts = [{"tag": x["tag"], "name": x["name"], "dims": x["dims"]} for x in items]
-    # hosting=False → EVERY part single-layer on the floor (no PCB-mounting) so the pack is
-    # 3D-clash-free BY CONSTRUCTION (one z-plane). Tristan 2026-07-24: "are parts not clashing
-    # on a 3D basis?" — a guaranteed-0-clash layout beats the tighter hosted pack that left a
-    # small probe↔connector overlap.
-    pos = _ipack.pack_interior(pack_parts, width, depth, pack_h, floor_z,
-                               gap_mm=3.0, wall_mm=0.0, hosting=False)
-    rot = pos.get("__rot__", {})
-    nclash, oob, worst = _ipack.count_clashes(pack_parts, pos, width, depth, pack_h,
-                                              floor_z, wall_mm=0.0)
+    # MULTI-PLANE pack (Tristan 2026-07-24: "no reason PCBs + other components can't be
+    # vertically aligned rather than everything on horizontal planes"): circuit BOARDS stand
+    # VERTICAL against the back wall, the rest single-layer on the floor front region — the two
+    # planes never overlap, so it stays 3D-clash-free BY CONSTRUCTION.
+    def _do_pack(wd, dp):
+        _p = _ipack.pack_interior_3d(pack_parts, wd, dp, pack_h, floor_z, gap_mm=4.0, wall_mm=0.0)
+        _nc, _oob, _w = _ipack.count_clashes(pack_parts, _p, wd, dp, pack_h, floor_z, wall_mm=0.0)
+        return _p, _nc, _oob, _w
+    pos, nclash, oob, worst = _do_pack(width, depth)
     if nclash or oob:
-        # widen the floor + re-pack once: a clash/oob here means the target was too tight.
-        width *= 1.15
-        depth *= 1.15
-        pos = _ipack.pack_interior(pack_parts, width, depth, pack_h, floor_z,
-                                   gap_mm=4.0, wall_mm=0.0, hosting=False)
-        rot = pos.get("__rot__", {})
-        nclash, oob, worst = _ipack.count_clashes(pack_parts, pos, width, depth, pack_h,
-                                                  floor_z, wall_mm=0.0)
+        width *= 1.15; depth *= 1.15               # too tight → widen + re-pack once
+        pos, nclash, oob, worst = _do_pack(width, depth)
+    rot = pos.get("__rot__", {})
+    orient_map = pos.get("__orient__", {})
+    wdims_map = pos.get("__world_dims__", {})
+    _nvert = sum(1 for o in orient_map.values() if o == "vertical_back")
     # HARD 3D-clash self-check on the FINAL placed AABBs (the answer to "do parts clash?").
     if nclash or oob:
         print(f"[univ][sealed][interior][CLASH] {nclash} clash + {oob} oob AFTER re-pack "
-              f"({worst[:3]}) — INVESTIGATE (should be 0 on a single-layer pack)")
+              f"({worst[:3]}) — INVESTIGATE (should be 0)")
     else:
         print(f"[univ][sealed][interior] 3D clash-check: 0 clashes, 0 out-of-bounds "
-              f"({len(pack_parts)} parts, single-layer)")
+              f"({len(pack_parts)} parts; {_nvert} board(s) vertical on the back wall)")
 
     # 3+4. overwrite placement (manifest/GA follow) + build recognizable meshes.
     mat_cache = {}
@@ -16531,10 +16529,17 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
         c = pos.get(tag)
         if not c:
             continue
+        _orient = orient_map.get(tag, "flat")
+        # WORLD extents: a vertical board's AABB is (w, thin, d); a flat part is its (w,d,h)
+        # with the packer's optional long-side-along-x swap. The manifest + GA + frame use these.
+        _wd = wdims_map.get(tag)
         rsw = bool(rot.get(tag))
-        w, d, h = sd
-        if rsw:
-            w, d = max(w, d), min(w, d)
+        if _wd:
+            w, d, h = _wd
+        else:
+            w, d, h = sd
+            if rsw:
+                w, d = max(w, d), min(w, d)
         p.placed_xyz_mm = (round(c[0], 2), round(c[1], 2), round(c[2], 2))
         p.shape = "box"
         p.dim = parse_dimension(f"{w:.0f}x{d:.0f}x{h:.0f} mm")
@@ -16548,7 +16553,7 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
         _igeo.build_component(
             fl, f"u_se_cutaway_cue_int_{slug}", fam, c, sd, mat_cache,
             module=getattr(p, "module_id", None) or story_mod, module_objects=MO,
-            rot_swap=rsw)
+            rot_swap=rsw, orient=_orient)
         n_vis += 1
 
     # 5. internal mounting frame — chassis base plate + 4 corner standoffs (bolt-on).

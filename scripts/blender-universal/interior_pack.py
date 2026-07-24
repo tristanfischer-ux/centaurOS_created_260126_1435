@@ -237,6 +237,75 @@ def pack_interior(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=3.0, wall_mm=6
     return pos
 
 
+def _is_board(name: str) -> bool:
+    """A flat circuit board that can stand VERTICALLY against a wall (Tristan 2026-07-24:
+    'no reason PCBs + other components can't be vertically aligned')."""
+    return bool(re.search(r"\bpcb\b|\bboard\b|motherboard|backplane|daughterboard|"
+                          r"\bmcu\b|microcontroller|regulation board|controller card", name, re.I))
+
+
+def pack_interior_3d(parts, iw_mm, idep_mm, ih_mm, base_z_mm, gap_mm=4.0, wall_mm=0.0):
+    """MULTI-PLANE pack (2026-07-24): flat circuit BOARDS stand VERTICALLY against the back
+    wall (reads like a real instrument + frees the floor); mechanical/chassis + the rest pack
+    single-layer on the floor in the FRONT region; the two planes never overlap (the floor pack
+    is depth-reduced + shifted forward to clear the thin back strip the boards occupy). Returns a
+    pos dict carrying `__rot__`, `__orient__` (flat|vertical_back), and `__world_dims__` (the
+    world AABB per part) so the clash oracle + the mesh builder agree on every oriented part.
+    Deterministic; 3D-clash-free by construction (verify with count_clashes)."""
+    floor_z = base_z_mm + wall_mm
+    fw = iw_mm - 2 * wall_mm
+    fd = idep_mm - 2 * wall_mm
+    fasteners = [p for p in parts if _is_fastener(p["name"])]
+    rest = [p for p in parts if not _is_fastener(p["name"])]
+    boards = [p for p in rest if _is_board(p["name"])]
+    floor = [p for p in rest if p not in boards]
+    pos = {}; world = {}; orient = {}; rot = {}
+
+    # 1. VERTICAL boards along the back wall. A board (w×d×h, h thin) stands so its w×d face is
+    #    vertical → world extents (w, h, d): w along x, thin h into the room (y), d up (z).
+    strip_y = 0.0
+    x = -fw / 2 + gap_mm
+    for p in list(boards):
+        w, d, h = p["dims"]
+        vh = min(d, ih_mm - gap_mm)                 # the board's deep dim becomes vertical height
+        vy = max(2.0, min(h, w, d))                 # thinnest dim = thickness into the room
+        if x + w > fw / 2 - gap_mm:                 # no lateral room for another board → floor it
+            floor.append(p)
+            continue
+        cx = x + w / 2
+        cy = fd / 2 - vy / 2 - gap_mm               # flush against the back wall
+        cz = floor_z + vh / 2
+        pos[p["tag"]] = (round(cx, 2), round(cy, 2), round(cz, 2))
+        world[p["tag"]] = (round(w, 1), round(vy, 1), round(vh, 1))
+        orient[p["tag"]] = "vertical_back"
+        x += w + gap_mm
+        strip_y = max(strip_y, vy)
+
+    # 2. FLOOR parts in the front region (depth reduced + shifted forward to clear the back strip)
+    front_fd = fd - strip_y - gap_mm if strip_y else fd
+    fpos, _ztop, _ = _shelf_pack(floor, fw, front_fd, floor_z, gap_mm)
+    frot = fpos.pop("__rot__", {})
+    y_shift = -(strip_y + gap_mm) / 2.0 if strip_y else 0.0
+    for p in floor:
+        if p["tag"] in fpos:
+            cx, cy, cz = fpos[p["tag"]]
+            pos[p["tag"]] = (cx, round(cy + y_shift, 2), cz)
+            rot[p["tag"]] = frot.get(p["tag"], False)
+            orient[p["tag"]] = "flat"
+
+    # 3. fasteners near the front-left corner
+    fx = -fw / 2 + gap_mm
+    for p in fasteners:
+        w, d, h = p["dims"]
+        pos[p["tag"]] = (round(fx + w / 2, 2), round(-fd / 2 + d, 2), round(floor_z + h / 2, 2))
+        fx += w + gap_mm
+
+    pos["__rot__"] = rot
+    pos["__orient__"] = orient
+    pos["__world_dims__"] = world
+    return pos
+
+
 # ── clash oracle (the convergence check) ─────────────────────────────────────
 def _aabb(cx, cy, cz, w, d, h):
     return (cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, cz - h / 2, cz + h / 2)
@@ -247,11 +316,17 @@ def count_clashes(parts, pos, iw_mm, idep_mm, ih_mm, base_z_mm, wall_mm=6.0):
     import itertools
     def fast(n): return _is_fastener(n)
     rot = pos.get("__rot__", {})
+    wdims = pos.get("__world_dims__", {})   # explicit world AABB (mm) for oriented parts
     boxes = {}
     for p in parts:
-        c = pos[p["tag"]]; w, d, h = p["dims"]
-        if rot.get(p["tag"]):  # packer swapped w/d to run the long side along x
-            w, d = max(w, d), min(w, d)
+        c = pos[p["tag"]]
+        wd = wdims.get(p["tag"])
+        if wd:                              # a placed WORLD extent (vertical boards etc.) — use it verbatim
+            w, d, h = wd
+        else:
+            w, d, h = p["dims"]
+            if rot.get(p["tag"]):           # packer swapped w/d to run the long side along x
+                w, d = max(w, d), min(w, d)
         boxes[p["tag"]] = (_aabb(c[0], c[1], c[2], w, d, h), p["name"])
     lo = (-(iw_mm/2)+wall_mm, -(idep_mm/2)+wall_mm, base_z_mm)
     hi = ((iw_mm/2)-wall_mm, (idep_mm/2)-wall_mm, base_z_mm+ih_mm)
@@ -300,6 +375,20 @@ def _selftest():
     bad["__rot__"] = {}
     nbad, _, _ = count_clashes(demo, bad, 10000, 10000, 10000, 0.0)
     assert nbad > 0, "clash oracle failed to catch a fully co-located layout"
+    # MULTI-PLANE proveCatch: boards stand VERTICAL on the back wall, 0 clash, world-dims oriented
+    demo3d = demo + [
+        {"tag": "P", "name": "Controller PCB", "dims": (90, 70, 2)},
+        {"tag": "Q", "name": "Power Regulation Board", "dims": (60, 45, 2)},
+    ]
+    p3 = pack_interior_3d(demo3d, 320, 460, 130, 0.0)
+    o3 = p3["__orient__"]
+    assert o3.get("P") == "vertical_back" and o3.get("Q") == "vertical_back", \
+        f"boards must stand vertical: {[(t, o3.get(t)) for t in ('P', 'Q')]}"
+    wd = p3["__world_dims__"]
+    # a vertical board's world AABB is (w, thin, d) — thin (2mm) is the y-extent, d(70) is the height
+    assert wd["P"][1] <= 3 and abs(wd["P"][2] - 70) < 1, f"vertical world dims wrong: {wd['P']}"
+    n3, oob3, w3 = count_clashes(demo3d, p3, 320, 460, 130, 0.0, wall_mm=0.0)
+    assert n3 == 0 and oob3 == 0, f"3D multi-plane pack must be clash-free: clash={n3} oob={oob3} {w3}"
     print(f"interior_pack _selftest: OK (stacked {len(placed)} parts, {len(layers)} layers, 0 clash, "
           f"frame=base-plate+standoffs; oracle catches co-location)")
 
