@@ -157,7 +157,20 @@ def _required_services(name, module, function, wet_plant=True):
         if 'powerdistribution' in m or 'powerconversion' in m:
             req.add('power')
         if 'safetyprotection' in m:
-            req.add('signal')
+            # A POWER-protection element sits IN the power rail (series fuse/PTC/polyfuse/
+            # reverse-polarity/breaker, or shunt MOV/TVS/OVP on the rail) and needs a POWER
+            # feed — NOT a signal tie. Only a DATA/signal-protection element (ESD/TVS on the
+            # debug/USB data lines) needs signal. Council 2026-07-24: the safety_protection
+            # module blanket-defaulted to 'signal', so the "PTC Resettable Fuse" fell through
+            # unclassified → signal → the power-bus fan-out skipped it (missing_input) and the
+            # signal-closer wired it to the Debug Header. Universal noun test, no class table.
+            if _re.search(r'\bfuse\b|polyfuse|\bptc\b|resettable|overcurrent|over[ -]?current|'
+                          r'reverse[ -]?polarity|thermal[ -]?cut|crowbar|inrush|\bmov\b|varistor|'
+                          r'current[ -]?limit|over[ -]?voltage|\bovp\b|\bocp\b|breaker|surge',
+                          tn):
+                req.add('power')
+            else:
+                req.add('signal')
         if 'sensing' in m or 'instrumentation' in m:
             req.add('signal')
         if 'controlcompute' in m or 'communication' in m:
