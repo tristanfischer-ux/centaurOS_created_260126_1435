@@ -68,6 +68,7 @@ run "B4 lab_electronics signature split"          "$PY" scripts/blender-universa
 run "LE handheld-cue form-gate (vial_bioreactor)" "$PY" scripts/blender-universal/le_handheld_cue_gating_selftest.py
 run "interior_pack stacked/single-layer pack"    "$PY" scripts/blender-universal/interior_pack.py --selftest
 run "interior_geometry function->mesh library"   "$PY" scripts/blender-universal/interior_geometry.py --selftest
+run "power_subsystem universal load-sized power"  "$PY" scripts/lib/power_subsystem.py --selftest
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 # EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice
 # (our only prior verifier) silently tolerates: Tristan opened bess-campaign-v3's

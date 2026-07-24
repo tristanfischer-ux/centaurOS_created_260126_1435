@@ -1994,6 +1994,23 @@ def _instrument_proxy_dim(name, module_id, quantities):
 def extract_parts(state):
     """Walk modules→sub_modules→words; return (parts, dropped, stats)."""
     parts, dropped = [], []
+    # UNIVERSAL POWER SUBSYSTEM (2026-07-24, Tristan "power on a universal basis at the right
+    # amount"): before walking, ensure a powered device carries a load-sized power inlet +
+    # supply (idempotent — no-op if already present / unpowered). Flows to render + BoM +
+    # drawings because they all read moduleDecomposition. Fixes the per-class REQUIRED_PARTS
+    # blind spot where a class not in the table (benchtop_bioreactor) got no PSU.
+    try:
+        import os as _os, sys as _sys
+        _libp = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "lib")
+        if _libp not in _sys.path:
+            _sys.path.insert(0, _libp)
+        from power_subsystem import augment_decomposition_with_power as _aug
+        _n = _aug(state)
+        if _n:
+            print(f"[univ][power] universal power subsystem: +{_n} part(s) "
+                  f"(load-sized inlet + supply) injected into the decomposition")
+    except Exception as _pe:  # noqa: BLE001 — never break the render on the augmentation
+        print(f"[univ][power] power-subsystem augmentation skipped: {_pe}")
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     quantities = ((state.get("orchestratorContract") or {}).get("quantities")) or {}
     instrument_device = bool(state.get("isInstrumentDevice"))
@@ -2005,6 +2022,13 @@ def extract_parts(state):
         rank = region_rank_for(display, module_id)
         for s in m.get("sub_modules", []):
             for w in s.get("words", []):
+                # EXTERNAL ACCESSORY (2026-07-24, universal power subsystem): a word marked
+                # `_internal: False` (e.g. the external DC power adapter/brick) is a SHIPPED
+                # accessory that lives OUTSIDE the product body — it must NOT become a physical
+                # placed/rendered/manifest part (else a 120 mm brick floats inside the case).
+                # It stays in moduleDecomposition so the BoM still costs it.
+                if w.get("_internal") is False:
+                    continue
                 # NAME FALLBACK (2026-07-06, the L&V-flagged "'Part' references no real
                 # part" Connection-trace HIGH): a malformed word entry with neither
                 # `name_human` nor a top-level `character_id` (a duplicate/partial patch
@@ -16428,6 +16452,12 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
         r"\benclosure cover\b|\btop lid\b|\bskin\b", re.I)
 
     # 1. collect interior parts (+ sane dims). Skin/body parts stay the product shell.
+    # A shipped EXTERNAL accessory (e.g. the external DC power adapter/brick from the universal
+    # power subsystem) is NOT inside the product body — it must not be packed/rendered in the
+    # interior (it stays in the decomposition → the BoM still costs it). Keyed on the noun.
+    _EXTERNAL_ACCESSORY_RE = re.compile(
+        r"external\s+.*adapter|power\s+adapter|wall\s+adapter|line\s+cord|mains\s+lead", re.I)
+
     items = []
     for p in parts:
         nm = str(getattr(p, "name", ""))
@@ -16438,6 +16468,9 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
             # Clear it so the resize sizes to the interior parts; the manifest shell row then
             # takes its pos from the real shell-mesh bbox centre (correct) + _SEALED_ENV_MM dims.
             p.placed_xyz_mm = None
+            continue
+        if _EXTERNAL_ACCESSORY_RE.search(nm):
+            p.placed_xyz_mm = None   # external accessory — BoM only, never in the interior
             continue
         own = p.dim if isinstance(getattr(p, "dim", None), dict) else None
         if own:
@@ -16462,14 +16495,31 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     pack_h = max_h + 8.0
     floor_z = base_z + margin
     pack_parts = [{"tag": x["tag"], "name": x["name"], "dims": x["dims"]} for x in items]
+    # hosting=False → EVERY part single-layer on the floor (no PCB-mounting) so the pack is
+    # 3D-clash-free BY CONSTRUCTION (one z-plane). Tristan 2026-07-24: "are parts not clashing
+    # on a 3D basis?" — a guaranteed-0-clash layout beats the tighter hosted pack that left a
+    # small probe↔connector overlap.
     pos = _ipack.pack_interior(pack_parts, width, depth, pack_h, floor_z,
-                               gap_mm=3.0, wall_mm=0.0)
+                               gap_mm=3.0, wall_mm=0.0, hosting=False)
     rot = pos.get("__rot__", {})
     nclash, oob, worst = _ipack.count_clashes(pack_parts, pos, width, depth, pack_h,
                                               floor_z, wall_mm=0.0)
     if nclash or oob:
-        print(f"[univ][sealed][interior][WARN] pack residual clash={nclash} oob={oob} "
-              f"({worst[:2]}) — layout not fully converged")
+        # widen the floor + re-pack once: a clash/oob here means the target was too tight.
+        width *= 1.15
+        depth *= 1.15
+        pos = _ipack.pack_interior(pack_parts, width, depth, pack_h, floor_z,
+                                   gap_mm=4.0, wall_mm=0.0, hosting=False)
+        rot = pos.get("__rot__", {})
+        nclash, oob, worst = _ipack.count_clashes(pack_parts, pos, width, depth, pack_h,
+                                                  floor_z, wall_mm=0.0)
+    # HARD 3D-clash self-check on the FINAL placed AABBs (the answer to "do parts clash?").
+    if nclash or oob:
+        print(f"[univ][sealed][interior][CLASH] {nclash} clash + {oob} oob AFTER re-pack "
+              f"({worst[:3]}) — INVESTIGATE (should be 0 on a single-layer pack)")
+    else:
+        print(f"[univ][sealed][interior] 3D clash-check: 0 clashes, 0 out-of-bounds "
+              f"({len(pack_parts)} parts, single-layer)")
 
     # 3+4. overwrite placement (manifest/GA follow) + build recognizable meshes.
     mat_cache = {}
