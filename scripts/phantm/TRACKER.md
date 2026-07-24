@@ -134,3 +134,4 @@ pre-commit hook). Use `python -m pip` for installs (relocated-venv shebangs).
 | OPEN: Vlad items — standoff distance, foil-edge clearance/choke, metallised-cell λc confirm | ⏳ external |
 | OPEN: vibration envelope from Tony → hold-force spec (§9.4 row 4) | ⏳ external |
 | OPEN: push 7 local commits to origin (classifier-blocked) | ⏳ Tristan |
+| v4.5: D5/D6 CAD + 3D hexcell render + drive PCB power/control + cell tutorial + 14 verified suppliers + Annex E emails | ✅ committed |
