@@ -19,12 +19,21 @@
 |---|---|---|---|
 | A | Scaffold + geometry/materials + selftest | ✅ done | (commit blocked — see Blockers) |
 | B | Nonlinear reluctance network → analytic five numbers v1 (selftest 27/27) | ✅ done | (commit blocked) |
-| C | FEMM FE loop: install → C-core gate → (x,i) sweeps → FE-truth Pm/Ic | ❌ | |
-| D | Step dynamics + energy/step + coil ΔT | ❌ | |
-| E | §5 scorecard (7 items) + §6 force-budget-at-scale crux | ❌ | |
-| F | Manufacture + cost to USD 0.10 + tolerance stack | ❌ | |
-| G | Report + verdict + curves (SIGHT on main thread) + Tony Qs | ❌ | |
-| H | Engine tools: magnetics:reluctance-detent-force / coil-rl-risetime / vr-stepper-drive | ❌ | |
+| C | FE loop: **xfemm femmcli native** (not Wine) → C-core gate PASS → FE-truth Pm/Ic | ✅ done | |
+| D | Step dynamics: transit 2.5–4 ms; capture-window + hold-and-release analysis | ✅ done | |
+| E | §5 scorecard (7 items, baseline vs fixed) + §6 crux quantified | ✅ done | |
+| F | Manufacture + cost to USD 0.10 + tolerance stack | ✅ done (cost.json) | |
+| G | Report + verdict + 4 figures (SIGHTed on main thread) + Tony Qs | ✅ done — out/PHANTM-ACTUATOR-REPORT.md | |
+| H | Engine tools: magnetics:reluctance-detent-force / coil-rl-risetime / vr-stepper-drive | ❌ NEXT SESSION (registry port per space-tools pattern; femm harness stays phantm-local) | |
+
+## FINAL ANSWERS (2026-07-24 — FE-truth, ship to Tony)
+Mt 0.1577 g · Wm 77.5 µm · **Pm: unreachable on baseline (net detent caps ≈0.47 mN =
+0.3 g, ×16 short — for ANY magnet); fixed design (gap 20 µm + bridge/PM ×1.5, all else
+stock) Pm* = 243 µm → 7.72 mN ✓ with 3 detents preserved** · **Ic: baseline unreachable;
+fixed Ic* = 3.35 A for the literal 2·Fd peak (needs ≈1.9 V; 1 V caps MMF at 36 At —
+practical stepping from ≈1.4 A within 1 V)** · Rc 0.552 Ω, Lc(FE) 0.4–0.6 µH, tr63 ≈ 4 µs.
+0.35p-teeth variant REJECTED (detent basins 3→2 — basin count is an acceptance check).
+Full story: out/PHANTM-ACTUATOR-REPORT.md (+ scorecard/cost/dynamics/variants JSONs).
 
 ## Findings so far (Increment A)
 - Mt = 0.1577 g (26 slots/face, 7.4 g/cm³) — matches Tony's ≈0.16 g hand-check.
@@ -60,6 +69,39 @@ harmonic permeance P = P0 + P1·(cosθ + k3·cos3θ)/(1+k3), k3 = 1/9 triangle s
   step path is −0.8 mN (a dead zone — step may not complete); stall-free (margin ½Fd)
   needs **Ic_step = 1.22 A**. Both within the 1 V / 0.55 Ω supply (I_∞ = 1.81 A). Report both.
 - PM manufacturability: 29 µm sintered NdFeB is thin-film/bonded territory — flag in F.
+
+## Findings — Increment C (FE truth; THE headline results)
+- **FE backend**: wine-stable cask is deprecated/broken → built **xfemm `femmcli` natively**
+  (3 portability patches: sincos→sin/cos, malloc.h→stdlib.h, ptr_fun→lambdas; recipe in
+  femm/runner.py; binary at scripts/phantm/bin/femmcli, ~1 s/solve). C-core gate PASS
+  (B +2.5%, force mid-band). Mesh-converged (0.4% at half meshsize).
+- **2D model**: the bridge wraps the translator TRANSVERSELY (slot-sections are 1.708 long
+  across it) — no single plane holds horseshoe + teeth ⇒ UNROLLED-loop model (teeth/gaps
+  exact; bridge straightened, area-preserving thickness scaling; translator ends fixed in
+  space so the unroll bias is a constant DC that the Fourier fit drops).
+- **⭐ MAKE-OR-BREAK (brief §6): the BASELINE CANNOT meet the force specs.** At g/t =
+  77.5/232 ≈ 1/3, fringing keeps unaligned permeance high → gap-flux modulation only ~8%
+  (2.8% in λ) → per-pole force ~1.5 mN and NET 3-phase detent plateaus ≈0.47 mN for ANY
+  Pm (PM self-reluctance ceiling) vs the 7.7 mN spec — **~16× short**; drive similarly.
+  86% of bridge flux DOES cross the gaps (no leakage short); W'-vs-WST consistent.
+  The network model's floor-permeance assumption was the wrong part — FE is truth.
+- **⭐ Recovery levers quantified (femm-variants.json)**: gap is dominant (20 µm: ×8.6 net);
+  deep stator slots + 0.35p teeth compound; PM area is the ceiling-lifter. **FIXED design =
+  gap 20 µm + stator slots 0.465 + teeth 0.162 (pitch/step unchanged) + bridge/PM ×1.5 →
+  net detent 7.8 mN at Pm* = 137 µm (manufacturable sintered NdFeB)** ✓ meets Fd.
+- **Coil sign physics**: positive coil current must AID the pole's PM (drive = boost your
+  own pole). First solve ran opposed — "more current made it worse" (B_br 0.83→0.24 T at
+  +3 A). Sign convention fixed in lua_gen 2026-07-24; both solvers re-run.
+- FE Lc ≈ 0.8 µH (vs network 2.2–2.6 µH — unrolled/2D approximation + leakage diffs).
+
+## Findings — D/E/F (pending final FE curves)
+- Dynamics (network-v1 curves): ring ~200 Hz at detent; open-loop 3 ms pulse OVERSHOOTS
+  into the wrong basin; capture-window analysis added — friction-dependent; ≥1 mN friction
+  stalls the baseline. Re-run on FE fixed-design curves once solver lands.
+- Cost (cost.json): materials $0.0014/unit (negligible) — the $0.10 target is process +
+  volume: baseline meets $0.10 from ~10M/yr (band low end); the FIXED 20 µm gap adds a
+  precision-assembly penalty → $0.10 only ≥100M/yr optimistic. Tolerance stack is the
+  driver: dF/dg ≈ −8%/µm → ±5 µm scatter = ±40% force ⇒ active gap-setting needed.
 
 ## Blockers
 - `git commit` denied by the Claude Code auto-mode classifier (3 attempts, incl. after

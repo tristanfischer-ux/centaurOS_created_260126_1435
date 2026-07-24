@@ -289,7 +289,8 @@ class PoleCircuit:
         # build λ(i) lookup once (monotone), then invert by interp
         i_tab = np.linspace(0.0, 1.5 * v_supply / R, 200)
         lam_tab = np.array([self.flux_linkage(x_m, i) for i in i_tab])
-        lam, dt = 0.0, t_end_s / n_steps
+        # start from the PM's standing flux linkage at i=0 (λ(0) ≠ 0)
+        lam, dt = float(lam_tab[0]), t_end_s / n_steps
         ts, cur = [0.0], [0.0]
         for k in range(n_steps):
             i_now = float(np.interp(lam, lam_tab, i_tab))
