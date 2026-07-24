@@ -344,6 +344,9 @@ import './tools/contactor-geometry'
 // + applicable predicate → 6 drawers loaded.
 import './tools/feep-thrust'               // propulsion:feep-thrust — Field-Emission EP: F=I_b sqrt(2 m_i V_b/q); Isp=v_e/g0 (Goebel & Katz 2008)
 import './tools/mpd-thrust'                // propulsion:mpd-thrust — self-field MPD: F=b(mu0/4pi)I_d^2, b=ln(r_a/r_c)+0.75 (Jahn 1968 / Maecker 1955)
+import './tools/magnetics-vr-detent'        // magnetics:vr-detent-force — toothed VR + PM net detent (PHANTM 2026-07-24; analytic upper bound, FE-calibratable)
+import './tools/magnetics-coil-rl'          // magnetics:coil-rl-risetime — micro-coil R/L/tau + voltage-limited MMF ceiling N*V/R
+import './tools/magnetics-vr-drive'         // magnetics:vr-stepper-drive — one-coil-aiding-PM drive force + stall estimate
 import './tools/tdoa-fdoa-geolocation'     // rf:tdoa-fdoa-geolocation — emitter CRLB: sigma_pos~c sigma_t GDOP (+FDOA) (Torrieri 1984)
 import './tools/deployable-boom'           // structures:deployable-boom — cantilever: delta=F L^3/(3 E I); f1=(1.875^2/2pi)sqrt(EI/rho A L^4) (Blevins 1979)
 import './tools/reflector-surface-rms'     // antenna:reflector-surface-rms — Ruze: eta=exp(-(4pi eps/lambda)^2); G=G0-L_ruze (Ruze 1966)

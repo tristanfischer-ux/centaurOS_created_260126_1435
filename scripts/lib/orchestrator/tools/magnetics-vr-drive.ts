@@ -1,0 +1,66 @@
+/**
+ * scripts/lib/orchestrator/tools/magnetics-vr-drive.ts
+ *
+ * TypeScript wrapper for `magnetics_vr_drive.py` — subprocess to repo .venv.
+ * Toothed VR stepper drive force with one coil aiding its pole PM.
+ * Ported 2026-07-24 from the PHANTM actuator workstream (scripts/phantm/ —
+ * FE-validated reference values in the python --selftest). The Python wrapper
+ * is the canonical implementation; this TS wrapper marshals JSON in/out and
+ * registers the tool with the orchestrator registry.
+ *
+ * License: free-proprietary. Source: internal://forgeos/phantm
+ */
+
+import { registerTool } from '../registry'
+import type { Tool, ToolResult } from '../types'
+import { spawnSync } from 'child_process'
+import { resolve } from 'path'
+
+const PYTHON_SCRIPT = resolve(__dirname, 'python', 'magnetics_vr_drive.py')
+const VENV_PYTHON = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'python3')
+
+export const magneticsVrDriveTool: Tool<any, any> = {
+  id: 'magnetics:vr-stepper-drive',
+  name: 'Magnetics VR Stepper Drive',
+  version: '1.0.0',
+  license: 'free-proprietary',
+  source_url: 'internal://forgeos/phantm',
+  domain: 'actuation',
+  pinned_environment: { python: '3.12' },
+  applicable_to(envelope) {
+    return ['beam_steering_actuator', 'linear_actuator', 'micro_stepper',
+            'phased_array_antenna', 'reluctance_actuator'].includes(envelope.class)
+  },
+  async invoke(input: any): Promise<ToolResult<any>> {
+    const t0 = Date.now()
+    const proc = spawnSync(VENV_PYTHON, [PYTHON_SCRIPT], {
+      input: JSON.stringify(input),
+      encoding: 'utf-8',
+      timeout: 60_000,
+    })
+    const duration_ms = Date.now() - t0
+    const provenance = {
+      source: 'tool:magnetics:vr-stepper-drive',
+      tool_id: 'magnetics:vr-stepper-drive',
+      tool_version: '1.0.0',
+      tool_license: 'free-proprietary',
+      tool_source_url: 'internal://forgeos/phantm',
+      invocation_input: input,
+      invocation_output_field: '(multiple)',
+      pinned_versions: { python: '3.12' },
+      timestamp: new Date().toISOString(),
+      duration_ms,
+    }
+    if (proc.status !== 0) {
+      return { ok: false, output: null, provenance, warnings: [],
+               error: `Python exit ${proc.status}: ${proc.stderr?.slice(0, 400) ?? '(no stderr)'}` }
+    }
+    try {
+      return { ok: true, output: JSON.parse(proc.stdout), provenance, warnings: [] }
+    } catch (err) {
+      return { ok: false, output: null, provenance, warnings: [],
+               error: `JSON parse: ${(err as Error).message}; stdout: ${proc.stdout.slice(0, 200)}` }
+    }
+  },
+}
+registerTool(magneticsVrDriveTool)

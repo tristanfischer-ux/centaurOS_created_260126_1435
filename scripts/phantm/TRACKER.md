@@ -24,7 +24,7 @@
 | E | §5 scorecard (7 items, baseline vs fixed) + §6 crux quantified | ✅ done | |
 | F | Manufacture + cost to USD 0.10 + tolerance stack | ✅ done (cost.json) | |
 | G | Report + verdict + 4 figures (SIGHTed on main thread) + Tony Qs | ✅ done — out/PHANTM-ACTUATOR-REPORT.md | |
-| H | Engine tools: magnetics:reluctance-detent-force / coil-rl-risetime / vr-stepper-drive | ❌ NEXT SESSION (registry port per space-tools pattern; femm harness stays phantm-local) | |
+| H | Engine tools registered: magnetics:vr-detent-force / coil-rl-risetime / vr-stepper-drive (TS+py+manifest; selftests green; registry-invoke verified) | ✅ done — guard wiring into verify-engine-guards.sh deferred pending other terminal's ACK (their ACTIVE file) | |
 
 ## FINAL ANSWERS (2026-07-24 — FE-truth, ship to Tony)
 Mt 0.1577 g · Wm 77.5 µm · **Pm: unreachable on baseline (net detent caps ≈0.47 mN =

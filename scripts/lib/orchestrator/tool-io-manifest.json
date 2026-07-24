@@ -5861,5 +5861,102 @@
       "vertical-farm"
     ],
     "output_source": "class-plan"
+  },
+  "magnetics:vr-detent-force": {
+    "cost_basis": [],
+    "input_keys": [
+      "gap_mm",
+      "harmonic3_ratio",
+      "modulation_calibration",
+      "n_poles",
+      "n_teeth_per_pole",
+      "pm_area_mm2",
+      "pm_br_t",
+      "pm_length_mm",
+      "pm_mu_r",
+      "pole_phase_offsets_mm",
+      "stack_width_mm",
+      "stator_slot_depth_mm",
+      "steel_b_sat_t",
+      "tooth_pitch_mm",
+      "tooth_width_mm",
+      "translator_slot_depth_mm"
+    ],
+    "output_keys": [
+      "detent_positions_mm",
+      "flux_per_pole_uwb",
+      "n_detents_per_pitch",
+      "net_breakaway_force_mn",
+      "p_modulation_ratio",
+      "per_pole_force_amplitude_mn",
+      "pm_operating_b_t",
+      "pm_operating_h_ka_m",
+      "warnings"
+    ],
+    "output_source": "python:run",
+    "seen_in": [
+      "phantm-actuator"
+    ]
+  },
+  "magnetics:coil-rl-risetime": {
+    "cost_basis": [],
+    "input_keys": [
+      "circuit_permeance_nh",
+      "mean_turn_length_mm",
+      "n_turns",
+      "supply_v",
+      "target_current_a",
+      "temp_c",
+      "wire_diameter_mm"
+    ],
+    "output_keys": [
+      "i_infinity_a",
+      "inductance_uh",
+      "mmf_ceiling_at",
+      "resistance_ohm",
+      "t63_us",
+      "t_to_target_us",
+      "target_reachable",
+      "tau_us",
+      "warnings",
+      "wire_length_mm"
+    ],
+    "output_source": "python:run",
+    "seen_in": [
+      "phantm-actuator"
+    ]
+  },
+  "magnetics:vr-stepper-drive": {
+    "cost_basis": [],
+    "input_keys": [
+      "coil_mmf_at",
+      "drive_pole_index",
+      "gap_mm",
+      "harmonic3_ratio",
+      "modulation_calibration",
+      "n_poles",
+      "n_teeth_per_pole",
+      "pm_area_mm2",
+      "pm_br_t",
+      "pm_length_mm",
+      "pm_mu_r",
+      "pole_phase_offsets_mm",
+      "stack_width_mm",
+      "stator_slot_depth_mm",
+      "steel_b_sat_t",
+      "tooth_pitch_mm",
+      "tooth_width_mm",
+      "translator_slot_depth_mm"
+    ],
+    "output_keys": [
+      "peak_net_force_mn",
+      "stall_min_force_mn",
+      "step_target_mm",
+      "warnings"
+    ],
+    "output_source": "python:run",
+    "seen_in": [
+      "phantm-actuator"
+    ]
   }
 }
