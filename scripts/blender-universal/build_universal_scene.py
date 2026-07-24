@@ -16537,6 +16537,7 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     # 3+4. overwrite placement (manifest/GA follow) + build recognizable meshes.
     mat_cache = {}
     n_vis = 0
+    _harness_nodes = []   # (name, centre_mm, family) — for the wiring harness + tubing pass
     xs = []
     ys = []
     for x in items:
@@ -16569,6 +16570,7 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
             fl, f"u_se_cutaway_cue_int_{slug}", fam, c, sd, mat_cache,
             module=getattr(p, "module_id", None) or story_mod, module_objects=MO,
             rot_swap=rsw, orient=_orient)
+        _harness_nodes.append((nm, (float(c[0]), float(c[1]), float(c[2])), fam))
         n_vis += 1
 
     # 5. internal mounting frame — chassis base plate + 4 corner standoffs (bolt-on).
@@ -16594,6 +16596,58 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
                      (floor_z + so_h / 2) * fl.MM),
                     3.0 * fl.MM, so_h * fl.MM, plate_mat,
                     module=story_mod, module_objects=MO)
+
+    # 6. WIRING HARNESS + TUBING (Tristan 2026-07-24: "i cant see wires or pipes"). Fills the
+    #    interior with the REAL runs: a power rail along the base with a drop to every powered
+    #    part, thin signal wires, and translucent TUBING between the fluid parts (pump ↔ vessel ↔
+    #    filter). Universal — keyed on the function family, no product table. u_se_cutaway_cue_int_
+    #    prefix → shown on the ghost/cutaway, hidden on the closed exterior views.
+    if _harness_nodes and xs and ys:
+        _MM = fl.MM
+        _pwr_mat = fl.make_mat("m_se_int_pwr_wire", fl._to_linear((0.72, 0.14, 0.11)),
+                               metallic=0.1, roughness=0.5)                     # red power wire
+        _sig_mat = fl.make_mat("m_se_int_sig_wire", fl._to_linear((0.15, 0.16, 0.19)),
+                               metallic=0.1, roughness=0.55)                    # dark signal wire
+        _tube_mat = fl.make_mat("m_se_int_tube", fl._to_linear((0.55, 0.75, 0.88)),
+                                metallic=0.0, roughness=0.12, alpha=0.5, ior=1.4)  # clear-blue tubing
+        _bus_y = min(ys) + 5.0
+        _bus_z = floor_z + 5.0
+        fl.add_cyl("u_se_cutaway_cue_int_powerbus",
+                   (fcx * _MM, _bus_y * _MM, _bus_z * _MM),
+                   2.6 * _MM, (fw * 0.92) * _MM, _pwr_mat,
+                   rotation=(0.0, math.radians(90), 0.0),
+                   module=story_mod, module_objects=MO)
+        _POWERED = {"motor", "pump", "fan", "thermal", "pcb", "component", "led",
+                    "connector", "sensor", "panel", "valve"}
+        _HEAVY = {"motor", "pump", "fan", "thermal"}
+        _nw = 0
+        for _i, (_nm, _c, _fam) in enumerate(_harness_nodes):
+            if _fam not in _POWERED:
+                continue
+            # an L-drop: down from the part, then across to the bus (a real loomed wire)
+            _pts = [(_c[0] * _MM, _c[1] * _MM, _c[2] * _MM),
+                    (_c[0] * _MM, _c[1] * _MM, _bus_z * _MM),
+                    (_c[0] * _MM, _bus_y * _MM, _bus_z * _MM)]
+            fl.add_pipe(f"u_se_cutaway_cue_int_wire_{_i}", _pts,
+                        1.1 * _MM, _pwr_mat if _fam in _HEAVY else _sig_mat,
+                        module=story_mod, module_objects=MO)
+            _nw += 1
+        # tubing between the fluid parts, chained pump → vessel → filter/tubing (a fluid loop)
+        _fluid = [(_nm, _c) for _nm, _c, _fam in _harness_nodes
+                  if _fam in {"vessel", "pump", "tubing", "valve", "filter"}]
+        _fluid.sort(key=lambda t: t[1][0])   # left→right so the tube doesn't cross the whole box
+        _nt = 0
+        for _i in range(len(_fluid) - 1):
+            (_n0, _c0), (_n1, _c1) = _fluid[_i], _fluid[_i + 1]
+            _mid = ((_c0[0] + _c1[0]) / 2 * _MM, (_c0[1] + _c1[1]) / 2 * _MM,
+                    (max(_c0[2], _c1[2]) + 14) * _MM)                          # arc up over the gap
+            _tp = [(_c0[0] * _MM, _c0[1] * _MM, _c0[2] * _MM), _mid,
+                   (_c1[0] * _MM, _c1[1] * _MM, _c1[2] * _MM)]
+            fl.add_pipe(f"u_se_cutaway_cue_int_tube_{_i}", _tp, 2.4 * _MM, _tube_mat,
+                        module=story_mod, module_objects=MO)
+            _nt += 1
+        print(f"[univ][sealed][interior] harness: power rail + {_nw} wire drop(s) + "
+              f"{_nt} tubing run(s) between fluid parts")
 
     # DE-DUPLICATE: the bespoke per-product interior story (u_se_le_pcb / stir_motor /
     # heater_block / cell / chip, built earlier by _place_lab_electronics_interior_layout)
