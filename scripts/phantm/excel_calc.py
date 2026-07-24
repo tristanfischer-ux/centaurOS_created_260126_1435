@@ -101,8 +101,8 @@ note("1. EDIT ONLY THE YELLOW CELLS. Every white cell is a live Excel formula an
 note("2. GREY CELLS ARE FINITE-ELEMENT RESULTS, NOT FORMULAS. They are real solved numbers from the "
      "2D nonlinear FE model. Changing a yellow input does NOT update them — they must be re-solved "
      "(scripts/phantm/femm/). The 'invalidated by' note on each says which inputs stale it.")
-note("3. THE RED CELL (waveguide cutoff wavelength) IS A PLACEHOLDER. Set the real cutoff before "
-     "trusting the two guide-wavelength rows; everything else is independent of it.")
+note("3. The waveguide cutoff λc is DERIVED from the measured 3.10 mm interior cell by a validated "
+     "eigensolver (scripts/phantm/hexcell.py) — Vlad to confirm; every λg row updates if he edits it.")
 note("4. DO NOT add a simple-formula force estimate. Lumped magnetic-circuit formulas over-predict "
      "force ≈15–40× at this gap/tooth scale (fringing at gap/tooth = 1/3 kills the permeance "
      "modulation) — that is the report's central finding. Force numbers live ONLY in the grey FE block.")
@@ -164,8 +164,9 @@ inp("lc", "Coil inductance (FE)", 0.60, "µH", "FE at the drive point; lumped mo
 banner("5 · OPERATING BAND + DYNAMICS INPUTS")
 head()
 inp("f", "Operating frequency", 70, "GHz", "Tony 24 Jul: outline spec was the ≈70 GHz band")
-inp("lamc", "Waveguide CUTOFF wavelength λc", 6.1, "mm",
-    "PLACEHOLDER (WR-12-like 2a). Tony/Vlad to set from the real cell", fill=RED)
+inp("lamc", "Waveguide CUTOFF wavelength λc", 5.598, "mm",
+    "DERIVED: validated FD eigensolver on the 3.10 mm interior hex (hexcell.json; "
+    "fc = 53.56 GHz) — Vlad to confirm against the metallised cell")
 inp("kdet", "Detent stiffness (FE)", 200, "N/m", "slope of the FE detent curve at zero", fill=GRY)
 
 # ============================ derived: mass + force ==========================
@@ -238,7 +239,7 @@ der("dT", "Adiabatic ΔT per step", "={es}*1000/({mcu}*{ccu})", "K", "E/(m·c); 
 
 # ============================ derived: RF + steps ============================
 lam0_ = 299792458 / 70e9 * 1000
-lamg_ = lam0_ / math.sqrt(1 - (lam0_ / 6.1) ** 2)
+lamg_ = lam0_ / math.sqrt(1 - (lam0_ / 5.598) ** 2)
 step_ = p_ / 3 * 1000
 banner("9 · WAVELENGTH, STROKE NEED + STEP GEOMETRY")
 note("The reflection phase per mechanical step is 4π·Δd/λ. INSIDE the cell the guide wavelength λg "
@@ -249,7 +250,7 @@ der("lam0", "Free-space wavelength λ0", "={c0}/({f}*1000000000)*1000", "mm", "c
 der("lamg", "Guide wavelength λg",
     "=IF({lam0}>={lamc},\"set real cutoff — below cutoff\",{lam0}/SQRT(1-({lam0}/{lamc})^2))",
     "mm", "λ0/√(1−(λ0/λc)²)", lamg_,
-    "with the PLACEHOLDER λc = 6.1 only — set the real cutoff first")
+    "below-cutoff guard shows a message instead of #NUM")
 der("stp", "Nominal step (pitch/3)", "={p}/3*1000", "µm", "p/3", step_,
     "FE actual at 374 µm registration: 172.6/146.1/145.3 (grey block)")
 der("phg", "Phase per step IN GUIDE", "=IF(ISNUMBER({lamg}),DEGREES(4*PI()*{stp}/1000/{lamg}),\"needs λc\")",
@@ -300,7 +301,7 @@ for label, val, unit, art, inval in fe_rows:
 af_, t_, dep_, apw_, aph_ = 3.1, 0.15, 7.75, 100.0, 100.0
 cella_ = math.sqrt(3) / 2 * af_ ** 2
 ncell_ = math.floor(apw_ * aph_ / cella_)
-wall_ = math.sqrt(3) * af_ * t_ * dep_
+wall_ = math.sqrt(3) / 2 * ((af_ + t_) ** 2 - af_**2) * dep_
 cellm_ = wall_ * 1240 / 1000
 hcm_ = ncell_ * cellm_ / 1000
 ssv_ = 2 * (1.16 * 1.708 * 0.465 - 3 * 0.155 * 0.232 * 1.708)
@@ -315,7 +316,8 @@ note("Structural/packing calculations for the cell lattice that houses one actua
      "24-hex sub-arrays. The cell-size ↔ band mapping is RF and stays with Tony/Vlad — cell "
      "sizes here are INPUTS. The large-cell photos are the demo-scale prototypes (≈25–30 mm).")
 head()
-inp("af", "Hex cell across-flats", 3.1, "mm", "Tony .skp 24 Jul: '3.1mm between flats'")
+inp("af", "Hex cell INTERIOR across-flats", 3.1, "mm",
+    "the RF aperture — STL wall-plane forensics: walls at 3.25 mm pitch, opening 3.10")
 inp("thc", "Cell wall thickness", 0.15, "mm", "Tony .skp 24 Jul: '150micron wall'")
 inp("dhc", "Cell depth", 7.75, "mm", "MEASURED from Tony's STL bounding box (drawing reads 7.7)")
 inp("apw", "Aperture width", 100.0, "mm", "SET FROM CAD — round aperture: use its bounding square")
@@ -325,18 +327,21 @@ inp("nsub", "Number of sub-arrays", 1, "-", "SET FROM CAD — how many 24-hex ti
 inp("dhcm", "Wall material density", 1240, "kg/m³",
     "3D-print resin/PLA ≈1240 (as prototyped); aluminium 2700; metallised print adds ≈5 %")
 inp("sqs", "Square-grid pitch (alt. prototype)", 3.0, "mm", "the square egg-crate array in photos 3–4")
-der("hexa", "Hex side length", "={af}/SQRT(3)", "mm", "AF/√3", af_ / math.sqrt(3), "")
-der("cella", "Cell area", "=SQRT(3)/2*{af}^2", "mm²", "(√3/2)·AF²", cella_, "")
+der("hexa", "Hex side length (interior)", "={af}/SQRT(3)", "mm", "a/√3", af_ / math.sqrt(3), "")
+der("pitch", "Tiling pitch", "={af}+{thc}", "mm", "a + t (one shared wall)", af_ + t_, "")
+der("cella", "Tiling cell area", "=SQRT(3)/2*({af}+{thc})^2", "mm²", "(√3/2)·p²",
+    math.sqrt(3) / 2 * (af_ + t_) ** 2, "area each cell occupies in the lattice")
 der("ncell", "Cells per aperture (by area)", "=FLOOR({apw}*{aph}/{cella},1)", "-",
     "⌊A_aperture/A_cell⌋", float(ncell_),
     "edge effects ignored — the cluster count below is the exact method")
 der("ncl", "Cells from sub-array tiling", "={csub}*{nsub}", "-", "cells/sub-array × sub-arrays",
     24.0, "Tony's .skp tiling — USE THIS count once the sub-array number is known")
-der("rdhc", "Honeycomb relative density", "=2*{thc}/{af}", "-", "2t/AF (thin wall, shared)",
-    2 * t_ / af_, "fraction of the slab that is metal")
-der("open", "Open-area fraction", "=1-2*{thc}/{af}", "-", "1 − 2t/AF", 1 - 2 * t_ / af_, "")
-der("wall", "Wall volume per cell", "=SQRT(3)*{af}*{thc}*{dhc}", "mm³",
-    "½·perimeter·t·depth = √3·AF·t·L (walls shared)", wall_, "")
+der("rdhc", "Honeycomb relative density", "=1-({af}/({af}+{thc}))^2", "-", "1 − (a/p)²",
+    1 - (af_ / (af_ + t_)) ** 2, "fraction of the slab that is wall material")
+der("open", "Open-area fraction", "=({af}/({af}+{thc}))^2", "-", "(a/p)²",
+    (af_ / (af_ + t_)) ** 2, "")
+der("wall", "Wall volume per cell", "=SQRT(3)/2*(({af}+{thc})^2-{af}^2)*{dhc}", "mm³",
+    "(√3/2)(p² − a²)·L (walls shared)", wall_, "")
 der("cellm", "Wall mass per cell", "={wall}*{dhcm}/1000", "mg", "V·ρ ÷1000 → mg", cellm_, "")
 der("hcm", "Honeycomb lattice mass", "={ncl}*{cellm}/1000", "g", "N·m_cell ÷1000 → g",
     24 * cellm_ / 1000, "per 24-hex sub-array at the default tile count")
@@ -376,12 +381,12 @@ der("aptot", "Moving hardware total", "={hcm}+{apact}", "g", "lattice + actuator
 inp("stlv", "24-hex sub-array solid volume (STL, measured)", 192.25, "mm³",
     "mesh integral of Tony's 1,640-triangle STL — ground truth incl. boundary walls", fill=GRY)
 der("stlm", "24-hex lattice mass (measured)", "={stlv}*{dhcm}/1000", "mg", "V·ρ ÷1000",
-    192.25 * 1.24, "= 0.238 g printed / 0.519 g Al; +28% over the shared-wall asymptote "
+    192.25 * 1.24, "= 0.238 g printed / 0.519 g Al; +25% over the shared-wall asymptote "
     "(an isolated tile owns its outer walls)")
 inp("stlv7", "7-hex sub-array solid volume (STL, measured)", 64.53, "mm³",
     "mesh integral of Tony's 264-triangle STL (9.9 × 9.6 × 7.75 mm tile)", fill=GRY)
 der("stlm7", "7-hex lattice mass (measured)", "={stlv7}*{dhcm}/1000", "mg", "V·ρ ÷1000",
-    64.53 * 1.24, "= 0.080 g printed / 0.174 g Al; +48% over the asymptote — the smaller "
+    64.53 * 1.24, "= 0.080 g printed / 0.174 g Al; +44% over the asymptote — the smaller "
     "the tile, the bigger the boundary-wall share")
 der("sqa", "Square-grid cell area", "={sqs}^2", "mm²", "s²", 9.0, "")
 der("sqrd", "Square-grid relative density", "=2*{thc}/{sqs}", "-", "2t/s — same form as hex",

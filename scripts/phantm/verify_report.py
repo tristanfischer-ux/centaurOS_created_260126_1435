@@ -153,14 +153,17 @@ check("reflector <2% of Mt", (m_foil + 2.0) / (mt_kg * 1e6) < 0.02,
 contains("reflector bound in report", "0.72 mg")
 
 # ---------------- honeycomb (§8.9) -----------------------------------------
-AF, T_HC, DEP = 3.1, 0.15, 7.75  # Tony .skp/STL 24 Jul: 3.1 mm flats, 150 µm wall, STL bbox depth
+# STL forensics: walls at 3.25 mm pitch → 3.10 is the INTERIOR aperture
+AF, T_HC, DEP = 3.1, 0.15, 7.75
+PITCH = AF + T_HC
 check("hex side 1.790", abs(AF / math.sqrt(3) - 1.790) < 2e-3)
-check("cell area 8.32", abs(math.sqrt(3) / 2 * AF**2 - 8.32) < 0.01)
-check("rel density 0.097", abs(2 * T_HC / AF - 0.097) < 1e-3)
-wall_v = math.sqrt(3) * AF * T_HC * DEP
-check("wall vol 6.24", abs(wall_v - 6.24) < 0.01)
-check("cell mass 7.7 (printed)", abs(wall_v * 1.24 - 7.74) < 0.05)
-check("sub-array lattice asymptote 0.186 g @24", abs(24 * wall_v * 1.24 / 1000 - 0.186) < 0.002)
+check("interior area 8.32", abs(math.sqrt(3) / 2 * AF**2 - 8.32) < 0.01)
+check("tiling area 9.15", abs(math.sqrt(3) / 2 * PITCH**2 - 9.15) < 0.01)
+check("rel density 0.090", abs(1 - (AF / PITCH) ** 2 - 0.090) < 1e-3)
+wall_v = math.sqrt(3) / 2 * (PITCH**2 - AF**2) * DEP
+check("wall vol 6.40", abs(wall_v - 6.40) < 0.01)
+check("cell mass 7.9 (printed)", abs(wall_v * 1.24 - 7.93) < 0.05)
+check("sub-array lattice asymptote 0.190 g @24", abs(24 * wall_v * 1.24 / 1000 - 0.190) < 0.002)
 # measured ground truth from Tony's STLs (the artefacts themselves re-measured every run)
 try:
     import struct
@@ -176,8 +179,8 @@ try:
         return vol, float(tris[..., 2].max() - tris[..., 2].min())
 
     for fname, cells, want_vol, want_edge, want_mass in (
-            ("tony-24hex-subarray.stl", 24, 192.25, (1.25, 1.32), 0.238),
-            ("tony-7hex-subarray.stl", 7, 64.53, (1.42, 1.53), 0.080)):
+            ("tony-24hex-subarray.stl", 24, 192.25, (1.22, 1.29), 0.238),
+            ("tony-7hex-subarray.stl", 7, 64.53, (1.40, 1.48), 0.080)):
         _vol, _depth = _stl_measure(fname)
         check(f"STL {cells}-hex volume {want_vol}", abs(_vol - want_vol) < 0.5, f"{_vol:.2f}")
         check(f"STL {cells}-hex depth 7.75", abs(_depth - 7.75) < 0.01, f"{_depth:.3f}")
@@ -195,8 +198,28 @@ brv = 0.348 * 1.162 * 2.634
 act_mg = mt_kg * 1e6 + 3 * ((ssv + brv) * 7.4 + 0.348 * 1.162 * 0.243 * 7.5 + 1.108)
 check("actuator total ≈220 mg", abs(act_mg - 219.7) < 1.5, f"{act_mg:.1f}")
 check("sub-array actuators 5.3 g", abs(24 * act_mg / 1000 - 5.27) < 0.1)
-contains("§8.9 present", "8.9 Honeycomb", "3.1 mm", "7.75 mm", "24-hex", "7-hex", "150 µm",
-         "2.06 mm", "192.2 mm³", "64.5 mm³", "0.238 g printed", "0.080 g printed")
+contains("§8.9 present", "8.9 Honeycomb", "7.75 mm", "24-hex", "7-hex", "150 µm",
+         "2.06 mm", "192.2 mm³", "64.5 mm³", "0.238 g printed", "0.080 g printed",
+         "3.10 mm is the INTERIOR")
+
+# ---------------- hex cell (§9) ---------------------------------------------
+hx = json.load(open(os.path.join(OUT, "hexcell.json")))
+check("hexcell fc 53.56 GHz", abs(hx["cutoff"]["fc_ghz"] - 53.56) < 0.06,
+      str(hx["cutoff"]["fc_ghz"]))
+check("hexcell λc 5.598 mm", abs(hx["cutoff"]["lam_c_mm"] - 5.598) < 0.006)
+check("equiv-circle within 1%", abs(hx["cutoff"]["fc_equiv_circle_ghz"] /
+                                    hx["cutoff"]["fc_ghz"] - 1) < 0.01)
+bt = {r["f_ghz"]: r for r in hx["band_table"]}
+check("50 GHz below cutoff", bt[50]["lamg_mm"] is None)
+check("λg @70 = 6.651", abs(bt[70]["lamg_mm"] - 6.651) < 0.01)
+check("stroke need @60 = 5.542", abs(bt[60]["stroke_need_mm"] - 5.542) < 0.01)
+check("single group covers 60 GHz", bt[60]["stroke_need_mm"] < 8.27)
+check("two-group fails 60, passes 70", bt[60]["stroke_need_mm"] > 3.7 > bt[70]["stroke_need_mm"])
+check("phase/step @70 = 16.7°", abs(bt[70]["phase_per_ideal_step_deg"] - 16.7) < 0.15)
+contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
+         "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz", "BELOW CUTOFF",
+         "## 10. Traceability", "## 11. Supplier outreach")
+absent("no stale cutoff-request", "needs the cell's cutoff to pin down")
 absent("old 7-cluster reading retired", "7-cell clusters", "7 × 19")
 
 # ---------------- blender model constants ----------------------------------
