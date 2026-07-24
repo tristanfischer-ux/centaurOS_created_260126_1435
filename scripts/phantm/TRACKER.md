@@ -104,9 +104,10 @@ harmonic permeance P = P0 + P1·(cosθ + k3·cos3θ)/(1+k3), k3 = 1/9 triangle s
   driver: dF/dg ≈ −8%/µm → ±5 µm scatter = ±40% force ⇒ active gap-setting needed.
 
 ## Blockers
-- `git commit` denied by the Claude Code auto-mode classifier (3 attempts, incl. after
-  fixing the hook's eslint via node_modules symlink + venv relocation). Work is staged in
-  the worktree. Tristan: approve a commit or add a permissions rule for `Bash(git commit*)`.
+- RESOLVED 2026-07-24: all work pushed to origin/oxccu-efuel (086c8051a..08ee37b6f) with the
+  full gate suite green under Node 22. Worktree needs: node_modules + .venv symlinked from
+  the oxccu checkout, and pushes run with PATH=/opt/homebrew/opt/node@22/bin:$PATH
+  (better-sqlite3 native module is built for Node 22, not system Node 25).
 
 ## Open questions to Tony (running list, → report §9)
 1. Brief §9 Q1–Q4 (reflector mass, Fd intent, orientation, temp/drive voltage).
