@@ -24376,6 +24376,12 @@ def main():
     # signal-closer: every measuring instrument reports to the control system (the instrument
     # analogue of the power-closer — closes the parts_ledger n_instrument_associated orphan gap).
     _candidate = _candidate + cl.close_instrument_signals(parts, _candidate, log=lambda m: print(m))
+    # INSTRUMENT controller-signal closer (2026-07-24): on a benchtop instrument the MCU/compute
+    # board is the control hub — tie it by signal to every sensor (data in) + actuator (command
+    # out) so the board shows genuinely wired to its peripherals (fixes the missing board->parts
+    # story that floor-set Interconnect). Instrument-only; plants keep the SCADA signal-closer.
+    _candidate = _candidate + cl.close_controller_signals(parts, _candidate, _IS_INSTRUMENT_DEVICE,
+                                                          log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
     # actuator-host closer (2026-07-04, the X-124/FCV-201-202 orphan diagnosis): every
     # OTHER closer above iterates `parts` (the MASSED list only), so a GA-non-massed

@@ -1338,6 +1338,67 @@ def close_instrument_signals(parts, topology, log=print):
     return extra
 
 
+# An instrument's compute/control principal — the MCU that reads sensors + drives actuators.
+_MCU_HUB_RE = re.compile(
+    r"microcontroller|\bmcu\b|esp32|esp8266|\bstm32\b|nucleo|main\s*controller|control\s*board|"
+    r"compute\s*ui|controller\s*board|\barduino\b|raspberry|feather|\bpcb\b.*(?:control|compute)|"
+    r"(?:control|compute).*\bpcb\b", re.I)
+# A controllable ACTUATOR — receives a command signal from the MCU (motor/pump/heater/light…).
+_ACTUATOR_SIGNAL_RE = re.compile(
+    r"\bpump\b|stir|\bmotor\b|peltier|\btec\b|heater|\bfan\b|\bvalve\b|solenoid|driver|actuator|"
+    r"stepper|servo|\brelay\b|led\s*source|light\s*source|\bemitter\b|dispens|dosing", re.I)
+
+
+def close_controller_signals(parts, topology, is_instrument, log=print):
+    """INSTRUMENT signal-hub closer (2026-07-24, Tristan: "is the PCB connected to the other
+    parts by wire?"). For a benchtop INSTRUMENT the microcontroller (MCU / compute board) IS the
+    control hub — it reads every sensor (data in) and drives every actuator (command out). The
+    plant signal-closer (close_instrument_signals) keys on SCADA/PLC/control-panel hub NAMES that
+    an instrument never carries, so an instrument's MCU ended up with only a power feed and the
+    board never showed wired to its peripherals — the "board → parts" story was missing and
+    Interconnect floor-set. This ties the MCU by SIGNAL to every sensor + controllable actuator,
+    unless that MCU↔part signal edge already exists. Instrument-only (plants keep the SCADA
+    closer); deterministic, position-free, noun-keyed — no class table."""
+    if not is_instrument:
+        return []
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+    mcu = next((nm for nm in by_name
+                if _MCU_HUB_RE.search(nm) and not _SUBCOMPONENT_RE.search(nm)), None)
+    if mcu is None:
+        return []
+    existing = set()   # parts already tied to the MCU by a signal edge (either direction)
+    for e in topology:
+        if (e.get("_ledger_service") or _service_of(e.get("mechanism"))) != "signal":
+            continue
+        f, t = e.get("from_part"), e.get("to_part")
+        if f == mcu and t:
+            existing.add(t)
+        if t == mcu and f:
+            existing.add(f)
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or nm == mcu or _SUBCOMPONENT_RE.search(nm) or nm in existing:
+            continue
+        is_sensor = bool(_INSTRUMENT_SIGNAL_RE.search(nm))
+        is_act = bool(_ACTUATOR_SIGNAL_RE.search(nm))
+        if not (is_sensor or is_act):
+            continue
+        # a sensor reports IN to the MCU; an actuator receives a command OUT from the MCU
+        f, t = (nm, mcu) if is_sensor else (mcu, nm)
+        if (f, t) in seen:
+            continue
+        seen.add((f, t))
+        extra.append({"from_part": f, "to_part": t, "mechanism": "signal",
+                      "constraint_kind": "signal_association", "_ledger_service": "signal",
+                      "material_context": "controller data/command tie (MCU <-> peripheral)",
+                      "_augmented": True, "_controller_closed": True})
+    if extra:
+        log(f"[ledger] controller-signal-closer: +{len(extra)} MCU signal tie(s) to {mcu!r} "
+            f"— the compute board now reads every sensor + drives every actuator")
+    return extra
+
+
 def close_subcomponents(parts, topology, log=print):
     """Connect every SUB-COMPONENT (a filter screen/backwash, MBBR media/carrier, vessel
     internals) to its PARENT equipment by an assembly edge — it is PART OF that unit, not a
