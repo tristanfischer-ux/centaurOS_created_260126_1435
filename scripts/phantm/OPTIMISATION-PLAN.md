@@ -173,3 +173,33 @@ report v5 fold-in per plan Phase 5.
 tolerance 1.5× looser); 40 µm → dead (single-basin). His call: margin vs assembly cost.
 
 Next: Phase 3 dynamics (damper + capture) on the OPTIMISED SET; then report v5 §12 fold-in.
+
+---
+
+## PHASE GATE 3 — dynamics + damper + the detent-vs-drive Pareto (2026-07-24 night)
+
+**Damper spec (Tony item 10, SOLVED): Ø0.15 mm vent** in the reflector foil (or 0.018 mm²
+edge-gap equivalent) — captures at EVERY hold ≥3 ms; larger vents fail (insufficient
+dissipation), sealed fails (≈300 N/m gas spring displaces parking). Model includes the
+brief's 0.35 mN guide friction (its omission was a real physics bug, caught by trajectory
+diagnostics — scalar metrics alone hid it).
+
+**THE CAMPAIGN'S CENTRAL FINDING — detent strength trades against stepping cost:**
+| Set | Detent (drawn/exact) | Drive scheme | Energy/step (3 ms hold) | Settle | Coil ΔT/step |
+|---|---|---|---|---|---|
+| Original FIXED | 5.0/3.8 g | single 1.8 A ballistic | 2.7 mJ | 2.5–4 ms | 6 K |
+| **BALANCED (N42 stack, Pm 0.4)** | **14.6/11.0 g** | DUAL ±3.35 A hold | 37 mJ | 5.5 ms | ≈44 K/coil |
+| MAX-FORCE (N52, Pm 0.5) | 19.1/14.3 g | DUAL ±5 A hold | 83 mJ | 8 ms | ≈97 K/coil |
+
+Both optimised sets are UNSTEPPABLE single-coil at moderate current (neighbour-pole grip
+barrier); the dual scheme (pull target pole, CANCEL holding pole with reverse current) is
+required. ⚠ ELECTRONICS IMPACT: the §9.5 unipolar topology is NOT sufficient for the
+optimised sets — the cancel coil needs reverse current ⇒ half-bridge per coil (or phase-
+pair bridges). §9.5 to be amended at the v5 fold-in; council to re-check.
+
+Heat: ΔT figures are adiabatic per step — occasional re-pointing fine, sustained slewing
+duty-limited; the coil pass (knob 1H: thicker wire on the 5 V rail) is the queued fix.
+
+**RECOMMENDATION to Tony: the BALANCED set** — 2.9× the spec on the worst registration,
+half the max-force set's step energy, faster settle. Remaining before v5: none (compute
+complete); fold-in next.

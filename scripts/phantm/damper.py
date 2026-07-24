@@ -24,7 +24,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out", "opt")
-C = json.load(open(os.path.join(OUT, "winner-curves.json")))
+C = json.load(open(os.path.join(OUT, os.environ.get("PHANTM_CURVES", "winner-curves.json"))))
 
 A = math.sqrt(3) / 2 * 3.1e-3**2            # hex bore area, m²
 GAMMA, P0, RHO, CD = 1.4, 101325.0, 1.204, 0.65
@@ -235,7 +235,7 @@ def main():
                assumptions="back cavity vented; isentropic; Cd 0.65; edge leak "
                            "counts toward vent area; L0 nominal 4 mm",
                rows=rows, recommended=best)
-    json.dump(out, open(os.path.join(OUT, "damper.json"), "w"), indent=1)
+    json.dump(out, open(os.path.join(OUT, os.environ.get("PHANTM_DAMPER_OUT", "damper.json")), "w"), indent=1)
 
     import matplotlib
     matplotlib.use("Agg")

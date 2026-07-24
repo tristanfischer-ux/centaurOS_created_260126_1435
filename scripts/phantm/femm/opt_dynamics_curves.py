@@ -22,7 +22,10 @@ from .opt_sweeps import OUT, reset_base, translator_mass_mg
 from .sweep import FeForceModel, net_force, sweep_pitch
 from .variants import apply_variant
 
-PM = 0.50
+import os as _os
+PM = float(_os.environ.get("PHANTM_PM", "0.50"))
+BR = float(_os.environ.get("PHANTM_BR", "1.45"))
+OUTNAME = _os.environ.get("PHANTM_CURVES_OUT", "winner-curves.json")
 
 
 def main():
@@ -33,7 +36,7 @@ def main():
     apply_variant(dict(FIXED, gap=0.020, tooth=round(0.40 * p, 4),
                        ss_slot_d=round(0.155 * 2.0, 4)))
     lua_gen.SLOT_T = round(0.465 * 1.5, 4)
-    BASELINE.materials.ndfeb_br_t = 1.45
+    BASELINE.materials.ndfeb_br_t = BR
     m_mg = translator_mass_mg()
     offsets_drawn = [o for o in geo.pole_phasing(BASELINE)[1]]
     offsets_exact = [0.0, p / 3, 2 * p / 3]
@@ -56,7 +59,7 @@ def main():
     zc = np.where((s[:-1] > 0) & (s[1:] < 0))[0]
     i0 = zc[np.argmin(np.abs(xg[zc]))]
     k = -(net_drawn[i0 + 4] - net_drawn[i0 - 4]) / ((xg[i0 + 4] - xg[i0 - 4]) * 1e-3)  # N/m
-    out = dict(config="d40-t150-ss200-N52-g20-Pm0.50", pm_mm=PM, mass_mg=round(m_mg, 1),
+    out = dict(config=f"d40-t150-ss200-Br{BR}-g20-Pm{PM}", pm_mm=PM, mass_mg=round(m_mg, 1),
                pitch_mm=p, k_det_n_per_m=round(float(k), 1),
                x_mm=xg.tolist(),
                net_drawn_n=np.asarray(net_drawn, float).tolist(),
@@ -64,9 +67,9 @@ def main():
                offsets_drawn=[float(o) for o in offsets_drawn],
                pm_pole=pm_raw,
                drv_pole_by_current={str(k): v for k, v in drv_raw.items()})
-    json.dump(out, open(os.path.join(OUT, "winner-curves.json"), "w"))
+    json.dump(out, open(os.path.join(OUT, OUTNAME), "w"))
     reset_base()
-    print(f"k_det = {k:.0f} N/m, mass {m_mg:.0f} mg; wrote winner-curves.json "
+    print(f"k_det = {k:.0f} N/m, mass {m_mg:.0f} mg; wrote {OUTNAME} "
           f"({time.time()-t0:.0f} s)")
 
 
