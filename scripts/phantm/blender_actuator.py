@@ -20,7 +20,7 @@ HT = 1.549 / 2
 CORE = 1.549 - 2 * 0.465
 G = 0.020
 SS_AX, SS_TR, SS_D, SS_SLOT = 1.16, 1.708, 0.465, 0.155
-SPACING = 0.390
+SPACING = 0.374
 BR_AX, BR_TR = 0.348, 1.162          # bridge axial (×1.5) × transverse width
 PM_L = 0.243
 

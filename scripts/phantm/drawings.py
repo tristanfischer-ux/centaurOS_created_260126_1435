@@ -162,7 +162,7 @@ def d2_transverse():
     ax.annotate("schematic: the bridge limb is drawn rotated into the section plane; in the device it\n"
                 "runs along the transverse END of the slot-sections. Bearing/frame block in Tony's CAD\n"
                 "(1784 × 3098, sited axially over the plain shaft) is NOT shown — it, not the magnetics,\n"
-                "dominates the cell-fit budget (§5.1).",
+                "dominates the cell-fit budget (report §4.5, Q8).",
                 (0.2, -3.35), ha="center", fontsize=8, color=MUT)
     ax.annotate("* working gap 77.5 → 20 µm (fix F1)", (0, 2.55), ha="center",
                 fontsize=8.5, color=DELTA)
@@ -190,9 +190,9 @@ def d3_tooth_detail():
     dim(ax, T / 2, HT - SLOT_T - 0.18, P - T / 2, HT - SLOT_T - 0.18, "232", offset=-0.08)
     dim(ax, 0.62, HT - SLOT_T, 0.62, HT, "465", offset=0.32)
     dim(ax, 0.62 + P, tipy, 0.62 + P, tipy + SS_SLOT, "155", offset=0.32)
-    ax.annotate("teeth, pitch, slot depths UNCHANGED — the gap closes by moving the whole\n"
-                "stator body toward the translator at assembly (datum shift, fix F1);\n"
-                "tooth geometry is identical. Bridge/PM section grows out-of-plane (fix F2)",
+    ax.annotate("each opposing slot-section is set 57.5 µm inward at assembly, reducing both\n"
+                "working gaps 77.5 → 20 µm (fix F1). Translator teeth (232 µm) and slots (232 µm)\n"
+                "are unchanged. Bridge/PM section grows out-of-plane (fix F2)",
                 (0.48, HT - 0.62), ha="center", fontsize=8.5, color=INK)
     ax.set_xlim(-0.85, 1.35); ax.set_ylim(HT - 0.85, HT + 0.62)
     fig.tight_layout(); fig.savefig(f"{OUT}/drawing-D3-tooth-detail.png"); plt.close(fig)
@@ -206,8 +206,7 @@ def d4_build_sequence():
         ("1. Mould micro-MIM parts", "translator + 6 slot-sections\n+ 3 bridge bars in\nmicro-MIM Fe-3%Si\n(pressed SMC cannot form\n232 µm teeth — §5)"),
         ("2. Pre-wind coils", "20t × Ø50 µm on a\nremovable former →\nself-bonded coil\n"
          "(bondable magnet wire)"),
-        ("3. Slip coil + PM\nonto OPEN bridge", "bridge is a straight bar\nBEFORE closing "
-         "the loop;\ncoil slides over;\nPM slug bonded in series"),
+        ("3. Slip coil onto\nOPEN bridge bar", "bridge is a straight bar\nBEFORE the loop closes:\ncoil slides over it; magnet\nslug bonded INTO the\nmagnetic path (not electrical)"),
         ("4. Close loop +\nset gaps", "bridge joins the two\nslot-sections; 20 µm gap\n"
          "set by precision shims /\nactive measurement"),
         ("5. Magnetise + test", "magnetise NdFeB\nin-situ (pulse fixture);\ndetent-force "

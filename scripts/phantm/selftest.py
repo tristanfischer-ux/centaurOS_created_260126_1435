@@ -141,6 +141,18 @@ def main() -> int:
     check("detent curve spike-free (max 2nd difference < 1.0·peak)",
           spike < 1.0 * np.abs(fdet).max(), f"2nd-diff {spike*1e3:.2f} mN")
 
+    # report-consistency guard (deterministic; skips if the report isn't built)
+    import os as _os
+    if _os.path.exists(_os.path.join(_os.path.dirname(__file__), "out",
+                                     "PHANTM-ACTUATOR-REPORT.md")):
+        import subprocess as _sp
+        rv = _sp.run([__import__("sys").executable,
+                      _os.path.join(_os.path.dirname(__file__), "verify_report.py")],
+                     capture_output=True, text=True)
+        check("verify_report.py (report ↔ formulas ↔ artefacts, no stale strings)",
+              rv.returncode == 0,
+              rv.stdout.strip().splitlines()[-1] if rv.stdout else "no output")
+
     failed = [c for c in CHECKS if not c[1]]
     print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} checks pass")
     return 1 if failed else 0

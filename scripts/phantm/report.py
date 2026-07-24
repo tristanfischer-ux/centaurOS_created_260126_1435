@@ -200,7 +200,7 @@ def fig_rise():
     fig, ax = plt.subplots(figsize=(8, 3.6), dpi=150)
     ax.plot(d["t_rise"] * 1e6, d["i_rise"], color=BLUE, linewidth=2, zorder=3)
     style_ax(ax, "time (µs)", "coil current (A)",
-             "Current rise onto 1 V supply (Rc = 0.55 Ω, nonlinear λ–i)")
+             "Current rise onto 1 V (lumped-model L ≈ 2.2 µH shown; FE τ = 0.7–1.1 µs is faster)")
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, "fig-rise.png"))
     plt.close(fig)
@@ -240,10 +240,13 @@ def main():
       "specified forces — the net zero-power detent saturates at ≈0.5 mN — ≈×15 below the "
       f"{fd_mn:.1f} mN target for any magnet size, because at a 77.5 µm gap the toothed "
       "interface barely modulates. The electromagnetic architecture itself is sound. Two "
-      "changes close the force gap in the 2D model — close the working gap to 20 µm and grow the bridge+magnet "
-      "cross-section ×1.5 — after which the force requirements are met in-model with a "
+      "changes close the force gap in the 2D model at the as-drawn registration — "
+      "close the working gap to 20 µm and grow the bridge+magnet cross-section ×1.5 — "
+      "after which the force requirements are met in-model with a "
       "manufacturable ~0.25 mm magnet (no margin yet — specify with trim-at-test "
-      "headroom, and note the full drive point needs ≈1.9 V, not 1 V). The price is a tolerance class that changes who "
+      "headroom, and note the full drive point needs ≈1.9 V, not 1 V). Uniform-step registration "
+      "trades ~23% of the detent back (§4, F3) — the in-model PASS is registration-"
+      "specific and awaits 3D-coupled FE + prototype breakaway before a final verdict. The price is a tolerance class that changes who "
       "can build it and how: the toothed parts must be micro-MIM (pressed SMC cannot "
       "form 232 µm teeth), and the 20 µm gap must be actively set at assembly.")
     A("")
@@ -313,8 +316,9 @@ def main():
           f"creeping at {plateau['pm_mm']*1e3:.0f} µm, where the magnet operates at "
           f"B = {plateau['b_pm_t']:.2f} T, H = {plateau['h_pm_ka_m']:.0f} kA/m). A longer "
           "magnet moves its own operating point back toward Br, but the flux it can push "
-          "is capped at Φ → Br·A by its internal reluctance — extra NdFeB buys nothing. "
-          "**No Pm meets the target within this model.**")
+          "is capped at Φ → Br·A by its internal reluctance — extra magnet LENGTH buys nothing at this cross-section. "
+          "**No magnet length meets the target at the specified section within this "
+          "model** — growing the SECTION is what helps, which is exactly fix F2.")
     A("")
     A("Three stacked causes:")
     A("- **Gap/tooth = 77.5/232 ≈ ⅓ kills the modulation.** Corner fringing conducts "
@@ -369,11 +373,17 @@ def main():
       "beam-facing envelope AND the stroke are both UNCHANGED (an earlier draft claimed "
       "a 0.35 mm stroke penalty — that was an artifact of the unrolled 2D model, "
       "corrected here). Lifts the magnet's Φ → Br·A ceiling into range.")
-    A("- **F3 (recommended; no added part or material cost, tooling layout only) — pole "
-      "spacing 374 → 386.7 µm (pitch 464) or 390 µm (pitch 465, pending Q6)** for exact "
-      "⅓-pitch steps (uniform ~154.7 µm; kills the ±3.4° jitter). NOTE: all force "
-      "curves and dynamics below are computed at the AS-DRAWN 374 µm registration "
-      "(F1+F2 only) — F3 changes step uniformity, not the force amplitudes.")
+    A("- **F3 — registration is a DESIGN TRADE, not a free fix (final-round FE result).** "
+      "Exact ⅓-pitch spacing (386.7 µm at pitch 464 / 390 µm at pitch 465) makes the "
+      "steps uniform (~154.7 µm, no jitter) — but perfect cancellation also SHRINKS "
+      "the detent residual: FE gives **5.95 mN at Pm 243 µm (3.85 g)** and only "
+      "6.44 mN at Pm 350 µm, vs 7.72 mN at the as-drawn 374 µm registration (whose "
+      "phasing error leaks fundamental into the net detent and boosts it). To hold "
+      "BOTH uniform steps AND ≥7.7 mN, add one lever: an N52 magnet (Br 1.45 T, "
+      "force ∝ Br² → ≈7.4 mN, marginal) or bridge/PM section ×1.75. Registration "
+      "offset is thus a tunable detent-vs-uniformity knob — the ruling on Q5/Q2 "
+      "picks the operating point. All curves below are at the AS-DRAWN 374 µm "
+      "registration (F1+F2).")
     A("- Teeth, pitch, translator, stator slots: **unchanged**. Rejected alternatives, "
       "both FE-tested: 0.35·pitch teeth (more force but detent basins 3→2 — step "
       "structure lost) and gap 40 µm + deep slots + bigger PM (caps at 4.3 mN AND "
@@ -436,7 +446,7 @@ def main():
     A("")
     A("![3D](render-3d-fixed.png)")
     A("")
-    A("### 4.4 Step dynamics (at the as-drawn 374 µm registration — F3 makes the steps uniform ~154.7 µm)")
+    A("### 4.4 Step dynamics (at the as-drawn 374 µm registration; exact-⅓ registration gives uniform ~154.7 µm steps at the §4 F3 detent trade)")
     A("")
     if dyn:
         A("- Transit to the next detent: **2.5–4 ms** at 1.8 A — the ms-scale "
@@ -444,8 +454,9 @@ def main():
         A("- Detents (FE) at −175.5/−3.0/+143.1 µm; stiffness ≈ 200 N/m ⇒ ≈180 Hz "
           "ring on the 0.158 g translator.")
         A(f"- Energy ≈ {dyn['energy_per_step_mj']:.1f} mJ per 1.5 ms pulse; coil "
-          f"ΔT ≈ {dyn['coil_dT_per_step_k']:.0f} K adiabatic — thermally trivial at "
-          "any realistic step rate with passive hold.")
+          f"ΔT ≈ {dyn['coil_dT_per_step_k']:.0f} K adiabatic — benign for occasional "
+          "repointing with passive hold between steps; sustained slewing needs a "
+          "duty-cycle + thermal-path check (not modelled).")
         A("- **Capture needs drive shaping**: with light damping a single full-force "
           "pulse has a narrow reliable-width window (overshoot lands one detent too "
           "far). Hold-until-settled-then-release captures correctly (15–45 ms full "
@@ -474,7 +485,18 @@ def main():
       "is more model-sensitive than the baseline's ×15 shortfall (which survives even "
       "total loss of cancellation). Treat Pm* = 243 µm as the design centre with the "
       "magnet length as the TRIM parameter at prototype; 3D FE (or a prototype "
-      "force-curve) bounds the residual before tooling. SMC B-H is Somaloy-700-shaped; "
+      "force-curve) bounds the residual before tooling. The residual is also "
+      "REGISTRATION-SENSITIVE (final-round FE: 7.72 mN at the as-drawn 374 µm vs "
+      "5.95 mN at exact ⅓-pitch, same magnet) — quote every detent figure with its "
+      "registration. Adiabatic ΔT estimates ignore R(T) growth (~9% at +22 K) and "
+      "say nothing about steady-state temperature (needs duty cycle + a thermal "
+      "path); and Δφ = 4πΔd/λ assumes normal incidence (cosθ factor off-normal). "
+      "The surviving STEEL-MAN, for balance: the one genuinely uncertain number — "
+      "the detent residual — is covered by TWO independent trim knobs that act at "
+      "assembly/tooling time (magnet length Pm, and registration offset, worth "
+      "~1.8 mN across its range); every other requirement checks out with margin "
+      "or fails for reasons no model error can rescue. A prototype force-curve "
+      "collapses the remaining uncertainty in one measurement. SMC B-H is Somaloy-700-shaped; "
       "the micro-MIM route's Fe-3%Si saturates HIGHER (~1.8–2.0 T) — favourable in the "
       "saturation-limited regions, but rerun the FE with the vendor's measured B-H "
       "curve before tooling; permeability and hysteresis also differ.")
@@ -720,6 +742,17 @@ def main():
       "identity) then the scripts in TRACKER.md order. FE backend: native xfemm "
       "femmcli (build recipe in femm/runner.py); C-core gate must PASS before any "
       "actuator run is trusted.")
+
+    A("")
+    A("**Final verification round (" + stamp + "):** a deterministic harness "
+      "(verify_report.py, wired into selftest) recomputes every hand-derivable "
+      "number from first principles, cross-checks every FE number against its "
+      "artefact, enforces a stale-string blacklist, and pins the 3D model's "
+      "constants to the analysed geometry — 28/28 green. A 5-seat cross-lineage "
+      "council then reviewed physics validity, red-teamed both headline "
+      "conclusions, steel-manned the design, and re-verified all 11 figures; its "
+      "one substantive catch (registration sensitivity of the detent residual) "
+      "was settled by a fresh FE solve and is now §4's F3 trade.")
 
     # ---------------------------------------------------------------- §10
     outreach = os.path.join(OUT, "SUPPLIER-OUTREACH-DRAFTS.md")
