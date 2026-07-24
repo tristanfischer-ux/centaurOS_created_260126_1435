@@ -25,7 +25,7 @@ export const magneticsVrDriveTool: Tool<any, any> = {
   version: '1.0.0',
   license: 'free-proprietary',
   source_url: 'internal://forgeos/phantm',
-  domain: 'actuation',
+  domain: 'power_electronics',
   pinned_environment: { python: '3.12' },
   applicable_to(envelope) {
     return ['beam_steering_actuator', 'linear_actuator', 'micro_stepper',
