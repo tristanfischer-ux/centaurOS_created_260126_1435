@@ -297,7 +297,7 @@ for label, val, unit, art, inval in fe_rows:
         ws.cell(row=r, column=col).fill = GRY
 
 # ============================ honeycomb ======================================
-af_, t_, dep_, apw_, aph_ = 3.1, 0.15, 7.7, 100.0, 100.0
+af_, t_, dep_, apw_, aph_ = 3.1, 0.15, 7.75, 100.0, 100.0
 cella_ = math.sqrt(3) / 2 * af_ ** 2
 ncell_ = math.floor(apw_ * aph_ / cella_)
 wall_ = math.sqrt(3) * af_ * t_ * dep_
@@ -317,7 +317,7 @@ note("Structural/packing calculations for the cell lattice that houses one actua
 head()
 inp("af", "Hex cell across-flats", 3.1, "mm", "Tony .skp 24 Jul: '3.1mm between flats'")
 inp("thc", "Cell wall thickness", 0.15, "mm", "Tony .skp 24 Jul: '150micron wall'")
-inp("dhc", "Cell depth", 7.7, "mm", "Tony CAD 24 Jul (dimension marked 7.7 mm; .skp is 2D-only)")
+inp("dhc", "Cell depth", 7.75, "mm", "MEASURED from Tony's STL bounding box (drawing reads 7.7)")
 inp("apw", "Aperture width", 100.0, "mm", "SET FROM CAD — round aperture: use its bounding square")
 inp("aph", "Aperture height", 100.0, "mm", "SET FROM CAD")
 inp("csub", "Cells per sub-array", 24, "-", "Tony .skp: tileable 24-hex sub-array")
@@ -373,6 +373,11 @@ der("apact", "Actuators, total mass", "={ncl}*{actm}/1000", "g", "N·m_act ÷100
     24 * act_ / 1000, "one actuator per cell — DOMINATES the lattice mass ≈29×")
 der("aptot", "Moving hardware total", "={hcm}+{apact}", "g", "lattice + actuators",
     24 * (cellm_ / 1000 + act_ / 1000), "per sub-array; frame, feed, reflectors excluded")
+inp("stlv", "Sub-array solid volume (STL, measured)", 192.25, "mm³",
+    "mesh integral of Tony's 1,640-triangle STL — ground truth incl. boundary walls", fill=GRY)
+der("stlm", "Sub-array lattice mass (measured)", "={stlv}*{dhcm}/1000", "mg", "V·ρ ÷1000",
+    192.25 * 1.24, "= 0.238 g printed / 0.519 g Al; +28% over the shared-wall asymptote "
+    "(an isolated tile owns its outer walls)")
 der("sqa", "Square-grid cell area", "={sqs}^2", "mm²", "s²", 9.0, "")
 der("sqrd", "Square-grid relative density", "=2*{thc}/{sqs}", "-", "2t/s — same form as hex",
     2 * t_ / 3.0, "")

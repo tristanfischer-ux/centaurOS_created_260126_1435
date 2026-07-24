@@ -153,14 +153,31 @@ check("reflector <2% of Mt", (m_foil + 2.0) / (mt_kg * 1e6) < 0.02,
 contains("reflector bound in report", "0.72 mg")
 
 # ---------------- honeycomb (§8.9) -----------------------------------------
-AF, T_HC, DEP = 3.1, 0.15, 7.7   # Tony .skp 24 Jul: 3.1 mm flats, 150 µm wall
+AF, T_HC, DEP = 3.1, 0.15, 7.75  # Tony .skp/STL 24 Jul: 3.1 mm flats, 150 µm wall, STL bbox depth
 check("hex side 1.790", abs(AF / math.sqrt(3) - 1.790) < 2e-3)
 check("cell area 8.32", abs(math.sqrt(3) / 2 * AF**2 - 8.32) < 0.01)
 check("rel density 0.097", abs(2 * T_HC / AF - 0.097) < 1e-3)
 wall_v = math.sqrt(3) * AF * T_HC * DEP
-check("wall vol 6.20", abs(wall_v - 6.20) < 0.01)
-check("cell mass 7.7 (printed)", abs(wall_v * 1.24 - 7.69) < 0.05)
-check("sub-array lattice 0.185 g @24", abs(24 * wall_v * 1.24 / 1000 - 0.185) < 0.002)
+check("wall vol 6.24", abs(wall_v - 6.24) < 0.01)
+check("cell mass 7.7 (printed)", abs(wall_v * 1.24 - 7.74) < 0.05)
+check("sub-array lattice asymptote 0.186 g @24", abs(24 * wall_v * 1.24 / 1000 - 0.186) < 0.002)
+# measured ground truth from Tony's STL (the artefact itself is re-measured every run)
+try:
+    import struct
+    import numpy as np
+    _raw = open(os.path.join(OUT, "tony-24hex-subarray.stl"), "rb").read()
+    _n = struct.unpack("<I", _raw[80:84])[0]
+    _tris = (np.frombuffer(_raw[84:84 + _n * 50], dtype=np.uint8).reshape(_n, 50)[:, 12:48]
+             .copy().view("<f4").reshape(_n, 3, 3).astype(float))
+    _vol = abs(float(np.einsum("ij,ij->i", _tris[:, 0],
+                               np.cross(_tris[:, 1], _tris[:, 2])).sum() / 6.0))
+    _depth = float(_tris[..., 2].max() - _tris[..., 2].min())
+    check("STL volume 192.2 mm³", abs(_vol - 192.25) < 0.5, f"{_vol:.2f}")
+    check("STL depth 7.75", abs(_depth - 7.75) < 0.01, f"{_depth:.3f}")
+    check("edge effect +28%", 1.25 < _vol / (24 * wall_v) < 1.32, f"{_vol/(24*wall_v):.3f}")
+    check("measured lattice 0.238 g printed", abs(_vol * 1.24 / 1000 - 0.238) < 0.002)
+except FileNotFoundError:
+    check("STL artefact present", False, "tony-24hex-subarray.stl missing")
 wfit = (2 * AF - 2.634) / math.sqrt(3)
 check("fit width 2.06 ≥ 1.708", abs(wfit - 2.059) < 2e-3 and wfit >= 1.708)
 check("no fit @1.9 cell", 2.634 > 1.9)
@@ -169,7 +186,8 @@ brv = 0.348 * 1.162 * 2.634
 act_mg = mt_kg * 1e6 + 3 * ((ssv + brv) * 7.4 + 0.348 * 1.162 * 0.243 * 7.5 + 1.108)
 check("actuator total ≈220 mg", abs(act_mg - 219.7) < 1.5, f"{act_mg:.1f}")
 check("sub-array actuators 5.3 g", abs(24 * act_mg / 1000 - 5.27) < 0.1)
-contains("§8.9 present", "8.9 Honeycomb", "3.1 mm", "7.7 mm", "24-hex", "150 µm", "2.06 mm")
+contains("§8.9 present", "8.9 Honeycomb", "3.1 mm", "7.75 mm", "24-hex", "150 µm", "2.06 mm",
+         "192.2 mm³", "0.238 g printed")
 absent("old 7-cluster reading retired", "7-cell clusters", "7 × 19")
 
 # ---------------- blender model constants ----------------------------------
