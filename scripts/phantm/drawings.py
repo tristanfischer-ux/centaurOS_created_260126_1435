@@ -225,6 +225,132 @@ def d4_build_sequence():
     fig.savefig(f"{OUT}/drawing-D4-build-sequence.png"); plt.close(fig)
 
 
+PCB_GRN = "#2f7d4f"
+
+
+def d5_cell_integration():
+    """Side cross-section: hex cell + moving short + actuator + PCB stack (mm)."""
+    fig, ax = sheet((12.5, 5.6), "D5 — Hex cell + actuator integration, axial cross-section "
+                                 "(dims mm; cell interior 3.10, depth 7.75)")
+    IN2 = 3.10 / 2          # interior half-height
+    W = 0.15                # wall
+    DEP = 7.75
+    d_short = 3.4           # drawn short depth (mid-travel)
+    # cell walls
+    for s in (1, -1):
+        ax.add_patch(Rectangle((0, s * IN2), DEP, s * W, fc=STEEL, ec=INK, lw=0.8))
+    # back wall with clearance hole Ø2.6
+    ax.add_patch(Rectangle((DEP, 1.3), 0.5, IN2 + W - 1.3, fc=STEEL, ec=INK, lw=0.8))
+    ax.add_patch(Rectangle((DEP, -IN2 - W), 0.5, (IN2 + W) - 1.3, fc=STEEL, ec=INK, lw=0.8))
+    # aperture PCB with hole
+    px = DEP + 1.1
+    for s in (1, -1):
+        ax.add_patch(Rectangle((px, 1.3 if s > 0 else -IN2 - W - 1.2), 1.6,
+                               (IN2 + W + 1.2) - 1.3, fc=PCB_GRN, ec=INK, lw=0.8))
+    ax.text(px + 0.8, IN2 + W + 1.55, "aperture PCB 1.6\n(pads + select FETs)",
+            ha="center", fontsize=7, color=PCB_GRN)
+    # translator (gold) with tooth hint, foil + standoff at nose
+    trans_y = 1.549 / 2
+    ax.add_patch(Rectangle((d_short + 0.25, -trans_y), 12.5, 2 * trans_y,
+                           fc=GOLD, ec=INK, lw=0.8))
+    for k in range(10):
+        x = d_short + 3.4 + k * 0.464
+        for s in (1, -1):
+            ax.add_patch(Rectangle((x, s * trans_y - (0.14 if s > 0 else 0)), 0.232,
+                                   0.14, fc="white", ec=INK, lw=0.4))
+    ax.add_patch(Rectangle((d_short + 0.05, -1.0), 0.2, 2.0, fc="#cccccc", ec=INK, lw=0.6))
+    ax.add_patch(Rectangle((d_short - 0.05, -(IN2 - 0.15)), 0.1, 2 * (IN2 - 0.15),
+                           fc=MAG, ec=INK, lw=0.8))
+    ax.text(d_short - 0.15, -IN2 - 0.62, "20 µm Cu foil short (moving)\n+ plastic standoff s (Vlad)",
+            ha="center", fontsize=7, color=INK)
+    # stator behind PCB
+    sx = px + 2.6
+    for s in (1, -1):
+        ax.add_patch(Rectangle((sx, s * (trans_y + 0.02)), 4.23, s * 0.465,
+                               fc=STEEL, ec=INK, lw=0.8))
+        ax.add_patch(Rectangle((sx + 1.5, s * (trans_y + 0.5)), 1.2, s * 0.45,
+                               fc=COIL, ec=INK, lw=0.8))
+    ax.text(sx + 2.1, trans_y + 1.75, "actuator stator (3 poles + coils + PM)\nmounted on the backplate",
+            ha="center", fontsize=7.5, color=INK)
+    # travel band + phase note
+    ax.annotate("", (0.35, 0), (0.35 + 3.33, 0),
+                arrowprops=dict(arrowstyle="<->", color=DELTA, lw=1.3))
+    ax.text(2.0, 0.28, "short travel λg/2 @70 GHz = 3.33", fontsize=7.5, color=DELTA,
+            ha="center")
+    ax.text(1.6, -2.75, "phase = 4π·d/λg   ·   everything behind the short is field-free —\n"
+            "the actuator sits inside the footprint of the cell it controls",
+            fontsize=8, color=INK)
+    # dims
+    dim(ax, 0, -IN2, 0, IN2, "3.10 interior", offset=-0.55)
+    dim(ax, 0, IN2 + W + 0.25, DEP, IN2 + W + 0.25, "7.75 cell depth", offset=0.3)
+    dim(ax, DEP + 0.05, -1.3, DEP + 0.05, 1.3, "Ø2.6 holes", offset=0.75)
+    ax.text(0.05, IN2 + 0.32, "wall 0.15", fontsize=7, color=MUT)
+    ax.set_xlim(-1.4, 17.2); ax.set_ylim(-3.3, 3.6)
+    fig.tight_layout(); fig.savefig(f"{OUT}/drawing-D5-cell-integration.png"); plt.close(fig)
+
+
+def d6_pcb():
+    """Aperture-PCB face (hole pattern) + electronics stack summary."""
+    import math as _m
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.5, 5.2), dpi=170,
+                                 gridspec_kw={"width_ratios": [1, 1.15]})
+    fig.suptitle("D6 — Drive PCB: hole pattern, stack and power/control budget",
+                 x=0.02, ha="left", fontsize=11, fontweight="bold", color=INK)
+    fig.text(0.995, 0.005, f"PHANTM fixed design — generated {STAMP}", ha="right",
+             va="bottom", fontsize=6.5, color=MUT)
+    a1.set_aspect("equal"); a1.axis("off")
+    a1.set_title("Aperture-board face — 7-cell tile shown (24-hex identical pattern)",
+                 fontsize=9)
+    P7 = 3.25
+    centres = [(0, 0)] + [(P7 * _m.cos(_m.radians(a)), P7 * _m.sin(_m.radians(a)))
+                          for a in range(0, 360, 60)]
+    for cx, cy in centres:
+        hexpts = [(cx + P7 / _m.sqrt(3) * _m.cos(_m.radians(a + 30)),
+                   cy + P7 / _m.sqrt(3) * _m.sin(_m.radians(a + 30)))
+                  for a in range(0, 360, 60)]
+        a1.add_patch(Polygon(hexpts, fill=False, ec=MUT, lw=0.8, ls=":"))
+        a1.add_patch(plt.Circle((cx, cy), 1.3, fc="white", ec=INK, lw=1.2))
+        for k in range(3):
+            a1.add_patch(plt.Circle((cx + 1.62 * _m.cos(_m.radians(90 + k * 120)),
+                                     cy + 1.62 * _m.sin(_m.radians(90 + k * 120))),
+                                    0.13, fc=COIL, ec=None))
+        a1.add_patch(Rectangle((cx - 0.35, cy - 1.85), 0.7, 0.42, fc=PCB_GRN, ec=INK, lw=0.5))
+    a1.set_facecolor("#eef3ee")
+    dim(a1, centres[1][0], centres[1][1], centres[2][0], centres[2][1],
+        "pitch 3.25", offset=0.5)
+    a1.text(0, -1.05, "Ø2.6", ha="center", fontsize=7, color=INK)
+    a1.text(0, -5.3, "per cell: Ø2.6 clearance hole (translator tail) · 3 coil-pad pairs (red)\n"
+            "· dual select-FET (green) · min web 0.65 mm, 2 oz Cu",
+            ha="center", fontsize=8, color=INK)
+    a1.set_xlim(-6.2, 6.2); a1.set_ylim(-6.2, 6.2)
+    a2.axis("off")
+    a2.set_title("Stack + power/control budget (drive-electronics.json)", fontsize=9)
+    rows = [
+        ("STACK", "hex lattice 7.75 → back skin → APERTURE PCB 1.6 (pads + select FETs)"
+                  " → board-to-board → DRIVER PCB (3 phase H-bridges, buck, MCU)"),
+        ("Rail", "5 V → buck 0.8–2.1 V, DAC-set — the RAIL VOLTAGE is the current "
+                 "control (resistive coil): 1.0 V→1.8 A step, 2.0 V→3.6 A ≈ Ic*"),
+        ("Per coil", "0.552 Ω · τ 1.1 µs · pulse 1.5 ms · 2.7 mJ/step"),
+        ("Per 24-cell tile", "72 coils · re-point 0.65 J · 8-parallel: 57.6 W burst "
+                             "(26.8 A rail), 0.12 s · idle 0 W (zero-power hold)"),
+        ("10 cm aperture", "≈1,093 cells · 29.3 J/re-point · 5.5 s @8-par (58 W) or "
+                           "0.72 s @64-par (461 W burst)"),
+        ("Control", "per-tile MCU, open-loop step counting into detents; hold-then-"
+                    "release capture (§4.4); tiles daisy-chained (CAN/SPI); host sends "
+                    "per-cell target depth map"),
+        ("Polarity", "phase bridges full-H: drive current must AID the PM "
+                     "(FE sign convention)"),
+    ]
+    y = 0.95
+    for head, body in rows:
+        a2.text(0.01, y, head, fontsize=8.5, fontweight="bold", color=INK, va="top")
+        a2.text(0.22, y, body, fontsize=8, color=INK, va="top", wrap=True)
+        y -= 0.135
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.savefig(f"{OUT}/drawing-D6-pcb.png"); plt.close(fig)
+
+
 if __name__ == "__main__":
     d1_axial(); d2_transverse(); d3_tooth_detail(); d4_build_sequence()
-    print("wrote drawing-D1..D4 to out/")
+    d5_cell_integration(); d6_pcb()
+    print("wrote drawing-D1..D6 to out/")

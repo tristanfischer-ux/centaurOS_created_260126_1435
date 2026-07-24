@@ -1017,6 +1017,120 @@ def main():
     A("| 8 | Re-point time / drive parallelism | driver electronics | ≈0.15 s per 24-cell tile at 8-way parallel |")
     A("")
 
+    A("### 9.5 CAD: the integration drawings, and the drive PCB with its power/control budget")
+    A("")
+    A("![D5](drawing-D5-cell-integration.png)")
+    A("")
+    A("D5 is the axial cross-section of one cell: the foil short travels inside the "
+      "7.75 mm guide (λg/2 = 3.33 mm of travel covers 2π at 70 GHz); the translator "
+      "tail exits through the cell back wall and a Ø2.6 mm clearance hole in the "
+      "APERTURE PCB; the stator mounts on the backplate behind. The 3D model shows "
+      "the same stack on a 7-cell tile (one cell cut away; aperture face down):")
+    A("")
+    A("![3D hexcell](render-3d-hexcell.png)")
+    A("")
+    A("![D6](drawing-D6-pcb.png)")
+    A("")
+    A("**The PCB is a two-board stack, by necessity**: three coil drivers per cell do "
+      "not fit inside a 3.25 mm hex pitch (9.15 mm² per cell) even using both sides — "
+      "so the APERTURE board carries only the clearance holes, coil termination pads "
+      "and a dual select-FET per cell (10–20 mΩ, negligible against the 0.552 Ω coil), "
+      "and the DRIVER board behind carries three shared phase H-bridges, the buck "
+      "rail, bulk capacitance and the MCU. Two design facts do the heavy lifting "
+      "(artefact: drive-electronics.json):")
+    A("")
+    A("- **The rail voltage IS the current control.** The coil is resistive at every "
+      "timescale that matters (τ = L/R ≈ 1.1 µs ≪ 1.5 ms pulse), so a DAC-set buck "
+      "rail of 1.0 V delivers the 1.8 A step current and 2.0 V delivers ≈3.6 A ≈ Ic* — "
+      "no per-channel current loops, no PWM chopping into a 0.6 µH load.")
+    A("- **Idle power is zero** (the PM detent holds), so the budget is entirely "
+      "re-pointing bursts: 2.7 mJ/step; a 24-cell tile re-points for 0.65 J — at "
+      "8-cells-parallel that is 57.6 W burst (26.8 A on the rail) for 0.12 s. A 10 cm "
+      "aperture (≈1,093 cells) re-points for 29.3 J: 5.5 s at 8-parallel (58 W) or "
+      "0.72 s at 64-parallel (461 W burst) — the parallelism knob is a driver-board "
+      "sizing choice, not a physics limit.")
+    A("")
+    A("Control is deliberately dumb: per-tile MCU, open-loop step counting into the "
+      "detents (that is what the zero-power detent is FOR), hold-then-release capture "
+      "per §4.4, tiles daisy-chained on CAN/SPI, and the host supplies only a per-cell "
+      "target-depth map. The phase map itself — which depth pattern steers where — is "
+      "RF and stays with Tony/Vlad. One polarity trap carried over from the FE: drive "
+      "current must AID the permanent magnet, so the phase bridges are full-H.")
+    A("")
+
+    A("### 9.6 How to make the cells — the tutorial, and who can fabricate them")
+    A("")
+    A("**The part**: a tileable hex lattice (24-hex, 19.7 × 20.8 mm, or 7-hex), interior "
+      "across-flats 3.10 mm, walls 150 µm, depth 7.75 mm, conductive inner surfaces. "
+      "Two framing facts before any process talk: the INTERIOR aperture is the RF "
+      "dimension (sensitivity: **fc moves ≈17 MHz per µm** of across-flats, so a "
+      "±25 µm tolerance is ±0.4 GHz of cutoff — fine mid-band, felt near the band "
+      "edge); and the WALL thickness is NOT a waveguide dimension — it sets element "
+      "pitch (array-level, Tony/Vlad) and mass, which means the manufacturer may "
+      "thicken walls for process reasons without touching the cell RF.")
+    A("")
+    A("**The manufacturing tension**: 150 µm walls × 7.75 mm deep is a ≈52:1 aspect "
+      "ratio — comfortably PRINTABLE, not conventionally mouldable (thin-wall "
+      "injection limits are ≈15–30:1). That splits the route by volume:")
+    A("")
+    A("1. **Prototype (1–100 tiles): print + metallise.** High-resolution "
+      "projection micro-stereolithography (2–25 µm class) or a good SLA print of the "
+      "tile → clean/dry → **electroless copper 3–5 µm** on all surfaces (skin depth "
+      "at 70 GHz is 0.25 µm — plate ≥10×) → thin nickel or immersion-gold flash for "
+      "corrosion. Print SURFACE ROUGHNESS is the RF tax: 1–10 µm print texture vs "
+      "0.25 µm skin depth raises conductor loss — specify vapour smoothing or "
+      "electropolish, and let Vlad set the loss budget. Plate BEFORE bonding the "
+      "back skin, while every cell is open at both ends. This is exactly Tony's "
+      "current 3D-printed route, plus the metallisation step.")
+    A("2. **Pilot (1k–100k): all-metal precision.** Electroforming (copper grown on "
+      "a dissolvable mandrel — the classic satellite feed-network process; "
+      "tolerances to ±5 µm, conductivity solved by construction) or wire-EDM from "
+      "solid aluminium. Higher unit cost, reference-grade RF.")
+    A("3. **Volume (100k+/yr): metallised moulded plastic** — the automotive-radar "
+      "playbook (77 GHz waveguide antennas ship in cars today). Needs the aspect "
+      "ratio tamed: EITHER thicken walls to ≈0.3 mm (pitch grows to 3.4 mm — an "
+      "array-level call for Vlad) OR mould TWO half-depth tiles (≈26:1 each, "
+      "standard) and bond face-to-face, then plate. Tooling £30–80k, parts "
+      "sub-£2/tile at scale (indicative, LOW confidence until quotes).")
+    A("4. **The cheap experiment**: aerospace aluminium honeycomb core is a COMMODITY "
+      "at exactly this cell size (1/8\" = 3.175 mm) — foil walls 18–50 µm, corrugated "
+      "geometry, MIL-spec. Not Tony's uniform-wall hexagon, but a £100 slice answers "
+      "'how does a real metal lattice of this cell size behave on Vlad's bench' in a "
+      "week.")
+    A("5. **Assembly + QA**: metallised tile → flatness check → bond to the drilled "
+      "back skin → PCB stack (§9.5). Gates: dimensional scan (the ±25 µm interior "
+      "tolerance), plating continuity (DC resistance wall-to-wall), and an RF "
+      "return-loss spot check per batch (Vlad's bench).")
+    A("")
+    A("**Who can make them — contact routes researched and live-verified 24 Jul** "
+      "(three parallel verification passes; every email read off the company's own "
+      "page, never constructed; gaps stated):")
+    A("")
+    A("| # | Company | Role for us | Route | Named person | Phone |")
+    A("|---|---|---|---|---|---|")
+    A("| 1 | **SWISSto12** (CH) | printed + plated RF structures — 2,000+ qualified 3D-printed RF parts in orbit | contact form (no public email) | **Hadar Naor, VP Sales EMEA** | — |")
+    A("| 2 | **Vitesse Systems / Custom Microwave** (Longmont CO) | electroforming, 50 yrs, 1 GHz–1 THz, ±5 µm — strongest all-metal fit | Sales@custommicrowave.com (live-verified) | **Matthew Parisi, VP Sales & Marketing** | +1 303 651 0707 |")
+    A("| 3 | **Thomas Keating** (Billingshurst UK) | precision mmWave machining + IN-HOUSE electroforming (ALMA heritage) | K.Pike@terahertz.co.uk (live-verified) | **Kevin Pike, Scientific Sales**; Simon Duke, Toolmaking Sales | +44 1403 787613 |")
+    A("| 4 | **RPG Radiometer Physics** (Meckenheim DE) | in-house mmWave design + machining, 50 GHz–1.1 THz | mm-wave-sales@radiometer-physics.de (live-verified) | Dr Thomas Rose, Managing Partner | +49 2225 7075-0 |")
+    A("| 5 | **Gapwaves** (Gothenburg SE) | volume metallised-waveguide antennas (77 GHz automotive) — the 100k+/yr route | enquiry form | no public sales name (CEO Jonas Ehinger) | +46 31 762 60 40 |")
+    A("| 6 | **Huber+Suhner** (Herisau CH) | metallised-plastic waveguide antennas 76–81 GHz in volume | contact form (email obfuscated) | **Francesco Merli, Head of PM & Dev, Antennas & mmWave** | +41 71 353 41 11 |")
+    A("| 7 | **Boston Micro Fabrication** (Maynard MA) | micro-printing 2–25 µm class, ±10 µm — the prototype tile printer | info@bmf3d.com (live-verified) | Steffen Hägele, Sales Manager DACH (2022 evidence) | +1 978 637 2050 |")
+    A("| 8 | **Cybershield** (Lufkin TX) | electroless plating on plastic — explicitly markets plated antenna/waveguide systems | sales@cybershieldinc.com (live-verified) | no public name | +1 866 684 8808 |")
+    A("| 9 | **SAT Plating** (Troy MI) | plating on PEEK/Ultem/printed parts (\"we plate the unplateable\") | WillW@SATPlating.com (live-verified) | **William Wallace, General Manager** | +1 248 273 0037 |")
+    A("| 10 | **Precision Micro** (Birmingham UK) | photochemical etching 10 µm–2.5 mm — the etched-foil/stacked-wall route | sales@precisionmicro.com (live-verified) | **Ben Kitson, Head of Business Development** | +44 121 380 0100 |")
+    A("| 11 | **Elliptika** (Brest FR) | RF design house: 3D-printed antennas + measurement benches — EU print-and-verify partner | contact@elliptika.com (live-verified) | Alexandre Manchec (heads the company) | +33 2 98 02 03 40 |")
+    A("| 12 | **Flann Microwave** (Bodmin UK) | precision waveguide components to 1.1 THz — bench/interface hardware for Vlad's tests | sales@flann.com (live-verified) | Steve Horner / Caleb Hamlet, Technical Sales | +44 1208 77777 |")
+    A("| 13 | **Hexcel** (Stamford CT) | commodity 1/8\" aluminium honeycomb (HexWeb CR III) — the cheap experiment | web form only | no public name | +1 800 688 7734 |")
+    A("| 14 | **Plascore** (Zeeland MI) | commodity aluminium honeycomb (PAMG-XR1), 1/16–3/8\" cells | sales@plascore.com (live-verified) | no public name | +1 616 772 1220 |")
+    A("")
+    A("Recommended first requests-for-quotation: **Thomas Keating + Vitesse** "
+      "(reference-grade metal tiles, both electroforming), **BMF + Cybershield or "
+      "SAT** (the print-and-plate prototype pair), **SWISSto12** (integrated "
+      "print+plate, space heritage), and a **Hexcel/Plascore honeycomb slice** as the "
+      "week-one bench experiment. Draft emails for the cell lattice are in §11 "
+      "alongside the actuator outreach (Annex E carries the cell specification).")
+    A("")
+
     # ------------------------------------------------------------------ §10
     A("## 10. Traceability")
     A("")

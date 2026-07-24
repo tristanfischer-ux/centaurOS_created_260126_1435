@@ -228,6 +228,26 @@ _l0p, _lcp = 299.792458 / 55.0, 299.792458 / _fc_p
 _lgp = _l0p / math.sqrt(1 - (_l0p / _lcp) ** 2)
 check("proto λg/2 @55 = 4.23", abs(_lgp / 2 - 4.23) < 0.02, f"{_lgp/2:.3f}")
 contains("proto sizing in report", "≈3.95 mm")
+
+# ---------------- §9.5 drive electronics + §9.6 cells ----------------------
+de = json.load(open(os.path.join(OUT, "drive-electronics.json")))
+p8 = next(r for r in de["parallelism_trade"] if r["parallel_cells"] == 8)
+check("8-parallel burst 57.6 W", abs(p8["burst_w"] - 57.6) < 0.1)
+check("8-parallel rail 26.8 A", abs(p8["rail_burst_a"] - 26.8) < 0.1)
+check("tile re-point 0.12 s", abs(p8["tile_repoint_s"] - 0.12) < 0.01)
+check("aperture energy 29.3 J", abs(de["aperture_10cm"]["energy_j"] - 29.3) < 0.1)
+check("64-parallel 0.72 s", abs(de["aperture_10cm"]["parallel_64"]["repoint_s"] - 0.72) < 0.01)
+check("idle 0 W", de["aperture_10cm"]["idle_w"] == 0.0)
+for f_ in ("drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
+           "render-3d-hexcell.png", "drive-electronics.json"):
+    check(f"artefact {f_} exists", os.path.exists(os.path.join(OUT, f_)))
+check("cell aspect ≈52:1", abs(7.75 / 0.15 - 51.7) < 0.1)
+check("fc sensitivity 17 MHz/µm", abs(hx["cutoff"]["fc_ghz"] / 3.1 - 17.3) < 0.1)
+contains("§9.5 present", "9.5 CAD", "drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
+         "render-3d-hexcell.png", "57.6 W burst", "29.3 J", "rail voltage IS the current control")
+contains("§9.6 present", "9.6 How to make the cells", "17 MHz per µm", "52:1",
+         "Thomas Keating", "Vitesse", "SWISSto12", "electroless copper",
+         "Annex E", "K.Pike@terahertz.co.uk", "Sales@custommicrowave.com")
 absent("no stale cutoff-request", "needs the cell's cutoff to pin down")
 absent("old 7-cluster reading retired", "7-cell clusters", "7 × 19")
 
