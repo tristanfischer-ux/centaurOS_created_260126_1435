@@ -289,9 +289,18 @@ def _make_chassis_word(part: dict) -> dict:
 
 def augment_decomposition_with_chassis_harness(state: dict) -> int:
     """Ensure the chassis base plate, mounting frame (standoffs + shelf decks) and internal wiring
-    harness — all RENDERED by the interior/frame/harness code — are BoM line items. Idempotent; only
-    for a device that has a populated physical interior (≥3 placed-ish physical parts). Returns count
-    added. `_structural: True` on the words tells the interior packer to skip placing them."""
+    harness — all RENDERED by the SEALED-INSTRUMENT interior/frame/harness code — are BoM line items.
+    Idempotent; only for a SEALED INSTRUMENT with a populated physical interior (≥3 physical parts).
+    Returns count added. `_structural: True` on the words tells the interior packer to skip placing them.
+
+    INSTRUMENT-ONLY (2026-07-24): the base plate + interior mounting frame + internal wiring loom are
+    a benchtop-device signature — a MW-scale process plant (BESS / CO₂ / recrystalliser) has a steel
+    structure + cable trays, NOT an 'Interior Mounting Frame', and its interior is not populated by the
+    sealed-enclosure path. Gate on the SAME isInstrumentDevice signal the render's interior population
+    uses, so the BoM injection matches what the render actually draws (no phantom instrument-chassis on
+    a plant)."""
+    if not state.get("isInstrumentDevice"):
+        return 0   # not a sealed instrument — the frame/harness is never drawn, so never billed
     md = state.get("moduleDecomposition") or {}
     modules = md.get("modules") or []
     if not modules:
@@ -377,13 +386,18 @@ def _selftest():
     # frame + wiring loom but has NONE of them as BoM words → the three structural parts get
     # added, marked _structural (so the packer skips them), idempotent, and skipped when the
     # interior is empty (<3 parts) or the parts are already present.
-    def _asm(nparts):
+    def _asm(nparts, instrument=True):
         ws = [{"name_human": f"Part {i}", "content_character": {"character_id": f"part_{i}"},
                "modifier_characters": []} for i in range(nparts)]
-        return {"moduleDecomposition": {"modules": [
-            {"sub_modules": [{"sub_module_id": "structure_containment", "words": ws}]}]}}
+        return {"isInstrumentDevice": instrument,
+                "moduleDecomposition": {"modules": [
+                    {"sub_modules": [{"sub_module_id": "structure_containment", "words": ws}]}]}}
     empty = _asm(1)
     assert augment_decomposition_with_chassis_harness(empty) == 0, "empty interior → no chassis"
+    # a NON-instrument (process plant) with a full interior → NO chassis/harness (it has steel +
+    # cable trays, not an Interior Mounting Frame; the sealed-enclosure path never draws it).
+    plant = _asm(5, instrument=False)
+    assert augment_decomposition_with_chassis_harness(plant) == 0, "non-instrument → no chassis/harness"
     full = _asm(5)
     nc = augment_decomposition_with_chassis_harness(full)
     assert nc == 3, f"expected 3 chassis/harness parts, got {nc}"
