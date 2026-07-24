@@ -16503,11 +16503,11 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     # MULTI-SHELF stacking (Tristan: "multiple shelves ... vertically or horizontally ... gravity")
     # uses the HEIGHT, so the FOOTPRINT target is divided by an assumed layer count — the body
     # hugs its contents in 3D, not one flat wasteful layer.
-    _STACK_LAYERS = 1.3
+    _STACK_LAYERS = 1.5                    # tighter footprint (more stacking → hugs the contents)
     area = tot_fp / max(0.30, _INTERIOR_PACK_EFFICIENCY) / _STACK_LAYERS
     width = max(_m.sqrt(area / _INTERIOR_BENCH_ASPECT_DW), _widest + 8.0)
     pack_h = max_h + 8.0
-    stack_h = max(pack_h, max_h * 2.6)    # room to stack ~2-3 short parts (tall parts still fit)
+    stack_h = max(pack_h, max_h * 3.0)    # room to stack short parts high (tall parts still fit)
     floor_z = base_z + margin
     pack_parts = [{"tag": x["tag"], "name": x["name"], "dims": x["dims"]} for x in items]
     # MULTI-SHELF, GRAVITY-AWARE pack: gravity-uprights (vessels/pumps) on the floor, short flats
