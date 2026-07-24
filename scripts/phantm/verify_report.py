@@ -136,7 +136,9 @@ absent("no retired numbers", "400 A-turns", "×8 short", "7.92 mm",
        "not the force amplitudes",
        "0.151/0.162/0.151", "±1.4°", "4–7× below", "×16 however",
        "FE-proven fixes", "steps 173/146/145; Tony CAD reads 400 µm — reconcile)")
-absent("no old title", "(v3)")
+absent("no old title", "(v3)", "(v3.1")
+absent("no strikethrough tildes", "~")
+contains("v4 title", "(v4 — 24 Jul feedback incorporated")
 
 # ---------------- blender model constants ----------------------------------
 bl = open(os.path.join(HERE, "blender_actuator.py")).read()

@@ -226,7 +226,7 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v3.1; pending 3D-FE/prototype validation)")
+    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v4 — 24 Jul feedback incorporated; pending 3D-FE/prototype validation)")
     A("")
     A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
@@ -815,8 +815,11 @@ def main():
         A(body)
 
     path = os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")
+    text = "\n".join(L) + "\n"
+    # '~' pairs render as strikethrough in GFM — use '≈' for approximations
+    text = text.replace("~", "≈")
     with open(path, "w") as f:
-        f.write("\n".join(L) + "\n")
+        f.write(text)
     print(f"wrote {path} + figures")
 
 
