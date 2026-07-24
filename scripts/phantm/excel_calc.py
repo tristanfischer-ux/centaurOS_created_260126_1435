@@ -373,11 +373,16 @@ der("apact", "Actuators, total mass", "={ncl}*{actm}/1000", "g", "N·m_act ÷100
     24 * act_ / 1000, "one actuator per cell — DOMINATES the lattice mass ≈29×")
 der("aptot", "Moving hardware total", "={hcm}+{apact}", "g", "lattice + actuators",
     24 * (cellm_ / 1000 + act_ / 1000), "per sub-array; frame, feed, reflectors excluded")
-inp("stlv", "Sub-array solid volume (STL, measured)", 192.25, "mm³",
+inp("stlv", "24-hex sub-array solid volume (STL, measured)", 192.25, "mm³",
     "mesh integral of Tony's 1,640-triangle STL — ground truth incl. boundary walls", fill=GRY)
-der("stlm", "Sub-array lattice mass (measured)", "={stlv}*{dhcm}/1000", "mg", "V·ρ ÷1000",
+der("stlm", "24-hex lattice mass (measured)", "={stlv}*{dhcm}/1000", "mg", "V·ρ ÷1000",
     192.25 * 1.24, "= 0.238 g printed / 0.519 g Al; +28% over the shared-wall asymptote "
     "(an isolated tile owns its outer walls)")
+inp("stlv7", "7-hex sub-array solid volume (STL, measured)", 64.53, "mm³",
+    "mesh integral of Tony's 264-triangle STL (9.9 × 9.6 × 7.75 mm tile)", fill=GRY)
+der("stlm7", "7-hex lattice mass (measured)", "={stlv7}*{dhcm}/1000", "mg", "V·ρ ÷1000",
+    64.53 * 1.24, "= 0.080 g printed / 0.174 g Al; +48% over the asymptote — the smaller "
+    "the tile, the bigger the boundary-wall share")
 der("sqa", "Square-grid cell area", "={sqs}^2", "mm²", "s²", 9.0, "")
 der("sqrd", "Square-grid relative density", "=2*{thc}/{sqs}", "-", "2t/s — same form as hex",
     2 * t_ / 3.0, "")

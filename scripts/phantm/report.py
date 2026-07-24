@@ -865,7 +865,8 @@ def main():
       "150 micron wall* and the matching 3D STL) fixes the cell lattice: hexagonal cells "
       "**3.1 mm across-flats, 150 µm walls, 7.75 mm deep** (depth MEASURED from the STL "
       "bounding box; the dimensioned drawing reads 7.7), 3D-printed (metallised for RF "
-      "duty), tiled as **24-hex sub-arrays** of 19.7 × 20.8 mm; demo-scale prototypes "
+      "duty), tiled as sub-arrays in TWO sizes, both received as STL: **24-hex "
+      "(19.7 × 20.8 mm)** and **7-hex (9.9 × 9.6 mm)**; demo-scale prototypes "
       "(≈25–30 mm cells, hex and square egg-crate) photographed working. Scope note: the "
       "cell-size↔band mapping is RF and stays with Tony/Vlad — cell dimensions are treated "
       "as INPUTS here; only structure, packing and mass are computed.")
@@ -874,19 +875,21 @@ def main():
     A("|---|---|---|---|")
     A("| Hexagon side | AF/√3 | 3.1/√3 | 1.790 mm |")
     A("| Cell area | (√3/2)·AF² | (√3/2)×3.1² | 8.32 mm² |")
-    A("| Cells per sub-array | from the .skp/STL | — | 24 (aperture = tiles × 24) |")
+    A("| Cells per sub-array | from the STLs | — | 24 or 7 (aperture = Σ tiles) |")
     A("| Relative density | 2t/AF (shared walls) | 2×0.15/3.1 | 0.097 |")
     A("| Wall volume per cell | √3·AF·t·L | √3×3.1×0.15×7.75 | 6.24 mm³ |")
     A("| Cell wall mass | V·ρ | 6.24 mm³ × 1.24 mg/mm³ (printed) | 7.7 mg |")
     A("| Lattice per sub-array (large-aperture asymptote) | N·m | 24 × 7.7 mg | 0.186 g |")
-    A("| **Sub-array solid volume — MEASURED from the STL** | mesh integral | 1,640-triangle STL, watertight | **192.2 mm³** |")
-    A("| **Sub-array lattice mass — measured** | V·ρ | 192.2 × 1.24 / 2.70 | **0.238 g printed / 0.519 g Al** |")
-    A("| Boundary-wall edge effect | measured/asymptote | 192.2 / 149.8 | +28% — an isolated tile owns its outer walls; interior sharing recovers the asymptote as tiles join |")
+    A("| **24-hex solid volume — MEASURED from its STL** | mesh integral | 1,640-triangle STL, watertight | **192.2 mm³** |")
+    A("| **24-hex lattice mass — measured** | V·ρ | 192.2 × 1.24 / 2.70 | **0.238 g printed / 0.519 g Al** |")
+    A("| **7-hex solid volume — MEASURED from its STL** | mesh integral | 264-triangle STL, watertight | **64.5 mm³** |")
+    A("| **7-hex lattice mass — measured** | V·ρ | 64.5 × 1.24 / 2.70 | **0.080 g printed / 0.174 g Al** |")
+    A("| Boundary-wall edge effect | measured/asymptote | 192.2/149.8 · 64.5/43.7 | +28% (24-hex) vs +48% (7-hex) — an isolated tile owns its outer walls; the excess shrinks toward the shared-wall asymptote as tiles grow or join |")
     A("| Widest fit at actuator height | (2·AF − h)/√3 | (6.2 − 2.634)/√3 | 2.06 mm ≥ 1.708 ✓ |")
     A("| Actuator fit in the 3.1 mm cell | h ≤ AF and w ≤ (2AF−h)/√3 | 2.634 ≤ 3.1; 1.708 ≤ 2.06 | **FITS** |")
     A("| Fit @80 GHz cell (1.9 mm) | same test | 2.634 > 1.9 | FAILS — needs ≥2-deep axial stagger |")
     A("| One actuator, total mass | Mt + 3·(steel+PM+coil) | 157.7 + 3×(18.8+0.74+1.11) | 220 mg |")
-    A("| Actuators per sub-array | N·m | 24 × 220 mg | **5.3 g** — dominates the measured lattice ≈22× |")
+    A("| Actuators per sub-array | N·m | 24 (7) × 220 mg | **5.3 g (1.5 g)** — dominates the measured lattice ≈22× (19×) |")
     A("")
     A("The hexagon fit rule (the corner cuts width as height grows) is why the 1.708 × 2.634 mm "
       "actuator clears the 3.1 mm cell with 0.35 mm to spare but can never enter a 1.9 mm cell. "

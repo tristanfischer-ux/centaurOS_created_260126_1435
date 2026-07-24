@@ -161,23 +161,32 @@ wall_v = math.sqrt(3) * AF * T_HC * DEP
 check("wall vol 6.24", abs(wall_v - 6.24) < 0.01)
 check("cell mass 7.7 (printed)", abs(wall_v * 1.24 - 7.74) < 0.05)
 check("sub-array lattice asymptote 0.186 g @24", abs(24 * wall_v * 1.24 / 1000 - 0.186) < 0.002)
-# measured ground truth from Tony's STL (the artefact itself is re-measured every run)
+# measured ground truth from Tony's STLs (the artefacts themselves re-measured every run)
 try:
     import struct
     import numpy as np
-    _raw = open(os.path.join(OUT, "tony-24hex-subarray.stl"), "rb").read()
-    _n = struct.unpack("<I", _raw[80:84])[0]
-    _tris = (np.frombuffer(_raw[84:84 + _n * 50], dtype=np.uint8).reshape(_n, 50)[:, 12:48]
-             .copy().view("<f4").reshape(_n, 3, 3).astype(float))
-    _vol = abs(float(np.einsum("ij,ij->i", _tris[:, 0],
-                               np.cross(_tris[:, 1], _tris[:, 2])).sum() / 6.0))
-    _depth = float(_tris[..., 2].max() - _tris[..., 2].min())
-    check("STL volume 192.2 mm³", abs(_vol - 192.25) < 0.5, f"{_vol:.2f}")
-    check("STL depth 7.75", abs(_depth - 7.75) < 0.01, f"{_depth:.3f}")
-    check("edge effect +28%", 1.25 < _vol / (24 * wall_v) < 1.32, f"{_vol/(24*wall_v):.3f}")
-    check("measured lattice 0.238 g printed", abs(_vol * 1.24 / 1000 - 0.238) < 0.002)
-except FileNotFoundError:
-    check("STL artefact present", False, "tony-24hex-subarray.stl missing")
+
+    def _stl_measure(fname):
+        raw = open(os.path.join(OUT, fname), "rb").read()
+        n = struct.unpack("<I", raw[80:84])[0]
+        tris = (np.frombuffer(raw[84:84 + n * 50], dtype=np.uint8).reshape(n, 50)[:, 12:48]
+                .copy().view("<f4").reshape(n, 3, 3).astype(float))
+        vol = abs(float(np.einsum("ij,ij->i", tris[:, 0],
+                                  np.cross(tris[:, 1], tris[:, 2])).sum() / 6.0))
+        return vol, float(tris[..., 2].max() - tris[..., 2].min())
+
+    for fname, cells, want_vol, want_edge, want_mass in (
+            ("tony-24hex-subarray.stl", 24, 192.25, (1.25, 1.32), 0.238),
+            ("tony-7hex-subarray.stl", 7, 64.53, (1.42, 1.53), 0.080)):
+        _vol, _depth = _stl_measure(fname)
+        check(f"STL {cells}-hex volume {want_vol}", abs(_vol - want_vol) < 0.5, f"{_vol:.2f}")
+        check(f"STL {cells}-hex depth 7.75", abs(_depth - 7.75) < 0.01, f"{_depth:.3f}")
+        check(f"STL {cells}-hex edge factor", want_edge[0] < _vol / (cells * wall_v) < want_edge[1],
+              f"{_vol/(cells*wall_v):.3f}")
+        check(f"STL {cells}-hex mass {want_mass} g printed",
+              abs(_vol * 1.24 / 1000 - want_mass) < 0.002)
+except FileNotFoundError as e:
+    check("STL artefacts present", False, str(e))
 wfit = (2 * AF - 2.634) / math.sqrt(3)
 check("fit width 2.06 ≥ 1.708", abs(wfit - 2.059) < 2e-3 and wfit >= 1.708)
 check("no fit @1.9 cell", 2.634 > 1.9)
@@ -186,8 +195,8 @@ brv = 0.348 * 1.162 * 2.634
 act_mg = mt_kg * 1e6 + 3 * ((ssv + brv) * 7.4 + 0.348 * 1.162 * 0.243 * 7.5 + 1.108)
 check("actuator total ≈220 mg", abs(act_mg - 219.7) < 1.5, f"{act_mg:.1f}")
 check("sub-array actuators 5.3 g", abs(24 * act_mg / 1000 - 5.27) < 0.1)
-contains("§8.9 present", "8.9 Honeycomb", "3.1 mm", "7.75 mm", "24-hex", "150 µm", "2.06 mm",
-         "192.2 mm³", "0.238 g printed")
+contains("§8.9 present", "8.9 Honeycomb", "3.1 mm", "7.75 mm", "24-hex", "7-hex", "150 µm",
+         "2.06 mm", "192.2 mm³", "64.5 mm³", "0.238 g printed", "0.080 g printed")
 absent("old 7-cluster reading retired", "7-cell clusters", "7 × 19")
 
 # ---------------- blender model constants ----------------------------------
