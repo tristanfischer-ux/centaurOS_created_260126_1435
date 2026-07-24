@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 
+import datetime
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -209,166 +210,241 @@ def main():
     p = BASELINE
     s = geo.summarise(p)
     fd_mn = p.detent_g_factor * G_ACCEL * s.translator_mass_kg * 1e3
-    net = load("five-numbers.json")
     fe = load("femm-five-numbers.json")
     fixed = load("fixed-design.json")
     dyn = load("dynamics.json")
     cost = load("cost.json")
     score = load("scorecard.json")
+    sweeps = load("pm-ic-sweeps.json")
     fig_detent(fd_mn)
-    fig_drive(fd_mn, geo.pole_phasing(p)[1][1] * 1000.0)  # mm → µm
+    fig_drive(fd_mn, geo.pole_phasing(p)[1][1] * 1000.0)
     fig_pm_sweep(fd_mn)
     fig_ic_sweep(fd_mn)
     fig_variants(fd_mn)
     fig_rise()
 
-    step_um = geo.pole_phasing(p)[1][1] * 1000
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — Anvil model v2 report")
+    A("# PHANTM beam-steering actuator — engineering verdict and the design that works (v3)")
     A("")
-    A("**CONFIDENTIAL — core IP.** Scope: the actuator only. "
-      "Model + FE code: `scripts/phantm/` (worktree CentaurOS-phantm). 2026-07-24.")
+    A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
+      "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
+      "validated on a gapped C-core to 2.5%, mesh-converged <1%, force cross-checked "
+      "weighted-stress-tensor vs co-energy). Reviewed by a 4-seat cross-lineage LLM "
+      "council (GPT-5.6-Sol physics fact-check · Grok-4.5 adversarial · MiniMax-M3 "
+      "honesty audit; the Kimi-K3 seat returned empty and is recorded as such) — every "
+      "surviving finding is incorporated. Code + artefacts: `scripts/phantm/`.")
     A("")
-    A("## Verdict (plain English)")
+    A("**One-paragraph verdict:** the actuator exactly as drawn cannot generate its "
+      "specified forces — the net zero-power detent saturates ≈×15 below the "
+      f"{fd_mn:.1f} mN target for any magnet size, because at a 77.5 µm gap the toothed "
+      "interface barely modulates. Everything else about the concept is sound. Two "
+      "changes fix it — close the working gap to 20 µm and grow the bridge+magnet "
+      "cross-section ×1.5 — after which every force requirement is met with a "
+      "manufacturable 243 µm magnet. The price is a tolerance class that changes who "
+      "can build it and how: the toothed parts must be micro-MIM (pressed SMC cannot "
+      "form 232 µm teeth), and the 20 µm gap must be actively set at assembly.")
     A("")
-    A("**As specified, the actuator cannot meet its force requirements — and the "
-      "model shows exactly why and what fixes it.** The 77.5 µm working gap is "
-      "~⅓ of the tooth width; at that ratio fringing keeps the unaligned gap "
-      "almost as conductive as the aligned one (flux modulation ~8 %), so the "
-      "net three-phase detent tops out at ≈0.5 mN against the 7.7 mN spec for "
-      "ANY magnet length, and the drive force is similarly capped. This is a "
-      "nonlinear-FE result (validated solver, mesh-converged, co-energy "
-      "cross-checked); the closed-form estimate misses it, which is precisely "
-      "why the brief mandated a field solver.")
+
+    # ------------------------------------------------------------------ §1
+    A("## 1. The current design and its assumptions")
     A("")
-    A("**The smallest change set that works (FE-proven): TWO changes.** "
-      "Working gap 77.5 → 20 µm, and bridge + magnet cross-section ×1.5. "
-      "Teeth, pitch, translator and stator slots stay exactly as specified. "
-      "With that set the detent spec is met at Pm* ≈ 0.24 mm (ordinary sintered "
-      "NdFeB), and the three ⅓-pitch detents are preserved. (Deepening the "
-      "stator slots to 0.465 mm is an optional third change that shrinks the "
-      "magnet to ≈0.19 mm. A narrower-tooth variant that looked attractive was "
-      "REJECTED: at 0.35·pitch teeth the net detent collapses to two basins per "
-      "pitch and the ⅓-pitch step structure is lost — basin count is now an "
-      "explicit acceptance check.) The cost is a much tighter assembly "
-      "tolerance at the 20 µm gap — the dominant cost/yield risk — and the "
-      "drive needing ≈1.9 V for the full 2·Fd force (see task 4).")
+    A("A linear variable-reluctance stepper with permanent-magnet detent: an SMC "
+      "toothed translator (1.549×1.55×12.5 mm, 232 µm teeth at 464 µm pitch, slots "
+      "465 µm deep both faces) runs between three horseshoe pole-pieces, each two "
+      "toothed slot-sections (1.16×0.465×1.708 mm, 155 µm slots) bridged by a "
+      "0.232×1.162×2.634 mm bar carrying a 20-turn Ø50 µm coil and an NdFeB slug. "
+      "Poles are offset ~⅓ tooth pitch for three-phase stepping; a PM detent holds "
+      "position at zero power.")
     A("")
-    sweeps = load("pm-ic-sweeps.json")
-    A("## The five numbers — each of Tony's asks, answered as asked")
+    A("Assumptions the brief embeds, made explicit here:")
+    A("- **Force spec** Fd = 5·g·Mt ≈ " + f"{fd_mn:.1f} mN detent; 2·Fd ≈ {2*fd_mn:.1f} mN "
+      "peak drive (whether 5 g is the real hold requirement vs 10–30 g shock is open — Q2).")
+    A("- **Drive** 1 V supply for the rise-time case; coil Nc=20, Dc=50 µm.")
+    A("- **Process** pressed/sintered Somaloy-type SMC, net shape.")
+    A("- **Registration** pole spacing 0.374 mm ⇒ claimed exact ⅓-pitch (0.155 mm) offsets.")
     A("")
-    A("### Task 1 — Mt, the translator mass")
-    A(f"**Mt = {s.translator_mass_kg*1e3:.4f} g** (density stated: 7.4 g/cm³). Solid bar "
-      f"1.549×1.55×12.5 mm minus 26 slots per face × 2 faces × (0.465×0.232×1.55 mm) "
-      f"= 21.32 mm³ net. Range over the 7.3–7.6 g/cm³ density band: 0.156–0.162 g. "
-      f"This reproduces and refines your ≈0.16 g hand-check.")
+    A("**Reconciliation against your CAD (the two SketchUp drawings):** the model and "
+      "your CAD agree on the translator, teeth, bridge (1162) and 155 µm features. "
+      "Three discrepancies need your ruling: (a) your CAD reads **400 µm** inter-pole "
+      "spacing where the brief says 374 µm — neither gives exact ⅓-pitch phasing "
+      "(390 µm is exact; derivation in §3); (b) your CAD dimensions the far tooth "
+      "features as **465/620** where the brief's slot+land arithmetic gives 232+232 = "
+      "464 pitch — please confirm which tooth profile is authoritative; (c) your CAD "
+      "shows a **bearing/frame block 1784×3098 µm × 7746 µm long** — larger in "
+      "cross-section than the entire magnetic assembly, so the frame, not the "
+      "magnetics, sets the cell-fit budget (§2/§4 scorecard).")
     A("")
-    A("### Task 2 — Wm, the working gap")
-    A("**Wm = 77.5 µm per side, confirmed from the geometry**: (1.704 − 1.549)/2, and the "
-      "bridge length closes the loop exactly (2×0.465 + 2×0.0775 + 1.549 = 2.634 mm — "
-      "your §2 dimensions are self-consistent to the µm). This Wm is the single most "
-      "consequential number in the design — see task 3.")
+
+    # ------------------------------------------------------------------ §2
+    A("## 2. What is good — verified as specified")
     A("")
-    A("### Task 3 — Pm for Fd = 5·g·Mt = " + f"{fd_mn:.2f} mN")
+    A(f"- **The geometry closes to the micrometre.** Mt = {s.translator_mass_kg*1e3:.4f} g "
+      "(bar − 52 slots at 7.4 g/cm³; band 0.156–0.162 g over the SMC density range) — "
+      "your ≈0.16 g hand-check reproduced. Wm = (1.704−1.549)/2 = 77.5 µm exactly, and "
+      "2×0.465 + 2×0.0775 + 1.549 = 2.634 mm closes the bridge loop dimension chain.")
+    A(f"- **Stroke is ample**: 12.5 − 4.23 (stator) = {s.usable_stroke_mm:.2f} mm usable "
+      "≥ the 3.0 mm λ/2 requirement at 50 GHz.")
+    A("- **The coil fits its window**: 20 turns of 58 µm-OD wire = 2 layers × 0.116 mm "
+      "build inside the 0.263 mm clearance; Rc = 0.552 Ω from 63 mm of wire.")
+    A("- **Phase quantisation is adequate below 100 GHz**: the 155 µm step gives "
+      "18.6° @50 GHz / 29.8° @80 GHz / 59.6° @160 GHz (Δφ = 4πΔd/λ) — ~4-bit control "
+      "at E-band, coarse at 160 GHz.")
+    A("- **Electrical and thermal physics are easy**: time constants are microseconds "
+      "against millisecond mechanics; a step pulse heats the coil single-digit kelvin.")
+    A("- **The architecture itself is right**: zero-power PM detent + three-phase VR "
+      "stepping is a sound, driver-friendly way to hold thousands of cells with no "
+      "standing power. Nothing below challenges the concept — only the flux budget.")
+    A("")
+
+    # ------------------------------------------------------------------ §3
+    A("## 3. What must change — and exactly why")
+    A("")
+    A("### 3.1 The detent cannot reach Fd (×15 short) — task 3 as asked")
     A("")
     A("![pm-sweep](fig-pm-sweep.png)")
     A("")
     if sweeps:
-        b_rows = sweeps["baseline"]["pm_sweep"]
-        plateau = b_rows[-1]
-        op = next((r for r in sweeps["fixed"]["pm_sweep"]
-                   if abs(r["pm_mm"] - 0.243) < 0.01), None)
-        A(f"**For your geometry the answer is: no Pm exists.** The curve you asked for is "
-          f"above — net zero-current breakaway force vs magnet length. It rises to only "
-          f"**{plateau['breakaway_mn']:.2f} mN and saturates** (at Pm = "
-          f"{plateau['pm_mm']*1e3:.0f} µm the magnet already operates at "
-          f"B = {plateau['b_pm_t']:.2f} T, H = {plateau['h_pm_ka_m']:.0f} kA/m on its load "
-          f"line; longer magnets just push themselves further down it — flux is capped at "
-          f"Φ → Br·A by the magnet's own internal reluctance). The target is missed "
-          f"≈×{fd_mn/plateau['breakaway_mn']:.0f} however much NdFeB you insert.")
-        A("")
-        A("**Why (the physics, not the model):** a reluctance detent needs the gap "
-          "permeance to *change* with position. At Wm/tooth-width = 77.5/232 ≈ 1/3, the "
-          "fringing field at the tooth corners conducts almost as well anti-aligned as the "
-          "faces do aligned — FE shows the flux crossing the gaps changes by only ~8 % "
-          "over a full pitch. On top of that, your three ⅓-pitch-offset poles cancel each "
-          "other's fundamental force component exactly (that is what makes three-phase "
-          "stepping work), so the net detent lives on the *harmonics* of the permeance "
-          "waveform — which this tooth profile barely produces (3rd/1st ≈ 4 %). Detent "
-          "force vs displacement for both designs is the figure in the next section.")
-        A("")
-        if op:
-            A(f"**What works instead:** gap → 20 µm and bridge+magnet cross-section ×1.5 "
-              f"(teeth, pitch, translator, stator slots unchanged). Then **Pm* = 243 µm** "
-              f"gives {op['breakaway_mn']:.2f} mN breakaway with the magnet at a healthy "
-              f"operating point (B = {op['b_pm_t']:.2f} T, H = {op['h_pm_ka_m']:.0f} kA/m) "
-              f"and the three ⅓-pitch detents intact.")
+        b_rows = sweeps["baseline"]["pm_sweep"]; plateau = b_rows[-1]
+        A(f"Net zero-current breakaway vs magnet length: it rises to only **≈0.5 mN and "
+          f"saturates** (0.47 mN at Pm = 0.30 mm; {plateau['breakaway_mn']:.2f} mN still "
+          f"creeping at {plateau['pm_mm']*1e3:.0f} µm, where the magnet operates at "
+          f"B = {plateau['b_pm_t']:.2f} T, H = {plateau['h_pm_ka_m']:.0f} kA/m). A longer "
+          "magnet moves its own operating point back toward Br, but the flux it can push "
+          "is capped at Φ → Br·A by its internal reluctance — extra NdFeB buys nothing. "
+          "**No Pm meets the target within this model.**")
     A("")
-    A("### Task 4 — Ic for a peak axial force of 2·Fd = " + f"{2*fd_mn:.1f} mN "
-      "(Nc = 20, Dc = 50 µm)")
+    A("Three stacked causes:")
+    A("- **Gap/tooth = 77.5/232 ≈ ⅓ kills the modulation.** Corner fringing conducts "
+      "almost as well anti-aligned as the faces do aligned: FE shows flux through the "
+      "gaps varies only ~8% over a pitch (coil flux-linkage 2.8%). Reluctance force "
+      "needs the position-DERIVATIVE of permeance, and there barely is one.")
+    A("- **Three-phase symmetry cancels the fundamental.** Poles at ⅓-pitch offsets "
+      "sum 1 + e^(j2π/3) + e^(j4π/3) = 0 for every harmonic except multiples of 3 — "
+      "the net detent rides on the 3rd permeance harmonic, which this equal-tooth/"
+      "equal-slot profile barely produces (h3/h1 ≈ 4%).")
+    A("- **The magnet self-limits** (the Φ → Br·A cap above).")
+    A("")
+    A("Robustness of the conclusion: even if the cancellation were completely spoiled "
+      "(pole forces adding incoherently), 3 × the per-pole FE amplitude < 4.5 mN — "
+      "still under spec. 86% of bridge flux does cross the working gaps (no leakage "
+      "short); the geometry itself is the limit.")
+    A("")
+    A("### 3.2 The drive cannot reach 2·Fd either — task 4 as asked")
     A("")
     A("![ic-sweep](fig-ic-sweep.png)")
     A("")
     if sweeps:
-        b_ic = sweeps["baseline"]["ic_sweep"]
-        top = b_ic[-1]
-        A(f"**For your geometry: no Ic exists either.** Peak net drive force vs coil "
-          f"current is above — it saturates near **{top['peak_mn']:.1f} mN even at "
-          f"{top['ic_a']:.0f} A** (400 A-turns), ×8 short of the 15.5 mN target, for the "
-          f"same reason as task 3: force needs permeance modulation, and current cannot "
-          f"add what the tooth geometry does not provide. (One subtlety your driver must "
-          f"respect: the coil has to be poled to AID its own pole's magnet — opposed, "
-          f"more current *reduces* the force.)")
-        A("")
-        if fixed:
-            A(f"**What works instead:** on the fixed design, **Ic* = {fixed['ic_a']:.2f} A** "
-              f"reaches the literal 2·Fd peak ({fixed['drive_peak_mn']:.1f} mN; worst force "
-              f"along the step path {fixed['stall_min_mn']:.1f} mN). Two practical notes: "
-              f"(a) 3.35 A through the 0.55 Ω coil needs ≈1.9 V — the 1 V case caps the "
-              f"MMF at 36 A-turns *regardless of turns count* (R scales with N, so "
-              f"voltage, not winding design, is the limit); (b) reliable stepping does "
-              f"not need the full 2·Fd — steps complete from ≈1.4 A, inside the 1 V "
-              f"budget. Force vs position with one coil energised:")
+        top = sweeps["baseline"]["ic_sweep"][-1]
+        A(f"Peak net drive force vs coil current saturates near "
+          f"**{top['peak_mn']:.1f} mN even at {top['ic_a']:.0f} A** (160 A-turns) — ×8 "
+          "short of 15.5 mN, for the same reason: current cannot add modulation the "
+          "teeth do not provide. (No Ic within the swept 0–8 A reaches the target; "
+          "the saturation trend makes a solution beyond it physically implausible.)")
     A("")
-    A("![drive](fig-drive.png)")
+    A("### 3.3 Secondary defects the model surfaced")
     A("")
-    A("### Task 5 — Lc, Rc and the rise time on 1 V")
-    lc_b = f"{fe['lc_uh_fe']:.1f}" if fe else "—"
-    lc_f = f"{fixed['lc_uh']:.1f}" if fixed else "—"
-    A(f"**Rc = 0.552 Ω** (63 mm of 50 µm Cu at 20 °C; the 20 turns wind in 2 layers with "
-      f"0.116 mm build inside your 0.263 mm window — it fits with margin). "
-      f"**Lc ≈ {lc_b} µH (baseline) / {lc_f} µH (fixed), from FE flux linkage dλ/di at "
-      f"the drive point** — small, because the same weak gap modulation that limits force "
-      f"also limits inductance. **tr: with λ-based nonlinear integration onto 1 V, the "
-      f"current reaches 63 % of I∞ = 1.81 A in ≈4 µs** and any practical stepping current "
-      f"(1.4–1.8 A) in <15 µs; electrical time constants are microseconds against "
-      f"millisecond mechanics, so the coil never limits the step. (The fixed design's "
-      f"full Ic* = 3.35 A is unreachable on 1 V — it needs the ≈1.9 V supply above.)")
+    A("- **Pole registration is off ⅓-pitch as drawn.** Centre-to-centre = 1.160 + "
+      "0.374 = 1.534 mm; 1.534 mod 0.464 = **0.142 mm offset, not 0.155** — spacing "
+      "0.390 mm would be exact. Your CAD's 400 µm is also inexact (0.168 mm offset). "
+      "Consequence (FE, fixed design): detents at −175.5/−3.0/+143.1 µm — step split "
+      "**172.6/146.1/145.3 µm** (±18 µm, ≈±3.4° phase jitter at 80 GHz).")
+    A("- **The step spec's assumed process cannot make the parts** — pressed SMC has a "
+      "published minimum-section floor of ~0.8–1.7 mm; the 232 µm teeth are 4–7× below "
+      "it (§5).")
+    A("- **Open-loop capture is not free**: the translator is a ≈180 Hz, lightly-damped "
+      "mass-spring; a naive full-force pulse overshoots into the wrong detent (§4.4).")
     A("")
-    A("### The detent curves behind tasks 3–4")
+
+    # ------------------------------------------------------------------ §4
+    A("## 4. The design that works — with the numbers")
     A("")
-    A("![detent](fig-detent.png)")
-    A("")
-    A("## Why the baseline fails, quantified (§6 make-or-break)")
+    A("**Change set (FE-solved):**")
+    A("- **F1 — working gap 77.5 → 20 µm.** Dominant lever: ×8.6 on net detent alone.")
+    A("- **F2 — bridge + magnet cross-section ×1.5** (0.232 → 0.348 mm in the AXIAL "
+      "direction: transverse width stays 1.162 < 1.708, so the beam-facing envelope is "
+      "untouched; the stator grows 0.35 mm axially, stroke 8.27 → 7.92 mm — still ≥3.0). "
+      "Lifts the magnet's Φ → Br·A ceiling into range.")
+    A("- **F3 (recommended, zero cost) — pole spacing 374 → 390 µm** for exact ⅓-pitch "
+      "steps (uniform 154.7 µm; kills the ±3.4° jitter).")
+    A("- Teeth, pitch, translator, stator slots: **unchanged**. Rejected alternatives, "
+      "both FE-tested: 0.35·pitch teeth (more force but detent basins 3→2 — step "
+      "structure lost) and gap 40 µm + deep slots + bigger PM (caps at 4.3 mN AND "
+      "collapses to 1 basin). The 20 µm gap is load-bearing.")
     A("")
     A("![variants](fig-variants.png)")
     A("")
-    A("- Reluctance force needs permeance MODULATION, not permeance. At g/t = 1/3, "
-      "corner fringing keeps the anti-aligned interface conducting: FE gap-flux "
-      "modulation is ~8 % (λ modulation 2.8 %), vs the ~3× a naive overlap model "
-      "predicts. 86 % of bridge flux does cross the gaps — there is no leakage "
-      "short; the geometry itself is the limit.")
-    A("- The three-phase offsets cancel the fundamental of the per-pole force; the "
-      "net detent rides on the harmonic content, which this tooth profile barely "
-      "produces (h3/h1 ≈ 4 %).")
-    A("- The magnet cannot brute-force it: flux is capped by the PM's own internal "
-      "reluctance (Φ → Br·A), reached long before useful force.")
-    A("- Gap is the dominant recovery lever (20 µm: ×8.6 on net detent); deep "
-      "stator slots and 0.35·pitch teeth compound; enlarging the bridge/PM "
-      "section lifts the flux ceiling (needed to actually hit Fd).")
+    A("### 4.1 The five numbers for the fixed design (methods stated)")
     A("")
-    A("## Requirements scorecard (§5)")
+    A("| # | Quantity | Value | Method |")
+    A("|---|---|---|---|")
+    A(f"| 1 | Mt | **{s.translator_mass_kg*1e3:.4f} g** (0.156–0.162 band) | bar − 52 × "
+      "(0.465×0.232×1.55) slots, ρ = 7.4 g/cm³ |")
+    A("| 2 | Wm | **20 µm** (was 77.5) | fix F1; per side, both interfaces |")
+    if fixed:
+        A(f"| 3 | Pm | **{fixed['pm_mm']*1e3:.0f} µm** → breakaway "
+          f"{fixed['breakaway_mn']:.2f} mN = Fd ✓, 3 detents ✓ | FE net-detent curve "
+          f"peak, bisected on Pm; magnet at B ≈ 0.98 T, H ≈ −245 kA/m (N42-class "
+          f"Br 1.30 T recoil line) |")
+        A(f"| 4 | Ic | **{fixed['ic_a']:.2f} A** (67 A-turns) for the literal 2·Fd peak "
+          f"({fixed['drive_peak_mn']:.1f} mN); worst-case NET path force **+"
+          f"{fixed['stall_min_mn']:.1f} mN** (all detent loads included — the step "
+          f"completes with margin) | FE force-vs-x, one coil AIDING its pole's PM |")
+        A(f"| 5 | Lc, Rc, tr | Lc ≈ {fixed['lc_uh']:.1f} µH (FE dλ/di), Rc = 0.552 Ω "
+          "(63 mm Ø50 µm Cu), τ = L/R ≈ 0.7–1.1 µs (lumped model ≈4 µs — honest range "
+          "1–4 µs); 1.4–1.8 A reached <15 µs on 1 V | RL rise; back-EMF negligible "
+          "over a step |")
+    A("")
+    A("Drive practicalities: (a) 3.35 A × 0.552 Ω needs **≈1.9 V** — at fixed wire gauge "
+      "and mean turn length a 1 V supply caps MMF at 36 A-turns regardless of turns "
+      "count (R ∝ N; rewound-gauge R ∝ N² gives the same conclusion: supply voltage, "
+      "not winding design, is the limit). Steps complete from ≈1.4 A inside 1 V, at "
+      "reduced margin. (b) **Wire duty**: 3.35 A in Ø50 µm Cu ≈ 1,700 A/mm² — legal "
+      "ONLY as ms pulses (adiabatic ΔT ≈ 6 K/step); continuous drive would fuse the "
+      "wire — the driver must be current- and duty-limited. (c) **Polarity is an "
+      "interface requirement**: the coil must AID its pole's magnet; opposed, more "
+      "current gives LESS force.")
+    A("")
+    A("### 4.2 Force curves (FE)")
+    A("")
+    A("![detent](fig-detent.png)")
+    A("")
+    A("![drive](fig-drive.png)")
+    A("")
+    A("### 4.3 The drawings — 2D dimensioned + 3D model")
+    A("")
+    A("![D1](drawing-D1-axial.png)")
+    A("")
+    A("![D2](drawing-D2-transverse.png)")
+    A("")
+    A("![D3](drawing-D3-tooth-detail.png)")
+    A("")
+    A("**3D model of the fixed design** (translator gold, poles steel, coils red; the "
+      "NdFeB slugs sit inside the far-side bridge limbs — see D2 for their exact "
+      "position):")
+    A("")
+    A("![3D](render-3d-fixed.png)")
+    A("")
+    A("### 4.4 Step dynamics")
+    A("")
+    if dyn:
+        A("- Transit to the next detent: **2.5–4 ms** at 1.8 A — the ms-scale "
+          "requirement is met.")
+        A("- Detents (FE) at −175.5/−3.0/+143.1 µm; stiffness ≈ 200 N/m ⇒ ≈180 Hz "
+          "ring on the 0.158 g translator.")
+        A(f"- Energy ≈ {dyn['energy_per_step_mj']:.1f} mJ per 1.5 ms pulse; coil "
+          f"ΔT ≈ {dyn['coil_dT_per_step_k']:.0f} K adiabatic — thermally trivial at "
+          "any realistic step rate with passive hold.")
+        A("- **Capture needs drive shaping**: with light damping a single full-force "
+          "pulse has a narrow reliable-width window (overshoot lands one detent too "
+          "far). Hold-until-settled-then-release captures correctly (15–45 ms full "
+          "settle at 0.2–0.5 mN guide friction, with a tapered hold current); a brake "
+          "pulse or modest damping restores few-ms settle. This is driver firmware, "
+          "not hardware. Guide friction is unspecified — it sets settle time (Q with "
+          "the bearing choice).")
+    A("")
+    A("### 4.5 Requirements scorecard")
     A("")
     if score:
         A("| Requirement | Baseline | Fixed design |")
@@ -380,97 +456,150 @@ def main():
             if r["note"]:
                 A(f"- *{r['requirement']}*: {r['note']}")
     A("")
-    A("## Step dynamics")
+    A("### 4.6 Model fidelity — what these numbers can and cannot claim")
     A("")
-    if dyn:
-        eq = ", ".join(f"{e:+.1f}" for e in dyn["equilibria_um"])
-        A(f"- Fixed-design detent equilibria at {eq} µm — steps uneven by ~11 µm "
-          f"(the 0.374 mm pole spacing; see open questions). Detent stiffness "
-          f"ring frequency ≈ 180 Hz on the translator mass.")
-        A(f"- TRANSIT is ms-scale as required: 2.5–4 ms to reach the next detent "
-          f"at 1.8 A. Energy ≈ {dyn['energy_per_step_mj']:.2f} mJ per "
-          f"{dyn['pulse_ms']:.1f} ms pulse; adiabatic coil ΔT ≈ "
-          f"{dyn['coil_dT_per_step_k']:.1f} K — negligible at realistic step "
-          f"rates with passive hold.")
-        A("- CAPTURE is the real dynamics constraint: the translator is a "
-          "~180 Hz mass-spring with little damping, so a single open-loop pulse "
-          "has a narrow reliable-width window (overshoot lands in the wrong "
-          "detent). Hold-until-settled-then-release captures correctly "
-          "(15–45 ms full settle at 0.2–0.5 mN guide friction, with a tapered "
-          "hold current); a shaped brake pulse or modest added damping brings "
-          "full settle to a few ms. Guide friction is unspecified — it sets "
-          "the settle time and is flagged to Tony with the bearing choice.")
+    A("2D unrolled-loop FE (the transverse horseshoe straightened into the tooth plane "
+      "with area-preserving scaling); poles superposed without cross-coupling; the "
+      "net detent is a residual after fundamental cancellation, so its absolute value "
+      "is more model-sensitive than the baseline's ×15 shortfall (which survives even "
+      "total loss of cancellation). Treat Pm* = 243 µm as the design centre with the "
+      "magnet length as the TRIM parameter at prototype; 3D FE (or a prototype "
+      "force-curve) bounds the residual before tooling. SMC B-H is Somaloy-700-shaped; "
+      "the micro-MIM route's Fe-3%Si saturates HIGHER (~1.8–2.0 T), making the force "
+      "conclusions conservative.")
     A("")
-    A("## Manufacture + cost (§7)")
+
+    # ------------------------------------------------------------------ §5
+    A("## 5. How to make it")
     A("")
-    if cost:
-        A(f"- Materials are negligible: **${cost['materials_usd']:.4f}/unit** "
-          f"(SMC 0.21 g + NdFeB 1.2 mg + Cu 3.3 mg).")
-        A("- The $0.10 target is a process/volume question. Estimated all-in bands "
-          "(LOW confidence — industry analogues, not quotes):")
-        A("")
-        A("| Volume | Baseline (77.5 µm gap) | Fixed design (20 µm gap) |")
-        A("|---|---|---|")
-        for tier in ("1M/yr", "10M/yr", "100M/yr"):
-            b = cost["cost_bands_usd"][f"{tier}:baseline_77um"]
-            fx = cost["cost_bands_usd"][f"{tier}:fixed_20um"]
-            A(f"| {tier} | ${b[0]:.2f}–${b[1]:.2f} | ${fx[0]:.2f}–${fx[1]:.2f} |")
-        A("")
-        A(f"- **Tolerance is the coupling between physics and cost**: "
-          f"{cost['tolerance_sensitivity']}.")
-        A("- Processes: pressed net-shape SMC (teeth in the die, no machining); "
-          "3× 20-turn 50 µm coils (fits 2 layers in the 0.263 mm window with "
-          "0.116 mm build); bonded or thin sintered NdFeB slugs magnetised after "
-          "insertion; the 77.5 µm gap was evidently a manufacturability choice — "
-          "the physics wants 20 µm, so the assembly must deliver it (active gap "
-          "setting / shimming), which is where the cost risk concentrates.")
+    A("![D4](drawing-D4-build-sequence.png)")
     A("")
-    A("## Where the linear model breaks (explicit statement, §8.7)")
+    A("1. **Toothed steel parts — micro-MIM, not pressed SMC.** Pressed/sintered SMC "
+      "has a published minimum-section floor of ~0.8–1.7 mm — 4–7× above the 232 µm "
+      "teeth, so the brief's assumed process cannot form these parts at all. "
+      "Micro-MIM in soft-magnetic Fe-3%Si / permalloy is the process family with "
+      "published capability at this scale (±10 µm tolerances, <100 µm walls; "
+      "magnetic-anneal without distortion). Multi-cavity tools amortise to cents/part "
+      "at 10–100 M/yr. Fallbacks needing redesign: etched Fe-Si lamination stacks, or "
+      "LIGA electroformed permalloy (custom material qualification).")
+    A("2. **Coils — pre-wound, because the loop closes.** Once the bridge joins the "
+      "two slot-sections the magnetic circuit is a closed ring: nothing can wind "
+      "through it at volume. So: wind 20 turns of Ø50 µm bondable magnet wire on a "
+      "removable former (or directly on the free bridge bar) → self-supporting coil → "
+      "**slip over the open bridge limb** → then close the loop. Hearing-aid and "
+      "watch-coil houses wind 9–50 µm wire at tens of millions/yr.")
+    A("3. **Magnets** — sintered NdFeB thin-sliced slugs (0.348×1.162×0.243 mm), "
+      "Ni + parylene coated (the 15-year-outdoor corrosion stack is a qualification "
+      "gate: demand salt-spray/PCT data on sub-mm parts), inserted UNMAGNETISED.")
+    A("4. **Assembly + the 20 µm gap.** Bond bridge to slot-sections around the "
+      "translator/bearing; set the gap with precision shims or active gauging. "
+      "dF/dg ≈ −8%/µm here, so ±5 µm scatter = ±40% force: the 100%-test detent-force "
+      "measurement IS the gap gauge — measure, sort/adjust, then fix.")
+    A("5. **Magnetise in-situ** (pulse fixture through the assembled pole), then "
+      "100% detent-force + step test.")
     A("")
-    A("A permeance-overlap model with plausible fringing constants over-predicts "
-      "the baseline detent by ~16× (it gave Pm ≈ 29 µm for Fd; FE shows Fd is "
-      "unreachable). The failure is structural, not a constant: at g/t = 1/3 the "
-      "fringing fields dominate the modulation, and only a field solution "
-      "captures the near-cancellation. The lumped model remains useful for "
-      "Rc/coil fit/dynamics scaffolding, but every FORCE number in this report "
-      "is FE (nonlinear B-H, validated against a gapped C-core to 2.5 %, "
-      "mesh-converged to <1 %, WST vs co-energy consistent).")
+    A("The cost picture (indicative, NOT quotes): materials ≈ $0.001/unit are noise; "
+      "the unit price is process + volume — micro-MIM parts a few cents each at "
+      "64+-cavity scale, coil ≈ $0.03–0.15, magnet ≈ $0.03–0.10 (CN volume tier), and "
+      "assembly-to-gap-tolerance dominant. $0.10 all-in needs ≥10–100 M/yr and the "
+      "detent-test-as-gap-gauge flow; treat every cost cell as planning-grade until "
+      "RFQs return.")
     A("")
-    A("## Model limitations (honest list)")
+
+    # ------------------------------------------------------------------ §6
+    A("## 6. Who can make it — ten companies, with evidence")
     A("")
-    A("- 2D unrolled-loop FE: the transverse horseshoe is straightened into the "
-      "tooth plane with area-preserving scaling; bridge-region leakage geometry "
-      "is approximate. 3D (Elmer) is the escalation if a prototype disagrees.")
-    A("- Poles are superposed (no cross-pole steel coupling); at 0.374 mm spacing "
-      "some interaction exists — expected second-order, unverified.")
-    A("- SMC B-H is a Somaloy-700-shaped table; swap in the chosen grade's curve.")
-    A("- Hysteresis/eddy losses and PM temperature demag margin estimated, not "
-      "swept (NdFeB Br −0.12 %/K included in the material model; a +85 °C check "
-      "runs in one line once Tony confirms the temperature).")
+    A("Researched 2026-07-24 (live company/product pages; every capability claim "
+      "sourced — URLs in the research annexes). No single vendor makes this exact "
+      "part today; the credible structure is a **hybrid supply chain**: a micro-MIM "
+      "house for the toothed steel + coil/magnet specialists + a volume "
+      "micro-actuator assembler.")
     A("")
-    A("## Open questions for Tony (§9 + new from the model)")
+    A("| # | Company (HQ) | What they mass-produce today | Which part of ours | Why credible |")
+    A("|---|---|---|---|---|")
+    A("| 1 | **MinebeaMitsumi** (JP) | Φ3 mm PM stepper motors (world's smallest at "
+      "launch), phone-camera AF actuators since 2005, Philippines volume plants | "
+      "Whole actuator | The only company already mass-producing a sub-5 mm toothed "
+      "PM stepper — the closest existing product on Earth to this device |")
+    A("| 2 | **Citizen Finedevice** (JP) | Watch-calibre stepper motors, coils and "
+      "µm-machined movement parts at watch-industry volumes | Whole actuator / "
+      "coils + assembly | Watch steppers are the cost/precision/volume analogue: "
+      "µm parts, tens of millions/yr, decades of DFM |")
+    A("| 3 | **Sonion** (DK) | Hearing-aid balanced-armature receivers: sub-mm coils, "
+      "magnets and steel assembled at 10M+/yr | Coil-magnet-armature assembly | A "
+      "balanced-armature receiver IS a micro electromagnetic actuator built to "
+      "medical reliability at consumer cost |")
+    A("| 4 | **Jahwa Electronics** (KR) | VCM AF/OIS camera actuators inside the "
+      "Apple supply chain; ~8,000-worker Vietnam plant | Coil + magnet + precision "
+      "assembly | Proven tier-1 volume discipline on µm-assembled "
+      "coil-magnet actuators |")
+    A("| 5 | **Alps Alpine** (JP) | VCM + SMA camera actuators, automated µm-tolerance "
+      "assembly at phone volumes | Assembly + test | One of the surviving top-tier "
+      "camera-actuator makers (TDK has EXITED this business — its lines went to "
+      "Actutek/Q Tech, worth tracking separately) |")
+    A("| 6 | **Micro MIM Japan / Taisei Kogyo** (JP) | µ-MIM parts at ±10 µm with "
+      "<100 µm walls in Fe-3%Si, permalloy, Permendur — explicitly marketed "
+      "soft-magnetic micro parts | **The toothed translator + slot-sections + "
+      "bridges** | The only published process+material match for 232 µm soft-magnetic "
+      "teeth |")
+    A("| 7 | **Parmaco AG** (CH) | Micro-MIM 0.1–100 mm parts in FeSi3/50NiFe/CoFe | "
+      "Toothed parts (second source / first articles) | Dedicated soft-magnetic MIM "
+      "alloys + Swiss precision; ideal pilot-tooling partner |")
+    A("| 8 | **Indo-MIM** (IN) | One of the world's largest MIM houses; Fe-Si "
+      "feedstocks in the MIM literature | Toothed parts at the COST point | The "
+      "volume/cost wildcard — needs a 232 µm-feature capability confirmation before "
+      "ruling in |")
+    A("| 9 | **Sumida** (JP) — with **Audemars Microtec / Benatav** (CH) as precision "
+      "alternates | Fine-wire winding 10–50 µm at volume (Sumida); 9–50 µm micro-coils "
+      "down to 0.5 mm (Audemars) | The 20-turn Ø50 µm coils | Hearing-aid/RFID/VCM "
+      "coil lines already wind this wire class in tens of millions |")
+    A("| 10 | **JL MAG** (CN) — with **SDM Magnetics** (CN) as the precision/coating "
+      "alternate | JL MAG: VCM-grade sintered NdFeB at world-leading volume; SDM: "
+      "micro-magnets to ±5 µm with Ni/parylene + magnetise-after-assembly | The "
+      "0.24 mm NdFeB slugs | Sub-mm VCM magnets are their existing catalogue; "
+      "the 15-yr outdoor coating is the one open qualification |")
     A("")
-    A("1. (§9.1) Is the reflector a translator face (Mt complete) or an added mass?")
-    A("2. (§9.2) Fd = 5·g·Mt: holding the translator against 10–30 g shock needs "
-      "16–47 mN, not 7.7 — which is the real requirement? It moves Pm and the "
-      "whole force budget.")
-    A("3. (§9.3) Orientation assumed: translator axis along beam depth — confirm.")
-    A("4. (§9.4) Peak temperature and the real driver voltage.")
-    A("5. **Pole spacing 0.374 mm gives a tooth-phase offset of 0.142 mm, not "
-      "0.155 (= pitch/3): spacing of 0.390 mm would be exact. As drawn, steps are "
-      "uneven (0.151/0.162/0.151 mm, ±1.4° phase jitter at 80 GHz) and detents "
-      "sit 23 µm off tooth-alignment. Intentional?**")
-    A("6. Tooth pitch: §2.1's slot+land arithmetic gives 0.464 mm; §2.3 uses "
-      "0.465. Which is authoritative? (Model uses 0.464.)")
-    A("7. The fixed design keeps pitch/step/translator; is a 20 µm assembled gap "
-      "acceptable to pursue, given the tolerance/cost analysis?")
+    A("Supporting cast: **Faulhaber PRECISTEP + MPS** (CH) — pilot-line engineering "
+      "and the Ø2 mm-class micro linear bearings for the guide (their cost structure "
+      "suits prototypes, not the $0.10 line); **IKO** 1 mm-rail micro linear ways as "
+      "a bearing alternative. Recommended first RFQs: Micro MIM Japan + Parmaco "
+      "(feasibility on the 232 µm/±10 µm tooth spec), Sonion or MinebeaMitsumi "
+      "(assembly), JL MAG/SDM (magnet + coating qualification).")
     A("")
-    A("---")
-    A("*Reproduce: `selftest.py` (27/27) · `five_numbers.py` (lumped) · "
-      "`femm/ccore.py` (FE gate) · `femm/sweep.py` (baseline FE) · "
-      "`femm/variants.py` (levers) · `femm/fixed_design.py` (fix) · "
-      "`dynamics.py` · `cost_model.py` · `scorecard.py` · `report.py`. "
-      "FE backend: native xfemm femmcli (build recipe in femm/runner.py).*")
+
+    # ------------------------------------------------------------------ §7
+    A("## 7. Open questions for Tony")
+    A("")
+    A("1. Reflector mass: part of the translator (Mt complete) or added? (moves the "
+      "hold/step budget)")
+    A("2. Is Fd = 5·g·Mt the real requirement, or hold against 10–30 g shock "
+      "(= 16–47 mN — 2–6× the current spec; the fixed design would need re-solving)?")
+    A("3. Orientation confirmed? (translator axis along beam depth — assumed)")
+    A("4. Peak temperature (NdFeB demag margin check is one line once known) and the "
+      "real driver voltage (1 V limits drive to reduced-margin stepping; 2 V unlocks "
+      "the full 2·Fd point).")
+    A("5. **Pole spacing: brief 374 µm vs your CAD 400 µm vs exact 390 µm — which "
+      "rules?** (374 ⇒ steps 172.6/146.1/145.3 µm, ±3.4° jitter at 80 GHz.)")
+    A("6. **Tooth profile: brief 232+232 (pitch 464) vs the 465/620 dimensions "
+      "readable on your CAD teeth — which is authoritative?**")
+    A("7. Is a 20 µm assembled gap acceptable to pursue given §5's tolerance/process "
+      "consequences? (FE says it is the only route that meets Fd with 3 detents.)")
+    A("8. The bearing/frame block (1784×3098) dominates the cell-fit budget — is its "
+      "cross-section negotiable for E-band?")
+    A("")
+
+    # ------------------------------------------------------------------ §8
+    A("## 8. Traceability")
+    A("")
+    A("Every headline number maps to a machine-readable artefact in `scripts/phantm/out/`: "
+      "five-numbers.json (lumped v1) · femm-five-numbers.json (baseline FE) · "
+      "pm-ic-sweeps.json (task-3/4 curves) · femm-variants.json (levers) · "
+      "fixed-design.json (Pm*, Ic*, curves) · fix-alternatives.json (rejected "
+      "alternates + FE step split) · dynamics.json · cost.json · scorecard.json. "
+      "Reproduce: selftest.py (27/27 guards incl. basin-count, spike-free, co-energy "
+      "identity) then the scripts in TRACKER.md order. FE backend: native xfemm "
+      "femmcli (build recipe in femm/runner.py); C-core gate must PASS before any "
+      "actuator run is trusted.")
 
     path = os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")
     with open(path, "w") as f:

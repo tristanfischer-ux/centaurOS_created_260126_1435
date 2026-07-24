@@ -62,8 +62,8 @@ def main():
         "translator 12.5 mm minus 3-pole stator extent 4.23 mm")
 
     # 3. phase quantisation
-    steps = "0.151/0.162/0.151 mm (uneven — 0.374 mm pole spacing; ideal 0.155)"
-    note3 = ("step ⇒ 19°@50 / 30°@80 / 59°@160 GHz (4πΔd/λ). Unevenness adds ~±1.4° "
+    steps = "172.6/146.1/145.3 µm (uneven — 0.374 mm pole spacing; ideal 154.7)"
+    note3 = ("step ⇒ 18.6°@50 / 29.8°@80 / 59.6°@160 GHz (4πΔd/λ). Unevenness adds ~±3.4° "
              "jitter at 80 GHz + a 23 µm systematic detent offset (calibratable). "
              "Micro-positioning between detents for 120–160 GHz: feasible by 2-phase "
              "current-ratio microstepping but loses zero-power hold between detents.")
@@ -80,8 +80,8 @@ def main():
         base4 = "UNVERIFIED"
     if fixed:
         g_fix = fixed["breakaway_mn"] / 1e3 / (mt * G_ACCEL)
-        fix4 = (f"PASS vs 5 g spec — {fixed['breakaway_mn']:.2f} mN = {g_fix:.1f} g "
-                f"at Pm={fixed['pm_mm']*1e3:.0f} µm")
+        fix4 = (f"PASS vs the brief's stated 5 g spec — {fixed['breakaway_mn']:.2f} mN = "
+                f"{g_fix:.1f} g at Pm={fixed['pm_mm']*1e3:.0f} µm (Fd intent itself is Tony Q2)")
     else:
         fix4 = "UNVERIFIED"
     row("4. Zero-power hold Fd = 5·g·Mt", base4, fix4,
