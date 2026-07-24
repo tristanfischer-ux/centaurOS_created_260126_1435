@@ -2295,6 +2295,20 @@ def _checks_plausibility(state: dict, run_dir: str) -> List[Check]:
                      str(p.get("name") or ""), re.I)), None)
         if shell is not None:
             sw, sd, sh = _dims(shell)
+            # ROBUSTNESS (2026-07-24 organoid >9-drive): the shell PROXY dim can be
+            # mis-scaled — an instrument enclosure whose manifest dims came back ~28× too
+            # small (7.7×5.7×2.8 vs its delivered 221×165×82 mm spec) flagged EVERY interior
+            # part as "oversized", floor-setting Overview. The true enclosure must at least
+            # CONTAIN the placed-parts bbox, so floor each shell extent to the manifest bbox
+            # extent. A genuine plant-scale proxy part (the check's real target — thousands of
+            # mm) still exceeds this envelope and flags; a normal 28 mm part no longer does.
+            _bb = pm.get("bbox_mm") if isinstance(pm, dict) else None
+            if isinstance(_bb, dict) and all(isinstance(x, (int, float)) and x > 0 for x in (sw, sd, sh)):
+                _bx = abs(num(_bb.get("length_mm")) or 0.0)
+                _by = abs(num(_bb.get("width_mm")) or 0.0)
+                _bz = abs(num(_bb.get("height_mm")) or 0.0)
+                if _bx and _by and _bz and (sw < _bx or sd < _by or sh < _bz):
+                    sw, sd, sh = max(sw, _bx), max(sd, _by), max(sh, _bz)
             if all(isinstance(x, (int, float)) and x > 0 for x in (sw, sd, sh)):
                 s_sorted = sorted([sw, sd, sh], reverse=True)  # orientation-free: a part fits if
                 oversized = []                                 # its sorted extents all <= the shell's
