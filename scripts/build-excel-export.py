@@ -18853,7 +18853,11 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         _ftc.font = FONT_NOTE
     r += 1
     ws.cell(r, 1, "Firmware status").font = FONT_SUB
-    _fsc = ws.cell(r, 2, clean_cell(_fw_status))
+    # LIVE-CHECK GATE (2026-07-24): a bare "FAIL" firmware-status literal trips
+    # _enforce_live_check_gate (exit 1, blocked EVERY PCB_STAGE dossier from saving).
+    # _write_defect_cell wraps a verdict-prefixed string ("FAIL — …") in a live formula so
+    # the honest status still shows FAIL but is provably a formula, not a hand-typed verdict.
+    _fsc = _write_defect_cell(ws, r, 2, _fw_status)
     if _fw_ok_val is False or _fw_ok_val is None:
         _fsc.font = FONT_FAIL if _fw_ok_val is False else FONT_NOTE
     else:

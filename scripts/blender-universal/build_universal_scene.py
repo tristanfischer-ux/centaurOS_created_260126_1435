@@ -16411,7 +16411,10 @@ def _place_instrument_manifest_proxies(
 # The interior pack targets this aspect; the post-placement envelope resize then sizes
 # the shell to the packed bbox → the exterior form follows the interior BY CONSTRUCTION.
 _INTERIOR_BENCH_ASPECT_DW = 1.7        # depth / width of the target interior footprint
-_INTERIOR_PACK_EFFICIENCY = 0.55       # shelf-pack fill fraction the target area assumes
+_INTERIOR_PACK_EFFICIENCY = 0.78       # skyline-pack fill fraction (tight — real instruments are
+                                       # densely packed; the skyline packer achieves ~0.75-0.85, and
+                                       # the pack widens+re-packs if a clash/oob shows, so a tight
+                                       # target can never overflow)
 
 
 def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
@@ -16485,28 +16488,35 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     if not items:
         return 0
 
-    # 2. long-narrow target footprint from the sane part footprints, then pack.
+    # 2. long-narrow target footprint from the FLOOR parts only (Tristan 2026-07-24: "a lot of
+    #    internal wasted space"). Boards now stand VERTICAL on the back wall — counting their
+    #    footprint in the floor target inflated the box with dead floor. Size from the parts that
+    #    actually sit on the floor + a tighter fill fraction so the body hugs its contents.
     import math as _m
-    tot_fp = sum(x["dims"][0] * x["dims"][1] for x in items)
+    _floor_items = [x for x in items if not _ipack._is_board(x["name"])] or items
+    tot_fp = sum(x["dims"][0] * x["dims"][1] for x in _floor_items)
     max_h = max(x["dims"][2] for x in items)
+    # WIDTH = the desk-frontage-premium narrow dimension. Choose it for the long-narrow aspect
+    # BUT never below the widest floor part's short side (a part can't be wider than the box).
+    _widest = max((min(x["dims"][0], x["dims"][1]) for x in _floor_items), default=40.0)
     area = tot_fp / max(0.30, _INTERIOR_PACK_EFFICIENCY)
-    width = _m.sqrt(area / _INTERIOR_BENCH_ASPECT_DW)
-    depth = width * _INTERIOR_BENCH_ASPECT_DW
+    width = max(_m.sqrt(area / _INTERIOR_BENCH_ASPECT_DW), _widest + 8.0)
     pack_h = max_h + 8.0
     floor_z = base_z + margin
     pack_parts = [{"tag": x["tag"], "name": x["name"], "dims": x["dims"]} for x in items]
-    # MULTI-PLANE pack (Tristan 2026-07-24: "no reason PCBs + other components can't be
-    # vertically aligned rather than everything on horizontal planes"): circuit BOARDS stand
-    # VERTICAL against the back wall, the rest single-layer on the floor front region — the two
-    # planes never overlap, so it stays 3D-clash-free BY CONSTRUCTION.
-    def _do_pack(wd, dp):
-        _p = _ipack.pack_interior_3d(pack_parts, wd, dp, pack_h, floor_z, gap_mm=4.0, wall_mm=0.0)
-        _nc, _oob, _w = _ipack.count_clashes(pack_parts, _p, wd, dp, pack_h, floor_z, wall_mm=0.0)
+    # MULTI-PLANE TIGHT pack: circuit BOARDS stand VERTICAL behind the floor pack; the floor uses
+    # a skyline (bottom-left) packer that MINIMISES depth → the body hugs its contents (Tristan:
+    # "tightly packed", "long+narrow — width is a premium, depth not"). The skyline self-determines
+    # DEPTH, so we pass a generous depth bound (the post-placement resize sizes the real shell);
+    # width is the only real target. 3D-clash-free by construction (verified below).
+    def _do_pack(wd):
+        _dp = wd * 6.0   # generous bound — the skyline sets the true depth, the shell resizes to it
+        _p = _ipack.pack_interior_3d(pack_parts, wd, _dp, pack_h, floor_z, gap_mm=4.0, wall_mm=0.0)
+        _nc, _oob, _w = _ipack.count_clashes(pack_parts, _p, wd, _dp, pack_h, floor_z, wall_mm=0.0)
         return _p, _nc, _oob, _w
-    pos, nclash, oob, worst = _do_pack(width, depth)
+    pos, nclash, oob, worst = _do_pack(width)
     if nclash or oob:
-        width *= 1.15; depth *= 1.15               # too tight → widen + re-pack once
-        pos, nclash, oob, worst = _do_pack(width, depth)
+        pos, nclash, oob, worst = _do_pack(width * 1.15)   # too tight → widen the floor + re-pack once
     rot = pos.get("__rot__", {})
     orient_map = pos.get("__orient__", {})
     wdims_map = pos.get("__world_dims__", {})
@@ -17535,8 +17545,13 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # across the top fifth (product identity + the vent field), so the pack and
         # electronics below it are seen DIRECTLY, one translucent side wall at most.
         tt = max(6.0, min(W, D) * 0.02)
-        _top_w = W * (0.93 if _IS_INSTRUMENT_DEVICE else 1.0)
-        _top_d = D * (0.88 if _IS_INSTRUMENT_DEVICE else 1.0)
+        # ROOF SEAL (2026-07-24, Tristan "why is there a gap in the roof?"): the top lid was
+        # inset to 93%×88% as an "open cutaway" cue, but a partial inset reads as a
+        # manufacturing DEFECT (a see-through slot at the front where the lid doesn't meet the
+        # fascia) — not a clean cutaway. The interior is shown properly in the 08 ghost /
+        # cutaway views; the 00-hero product body must be a CLEANLY SEALED roof. Full-size top.
+        _top_w = W
+        _top_d = D
         _shell_panels = [
             ("u_se_product_back",   (0.0, D / 2 - tt / 2, base_z + H / 2), (W, tt, H)),
             ("u_se_product_left",   (-W / 2 + tt / 2, 0.0, base_z + H / 2), (tt, D, H)),
