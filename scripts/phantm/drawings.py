@@ -143,7 +143,7 @@ def d2_transverse():
     ax.add_patch(Rectangle((limb_x0, -PM_L / 2), 0.35, PM_L, fc=MAG, ec=INK, lw=0.8, zorder=4))
     ax.add_patch(Rectangle((limb_x0 - 0.13, 0.45), 0.61, 0.5, fc=COIL, ec=INK, lw=0.7,
                            zorder=3, alpha=0.9))
-    ax.annotate("coil 20t × Ø50 µm\n(pre-wound, slipped on)", (limb_x0 + 0.24, 0.7),
+    ax.annotate("coil 20t × Ø50 µm\n(wound in situ — §5.2)", (limb_x0 + 0.24, 0.7),
                 fontsize=7.5, ha="left", color=INK,
                 xytext=(limb_x0 - 0.35, 2.05), textcoords="data",
                 arrowprops=dict(arrowstyle="->", color=MUT, lw=0.7))
@@ -200,17 +200,14 @@ def d3_tooth_detail():
 
 def d4_build_sequence():
     fig, axes = plt.subplots(1, 5, figsize=(12.5, 3.4), dpi=170)
-    fig.suptitle("D4 — Build sequence (the coil problem drives the order)",
+    fig.suptitle("D4 — Build sequence (corrected 24 Jul: the pole is an OPEN horseshoe until the translator enters)",
                  x=0.02, ha="left", fontsize=11, fontweight="bold", color=INK)
     steps = [
-        ("1. Mould micro-MIM parts", "translator + 6 slot-sections\n+ 3 bridge bars in\nmicro-MIM Fe-3%Si\n(pressed SMC cannot form\n232 µm teeth — §5)"),
-        ("2. Pre-wind coils", "20t × Ø50 µm on a\nremovable former →\nself-bonded coil\n"
-         "(bondable magnet wire)"),
-        ("3. Slip coil onto\nOPEN bridge bar", "bridge is a straight bar\nBEFORE the loop closes:\ncoil slides over it; magnet\nslug bonded INTO the\nmagnetic path (not electrical)"),
-        ("4. Close loop +\nset gaps", "bridge joins the two\nslot-sections; 20 µm gap\n"
-         "set by precision shims /\nactive measurement"),
-        ("5. Magnetise + test", "magnetise NdFeB\nin-situ (pulse fixture);\ndetent-force "
-         "100% test\n= the gap gauge"),
+        ("1. Mould micro-MIM parts", "translator + 3 MONOLITHIC\nhorseshoe poles in\nmicro-MIM Fe-3%Si\n(pressed SMC cannot form\n232 µm teeth — §5)"),
+        ("2. Wind coils", "Route A: wind 20t × Ø50 µm\nIN SITU on the one-piece\npole's bridge limb\n(Route B: pre-wound coil\nslipped on a 2-piece pole)"),
+        ("3. Bond magnet slug", "NdFeB slug bonded\nUNMAGNETISED into the\nmagnetic path (magnetised\nparts snap at ≈37,000×\ntheir weight — §5.3)"),
+        ("4. Insert translator +\nset gaps", "translator slides in\nAXIALLY; 20 µm gap\nset by precision shims /\nactive measurement"),
+        ("5. Magnetise + test", "magnetise NdFeB through\nthe assembled pole\n(supplier service — §5.5);\ndetent-force 100% test\n= the gap gauge"),
     ]
     for ax, (title, body) in zip(axes, steps):
         ax.axis("off")
@@ -221,8 +218,8 @@ def d4_build_sequence():
         ax.text(0.5, 0.60, body, transform=ax.transAxes, ha="center", va="top",
                 fontsize=8, color=INK)
     fig.text(0.02, 0.02,
-             "THE COIL CONSTRAINT: once the horseshoe closes, the bridge is a closed magnetic loop — a coil cannot be wound on it in volume. "
-             "It must be pre-wound and slipped over the open bridge bar (step 3) before the loop closes (step 4). This fixes the assembly order.",
+             "CORRECTED (Tony, 24 Jul): the pole steel alone is an OPEN horseshoe — its circuit closes only THROUGH the translator, which enters last. "
+             "Winding is never blocked; a MONOLITHIC pole (no bonded joints in the flux path, ≈5–15% detent saved vs glued two-piece) becomes the baseline.",
              fontsize=8, color=DELTA)
     fig.tight_layout(rect=(0, 0.07, 1, 0.93))
     fig.savefig(f"{OUT}/drawing-D4-build-sequence.png"); plt.close(fig)

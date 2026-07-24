@@ -226,7 +226,7 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v4 — 24 Jul feedback incorporated; pending 3D-FE/prototype validation)")
+    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v4.3 — 24 Jul feedback rounds 1–3 incorporated; pending 3D-FE/prototype validation)")
     A("")
     A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
@@ -308,6 +308,52 @@ def main():
       "impossibility and the coil sequencing) and §6 (ten supplier entries with "
       "evidence) answer this directly; raw materials are indeed tiny "
       "($0.0014/unit, §8.1) — the unit price lives in process and gap-setting.")
+    A("")
+    A("**Round 3 (24 Jul, 09:00–09:14) — the coil-winding challenge and two process points:**")
+    A("")
+    A("8. **\"The pole piece when fully assembled is still an open horseshoe\" — Tony is "
+      "right, and the claim is RETRACTED.** The earlier closed-ring / cannot-wind "
+      "statement conflated MAGNETIC closure with "
+      "MECHANICAL closure. Re-analysed: the pole steel alone (two slot-sections + bridge) "
+      "is an open horseshoe whose circuit only closes THROUGH the translator across the "
+      "two working gaps — and the translator inserts axially LAST, so the winding window "
+      "is open throughout pole assembly. In-situ winding is therefore possible, and "
+      "checking where the wrong premise propagated found it had HIDDEN A DESIGN "
+      "IMPROVEMENT rather than corrupted the force numbers: the slip-on-coil sequence "
+      "forced a TWO-PIECE bridge with bonded joints in the flux path, and each glue line "
+      "(≈1–3 µm effective air, unmodelled in the FE, which assumes continuous steel) "
+      "costs ≈5–15% of the detent against the 2×20 µm working gaps. In-situ winding "
+      "permits a MONOLITHIC horseshoe pole — zero magnetic joints, one fewer part, one "
+      "fewer bond. §5.2 now carries both routes: monolithic + wind-in-situ (recommended "
+      "baseline) vs two-piece + pre-wound slip-on (falls back on the mature hearing-aid "
+      "coil supply chain if fine-wire winding on a 2.6 mm assembly proves slow). The FE "
+      "force results are unchanged either way — they model the steel as continuous, "
+      "which the monolithic route now actually delivers.")
+    A("9. **In-situ magnetisation — the logic, then the concession.** The rationale was "
+      "handling: a magnetised 0.74 mg slug near steel sees ≈B²A/2µ0 ≈ 0.27 N of snap "
+      "force — ≈37,000× its own weight — so parts leap to fixtures and collect ferrous "
+      "debris that later sits in a 20 µm gap. But Tony's instinct is right that this "
+      "needn't be OUR process step: magnetise-after-assembly is an off-the-shelf "
+      "SERVICE at the magnet suppliers themselves (SDM explicitly offers it — §6 row "
+      "10, and it is already in the Annex C request-for-quotation), so the "
+      "recommendation becomes: slugs supplied unmagnetised, magnetised through the "
+      "assembled pole BY THE SUPPLIER'S fixture/service or a bought fixture on the "
+      "assembly line — whichever the RFQ returns cheaper. Magnetised-at-supplier "
+      "delivery stays a fallback if placement automation with non-magnetic tooling "
+      "proves controllable.")
+    A("10. **Same alloy both sides of the gap, and no laminations — agreed, with the "
+      "analysis flagged.** Translator AND pole pieces are already specified as the SAME "
+      "material family (micro-MIM Fe-3%Si, §5.1) — which also matches thermal expansion "
+      "across the field gap, exactly Tony's point. On skipping laminations for DC "
+      "pulsing: flux-diffusion estimates for solid Fe-3%Si (ρ ≈ 47 µΩ·cm, µr ≈ 4000) "
+      "give τ ≈ 15–60 µs across the 0.23–0.47 mm stator sections and up to "
+      "≈0.3–0.6 ms for the deepest translator return paths — inside the 1.5 ms pulse, "
+      "so DC pulsing works unlaminated, but the margin on the thickest path is <10×: a "
+      "transient (eddy) FE run is on the punch list before tooling, and eddy loss will "
+      "add modestly to the 2.7 mJ/step. Confidence: moderate (µr-dependent).")
+    A("11. **Cost \"steep but within order of magnitude\"** — noted; the honest band "
+      "stays $0.10–0.25 at ≈10 M/yr (§5), and the monolithic-pole simplification from "
+      "item 8 removes one bond + one part from that stack.")
     A("")
 
     # ------------------------------------------------------------------ §1
@@ -558,7 +604,13 @@ def main():
       "collapses the remaining uncertainty in one measurement. SMC B-H is Somaloy-700-shaped; "
       "the micro-MIM route's Fe-3%Si saturates HIGHER (~1.8–2.0 T) — favourable in the "
       "saturation-limited regions, but rerun the FE with the vendor's measured B-H "
-      "curve before tooling; permeability and hysteresis also differ.")
+      "curve before tooling; permeability and hysteresis also differ. Two further "
+      "unmodelled effects, both flagged 24 Jul: the FE treats the pole steel as "
+      "CONTINUOUS — true for the monolithic Route-A pole, but the two-piece Route B "
+      "adds ≈1–3 µm of bonded-joint air per joint (≈5–15% detent loss, §5.2); and no "
+      "transient eddy-current solve has been run — §0.10's flux-diffusion estimate "
+      "says DC pulsing clears the 1.5 ms pulse unlaminated, but the thickest-path "
+      "margin is <10× and a transient FE run is on the punch list.")
     A("")
 
     # ------------------------------------------------------------------ §5
@@ -573,22 +625,38 @@ def main():
       "published capability at this scale (±10 µm tolerances, <100 µm walls; "
       "vendor-claimed low-distortion magnetic annealing — subject to dimensional qualification). Multi-cavity tools amortise to cents/part "
       "at 10–100 M/yr. Fallbacks needing redesign: etched Fe-Si lamination stacks, or "
-      "LIGA electroformed permalloy (custom material qualification).")
-    A("2. **Coils — pre-wound, because the loop closes.** Once the bridge joins the "
-      "two slot-sections the magnetic circuit is a closed ring: nothing can wind "
-      "through it at volume. So: wind 20 turns of Ø50 µm bondable magnet wire on a "
-      "removable former (or directly on the free bridge bar) → self-supporting coil → "
-      "**slip over the open bridge limb** → then close the loop. Hearing-aid and "
-      "watch-coil houses wind 9–50 µm wire at tens of millions/yr.")
+      "LIGA electroformed permalloy (custom material qualification). Translator and "
+      "pole pieces in the SAME alloy (thermal-expansion match across the field gap — "
+      "Tony's 24 Jul point); no laminations needed for DC pulsing per the §0.10 "
+      "flux-diffusion estimate, transient FE check pending.")
+    A("2. **Coils — two viable routes (corrected 24 Jul after Tony's challenge, §0.8).** "
+      "The assembled pole WITHOUT the translator is an open horseshoe — its magnetic "
+      "circuit closes only through the translator, which slides in axially LAST — so "
+      "winding is never topologically blocked. **Route A (recommended): monolithic "
+      "MIM horseshoe pole + in-situ winding** — wind 20 turns of Ø50 µm bondable wire "
+      "directly on the bridge limb of the one-piece pole (watch/hearing-aid fine-wire "
+      "winders; needle access through the open throat). Zero magnetic joints: the FE "
+      "assumes continuous steel, and this route delivers it. **Route B: two-piece pole "
+      "+ pre-wound coil** — self-supporting coil wound on a former, slipped over the "
+      "open bridge limb, then the bridge bonded to the slot-sections. Falls back on "
+      "the mature hearing-aid/VCM coil supply chain, but each bonded joint in the flux "
+      "path is ≈1–3 µm of effective air ⇒ ≈5–15% detent loss against the 2×20 µm "
+      "working gaps — measurable, and Route A avoids it. Both are in the Annex B "
+      "request-for-quotation; the winder-cycle-time quote decides.")
     A("3. **Magnets** — sintered NdFeB thin-sliced slugs (0.348×1.162×0.243 mm), "
       "Ni + parylene coated (the 15-year-outdoor corrosion stack is a qualification "
-      "gate: demand salt-spray/PCT data on sub-mm parts), inserted UNMAGNETISED.")
-    A("4. **Assembly + the 20 µm gap.** Bond bridge to slot-sections around the "
-      "translator/bearing; set the gap with precision shims or active gauging. "
-      "dF/dg ≈ −8%/µm here, so ±5 µm scatter = ±40% force: the 100%-test detent-force "
-      "measurement IS the gap gauge — measure, sort/adjust, then fix.")
-    A("5. **Magnetise in-situ** (pulse fixture through the assembled pole), then "
-      "100% detent-force + step test.")
+      "gate: demand salt-spray/PCT data on sub-mm parts), supplied UNMAGNETISED "
+      "(handling: a magnetised slug near steel sees ≈0.27 N ≈ 37,000× its weight and "
+      "collects ferrous debris destined for a 20 µm gap).")
+    A("4. **Assembly + the 20 µm gap.** Bond the pole (monolithic, Route A) or bridge "
+      "+ slot-sections (Route B) around the translator/bearing; set the gap with "
+      "precision shims or active gauging. dF/dg ≈ −8%/µm here, so ±5 µm scatter = "
+      "±40% force: the 100%-test detent-force measurement IS the gap gauge — measure, "
+      "sort/adjust, then fix.")
+    A("5. **Magnetise after assembly** (pulse fixture through the assembled pole) — "
+      "preferably as the magnet SUPPLIER'S service (SDM offers exactly this, §6 row "
+      "10; already in Annex C) rather than an in-house step, per Tony's 24 Jul "
+      "steer — then 100% detent-force + step test.")
     A("")
     A("The cost picture (indicative, NOT quotes): materials ≈ $0.001/unit are noise. "
       "Component floors already stack: 3 coils ($0.03–0.15 ea) + 3 magnets "

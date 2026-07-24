@@ -136,15 +136,21 @@ absent("no retired numbers", "400 A-turns", "×8 short", "7.92 mm",
        "not the force amplitudes",
        "0.151/0.162/0.151", "±1.4°", "4–7× below", "×16 however",
        "FE-proven fixes", "steps 173/146/145; Tony CAD reads 400 µm — reconcile)")
-absent("no old title", "(v3)", "(v3.1")
+absent("no old title", "(v3)", "(v3.1", "(v4 — 24 Jul feedback incorporated")
 absent("no strikethrough tildes", "~")
+# round-3 retractions (Tony 24 Jul 09:00-09:14) — the old claims must never reappear
+absent("coil closed-ring claim retired", "nothing can wind",
+       "pre-wound, because the loop closes", "closed ring: nothing")
+absent("in-situ magnetisation as mandate retired", "**Magnetise in-situ**")
+contains("round-3 responses present", "open horseshoe", "monolithic", "Route A",
+         "37,000", "flux-diffusion", "magnetise-after-assembly")
+contains("v4.3 title", "(v4.3 — 24 Jul feedback rounds 1–3")
 # reflector bound: 2x2 mm x 20 um Cu = 0.716 mg < 0.5% of Mt; +2 mg plastic < 2%
 m_foil = 8960 * 2e-3 * 2e-3 * 20e-6 * 1e6  # mg
 check("reflector foil bound 0.72 mg", abs(m_foil - 0.717) < 0.01, f"{m_foil:.3f}")
 check("reflector <2% of Mt", (m_foil + 2.0) / (mt_kg * 1e6) < 0.02,
       f"{(m_foil + 2.0)/(mt_kg*1e6):.3%}")
 contains("reflector bound in report", "0.72 mg")
-contains("v4 title", "(v4 — 24 Jul feedback incorporated")
 
 # ---------------- honeycomb (§8.9) -----------------------------------------
 AF, T_HC, DEP = 3.1, 0.2, 7.7
