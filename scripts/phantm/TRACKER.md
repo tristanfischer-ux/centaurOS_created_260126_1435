@@ -122,3 +122,15 @@ pre-commit hook). Use `python -m pip` for installs (relocated-venv shebangs).
 ~/.venvs/phantm/bin/python scripts/phantm/selftest.py    # 20/20 green
 ~/.venvs/phantm/bin/python scripts/phantm/geometry.py    # derived-geometry dump
 ```
+
+## Hex-cell wave conformer work package (opened 24 Jul, Tristan instruction)
+| Increment | Status |
+|---|---|
+| STL forensics: interior 3.10 / pitch 3.25 / wall 0.15 / depth 7.75 | ✅ v4.3.x |
+| hexcell.py validated eigensolver → λc 5.598 / fc 53.56 + band table | ✅ v4.4 |
+| §9 report section (physics + integration + interface contract) | ✅ v4.4 |
+| Council check (gpt-5.5 catch applied: cell depth binds band edge) | ✅ v4.4 |
+| Excel: derived λc + interior/pitch lattice rows | ✅ v4.4 |
+| OPEN: Vlad items — standoff distance, foil-edge clearance/choke, metallised-cell λc confirm | ⏳ external |
+| OPEN: vibration envelope from Tony → hold-force spec (§9.4 row 4) | ⏳ external |
+| OPEN: push 7 local commits to origin (classifier-blocked) | ⏳ Tristan |
