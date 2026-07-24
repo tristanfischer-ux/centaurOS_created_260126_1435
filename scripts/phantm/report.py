@@ -251,6 +251,53 @@ def main():
       "form 232 µm teeth), and the 20 µm gap must be actively set at assembly.")
     A("")
 
+    # ---------------------------------------------------------- §0 Tony response
+    A("## 0. Response to Tony's feedback of 24 July (before reading on)")
+    A("")
+    A("Tony confirmed the physics numbers \"mostly well match my own calculations\" "
+      "and corrected the framing in four ways, each actioned below:")
+    A("")
+    A("1. **Scope: ~70 GHz outline feasibility only.** The spec was a ballpark check "
+      "for the ~70 GHz band, not a 50–160 GHz product — one actuator will not cover "
+      "the full range (a ~2× stroke spread). The multi-band scorecard rows are "
+      "therefore secondary; this report's verdicts should be read at the ~70 GHz "
+      "point, where the cell pitch sits between the 1.9 and 3.0 mm cases analysed.")
+    A("2. **Waveguide wavelength.** Phase steps and stroke must use the GUIDE "
+      "wavelength λg = λ0/√(1−(λ0/λc)²) > λ0, not free space — which is why the "
+      "brief carries a long stroke. All phase-per-step figures in this report are "
+      "free-space values and are therefore UPPER bounds (λg makes quantisation "
+      "finer — favourable); the stroke requirement grows to λg/2 and needs the "
+      "cell's cutoff to pin down (requested below — the RF stays Tony's domain per "
+      "the brief's confidentiality boundary). Stroke available: 8.27 mm with one "
+      "3-pole group; note the force ladder below trades stroke for force.")
+    A("3. **Force targets: 5 g was the test minimum — the ambition is 20–30 g "
+      "(31–46 mN).** FE-backed growth ladder at the 20 µm gap, from the 7.7 mN "
+      "(5 g) fixed design: doubling to TWO 3-pole groups along the translator "
+      "(8.46 mm of stator; stroke falls to ~3.7 mm — check vs λg/2) → ~15.4 mN "
+      "(10 g); N52 magnets (Br 1.45, force ∝ Br²) → ~19 mN (12 g); the "
+      "registration knob (§4 F3) → ~21 mN (≈13–14 g). **Reaching 20–30 g needs "
+      "one more multiplier**: gap ≤ ~12 µm, a wider magnetic stack (cell-budget "
+      "permitting), or accepting the two-group stroke. \"More coil turns\" raises "
+      "drive MMF but not the zero-power detent; \"more NdFeB\" helps only until "
+      "the Φ → Br·A ceiling (§3.1) — the real currencies are gap, tooth area and "
+      "registration.")
+    A("4. **The gap ruling — our one push-back, with evidence.** Tony expects "
+      "~75 µm is \"probably not manufacturable\" and the gap must GROW. FE says "
+      "the opposite direction is fatal: at 100/150 µm with the enlarged bridge/PM, "
+      "the detent caps at **0.67/0.48 mN = 0.43/0.31 g** — 12–16× below even the "
+      "5 g minimum (artefact: tony-gap-check.json). The resolution is that the "
+      "working gap is NOT a moulded tolerance but an ASSEMBLED clearance, set at "
+      "the force-gauged assembly step (§5.4): voice-coil-motor, watch and "
+      "hard-disk lines hold single-µm assembled clearances at consumer volumes "
+      "today (§6 evidence rows). 20 µm assembled is industrially normal — it is a "
+      "process-and-cost choice, not a feasibility wall — and it is the single "
+      "decision this design cannot survive losing.")
+    A("5. **Manufacturing methods and cost** — §5 (route, incl. the pressed-SMC "
+      "impossibility and the coil sequencing) and §6 (ten supplier entries with "
+      "evidence) answer this directly; raw materials are indeed tiny "
+      "($0.0014/unit, §8.1) — the unit price lives in process and gap-setting.")
+    A("")
+
     # ------------------------------------------------------------------ §1
     A("## 1. The current design and its assumptions")
     A("")
@@ -605,12 +652,14 @@ def main():
     A("")
     A("1. Reflector mass: part of the translator (Mt complete) or added? (moves the "
       "hold/step budget)")
-    A("2. Is Fd = 5·g·Mt the real requirement, or hold against 10–30 g shock "
-      "(= 16–47 mN — 2–6× the current spec; the fixed design would need re-solving)?")
+    A("2. ANSWERED 24 Jul: 5 g was the test minimum; ambition is 20–30 g — see §0.3 "
+      "ladder. Remaining ask: confirm whether 20–30 g is HOLD (detent) or survive "
+      "(shock) — they size differently.")
     A("3. Orientation confirmed? (translator axis along beam depth — assumed)")
     A("4. Peak temperature (NdFeB demag margin check is one line once known) and the "
       "real driver voltage (1 V limits drive to reduced-margin stepping; 2 V unlocks "
-      "the full 2·Fd point).")
+      "the full 2·Fd point). NEW: the cell's guide-wavelength/cutoff at ~70 GHz, so "
+      "the stroke requirement (λg/2) and phase-per-step can be finalised (§0.2).")
     A("5. **Pole spacing: brief 374 µm vs your CAD 400 µm vs exact 390 µm — which "
       "rules?** (374 ⇒ steps 172.6/146.1/145.3 µm, ±3.4° jitter at 80 GHz.)")
     A("6. **Tooth profile: brief 232+232 (pitch 464) vs the 465/620 dimensions "

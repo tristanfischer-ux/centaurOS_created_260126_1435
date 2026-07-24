@@ -125,6 +125,12 @@ check("F3 detent 5.95 @ Pm 0.243 (exact thirds)", abs(f3["0.243"][0] - 5.95) < 0
 check("F3 basins = 3 at all Pm", all(v[1] == 3 for v in f3.values()))
 contains("F3 trade in report", "5.95 mN")
 
+tg = json.load(open(os.path.join(OUT, "tony-gap-check.json")))
+check("gap100 detent 0.67 mN", abs(tg["gap100_pm0.3"] - 0.673) < 0.03)
+check("gap150 detent 0.48 mN", abs(tg["gap150_pm0.3"] - 0.482) < 0.03)
+contains("gap ruling in report", "0.43/0.31 g")
+contains("ladder in report", "20–30 g")
+
 # ---------------- stale-string blacklist -----------------------------------
 absent("no retired numbers", "400 A-turns", "×8 short", "7.92 mm",
        "not the force amplitudes",
