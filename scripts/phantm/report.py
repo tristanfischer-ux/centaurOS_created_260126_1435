@@ -887,7 +887,7 @@ def main():
     A("| Boundary-wall edge effect | measured/asymptote | 192.2/149.8 · 64.5/43.7 | +28% (24-hex) vs +48% (7-hex) — an isolated tile owns its outer walls; the excess shrinks toward the shared-wall asymptote as tiles grow or join |")
     A("| Widest fit at actuator height | (2·AF − h)/√3 | (6.2 − 2.634)/√3 | 2.06 mm ≥ 1.708 ✓ |")
     A("| Actuator fit in the 3.1 mm cell | h ≤ AF and w ≤ (2AF−h)/√3 | 2.634 ≤ 3.1; 1.708 ≤ 2.06 | **FITS** |")
-    A("| Fit @80 GHz cell (1.9 mm) | same test | 2.634 > 1.9 | FAILS — needs ≥2-deep axial stagger |")
+    A("| Fit @80 GHz cell (1.9 mm) | same test | 2.634 > 1.9 | FAILS — needs ≥2-deep axial stagger; NOTE this row uses the OUTLINE spec's per-band cell assumption — Tony's delivered E-band cell is 3.1 mm, where the actuator FITS (the 1.9/0.94 rows stand only as stress-tests for the 120–160 GHz roadmap) |")
     A("| One actuator, total mass | Mt + 3·(steel+PM+coil) | 157.7 + 3×(18.8+0.74+1.11) | 220 mg |")
     A("| Actuators per sub-array | N·m | 24 (7) × 220 mg | **5.3 g (1.5 g)** — dominates the measured lattice ≈22× (19×) |")
     A("")
