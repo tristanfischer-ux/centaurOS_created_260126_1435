@@ -2460,17 +2460,45 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
     if isinstance(state, dict):
         _sa = state.get("selfAudit")
         _bd = (_sa.get("blocking_defects") if isinstance(_sa, dict) else None) or []
+        # VERIFY-BEFORE-BIND (2026-07-25, #68 — council-unanimous "LLM discovers, code
+        # binds"; drawer_forgeos_decisions_3d529331a410101e): a stochastic self-audit
+        # blocking_defect must NOT hard-floor on its own — it differs every run (r6 floored
+        # on an OD-path physics HIGH, r7 on a brief-compliance flag: a treadmill). Route each
+        # defect to a DETERMINISTIC check compiled from its family (scripts/lib/
+        # self_audit_verify): it BINDS only if the check CONFIRMS the violation, is RETIRED as
+        # noise when the check passes. Families with NO compiled check yet KEEP binding
+        # (conservative — never weaken the gate; tracked as compile-debt). The bind still
+        # refuses via ships+floor only (open_n stays the CELL-BACKED count — ONE-TRUTH).
         if isinstance(_bd, list) and len(_bd) > 0:
-            ships = False
-            # NOTE (S7 one-truth reconcile, 2026-07-20): the bind refuses via ships+floor;
-            # it does NOT inflate open_n. open_issues is the CELL-BACKED count (tabs/sections
-            # below 8 — the workbook's LIVE OPEN ISSUES formula) so python and the recalculated
-            # workbook always agree (the ONE-TRUTH read-back). The blocking defect surfaces in
-            # the findings, not as N phantom open-issue counts no cell reproduces.
-            if floor is None or floor > 4.0:
-                floor = 4.0
-            print(f"  ! self-audit blocking_defects blocked SHIPS ({len(_bd)}): "
-                  f"{[str(d)[:70] for d in _bd[:2]]}")
+            try:
+                import sys as _sys, os as _os
+                _lib = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "lib")
+                if _lib not in _sys.path:
+                    _sys.path.insert(0, _lib)
+                import self_audit_verify as _sav
+                # disclosed_na_keys: the constraint keys the compliance table marks N/A
+                # (SIGHT). None until the disclosure stash (#69) lands → an incomplete-
+                # disclosure brief_compliance finding still binds; an honest one retires.
+                _dis = state.get("_complianceDisclosedNaKeys")
+                _part = _sav.partition_blocking_defects(_bd, state, disclosed_na_keys=_dis)
+            except Exception as _sav_exc:  # verifier must never kill the verdict → old conservative bind
+                print(f"  ! self_audit_verify unavailable ({_sav_exc}) — binding all "
+                      f"blocking_defects conservatively")
+                _part = {"binding": [{"defect": str(d)[:120]} for d in _bd],
+                         "retired": [], "uncompiled": []}
+            state["_selfAuditVerify"] = _part
+            if _part["binding"]:
+                ships = False
+                if floor is None or floor > 4.0:
+                    floor = 4.0
+                print(f"  ! self-audit blocking_defects BIND SHIPS ({len(_part['binding'])}/"
+                      f"{len(_bd)}; {len(_part['retired'])} retired as noise, "
+                      f"{len(_part['uncompiled'])} uncompiled-conservative): "
+                      f"{[b.get('family') for b in _part['binding'][:3]]}")
+            elif _part["retired"]:
+                print(f"  ✓ self-audit blocking_defects ALL RETIRED as noise by compiled checks "
+                      f"({len(_part['retired'])}: {[r.get('family') for r in _part['retired'][:3]]}) "
+                      f"— disclosure verified honest, does NOT floor")
         # Process-plant vocabulary emitted onto a DEVICE-SCALE product (the
         # pressure-vessel/backwash/skid words leaked onto a 20 ml benchtop box):
         # a physical-scale impossibility the coherence audit already detected but
