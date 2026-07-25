@@ -629,8 +629,16 @@ def _phenotype_containment_verdict(run_dir: str):
             # "do the rendered parts fit the product body?" — with the body correctly defined:
             # a part placed OUTSIDE the shell still makes scene > shell → FAIL. Falls back to the
             # placer's resolver when no shell part is present (synthetic/word-less states).
+            # The product body is the LARGER of the delivered shell part and the authoritative
+            # envelope resolver. The delivered shell may legitimately be BIGGER (a large real BoM
+            # grows it past the pre-estimate — the 2026-07-24 intent) OR wrongly SMALLER (a
+            # mis-scaled "Enclosure Shell" part: r7 landed it at 6.5 mm vs the real 180 mm, which
+            # turned a 1.25x pack into a fake ~35x sprawl and floored Renders 9→4). max() honours
+            # both and NEVER trusts a shell dim implausibly small against the resolver. (2026-07-25)
             _shell_edge = _delivered_shell_longest_mm(pm)
-            _encl_edge = _shell_edge if (_shell_edge and _shell_edge > 0) else _real_enclosure_edge_mm(state)
+            _resolver_edge = _real_enclosure_edge_mm(state)
+            _encl_cands = [e for e in (_shell_edge, _resolver_edge) if e and e > 0]
+            _encl_edge = max(_encl_cands) if _encl_cands else None
             if _encl_edge is not None and _encl_edge > 0:
                 bb = pm.get("bbox_mm") or {}
                 _scene_edge = max(num(bb.get("length_mm")) or 0.0,
