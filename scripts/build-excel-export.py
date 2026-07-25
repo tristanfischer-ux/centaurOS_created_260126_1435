@@ -9879,6 +9879,29 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
     if not metrics and tp.get("value") is not None:
         metrics = [tp]
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    # COST-METRIC ACHIEVED (2026-07-25): the brief's bom_cost_* metrics (midpoint/floor
+    # £) carry NO contract quantity — the ACHIEVED BoM total lives in state.requirementsBom
+    # (Σ line_gbp), not the contract — so the matcher found nothing and reported a false
+    # UNVERIFIED even when the design DOES cost within the band (£291 vs £275-330). Same
+    # LLM-authored-key-gap class as the stability bug. Inject the BoM total as the achieved
+    # for any BoM-cost metric so it verifies against its own target. Universal, noun-keyed;
+    # a COPY of quantities (never mutate the shared contract).
+    _rb = state.get("requirementsBom")
+    if isinstance(_rb, list) and _rb:
+        _bom_total = round(sum(float((r or {}).get("line_gbp", 0) or 0)
+                               for r in _rb if isinstance(r, dict)), 2)
+        if _bom_total > 0:
+            _cost_rx = re.compile(r"bom_cost|(?:total|assembled|build)_cost.*gbp", re.I)
+            _inject = {}
+            for _m in metrics:
+                if not isinstance(_m, dict):
+                    continue
+                _mk = str(_m.get("key_metric") or _m.get("metric") or _m.get("name") or "").strip()
+                if _mk and _cost_rx.search(_mk) and _mk not in quantities:
+                    _inject[_mk] = {"value": _bom_total, "unit": "GBP",
+                                    "provenance": {"source": "requirementsBom Σ line_gbp (assembled BoM total)"}}
+            if _inject:
+                quantities = {**quantities, **_inject}
     brief_text = pb.get("original_text") or pb.get("revised_text") or ""
     if not isinstance(brief_text, str):
         brief_text = ""
