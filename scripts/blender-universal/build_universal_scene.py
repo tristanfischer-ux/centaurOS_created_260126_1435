@@ -7026,6 +7026,15 @@ def _vessel_drawn_bbox_mm():
     return tuple(acc) if acc is not None else None
 
 
+def _sealed_vial_r_h_mm(W, D, H):
+    """SINGLE SOURCE OF TRUTH for the vial_bioreactor on-top vessel radius + height
+    from the sealed-enclosure dims. Used by BOTH the SEAM-1 exterior-signature mesh
+    placement AND the manifest seat (_exterior_signature_vessel_bbox_mm), so the render
+    and the GA describe the SAME vial with no KEEP-IN-SYNC duplication (council
+    2026-07-25). Radius reads as the hero silhouette; height dominates the top."""
+    return (min(W, D) * 0.13, max(H * 0.88, 42.0))
+
+
 def _exterior_signature_vessel_bbox_mm():
     """Deterministic on-top vessel bbox for the vial_bioreactor EXTERIOR SIGNATURE.
 
@@ -7042,7 +7051,8 @@ def _exterior_signature_vessel_bbox_mm():
     sealed env (W×D×H) — NAME-INDEPENDENT, because the shell mesh is named after the
     enclosure PART (u_hammond_abs_instrument_enclosure on one roll, u_enclosure_shell
     on another). None unless the signature is vial_bioreactor and the env + shell are
-    known. KEEP IN SYNC with the SEAM-1 vial formula."""
+    known. The radius/height formula is SHARED with the SEAM-1 mesh placement via
+    _sealed_vial_r_h_mm (single source of truth — no duplication)."""
     if _LE_SIGNATURE != "vial_bioreactor" or not _SEALED_ENV_MM:
         return None
     try:
@@ -7073,8 +7083,7 @@ def _exterior_signature_vessel_bbox_mm():
             z_top = max(zs) if z_top is None else max(z_top, max(zs))
     if z_top is None:
         return None
-    vial_r = min(W, D) * 0.13
-    vial_h = max(H * 0.88, 42.0)
+    vial_r, vial_h = _sealed_vial_r_h_mm(W, D, H)  # single source of truth (SEAM-1 shares)
     return (-vial_r, vial_r, -vial_r, vial_r, z_top, z_top + vial_h)
 
 
@@ -17907,8 +17916,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _z_top = base_z + H
                 # Slender vial that clears the sealed base but stays within the product
                 # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
-                _vial_r = min(W, D) * 0.13         # a touch wider so the amber vessel reads as the hero silhouette
-                _vial_h = max(H * 0.88, 42.0)      # tallest top element (OD heads now 0.30·h) — the vial dominates; stays inside the 2.0·H frame
+                # SINGLE SOURCE OF TRUTH shared with the manifest seat (council 2026-07-25):
+                _vial_r, _vial_h = _sealed_vial_r_h_mm(W, D, H)
                 # VISIBILITY (2026-07-23, Tristan "lost the light tower"): a highly
                 # transparent glass vial (alpha 0.35) vanished against the light studio
                 # backdrop — the hero read as a flat lid. Raise alpha so the vessel reads
