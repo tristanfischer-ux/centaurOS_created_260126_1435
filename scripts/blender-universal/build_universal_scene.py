@@ -7026,6 +7026,51 @@ def _vessel_drawn_bbox_mm():
     return tuple(acc) if acc is not None else None
 
 
+def _exterior_signature_vessel_bbox_mm():
+    """Deterministic on-top vessel bbox for the vial_bioreactor EXTERIOR SIGNATURE.
+
+    The dominant vessel the RENDER leads with is the on-top `u_se_le_vial` signature
+    mesh (a tall amber vial standing proud on the lid, Pioreactor-style). It is placed
+    in the SHADED exterior/hero pass — but write_parts_manifest runs in the CAD pass
+    where that mesh is absent, so a bbox scan finds only the squat interior cutaway-cue
+    vessel and the GA drew the vessel too small + low ("they don't look anything like
+    each other"). This computes the on-top bbox DETERMINISTICALLY from the sealed-
+    enclosure dims (`_SEALED_ENV_MM` = W,D,H; set by place_sealed_enclosure BEFORE the
+    manifest, confirmed present at call time) using the SAME formula as the SEAM-1
+    placement (~L17851): centred on (0,0), radius min(W,D)*0.13, height max(H*0.88, 42),
+    sitting from the enclosure top (z_top = max z of the `u_enclosure_shell`). None
+    unless the signature is vial_bioreactor and the env + shell are known. KEEP IN SYNC
+    with the SEAM-1 vial formula."""
+    if _LE_SIGNATURE != "vial_bioreactor" or not _SEALED_ENV_MM:
+        return None
+    try:
+        W, D, H = (float(x) for x in _SEALED_ENV_MM)
+    except (TypeError, ValueError):
+        return None
+    if not hasattr(bpy, "data"):
+        return None
+    z_top = None
+    for obj in bpy.data.objects:
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        # the sealed shell is `u_enclosure_shell`; keep the product/skid prefixes as
+        # fallbacks for other enclosure families.
+        if not (obj.name == "u_enclosure_shell"
+                or obj.name.startswith(("u_enclosure_shell", "u_se_product_", "u_skid_encl_"))):
+            continue
+        try:
+            zs = [(obj.matrix_world @ v.co).z * 1000.0 for v in obj.data.vertices]
+        except Exception:  # noqa: BLE001
+            continue
+        if zs:
+            z_top = max(zs) if z_top is None else max(z_top, max(zs))
+    if z_top is None:
+        return None
+    vial_r = min(W, D) * 0.13
+    vial_h = max(H * 0.88, 42.0)
+    return (-vial_r, vial_r, -vial_r, vial_r, z_top, z_top + vial_h)
+
+
 def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
@@ -7067,7 +7112,11 @@ def write_parts_manifest(out_dir, parts, state=None):
         # on-top vessel and the GA's manifest-drawn vessel are ONE object (was: vessel
         # packed small-and-inside → GA drew it inside while the render showed it on top).
         from instrument_spine_manifest import seat_vessel_on_top_from_mesh as _seat_vessel
-        _vessel_bb = _vessel_drawn_bbox_mm()
+        # Prefer the DETERMINISTIC on-top exterior-signature vessel bbox (the tall vial
+        # the render leads with, placed in a later pass than this manifest write) over
+        # the squat interior cutaway-cue bbox; fall back to the cutaway cue when there
+        # is no vial_bioreactor signature.
+        _vessel_bb = _exterior_signature_vessel_bbox_mm() or _vessel_drawn_bbox_mm()
         _seat_bb = dict(_mesh_bb)
         if _vessel_bb:
             _seat_bb["vessel_drawn"] = _vessel_bb
