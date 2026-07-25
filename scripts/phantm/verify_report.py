@@ -239,6 +239,14 @@ for d_name in ("damper.json", "damper-balanced.json"):
     check(f"{d_name} scheme_table + air spring recorded",
           len(dj.get("scheme_table", [])) == 6
           and abs(dj["k_air_sealed_n_per_m"] - 296) < 2)
+# RF-efficacy audit (§9.8): the hole-leak bound recomputed here
+import math as _m
+_fc_hole = 1.8412 * 299.792458 / (_m.pi * 0.15)
+check("vent-hole cutoff 1.17 THz", abs(_fc_hole - 1171) < 5, f"{_fc_hole:.0f} GHz")
+check("Bethe leak −58 dB", abs(10 * _m.log10((0.15 / 4.283) ** 4) + 58.3) < 0.5)
+contains("§9.8 present", "9.8 The RF-efficacy audit", "INVARIANT — untouched by all 93 options",
+         "1.17 THz", "−58 dB", "electromagnetically SILENT",
+         "must be SPECIFIED, not assumed")
 contains("§10.1b/9.5b/9.7/§11 present", "### 10.1b The complete options ledger",
          "### 9.5b The drive/PCB options ledger", "### 9.7 The hex-cell options ledger",
          "## 11. Making the SYSTEM easy to manufacture",

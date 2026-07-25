@@ -1191,6 +1191,37 @@ def main():
             A(ln)
     A("")
 
+    A("### 9.8 The RF-efficacy audit — did the mechatronics keep the antenna's core promise?")
+    A("")
+    A("The product is a mechatronic, hard-to-jam, low-probability-of-intercept antenna; "
+      "everything else is in service of that. This table audits every design decision "
+      "of the actuator/cell/PCB work for its RF consequence — what was held invariant, "
+      "what was gated to Tony/Vlad, and what the mechatronics actively contributes:")
+    A("")
+    A("| Decision | RF consequence | Status |")
+    A("|---|---|---|")
+    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by all 93 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter |")
+    A("| Tooth duty / slot depths / magnet / registration | change step FORCE + uniformity, not step SIZE — phase quantisation preserved at 154.7 µm ⇒ 16.7°/step at 70 GHz | invariant on phase scale; registration choice trades ±1.9° step jitter for detent (quantified, Tony's knob) |")
+    A("| Phase levels: 21 per 2π at 70 GHz today | the UKDI bid's 32-level ambition needs step 108 µm ⇒ pitch 324 µm (scenario S108) | **OPEN — tracked, not built**; awaits Vlad's real λg before a pitch redesign |")
+    A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | gated to Vlad, flagged at every mention |")
+    A("| Damper vent Ø0.15 mm through the reflector | the hole is 17× below its own cutoff (1.17 THz); Bethe small-aperture leakage ∝(d/λ)⁴ ≈ 1.5×10⁻⁶ (−58 dB) before foil-thickness attenuation | **checked here: negligible perturbation of the short** |")
+    A("| Foil-edge running clearance | a real annular leak path past the short | OPEN interface (choke/lip) — Vlad's, flagged since §9.3 |")
+    A("| Actuator inside the cell footprint | sits BEHIND the plane it controls; fields evanescent to first order | shielded by construction; residual = the edge-leak item above |")
+    A("| Plating spec ≥3 µm Cu (+flash) | ≥12 skin depths — conductor loss floor; print roughness is the loss tax | PASS-gated; Vlad owns the loss budget on the print route |")
+    A("| Drive electronics behind the aperture | see the LPI note below | **POSITIVE, plus one new EMC requirement** |")
+    A("")
+    A("**The LPI story the mechatronics adds — worth putting in the bids**: at hold, "
+      "this aperture draws ZERO current. No bias, no clock, no T/R hash — a holding "
+      "PHANTM aperture is electromagnetically SILENT in a way no semiconductor "
+      "phased array can be, which is the low-probability-of-intercept property in its "
+      "purest form. And when it does step, the drive is millisecond-class switching "
+      "(τ = 1.1 µs coil, 1.5 ms pulses) — audio-frequency edges, trivially "
+      "soft-switched and filtered, versus the GHz-rich emissions of an active array's "
+      "beamforming electronics. One requirement falls out and is now on the "
+      "electronics punch list: the driver board must be laid out and shielded so "
+      "re-pointing bursts (up to 26.8 A pulsed) stay out of the feed's band — easy at "
+      "these edge rates, but it must be SPECIFIED, not assumed.")
+    A("")
     # ------------------------------------------------- §10 optimisation
     A("## 10. The optimisation campaign — from 5 g to a chosen Pareto (24 Jul)")
     A("")
