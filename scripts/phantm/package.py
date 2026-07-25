@@ -50,6 +50,29 @@ from pathlib import Path  # noqa: E402
 html_path = show_md.render(Path(sa_md))
 print(f"wrote {html_path}")
 
+# ---- print stylesheet: show-md makes wide tables scroll horizontally, which
+# PRINT clips at the page edge (Tristan 25 Jul: fabricator tables cut off).
+# Force print tables back to normal flow, full width, with wrapped cells.
+PRINT_CSS = """
+<style>
+@media print {
+  body { max-width: 100% !important; padding: 24px 8px !important; font-size: 13px; }
+  table { display: table !important; width: 100% !important;
+          overflow-x: visible !important; font-size: 9.5px; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th, td { padding: 3px 5px !important; word-break: break-word;
+           overflow-wrap: anywhere; hyphens: auto; }
+  pre { white-space: pre-wrap; word-break: break-word; }
+  h1, h2, h3 { break-after: avoid; }
+}
+</style>
+"""
+html_txt = open(html_path).read()
+assert "</head>" in html_txt, "no </head> to inject print CSS into"
+open(html_path, "w").write(html_txt.replace("</head>", PRINT_CSS + "</head>", 1))
+print("injected print stylesheet (tables fit page width)")
+
 pdf_path = os.path.join(OUT, "PHANTM-actuator-report.pdf")
 r = subprocess.run([CHROME, "--headless", "--disable-gpu",
                     "--virtual-time-budget=20000",
