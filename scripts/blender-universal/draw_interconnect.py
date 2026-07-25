@@ -679,6 +679,37 @@ def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[di
             _add_edge(fr, to, str(c.get("service") or c.get("mech") or ""),
                       str(c.get("material_context") or c.get("service") or ""))
 
+    # POWER-LIFT (2026-07-25, organoid council Grok/Gemini/MiMo): the ledger's power edges fan
+    # out from a BUS hub (ferrite bead / power-entry) that is NOT a BoM principal, so every
+    # principal_A -> bus -> principal_B power path is DROPPED (both hops touch the non-principal
+    # bus) and the diagram renders ZERO power edges ("MISSING POWER STORY") though the ledger
+    # holds 20 real power feeds. Lift them: for a power edge INTO a bus and OUT of it to a
+    # principal, draw a DIRECT principal power edge; plus any direct principal->principal power
+    # edge. Deterministic — copies REAL ledger power edges (no synthesis, so synth_ratio stays
+    # low), and only ever draws to a part the ledger genuinely powers (Kimi: no signal-part noise).
+    _led = _load_json(out_dir / "connection-ledger.json")
+    _led_rows = _led.get("rows") or []
+    _pwr_out: dict[str, list[str]] = {}
+    _pwr_in: dict[str, list[str]] = {}
+    for _r in _led_rows:
+        if str(_r.get("service") or "") != "power":
+            continue
+        _f, _t = str(_r.get("from_part") or "").strip(), str(_r.get("to_part") or "").strip()
+        if _f and _t:
+            _pwr_out.setdefault(_f, []).append(_t)
+            _pwr_in.setdefault(_t, []).append(_f)
+            _add_edge(_f, _t, "electrical_bus", "power")   # direct principal->principal feeds
+    # bus = a part that receives power and fans it to >=2 parts but is NOT itself a principal
+    for _bus, _outs in _pwr_out.items():
+        if len(_outs) < 2 or _match_principal(_bus, principals):
+            continue
+        _srcs = [s for s in _pwr_in.get(_bus, []) if _match_principal(s, principals)]
+        for _load in _outs:
+            if not _match_principal(_load, principals):
+                continue
+            for _s in _srcs:
+                _add_edge(_s, _load, "electrical_bus", "power")
+
     # INTENT: Enclosure SHELL is the mechanical story — never the ambient-light
     # cap (cap sorted first alphabetically and stole every mount on colorimeter,
     # leaving Enclosure Shell at degree 0 while story_ok still passed).

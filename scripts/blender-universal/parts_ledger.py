@@ -2101,7 +2101,19 @@ def main() -> int:
         # the EC cooling fan held process connectivity at 50%). Universal: every enclosure
         # fan (utility container or wall cabinet) has a POWER feed (electrical connectivity
         # covers it), not process pipework.
-        "cooling fan", "ventilation fan", "enclosure fan", "cabinet fan", "axial fan", "case fan"}
+        "cooling fan", "ventilation fan", "enclosure fan", "cabinet fan", "axial fan", "case fan",
+        # INSTRUMENT STRUCTURAL / ELECTRONIC MOUNTS (2026-07-25, organoid council): a mounting
+        # fixture, base plate, standoff, thermal insulation/interface pad, debug header or creepage
+        # slot carries NO process fluid — it is a passive support/electronic part whose real tie is
+        # mechanical (assembly) or signal/power, never a piped fluid in+out. Without this they got a
+        # PROCESS etype → flagged missing-fluid → the residual closer plumbed spurious WATER edges
+        # (e.g. "Debug Header -> Thermal Insulation | water", "Vial Holder Fixture -> Chassis Base
+        # Plate | water"). CONSERVATIVE phrases only — deliberately NOT the bare nouns "header" /
+        # "housing" / "plate" / "fixture", which would wrongly exclude a wetted media HEADER, filter
+        # HOUSING, manifold PLATE or pump-HEAD fixture (council: Kimi false-exclusion warnings).
+        "vial holder", "holder fixture", "cuvette holder", "sample holder", "probe holder",
+        "base plate", "chassis base", "mounting frame", "mounting plate", "mounting bracket",
+        "standoff", "thermal insulation", "thermal interface pad", "debug header", "creepage"}
 
     # ── 2c. DEVICE-INSTRUMENT AUTHORITATIVE-TOPOLOGY TIES (2026-07-13) ────────────────
     # A device instrument's signal + DC-rail edges are PCB-level: they are NEVER drawn as
