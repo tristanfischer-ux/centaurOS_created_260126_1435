@@ -51,7 +51,11 @@ import { resolve } from 'path'
 // Best-reasoning model, run ONCE per chain (the result is written to disk +
 // reused). Mirrors bootstrap-tool-plan's HARVEST_MODEL deliberately — the brief
 // expansion is the hardest single derivation in the pipeline and is cacheable.
-const EXPAND_MODEL = 'google/gemini-3.1-pro-preview'
+// 2026-07-25: repointed off the prior-gen gemini-3.1-pro-preview to grok-4.5 (current
+// top reasoner per the 2026-07-24 routing doctrine — strong reasoning + low
+// hallucination; gpt-5.6-sol is deeper but its 11% non-hallucination risks inventing
+// brief requirements on the single most load-bearing derivation).
+const EXPAND_MODEL = 'x-ai/grok-4.5'
 const MAX_OUTPUT_TOKENS = 12_000
 
 export type RequirementProvenance = 'stated' | 'derived'

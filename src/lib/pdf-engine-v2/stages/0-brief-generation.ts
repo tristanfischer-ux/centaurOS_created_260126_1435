@@ -291,7 +291,7 @@ export async function runBriefParsing(
   console.log('[brief-parse] PA Stage 1: parsing brief...')
   console.log(`[brief-parse] Input: ${rawBriefText.length} chars`)
 
-  const MODEL = 'google/gemini-3.1-pro-preview'
+  const MODEL = 'x-ai/grok-4.5'  // 2026-07-25: brief parse repointed off prior-gen gemini-3.1-pro to the current top reasoner (strong instruction-following, low hallucination) — the brief entry point should use the most modern model
   // 2026-05-23 (L31 wind chain blew up on Gemini empty response from this
   // exact stage): add transient-error retry with exponential backoff. Same
   // pattern as scripts/serial-design-chain-v2.tsx callLLM. Without this,

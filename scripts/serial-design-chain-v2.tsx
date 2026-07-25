@@ -3698,13 +3698,13 @@ async function main() {
   // so an edited parsing prompt misses automatically.
   const { value: parsedResultOriginal, cacheHit: briefParseCacheHit } = await cachedDesignStage({
     stage: 'brief-parsing',
-    payload: { brief, model: 'google/gemini-3.1-pro-preview', prompt: BRIEF_PARSING_SYSTEM },
+    payload: { brief, model: 'x-ai/grok-4.5', prompt: BRIEF_PARSING_SYSTEM },
     run: () => runBriefParsing(brief),
     isValid: (v) => !!v?.ok && !!v?.data,
   })
   if (!parsedResultOriginal.ok || !parsedResultOriginal.data) throw new Error('Brief parsing failed')
   if (briefParseCacheHit) console.error(`[chain] brief-parsing cache HIT — LLM not called (determinism #86)`)
-  logAction({ step: 'parse_brief', model: 'gemini-3.1-pro', latency_ms: Date.now() - t0, cache_hit: briefParseCacheHit })
+  logAction({ step: 'parse_brief', model: 'grok-4.5', latency_ms: Date.now() - t0, cache_hit: briefParseCacheHit })
   writeFileSync(resolve(outDir, '1-parsed-brief-original.json'), JSON.stringify(parsedResultOriginal.data, null, 2))
 
   const classificationOriginal = classifyProduct(brief)
