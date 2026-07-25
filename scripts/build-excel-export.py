@@ -9922,8 +9922,24 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
         hard_brief_keys.append(_dk)
         # a DERIVED achieved value must exist — the setpoint does NOT satisfy stability.
         _ach_q = (quantities.get(_dk) or quantities.get(_dk.replace("_k", "_c"))
-                  or quantities.get("temperature_stability_c") or quantities.get("temp_stability_k")
-                  or quantities.get("temp_stability_c"))
+                  or quantities.get(_dk.replace("_c", "_k"))
+                  or quantities.get("temperature_stability_k") or quantities.get("temperature_stability_c")
+                  or quantities.get("temp_stability_k") or quantities.get("temp_stability_c"))
+        if _ach_q is None:
+            # NOUN-based fallback (2026-07-25): the derived-requirement key
+            # (culture_temperature_stability_c) and the emitted achieved quantity
+            # (temperature_stability_k) routinely differ in BOTH prefix (culture_) and
+            # unit suffix (_c vs _k), so the exact-key list silently misses a real
+            # achieved figure → a false UNVERIFIED on a requirement the design DOES meet.
+            # Match any quantity whose key carries the stability noun AND the requirement's
+            # measurement family (temperature). A stability DELTA is numerically identical
+            # in K and °C, so no conversion is needed. Universal, noun-keyed.
+            _fam = next((f for f in ("temp", "press", "volt", "curr", "flow", "speed", "rpm")
+                         if f in _dk.lower() or f in _lbl.lower()), None)
+            for _qk, _qv in (quantities or {}).items():
+                if _STABILITY_REQ_RX.search(_qk) and (_fam is None or _fam in _qk.lower()):
+                    _ach_q = _qv
+                    break
         _ach = num(_ach_q.get("value")) if isinstance(_ach_q, dict) else num(_ach_q)
         rows.append(_verif_row(
             "brief", _lbl or _humanize_class(_dk),
