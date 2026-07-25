@@ -341,6 +341,89 @@ def augment_decomposition_with_chassis_harness(state: dict) -> int:
     return added
 
 
+def _routed_lengths(out_dir: str) -> dict:
+    """Read <out_dir>/wired-lengths.json → {elec_m, fluid_m, n_elec, n_fluid} or {}.
+
+    The render measures every routed run in 3-D (power/signal = electrical loom;
+    water/air/thermal = fluid conduit) and writes wired-lengths.json. This reads it
+    back so the harness/tubing BoM lines can carry the REAL routed length + run count
+    (Tristan's canonical loop: "the 3-D wiring tells the BoM the wire count + length")
+    instead of a placeholder. Empty when the file is absent (pre-render / non-routed).
+    """
+    import json as _json
+    import os as _os
+    path = _os.path.join(out_dir or "", "wired-lengths.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            doc = _json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    by_svc = doc.get("length_m_by_service") or {}
+    runs = doc.get("runs") or []
+    def _m(*svcs):
+        return round(sum(float(by_svc.get(s, 0) or 0) for s in svcs), 2)
+    def _n(*svcs):
+        return sum(1 for r in runs if str(r.get("service") or "") in svcs)
+    elec_m, fluid_m = _m("power", "signal"), _m("water", "air", "thermal")
+    return {
+        "elec_m": elec_m, "fluid_m": fluid_m,
+        "n_elec": _n("power", "signal"), "n_fluid": _n("water", "air", "thermal"),
+    }
+
+
+def _append_routed_basis(word: dict, text: str) -> bool:
+    """Append a routed-length provenance note to a word's form + add a basis modifier.
+    Idempotent (no-op if already annotated). Returns True if it enriched the word."""
+    mods = word.setdefault("modifier_characters", [])
+    if any(str(m.get("kind")) == "basis" and "3D-routed" in str(m.get("value") or "")
+           for m in mods):
+        return False
+    mods.append({"kind": "basis", "value": text})
+    for m in mods:
+        if str(m.get("kind")) == "form" and "3D-routed" not in str(m.get("value") or ""):
+            m["value"] = f"{m.get('value')} — {text}"
+            break
+    return True
+
+
+def enrich_conduit_from_routing(state: dict, out_dir: str) -> int:
+    """Annotate the harness + fluid-tubing BoM words with the 3-D-measured routed
+    length + run count from wired-lengths.json (Tristan 2026-07-25: the render routes
+    the wires AND the fluid pipes in 3-D — that measurement must reach the BoM).
+
+    SAFE by design: appends a `basis` provenance modifier + enriches the `form` string
+    only — never changes quantity / cost / dimensions / tag, so a complete BoM row stays
+    complete (the incomplete-row injection that floored the dossier is NOT repeated).
+    Idempotent. Returns the number of words enriched. No-op when the routing file is
+    absent (pre-render) or the design is not a routed instrument."""
+    if not isinstance(state, dict):
+        return 0
+    rl = _routed_lengths(out_dir)
+    if not rl or (rl["elec_m"] <= 0 and rl["fluid_m"] <= 0):
+        return 0
+    md = state.get("moduleDecomposition") or {}
+    n = 0
+    for m in md.get("modules") or []:
+        for s in m.get("sub_modules", []) or []:
+            for w in s.get("words", []) or []:
+                cid = str((w.get("content_character") or {}).get("character_id") or "")
+                nm = str(w.get("name_human") or "")
+                is_harness = cid == "internal_wiring_harness"
+                is_tubing = bool(rl["fluid_m"] > 0 and re.search(
+                    r"tubing|\btube\b|perfusion|dosing.*line|fluid.*line", nm, re.I))
+                if is_harness and rl["elec_m"] > 0:
+                    if _append_routed_basis(w, (
+                        f"3D-routed loom ≈{rl['elec_m']:.2f} m over {rl['n_elec']} "
+                        f"runs (power+signal), measured from the assembled Blender wiring")):
+                        n += 1
+                elif is_tubing:
+                    if _append_routed_basis(w, (
+                        f"3D-routed conduit ≈{rl['fluid_m']:.2f} m over {rl['n_fluid']} "
+                        f"runs (water+air), measured from the assembled Blender routing")):
+                        n += 1
+    return n
+
+
 def _selftest():
     # tiering
     assert select_power_subsystem(0) == []
@@ -412,9 +495,41 @@ def _selftest():
         assert {"part_number", "dimensions", "quantity"} <= kinds, kinds
     assert augment_decomposition_with_chassis_harness(full) == 0, "chassis augment not idempotent"
 
+    # --- routed-conduit → BoM enrichment proveCatch (2026-07-25 vessel/wiring loop) --
+    import json as _json, os as _os, tempfile as _tmp
+    rl_dir = _tmp.mkdtemp()
+    with open(_os.path.join(rl_dir, "wired-lengths.json"), "w", encoding="utf-8") as fh:
+        _json.dump({"length_m_by_service": {"power": 1.92, "signal": 2.49,
+                                            "water": 3.46, "air": 0.70},
+                    "runs": [{"service": s} for s in
+                             (["power"] * 20 + ["signal"] * 21 + ["water"] * 5 + ["air"] * 1)]}, fh)
+    est = {"isInstrumentDevice": True, "moduleDecomposition": {"modules": [
+        {"sub_modules": [{"sub_module_id": "structure_containment", "words": [
+            {"name_human": "Internal Wiring Harness",
+             "content_character": {"character_id": "internal_wiring_harness"},
+             "modifier_characters": [{"kind": "form", "value": "loomed cable harness"}]},
+            {"name_human": "PharMed BPT Pump Tubing",
+             "content_character": {"character_id": "pharmed_bpt_pump_tubing"},
+             "modifier_characters": [{"kind": "form", "value": "peristaltic pump tubing"}]},
+        ]}]}]}}
+    ne = enrich_conduit_from_routing(est, rl_dir)
+    assert ne == 2, f"expected harness + tubing enriched, got {ne}"
+    _ws = est["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"]
+    _h = next(w for w in _ws if w["name_human"] == "Internal Wiring Harness")
+    _hb = next(m for m in _h["modifier_characters"] if m["kind"] == "basis")
+    assert "4.41 m" in _hb["value"] and "power+signal" in _hb["value"], _hb  # 1.92+2.49
+    _t = next(w for w in _ws if "Tubing" in w["name_human"])
+    _tb = next(m for m in _t["modifier_characters"] if m["kind"] == "basis")
+    assert "4.16 m" in _tb["value"] and "water+air" in _tb["value"], _tb     # 3.46+0.70
+    # idempotent + no-op when file absent
+    assert enrich_conduit_from_routing(est, rl_dir) == 0, "conduit enrich not idempotent"
+    assert enrich_conduit_from_routing(est, "/tmp/nonexistent-routing-xyz") == 0
+    _os.remove(_os.path.join(rl_dir, "wired-lengths.json")); _os.rmdir(rl_dir)
+
     print("power_subsystem _selftest: OK (tiering 6/35/180/600 W; organoid→60W external brick; "
           "gate catches supply<load; augment idempotent; unpowered N/A; "
-          "chassis+harness→3 BoM parts, _structural-flagged, idempotent, empty-interior skip)")
+          "chassis+harness→3 BoM parts, _structural-flagged, idempotent, empty-interior skip; "
+          "routed-conduit enrich harness 4.41 m + tubing 4.16 m from wired-lengths.json)")
 
 
 if __name__ == "__main__":
