@@ -18971,6 +18971,38 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     ])
     r += 1
 
+    # ── Board renders (2026-07-25, Tristan "I can't see any PCB images at all"): embed each
+    #    fabricated board's 3D render (pcb-boards/<id>/pcb/board-3d.png). The renders exist on
+    #    disk (KiCad 3D export) but were never placed in the tab, so the PCB tab showed only
+    #    hygiene tables with no picture of the boards. Universal — one image per board present.
+    import glob as _glob_b3d
+    _b3d = sorted(_glob_b3d.glob(os.path.join(run_dir, "pcb-boards", "*", "pcb", "board-3d.png")))
+    if _b3d:
+        sub_banner(ws, r, f"Board renders — {len(_b3d)} fabricated board(s) (KiCad 3D)", 8)
+        r += 1
+        for _bp in _b3d:
+            _bid = os.path.basename(os.path.dirname(os.path.dirname(_bp)))
+            _cap = ws.cell(r, 1, clean_cell(f"{_bid} — routed board, 3D view"))
+            _cap.font = FONT_NOTE
+            _cap.alignment = WRAP_TOP
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+            ws.row_dimensions[r].height = 24
+            r += 1
+            try:
+                _ds = downscale_png(_bp, run_dir)
+                _img = XLImage(_ds)
+                _maxw = 1200
+                if _img.width and _img.width > _maxw:
+                    _ratio = _maxw / float(_img.width)
+                    _img.width = int(_img.width * _ratio)
+                    _img.height = int(_img.height * _ratio)
+                ws.add_image(_img, f"A{r}")
+                r += int(-(-(_img.height or 500) // 20)) + 2
+            except Exception as _bexc:  # noqa: BLE001 — a board image must never crash the build
+                print(f"    ! could not embed board render {_bp}: {_bexc}")
+                r += 1
+        r += 1
+
     # ── Firmware proof — honest tier disclosure (Cursor QEMU harness, 2026-07-22) ────
     # Cursor's QEMU harness is VIRTUAL (RAM-modelled I²C on a Cortex-M sim), not HIL.
     # Banner ALWAYS stays "FAB-READY — UNPROVEN IN HARDWARE"; this block surfaces the
