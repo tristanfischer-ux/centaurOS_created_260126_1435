@@ -1105,6 +1105,41 @@ def main():
         for ln in open(pl).read().splitlines()[1:]:
             A(ln)
     A("")
+    A("### 9.5c Drive electronics implementation — firmware written and tested, BoM candidates named")
+    A("")
+    A("**Firmware exists and passes its tests** (scripts/phantm/firmware/): a portable "
+      "C99 reference step-sequencer for one 24-cell tile — hold-then-release timing "
+      "from the campaign (3 ms hold, 5.5 ms settle), direction by phase sequence, "
+      "open-loop position with stall-against-stop homing, an 8-cell rail-budget "
+      "governor, and a per-coil thermal accumulator that throttles stepping at the "
+      "adiabatic budget. Two properties are enforced IN CODE and proven by the host "
+      "test bench (both build configurations compile -Wall -Wextra -Werror and pass): "
+      "**the §10.4 demagnetisation gate is a compile-time flag — with the gate closed "
+      "the firmware provably never emits a reverse-current command** (asserted across "
+      "full homing + re-point runs); and with dual drive enabled, homing becomes "
+      "thermally PACED by the guard (≈10 s for a full-stroke home) — a real "
+      "operational consequence surfaced by the tests, not the prose.")
+    A("")
+    A("**Candidate parts** — named so the RFQs and layout can start, but every MPN "
+      "below is a CANDIDATE to be verified against live distributor data before "
+      "ordering (the fictional-part discipline applies to us too):")
+    A("")
+    A("| Function | Candidate class/MPN | Sizing basis | Status |")
+    A("|---|---|---|---|")
+    A("| H-bridge per coil (balanced set) | TI DRV8231A-class (3.7 A peak) | ±3.35 A pulls, 1.5–3 ms pulses | VERIFY |")
+    A("| H-bridge per coil (max-force set) | TI DRV8874-class (6 A) | ±5 A pulses | VERIFY |")
+    A("| Tile MCU | STM32G0B1-class (Cortex-M0+, CAN-FD) | 10 kHz tick × 24 state machines — trivial load | VERIFY |")
+    A("| Buck rail | VRM-class 0.8–2.1 V / ≥30 A burst (TPS543-class) | 26.8 A pulsed at 8-parallel; DAC-set = current control | VERIFY |")
+    A("| CAN transceiver | TCAN1042-class | tile daisy-chain | VERIFY |")
+    A("| Board-to-board | Hirose DF40-class mezzanine | aperture ↔ driver stack | VERIFY |")
+    A("")
+    A("**What remains for a buildable board**: schematic capture + layout through the "
+      "established design stack (atopile → KiCad → FreeRouting) with the D6 hole "
+      "pattern and both-sides 1 mm-class placement, MPN verification through the "
+      "distributor cascade, and the driver-EMC layout rule of §9.8. The firmware "
+      "above is the behavioural spec that board must satisfy — and its test bench "
+      "runs in CI with the report verifier.")
+    A("")
     A("### 9.6 How to make the cells — the tutorial, and who can fabricate them")
     A("")
     A("**The part**: a tileable hex lattice (24-hex, 19.7 × 20.8 mm, or 7-hex), interior "

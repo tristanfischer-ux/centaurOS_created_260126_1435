@@ -223,6 +223,22 @@ contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
          "## 10. The optimisation campaign", "## 12. Traceability",
          "## 13. Supplier outreach")
 
+# ---------------- firmware gate: compile + run BOTH configs -----------------
+import subprocess as _sp
+_fwd = os.path.join(HERE, "firmware")
+for _flags, _lab in (([], "unipolar"), (["-DALLOW_DUAL_DRIVE=1"], "dual")):
+    _r = _sp.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2", *_flags,
+                  "phantm_fw.c", "test_fw.c", "-o", f"/tmp/phantm_test_{_lab}"],
+                 cwd=_fwd, capture_output=True, text=True)
+    check(f"firmware compiles ({_lab})", _r.returncode == 0, _r.stderr[-160:] if _r.returncode else "")
+    if _r.returncode == 0:
+        _t = _sp.run([f"/tmp/phantm_test_{_lab}"], capture_output=True, text=True, timeout=120)
+        check(f"firmware tests pass ({_lab})", _t.returncode == 0
+              and "ALL FIRMWARE TESTS PASS" in _t.stdout)
+contains("§9.5c present", "9.5c Drive electronics implementation",
+         "demagnetisation gate is a compile-time flag", "VERIFY",
+         "thermally PACED", "atopile")
+
 # ---------------- option ledgers (Tristan 25 Jul: kills on the record) ------
 ol = json.load(open(os.path.join(OUT, "opt", "options-ledger.json")))
 check("actuator ledger 66 options, 36 kills", ol["counts"].get("KILL") == 36
