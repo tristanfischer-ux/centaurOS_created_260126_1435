@@ -12145,6 +12145,45 @@ async function main() {
       }
     }
   } catch { /* freeze check is best-effort */ }
+
+  // RENDER-FREEZE CHECK (2026-07-25, Tristan "why are there no internal blender images"): the
+  // render/vision barrier (RENDER_BARRIER_MS, 30 min) can TIME OUT on a slow/heavy render — the
+  // glass-heavy organoid hero exceeded it, so the workbook built ~20 min BEFORE 00-hero (the
+  // cutaway) + 08-ghost landed, shipping a Renders tab with the internal images MISSING. By
+  // chain end the bg render has usually finished; give it a bounded final wait, then if any
+  // render PNG is NEWER than the built workbook, rebuild once so the deliverable embeds the
+  // actual internal renders. Deterministic, artefact-truth (the shipped Renders tab must show
+  // what was rendered). Skipped when no bg pipeline spawned or the rebuild hook is absent.
+  try {
+    const _rebuild = (globalThis as Record<string, any>).__rebuildExcel
+    const _xlsxPath = resolve(outDir, 'dossier.xlsx')
+    if (typeof _rebuild === 'function' && existsSync(_xlsxPath)
+        && (globalThis as Record<string, any>).__blenderBgSpawned === true) {
+      // bounded wait for the render to finish if it is still going at chain end
+      const _sentinel = resolve(outDir, '.blender-bg-done')
+      const _tailMs = Number(process.env.RENDER_BARRIER_MS || 1_800_000)
+      if (!existsSync(_sentinel)) {
+        console.error(`[chain] render-freeze: waiting up to ${Math.round(_tailMs / 60000)} min at chain-end for the bg render to finish before the final deliverable…`)
+        const _sab = new Int32Array(new SharedArrayBuffer(4))
+        const _t0 = Date.now()
+        while (!existsSync(_sentinel) && (Date.now() - _t0) < _tailMs) {
+          Atomics.wait(_sab, 0, 0, 3000)
+        }
+      }
+      const _xlsxMs = statSync(_xlsxPath).mtimeMs
+      const _newest = ['00-hero.png', '08-product-ghost-shell.png', '04-product-exterior.png',
+        'blender-cover.png']
+        .map(n => resolve(outDir, n)).filter(p => existsSync(p))
+        .reduce((m, p) => Math.max(m, statSync(p).mtimeMs), 0)
+      if (_newest > _xlsxMs + 1000) {
+        console.error('[chain] render-freeze: render PNGs landed AFTER the workbook build (barrier had timed out) — rebuilding Excel once so the Renders tab embeds the delivered internal images')
+        _rebuild()
+        logAction({ step: 'render_freeze_rebuild', ok: true, newest_png_ms: Math.round(_newest), xlsx_ms: Math.round(_xlsxMs) })
+      } else {
+        logAction({ step: 'render_freeze_verified', ok: true })
+      }
+    }
+  } catch { /* render-freeze check is best-effort */ }
 }
 
 main().catch(err => {
