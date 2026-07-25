@@ -760,6 +760,51 @@ def envelope_equality_cross_check(
             f"(within ±{max(tol_mm, canon_sorted[0] * tol_frac):.1f} mm / {tol_frac*100:.0f}%)")
 
 
+_VESSEL_NOUN_GATE = re.compile(
+    r"\b(vial|culture\s+vessel|culture\s+chamber|bioreactor\s+vessel|culture\s+flask|"
+    r"reaction\s+vessel|growth\s+vessel)\b", re.I)
+_VESSEL_EXCL_GATE = re.compile(
+    r"holder|fixture|probe|thermistor|\bcap\b|\blid\b|seal|collar|septum|clamp|port|tubing",
+    re.I)
+
+
+def vessel_manifest_realistic_check(parts, is_instrument):
+    """Deterministic backstop for the vessel-unification seat (2026-07-25).
+
+    The culture vessel is DRAWN from its cutaway-cue geometry (~30×63 mm for a 20 ml
+    vial) but the manifest can silently key off the tiny HIDDEN base pack-mesh (2.9 mm)
+    — so the GA drew a vessel ~10× too small ("they don't look anything like each
+    other"). seat_vessel_on_top_from_mesh fixes it at source; THIS gate proveCatches a
+    regression where the seat silently no-ops (mesh renamed / not found at runtime).
+    None = abstain (not an instrument, or no culture vessel in the design)."""
+    if not is_instrument:
+        return None
+    vrow = None
+    for p in parts or []:
+        nm = str((p or {}).get("name") or "")
+        if _VESSEL_NOUN_GATE.search(nm) and not _VESSEL_EXCL_GATE.search(nm):
+            vrow = p
+            break
+    if vrow is None:
+        return None  # no vessel → not applicable
+    d = vrow.get("dims_mm") or {}
+    if "dia" in d:
+        dims = [float(d.get("dia") or 0), float(d.get("len") or d.get("h") or 0)]
+    else:
+        dims = [float(d.get(k) or 0) for k in ("w", "d", "h")]
+    mx = max(dims) if dims else 0.0
+    tag = str(vrow.get("equipment_tag") or vrow.get("tag") or vrow.get("name") or "vessel")
+    # 10 mm floor: no real culture vessel is < 10 mm; the base-mesh bug produced 2.9 mm.
+    if mx < 10.0:
+        return (False,
+                f"culture vessel {tag} manifest size {mx:.1f} mm is micro — it keyed "
+                f"off the hidden base pack-mesh, not the drawn cutaway-cue vessel; the GA "
+                f"would draw it ~10× too small. Fix: seat_vessel_on_top_from_mesh "
+                f"(build_universal_scene.write_parts_manifest) — check the vessel cutaway "
+                f"cue exists + _vessel_drawn_bbox_mm matched it.")
+    return (True, f"culture vessel {tag} manifest size {mx:.0f} mm is realistic (drawn geometry)")
+
+
 def run_gates(out_dir: str) -> list:
     """Run every deterministic drawing gate on <out_dir>. Returns list[Gate]."""
     def _load(name):
@@ -1199,6 +1244,22 @@ def run_gates(out_dir: str) -> list:
             (f"SHADOW would-fail: {_g18b_detail}")
             if not _g18b_enforce and not _g18b_ok
             else _g18b_detail,
+        ))
+
+    # ── G18c VESSEL MANIFEST REALISM (2026-07-25 vessel-unification backstop) ──
+    # Deterministic proveCatch for the seat: if the vessel row keys off the tiny
+    # hidden base pack-mesh instead of the drawn cutaway-cue geometry, the GA draws
+    # it ~10× too small. Abstains when there is no culture vessel / not an instrument.
+    _pm_parts_g18c = (pm_doc.get("parts") if isinstance(pm_doc, dict) else None) or []
+    _g18c = vessel_manifest_realistic_check(_pm_parts_g18c, bool(_instrument))
+    if _g18c is not None:
+        _g18c_ok, _g18c_detail = _g18c
+        gates.append(Gate(
+            "vessel_manifest_realism",
+            ["general-arrangement", "renders"],
+            "high",
+            _g18c_ok,
+            _g18c_detail,
         ))
 
     # ── G19 ENCLOSURE SHELL CONTAINS PARTS BBOX (2026-07-22) ─────────────────
@@ -2250,6 +2311,24 @@ def _selftest() -> int:
     def chk(name, cond):
         if not cond:
             fails.append(name)
+
+    # vessel-manifest realism (G18c) proveCatch: the tiny hidden base-mesh (2.9 mm)
+    # FIRES; the drawn cutaway-cue vessel (29.7×63) PASSES; a holder/probe is not the
+    # vessel; a non-instrument / vessel-less design abstains (None).
+    _vp_micro = [{"equipment_tag": "X-103", "name": "Borosilicate Culture Vial 20 ml",
+                  "dims_mm": {"w": 2.9, "d": 2.9, "h": 6.1}},
+                 {"equipment_tag": "X-105", "name": "Vial Holder Fixture",
+                  "dims_mm": {"w": 60.0, "d": 40.0, "h": 30.0}}]
+    _vp_real = [{"equipment_tag": "X-103", "name": "Borosilicate Culture Vial 20 ml",
+                 "dims_mm": {"w": 29.7, "d": 29.7, "h": 63.0}}]
+    _vm = vessel_manifest_realistic_check(_vp_micro, True)
+    chk("g18c_micro_vessel_fires", _vm is not None and _vm[0] is False)
+    _vr = vessel_manifest_realistic_check(_vp_real, True)
+    chk("g18c_real_vessel_passes", _vr is not None and _vr[0] is True)
+    chk("g18c_no_vessel_abstains",
+        vessel_manifest_realistic_check([{"name": "Vial Holder Fixture",
+                                          "dims_mm": {"w": 2.0, "d": 2.0, "h": 2.0}}], True) is None)
+    chk("g18c_non_instrument_abstains", vessel_manifest_realistic_check(_vp_micro, False) is None)
 
     # legibility: a 9:1 strip fails, a 1.3:1 sheet passes (pure aspect logic)
     chk("legible_pass", (lambda a: a <= 4.0)(2160 / 1716))
