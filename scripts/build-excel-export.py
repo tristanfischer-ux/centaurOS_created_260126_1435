@@ -8890,12 +8890,18 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         r += 1
         for dname, c in cov.items():
             ws.cell(r, 1, dname).border = BORDER
-            ws.cell(r, 2, c.get("expected")).border = BORDER
-            ws.cell(r, 3, c.get("present")).border = BORDER
-            pc = ws.cell(r, 4, c.get("pct"))
+            # A drawing that is NOT APPLICABLE to this class (e.g. P&ID / block-flow /
+            # process-schedules for a fluid-less instrument) is SKIPPED, so it has no
+            # expected/present/pct — write an explicit "n/a" rather than leaving the cell
+            # empty (the cell-contract flagged the blank '% present' → capped BoM at 8.9).
+            _exp, _pre, _pct = c.get("expected"), c.get("present"), c.get("pct")
+            _applic = isinstance(_pct, (int, float))
+            ws.cell(r, 2, _exp if _exp is not None else "n/a").border = BORDER
+            ws.cell(r, 3, _pre if _pre is not None else "n/a").border = BORDER
+            pc = ws.cell(r, 4, _pct if _applic else "n/a")
             pc.border = BORDER
-            if isinstance(c.get("pct"), (int, float)):
-                pc.fill = FILL_PASS if c["pct"] >= 90 else (FILL_CONST if c["pct"] >= 70 else FILL_FAIL)
+            if _applic:
+                pc.fill = FILL_PASS if _pct >= 90 else (FILL_CONST if _pct >= 70 else FILL_FAIL)
             r += 1
         r += 1
 
