@@ -13366,17 +13366,19 @@ def _prepare_sealed_product_view(view_name, entering):
             # wire that floated as a red/blue stub) is interior/cutaway and MUST be hidden
             # here — mirrors how the working forms hide-all-but-keep. Non-u_se_ meshes
             # (ground slab, backdrop) and lights/cameras are left untouched.
-            # FIX (2026-07-22, floating-vial defect on 04-product-exterior):
-            # "u_se_le_vial" prefix matched BOTH the transparent glass culture
-            # vessel (u_se_le_vial, u_se_le_vial_fluid) AND the opaque holder
-            # ring (u_se_le_vial_collar).  On the sealed exterior the translucent
-            # vial/fluid must be hidden (they are above-deck cutaway features);
-            # only the opaque collar acts as the sealed sample-port face.
-            # Changed "u_se_le_vial" → "u_se_le_vial_collar" so the prefix-match
-            # keeps the collar only and the bare vial+fluid fall to the hide pass.
+            # FIX (2026-07-25, floating-OD-heads defect on 04-product-exterior): the
+            # 2026-07-22 change hid the culture vial (u_se_le_vial + _fluid) on the
+            # exterior to kill a "floating vial" — but that left the OD source/detector
+            # heads clamped to NOTHING, hovering above a bare collar (SIGHT: "H-fork
+            # floating over a hockey puck"). For a Pioreactor-style OD bioreactor the
+            # amber culture VIAL is the defining exterior silhouette (like a real
+            # Pioreactor's visible vessel); hiding it is wrong. The original float was a
+            # POSITIONING bug (now fixed: the vial seats on the deck, the collar wraps its
+            # base, OD heads flank it at mid-vial). Keep "u_se_le_vial" so the vessel +
+            # amber media + collar all render — the heads now clamp a real vial.
             # proveCatch: _selftest_le_vial_exterior_gating (below in selftest block).
             _keep = ("u_se_le_lead", "u_se_le_electrode", "u_se_le_grid",
-                     "u_se_le_cartridge", "u_se_le_vial_collar", "u_se_le_od",
+                     "u_se_le_cartridge", "u_se_le_vial", "u_se_le_od",
                      "u_se_le_enclosure", "u_se_le_face")
             _shell_ids = {id(o) for o in _SEALED_SHELL_OBJECTS if o}
             if _SEALED_FRONT_COVER is not None:
@@ -16693,6 +16695,15 @@ def _draw_ledger_harness(topology, parts, MO):
     MM = fl.MM
     n_w = n_t = 0
     seen = set()
+    # Common cable-tray heights near the enclosure floor. A real loom DROPS to a tray and
+    # runs bundled along it; drawing each edge as a direct point-to-point arch made a
+    # multi-fan-out hub (MCU → ~10 sensors/actuators) radiate as a PINCUSHION star (SIGHT
+    # 2026-07-25). Routing every conduit down to a shared tray with a small per-conduit
+    # lateral spread reads as a bundled harness instead. Wires and tubing get separate trays.
+    _floor_z = min(p[2] for p in posmap.values())
+    _tray_wire = _floor_z + 4.0
+    _tray_tube = _floor_z + 11.0   # tubing on its own slightly-higher tray, visually separate from wires
+    _ci = 0                        # running conduit index → deterministic lateral spread across the tray
     for e in (topology or []):
         f = _norm(e.get("from_part") or e.get("from") or "")
         t = _norm(e.get("to_part") or e.get("to") or "")
@@ -16709,10 +16720,21 @@ def _draw_ledger_harness(topology, parts, MO):
         a, b = posmap[f], posmap[t]
         _mod = modmap.get(f) or modmap.get(t)
         _is_fluid = svc in ("water", "thermal", "air", "gas", "fluid_loop")
-        _lift = 20.0 if _is_fluid else 12.0
-        mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, max(a[2], b[2]) + _lift)   # bow up over the gap
+        # bundle spread: fan conduits ±across the tray so parallel runs neither overlap nor z-fight
+        _spread = ((_ci % 7) - 3) * 1.3
+        _ci += 1
+        _tz = (_tray_tube if _is_fluid else _tray_wire) + abs(_spread) * 0.25
+        mx, my = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+        dx, dy = (b[0] - a[0]), (b[1] - a[1])
+        _L = (dx * dx + dy * dy) ** 0.5 or 1.0
+        _px, _py = (-dy / _L), (dx / _L)   # unit perpendicular in XY → lateral bundle spread
+        # break-out knuckles: drop from each endpoint to the tray, pulled 30% toward the
+        # midpoint so the two legs converge into a loom instead of a sharp V under the part
+        ka = (a[0] * 0.70 + mx * 0.30 + _px * _spread, a[1] * 0.70 + my * 0.30 + _py * _spread, _tz)
+        kb = (b[0] * 0.70 + mx * 0.30 + _px * _spread, b[1] * 0.70 + my * 0.30 + _py * _spread, _tz)
         pts = [(a[0] * MM, a[1] * MM, a[2] * MM),
-               (mid[0] * MM, mid[1] * MM, mid[2] * MM),
+               (ka[0] * MM, ka[1] * MM, ka[2] * MM),
+               (kb[0] * MM, kb[1] * MM, kb[2] * MM),
                (b[0] * MM, b[1] * MM, b[2] * MM)]
         _sfx = f"{f[:8]}_{t[:8]}"
         if _is_fluid:
@@ -17776,22 +17798,28 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _z_top = base_z + H
                 # Slender vial that clears the sealed base but stays within the product
                 # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
-                _vial_r = min(W, D) * 0.11
-                _vial_h = max(H * 0.8, 30.0)
+                _vial_r = min(W, D) * 0.13         # a touch wider so the amber vessel reads as the hero silhouette
+                _vial_h = max(H * 0.88, 42.0)      # tallest top element (OD heads now 0.30·h) — the vial dominates; stays inside the 2.0·H frame
                 # VISIBILITY (2026-07-23, Tristan "lost the light tower"): a highly
                 # transparent glass vial (alpha 0.35) vanished against the light studio
                 # backdrop — the hero read as a flat lid. Raise alpha so the vessel reads
                 # as a real semi-opaque culture tube, and fill it most of the way with the
                 # amber media so the DOMINANT top silhouette is a solid coloured vessel.
-                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.82, 0.90, 0.94)),
-                                     metallic=0.0, roughness=0.08, kind="glass", alpha=0.62)
+                # Frosted semi-opaque wall (alpha-blend, NOT kind="glass"): a transmission
+                # vial here multiplied the Cycles bounce cost across 04–07 + hero + ghost and
+                # was crashing the shaded pass (OOM). A frosted wall reads as a real culture
+                # tube, renders cheaply, and lets the amber media below dominate the silhouette.
+                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.86, 0.86, 0.88)),
+                                     metallic=0.0, roughness=0.16, alpha=0.40)   # translucent frost so the amber media reads through the wall
                 _vial = fl.add_cyl("u_se_le_vial",
                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.5)),
                                    _vial_r * fl.MM, _vial_h * fl.MM, _glass,
                                    module=_skin_mod, module_objects=MO)
                 _sig_new.append(_vial)
-                _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.86, 0.62, 0.18)),
-                                      metallic=0.0, roughness=0.3)
+                # Saturated amber culture media — the DOMINANT top silhouette, opaque so it
+                # reads against both the light deck and the dark upper backdrop.
+                _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.88, 0.56, 0.12)),
+                                      metallic=0.0, roughness=0.28)
                 _fluid = fl.add_cyl("u_se_le_vial_fluid",
                                     _mm3((0.0, 0.0, _z_top + _vial_h * 0.40)),
                                     _vial_r * 0.9 * fl.MM, _vial_h * 0.72 * fl.MM, _fluidm,
@@ -17817,27 +17845,48 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 # 8×11 mm blocks were specks on a 288 mm deck — invisible on the hero.
                 # Scale to the vessel so the paired source/detector clearly flank the
                 # vial as the GA "OPTICAL" assembly, seated outside the vial wall.
-                _od_h = _vial_h * 0.52
-                _od_w = max(18.0, _vial_r * 0.7)     # radial thickness of each housing
-                _od_d = max(24.0, _vial_r * 0.9)      # along the beam axis (reads as a block)
+                # REBALANCE (2026-07-25 SIGHT: the two OD housings rendered as OVERSIZED dark
+                # monoliths — half the vial height, 18 mm wide — while the glass vial vanished
+                # between them, so the hero read as a primitive "H-fork" gimbal instead of an
+                # amber culture vial under optical measurement. The VIAL is the product; the OD
+                # heads are secondary sensors clamped to it. Shrink the housings to slim heads at
+                # beam height, add a lens face so each reads as an OPTICAL sensor, not a brick.
+                _od_h = _vial_h * 0.30               # slim band, not a half-height monolith
+                _od_w = max(9.0, _vial_r * 0.45)     # radial thickness of each housing
+                _od_d = max(14.0, _vial_r * 0.6)      # along the beam axis
+                _od_z = _z_top + _vial_h * 0.50       # beam height ≈ mid-vial (clears the collar)
                 for _sx, _lbl in ((-(_vial_r + _od_w * 0.5), "src"),
                                   (_vial_r + _od_w * 0.5, "det")):
                     _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.10, 0.10, 0.12)),
                                        metallic=0.35, roughness=0.45)
                     _od = fl.add_box(f"u_se_le_od_{_lbl}",
-                                     _mm3((_sx, 0.0, _z_top + _collar_h + _od_h * 0.5)),
+                                     _mm3((_sx, 0.0, _od_z)),
                                      _mm3((_od_w, _od_d, _od_h)), _odm,
                                      module=_skin_mod, module_objects=MO)
                     _od.dimensions = _mm3((_od_w, _od_d, _od_h))
                     _sig_new.append(_od)
+                    # Lens face on the VIAL-SIDE of each head — a small polished disc so the pair
+                    # reads unmistakably as an OPTICAL source/detector aimed across the vessel.
+                    # Opaque metallic (NOT glass): a transmission lens here adds Cycles bounce
+                    # cost on top of the vial + display glass and risked an OOM crash (2026-07-25).
+                    _lens_x = _sx + (_od_w * 0.5) * (1 if _sx < 0 else -1)   # inner (vial-facing) face
+                    _lensm = fl.make_mat(f"m_se_le_od_lens_{_lbl}",
+                                         fl._to_linear((0.80, 0.84, 0.90)),
+                                         metallic=0.7, roughness=0.12)
+                    _lens = fl.add_cyl(f"u_se_le_od_lens_{_lbl}",
+                                       _mm3((_lens_x, 0.0, _od_z)),
+                                       _od_d * 0.26 * fl.MM, 1.4 * fl.MM, _lensm,
+                                       module=_skin_mod, module_objects=MO,
+                                       rotation=(0.0, math.radians(90), 0.0))
+                    _sig_new.append(_lens)
                     # Clamp arm: bridges the OD housing inner face to the vial wall at
                     # beam height, so the pair reads as mounted to the vessel, not adrift.
                     _arm_x = _sx * 0.5
                     _arm = fl.add_box(f"u_se_le_od_arm_{_lbl}",
-                                      _mm3((_arm_x, 0.0, _z_top + _collar_h + _od_h * 0.5)),
-                                      _mm3((abs(_sx) + 4.0, 3.5, 3.5)), _odm,
+                                      _mm3((_arm_x, 0.0, _od_z)),
+                                      _mm3((abs(_sx) + 4.0, 3.0, 3.0)), _odm,
                                       module=_skin_mod, module_objects=MO)
-                    _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.5, 3.5))
+                    _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.0, 3.0))
                     _sig_new.append(_arm)
                 # FRONT CONTROL-PANEL FASCIA (2026-07-19 — the render_vision_critic
                 # flagged "featureless closed chassis with no visible display, keys,
@@ -25220,22 +25269,24 @@ def _selftest_le_handheld_cue_gating() -> None:
 
 
 def _selftest_le_vial_exterior_gating() -> None:
-    """proveCatch (2026-07-22 iter-2): on the 04–07 sealed exterior product views,
-    vial_bioreactor must NOT expose the translucent glass culture vessel
-    (u_se_le_vial / u_se_le_vial_fluid) above the sealed top deck.  Only the opaque
-    holder collar (u_se_le_vial_collar) is a legitimate exterior feature.
+    """proveCatch (2026-07-25): on the 04–07 sealed exterior product views,
+    vial_bioreactor MUST expose its culture vessel (u_se_le_vial / u_se_le_vial_fluid)
+    as the defining top-deck silhouette — the OD source/detector heads clamp to it.
 
-    Root cause: the exterior keep-list in _prepare_sealed_product_view used the
-    broad prefix "u_se_le_vial" which matched the transparent glass cylinders AS WELL
-    as the opaque collar.  On the exterior Cycles render the glass vial floated ~30 mm
-    above the centre of the sealed top deck (translucent glass cylinder against the
-    white studio backdrop).
+    Root cause of the defect this now guards: the 2026-07-22 keep-list used
+    "u_se_le_vial_collar" (collar only) to kill a "floating vial", which HID the
+    vessel and left the OD heads hovering above a bare collar ("H-fork over a hockey
+    puck", SIGHT 2026-07-25). For a Pioreactor-style OD bioreactor the amber vial is
+    the product's face; the original float was a positioning bug, since fixed (vial
+    seats on the deck, collar wraps its base). The prefix "u_se_le_vial" matches the
+    vessel, the amber media (u_se_le_vial_fluid) AND the collar (u_se_le_vial_collar),
+    so all three render and the heads clamp a real vial.
 
     Two proveCatch assertions:
-    (a) "u_se_le_vial" (the bare glass vessel name-prefix) is NOT in the keep-list
-        — the transparent vial is never kept visible on the exterior view.
-    (b) "u_se_le_vial_collar" IS covered by the keep-list (the opaque sample-port
-        ring must remain visible as the sealed product's top-deck feature).
+    (a) "u_se_le_vial" IS a keep-list tuple element — the culture vessel + media are
+        kept visible on the exterior (the heads have something to clamp).
+    (b) the bare collar-only prefix "u_se_le_vial_collar" is NOT the keep element used
+        in place of it (that was the vessel-hiding regression).
 
     Source-code checks only (no bpy needed).  Also verifies the sealed exterior path
     for the optical_handheld form still has a cuvette-port feature so the photometer
@@ -25245,27 +25296,25 @@ def _selftest_le_vial_exterior_gating() -> None:
     import re as _re_veg
     _src = _ins.getsource(_prepare_sealed_product_view)
 
-    # (a) The BARE vial prefix must NOT appear as a standalone _keep tuple element.
-    # Search for the exact element pattern (comma or closing paren follow the quote)
-    # to avoid false-positive matches in comments that mention the old prefix.
-    _bare_vial_in_tuple = bool(
+    # (a) The vial prefix MUST appear as a standalone _keep tuple element so the
+    # culture vessel + amber media render on the exterior product views.
+    _vial_in_tuple = bool(
         _re_veg.search(r'"u_se_le_vial"(?:\s*[,)])', _src)
     )
-    assert not _bare_vial_in_tuple, (
-        "REGRESSION: \"u_se_le_vial\" found as a keep-list tuple element in "
-        "_prepare_sealed_product_view — the broad prefix was restored and will make "
-        "the translucent glass culture vessel visible on view 04 again. "
-        "The keep-list must use 'u_se_le_vial_collar' (opaque ring only).")
+    assert _vial_in_tuple, (
+        "REGRESSION: \"u_se_le_vial\" not found as a keep-list tuple element in "
+        "_prepare_sealed_product_view — the culture vessel is hidden again, leaving "
+        "the OD source/detector heads floating above a bare collar on view 04.")
 
-    # (b) The collar prefix MUST appear as a keep-list tuple element so the opaque
-    # sample-port ring is kept visible on the exterior view.
-    _collar_in_tuple = bool(
+    # (b) The collar-only prefix must NOT be the keep element used INSTEAD of the vial
+    # (that was the 2026-07-22 vessel-hiding regression). It is fine as a comment.
+    _collar_only_element = bool(
         _re_veg.search(r'"u_se_le_vial_collar"(?:\s*[,)])', _src)
     )
-    assert _collar_in_tuple, (
-        "REGRESSION: \"u_se_le_vial_collar\" not found as a keep-list tuple element "
-        "in _prepare_sealed_product_view — the opaque holder collar was removed. "
-        "The vial_bioreactor exterior must show the collar as the sealed sample-port.")
+    assert not _collar_only_element, (
+        "REGRESSION: \"u_se_le_vial_collar\" is the keep-list element instead of "
+        "\"u_se_le_vial\" — this hides the culture vessel and floats the OD heads. "
+        "Use the broader 'u_se_le_vial' prefix so vessel + media + collar all show.")
 
     # (c) CAMERA FRAMING (2026-07-23, Tristan "lost the light tower"): the vial +
     # OD tower protrude ≈1.8·H above the deck. If the sealed product / hero cameras
@@ -25285,7 +25334,7 @@ def _selftest_le_vial_exterior_gating() -> None:
         "(~2·H) — the OD tower / vial will crop again.")
 
     print("[univ][sealed] _selftest_le_vial_exterior_gating OK "
-          "(a: bare vial prefix absent from keep-list, b: collar prefix present, "
+          "(a: vial prefix KEPT visible on exterior, b: collar-only element not used, "
           "c: vial_bioreactor camera frames the protruding tower)")
 
 
