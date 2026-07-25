@@ -325,8 +325,8 @@ absent("old numbering scars gone", "### 9.5b ", "### 10.1b ", "### 9.5c ",
        "## 0. Response to Tony", "## 13. Supplier outreach",
        "## 9. The hex-cell wave conformer", "### 9.9 ", "### 9.8 ")
 cr = json.load(open(os.path.join(OUT, "claims-register.json")))
-check("claims register 24 claims, 4 open gates",
-      cr["total"] == 24 and cr["open_gates"] == 4
+check("claims register 26 claims, 5 open gates",
+      cr["total"] == 26 and cr["open_gates"] == 5
       and cr["total"] == len(cr["rows"]))
 check("claims register: no empty cells, statuses legal",
       all(all(str(v).strip() for v in r.values()) for r in cr["rows"])
@@ -336,7 +336,7 @@ check("claims table fully rendered",
       MD.count("| **PROVEN-FE** |") == cr["counts"]["PROVEN-FE"]
       and MD.count("| **RED-TEAMED** |") == cr["counts"]["RED-TEAMED"])
 contains("exec layer content", "de-risking funnel", "Prototype-A",
-         "Decision queue by owner", "4 open gates")
+         "Decision queue by owner", "5 open gates")
 # §-renumber spot checks: old refs must have been rewritten in prose
 contains("renumbered refs", "actuator of §2 is the device",
          "(§11, validated eigensolver", "§A.3 ladder",
@@ -365,6 +365,30 @@ contains("foil route in report", "folded-foil route", "grooved base plate",
          "RF-CONTINUOUS", "foil-corner.json", "slot antenna between cells")
 contains("COTS option in report", "off-the-shelf honeycomb", "52.3 GHz",
          "CALIBRATABLE", "Hexcel/Plascore slice")
+
+# ---------------- Tony 25 Jul round 2: topology + laminations ---------------
+ft = json.load(open(os.path.join(OUT, "foil-topology.json")))
+_p7 = ft["patches"][0]
+check("topology 7-cell: 30 walls, 12 odd, non-Eulerian",
+      _p7["walls"] == 30 and _p7["odd_junctions"] == 12
+      and not _p7["euler_single_thickness"])
+check("topology: orientation-doubling evens every interior junction",
+      all(p["interior_even_after_orientation_doubling"] for p in ft["patches"]))
+contains("topology in report", "a THEOREM, not a process defect", "Euler trail",
+         "⅓ of walls double", "two known lattice constants",
+         "2+1+1 tape layers")
+lr = json.load(open(os.path.join(OUT, "lamination-route.json")))
+check("lamination screen: 8 routes, budget 1.25 µm",
+      len(lr["options"]) == 8
+      and abs(lr["tip_edge_budget_um_at_10pct_force"] - 1.25) < 0.01)
+check("lamination council on record",
+      lr["council"]["sol"] == "SOUND-WITH-CORRECTIONS"
+      and lr["council"]["grok"] == "CONFIRMED-WITH-CAVEATS"
+      and os.path.exists(os.path.join(OUT, "council-lamfoil-sol.txt"))
+      and os.path.exists(os.path.join(OUT, "council-lamfoil-grok.txt")))
+contains("lamination route in report", "1b. Tony's stamped-and-stacked challenge",
+         "VOLUME CO-LEAD CANDIDATE", "sheared edge", "SUPPLIER COUPON",
+         "80/20 permalloy", "in-die interlocked stacking")
 
 # ---------------- §9.9 wall-thickness proof ---------------------------------
 wp = json.load(open(os.path.join(OUT, "wall-proof.json")))
@@ -452,7 +476,7 @@ try:
     _all_a = "\n".join(str(r[0].value) for r in _ws.iter_rows() if r[0].value)
     check("xlsx: glossary + state of play present",
           "AF (across-flats)" in _all_a and "LPI" in _all_a
-          and "STATE OF PLAY" in _all_a and "24 load-bearing claims" in _all_a)
+          and "STATE OF PLAY" in _all_a and "26 load-bearing claims" in _all_a)
     check("xlsx: v6 title", "v6" in str(_ws["A1"].value))
 except Exception as _e:  # noqa: BLE001
     check("xlsx structure readable", False, str(_e))

@@ -95,6 +95,15 @@ ROWS = [
     ("The 20–30 g hold ambition is reachable via the force ladder (two groups / N52 / registration)",
      "PROVEN-FE", "§0.3 ladder + campaign stacks; §10",
      "vibration envelope decides hold-vs-shock sizing (Tony)"),
+    ("A single continuous tape CANNOT wind the hex lattice at uniform wall — Euler parity; "
+     "one orientation class doubled (or row strips) makes it windable at ⅓ walls double",
+     "PROVEN-calc", "foil-topology.json, verified on 7/19/37-cell lattices; §9.6",
+     "row-strip is the volume default; node geometry + mixed walls go to Vlad's periodic unit-cell check"),
+    ("Stamped-and-stacked laminations are a viable VOLUME route for the toothed parts "
+     "(prismatic geometry; solid-bonded stack; strip Bsat ≥ MIM)",
+     "RED-TEAMED", "lamination-route.json screen + sol/grok council; §5",
+     "OPEN GATE: sheared-edge condition (roll+burr+taper, 5–20 µm vs the 20 µm gap) + anneal "
+     "distortion — measured-edge FE + supplier coupon decide (us)"),
 ]
 
 

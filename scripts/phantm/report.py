@@ -637,6 +637,46 @@ def main():
       "pole pieces in the SAME alloy (thermal-expansion match across the field gap — "
       "Tony's 24 Jul point); no laminations needed for DC pulsing per the §0.10 "
       "flux-diffusion estimate, transient FE check pending.")
+    A("")
+    A("**1b. Tony's stamped-and-stacked challenge (25 Jul) — analysed, "
+      "council-reviewed, and promoted to volume co-lead CANDIDATE.** Tony's "
+      "transformer instinct — stack stamped laminations — holds at this scale for a "
+      "structural reason our earlier fallback note under-sold: every toothed part is "
+      "PRISMATIC (a constant 2D profile extruded along one axis), so the translator "
+      "is ≈8 stamped 0.20 mm leaves and each slot-section ≈12 of 0.15 mm, and "
+      "in-die interlocked stacking (motor-core standard: complete stacks exit the "
+      "progressive die) makes one stack = one handled part, matching MIM's part "
+      "count. Magnetically it is clean: laminations are UNNECESSARY here "
+      "(flux-diffusion cleared solid parts, §A.10) but harmless — so the stack may "
+      "be bonded/welded SOLID with no interlaminar insulation, and non-oriented "
+      "electrical-steel strip (Bsat ≈1.9–2.0 T) matches or beats MIM Fe-3%Si with "
+      "its sinter porosity. What GATES it is the tooth-tip EDGE: the gap-facing "
+      "tooth surface IS the sheared edge, whose full profile (roll + burnish + "
+      "fracture taper + burr) plus stack-registration scallop and anneal "
+      "distortion is 5–20 µm against a 20 µm working gap at dF/dg ≈ −8%/µm. The "
+      "honest framing (council-corrected): the Pm trim knob absorbs a STATIC mean "
+      "force loss, so the raw ≈1.25 µm/10% sensitivity is not a kill number — "
+      "REPRODUCIBILITY, step-ripple and positional error are the real limits, and "
+      "they are decided by a measured-edge FE variant plus a SUPPLIER COUPON, "
+      "never by generic feature rules. Fine blanking (roll 2–5% of t) and "
+      "photochemical etch + stack (near-zero roll, no work-hardening — Precision "
+      "Micro class) are the gate-friendly variants. Full screen, all eight routes "
+      "with verdicts (lamination-route.json; council: sol SOUND-WITH-CORRECTIONS, "
+      "grok CONFIRMED-WITH-CAVEATS — transcripts in out/):")
+    A("")
+    A("| Route | Verdict | Why |")
+    A("|---|---|---|")
+    _lr = json.load(open(os.path.join(OUT, "lamination-route.json")))
+    for r in _lr["options"]:
+        A(f"| {r['option']} | **{r['verdict']}** | {r['why']} |")
+    A("")
+    A("Electroforming deserves its one-line physics ruling on the record: 80/20 "
+      "permalloy saturates at ≈0.8 T against our 1.0–1.15 T working flux — the "
+      "MATERIAL, not the process, rules it out; 45–50% Ni (Bsat ≈1.5 T) clears "
+      "with margin but needs a re-solve with deposited-alloy properties. New RFQ "
+      "targets this adds: a precision motor-lamination house (progressive + "
+      "in-die stacking) and Precision Micro for etched stacks — both bolt onto "
+      "the existing Annexe A conversation.")
     A("2. **Coils — two viable routes (corrected 24 Jul after Tony's challenge, §0.8).** "
       "The assembled pole WITHOUT the translator is an open horseshoe — its magnetic "
       "circuit closes only through the translator, which slides in axially LAST — so "
@@ -1191,22 +1231,36 @@ def main():
       "tolerance), plating continuity (DC resistance wall-to-wall), and an RF "
       "return-loss spot check per batch (Vlad's bench).")
     A("")
-    A("**Tony's folded-foil route (25 Jul) — added to the ledger with its first "
-      "physics check done.** Press a stiff metal foil into 60° half-hex corrugations, "
-      "wind it row by row into the lattice, weld at the node faces, and register it "
-      "in a GROOVED base plate. This is the commercial corrugated-honeycomb process "
-      "at custom precision, and the eigensolver has now priced its signature "
-      "compromise — bent corners instead of sharp ones: a bend radius of 0.3 mm "
-      "shifts fc by only +137 MHz (≡ 7.9 µm of interior; even r = 0.5 mm costs just "
-      "20.8 µm-equivalent) — comfortably inside the ±25 µm tolerance gate "
-      "(foil-corner.json). Two design rules make it work: the MACHINED groove plate "
-      "carries the precision (±10 µm is routine machining; foil springback stops "
-      "mattering because the grooves register every wall — and the same plate IS the "
-      "drilled back wall the translator tails pass through); and the corner seams "
-      "must be RF-CONTINUOUS — circumferential wall currents cross those joints, so "
-      "braze or a continuous laser seam, never spot welds (a gappy seam is a slot "
-      "antenna between cells). Seam continuity is Vlad's bench check, same class as "
-      "the two-half moulding bond line.")
+    A("**Tony's folded-foil route (25 Jul) — two physics checks done, and his "
+      "winding collision explained exactly.** Press a stiff metal foil into 60° "
+      "half-hex corrugations, build the lattice, weld at the node faces, and "
+      "register it in a GROOVED base plate. First check, corner radii "
+      "(foil-corner.json): a 0.3 mm bend shifts fc by only +137 MHz (≡ 7.9 µm of "
+      "interior; even r = 0.5 mm costs 20.8 µm-equivalent) — inside the ±25 µm "
+      "gate. Second, the collision Tony's CAD found when winding ONE continuous "
+      "tape is a THEOREM, not a process defect (foil-topology.json, verified on "
+      "7/19/37-cell lattices): every interior wall junction is 3-way — odd — and a "
+      "single tape laying every wall once is an Euler trail, which tolerates at "
+      "most TWO odd junctions. A 7-cell tile already has 12. The constructive fix "
+      "is exactly Tony's own mixed single/double-wall instinct, made systematic: "
+      "double the walls of ONE of the three orientation classes and every interior "
+      "junction becomes even — a 7-cell tile then needs only ≈3 extra boundary "
+      "walls doubled and one tape winds the lot (⅓ of walls double). Better "
+      "still, the commercial ROW-STRIP corrugation topology — one short strip per "
+      "row, node walls doubled — reaches the SAME ⅓-double lattice with trivial "
+      "paths, and both patterns are PERIODIC: Tony's software-correction idea "
+      "collapses from a per-cell table to two known lattice constants (pitch "
+      "across doubled walls grows by one tape thickness, ≈2.3% at 75 µm — an "
+      "array-level constant for the beam-forming, and fc is untouched because the "
+      "interior is held, §9.9). Council caveats on the record (sol + grok, "
+      "SOUND/CONFIRMED-WITH-CAVEATS): row-strip is the only volume-credible "
+      "default (per-node discrete welds at 3.25 mm pitch do not scale — line "
+      "bonding or brazing does); real node geometry is 2+1+1 tape layers with "
+      "fillets and belongs in Vlad's periodic unit-cell RF check along with the "
+      "75/150 µm mixed walls and the ≈2.3% biperiodic pitch; corner seams must "
+      "be RF-CONTINUOUS (a gappy seam is a slot antenna between cells); and the "
+      "MACHINED groove plate still carries the precision (±10 µm routine) while "
+      "doubling as the drilled back wall.")
     A("")
     A("**And the COTS question (Tristan, 25 Jul): could we just fit the design to an "
       "off-the-shelf honeycomb?** The wall-thickness proof makes this askable, and "
@@ -1608,7 +1662,7 @@ def main():
       f"PROVEN-calc, {c['RED-TEAMED']} RED-TEAMED, {c['MEASURED']} MEASURED, "
       f"{c['TESTED']} TESTED, {c['ESTIMATE']} ESTIMATE — with "
       f"**{reg['open_gates']} open gates** (transient-eddy FE; damper-vent "
-      "tolerance; the DEMAGNETISATION FE that blocks dual drive; the driver-EMC "
+      "tolerance; the DEMAGNETISATION FE that blocks dual drive; the stamped-tooth edge coupon; the driver-EMC "
       f"layout specification) and {reg['external_inputs']} items awaiting an "
       "external input or ruling.")
     A("")

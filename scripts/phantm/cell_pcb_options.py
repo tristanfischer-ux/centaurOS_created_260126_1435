@@ -68,7 +68,10 @@ crow("Folded/corrugated foil, welded, registered in a grooved base plate (Tony 2
      "MACHINED groove plate (±10 µm easy), not foil springback",
      "KEEP (pilot candidate)",
      "the commercial corrugated-honeycomb process at custom precision; the grooved plate "
-     "both registers the foil and forms the drilled back wall; seam continuity is Vlad's check")
+     "both registers the foil and forms the drilled back wall; Tony's one-tape collision is "
+     "Euler parity (foil-topology.json) — row strips (node walls double, 1/3 of walls) are "
+     "the volume default, one-tape works with one orientation class doubled; seam continuity "
+     "+ the mixed-wall periodic unit cell are Vlad's checks")
 crow("Adapt the DESIGN to COTS metal honeycomb (1/8\" = 3.175 mm cell class)",
      "fabrication",
      "fc scales as 1/AF: 3.175 mm → 52.29 GHz (band edge IMPROVES); actuator fits any "
