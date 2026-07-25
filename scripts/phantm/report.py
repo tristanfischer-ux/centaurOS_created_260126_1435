@@ -226,9 +226,11 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v5.1 — 25 Jul: optimisation campaign §10 + COMPLETE option ledgers with kills on the record + system-manufacturability §11; five-seat exhaustive red team applied; pending 3D-FE/prototype validation)")
+    A("# PHANTM — the actuator and hex-cell work package as a de-risking funnel (v6 — 25 Jul restructure: Part 0 executive · I concept & claims · II hardening: facts and testing · III design choices with kills on the record · IV how to manufacture · V who can manufacture; five-seat red team applied; pending 3D-FE/prototype validation)")
     A("")
-    A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
+    A("**CONFIDENTIAL — core IP.** Scope: the actuator, single-cell waveguide "
+      "physics, drive electronics and firmware; array-level RF (gain, scan, "
+      f"nulling, feed) stays with Tony/Vlad. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
       "validated on a gapped C-core to 2.5%, mesh-converged <1%, force cross-checked "
       "weighted-stress-tensor vs co-energy). Reviewed by a 4-seat cross-lineage LLM "
@@ -307,7 +309,7 @@ def main():
     A("7. **Manufacturing methods and cost** — §5 (route, incl. the pressed-SMC "
       "impossibility and the coil sequencing) and §6 (ten supplier entries with "
       "evidence) answer this directly; raw materials are indeed tiny "
-      "($0.0014/unit, §8.1) — the unit price lives in process and gap-setting.")
+      "($0.0014/unit, §5) — the unit price lives in process and gap-setting.")
     A("")
     A("**Round 4 (24 Jul, from the call) — the ten-knob optimisation brief: executed "
       "same-day as a full FE campaign; results and the recommended BALANCED set in §10 "
@@ -735,7 +737,7 @@ def main():
     A("## 7. Open questions for Tony")
     A("")
     A("1. ANSWERED 24 Jul: reflector = mg-scale plastic + 20 µm Cu foil on a standoff "
-      "(<2% of Mt — budgets stand; see §0.6). Remaining ask: the standoff distance "
+      "(<2% of Mt — budgets stand; see §0.5). Remaining ask: the standoff distance "
       "(Vlad), only because it sets the moving-mass tail and the cell stack-up.")
     A("2. ANSWERED 24 Jul: 5 g was the test minimum; ambition is 20–30 g — see §0.3 "
       "ladder. Remaining ask: confirm whether 20–30 g is HOLD (detent) or survive "
@@ -923,7 +925,7 @@ def main():
       "path to that short applies a reflection phase **φ = 4π·d/λg** to the cell's "
       "re-radiated field. Setting each cell's short depth d sets the aperture's phase "
       "profile — the beam is formed and steered with zero active electronics on the "
-      "aperture. The actuator of §1–§8 is the device that positions one cell's short: "
+      "aperture. The actuator of §1 is the device that positions one cell's short: "
       "one actuator per cell, translator axis along the cell (beam) axis.")
     A("")
     A("### 9.2 Single-cell physics — cutoff and guide wavelength (computed, validated)")
@@ -1184,7 +1186,9 @@ def main():
       "tolerance), plating continuity (DC resistance wall-to-wall), and an RF "
       "return-loss spot check per batch (Vlad's bench).")
     A("")
-    A("**Who can make them — contact routes researched and live-verified 24 Jul** "
+    A("### 9.6b Who can make the cells — fabricator table, contact routes live-verified")
+    A("")
+    A("**Contact routes researched and live-verified 24 Jul** "
       "(three parallel verification passes; every email read off the company's own "
       "page, never constructed; gaps stated):")
     A("")
@@ -1209,7 +1213,7 @@ def main():
       "(reference-grade metal tiles, both electroforming), **BMF + Cybershield or "
       "SAT** (the print-and-plate prototype pair), **SWISSto12** (integrated "
       "print+plate, space heritage), and a **Hexcel/Plascore honeycomb slice** as the "
-      "week-one bench experiment. Draft emails for the cell lattice are in §11 "
+      "week-one bench experiment. Draft emails for the cell lattice are in §13 "
       "alongside the actuator outreach (Annex E carries the cell specification).")
     A("")
 
@@ -1238,7 +1242,7 @@ def main():
     A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by all 93 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter |")
     A("| Tooth duty / slot depths / magnet / registration | change step FORCE + uniformity, not step SIZE — phase quantisation preserved at 154.7 µm ⇒ 16.7°/step at 70 GHz | invariant on phase scale; registration choice trades ±1.9° step jitter for detent (quantified, Tony's knob) |")
     A("| Phase levels: 21 per 2π at 70 GHz today | the UKDI bid's 32-level ambition needs step 108 µm ⇒ pitch 324 µm (scenario S108) | **OPEN — tracked, not built**; awaits Vlad's real λg before a pitch redesign |")
-    A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | gated to Vlad, flagged at every mention |")
+    A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | **PROVEN in §9.9** (deterministic 3-leg proof + adversarial pass); pitch budget gated to Vlad |")
     A("| Damper vent Ø0.15 mm through the reflector | the hole is 17× below its own cutoff (1.17 THz); Bethe small-aperture leakage ∝(d/λ)⁴ ≈ 1.5×10⁻⁶ (−58 dB) before foil-thickness attenuation | **checked here: negligible perturbation of the short** |")
     A("| Foil-edge running clearance | a real annular leak path past the short | OPEN interface (choke/lip) — Vlad's, flagged since §9.3 |")
     A("| Actuator inside the cell footprint | sits BEHIND the plane it controls; fields evanescent to first order | shielded by construction; residual = the edge-leak item above |")
@@ -1256,6 +1260,67 @@ def main():
       "electronics punch list: the driver board must be laid out and shielded so "
       "re-pointing bursts (up to 26.8 A pulsed) stay out of the feed's band — easy at "
       "these edge rates, but it must be SPECIFIED, not assumed.")
+    A("")
+    A("### 9.9 The wall-thickness proof — thicker walls are RF-free (25 Jul, Tristan's challenge)")
+    A("")
+    A("Tristan asked for PROOF (not assertion) that the hex walls can be thickened "
+      "for manufacturability without touching the RF. The proof is deterministic "
+      "(wall_proof.py, self-testing, artefact out/wall-proof.json) and was then "
+      "attacked by an adversarial council seat. Three legs:")
+    A("")
+    A("**Leg A — the cutoff physics never sees the wall.** Every in-guide quantity "
+      "this report uses (cutoff, guide wavelength, reflection phase, stroke need) is "
+      "the eigenvalue of the Helmholtz problem on the INTERIOR cross-section. Wall "
+      "thickness is not a parameter of that problem: ∂fc/∂wall = 0 exactly at fixed "
+      "interior. Re-solved on the validated eigensolver: fc(interior 3.10) = "
+      "53.558 GHz for ANY wall.")
+    A("")
+    A("**Leg B — the wall's far side is electromagnetically invisible.** Fields "
+      "penetrate the copper only ≈0.3–0.4 µm (skin depth, worst-case rough plated "
+      "Cu). The 3 µm plating spec alone is 8–11 skin depths — a 72–93 dB field "
+      "shield across the band; the as-drawn 150 µm wall is ≈3,600 dB and 300 µm is "
+      "≈7,200 dB. The interior fields cannot know what is behind the first few "
+      "microns of metal, so added wall material changes nothing inside the cell and "
+      "only lowers the already-immeasurable cell-to-cell through-wall leak.")
+    A("")
+    A("**Leg C — the ONE real cost, priced.** In the shared-wall honeycomb, pitch = "
+      "interior + wall (3.10 + 0.15 = 3.25 ✓ vs the STL). Thicker walls grow the "
+      "ARRAY pitch — a grating-lobe/scan budget that belongs to Tony/Vlad. The "
+      "envelope (textbook square-lattice bound; hex tiling relaxes it ≈15%):")
+    A("")
+    A("| Wall (mm) | Pitch (mm) | fc (GHz) | Broadside grating limit | ±30° scan | Aperture open | Mould aspect (7.75 deep) |")
+    A("|---|---|---|---|---|---|---|")
+    wp_path = os.path.join(OUT, "wall-proof.json")
+    if os.path.exists(wp_path):
+        _wp = json.load(open(wp_path))
+        for r in _wp["leg_c_pitch"]["rows"]:
+            A(f"| {r['wall_mm']:.2f}{' (as drawn)' if r['wall_mm'] == 0.15 else ''} "
+              f"| {r['pitch_mm']:.2f} | {r['fc_ghz']} (unchanged) "
+              f"| {r['broadside_grating_limit_ghz']} GHz | {r['scan30_limit_ghz']} GHz "
+              f"| {r['aperture_open_fraction']*100:.0f}% | {r['mould_aspect_7p75_depth']}:1 |")
+    A("")
+    A("Every 50 µm of wall costs ≈1.4 GHz of grating-lobe headroom and 2–3 points "
+      "of aperture open fraction — and buys mouldability: at 0.30 mm walls the "
+      "single-piece moulding aspect ratio falls from the unmouldable 52:1 to a "
+      "standard 26:1, which is why the §9.7 ledger keeps thickened-wall moulding "
+      "as a volume route.")
+    A("")
+    A("**The mandatory drawing rule that makes all of this true: thicken OUTWARD.** "
+      "The held fabrication dimension is the INTERIOR 3.10 mm; the pitch grows. "
+      "Thickening INWARD at fixed 3.25 mm pitch shrinks the interior and moves the "
+      "cutoff at 17.3 MHz/µm — 0.30 mm walls inward would push fc up 2.6 GHz and "
+      "lose the bottom of the band. Any drawing sent to a fabricator must dimension "
+      "and tolerance the interior across-flats, never the wall.")
+    A("")
+    A("**Adversarial check (grok-4.5, eight attacks)**: aperture-plane septum width, "
+      "front-face mutual coupling, moving-short fit, plating uniformity on thicker "
+      "walls, thermal distortion, seams, higher-order modes, losses. Verdict: "
+      "**CONFIRMED-WITH-CAVEATS** — no attack breaks the claim; the residual "
+      "effects (aperture-rim perturbation, front-face coupling ≲0.2–0.4 dB) are "
+      "second-order and scale with the same pitch growth already priced above, and "
+      "several attacks FAVOUR thicker walls (stiffer core pins → better plating "
+      "uniformity; less thermal distortion; better bearing for the moving short). "
+      "Full transcript: out/council-wallproof-grok.txt.")
     A("")
     # ------------------------------------------------- §10 optimisation
     A("## 10. The optimisation campaign — from 5 g to a chosen Pareto (24 Jul)")
@@ -1464,13 +1529,98 @@ def main():
         body = body.split("\n", 1)[1] if body.startswith("#") else body
         A(body)
 
+    # ---------------- NEW v6 sections (placed by the restructure pass) ------
+    import claims as claims_mod
+    reg = claims_mod.build()
+    c = reg["counts"]
+
+    A("")
+    A("## NEW-EXEC Executive summary — the state of play")
+    A("")
+    A("This document is the PHANTM mechatronic-antenna work package: Tony's "
+      "actuator concept and hex-cell wave conformer taken through FE-backed "
+      "physics, a ten-knob optimisation campaign, drive electronics and firmware, "
+      "manufacturing routes and named fabricators with live-verified contacts. It "
+      "is organised as a **de-risking funnel**: Part I states the concept and the "
+      "claims it rests on; Part II hardens those claims with computation, "
+      "measurement and adversarial red-teaming; Part III records every design "
+      "choice — the failures kept on the record beside the winners; Part IV says "
+      "how to make it; Part V says who can.")
+    A("")
+    A("**The headline numbers (≈70 GHz operating point):**")
+    A("")
+    A("| Quantity | Value | Hardened where |")
+    A("|---|---|---|")
+    A("| Zero-power detent, fixed design (as-drawn registration) | 7.72 mN = 5.0 g | §4 |")
+    A("| BALANCED optimised set (worst-registration margin) | 14.6/11.0 g at 37 mJ/step | §10.2 |")
+    A("| Cell cutoff (interior 3.10 mm, measured) | fc = 53.56 GHz; full 2π from ≈57.4–58.0 GHz | §9.2 |")
+    A("| Phase quantisation at 70 GHz | 16.7°/step, 21 levels per 2π | §9.2 |")
+    A("| Unit cost at ≈10 M/yr | $0.10–0.25 (process-dominated) | §5 |")
+    A("")
+    A(f"**The claims register** (the funnel's spine, closing Part I) holds {reg['total']} "
+      f"load-bearing claims: {c['PROVEN-FE']} PROVEN-FE, {c['PROVEN-calc']} "
+      f"PROVEN-calc, {c['RED-TEAMED']} RED-TEAMED, {c['MEASURED']} MEASURED, "
+      f"{c['TESTED']} TESTED, {c['ESTIMATE']} ESTIMATE — with "
+      f"**{reg['open_gates']} open gates** (transient-eddy FE; damper-vent "
+      "tolerance; the DEMAGNETISATION FE that blocks dual drive; the driver-EMC "
+      f"layout specification) and {reg['external_inputs']} items awaiting an "
+      "external input or ruling.")
+    A("")
+    A("**Recommended first hardware — Prototype-A**: the ORIGINAL 5 g design with "
+      "unipolar drive. Zero open gates stand in its way, every part is orderable "
+      "now, and it delivers the single highest-value measurement in the "
+      "programme — a real force curve to collapse the FE residual — while the "
+      "optimised sets clear their gates in parallel.")
+    A("")
+    A("**Who can build it**: 24 fabricators with live-verified contacts (ten "
+      "actuator, fourteen cell) and ready-to-send request-for-quotation annexes "
+      "A–E — all in Part V. Cost band $0.10–0.25/actuator at ≈10 M/yr, "
+      "process-dominated.")
+    A("")
+    A("**Decision queue by owner:**")
+    A("")
+    A("- **Tristan** — send the fabricator RFQs (§13 + Annex E); UKDI Stage-1 bid tightenings (deadline 28 Jul 12:00).")
+    A("- **Tony** — gap 20-vs-30 ruling; vibration envelope (hold-vs-shock sizing); registration knob; pole-spacing/tooth-profile ruling; full technical question detail in §7.")
+    A("- **Vlad** — metallised-cell cutoff + loss budget; foil-edge choke; array pitch budget (how much wall-thickening headroom, §9.9); moulding-seam RF check.")
+    A("- **Engineering (us)** — demagnetisation FE (unlocks dual drive); transient eddy FE; vent tolerance sweep; PCB layout on the decided atopile→KiCad→FreeRouting stack; 3D FE or prototype force curve.")
+    A("")
+
+    A("## NEW-CLAIMS The claims register — every load-bearing assumption, its status and its evidence")
+    A("")
+    A("The spine of this report. Each claim's status names HOW it was hardened "
+      "(PROVEN-calc = closed-form, verifier-recomputed every run; PROVEN-FE = "
+      "validated nonlinear finite elements; MEASURED = from Tony's delivered "
+      "artefacts; TESTED = compiled and executed under CI gates; RED-TEAMED = "
+      "survived a named adversarial attack; ESTIMATE = honest band). The residual "
+      "column names what would still have to be true — and WHO owns closing it. "
+      "A blank residual would be a lie; \"closed\" is a statement.")
+    A("")
+    A("| # | Claim | Status | Evidence | Residual risk / owner |")
+    A("|---|---|---|---|---|")
+    for i, r in enumerate(reg["rows"], 1):
+        A(f"| {i} | {r['claim']} | **{r['status']}** | {r['evidence']} | {r['residual']} |")
+    A("")
+    A(f"Register generated by claims.py; counts ({reg['total']} claims, "
+      f"{reg['open_gates']} open gates) are pinned by the deterministic verifier "
+      "so the register cannot silently rot.")
+    A("")
+
     path = os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")
     text = "\n".join(L) + "\n"
     # '~' pairs render as strikethrough in GFM — use '≈' for approximations
     text = text.replace("~", "≈")
+    # ---------------- v6 structure pass (the de-risking funnel) -------------
+    from restructure import restructure
+    text = restructure(
+        text,
+        "PHANTM — the actuator and hex-cell work package as a de-risking funnel "
+        "(v6 — 25 Jul restructure: Part 0 executive · I concept & claims · II "
+        "hardening: facts and testing · III design choices with kills on the "
+        "record · IV how to manufacture · V who can manufacture; five-seat red "
+        "team applied; pending 3D-FE/prototype validation)")
     with open(path, "w") as f:
         f.write(text)
-    print(f"wrote {path} + figures")
+    print(f"wrote {path} + figures (v6 structure pass applied)")
 
 
 if __name__ == "__main__":

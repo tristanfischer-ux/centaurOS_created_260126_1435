@@ -198,9 +198,9 @@ brv = 0.348 * 1.162 * 2.634
 act_mg = mt_kg * 1e6 + 3 * ((ssv + brv) * 7.4 + 0.348 * 1.162 * 0.243 * 7.5 + 1.108)
 check("actuator total ≈220 mg", abs(act_mg - 219.7) < 1.5, f"{act_mg:.1f}")
 check("sub-array actuators 5.3 g", abs(24 * act_mg / 1000 - 5.27) < 0.1)
-contains("§8.9 present", "8.9 Honeycomb", "7.75 mm", "24-hex", "7-hex", "150 µm",
-         "2.06 mm", "192.2 mm³", "64.5 mm³", "0.238 g printed", "0.080 g printed",
-         "3.10 mm is the INTERIOR")
+contains("§10.9 present (old 8.9)", "10.9 Honeycomb", "7.75 mm", "24-hex", "7-hex",
+         "150 µm", "2.06 mm", "192.2 mm³", "64.5 mm³", "0.238 g printed",
+         "0.080 g printed", "3.10 mm is the INTERIOR")
 
 # ---------------- hex cell (§9) ---------------------------------------------
 hx = json.load(open(os.path.join(OUT, "hexcell.json")))
@@ -218,10 +218,10 @@ check("two-group fails 60, passes 70", bt[60]["stroke_need_mm"] > 3.7 > bt[70]["
 check("levels floor @75 = 18", bt[75]["phase_levels_per_2pi"] == 18)
 contains("sol round-2 fixes", "57.4–58.0 GHz", "≈67.2", "1.07 V", "0.60 Ω")
 check("phase/step @70 = 16.7°", abs(bt[70]["phase_per_ideal_step_deg"] - 16.7) < 0.15)
-contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
-         "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz", "BELOW CUTOFF",
-         "## 10. The optimisation campaign", "## 12. Traceability",
-         "## 13. Supplier outreach")
+contains("cell sections present (v6)", "## 4. The hex-cell wave conformer",
+         "φ = 4π·d/λg", "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz",
+         "BELOW CUTOFF", "## 14. The optimisation campaign",
+         "## Appendix B — Traceability", "## 25. Supplier outreach")
 
 # ---------------- firmware gate: compile + run BOTH configs -----------------
 import subprocess as _sp
@@ -235,7 +235,7 @@ for _flags, _lab in (([], "unipolar"), (["-DALLOW_DUAL_DRIVE=1"], "dual")):
         _t = _sp.run([f"/tmp/phantm_test_{_lab}"], capture_output=True, text=True, timeout=120)
         check(f"firmware tests pass ({_lab})", _t.returncode == 0
               and "ALL FIRMWARE TESTS PASS" in _t.stdout)
-contains("§9.5c present", "9.5c Drive electronics implementation",
+contains("§17 present (old 9.5c)", "17. Drive electronics implementation",
          "demagnetisation gate is a compile-time flag", "VERIFY",
          "thermally PACED", "atopile")
 
@@ -260,12 +260,13 @@ import math as _m
 _fc_hole = 1.8412 * 299.792458 / (_m.pi * 0.15)
 check("vent-hole cutoff 1.17 THz", abs(_fc_hole - 1171) < 5, f"{_fc_hole:.0f} GHz")
 check("Bethe leak −58 dB", abs(10 * _m.log10((0.15 / 4.283) ** 4) + 58.3) < 0.5)
-contains("§9.8 present", "9.8 The RF-efficacy audit", "INVARIANT — untouched by all 93 options",
+contains("§13 present (old 9.8)", "13. The RF-efficacy audit",
+         "INVARIANT — untouched by all 93 options",
          "1.17 THz", "−58 dB", "electromagnetically SILENT",
          "must be SPECIFIED, not assumed")
-contains("§10.1b/9.5b/9.7/§11 present", "### 10.1b The complete options ledger",
-         "### 9.5b The drive/PCB options ledger", "### 9.7 The hex-cell options ledger",
-         "## 11. Making the SYSTEM easy to manufacture",
+contains("ledgers present (v6)", "### 14.2 The complete options ledger",
+         "## 16. The drive/PCB options ledger", "## 20. The hex-cell options ledger",
+         "## 22. Making the SYSTEM easy to manufacture",
          "66 actuator/drive/damper options", "36 were killed",
          "MASS-NORMALISED Pareto choice", "FULL H-BRIDGE",
          "demagnetisation FE", "PROTOTYPE-NOW", "EASIEST BUILD")
@@ -304,8 +305,68 @@ check("energy 37/83 mJ", abs(e_bal - 37.2) < 0.3 and abs(e_max - 82.8) < 0.3)
 contains("§10 content", "BALANCED set is the recommendation", "DUAL ±3.35 A",
          "DUAL ±5 A", "Ø0.15 mm vent", "0.35 mN guide friction",
          "half-bridge per coil", "basin count is", "Goodhart trap")
-contains("v5.1 title", "(v5.1 — 25 Jul")
-absent("v4.5 title retired", "(v4.5 — 24 Jul")
+contains("v6 title", "(v6 — 25 Jul restructure")
+absent("old titles retired", "(v4.5 — 24 Jul", "(v5.1 — 25 Jul", "(v5.2 — 25 Jul")
+
+# ---------------- v6 structure: parts, exec, claims register ----------------
+for _h in ("# Part 0 — Executive: the state of play",
+           "# Part I — The concept design and what must be true",
+           "# Part II — Hardening: facts and testing",
+           "# Part III — Design choices: what was tried, what won, what was killed",
+           "# Part IV — How to manufacture",
+           "# Part V — Who can manufacture",
+           "# Appendices",
+           "## 1. Executive summary — the state of play",
+           "## 7. The claims register",
+           "## 24. Who can make the cells — fabricator table",
+           "## Appendix A — Response to Tony's feedback"):
+    contains(f"v6 header: {_h[:44]}", _h)
+absent("old numbering scars gone", "### 9.5b ", "### 10.1b ", "### 9.5c ",
+       "## 0. Response to Tony", "## 13. Supplier outreach",
+       "## 9. The hex-cell wave conformer", "### 9.9 ", "### 9.8 ")
+cr = json.load(open(os.path.join(OUT, "claims-register.json")))
+check("claims register 24 claims, 4 open gates",
+      cr["total"] == 24 and cr["open_gates"] == 4
+      and cr["total"] == len(cr["rows"]))
+check("claims register: no empty cells, statuses legal",
+      all(all(str(v).strip() for v in r.values()) for r in cr["rows"])
+      and all(r["status"] in ("PROVEN-calc", "PROVEN-FE", "MEASURED", "TESTED",
+                              "RED-TEAMED", "ESTIMATE") for r in cr["rows"]))
+check("claims table fully rendered",
+      MD.count("| **PROVEN-FE** |") == cr["counts"]["PROVEN-FE"]
+      and MD.count("| **RED-TEAMED** |") == cr["counts"]["RED-TEAMED"])
+contains("exec layer content", "de-risking funnel", "Prototype-A",
+         "Decision queue by owner", "4 open gates")
+# §-renumber spot checks: old refs must have been rewritten in prose
+contains("renumbered refs", "actuator of §2 is the device",
+         "(§11, validated eigensolver", "§A.3 ladder",
+         "All of §10.9 is live in PHANTM-CALC.xlsx")
+absent("no stale old refs", "§9.8", "§9.9", "§10.1b", "§0.3", "§8.9",
+       "§9.5c", "the §9 sensitivities")
+
+# ---------------- §9.9 wall-thickness proof ---------------------------------
+wp = json.load(open(os.path.join(OUT, "wall-proof.json")))
+check("wall proof fc 53.558 (interior only)",
+      abs(wp["leg_a_boundary"]["fc_ghz_interior_3p10"] - 53.558) < 0.05
+      and wp["leg_a_boundary"]["fc_sens_wall_at_fixed_interior"] == 0.0)
+# skin depth recomputed: worst-case plated Cu at 57.5 GHz
+_d_pl = math.sqrt(3.0e-8 / (math.pi * 57.5e9 * MU0)) * 1e6
+check("skin depth plated 0.364 µm @57.5", abs(_d_pl - 0.364) < 0.003, f"{_d_pl:.4f}")
+check("3 µm plating ≈72 dB", abs(8.686 * 3.0 / _d_pl - 72) < 2)
+check("150 µm wall ≈3580 dB", abs(8.686 * 150.0 / _d_pl - 3584) < 40)
+# leg C pitch rows recomputed: pitch = interior + wall, broadside limit = C0/p
+for r in wp["leg_c_pitch"]["rows"]:
+    _p = 3.10 + r["wall_mm"]
+    check(f"pitch row wall {r['wall_mm']}", abs(r["pitch_mm"] - _p) < 1e-6
+          and abs(r["broadside_grating_limit_ghz"] - 299.792458 / _p) < 0.1
+          and abs(r["aperture_open_fraction"] - (3.10 / _p) ** 2) < 1e-3
+          and r["fc_ghz"] == round(wp["leg_a_boundary"]["fc_ghz_interior_3p10"], 2))
+check("council wall-proof transcript on record",
+      os.path.exists(os.path.join(OUT, "council-wallproof-grok.txt"))
+      and "CONFIRMED" in open(os.path.join(OUT, "council-wallproof-grok.txt")).read())
+contains("§12 present (old 9.9)", "12. The wall-thickness proof", "∂fc/∂wall = 0",
+         "thicken OUTWARD", "17.3 MHz/µm", "CONFIRMED-WITH-CAVEATS",
+         "52:1 to a standard 26:1", "dimension and tolerance the interior")
 # U-band prototype scaling: 55 GHz at the production 70-GHz operating point
 _ratio = 70.0 / hx["cutoff"]["fc_ghz"]
 _fc_p = 55.0 / _ratio
@@ -333,17 +394,46 @@ for f_ in ("drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
     check(f"artefact {f_} exists", os.path.exists(os.path.join(OUT, f_)))
 check("cell aspect ≈52:1", abs(7.75 / 0.15 - 51.7) < 0.1)
 check("fc sensitivity 17 MHz/µm", abs(hx["cutoff"]["fc_ghz"] / 3.1 - 17.3) < 0.1)
-contains("§9.5 present", "9.5 CAD", "drawing-D5-cell-integration.png", "drawing-D6-pcb.png",
+contains("§15 present (old 9.5)", "15. CAD", "drawing-D5-cell-integration.png",
+         "drawing-D6-pcb.png",
          "render-3d-hexcell.png", "53.6 W pulses", "15.4 W", "29.3 J", "UNIPOLAR",
          "≤5 mΩ", "10 × 10 cm panel", "rail voltage IS the current control")
 absent("rejected H-bridge architecture not presented as chosen",
        "so the phase bridges are full-H", "dual select-FET per cell (10–20 mΩ, negligible")
 absent("no mixed-regime power claim", "57.6 W burst (26.8 A on the rail) for 0.12 s")
-contains("§9.6 present", "9.6 How to make the cells", "17 MHz per µm", "52:1",
+contains("§21 present (old 9.6)", "21. How to make the cells", "17 MHz per µm",
+         "52:1",
          "Thomas Keating", "Vitesse", "SWISSto12", "electroless copper",
          "Annex E", "K.Pike@terahertz.co.uk", "Sales@custommicrowave.com")
 absent("no stale cutoff-request", "needs the cell's cutoff to pin down")
 absent("old 7-cluster reading retired", "7-cell clusters", "7 × 19")
+
+# ---------------- v6 Excel workbook structure -------------------------------
+try:
+    from openpyxl import load_workbook
+    _wb = load_workbook(os.path.join(OUT, "PHANTM-CALC.xlsx"))
+    _ws = _wb.active
+    _parts, _secs, _syms = [], [], set()
+    for _row in _ws.iter_rows():
+        _a = _row[0].value
+        if isinstance(_a, str) and _a.startswith("PART "):
+            _parts.append(_a)
+        elif isinstance(_a, str) and "·" in _a[:5] and _a.split("·")[0].strip().isdigit():
+            _secs.append(int(_a.split("·")[0].strip()))
+        if _row[1].value and isinstance(_row[1].value, str):
+            _syms.add(_row[1].value)
+    check("xlsx: 6 part banners", len(_parts) == 6, str(len(_parts)))
+    check("xlsx: sections 1..16 in order", _secs == list(range(1, 17)), str(_secs))
+    check("xlsx: wall-proof + manufacture symbols",
+          {"skin", "att3", "attw", "fcsc", "masp", "maspt", "pitcht",
+           "skint", "walt"} <= _syms)
+    _all_a = "\n".join(str(r[0].value) for r in _ws.iter_rows() if r[0].value)
+    check("xlsx: glossary + state of play present",
+          "AF (across-flats)" in _all_a and "LPI" in _all_a
+          and "STATE OF PLAY" in _all_a and "24 load-bearing claims" in _all_a)
+    check("xlsx: v6 title", "v6" in str(_ws["A1"].value))
+except Exception as _e:  # noqa: BLE001
+    check("xlsx structure readable", False, str(_e))
 
 # ---------------- blender model constants ----------------------------------
 bl = open(os.path.join(HERE, "blender_actuator.py")).read()
