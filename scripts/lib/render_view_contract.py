@@ -51,6 +51,7 @@ class ViewSpec:
     title: str
     caption: str
     required: bool = True
+    alternates: tuple = ()   # fallback filenames if `filename` is absent (first existing wins)
 
 
 def _quantity_raw(state: dict, key: str) -> object:
@@ -463,9 +464,17 @@ _PRODUCT_VIEWS = (
         "Closed product exterior from the primary service face.",
     ),
     ViewSpec(
-        "product_cutaway", "00-hero.png",
+        # 2026-07-25 (Tristan: "still no internal render image"): the cutaway slot used
+        # 00-hero.png, but for a sealed instrument 00-hero renders the interior clutter
+        # SUPPRESSED (or falls back to the closed 04 exterior) — an EMPTY translucent box,
+        # not "the principal internal architecture" the caption promises. 08-product-ghost-
+        # shell.png IS the see-inside render (translucent shell + opaque internals: display,
+        # vessel, PCB, wiring, heatsink all visible). Use the ghost as the cutaway; fall back
+        # to 00-hero only when the ghost pass did not run.
+        "product_cutaway", "08-product-ghost-shell.png",
         "Interior — cutaway three-quarter",
-        "Open service-face cutaway showing the principal internal architecture.",
+        "Ghost-shell see-inside showing the principal internal architecture.",
+        alternates=("00-hero.png",),
     ),
     ViewSpec(
         "product_left", "05-product-left.png",
@@ -514,10 +523,10 @@ def sealed_exterior_view_names(is_instrument_device: bool) -> frozenset[str]:
     """Blender view names that render the CLOSED product shell (not cutaway internals).
 
     INTENT: product exterior shots (04–07) show the closed handheld — top deck,
-    sample well, source board, loom. Excel's "Interior — cutaway" is `00-hero.png`
-    (_PRODUCT_VIEWS.product_cutaway) and MUST stay a true cutaway so the optical
-    bench + PCB story is delivered. Closing 00-hero hid that story and contradicted
-    the Excel label (instrument-form-beauty rule, 2026-07-13).
+    sample well, source board, loom. Excel's "Interior — cutaway" is the ghost-shell
+    see-inside `08-product-ghost-shell.png` (_PRODUCT_VIEWS.product_cutaway, 2026-07-25;
+    was 00-hero.png, which rendered an empty box for sealed instruments) and MUST stay a
+    true see-inside so the optical bench + PCB + loom story is delivered.
 
     DECISION: instruments close 04/05/06/07 only; 00-hero remains open cutaway.
     Cabinets keep the same exterior trio; their 00-hero was already cutaway.

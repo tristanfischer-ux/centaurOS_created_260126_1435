@@ -22703,7 +22703,12 @@ def _gallery_render_specs(run_dir: str) -> List[Tuple[str, str, str]]:
         for _view in required_views(_state):
             _path = os.path.join(run_dir, _view.filename)
             if not os.path.exists(_path):
-                continue
+                # try the view's fallback filenames (e.g. cutaway 08-ghost -> 00-hero)
+                _alt = next((os.path.join(run_dir, a) for a in getattr(_view, "alternates", ())
+                             if os.path.exists(os.path.join(run_dir, a))), None)
+                if not _alt:
+                    continue
+                _path = _alt
             _sheet_name, _caption = _rmap.get(
                 os.path.normpath(_path), ("", ""))
             _product_specs.append((
