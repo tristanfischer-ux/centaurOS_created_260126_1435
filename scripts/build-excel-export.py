@@ -9312,6 +9312,25 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         ac.fill = FILL_RESULT
         ac.border = BORDER
 
+        # HONESTY RULE (2026-07-25): a QUANTITATIVE constraint (unit-bearing) whose
+        # brief TARGET is null/missing cannot be verified against a missing number.
+        # Render "UNVERIFIED" as a plain string — never a =IF(...) formula that
+        # would resolve to PASS because an empty B cell is ≤ any achieved value.
+        # Qualitative rows (no real unit) are unaffected.
+        if tgt is None and _unit_is_quantitative(unit):
+            ws.cell(r, 6, "—").border = BORDER
+            sc = ws.cell(r, 7, "UNVERIFIED")
+            sc.fill = FILL_CONST
+            sc.font = Font(bold=True, color="7F5B00")
+            sc.border = BORDER
+            nt = ws.cell(r, 8, f"Brief target not specified — cannot verify a number against "
+                              f"a missing target. (brief key: {key} → contract: {qname})")
+            nt.alignment = WRAP_TOP
+            nt.font = FONT_NOTE
+            nt.border = BORDER
+            r += 1
+            continue
+
         # Direction of the PASS test — MUST stay identical to `_brief_metric_is_lower_better`
         # (Verification spine + quality-scorecard probe). Cover used a shorter list and
         # marked focus_resolution_um FAIL with "≥ target" while Abbe 0.611 µm beats 1 µm
@@ -25001,6 +25020,29 @@ _COVER_HARD_PERFORMANCE_METRIC_RX = re.compile(
     r"\b(capacity|output|throughput|yield|product|rated|nameplate|power|voltage|current|"
     r"efficiency|energy|duty|captur\w*)\b", re.I)
 
+# Qualitative unit tokens that indicate a row is PASS-by-provision (not a numeric
+# comparison against a stated target value). Any unit NOT in this set and NOT blank
+# is a "real" metric unit — the row is QUANTITATIVE and cannot PASS when either the
+# brief target or the achieved value is missing/null.
+_QUALITATIVE_UNIT_TOKENS: frozenset = frozenset({
+    "", "—", "-", "--", "n/a", "na", "none", "bool", "yes/no", "yes", "no",
+    "pass/fail", "provision", "stated", "adopted", "qualitative",
+})
+
+
+def _unit_is_quantitative(unit_str: str) -> bool:
+    """True when a compliance row's unit indicates a NUMERIC comparison is required.
+
+    A blank / placeholder / yes-no unit → qualitative (PASS-by-provision allowed).
+    Any real SI / derived unit (kg, °C, ml, mm, W, kWh, V, …) → quantitative
+    (UNVERIFIED when target or achieved is missing, never PASS).
+
+    Discriminator is UNIT PRESENCE, not metric name — universal across all archetypes.
+    proveCatch in _selftest (HONESTY.quantitative_null_target_is_unverified).
+    """
+    t = unit_str.strip().lower().replace(" ", "") if unit_str else ""
+    return t not in _QUALITATIVE_UNIT_TOKENS
+
 
 def _cover_metric_is_feedstock(name) -> bool:
     """True for a feedstock/raw-material CONSUMPTION metric name; false for a hard
@@ -25123,9 +25165,19 @@ def _compliance_row_pass(d, state: Optional[dict] = None) -> Optional[bool]:
         if fb is not None:
             a = fb[1]
     if t is None or a is None:
+        # HONESTY RULE (2026-07-25): a QUANTITATIVE row (unit-bearing) whose brief
+        # target or achieved value is null/missing CANNOT be verified — it is
+        # UNVERIFIED regardless of any static "PASS" in the status cell.  You
+        # cannot verify a number against a missing number.
+        # A QUALITATIVE row (unit absent / placeholder) may still carry a static
+        # PASS by provision (e.g. "design_life adopted", "additional_constraint
+        # adopted") — those are honest disclosures, not numeric comparisons.
+        # Discriminator: does the row carry a real numeric unit?
+        if _unit_is_quantitative(_cell_txt(d.get("unit"))):
+            return None   # quantitative + null target/achieved = UNVERIFIED
         st = _cell_txt(d.get("status")).upper()
         if st.startswith("PASS"):
-            return True       # a static PASS status over non-numeric cells
+            return True   # qualitative PASS-by-provision (unit absent/placeholder)
         return None
     dirn = _cell_txt(d.get("direction")).lower()
     if "≥" in dirn or ">=" in dirn or "meet/exceed" in dirn or "at least" in dirn:
@@ -29879,6 +29931,77 @@ def _selftest() -> int:
     if _compliance_row_pass(_already_matched_row, {"orchestratorContract": {"quantities": _decoy_qs}}) is not False:
         print("  FAIL cover-recompute fallback-matcher: must NEVER override an already-numeric "
               "Achieved cell via the fallback matcher"); bad += 1
+
+    # ═══ HONESTY.quantitative_null_target_is_unverified (2026-07-25) ═══
+    # Regression guard: a QUANTITATIVE compliance row (unit-bearing) whose brief
+    # TARGET is null/missing must return UNVERIFIED (None), NEVER True/PASS —
+    # you cannot verify a number against a missing number.
+    # A QUALITATIVE row (no real unit) may still PASS by provision.
+    #
+    # proveCatch direction 1: quantitative + null target → UNVERIFIED (None).
+    _quant_null_tgt = {
+        "target": None, "achieved": 25.0, "direction": "≥ target (meet/exceed)",
+        "status": "PASS", "unit": "ml", "note": "brief key: working_volume_ml → contract: working_volume_ml",
+    }
+    if _compliance_row_pass(_quant_null_tgt) is not None:
+        print("  FAIL HONESTY.quantitative_null_target_is_unverified: a ml row with null brief "
+              "target MUST return UNVERIFIED (None), not PASS — "
+              f"got {_compliance_row_pass(_quant_null_tgt)!r}"); bad += 1
+
+    # proveCatch direction 2: quantitative + null achieved → UNVERIFIED (None).
+    _quant_null_ach = {
+        "target": 37.0, "achieved": None, "direction": "≥ target (meet/exceed)",
+        "status": "PASS", "unit": "°C", "note": "brief key: culture_temperature_c → contract: culture_temperature_c",
+    }
+    if _compliance_row_pass(_quant_null_ach) is not None:
+        print("  FAIL HONESTY.quantitative_null_target_is_unverified: a °C row with null achieved "
+              "MUST return UNVERIFIED (None) even when status cell reads PASS — "
+              f"got {_compliance_row_pass(_quant_null_ach)!r}"); bad += 1
+
+    # proveCatch direction 3: qualitative provision row (no real unit) with static
+    # PASS still passes — this tests we did NOT break the qualitative path.
+    _qual_pass = {
+        "target": "5–8 yr", "achieved": "5–8 yr", "direction": "—",
+        "status": "PASS", "unit": "", "note": "Design life provision (qualitative)",
+    }
+    if _compliance_row_pass(_qual_pass) is not True:
+        print("  FAIL HONESTY.quantitative_null_target_is_unverified: a qualitative PASS-by-"
+              "provision row (unit='') MUST still return True — "
+              f"got {_compliance_row_pass(_qual_pass)!r}"); bad += 1
+
+    # proveCatch direction 4: qualitative additional-constraint PASS (unit=—) still passes.
+    _qual_dash = {
+        "target": "stated", "achieved": "adopted", "direction": "—",
+        "status": "PASS", "unit": "—", "note": "additional constraint provision",
+    }
+    if _compliance_row_pass(_qual_dash) is not True:
+        print("  FAIL HONESTY.quantitative_null_target_is_unverified: a qualitative PASS row "
+              "with unit='—' MUST still return True — "
+              f"got {_compliance_row_pass(_qual_dash)!r}"); bad += 1
+
+    # proveCatch direction 5: a real numeric row (target AND achieved both present,
+    # unit is ml) must NOT be affected — verified numeric rows still PASS normally.
+    _quant_both = {
+        "target": 20.0, "achieved": 20.0, "direction": "≥ target (meet/exceed)",
+        "status": "PASS", "unit": "ml", "note": "brief key: working_volume_ml → contract: working_volume_ml",
+    }
+    if _compliance_row_pass(_quant_both) is not True:
+        print("  FAIL HONESTY.quantitative_null_target_is_unverified: a ml row with BOTH "
+              "target and achieved present MUST still PASS — "
+              f"got {_compliance_row_pass(_quant_both)!r}"); bad += 1
+
+    # proveCatch direction 6: _unit_is_quantitative helpers are correct.
+    _uq_cases = [
+        ("ml", True), ("°C", True), ("kg", True), ("mm", True), ("W", True),
+        ("kWh", True), ("t/day", True), ("m³", True), ("V", True),
+        ("", False), ("—", False), ("-", False), ("n/a", False), ("bool", False),
+        ("yes/no", False), ("yes", False), ("no", False),
+    ]
+    for _uu, _expected in _uq_cases:
+        _got = _unit_is_quantitative(_uu)
+        if _got != _expected:
+            print(f"  FAIL HONESTY.unit_is_quantitative: unit={_uu!r} expected {_expected} "
+                  f"got {_got}"); bad += 1
 
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
