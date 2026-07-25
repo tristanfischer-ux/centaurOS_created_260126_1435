@@ -38,7 +38,7 @@ POINTS = [
 def basins(model_net, p):
     xg = np.linspace(-p / 2, p / 2, 481)
     f = model_net(xg)
-    s = np.sign(f)
+    s = np.where(f > 0, 1, -1)
     return int(np.sum((s[:-1] > 0) & (s[1:] < 0)))
 
 

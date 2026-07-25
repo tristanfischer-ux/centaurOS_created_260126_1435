@@ -220,8 +220,35 @@ contains("sol round-2 fixes", "57.4–58.0 GHz", "≈67.2", "1.07 V", "0.60 Ω")
 check("phase/step @70 = 16.7°", abs(bt[70]["phase_per_ideal_step_deg"] - 16.7) < 0.15)
 contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
          "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz", "BELOW CUTOFF",
-         "## 10. The optimisation campaign", "## 11. Traceability",
-         "## 12. Supplier outreach")
+         "## 10. The optimisation campaign", "## 12. Traceability",
+         "## 13. Supplier outreach")
+
+# ---------------- option ledgers (Tristan 25 Jul: kills on the record) ------
+ol = json.load(open(os.path.join(OUT, "opt", "options-ledger.json")))
+check("actuator ledger 66 options, 36 kills", ol["counts"].get("KILL") == 36
+      and sum(ol["counts"].values()) == 66)
+co = json.load(open(os.path.join(OUT, "opt", "cell-options.json")))
+po = json.load(open(os.path.join(OUT, "opt", "pcb-options.json")))
+check("cell ledger 16 options, 4 kills", sum(co["counts"].values()) == 16
+      and co["counts"].get("KILL") == 4)
+check("pcb ledger 11 options, 5 kills + open demag gate",
+      sum(po["counts"].values()) == 11 and po["counts"].get("KILL") == 5
+      and po["counts"].get("OPEN") == 1)
+for d_name in ("damper.json", "damper-balanced.json"):
+    dj = json.load(open(os.path.join(OUT, "opt", d_name)))
+    check(f"{d_name} scheme_table + air spring recorded",
+          len(dj.get("scheme_table", [])) == 6
+          and abs(dj["k_air_sealed_n_per_m"] - 296) < 2)
+contains("§10.1b/9.5b/9.7/§11 present", "### 10.1b The complete options ledger",
+         "### 9.5b The drive/PCB options ledger", "### 9.7 The hex-cell options ledger",
+         "## 11. Making the SYSTEM easy to manufacture",
+         "66 actuator/drive/damper options", "36 were killed",
+         "MASS-NORMALISED Pareto choice", "FULL H-BRIDGE",
+         "demagnetisation FE", "PROTOTYPE-NOW", "EASIEST BUILD")
+absent("council5 corrected claims retired",
+       "The optimum is ROBUST across both registrations",
+       "half the max-force set's step energy",
+       "(+7% to 0.7 mm)")
 
 # ---------------- §10 optimisation campaign ---------------------------------
 o3 = json.load(open(os.path.join(OUT, "opt", "opt-sweeps-3.json")))
@@ -253,7 +280,7 @@ check("energy 37/83 mJ", abs(e_bal - 37.2) < 0.3 and abs(e_max - 82.8) < 0.3)
 contains("§10 content", "BALANCED set is the recommendation", "DUAL ±3.35 A",
          "DUAL ±5 A", "Ø0.15 mm vent", "0.35 mN guide friction",
          "half-bridge per coil", "basin count is", "Goodhart trap")
-contains("v5 title", "(v5 — 25 Jul")
+contains("v5.1 title", "(v5.1 — 25 Jul")
 absent("v4.5 title retired", "(v4.5 — 24 Jul")
 # U-band prototype scaling: 55 GHz at the production 70-GHz operating point
 _ratio = 70.0 / hx["cutoff"]["fc_ghz"]

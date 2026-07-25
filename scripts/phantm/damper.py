@@ -46,8 +46,7 @@ DRV_RAW = {float(k): (np.array(v[0]) * 1e-3, np.array(v[1]))
 
 def pole_force(x, xs, fx, off):
     """Periodic interp of a single-pole curve evaluated at (x − off)."""
-    rel = np.mod(x - off - xs[0], PITCH) + xs[0]
-    return np.interp(rel, xs, fx)
+    return np.interp(x - off, xs, fx, period=PITCH)
 
 
 def net_det(x):
@@ -71,7 +70,7 @@ F_DRV = None
 T_PULSE = 1.5e-3
 
 # basins of the detent curve (stable zeros)
-s = np.sign(F_DET)
+s = np.where(F_DET > 0, 1, -1)          # zeros count as negative: robust crossings
 zc = np.where((s[:-1] > 0) & (s[1:] < 0))[0]
 basins = X[zc]
 # stepping convention: energising pole 0 pulls TOWARD its alignment — so the
@@ -100,7 +99,10 @@ def simulate(ao_m2, t_end=60e-3, dt=1e-6, air=True, f_drv=None, t_pulse=T_PULSE)
         def acc(x_, v_, p_):
             f = f_drv(x_) if drv else net_det(x_)
             f_air = -(p_ - P0) * A if air else 0.0
-            f_fric = -math.copysign(min(F_FRIC, abs(f + f_air)), v_) if abs(v_) > 1e-5 else 0.0
+            if abs(v_) > 1e-5:                      # sliding: full kinetic friction
+                f_fric = -math.copysign(F_FRIC, v_)
+            else:                                    # static: cap at applied force
+                f_fric = -math.copysign(min(F_FRIC, abs(f + f_air)), f + f_air)
             return (f + f_air + f_fric) / M
 
         def pdot(x_, v_, p_):
@@ -156,6 +158,7 @@ def main():
     # equilibrium is nearest the target (then min energy).
     xg = np.linspace(min(x0, x1) - 60e-6, max(x0, x1) + 60e-6, 1200)
     chosen = None
+    scheme_table = []
     for name, sch in schemes:
         fd = make_net_drv(sch)
         fv = np.array([fd(x) for x in xg])
@@ -171,6 +174,8 @@ def main():
         e_mj = sum(i**2 for i in sch.values()) * 0.552 * T_PULSE * 1e3
         print(f"{name:20s}: eq {[round(float(e)*1e6,1) for e in eq]} µm "
               f"(target {x1*1e6:.1f}); barrier {barrier*1e3:+.2f} mN; {e_mj:.1f} mJ/1.5ms")
+        scheme_table.append(dict(scheme=name, equilibria_um=[round(float(e) * 1e6, 1) for e in eq],
+                                 barrier_mn=round(barrier * 1e3, 2), e_mj_per_1p5ms=round(e_mj, 1)))
         if d_tgt is not None and d_tgt < 60 and barrier < 0.5e-3:
             if chosen is None or e_mj < chosen[2]:
                 chosen = (name, sch, e_mj)
@@ -228,8 +233,11 @@ def main():
         for lab2, ao2, air2 in (("recommended", ao, True), ("open", 0.0, False)):
             tr, _ = simulate(ao2, air=air2, f_drv=F_DRV, t_pulse=best["hold_ms"] * 1e-3)
             trajs[lab2] = tr
+    k_air_sealed = GAMMA * P0 * A**2 / (A * L0)
     out = dict(config=C["config"], mass_kg=M, k_det=K, fn_hz=round(fn, 1),
-               drive_scheme=scheme_name,
+               drive_scheme=scheme_name, scheme_table=scheme_table,
+               k_air_sealed_n_per_m=round(k_air_sealed, 1),
+               friction_n=F_FRIC, mass_note="dynamics mass = translator + 3 mg reflector/standoff",
                c_crit=round(c_crit, 4), step_um=round(STEP * 1e6, 1),
                chamber_area_mm2=round(A * 1e6, 3), L0_mm=L0 * 1e3,
                assumptions="back cavity vented; isentropic; Cd 0.65; edge leak "

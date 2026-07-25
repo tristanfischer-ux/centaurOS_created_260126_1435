@@ -226,7 +226,7 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v5 — 25 Jul: adds the optimisation campaign (§10) with the balanced-set recommendation; council-reviewed; pending 3D-FE/prototype validation)")
+    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v5.1 — 25 Jul: optimisation campaign §10 + COMPLETE option ledgers with kills on the record + system-manufacturability §11; five-seat exhaustive red team applied; pending 3D-FE/prototype validation)")
     A("")
     A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
@@ -1094,6 +1094,17 @@ def main():
       "RF and stays with Tony/Vlad.")
     A("")
 
+    A("### 9.5b The drive/PCB options ledger — passed and failed")
+    A("")
+    A("Same rule as everywhere: the kills stay on the record. 11 drive/PCB options "
+      "(pcb-options.json), including two topologies killed by council review and one "
+      "OPEN GATE (the demagnetisation check) that currently blocks the dual scheme:")
+    A("")
+    pl = os.path.join(OUT, "opt", "PCB-OPTIONS.md")
+    if os.path.exists(pl):
+        for ln in open(pl).read().splitlines()[1:]:
+            A(ln)
+    A("")
     A("### 9.6 How to make the cells — the tutorial, and who can fabricate them")
     A("")
     A("**The part**: a tileable hex lattice (24-hex, 19.7 × 20.8 mm, or 7-hex), interior "
@@ -1167,6 +1178,19 @@ def main():
       "alongside the actuator outreach (Annex E carries the cell specification).")
     A("")
 
+    A("### 9.7 The hex-cell options ledger — fabrication, geometry, plating")
+    A("")
+    A("16 cell options scored with the validated §9 sensitivities (fc moves "
+      "17.3 MHz/µm of interior; band edge from usable travel; ≥10 skin depths of "
+      "copper). Kills — including the as-drawn single-piece moulding, killed by its "
+      "own 52:1 aspect ratio — stay on the record (cell-options.json):")
+    A("")
+    cl = os.path.join(OUT, "opt", "CELL-OPTIONS.md")
+    if os.path.exists(cl):
+        for ln in open(cl).read().splitlines()[1:]:
+            A(ln)
+    A("")
+
     # ------------------------------------------------- §10 optimisation
     A("## 10. The optimisation campaign — from 5 g to a chosen Pareto (24 Jul)")
     A("")
@@ -1183,26 +1207,48 @@ def main():
     A("")
     A("![duty sweep](opt/fig-opt-1A-duty.png)")
     A("")
-    A("- **Tooth duty is the dominant lever, and Tony's 50/50 guess was the worst in "
-      "range**: narrowing teeth to 0.40×pitch (186 µm teeth, wider slots) cuts fringing "
-      "exactly as he suspected — detent margin 5.0 → 8.5 g and drive at 1.8 A +75%. "
-      "Duty 0.30 looks better still as-drawn but is registration-fragile; 0.35 sits in "
-      "a genuine harmonic dip. The optimum is ROBUST across both registrations.")
+    A("- **Tooth duty is the dominant lever, and Tony's 50/50 guess left force on the "
+      "table**: narrowing teeth to 0.40–0.45×pitch raises the flux modulation "
+      "(4.8 → 7.4%) — consistent with Tony's fringing hypothesis, though the "
+      "mechanism is not field-decomposed — lifting as-drawn margin 5.0 → 8.5 g and "
+      "drive FORCE at the same 1.8 A by +76%. On the WORST registration the sweep's "
+      "best duty is 0.45 (10.0 mN) over 0.40 (8.9 mN): the recommendation of 0.40 is "
+      "a MASS-NORMALISED Pareto choice (better margin-per-gram and drive-per-amp), "
+      "not a unique electromagnetic optimum — council correction, on the record. "
+      "Duty 0.30 is registration-fragile; 0.35's harmonic dip makes it the worst "
+      "option of all on the exact registration (2.4 mN).")
     A("- **Deep translator slots are free margin**: force is flat with slot depth, so "
       "1.5× slots plus the wider duty-0.40 slots delete 52 mg of moving mass "
       "(158 → 106 mg).")
-    A("- **Stator slots 2× add ≈5–7%**; breadth is margin-neutral (force and mass both "
-      "scale with it) — it is a drive-efficiency lever only.")
+    A("- **Stator slots 2× add ≈6–7% force at unchanged mass.** Breadth — a separate "
+      "knob — is margin-neutral because force AND mass both scale with it; it is a "
+      "drive-efficiency lever only.")
     A("- **The basin check killed a mirage**: the relaxed-gap-40 variant passed 5 g on "
       "breakaway force but had only ONE detent basin per pitch at the as-drawn "
-      "registration — not a stepper. Breakaway without a basin count is a Goodhart "
-      "trap; every campaign row carries basin counts on both registrations since.")
-    A("- **Gap 30 µm is the honest manufacturing trade**: the full stack at 30 µm gives "
+      "registration — not a stepper (and most gap-40 rows never cleared 5 g on the "
+      "worst registration anyway). Breakaway without a basin count is a Goodhart "
+      "trap; every campaign row from the re-centre onward carries basin counts on "
+      "both registrations (batches 1–2 predate the check — their keepers were all "
+      "re-verified downstream).")
+    A("- **Gap 30 µm is the honest manufacturing trade**: the full N52 stack at 30 µm gives "
       "11.3/7.7 g with 3 basins on both registrations — the gauged-assembly tolerance "
       "relaxes 1.5× and the spec still clears with 54% worst-case margin. Gap 40 stays "
       "dead.")
     A("- **Magnet length**: detent grows to Pm ≈ 0.5 mm and the plateau beyond is soft "
-      "(+7% to 0.7 mm); Pm 0.4–0.5 is the sweet spot, and Pm remains the assembly trim.")
+      "(like-for-like ≈+3% per 0.1 mm beyond 0.6); Pm 0.4–0.5 is the sweet spot, and "
+      "Pm remains the assembly trim.")
+    A("")
+    A("### 10.1b The complete options ledger — everything tried, kept AND killed")
+    A("")
+    A("Per Tristan's instruction, the FULL record — including every failure and why it "
+      "failed — is part of the deliverable. 66 actuator/drive/damper options were "
+      "evaluated; 36 were killed. The ledger below is generated from the raw "
+      "artefacts (options-ledger.json):")
+    A("")
+    ledger = os.path.join(OUT, "opt", "OPTIONS-LEDGER.md")
+    if os.path.exists(ledger):
+        for ln in open(ledger).read().splitlines()[1:]:
+            A(ln)
     A("")
     A("### 10.2 The Pareto — detent strength buys stepping cost")
     A("")
@@ -1210,8 +1256,10 @@ def main():
       "neighbouring pole's magnet grip the translator harder than one coil can pull it "
       "off — BOTH optimised sets are unsteppable single-coil (a +7.4 mN mid-step "
       "barrier at moderate current). Stepping them needs a DUAL scheme: pull with the "
-      "target pole while CANCELLING the holding pole with reverse current. That works "
-      "cleanly — at a price:")
+      "target pole while CANCELLING the holding pole with reverse current (the "
+      "+7.4 mN single-coil barrier and each scheme's held equilibria are now "
+      "recorded per scheme in damper*.json's scheme_table). That works cleanly — "
+      "at a price:")
     A("")
     A("| Set | Detent drawn/worst-reg | k_det | Drive scheme | Energy/step | Settle | Coil ΔT/step |")
     A("|---|---|---|---|---|---|---|")
@@ -1220,7 +1268,7 @@ def main():
     A("| MAX-FORCE (as balanced + N52, Pm 0.5) | 19.9/14.9 mN → 19.1/14.3 g | 544 N/m | DUAL ±5 A hold 3 ms | 83 mJ | 8 ms | ≈97 K |")
     A("")
     A("The BALANCED set is the recommendation: 2.2× the 5 g spec on the WORST "
-      "registration (2.9× as-drawn), half the max-force set's step energy, faster settle, cooler "
+      "registration (2.9× as-drawn), ≈45% of the max-force set's step energy, faster settle, cooler "
       "coils. The max-force set stays on the table if the vehicle vibration envelope "
       "(§9.4 row 4, Tony's number) demands it. ΔT figures are adiabatic per step — "
       "occasional re-pointing is fine, sustained slewing is duty-limited; the queued "
@@ -1239,31 +1287,84 @@ def main():
       "≈300 N/m, displaces the parking position). The model includes the brief's "
       "0.35 mN guide friction — its omission in the first pass made capture impossible "
       "and was caught by trajectory diagnostics, a bug worth confessing because it "
-      "shows the discipline working. The hold-then-release drive of §4.4 remains the "
-      "capture strategy; the damper makes it fast and robust.")
+      "shows the discipline working (the friction and interpolation models were then "
+      "hardened again after the council-5 code audit, and the conclusions re-ran "
+      "UNCHANGED). Honest limits, per the same audit: the simulated step is 149.7 µm "
+      "(one of the drawn registration's short steps, not the 154.7 ideal); the "
+      "dynamics mass is 109.3 mg (translator 106.3 + 3 mg reflector/standoff) while "
+      "the margin tables use the translator alone; the sealed-case air spring "
+      "(γP₀A²/V₀ ≈ 296 N/m, now in the artefact) is isentropic — the isothermal "
+      "limit is ≈30% softer and the truth at 310–355 Hz sits between; and the "
+      "capture window is NARROW in vent size (Ø0.15 works, Ø0.20 already fails), so "
+      "a continuous vent/tolerance sweep with pressure-dependent discharge is on the "
+      "punch list before the foil is specified. The hold-then-release drive of §4.4 "
+      "remains the capture strategy; the damper makes it fast at the nominal point.")
     A("")
     A("### 10.4 Consequence for the drive electronics (§9.5 amendment)")
     A("")
     A("The dual pull-and-cancel scheme requires the cancel coil to carry REVERSE "
       "current — so the §9.5 unipolar topology (one low-side FET per coil) is "
-      "sufficient ONLY for the original 5 g design. The optimised sets need a "
-      "half-bridge per coil (or per phase pair). The aperture-board footprint "
-      "grows accordingly (2 FETs + clamp per coil still fits the 3.25 mm pitch in "
-      "1 mm-class packages); the rail-voltage-as-current-control principle and the "
-      "two-board stack survive unchanged. Flagged for the next electronics pass and "
-      "council check.")
+      "sufficient ONLY for the original 5 g design. Reversing current in a coil "
+      "needs a FULL H-BRIDGE per coil (or a complementary half-bridge returning to "
+      "a split mid-rail — council correction: a lone half-bridge cannot reverse). "
+      "The aperture board still fits the 3.25 mm pitch with 1 mm-class packages "
+      "both-sides; the rail-voltage-as-current-control principle and the two-board "
+      "stack survive. ⚠ AND ONE GATE NOW BLOCKS FREEZING THE DUAL SCHEME (council-5, "
+      "sol): the cancel coil drives REVERSE MMF straight across its own pole's "
+      "NdFeB — an irreversible-demagnetisation hazard, worst for the max-force "
+      "set's N52 (lowest coercivity margin). A temperature-dependent demagnetisation "
+      "FE (local H against the knee, repeated pulses, tolerances) is REQUIRED "
+      "before any dual-drive set ships; the fallback if it fails is the original "
+      "5 g detent with unipolar drive.")
     A("")
     A("### 10.5 What remains before tooling")
     A("")
     A("Tooth-tip/corner |B| probes (bridge-only today, ≤1.15 T), a joint "
       "duty×Pm×registration fine pass (council: fixed-Pm screening can mis-rank), the "
-      "coil heat redesign, the 2D-unrolled residual (the standing caveat) — and the "
-      "prototype force curve, which remains the single measurement that collapses all "
-      "of it.")
+      "coil heat redesign, the 2D-unrolled residual (the standing caveat), a CONTINUOUS "
+      "registration/tolerance sweep (two sampled registrations do not define a worst "
+      "case — council), mesh/force-extraction convergence around the duty optimum, "
+      "the demagnetisation gate of §10.4, the damper vent tolerance sweep — and the "
+      "prototype force curve, which remains the single measurement that collapses "
+      "most of it.")
     A("")
 
-    # ---------------------------------------------------------------- §11
-    A("## 11. Traceability")
+    # ------------------------------------------------- §11 system DFM
+    A("## 11. Making the SYSTEM easy to manufacture — the combined ledger")
+    A("")
+    A("The three option funnels above (actuator 66 → 1 recommended, cells 16 → 2 "
+      "routes, drive 11 → 1 topology + 1 gate) combine into whole-system builds. "
+      "The design-for-manufacture principles the campaign PROVED, then the builds:")
+    A("")
+    A("- **Wall thickness is free** (not an RF dimension): the cell manufacturer may "
+      "thicken 150 µm walls to 0.25–0.30 mm to make single-piece moulding viable — "
+      "the RF interior stays 3.10 mm. That converts an impossible part into a "
+      "standard one at the cost of array pitch (Vlad's call) and lattice mass.")
+    A("- **The gauged 20 µm gap is the single most expensive assembly step, and it "
+      "is now optional**: gap 30 µm clears spec on both registrations with 54% "
+      "margin — a 1.5× looser tolerance bought with magnet grade and geometry "
+      "already in hand.")
+    A("- **The monolithic pole** (Tony's own catch) deletes both yoke glue joints; "
+      "the only remaining flux-path joints sit in the magnet seat where µm-scale "
+      "glue costs 1.7%, not 5%/joint.")
+    A("- **Deleted operations, by the numbers**: no lamination stacks (flux-diffusion "
+      "15–60 µs ≪ pulses), magnetise-after-assembly as a supplier service, coils "
+      "wound in situ on the open horseshoe, damper drilled (one Ø0.15 mm hole) "
+      "rather than assembled.")
+    A("")
+    A("| System build | Cells | Actuator | Gap | Drive PCB | Flux joints | Gauged steps | Open gates | Verdict |")
+    A("|---|---|---|---|---|---|---|---|---|")
+    A("| A · PROTOTYPE-NOW | print + plate (±25 µm) | original 5 g design | 20 µm gauged | unipolar, 72 FETs | 2 (magnet seat) | 1 | none | build FIRST — cheapest path to a force curve, no gates |")
+    A("| B · BALANCED PRODUCT | two-half mould + plate | BALANCED set (11.0 g worst-reg) | 20 µm gauged | full-H per coil | 2 | 1 | demag gate §10.4 | the performance product — pending one FE gate |")
+    A("| C · EASIEST BUILD | thick-wall single mould (0.25–0.30) | BALANCED set at gap 30 (7.7 g worst-reg) | 30 µm (1.5× looser) | full-H per coil | 2 | 1 (relaxed) | demag gate | fewest hard operations of any spec-clearing build |")
+    A("")
+    A("Recommended sequencing: build A immediately (it validates the FE with zero "
+      "gates), run the demagnetisation FE in parallel, then choose B or C on Tony's "
+      "margin-versus-cost ruling with the gate closed.")
+    A("")
+
+    # ---------------------------------------------------------------- §12
+    A("## 12. Traceability")
     A("")
     A("Every headline number maps to a machine-readable artefact in `scripts/phantm/out/`: "
       "five-numbers.json (lumped v1) · femm-five-numbers.json (baseline FE) · "
@@ -1290,7 +1391,7 @@ def main():
     outreach = os.path.join(OUT, "SUPPLIER-OUTREACH-DRAFTS.md")
     if os.path.exists(outreach):
         A("")
-        A("## 12. Supplier outreach — verified contacts, draft emails and "
+        A("## 13. Supplier outreach — verified contacts, draft emails and "
           "request-for-quotation specifications")
         A("")
         body = open(outreach).read()

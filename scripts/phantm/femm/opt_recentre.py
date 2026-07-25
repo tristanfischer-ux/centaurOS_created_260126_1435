@@ -45,8 +45,9 @@ def apply_winner(gap, duty, ts, br):
 def basins(model_net, p):
     xg = np.linspace(-p / 2, p / 2, 481)
     f = model_net(xg)
-    # count stable zero-crossings (force + -> -)
-    s = np.sign(f)
+    # count stable zero-crossings (force + -> -); zeros count as negative so an
+    # exact-zero sample cannot hide a crossing (council5 code audit)
+    s = np.where(f > 0, 1, -1)
     idx = np.where((s[:-1] > 0) & (s[1:] < 0))[0]
     return int(len(idx))
 
