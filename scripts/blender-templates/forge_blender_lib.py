@@ -111,6 +111,20 @@ def init_scene_cycles_hero():
                 ("preview_samples", max(8, sample_count // 2)),
                 ("use_denoising", True), ("denoiser", "OPENIMAGEDENOISE"),
                 ("device", "CPU"),  # safe default; Metal/CUDA optional later
+                # BOUNCE + TILE CAPS (2026-07-25): the glass/transmission material pass made the
+                # interior-showing passes (00-hero cutaway, 08-ghost) OOM-crash on CPU Cycles, so
+                # the cutaway image went MISSING from the Renders tab. Cycles defaults transmission
+                # bounces to 12; a glass-heavy interior then traces very deep, ballooning peak
+                # memory. Cap total/transmission bounces (negligible visual change for a product
+                # shot) + enable auto-tiling to bound peak memory so the interior render completes.
+                ("max_bounces", 6),
+                ("diffuse_bounces", 3),
+                ("glossy_bounces", 4),
+                ("transmission_bounces", 6),
+                ("transparent_max_bounces", 6),
+                ("volume_bounces", 0),
+                ("use_auto_tile", True),
+                ("tile_size", 256),
             ]:
                 try: setattr(cycles, attr, val)
                 except (AttributeError, TypeError): continue

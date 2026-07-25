@@ -85,7 +85,13 @@ CABLE_CHANNEL_MIN_W_MM = 4.0
 # Soft studio world + softbox lights live in forge_blender_lib
 # (make_instrument_studio_world / add_instrument_studio_lights). Defaults:
 INSTRUMENT_CYCLES_SAMPLES_DEFAULT = 128
-INSTRUMENT_RENDER_RESOLUTION = (3600, 2400)
+# 2026-07-25: 3600×2400 (8.6M px) × CPU Cycles × the glass-heavy material pass OOM-crashed
+# the multi-view render partway (the 00-hero CUTAWAY + module pages went MISSING, so the
+# Renders tab shipped no internal image). 2400×1600 (3.8M px) cuts peak memory ~2.3× — still
+# far sharper than the Excel/PDF embed size — so all ~25 views (inspect + product + hero +
+# ghost + modules) complete in one process. Pairs with the Cycles bounce/tile caps in
+# forge_blender_lib.init_scene_cycles_hero.
+INSTRUMENT_RENDER_RESOLUTION = (2400, 1600)
 # GOTCHA: never lift exposure for instruments — softboxes already model the
 # form; +0.15 crushed charcoal to clay-white (2026-07-13).
 INSTRUMENT_EXPOSURE_LIFT = 0.0
