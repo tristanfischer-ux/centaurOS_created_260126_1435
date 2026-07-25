@@ -343,6 +343,14 @@ contains("renumbered refs", "actuator of §2 is the device",
          "All of §10.9 is live in PHANTM-CALC.xlsx")
 absent("no stale old refs", "§9.8", "§9.9", "§10.1b", "§0.3", "§8.9",
        "§9.5c", "the §9 sensitivities")
+# proofread round (25 Jul, Tristan-directed): retired strings stay retired
+absent("proofread fixes hold", "16.4 W pulses", "table above", "28/28 green",
+       "(before reading on)", "4-seat cross-lineage",
+       "can be finalised (§A.2)")
+contains("proofread fixes present", "the §11 band table",
+         "15.4 W pulses", "now ANSWERED by derivation",
+         "BASELINE drive (original design / Prototype-A) is UNIPOLAR",
+         "rounds 1–4, the historical record", "GLM-5.2")
 
 # ---------------- §9.9 wall-thickness proof ---------------------------------
 wp = json.load(open(os.path.join(OUT, "wall-proof.json")))

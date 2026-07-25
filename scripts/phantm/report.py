@@ -233,10 +233,12 @@ def main():
       f"nulling, feed) stays with Tony/Vlad. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
       "validated on a gapped C-core to 2.5%, mesh-converged <1%, force cross-checked "
-      "weighted-stress-tensor vs co-energy). Reviewed by a 4-seat cross-lineage LLM "
-      "council (GPT-5.6-Sol physics fact-check · Grok-4.5 adversarial · MiniMax-M3 "
-      "honesty audit; the Kimi-K3 seat returned empty and is recorded as such) — every "
-      "surviving finding is incorporated. Code + artefacts: `scripts/phantm/`.")
+      "weighted-stress-tensor vs co-energy). Reviewed across multiple cross-lineage "
+      "LLM council rounds (GPT-5.6-Sol physics fact-check · Grok-4.5 adversarial, "
+      "twice, incl. the wall-thickness attack · Kimi-K3 code audit · GLM-5.2 "
+      "structure/readability read of this v6 · MiniMax-M3 honesty audit) — every "
+      "surviving finding is incorporated; refutations and full transcripts are in "
+      "`out/`. Code + artefacts: `scripts/phantm/`.")
     A("")
     A("**One-paragraph verdict:** the actuator as specified in the brief (geometry Qs 5/6 noted) cannot generate its "
       "specified forces — the net zero-power detent saturates at ≈0.5 mN — ≈×15 below the "
@@ -254,7 +256,7 @@ def main():
     A("")
 
     # ---------------------------------------------------------- §0 Tony response
-    A("## 0. Response to Tony's feedback of 24 July (before reading on)")
+    A("## 0. Response to Tony's feedback of 24 July (rounds 1–4, the historical record)")
     A("")
     A("Tony confirmed the physics numbers \"mostly well match my own calculations\" "
       "and corrected the framing in four ways, each actioned below:")
@@ -745,8 +747,9 @@ def main():
     A("3. Orientation confirmed? (translator axis along beam depth — assumed)")
     A("4. Peak temperature (NdFeB demag margin check is one line once known) and the "
       "real driver voltage (1 V limits drive to reduced-margin stepping; 2 V unlocks "
-      "the full 2·Fd point). NEW: the cell's guide-wavelength/cutoff at ~70 GHz, so "
-      "the stroke requirement (λg/2) and phase-per-step can be finalised (§0.2).")
+      "the full 2·Fd point). The cell's cutoff/guide-wavelength ask is now ANSWERED "
+      "by derivation (§9.2: fc 53.56 GHz from the measured interior) — the remaining "
+      "ask is Vlad's confirmation on the metallised cell (§0.2).")
     A("5. **Pole spacing: brief 374 µm vs your CAD 400 µm vs exact 390 µm — which "
       "rules?** (374 ⇒ steps 172.6/146.1/145.3 µm, ±3.4° jitter at 80 GHz.)")
     A("6. **Tooth profile: brief 232+232 (pitch 464) vs the 465/620 dimensions "
@@ -998,7 +1001,7 @@ def main():
       "fitting the 3.1 mm interior (§8.9, 0.35 mm width margin) remains the "
       "make-or-break packaging fact — and it fits (0.35 mm is the WIDTH margin at "
       "the actuator's 2.634 mm height; the height margin itself is 0.47 mm).")
-    A("2. **Stroke budget** — table above: single-group covers the band (cell "
+    A("2. **Stroke budget** — the §9.2 band table: single-group covers the band (cell "
       "depth binding); the two-group option (§0.3's force-doubler: TWO 3-pole "
       "stator groups on one translator, halving usable stroke to ≈3.7 mm) is a "
       "≥67 GHz option only.")
@@ -1055,8 +1058,10 @@ def main():
     A("")
     A("![D6](drawing-D6-pcb.png)")
     A("")
-    A("**The drive is UNIPOLAR — a council correction that simplified the whole "
-      "board.** The first-draft architecture (three shared full-H phase bridges + a "
+    A("**The BASELINE drive (original design / Prototype-A) is UNIPOLAR — a council "
+      "correction that simplified the whole board; the optimised sets take the "
+      "H-bridge upgrade of §10.4, as the reader has just seen.** The first-draft "
+      "architecture (three shared full-H phase bridges + a "
       "dual select-FET per cell) was killed in review (gemini-3.1): a dual FET "
       "cannot block a bipolar phase rail — body diodes conduct and deselected coils "
       "cross-feed. The fix is cheaper than the bug: step DIRECTION comes from the "
@@ -1082,7 +1087,7 @@ def main():
       "makes it between linear and quadratic — council items, gemini-3.1 + sol), and coil warming "
       "(+0.39%/K) trims current a few percent within a burst.")
     A("- **Idle power is zero** (the PM detent holds); the budget is re-pointing "
-      "bursts, quoted per regime. STEPPING (1.8 A): tile 0.65 J, 16.4 W pulses / "
+      "bursts, quoted per regime. STEPPING (1.8 A): tile 0.65 J, 15.4 W pulses / "
       "≈6 W average, 0.12 s at 8-parallel; a 10 × 10 cm panel (≈1,093 cells) "
       "29.3 J, 5.5 s at 8-parallel or 0.72 s at 64-parallel (131 W pulses). "
       "WORST-CASE FULL-DRIVE (3.35 A): tile 2.2 J, 53.6 W pulses / ≈20 W average; "
@@ -1511,12 +1516,18 @@ def main():
     A("**Final verification round (" + stamp + "):** a deterministic harness "
       "(verify_report.py, wired into selftest) recomputes every hand-derivable "
       "number from first principles, cross-checks every FE number against its "
-      "artefact, enforces a stale-string blacklist, and pins the 3D model's "
-      "constants to the analysed geometry — 28/28 green. A 5-seat cross-lineage "
-      "council then reviewed physics validity, red-teamed both headline "
-      "conclusions, steel-manned the design, and re-verified all 11 figures; its "
+      "artefact, compiles and runs the firmware in both configurations, pins the "
+      "structure, claims register and Excel workbook, enforces a stale-string "
+      "blacklist, and pins the 3D model's constants to the analysed geometry — "
+      "ALL GREEN at every release. A 5-seat cross-lineage "
+      "council reviewed physics validity, red-teamed both headline "
+      "conclusions, steel-manned the design, and re-verified all figures; its "
       "one substantive catch (registration sensitivity of the detent residual) "
-      "was settled by a fresh FE solve and is now §4's F3 trade.")
+      "was settled by a fresh FE solve and is now §4's F3 trade. The v6 "
+      "restructure took a further fresh-eyes structure/readability seat "
+      "(GLM-5.2) plus a full human-directed proofread; every accepted finding "
+      "is fixed at source, and the two rejected findings carry their reasons "
+      "in out/council-v6-structure-glm.txt.")
 
     # ---------------------------------------------------------------- §10
     outreach = os.path.join(OUT, "SUPPLIER-OUTREACH-DRAFTS.md")
