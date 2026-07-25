@@ -263,6 +263,136 @@ def seat_spine_principals_in_manifest(
     return n
 
 
+# ── culture-vessel unification (Tristan 2026-07-25 "on top, accessible") ──────────
+# The sealed vial-bioreactor render draws the culture vessel as the ON-TOP hero
+# signature mesh (u_se_le_vial), but the real BoM vessel part (X-103) is packed
+# small-and-inside by the interior packer — so the GA (which reads the manifest)
+# drew the vessel INSIDE while the render showed it ON TOP ("they don't look
+# anything like each other"). SOURCE fix: seat the real vessel row's manifest
+# position + dims from the on-top signature-mesh bbox, so manifest = render = GA
+# (ONE vessel, on top). Universal: keyed on vessel-noun tokens + the u_se_le_vial
+# mesh union, never a product-class slug. Update-in-place when the row exists
+# (never additive-duplicate — that would double-count the vessel); additive from
+# state only when the packer skipped it entirely.
+_VESSEL_NOUN_RE = re.compile(
+    r"\b(vial|culture\s+vessel|culture\s+chamber|bioreactor\s+vessel|"
+    r"culture\s+flask|reaction\s+vessel|growth\s+vessel|culture\s+bottle)\b",
+    re.I,
+)
+# A holder / cap / probe / fitting that merely MENTIONS the vessel is NOT the vessel.
+_VESSEL_EXCLUDE_RE = re.compile(
+    r"holder|fixture|probe|thermistor|sensor|\bcap\b|\blid\b|seal|septum|clamp|"
+    r"collar|bracket|mount|gasket|o-ring|adapter|fitting|tubing|\bline\b|port|stir",
+    re.I,
+)
+# The DRAWN vessel geometry the render actually shows — build_universal_scene unions
+# the vessel cutaway-cue meshes (u_se_cutaway_cue_int_<slug>_{body,cap,neck}) and passes
+# the bbox under this key. (The bare u_se_le_vial signature mesh is hidden/replaced by
+# the universal pack, so the drawn vessel is the cutaway cue, NOT a u_se_le_* mesh.)
+_VESSEL_MESH_PREFIX = "vessel_drawn"
+
+
+def _find_vessel_row(rows: list[dict]) -> Optional[dict]:
+    """The single real culture-vessel manifest row (vessel-noun, not a holder/probe)."""
+    for r in rows:
+        nm = str(r.get("name") or "")
+        if _VESSEL_NOUN_RE.search(nm) and not _VESSEL_EXCLUDE_RE.search(nm):
+            return r
+    return None
+
+
+def _vessel_seat_from_state(state: Optional[dict]) -> Optional[dict[str, str]]:
+    """{tag, name} for the culture-vessel principal from the BoM (additive fallback)."""
+    if not isinstance(state, dict):
+        return None
+    rb = ((state.get("requirementsBom") or {}).get("rows")
+          or state.get("requirements_bom_rows") or [])
+    for r in rb:
+        if not isinstance(r, dict) or r.get("status") == "SUB-COMPONENT":
+            continue
+        name = str(r.get("requirement") or r.get("name") or "").strip()
+        if name and _VESSEL_NOUN_RE.search(name) and not _VESSEL_EXCLUDE_RE.search(name):
+            return {"tag": str(r.get("tag") or "").strip(), "name": name}
+    return None
+
+
+def _vessel_mesh_bbox(
+    mesh_bbox_by_prefix: Optional[dict[str, tuple[float, float, float, float, float, float]]],
+) -> Optional[tuple[float, float, float, float, float, float]]:
+    """Union bbox of the on-top vessel signature meshes (vial + fluid fill + collar)."""
+    if not mesh_bbox_by_prefix:
+        return None
+    acc: Optional[list[float]] = None
+    for k, bb in mesh_bbox_by_prefix.items():
+        if not (k == _VESSEL_MESH_PREFIX or k.startswith(_VESSEL_MESH_PREFIX)):
+            continue
+        if not bb:
+            continue
+        if acc is None:
+            acc = list(bb)
+        else:
+            acc = [min(acc[0], bb[0]), max(acc[1], bb[1]),
+                   min(acc[2], bb[2]), max(acc[3], bb[3]),
+                   min(acc[4], bb[4]), max(acc[5], bb[5])]
+    return tuple(acc) if acc is not None else None  # type: ignore[return-value]
+
+
+def seat_vessel_on_top_from_mesh(
+    rows: list[dict],
+    state: Optional[dict] = None,
+    mesh_bbox_by_prefix: Optional[
+        dict[str, tuple[float, float, float, float, float, float]]
+    ] = None,
+) -> int:
+    """Seat the real culture-vessel manifest row to the ON-TOP signature-mesh pose.
+
+    @description Mutates `rows` in place so the vessel the render draws on top and the
+    vessel the GA draws from the manifest are ONE object. Update-in-place when the
+    vessel row exists (never a duplicate); additive from state only when the packer
+    skipped the vessel entirely. Idempotent (no-op once seated to the same pose).
+    @returns 1 when a vessel row is seated/updated, else 0.
+    """
+    if not isinstance(rows, list):
+        return 0
+    if not (isinstance(state, dict) and state.get("isInstrumentDevice")):
+        return 0
+    bb = _vessel_mesh_bbox(mesh_bbox_by_prefix)
+    if not bb:
+        return 0  # no on-top vessel signature (not a vial-bioreactor form) → no-op
+    xmin, xmax, ymin, ymax, zmin, zmax = bb
+    pos = [round((xmin + xmax) / 2.0, 1), round((ymin + ymax) / 2.0, 1),
+           round((zmin + zmax) / 2.0, 1)]
+    dims = {"w": round(max(1.0, xmax - xmin), 1),
+            "d": round(max(1.0, ymax - ymin), 1),
+            "h": round(max(1.0, zmax - zmin), 1)}
+    row = _find_vessel_row(rows)
+    if row is not None:
+        if (row.get("geometry_source") == "vessel_seat_on_top_from_signature_mesh"
+                and row.get("pos_mm") == pos):
+            return 0  # idempotent
+        row["pos_mm"] = pos
+        row["dims_mm"] = dims
+        row["geometry_source"] = "vessel_seat_on_top_from_signature_mesh"
+        return 1
+    # Additive: the packer skipped the vessel — create its row from the BoM identity.
+    seat = _vessel_seat_from_state(state)
+    if seat is None:
+        return 0
+    rows.append({
+        "tag": _slug(seat["name"]),
+        "equipment_tag": seat["tag"] or "",
+        "name": seat["name"],
+        "module": "culture_vessel",
+        "shape": "instrument",
+        "qty": 1,
+        "region_rank": 50,
+        "pos_mm": pos,
+        "dims_mm": dims,
+        "geometry_source": "vessel_seat_on_top_from_signature_mesh",
+    })
+    return 1
+
+
 def reseat_run_manifest(run_dir: Path) -> int:
     """Offline: reseat spine principals into an existing parts-manifest.json (+ blender copy)."""
     run_dir = Path(run_dir)
@@ -341,7 +471,41 @@ def _selftest() -> None:
     ui = next(r for r in rows2 if r["name"] == "Compute UI Module")
     assert ui["geometry_source"] == "spine_principal_seat_from_story_mesh"
     assert ui["pos_mm"] == [-20.0, 0.0, 35.0]
-    print("instrument-spine-manifest _selftest: OK (donor seat + mesh seat + idempotent)")
+
+    # ── vessel-on-top seat proveCatch (Tristan 2026-07-25 vessel unification) ──
+    vstate = {"isInstrumentDevice": True}
+    vmesh = {  # drawn vessel cutaway-cue union: a tall vessel z ≈ 312→375, ~52 dia
+        "vessel_drawn": (-26.0, 26.0, -26.0, 26.0, 312.0, 375.0),
+    }
+    # (a) UPDATE-in-place: the packed-small-inside vessel row moves on-top, big dims.
+    vrows = [
+        {"equipment_tag": "X-103", "name": "Borosilicate Culture Vial 20 ml",
+         "pos_mm": [-47.5, -90.6, 338.0], "dims_mm": {"w": 2.9, "d": 2.9, "h": 6.1}},
+        {"equipment_tag": "X-105", "name": "Vial Holder Fixture",
+         "pos_mm": [-16.5, -38.6, 328.0], "dims_mm": {"w": 6.4, "d": 4.3, "h": 2.8}},
+    ]
+    nv = seat_vessel_on_top_from_mesh(vrows, vstate, mesh_bbox_by_prefix=vmesh)
+    assert nv == 1, nv
+    vx = next(r for r in vrows if r["equipment_tag"] == "X-103")
+    assert vx["geometry_source"] == "vessel_seat_on_top_from_signature_mesh"
+    assert vx["pos_mm"][2] >= 340.0, vx["pos_mm"]          # centred on the tall drawn vessel
+    assert vx["dims_mm"]["w"] >= 40.0 and vx["dims_mm"]["h"] >= 50.0, vx["dims_mm"]  # real drawn size, not 2.9×6.1
+    # the HOLDER must NOT be mistaken for the vessel (still at its packed pose)
+    vh = next(r for r in vrows if r["equipment_tag"] == "X-105")
+    assert vh["pos_mm"] == [-16.5, -38.6, 328.0], vh["pos_mm"]
+    # idempotent
+    assert seat_vessel_on_top_from_mesh(vrows, vstate, mesh_bbox_by_prefix=vmesh) == 0
+    # (b) ADDITIVE: packer skipped the vessel → seat creates the row from BoM identity.
+    arows = [{"equipment_tag": "X-105", "name": "Vial Holder Fixture",
+              "pos_mm": [-16.5, -38.6, 328.0], "dims_mm": {"w": 6.4, "d": 4.3, "h": 2.8}}]
+    astate = {"isInstrumentDevice": True, "requirementsBom": {"rows": [
+        {"tag": "X-103", "requirement": "Borosilicate Culture Vial 20 ml"},
+        {"tag": "X-105", "requirement": "Vial Holder Fixture"}]}}
+    na = seat_vessel_on_top_from_mesh(arows, astate, mesh_bbox_by_prefix=vmesh)
+    assert na == 1 and any(r.get("equipment_tag") == "X-103" for r in arows), arows
+    # (c) no vessel mesh (non-vial form) → no-op
+    assert seat_vessel_on_top_from_mesh(vrows, vstate, mesh_bbox_by_prefix={"u_se_cutaway_cue_ui_pcb": (0, 1, 0, 1, 0, 1)}) == 0
+    print("instrument-spine-manifest _selftest: OK (donor seat + mesh seat + idempotent + vessel-on-top update/additive/holder-exclude)")
 
 
 if __name__ == "__main__":

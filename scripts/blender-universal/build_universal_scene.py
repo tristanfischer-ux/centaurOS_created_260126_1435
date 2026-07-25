@@ -6986,6 +6986,46 @@ def _instrument_story_mesh_bboxes_mm() -> dict:
     return out
 
 
+def _vessel_drawn_bbox_mm():
+    """World bbox (mm) of the DRAWN culture-vessel geometry — the cutaway-cue meshes
+    (u_se_cutaway_cue_int_<vessel-slug>_{body,cap,neck}) the render actually SHOWS,
+    NOT the tiny hidden base pack-mesh the manifest would otherwise key off. Seats the
+    vessel manifest row so the GA draws the vessel the RENDER draws (Tristan 2026-07-25
+    "they don't look anything like each other"). Vessel-noun keyed; holder / probe /
+    tube / wire / port excluded. Returns (xmin,xmax,ymin,ymax,zmin,zmax) or None."""
+    if not _IS_INSTRUMENT_DEVICE or not hasattr(bpy, "data"):
+        return None
+    _noun = re.compile(r"vial|culture|vessel|bioreactor|flask", re.I)
+    _excl = re.compile(r"holder|fixture|probe|thermistor|tube|wire|port|stir|pump|filter|sensor", re.I)
+    acc = None
+    for obj in bpy.data.objects:
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        nm = obj.name
+        if not nm.startswith("u_se_cutaway_cue_int_"):
+            continue
+        tail = nm[len("u_se_cutaway_cue_int_"):]
+        if not _noun.search(tail) or _excl.search(tail):
+            continue
+        try:
+            corners = [obj.matrix_world @ v.co for v in obj.data.vertices]
+        except Exception:  # noqa: BLE001
+            continue
+        if not corners:
+            continue
+        xs = [c.x * 1000.0 for c in corners]
+        ys = [c.y * 1000.0 for c in corners]
+        zs = [c.z * 1000.0 for c in corners]
+        bb = (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
+        if acc is None:
+            acc = list(bb)
+        else:
+            acc = [min(acc[0], bb[0]), max(acc[1], bb[1]),
+                   min(acc[2], bb[2]), max(acc[3], bb[3]),
+                   min(acc[4], bb[4]), max(acc[5], bb[5])]
+    return tuple(acc) if acc is not None else None
+
+
 def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
@@ -7022,8 +7062,21 @@ def write_parts_manifest(out_dir, parts, state=None):
         if _n_spine:
             print(f"[parts-manifest] seated {_n_spine} gold-spine principal(s) "
                   f"(Compute UI / LED Source Board)")
+        # VESSEL UNIFICATION (2026-07-25 Tristan "on top, accessible"): seat the real
+        # culture-vessel row (X-103) at the ON-TOP signature-mesh pose so the render's
+        # on-top vessel and the GA's manifest-drawn vessel are ONE object (was: vessel
+        # packed small-and-inside → GA drew it inside while the render showed it on top).
+        from instrument_spine_manifest import seat_vessel_on_top_from_mesh as _seat_vessel
+        _vessel_bb = _vessel_drawn_bbox_mm()
+        _seat_bb = dict(_mesh_bb)
+        if _vessel_bb:
+            _seat_bb["vessel_drawn"] = _vessel_bb
+        _n_vessel = _seat_vessel(rows, state, mesh_bbox_by_prefix=_seat_bb)
+        if _n_vessel:
+            print(f"[parts-manifest] seated culture vessel on top from signature mesh "
+                  f"(render = manifest = GA)")
     except Exception as _sse:  # noqa: BLE001 — never block the export
-        print(f"[parts-manifest] spine principal seat skipped: {_sse}")
+        print(f"[parts-manifest] spine principal / vessel seat skipped: {_sse}")
     # MICRO-COMPONENT DIMS CLAMP — FINAL PASS (organoid 2150, R4 2026-07-21).
     # resolved_dims_mm + the per-word manifest clamp (~L6647) already cap discrete
     # electronics, but a part that is the WIRING LOAD HUB (a shared-tray fan-out node —
