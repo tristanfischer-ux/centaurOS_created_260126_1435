@@ -42,9 +42,18 @@ def _target_present(v) -> bool:
 
 
 def brief_constraint_slots(state):
-    """Enumerate every brief constraint slot as (key, has_target: bool). A slot whose
-    target is null/missing MUST be disclosed N/A in the compliance table — never counted
-    PASS, never silently absent."""
+    """Enumerate the TOP-LEVEL brief constraint slots as (key, has_target: bool). A slot
+    whose target is null/missing MUST be disclosed N/A in the compliance table — never
+    counted PASS, never silently absent (the self-audit's exact concern: "brief has
+    mass_cap=null and operating_env missing … none disclosed as unverified or N/A").
+
+    Deliberately EXCLUDES target_performance.metrics: those are per-ROW compliance entries
+    whose null-target case is handled deterministically at render time by
+    _compliance_row_pass / _render_brief_compliance_section (commit afef9585 — a
+    quantitative null-target metric row renders UNVERIFIED). A metric with a null
+    metrics[].target frequently STILL resolves to a real value via
+    orchestratorContract.quantities (r7: name/target null but 20 ml / 37 C resolve
+    downstream), so enumerating them here would false-flag verifiable metrics."""
     pb = (state or {}).get("parsedBrief") or {}
     c = pb.get("constraints") or {}
     slots = []
@@ -52,12 +61,6 @@ def brief_constraint_slots(state):
                 "operating_environment", "design_life", "batch_size"):
         if key in c:
             slots.append((key, _target_present(c.get(key))))
-    tp = c.get("target_performance") or {}
-    for m in (tp.get("metrics") or []):
-        if not isinstance(m, dict):
-            continue
-        nm = m.get("name") or "metric"
-        slots.append((f"metric:{nm}", m.get("target") is not None))
     return slots
 
 
