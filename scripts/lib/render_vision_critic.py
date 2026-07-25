@@ -570,22 +570,21 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
     return res
 
 
-def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 90) -> dict:
+def _post_vision(content: list, model: str, timeout: int, checks_prompt: str) -> dict:
+    """Shared transport + robust parse for one OpenRouter vision call.
+
+    @param content Prebuilt OpenAI-shape content array (text + N image_url parts).
+    @param checks_prompt The rubric text used to count checks_run (Excel honesty gate).
+    Mirrors _critique_render_impl's 402 failover + fenced/truncated JSON recovery so
+    the single-image and multi-image entrypoints share ONE battle-tested code path.
+    """
     key = _key()
     if not key:
         return {"broken": None, "defects": [], "model": model, "ok": False, "error": "no OPENROUTER_API_KEY"}
-    try:
-        with open(image_path, "rb") as fh:
-            b64 = base64.b64encode(fh.read()).decode()
-    except OSError as exc:
-        return {"broken": None, "defects": [], "model": model, "ok": False, "error": f"read failed: {exc}"}
     body = json.dumps({
         "model": model,
         "max_tokens": 600,
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": _prompt_for_image(image_path)},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-        ]}],
+        "messages": [{"role": "user", "content": content}],
     }).encode()
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions", data=body,
@@ -644,8 +643,7 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
     # broken=false cannot mint a 9. Count the rubric's explicit "Flag broken=true"
     # criteria that this prompt asked the model to evaluate — a real glance, not a
     # nameless shrug. Deterministic from the prompt text; never invents per-item PASS.
-    prompt = _prompt_for_image(image_path)
-    checks = _rubric_check_labels(prompt)
+    checks = _rubric_check_labels(checks_prompt)
     res = {
         "broken": bool(v.get("broken")),
         "defects": v.get("defects") or [],
@@ -658,6 +656,45 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
     if v.get("incoherence_floor"):
         res["incoherence_floor"] = True
     return res
+
+
+def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 90) -> dict:
+    try:
+        with open(image_path, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode()
+    except OSError as exc:
+        return {"broken": None, "defects": [], "model": model, "ok": False, "error": f"read failed: {exc}"}
+    prompt = _prompt_for_image(image_path)
+    content = [
+        {"type": "text", "text": prompt},
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+    ]
+    return _post_vision(content, model, timeout, prompt)
+
+
+def critique_images(image_paths: list, prompt: str, model: str = DEFAULT_MODEL,
+                    timeout: int = 90) -> dict:
+    """Critique MULTIPLE images in one call against an explicit prompt.
+
+    @description Sends every image (labelled IMAGE 1..N in a text preamble) plus the
+    caller's prompt to the vision model. Used by the render-vs-GA coherence SIGHT
+    (drawing_vision_glance) — the two artefacts must depict ONE device; the model is
+    shown both together so it can judge cross-artefact agreement, not each alone.
+    Shares _post_vision's 402 failover + incoherence floor + robust parse.
+    """
+    if not image_paths:
+        return {"broken": None, "defects": [], "model": model, "ok": False, "error": "no images"}
+    content: list = [{"type": "text", "text": prompt}]
+    for idx, p in enumerate(image_paths, 1):
+        try:
+            with open(p, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode()
+        except OSError as exc:
+            return {"broken": None, "defects": [], "model": model, "ok": False,
+                    "error": f"read failed ({p}): {exc}"}
+        content.append({"type": "text", "text": f"IMAGE {idx}:"})
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+    return _post_vision(content, model, timeout, prompt)
 
 
 _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")

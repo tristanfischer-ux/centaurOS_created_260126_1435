@@ -74,7 +74,7 @@ from placement_fp import (  # noqa: E402
     placement_fingerprint,
 )
 from ga_glance_audit import ga_glance_coherent  # noqa: E402
-from drawing_vision_glance import drawing_vision_coherent  # noqa: E402
+from drawing_vision_glance import drawing_vision_coherent, render_ga_coherent  # noqa: E402
 
 # EVERY system drawing that can ship in the dossier — all must share one
 # parts-manifest generation (G16). Tabular sheets (panel / process schedules)
@@ -1175,6 +1175,32 @@ def run_gates(out_dir: str) -> list:
             else _g18_detail,
         ))
 
+    # ── G18b RENDER↔GA COHERENCE VISION SIGHT (2026-07-25 Tristan: "render and
+    # drawings were supposed to always be identical") ────────────────────────
+    # The single-image G18 critiques the GA and the render SEPARATELY, each against
+    # its own form rubric — so a GA that is individually plausible AND a render that
+    # is individually plausible both pass while depicting DIFFERENT devices (the
+    # vessel-on-top-in-render vs vessel-inside-in-GA divergence). This gate shows the
+    # model BOTH images together and flags cross-artefact disagreement of the dominant
+    # geometry — the irreducible visual residue G21/G22 (manifest-based) cannot see
+    # because the render's decorative meshes are not in the manifest. FLAG-ONLY;
+    # shadow unless RENDER_GA_VISION_ENFORCING=1; abstains offline / no key.
+    _g18b = render_ga_coherent(out_dir)
+    if _g18b is not None:
+        _g18b_ok, _g18b_detail = _g18b
+        _g18b_enforce = os.environ.get("RENDER_GA_VISION_ENFORCING", "").strip().lower() not in (
+            "", "0", "false", "no", "off", "shadow",
+        )
+        gates.append(Gate(
+            "render_ga_vision_coherence",
+            ["renders", "general-arrangement"],
+            "high",
+            True if not _g18b_enforce else _g18b_ok,
+            (f"SHADOW would-fail: {_g18b_detail}")
+            if not _g18b_enforce and not _g18b_ok
+            else _g18b_detail,
+        ))
+
     # ── G19 ENCLOSURE SHELL CONTAINS PARTS BBOX (2026-07-22) ─────────────────
     # The RENDER's outer envelope (enclosure shell dims) must CONTAIN the
     # DRAWING's parts-manifest bbox. A parts stack that exceeds the shell means
@@ -2142,6 +2168,7 @@ GATE_STAGE = {
     "drawing_set_coherence": "placement_fp on EVERY system SVG (GA/P&ID/BFD/SLD/panel/process/facility/distribution) + pairwise fp agree + phantom-tag content check + png≥svg + parts_ledger coverage ≥80%",
     "ga_glance_coherence": "ga_glance_audit.audit_ga_svg (cutaway-claim honesty + envelope-vs-dims + instrument form markers + FRONT data-glance HMI) + draw_ga title/FRONT HMI band",
     "drawing_vision_glance": "drawing_vision_glance.critique_drawing_set (GA PNG + product exterior — flag-only residue; proveCatch on known-bad fixture)",
+    "render_ga_vision_coherence": "drawing_vision_glance.render_ga_coherent (RENDER + GA shown together — flag-only cross-artefact residue; retry+tiebreak on nameless-broken; catches vessel-on-top-vs-inside G22 can't see)",
     "drawing_domain": "deriveDeviceEnergyTopology (device-scale topology override) + draw_single_line/_apply_distribution_voltage_model DC-product branch",
     "render_view_quality": "render_view_contract required_views + build_universal_scene product cameras + render_image_quality",
     "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",

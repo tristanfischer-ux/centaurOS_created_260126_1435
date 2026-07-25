@@ -275,6 +275,131 @@ _FIXTURE_BAD_GA = (
     _HERE.parent.parent / "tests" / "fixtures" / "render-vision" / "known-bad-red-beam.png"
 )
 
+# INTENT (Tristan 2026-07-25): the ghost render showed the culture vessel standing
+# ON TOP while the GA drew it small + flat + INSIDE the box — "they don't look
+# anything like each other". The deterministic coherence gate (G22) compares MANIFEST
+# feature-family PRESENCE, so a vessel-on-top-vs-in-corner PLACEMENT divergence walks
+# straight through. This is the irreducible VISUAL residue: show the model the RENDER
+# and the GA TOGETHER and ask "is this one device?". FLAG-ONLY (never mints a PASS),
+# shadow by default. Cross-artefact analogue of drawing_vision_glance's single-image
+# critics, using render_vision_critic.critique_images (two images, one call).
+_RENDER_GA_COHERENCE_PROMPT = (
+    "You are an adversarial chartered engineer performing a CROSS-ARTEFACT coherence "
+    "check. IMAGE 1 is a 3-D product RENDER of a device. IMAGE 2 is the 2-D GENERAL "
+    "ARRANGEMENT (orthographic) drawing of THE SAME device, generated from the same "
+    "design data. They MUST depict one and the same object.\n\n"
+    "Judge ONLY the gross geometry + placement of the DOMINANT features — never "
+    "shading, colour, texture, line-weight, annotation, or the number of views (a "
+    "drawing is flat line-art; a render is shaded — that difference is EXPECTED and is "
+    "NEVER a defect).\n\n"
+    "Flag broken=true ONLY when the two clearly disagree about the device itself:\n"
+    "  • a large feature prominent in one is ABSENT from the other (e.g. a vessel / "
+    "tower / vial standing proud on TOP in the render but nowhere on the drawing)\n"
+    "  • the same dominant feature sits in a RADICALLY different place or orientation — "
+    "on TOP / upright in one versus small, flat, or tucked INSIDE the box in the other\n"
+    "  • the overall body proportion or dominant part-count is grossly different (a tall "
+    "stacked assembly in one versus a plain low box in the other)\n\n"
+    "Do NOT flag shaded-vs-line-art, missing colour, extra orthographic views, "
+    "dimension text, or fine detail only visible at render resolution.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"which feature disagrees and how\", ...]}."
+)
+
+# Render candidates to pair against the GA, best-first. The ghost/cutaway shows the
+# same internal layout the GA draws, so it is the sharpest coherence probe; the hero
+# and exterior are the artefacts a human actually leads with.
+_COHERENCE_RENDER_CANDIDATES = (
+    "08-product-ghost-shell.png",
+    "00-hero.png",
+    "04-product-exterior.png",
+)
+
+
+def critique_render_ga_coherence(out_dir: str) -> dict:
+    """Show the hero/ghost RENDER and the GA drawing TOGETHER; flag if they disagree.
+
+    @returns {ok, broken, defects, images:[names], skipped?} — flag-only, never PASS.
+    """
+    out = Path(out_dir)
+    if not rvc._key():
+        return {"ok": False, "broken": None, "defects": [], "images": [],
+                "skipped": True, "error": "no OPENROUTER_API_KEY"}
+    ga = out / "drawings" / "general-arrangement.png"
+    if not (ga.is_file() and ga.stat().st_size > 800):
+        return {"ok": False, "broken": None, "defects": [], "images": [],
+                "skipped": True, "error": "no GA PNG to pair"}
+    render = None
+    for name in _COHERENCE_RENDER_CANDIDATES:
+        p = out / name
+        if p.is_file() and p.stat().st_size > 800:
+            render = p
+            break
+    if render is None:
+        return {"ok": False, "broken": None, "defects": [], "images": [],
+                "skipped": True, "error": "no render PNG to pair"}
+    imgs = [str(render), str(ga)]
+
+    def _call(model: str) -> dict:
+        return rvc.critique_images(imgs, _RENDER_GA_COHERENCE_PROMPT, model=model)
+
+    res = _call(rvc.DEFAULT_MODEL)
+    # NAMELESS-BROKEN FLAKE FILTER (mirrors render_vision_critic.critique_render): a
+    # broken verdict with an EMPTY defects list violates the rubric's own output
+    # contract ("flag ONLY these") — a NON-VERDICT. Give it ONE retry to substantiate,
+    # then a DIFFERENT-model tiebreak (perspective diversity, not re-rolling the same
+    # flaky judge). A named verdict upholds broken WITH names; a clean tiebreak overrules.
+    def _nameless_broken(r: dict) -> bool:
+        return bool(r.get("ok")) and r.get("broken") is True and not (r.get("defects") or [])
+
+    if _nameless_broken(res):
+        retry = _call(rvc.DEFAULT_MODEL)
+        if isinstance(retry, dict) and retry.get("ok"):
+            res = retry
+    if _nameless_broken(res):
+        tb_model = os.environ.get("VISION_TIEBREAK_MODEL", "x-ai/grok-4.3")
+        tb = _call(tb_model)
+        if isinstance(tb, dict) and tb.get("ok"):
+            tb["tiebreak_after_nameless"] = {
+                "first_model": rvc.DEFAULT_MODEL,
+                "verdict": "overruled" if tb.get("broken") is False else "upheld",
+            }
+            res = tb
+    entry = {
+        "ok": bool(res.get("ok")),
+        "broken": res.get("broken"),
+        "defects": list(res.get("defects") or []),
+        "images": [render.name, ga.name],
+        "model": res.get("model"),
+        "error": res.get("error"),
+        "skipped": False,
+    }
+    return entry
+
+
+def render_ga_coherent(out_dir: str) -> Optional[tuple[bool, str]]:
+    """Gate-shaped wrapper for the render-vs-GA coherence SIGHT. None = abstain.
+
+    FLOW: persists drawings/render-ga-coherence.json so a downstream Excel scorer /
+    ship card can read the cross-artefact verdict. Flag-only: a clean verdict is
+    necessary-but-not-sufficient; a broken verdict caps + names the divergence.
+    """
+    if os.environ.get("CHAIN_SKIP_RENDER_GA_COHERENCE", "").strip() in ("1", "true", "yes"):
+        return None
+    res = critique_render_ga_coherence(out_dir)
+    if not res.get("skipped"):
+        try:
+            dest = Path(out_dir) / "drawings" / "render-ga-coherence.json"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps(res, indent=2), encoding="utf-8")
+        except OSError as exc:
+            print(f"[render-ga-coherence] write failed: {exc}", file=sys.stderr)
+    if res.get("skipped") or not res.get("ok"):
+        return None  # no key / transient API — never fail the set offline
+    if res.get("broken") is True:
+        detail = "; ".join(res.get("defects") or ["unnamed render↔GA divergence"])[:280]
+        return False, f"render↔GA incoherent: {detail}"
+    return True, "render↔GA coherence glance clean"
+
 
 def critique_image(image_path: str, prompt: str, model: Optional[str] = None) -> dict:
     """Run the vision critic with an explicit drawing/exterior prompt."""
@@ -434,6 +559,22 @@ def _selftest() -> None:
     assert ifg.is_lab_microscope_form(product_class="lab_microscope")
     assert ifg.is_lab_microscope_form(product_class="openflexure")
     assert not ifg.is_lab_microscope_form(product_class="colorimeter")
+    # Render↔GA coherence prompt must NAME the on-top-vs-inside divergence (the
+    # organoid vessel case) + must have ≥3 "Flag broken=true" bullets so a clean
+    # verdict reports checks_run≥3, AND must explicitly NOT flag shaded-vs-line-art.
+    assert "TOP" in _RENDER_GA_COHERENCE_PROMPT and "INSIDE" in _RENDER_GA_COHERENCE_PROMPT
+    assert "line-art" in _RENDER_GA_COHERENCE_PROMPT.lower()
+    assert len(rvc._rubric_check_labels(_RENDER_GA_COHERENCE_PROMPT)) >= 3, \
+        rvc._rubric_check_labels(_RENDER_GA_COHERENCE_PROMPT)
+    # Without a key, the coherence critic must SKIP (never pretend PASS).
+    _prev_key2 = rvc._key
+    rvc._key = lambda: ""  # type: ignore[assignment]
+    try:
+        r = critique_render_ga_coherence("/tmp/nonexistent-render-ga-coherence")
+        assert r.get("skipped") is True, r
+        assert render_ga_coherent("/tmp/nonexistent-render-ga-coherence") is None
+    finally:
+        rvc._key = _prev_key2  # type: ignore[assignment]
     # Without a key, critique_drawing_set must SKIP (never pretend PASS).
     old = os.environ.pop("OPENROUTER_API_KEY", None)
     try:
