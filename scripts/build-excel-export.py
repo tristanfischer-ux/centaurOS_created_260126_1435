@@ -24423,9 +24423,18 @@ _dt(["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Key inputs", "F
     ["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Est class", "Confidence",
      "Row check"], numeric=["Qty", "Unit £", "Line £"],
     row_rules=[{"col": "Item", "rx": r"^\s*↳", "exempt": ["Unit £", "Line £", "Tag"]}])
+# A drawing NOT APPLICABLE to this class (P&ID / block-flow / process-schedules for a
+# fluid-less instrument) is written with an explicit "n/a" in Expected/Present/% present
+# (build ~L8906, ONLY when the parts-ledger coverage pct is None). "n/a" is a DELIBERATE,
+# honest not-applicable disclosure — not a missing cell — so a row whose "% present" is
+# "n/a" is EXEMPT from the required-cell check on those three columns (2026-07-25: the
+# cell-contract was counting "n/a" as a placeholder gap and capping BoM at 8.9 → floor 8.9;
+# a genuinely blank "% present" on an APPLICABLE drawing still fails, catching real gaps).
 _dt(["Drawing", "Expected", "Present", "% present", "", "", "", "", "", "", "", "", "", ""],
     "drawing-coverage", ["Drawing", "Expected", "Present", "% present"],
-    numeric=["Expected", "Present"])
+    numeric=["Expected", "Present"],
+    row_rules=[{"col": "% present", "rx": r"(?i)^\s*n/?a\s*$",
+                "exempt": ["Expected", "Present", "% present"]}])
 _dt(["Part", "Tag", "Status", "Inputs ← (from)", "Outputs → (to)", "Services"],
     "connection", ["Part", "Status"])
 _dt(["Housed device", "Tag", "Function", "Inputs ← (from)", "Outputs → (to)", "Connectors"],
