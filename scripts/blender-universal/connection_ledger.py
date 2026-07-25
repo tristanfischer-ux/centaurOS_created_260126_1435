@@ -800,6 +800,18 @@ _ELEC_GEAR_CLOSER_RE = re.compile(
     r"\bpcs\b|busbar|contactor|breaker|\bfuses?\b|switchgear|transformer|\brelay\b|"
     r"surge|arrester|bms\b|battery|cells?\b", re.I)
 
+# NON-WETTED STRUCTURAL / ELECTRONIC MOUNTS (2026-07-25, organoid council): a holder /
+# fixture / base plate / mounting / standoff / bracket / insulation / thermal-interface pad /
+# debug header / creepage / enclosure shell carries NO process fluid. The residual closer must
+# NOT (a) create a fluid tie FOR one, nor (b) pick one as the nearest fluid PARTNER for a genuinely
+# wetted part (that produced "Vial → Vial Holder Fixture | water", "Debug Header → Thermal
+# Insulation | water"). Conservative phrases only — deliberately NOT bare header/housing/plate,
+# which would exclude a real wetted media HEADER / filter HOUSING / manifold PLATE (Kimi warning).
+_NON_WETTED_STRUCT_RE = re.compile(
+    r"\bholder\b|fixture|base[_ -]?plate|mounting[_ -]?(?:frame|plate|bracket)|standoff|"
+    r"\bbracket\b|chassis|thermal[_ -]?insulation|\binsulation\b|thermal[_ -]?interface[_ -]?pad|"
+    r"debug[_ -]?header|\bcreepage\b|nameplate|enclosure[_ -]?shell", re.I)
+
 _ABSTRACT_BOUNDARY_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
@@ -1777,19 +1789,24 @@ def close_residual_completeness(parts, topology, required_services, log=print):
         # BOUNDARY closer applies (2026-07-11 run 70: the RESIDUAL closer re-plumbed
         # DN25 water through Power Semiconductors → DC DC Converters after the boundary
         # exemption landed; TWO creators, one rule).
-        if _ELEC_GEAR_CLOSER_RE.search(nm):
-            continue
+        if _ELEC_GEAR_CLOSER_RE.search(nm) or _NON_WETTED_STRUCT_RE.search(nm):
+            continue   # electrical gear + structural/electronic mounts are never fluid nodes
         r, m = _rank(nm), _mod(nm)
         for miss in c["missing"]:
             if miss == "fluid-input":
-                cands = [s for s in sources if s != nm and (nm, s) not in fwd_fluid]
+                # NEVER pick a non-wetted structural/electronic part as the fluid PARTNER — a
+                # genuinely wetted part's residual tie must land on another WETTED part (else the
+                # battery-limit boundary), not a holder/base-plate/insulation (2026-07-25 council).
+                cands = [s for s in sources if s != nm and (nm, s) not in fwd_fluid
+                         and not _NON_WETTED_STRUCT_RE.search(s)]
                 pool = [s for s in cands if _mod(s) == m] or cands
                 pick = _pick_nearest(pool, nm, r) if pool else _BL_FEED
                 _add(pick, nm, "water",
                      "process input (residual closer: nearest producer)" if pick != _BL_FEED
                      else "plant feed (battery limit)")
             elif miss in ("fluid-output", "fluid-connection"):
-                cands = [s for s in consumers if s != nm and (s, nm) not in fwd_fluid]
+                cands = [s for s in consumers if s != nm and (s, nm) not in fwd_fluid
+                         and not _NON_WETTED_STRUCT_RE.search(s)]
                 pool = [s for s in cands if _mod(s) == m] or cands
                 pick = _pick_nearest(pool, nm, r) if pool else _BL_EXPORT
                 _add(nm, pick, "water",
