@@ -101,17 +101,26 @@ def main():
         "constructive fix check: doubling one orientation evens every interior junction"
 
     t = 0.075  # candidate tape thickness, mm (Tony: 75–100 µm)
+    def _sd(rho):
+        return round(t * 1000 / (math.sqrt(rho / (math.pi * 57.5e9 * 4e-7 * math.pi)) * 1e6))
     geom = {
         "tape_mm": t,
-        "skin_depths_at_57p5": round(t * 1000 /
-                                     (math.sqrt(3.0e-8 / (math.pi * 57.5e9 * 4e-7 * math.pi)) * 1e6)),
+        # material-labelled (build-round fact-check: an unlabelled 206 was
+        # ambiguous — it was the worst-case PLATED-Cu figure)
+        "skin_depths_at_57p5": {"bulk_cu": _sd(1.72e-8),
+                                "plated_cu_worstcase": _sd(3.0e-8),
+                                "stainless_tape": _sd(7.0e-7),
+                                "note": "the RF conductor is the ≥3 µm Cu coating "
+                                        "(≈11δ) regardless of tape alloy"},
         "doubled_wall_mm": 2 * t,
         "doubled_fraction": "1/3 of walls (one orientation class; the row-strip "
                             "process gives the same fraction)",
         "pitch_anisotropy": f"pitch across doubled walls grows by t = {t*1000:.0f} µm "
                             f"≈ {100*t/3.25:.1f}% — a PERIODIC lattice-vector change "
-                            "(two lattice constants), not per-cell scatter; fc "
-                            "unchanged (interior held, §12 proof)",
+                            "(two lattice constants), not per-cell scatter; ISOLATED-CELL fc "
+                            "unchanged to first order (interior held, §12 proof) — the ARRAY "
+                            "response (coupling, scan impedance, Floquet lobes) needs the "
+                            "periodic-supercell check (build council, all seats)",
     }
     out = {"patches": rows, "geometry": geom,
            "verdict": "Tony's collision is an Euler-parity theorem, not a "
@@ -119,7 +128,11 @@ def main():
                       "(1) ROW STRIPS (commercial corrugated topology): many "
                       "short strips, node walls double — trivial paths, "
                       "exactly 1/3 of walls double, no boundary complication; "
-                      "(2) ONE tape with one orientation class doubled evens "
+                      "(2) ONE tape with one orientation class doubled is a TOPOLOGICAL "
+                      "ROUTE CANDIDATE (sol correction: parity is necessary, not "
+                      "sufficient — a finite-width fold simulation must confirm no "
+                      "self-intersection/turn violations; the 3/5/7 boundary counts "
+                      "are parity LOWER BOUNDS): doubling evens "
                       "every INTERIOR junction — a finite tile then needs a "
                       "handful of extra boundary walls doubled (route-"
                       "inspection), tape ends at the last odd pair; both give "

@@ -245,7 +245,7 @@ check("actuator ledger 66 options, 36 kills", ol["counts"].get("KILL") == 36
       and sum(ol["counts"].values()) == 66)
 co = json.load(open(os.path.join(OUT, "opt", "cell-options.json")))
 po = json.load(open(os.path.join(OUT, "opt", "pcb-options.json")))
-check("cell ledger 18 options, 4 kills", sum(co["counts"].values()) == 18
+check("cell ledger 20 options, 4 kills", sum(co["counts"].values()) == 20
       and co["counts"].get("KILL") == 4)
 check("pcb ledger 11 options, 5 kills + open demag gate",
       sum(po["counts"].values()) == 11 and po["counts"].get("KILL") == 5
@@ -261,7 +261,7 @@ _fc_hole = 1.8412 * 299.792458 / (_m.pi * 0.15)
 check("vent-hole cutoff 1.17 THz", abs(_fc_hole - 1171) < 5, f"{_fc_hole:.0f} GHz")
 check("Bethe leak −58 dB", abs(10 * _m.log10((0.15 / 4.283) ** 4) + 58.3) < 0.5)
 contains("§13 present (old 9.8)", "13. The RF-efficacy audit",
-         "INVARIANT — untouched by 94 of the 95 options",
+         "INVARIANT — untouched by 96 of the 97 options",
          "1.17 THz", "−58 dB", "electromagnetically SILENT",
          "must be SPECIFIED, not assumed")
 contains("ledgers present (v6)", "### 14.2 The complete options ledger",
@@ -378,8 +378,8 @@ contains("topology in report", "a THEOREM, not a process defect", "Euler trail",
          "⅓ of walls double", "two known lattice constants",
          "2+1+1 tape layers")
 lr = json.load(open(os.path.join(OUT, "lamination-route.json")))
-check("lamination screen: 8 routes, budget 1.25 µm",
-      len(lr["options"]) == 8
+check("lamination screen: 10 routes, budget 1.25 µm",
+      len(lr["options"]) == 10
       and abs(lr["tip_edge_budget_um_at_10pct_force"] - 1.25) < 0.01)
 check("lamination council on record",
       lr["council"]["sol"] == "SOUND-WITH-CORRECTIONS"
@@ -389,6 +389,23 @@ check("lamination council on record",
 contains("lamination route in report", "1b. Tony's stamped-and-stacked challenge",
          "VOLUME CO-LEAD CANDIDATE", "sheared edge", "SUPPLIER COUPON",
          "80/20 permalloy", "in-die interlocked stacking")
+
+# ---------------- build round (Tristan 25 Jul: seed → build, five seats) ----
+check("plating trim knob 34.6 MHz/µm·2", abs(2 * 17.3 - 34.6) < 0.01)
+check("build council transcripts on record", all(
+    os.path.exists(os.path.join(OUT, f"council-build-{s}.txt"))
+    for s in ("sol", "grok", "glm", "opus", "opus5")))
+contains("build round actuator in report", "1c. The build round",
+         "ALL FIVE seats", "GRIND/EDM the gap face", "profile-ROLL or COIN",
+         "coarser than an M0.5 thread", "5–20% of strip",
+         "WHEN and HOW the accurate surface is created")
+contains("build round cells in report", "HOBE-style expansion",
+         "trims fc by 34.6 MHz", "Make HOLES, not walls",
+         "topological ROUTE CANDIDATE", "periodic-supercell/Floquet check",
+         "pre-roll a periodic thickness pattern")
+_lrj = json.load(open(os.path.join(OUT, "lamination-route.json")))
+check("die-roll band widened (5,20)",
+      "(5, 20)" in open(os.path.join(HERE, "lamination_route.py")).read())
 
 # ---------------- §9.9 wall-thickness proof ---------------------------------
 wp = json.load(open(os.path.join(OUT, "wall-proof.json")))

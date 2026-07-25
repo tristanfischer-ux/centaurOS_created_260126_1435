@@ -29,7 +29,7 @@ DFDG_PCT_PER_UM = 8.0
 
 # stamping practice: minimum feature vs strip thickness; edge die-roll band
 RULES = {
-    "progressive_stamping": {"min_feature_over_t": 1.0, "die_roll_pct_t": (5, 10)},
+    "progressive_stamping": {"min_feature_over_t": 1.0, "die_roll_pct_t": (5, 20)},  # build-round: opus-4.8 says 10–20% typical; band widened, coupon decides
     "fine_blanking":        {"min_feature_over_t": 0.6, "die_roll_pct_t": (2, 5)},
     "photochemical_etch":   {"min_feature_over_t": 0.9, "die_roll_pct_t": (0, 2)},
 }
@@ -122,6 +122,21 @@ def main():
              verdict="KEEP — prototype/bridge volumes only",
              why="perfect for Prototype-A coupons and first hundreds; HAZ demands the same "
                  "anneal; per-part seconds never reach 10M/yr economics"),
+        dict(option="Profile-roll / coin the TEETH — die-replicated, never sheared (build round)",
+             verdict="KEEP — strongest precision-relocation move (build council: opus-4.8 #1, sol restrike, glm coin, opus-5 coin)",
+             why="thread/gear-rolling transplant: the 232 µm tooth at 464 µm pitch is coarser "
+                 "than an M0.5 thread, and rolling holds pitch to a few µm at billions/yr; "
+                 "rolled/coined surfaces replicate the die to <2 µm, work-hardened, no burr, "
+                 "no die-roll — the gap-facing surface is FORMED, not cut; blank the outline "
+                 "cheaply, form the teeth in the rigid die; validate with ONE coining die + "
+                 "profilometer coupon (~a week)"),
+        dict(option="Stack solid, then GRIND/EDM the gap face in one pass (build round)",
+             verdict="KEEP — consensus finisher (ALL FIVE build seats independently)",
+             why="stamp oversize → bond solid (legal, §A.10) → anneal → one fixtured "
+                 "grind/wire-EDM across the assembled tooth face: N per-leaf edge tolerances "
+                 "collapse into ONE 1–2 µm machining tolerance and the registration scallop "
+                 "vanishes; standard motor-core practice (stator-ID/rotor-OD skim); validate "
+                 "by grinding one hand-stacked 8-leaf coupon + interferometry (an afternoon)"),
         dict(option="Cold coining / precision forming",
              verdict="viable for the BRIDGE only",
              why="plain 0.348 × 1.162 bar coins trivially; toothed parts would still need a "
@@ -137,7 +152,14 @@ def main():
             "SOLID with no interlaminar insulation: cheapest possible stack",
             "stack factor ≈0.95–0.98 without insulation → few-% force penalty via area",
             "electrical-steel strip (non-oriented, Bsat ≈1.9–2.0 T) matches or beats "
-            "MIM Fe-3%Si (which carries sinter porosity); anneal after stamping mandatory",
+            "MIM Fe-3%Si (which carries sinter porosity); anneal typically required "
+            "after stamping (work hardening) but the SEQUENCE is a qualification, "
+            "not an assumption (sol correction)",
+            "tip-edge %-of-gap is a SCREENING number only — edge roll recesses "
+            "LOCAL pole area, it does not add uniformly to the gap; measured edge "
+            "profiles go into the magnetic FE directly (sol correction)",
+            "etch edges have no mechanical roll but DO have their own sidewall "
+            "profile (undercut/radius) — coupon, not datasheet (sol correction)",
             "80/20 permalloy electroform Bsat ≈0.8 T < our 1.0–1.15 T bridge flux — "
             "material, not process, rules that variant out",
         ],

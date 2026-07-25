@@ -72,6 +72,27 @@ crow("Folded/corrugated foil, welded, registered in a grooved base plate (Tony 2
      "Euler parity (foil-topology.json) — row strips (node walls double, 1/3 of walls) are "
      "the volume default, one-tape works with one orientation class doubled; seam continuity "
      "+ the mixed-wall periodic unit cell are Vlad's checks")
+crow("HOBE-style expansion: print node-lines FLAT, stack, cure, expand (build round)",
+     "fabrication",
+     "node bonds made while FLAT (gravure/screen print ±5 µm routine) — no 3D weld access "
+     "ever needed; the 1/3-double topology is NATIVE to expanded honeycomb; cell size set "
+     "by node-line pitch + expansion fixture; corrugate-then-bond variant locks shape by "
+     "the roll if free expansion relaxes the hexes",
+     "KEEP (volume candidate)",
+     "adopts the industry that already solved the Euler problem at 10M-cells/yr (build "
+     "council consensus: grok #1, opus-4.8, sol, opus-5); gate = expanded-cell regularity "
+     "vs the ±25 µm interior gate → hot-calibrate on a precision mandrel; the periodic-"
+     "supercell RF check still applies (Vlad)")
+crow("Stacked etched PLATES — make HOLES, not walls (build round, opus-5 lateral)",
+     "fabrication",
+     "≈8 etched/fine-blanked ≈1 mm plates with hex HOLES, dowel-aligned, diffusion-bonded "
+     "or brazed, then through-plated: lithographic ±10 µm lands directly on THE RF "
+     "dimension; single-thickness webs everywhere (no anisotropy, no supercell re-solve); "
+     "axial registration steps are weakly coupled to cutoff",
+     "KEEP (strong prototype/pilot route)",
+     "inverts the topology problem out of existence — walls are never FORMED, they are "
+     "what REMAINS around etched holes; Precision Micro-class suppliers already on the "
+     "list; arguably the best Prototype-B path")
 crow("Adapt the DESIGN to COTS metal honeycomb (1/8\" = 3.175 mm cell class)",
      "fabrication",
      "fc scales as 1/AF: 3.175 mm → 52.29 GHz (band edge IMPROVES); actuator fits any "

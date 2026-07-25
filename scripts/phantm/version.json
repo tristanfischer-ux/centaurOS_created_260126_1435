@@ -1,5 +1,5 @@
 {
  "major": 6,
- "minor": 2,
+ "minor": 3,
  "note": "package.py bumps minor on every build and stamps V{major}.{minor} + datetime into every deliverable filename (Tony 25 Jul: identical filenames across versions are a documentation nightmare). Bump major only on a structural re-release."
 }

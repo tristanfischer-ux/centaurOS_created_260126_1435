@@ -677,6 +677,44 @@ def main():
       "targets this adds: a precision motor-lamination house (progressive + "
       "in-die stacking) and Precision Micro for etched stacks — both bolt onto "
       "the existing Annexe A conversation.")
+    A("")
+    A("**1c. The build round (25 Jul, five seats: sol · grok · glm · Opus 4.8 · "
+      "Opus 5) — Tony's seeds grown into their strongest forms.** A second "
+      "council pass was tasked not to judge but to BUILD: fact-check everything, "
+      "then construct the modification that makes each seed work. Fact-check "
+      "corrections applied to the artefacts: the progressive die-roll band was "
+      "OPTIMISTIC (widened to 5–20% of strip — the raw-stamp gate is HARDER than "
+      "first stated); tip-edge-as-%-of-gap is a screening number, not a force "
+      "predictor (edge roll recesses LOCAL pole area — measured profiles go into "
+      "the FE); etch edges carry their own sidewall profile; the anneal sequence "
+      "is a qualification, not an assumption. And the two convergent builds that "
+      "route AROUND the sheared-edge gate rather than fighting it:")
+    A("")
+    A("- **Stack solid, then GRIND/EDM the gap face in one pass** — proposed "
+      "independently by ALL FIVE seats. Stamp oversize, bond the stack solid "
+      "(legal — flux diffusion cleared solid parts), anneal, then one fixtured "
+      "grind or wire-EDM across the assembled tooth face: N per-leaf edge "
+      "tolerances collapse into one 1–2 µm machining pass, the registration "
+      "scallop vanishes, and every upstream defect is removed simultaneously. "
+      "Standard motor-core practice. Cheapest test: hand-stack 8 leaves, grind, "
+      "interferometry — an afternoon.")
+    A("- **Never shear the tooth at all: profile-ROLL or COIN it** (Opus 4.8's "
+      "top move; sol/glm/Opus 5 variants). The 232 µm tooth at 464 µm pitch is "
+      "coarser than an M0.5 thread, and thread rolling holds a few µm at "
+      "billions/yr; a rolled/coined face replicates the die to <2 µm, "
+      "work-hardened, burr-free — the gap surface is FORMED, not cut. Blank the "
+      "outline cheaply; form the teeth in the rigid die. Cheapest test: one "
+      "coining die + profilometer — a week.")
+    A("- **Absorb the residual in electronics** (Opus 5): the array already "
+      "needs per-cell calibration, so a per-element force/gap measurement and "
+      "pulse-energy trim table makes ABSOLUTE tooth accuracy irrelevant — only "
+      "STABILITY matters. This is the modification that makes raw progressive "
+      "stamping credible at 10 M/yr even before the grind/roll steps.")
+    A("")
+    A("Together: Tony's transformer instinct survives its own hardest critique — "
+      "not by beating the sheared edge, but by changing WHEN and HOW the "
+      "accurate surface is created. Both enabling builds are now ledger rows "
+      "with their validation coupons; transcripts in out/council-build-*.txt.")
     A("2. **Coils — two viable routes (corrected 24 Jul after Tony's challenge, §0.8).** "
       "The assembled pole WITHOUT the translator is an open horseshoe — its magnetic "
       "circuit closes only through the translator, which slides in axially LAST — so "
@@ -1262,6 +1300,33 @@ def main():
       "MACHINED groove plate still carries the precision (±10 µm routine) while "
       "doubling as the drilled back wall.")
     A("")
+    A("**The build round on the cells (25 Jul, five seats) — from 'the winding "
+      "fails' to three routes that keep Tony's foil idea alive.** The same "
+      "build-not-judge council pass grew the foil seed into its strong forms: "
+      "**(1) HOBE-style expansion** (the aluminium-honeycomb industry's own "
+      "process, four seats independently): print the node-bond lines on FLAT "
+      "foil — a ±5 µm printing operation, no 3D weld access ever — stack, cure, "
+      "expand; the ⅓-double-wall topology Tony arrived at is NATIVE to expanded "
+      "honeycomb, which is the neatest possible confirmation of his instinct. "
+      "**(2) Move the RF precision to the LAST operation** (Opus 4.8/Opus 5): "
+      "build the lattice deliberately oversize, braze it rigid, then close the "
+      "interior to dimension by plating time — at 17.3 MHz/µm, one micron of Cu "
+      "on both walls trims fc by 34.6 MHz, and bath time is controllable to "
+      "±0.3 µm: a closed-loop chemistry knob replaces a forming tolerance. "
+      "**(3) Make HOLES, not walls** (Opus 5's inversion, now a ledger row): "
+      "stack ≈8 etched 1 mm plates with hex holes, dowel-align, braze, "
+      "through-plate — the topology problem never exists because walls are what "
+      "REMAINS, and lithographic ±10 µm lands directly on the RF dimension. "
+      "Honest boundaries from the same round: the one-tape Euler fix is a "
+      "topological ROUTE CANDIDATE, not yet a fold-path proof (finite-width "
+      "simulation before any tooling); isolated-cell fc invariance is "
+      "first-order — the ARRAY response of any mixed-wall lattice needs a "
+      "periodic-supercell/Floquet check, which is pure computation, costs a "
+      "day, and should run BEFORE any Seed-1 hardware; and glm's refinement "
+      "for the purist path: pre-roll a periodic thickness pattern into the "
+      "tape so 'doubled' walls are THICKER regions of one foil — restoring a "
+      "single lattice constant with no folded double layer at all.")
+    A("")
     A("**And the COTS question (Tristan, 25 Jul): could we just fit the design to an "
       "off-the-shelf honeycomb?** The wall-thickness proof makes this askable, and "
       "the answer is: worth a £100 experiment, not yet a bet. What works: commodity "
@@ -1313,7 +1378,7 @@ def main():
 
     A("### 9.7 The hex-cell options ledger — fabrication, geometry, plating")
     A("")
-    A("18 cell options scored with the validated §9 sensitivities (fc moves "
+    A("20 cell options scored with the validated §9 sensitivities (fc moves "
       "17.3 MHz/µm of interior; band edge from usable travel; ≥10 skin depths of "
       "copper). Kills — including the as-drawn single-piece moulding, killed by its "
       "own 52:1 aspect ratio — stay on the record (cell-options.json):")
@@ -1333,7 +1398,7 @@ def main():
     A("")
     A("| Decision | RF consequence | Status |")
     A("|---|---|---|")
-    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by 94 of the 95 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter; the one exception is the DELIBERATE §9.7 COTS-adapt candidate (3.10 → 3.175, fc 52.3 GHz — a band-edge improvement, Vlad/Tony call) |")
+    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by 96 of the 97 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter; the one exception is the DELIBERATE §9.7 COTS-adapt candidate (3.10 → 3.175, fc 52.3 GHz — a band-edge improvement, Vlad/Tony call) |")
     A("| Tooth duty / slot depths / magnet / registration | change step FORCE + uniformity, not step SIZE — phase quantisation preserved at 154.7 µm ⇒ 16.7°/step at 70 GHz | invariant on phase scale; registration choice trades ±1.9° step jitter for detent (quantified, Tony's knob) |")
     A("| Phase levels: 21 per 2π at 70 GHz today | the UKDI bid's 32-level ambition needs step 108 µm ⇒ pitch 324 µm (scenario S108) | **OPEN — tracked, not built**; awaits Vlad's real λg before a pitch redesign |")
     A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | **PROVEN in §9.9** (deterministic 3-leg proof + adversarial pass); pitch budget gated to Vlad |")
@@ -1557,7 +1622,7 @@ def main():
     # ------------------------------------------------- §11 system DFM
     A("## 11. Making the SYSTEM easy to manufacture — the combined ledger")
     A("")
-    A("The three option funnels above (actuator 66 → 1 recommended, cells 18 → 2 "
+    A("The three option funnels above (actuator 66 → 1 recommended, cells 20 → 2 "
       "routes, drive 11 → 1 topology + 1 gate) combine into whole-system builds. "
       "The design-for-manufacture principles the campaign PROVED, then the builds:")
     A("")
