@@ -181,18 +181,34 @@ def _mat(fl, cache, role):
         return cache[role]
     rgb = _MAT_RGB.get(role, (0.40, 0.42, 0.45))
     kw = {}
-    if role == "glass" or role == "clear_tube":
-        kw = dict(metallic=0.0, roughness=0.08, alpha=0.35, ior=1.46)
-    elif role in ("steel", "alu"):
-        kw = dict(metallic=0.9, roughness=0.35)
+    # PBR realism pass (2026-07-25, render-quality drive): clearer glass, brushed-reflective
+    # metal, glossier plastics — so an accurate component reads as a real part under Cycles,
+    # not a flat grey clay proxy (the vision-critic "primitive geometry" flag). Values are
+    # physically-plausible per material family; universal (keyed on role, no per-part table).
+    if role == "glass":
+        # kind="glass" + alpha=1.0 → Cycles TRANSMISSION (photoreal borosilicate), the path
+        # make_mat documents; passing alpha<1 would force the legacy EEVEE fade and fight it.
+        kw = dict(kind="glass", roughness=0.03, ior=1.46)
+    elif role == "clear_tube":
+        kw = dict(metallic=0.0, roughness=0.10, alpha=0.22, ior=1.41)   # silicone tubing — soft-clear
+    elif role == "alu":
+        kw = dict(metallic=1.0, roughness=0.22)                          # brushed aluminium
+    elif role == "steel":
+        kw = dict(metallic=1.0, roughness=0.30)                          # machined steel
     elif role == "brass":
-        kw = dict(metallic=0.85, roughness=0.30)
+        kw = dict(metallic=1.0, roughness=0.22)
     elif role == "emissive":
-        kw = dict(emission_strength=2.5, roughness=0.4)
+        kw = dict(emission_strength=4.0, roughness=0.4)                  # brighter status LED
     elif role == "screen":
-        kw = dict(metallic=0.1, roughness=0.15, emission_strength=0.4)
+        kw = dict(metallic=0.2, roughness=0.08, emission_strength=0.6)   # glossy backlit display
+    elif role == "pcb_green":
+        kw = dict(metallic=0.0, roughness=0.32)                          # FR-4 solder-mask sheen
+    elif role == "dark_plastic":
+        kw = dict(metallic=0.0, roughness=0.38)                          # moulded ABS — semi-gloss
+    elif role == "polymer":
+        kw = dict(metallic=0.0, roughness=0.42)
     else:
-        kw = dict(metallic=0.05, roughness=0.55)
+        kw = dict(metallic=0.05, roughness=0.5)
     m = fl.make_mat(f"m_se_int_{role}", fl._to_linear(rgb), **kw)
     cache[role] = m
     return m
