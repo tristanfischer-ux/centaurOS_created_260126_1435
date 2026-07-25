@@ -9401,6 +9401,61 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         nt.border = BORDER
         r += 1
 
+    # ── TASK #69: NULL-CONSTRAINT DISCLOSURE (2026-07-25) ─────────────────────
+    # Enumerate the TOP-LEVEL brief constraint slots. Any slot whose target is
+    # null / source:missing MUST be disclosed N/A here so:
+    #   (a) the reader sees an honest table (no silent omission), and
+    #   (b) self_audit_verify.brief_compliance_honest() can retire the LLM
+    #       `[brief_compliance]` blocking_defect as noise when every null-target
+    #       constraint is disclosed (sets state["_complianceDisclosedNaKeys"]).
+    # This is a PLAIN NOTE ROW — NOT a scored compliance row.  It MUST NOT be
+    # picked up by _sc_exec / _compliance_row_pass / the per-cell contract; it
+    # therefore does NOT use header() columns or a STATUS formula.
+    _SLOT_DISPLAY = {
+        "unit_cost_ceiling": "Unit cost ceiling",
+        "max_mass_kg": "Maximum mass",
+        "max_dimensions_mm": "Maximum dimensions",
+        "operating_environment": "Operating environment",
+        "design_life": "Design life",
+        "batch_size": "Batch size",
+    }
+
+    def _slot_missing(v) -> bool:
+        """Mirror of self_audit_verify._target_present (no import needed — pure)."""
+        if v is None:
+            return True
+        if isinstance(v, dict):
+            if str(v.get("source", "")).lower() == "missing":
+                return True
+            if "value" in v:
+                return v.get("value") is None
+            # nested slot (max_dimensions_mm w/d/h, operating_environment temp_min/max):
+            # missing iff ALL non-`source` sub-fields are None.
+            return all(sv is None for sk, sv in v.items() if sk != "source")
+        return False
+
+    _null_keys = [
+        k for k in _SLOT_DISPLAY
+        if k in con and _slot_missing(con.get(k))
+    ]
+
+    # Always stash (even if empty) so compute_verdict reads a set not None.
+    state["_complianceDisclosedNaKeys"] = set(_null_keys)
+
+    if _null_keys:
+        _names = ", ".join(_SLOT_DISPLAY[k] for k in _null_keys)
+        _note_text = (
+            f"Not specified in the brief — disclosed N/A (not a target, "
+            f"not counted as PASS): {_names}"
+        )
+        nc = ws.cell(r, 1, _note_text)
+        nc.fill = FILL_ADVISORY
+        nc.font = FONT_NOTE
+        nc.alignment = WRAP_TOP
+        # Merge across the full 8-column table width — same span as header().
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        r += 1
+
     # live conditional formatting on STATUS
     from openpyxl.formatting.rule import CellIsRule
     rng = f"G{first}:G{r-1}"
@@ -35213,6 +35268,65 @@ def _selftest() -> int:
         print(f"  FAIL _write_deliverable_bundle selftest raised: {_dbe!r}"); bad += 1
     finally:
         _sh_db.rmtree(_db_td, ignore_errors=True)
+
+    # ═══ proveCatch TASK #69: null-constraint disclosure stash (2026-07-25) ═══
+    # (a) proveCatch: a state with 4 null top-level constraints (organoid shape) must
+    #     stash exactly those 4 keys on state["_complianceDisclosedNaKeys"] after the
+    #     compliance section is rendered. We test the pure _slot_missing helper + the
+    #     downstream brief_compliance_honest (the compiled check that retires the
+    #     [brief_compliance] blocking defect).
+    try:
+        import sys as _sys69, os as _os69
+        _lib69 = _os69.path.join(_os69.path.dirname(_os69.path.abspath(__file__)), "lib")
+        if _lib69 not in _sys69.path:
+            _sys69.path.insert(0, _lib69)
+        import self_audit_verify as _sav69
+
+        _t69_state = {"parsedBrief": {"constraints": {
+            "unit_cost_ceiling": {"value": 385, "currency": "GBP", "source": "user"},
+            "max_mass_kg": {"value": None, "source": "missing"},
+            "max_dimensions_mm": {"w": None, "d": None, "h": None, "source": "missing"},
+            "operating_environment": {"temp_min_c": None, "temp_max_c": None, "source": "missing"},
+            "design_life": {"value": "5–8 yr", "source": "inferred"},
+            "batch_size": {"value": None, "source": "missing"},
+            "target_performance": {"metrics": []},
+        }}}
+        _t69_slots = _sav69.brief_constraint_slots(_t69_state)
+        _t69_null = {k for k, has in _t69_slots if not has}
+        # null should be: max_mass_kg, max_dimensions_mm, operating_environment, batch_size
+        _t69_expected = {"max_mass_kg", "max_dimensions_mm", "operating_environment", "batch_size"}
+        if _t69_null != _t69_expected:
+            print(f"  FAIL task69 proveCatch: expected null keys {sorted(_t69_expected)}, "
+                  f"got {sorted(_t69_null)}"); bad += 1
+
+        # (b) honest=True when all null slots are disclosed:
+        _t69_honest = _sav69.brief_compliance_honest(_t69_state, _t69_expected)
+        if not _t69_honest["honest"] or _t69_honest["violations"]:
+            print(f"  FAIL task69 proveCatch: disclosing all null keys must retire the "
+                  f"brief_compliance finding (got {_t69_honest})"); bad += 1
+
+        # (c) honest=False when nothing is disclosed (the pre-fix state):
+        _t69_dishonest = _sav69.brief_compliance_honest(_t69_state, None)
+        if _t69_dishonest["honest"] or set(_t69_dishonest["violations"]) != _t69_expected:
+            print(f"  FAIL task69 proveNoFalsePositive: undisclosed null keys must keep the "
+                  f"finding BINDING (got {_t69_dishonest})"); bad += 1
+
+        # (d) a state where ALL slots are present → stash is empty → honest=True trivially:
+        _t69_full_state = {"parsedBrief": {"constraints": {
+            "unit_cost_ceiling": {"value": 385, "source": "user"},
+            "max_mass_kg": {"value": 2.5, "source": "user"},
+            "max_dimensions_mm": {"w": 200, "d": 100, "h": 80, "source": "user"},
+            "operating_environment": {"temp_min_c": 0, "temp_max_c": 40, "source": "user"},
+            "design_life": {"value": "5 yr", "source": "user"},
+            "batch_size": {"value": 500, "source": "user"},
+        }}}
+        _t69_full_honest = _sav69.brief_compliance_honest(_t69_full_state, set())
+        if not _t69_full_honest["honest"]:
+            print(f"  FAIL task69 proveNoFalsePositive: a fully-specified brief must be honest "
+                  f"with empty disclosed set (got {_t69_full_honest})"); bad += 1
+
+    except Exception as _t69_exc:
+        print(f"  FAIL task69 disclosure stash proveCatch raised: {_t69_exc!r}"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
