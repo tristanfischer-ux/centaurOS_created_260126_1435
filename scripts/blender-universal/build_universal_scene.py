@@ -7038,25 +7038,32 @@ def _exterior_signature_vessel_bbox_mm():
     enclosure dims (`_SEALED_ENV_MM` = W,D,H; set by place_sealed_enclosure BEFORE the
     manifest, confirmed present at call time) using the SAME formula as the SEAM-1
     placement (~L17851): centred on (0,0), radius min(W,D)*0.13, height max(H*0.88, 42),
-    sitting from the enclosure top (z_top = max z of the `u_enclosure_shell`). None
-    unless the signature is vial_bioreactor and the env + shell are known. KEEP IN SYNC
-    with the SEAM-1 vial formula."""
+    sitting from the enclosure top. z_top is found by matching a mesh's bbox to the
+    sealed env (W×D×H) — NAME-INDEPENDENT, because the shell mesh is named after the
+    enclosure PART (u_hammond_abs_instrument_enclosure on one roll, u_enclosure_shell
+    on another). None unless the signature is vial_bioreactor and the env + shell are
+    known. KEEP IN SYNC with the SEAM-1 vial formula."""
     if _LE_SIGNATURE != "vial_bioreactor" or not _SEALED_ENV_MM:
         return None
     try:
         W, D, H = (float(x) for x in _SEALED_ENV_MM)
     except (TypeError, ValueError):
         return None
-    if not hasattr(bpy, "data"):
+    if not hasattr(bpy, "data") or min(W, D, H) <= 0:
         return None
+    # The outer shell mesh is named after the enclosure PART, which varies run to run
+    # (`u_enclosure_shell` one roll, `u_hammond_abs_instrument_enclosure` another) — but
+    # both carry the substring "enclosure", while the interior cue shells are
+    # `u_se_cutaway_cue_*`. The shell mesh may be a resized proxy, so do NOT filter on
+    # footprint — take the top z of the enclosure-named (non-cue) mesh: that is the lid
+    # the on-top vessel sits on (empirically the value that makes the render↔GA match;
+    # the analytic DECK_Z_MM+H disagrees because the shell is repositioned/scaled).
     z_top = None
     for obj in bpy.data.objects:
         if getattr(obj, "type", None) != "MESH":
             continue
-        # the sealed shell is `u_enclosure_shell`; keep the product/skid prefixes as
-        # fallbacks for other enclosure families.
-        if not (obj.name == "u_enclosure_shell"
-                or obj.name.startswith(("u_enclosure_shell", "u_se_product_", "u_skid_encl_"))):
+        nm = obj.name.lower()
+        if nm.startswith("u_se_cutaway_cue_") or "enclosure" not in nm:
             continue
         try:
             zs = [(obj.matrix_world @ v.co).z * 1000.0 for v in obj.data.vertices]
