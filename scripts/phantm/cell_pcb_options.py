@@ -60,6 +60,26 @@ crow("Commodity aerospace Al honeycomb (3.175 mm cell, 18–50 µm foil)", "fabr
 crow("Fine-blank/stamped lattice from strip", "fabrication",
      "155 µm slots at 7.75 mm depth unreachable by blanking (it is a 2D process)", "KILL",
      "wrong process class for a deep lattice — kept on record so nobody re-proposes it")
+crow("Folded/corrugated foil, welded, registered in a grooved base plate (Tony 25 Jul)",
+     "fabrication",
+     "bend-radius fc cost SOLVED (foil-corner.json): r 0.3 mm ≡ +7.9 µm interior-equiv, "
+     "r 0.5 ≡ +20.8 — inside the ±25 µm gate; corner seams must be RF-continuous "
+     "(braze/laser seam, not spot welds — slot-leak risk); tolerance carried by the "
+     "MACHINED groove plate (±10 µm easy), not foil springback",
+     "KEEP (pilot candidate)",
+     "the commercial corrugated-honeycomb process at custom precision; the grooved plate "
+     "both registers the foil and forms the drilled back wall; seam continuity is Vlad's check")
+crow("Adapt the DESIGN to COTS metal honeycomb (1/8\" = 3.175 mm cell class)",
+     "fabrication",
+     "fc scales as 1/AF: 3.175 mm → 52.29 GHz (band edge IMPROVES); actuator fits any "
+     "AF ≥ ≈2.8; BUT commercial cell tolerance ±5–10% ≡ ±2.6 GHz fc scatter, "
+     "expansion-process hexes are irregular, and adhesive node bonds are fine RF-wise "
+     "(every foil ≥ hundreds of skin depths)",
+     "KEEP (prototype accelerator; test first)",
+     "per-cell fc calibration in the phase map could absorb STATIC scatter (open-loop "
+     "steppers are calibratable); decide with the £100 Hexcel/Plascore slice — measure real "
+     "cells, eigensolve the ACTUAL shapes, Vlad benches it; volume advantage fades against "
+     "sub-£2/tile moulding")
 
 # geometry options
 for tol, cls in ((10, "electroform/EDM class"), (25, "good print class"), (50, "loose print class")):

@@ -1191,6 +1191,41 @@ def main():
       "tolerance), plating continuity (DC resistance wall-to-wall), and an RF "
       "return-loss spot check per batch (Vlad's bench).")
     A("")
+    A("**Tony's folded-foil route (25 Jul) — added to the ledger with its first "
+      "physics check done.** Press a stiff metal foil into 60° half-hex corrugations, "
+      "wind it row by row into the lattice, weld at the node faces, and register it "
+      "in a GROOVED base plate. This is the commercial corrugated-honeycomb process "
+      "at custom precision, and the eigensolver has now priced its signature "
+      "compromise — bent corners instead of sharp ones: a bend radius of 0.3 mm "
+      "shifts fc by only +137 MHz (≡ 7.9 µm of interior; even r = 0.5 mm costs just "
+      "20.8 µm-equivalent) — comfortably inside the ±25 µm tolerance gate "
+      "(foil-corner.json). Two design rules make it work: the MACHINED groove plate "
+      "carries the precision (±10 µm is routine machining; foil springback stops "
+      "mattering because the grooves register every wall — and the same plate IS the "
+      "drilled back wall the translator tails pass through); and the corner seams "
+      "must be RF-CONTINUOUS — circumferential wall currents cross those joints, so "
+      "braze or a continuous laser seam, never spot welds (a gappy seam is a slot "
+      "antenna between cells). Seam continuity is Vlad's bench check, same class as "
+      "the two-half moulding bond line.")
+    A("")
+    A("**And the COTS question (Tristan, 25 Jul): could we just fit the design to an "
+      "off-the-shelf honeycomb?** The wall-thickness proof makes this askable, and "
+      "the answer is: worth a £100 experiment, not yet a bet. What works: commodity "
+      "1/8\" (3.175 mm) cell honeycomb is one wall-thickness away from our 3.10 mm — "
+      "and since fc scales as 1/size, a 3.175 mm interior gives fc = 52.3 GHz, which "
+      "IMPROVES the band edge; the actuator fits any cell ≥ ≈2.8 mm; glued node "
+      "bonds are RF-irrelevant (every foil is hundreds of skin depths). What "
+      "doesn't: commercial cell tolerance is ±5–10% (≡ ±2.6 GHz of fc scatter, cell "
+      "to cell — a hundred times our gate) and expansion-process hexes are visibly "
+      "irregular. The honest mitigation is that an open-loop stepper aperture is "
+      "CALIBRATABLE: each cell's phase-vs-depth curve could be measured once and "
+      "absorbed into the host's per-cell target map, converting static geometry "
+      "scatter into a lookup table. Whether that survives contact with real "
+      "hardware is exactly what the Hexcel/Plascore slice decides: measure the "
+      "actual cells, eigensolve the ACTUAL shapes (the solver takes arbitrary "
+      "cross-sections), and put it on Vlad's bench. At volume the argument fades — "
+      "bespoke moulding at sub-£2/tile beats adapting to someone else's tolerance.")
+    A("")
     A("### 9.6b Who can make the cells — fabricator table, contact routes live-verified")
     A("")
     A("**Contact routes researched and live-verified 24 Jul** "
@@ -1224,7 +1259,7 @@ def main():
 
     A("### 9.7 The hex-cell options ledger — fabrication, geometry, plating")
     A("")
-    A("16 cell options scored with the validated §9 sensitivities (fc moves "
+    A("18 cell options scored with the validated §9 sensitivities (fc moves "
       "17.3 MHz/µm of interior; band edge from usable travel; ≥10 skin depths of "
       "copper). Kills — including the as-drawn single-piece moulding, killed by its "
       "own 52:1 aspect ratio — stay on the record (cell-options.json):")
@@ -1244,7 +1279,7 @@ def main():
     A("")
     A("| Decision | RF consequence | Status |")
     A("|---|---|---|")
-    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by all 93 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter |")
+    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by 94 of the 95 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter; the one exception is the DELIBERATE §9.7 COTS-adapt candidate (3.10 → 3.175, fc 52.3 GHz — a band-edge improvement, Vlad/Tony call) |")
     A("| Tooth duty / slot depths / magnet / registration | change step FORCE + uniformity, not step SIZE — phase quantisation preserved at 154.7 µm ⇒ 16.7°/step at 70 GHz | invariant on phase scale; registration choice trades ±1.9° step jitter for detent (quantified, Tony's knob) |")
     A("| Phase levels: 21 per 2π at 70 GHz today | the UKDI bid's 32-level ambition needs step 108 µm ⇒ pitch 324 µm (scenario S108) | **OPEN — tracked, not built**; awaits Vlad's real λg before a pitch redesign |")
     A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | **PROVEN in §9.9** (deterministic 3-leg proof + adversarial pass); pitch budget gated to Vlad |")
@@ -1468,7 +1503,7 @@ def main():
     # ------------------------------------------------- §11 system DFM
     A("## 11. Making the SYSTEM easy to manufacture — the combined ledger")
     A("")
-    A("The three option funnels above (actuator 66 → 1 recommended, cells 16 → 2 "
+    A("The three option funnels above (actuator 66 → 1 recommended, cells 18 → 2 "
       "routes, drive 11 → 1 topology + 1 gate) combine into whole-system builds. "
       "The design-for-manufacture principles the campaign PROVED, then the builds:")
     A("")

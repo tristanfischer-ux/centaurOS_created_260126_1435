@@ -85,7 +85,7 @@ ROWS = [
     ("The damper vent hole leaks ≤ −58 dB (17× below its own cutoff; Bethe (d/λ)⁴)",
      "PROVEN-calc", "§9.8, verifier-recomputed", "closed"),
     ("Cell fabrication ladder: print+plate (prototype) → electroform (reference) → moulding (volume)",
-     "RED-TEAMED", "§9.7 ledger, 16 options, kills on record",
+     "RED-TEAMED", "§9.7 ledger, 18 options, kills on record",
      "two-half moulding bond-seam RF check (Vlad)"),
     ("The toothed parts can ONLY be micro-MIM at this scale (pressed SMC floor 0.8–1.7 mm)",
      "PROVEN-calc", "vendor capability data; §5", "closed"),

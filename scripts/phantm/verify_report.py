@@ -245,7 +245,7 @@ check("actuator ledger 66 options, 36 kills", ol["counts"].get("KILL") == 36
       and sum(ol["counts"].values()) == 66)
 co = json.load(open(os.path.join(OUT, "opt", "cell-options.json")))
 po = json.load(open(os.path.join(OUT, "opt", "pcb-options.json")))
-check("cell ledger 16 options, 4 kills", sum(co["counts"].values()) == 16
+check("cell ledger 18 options, 4 kills", sum(co["counts"].values()) == 18
       and co["counts"].get("KILL") == 4)
 check("pcb ledger 11 options, 5 kills + open demag gate",
       sum(po["counts"].values()) == 11 and po["counts"].get("KILL") == 5
@@ -261,7 +261,7 @@ _fc_hole = 1.8412 * 299.792458 / (_m.pi * 0.15)
 check("vent-hole cutoff 1.17 THz", abs(_fc_hole - 1171) < 5, f"{_fc_hole:.0f} GHz")
 check("Bethe leak −58 dB", abs(10 * _m.log10((0.15 / 4.283) ** 4) + 58.3) < 0.5)
 contains("§13 present (old 9.8)", "13. The RF-efficacy audit",
-         "INVARIANT — untouched by all 93 options",
+         "INVARIANT — untouched by 94 of the 95 options",
          "1.17 THz", "−58 dB", "electromagnetically SILENT",
          "must be SPECIFIED, not assumed")
 contains("ledgers present (v6)", "### 14.2 The complete options ledger",
@@ -351,6 +351,20 @@ contains("proofread fixes present", "the §11 band table",
          "15.4 W pulses", "now ANSWERED by derivation",
          "BASELINE drive (original design / Prototype-A) is UNIPOLAR",
          "rounds 1–4, the historical record", "GLM-5.2")
+
+# ---------------- foil route + COTS options (Tony/Tristan 25 Jul) -----------
+fcj = json.load(open(os.path.join(OUT, "foil-corner.json")))
+_fr = {r["corner_r_mm"]: r for r in fcj["rows"]}
+check("foil-corner r=0 reproduces fc", abs(_fr[0.0]["fc_ghz"] - 53.558) < 0.06)
+check("foil-corner monotonic", all(
+    _fr[a]["fc_ghz"] <= _fr[b]["fc_ghz"] + 1e-6
+    for a, b in ((0.0, 0.1), (0.1, 0.2), (0.2, 0.3), (0.3, 0.5))))
+check("foil-corner r=0.3 ≈ +7.9 µm-equiv", abs(_fr[0.3]["shift_um_equiv"] - 7.9) < 1.5)
+check("COTS fc scale 52.29", abs(53.558 * 3.10 / 3.175 - 52.29) < 0.05)
+contains("foil route in report", "folded-foil route", "grooved base plate",
+         "RF-CONTINUOUS", "foil-corner.json", "slot antenna between cells")
+contains("COTS option in report", "off-the-shelf honeycomb", "52.3 GHz",
+         "CALIBRATABLE", "Hexcel/Plascore slice")
 
 # ---------------- §9.9 wall-thickness proof ---------------------------------
 wp = json.load(open(os.path.join(OUT, "wall-proof.json")))
