@@ -7710,19 +7710,19 @@ def assemble(out_dir: str):
                                       enrich_conduit_from_routing as _enrich_conduit)
         _npwr = _aug_pwr(st)
         if _npwr:
-            print(f"[requirements-bom] universal power subsystem: +{_npwr} load-sized part(s)")
+            print(f"[requirements-bom] universal power subsystem: +{_npwr} load-sized part(s)", file=sys.stderr)
         _nch = _aug_ch(st)
         if _nch:
-            print(f"[requirements-bom] chassis + wiring harness: +{_nch} rendered part(s) → BoM")
+            print(f"[requirements-bom] chassis + wiring harness: +{_nch} rendered part(s) → BoM", file=sys.stderr)
         # ROUTED-CONDUIT FEEDBACK (2026-07-25): this runs POST-render, so wired-lengths.json
         # exists — annotate the harness + fluid-tubing lines with the 3-D-measured routed
         # length + run count (Tristan's loop: the Blender wiring tells the BoM the length).
         _nrl = _enrich_conduit(st, out_dir)
         if _nrl:
             print(f"[requirements-bom] routed-conduit feedback: enriched {_nrl} conduit line(s) "
-                  f"with 3-D-measured length from wired-lengths.json")
+                  f"with 3-D-measured length from wired-lengths.json", file=sys.stderr)
     except Exception as _pwe:  # noqa: BLE001 — never break the BoM on the augmentation
-        print(f"[requirements-bom] power-subsystem augmentation skipped: {_pwe}")
+        print(f"[requirements-bom] power-subsystem augmentation skipped: {_pwe}", file=sys.stderr)
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
                             # local `st` to a take-off tuple (~line 2449); the corpus-
                             # median-lift post-pass reads partVerifications from here.
