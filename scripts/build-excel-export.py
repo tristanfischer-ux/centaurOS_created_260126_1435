@@ -27272,6 +27272,127 @@ def _should_na_electrical_to_pcb(state: dict) -> bool:
             and not _instrument_electrical_topology_edges(state))
 
 
+def _wired_lengths_feedback(rows: list, run_dir: str) -> int:
+    """ROUTED CONDUIT → BoM FEEDBACK (2026-07-25).
+
+    Reads wired-lengths.json (written by the Blender router AFTER render) and patches
+    the BoM rows in place:
+
+    1. The "Internal Wiring Harness" row's `basis` and `sizing_calc` are updated with
+       the REAL 3D-measured electrical (power + signal) conduit length + run count, so
+       col M (Sizing calc) shows the honest measured number instead of the
+       120×40×15 mm placeholder.
+
+    2. A new fluid tubing/piping row is INJECTED immediately after the harness row when
+       water or air services are present, quoting the measured lengths + run count.
+
+    3. If wired-lengths.json is ABSENT (non-instrument / no Blender routing pass) the
+       function is a pure no-op — current behaviour is unchanged.
+
+    4. The existing "Line & velocity" tab's per-cable schedule is UNAFFECTED: that tab
+       reads connection-schedule.json (individual per-cable lengths from the route-manifest
+       segment geometry) and is a per-cable view. The harness row here is the LOOM SUMMARY;
+       the two surfaces are complementary, not redundant.
+
+    Returns the count of rows modified/injected (0 = no wired-lengths.json or no harness).
+    """
+    wl_path = os.path.join(run_dir, "wired-lengths.json")
+    if not os.path.exists(wl_path):
+        return 0                # guard: no routing data → keep placeholder unchanged
+
+    try:
+        with open(wl_path) as _fh:
+            wl = json.load(_fh)
+    except Exception as _e:     # noqa: BLE001 — never break the BoM on a bad routing file
+        print(f"  [wired-lengths-feedback] skipped: cannot read {wl_path}: {_e}")
+        return 0
+
+    by_service = wl.get("length_m_by_service") or {}
+    runs = wl.get("runs") or []
+    if not isinstance(by_service, dict) or not by_service:
+        return 0
+
+    # ── 1. Electrical services (power + signal) ──────────────────────────────
+    elec_services = {"power", "signal", "electrical", "control", "dc"}
+    fluid_services = {"water", "air", "gas", "steam", "thermal", "fluid", "coolant"}
+    elec_m = sum(v for k, v in by_service.items() if k.lower() in elec_services
+                 if isinstance(v, (int, float)))
+    fluid_m = sum(v for k, v in by_service.items() if k.lower() in fluid_services
+                  if isinstance(v, (int, float)))
+    elec_runs = [r for r in runs if isinstance(r, dict)
+                 and str(r.get("service", "")).lower() in elec_services]
+    fluid_runs = [r for r in runs if isinstance(r, dict)
+                  and str(r.get("service", "")).lower() in fluid_services]
+
+    # Build compact per-service breakdown strings
+    elec_detail_parts = []
+    for svc in sorted(elec_services):
+        v = by_service.get(svc)
+        if isinstance(v, (int, float)) and v > 0:
+            elec_detail_parts.append(f"{v:.2f} m {svc}")
+    fluid_detail_parts = []
+    for svc in sorted(fluid_services):
+        v = by_service.get(svc)
+        if isinstance(v, (int, float)) and v > 0:
+            fluid_detail_parts.append(f"{v:.2f} m {svc}")
+
+    modified = 0
+
+    # ── 2. Patch "Internal Wiring Harness" basis ─────────────────────────────
+    harness_idx = None
+    for i, row in enumerate(rows):
+        req = str(row.get("requirement", "") or "")
+        if re.search(r"internal\s+wiring\s+harness", req, re.I):
+            harness_idx = i
+            break
+
+    if harness_idx is not None and elec_m > 0:
+        detail_str = (" (" + " + ".join(elec_detail_parts) + ")") if elec_detail_parts else ""
+        new_basis = (
+            f"measured from 3D routing (wired-lengths.json): "
+            f"{elec_m:.2f} m loom{detail_str}, {len(elec_runs)} electrical runs"
+        )
+        rows[harness_idx] = dict(rows[harness_idx])
+        rows[harness_idx]["basis"] = new_basis
+        modified += 1
+
+    # ── 3. Inject fluid tubing/piping row when fluid services are present ────
+    if fluid_m > 0:
+        # Check if a fluid tubing row already exists (idempotent for re-runs)
+        _fluid_exists = any(
+            re.search(r"fluid\s+tubing|perfusion.*tubing|dosing.*tubing|vent.*tubing",
+                      str(r.get("requirement", "") or ""), re.I)
+            for r in rows
+        )
+        if not _fluid_exists:
+            detail_str = (" (" + " + ".join(fluid_detail_parts) + ")") if fluid_detail_parts else ""
+            fluid_row = {
+                "tag": "—",
+                "requirement": "Fluid Tubing / Piping (internal)",
+                "status": "NOT FOUND",
+                "part": "requirement stated",
+                "qty": 1,
+                "unit_gbp": max(1, round(fluid_m * 2)),  # £2/m silicone tubing floor
+                "line_gbp": max(1, round(fluid_m * 2)),
+                "basis": (
+                    f"measured from 3D routing (wired-lengths.json): "
+                    f"{fluid_m:.2f} m{detail_str}, {len(fluid_runs)} fluid runs — "
+                    f"perfusion/dosing + vent tubing (silicone/FEP, instrument-scale)"
+                ),
+                "material": "silicone / FEP tubing",
+                "_wired_lengths_injected": True,
+            }
+            insert_at = (harness_idx + 1) if harness_idx is not None else len(rows)
+            rows.insert(insert_at, fluid_row)
+            modified += 1
+
+    if modified:
+        print(f"  [wired-lengths-feedback] {modified} BoM row(s) updated/injected "
+              f"— elec {elec_m:.2f} m ({len(elec_runs)} runs), "
+              f"fluid {fluid_m:.2f} m ({len(fluid_runs)} runs)")
+    return modified
+
+
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
@@ -27316,6 +27437,11 @@ def build(run_dir: str, out_path: str) -> dict:
     _repair = repair_dossier(state, rows, run_dir)
     state, rows = _repair.state, _repair.rows
     state["requirementsBom"] = rows                       # downstream tabs read the repaired bill
+    # ── ROUTED CONDUIT → BoM FEEDBACK (2026-07-25): patch the harness basis + inject the
+    #    fluid tubing row from wired-lengths.json NOW (post-render seam — the Blender router
+    #    writes wired-lengths.json before this Excel build runs, so the file exists).
+    #    No-op when wired-lengths.json is absent (non-instrument / no Blender routing pass).
+    _wired_lengths_feedback(rows, run_dir)
     # STORAGE REVENUE MODEL (2026-07-05, Tristan council item 3) — computed EARLY, before the
     # ship-gate audit, so a storage/grid class's cited GB arbitrage/capacity-market revenue
     # path is a genuine signal `dossier_audit.check_economics` can see (it previously always
@@ -35359,6 +35485,62 @@ def _selftest() -> int:
 
     except Exception as _t69_exc:
         print(f"  FAIL task69 disclosure stash proveCatch raised: {_t69_exc!r}"); bad += 1
+
+    # ═══ proveCatch _wired_lengths_feedback (2026-07-25) ════════════════════════════
+    # (a) Synthetic wired-lengths dict → harness basis carries summed electrical length,
+    #     fluid tubing row is injected with summed fluid length.
+    import tempfile as _tempfile, os as _os2
+    _wl_tc = {
+        "schema": "wired-lengths/3",
+        "total_routed_length_m": 10.0,
+        "length_m_by_service": {"power": 2.0, "signal": 3.0, "water": 4.0, "air": 1.0},
+        "runs": (
+            [{"service": "power", "length_m": 0.1} for _ in range(5)] +
+            [{"service": "signal", "length_m": 0.1} for _ in range(7)] +
+            [{"service": "water", "length_m": 0.2} for _ in range(10)] +
+            [{"service": "air", "length_m": 0.1} for _ in range(5)]
+        ),
+    }
+    _rows_tc = [
+        {"tag": "—", "requirement": "Internal Wiring Harness",
+         "basis": "120×40×15 mm placeholder", "qty": 1, "unit_gbp": 3, "line_gbp": 3},
+        {"tag": "X-1", "requirement": "Some Other Part",
+         "basis": "catalogue", "qty": 1, "unit_gbp": 5, "line_gbp": 5},
+    ]
+    with _tempfile.TemporaryDirectory() as _td:
+        _wl_file = _os2.path.join(_td, "wired-lengths.json")
+        with open(_wl_file, "w") as _fh:
+            import json as _json2
+            _json2.dump(_wl_tc, _fh)
+        _rows_copy = [dict(r) for r in _rows_tc]
+        _n_mod = _wired_lengths_feedback(_rows_copy, _td)
+        # proveCatch (a): harness row updated with electrical length (power 2.0 + signal 3.0 = 5.0 m)
+        _harness_basis = _rows_copy[0].get("basis", "")
+        if "5.00 m" not in _harness_basis or "wired-lengths.json" not in _harness_basis:
+            print(f"  FAIL wired_lengths_feedback proveCatch (a): harness basis missing "
+                  f"measured electrical length (got {_harness_basis!r})"); bad += 1
+        # proveCatch (b): fluid tubing row injected after harness with fluid length (water 4.0 + air 1.0 = 5.0 m)
+        _fluid_rows = [r for r in _rows_copy if "Fluid Tubing" in str(r.get("requirement", ""))]
+        if not _fluid_rows:
+            print("  FAIL wired_lengths_feedback proveCatch (b): fluid tubing row not injected"); bad += 1
+        elif "5.00 m" not in _fluid_rows[0].get("basis", ""):
+            print(f"  FAIL wired_lengths_feedback proveCatch (b): fluid row basis missing "
+                  f"measured fluid length (got {_fluid_rows[0].get('basis', '')!r})"); bad += 1
+        # proveCatch (c): idempotent — re-running does NOT add a second fluid row
+        _n_mod2 = _wired_lengths_feedback(_rows_copy, _td)
+        _fluid_rows2 = [r for r in _rows_copy if "Fluid Tubing" in str(r.get("requirement", ""))]
+        if len(_fluid_rows2) != 1:
+            print(f"  FAIL wired_lengths_feedback proveCatch (c): idempotency broken — "
+                  f"expected 1 fluid row after re-run, got {len(_fluid_rows2)}"); bad += 1
+
+    # (d) absent file → pure no-op (placeholder unchanged, no fluid row)
+    with _tempfile.TemporaryDirectory() as _td_absent:
+        _rows_absent = [{"tag": "—", "requirement": "Internal Wiring Harness",
+                         "basis": "120×40×15 mm placeholder", "qty": 1, "unit_gbp": 3, "line_gbp": 3}]
+        _n_absent = _wired_lengths_feedback(_rows_absent, _td_absent)
+        if _n_absent != 0 or _rows_absent[0].get("basis") != "120×40×15 mm placeholder":
+            print("  FAIL wired_lengths_feedback proveCatch (d): absent wired-lengths.json "
+                  "must be a pure no-op (placeholder must be unchanged)"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
