@@ -431,6 +431,32 @@ der("ape", "Panel re-point energy, STEPPING", "={napc}*{nstp}*{es}/1000", "J", "
 der("apef", "Panel re-point energy, FULL-drive", "={napc}*{nstp}*{Ix}^2*{rc}*{tp}/1000", "J",
     "N·steps·Ic*²·R·t", 1093 * 10 * 3.35**2 * 0.5518 * 1.5 / 1000, "the worst-case bound")
 
+# ============================ 13 · optimisation campaign =====================
+banner("13 · OPTIMISATION CAMPAIGN — the Pareto (report §10; grey = FE campaign results)")
+note("≈250 FE solutions, 24 Jul, council-audited. These are MEASURED campaign numbers, not "
+     "formulas: the geometry stack is duty 0.40 teeth (186 µm) + translator slots 1.5× + stator "
+     "slots 2× at gap 20 µm. Detent strength TRADES against stepping cost — both optimised sets "
+     "need DUAL-coil drive (pull target pole, CANCEL holding pole with reverse current). "
+     "Recommendation: the BALANCED set. Artefacts: out/opt/*.json; decisions: OPTIMISATION-PLAN.md.")
+head()
+opt_rows = [
+    ("Original FIXED design", "5.0 / 3.8 g", "-", "k 200 N/m · single 1.8 A · 2.7 mJ · settle 2.5-4 ms", "§4 baseline", "opt-sweeps-1 baseline row"),
+    ("BALANCED set (N42, Pm 0.4) — RECOMMENDED", "15.2/11.4 mN = 14.6/11.0 g", "-", "k 415 N/m · DUAL ±3.35 A hold 3 ms · 37 mJ · settle 5.5 ms · ΔT ≈44 K", "2.2× spec worst-reg (2.9× drawn)", "opt-sweeps-3 + damper-balanced.json"),
+    ("MAX-FORCE set (N52, Pm 0.5)", "19.9/14.9 mN = 19.1/14.3 g", "-", "k 544 N/m · DUAL ±5 A hold 3 ms · 83 mJ · settle 8 ms · ΔT ≈97 K", "if vibration demands", "opt-sweeps-4 + damper.json"),
+    ("Gap-30 full stack (the tolerance trade)", "11.3 / 7.7 g", "-", "3 basins both registrations; assembly tolerance 1.5× looser", "Tony's margin-vs-cost call", "opt-sweeps-3"),
+    ("Gap-40 (KILLED)", "1 basin as-drawn", "-", "breakaway passed 5 g but not a stepper — basin-check mirage", "dead", "opt-recentre.json"),
+    ("Damper spec (both sets)", "Ø0.15 mm vent", "-", "captures at EVERY hold ≥3 ms; larger vents escape; sealed mis-parks", "Tony item 10 solved", "damper*.json"),
+]
+for label, val, unit, detail, verdict, art in opt_rows:
+    r = _next()
+    ws.cell(row=r, column=1, value=label)
+    ws.cell(row=r, column=3, value=val)
+    ws.cell(row=r, column=4, value=unit)
+    ws.cell(row=r, column=5, value=art).font = SMALL
+    ws.cell(row=r, column=6, value=detail + " — " + verdict).font = SMALL
+    for col in range(1, 7):
+        ws.cell(row=r, column=col).fill = GRY
+
 for col, w in (("A", 36), ("B", 7), ("C", 14), ("D", 9), ("E", 40), ("F", 62)):
     ws.column_dimensions[col].width = w
 for rr in ws.iter_rows(min_col=6, max_col=6):

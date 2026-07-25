@@ -226,7 +226,7 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v4.5 — 24 Jul: feedback rounds 1–3 + hex-cell/PCB work package, council-reviewed; pending 3D-FE/prototype validation)")
+    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v5 — 25 Jul: adds the optimisation campaign (§10) with the balanced-set recommendation; council-reviewed; pending 3D-FE/prototype validation)")
     A("")
     A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
@@ -308,6 +308,10 @@ def main():
       "impossibility and the coil sequencing) and §6 (ten supplier entries with "
       "evidence) answer this directly; raw materials are indeed tiny "
       "($0.0014/unit, §8.1) — the unit price lives in process and gap-setting.")
+    A("")
+    A("**Round 4 (24 Jul, from the call) — the ten-knob optimisation brief: executed "
+      "same-day as a full FE campaign; results and the recommended BALANCED set in §10 "
+      "(headline: 11.0 g on the worst registration at 37 mJ/step — 2.2× the spec).**")
     A("")
     A("**Round 3 (24 Jul, 09:00–09:14) — the coil-winding challenge and two process points:**")
     A("")
@@ -1061,7 +1065,9 @@ def main():
       "coil pads and those per-coil FETs; the DRIVER board behind carries the "
       "DAC-set buck (burst-rated, VRM-class ≥30 A at 2 V, with input bulk), the "
       "MCU and the gate-drive shift registers. A reverse 'brake' pulse (§4.4 "
-      "option) would need half-bridges — added only if settle tests demand it. "
+      "option) would need half-bridges — and the optimisation campaign later made "
+      "half-bridges MANDATORY for the optimised sets (§10.4: the dual "
+      "pull-and-cancel step needs reverse current in the cancel coil). "
       "Coils are wired so positive rail current AIDS the permanent magnet (the FE "
       "sign convention). Facts that do the heavy lifting (drive-electronics.json):")
     A("")
@@ -1161,12 +1167,107 @@ def main():
       "alongside the actuator outreach (Annex E carries the cell specification).")
     A("")
 
-    # ------------------------------------------------------------------ §10
-    A("## 10. Traceability")
+    # ------------------------------------------------- §10 optimisation
+    A("## 10. The optimisation campaign — from 5 g to a chosen Pareto (24 Jul)")
+    A("")
+    A("Tony's optimisation brief (24 Jul) listed ten knobs and asked for a systematic "
+      "search before anything gets made. The campaign ran the same day on the validated "
+      "FE harness (≈250 solutions across four batches, a magnet re-centre and a dynamics "
+      "study; full decision trail with three phase gates in OPTIMISATION-PLAN.md; every "
+      "number below traceable to out/opt/*.json), and was council-audited twice — "
+      "gpt-5.6-sol, grok-4.5 and glm-5.2 red-teamed the methodology mid-campaign, and "
+      "their corrections (the d.45 inversion, the retirement of the Br² extrapolation, "
+      "strengthened caveats) are folded in.")
+    A("")
+    A("### 10.1 What the knobs did")
+    A("")
+    A("![duty sweep](opt/fig-opt-1A-duty.png)")
+    A("")
+    A("- **Tooth duty is the dominant lever, and Tony's 50/50 guess was the worst in "
+      "range**: narrowing teeth to 0.40×pitch (186 µm teeth, wider slots) cuts fringing "
+      "exactly as he suspected — detent margin 5.0 → 8.5 g and drive at 1.8 A +75%. "
+      "Duty 0.30 looks better still as-drawn but is registration-fragile; 0.35 sits in "
+      "a genuine harmonic dip. The optimum is ROBUST across both registrations.")
+    A("- **Deep translator slots are free margin**: force is flat with slot depth, so "
+      "1.5× slots plus the wider duty-0.40 slots delete 52 mg of moving mass "
+      "(158 → 106 mg).")
+    A("- **Stator slots 2× add ≈5–7%**; breadth is margin-neutral (force and mass both "
+      "scale with it) — it is a drive-efficiency lever only.")
+    A("- **The basin check killed a mirage**: the relaxed-gap-40 variant passed 5 g on "
+      "breakaway force but had only ONE detent basin per pitch at the as-drawn "
+      "registration — not a stepper. Breakaway without a basin count is a Goodhart "
+      "trap; every campaign row carries basin counts on both registrations since.")
+    A("- **Gap 30 µm is the honest manufacturing trade**: the full stack at 30 µm gives "
+      "11.3/7.7 g with 3 basins on both registrations — the gauged-assembly tolerance "
+      "relaxes 1.5× and the spec still clears with 54% worst-case margin. Gap 40 stays "
+      "dead.")
+    A("- **Magnet length**: detent grows to Pm ≈ 0.5 mm and the plateau beyond is soft "
+      "(+7% to 0.7 mm); Pm 0.4–0.5 is the sweet spot, and Pm remains the assembly trim.")
+    A("")
+    A("### 10.2 The Pareto — detent strength buys stepping cost")
+    A("")
+    A("The campaign's central discovery: optimising the zero-power detent makes the "
+      "neighbouring pole's magnet grip the translator harder than one coil can pull it "
+      "off — BOTH optimised sets are unsteppable single-coil (a +7.4 mN mid-step "
+      "barrier at moderate current). Stepping them needs a DUAL scheme: pull with the "
+      "target pole while CANCELLING the holding pole with reverse current. That works "
+      "cleanly — at a price:")
+    A("")
+    A("| Set | Detent drawn/worst-reg | k_det | Drive scheme | Energy/step | Settle | Coil ΔT/step |")
+    A("|---|---|---|---|---|---|---|")
+    A("| Original FIXED (§4) | 7.7 mN → 5.0/3.8 g | 200 N/m | single 1.8 A ballistic | 2.7 mJ | 2.5–4 ms | 6 K |")
+    A("| **BALANCED — recommended** (duty .40, slots 1.5×/2×, N42, Pm 0.4) | 15.2/11.4 mN → 14.6/11.0 g | 415 N/m | DUAL ±3.35 A hold 3 ms | 37 mJ | 5.5 ms | ≈44 K |")
+    A("| MAX-FORCE (as balanced + N52, Pm 0.5) | 19.9/14.9 mN → 19.1/14.3 g | 544 N/m | DUAL ±5 A hold 3 ms | 83 mJ | 8 ms | ≈97 K |")
+    A("")
+    A("The BALANCED set is the recommendation: 2.2× the 5 g spec on the WORST "
+      "registration (2.9× as-drawn), half the max-force set's step energy, faster settle, cooler "
+      "coils. The max-force set stays on the table if the vehicle vibration envelope "
+      "(§9.4 row 4, Tony's number) demands it. ΔT figures are adiabatic per step — "
+      "occasional re-pointing is fine, sustained slewing is duty-limited; the queued "
+      "coil pass (knob 1H: thicker wire on Tony's 5 V rail) attacks exactly this — "
+      "and, as §4.4 already holds, sustained slewing needs a duty-cycle + "
+      "thermal-path check that is NOT modelled here.")
+    A("")
+    A("### 10.3 Dynamics: Tony's air-piston damper works, with a number")
+    A("")
+    A("![damper](opt/fig-damper.png)")
+    A("")
+    A("A **Ø0.15 mm vent hole** in the reflector foil (equivalently 0.018 mm² of edge "
+      "gap) captures the commanded step at EVERY hold length from 3 ms up on both "
+      "Pareto sets — total step latency 5.5–8 ms. Larger vents dissipate too little "
+      "(the translator escapes); a sealed front is worse (the trapped-air spring, "
+      "≈300 N/m, displaces the parking position). The model includes the brief's "
+      "0.35 mN guide friction — its omission in the first pass made capture impossible "
+      "and was caught by trajectory diagnostics, a bug worth confessing because it "
+      "shows the discipline working. The hold-then-release drive of §4.4 remains the "
+      "capture strategy; the damper makes it fast and robust.")
+    A("")
+    A("### 10.4 Consequence for the drive electronics (§9.5 amendment)")
+    A("")
+    A("The dual pull-and-cancel scheme requires the cancel coil to carry REVERSE "
+      "current — so the §9.5 unipolar topology (one low-side FET per coil) is "
+      "sufficient ONLY for the original 5 g design. The optimised sets need a "
+      "half-bridge per coil (or per phase pair). The aperture-board footprint "
+      "grows accordingly (2 FETs + clamp per coil still fits the 3.25 mm pitch in "
+      "1 mm-class packages); the rail-voltage-as-current-control principle and the "
+      "two-board stack survive unchanged. Flagged for the next electronics pass and "
+      "council check.")
+    A("")
+    A("### 10.5 What remains before tooling")
+    A("")
+    A("Tooth-tip/corner |B| probes (bridge-only today, ≤1.15 T), a joint "
+      "duty×Pm×registration fine pass (council: fixed-Pm screening can mis-rank), the "
+      "coil heat redesign, the 2D-unrolled residual (the standing caveat) — and the "
+      "prototype force curve, which remains the single measurement that collapses all "
+      "of it.")
+    A("")
+
+    # ---------------------------------------------------------------- §11
+    A("## 11. Traceability")
     A("")
     A("Every headline number maps to a machine-readable artefact in `scripts/phantm/out/`: "
       "five-numbers.json (lumped v1) · femm-five-numbers.json (baseline FE) · "
-      "pm-ic-sweeps.json (task-3/4 curves) · femm-variants.json (levers) · hexcell.json (cell cutoff + band table) · "
+      "pm-ic-sweeps.json (task-3/4 curves) · femm-variants.json (levers) · hexcell.json (cell cutoff + band table) · opt/opt-sweeps-1..4.json + opt/opt-recentre.json (campaign) · opt/damper.json + opt/damper-balanced.json (dynamics) · "
       "fixed-design.json (Pm*, Ic*, curves) · fix-alternatives.json (rejected "
       "alternates + FE step split) · dynamics.json · cost.json · scorecard.json. "
       "Reproduce: selftest.py (27/27 guards incl. basin-count, spike-free, co-energy "
@@ -1189,7 +1290,7 @@ def main():
     outreach = os.path.join(OUT, "SUPPLIER-OUTREACH-DRAFTS.md")
     if os.path.exists(outreach):
         A("")
-        A("## 11. Supplier outreach — verified contacts, draft emails and "
+        A("## 12. Supplier outreach — verified contacts, draft emails and "
           "request-for-quotation specifications")
         A("")
         body = open(outreach).read()

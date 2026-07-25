@@ -144,7 +144,6 @@ absent("coil closed-ring claim retired", "nothing can wind",
 absent("in-situ magnetisation as mandate retired", "**Magnetise in-situ**")
 contains("round-3 responses present", "open horseshoe", "monolithic", "Route A",
          "37,000", "flux-diffusion", "magnetise-after-assembly")
-contains("v4.5 title", "(v4.5 — 24 Jul: feedback rounds 1–3 + hex-cell/PCB")
 absent("no v4.3 title", "(v4.3 — 24 Jul feedback rounds")
 # reflector bound: 2x2 mm x 20 um Cu = 0.716 mg < 0.5% of Mt; +2 mg plastic < 2%
 m_foil = 8960 * 2e-3 * 2e-3 * 20e-6 * 1e6  # mg
@@ -221,7 +220,41 @@ contains("sol round-2 fixes", "57.4–58.0 GHz", "≈67.2", "1.07 V", "0.60 Ω")
 check("phase/step @70 = 16.7°", abs(bt[70]["phase_per_ideal_step_deg"] - 16.7) < 0.15)
 contains("§9 present", "## 9. The hex-cell wave conformer", "φ = 4π·d/λg",
          "53.56 GHz", "5.598 mm", "≈57 GHz upward", "≥67 GHz", "BELOW CUTOFF",
-         "## 10. Traceability", "## 11. Supplier outreach")
+         "## 10. The optimisation campaign", "## 11. Traceability",
+         "## 12. Supplier outreach")
+
+# ---------------- §10 optimisation campaign ---------------------------------
+o3 = json.load(open(os.path.join(OUT, "opt", "opt-sweeps-3.json")))
+o4 = json.load(open(os.path.join(OUT, "opt", "opt-sweeps-4.json")))
+r_bal = next(r for r in o3["rows"] if r["name"] == "win sslot2x")
+check("balanced 14.6/11.0 g", abs(r_bal["margin_g_drawn"] - 14.60) < 0.05
+      and abs(r_bal["margin_g_exact"] - 10.99) < 0.05)
+r_max = next(r for r in o4["rows"] if r["name"] == "d40 stack N52 Pm0.50")
+check("max-force 19.1/14.3 g", abs(r_max["margin_g_drawn"] - 19.06) < 0.05
+      and abs(r_max["margin_g_exact"] - 14.34) < 0.05)
+r_g30 = next(r for r in o3["rows"] if r["name"] == "g30 stack N52")
+check("gap-30 11.3/7.7 g, 3 basins", abs(r_g30["margin_g_drawn"] - 11.33) < 0.05
+      and r_g30["basins_drawn"] == 3 and r_g30["basins_exact"] == 3)
+rc_ = json.load(open(os.path.join(OUT, "opt", "opt-recentre.json")))
+v2r = rc_["winners"]["V2-d40-t150-g40-N52"]
+check("gap-40 killed (1 basin as-drawn, all Pm)",
+      all(r["basins_drawn"] == 1 for r in v2r["pm_rows"]))
+dmp = json.load(open(os.path.join(OUT, "opt", "damper.json")))
+dmpb = json.load(open(os.path.join(OUT, "opt", "damper-balanced.json")))
+check("damper Ø0.15 both sets", dmp["recommended"]["vent"] == "Ø0.15"
+      and dmpb["recommended"]["vent"] == "Ø0.15")
+check("balanced k 415", abs(dmpb["k_det"] - 415) < 2)
+check("max k 544", abs(dmp["k_det"] - 544) < 2)
+check("hold ≥3 ms both", dmp["recommended"]["hold_ms"] == 3.0
+      and dmpb["recommended"]["hold_ms"] == 3.0)
+e_bal = 2 * 3.35**2 * 0.552 * 3e-3 * 1e3
+e_max = 2 * 5.0**2 * 0.552 * 3e-3 * 1e3
+check("energy 37/83 mJ", abs(e_bal - 37.2) < 0.3 and abs(e_max - 82.8) < 0.3)
+contains("§10 content", "BALANCED set is the recommendation", "DUAL ±3.35 A",
+         "DUAL ±5 A", "Ø0.15 mm vent", "0.35 mN guide friction",
+         "half-bridge per coil", "basin count is", "Goodhart trap")
+contains("v5 title", "(v5 — 25 Jul")
+absent("v4.5 title retired", "(v4.5 — 24 Jul")
 # U-band prototype scaling: 55 GHz at the production 70-GHz operating point
 _ratio = 70.0 / hx["cutoff"]["fc_ghz"]
 _fc_p = 55.0 / _ratio
