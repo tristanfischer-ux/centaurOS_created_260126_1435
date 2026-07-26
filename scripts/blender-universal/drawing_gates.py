@@ -1424,11 +1424,21 @@ def run_gates(out_dir: str) -> list:
             _ga_svg_path_g20 = os.path.join(out_dir, "drawings", "general-arrangement.svg")
             if os.path.exists(_ga_svg_path_g20):
                 _ga_svg_text_g20 = open(_ga_svg_path_g20, encoding="utf-8", errors="replace").read()
-                # The title block emits: "product envelope W × D × H mm (L×W×H)"
-                # or "Overall plant envelope …". Extract the first dim-string after
-                # either noun.
+                # The title block emits one of:
+                #   "product envelope W × D × H mm (L×W×H)"      — product/instrument
+                #   "Overall plant envelope …"                    — plant scale
+                #   "enclosure W × D × H mm (L×W×H) · OVERALL assembled height N mm"
+                #     — a product with feature(s) proud of the lid (2026-07-26). The
+                #     enclosure triple and the overall height are DIFFERENT numbers and
+                #     the sheet must state both; this gate checks the ENCLOSURE triple
+                #     against the canonical shell, which is what it has always meant.
+                # `enclosure` MUST be in this alternation: when the organoid caption
+                # gained the OVERALL clause the old two-noun regex stopped matching and
+                # G20 silently ABSTAINED ("no parseable drawing-caption envelope") — a
+                # gate that stopped catching, the same failure mode as an exemption that
+                # widens with the defect.
                 _cap_match_g20 = re.search(
-                    r"(?:product envelope|Overall plant envelope)\s+"
+                    r"(?:product envelope|Overall plant envelope|enclosure)\s+"
                     r"([\d][\d ×\.]+(?:mm|m))",
                     _ga_svg_text_g20)
                 if _cap_match_g20:
@@ -3384,6 +3394,27 @@ def _selftest() -> int:
     chk("g20_fail_when_caption_diverges_from_shell", not _g20_ok_fail)
     chk("g20_fail_detail_says_mismatch", "MISMATCH" in _g20_msg_fail)
     chk("g20_fail_detail_mentions_fix", "canonical" in _g20_msg_fail.lower())
+    # (b2) EXTRACTION proveCatch (2026-07-26): the title block gained a second labelled
+    #      value — "enclosure W × D × H mm (L×W×H) · OVERALL assembled height N mm" —
+    #      when a feature stands proud of the lid. The SVG-side extraction regex keyed
+    #      only on "product envelope|Overall plant envelope", so the new wording made G20
+    #      silently ABSTAIN ("no parseable drawing-caption envelope"): a gate that stopped
+    #      catching. Assert the caption the drawing ACTUALLY emits still yields the
+    #      ENCLOSURE triple (not the OVERALL height) through the same regex the runner uses.
+    _g20_cap_dual = (
+        "enclosure 180 × 242 × 108 mm (L×W×H) · OVERALL assembled height 203 mm "
+        "(incl. 1 feature(s) proud of the lid) · 10 equipment items."
+    )
+    _g20_dual_m = re.search(
+        r"(?:product envelope|Overall plant envelope|enclosure)\s+"
+        r"([\d][\d ×\.]+(?:mm|m))", _g20_cap_dual)
+    chk("g20_dual_label_caption_extracts", _g20_dual_m is not None)
+    _g20_dual_dims = (_parse_caption_envelope_mm(_g20_dual_m.group(1).strip())
+                      if _g20_dual_m else None)
+    chk("g20_dual_label_yields_enclosure_triple_not_overall",
+        _g20_dual_dims is not None
+        and abs(_g20_dual_dims[0] - 180.0) < 1.0
+        and abs(_g20_dual_dims[2] - 108.0) < 1.0)
     # (c) ABSTAIN: no Enclosure Shell part in manifest (plant-scale / non-enclosure).
     _g20_ok_abs, _g20_msg_abs = envelope_equality_cross_check(
         [], _g20_caption_coherent)

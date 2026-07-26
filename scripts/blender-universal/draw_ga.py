@@ -1746,7 +1746,56 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
             from instrument_form_rule import instrument_form_rule_mm
             _opath = float(meta.get("optical_path_mm") or 10.0)
             _form = instrument_form_rule_mm(L, W, H, 0.0, 2.0, optical_path_mm=_opath)
-            z_max = max(z_max, float(_form["total_height_mm"]))
+            _body_h = float(_form["body_size"][2])
+            # ABOVE-LID FEATURES COME FROM THE MANIFEST, NOT FROM `parts` (2026-07-26).
+            # By this point `parts` is in a MIXED frame: _instrument_clamp rewrote the
+            # SHELL to a local 0-based band (0 .. hh*0.65) while every other part still
+            # carries its WORLD z centre, and sizes have been clamped to envelope
+            # fractions. Any lid test against that list is meaningless — it read the
+            # shell top as 70 mm and called 35 of 37 parts "above the lid". The manifest
+            # is the authoritative world-frame record, so membership is decided there.
+            #
+            # SITS-ON TEST (universal, archetype-agnostic): top clears the lid AND base
+            # is at/above it. The second clause is the discriminator — an interior cue
+            # that merely pokes through cannot spoof it, while a real on-top vessel
+            # passes. A product with nothing on its lid (the colorimeter) yields an empty
+            # set and keeps the synthesized form-rule tower untouched.
+            _above_lid_off: dict = {}
+            try:
+                _mpath = Path(str(meta.get("out_dir") or "")) / "parts-manifest.json"
+                _mrows = (json.loads(_mpath.read_text()).get("parts") or []
+                          ) if _mpath.exists() else []
+                _csr = re.compile(
+                    r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+
+                def _mz(_r):
+                    _d = _r.get("dims_mm") or {}
+                    _h = float(_d.get("h") or _d.get("len") or 0.0)
+                    _zc = float((_r.get("pos_mm") or [0, 0, 0])[2])
+                    return _zc - _h / 2.0, _zc + _h / 2.0
+
+                _sh_rows = [_r for _r in _mrows
+                            if _csr.search(str(_r.get("name") or ""))]
+                if _sh_rows:
+                    _sh = max(_sh_rows, key=lambda _r: _mz(_r)[1] - _mz(_r)[0])
+                    _lid_w = _mz(_sh)[1]
+                    for _r in _mrows:
+                        _z0, _z1 = _mz(_r)
+                        if _z1 > _lid_w + 1.0 and _z0 >= _lid_w - 1.0:
+                            _above_lid_off[str(_r.get("equipment_tag") or "")] = (
+                                _z0 - _lid_w, _z1 - _lid_w)
+            except Exception as _ale:  # noqa: BLE001 — never block the drawing
+                print(f"[ga] above-lid scan skipped: {_ale}")
+            meta["above_lid_offsets_mm"] = _above_lid_off
+            if _above_lid_off:
+                _top_local = _body_h + max(o1 for _, o1 in _above_lid_off.values())
+                z_max = max(z_max, _top_local)
+                print(f"[ga] above-lid geometry PRESENT ({len(_above_lid_off)} part(s)) — "
+                      f"overall {_top_local:.0f} mm from REAL geometry, not the form-rule "
+                      f"tower ({float(_form['total_height_mm']):.0f} mm)")
+            else:
+                z_max = max(z_max, float(_form["total_height_mm"]))
+                print("[ga] no above-lid geometry — form-rule tower supplies the envelope")
             H = max(z_max - z_min, 1.0)
             # DECISION (2026-07-14 Tristan): Assembly must show PCB + parts stack-up.
             # Seat BoM proxies into form-rule Z bands BEFORE drawing — the old
@@ -1755,6 +1804,23 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                 n_seat = _seat_instrument_parts_in_form(
                     parts, _form, L, W, float(_form["body_size"][2]))
                 print(f"[ga] instrument assembly seat: {n_seat} part(s) in form bands")
+                # RESTORE the above-lid features ON TOP of the body. The seat pass folds
+                # every non-shell part into the form's interior bands — which is right for
+                # an assembly stack-up but wrong for an exterior feature that stands proud
+                # of the lid, and is why the organoid culture vessel (95 mm above the lid,
+                # the render's dominant silhouette) vanished from every orthographic view.
+                # Re-place them in the seat's LOCAL frame at body_h + their true offset.
+                _restored = 0
+                for _p in parts:
+                    _off = _above_lid_off.get(str(getattr(_p, "tag", "") or ""))
+                    if not _off:
+                        continue
+                    _p.z0 = _body_h + float(_off[0])
+                    _p.z1 = _body_h + float(_off[1])
+                    _restored += 1
+                if _restored:
+                    print(f"[ga] restored {_restored} above-lid feature(s) proud of the "
+                          f"lid (body {_body_h:.0f} mm → top {max(_p2.z1 for _p2 in parts):.0f} mm)")
                 meta["instrument_assembly_cutaway"] = True
                 # Retag proxies → spine BoM tags (I-201…) so the sheet matches Part names.
                 try:
@@ -2543,11 +2609,27 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
     _cap_L = float(meta.get("envelope_ww") or L)
     _cap_W = float(meta.get("envelope_dd") or W)
     _cap_H = float(meta.get("envelope_hh") or H)
+    # OVERALL vs ENCLOSURE (2026-07-26). The caption triple is the ENCLOSURE shell. When
+    # a feature stands proud of the lid (the organoid culture vessel, +95 mm) the sheet's
+    # own overall-height dimension is LARGER than the caption — a drawing that contradicts
+    # itself (108 caption vs 203 dimension). Standard drafting practice is to state the
+    # controlling overall dimension; do NOT silently redefine "enclosure" to mean
+    # "overall" (they are different numbers a fabricator and an installer each need).
+    # State BOTH, explicitly labelled, so caption and dimension line agree by disclosure.
+    _al_off = meta.get("above_lid_offsets_mm") or {}
+    _overall_H = (_cap_H + max(o1 for _, o1 in _al_off.values())) if _al_off else None
     if (meta.get("is_instrument_device") or meta.get("is_product_scale")) and max(L, W, H) < 1000.0:
         _env_line = (
             f"{_env_noun} {_cap_L:.0f} × {_cap_W:.0f} × {_cap_H:.0f} mm (L×W×H) · "
             f"{meta.get('count', 0)} equipment items."
         )
+        if _overall_H is not None and _overall_H > _cap_H + 1.0:
+            _env_line = (
+                f"enclosure {_cap_L:.0f} × {_cap_W:.0f} × {_cap_H:.0f} mm (L×W×H) · "
+                f"OVERALL assembled height {_overall_H:.0f} mm "
+                f"(incl. {len(_al_off)} feature(s) proud of the lid) · "
+                f"{meta.get('count', 0)} equipment items."
+            )
     else:
         _env_line = (
             f"{_env_noun} {_cap_L/1000:.1f} m (L) × {_cap_W/1000:.1f} m (W) × "
