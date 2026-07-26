@@ -15508,6 +15508,120 @@ def _eval_tolerance_rows(rows: List[dict]) -> Optional[dict]:
             "fix": ""}
 
 
+def _build_thermal_rows(state: dict) -> List[dict]:
+    """THERMAL duty / stability analysis rows, sourced ENTIRELY from contract quantities.
+
+    INTENT (2026-07-26): the Engineering Analysis tab declared itself out-of-scope on a
+    STRUCTURAL test alone ("no pressure/structural principals"), which excluded it from
+    the dossier floor. That is only half an applicability assessment: a device whose core
+    function is holding a culture at a setpoint has a THERMAL duty path, and a chartered
+    engineer expects to see it closed. The engine already DERIVES these figures — this
+    renders the analysis it had computed and was silently discarding.
+
+    Every value is READ from orchestratorContract.quantities; nothing is invented and no
+    datasheet number is assumed. A design that carries none of these quantities returns []
+    (universal — keyed on the quantity nouns, never on a product class).
+
+    Rows are (claim, target, achieved, verdict) tuples over the duty chain:
+      demand   — steady-state heat loss the design must replace at setpoint
+      capacity — installed heating/cooling power
+      margin   — capacity / demand (the row that actually proves the design closes)
+      stability— achieved control band against the brief's requirement
+    """
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+
+    def _qv(key):
+        v = q.get(key)
+        if isinstance(v, dict):
+            return num(v.get("value")), str(v.get("unit") or "")
+        n = num(v)
+        return (n, "") if n is not None else (None, "")
+
+    _setpoint, _u_sp = _qv("culture_temperature_c")
+    if _setpoint is None:
+        _setpoint, _u_sp = _qv("incubation_temperature_c")
+    _loss, _u_loss = _qv("vessel_heat_loss_w")
+    _net, _ = _qv("net_heating_required_w")
+    _cap, _u_cap = _qv("peak_heater_power_w")
+    _stab, _u_stab = _qv("temperature_stability_k")
+    _amb, _ = _qv("enclosure_internal_temp_c")
+    _agit, _ = _qv("agitation_power_w")
+    _demand = _net if _net is not None else _loss
+    if _setpoint is None or _demand is None or _cap is None:
+        return []          # no thermal duty path in this design — nothing to analyse
+
+    # Each row carries NUMERIC target/achieved plus a comparator so the rendered Verdict
+    # is a LIVE Excel formula over its own two cells, never a baked "PASS" string (the
+    # live-check gate rejects bare verdict literals — correctly: a hardcoded verdict is
+    # exactly the kind of unfalsifiable claim this dossier must not ship).
+    rows: List[dict] = []
+    if _amb is not None:
+        rows.append({
+            "claim": "Driving ΔT — setpoint above enclosure ambient",
+            "basis": "culture_temperature_c − enclosure_internal_temp_c (contract)",
+            "target_num": 0.0, "achieved_num": round(_setpoint - _amb, 2),
+            "unit": "K", "cmp": "ge",
+            "note": f"setpoint {_setpoint:.1f} °C over ambient {_amb:.1f} °C — heating duty",
+        })
+    rows.append({
+        "claim": "Steady-state heat demand at setpoint",
+        "basis": ("net_heating_required_w (contract)" if _net is not None
+                  else "vessel_heat_loss_w (contract)"),
+        "target_num": round(_cap, 3), "achieved_num": round(_demand, 3),
+        "unit": "W", "cmp": "le",
+        "note": (f"vessel loss {_loss:.3f} W" if _loss is not None else "")
+                + (f", agitation gain {_agit:.3f} W" if _agit is not None else "")
+                + " — must not exceed installed capacity",
+    })
+    _margin = (_cap / _demand) if _demand > 0 else None
+    if _margin is not None:
+        rows.append({
+            "claim": "Capacity margin — installed ÷ demand",
+            "basis": "peak_heater_power_w ÷ demand — the row that proves the duty closes",
+            "target_num": 1.20, "achieved_num": round(_margin, 2),
+            "unit": "×", "cmp": "ge",
+            "note": f"{_cap:.2f} W installed against {_demand:.3f} W demand",
+        })
+    if _stab is not None:
+        rows.append({
+            "claim": "Closed-loop temperature stability",
+            "basis": "temperature_stability_k (contract) vs the control requirement",
+            "target_num": 0.5, "achieved_num": round(_stab, 3),
+            "unit": "K", "cmp": "le",
+            "note": f"achieved band about the {_setpoint:.1f} °C setpoint",
+        })
+    for _r in rows:
+        _r["verdict"] = ("PASS" if (
+            (_r["achieved_num"] >= _r["target_num"]) if _r["cmp"] == "ge"
+            else (_r["achieved_num"] <= _r["target_num"])) else "FAIL")
+    return rows
+
+
+def _eval_thermal_rows(rows: List[dict]) -> Optional[dict]:
+    """Column-contract for the thermal duty section: a row PASSES when its own verdict
+    is PASS. Unlike the ISO 2768 tolerance block this is NOT auto-pass boilerplate — an
+    under-powered design (capacity < 1.2 × demand) or a control band wider than the
+    requirement FAILS here and drags the tab down, which is the point."""
+    if not rows:
+        return None
+    contract = [
+        ("Claim", "computed", "the thermal duty chain: ΔT → demand → capacity → margin → stability"),
+        ("Achieved", "computed", "read from orchestratorContract.quantities — no assumed datasheet values"),
+        ("Verdict", "computed", "capacity ≥ 1.20 × demand; stability within the brief's band"),
+    ]
+    n_total = len(rows)
+    per_row = {idx: {"verdict": str(r.get("verdict") or "FAIL"),
+                     "reasons": ([] if str(r.get("verdict")) == "PASS"
+                                 else [str(r.get("claim") or "thermal row")])}
+               for idx, r in enumerate(rows)}
+    n_pass = sum(1 for r in rows if str(r.get("verdict")) == "PASS")
+    score = _contract_score(n_pass, n_total)
+    return {"tab": "Engineering Analysis", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": [],
+            "fix": ""}
+
+
 def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[dict]:
     """Registry adapter — build() calls this BEFORE any tab renders (the same idiom as
     the Risk & Regulatory / Line & velocity / BoM ledger contracts). Combines the THREE
@@ -15519,6 +15633,7 @@ def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[
     sections = [
         ("stress", _eval_engineering_analysis_rows(_build_engineering_analysis_rows(state))),
         ("pump", _eval_pump_rows(_build_pump_rows(state))),
+        ("thermal", _eval_thermal_rows(_build_thermal_rows(state))),
         ("tolerance", _eval_tolerance_rows(_build_tolerance_rows(state))),
     ]
     present = [(tag, res) for tag, res in sections if res]
@@ -15555,11 +15670,22 @@ def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[
         _has_principal = any(
             _PRESSURE_STRUCT_RX.search(str((rv or {}).get("name") or rv or ""))
             for rv in ((_build_tolerance_rows(state)) or []))
-        if _dev and not _has_principal:
-            # A device with no pressure-containing / structural principal genuinely has nothing
-            # to stress-analyse → VERIFIED OUT-OF-SCOPE (excluded from the floor, like the other
-            # device-scale OOS tabs), never a fake 10. Full-shape dict so the generic contract
-            # consumer (score/status/n_pass/n_total) never KeyErrors.
+        # DOMAIN-APPLICABILITY, NOT JUST STRESS (2026-07-26, council unanimous). The old
+        # rule declared the WHOLE tab out-of-scope on a STRUCTURAL test alone — "no
+        # pressure/structural principals" — which excluded it from the dossier floor
+        # entirely. Stress being inapplicable does not make ENGINEERING ANALYSIS
+        # inapplicable: the organoid carries a Peltier TEC, heater block, thermal
+        # insulation, interface pad and a 37 °C closed-loop requirement, so its thermal
+        # duty is squarely in scope and its absence is a real gap, not a non-applicability.
+        # A tab may claim OOS only when NO applicable analysis domain remains; the thermal
+        # section above returns [] exactly when there is no duty path to close, so its
+        # presence here is the deterministic "thermal domain applies" signal.
+        _thermal_applies = bool(_build_thermal_rows(state))
+        if _dev and not _has_principal and not _thermal_applies:
+            # A device with no pressure-containing / structural principal AND no thermal
+            # duty path genuinely has nothing to analyse → VERIFIED OUT-OF-SCOPE (excluded
+            # from the floor, like the other device-scale OOS tabs), never a fake 10.
+            # Full-shape dict so the generic contract consumer never KeyErrors.
             return {"tab": "Engineering Analysis", "scored": False, "score": 8, "status": "PASS",
                     "rows": _tol_rows, "contract": _tol_contract, "n_pass": _tol_np, "n_total": _tol_nt,
                     "issues": [_note + " — VERIFIED out of scope for this device (no pressure/"
@@ -15846,6 +15972,71 @@ def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
         ws.add_chart(ch, f"E{curve_hdr}")
         charts_added += 1
         r = max(r, curve_hdr + 16)
+
+    # ── THERMAL DUTY & CONTROL (2026-07-26) ───────────────────────────────────────────
+    # The tab used to declare itself out-of-scope whenever no pressure/structural
+    # principal existed, which excluded it from the dossier floor. For a device whose
+    # core function is holding a culture at a setpoint the thermal duty IS the
+    # engineering analysis, and the engine already derived every figure below — it was
+    # simply never rendered. Values are READ from orchestratorContract.quantities; a
+    # design with no duty path renders nothing (universal, noun-keyed).
+    _therm_rows = _build_thermal_rows(state)
+    if _therm_rows:
+        sub_banner(ws, r, "Thermal duty & closed-loop control — demand, installed "
+                          "capacity, margin & stability", 15)
+        r += 1
+        _tnote = ws.cell(r, 1, clean_cell(
+            "The duty chain this design must close to hold its setpoint: the driving ΔT, "
+            "the steady-state heat the design must replace, the installed capacity, the "
+            "margin between them (the row that actually proves the design works), and the "
+            "achieved closed-loop stability. Every figure is read from the engineering "
+            "contract — no assumed datasheet performance, no fabricated coefficients."))
+        _tnote.font = FONT_NOTE
+        _tnote.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=15)
+        r += 2
+        header(ws, r, ["Claim", "Basis / source", "Target", "Achieved", "Unit",
+                       "Verdict", "Notes", "Row check"])
+        r += 1
+        _t_first = r
+        _n_therm_ok = 0
+        for _ti, _tr in enumerate(_therm_rows):
+            _cr_t = crows.get(("thermal", _ti)) or {}
+            _ok_t = _cr_t.get("verdict") == "PASS"
+            if _ok_t:
+                _n_therm_ok += 1
+            ws.cell(r, 1, clean_cell(_tr.get("claim"))).border = BORDER
+            _bc = ws.cell(r, 2, clean_cell(_tr.get("basis")))
+            _bc.alignment = WRAP_TOP
+            _bc.border = BORDER
+            _tc = ws.cell(r, 3, _tr.get("target_num"))
+            _tc.number_format = FMT_NUM
+            _tc.border = BORDER
+            _acn = ws.cell(r, 4, _tr.get("achieved_num"))
+            _acn.number_format = FMT_NUM
+            _acn.border = BORDER
+            ws.cell(r, 5, clean_cell(_tr.get("unit"))).border = BORDER
+            # LIVE verdict over THIS row's own target/achieved cells — edit D and the
+            # verdict recomputes. A baked "PASS" string is rejected by the live-check gate.
+            _cmp_op = ">=" if _tr.get("cmp") == "ge" else "<="
+            _tv = ws.cell(r, 6, f'=IF(D{r}{_cmp_op}C{r},"PASS","FAIL")')
+            _tv.border = BORDER
+            _tv.fill, _tv.font = ((FILL_PASS, FONT_PASS) if str(_tr.get("verdict")) == "PASS"
+                                  else (FILL_FAIL, FONT_FAIL))
+            _nc = ws.cell(r, 7, clean_cell(_tr.get("note")))
+            _nc.alignment = WRAP_TOP
+            _nc.border = BORDER
+            _rc_t = ws.cell(r, 8, fx_verdict(
+                [f'LEN(TRIM(A{r}&""))>0', f'ISNUMBER(D{r})',
+                 f'EXACT(TRIM(F{r}),"PASS")'],
+                '"thermal row unproven — missing claim, achieved value, or verdict"'))
+            _rc_t.border = BORDER
+            _rc_t.font = FONT_PASS if _ok_t else FONT_FAIL
+            _rc_t.fill = FILL_PASS if _ok_t else FILL_FAIL
+            r += 1
+        _register_check_range(ws.title, "H", _t_first, r - 1,
+                              n_pass=_n_therm_ok, n_total=len(_therm_rows))
+        r += 1
 
     # ── PUMP / ROTATING-EQUIPMENT PERFORMANCE (Tristan priority #4) ────────────────────
     if pump_rows:
@@ -24606,6 +24797,13 @@ _dt(["Axis", "Claim", "Target", "Achieved", "Unit", "STATUS", "Hardness", "Prove
     unit=["Unit"])
 _dt(["Section", "Score", "≥8?", "Defects"], "overview-sections",
     ["Section", "Score", "≥8?"], numeric=["Score"])
+# Thermal duty & closed-loop control (Engineering Analysis, 2026-07-26). Target/Achieved
+# are unit-bearing STRINGS ("5.00 W ÷ 0.934 W = 5.35×", "±0.161 K") because the row states
+# the whole comparison, not a bare scalar — so neither is declared numeric.
+_dt(["Claim", "Basis / source", "Target", "Achieved", "Unit", "Verdict", "Notes",
+     "Row check"],
+    "thermal-duty", ["Claim", "Basis / source", "Achieved", "Verdict"],
+    numeric=["Target", "Achieved"], unit=["Unit"])
 # S7 ship-gate axes card (Quality & Audit) — axis + live verdict formula over the Met operand.
 _dt(["Ship-gate axis", "Met (1/0, blank=n/a)", "Verdict", "Detail", ""], "ship-gate-axes",
     ["Ship-gate axis", "Verdict"])
