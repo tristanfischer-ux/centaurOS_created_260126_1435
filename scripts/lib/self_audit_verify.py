@@ -80,9 +80,70 @@ def brief_compliance_honest(state, disclosed_na_keys=None):
     return {"honest": len(violations) == 0, "violations": violations}
 
 
+def _bom_cost_band(state):
+    """The brief's BoM cost plausibility band (floor, ceiling) from its derived cost anchors,
+    or (None, None) if the brief states none. floor = bom_cost_floor_gbp; ceiling =
+    unit_cost_ceiling_gbp, else reconstructed from the midpoint (2·mid − floor)."""
+    def _num(x):
+        try:
+            return float(str(x).replace(",", "").replace("£", "").strip())
+        except (TypeError, ValueError):
+            return None
+    floor = mid = ceil = None
+    km = (state or {}).get("keyMetrics") or {}
+    for grp in ("supporting_metrics", "primary_metrics"):
+        for m in (km.get(grp) or []):
+            if not isinstance(m, dict):
+                continue
+            mid = _num(m.get("value")) if m.get("id") == "bom_cost_midpoint_gbp" else mid
+            floor = _num(m.get("value")) if m.get("id") == "bom_cost_floor_gbp" else floor
+    con = (((state or {}).get("parsedBrief") or {}).get("constraints") or {})
+    _uc = con.get("unit_cost_ceiling")
+    if isinstance(_uc, dict):
+        ceil = _num(_uc.get("value"))
+    elif _uc is not None:
+        ceil = _num(_uc)
+    if ceil is None and mid is not None and floor is not None:
+        ceil = 2 * mid - floor
+    return (floor, ceil)
+
+
+def bom_plausible(state):
+    """The DETERMINISTIC check a `[bill_of_materials]` self-audit finding compiles to.
+
+    The self-audit exists to catch a BROKEN / deceptive bill — an empty £0 fallback, a
+    single line that dominates the rollup implausibly (the organoid r11 finding's "£186
+    thermal pad = 64% of the bill" class), or a total wildly outside the brief's own cost
+    band. When NONE of those hold, the bill is deterministically sound and the LLM's BoM
+    complaint is noise / stale (r11: the £186 pad and the £114 estimate it cited no longer
+    exist in the £287 bill). Minor per-line data gaps (a £0 commodity line) are scored by
+    the deterministic Bill-of-Materials ledger tab itself, not re-litigated here.
+
+    Returns {plausible: bool, reasons: [str, …]}. Conservative: any real brokenness binds."""
+    rb = (state or {}).get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return {"plausible": False, "reasons": ["no assembled BoM (empty / fallback bill)"]}
+    lines = [float((r or {}).get("line_gbp", 0) or 0) for r in rb if isinstance(r, dict)]
+    total = round(sum(lines), 2)
+    reasons = []
+    if total <= 0:
+        reasons.append("BoM total is £0 (empty / fallback bill)")
+    else:
+        top = max(lines) if lines else 0.0
+        if top / total > 0.40:
+            reasons.append(f"a single line is £{top:.0f} = {top/total*100:.0f}% of the "
+                           f"£{total:.0f} bill (implausible dominant line)")
+        floor, ceil = _bom_cost_band(state)
+        if floor is not None and total < floor * 0.5:
+            reasons.append(f"BoM £{total:.0f} is < half the brief cost floor £{floor:.0f}")
+        if ceil is not None and total > ceil * 2.0:
+            reasons.append(f"BoM £{total:.0f} is > 2× the brief cost ceiling £{ceil:.0f}")
+    return {"plausible": len(reasons) == 0, "reasons": reasons}
+
+
 # Families that have a compiled deterministic check. Everything else binds conservatively
 # (KEEP the old behaviour) until its check is written — never a silent downgrade.
-_COMPILED_FAMILIES = ("brief_compliance",)
+_COMPILED_FAMILIES = ("brief_compliance", "bill_of_materials")
 
 
 def verify_blocking_defect(defect, state, disclosed_na_keys=None):
@@ -98,6 +159,14 @@ def verify_blocking_defect(defect, state, disclosed_na_keys=None):
         return {"binds": False, "family": fam, "compiled": True,
                 "reason": "compliance disclosure honest (every null-target constraint disclosed "
                           "N/A) — LLM finding retired as noise"}
+    if fam == "bill_of_materials":
+        v = bom_plausible(state)
+        if not v["plausible"]:
+            return {"binds": True, "family": fam, "compiled": True,
+                    "reason": "BoM deterministically BROKEN — " + "; ".join(v["reasons"])}
+        return {"binds": False, "family": fam, "compiled": True,
+                "reason": ("BoM deterministically sound (real total · no dominant line · cost in "
+                           "band) — LLM finding retired as noise / stale")}
     return {"binds": True, "family": fam, "compiled": False,
             "reason": f"no deterministic check compiled for family '{fam}' yet — binds "
                       f"conservatively (compile-debt; do not weaken the gate)"}
@@ -171,6 +240,27 @@ def _selftest() -> None:
     part = partition_blocking_defects(["[brief_compliance] over-claim"], st, disclosed_na_keys=None)
     assert len(part["binding"]) == 1 and part["binding"][0]["compiled"] is True, part
     assert len(part["retired"]) == 0, part
+
+    # (g) bill_of_materials — a SOUND bill retires the LLM's stale complaint (organoid r11:
+    #     £287 total, top line £60 = 21%, cost in the £275-385 band → noise).
+    _bom_ok_state = {
+        "keyMetrics": {"supporting_metrics": [
+            {"id": "bom_cost_floor_gbp", "value": "275"},
+            {"id": "bom_cost_midpoint_gbp", "value": "330"}]},
+        "requirementsBom": [{"line_gbp": 60}, {"line_gbp": 45}, {"line_gbp": 30},
+                            {"line_gbp": 25}, {"line_gbp": 25}, {"line_gbp": 22},
+                            {"line_gbp": 20}, {"line_gbp": 18}, {"line_gbp": 15},
+                            {"line_gbp": 15}, {"line_gbp": 12}],  # Σ 287, top 60 = 21%
+    }
+    r = verify_blocking_defect("[bill_of_materials] a £186 pad dominates the rollup", _bom_ok_state)
+    assert r["binds"] is False and r["compiled"] is True, r
+    # (h) a BROKEN bill (one line = 64% of the total) still BINDS — the gate is not weakened.
+    _bom_bad_state = {"requirementsBom": [{"line_gbp": 186}, {"line_gbp": 60}, {"line_gbp": 45}]}
+    r = verify_blocking_defect("[bill_of_materials] dominant line", _bom_bad_state)
+    assert r["binds"] is True and r["compiled"] is True and "dominant" in r["reason"], r
+    # (i) an empty / £0 fallback bill BINDS.
+    r = verify_blocking_defect("[bill_of_materials] empty", {"requirementsBom": []})
+    assert r["binds"] is True and r["compiled"] is True, r
 
     print("self_audit_verify _selftest: OK "
           "(HONESTY.compiled_finding_binds_only_when_check_fails — brief_compliance compiled, "
