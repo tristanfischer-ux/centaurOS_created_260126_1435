@@ -6549,6 +6549,50 @@ def _synthetic_equipment_rows(parts, region_rank_default):
     return rows
 
 
+_SHELL_NAME_RE = re.compile(r"enclosure|shell|housing|chassis|main\s*body|cabinet", re.I)
+
+
+def _pick_containing_shell(rows):
+    """The CONTAINING shell for the containment clamp is the LARGEST enclosure-like box —
+    never the first regex match. Organoid r11 (2026-07-26): "Chassis Base Plate"
+    (200×140×3 mm, a flat mounting plate) matched `chassis` and sat first in row order,
+    so a plain next() picked it; the clamp then scaled every interior part's tallest axis
+    to fit its 3 mm thickness → 5 parts collapsed to 6.4×4.3×2.8 mm (the Renders/Assembly
+    litter). A base plate is NOT a container. Choose the max-VOLUME shell-named row, and
+    never let a THIN plate (min axis < 20 mm) be the clamp datum. Pure so proveCatch can
+    pin the base-plate-vs-enclosure choice without bpy. Universal."""
+    cands = []
+    for r in rows:
+        if not _SHELL_NAME_RE.search(str(r.get("name") or "")):
+            continue
+        d = r.get("dims_mm")
+        if not isinstance(d, dict) or not all(k in d for k in ("w", "d", "h")):
+            continue
+        vals = [float(d["w"]), float(d["d"]), float(d["h"])]
+        if min(vals) < 20.0:      # a thin plate / bracket is not a containing shell
+            continue
+        cands.append((vals[0] * vals[1] * vals[2], r))
+    return max(cands, key=lambda c: c[0])[1] if cands else None
+
+
+def _selftest_containing_shell() -> None:
+    """proveCatch: a flat base plate must NEVER be chosen as the containment datum over a
+    real enclosure — the organoid r11 litter-collapse root cause."""
+    rows = [
+        {"name": "Chassis Base Plate", "dims_mm": {"w": 200, "d": 140, "h": 3}},
+        {"name": "Enclosure Shell", "dims_mm": {"w": 180, "d": 242, "h": 108}},
+        {"name": "Vial Holder Fixture", "dims_mm": {"w": 90, "d": 60, "h": 40}},
+    ]
+    picked = _pick_containing_shell(rows)
+    assert picked is not None and picked["name"] == "Enclosure Shell", (
+        f"containment clamp must pick the real enclosure, not a flat plate — got "
+        f"{picked and picked.get('name')!r}")
+    # a run with ONLY a thin plate (no true shell) picks nothing — never clamp to a plate.
+    assert _pick_containing_shell([rows[0]]) is None, (
+        "a thin base plate alone must not be a containment datum")
+    print("  OK _selftest_containing_shell: enclosure > base plate; thin plate exempt")
+
+
 def build_parts_manifest(parts):
     """Build the deterministic parts-manifest rows for every PLACED physical part.
 
@@ -6803,8 +6847,7 @@ def build_parts_manifest(parts):
     # to fit the shell's inner envelope (aspect preserved, orientation-free via sorted extents).
     # Universal: only fires when a single enclosure-shell row exists (a plant with no shell, or a
     # part that already fits, is untouched). Enforces at GENERATION what P8 catches after.
-    _shell = next((r for r in rows if re.search(
-        r"enclosure|shell|housing|chassis|main\s*body|cabinet", str(r.get("name") or ""), re.I)), None)
+    _shell = _pick_containing_shell(rows)
     if _shell and isinstance(_shell.get("dims_mm"), dict):
         _sv_shell = sorted((float(x) for x in _shell["dims_mm"].values()), reverse=True)
         if len(_sv_shell) == 3 and all(v > 0 for v in _sv_shell):
@@ -25642,6 +25685,7 @@ def _selftest_instrument_direct_logical_routing() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
+        _selftest_containing_shell()
         _selftest_instrument_form_rule()
         _selftest_thermocycler_exterior_keep()
         _selftest_instrument_mesh_keep_prefixes()
