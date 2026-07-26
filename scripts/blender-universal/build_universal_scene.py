@@ -24954,6 +24954,38 @@ def main():
     except Exception as _tce:   # additive — never fail the whole render
         print(f"[univ][callouts] WARN add_tag_callouts skipped: {_tce}")
 
+    # ── FORM-MESHES EXTERIOR SIGNATURE FIXUP ──────────────────────────────────
+    # The signature builder (inside `if _SEALED_HERO_PRODUCT:`) adds
+    # exterior_signature_features to form-meshes.json. In INSPECT mode that
+    # block is skipped, so the G22 render↔drawing feature-coherence gate sees
+    # an empty render set and fires "drawn-but-not-rendered". This fixup reads
+    # the existing form-meshes.json, derives exterior_signature_features from
+    # the already-placed u_se_le_* meshes, and writes back if the field was
+    # absent. Fires unconditionally (harmless in non-INSPECT mode — the
+    # signature builder re-dumps afterwards with the full set).
+    try:
+        _fm_path = Path(out_dir).joinpath("form-meshes.json")
+        if _fm_path.exists():
+            _fm = json.loads(_fm_path.read_text())
+            if not _fm.get("exterior_signature_features") and hasattr(bpy, "data"):
+                _le_meshes = sorted(
+                    o.name for o in bpy.data.objects
+                    if getattr(o, "type", None) == "MESH"
+                    and o.name.startswith(_EXTERIOR_KEEP_PREFIXES))
+                if _le_meshes:
+                    _esf = []
+                    for _mn in _le_meshes:
+                        _fam = _exterior_signature_family(_mn)
+                        if _fam:
+                            _esf.append({"family": _fam, "mesh": _mn})
+                    if _esf:
+                        _fm["exterior_signature_features"] = _esf
+                        _fm_path.write_text(json.dumps(_fm, indent=2))
+                        print(f"[univ] form-meshes fixup: added {len(_esf)} "
+                              f"exterior_signature_features")
+    except Exception as _fmx:
+        print(f"[univ] form-meshes fixup skipped: {_fmx}")
+
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
     # (bright light deck, flat-matte by part type, de-emphasised frame, four

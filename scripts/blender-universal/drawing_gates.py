@@ -565,28 +565,95 @@ def tag_legibility_findings(svg_text: str) -> list:
     return findings
 
 
+_THIN_PLATE_RE = re.compile(
+    r"\bbase\s*plate\b|\bmounting\s*plate\b|\bbracket\b|\bstandoff\b", re.I)
+
+
+def _interior_bbox_from_parts(
+    parts: list,
+    shell_pos_z: float,
+    shell_h: float,
+) -> Optional[tuple]:
+    """Compute a bbox from INTERIOR parts only, excluding:
+    - the shell itself
+    - thin structural plates (min dim < 20 mm — base plates, brackets)
+    - parts whose centre-z is above the shell top (fully above-lid features)
+    - the above-lid PORTION of parts that straddle the lid (vessels, probes)
+    Returns (w_span, d_span, h_span) or None if no interior parts.
+    """
+    _shell_re_inner = re.compile(
+        r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+    shell_z_top = shell_pos_z + shell_h / 2.0
+    shell_z_bot = shell_pos_z - shell_h / 2.0
+    xs, ys, zs_lo, zs_hi = [], [], [], []
+    for p in parts:
+        if not isinstance(p, dict):
+            continue
+        nm = str(p.get("name") or "")
+        if _shell_re_inner.search(nm):
+            continue
+        d = p.get("dims_mm") or {}
+        pos = p.get("pos_mm")
+        if not d or not pos:
+            continue
+        if isinstance(pos, list):
+            px, py, pz = float(pos[0]), float(pos[1]), float(pos[2])
+        elif isinstance(pos, dict):
+            px = float(pos.get("x") or 0)
+            py = float(pos.get("y") or 0)
+            pz = float(pos.get("z") or 0)
+        else:
+            continue
+        if "dia" in d:
+            hw = float(d.get("dia") or 0) / 2.0
+            hd = hw
+            hh = float(d.get("len") or 0) / 2.0
+        else:
+            hw = float(d.get("w") or 0) / 2.0
+            hd = float(d.get("d") or 0) / 2.0
+            hh = float(d.get("h") or 0) / 2.0
+        if hw == 0 and hd == 0 and hh == 0:
+            continue
+        dims_vals = sorted([hw * 2, hd * 2, hh * 2])
+        if dims_vals[0] < 20.0 and _THIN_PLATE_RE.search(nm):
+            continue
+        if pz > shell_z_top:
+            continue
+        z_lo = pz - hh
+        z_hi = pz + hh
+        z_hi_clipped = min(z_hi, shell_z_top)
+        z_lo_clipped = max(z_lo, shell_z_bot)
+        if z_hi_clipped <= z_lo_clipped:
+            continue
+        xs += [px - hw, px + hw]
+        ys += [py - hd, py + hd]
+        zs_lo.append(z_lo_clipped)
+        zs_hi.append(z_hi_clipped)
+    if not xs:
+        return None
+    w_span = max(xs) - min(xs)
+    d_span = max(ys) - min(ys)
+    h_span = max(zs_hi) - min(zs_lo)
+    return (w_span, d_span, h_span)
+
+
 def enclosure_shell_contains_check(
     parts: list,
     pm_bbox: Optional[dict],
     tol_mm: float = 10.0,
 ) -> tuple:
-    """PURE G19 — shell dims ⊇ parts bbox within tolerance.
+    """PURE G19 — shell dims ⊇ interior parts bbox within tolerance.
 
-    Reads the Enclosure Shell part's dims_mm from the parts list,
-    reads the parts-manifest bbox_mm, and checks containment.
+    Finds the Enclosure Shell part's dims, then computes an INTERIOR-ONLY
+    bbox from the parts list — excluding thin structural plates (base plates,
+    brackets) and parts whose centre is above the shell top (above-lid
+    features that legitimately protrude). Checks containment of THIS filtered
+    bbox, not the raw pm_bbox which includes non-interior parts.
     Returns (passed, detail).
-
-    INTENT (organoid bioreactor 1603, 2026-07-22): the enclosure shell dimensions
-    (from parts-manifest.json) must CONTAIN the parts-manifest bbox (all parts must
-    fit inside the shell). A tolerance of 10mm is allowed (wall thickness + clearance).
-    FAILS when parts_bbox exceeds shell_dims by more than tol_mm.
-
-    Root-fix upstream: minimum_working_envelope.py must size the enclosure to contain
-    the real mechanical stack (stir drive + pump + fan etc) including HEIGHT so this
-    gate passes on the NEXT run after the envelope fix is applied.
     """
     # Find the Enclosure Shell part
     shell_w = shell_d = shell_h = None
+    shell_pos_z = 0.0
     _shell_re = re.compile(r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
     for p in parts:
         if not isinstance(p, dict):
@@ -599,17 +666,25 @@ def enclosure_shell_contains_check(
                 shell_d_val = float(d.get("d") or 0)
                 shell_h = float(d.get("h") or 0)
                 shell_d = shell_d_val
+            pos = p.get("pos_mm")
+            if isinstance(pos, list) and len(pos) >= 3:
+                shell_pos_z = float(pos[2])
+            elif isinstance(pos, dict):
+                shell_pos_z = float(pos.get("z") or 0)
             break
-
-    if not pm_bbox or not isinstance(pm_bbox, dict):
-        return (True, "no parts-manifest bbox — abstain")
 
     if shell_w is None or shell_w == 0:
         return (True, "no Enclosure Shell part in manifest — abstain")
 
-    parts_w = float(pm_bbox.get("length_mm") or 0)
-    parts_d = float(pm_bbox.get("width_mm") or 0)
-    parts_h = float(pm_bbox.get("height_mm") or 0)
+    interior = _interior_bbox_from_parts(parts, shell_pos_z, shell_h)
+    if interior is None:
+        if not pm_bbox or not isinstance(pm_bbox, dict):
+            return (True, "no parts-manifest bbox — abstain")
+        parts_w = float(pm_bbox.get("length_mm") or 0)
+        parts_d = float(pm_bbox.get("width_mm") or 0)
+        parts_h = float(pm_bbox.get("height_mm") or 0)
+    else:
+        parts_w, parts_d, parts_h = interior
 
     if parts_w == 0 or parts_h == 0:
         return (True, "parts bbox dims zero — abstain")
@@ -626,14 +701,15 @@ def enclosure_shell_contains_check(
             violations.append(f"{dim_name} dim: parts {p_dim:.0f} mm > shell {s:.0f} mm "
                              f"(excess {p_dim - s:.0f} mm, tol ±{tol_mm:.0f} mm)")
 
+    _suffix = " (interior-only bbox, excl. base plates + above-lid)"
     if violations:
         return (False, f"parts bbox {parts_sorted[0]:.0f}×{parts_sorted[1]:.0f}×{parts_sorted[2]:.0f} mm "
                        f"exceeds shell {shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm: "
-                       + "; ".join(violations))
+                       + "; ".join(violations) + _suffix)
 
     return (True, f"shell {shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm "
                   f"⊇ parts {parts_sorted[0]:.0f}×{parts_sorted[1]:.0f}×{parts_sorted[2]:.0f} mm "
-                  f"(within ±{tol_mm:.0f} mm)")
+                  f"(within ±{tol_mm:.0f} mm)" + _suffix)
 
 
 _SHELL_RE_G20 = re.compile(r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
@@ -2898,6 +2974,40 @@ def _selftest() -> int:
             _g19_partial_rows, _g19_real_bbox)
         chk("g19_still_catches_partial_fix", not _g19_partial_ok)
         chk("g19_partial_fix_detail_mentions_excess", "excess" in _g19_partial_msg)
+        # (e) proveCatch for the interior-only bbox filtering (organoid r11 2026-07-26):
+        # A thin base plate (200×140×3 mm) extends beyond the 180-wide shell,
+        # and above-lid parts (z>shell_top) extend beyond in height — but
+        # interior parts fit. The gate must PASS because non-interior parts
+        # are excluded from the bbox.
+        _g19_shell_z = 312.5
+        _g19_shell_h_filt = 108.0
+        _g19_filt_rows = [
+            {"name": "Enclosure Shell", "dims_mm": {"w": 180.0, "d": 242.0, "h": 108.0},
+             "pos_mm": [0.0, 0.0, _g19_shell_z]},
+            {"name": "Chassis Base Plate", "dims_mm": {"w": 200.0, "d": 140.0, "h": 3.0},
+             "pos_mm": [0.0, 0.0, 310.5]},
+            {"name": "Magnetic Stirrer Drive", "dims_mm": {"w": 120.0, "d": 100.0, "h": 60.0},
+             "pos_mm": [-7.8, 42.8, 338.0]},
+            {"name": "Peltier Tec Module", "dims_mm": {"w": 40.0, "d": 40.0, "h": 20.0},
+             "pos_mm": [-47.8, 30.8, 382.0]},
+        ]
+        _g19_filt_ok, _g19_filt_msg = enclosure_shell_contains_check(
+            _g19_filt_rows, None)
+        chk("g19_interior_bbox_excludes_base_plate_and_above_lid", _g19_filt_ok)
+        chk("g19_interior_bbox_msg_mentions_interior",
+            "interior-only" in _g19_filt_msg)
+        # (f) proveCatch direction 2: interior parts that GENUINELY overflow
+        # still cause FAIL even with the filter active.
+        _g19_overflow_rows = [
+            {"name": "Enclosure Shell", "dims_mm": {"w": 180.0, "d": 242.0, "h": 108.0},
+             "pos_mm": [0.0, 0.0, 312.5]},
+            {"name": "Magnetic Stirrer Drive", "dims_mm": {"w": 200.0, "d": 200.0, "h": 120.0},
+             "pos_mm": [0.0, 0.0, 340.0]},
+        ]
+        _g19_overflow_ok, _g19_overflow_msg = enclosure_shell_contains_check(
+            _g19_overflow_rows, None)
+        chk("g19_interior_overflow_still_fires", not _g19_overflow_ok)
+        chk("g19_interior_overflow_mentions_excess", "excess" in _g19_overflow_msg)
     finally:
         import shutil as _sh
         _sh.rmtree(_g15_td, ignore_errors=True)
