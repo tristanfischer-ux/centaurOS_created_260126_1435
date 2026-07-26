@@ -568,18 +568,48 @@ def tag_legibility_findings(svg_text: str) -> list:
 _THIN_PLATE_RE = re.compile(
     r"\bbase\s*plate\b|\bmounting\s*plate\b|\bbracket\b|\bstandoff\b", re.I)
 
+# PROVENANCE allow-list for DELIBERATE above-lid features (2026-07-26). A part may sit
+# proud of the enclosure lid ONLY when a seating pass explicitly put it there and stamped
+# its `geometry_source` — the on-top culture vessel (instrument_spine_manifest.
+# seat_vessel_on_top_from_mesh) and the exterior signature features registered in
+# build_universal_scene._ABOVE_LID_SIGNATURE_MESHES (optical tower, collar, fascia).
+#
+# WHY THIS REPLACED A GEOMETRIC TEST: the previous rule exempted ANY part whose centre-z
+# cleared the lid. That inverted G19's intent — the further a part was dumped out of
+# containment, the more certainly it was excluded from the check, so the gate could not
+# fail on its own adversarial input (a Peltier TEC module parked 25 mm above the lid on
+# the organoid r11 bake was silently dropped, along with 12 other internal parts). A gate
+# that cannot catch its adversarial input is decoration (GATE INTENT RULE). Provenance is
+# the same doctrine the Blender-side containment clamp already honours: an intentional
+# exterior feature is exempt because a builder SAID SO, never because of where it landed.
+_INTENTIONAL_ABOVE_LID_SOURCES = frozenset({
+    "vessel_seat_on_top_from_signature_mesh",
+    "exterior_signature_mesh",
+    "above_lid_signature",
+})
+
+
+def _is_intentional_above_lid(part: dict) -> bool:
+    """True when `part` carries provenance marking it a DELIBERATE above-lid feature."""
+    src = str((part or {}).get("geometry_source") or "").strip()
+    return src in _INTENTIONAL_ABOVE_LID_SOURCES
+
 
 def _interior_bbox_from_parts(
     parts: list,
     shell_pos_z: float,
     shell_h: float,
 ) -> Optional[tuple]:
-    """Compute a bbox from INTERIOR parts only, excluding:
+    """Compute a bbox from the parts the shell MUST contain, excluding:
     - the shell itself
     - thin structural plates (min dim < 20 mm — base plates, brackets)
-    - parts whose centre-z is above the shell top (fully above-lid features)
-    - the above-lid PORTION of parts that straddle the lid (vessels, probes)
-    Returns (w_span, d_span, h_span) or None if no interior parts.
+    - parts stamped as DELIBERATE above-lid features (provenance, not geometry —
+      see _INTENTIONAL_ABOVE_LID_SOURCES); for those that straddle the lid only the
+      interior PORTION counts.
+
+    An UNSTAMPED part sitting proud of the lid is counted IN FULL — that protrusion is
+    precisely the defect G19 exists to catch, not a reason to skip the part.
+    Returns (w_span, d_span, h_span) or None if no containable parts.
     """
     _shell_re_inner = re.compile(
         r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
@@ -617,11 +647,15 @@ def _interior_bbox_from_parts(
         dims_vals = sorted([hw * 2, hd * 2, hh * 2])
         if dims_vals[0] < 20.0 and _THIN_PLATE_RE.search(nm):
             continue
-        if pz > shell_z_top:
-            continue
+        _intentional = _is_intentional_above_lid(p)
+        if pz > shell_z_top and _intentional:
+            continue          # deliberate exterior feature — exempt BY PROVENANCE
         z_lo = pz - hh
         z_hi = pz + hh
-        z_hi_clipped = min(z_hi, shell_z_top)
+        # Clip the above-lid portion ONLY for a stamped feature (its interior portion is
+        # what the shell must contain). An unstamped part counts in FULL, protrusion and
+        # all, so the containment span reflects the real overshoot.
+        z_hi_clipped = min(z_hi, shell_z_top) if _intentional else z_hi
         z_lo_clipped = max(z_lo, shell_z_bot)
         if z_hi_clipped <= z_lo_clipped:
             continue
@@ -642,13 +676,15 @@ def enclosure_shell_contains_check(
     pm_bbox: Optional[dict],
     tol_mm: float = 10.0,
 ) -> tuple:
-    """PURE G19 — shell dims ⊇ interior parts bbox within tolerance.
+    """PURE G19 — shell dims ⊇ contained parts bbox within tolerance.
 
-    Finds the Enclosure Shell part's dims, then computes an INTERIOR-ONLY
-    bbox from the parts list — excluding thin structural plates (base plates,
-    brackets) and parts whose centre is above the shell top (above-lid
-    features that legitimately protrude). Checks containment of THIS filtered
-    bbox, not the raw pm_bbox which includes non-interior parts.
+    Finds the Enclosure Shell part's dims, then computes the bbox of the parts the
+    shell MUST contain — excluding thin structural plates (base plates, brackets) and
+    parts stamped as DELIBERATE above-lid features via `geometry_source`
+    (_INTENTIONAL_ABOVE_LID_SOURCES). An UNSTAMPED part sitting proud of the lid counts
+    IN FULL: that protrusion is the defect this gate exists to catch, so it must move the
+    span rather than earn an exemption. Checks containment of THIS filtered bbox, not the
+    raw pm_bbox which includes deliberate exterior features.
     Returns (passed, detail).
     """
     # Find the Enclosure Shell part
@@ -689,27 +725,33 @@ def enclosure_shell_contains_check(
     if parts_w == 0 or parts_h == 0:
         return (True, "parts bbox dims zero — abstain")
 
-    # Check containment: shell ⊇ parts within tolerance
-    # Sort both triples (largest→smallest) for dimension-agnostic comparison
-    shell_sorted = sorted([shell_w, shell_d, shell_h], reverse=True)
-    parts_sorted = sorted([parts_w, parts_d, parts_h], reverse=True)
-
+    # Check containment PER AXIS. Both triples come from the SAME manifest in the SAME
+    # convention (w↔x, d↔y, h↔z), so there is no axis-flip ambiguity to defend against.
+    # The old code sorted both triples largest→smallest before comparing, which silently
+    # compared HEIGHT against LENGTH: a 160 mm-tall stack "fitted" a 108 mm-tall shell
+    # because the shell was 242 mm long. Containment is not a multiset property — a part
+    # must fit on the axis it actually occupies. (The sorted form is still correct in G20
+    # / envelope_equality_cross_check, where a drawing CAPTION may legitimately list its
+    # dims in a different order; that is a different question on a different input.)
+    _axes = (("length (x)", parts_w, shell_w),
+             ("depth (y)", parts_d, shell_d),
+             ("height (z)", parts_h, shell_h))
     violations = []
-    for i, (s, p_dim) in enumerate(zip(shell_sorted, parts_sorted)):
-        if p_dim > s + tol_mm:
-            dim_name = ["largest", "middle", "smallest"][i]
-            violations.append(f"{dim_name} dim: parts {p_dim:.0f} mm > shell {s:.0f} mm "
-                             f"(excess {p_dim - s:.0f} mm, tol ±{tol_mm:.0f} mm)")
+    for _ax_name, _p_dim, _s_dim in _axes:
+        if _s_dim and _p_dim > _s_dim + tol_mm:
+            violations.append(f"{_ax_name}: parts {_p_dim:.0f} mm > shell {_s_dim:.0f} mm "
+                              f"(excess {_p_dim - _s_dim:.0f} mm, tol ±{tol_mm:.0f} mm)")
 
-    _suffix = " (interior-only bbox, excl. base plates + above-lid)"
+    _suffix = (" (containable bbox: excl. base plates + provenance-stamped "
+               "above-lid features)")
+    _parts_str = f"{parts_w:.0f}×{parts_d:.0f}×{parts_h:.0f} mm"
+    _shell_str = f"{shell_w:.0f}×{shell_d:.0f}×{shell_h:.0f} mm"
     if violations:
-        return (False, f"parts bbox {parts_sorted[0]:.0f}×{parts_sorted[1]:.0f}×{parts_sorted[2]:.0f} mm "
-                       f"exceeds shell {shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm: "
+        return (False, f"parts bbox {_parts_str} exceeds shell {_shell_str}: "
                        + "; ".join(violations) + _suffix)
 
-    return (True, f"shell {shell_sorted[0]:.0f}×{shell_sorted[1]:.0f}×{shell_sorted[2]:.0f} mm "
-                  f"⊇ parts {parts_sorted[0]:.0f}×{parts_sorted[1]:.0f}×{parts_sorted[2]:.0f} mm "
-                  f"(within ±{tol_mm:.0f} mm)" + _suffix)
+    return (True, f"shell {_shell_str} ⊇ parts {_parts_str} "
+                  f"(within ±{tol_mm:.0f} mm, per-axis)" + _suffix)
 
 
 _SHELL_RE_G20 = re.compile(r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
@@ -2974,28 +3016,44 @@ def _selftest() -> int:
             _g19_partial_rows, _g19_real_bbox)
         chk("g19_still_catches_partial_fix", not _g19_partial_ok)
         chk("g19_partial_fix_detail_mentions_excess", "excess" in _g19_partial_msg)
-        # (e) proveCatch for the interior-only bbox filtering (organoid r11 2026-07-26):
-        # A thin base plate (200×140×3 mm) extends beyond the 180-wide shell,
-        # and above-lid parts (z>shell_top) extend beyond in height — but
-        # interior parts fit. The gate must PASS because non-interior parts
-        # are excluded from the bbox.
-        _g19_shell_z = 312.5
-        _g19_shell_h_filt = 108.0
-        _g19_filt_rows = [
+        # (e) proveCatch for PROVENANCE-keyed above-lid handling (organoid r11,
+        # rewritten 2026-07-26). The shell spans z 258.5–366.5 (h=108 @ z=312.5).
+        # A thin base plate (200×140×3 mm) overhangs the 180-wide shell and must stay
+        # excluded (structural, not contained equipment).
+        #
+        # DIRECTION 1 — an UNSTAMPED part parked on the roof MUST FIRE. This is the exact
+        # adversarial input the old geometric rule silently dropped: it exempted anything
+        # whose centre cleared the lid, so the worse the overshoot the surer the escape.
+        _g19_roof_rows = [
             {"name": "Enclosure Shell", "dims_mm": {"w": 180.0, "d": 242.0, "h": 108.0},
-             "pos_mm": [0.0, 0.0, _g19_shell_z]},
+             "pos_mm": [0.0, 0.0, 312.5]},
             {"name": "Chassis Base Plate", "dims_mm": {"w": 200.0, "d": 140.0, "h": 3.0},
-             "pos_mm": [0.0, 0.0, 310.5]},
+             "pos_mm": [0.0, 0.0, 260.0]},
             {"name": "Magnetic Stirrer Drive", "dims_mm": {"w": 120.0, "d": 100.0, "h": 60.0},
-             "pos_mm": [-7.8, 42.8, 338.0]},
+             "pos_mm": [-7.8, 42.8, 300.0]},
+            # 410–430 mm: 43.5 mm clear of the lid, no provenance stamp → a placer bug.
             {"name": "Peltier Tec Module", "dims_mm": {"w": 40.0, "d": 40.0, "h": 20.0},
-             "pos_mm": [-47.8, 30.8, 382.0]},
+             "pos_mm": [-47.8, 30.8, 420.0]},
         ]
-        _g19_filt_ok, _g19_filt_msg = enclosure_shell_contains_check(
-            _g19_filt_rows, None)
-        chk("g19_interior_bbox_excludes_base_plate_and_above_lid", _g19_filt_ok)
-        chk("g19_interior_bbox_msg_mentions_interior",
-            "interior-only" in _g19_filt_msg)
+        _g19_roof_ok, _g19_roof_msg = enclosure_shell_contains_check(
+            _g19_roof_rows, None)
+        chk("g19_unstamped_above_lid_part_fires", not _g19_roof_ok)
+        chk("g19_unstamped_above_lid_mentions_excess", "excess" in _g19_roof_msg)
+        # DIRECTION 2 — the SAME part, stamped as a deliberate exterior feature, is
+        # exempt and the gate PASSES (a real on-top vessel / optical tower must not
+        # be reported as a containment breach).
+        _g19_stamped_rows = [dict(r) for r in _g19_roof_rows]
+        _g19_stamped_rows[-1]["geometry_source"] = "above_lid_signature"
+        _g19_stamped_ok, _g19_stamped_msg = enclosure_shell_contains_check(
+            _g19_stamped_rows, None)
+        chk("g19_stamped_above_lid_feature_exempt", _g19_stamped_ok)
+        chk("g19_bbox_msg_mentions_containable",
+            "containable bbox" in _g19_stamped_msg)
+        # The thin base plate (200 mm wide, overhanging the 180 mm shell) must stay
+        # excluded in the passing direction — else its overhang would fire length (x).
+        chk("g19_thin_base_plate_still_excluded", "120×100" in _g19_stamped_msg)
+        # PER-AXIS proof: the roof part violates HEIGHT specifically, not "largest dim".
+        chk("g19_roof_violation_names_height_axis", "height (z)" in _g19_roof_msg)
         # (f) proveCatch direction 2: interior parts that GENUINELY overflow
         # still cause FAIL even with the filter active.
         _g19_overflow_rows = [
