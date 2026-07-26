@@ -7467,9 +7467,14 @@ def write_parts_manifest(out_dir, parts, state=None):
     # project them like any other part. Universal: driven by the registered signature set
     # and the role token, never a product class.
     try:
-        _EXTRA_SIG = (("u_se_le_face_display", "HMI Display", "hmi-display"),
-                      ("u_se_le_face_key",     "HMI Button",  "hmi-button"),
-                      ("u_se_le_face_dpad",    "HMI Button",  "hmi-button"))
+        # Every REAL front-panel feature the render carries. The GA draws these with the
+        # same conventions the glance audit reads (display fill / button-scale outline),
+        # so the HMI checks are satisfied by GEOMETRY rather than by form-rule fiction.
+        _EXTRA_SIG = (("u_se_le_face_display", "HMI Display",   "hmi-display"),
+                      ("u_se_le_face_key",     "HMI Button",    "hmi-button"),
+                      ("u_se_le_face_dpad",    "HMI Button",    "hmi-button"),
+                      ("u_se_le_face_led",     "HMI Indicator", "hmi-button"),
+                      ("u_se_le_face_port",    "HMI Port",      "hmi-button"))
         _have = {str(r.get("tag") or "") for r in rows}
         import mathutils as _mu2
         _n_extra = 0

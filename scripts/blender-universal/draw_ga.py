@@ -2082,7 +2082,20 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
 
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.y1 - q.y0, 1))):
         # Instrument shells = envelope outline (already drawn); clutter = schedule-only.
-        if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
+        if _form is not None and _is_instrument_clutter(p):
+            continue
+        if _form is not None and _is_instrument_shell(p) and not _CANON_SHELL_RE.search(
+                str(getattr(p, "name", "") or "")):
+            continue          # a noun-family match (base plate / lid / cover), not THE shell
+        if _form is not None and _CANON_SHELL_RE.search(str(getattr(p, "name", "") or "")):
+            # DRAW THE ENCLOSURE OUTLINE (2026-07-26). It used to be skipped because the
+            # form rule painted a silhouette instead. With the as-placed projection there
+            # is no silhouette, so the body vanished and the on-top vessel / optical /
+            # sample-port read as floating boxes with a gap — "why are all these
+            # components just floating in the middle of the air? What are they connected
+            # to?". Draw the shell as a light envelope so the reader sees the internals
+            # INSIDE it and the exterior features seated ON it.
+            svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.6, fill="#f7f9fb", dash="6,3")
             continue
         if _is_face_skin(p):
             continue
@@ -2266,14 +2279,27 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         # a real manifest part (aliased to the drawn u_se_le_face_* meshes) stamp the
         # marker on the ACTUAL part, so the glance gate is satisfied by geometry rather
         # than by a drawn fiction.
-        if (meta.get("is_instrument_device")
-                and re.search(r"front\s*panel|display|fascia|hmi|keypad",
-                              str(getattr(p, "name", "") or ""), re.I)):
-            svg.rect(px, py, pw, ph, stroke="none", fill="none",
-                     extra='data-glance="front-display"')
-            svg.text(px + pw / 2.0, py + ph / 2.0 + 2, "DISPLAY / HMI",
-                     size=6.5, anchor="middle", fill=MUTED,
-                     extra='data-glance="front-display-label"')
+        # HMI FROM REAL GEOMETRY (2026-07-26). The glance audit counts a display FILL
+        # (#c8e6d8) and button-scale outlines (fill=none, stroke=#5b6470); those used to
+        # come from the form rule's synthesized zone layer. The front panel is now a set
+        # of REAL manifest rows aliased to the drawn u_se_le_face_* meshes, so draw them
+        # in the SAME conventions — the audit then measures geometry, not a drawn fiction.
+        if meta.get("is_instrument_device"):
+            _nm_hmi = str(getattr(p, "name", "") or "")
+            if re.search(r"hmi\s*display", _nm_hmi, re.I):
+                svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.2, fill="#c8e6d8",
+                         extra='data-glance="front-display"')
+                svg.text(px + pw / 2.0, py + ph / 2.0 + 2, "DISPLAY",
+                         size=6.5, anchor="middle", fill=MUTED,
+                         extra='data-glance="front-display-label"')
+            elif re.search(r"hmi\s*(?:button|indicator|port)", _nm_hmi, re.I):
+                svg.rect(px, py, pw, ph, fill="none", stroke="#5b6470", width=1.0)
+            elif re.search(r"front\s*panel|fascia", _nm_hmi, re.I):
+                svg.text(px + pw / 2.0, py - 3, "UI DECK",
+                         size=7.0, anchor="middle", fill=MUTED,
+                         extra='data-glance="front-ui-label"')
+                svg.rect(px, py, pw, ph, stroke="none", fill="none",
+                         extra='data-glance="front-ui-deck"')
         front_items.append((p, px, py, pw, ph))
     # INTENT (2026-07-14 Tristan): instrument FRONT must not ladder every optical
     # tag at ~12 px pitch (G9 IoU=0 while the human glance fails). One tag per
