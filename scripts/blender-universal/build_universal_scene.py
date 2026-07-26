@@ -7117,28 +7117,24 @@ def _exterior_signature_vessel_bbox_mm():
         return None
     if not hasattr(bpy, "data") or min(W, D, H) <= 0:
         return None
-    # The outer shell mesh is named after the enclosure PART, which varies run to run
-    # (`u_enclosure_shell` one roll, `u_hammond_abs_instrument_enclosure` another) — but
-    # both carry the substring "enclosure", while the interior cue shells are
-    # `u_se_cutaway_cue_*`. The shell mesh may be a resized proxy, so do NOT filter on
-    # footprint — take the top z of the enclosure-named (non-cue) mesh: that is the lid
-    # the on-top vessel sits on (empirically the value that makes the render↔GA match;
-    # the analytic DECK_Z_MM+H disagrees because the shell is repositioned/scaled).
-    z_top = None
-    for obj in bpy.data.objects:
-        if getattr(obj, "type", None) != "MESH":
-            continue
-        nm = obj.name.lower()
-        if nm.startswith("u_se_cutaway_cue_") or "enclosure" not in nm:
-            continue
-        try:
-            zs = [(obj.matrix_world @ v.co).z * 1000.0 for v in obj.data.vertices]
-        except Exception:  # noqa: BLE001
-            continue
-        if zs:
-            z_top = max(zs) if z_top is None else max(z_top, max(zs))
-    if z_top is None:
+    # LID DATUM = THE ANALYTIC VALUE THE HERO PASS ITSELF USES (2026-07-26).
+    # The SEAM-1 placement below (~L18010) puts the vial at `_z_top = base_z + H` and
+    # sizes it with _sealed_vial_r_h_mm(W, D, H). Reading the SAME expression here makes
+    # the manifest row and the rendered mesh ONE placement, not two that happen to share
+    # a size helper.
+    #
+    # WHY THE OLD MESH-SCAN WAS WRONG: it took the top z of any non-cue mesh whose name
+    # contains "enclosure". The real sealed shell is built as `u_skid_encl_*` — "encl",
+    # NOT "enclosure" — so the scan skipped it and latched onto a stale proxy topping out
+    # at z=317. The vessel row was therefore seated 317..412 (4% proud) while the render
+    # drew u_se_le_vial at 408..503 (95 mm proud, standing on the lid) — the render↔GA
+    # mismatch this whole exercise is about. The old comment claimed "the analytic
+    # DECK_Z_MM+H disagrees because the shell is repositioned/scaled"; that was an
+    # artefact of the shell's base_z never being recorded, fixed by _SEALED_BASE_Z_MM.
+    # Verified: base_z 300 + H 108 = 408 == the probed world z of u_se_le_vial's base.
+    if _SEALED_BASE_Z_MM is None:
         return None
+    z_top = float(_SEALED_BASE_Z_MM) + H
     vial_r, vial_h = _sealed_vial_r_h_mm(W, D, H)  # single source of truth (SEAM-1 shares)
     return (-vial_r, vial_r, -vial_r, vial_r, z_top, z_top + vial_h)
 
