@@ -6231,11 +6231,25 @@ def _world_bbox_mm_by_prefix(parts):
     acc = {}
     SKIP = ("u_skid_", "u_rack_", "u_route_", "u_pipe_", "u_ground_", "u_grid_",
             "u_datum_", "u_dim_")
+    # PORT TERMINALS ARE CONNECTION ANNOTATION, NOT PART GEOMETRY (2026-07-26).
+    # They are named `<part-prefix>_port_<service>_<dir>_term_<service>` — so they START
+    # WITH the part's own prefix and get unioned into that part's bbox, which is how a
+    # 0.5 mm thermal interface pad came to report h=240 mm (ninjapcr: the pad's real mesh
+    # is 328.8..329.3, its proxy box 308..314, and its port terminal 187.3..427.3). The
+    # same 240 mm whiskers sit on the ferrite bead, USB entry, Peltier and heatsink fan of
+    # every instrument — this is the root of the "default-size litter" class that the
+    # manifest's per-noun micro-component clamp was written to paper over downstream.
+    # Excluding them here fixes the class at source for every consumer of this function
+    # (manifest dims, the post-placement envelope resize, G19 containment) instead of
+    # maintaining a noun list that only ever covers the parts someone already noticed.
+    _PORT_TERM_RE = re.compile(r"_port_.*_term_[a-z]+(?:\.\d+)?$", re.I)
     for obj in list(bpy.data.objects):
         if getattr(obj, "type", None) != "MESH" or obj.data is None:
             continue
         nm = obj.name
         if any(nm.startswith(s) for s in SKIP):
+            continue
+        if _PORT_TERM_RE.search(nm):
             continue
         pref = None
         for pr in prefixes:           # longest first → most specific wins

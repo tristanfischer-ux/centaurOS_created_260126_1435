@@ -119,6 +119,56 @@ def _instrument_envelope_bbox(ww: float, dd: float, hh: float) -> dict:
     }
 
 
+_CANON_SHELL_RE = re.compile(
+    r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+
+
+def _project_instrument_parts_as_placed(parts: list[GAPart]) -> bool:
+    """Draw the instrument where BLENDER ACTUALLY PLACED IT (Tristan 2026-07-26).
+
+    "I think the blender is the first one you draw. That means that all the components
+    MUST have a layout in order to do the Blender. Why can't you use those coordinates
+    to lay out the drawing?" — exactly right. The parts-manifest IS that layout: every
+    row carries the real placed centre and the real world-mesh size. The GA should
+    PROJECT it, not re-derive one.
+
+    What it replaces: _clamp_instrument_parts_to_envelope crushed every part's half-size
+    to a FRACTION of the envelope (ww*0.22, dd*0.22, hh*0.35) and shoved its centre
+    inside, then _seat_instrument_parts_in_form rewrote Z into synthesized form bands. So
+    the drawn boxes were neither the real size nor the real position — which is why the
+    sheet showed parts hanging outside the dashed envelope while the manifest numbers
+    said everything was contained. Those clamps were compensating for coordinates that
+    used to be unreliable; now that the interior packs properly and the shell is placed
+    and sized from that pack, they corrupt a correct layout.
+
+    NO COHERENCE HEDGE. An earlier draft only projected when the layout already looked
+    tidy and otherwise fell back to the clamp. That is the same mistake as every masked
+    gate today: if the placement is wrong the DRAWING MUST SHOW IT SO, and the containment
+    gate must fail on it. Hiding a bad layout behind a cosmetic clamp is what produced a
+    sheet with parts outside the envelope carrying a 9/10.
+
+    The ONLY transformation is a rigid Z translation so the shell floor becomes the
+    drawing's ±0.000 FFL datum — an origin shift, not a second coordinate system. No
+    scaling, no per-part resizing, no reseating. X/Y are already centred on the product
+    origin in the manifest. Mutates in place. Returns True when a shell datum was found.
+    """
+    if not parts:
+        return False
+    _shells = [p for p in parts if _CANON_SHELL_RE.search(str(getattr(p, "name", "") or ""))]
+    if not _shells:
+        return False
+    _sh = max(_shells, key=lambda p: float(p.z1) - float(p.z0))
+    _sz0 = float(_sh.z0)
+    for p in parts:
+        p.z0 = float(p.z0) - _sz0
+        p.z1 = float(p.z1) - _sz0
+    return True
+
+
+_THIN_PLATE_GA_RE = re.compile(
+    r"\bbase\s*plate\b|\bmounting\s*plate\b|\bbracket\b|\bstandoff\b", re.I)
+
+
 def _clamp_instrument_parts_to_envelope(
     parts: list[GAPart],
     ww: float,
@@ -605,7 +655,16 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                             meta["instrument_role_xy_spread"] = n_rew
                     except Exception as _exc:  # noqa: BLE001
                         print(f"[ga] instrument role-XY spread skipped: {_exc}")
-                    _clamp_instrument_parts_to_envelope(parts, ww, dd, hh)
+                    # ONE SET OF COORDINATES. The GA projects the AS-PLACED Blender
+                    # layout the manifest carries — same numbers, real sizes, only a
+                    # rigid Z shift onto the FFL datum. No envelope clamp: a part drawn
+                    # outside the envelope means the PLACEMENT is wrong, and the drawing
+                    # + the containment gate must both say so.
+                    _faithful = _project_instrument_parts_as_placed(parts)
+                    meta["instrument_faithful_projection"] = _faithful
+                    print(f"[ga] projecting the AS-PLACED Blender layout "
+                          f"(manifest coordinates, real sizes, no clamp) "
+                          f"— datum={'shell floor' if _faithful else 'manifest origin'}")
                 elif meta["is_product_scale"] and parts:
                     # INTENT (Powerwall 0332): envelope bbox alone is not enough —
                     # floating world-Z parts still paint in the upper half of a
@@ -1819,7 +1878,9 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
             # DECISION (2026-07-14 Tristan): Assembly must show PCB + parts stack-up.
             # Seat BoM proxies into form-rule Z bands BEFORE drawing — the old
             # exterior-only silhouette + "see FRONT" TOP failed a real assembly glance.
-            if parts:
+            if parts and not meta.get("instrument_faithful_projection"):
+                # Only reseat when we did NOT project the real layout. Reseating on top of
+                # faithful coordinates would throw away the very Z the manifest supplied.
                 n_seat = _seat_instrument_parts_in_form(
                     parts, _form, L, W, float(_form["body_size"][2]))
                 print(f"[ga] instrument assembly seat: {n_seat} part(s) in form bands")
