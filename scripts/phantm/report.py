@@ -1402,7 +1402,7 @@ def main():
     A("| Tooth duty / slot depths / magnet / registration | change step FORCE + uniformity, not step SIZE — phase quantisation preserved at 154.7 µm ⇒ 16.7°/step at 70 GHz | invariant on phase scale; registration choice trades ±1.9° step jitter for detent (quantified, Tony's knob) |")
     A("| Phase levels: 21 per 2π at 70 GHz today | the UKDI bid's 32-level ambition needs step 108 µm ⇒ pitch 324 µm (scenario S108) | **OPEN — tracked, not built**; awaits Vlad's real λg before a pitch redesign |")
     A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | **PROVEN in §9.9** (deterministic 3-leg proof + adversarial pass); pitch budget gated to Vlad |")
-    A("| Damper vent Ø0.15 mm through the reflector | the hole is 17× below its own cutoff (1.17 THz); Bethe small-aperture leakage ∝(d/λ)⁴ ≈ 1.5×10⁻⁶ (−58 dB) before foil-thickness attenuation | **checked here: negligible perturbation of the short** |")
+    A("| Damper vent Ø0.15 mm through the reflector | the hole is 17× below its own cutoff (1.17 THz); Bethe small-aperture leakage ∝(d/λ)⁴ ≈ 1.5×10⁻⁶ (−58 dB) before foil-thickness attenuation. §14.7 has since revised the vent DOWN to Ø0.138 mm, and since the leak goes as the fourth power of diameter this bound only becomes more conservative (a further ≈1.5 dB) | **checked here: negligible perturbation of the short** |")
     A("| Foil-edge running clearance | a real annular leak path past the short | OPEN interface (choke/lip) — Vlad's, flagged since §9.3 |")
     A("| Actuator inside the cell footprint | sits BEHIND the plane it controls; fields evanescent to first order | shielded by construction; residual = the edge-leak item above |")
     A("| Plating spec ≥3 µm Cu (+flash) | ≥12 skin depths — conductor loss floor; print roughness is the loss tax | PASS-gated; Vlad owns the loss budget on the print route |")
@@ -1420,6 +1420,54 @@ def main():
       "re-pointing bursts (up to 26.8 A pulsed) stay out of the feed's band — easy at "
       "these edge rates, but it must be SPECIFIED, not assumed.")
     A("")
+
+    # --- 9.8b the EMC layout specification (closes that open requirement) --
+    em = load("emc-spec.json")
+    if em:
+        A("### 9.8b The driver layout specification — the silent hold, made a requirement")
+        A("")
+        sp_ = em["spectrum"]
+        A("The line above says the layout rule must be specified rather than "
+          "assumed. Here it is. The first job is to establish what is *not* a "
+          "risk, because that decides where the effort goes.")
+        A("")
+        A(f"The drive is a millisecond pulse into a coil whose own electrical "
+          f"time constant is {em['drive']['tau_us']} µs. A trapezoidal pulse's "
+          f"spectral envelope breaks at 1/(π·t_rise) and falls at 40 dB/decade "
+          f"above it. Even with edges deliberately held to "
+          f"{em['layout_budget']['min_edge_ns']:.0f} ns — far faster than the "
+          f"coil can respond to — the break sits at "
+          f"{sp_['knee_at_slew_floor_mhz']:.1f} MHz, which is "
+          f"{sp_['decades_to_band']:.1f} decades below the "
+          f"{sp_['band_low_ghz']:.0f} GHz operating band: about "
+          f"**{sp_['attenuation_to_band_db']:.0f} dB** of envelope roll-off. "
+          f"In-band radiation from the driver is therefore not a credible "
+          f"mechanism — not because the layout is careful, but because the "
+          f"physics separates the two by more than four orders of magnitude.")
+        A("")
+        A("What can genuinely go wrong is narrower, and the rules target it: "
+          "near-field magnetic coupling from the drive loops (a broadband "
+          "desense problem, not an emission one), the hold state ceasing to be "
+          "silent, and 72 coils per tile switching as one. Only the second of "
+          "these attacks the actual claim — and it is the one that would fail "
+          "invisibly.")
+        A("")
+        A("| # | Rule | Verified by |")
+        A("|---|---|---|")
+        for r in em["rules"]:
+            A(f"| {r['id']} | **{r['title']}.** {r['rule']} | {r['verify']} |")
+        A("")
+        A("**EMC-4 is the load-bearing one.** The low-probability-of-intercept "
+          "property rests entirely on a held cell drawing zero current. That is "
+          "a property of the architecture — the detent is permanent-magnet, so "
+          "holding costs nothing — but a driver that idles with a switching "
+          "regulator live on the coil rail forfeits it completely, and the "
+          "aperture would look exactly the same while doing so. Rail voltage "
+          "already sets the current against the coil resistance, so no "
+          "regulation loop is needed at hold; the rule is there to stop one "
+          "being added later for convenience.")
+        A("")
+
     A("### 9.9 The wall-thickness proof — thicker walls are RF-free (25 Jul, Tristan's challenge)")
     A("")
     A("Tristan asked for PROOF (not assertion) that the hex walls can be thickened "
@@ -1768,10 +1816,98 @@ def main():
       "(γP₀A²/V₀ ≈ 296 N/m, now in the artefact) is isentropic — the isothermal "
       "limit is ≈30% softer and the truth at 310–355 Hz sits between; and the "
       "capture window is NARROW in vent size (Ø0.15 works, Ø0.20 already fails), so "
-      "a continuous vent/tolerance sweep with pressure-dependent discharge is on the "
-      "punch list before the foil is specified. The hold-then-release drive of §4.4 "
+      "a continuous vent/tolerance sweep with pressure-dependent discharge was put on "
+      "the punch list before the foil is specified. **That sweep has now been run — "
+      "see §14.7, which supersedes the Ø0.15 figure here.** It found the robust "
+      "centre is Ø0.138 mm rather than Ø0.15, and that the discharge coefficient "
+      "carries almost the whole tolerance. The hold-then-release drive of §4.4 "
       "remains the capture strategy; the damper makes it fast at the nominal point.")
     A("")
+    # --- 10.3b vent tolerance gate ---------------------------------------
+    vt = load(os.path.join("opt", "vent-tolerance.json"))
+    if vt and vt.get("specification"):
+        A("### 10.3b The vent tolerance gate — can the damper actually be made?")
+        A("")
+        A("The damper works, and §14.6 gives the number. But the study that "
+          "produced it sampled vent diameters at 0.15, 0.20, 0.25 mm — and "
+          "Ø0.20 already fails. A design whose only demonstrated working point "
+          "sits one sample away from failure, on a feature that is a drilled "
+          "hole in a foil, is not yet a specification: nobody can order it "
+          "without a tolerance. That was the open gate, and closing it produced "
+          "the least comfortable result in this document.")
+        A("")
+        A("The sweep was rerun at 5 µm resolution and, more importantly, "
+          "repeated across the things we had assumed rather than measured — "
+          "discharge coefficient 0.60–0.85, air column ±15%, air density from "
+          "−40 to +80 °C, and guide friction across the brief's own 0.2–0.5 mN "
+          "band, plus two compound corners. Friction is in there because it "
+          "competes with the same damping the vent provides; toleranced the "
+          "vent while holding friction nominal would have measured the wrong "
+          "thing.")
+        A("")
+        nb, rb = vt.get("nominal_band_mm"), vt.get("robust_band_mm")
+        sp = vt["specification"]
+        A("| Basis | Pass band | As a tolerance |")
+        A("|---|---|---|")
+        if nb:
+            A(f"| Nominal assumptions only | Ø{nb[0]:.3f}–Ø{nb[1]:.3f} mm | "
+              f"±{(nb[1]-nb[0])/2*1000:.0f} µm |")
+        if rb:
+            A(f"| **Every uncertainty corner** | Ø{rb[0]:.3f}–Ø{rb[1]:.3f} mm | "
+              f"**±{sp['tolerance_mm']*1000:.0f} µm** |")
+        cdb, cds = vt.get("cd_pinned_band_mm"), vt.get("cd_pinned_specification")
+        if cdb and cds:
+            A(f"| Every corner, **with discharge coefficient measured** | "
+              f"Ø{cdb[0]:.3f}–Ø{cdb[1]:.3f} mm | "
+              f"±{cds['tolerance_mm']*1000:.0f} µm |")
+        A("")
+        cr = vt.get("current_recommendation_check")
+        if cr and not cr.get("robust"):
+            A(f"**First finding: the Ø0.15 mm currently recommended is not "
+              f"robust.** It captures at nominal, and fails in "
+              f"{len(cr['fails_in_corners'])} of the corners tested "
+              f"({', '.join(cr['fails_in_corners'])}) — both driven by the high "
+              f"end of the discharge-coefficient range. It was never wrong; it "
+              f"was only ever validated against one set of assumptions. The "
+              f"robust centre is Ø{sp['centre_mm']:.3f} mm, not Ø0.15.")
+            A("")
+        A(f"**Second finding, and the useful one: the tolerance is being eaten "
+          f"almost entirely by one number.** Specified against every corner, "
+          f"the vent is Ø{sp['centre_mm']:.3f} ±{sp['tolerance_mm']*1000:.0f} µm "
+          f"— about ±{sp['tolerance_mm']/sp['centre_mm']*100:.0f}% on a "
+          f"{sp['centre_mm']*1000:.0f} µm hole, which is a demanding thing to "
+          f"buy and hold in production.")
+        if cds:
+            factor = cds["tolerance_mm"] / sp["tolerance_mm"]
+            A("")
+            A(f"But recomputing the same intersection with the discharge "
+              f"coefficient pinned — not assumed, *measured* — widens it to "
+              f"Ø{cds['centre_mm']:.3f} ±{cds['tolerance_mm']*1000:.0f} µm, "
+              f"roughly ±{cds['tolerance_mm']/cds['centre_mm']*100:.0f}%. That "
+              f"is **{factor:.0f}× the tolerance**, and it is an entirely "
+              f"ordinary specification that laser drilling holds without "
+              f"difficulty. Everything else we varied — temperature, air "
+              f"column, friction — barely moves the band.")
+            A("")
+            A("**So the recommendation is a measurement, not a tighter "
+              "process.** Drill a short orifice in the actual foil at the "
+              "actual thickness, measure its discharge coefficient on a flow "
+              "bench, and the vent becomes a routine part. Trying instead to "
+              "hold ±%.0f µm in production would be expensive, and might not be "
+              "achievable at all — for want of one afternoon's coupon test. "
+              "This is the cheapest open item in the programme and it should be "
+              "done before any damper hardware is ordered."
+              % (sp["tolerance_mm"] * 1000))
+        A("")
+        A("The honest caveat: the orifice model here is inviscid "
+          "(discharge-coefficient times area times root-two-delta-p-over-rho), "
+          "which is why the discharge coefficient carries so much of the "
+          "uncertainty — at 140 µm and these pressure differences the flow is "
+          "not obviously in the regime where that form is exact. The coupon "
+          "measurement settles the modelling question and the tolerance "
+          "question in the same experiment.")
+        A("")
+
     A("### 10.4 Consequence for the drive electronics (§9.5 amendment)")
     A("")
     A("The dual pull-and-cancel scheme requires the cancel coil to carry REVERSE "
@@ -1821,7 +1957,7 @@ def main():
       "glue costs 1.7%, not 5%/joint.")
     A("- **Deleted operations, by the numbers**: no lamination stacks (flux-diffusion "
       "15–60 µs ≪ pulses), magnetise-after-assembly as a supplier service, coils "
-      "wound in situ on the open horseshoe, damper drilled (one Ø0.15 mm hole) "
+      "wound in situ on the open horseshoe, damper drilled (one Ø0.138 mm hole — §14.7) "
       "rather than assembled.")
     A("")
     A("| System build | Cells | Actuator | Gap | Drive PCB | Flux joints | Gauged steps | Open gates | Verdict |")

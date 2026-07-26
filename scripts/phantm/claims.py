@@ -68,9 +68,16 @@ ROWS = [
     ("Wall thickness is NOT an RF dimension — thicken OUTWARD freely; interior is the held dimension",
      "RED-TEAMED", "wall-proof.json 3-leg proof + grok-4.5 8-attack pass; §9.9",
      "array pitch growth budget (grating/scan headroom) is Vlad's"),
-    ("The Ø0.15 mm air-piston vent captures the step at every hold ≥3 ms, both drive sets",
-     "PROVEN-FE", "damper.json / damper-balanced.json scheme tables; §10.3",
-     "OPEN GATE: vent window is narrow (Ø0.20 fails) — vent tolerance sweep (us)"),
+    ("The air-piston vent captures the step at every hold ≥3 ms, both drive sets — "
+     "but the robust diameter is Ø0.138 ±0.003 mm, NOT the Ø0.15 previously "
+     "recommended, which fails at the high end of the discharge-coefficient range. "
+     "Discharge coefficient carries almost all of the tolerance: measuring it on a "
+     "coupon widens the specification to Ø0.140 ±0.020 mm, a 7× looser and entirely "
+     "ordinary part",
+     "PROVEN-FE", "vent-tolerance.json (5 µm resolution × 11 uncertainty corners; "
+     "fast integrator validated against damper.py); §14.7",
+     "ACTION: measure orifice discharge coefficient on a foil coupon before "
+     "ordering damper hardware — cheapest open item in the programme (us)"),
     ("The optimised detents cannot be stepped single-coil; DUAL pull-and-cancel steps them",
      "PROVEN-FE", "opt dynamics curves + damper ODE; §10.2 + §10.3",
      "closed — the demagnetisation gate below cleared the block on dual drive"),
@@ -95,9 +102,15 @@ ROWS = [
      "reference-level only; BSP + real-board bring-up outstanding (us)"),
     ("Rail voltage IS the current control (0.60 Ω path: 1.07 V step / 2.0 V full)",
      "PROVEN-calc", "drive-electronics.json; §9.5", "closed"),
-    ("At hold the aperture draws ZERO current — electromagnetically silent (the LPI property)",
-     "PROVEN-calc", "drive-electronics.json idle 0 W; §9.8",
-     "OPEN REQUIREMENT: driver-EMC layout rule must be specified, not assumed (us)"),
+    ("At hold the aperture draws ZERO current — electromagnetically silent (the LPI "
+     "property). The driver cannot compromise it in band: the drive spectrum breaks "
+     "at 3.2 MHz even at a deliberately fast 100 ns edge, 4.3 decades and ~171 dB "
+     "below 60 GHz. Six layout rules, each with a verification method, cover what "
+     "can go wrong — near-field coupling, tile-wide simultaneous switching, and "
+     "above all a driver that idles noisily and forfeits the silent hold",
+     "PROVEN-calc", "emc-spec.json (6 rules + spectral separation); §13.1",
+     "closed as a specification — compliance is verified at board bring-up, and "
+     "EMC-4 (zero coil current at hold) is the acceptance test that defends the claim"),
     ("The damper vent hole leaks ≤ −58 dB (17× below its own cutoff; Bethe (d/λ)⁴)",
      "PROVEN-calc", "§9.8, verifier-recomputed", "closed"),
     ("Cell fabrication ladder: print+plate (prototype) → electroform (reference) → moulding (volume)",

@@ -481,7 +481,7 @@ opt_rows = [
     ("MAX-FORCE set (N52, Pm 0.5)", "19.9/14.9 mN = 19.1/14.3 g", "-", "k 544 N/m · DUAL ±5 A hold 3 ms · 83 mJ · settle 8 ms · ΔT ≈97 K", "if vibration demands", "opt-sweeps-4 + damper.json"),
     ("Gap-30 full stack (the tolerance trade)", "11.3 / 7.7 g", "-", "3 basins both registrations; assembly tolerance 1.5× looser", "Tony's margin-vs-cost call", "opt-sweeps-3"),
     ("Gap-40 (KILLED)", "1 basin as-drawn", "-", "breakaway passed 5 g but not a stepper — basin-check mirage", "dead", "opt-recentre.json"),
-    ("Damper spec (both sets)", "Ø0.15 mm vent", "-", "captures at EVERY hold ≥3 ms; larger vents escape; sealed mis-parks", "Tony item 10 solved", "damper*.json"),
+    ("Damper spec (both sets)", "Ø0.138 ±0.003 mm vent", "-", "captures at EVERY hold ≥3 ms across all 11 uncertainty corners; Ø0.15 fails at high discharge coefficient; measuring Cd on a coupon widens tolerance 7x to ±0.020 mm", "Tony item 10 solved; tolerance gated on a Cd coupon measurement", "damper*.json + vent-tolerance.json"),
 ]
 for label, val, unit, detail, verdict, art in opt_rows:
     r = _next()

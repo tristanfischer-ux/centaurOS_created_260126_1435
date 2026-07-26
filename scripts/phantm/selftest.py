@@ -229,6 +229,56 @@ def main() -> int:
         check("eddy gate: verdict is set by a buildable route, not by SMC",
               "SMC" not in _w["material"], _w["material"])
 
+    # --- vent tolerance gate ----------------------------------------------
+    _vt = _os.path.join(_os.path.dirname(__file__), "out", "opt",
+                        "vent-tolerance.json")
+    if _os.path.exists(_vt):
+        _v = _json.load(open(_vt))
+        # METHOD gate: the fast integrator must reproduce the reference one,
+        # or every tolerance number downstream is meaningless.
+        check("vent gate: fast integrator reproduces damper.simulate",
+              all(r["ok"] for r in _v["validation"]),
+              f"{sum(r['ok'] for r in _v['validation'])}/"
+              f"{len(_v['validation'])} cases match")
+        # The robust band must be a strict subset of the nominal one. If they
+        # ever coincide, the corners have stopped biting and the sweep is
+        # measuring nominal twice.
+        _nb, _rb = _v["nominal_band_mm"], _v["robust_band_mm"]
+        check("vent gate: uncertainty corners actually narrow the band",
+              _rb is not None and (_rb[1] - _rb[0]) < (_nb[1] - _nb[0]),
+              f"nominal {_nb} → robust {_rb}")
+        # The specified centre must sit inside the robust band it came from.
+        _sp = _v["specification"]
+        check("vent gate: specified centre lies inside the robust band",
+              _rb[0] <= _sp["centre_mm"] <= _rb[1],
+              f"Ø{_sp['centre_mm']} in {_rb}")
+        if _v.get("cd_pinned_specification"):
+            _cd = _v["cd_pinned_specification"]
+            check("vent gate: discharge coefficient is the dominant "
+                  "uncertainty (measuring it buys real tolerance)",
+                  _cd["tolerance_mm"] > 2.0 * _sp["tolerance_mm"],
+                  f"±{_sp['tolerance_mm']*1e3:.0f} µm → "
+                  f"±{_cd['tolerance_mm']*1e3:.0f} µm with Cd measured")
+
+    # --- driver EMC specification -----------------------------------------
+    _es = _os.path.join(_os.path.dirname(__file__), "out", "emc-spec.json")
+    if _os.path.exists(_es):
+        _e2 = _json.load(open(_es))
+        _sp2 = _e2["spectrum"]
+        check("EMC spec: drive spectrum is decades below the operating band",
+              _sp2["decades_to_band"] > 3.0
+              and _sp2["attenuation_to_band_db"] > 100,
+              f"{_sp2['decades_to_band']} decades = "
+              f"{_sp2['attenuation_to_band_db']:.0f} dB")
+        check("EMC spec: every rule carries a verification method",
+              all(r.get("verify", "").strip() and r.get("why", "").strip()
+                  for r in _e2["rules"]),
+              f"{len(_e2['rules'])} rules")
+        # The rule that defends the LPI claim must exist by name — the others
+        # are hygiene, this one IS the property being sold.
+        check("EMC spec: the silent-hold rule is present",
+              any("hold" in r["title"].lower() for r in _e2["rules"]))
+
     # report-consistency guard (deterministic; skips if the report isn't built)
     if _os.path.exists(_os.path.join(_os.path.dirname(__file__), "out",
                                      "PHANTM-ACTUATOR-REPORT.md")):
