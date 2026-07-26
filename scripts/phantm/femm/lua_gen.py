@@ -149,7 +149,7 @@ def slot_section_polygon(top: bool):
 
 
 def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
-                 smc_bh_points=None, probe_pts=None) -> str:
+                 smc_bh_points=None, probe_pts=None, harmonic=None) -> str:
     """Generate the full Lua script for one (position, current, Pm) case.
 
     probe_pts: optional [(x_mm, y_mm), ...] at which to emit POINT field values
@@ -157,20 +157,35 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     a region, which is the wrong statistic for a demagnetisation check — the
     magnet demagnetises where the reverse field is WORST, not where it is
     typical. These probes are how demag_gate.py gets that worst value.
+
+    harmonic: optional dict(freq_hz, mu_r, sigma_ms) turning this into an
+    AC/eddy-current solve on the SAME geometry — used by eddy.py to measure how
+    fast flux actually diffuses into the solid steel. The solver linearises B-H
+    for a harmonic solve, so mu_r replaces the nonlinear curve; eddy.py brackets
+    that by sweeping mu_r rather than trusting a single value.
     """
     from materials import SmcMaterial
     bh = smc_bh_points or SmcMaterial().femm_bh_points()
     nc = P.coil.n_turns
     hc = P.materials.ndfeb_br_t / (4e-7 * math.pi * P.materials.ndfeb_mu_r)
+    freq = float(harmonic["freq_hz"]) if harmonic else 0.0
 
     L = ["show_console()", "newdocument(0)",
-         'mi_probdef(0, "millimeters", "planar", 1e-8, 1.55, 30)']
+         f'mi_probdef({freq:g}, "millimeters", "planar", 1e-8, 1.55, 30)']
 
     # materials
     L.append('mi_addmaterial("air", 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
-    L.append('mi_addmaterial("smc", 500, 500, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
-    for b, h in bh:
-        L.append(f'mi_addbhpoint("smc", {b:.6f}, {h:.3f})')
+    if harmonic:
+        # Linear + CONDUCTIVE steel: conductivity is what makes eddy currents
+        # exist at all, and it is deliberately zero in every other study here
+        # (a magnetostatic solve with sigma is meaningless).
+        mur = float(harmonic["mu_r"])
+        L.append(f'mi_addmaterial("smc", {mur:g}, {mur:g}, 0, 0, '
+                 f'{float(harmonic["sigma_ms"]):g}, 0, 0, 1, 0, 0, 0)')
+    else:
+        L.append('mi_addmaterial("smc", 500, 500, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
+        for b, h in bh:
+            L.append(f'mi_addbhpoint("smc", {b:.6f}, {h:.3f})')
     L.append(f'mi_addmaterial("ndfeb", {P.materials.ndfeb_mu_r}, '
              f'{P.materials.ndfeb_mu_r}, {hc:.1f}, 0, 0, 0, 0, 1, 0, 0, 0)')
     L.append('mi_addmaterial("copper", 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
@@ -276,6 +291,14 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     L.append("mo_clearblock()")
     L.append('i_, v_, flux_ = mo_getcircuitproperties("drv")')
     L.append('print("PHANTM_RESULT flux_linkage=" .. flux_)')
+    if harmonic:
+        # Ohmic (eddy) loss in the STEEL only — groups 1/2/3 are translator,
+        # slot-sections and bridge. This is the number that says what skipping
+        # laminations actually costs per pulse.
+        for grp in (1, 2, 3):
+            L.append(f"mo_groupselectblock({grp})")
+        L.append('print("PHANTM_RESULT steel_loss_w=" .. mo_blockintegral(6))')
+        L.append("mo_clearblock()")
     for k, (px, py) in enumerate(probe_pts or []):
         L.append(f"pA,pB1,pB2,pSig,pE,pH1,pH2,pJe,pJs,pMu1,pMu2,pPe,pPh "
                  f"= mo_getpointvalues({px:.6f},{py:.6f})")

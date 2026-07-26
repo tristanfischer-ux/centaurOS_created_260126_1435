@@ -196,6 +196,39 @@ def main() -> int:
                   _c["worst_vs_mean_cold"]["ratio"] > 1.02,
                   f"{_c['worst_vs_mean_cold']['ratio']}x")
 
+    # --- eddy-current gate (the no-laminations claim) ----------------------
+    _eg = _os.path.join(_os.path.dirname(__file__), "out", "eddy-fe.json")
+    if _os.path.exists(_eg):
+        _e = _json.load(open(_eg))
+        # The METHOD gate: the metric must reproduce the closed-form slab
+        # solution or it does not get to rule on tooling.
+        check("eddy gate: metric reproduces the closed-form slab solution",
+              all(v["ok"] for v in _e["slab_validation"]),
+              "; ".join(f"{v['f_hz']:.0f} Hz {v['rel_error']*100:.1f}%"
+                        for v in _e["slab_validation"]))
+        # Diffusion time must scale with permeability. If this ever goes flat,
+        # the solve has stopped seeing the steel (which is exactly how the
+        # first, wrong version of this gate looked).
+        _mim = [r for r in _e["rows"] if r["sigma_ms"] > 0.01]
+        _lo = min(_mim, key=lambda r: r["mu_r"])
+        _hi = max(_mim, key=lambda r: r["mu_r"])
+        check("eddy gate: diffusion time rises with permeability",
+              _hi["tau_ms"] > 3.0 * _lo["tau_ms"],
+              f"tau {_lo['tau_ms']*1e3:.1f} µs at µr {_lo['mu_r']} → "
+              f"{_hi['tau_ms']*1e3:.1f} µs at µr {_hi['mu_r']}")
+        _w = _e["worst_buildable"]
+        check("eddy gate: flux clears the pulse on the worst buildable route",
+              _w["margin_pulse_over_tau"] > 2.0
+              and _w["force_fraction_at_pulse_end"] > 0.90,
+              f"{_w['margin_pulse_over_tau']}× margin, flux "
+              f"{_w['penetration_at_pulse_end']*100:.2f}%, force "
+              f"{_w['force_fraction_at_pulse_end']*100:.1f}% at pulse end")
+        # The verdict must be computed on a route that will actually be built.
+        # SMC is ~850x less conductive and was killed as a process; if it ever
+        # became the worst case the study would be self-flattering.
+        check("eddy gate: verdict is set by a buildable route, not by SMC",
+              "SMC" not in _w["material"], _w["material"])
+
     # report-consistency guard (deterministic; skips if the report isn't built)
     if _os.path.exists(_os.path.join(_os.path.dirname(__file__), "out",
                                      "PHANTM-ACTUATOR-REPORT.md")):

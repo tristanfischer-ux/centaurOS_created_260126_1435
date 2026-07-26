@@ -50,9 +50,16 @@ ROWS = [
     ("The pole is an open horseshoe — in-situ winding possible; each glue joint costs ≈5–15% detent",
      "RED-TEAMED", "§0.8 retraction + re-analysis; §5.2 Route A/B",
      "Route A (monolithic) recommended; winder cycle-time quote decides (RFQ)"),
-    ("No laminations needed for 1.5 ms DC pulses — flux diffusion clears the pulse",
-     "PROVEN-calc", "§0.10 flux-diffusion estimate",
-     "OPEN GATE: margin <10× on the thickest path — transient eddy FE before tooling (us)"),
+    ("No laminations needed for 1.5 ms DC pulses — flux diffusion clears the pulse. "
+     "Harmonic FE on the real geometry (metric validated against the closed-form "
+     "slab solution to ≤2.2%): the slowest path is the translator core, τ = 21 µs "
+     "at the saturated working point and 445 µs at the pessimistic unsaturated "
+     "corner — 70× and 3.4× the 1.5 ms pulse. Worst case still delivers 96.6% of "
+     "final flux (93% of force) by pulse end",
+     "PROVEN-FE", "eddy-fe.json (per-region interior probes, µr 100–4000, "
+     "solid Fe-3%Si conductivity); §14.5",
+     "closed — but the honest margin is 3.4× at the pessimistic corner, not the "
+     "comfortable number SMC implied; re-run if section thickness grows"),
     ("Interior across-flats 3.10 mm is THE RF dimension; fc = 53.56 GHz, λc = 5.598 mm",
      "MEASURED", "STL forensics + validated eigensolver; §9.2",
      "metallised-cell λc + loss budget confirmation (Vlad)"),

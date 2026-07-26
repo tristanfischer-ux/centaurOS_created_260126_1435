@@ -22,6 +22,14 @@ import subprocess
 
 BIN = os.path.join(os.path.dirname(__file__), "..", "bin", "femmcli")
 _RESULT_RE = re.compile(r"PHANTM_RESULT\s+(\w+)\s*=\s*([-+eE0-9.naif]+)")
+# A HARMONIC solve returns complex values as "<re>+I*<im>" / "<re>-I*<im>".
+# The magnetostatic regex above would silently truncate one of those at the
+# sign before the I and hand float() a trailing "+", so complex results need
+# their own pattern rather than a looser one shared with the real case.
+_CPLX_RE = re.compile(
+    r"PHANTM_RESULT\s+(\w+)\s*=\s*"
+    r"([-+]?[0-9.]+(?:[eE][-+]?\d+)?)\s*([-+])\s*I\s*\*\s*"
+    r"([-+]?[0-9.]+(?:[eE][-+]?\d+)?)")
 
 
 class FemmError(RuntimeError):
@@ -40,7 +48,13 @@ def run_lua(script_path: str, timeout_s: float = 120.0) -> dict:
             if attempt == 2:
                 raise FemmError(f"femmcli timeout on {script_path}")
             continue
-        results = {k: float(v) for k, v in _RESULT_RE.findall(proc.stdout)}
+        results = {k: complex(float(re_), (1 if sgn == "+" else -1) * float(im))
+                   for k, re_, sgn, im in _CPLX_RE.findall(proc.stdout)}
+        # Real-valued keys fill in around the complex ones; a key already
+        # captured as complex must not be overwritten by a truncated real read.
+        for k, v in _RESULT_RE.findall(proc.stdout):
+            if k not in results:
+                results[k] = float(v)
         if results:
             return results
         if attempt == 2:

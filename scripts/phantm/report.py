@@ -1661,6 +1661,93 @@ def main():
           "costs nothing extra to ask for it.")
         A("")
 
+    # --- 10.2c eddy-current gate (the no-laminations claim) ---------------
+    ed = load("eddy-fe.json")
+    if ed:
+        A("### 10.2c The eddy-current gate — is skipping laminations really free?")
+        A("")
+        A("The design carries no laminations: the pulses are 1.5 ms of essentially "
+          "DC, and flux was estimated to diffuse into the solid steel far faster "
+          "than that. The estimate was flagged with an open gate, because the "
+          "margin on the thickest path was under 10× and a hand calculation that "
+          "close to the line is not something to cut tooling against. It has now "
+          "been run properly, and the flag was justified.")
+        A("")
+        A("**The estimate was made on the wrong material.** The brief assumes "
+          "pressed SMC, which is insulated powder — eddy currents barely exist in "
+          "it and the claim is trivially true. But SMC was killed as a process "
+          "(§19.1: it cannot form 232 µm teeth), and *both* surviving routes — "
+          "micro-MIM Fe-3%Si and Tony's stamped-and-bonded-solid electrical steel "
+          "— are roughly **850× more conductive**. The claim had to be re-tested "
+          "on the material that will actually be built.")
+        A("")
+        A("**A metric that looked right and was not.** The obvious probe is to "
+          "sweep frequency and watch the coil flux linkage roll off. It does not "
+          "work here: this is a *gapped* circuit, and the two 20 µm working gaps "
+          "dominate the reluctance, so terminal flux is set by the gaps almost "
+          "regardless of what the steel is doing — measured, it falls only 20% by "
+          "100 kHz, long after the steel has stopped carrying flux at its centre. "
+          "Worse, the first cut of this study read \"no corner found in the "
+          "sweep\" as \"the circuit is infinitely fast\" and reported a 576× "
+          "margin. That number was produced by a fallback, not by physics. It is "
+          "recorded here because it is exactly the kind of flattering artefact "
+          "that survives review when only the conclusion is checked.")
+        A("")
+        A("The gate instead measures inside the metal — |B| at the centreline of "
+          "each section against |B| just under its surface — and the method is "
+          "validated first against the closed-form slab solution, the same "
+          "discipline the force loop applies with its gapped C-core gate:")
+        A("")
+        A("| Frequency | FE centre/surface | Closed form | Error |")
+        A("|---|---|---|---|")
+        for v in ed["slab_validation"]:
+            A(f"| {v['f_hz']:.0f} Hz | {v['fe_ratio']:.4f} | "
+              f"{v['analytic_ratio']:.4f} | {v['rel_error']*100:.2f}% |")
+        A("")
+        mim = [r for r in ed["rows"] if r["sigma_ms"] > 0.01
+               and "MIM" in r["material"]]
+        A("Applied to the real geometry on solid Fe-3%Si, the slowest path is the "
+          "**translator core** — which is precisely the path the original hand "
+          "estimate singled out. (Note the slot-section back has almost the same "
+          "time constant at half the thickness: the eddy loop is set by the 2D "
+          "geometry, not by a section thickness, which is why no 1D formula could "
+          "have settled this.)")
+        A("")
+        A("| Permeability | Regime | τ (translator core) | Flux at pulse end | Force at pulse end | Margin |")
+        A("|---|---|---|---|---|---|")
+        regime = {100: "saturated working point",
+                  500: "working point, conservative",
+                  1500: "part-saturated",
+                  4000: "small-signal, cold/low-flux — pessimistic"}
+        for r in sorted(mim, key=lambda r: r["mu_r"]):
+            A(f"| µr {r['mu_r']} | {regime.get(r['mu_r'], '')} | "
+              f"{r['tau_ms']*1e3:.1f} µs | "
+              f"{r['penetration_at_pulse_end']*100:.2f}% | "
+              f"{r['force_fraction_at_pulse_end']*100:.1f}% | "
+              f"**{r['margin_pulse_over_tau']:.0f}×** |")
+        A("")
+        w = ed["worst_buildable"]
+        A(f"**The verdict: the claim holds, with an honest margin of "
+          f"{w['margin_pulse_over_tau']:.1f}× rather than a comfortable one.** At "
+          f"the working point the steel runs at 1.5–2 T, deep in saturation, "
+          f"where the differential permeability that governs a flux *change* is "
+          f"one to two orders below the small-signal figure — there the margin is "
+          f"22–70× and flux is fully in. The binding case is the pessimistic "
+          f"unsaturated corner (µr 4000), and even that delivers "
+          f"{w['penetration_at_pulse_end']*100:.1f}% of final flux, i.e. "
+          f"{w['force_fraction_at_pulse_end']*100:.0f}% of final force, by the end "
+          f"of the pulse. Against detent margins of 2.2× spec that ~7% shortfall "
+          f"is absorbable — but it is real, it is not zero, and it should be "
+          f"carried in the step-timing budget rather than rounded away. "
+          f"Laminations remain unnecessary; they were never harmful, and this "
+          f"says how much headroom is being spent to skip them.")
+        A("")
+        A("Ohmic loss in the steel is negligible against the step energy at these "
+          "rates, so the earlier note that eddy loss would \"add modestly\" to the "
+          "2.7 mJ/step budget stands — the cost of solid parts is the flux "
+          "*delay* quantified above, not the dissipation.")
+        A("")
+
     A("### 10.3 Dynamics: Tony's air-piston damper works, with a number")
     A("")
     A("![damper](opt/fig-damper.png)")

@@ -32,12 +32,14 @@ N_HARM = 6
 _counter = [0]
 
 
-def run_case(x_mm: float, i_a: float, pm_mm: float, probe_pts=None) -> dict:
+def run_case(x_mm: float, i_a: float, pm_mm: float, probe_pts=None,
+             harmonic=None) -> dict:
     _counter[0] += 1
     tag = f"case_{_counter[0]:05d}"
     path = os.path.join(CASES, f"{tag}.lua")
     with open(path, "w") as f:
-        f.write(actuator_lua(x_mm, i_a, pm_mm, f"{tag}.fem", probe_pts=probe_pts))
+        f.write(actuator_lua(x_mm, i_a, pm_mm, f"{tag}.fem",
+                             probe_pts=probe_pts, harmonic=harmonic))
     res = run_lua(path)
     for ext in (".lua", ".fem", ".ans"):
         p = os.path.join(CASES, f"{tag}{ext}")
