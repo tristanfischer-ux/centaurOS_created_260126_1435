@@ -2084,19 +2084,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         # Instrument shells = envelope outline (already drawn); clutter = schedule-only.
         if _form is not None and _is_instrument_clutter(p):
             continue
-        if _form is not None and _is_instrument_shell(p) and not _CANON_SHELL_RE.search(
-                str(getattr(p, "name", "") or "")):
-            continue          # a noun-family match (base plate / lid / cover), not THE shell
-        if _form is not None and _CANON_SHELL_RE.search(str(getattr(p, "name", "") or "")):
-            # DRAW THE ENCLOSURE OUTLINE (2026-07-26). It used to be skipped because the
-            # form rule painted a silhouette instead. With the as-placed projection there
-            # is no silhouette, so the body vanished and the on-top vessel / optical /
-            # sample-port read as floating boxes with a gap — "why are all these
-            # components just floating in the middle of the air? What are they connected
-            # to?". Draw the shell as a light envelope so the reader sees the internals
-            # INSIDE it and the exterior features seated ON it.
-            svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.6, fill="#f7f9fb", dash="6,3")
-            continue
+        if _form is not None and _is_instrument_shell(p):
+            continue          # the envelope is drawn once, below, from the canonical dims
         if _is_face_skin(p):
             continue
         pw = (p.x1 - p.x0) * ppm
@@ -2250,6 +2239,18 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         print(f"[ga] form-rule zone boxes SUPPRESSED — "
               f"{len(meta.get('above_lid_offsets_mm') or {})} real above-lid part(s) "
               f"carry the top of the product")
+    # ENCLOSURE ENVELOPE (2026-07-26). Drawn ONCE from the canonical shell dimensions
+    # rather than from a GAPart — the shell part's own extents proved unreliable (a
+    # 20x13 mm box). Without it the body vanished and the on-top vessel / optical /
+    # sample-port read as boxes floating above a gap: "why are all these components just
+    # floating in the middle of the air? What are they connected to?". With it the reader
+    # sees the internals INSIDE the box and the exterior features seated ON its lid.
+    _env_h = float(meta.get("envelope_hh") or 0.0)
+    _env_w = float(meta.get("envelope_ww") or 0.0)
+    if meta.get("is_instrument_device") and _env_h > 0 and _env_w > 0:
+        _e_y = front_y + (z_max - _env_h) * ppm
+        svg.rect(front_x + mx(-_env_w / 2.0), _e_y, _env_w * ppm, _env_h * ppm,
+                 stroke=EQ_INK, width=1.6, fill="#f7f9fb", dash="6,3")
     front_items = []
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.z1 - q.z0, 1))):
         if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
