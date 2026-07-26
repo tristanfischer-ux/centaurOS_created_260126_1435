@@ -2309,6 +2309,14 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
                 "score": max(0.0, 10.0 - 2.0 * max(1, _nf)),
                 "defects": [f"{_nf} drawing gate(s) failing (live drawing-gates.json)"],
             }
+    # BRIEF-COMPLIANCE RE-INGEST (2026-07-26, organoid floor-7 root cause): the chain
+    # generates quality-scorecard.json WITHOUT _inject_bom_cost_achieved quantities, so
+    # brief_compliance freezes a stale score (e.g. 7) with UNVERIFIED cost metrics that
+    # the Excel build has ALREADY injected into state. Recompute from the live state —
+    # same check_brief_metric_fail that _performance_card_fact uses.
+    _bc = _performance_card_fact(state)
+    if _bc.get("score") is not None:
+        facts["brief_compliance"] = _bc
     return facts, advisory
 
 
@@ -9625,6 +9633,8 @@ def _inject_bom_cost_achieved(state: dict, quantities: Dict[str, Any],
         _mk = str(_m.get("key_metric") or _m.get("metric") or _m.get("name") or "").strip()
         if _mk and _cost_rx.search(_mk) and _mk not in quantities:
             _inject[_mk] = {"value": _bom_total, "unit": "GBP",
+                            "source": "derived",
+                            "source_detail": f"requirementsBom Σ line_gbp = £{_bom_total:.2f} (assembled BoM total, {len(_rb)} lines)",
                             "provenance": {"source": "requirementsBom Σ line_gbp (assembled BoM total)"}}
     return {**quantities, **_inject} if _inject else quantities
 
