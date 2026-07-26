@@ -4283,11 +4283,27 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
         note.font = FONT_NOTE
         note.alignment = WRAP_TOP
         row += 1
+        # LIVE-SOURCE OVERRIDE (2026-07-26). The rows below used to render the RAW
+        # quality-scorecard.json score, while _sc_overview's own check compares each row
+        # against _verdict_sections() — the re-ingested source the VERDICT uses. Where the
+        # two differ the tab marked itself down for disagreeing with the engine: the
+        # organoid r11 bake rendered 'Brief compliance' 7.0 against an engine 10 (the
+        # on-disk scorecard predates the _inject_bom_cost_achieved quantities) and
+        # 'Drawing gates' 8.0 against a live ALL-PASS 10, costing Overview 2 of 12 rows.
+        # Render the SAME numbers the verdict and the checker read — one source, no drift.
+        _ov_facts, _ov_adv = _verdict_sections(state, run_dir)
+        _ov_fact_by = {_sec_label_norm(k): (v or {}).get("score")
+                       for k, v in _ov_facts.items()}
+        _ov_adv_by = {_sec_label_norm(k): (v or {}).get("score")
+                      for k, v in _ov_adv.items()}
         for sec in sc.get("sections", []):
             name = sec.get("name", "")
             score = sec.get("score")
             advisory = bool(sec.get("advisory"))
             defects = sec.get("defects") or []
+            _live = (_ov_adv_by if advisory else _ov_fact_by).get(_sec_label_norm(name))
+            if isinstance(_live, (int, float)):
+                score = _live
             ws.cell(row, 1, _display_name(name) + ("  (advisory)" if advisory else "")).border = BORDER
             cs = ws.cell(row, 2, score if score is not None else "—")
             cs.border = BORDER
