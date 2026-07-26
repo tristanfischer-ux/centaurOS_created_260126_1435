@@ -149,8 +149,15 @@ def slot_section_polygon(top: bool):
 
 
 def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
-                 smc_bh_points=None) -> str:
-    """Generate the full Lua script for one (position, current, Pm) case."""
+                 smc_bh_points=None, probe_pts=None) -> str:
+    """Generate the full Lua script for one (position, current, Pm) case.
+
+    probe_pts: optional [(x_mm, y_mm), ...] at which to emit POINT field values
+    as PHANTM_RESULT probe<i>_{bx,by,hx,hy}. Block integrals give AVERAGES over
+    a region, which is the wrong statistic for a demagnetisation check — the
+    magnet demagnetises where the reverse field is WORST, not where it is
+    typical. These probes are how demag_gate.py gets that worst value.
+    """
     from materials import SmcMaterial
     bh = smc_bh_points or SmcMaterial().femm_bh_points()
     nc = P.coil.n_turns
@@ -269,5 +276,12 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     L.append("mo_clearblock()")
     L.append('i_, v_, flux_ = mo_getcircuitproperties("drv")')
     L.append('print("PHANTM_RESULT flux_linkage=" .. flux_)')
+    for k, (px, py) in enumerate(probe_pts or []):
+        L.append(f"pA,pB1,pB2,pSig,pE,pH1,pH2,pJe,pJs,pMu1,pMu2,pPe,pPh "
+                 f"= mo_getpointvalues({px:.6f},{py:.6f})")
+        L.append(f'print("PHANTM_RESULT probe{k}_bx=" .. pB1)')
+        L.append(f'print("PHANTM_RESULT probe{k}_by=" .. pB2)')
+        L.append(f'print("PHANTM_RESULT probe{k}_hx=" .. pH1)')
+        L.append(f'print("PHANTM_RESULT probe{k}_hy=" .. pH2)')
     L.append("quit()")
     return "\n".join(L) + "\n"

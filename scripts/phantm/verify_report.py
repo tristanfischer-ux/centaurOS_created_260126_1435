@@ -325,9 +325,15 @@ absent("old numbering scars gone", "### 9.5b ", "### 10.1b ", "### 9.5c ",
        "## 0. Response to Tony", "## 13. Supplier outreach",
        "## 9. The hex-cell wave conformer", "### 9.9 ", "### 9.8 ")
 cr = json.load(open(os.path.join(OUT, "claims-register.json")))
-check("claims register 26 claims, 5 open gates",
-      cr["total"] == 26 and cr["open_gates"] == 5
-      and cr["total"] == len(cr["rows"]))
+check(f"claims register self-consistent ({cr['total']} claims, "
+      f"{cr['open_gates']} open gates) and the report quotes the same numbers",
+      cr["total"] == len(cr["rows"])
+      and cr["open_gates"] == sum(1 for r in cr["rows"] if "OPEN" in r["residual"])
+      and cr["open_gates"] == len(cr.get("open_gate_labels", []))
+      # the counts the prose actually renders must match the register, which is
+      # what a frozen literal here used to catch and then itself go stale on
+      and f"{cr['total']} load-bearing claims" in MD
+      and f"**{cr['open_gates']} open gates**" in MD)
 check("claims register: no empty cells, statuses legal",
       all(all(str(v).strip() for v in r.values()) for r in cr["rows"])
       and all(r["status"] in ("PROVEN-calc", "PROVEN-FE", "MEASURED", "TESTED",
@@ -336,7 +342,7 @@ check("claims table fully rendered",
       MD.count("| **PROVEN-FE** |") == cr["counts"]["PROVEN-FE"]
       and MD.count("| **RED-TEAMED** |") == cr["counts"]["RED-TEAMED"])
 contains("exec layer content", "de-risking funnel", "Prototype-A",
-         "Decision queue by owner", "5 open gates")
+         "Decision queue by owner")
 # §-renumber spot checks: old refs must have been rewritten in prose
 contains("renumbered refs", "actuator of §2 is the device",
          "(§11, validated eigensolver", "§A.3 ladder",

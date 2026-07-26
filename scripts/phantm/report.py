@@ -1566,6 +1566,101 @@ def main():
       "and, as §4.4 already holds, sustained slewing needs a duty-cycle + "
       "thermal-path check that is NOT modelled here.")
     A("")
+    # --- 10.2b demagnetisation gate (closes the block on dual drive) -------
+    dm = load("demag-fe.json")
+    if dm:
+        A("### 10.2b The demagnetisation gate — does the cancel coil wreck its own magnet?")
+        A("")
+        A("Dual drive asks one coil to push reverse flux through the magnet it is "
+          "wound around. That is a demagnetising field, and if it reaches the knee "
+          "of the magnet's intrinsic curve the loss is permanent: the detent comes "
+          "back weaker after every step until the cell stops holding. Nothing in "
+          "the force model of §10.2 would notice — every force sweep assumes a "
+          "fully-magnetised slug. This was logged as the open gate BLOCKING dual "
+          "drive; it is now closed, and it clears.")
+        A("")
+        A("Two things make the check non-trivial. First, the finite-element magnet "
+          "is a **linear recoil line with no knee anywhere in it** — drive the coil "
+          "as hard as you like and the solver reports a serenely converged "
+          "operating point that a real magnet would not have survived. The knee has "
+          "to be imposed from outside, as an acceptance test on the FE result. "
+          "Second, the statistic has to be the **worst point inside the slug, not "
+          "the average**: a magnet loses flux wherever the local reverse field is "
+          "worst, and that corner stays lost. A block-average would have "
+          "under-read the true reverse field by "
+          f"{max(c['worst_vs_mean_cold']['ratio'] for c in dm['configs']) - 1:.0%}"
+          + " here. The gate therefore probes a grid of points "
+          "inside the magnet, at the worst translator position over a whole tooth "
+          "pitch, and confirms that position does not move when the magnet is hot.")
+        A("")
+        A("| Set | Magnet | Worst reverse field at design cancel current | Knee at 20 °C | Margin |")
+        A("|---|---|---|---|---|")
+        for c in dm["configs"]:
+            g20 = next(v for v in c["verdicts"]
+                       if v["grade"] == c["workhorse_grade"])
+            sch = next(s for s in g20["schemes"]
+                       if s["i_cancel_a"] == c["i_cancel_design_a"])
+            r20 = next(x for x in sch["curve"] if x["temp_c"] == 20)
+            A(f"| {c['name']} | {c['workhorse_grade']} (Br {c['br_t']} T, "
+              f"Pm {c['pm_mm']} mm) | {r20['h_reverse_ka_m']:.0f} kA/m "
+              f"at {c['i_cancel_design_a']:+.2f} A | {r20['knee_ka_m']:.0f} kA/m "
+              f"| **{r20['margin']:.1f}×** |")
+        A("")
+        A("Because coercivity falls about five times faster with temperature than "
+          "remanence does (≈−0.6 %/K against −0.12 %/K), demagnetisation is always "
+          "a HOT failure, so the honest answer is not a single number but a "
+          "temperature ceiling per grade. Every magnet then has **two** limits — "
+          "its own catalogue thermal rating, and the temperature at which this "
+          "geometry's cancel coil reaches its knee — and the design is bounded by "
+          "the lower one:")
+        A("")
+        A("| Set | Grade | Catalogue max | Demagnetisation limit | Usable ceiling | What binds |")
+        A("|---|---|---|---|---|---|")
+        for c in dm["configs"]:
+            for ce in c["ceilings"]:
+                bold = "**" if ce["grade"] == c["workhorse_grade"] else ""
+                A(f"| {c['name']} | {bold}{ce['grade']}{bold} | "
+                  f"{ce['t_max_catalogue_c']} °C | {ce['t_max_reversible_c']:.0f} °C "
+                  f"| {ce['usable_ceiling_c']:.0f} °C | {ce['binding']} |")
+        A("")
+        bal = dm["configs"][0]
+        mx = dm["configs"][1]
+        bal_w = next(x for x in bal["ceilings"] if x["grade"] == bal["workhorse_grade"])
+        mx_w = next(x for x in mx["ceilings"] if x["grade"] == mx["workhorse_grade"])
+        A(f"**The verdict: the cancel coil is not the constraint.** For every grade "
+          f"one would actually specify, the magnet's own thermal rating runs out "
+          f"first — by {abs(bal_w['headroom_k']):.0f} K on the BALANCED set "
+          f"({bal['workhorse_grade']}) and {abs(mx_w['headroom_k']):.0f} K on "
+          f"MAX-FORCE ({mx['workhorse_grade']}). Dual pull-and-cancel drive is "
+          f"cleared to use. The ordering only inverts for the exotic "
+          f"high-coercivity grades, where the thermal rating runs so far above the "
+          f"knee curve that demagnetisation becomes the real ceiling — relevant "
+          f"only if the environment is specified above 180 °C, which PHANTM's is "
+          f"not.")
+        A("")
+        A(f"The result rests on two assumptions that are not measured on Tony's "
+          f"actual magnet — a knee at {dm['knee_fraction']:.2f}× coercivity "
+          f"(catalogue squareness is specified ≥0.90, so this is the conservative "
+          f"side) and the −0.6 %/K coercivity coefficient. Re-evaluating across "
+          f"the full plausible band of both "
+          f"(knee 0.75–0.95 × coercivity −0.65…−0.50 %/K) leaves the verdict "
+          f"unchanged in "
+          f"{bal['workhorse_corners_clear'][0]}/{bal['workhorse_corners_clear'][1]} "
+          f"and {mx['workhorse_corners_clear'][0]}/{mx['workhorse_corners_clear'][1]} "
+          f"corners respectively — it does not turn on the assumptions.")
+        A("")
+        A("**The honest caveat.** The magnet sits in the bridge limb, which is the "
+          "one region the unrolled 2D model treats approximately (the tooth and gap "
+          "region is exact — see §8.2). So this number carries the unrolled-model "
+          "uncertainty. It is worth stating what that would have to be worth to "
+          "change the answer: pushing the specified N42 past its knee at its own "
+          "80 °C rating would need the true reverse field to be **2.3×** the "
+          "computed value. An area-preserving unrolled model does not err by that "
+          "much, so the verdict is robust to the known weakness — but the 3D FE "
+          "already queued for the force curve should report this field too, and it "
+          "costs nothing extra to ask for it.")
+        A("")
+
     A("### 10.3 Dynamics: Tony's air-piston damper works, with a number")
     A("")
     A("![damper](opt/fig-damper.png)")
@@ -1726,9 +1821,9 @@ def main():
       f"load-bearing claims: {c['PROVEN-FE']} PROVEN-FE, {c['PROVEN-calc']} "
       f"PROVEN-calc, {c['RED-TEAMED']} RED-TEAMED, {c['MEASURED']} MEASURED, "
       f"{c['TESTED']} TESTED, {c['ESTIMATE']} ESTIMATE — with "
-      f"**{reg['open_gates']} open gates** (transient-eddy FE; damper-vent "
-      "tolerance; the DEMAGNETISATION FE that blocks dual drive; the stamped-tooth edge coupon; the driver-EMC "
-      f"layout specification) and {reg['external_inputs']} items awaiting an "
+      f"**{reg['open_gates']} open gates** ("
+      + "; ".join(reg.get("open_gate_labels", []))
+      + f") and {reg['external_inputs']} items awaiting an "
       "external input or ruling.")
     A("")
     A("**Recommended first hardware — Prototype-A**: the ORIGINAL 5 g design with "

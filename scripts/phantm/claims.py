@@ -66,7 +66,16 @@ ROWS = [
      "OPEN GATE: vent window is narrow (Ø0.20 fails) — vent tolerance sweep (us)"),
     ("The optimised detents cannot be stepped single-coil; DUAL pull-and-cancel steps them",
      "PROVEN-FE", "opt dynamics curves + damper ODE; §10.2 + §10.3",
-     "OPEN GATE: demagnetisation FE — cancel-coil reverse MMF vs the magnet knee BLOCKS dual drive (us)"),
+     "closed — the demagnetisation gate below cleared the block on dual drive"),
+    ("The cancel coil does NOT demagnetise its own magnet: at the design cancel "
+     "current the worst reverse field inside the slug is 238 kA/m (BALANCED, N42) "
+     "and 269 kA/m (MAX-FORCE, N52), against knee fields of 812 and 745 kA/m at "
+     "20 °C — margins of 3.4× and 2.8×. The grade's own thermal rating (80 °C) "
+     "binds 60 K and 49 K before demagnetisation does",
+     "PROVEN-FE", "demag-fe.json (point-probe grid inside the magnet, worst "
+     "position over a pitch, 9/9 assumption corners); §9.9",
+     "closed — re-run the gate if drive current, magnet length or grade changes; "
+     "selftest pins the verdict"),
     ("BALANCED set delivers 14.6/11.0 g margins at 37 mJ/step (MAX-FORCE: 19.1/14.3 g at 83 mJ)",
      "PROVEN-FE", "opt-sweeps-3/4.json; §10.2",
      "same 3D-FE/prototype residual as the fixed design (us)"),
@@ -116,10 +125,25 @@ def build():
         counts[st] = counts.get(st, 0) + 1
     open_rows = [r[0] for r in ROWS if "OPEN" in r[3]]
     external_rows = [r[0] for r in ROWS if any(k in r[3] for k in ("Vlad", "Tony", "Tristan"))]
+
+    # Short label per open gate, derived from the residual text rather than
+    # written out a second time by hand. The executive summary lists the gates
+    # by name, and a hand-maintained list there is exactly the kind of prose
+    # that survives the gate it describes being closed.
+    def _label(residual: str) -> str:
+        body = residual.split("OPEN GATE:", 1)[-1]
+        body = body.split("OPEN REQUIREMENT:", 1)[-1]
+        for sep in ("—", "(", " - "):
+            body = body.split(sep, 1)[0]
+        return " ".join(body.split()).strip(" ,;.")
+
+    open_labels = [_label(r[3]) for r in ROWS if "OPEN" in r[3]]
+
     out = {"rows": [dict(claim=c, status=s, evidence=e, residual=r)
                     for c, s, e, r in ROWS],
            "counts": counts, "total": len(ROWS),
-           "open_gates": len(open_rows), "external_inputs": len(external_rows)}
+           "open_gates": len(open_rows), "open_gate_labels": open_labels,
+           "external_inputs": len(external_rows)}
     path = os.path.join(os.path.dirname(__file__), "out", "claims-register.json")
     json.dump(out, open(path, "w"), indent=1)
     print(f"claims register: {len(ROWS)} claims, {counts}, "
