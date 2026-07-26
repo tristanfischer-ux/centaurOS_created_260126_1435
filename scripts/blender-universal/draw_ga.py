@@ -216,6 +216,17 @@ def _retag_instrument_parts_to_spine(parts: list[GAPart], state: dict) -> int:
     )
     compute_tag = next((tg for nm, tg in spine if "compute ui" in nm), "I-201")
     led_tag = next((tg for nm, tg in spine if "led source" in nm), "X-201")
+    # NEVER NAME A PART THE PARTS LIST DOES NOT CONTAIN (2026-07-26). `parts` was loaded
+    # FROM the parts-manifest, so their current tags ARE the manifest's tag set. Only
+    # relabel to a spine tag that the manifest actually carries — i.e. one that
+    # seat_spine_principals_in_manifest has seated (it is the pass that decides which
+    # principals are canonical). Relabelling to any other BoM tag mints a PHANTOM: the
+    # colorimeter GA showed I-104 (Adafruit Feather M0) and I-109 (Detector Mount Plate,
+    # status NOT FOUND — a part that was never even resolved) while the manifest carried
+    # only I-201, tripping part_set_coherence + drawing_set_coherence. A drawing that
+    # names a part absent from its own schedule is not a real drawing.
+    _present_tags = {str(getattr(p, "tag", "") or "") for p in parts}
+    _refused: set = set()
     n = 0
     for p in parts:
         nm = str(p.name or "").lower()
@@ -231,9 +242,17 @@ def _retag_instrument_parts_to_spine(parts: list[GAPart], state: dict) -> int:
                 matched = led_tag
             elif host_to_compute.search(nm):
                 matched = compute_tag
+        if matched and matched not in _present_tags:
+            _refused.add(matched)      # not seated in the manifest — would be a phantom
+            matched = None
         if matched and p.tag != matched:
             p.tag = matched
             n += 1
+    if _refused:
+        print(f"[ga] spine retag REFUSED {len(_refused)} tag(s) absent from the "
+              f"parts-manifest (would be phantoms on the sheet): "
+              f"{', '.join(sorted(_refused))} — seat them via "
+              f"seat_spine_principals_in_manifest if they are meant to be drawn")
     return n
 
 
