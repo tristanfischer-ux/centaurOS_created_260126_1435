@@ -16665,10 +16665,12 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
         r"chassis base plate|mounting frame|wiring harness|wiring loom|shelf deck|base plate", re.I)
 
     items = []
+    _structural_parts = []      # sized FROM the pack once its extents are known (see §5)
     for p in parts:
         nm = str(getattr(p, "name", ""))
         if _STRUCTURAL_RE.search(nm):
             p.placed_xyz_mm = None   # drawn by the frame/harness pass, not the component packer
+            _structural_parts.append(p)
             continue
         if not nm or _SKIN_RE.search(nm):
             # the enclosure BODY is the container, not an interior part to CONTAIN — and
@@ -16745,6 +16747,7 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     _harness_nodes = []   # (name, centre_mm, family) — for the wiring harness + tubing pass
     xs = []
     ys = []
+    zs_pack = []          # packed-component z extents — the frame spans these (see §5)
     for x in items:
         tag, p, nm, sd = x["tag"], x["_p"], x["name"], x["dims"]
         c = pos.get(tag)
@@ -16767,6 +16770,8 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
         p.anchors = {"centre": p.placed_xyz_mm}
         xs += [c[0] - w / 2, c[0] + w / 2]
         ys += [c[1] - d / 2, c[1] + d / 2]
+        zs_pack.append(c[2] - h / 2)
+        zs_pack.append(c[2] + h / 2)
         if _igeo.is_hidden_fastener(nm):
             continue   # visibility filter (council) — placed for manifest, not drawn
         fam = _igeo.function_family(nm, getattr(p, "shape", None))
@@ -16784,6 +16789,44 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
         fd = max(ys) - min(ys)
         fcx = (max(xs) + min(xs)) / 2.0
         fcy = (max(ys) + min(ys)) / 2.0
+        # FORM FOLLOWS FUNCTION (Tristan 2026-07-26): the interior packs as compactly as it
+        # can, the FRAME wraps the pack, and the exterior wraps the frame. Sizing the frame
+        # from anything else is a guess — and if the interior genuinely needs more room the
+        # box must grow, never the contents shrink to fit a pre-guessed shell.
+        #
+        # The DRAWN frame below is already pack-derived (fw/fd/fcx/fcy). The BoM ROWS for
+        # the same structure were not: they kept their proxy dims and had placed_xyz_mm
+        # cleared, so the manifest reported an Interior Mounting Frame 160 mm wide around a
+        # 112 mm pack, and — because the post-placement resize only measures parts that
+        # HAVE placed_xyz_mm — the shell was sized blind to it and came out narrower than
+        # its own frame. That is the residual containment overshoot on opendrop (x +32 mm),
+        # ninjapcr (z +29 mm) and pcb_assembly (x +22 mm).
+        #
+        # Give the structural rows the pack's real extents and a real placement, so (a) the
+        # manifest reports the frame that is actually drawn and (b) the resize SEES it and
+        # grows the shell around it. Universal — keyed on the same _STRUCTURAL_RE noun
+        # family that deferred them, never on a product class.
+        _pk_z0 = min(zs_pack) if zs_pack else floor_z
+        _pk_z1 = max(zs_pack) if zs_pack else floor_z
+        _plate_re = re.compile(r"base\s*plate|shelf\s*deck", re.I)
+        for _sp in _structural_parts:
+            _spn = str(getattr(_sp, "name", ""))
+            if re.search(r"harness|loom", _spn, re.I):
+                continue          # the wiring loom is routed, not a bounding structure
+            if _plate_re.search(_spn):
+                _sw, _sd, _sh = fw, fd, 3.0
+                _scz = floor_z - 1.5
+            else:                 # the mounting frame spans the packed stack
+                _sw, _sd, _sh = fw, fd, max(_pk_z1 - _pk_z0, 10.0)
+                _scz = (_pk_z0 + _pk_z1) / 2.0
+            _sp.placed_xyz_mm = (round(fcx, 2), round(fcy, 2), round(_scz, 2))
+            _sp.shape = "box"
+            _sp.dim = parse_dimension(f"{_sw:.0f}x{_sd:.0f}x{_sh:.0f} mm")
+            _sp.anchors = {"centre": _sp.placed_xyz_mm}
+        if _structural_parts:
+            print(f"[univ][sealed][interior] sized {len(_structural_parts)} structural "
+                  f"part(s) FROM the pack ({fw:.0f}×{fd:.0f} mm footprint) — the shell now "
+                  f"wraps the frame instead of being sized blind to it", flush=True)
         plate_mat = _igeo._mat(fl, mat_cache, "alu")
         _pt = 3.0
         _bp = fl.add_box("u_se_cutaway_cue_int_frame_baseplate",
