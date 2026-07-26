@@ -91,11 +91,19 @@ def _spine_seats_from_state(state: Optional[dict]) -> list[dict[str, str]]:
     seen: set[str] = set()
     rb = []
     if isinstance(state, dict):
-        rb = (
-            (state.get("requirementsBom") or {}).get("rows")
-            or state.get("requirements_bom_rows")
-            or []
-        )
+        # `requirementsBom` is EITHER the rows list itself OR a {rows: [...]} wrapper —
+        # both shapes are live in the wild. The old code assumed the wrapper and did
+        # `(... or {}).get("rows")`, which raised AttributeError on the list shape. That
+        # exception propagated out of the SHARED try block in write_parts_manifest and
+        # silently killed the vessel-on-top seating too, so no manifest row ever received
+        # its `geometry_source` provenance stamp (organoid r11: the culture vessel was
+        # then packed as an ordinary interior part instead of standing proud on the lid).
+        _rb_raw = state.get("requirementsBom")
+        if isinstance(_rb_raw, list):
+            rb = _rb_raw
+        elif isinstance(_rb_raw, dict):
+            rb = _rb_raw.get("rows") or []
+        rb = rb or state.get("requirements_bom_rows") or []
     for r in rb:
         if not isinstance(r, dict):
             continue

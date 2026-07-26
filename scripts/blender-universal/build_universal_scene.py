@@ -6836,6 +6836,19 @@ def build_parts_manifest(parts):
                     "d": round(float(_se_D), 1),
                     "h": round(float(_se_H), 1),
                 }
+                # POSITION TOO (2026-07-26). Correcting dims alone left the row's stale
+                # proxy z while the real shell mesh spans _SEALED_BASE_Z_MM .. +H. On the
+                # organoid r11 bake that put the row 41.5 mm low, so G19 measured interior
+                # parts against a shell that had been slid down under them and reported an
+                # 18 mm overshoot the scene does not contain. The row must describe the
+                # mesh that was actually built — dims AND placement.
+                if _SEALED_BASE_Z_MM is not None:
+                    _pos = _r.get("pos_mm")
+                    _z_centre = round(float(_SEALED_BASE_Z_MM) + float(_se_H) / 2.0, 1)
+                    if isinstance(_pos, list) and len(_pos) >= 3:
+                        _r["pos_mm"] = [_pos[0], _pos[1], _z_centre]
+                    else:
+                        _r["pos_mm"] = [0.0, 0.0, _z_centre]
                 print(f"[parts-manifest] Enclosure Shell dims corrected to _SEALED_ENV_MM: "
                       f"{_se_W:.0f}×{_se_D:.0f}×{_se_H:.0f} mm (was proxy/default)")
                 break   # only one shell row expected
@@ -7183,8 +7196,19 @@ def write_parts_manifest(out_dir, parts, state=None):
         if _n_vessel:
             print(f"[parts-manifest] seated culture vessel on top from signature mesh "
                   f"(render = manifest = GA)")
+        else:
+            print("[parts-manifest] WARN vessel seat returned 0 — no on-top vessel "
+                  "signature bbox resolved; the vessel row keeps its packed pose and "
+                  "will NOT carry a geometry_source provenance stamp")
     except Exception as _sse:  # noqa: BLE001 — never block the export
-        print(f"[parts-manifest] spine principal / vessel seat skipped: {_sse}")
+        # LOUD, not silent (2026-07-26): this handler previously swallowed an
+        # AttributeError from _spine_seats_from_state and took the INDEPENDENT vessel
+        # seating down with it — the organoid r11 bake shipped 37 rows with no
+        # geometry_source stamp and a vessel packed inside instead of proud on the lid.
+        import traceback as _tb
+        print(f"[parts-manifest] ERROR spine principal / vessel seat FAILED: "
+              f"{type(_sse).__name__}: {_sse}", flush=True)
+        _tb.print_exc()
     # MICRO-COMPONENT DIMS CLAMP — FINAL PASS (organoid 2150, R4 2026-07-21).
     # resolved_dims_mm + the per-word manifest clamp (~L6647) already cap discrete
     # electronics, but a part that is the WIRING LOAD HUB (a shared-tray fan-out node —
@@ -12787,6 +12811,15 @@ SEALED_ENV_MAX_M3 = 1.0
 # PRODUCT shot — tag callouts, wire draws + boundary-service beams are suppressed.
 _SEALED_HERO_PRODUCT = False
 _SEALED_ENV_MM = None   # (W, D, H) set by place_sealed_enclosure — the hero camera frames THIS
+# Z ORIGIN of the sealed shell in mm (its FLOOR — the mesh spans _SEALED_BASE_Z_MM ..
+# _SEALED_BASE_Z_MM + H). Recorded alongside _SEALED_ENV_MM because the manifest's
+# "Enclosure Shell" row cannot recover it from a bbox scan: _world_bbox_mm_by_prefix
+# SKIPs the "u_skid_" prefix, so the actual enclosure walls (u_skid_encl_*) are invisible
+# to it and the row keeps a stale proxy position. Correcting dims WITHOUT the position
+# (the 2026-07-22 "G19 fix attempt #3") left the row 41.5 mm below the real shell on the
+# organoid r11 bake, which is what made G19 report an 18 mm containment overshoot that
+# does not exist in the scene.
+_SEALED_BASE_Z_MM = None
 _SEALED_FRONT_COVER = None
 _SEALED_SHELL_OBJECTS = []
 _LE_SIGNATURE = "generic"   # lab_electronics sub-type by contract signal (set in _sealed_enclosure_env_mm)
@@ -17259,11 +17292,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     cabinet scale. Same return tuple as every other strategy:
     (bbox, region_centres, frame_top_mm, routed, unresolved)."""
     W, D, H = env_mm
-    global _SEALED_ENV_MM
+    global _SEALED_ENV_MM, _SEALED_BASE_Z_MM
     _SEALED_ENV_MM = (W, D, H)
     margin = max(8.0, min(W, D, H) * 0.05)
     iw, idep, ih = W - 2 * margin, D - 2 * margin, H - 2 * margin
     base_z = DECK_Z_MM
+    _SEALED_BASE_Z_MM = float(base_z)   # shell floor — mesh spans base_z .. base_z + H
     print(f"[univ][sealed] enclosure {W:.0f}×{D:.0f}×{H:.0f} mm "
           f"(interior {iw:.0f}×{idep:.0f}×{ih:.0f}); {len(parts)} parts")
 
