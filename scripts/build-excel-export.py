@@ -9285,6 +9285,9 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
     if not metrics:
         return None
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    # Same BoM-cost achieved injection the Verification spine uses — so the Exec matrix and
+    # the spine agree that a bom_cost metric IS verifiable against the assembled BoM total.
+    quantities = _inject_bom_cost_achieved(state, quantities, metrics)
     brief_text = pb.get("original_text") or pb.get("revised_text") or ""
     if not isinstance(brief_text, str):
         brief_text = ""
@@ -9363,10 +9366,16 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         # (Verification spine + quality-scorecard probe). Cover used a shorter list and
         # marked focus_resolution_um FAIL with "≥ target" while Abbe 0.611 µm beats 1 µm
         # (OpenFlexure 0101 Exec content_score 0 → floored SHIPS).
+        band_center = _is_cost_band_center(key)
         lower_better = _brief_metric_is_lower_better(key)
-        # tolerance band: ±2% of target (display rounding + sizing granularity)
-        tol = abs(tgt) * 0.02 if tgt else 0.0
-        if lower_better:
+        # tolerance band: ±2% of target (display rounding + sizing granularity); a cost
+        # band-CENTRE (midpoint) is symmetric with the band half-width (±20%) — see
+        # _is_cost_band_center: a BoM within the plausibility band PASSES either side.
+        tol = abs(tgt) * (0.20 if band_center else 0.02) if tgt else 0.0
+        if band_center:
+            ws.cell(r, 6, "within band (±20%)").border = BORDER
+            status_f = f'=IF(ABS(E{r}-B{r})<={tol:.6g},"PASS","FAIL")'
+        elif lower_better:
             ws.cell(r, 6, "≤ target (lower better)").border = BORDER
             status_f = f'=IF(E{r}<=B{r}+{tol:.6g},"PASS","FAIL")'
         else:
@@ -9378,7 +9387,8 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
 
         # pre-evaluate so the cell colours on open (before Excel recomputes)
         if tgt is not None and ach is not None:
-            passed = (ach <= tgt + tol) if lower_better else (ach >= tgt - tol)
+            passed = (abs(ach - tgt) <= tol) if band_center else (
+                (ach <= tgt + tol) if lower_better else (ach >= tgt - tol))
             sc_fill = FILL_PASS if passed else FILL_FAIL
             for col in range(1, 9):
                 if not isinstance(ws.cell(r, col).fill, PatternFill) or \
@@ -9589,6 +9599,54 @@ def _brief_metric_is_lower_better(key: str) -> bool:
     )
 
 
+def _inject_bom_cost_achieved(state: dict, quantities: Dict[str, Any],
+                              metrics: List[dict]) -> Dict[str, Any]:
+    """Return `quantities` augmented with the assembled BoM total as the ACHIEVED for any
+    `bom_cost` / total-build-cost brief metric that has no contract quantity of its own.
+
+    The brief's cost anchors carry NO contract quantity — the achieved cost lives in
+    state.requirementsBom (Σ line_gbp), not the contract — so the matcher found nothing and
+    reported a false UNVERIFIED even when the design DOES cost within the band. Shared by the
+    Verification spine AND the Exec compliance matrix so BOTH surfaces read one truth (the
+    honest-scoring precondition: one matcher, never two). Returns a COPY when it injects;
+    the original dict is never mutated. Universal, noun-keyed."""
+    _rb = state.get("requirementsBom")
+    if not (isinstance(_rb, list) and _rb):
+        return quantities
+    _bom_total = round(sum(float((r or {}).get("line_gbp", 0) or 0)
+                           for r in _rb if isinstance(r, dict)), 2)
+    if _bom_total <= 0:
+        return quantities
+    _cost_rx = re.compile(r"bom_cost|(?:total|assembled|build)_cost.*gbp", re.I)
+    _inject = {}
+    for _m in metrics:
+        if not isinstance(_m, dict):
+            continue
+        _mk = str(_m.get("key_metric") or _m.get("metric") or _m.get("name") or "").strip()
+        if _mk and _cost_rx.search(_mk) and _mk not in quantities:
+            _inject[_mk] = {"value": _bom_total, "unit": "GBP",
+                            "provenance": {"source": "requirementsBom Σ line_gbp (assembled BoM total)"}}
+    return {**quantities, **_inject} if _inject else quantities
+
+
+def _is_cost_band_center(key: str) -> bool:
+    """True when a cost/£ metric names the CENTRE of a plausibility band (a `midpoint` /
+    `typical` / `target_cost` anchor) rather than a hard bound.
+
+    INTENT (organoid r11 Verification 4/10, 2026-07-26): the brief derives THREE cost
+    anchors from one expectation — floor 275, midpoint 330, ceiling 385. A BoM at £291 is
+    ABOVE the floor and BELOW the ceiling — an economical, plausible design — yet scoring
+    the MIDPOINT with a directional `ge` marked it FAIL (291 < 330), a false negative that
+    floored Verification + Exec Summary + Brief. A midpoint is a band CENTRE: it is neither
+    lower- nor higher-better; the design passes when it lands WITHIN the band. The `*_floor`
+    sibling still enforces the hard lower bound (a genuinely under-covered £180 BoM FAILs
+    it), so this never hides real under-coverage. Noun/unit-keyed, universal — never a class
+    table. Shared by the Verification spine + the Exec compliance matrix (one matcher)."""
+    kl = (key or "").lower()
+    is_cost = ("cost" in kl or "gbp" in kl or "price" in kl)
+    return is_cost and bool(re.search(r"midpoint|mid_point|\btypical\b|band_cent|target_cost", kl))
+
+
 def _brief_metric_status(metric: dict, quantities: Dict[str, Any], brief_text: str) -> dict:
     """Pure PASS/FAIL/UNVERIFIED for one brief metric — same rules as the compliance matrix."""
     key = (metric.get("key_metric") or metric.get("metric") or metric.get("name") or "").strip()
@@ -9607,9 +9665,16 @@ def _brief_metric_status(metric: dict, quantities: Dict[str, Any], brief_text: s
     ach_converted = _convert_value(ach_raw, qunit_s, unit)
     ach = ach_converted if ach_converted is not None else ach_raw
     # GOTCHA: cover matrix (_render_brief_compliance_section) MUST call the same helper.
-    lower_better = _brief_metric_is_lower_better(key)
-    compare = "le" if lower_better else "ge"
-    status = _status_from_compare(compare, tgt, ach, 0.02)
+    # A cost band-CENTRE (midpoint) is symmetric: PASS when the assembled BoM lands within
+    # the plausibility band, using the band half-width as the tolerance (floor 275 → mid 330
+    # ⇒ ±16.7%; a defensible ±20% concept-stage cost band). Directional metrics keep ge/le.
+    if _is_cost_band_center(key):
+        compare, _tol = "eq_frac", 0.20
+    else:
+        lower_better = _brief_metric_is_lower_better(key)
+        compare = "le" if lower_better else "ge"
+        _tol = 0.02
+    status = _status_from_compare(compare, tgt, ach, _tol)
     return _verif_row(
         "brief", claim, status=status, hardness=_brief_metric_hardness(metric),
         provenance=f"brief key: {key} → contract: {qname}",
@@ -9879,29 +9944,10 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
     if not metrics and tp.get("value") is not None:
         metrics = [tp]
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
-    # COST-METRIC ACHIEVED (2026-07-25): the brief's bom_cost_* metrics (midpoint/floor
-    # £) carry NO contract quantity — the ACHIEVED BoM total lives in state.requirementsBom
-    # (Σ line_gbp), not the contract — so the matcher found nothing and reported a false
-    # UNVERIFIED even when the design DOES cost within the band (£291 vs £275-330). Same
-    # LLM-authored-key-gap class as the stability bug. Inject the BoM total as the achieved
-    # for any BoM-cost metric so it verifies against its own target. Universal, noun-keyed;
-    # a COPY of quantities (never mutate the shared contract).
-    _rb = state.get("requirementsBom")
-    if isinstance(_rb, list) and _rb:
-        _bom_total = round(sum(float((r or {}).get("line_gbp", 0) or 0)
-                               for r in _rb if isinstance(r, dict)), 2)
-        if _bom_total > 0:
-            _cost_rx = re.compile(r"bom_cost|(?:total|assembled|build)_cost.*gbp", re.I)
-            _inject = {}
-            for _m in metrics:
-                if not isinstance(_m, dict):
-                    continue
-                _mk = str(_m.get("key_metric") or _m.get("metric") or _m.get("name") or "").strip()
-                if _mk and _cost_rx.search(_mk) and _mk not in quantities:
-                    _inject[_mk] = {"value": _bom_total, "unit": "GBP",
-                                    "provenance": {"source": "requirementsBom Σ line_gbp (assembled BoM total)"}}
-            if _inject:
-                quantities = {**quantities, **_inject}
+    # COST-METRIC ACHIEVED (2026-07-25): inject the assembled BoM total as the achieved for
+    # a bom_cost metric that carries no contract quantity (shared with the Exec matrix so
+    # both surfaces read one truth — see _inject_bom_cost_achieved).
+    quantities = _inject_bom_cost_achieved(state, quantities, metrics)
     brief_text = pb.get("original_text") or pb.get("revised_text") or ""
     if not isinstance(brief_text, str):
         brief_text = ""
@@ -27315,6 +27361,27 @@ def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
         raise SystemExit(f"No state.json in {run_dir}")
+    # ONE-TRUTH BoM-COST ACHIEVED (2026-07-26): the assembled BoM total is the delivered
+    # answer to the brief's bom_cost_* metrics, but it lives in state.requirementsBom, not
+    # the contract — so the deterministic self-audit (dossier_audit._contract_match), the
+    # compliance matrix AND the questions-for-customer generator all read the contract and
+    # ALL reported a false UNVERIFIED. Inject it into the contract quantities ONCE here, before
+    # any consumer runs, so every surface reads the same truth (the honest-scoring precondition).
+    try:
+        _oc = state.get("orchestratorContract")
+        if isinstance(_oc, dict):
+            _cost_metrics = []
+            for _mlist in (((state.get("parsedBrief") or {}).get("constraints") or {})
+                           .get("target_performance", {}).get("metrics") or [],
+                           (state.get("keyMetrics") or {}).get("supporting_metrics") or [],
+                           (state.get("keyMetrics") or {}).get("primary_metrics") or []):
+                _cost_metrics.extend(m for m in _mlist if isinstance(m, dict))
+            _q0 = _oc.get("quantities") or {}
+            _q1 = _inject_bom_cost_achieved(state, _q0, _cost_metrics)
+            if _q1 is not _q0:
+                _oc["quantities"] = _q1
+    except Exception:  # noqa: BLE001 — scoring augmentation must never crash the export
+        pass
     sha = git_short_sha()
     global _RUN_DIR
     _RUN_DIR = run_dir            # so _tab_quality_banner can score drawing/render/meta sheets

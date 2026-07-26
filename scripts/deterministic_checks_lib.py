@@ -1662,6 +1662,17 @@ def _btoks(s: Any) -> set:
     return {t for t in s.split() if t and t not in _drop and not t.isdigit()}
 
 
+def _is_cost_band_center(name) -> bool:
+    """A cost/£ brief metric that names the CENTRE of a plausibility band (midpoint/typical/
+    target_cost) — verified WITHIN-band (±20%), not with a directional ge. Mirrors
+    build-excel-export + dossier_audit (the ONE-matcher doctrine). Organoid r11: a £291 BoM in
+    a £275-385 band is economical and correct; a `ge` test on the £330 midpoint false-FAILed the
+    'Brief target met: bom_cost_midpoint_gbp' invariant and floored Exec Summary/⚠ Checks."""
+    nl = re.sub(r"[_\-]+", " ", str(name or "")).lower()
+    is_cost = ("cost" in nl or "gbp" in nl or "price" in nl)
+    return is_cost and bool(re.search(r"midpoint|mid point|\btypical\b|band cent|target cost", nl))
+
+
 def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
     """UNIVERSAL: deterministically verify each STRUCTURED brief target metric
     (constraints.target_performance.metrics) against the matching DESIGNED contract quantity —
@@ -1694,17 +1705,22 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         tol = abs(tvf) * 0.05
         # DECISION (OpenFlexure 2026-07-17): exact key_metric match FIRST.
         # Fuzzy token overlap wrongly bound focus_resolution_um → abbe_resolution_um.
+        _band = _is_cost_band_center(km)
+        _band_tol = abs(tvf) * 0.20
         if km in q:
             dvc = qval(q, km)
             if dvc is not None:
+                _ok = (abs(dvc - tvf) <= _band_tol) if _band else (dvc >= tvf - tol)
                 out.append(Check(
                     name=f"Brief target met: {km}",
-                    category="BRIEF", relation="ge",
-                    status=PASS if dvc >= tvf - tol else FAIL,
-                    actual=round(dvc, 4), expected=tvf, tol=round(tol, 4), unit=unit,
+                    category="BRIEF", relation=("band" if _band else "ge"),
+                    status=PASS if _ok else FAIL,
+                    actual=round(dvc, 4), expected=tvf,
+                    tol=round(_band_tol if _band else tol, 4), unit=unit,
                     producer=f"brief:{km}",
                     detail=(f"Brief target {km} = {tvf:g} {unit}; design ({km}) = {dvc:g} {unit} — "
-                            f"the design must realise the brief target within ±5%."),
+                            + ("a cost band-centre: the BoM must land WITHIN the ±20% plausibility band."
+                               if _band else "the design must realise the brief target within ±5%.")),
                 ))
                 continue
         # candidate designed quantities: unit-family agrees AND a concept-token overlap (>=2,
@@ -1736,16 +1752,23 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         # Prefer the candidate that MEETS the target, closest from above (resolves the per-unit-vs-total
         # clash without falsely failing on over-delivery); if none meets, surface the closest (a real miss).
         cands.sort(key=lambda t: t[0])
-        meeting = sorted((c for c in cands if c[1] >= tvf - tol), key=lambda t: t[0])
-        _, dv, best = (meeting[0] if meeting else cands[0])
+        if _band:
+            _, dv, best = min(cands, key=lambda t: abs(t[1] - tvf))
+            _ok = abs(dv - tvf) <= _band_tol
+        else:
+            meeting = sorted((c for c in cands if c[1] >= tvf - tol), key=lambda t: t[0])
+            _, dv, best = (meeting[0] if meeting else cands[0])
+            _ok = dv >= tvf - tol
         out.append(Check(
             name=f"Brief target met: {km}",
-            category="BRIEF", relation="ge",
-            status=PASS if dv >= tvf - tol else FAIL,
-            actual=round(dv, 4), expected=tvf, tol=round(tol, 4), unit=unit,
+            category="BRIEF", relation=("band" if _band else "ge"),
+            status=PASS if _ok else FAIL,
+            actual=round(dv, 4), expected=tvf,
+            tol=round(_band_tol if _band else tol, 4), unit=unit,
             producer=f"brief:{km}",
             detail=(f"Brief target {km} = {tvf:g} {unit}; design ({best}) = {dv:g} {unit} — "
-                    f"the design must realise the brief target within ±5%."),
+                    + ("a cost band-centre: the BoM must land WITHIN the ±20% plausibility band."
+                       if _band else "the design must realise the brief target within ±5%.")),
         ))
     return out
 
@@ -3357,6 +3380,29 @@ def _selftest() -> int:
         check(_has(checks, "Brief target met: focus_resolution_um", PASS),
               "FOCUS um/µm: brief 1 um must PASS against contract focus_resolution_um=1 µm "
               "(exact key), NOT fail via fuzzy bind to abbe_resolution_um=0.611")
+
+    # ---- COST-BAND CENTRE (organoid r11, 2026-07-26) --------------------------------
+    # A £291 BoM against a £330 midpoint is WITHIN the ±20% plausibility band → the
+    # 'Brief target met: bom_cost_midpoint_gbp' invariant must PASS (a directional ge
+    # test false-FAILed it). A £150 BoM is >20% out → still FAIL.
+    _cost_brief = {"constraints": {"target_performance": {"metrics": [
+        {"key_metric": "bom_cost_midpoint_gbp", "value": 330, "unit": "GBP"},
+    ]}}}
+    for _bom, _want in ((291, PASS), (150, FAIL)):
+        _cost_state = {
+            "orchestratorContract": {"quantities": {
+                "bom_cost_midpoint_gbp": {"value": _bom, "unit": "GBP"}}},
+            "parsedBrief": _cost_brief,
+            "requirementsBom": [], "partVerifications": [],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            d = _write_run(tmp, _cost_state, {}, {})
+            with open(os.path.join(d, "1-parsed-brief.json"), "w") as fh:
+                json.dump(_cost_state["parsedBrief"], fh)
+            checks = run_all_checks(d)
+            check(_has(checks, "Brief target met: bom_cost_midpoint_gbp", _want),
+                  f"COST midpoint band: a £{_bom} BoM vs £330 midpoint must be "
+                  f"{'PASS (within ±20%)' if _want == PASS else 'FAIL (>20% out)'}")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----

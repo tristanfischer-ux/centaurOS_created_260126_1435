@@ -224,9 +224,30 @@ _LOWER_BETTER_RX = re.compile(
     r"emission|emissions|leak|downtime|payback|noise|consumption|spend)\b", re.I)
 
 
+def _is_cost_band_center(name) -> bool:
+    """A cost/£ metric that names the CENTRE of a plausibility band (`midpoint`/`typical`/
+    `target_cost`) rather than a hard bound — a design within the band PASSES either side.
+    Mirrors build-excel-export._is_cost_band_center (the ONE-matcher doctrine). Organoid r11:
+    a £291 BoM against a £275 floor / £330 midpoint / £385 ceiling is economical and correct,
+    but a directional test on the midpoint marked it a false miss and floored Exec Summary."""
+    nl = re.sub(r"[_\-]+", " ", str(name or "")).lower()
+    is_cost = ("cost" in nl or "gbp" in nl or "price" in nl)
+    return is_cost and bool(re.search(r"midpoint|mid point|\btypical\b|band cent|target cost", nl))
+
+
 def _metric_direction(name, category) -> str:
     """Return 'higher' (meet-or-exceed), 'lower' (under-or-equal), or 'close'."""
     text = f"{name or ''} {category or ''}"
+    # COST-BAND semantics (organoid r11): a cost token alone is 'lower-better', but a cost
+    # FLOOR is a LOWER BOUND (the design must cost AT LEAST it — plausibility: too cheap =
+    # missing parts), so it is 'higher'. A midpoint is a band CENTRE ('close', with a wide
+    # band applied by the caller). A ceiling/cap stays 'lower'. Keyed on the bound noun.
+    _nl = re.sub(r"[_\-]+", " ", str(name or "")).lower()
+    if "cost" in _nl or "gbp" in _nl or "price" in _nl:
+        if re.search(r"\bfloor\b|\bmin(?:imum)?\b|at least|lower bound", _nl):
+            return "higher"
+        if _is_cost_band_center(name):
+            return "close"
     # lower-better wins ties on cost/mass (those tokens are unambiguous)
     if _LOWER_BETTER_RX.search(text):
         return "lower"
@@ -2293,13 +2314,16 @@ def check_brief_metric_fail(state, rows, run_dir) -> list:
         if achieved is None:
             continue
         direction = _metric_direction(name, m.get("category") if isinstance(m, dict) else None)
+        # a cost band-CENTRE (midpoint) is 'close' but its band is the plausibility half-width
+        # (±20%), not the tight ±2% equality band — a BoM anywhere in the band MEETS the anchor.
+        close_tol = 0.20 if _is_cost_band_center(name) else TOL
         meets = True
         if direction == "higher":
             meets = achieved >= target * (1 - TOL)
         elif direction == "lower":
             meets = achieved <= target * (1 + TOL)
         else:  # close
-            meets = abs(achieved - target) <= abs(target) * TOL or target == 0
+            meets = abs(achieved - target) <= abs(target) * close_tol or target == 0
         if not meets and _is_feedstock_metric(name) and _brief_value_approximated(state, target):
             # The brief itself discloses this feedstock/consumption figure as
             # approximate — widen to a ±5% band; a genuine under/over-consumption
@@ -4857,6 +4881,32 @@ def _selftest() -> int:
     expect(any(f.check == "brief_metric_fail" for f in check_brief_metric_fail(_output_state, [], "")),
            "an OUTPUT/capacity metric must stay on the tight 2% tolerance even when the "
            "brief also says 'approximately' — the feedstock relief must not leak to output metrics")
+
+    # ---- COST-BAND direction (organoid r11, 2026-07-26) --------------------------
+    # A cost FLOOR is a LOWER BOUND (achieved ≥ floor); a MIDPOINT is a band CENTRE
+    # (within ±20%). A £291 BoM against floor 275 / midpoint 330 must PASS BOTH — the old
+    # 'cost token ⇒ lower-better' rule false-failed the floor (291>275 read as an over-run).
+    _cost_state = {
+        "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+            {"key_metric": "bom_cost_floor_gbp", "value": 275, "unit": "GBP"},
+            {"key_metric": "bom_cost_midpoint_gbp", "value": 330, "unit": "GBP"},
+        ]}}},
+        "orchestratorContract": {"quantities": {
+            "bom_cost_floor_gbp": {"value": 291, "unit": "GBP"},
+            "bom_cost_midpoint_gbp": {"value": 291, "unit": "GBP"},
+        }},
+    }
+    expect(not any(f.check == "brief_metric_fail" for f in check_brief_metric_fail(_cost_state, [], "")),
+           "a £291 BoM (above the £275 floor, within ±20% of the £330 midpoint) must MEET both "
+           "cost anchors — floor is a lower bound, midpoint is a band centre")
+    # Direction 2: a genuinely under-covered BoM (£150) still FAILs the floor.
+    _cost_short = json.loads(json.dumps(_cost_state))
+    _cost_short["orchestratorContract"]["quantities"]["bom_cost_floor_gbp"]["value"] = 150
+    _cost_short["orchestratorContract"]["quantities"]["bom_cost_midpoint_gbp"]["value"] = 150
+    expect(any(f.check == "brief_metric_fail" for f in check_brief_metric_fail(_cost_short, [], "")),
+           "a £150 BoM under the £275 floor (and >20% below the £330 midpoint) must still FAIL")
+    expect(_metric_direction("bom_cost_floor_gbp", None) == "higher",
+           "a cost FLOOR must score as a lower bound (higher-is-better direction)")
 
     # ---- civil-works exclusion must not catch in-scope equipment structure (2026-07-05) ----
     # proveCatch direction 1: a container's OWN internal structural item (in-scope equipment
