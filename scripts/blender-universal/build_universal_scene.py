@@ -7153,6 +7153,39 @@ def _exterior_signature_vessel_bbox_mm():
     return (-vial_r, vial_r, -vial_r, vial_r, z_top, z_top + vial_h)
 
 
+def _exterior_signature_od_bbox_mm():
+    """Deterministic bbox of ONE on-top OD sensor head, from the SAME formula the SEAM-1
+    hero placement uses (~L18103): heads flank the vial at beam height, seated above the
+    collar.
+
+    WHY (2026-07-26): the render seats the paired OD source/detector ON TOP, hugging the
+    vial (probed world z 441.3..469.8 above the 408 lid). The manifest kept the packed
+    INTERIOR position for its 'Optical Density Sensor' row (z 370..379, inside the shell),
+    so the GA had nothing to draw up there and fell back to the form rule's synthesized
+    OPTICAL zone — a large box detached to the right of the vessel, which is nothing like
+    the two small blocks the render shows. Identical failure to the vessel lid-datum bug
+    (52e3a592c), one component along.
+
+    Returns (xmin, xmax, ymin, ymax, zmin, zmax) for the +x head, or None.
+    """
+    if _LE_SIGNATURE != "vial_bioreactor" or not _SEALED_ENV_MM or _SEALED_BASE_Z_MM is None:
+        return None
+    try:
+        W, D, H = (float(x) for x in _SEALED_ENV_MM)
+    except (TypeError, ValueError):
+        return None
+    vial_r, vial_h = _sealed_vial_r_h_mm(W, D, H)
+    z_top = float(_SEALED_BASE_Z_MM) + H
+    od_h = vial_h * 0.30
+    od_w = max(9.0, vial_r * 0.45)
+    od_d = max(14.0, vial_r * 0.6)
+    od_z = z_top + vial_h * 0.50
+    cx = vial_r + od_w * 0.5
+    return (cx - od_w / 2.0, cx + od_w / 2.0,
+            -od_d / 2.0, od_d / 2.0,
+            od_z - od_h / 2.0, od_z + od_h / 2.0)
+
+
 def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
@@ -7210,6 +7243,30 @@ def write_parts_manifest(out_dir, parts, state=None):
             print("[parts-manifest] WARN vessel seat returned 0 — no on-top vessel "
                   "signature bbox resolved; the vessel row keeps its packed pose and "
                   "will NOT carry a geometry_source provenance stamp")
+        # OD SENSOR HEADS — same on-top seating as the vessel (2026-07-26). Without this
+        # the optical row keeps its packed interior pose and the GA draws the form rule's
+        # synthesized OPTICAL zone instead of the small heads the render shows flanking
+        # the vial. Noun-keyed on the optical-sensor family, never a product class.
+        _od_bb = _exterior_signature_od_bbox_mm()
+        if _od_bb:
+            _od_rx = re.compile(
+                r"optical\s*density|(?:\bod\b).*sensor|photodiode|led\s*source", re.I)
+            _xmin, _xmax, _ymin, _ymax, _zmin, _zmax = _od_bb
+            _n_od = 0
+            for _r in rows:
+                if not _od_rx.search(str(_r.get("name") or "")):
+                    continue
+                _r["pos_mm"] = [round((_xmin + _xmax) / 2.0, 1),
+                                round((_ymin + _ymax) / 2.0, 1),
+                                round((_zmin + _zmax) / 2.0, 1)]
+                _r["dims_mm"] = {"w": round(_xmax - _xmin, 1),
+                                 "d": round(_ymax - _ymin, 1),
+                                 "h": round(_zmax - _zmin, 1)}
+                _r["geometry_source"] = "od_head_seat_on_top_from_signature_mesh"
+                _n_od += 1
+            if _n_od:
+                print(f"[parts-manifest] seated {_n_od} OD sensor row(s) on top from the "
+                      f"signature-mesh formula (render = manifest = GA)")
     except Exception as _sse:  # noqa: BLE001 — never block the export
         # LOUD, not silent (2026-07-26): this handler previously swallowed an
         # AttributeError from _spine_seats_from_state and took the INDEPENDENT vessel

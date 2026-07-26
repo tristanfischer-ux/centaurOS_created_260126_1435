@@ -2214,7 +2214,16 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         )
         print("[ga] thermocycler form context drawn "
               f"(assembly_cutaway={_assembly_cutaway})")
-    elif _form is not None:
+    elif _form is not None and not meta.get("above_lid_offsets_mm"):
+        # SYNTHESIZED ZONES ONLY WHERE THERE IS NO REAL ABOVE-LID GEOMETRY (2026-07-26).
+        # This layer paints the form rule's OPTICAL / UI DECK / PCB zone boxes. That is
+        # the right context for a product whose optics are integral to the body (the
+        # colorimeter). But when the manifest carries REAL above-lid features — the
+        # organoid's vial and its OD heads, now seated from the signature meshes — the
+        # zone box is a SECOND, fictional object drawn beside the real one: the sheet
+        # showed the vessel, the true OD head hugging it, AND a large detached "OPTICAL"
+        # rectangle, which is nothing like the render. Draw the real parts or the zones,
+        # never both.
         _draw_instrument_form_silhouettes(
             svg, _form,
             plan_x=plan_x, plan_y=plan_y, plan_w=plan_w, plan_h=plan_h,
@@ -2224,6 +2233,10 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         )
         print("[ga] instrument form context drawn "
               f"(assembly_cutaway={_assembly_cutaway})")
+    elif _form is not None:
+        print(f"[ga] form-rule zone boxes SUPPRESSED — "
+              f"{len(meta.get('above_lid_offsets_mm') or {})} real above-lid part(s) "
+              f"carry the top of the product")
     front_items = []
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.z1 - q.z0, 1))):
         if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
