@@ -765,7 +765,9 @@ _HOST_INTO_COMPUTE_RE = re.compile(
     r"mounting\s*bezel|power\s*indicator|overcurrent|input\s*fuse|"
     r"dc\s*input\s*fuse|thermal\s*(?:cutoff|fuse)|reverse\s*polarity|"
     r"power\s*input\s*connector|esd\s*protection|polyfuse|ferrite|"
-    r"dc\s*dc\s*regulator|debug\s*uart|current\s*sense|estop|e[- ]?stop|"
+    r"dc\s*[- ]?dc\s*regulat(?:or|ion)|voltage\s*regulat(?:or|ion)|"
+    r"regulat(?:or|ion)\s*board|power\s*regulat(?:or|ion)|"
+    r"debug\s*uart|current\s*sense|estop|e[- ]?stop|"
     r"power\s*kill|protective\s*earth|fan\s*(?:tach|failure)|overtemp|"
     # INTENT (Rodeostat 0201): AFE / voltage-ref / front-panel ports ride the
     # MCU kit — flagging missing_input/output floored Connection Trace to 6.
@@ -2815,6 +2817,24 @@ def _selftest() -> int:
         bad += 1
     if not _is_grid_electrical_origin("Mains Incomer"):
         print("  FAIL _is_grid_electrical_origin: 'Mains Incomer' must match")
+        bad += 1
+    # DC-DC regulation-board absorption (organoid r11 Interconnect 0/10, 2026-07-26):
+    # a power-regulation host peripheral rides the compute kit (no drawn downstream
+    # LOAD edge), same as the polyfuse / reverse-polarity / usb-power siblings on the
+    # SAME bus. The exemption keyed off `dc dc regulator` but the emitter named it
+    # "DC-DC Regulation Board" — "regulation" ≠ "regulator" → X-120 alone false-
+    # flagged missing_output and floored Interconnect via min. Pin the noun FAMILY
+    # (regulator|regulation, board variant) so the treadmill's name-drift can't reopen
+    # it; the negative keeps a genuine PLANT power distributor un-absorbed.
+    for _hn in ("DC-DC Regulation Board", "DC-DC Regulator", "Voltage Regulation Module",
+                "Power Regulation Board", "Regulator Board"):
+        if not _HOST_INTO_COMPUTE_RE.search(_hn):
+            print(f"  FAIL host-into-compute: power-regulation peripheral '{_hn}' must be "
+                  f"absorbed into the compute kit (rides the MCU, no drawn LOAD edge)")
+            bad += 1
+    if _HOST_INTO_COMPUTE_RE.search("Zone Distribution Transformer"):
+        print("  FAIL host-into-compute: a plant distribution transformer must NEVER be "
+              "absorbed (it is a real flow-through electrical node)")
         bad += 1
     # Device-instrument signal-carrier rule (colorimeter 1441): a physical sensor
     # interconnect cable is not itself a topology endpoint, but must inherit the
