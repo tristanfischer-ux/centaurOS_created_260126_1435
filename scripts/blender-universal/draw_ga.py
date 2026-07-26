@@ -2246,6 +2246,34 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         px = front_x + mx(p.x0)
         py = front_y + (z_max - p.z1) * ppm
         _draw_elevation_item(svg, px, py, pw, ph, p)
+        # LABEL THE REAL ABOVE-LID FEATURES (2026-07-26). Now that the GA projects the
+        # as-placed geometry instead of synthesized zone boxes, the sheet must NAME what
+        # it draws — both so a reader can tell what is standing on the lid, and so the
+        # render<->drawing family gate reads a REAL label rather than the form rule's
+        # fictional OPTICAL marker. Family tokens match _exterior_signature_family.
+        _alo = meta.get("above_lid_offsets_mm") or {}
+        if _alo and str(getattr(p, "tag", "") or "") in _alo:
+            _pn = str(getattr(p, "name", "") or "")
+            _fam_lbl = ("OPTICAL" if re.search(r"optical|photodiode|\bod\b|led\s*source", _pn, re.I)
+                        else "SAMPLE PORT" if re.search(r"collar|holder|port", _pn, re.I)
+                        else "VESSEL" if re.search(r"vessel|vial|reactor", _pn, re.I)
+                        else None)
+            if _fam_lbl:
+                svg.text(px + pw / 2.0, py - 3, _fam_lbl,
+                         size=7.0, anchor="middle", fill=MUTED)
+        # HMI PLANE from REAL geometry. The front-display / front-ui-deck glance markers
+        # used to come from the form rule's synthesized zone layer; now that the fascia is
+        # a real manifest part (aliased to the drawn u_se_le_face_* meshes) stamp the
+        # marker on the ACTUAL part, so the glance gate is satisfied by geometry rather
+        # than by a drawn fiction.
+        if (meta.get("is_instrument_device")
+                and re.search(r"front\s*panel|display|fascia|hmi|keypad",
+                              str(getattr(p, "name", "") or ""), re.I)):
+            svg.rect(px, py, pw, ph, stroke="none", fill="none",
+                     extra='data-glance="front-display"')
+            svg.text(px + pw / 2.0, py + ph / 2.0 + 2, "DISPLAY / HMI",
+                     size=6.5, anchor="middle", fill=MUTED,
+                     extra='data-glance="front-display-label"')
         front_items.append((p, px, py, pw, ph))
     # INTENT (2026-07-14 Tristan): instrument FRONT must not ladder every optical
     # tag at ~12 px pitch (G9 IoU=0 while the human glance fails). One tag per

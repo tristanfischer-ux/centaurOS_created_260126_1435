@@ -6622,6 +6622,78 @@ def build_parts_manifest(parts):
     `tag` is the slugged object prefix; `equipment_tag` is the ISA letter + a
     per-letter running number (K-101, P-101, R-101, V-101, D-101, E-101, TK-101…)."""
     bbox_by_pref = _world_bbox_mm_by_prefix(parts)
+    # SIGNATURE MESHES ARE THE PART'S REAL GEOMETRY (2026-07-26, "there should not be two
+    # Blender images"). The exterior signature meshes are named for their ROLE
+    # (u_se_le_vial, u_se_le_od_src, u_se_le_face_display) not for the BoM part they
+    # depict, so _world_bbox_mm_by_prefix — which keys on the part-name prefix
+    # (u_culture_vessel, u_optical_density_sensor) — never matched them. The manifest
+    # therefore described the packed INTERIOR proxy while the render drew the real
+    # exterior feature, and each divergence needed a hand-written reconstruction formula.
+    #
+    # Alias each signature-mesh family to the BoM part it depicts and UNION its world
+    # bbox into that part's entry. The part's manifest row then reports the geometry that
+    # was actually drawn — one source, no reconstruction. Noun-keyed on the role token and
+    # the part name, never a product class; a design with no such mesh is untouched.
+    try:
+        _SIG_ALIAS = (
+            ("u_se_le_vial_collar", r"collar|holder|sample\s*port|vial\s*holder"),
+            ("u_se_le_vial",        r"culture\s*vessel|\bvial\b|bioreactor\s*vessel"),
+            ("u_se_le_od",          r"optical\s*density|\bod\b.*sensor|photodiode|"
+                                    r"led\s*source"),
+            ("u_se_le_face",        r"display|hmi|front\s*panel|fascia|keypad|user\s*input"),
+        )
+        _sig_names = [n for n in _ABOVE_LID_SIGNATURE_MESHES]
+        if _sig_names:
+            _n_alias = 0
+            _consumed: set = set()   # a mesh belongs to ONE family — the table is ordered
+            for _mesh_pref, _part_rx in _SIG_ALIAS:
+                _mm = [n for n in _sig_names
+                       if n.startswith(_mesh_pref) and n not in _consumed]
+                if not _mm:
+                    continue
+                _acc = None
+                for _n in _mm:
+                    _o = bpy.data.objects.get(_n)
+                    if _o is None or getattr(_o, "type", None) != "MESH":
+                        continue
+                    import mathutils as _mu
+                    _bb = [_o.matrix_world @ _mu.Vector(_c) for _c in _o.bound_box]
+                    _xs = [v.x * 1000.0 for v in _bb]
+                    _ys = [v.y * 1000.0 for v in _bb]
+                    _zs = [v.z * 1000.0 for v in _bb]
+                    _cur = (min(_xs), max(_xs), min(_ys), max(_ys), min(_zs), max(_zs))
+                    _acc = _cur if _acc is None else (
+                        min(_acc[0], _cur[0]), max(_acc[1], _cur[1]),
+                        min(_acc[2], _cur[2]), max(_acc[3], _cur[3]),
+                        min(_acc[4], _cur[4]), max(_acc[5], _cur[5]))
+                if _acc is None:
+                    continue
+                _consumed.update(_mm)
+                _rx = re.compile(_part_rx, re.I)
+                for _p in parts:
+                    if not _rx.search(str(getattr(_p, "name", "") or "")):
+                        continue
+                    _pf = _part_prefix(_p.name)
+                    bbox_by_pref[_pf] = _acc      # the DRAWN geometry wins
+                    _SIG_ALIASED_PREFIXES.add(_pf)
+                    try:
+                        _p.placed_xyz_mm = ((_acc[0]+_acc[1])/2.0,
+                                            (_acc[2]+_acc[3])/2.0,
+                                            (_acc[4]+_acc[5])/2.0)
+                        _p.dim = parse_dimension(
+                            f"{_acc[1]-_acc[0]:.0f}x{_acc[3]-_acc[2]:.0f}x{_acc[5]-_acc[4]:.0f} mm")
+                    except Exception:
+                        pass
+                    print(f"[parts-manifest]   alias {_mesh_pref} -> {_p.name} "
+                          f"z {_acc[4]:.1f}..{_acc[5]:.1f}", flush=True)
+                    _n_alias += 1
+                    break
+            if _n_alias:
+                print(f"[parts-manifest] {_n_alias} part(s) took their geometry from the "
+                      f"DRAWN signature mesh (one scene — no reconstruction formula)",
+                      flush=True)
+    except Exception as _sae:  # noqa: BLE001 — never block the export
+        print(f"[parts-manifest] signature-mesh alias skipped: {_sae}", flush=True)
 
     # one Part per object-prefix (the richest by region rank wins the metadata; a
     # name that slugged identically is the same drawn equipment).
@@ -7186,6 +7258,182 @@ def _exterior_signature_od_bbox_mm():
             od_z - od_h / 2.0, od_z + od_h / 2.0)
 
 
+
+
+def _build_vial_bioreactor_signature(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy):
+    """ONE canonical build of the vial_bioreactor on-top signature geometry.
+
+    Tristan 2026-07-26: "The blender image should be the canonical image ... There
+    should not be two Blender images." This geometry used to be built ONLY inside the
+    hero block (`if _SEALED_HERO_PRODUCT:` == `not _INSPECT_MODE`), so the INSPECT pass
+    that exports parts-manifest.json never saw it — probing that pass showed 7 u_se_le_*
+    meshes and NO vial. The manifest therefore could not describe what the render drew,
+    and each exterior feature needed a hand-written reconstruction formula
+    (_exterior_signature_vessel_bbox_mm, _exterior_signature_od_bbox_mm) that silently
+    diverged whenever someone forgot to write the next one.
+
+    Extracted verbatim so BOTH passes build the SAME objects from the SAME code. The
+    INSPECT pass hides them from its render (a per-VIEW presentation choice) but the
+    manifest measures their real world bboxes — geometry is canonical, visibility is not.
+
+    @returns the list of created signature objects (the caller appends to _sig_new).
+    """
+    # tt  = shell wall thickness  = max(6.0, min(W, D) * 0.02)   (caller's value)
+    # _fy = product front face y  = -D / 2                        (caller's value)
+    def _mm3(tpl):                 # mm -> Blender units; local so the fn is self-contained
+        return tuple(c * fl.MM for c in tpl)
+
+    _sig_new = []
+    # Pioreactor: a transparent culture VIAL standing on top is the dominant
+    # silhouette, with paired OD source/detector housings hugging it.
+    _z_top = base_z + H
+    # Slender vial that clears the sealed base but stays within the product
+    # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
+    # SINGLE SOURCE OF TRUTH shared with the manifest seat (council 2026-07-25):
+    _vial_r, _vial_h = _sealed_vial_r_h_mm(W, D, H)
+    # VISIBILITY (2026-07-23, Tristan "lost the light tower"): a highly
+    # transparent glass vial (alpha 0.35) vanished against the light studio
+    # backdrop — the hero read as a flat lid. Raise alpha so the vessel reads
+    # as a real semi-opaque culture tube, and fill it most of the way with the
+    # amber media so the DOMINANT top silhouette is a solid coloured vessel.
+    # Frosted semi-opaque wall (alpha-blend, NOT kind="glass"): a transmission
+    # vial here multiplied the Cycles bounce cost across 04–07 + hero + ghost and
+    # was crashing the shaded pass (OOM). A frosted wall reads as a real culture
+    # tube, renders cheaply, and lets the amber media below dominate the silhouette.
+    _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.86, 0.86, 0.88)),
+                         metallic=0.0, roughness=0.16, alpha=0.40)   # translucent frost so the amber media reads through the wall
+    _vial = fl.add_cyl("u_se_le_vial",
+                       _mm3((0.0, 0.0, _z_top + _vial_h * 0.5)),
+                       _vial_r * fl.MM, _vial_h * fl.MM, _glass,
+                       module=_skin_mod, module_objects=MO)
+    _sig_new.append(_vial)
+    # Saturated amber culture media — the DOMINANT top silhouette, opaque so it
+    # reads against both the light deck and the dark upper backdrop.
+    _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.88, 0.56, 0.12)),
+                          metallic=0.0, roughness=0.28)
+    _fluid = fl.add_cyl("u_se_le_vial_fluid",
+                        _mm3((0.0, 0.0, _z_top + _vial_h * 0.40)),
+                        _vial_r * 0.9 * fl.MM, _vial_h * 0.72 * fl.MM, _fluidm,
+                        module=_skin_mod, module_objects=MO)
+    _sig_new.append(_fluid)
+    # VESSEL HOLDER COLLAR (2026-07-19, vision-critic "cuvette + optical
+    # blocks floating disconnected from chassis"): a short opaque ring seats
+    # the vial ON the deck so the glass reads as PLUGGED INTO a holder, not
+    # hovering. Universal for every vial_bioreactor — no per-product table.
+    _collar_h = max(6.0, _vial_h * 0.14)
+    _collarm = fl.make_mat("m_se_le_vial_collar", fl._to_linear((0.14, 0.15, 0.17)),
+                           metallic=0.45, roughness=0.45)
+    _collar = fl.add_cyl("u_se_le_vial_collar",
+                         _mm3((0.0, 0.0, _z_top + _collar_h * 0.5)),
+                         _vial_r * 1.42 * fl.MM, _collar_h * fl.MM, _collarm,
+                         module=_skin_mod, module_objects=MO)
+    _sig_new.append(_collar)
+    # OD SOURCE/DETECTOR: SEATED on the deck (bottom ≈ deck top) and CLAMPED
+    # to the vessel via a short arm — the pair previously floated at mid-vial
+    # height with a gap to the chassis (the flagged defect). Housing now runs
+    # from just above the collar up the vessel; the arm ties it to the glass.
+    # OD housings SIZED to read as a real optical assembly (2026-07-23):
+    # 8×11 mm blocks were specks on a 288 mm deck — invisible on the hero.
+    # Scale to the vessel so the paired source/detector clearly flank the
+    # vial as the GA "OPTICAL" assembly, seated outside the vial wall.
+    # REBALANCE (2026-07-25 SIGHT: the two OD housings rendered as OVERSIZED dark
+    # monoliths — half the vial height, 18 mm wide — while the glass vial vanished
+    # between them, so the hero read as a primitive "H-fork" gimbal instead of an
+    # amber culture vial under optical measurement. The VIAL is the product; the OD
+    # heads are secondary sensors clamped to it. Shrink the housings to slim heads at
+    # beam height, add a lens face so each reads as an OPTICAL sensor, not a brick.
+    _od_h = _vial_h * 0.30               # slim band, not a half-height monolith
+    _od_w = max(9.0, _vial_r * 0.45)     # radial thickness of each housing
+    _od_d = max(14.0, _vial_r * 0.6)      # along the beam axis
+    _od_z = _z_top + _vial_h * 0.50       # beam height ≈ mid-vial (clears the collar)
+    for _sx, _lbl in ((-(_vial_r + _od_w * 0.5), "src"),
+                      (_vial_r + _od_w * 0.5, "det")):
+        _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.10, 0.10, 0.12)),
+                           metallic=0.35, roughness=0.45)
+        _od = fl.add_box(f"u_se_le_od_{_lbl}",
+                         _mm3((_sx, 0.0, _od_z)),
+                         _mm3((_od_w, _od_d, _od_h)), _odm,
+                         module=_skin_mod, module_objects=MO)
+        _od.dimensions = _mm3((_od_w, _od_d, _od_h))
+        _sig_new.append(_od)
+        # Lens face on the VIAL-SIDE of each head — a small polished disc so the pair
+        # reads unmistakably as an OPTICAL source/detector aimed across the vessel.
+        # Opaque metallic (NOT glass): a transmission lens here adds Cycles bounce
+        # cost on top of the vial + display glass and risked an OOM crash (2026-07-25).
+        _lens_x = _sx + (_od_w * 0.5) * (1 if _sx < 0 else -1)   # inner (vial-facing) face
+        _lensm = fl.make_mat(f"m_se_le_od_lens_{_lbl}",
+                             fl._to_linear((0.80, 0.84, 0.90)),
+                             metallic=0.7, roughness=0.12)
+        _lens = fl.add_cyl(f"u_se_le_od_lens_{_lbl}",
+                           _mm3((_lens_x, 0.0, _od_z)),
+                           _od_d * 0.26 * fl.MM, 1.4 * fl.MM, _lensm,
+                           module=_skin_mod, module_objects=MO,
+                           rotation=(0.0, math.radians(90), 0.0))
+        _sig_new.append(_lens)
+        # Clamp arm: bridges the OD housing inner face to the vial wall at
+        # beam height, so the pair reads as mounted to the vessel, not adrift.
+        _arm_x = _sx * 0.5
+        _arm = fl.add_box(f"u_se_le_od_arm_{_lbl}",
+                          _mm3((_arm_x, 0.0, _od_z)),
+                          _mm3((abs(_sx) + 4.0, 3.0, 3.0)), _odm,
+                          module=_skin_mod, module_objects=MO)
+        _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.0, 3.0))
+        _sig_new.append(_arm)
+    # FRONT CONTROL-PANEL FASCIA (2026-07-19 — the render_vision_critic
+    # flagged "featureless closed chassis with no visible display, keys,
+    # ports"). Group the controls on a recessed dark bezel in the lower
+    # front (clear of the top handle strip), proud of the face so they cast
+    # shadow and read as a real fascia. Dark panel + dark keys CONTRAST the
+    # light body. CRITICAL: every mesh MUST use the `u_se_le_face` prefix —
+    # the lab_electronics exterior keep-list (build ~L13045 `_keep`) hides
+    # any u_se_le_* NOT in its allowlist, and `u_se_le_face` is the allowed
+    # front-face signature prefix (a bare u_se_le_display/key/panel is culled
+    # on 04, the bug that hid the first fascia attempt).
+    _pan_face = _fy - tt                    # operator face plane (mm)
+    _panelm = fl.make_mat("m_se_le_panel", fl._to_linear((0.16, 0.17, 0.19)),
+                          metallic=0.4, roughness=0.5)
+    _panel = fl.add_box("u_se_le_face_panel",
+                        _mm3((-W * 0.14, _pan_face - 2.0, base_z + H * 0.32)),
+                        _mm3((W * 0.50, 4.0, H * 0.40)), _panelm,
+                        module=_skin_mod, module_objects=MO)
+    _panel.dimensions = _mm3((W * 0.50, 4.0, H * 0.40))
+    _sig_new.append(_panel)
+    _dispm = fl.make_mat("m_se_le_display", fl._to_linear((0.03, 0.10, 0.16)),
+                         metallic=0.1, roughness=0.12, kind="glass", alpha=0.92)
+    _disp = fl.add_box("u_se_le_face_display",
+                       _mm3((-W * 0.16, _pan_face - 6.0, base_z + H * 0.42)),
+                       _mm3((W * 0.34, 6.0, H * 0.16)), _dispm,
+                       module=_skin_mod, module_objects=MO)
+    _disp.dimensions = _mm3((W * 0.34, 6.0, H * 0.16))
+    _sig_new.append(_disp)
+    _keym = fl.make_mat("m_se_le_key", fl._to_linear((0.07, 0.07, 0.09)),
+                        metallic=0.3, roughness=0.55)
+    for _ki in range(3):
+        _kx = -W * 0.28 + _ki * (W * 0.12)
+        _key = fl.add_box(f"u_se_le_face_key_{_ki}",
+                          _mm3((_kx, _pan_face - 6.0, base_z + H * 0.20)),
+                          _mm3((W * 0.08, 6.0, H * 0.10)), _keym,
+                          module=_skin_mod, module_objects=MO)
+        _key.dimensions = _mm3((W * 0.08, 6.0, H * 0.10))
+        _sig_new.append(_key)
+    _ledm = fl.make_mat("m_se_le_status_led", fl._to_linear((0.15, 0.90, 0.38)),
+                        kind="led_emissive", emission_strength=3.0)
+    _led = fl.add_cyl("u_se_le_face_led",
+                      _mm3((W * 0.06, _pan_face - 6.0, base_z + H * 0.20)),
+                      2.6 * fl.MM, 6.0 * fl.MM, _ledm,
+                      module=_skin_mod, module_objects=MO,
+                      rotation=(math.radians(90), 0.0, 0.0))
+    _sig_new.append(_led)
+    _portm = fl.make_mat("m_se_le_face_port", fl._to_linear((0.08, 0.08, 0.10)),
+                         metallic=0.45, roughness=0.4)
+    _port = fl.add_box("u_se_le_face_port",
+                       _mm3((W * 0.30, _pan_face - 5.0, base_z + H * 0.30)),
+                       _mm3((14.0, 5.0, 9.0)), _portm,
+                       module=_skin_mod, module_objects=MO)
+    _port.dimensions = _mm3((14.0, 5.0, 9.0))
+    _sig_new.append(_port)
+    return _sig_new
+
 def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
@@ -7205,6 +7453,60 @@ def write_parts_manifest(out_dir, parts, state=None):
         return {"parts": [], "count": 0, "skipped": True}
     os.makedirs(out_dir, exist_ok=True)
     rows = build_parts_manifest(parts)
+    # Stamp provenance on every row that took its geometry from a drawn
+    # signature mesh, so the containment gate exempts a real on-top feature.
+    for _r in rows:
+        if str(_r.get('tag') or '') in _SIG_ALIASED_PREFIXES:
+            _r['geometry_source'] = 'exterior_signature_mesh'
+    # ROWS FOR SIGNATURE MESHES WITH NO BoM PART (2026-07-26, completes "one scene").
+    # The alias above gives a BoM part its DRAWN geometry. But some real exterior features
+    # have no BoM counterpart at all — the HMI display and its keypad buttons exist only as
+    # u_se_le_face_display / u_se_le_face_key_* meshes. They were therefore invisible to
+    # the manifest and so undrawable, which is why the sheet had no HMI plane and no D-pad
+    # while the render plainly shows both. Emit them as their OWN rows so the drawing can
+    # project them like any other part. Universal: driven by the registered signature set
+    # and the role token, never a product class.
+    try:
+        _EXTRA_SIG = (("u_se_le_face_display", "HMI Display", "hmi-display"),
+                      ("u_se_le_face_key",     "HMI Button",  "hmi-button"),
+                      ("u_se_le_face_dpad",    "HMI Button",  "hmi-button"))
+        _have = {str(r.get("tag") or "") for r in rows}
+        import mathutils as _mu2
+        _n_extra = 0
+        for _pref, _label, _fam in _EXTRA_SIG:
+            _objs = [bpy.data.objects.get(n) for n in _ABOVE_LID_SIGNATURE_MESHES
+                     if n.startswith(_pref)]
+            _objs = [o for o in _objs if o is not None and getattr(o, "type", None) == "MESH"]
+            for _i, _o in enumerate(_objs):
+                _tag = f"u_sig_{_fam.replace('-', '_')}_{_i}"
+                if _tag in _have:
+                    continue
+                _bb = [_o.matrix_world @ _mu2.Vector(_c) for _c in _o.bound_box]
+                _xs = [v.x * 1000.0 for v in _bb]
+                _ys = [v.y * 1000.0 for v in _bb]
+                _zs = [v.z * 1000.0 for v in _bb]
+                rows.append({
+                    "tag": _tag,
+                    "equipment_tag": f"H-{200 + _n_extra}",
+                    "name": _label if len(_objs) == 1 else f"{_label} {_i + 1}",
+                    "module": "control_compute_communication",
+                    "shape": "box", "qty": 1,
+                    "region_rank": REGION_PRIORITY_DEFAULT,
+                    "pos_mm": [round((min(_xs) + max(_xs)) / 2.0, 1),
+                               round((min(_ys) + max(_ys)) / 2.0, 1),
+                               round((min(_zs) + max(_zs)) / 2.0, 1)],
+                    "dims_mm": {"w": round(max(max(_xs) - min(_xs), 1.0), 1),
+                                "d": round(max(max(_ys) - min(_ys), 1.0), 1),
+                                "h": round(max(max(_zs) - min(_zs), 1.0), 1)},
+                    "geometry_source": "exterior_signature_mesh",
+                    "signature_family": _fam,
+                })
+                _n_extra += 1
+        if _n_extra:
+            print(f"[parts-manifest] emitted {_n_extra} signature row(s) with no BoM part "
+                  f"(HMI display / buttons) — the drawing can now project them", flush=True)
+    except Exception as _xse:  # noqa: BLE001 — never block the export
+        print(f"[parts-manifest] extra signature rows skipped: {_xse}", flush=True)
     # Unify auxiliary tags with the canonical BoM/index namespace (kill: CANON_TAGS=0).
     if os.environ.get("CANON_TAGS", "").strip() not in ("0", "false", "no"):
         _remap_manifest_to_canonical_tags(rows, state)
@@ -7235,7 +7537,9 @@ def write_parts_manifest(out_dir, parts, state=None):
         _seat_bb = dict(_mesh_bb)
         if _vessel_bb:
             _seat_bb["vessel_drawn"] = _vessel_bb
-        _n_vessel = _seat_vessel(rows, state, mesh_bbox_by_prefix=_seat_bb)
+        _n_vessel = 0   # DISABLED (step D): the signature-mesh alias in
+        # build_parts_manifest now gives the vessel row its DRAWN geometry
+        # directly — no reconstruction formula to keep in sync.
         if _n_vessel:
             print(f"[parts-manifest] seated culture vessel on top from signature mesh "
                   f"(render = manifest = GA)")
@@ -7247,7 +7551,7 @@ def write_parts_manifest(out_dir, parts, state=None):
         # the optical row keeps its packed interior pose and the GA draws the form rule's
         # synthesized OPTICAL zone instead of the small heads the render shows flanking
         # the vial. Noun-keyed on the optical-sensor family, never a product class.
-        _od_bb = _exterior_signature_od_bbox_mm()
+        _od_bb = None   # DISABLED (step D) — see above; the alias covers OD heads.
         if _od_bb:
             _od_rx = re.compile(
                 r"optical\s*density|(?:\bod\b).*sensor|photodiode|led\s*source", re.I)
@@ -17097,6 +17401,10 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
 # shell. Role-keyed (provenance = "emitted as an exterior signature feature"),
 # never a product-class slug or a per-product table.
 _ABOVE_LID_SIGNATURE_MESHES: set = set()
+# Part prefixes whose manifest geometry came from a DRAWN signature mesh — the
+# rows are stamped `exterior_signature_mesh` so G19 exempts a genuine on-top
+# feature by PROVENANCE (aafce5dd6) rather than by where it happens to land.
+_SIG_ALIASED_PREFIXES: set = set()
 
 # The exterior-VISIBLE signature prefixes the sealed-product view keeps on 04–07
 # (mirrors _prepare_sealed_product_view LE `_keep` tuple ~L13348). An exterior
@@ -17913,6 +18221,40 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     global _SEALED_HERO_PRODUCT, _SEALED_FRONT_COVER, _SEALED_SHELL_OBJECTS
     global _SEALED_CUTAWAY_MATERIAL, _SEALED_EXTERIOR_MATERIAL
     _SEALED_HERO_PRODUCT = not _INSPECT_MODE
+    # ONE CANONICAL SCENE (Tristan 2026-07-26: "The blender image should be the canonical
+    # image ... There should not be two Blender images."). The on-top signature geometry
+    # is built in EVERY pass, so the INSPECT pass that exports parts-manifest.json
+    # measures the SAME objects the hero pass renders. Previously this lived only inside
+    # the hero block below, so the manifest could not see the vial or the OD heads and
+    # every exterior feature needed a hand-written reconstruction formula that silently
+    # diverged when the next one was forgotten.
+    #
+    # Geometry is canonical; VISIBILITY is a per-view presentation choice — the INSPECT
+    # render hides these so its cutaway views stay clean, but their world bboxes are real
+    # and the manifest reports them. The hero block's opaque SKIN and its tag/wire
+    # suppression flags stay hero-only: those are presentation, and the drawings need the
+    # tags the hero pass suppresses.
+    if _INSPECT_MODE and _IS_INSTRUMENT_DEVICE and _LE_SIGNATURE == "vial_bioreactor" \
+            and _SEALED_ENV_MM:
+        try:
+            _iW, _iD, _iH = (float(x) for x in _SEALED_ENV_MM)
+            _i_tt = max(6.0, min(_iW, _iD) * 0.02)   # same derivation as the hero pass
+            _i_sig = _build_vial_bioreactor_signature(
+                fl, _iW, _iD, _iH, DECK_Z_MM, _story_mod, MO, _i_tt, -_iD / 2.0)
+            for _o in _i_sig:
+                try:
+                    _o.hide_render = True          # present in geometry, absent from THIS view
+                except Exception:
+                    pass
+                try:
+                    _ABOVE_LID_SIGNATURE_MESHES.add(_o.name)
+                except Exception:
+                    pass
+            print(f"[univ][sealed] INSPECT pass built {len(_i_sig)} on-top signature "
+                  f"mesh(es) (hidden from this render) — manifest now measures the SAME "
+                  f"geometry the hero pass renders", flush=True)
+        except Exception as _ise:  # noqa: BLE001 — never block the CAD pass
+            print(f"[univ][sealed] INSPECT signature build skipped: {_ise}", flush=True)
     if _SEALED_HERO_PRODUCT:
         # GHOSTED shell (Tristan 2026-07-10: "why is the box not translucent so you
         # can see through it") — the zone-stacked internals read through a glassy skin,
@@ -18098,154 +18440,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _oled.dimensions = _mm3((W * 0.16, D * 0.28, 2.4))
                 _sig_new.append(_oled)
             elif _LE_SIGNATURE == "vial_bioreactor":
-                # Pioreactor: a transparent culture VIAL standing on top is the dominant
-                # silhouette, with paired OD source/detector housings hugging it.
-                _z_top = base_z + H
-                # Slender vial that clears the sealed base but stays within the product
-                # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
-                # SINGLE SOURCE OF TRUTH shared with the manifest seat (council 2026-07-25):
-                _vial_r, _vial_h = _sealed_vial_r_h_mm(W, D, H)
-                # VISIBILITY (2026-07-23, Tristan "lost the light tower"): a highly
-                # transparent glass vial (alpha 0.35) vanished against the light studio
-                # backdrop — the hero read as a flat lid. Raise alpha so the vessel reads
-                # as a real semi-opaque culture tube, and fill it most of the way with the
-                # amber media so the DOMINANT top silhouette is a solid coloured vessel.
-                # Frosted semi-opaque wall (alpha-blend, NOT kind="glass"): a transmission
-                # vial here multiplied the Cycles bounce cost across 04–07 + hero + ghost and
-                # was crashing the shaded pass (OOM). A frosted wall reads as a real culture
-                # tube, renders cheaply, and lets the amber media below dominate the silhouette.
-                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.86, 0.86, 0.88)),
-                                     metallic=0.0, roughness=0.16, alpha=0.40)   # translucent frost so the amber media reads through the wall
-                _vial = fl.add_cyl("u_se_le_vial",
-                                   _mm3((0.0, 0.0, _z_top + _vial_h * 0.5)),
-                                   _vial_r * fl.MM, _vial_h * fl.MM, _glass,
-                                   module=_skin_mod, module_objects=MO)
-                _sig_new.append(_vial)
-                # Saturated amber culture media — the DOMINANT top silhouette, opaque so it
-                # reads against both the light deck and the dark upper backdrop.
-                _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.88, 0.56, 0.12)),
-                                      metallic=0.0, roughness=0.28)
-                _fluid = fl.add_cyl("u_se_le_vial_fluid",
-                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.40)),
-                                    _vial_r * 0.9 * fl.MM, _vial_h * 0.72 * fl.MM, _fluidm,
-                                    module=_skin_mod, module_objects=MO)
-                _sig_new.append(_fluid)
-                # VESSEL HOLDER COLLAR (2026-07-19, vision-critic "cuvette + optical
-                # blocks floating disconnected from chassis"): a short opaque ring seats
-                # the vial ON the deck so the glass reads as PLUGGED INTO a holder, not
-                # hovering. Universal for every vial_bioreactor — no per-product table.
-                _collar_h = max(6.0, _vial_h * 0.14)
-                _collarm = fl.make_mat("m_se_le_vial_collar", fl._to_linear((0.14, 0.15, 0.17)),
-                                       metallic=0.45, roughness=0.45)
-                _collar = fl.add_cyl("u_se_le_vial_collar",
-                                     _mm3((0.0, 0.0, _z_top + _collar_h * 0.5)),
-                                     _vial_r * 1.42 * fl.MM, _collar_h * fl.MM, _collarm,
-                                     module=_skin_mod, module_objects=MO)
-                _sig_new.append(_collar)
-                # OD SOURCE/DETECTOR: SEATED on the deck (bottom ≈ deck top) and CLAMPED
-                # to the vessel via a short arm — the pair previously floated at mid-vial
-                # height with a gap to the chassis (the flagged defect). Housing now runs
-                # from just above the collar up the vessel; the arm ties it to the glass.
-                # OD housings SIZED to read as a real optical assembly (2026-07-23):
-                # 8×11 mm blocks were specks on a 288 mm deck — invisible on the hero.
-                # Scale to the vessel so the paired source/detector clearly flank the
-                # vial as the GA "OPTICAL" assembly, seated outside the vial wall.
-                # REBALANCE (2026-07-25 SIGHT: the two OD housings rendered as OVERSIZED dark
-                # monoliths — half the vial height, 18 mm wide — while the glass vial vanished
-                # between them, so the hero read as a primitive "H-fork" gimbal instead of an
-                # amber culture vial under optical measurement. The VIAL is the product; the OD
-                # heads are secondary sensors clamped to it. Shrink the housings to slim heads at
-                # beam height, add a lens face so each reads as an OPTICAL sensor, not a brick.
-                _od_h = _vial_h * 0.30               # slim band, not a half-height monolith
-                _od_w = max(9.0, _vial_r * 0.45)     # radial thickness of each housing
-                _od_d = max(14.0, _vial_r * 0.6)      # along the beam axis
-                _od_z = _z_top + _vial_h * 0.50       # beam height ≈ mid-vial (clears the collar)
-                for _sx, _lbl in ((-(_vial_r + _od_w * 0.5), "src"),
-                                  (_vial_r + _od_w * 0.5, "det")):
-                    _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.10, 0.10, 0.12)),
-                                       metallic=0.35, roughness=0.45)
-                    _od = fl.add_box(f"u_se_le_od_{_lbl}",
-                                     _mm3((_sx, 0.0, _od_z)),
-                                     _mm3((_od_w, _od_d, _od_h)), _odm,
-                                     module=_skin_mod, module_objects=MO)
-                    _od.dimensions = _mm3((_od_w, _od_d, _od_h))
-                    _sig_new.append(_od)
-                    # Lens face on the VIAL-SIDE of each head — a small polished disc so the pair
-                    # reads unmistakably as an OPTICAL source/detector aimed across the vessel.
-                    # Opaque metallic (NOT glass): a transmission lens here adds Cycles bounce
-                    # cost on top of the vial + display glass and risked an OOM crash (2026-07-25).
-                    _lens_x = _sx + (_od_w * 0.5) * (1 if _sx < 0 else -1)   # inner (vial-facing) face
-                    _lensm = fl.make_mat(f"m_se_le_od_lens_{_lbl}",
-                                         fl._to_linear((0.80, 0.84, 0.90)),
-                                         metallic=0.7, roughness=0.12)
-                    _lens = fl.add_cyl(f"u_se_le_od_lens_{_lbl}",
-                                       _mm3((_lens_x, 0.0, _od_z)),
-                                       _od_d * 0.26 * fl.MM, 1.4 * fl.MM, _lensm,
-                                       module=_skin_mod, module_objects=MO,
-                                       rotation=(0.0, math.radians(90), 0.0))
-                    _sig_new.append(_lens)
-                    # Clamp arm: bridges the OD housing inner face to the vial wall at
-                    # beam height, so the pair reads as mounted to the vessel, not adrift.
-                    _arm_x = _sx * 0.5
-                    _arm = fl.add_box(f"u_se_le_od_arm_{_lbl}",
-                                      _mm3((_arm_x, 0.0, _od_z)),
-                                      _mm3((abs(_sx) + 4.0, 3.0, 3.0)), _odm,
-                                      module=_skin_mod, module_objects=MO)
-                    _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.0, 3.0))
-                    _sig_new.append(_arm)
-                # FRONT CONTROL-PANEL FASCIA (2026-07-19 — the render_vision_critic
-                # flagged "featureless closed chassis with no visible display, keys,
-                # ports"). Group the controls on a recessed dark bezel in the lower
-                # front (clear of the top handle strip), proud of the face so they cast
-                # shadow and read as a real fascia. Dark panel + dark keys CONTRAST the
-                # light body. CRITICAL: every mesh MUST use the `u_se_le_face` prefix —
-                # the lab_electronics exterior keep-list (build ~L13045 `_keep`) hides
-                # any u_se_le_* NOT in its allowlist, and `u_se_le_face` is the allowed
-                # front-face signature prefix (a bare u_se_le_display/key/panel is culled
-                # on 04, the bug that hid the first fascia attempt).
-                _pan_face = _fy - tt                    # operator face plane (mm)
-                _panelm = fl.make_mat("m_se_le_panel", fl._to_linear((0.16, 0.17, 0.19)),
-                                      metallic=0.4, roughness=0.5)
-                _panel = fl.add_box("u_se_le_face_panel",
-                                    _mm3((-W * 0.14, _pan_face - 2.0, base_z + H * 0.32)),
-                                    _mm3((W * 0.50, 4.0, H * 0.40)), _panelm,
-                                    module=_skin_mod, module_objects=MO)
-                _panel.dimensions = _mm3((W * 0.50, 4.0, H * 0.40))
-                _sig_new.append(_panel)
-                _dispm = fl.make_mat("m_se_le_display", fl._to_linear((0.03, 0.10, 0.16)),
-                                     metallic=0.1, roughness=0.12, kind="glass", alpha=0.92)
-                _disp = fl.add_box("u_se_le_face_display",
-                                   _mm3((-W * 0.16, _pan_face - 6.0, base_z + H * 0.42)),
-                                   _mm3((W * 0.34, 6.0, H * 0.16)), _dispm,
-                                   module=_skin_mod, module_objects=MO)
-                _disp.dimensions = _mm3((W * 0.34, 6.0, H * 0.16))
-                _sig_new.append(_disp)
-                _keym = fl.make_mat("m_se_le_key", fl._to_linear((0.07, 0.07, 0.09)),
-                                    metallic=0.3, roughness=0.55)
-                for _ki in range(3):
-                    _kx = -W * 0.28 + _ki * (W * 0.12)
-                    _key = fl.add_box(f"u_se_le_face_key_{_ki}",
-                                      _mm3((_kx, _pan_face - 6.0, base_z + H * 0.20)),
-                                      _mm3((W * 0.08, 6.0, H * 0.10)), _keym,
-                                      module=_skin_mod, module_objects=MO)
-                    _key.dimensions = _mm3((W * 0.08, 6.0, H * 0.10))
-                    _sig_new.append(_key)
-                _ledm = fl.make_mat("m_se_le_status_led", fl._to_linear((0.15, 0.90, 0.38)),
-                                    kind="led_emissive", emission_strength=3.0)
-                _led = fl.add_cyl("u_se_le_face_led",
-                                  _mm3((W * 0.06, _pan_face - 6.0, base_z + H * 0.20)),
-                                  2.6 * fl.MM, 6.0 * fl.MM, _ledm,
-                                  module=_skin_mod, module_objects=MO,
-                                  rotation=(math.radians(90), 0.0, 0.0))
-                _sig_new.append(_led)
-                _portm = fl.make_mat("m_se_le_face_port", fl._to_linear((0.08, 0.08, 0.10)),
-                                     metallic=0.45, roughness=0.4)
-                _port = fl.add_box("u_se_le_face_port",
-                                   _mm3((W * 0.30, _pan_face - 5.0, base_z + H * 0.30)),
-                                   _mm3((14.0, 5.0, 9.0)), _portm,
-                                   module=_skin_mod, module_objects=MO)
-                _port.dimensions = _mm3((14.0, 5.0, 9.0))
-                _sig_new.append(_port)
+                _sig_new.extend(_build_vial_bioreactor_signature(
+                    fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
             # Register the above-lid signature parts so the UNIVERSAL INTERIOR
             # CONTAINMENT CLAMP (below, ~L18408) does NOT crush them back inside
             # the sealed shell (the 2026-07-22 clamp buried the vial_bioreactor
