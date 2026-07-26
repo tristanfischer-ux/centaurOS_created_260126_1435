@@ -25425,7 +25425,16 @@ def _compliance_row_pass(d, state: Optional[dict] = None) -> Optional[bool]:
     elif "≤" in dirn or "<=" in dirn or "at most" in dirn or "ceiling" in dirn:
         passed = a <= t * 1.02
     else:
-        passed = abs(a - t) <= 0.02 * max(abs(t), 1e-9)
+        # ONE COMPLIANCE MATCHER (2026-07-26). A cost band-CENTRE (midpoint) is symmetric
+        # about a plausibility band, not a hard target: the RENDERER already writes
+        # `=IF(ABS(achieved-target)<=0.20*target, "PASS", "FAIL")` for these rows via
+        # _is_cost_band_center, but THIS checker fell through to the generic ±2%. On the
+        # organoid r11 cover that scored the rendered-PASS midpoint row (target 330,
+        # achieved 291, |39| <= 66) as a FAIL because 39 > 6.6 — the tab marked itself
+        # down for disagreeing with a formula it had just written. Share the helper so the
+        # rendered cell and the audit of that cell can never diverge.
+        _tol_frac = 0.20 if _is_cost_band_center(key) else 0.02
+        passed = abs(a - t) <= _tol_frac * max(abs(t), 1e-9)
     if not passed and key and state is not None and _cover_metric_is_feedstock(key):
         pb = state.get("parsedBrief") or {}
         brief_text = pb.get("original_text") or pb.get("revised_text") or ""
