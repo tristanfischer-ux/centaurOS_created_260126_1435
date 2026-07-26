@@ -389,8 +389,26 @@ def main() -> int:
     existing_hero = out_dir / "00-hero.png"
     existing_cover = out_dir / "blender-cover.png"
     existing_modules = list(out_dir.glob("module-*.png"))
+    # STALENESS CHECK (2026-07-26). "Outputs exist" is NOT the same as "outputs are
+    # current". This skip previously fired regardless of how old the renders were
+    # relative to the scene inputs, and INSPECT=1 rebuilds of build_universal_scene
+    # refresh the manifest + inspect-*.png but NOT these shaded product renders — so the
+    # pair silently diverged. On the organoid r11 bake 04-product-exterior.png was 14
+    # HOURS older than parts-manifest.json, and every render↔manifest↔GA coherence claim
+    # (including the render_ga_vision_coherence gate) was judging a stale image against
+    # fresh data. Re-render whenever an INPUT is newer than the hero we would keep.
+    _stale_inputs = []
+    if existing_hero.exists():
+        try:
+            _hero_mtime = existing_hero.stat().st_mtime
+            for _src in (Path(args.state), out_dir / "parts-manifest.json"):
+                if _src.exists() and _src.stat().st_mtime > _hero_mtime + 1.0:
+                    _stale_inputs.append(_src.name)
+        except OSError:
+            pass
     if (not args.force and existing_hero.exists()
-            and existing_cover.exists() and existing_modules):
+            and existing_cover.exists() and existing_modules
+            and not _stale_inputs):
         print(
             f"[render-scene] outputs already present "
             f"({len(existing_modules)} modules + hero + blender-cover); "
@@ -398,6 +416,12 @@ def main() -> int:
             flush=True,
         )
         return 0
+    if _stale_inputs:
+        print(
+            f"[render-scene] STALE renders — {', '.join(sorted(set(_stale_inputs)))} "
+            f"newer than 00-hero.png; re-rendering instead of shipping a stale image",
+            flush=True,
+        )
 
     # CONTAINERISED → UNIVERSAL (Tristan 2026-07-03): the plant must render ASSEMBLED
     # (container shell joined + roof on + interior visible), which the deterministic
