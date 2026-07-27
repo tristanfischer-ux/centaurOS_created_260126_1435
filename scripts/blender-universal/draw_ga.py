@@ -391,6 +391,40 @@ def _seat_instrument_parts_in_form(
     return n
 
 
+
+def _proj_audit_extra(p, view: str, meta: dict) -> Optional[str]:
+    """Attributes for one manifest-projection audit rectangle, or None if this sheet
+    publishes no projection contract.
+
+    Two modes, and the gate is told which one it is looking at:
+
+      faithful  — the instrument path. The drawing is the manifest's own coordinates
+                  under a rigid Z shift, so the gate derives the expected rectangle
+                  straight from the MANIFEST ROW. That measures the whole chain.
+      fitted    — the product/plant path. `_fit_product_parts_to_envelope` rebases,
+                  scales and clamps per part, so the manifest row no longer predicts
+                  the drawing. The rect therefore publishes the part's POST-FIT bounds
+                  and the gate recomputes the expected rectangle from those with its
+                  own projection maths (SOL round 5). Weaker — it does not check the
+                  fit — but it is honest about that, and it is the only form that is
+                  not either tautological or a duplicate of the fit algorithm.
+    """
+    if meta.get("instrument_faithful_projection"):
+        mode = "faithful"
+    elif meta.get("product_fit_projection"):
+        mode = "fitted"
+    else:
+        return None
+    tag = _svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))
+    out = ('class="manifest-projection-audit" '
+           f'data-entity-tag="{tag}" data-view="{view}" data-mode="{mode}"')
+    if mode == "fitted":
+        out += (f' data-fit-x0-mm="{float(p.x0):.3f}" data-fit-x1-mm="{float(p.x1):.3f}"'
+                f' data-fit-y0-mm="{float(p.y0):.3f}" data-fit-y1-mm="{float(p.y1):.3f}"'
+                f' data-fit-z0-mm="{float(p.z0):.3f}" data-fit-z1-mm="{float(p.z1):.3f}"')
+    return out
+
+
 def _fit_product_parts_to_envelope(
     parts: list[GAPart],
     ww: float,
@@ -432,7 +466,11 @@ def _fit_product_parts_to_envelope(
         p.cx, p.cy = cx, cy
         p.x0, p.x1 = cx - hx, cx + hx
         p.y0, p.y1 = cy - hy, cy + hy
-        p.z0 = max(0.0, min(float(p.z0), hh))
+        # A part is given a 1 mm minimum drawn height, but the old form clamped z0 to
+        # hh FIRST — so a part sitting exactly at the envelope top got z1 = hh + 1, one
+        # millimetre OUTSIDE the envelope it was being fitted into (SOL round 5). Clamp
+        # z0 to hh - 1 so the minimum height is taken from INSIDE the envelope.
+        p.z0 = max(0.0, min(float(p.z0), max(0.0, hh - 1.0)))
         p.z1 = max(p.z0 + 1.0, min(float(p.z1), hh))
     return {"z_shift_mm": z_lo, "z_scale": z_scale}
 
@@ -696,6 +734,19 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                     # 0…H frame. Rebase onto FFL + fit into design L×W×H.
                     _fit = _fit_product_parts_to_envelope(parts, ww, dd, hh)
                     meta["product_ffl_rebase"] = _fit
+                    # PLANT PROJECTION CONTRACT (SOL round 5). The fit above is lossy and
+                    # part-dependent — Z rebased, Z scaled, Z clamped, XY centres clamped,
+                    # XY half-extents shrunk independently per part — so it is NOT
+                    # representable as an extension of the rigid instrument datum, and
+                    # modelling it in the checker would be a second implementation of the
+                    # fit that can drift. Instead the writer publishes each part's
+                    # POST-FIT bounds and the gate recomputes the expected rectangle from
+                    # THOSE using its own projection maths. HONEST LIMIT, stated by the
+                    # gate: this measures the PROJECTION step (post-fit mm -> paper px),
+                    # not the fit itself. It still catches a box drawn in the wrong place
+                    # or at the wrong size for its own fitted bounds, an invented box, and
+                    # a missing one — which is what plant sheets had no cover for at all.
+                    meta["product_fit_projection"] = True
                     if (_fit.get("z_shift_mm") or 0) > 50 or abs(
                             (_fit.get("z_scale") or 1.0) - 1.0) > 0.02:
                         print(f"[ga] product FFL rebase: shift="
@@ -2117,11 +2168,10 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         ph = (p.y1 - p.y0) * ppm
         px = plan_x + mx(p.x0)
         py = plan_y + my(p.y1)        # my inverts → top edge is the larger y
-        if meta.get("instrument_faithful_projection"):
+        _pa = _proj_audit_extra(p, "top", meta)
+        if _pa:
             svg.rect(px, py, pw, ph, stroke="none", fill="none",
-                     extra=('class="manifest-projection-audit" '
-                            f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
-                            'data-view="top"'))
+                     extra=_pa)
         # DECISION (2026-07-14): thin product TOP views draw outlines only — tags
         # live on FRONT (the cutaway-matched primary). Labelling a 182 mm-deep strip
         # is what made Powerwall GA look unrelated to the Blender hero.
@@ -2278,12 +2328,19 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # VIEW DATUM (SOL item 4): everything the projection gate needs to recompute the
     # expected rect for this view straight from the manifest — origin, scale, the model
     # reference extents, and the FFL rebase draw_ga applied before drawing.
-    if meta.get("instrument_faithful_projection"):
+    if meta.get("instrument_faithful_projection") or meta.get("product_fit_projection"):
+        # In FITTED mode the fit has already produced each part's final bounds, so the
+        # published Z shift is zero — the gate reads the post-fit mm off the rect and
+        # applies no further rebase. In FAITHFUL mode the drawing rebases manifest Z onto
+        # the FFL datum, so the shift must travel with the datum or the gate would
+        # recompute every front/side rectangle a whole shell-height out.
+        _z_sh = (0.0 if meta.get("product_fit_projection")
+                 else float(_PROJECTION_Z_SHIFT.get("mm") or 0.0))
         svg.add(f'<g class="projection-view-datum" data-view="front" '
                 f'data-origin-x="{front_x:.3f}" data-origin-y="{front_y:.3f}" '
                 f'data-ppm="{ppm:.6f}" data-x-min-mm="{x_min:.3f}" '
                 f'data-z-max-mm="{z_max:.3f}" '
-                f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
+                f'data-z-shift-mm="{_z_sh:.3f}"/>')
         # TOP and SIDE carry the same contract (SOL round 3 item C). TOP needs y_max_mm;
         # SIDE needs y_max_mm too, because the side elevation inverts Y with the plan's
         # handedness — verified against the loop, not assumed.
@@ -2295,7 +2352,7 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                 f'data-origin-x="{side_x:.3f}" data-origin-y="{side_y:.3f}" '
                 f'data-ppm="{ppm:.6f}" data-y-max-mm="{y_max:.3f}" '
                 f'data-z-max-mm="{z_max:.3f}" '
-                f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
+                f'data-z-shift-mm="{_z_sh:.3f}"/>')
     _env_h = float(meta.get("envelope_hh") or 0.0)
     _env_w = float(meta.get("envelope_ww") or 0.0)
     if meta.get("is_instrument_device") and _env_h > 0 and _env_w > 0:
@@ -2321,11 +2378,10 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         # on powerwall: "33 drawn box(es) disagree with the manifest". A gate that
         # false-fires is as useless as one that never fires, so the contract is emitted
         # only where it is true and G23 ABSTAINS (visibly) elsewhere.
-        if meta.get("instrument_faithful_projection"):
+        _pa = _proj_audit_extra(p, "front", meta)
+        if _pa:
             svg.rect(px, py, pw, ph, stroke="none", fill="none",
-                     extra=('class="manifest-projection-audit" '
-                            f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
-                            'data-view="front"'))
+                     extra=_pa)
         # LABEL THE REAL ABOVE-LID FEATURES (2026-07-26). Now that the GA projects the
         # as-placed geometry instead of synthesized zone boxes, the sheet must NAME what
         # it draws — both so a reader can tell what is standing on the lid, and so the
@@ -2435,11 +2491,10 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         px = side_x + (y_max - p.y1) * ppm
         py = side_y + (z_max - p.z1) * ppm
         _draw_elevation_item(svg, px, py, pw, ph, p)
-        if meta.get("instrument_faithful_projection"):
+        _pa = _proj_audit_extra(p, "side", meta)
+        if _pa:
             svg.rect(px, py, pw, ph, stroke="none", fill="none",
-                     extra=('class="manifest-projection-audit" '
-                            f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
-                            'data-view="side"'))
+                     extra=_pa)
         side_items.append((p, px, py, pw, ph))
     if meta.get("is_instrument_device"):
         side_items = _instrument_zone_tag_items(side_items)

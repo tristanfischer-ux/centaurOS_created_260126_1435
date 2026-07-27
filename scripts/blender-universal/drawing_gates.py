@@ -1506,7 +1506,16 @@ def run_gates(out_dir: str) -> list:
         _g23_p = os.path.join(out_dir, "drawings", "general-arrangement.svg")
         if os.path.exists(_g23_p):
             _g23_svg = open(_g23_p, encoding="utf-8", errors="replace").read()
-        _g23_ok_r, _g23_detail = manifest_svg_projection_check(_parts_for_g20, _g23_svg)
+        # Read the manifest INDEPENDENTLY. This block used to borrow `_parts_for_g20`,
+        # which is only bound inside G20's enclosure-scale branch — so on every
+        # plant/product sheet the name was unbound, the except swallowed it, and the gate
+        # reported "abstain" behind a GREEN TICK. G23 was structurally instrument-only
+        # while appearing to cover everything. Same shape as the earlier `run_dir` slip:
+        # an exception path that renders as a pass is worse than no gate, because it
+        # advertises coverage it does not have.
+        _g23_doc = pm_doc if isinstance(pm_doc, dict) else {}
+        _g23_parts = _g23_doc.get("parts") or []
+        _g23_ok_r, _g23_detail = manifest_svg_projection_check(_g23_parts, _g23_svg)
     except Exception as _g23e:  # noqa: BLE001 — never block the gate run
         _g23_ok_r, _g23_detail = True, f"projection gate skipped ({_g23e}) — abstain"
     gates.append(Gate(
@@ -3560,6 +3569,41 @@ def _selftest() -> int:
     _g23_ab_ok, _g23_ab_msg = manifest_svg_projection_check(_g23_rows, "<svg></svg>")
     chk("g23_no_contract_abstains", _g23_ab_ok and "abstain" in _g23_ab_msg)
 
+    # ── G23 FITTED-MODE proveCatch (SOL round 5, plant coverage) ──────────────────
+    # Plant/product sheets route through _fit_product_parts_to_envelope, which rebases,
+    # scales and clamps each part, so the manifest row no longer predicts the drawing and
+    # the rigid contract false-fired on all 77 powerwall pairs. Fitted rects therefore
+    # publish their POST-FIT bounds and the gate projects THOSE with its own maths.
+    # The manifest row below is deliberately NOWHERE NEAR the fitted bounds: if the gate
+    # ever silently fell back to it, these cases would fail — which is exactly how the
+    # attribute-order bug was caught (the regex stopped at data-view, so data-fit-*-mm sat
+    # outside the match and every fitted rect was scored as faithful).
+    def _g23_fit_rect(x, y, w, h, z0="10.000", z1="40.000", tag="u_widget"):
+        return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0" fill="none" '
+                f'stroke="none" class="manifest-projection-audit" '
+                f'data-entity-tag="{tag}" data-view="front" data-mode="fitted" '
+                f'data-fit-x0-mm="-10.000" data-fit-x1-mm="10.000" '
+                f'data-fit-y0-mm="-5.000" data-fit-y1-mm="5.000" '
+                f'data-fit-z0-mm="{z0}" data-fit-z1-mm="{z1}"/>')
+    # front from the FITTED bounds: x = 100 + (-10 - -50)*2 = 180 ; y = 200 + (100-40)*2
+    # = 320 ; w = 20*2 = 40 ; h = 30*2 = 60.
+    _g23_far_rows = [{"tag": "u_widget", "name": "Widget",
+                      "pos_mm": [900.0, 900.0, 900.0],
+                      "dims_mm": {"w": 5.0, "d": 5.0, "h": 5.0}}]
+    _g23_ft_ok, _g23_ft_msg = manifest_svg_projection_check(
+        _g23_far_rows, "<svg>" + _g23_datum + _g23_fit_rect("180.0", "320.0", "40.0", "60.0") + "</svg>")
+    chk("g23_fitted_projection_passes", _g23_ft_ok)
+    chk("g23_fitted_states_coverage_limit", "NOT the envelope fit" in _g23_ft_msg)
+    # MOVED in fitted mode must still fire — the mode changes the SOURCE of the expected
+    # rectangle, never whether the gate is willing to fail.
+    _g23_ftm_ok, _g23_ftm_msg = manifest_svg_projection_check(
+        _g23_far_rows, "<svg>" + _g23_datum + _g23_fit_rect("260.0", "320.0", "40.0", "60.0") + "</svg>")
+    chk("g23_fitted_moved_box_fires", not _g23_ftm_ok)
+    # RESIZED in fitted mode must fire.
+    _g23_ftr_ok, _ = manifest_svg_projection_check(
+        _g23_far_rows, "<svg>" + _g23_datum + _g23_fit_rect("180.0", "320.0", "12.0", "18.0") + "</svg>")
+    chk("g23_fitted_resized_box_fires", not _g23_ftr_ok)
+
     # (c) ABSTAIN: no Enclosure Shell part in manifest (plant-scale / non-enclosure).
     _g20_ok_abs, _g20_msg_abs = envelope_equality_cross_check(
         [], _g20_caption_coherent)
@@ -3900,25 +3944,60 @@ def manifest_svg_projection_check(parts: list, ga_svg_text: str) -> tuple:
     for m in re.finditer(
             r'<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"'
             r'[^>]*class="manifest-projection-audit"[^>]*?'
-            r'data-entity-tag="([^"]*)"[^>]*?data-view="([^"]+)"', ga_svg_text):
+            # `[^>]*>` matters: data-mode and the data-fit-*-mm bounds are emitted AFTER
+            # data-view, so a match that stopped at data-view left them outside group(0).
+            # Every fitted rect then read as faithful, fell back to the manifest row the
+            # fit had deliberately superseded, and the gate false-fired on all 77 pairs.
+            r'data-entity-tag="([^"]*)"[^>]*?data-view="([^"]+)"[^>]*>', ga_svg_text):
+        _whole = m.group(0)
+        _mode_m = re.search(r'data-mode="([a-z]+)"', _whole)
+        _mode = _mode_m.group(1) if _mode_m else "faithful"
+        # FITTED sheets publish the part's POST-FIT bounds on the rect, because the
+        # product/plant fit rebases, scales and clamps per part and the manifest row no
+        # longer predicts the drawing. The gate still recomputes the rectangle with its
+        # OWN projection maths — it never copies px/py/pw/ph — so this measures the
+        # projection step rather than restating it (SOL round 5's tautology warning).
+        _fit_bb = None
+        if _mode == "fitted":
+            _v = {}
+            for _k in ("x0", "x1", "y0", "y1", "z0", "z1"):
+                _mm2 = re.search(rf'data-fit-{_k}-mm="([-\d.]+)"', _whole)
+                if _mm2 is None:
+                    break
+                _v[_k] = float(_mm2.group(1))
+            if len(_v) == 6:
+                _fit_bb = (_v["x0"], _v["x1"], _v["y0"], _v["y1"], _v["z0"], _v["z1"])
         _drawn.setdefault((m.group(6), m.group(5)), []).append(
-            (float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4))))
+            (float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4)),
+             _mode, _fit_bb))
     if not _drawn:
         return (True, "no audit rects emitted — abstain")
 
     _rows = {str(p.get("tag") or ""): p for p in (parts or []) if isinstance(p, dict)}
     bad, missing, invented = [], [], []
+    _fitted_pairs = 0
     for (view, tag), rects in sorted(_drawn.items()):
         row = _rows.get(tag)
         if row is None:
             invented.append(f"{tag or '(untagged)'}@{view}")
             continue
-        exp = expected_rect_px(row, view, _dat.get(view) or {})
-        if exp is None:
-            continue
-        if not any(compare_rect(r, exp) is None for r in rects):
-            why = compare_rect(rects[0], exp)
-            bad.append(f"{tag}@{view}: {why}")
+        _ok = False
+        _why = None
+        for r in rects:
+            exp = expected_rect_px(row, view, _dat.get(view) or {}, bbox_mm=r[5])
+            if exp is None:
+                _ok = True          # nothing to compare against — do not manufacture a fail
+                break
+            _w = compare_rect(r[:4], exp)
+            if _w is None:
+                _ok = True
+                break
+            if _why is None:
+                _why = _w
+        if not _ok and _why is not None:
+            bad.append(f"{tag}@{view}: {_why}")
+        if rects and rects[0][4] == "fitted":
+            _fitted_pairs += 1
     _drawn_tags = {t for _v, t in _drawn}
     for tag, row in sorted(_rows.items()):
         if tag and tag not in _drawn_tags and (row.get("dims_mm") or {}):
@@ -3938,8 +4017,14 @@ def manifest_svg_projection_check(parts: list, ga_svg_text: str) -> tuple:
                   "list, not re-invent it)")
     _miss_note = (f"; {len(missing)} manifest row(s) not drawn in any view "
                   f"(e.g. {', '.join(missing[:3])})" if missing else "")
+    # State the coverage limit rather than letting a green tick imply more than it
+    # measures: on a fitted sheet this proves the PROJECTION of the post-fit bounds, not
+    # the fit that produced them.
+    _mode_note = (f"; {_fitted_pairs} of these are FITTED pairs — that checks the "
+                  f"projection of each part's post-fit bounds, NOT the envelope fit "
+                  f"itself" if _fitted_pairs else "")
     return (True, f"all {n} drawn entity/view pair(s) equal their manifest projection"
-                  f"{_miss_note}")
+                  f"{_mode_note}{_miss_note}")
 
 
 if __name__ == "__main__":

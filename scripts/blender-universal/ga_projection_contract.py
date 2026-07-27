@@ -68,14 +68,20 @@ def manifest_bbox_mm(row: Mapping) -> Optional[tuple]:
             z - h / 2.0, z + h / 2.0)
 
 
-def expected_rect_px(row: Mapping, view: str, datum: Mapping) -> Optional[tuple]:
+def expected_rect_px(row: Mapping, view: str, datum: Mapping,
+                     bbox_mm: Optional[tuple] = None) -> Optional[tuple]:
     """Independently recompute (x, y, w, h) in paper px for `row` in `view`.
 
     `datum` is the view record the writer emitted: origin_x/origin_y (paper px), ppm,
     the model min/max used by the mapping, and z_shift_mm (the FFL rebase draw_ga applies
     before drawing). Returns None when the row carries no usable geometry.
     """
-    bb = manifest_bbox_mm(row)
+    # FITTED mode (plant/product sheets) passes the part's POST-FIT bounds explicitly,
+    # because `_fit_product_parts_to_envelope` rebases/scales/clamps per part and the
+    # manifest row no longer predicts the drawing. Everything after this point — the
+    # projection maths itself — is identical for both modes, which is the point: one
+    # projection implementation, two sources of truth for what is being projected.
+    bb = bbox_mm if bbox_mm is not None else manifest_bbox_mm(row)
     if bb is None:
         return None
     xmin, xmax, ymin, ymax, zmin, zmax = bb
