@@ -112,6 +112,12 @@ import { composeToolGraph, type ToolIOSchema } from '../auto-planner'
 import { sweepToolRelevance, checkUnitCoverage } from './relevance-sweep'
 import { deriveDesignScaleTier } from './design-scale-tier'
 import { coerceContractValueToParamUnit, magnitudeRefusal } from './unit-coercion'
+import {
+  structuralCacheReuseEnabled,
+  tableHasQuarantineColumn,
+  reusableCandidateWhereSql,
+  ensureQuarantineColumn,
+} from './structural-cache-policy'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -907,6 +913,7 @@ function openCandidateDb(dbPath: string = FORGE_TRUTH_DB): Database.Database {
   status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','shadow','approved')),
   UNIQUE(slug, version)
 );`)
+  ensureQuarantineColumn(db, 'class_tool_plan_candidates')
   return db
 }
 
@@ -934,6 +941,10 @@ export function scopeToolPlanSlugByApplication(baseSlug: string, application?: s
 
 export function latestCandidate(slug: string, dbPath: string = FORGE_TRUTH_DB): CandidateRow | null {
   assertCandidateSlug(slug)
+  if (!structuralCacheReuseEnabled()) {
+    console.error('[bootstrap-tool-plan] STRUCTURAL_CACHE_REUSE disabled — skipping candidate reuse (cold miss path)')
+    return null
+  }
   if (!existsSync(dbPath)) return null
   let db: Database.Database | null = null
   try {
@@ -941,9 +952,11 @@ export function latestCandidate(slug: string, dbPath: string = FORGE_TRUTH_DB): 
     db.pragma('busy_timeout = 2000')
     const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='class_tool_plan_candidates'`).get()
     if (!exists) return null
+    const qCol = tableHasQuarantineColumn(db, 'class_tool_plan_candidates')
+    const qSql = reusableCandidateWhereSql(qCol)
     return (db.prepare(
       `SELECT id, slug, version, plan_json, status FROM class_tool_plan_candidates
-       WHERE slug = ? ORDER BY version DESC LIMIT 1`,
+       WHERE slug = ? ${qSql} ORDER BY version DESC LIMIT 1`,
     ).get(slug) as CandidateRow | undefined) ?? null
   } catch (err) {
     console.warn(`[bootstrap-tool-plan] latestCandidate read failed: ${(err as Error).message}`)

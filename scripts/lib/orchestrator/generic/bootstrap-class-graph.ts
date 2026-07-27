@@ -62,6 +62,13 @@ import {
   getClassReferenceGraphDBFirst,
 } from '../../../../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { buildEnvelopeVector } from '../envelope-vector'
+import {
+  structuralCacheReuseEnabled,
+  structuralCorpusNeighboursEnabled,
+  tableHasQuarantineColumn,
+  reusableCandidateWhereSql,
+  ensureQuarantineColumn,
+} from './structural-cache-policy'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -244,21 +251,27 @@ async function gatherCorpusMaterial(slug: string, brief: ParsedConstraints): Pro
   const out: CorpusMaterial = { neighbourSummaries: '', neighbourSlugs: [], productLines: [], partLines: [] }
 
   // Nearest existing class graphs (hybrid lexical+semantic; degrades gracefully).
-  try {
-    const desc = String(brief.product_description ?? '').slice(0, 1000) || slug.replace(/_/g, ' ')
-    const similar = await findSimilarClassGraphs(desc, 3, { excludeClass: slug })
-    const summaries: string[] = []
-    for (const s of similar) {
-      const full = await getClassReferenceGraphDBFirst(s.product_class)
-      if (!full) continue
-      out.neighbourSlugs.push(s.product_class)
-      const nodeList = full.nodes.map(n => `${n.class}(${n.role}${n.required ? '' : ',optional'})`).join(', ')
-      const edgeList = full.edges.slice(0, 12).map(e => `${e.from_class}->${e.to_class}[${e.mechanism ?? e.protocol ?? '?'}]`).join(', ')
-      summaries.push(`NEIGHBOUR GRAPH "${s.product_class}" (${full.display_name}):\n  nodes: ${nodeList}\n  edges (sample): ${edgeList}`)
+  // COLD measurement: STRUCTURAL_CORPUS_NEIGHBOURS=0 skips this — neighbour graphs
+  // from unrelated plant classes (BESS, electrolyser) poisoned consumer_electronics.
+  if (structuralCorpusNeighboursEnabled()) {
+    try {
+      const desc = String(brief.product_description ?? '').slice(0, 1000) || slug.replace(/_/g, ' ')
+      const similar = await findSimilarClassGraphs(desc, 3, { excludeClass: slug })
+      const summaries: string[] = []
+      for (const s of similar) {
+        const full = await getClassReferenceGraphDBFirst(s.product_class)
+        if (!full) continue
+        out.neighbourSlugs.push(s.product_class)
+        const nodeList = full.nodes.map(n => `${n.class}(${n.role}${n.required ? '' : ',optional'})`).join(', ')
+        const edgeList = full.edges.slice(0, 12).map(e => `${e.from_class}->${e.to_class}[${e.mechanism ?? e.protocol ?? '?'}]`).join(', ')
+        summaries.push(`NEIGHBOUR GRAPH "${s.product_class}" (${full.display_name}):\n  nodes: ${nodeList}\n  edges (sample): ${edgeList}`)
+      }
+      out.neighbourSummaries = summaries.join('\n')
+    } catch (err) {
+      console.warn(`[bootstrap-class-graph] neighbour-graph lookup failed: ${(err as Error).message}`)
     }
-    out.neighbourSummaries = summaries.join('\n')
-  } catch (err) {
-    console.warn(`[bootstrap-class-graph] neighbour-graph lookup failed: ${(err as Error).message}`)
+  } else {
+    console.error('[bootstrap-class-graph] STRUCTURAL_CORPUS_NEIGHBOURS disabled — no neighbour graphs in harvest')
   }
 
   // Adjacent products + parts by slug-token match (read-only).
@@ -432,6 +445,7 @@ function openCandidateDb(dbPath: string = FORGE_TRUTH_DB): Database.Database {
   status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','shadow','approved')),
   UNIQUE(slug, version)
 );`)
+  ensureQuarantineColumn(db, 'class_graph_candidates')
   return db
 }
 
@@ -462,6 +476,11 @@ interface CandidateRow { id: number; slug: string; version: number; graph_json: 
 /** Newest stored candidate for a slug (any status), or null. Read-only. */
 export function latestCandidate(slug: string, dbPath: string = FORGE_TRUTH_DB): CandidateRow | null {
   assertCandidateSlug(slug)
+  // COLD / quarantine policy (2026-07-27) — see structural-cache-policy.ts
+  if (!structuralCacheReuseEnabled()) {
+    console.error('[bootstrap-class-graph] STRUCTURAL_CACHE_REUSE disabled — skipping candidate reuse (cold miss path)')
+    return null
+  }
   if (!existsSync(dbPath)) return null
   let db: Database.Database | null = null
   try {
@@ -469,9 +488,11 @@ export function latestCandidate(slug: string, dbPath: string = FORGE_TRUTH_DB): 
     db.pragma('busy_timeout = 2000')
     const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='class_graph_candidates'`).get()
     if (!exists) return null
+    const qCol = tableHasQuarantineColumn(db, 'class_graph_candidates')
+    const qSql = reusableCandidateWhereSql(qCol)
     return (db.prepare(
       `SELECT id, slug, version, graph_json, status FROM class_graph_candidates
-       WHERE slug = ? ORDER BY version DESC LIMIT 1`,
+       WHERE slug = ? ${qSql} ORDER BY version DESC LIMIT 1`,
     ).get(slug) as CandidateRow | undefined) ?? null
   } catch (err) {
     console.warn(`[bootstrap-class-graph] latestCandidate read failed: ${(err as Error).message}`)

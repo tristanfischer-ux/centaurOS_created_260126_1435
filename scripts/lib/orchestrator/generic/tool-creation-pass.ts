@@ -37,6 +37,12 @@ import {
   type DutyKeySpec,
   type ToolGenerationResult,
 } from './tool-generator'
+import {
+  structuralCacheReuseEnabled,
+  tableHasQuarantineColumn,
+  reusableCandidateWhereSql,
+  ensureQuarantineColumn,
+} from './structural-cache-policy'
 
 // The SAME strong reasoner the bootstrap uses to PROPOSE duty gaps. The
 // deterministic self-test gate (tool-generator.ts) is what actually disposes.
@@ -274,6 +280,7 @@ function openProposalDb(dbPath: string = FORGE_TRUTH_DB): Database.Database {
   status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','shadow','approved')),
   UNIQUE(slug, version)
 );`)
+  ensureQuarantineColumn(db, 'tool_creation_proposals')
   return db
 }
 
@@ -289,6 +296,10 @@ interface ProposalRow { id: number; slug: string; version: number; duties_json: 
 export function loadProposalForClass(rawClass: string, dbPath: string = FORGE_TRUTH_DB, application?: string): DutySpec[] | null {
   const slug = proposalSlugFor(rawClass, application)
   if (!slug) return null
+  if (!structuralCacheReuseEnabled()) {
+    console.error('[tool-creation] STRUCTURAL_CACHE_REUSE disabled — skipping proposal cache (cold miss path)')
+    return null
+  }
   if (!existsSync(dbPath)) return null
   let db: Database.Database | null = null
   try {
@@ -296,9 +307,11 @@ export function loadProposalForClass(rawClass: string, dbPath: string = FORGE_TR
     db.pragma('busy_timeout = 2000')
     const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='tool_creation_proposals'`).get()
     if (!exists) return null
+    const qCol = tableHasQuarantineColumn(db, 'tool_creation_proposals')
+    const qSql = reusableCandidateWhereSql(qCol)
     const row = db.prepare(
       `SELECT id, slug, version, duties_json FROM tool_creation_proposals
-       WHERE slug = ? ORDER BY version DESC LIMIT 1`,
+       WHERE slug = ? ${qSql} ORDER BY version DESC LIMIT 1`,
     ).get(slug) as ProposalRow | undefined
     if (!row) return null
     let parsed: unknown
