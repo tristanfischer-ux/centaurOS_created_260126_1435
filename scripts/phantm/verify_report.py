@@ -20,7 +20,15 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
-MD = open(os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")).read()
+# The deliverable is TWO documents since the v7 split (Tony, 26 Jul: a report
+# with no history in it). Every existing content check asks "does the
+# deliverable still say this?", and the answer must be yes wherever it now
+# lives — so MD is the concatenation. MD_CURRENT / MD_ARCHIVE are used by the
+# split-specific checks below, which are the ones that care WHERE it lives.
+MD_CURRENT = open(os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")).read()
+_arc_path = os.path.join(OUT, "PHANTM-ARCHIVE.md")
+MD_ARCHIVE = open(_arc_path).read() if os.path.exists(_arc_path) else ""
+MD = MD_CURRENT + "\n" + MD_ARCHIVE
 
 G = 9.80665
 MU0 = 4e-7 * math.pi
@@ -305,7 +313,8 @@ check("energy 37/83 mJ", abs(e_bal - 37.2) < 0.3 and abs(e_max - 82.8) < 0.3)
 contains("§10 content", "BALANCED set is the recommendation", "DUAL ±3.35 A",
          "DUAL ±5 A", "Ø0.15 mm vent", "0.35 mN guide friction",
          "half-bridge per coil", "basin count is", "Goodhart trap")
-contains("v6 title", "(v6 — 25 Jul restructure")
+contains("v7 title — current-design report declares it carries no history",
+         "current design and analysis (v7 — no history")
 absent("old titles retired", "(v4.5 — 24 Jul", "(v5.1 — 25 Jul", "(v5.2 — 25 Jul")
 
 # ---------------- v6 structure: parts, exec, claims register ----------------
@@ -513,6 +522,35 @@ for pat, want in ((r"^SPACING = ([0-9.]+)", 0.374), (r"^G = ([0-9.]+)", 0.020),
           m is not None and abs(float(m.group(1)) - want) < 1e-6,
           m.group(1) if m else "not found")
 
-n_pass = MD.count("")  # noqa - summary below
+# ---------------- v7 document split (Tony, 26 Jul) --------------------------
+# The split's whole value is that Tony can read ONE file and trust it is the
+# latest design. These check that promise mechanically, in both directions:
+# nothing he needs is missing, and nothing he asked to be rid of has crept back.
+if MD_ARCHIVE:
+    _cur_h = set(re.findall(r"^## (\d+|Appendix [AB])[.\s]", MD_CURRENT, re.M))
+    _arc_h = set(re.findall(r"^## (\d+|Appendix [AB])[.\s]", MD_ARCHIVE, re.M))
+    # §14 straddles deliberately: the campaign narrative and kill list are
+    # archived, the chosen operating point and the gate results are current.
+    check("split: only §14 appears in both documents",
+          _cur_h & _arc_h == {"14"}, f"overlap {sorted(_cur_h & _arc_h)}")
+    check("split: history and manufacture are OUT of the current report",
+          not (_cur_h & {"16", "19", "20", "21", "22", "23", "24", "25",
+                         "Appendix A", "Appendix B"}),
+          f"current holds {sorted(_cur_h)}")
+    check("split: the current report keeps the design and its analyses",
+          {"2", "3", "8", "9", "10", "11", "13", "15", "18"} <= _cur_h)
+    # The gate results are the NEW work — they must be in the file Tony reads,
+    # not filed into the archive with the campaign that preceded them.
+    for _s in ("14.4", "14.5", "14.7"):
+        check(f"split: gate §{_s} is in the current report",
+              f"### {_s} " in MD_CURRENT)
+    check("split: current report carries a change log",
+          "What is new in this issue" in MD_CURRENT)
+    check("split: cross-document references still point somewhere real",
+          "§19" in MD_CURRENT and "## 19." in MD_ARCHIVE)
+    # Renumbering per document would silently mis-point every prose reference.
+    check("split: section numbers are NOT renumbered per document",
+          "## 25." in MD_ARCHIVE and "## 16." in MD_ARCHIVE)
+
 print(f"\n{'ALL GREEN' if not FAILS else 'FAILURES: ' + str(FAILS)}")
 sys.exit(1 if FAILS else 0)

@@ -35,6 +35,14 @@ TAG = f"{VER}-{STAMP}"
 ZIP_NAME = f"PHANTM-report-{TAG}.zip"
 print(f"build {TAG}")
 
+# v7 split (Tony, 26 Jul): the deliverable is a current-design report plus a
+# companion archive. Both get the same treatment — inlined images, build stamp,
+# styled HTML, PDF — so neither is a second-class artefact.
+DOCS = [
+    ("PHANTM-ACTUATOR-REPORT.md", "report", "current design and analysis"),
+    ("PHANTM-ARCHIVE.md", "archive", "history, kills, manufacture, suppliers"),
+]
+
 md = open(os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")).read()
 
 
@@ -105,6 +113,40 @@ print(f"PDF {'OK' if ok_pdf else 'FAILED'} ({os.path.getsize(pdf_path)//1024} KB
 if not ok_pdf:
     sys.exit(1)
 
+
+def build_secondary(src_md, slug, min_bytes=20_000):
+    """Same pipeline for the companion documents (archive, question packs)."""
+    src = os.path.join(OUT, src_md)
+    if not os.path.exists(src):
+        print(f"  WARN missing {src_md}")
+        return None, None
+    txt = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", inline, open(src).read())
+    nl = txt.index("\n")
+    txt = (txt[:nl] + f"\n\n**Build {TAG}** — companion to "
+           f"`PHANTM-report-{TAG}.pdf`. Section numbers match that report."
+           + txt[nl:])
+    tmp = os.path.join(OUT, f"PHANTM-{slug}-standalone.md")
+    open(tmp, "w").write(txt)
+    hp = show_md.render(Path(tmp))
+    h = open(hp).read()
+    open(hp, "w").write(h.replace("</head>", PRINT_CSS + "</head>", 1))
+    pp = os.path.join(OUT, f"PHANTM-{slug}.pdf")
+    subprocess.run([CHROME, "--headless", "--disable-gpu",
+                    "--virtual-time-budget=20000",
+                    f"--print-to-pdf={pp}", f"file://{hp}"],
+                   capture_output=True, text=True, timeout=180)
+    ok = os.path.exists(pp) and os.path.getsize(pp) > min_bytes
+    print(f"  {slug}: PDF {'OK' if ok else 'THIN'} "
+          f"({os.path.getsize(pp)//1024 if os.path.exists(pp) else 0} KB)")
+    return os.path.basename(hp), os.path.basename(pp)
+
+
+SECONDARY = {}
+for _src, _slug in (("PHANTM-ARCHIVE.md", "archive"),
+                    ("PHANTM-QUESTIONS-TONY.md", "questions-tony"),
+                    ("PHANTM-QUESTIONS-VLAD.md", "questions-vlad")):
+    SECONDARY[_slug] = build_secondary(_src, _slug)
+
 zip_dir = os.path.expanduser("~/Downloads")
 if not os.access(zip_dir, os.W_OK):
     zip_dir = OUT
@@ -112,14 +154,25 @@ zip_path = os.path.join(zip_dir, ZIP_NAME)
 # working files keep stable names in out/ (the verifier reads them); the
 # DELIVERABLE names inside the zip carry the version + timestamp. Tony's own
 # CAD keeps its received-date provenance instead of our build tag.
-MANIFEST = (
-    ("PHANTM-report-standalone.html", f"PHANTM-report-{TAG}.html"),
-    ("PHANTM-actuator-report.pdf",    f"PHANTM-report-{TAG}.pdf"),
+# Ordered so the first three files are the ones to read, in reading order.
+MANIFEST = [
+    ("PHANTM-report-standalone.html", f"1-PHANTM-CURRENT-DESIGN-{TAG}.html"),
+    ("PHANTM-actuator-report.pdf",    f"1-PHANTM-CURRENT-DESIGN-{TAG}.pdf"),
+]
+for _slug, _label in (("questions-tony", "2-QUESTIONS-FOR-TONY"),
+                      ("questions-vlad", "2-QUESTIONS-FOR-VLAD"),
+                      ("archive", "3-PHANTM-ARCHIVE-history-and-manufacture")):
+    _h, _p = SECONDARY.get(_slug, (None, None))
+    if _h:
+        MANIFEST.append((_h, f"{_label}-{TAG}.html"))
+    if _p:
+        MANIFEST.append((_p, f"{_label}-{TAG}.pdf"))
+MANIFEST += [
     ("PHANTM-CALC.xlsx",              f"PHANTM-CALC-{TAG}.xlsx"),
     ("tony-24hex-subarray.stl", "tony-24hex-subarray-received-20260724.stl"),
     ("tony-7hex-subarray.stl",  "tony-7hex-subarray-received-20260724.stl"),
     ("tony-24hex-subarray.skp", "tony-24hex-subarray-received-20260724.skp"),
-)
+]
 with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
     for src, arcname in MANIFEST:
         z.write(os.path.join(OUT, src), arcname)

@@ -2094,16 +2094,61 @@ def main():
     text = text.replace("~", "≈")
     # ---------------- v6 structure pass (the de-risking funnel) -------------
     from restructure import restructure
-    text = restructure(
+    # ---- v7 split (Tony, 26 Jul): current-state report + companion archive --
+    # "A report that had no history in it, but only analyses and info about the
+    # most recent iteration of design." Two files, same section numbers, so a
+    # cross-reference from one still lands in the other.
+    from restructure import ARCHIVE, CURRENT
+
+    changelog = [
+        "> **What is new in this issue** — so nothing here needs re-reading to "
+        "find the change.",
+        ">",
+        "> - **This report no longer carries its own history.** Everything "
+        "tried-and-killed, the optimisation campaign narrative, manufacturing "
+        "routes, fabricators and supplier outreach have moved to a companion "
+        "archive. Section numbers are unchanged, so a reference to §19 still "
+        "means §19 — it is just in the other file. This document is the latest "
+        "design and what is known about it, and nothing else.",
+        "> - **Three engineering gates closed** (open gates 5 → 1). "
+        "Demagnetisation (§14.4): the cancel coil does **not** demagnetise its "
+        "own magnet — 3.4× and 2.8× margin, and the magnet's own 80 °C rating "
+        "binds 60 K before demagnetisation does, so dual-coil drive is cleared. "
+        "Eddy currents (§14.5): solid unlaminated parts do pass flux inside the "
+        "pulse, but at 3.4× at the pessimistic corner, not the comfortable "
+        "margin the earlier estimate implied — the earlier estimate had been "
+        "made on SMC, which is no longer the process. Vent tolerance (§14.7): "
+        "**Ø0.15 mm is not robust** — the robust figure is Ø0.138 ±0.003 mm.",
+        "> - **One new action, and it is cheap.** The vent tolerance is being "
+        "eaten almost entirely by the orifice discharge coefficient. Measuring "
+        "it on a foil coupon widens the tolerance sevenfold, to a routine part. "
+        "Worth doing before any damper hardware is ordered.",
+        "> - **Driver electromagnetic-compatibility rules specified** (§13.1), "
+        "which closes the last open requirement on the electronics side.",
+        "> - Only the stamped-lamination sheared-edge coupon remains open, and "
+        "it needs a physical supplier part rather than more analysis.",
+    ]
+
+    cur = restructure(
         text,
-        "PHANTM — the actuator and hex-cell work package as a de-risking funnel "
-        "(v6 — 25 Jul restructure: Part 0 executive · I concept & claims · II "
-        "hardening: facts and testing · III design choices with kills on the "
-        "record · IV how to manufacture · V who can manufacture; five-seat red "
-        "team applied; pending 3D-FE/prototype validation)")
+        "PHANTM — the actuator and hex-cell work package: current design and "
+        "analysis (v7 — no history; the tried-and-killed record, manufacturing "
+        "routes and fabricator work are in the companion archive)",
+        doc=CURRENT, preamble_extra=changelog)
+    arc = restructure(
+        text,
+        "PHANTM — companion archive: the optimisation campaign, what was "
+        "killed, how to manufacture it and who can (v7 — section numbers match "
+        "the current-design report; nothing here is needed to read that one)",
+        doc=ARCHIVE)
+
     with open(path, "w") as f:
-        f.write(text)
-    print(f"wrote {path} + figures (v6 structure pass applied)")
+        f.write(cur)
+    apath = path.replace("PHANTM-ACTUATOR-REPORT.md", "PHANTM-ARCHIVE.md")
+    with open(apath, "w") as f:
+        f.write(arc)
+    print(f"wrote {path} ({len(cur.splitlines())} lines, current design only)")
+    print(f"wrote {apath} ({len(arc.splitlines())} lines, history + manufacture)")
 
 
 if __name__ == "__main__":

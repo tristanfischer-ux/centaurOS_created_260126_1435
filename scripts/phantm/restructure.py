@@ -105,6 +105,64 @@ REF_MAP = {
     "0.11": "A.11",
 }
 
+# ---- document split (Tony, 26 Jul) ----------------------------------------
+# "What would be much easier to cope with was a report that had no history in
+# it, but only analyses and info about the most recent iteration of design —
+# one can always go back to a previous session if the latest turns out to be a
+# dead end. It's very time consuming to keep on churning through ALL the old
+# stuff as it can obscure the latest results / tweaks / optimisations."
+#
+# He is right, and it is measurable: of 1285 rendered lines, the optimisation
+# campaign narrative (199), supplier outreach emails (291), manufacturing and
+# fabricator sections (~228) and the feedback-history appendix accounted for
+# well over half. The design-and-analysis core he actually wants is ~350.
+#
+# Tony also set the SEQUENCE: confirm the efficacy of his next design first,
+# and only then look at manufacturing implications — "I don't think we're very
+# close to that point yet." So manufacturing leaves the lead document; it is
+# not deleted, because the supplier work is real and Tristan's standing
+# instruction is that knowing what does NOT work is as valuable as knowing what
+# does. Nothing is lost; it moves to a companion.
+#
+# CRITICAL: section NUMBERS are unchanged across the split. A reference to §19
+# from the current-state document still means §19, now found in the companion.
+# Renumbering per document would break every cross-reference in the prose and
+# silently mis-point the reader.
+CURRENT = "current"     # the latest design, its analyses and its open gates
+ARCHIVE = "archive"     # history, kills, manufacturing, suppliers, outreach
+
+DOC_OF = {
+    # --- the current design and what is known about it -------------------
+    "1": CURRENT, "2": CURRENT, "3": CURRENT, "4": CURRENT, "5": CURRENT,
+    "6": CURRENT, "7": CURRENT, "8": CURRENT, "9": CURRENT, "10": CURRENT,
+    "11": CURRENT, "12": CURRENT, "13": CURRENT,
+    # §14 splits: the campaign NARRATIVE and its kill list are history; the
+    # chosen operating point and the four gate results are current findings.
+    "14": ARCHIVE, "14.1": ARCHIVE, "14.2": ARCHIVE,
+    "14.3": CURRENT, "14.4": CURRENT, "14.5": CURRENT, "14.6": CURRENT,
+    "14.7": CURRENT, "14.8": CURRENT, "14.9": CURRENT,
+    "15": CURRENT,
+    "16": ARCHIVE,          # drive/PCB options ledger — passed and failed
+    "17": CURRENT,          # firmware, written and tested
+    "18": CURRENT,          # open questions (also shipped standalone)
+    # --- manufacturing and who can build it: deferred per Tony's sequence -
+    "19": ARCHIVE, "20": ARCHIVE, "21": ARCHIVE, "22": ARCHIVE,
+    "23": ARCHIVE, "24": ARCHIVE, "25": ARCHIVE,
+    "A": ARCHIVE,           # response to Tony's feedback — the historical record
+    "B": ARCHIVE,           # traceability
+}
+
+# Part banners belong to whichever document still holds sections under them.
+PART_DOC = {
+    "Part 0 — Executive: the state of play": CURRENT,
+    "Part I — The concept design and what must be true": CURRENT,
+    "Part II — Hardening: facts and testing": CURRENT,
+    "Part III — Design choices: what was tried, what won, what was killed": None,
+    "Part IV — How to manufacture": ARCHIVE,
+    "Part V — Who can manufacture": ARCHIVE,
+    "Appendices": ARCHIVE,
+}
+
 HDR_RE = re.compile(r"^(##|###) (\d+(?:\.\d+)?[a-z]?|NEW-[A-Z]+)[. ]\s*(.*)$")
 
 
@@ -136,23 +194,55 @@ def _split(md):
     return preamble, blocks
 
 
-def restructure(md, new_title):
+def restructure(md, new_title, doc=None, preamble_extra=None):
+    """Emit one document.
+
+    doc=None keeps the historical single-file behaviour (everything, in order).
+    doc=CURRENT / ARCHIVE emits only that document's sections, with numbering
+    left ALONE so cross-references between the two still resolve.
+    """
     preamble, blocks = _split(md)
     # replace the old H1 title line (first line of preamble)
     assert preamble and preamble[0].startswith("# "), "title line not found"
     preamble[0] = "# " + new_title
+    if preamble_extra:
+        preamble = [preamble[0]] + ["", *preamble_extra] + preamble[1:]
+
+    def doc_of(num):
+        """A subsection INHERITS its parent's document unless overridden.
+
+        Defaulting a subsection to ARCHIVE instead would silently drag whole
+        current-state sections (8, 9, 10, 13 — each of which has subsections)
+        into the archive, and the orphan-parent path would then mint a
+        duplicate heading for them there.
+        """
+        if num in DOC_OF:
+            return DOC_OF[num]
+        if "." in num:
+            return doc_of(num.split(".", 1)[0])
+        return ARCHIVE
+
+    def wanted(num):
+        return doc is None or doc_of(num) == doc
 
     consumed = set()
     out = []
     for entry in ORDER:
         if entry[0] == "PART":
+            want = PART_DOC.get(entry[1])
+            # a banner whose sections straddle both documents (Part III) is
+            # emitted in either; one pinned to the other document is skipped
+            if doc is not None and want is not None and want != doc:
+                continue
             out += ["", "---", "", f"# {entry[1]}", ""]
             continue
         if entry[0] == "APP":
             _, letter, src = entry
             assert src in blocks, f"appendix source {src} missing"
+            consumed.add(src)          # consumed regardless, for the bijection
+            if not wanted(letter):
+                continue
             title, body = blocks[src]
-            consumed.add(src)
             out += [f"## Appendix {letter} — {title}"] + body
             continue
         new_num, srcs = entry[0], entry[1]
@@ -162,13 +252,25 @@ def restructure(md, new_title):
             title, body = blocks[src]
             consumed.add(src)
             if i == 0:
-                out += [f"## {new_num}. {override or title}"] + body
+                if wanted(new_num):
+                    out += [f"## {new_num}. {override or title}"] + body
             elif src in SUBSECTION_OF:
                 parent, subnum = SUBSECTION_OF[src]
                 assert parent == new_num, f"{src}: parent map disagrees"
-                out += [f"### {new_num}.{subnum} {title}"] + body
+                sub = f"{new_num}.{subnum}"
+                if wanted(sub):
+                    # a kept subsection whose PARENT went to the other document
+                    # still needs a heading to sit under, or it is orphaned
+                    if not wanted(new_num) and not any(
+                            ln.startswith(f"## {new_num}.") for ln in out):
+                        out += ["", f"## {new_num}. {override or blocks[srcs[0]][0]}",
+                                "", f"*(campaign narrative and the kill list are in "
+                                f"the companion archive; the current operating "
+                                f"point and gate results follow)*", ""]
+                    out += [f"### {sub} {title}"] + body
             else:  # merged continuation (e.g. 9.1 into 4): body only
-                out += body
+                if wanted(new_num):
+                    out += body
 
     leftover = set(blocks) - consumed
     assert not leftover, f"unmapped sections left over: {sorted(leftover)}"
