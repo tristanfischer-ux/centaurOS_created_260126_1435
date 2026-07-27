@@ -7502,8 +7502,16 @@ def write_parts_manifest(out_dir, parts, state=None):
             _objs = [bpy.data.objects.get(n) for n in _ABOVE_LID_SIGNATURE_MESHES
                      if n.startswith(_pref)]
             _objs = [o for o in _objs if o is not None and getattr(o, "type", None) == "MESH"]
-            for _i, _o in enumerate(_objs):
-                _tag = f"u_sig_{_fam.replace('-', '_')}_{_i}"
+            for _o in _objs:
+                # UNIQUE JOIN KEY (SOL round 5). The index must be GLOBAL across the
+                # whole extra-signature pass, not per-prefix: three prefixes
+                # (face_key / face_led / face_port) all map to family "hmi-button", so a
+                # per-prefix counter restarted and minted u_sig_hmi_button_0 THREE times.
+                # `tag` is the exact key G23 joins on, so a collision lets the projection
+                # gate compare a drawn box against the wrong row's expectation — the
+                # "collision suffixes assigned according to iteration order" failure.
+                # Measured: 527 of 528 manifests have a unique tag; this was the one.
+                _tag = f"u_sig_{_fam.replace('-', '_')}_{_n_extra}"
                 if _tag in _have:
                     continue
                 _bb = [_o.matrix_world @ _mu2.Vector(_c) for _c in _o.bound_box]
@@ -7513,7 +7521,8 @@ def write_parts_manifest(out_dir, parts, state=None):
                 rows.append({
                     "tag": _tag,
                     "equipment_tag": f"H-{200 + _n_extra}",
-                    "name": _label if len(_objs) == 1 else f"{_label} {_i + 1}",
+                    "name": (_label if len(_objs) == 1
+                             else f"{_label} {_objs.index(_o) + 1}"),
                     "module": "control_compute_communication",
                     "shape": "box", "qty": 1,
                     "region_rank": REGION_PRIORITY_DEFAULT,

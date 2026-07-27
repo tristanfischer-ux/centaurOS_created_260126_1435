@@ -1,0 +1,88 @@
+· .venv preflight OK: Python 3.12.12 + numpy imports
+· validation run: benchmark net FORCED ON (BENCHMARK_NET_FORCE=1), no CHAIN_SKIP_* nets, node v22.22.1
+· brief: briefs-loop/bess_20ft_grid_storage.md
+· out:   out/bess-campaign-v4
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/bess_20ft_grid_storage.md (6158 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 6158 chars
+[brief-parse] OK — confidence=HIGH, missing=2 fields, metrics=6
+[chain] classification: energy_storage (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 1.5s)
+[chain] U5 brief augmentation: U5 augmentation (class: energy_storage): 1 HARD field(s) filled with class-aware inferred values, 6 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Containerised assembly: cell module stacking, busbaring, BMS wiring, PCS integration, factory-acceptance test" (Class-canonical process for energy_storage. Class default for utility-scale BESS in 40 ft Hi-Cube ISO container)
+[chain] U6 brief expansion: 13 duties derived; product="Dispatchable direct-current (DC) electrical energy for grid frequency response, peak shaving, and arbitrage" (model=google/gemini-3.1-pro-preview, cost_usd=0.069186)
+  [U6] nameplate_energy_capacity_mwh = 5 MWh [stated/high] — Stated in brief as the headline configuration.
+  [U6] usable_energy_capacity_mwh = 4.5 MWh [stated/high] — Stated in brief (90% depth of discharge at beginning of life).
+  [U6] rated_dc_power_mw = 2.5 MW [stated/high] — Stated in brief as the continuous power rating.
+  [U6] nominal_dc_voltage_v = 1500 V [stated/high] — Stated in brief.
+  [U6] max_dc_current_a = 1667 A [derived/high] — Derived from rated power and nominal voltage: 2.5 MW / 1500 V = 1666.7 A.
+  [U6] discharge_duration_h = 2 h [derived/high] — Derived from nameplate capacity and rated power: 5 MWh / 2.5 MW = 2 hours.
+  [U6] battery_heat_rejection_duty_kw = 120 kW [derived/medium] — System round-trip efficiency (RTE) is 88%. Assuming PCS/transformer account for ~4% of los
+  [U6] coolant_flow_rate_l_min = 400 L/min [derived/medium] — To remove 120 kW of heat using a 50/50 water-glycol mix (Cp approx 3.6 kJ/kgK) with a 5 de
+  [U6] volumetric_energy_density_kwh_m3 = 130.5 kWh/m3 [derived/high] — 5000 kWh nameplate capacity divided by the external volume of a 20-foot ISO container (6.0
+  [U6] average_floor_loading_kn_m2 = 29.2 kN/m2 [derived/high] — Maximum gross mass of 44,000 kg distributed over the container footprint (6.06 m * 2.44 m 
+  [U6] system_round_trip_efficiency_percent = 88 % [stated/high] — Stated in brief at beginning of life.
+  [U6] cycle_life_cycles = 6000 cycles [stated/high] — Stated in brief (equivalent full cycles over 15 years).
+  [U6] deflagration_venting_area_m2 = n/a m2 [derived/low] — Required by DSEAR/NFPA 855, but unquantifiable without UL 9540A cell-level thermal runaway
+[chain] engineering_contract: 47 quantities, 3 topology edges, 7 macro-assemblies (total £987,400), closures: 4 pass / 2 warn / 1 fail
+  ✕ [cost_per_kwh_closure] Battery-only rollup £147/kWh (cells + enclosure + BMS + cooling + DC distribution ÷ nameplate kWh) vs the brief's own battery-container-only anchor £63/kWh (ratio 2.33). Scope-matched to brief §"SCOPE OF THIS CONTAINER" — PCS/transformer/switchgear excluded from both sides, per the brief's own cost-anchor derivation.
+[specs-writeback] web search: bess bess brief_target_feasibility — 645ms
+[specs-writeback] {"spec_key":"brief_target_feasibility","part_number":"bess","hit":"miss","latency_ms":2405}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":768}
+[products-writeback] {"product_name":"Containerised 5.45 MWh nameplate LFP BESS (6084 × 280 Ah cells, 13 racks × 1P × 468S = 1497.6000000000001 V DC bus, 2.5 MW PCS) — single 40-ft ISO container with EXTERNAL pad-mounted MV step-up transf","hit":"db_hybrid","matched":"Saft Intensium Max","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":168}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: WARN (hard=0 soft=1; 0.00s)
+[chain] G1b compliance: PASS — 3/3 mandatory covered for UK+global
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: energy_storage
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 12557 chars. First 200: {
+  "market_context": "The global battery energy storage system (BESS) market is experiencing rapid growth, driven by the integration of intermittent renewable energy, the need for grid stability serv
+[research-synthesis] Complete: 5 competitors, 8 sources, 8 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[distributor-cascade] DB library:bess_oem_2026-05-25 hit for SC1000UD-MV
+[distributor-cascade] DB library:mouser hit for GX21BAB
+[chain] Orchestrator: 10 modules, 31 sub-modules, 146 words, 10 tools ran (12299ms)
+[chain] Build #18k: toolOutputsBlock built (14 tools, 13153 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 27 component_classes covered (27 with match, 0 empty), 22301 chars (27602ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=900000, max_mass_kg=44000, envelope_volume_m3=38.3, target_capacity_mwh=5 (MWh), operating_temp_min_c=-20, operating_temp_max_c=45
+[chain] Contract validation: all 7 macro-assemblies present in design ✓
+[chain] keyMetrics seeded early (pre-reviewer): Annual MWh throughput=1592 MWh / year
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=9/10 plaus=8/10 coh=9/10 part=9/10 hon=10/10 (5991ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ modules[7].sub_modules[0].words[0].modifier_characters[2]] The brief explicitly mandates a single 20-foot ISO container (6060 mm x 2440 mm x 2590 mm). However, the structural module selects a CIMC 20-ft High-Cube container ('20HC-BESS-HD')
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 16707 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 23 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 19 / 23 patches (skipped 4)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word manufacturer="Rittal" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word part_number="TS 8 1200x800" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word material="S355JR structural steel, powder-coated RAL 7035" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word rating_primary="2000 kg static load per bay" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word regulatory="IEC 62208" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_storage_source.rack_structure.module_steel_frame_word (+6 modifiers)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word manufacturer="Rittal" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word part_number="TS 8 top panel" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 33.1s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":1,"d_overview_chars":1554}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=9/10 phys=7/10 coh=9/10 part=9/10 hon=9/10 (6704ms)
+[chain] critic headline: The design honours the documented trade-off of 4.36 MWh usable capacity vs the 4.5 MWh brief target, but contains a critical physical mismatch between the 13-rack battery configuration and the BMS monitoring board quantities.
+[chain] critic issues: 2 high, 1 med, 3 total
+  ✗ [high/high] engineering_plausibility @ control_compute_communication.sub_modules[0].words[4]: The design specifies 338 units of Analog Devices LTC6813-1 (18-channel monitoring boards). With 13 racks of 468S cells (total 6,084 cells), each rack has 468 ce
+  ✗ [high/high] engineering_plausibility @ power_distribution.sub_modules[0].words[4]: The rack-level fuses are specified as Eaton Bussmann PV-200A-1XL-B-15 rated at 200 A. However, the maximum DC current of the system is 1,667 A. Split across 13 
+  ✗ [med/high] internal_coherence @ environmental_interface.sub_modules[0].words[1]: The Grundfos NB 50-160/143 BQQE pumps are listed twice with identical quantities and descriptions: once under environmental_interface (sub_modules[0]) and once 
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (SHADOW — records would-be corrections, does NOT mutate the design)
+[chain] physics auto-correct (shadow): selected 1 blocking finding(s) → corrected 1, declined 0, unlocatable 0, still-uncorrectable 0 after 1 pass(es)
+  • [corrected] undersized-vs-load @ safety_protection/sub_modules[4]/words[0] (part-token): {manufacturer=Eaton Bussmann, part_number=PV-200A-1XL-B-15, form=Class gPV per IEC 60269-6, 200 A / 1500 V DC bolt-in (rated to the 1500 V DC bus nominal class — the real 1500V-class BESS/PV DC-fuse market segment; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/bussmann-iec-high-speed-semi-conductors-fuses/bussmann-iec-photovoltaic-high-speed-fuses/eaton-bussmann-series-1500vdc-photovoltaic-fuses-product-aid-pa135007en.pdf, rating_primary=200 A, dimension=1500, list_price_gbp=320} → {manufacturer=Eaton Bussmann, part_number=PV-315A-2XL-B-15, form=Class gPV per IEC 60269-6, 315 A / 1500 V DC bolt-in size 2XL rack-level string fuse, rating_primary=315 A, dimension=1500, list_price_gbp=410}
+[chain] physics-critic enforcement (ENFORCING): 1 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ power_distribution.sub_modules[0].words[4]: The rack-level fuses are specified as Eaton Bussmann PV-200A-1XL-B-15 rated at 200 A. However, the maximum DC current of the system is 1,667 A. Split across 13 parallel racks, the nominal current per …
+[chain] physics-critic ENFORCING: BLOCKING (exit 33) — the design recommends 1 part(s) the Physics Critic proved will FAIL. Refusing to ship a known-failing part. Fix the flagged part(s) (or run Phase-2 auto-correct) and re-run.

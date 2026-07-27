@@ -1,0 +1,23 @@
++ set -u
++ BRIEF=briefs-loop/yuri_poseidon.md
++ BOARD=out/poseidon-board.json
++ LABEL=poseidon
+++ dirname scripts/run-loop.sh
++ cd scripts/..
++ export 'PATH=/opt/homebrew/opt/node@22/bin:/Users/tristanfischer/.grok/bin:/Users/tristanfischer/.opencode/bin:/opt/homebrew/opt/libpq/bin:/Users/tristanfischer/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Users/tristanfischer/Library/Application Support/Cursor/User/globalStorage/anysphere.cursor-agent-worker/agent-cli/.local/share/cursor-agent/versions/2026.07.09-a3815c0:/Users/tristanfischer/Library/Application Support/Cursor/User/globalStorage/anysphere.cursor-agent-worker/agent-cli/.local/bin:/Users/tristanfischer/.grok/bin:/Users/tristanfischer/.opencode/bin:/opt/homebrew/opt/libpq/bin:/Users/tristanfischer/.bun/bin:/Users/tristanfischer/.cargo/bin:/Users/tristanfischer/.local/bin:/Users/tristanfischer/.lmstudio/bin:/Users/tristanfischer/.local/bin:/Users/tristanfischer/.lmstudio/bin:/Users/tristanfischer/.local/bin'
++ PATH='/opt/homebrew/opt/node@22/bin:/Users/tristanfischer/.grok/bin:/Users/tristanfischer/.opencode/bin:/opt/homebrew/opt/libpq/bin:/Users/tristanfischer/.bun/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Users/tristanfischer/Library/Application Support/Cursor/User/globalStorage/anysphere.cursor-agent-worker/agent-cli/.local/share/cursor-agent/versions/2026.07.09-a3815c0:/Users/tristanfischer/Library/Application Support/Cursor/User/globalStorage/anysphere.cursor-agent-worker/agent-cli/.local/bin:/Users/tristanfischer/.grok/bin:/Users/tristanfischer/.opencode/bin:/opt/homebrew/opt/libpq/bin:/Users/tristanfischer/.bun/bin:/Users/tristanfischer/.cargo/bin:/Users/tristanfischer/.local/bin:/Users/tristanfischer/.lmstudio/bin:/Users/tristanfischer/.local/bin:/Users/tristanfischer/.lmstudio/bin:/Users/tristanfischer/.local/bin'
++ export 'NODE_OPTIONS=--max-old-space-size=8192 --import /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/or402-failover.mjs'
++ NODE_OPTIONS='--max-old-space-size=8192 --import /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/or402-failover.mjs'
++ export DESIGN_STAGE_CACHE_DIR=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/.poseidon-stage-cache
++ DESIGN_STAGE_CACHE_DIR=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/.poseidon-stage-cache
++ export BENCHMARK_NET_FORCE=1 QUALITY_LOOP_PHASE=3 PHYSICS_CRITIC_AUTOCORRECT=1
++ BENCHMARK_NET_FORCE=1
++ QUALITY_LOOP_PHASE=3
++ PHYSICS_CRITIC_AUTOCORRECT=1
+++ date +%Y%m%d-%H%M
++ OUT=out/poseidon-20260715-2123
++ mkdir -p out/poseidon-20260715-2123
++ python3 scripts/lib/loop_board.py gate --board out/poseidon-board.json
+[board] GATE OPEN — every active defect on None is dispositioned
++ npx tsx --no-cache scripts/serial-design-chain-v2.tsx briefs-loop/yuri_poseidon.md out/poseidon-20260715-2123
+++ basename out/poseidon-20260715-2123

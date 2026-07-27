@@ -1,0 +1,525 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_open_colorimeter.md (5232 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: optical_instrument (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: optical_instrument): 2 HARD field(s) filled with class-aware inferred values, 3 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_material, design_life.
+  [U5] filled "target_material": "Injection-moulded / 3D-printed ABS-polycarbonate enclosure, FR-4 printed-circuit-board assembly, COTS optical + electronic components (no process-pressure fabrication)" (Material/products inferred from brief text for optical_instrument. class-agnostic inference from brief text for unmapped)
+  [U5] filled "design_life": "5–8 yr (portable laboratory/field electronic instrument service life; battery + LED source are user-replaceable consumables; no pressure-vessel re-inspection regime)" (Industry-standard service life for optical_instrument per applicable design standard. class-agnostic inference from brie)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 12 duties derived; product="Optical absorbance and concentration measurements (data)" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] optical_path_length_mm = 10 mm [stated/high] — Standard cuvette path length specified in the brief.
+  [U6] wavelength_min_nm = 430 nm [stated/high] — Lower bound of the visible-to-near-infrared range specified in the brief.
+  [U6] wavelength_max_nm = 940 nm [stated/high] — Upper bound of the visible-to-near-infrared range specified in the brief.
+  [U6] absorbance_max_au = 2 AU [derived/high] — Standard linear range for Beer-Lambert law in simple single-beam photometers before stray 
+  [U6] absorbance_resolution_au = 0.01 AU [derived/high] — Typical requirement for basic analytical and biological colorimetric assays to provide mea
+  [U6] stray_light_limit_percent = 0.1 % [derived/medium] — To achieve a maximum absorbance of 2.0 AU (1% transmittance) with <10% error, stray light 
+  [U6] adc_resolution_bits = 16 bits [derived/high] — Measuring 2.0 AU requires a 100:1 signal ratio. A 16-bit ADC (65,536 counts) provides ~650
+  [U6] battery_runtime_h = 8 h [derived/medium] — Standard requirement for portable field instruments to support a full working day of inter
+  [U6] battery_capacity_mah = 1000 mAh [derived/medium] — Estimated system draw of ~70mA (LED + MCU + display) over 8 hours = 560mAh. Rounded up to 
+  [U6] usb_input_voltage_v = 5 V [derived/high] — Standard USB power specification required for charging and tethered operation.
+  [U6] minimum_sample_volume_ml = 1.5 mL [derived/high] — Standard 10 mm macro cuvettes require approximately 1.5 mL to ensure the liquid meniscus i
+  [U6] production_batch_size_units = 20 units [stated/high] — Target manufacturing batch size specified in the brief.
+[chain] engineering_contract: 0 quantities, 0 topology edges, 0 macro-assemblies (total £0), closures: 0 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":6}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":309}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":444}
+[products-writeback] web search: Engineering Contract not registered for optical_instrument — falling back to LLM-only chain. — 5ms
+[products-writeback] {"product_name":"Engineering Contract not registered for optical_instrument — falling back to LLM-only chain.","hit":"miss","latency_ms":144}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU+US
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for optical-instrument: replaying 3 stored duty spec(s) (photometry:beer-lambert-range, photodiode:tia-sizing, led-source:optical-power-budget) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool photometry:beer-lambert-range (duty_hash=dd5706c66c2a, db id=37) — no LLM call.
+[tool-generator] REUSED stored generated tool photodiode:tia-sizing (duty_hash=821403a87da1, db id=38) — no LLM call.
+[tool-generator] REUSED stored generated tool led-source:optical-power-budget (duty_hash=34aaf8e49963, db id=39) — no LLM call.
+[tool-creation] DONE for optical-instrument: created 3 self-test-passed tool(s) (photometry:beer-lambert-range, photodiode:tia-sizing, led-source:optical-power-budget), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for optical-instrument: created+registered 3 self-test-passed tool(s) [photometry:beer-lambert-range, photodiode:tia-sizing, led-source:optical-power-budget]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] REUSING stored candidate slug=optical_instrument version=1 status=candidate (no LLM call; 18 steps, 18 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for optical-instrument/generic — bootstrapped a 18-step tool plan (candidate id=34 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: battery-li-s:cell-sizing, cybersecurity-threat-model:stride, enclosure-emc:margin, extruder:thermal, iec-standards:lookup, led-source:optical-power-budget, lifecycle-co2:assessment, mass-aggregator:envelope-check, octopart:parts-lookup, photodiode:tia-sizing, photometry:beer-lambert-range, regulatory-cert-cost:lookup, reliability-fmea:system, runtime:peukert-discharge, supply-chain-risk:scoring, thermal-envelope:ladder, transport-logistics:routing, warranty-reliability:battery
+[bootstrap-tool-plan] FAIL-CLOSED iec-standards:lookup: missing computed output field(s) → emitted nothing for [iec_mandatory_standards_count(iec-standards:lookup.regulatory_mandatory_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED octopart:parts-lookup: missing computed output field(s) → emitted nothing for [critical_parts_in_stock_count(octopart:parts-lookup.parts_in_stock_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_certification_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp), regulatory_certification_months(regulatory-cert-cost:lookup.total_critical_path_months)] (no fabricated number written)
+[class-reference-graph-db] {"product_class":"optical-instrument","hit":"miss"}
+[generic-emitter] no class-reference graph for class='optical-instrument' (resolved slug='optical-instrument') — invoking E6a bootstrap-on-miss (corpus-first + one google/gemini-3.5-flash harvest, G1 candidate store)
+[bootstrap-class-graph] REUSING stored candidate slug=optical_instrument version=1 status=candidate (no LLM call)
+[generic-emitter] graph BOOTSTRAPPED for slug='optical_instrument': 8 nodes / 11 edges — bootstrap-candidate@v1 (candidate_id=5, version=1, status=candidate, reused=true, attempts=0). Stored row stays 'candidate' (G1): NOT promoted to class_reference_graphs.
+[generic-emitter] physics-derived equipment: 1 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 8 modules, 8 sub-modules, 38 words, 13 tools ran (574ms)
+[chain] WORD-DOMAIN-COHERENCE: 1 process-plant-vessel/industrial-power word(s) in device-scale "optical_instrument": sensing_instrumentation/sensing_instrumentation__photodiode/proc_scada[industrial_power:plc]
+  ✕ [industrial_power:plc] sensing_instrumentation/sensing_instrumentation__photodiode/proc_scada "SCADA / Plant Control System"
+[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped 1 wrong-domain word(s) from the design
+[chain] Build #18k: toolOutputsBlock built (11 tools, 8403 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 16 component_classes covered (16 with match, 0 empty), 14455 chars (10222ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=200, target_performance_value=10 (mm)
+[chain] keyMetrics seeded early (pre-reviewer): Optical Path Length=10 mm
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] physics-critic CACHE HIT (skeleton): design-hash 3f6737aec609… — reusing the stored critique verbatim (no LLM call)
+[chain] PHASE 4 skeleton critic: brief=8/10 plaus=7/10 coh=9/10 part=2/10 hon=9/10 (6275ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [part_realism @ modules/all/sub_modules/words/modifier_characters] Every single component in the bill of materials uses 'TBD (detailed design)' as its part number. No real, catalog-available parts are specified, which fails the objective of provid
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 10612 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 14 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 11 / 14 patches (skipped 3)
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word manufacturer="Opto Diode Corp" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word part_number="ODD-15W" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word material="silicon photodiode TO-5 package" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word rating_primary="940 nm peak sensitivity" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word regulatory="RoHS" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word (+7 modifiers)
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.transimpedance_amplifier_word manufacturer="Texas Instruments" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.transimpedance_amplifier_word part_number="OPA380" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 33.5s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1414}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=9/10 phys=7/10 coh=8/10 part=2/10 hon=9/10 (5320ms)
+[chain] critic headline: The design successfully captures the functional topology of a portable colorimeter, but relies entirely on placeholder 'TBD' parts and contains redundant power protection components.
+[chain] critic issues: 1 high, 1 med, 3 total
+  ✗ [high/high] part_realism @ modules/all/sub_modules/words/modifier_characters: Every single component in the bill of materials is marked as 'TBD (detailed design)' with a lifecycle of 'Concept design'. No real manufacturer or part numbers 
+  ✗ [med/high] engineering_plausibility @ modules/safety_protection/sub_modules/0/words/3: The inclusion of a 'Thermal Cutoff' in the safety_protection module is highly implausible for a low-power, battery-operated optical instrument drawing <100mA. T
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 9462 chars
+[chain] STEP 8: R4 Flash-Lite review returned 12 patches
+[chain] STEP 8: R4 Flash-Lite review applied 12 / 12 patches (skipped 0)
+    =sensing_instrumentation.overview_paragraph_en (prose)
+    =sensing_instrumentation.sensing_instrumentation__photodiode.english_sentence (prose)
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word manufacturer="Opto Diode Corp" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word part_number="ODD-15W" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word rating_primary="940 nm peak sensitivity" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word sensing_instrumentation.sensing_instrumentation__photodiode.photodiode_word (+5 modifiers)
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.transimpedance_amplifier_word manufacturer="Texas Instruments" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__photodiode.transimpedance_amplifier_word part_number="OPA380AID" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 24.5s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":678}
+[chain] canonical product_class OVERRIDE: "" → "optical_instrument" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "optical_instrument" — skipping
+[chain] physics repair: 0 iter(s); HIGH 1→1; plausibility 7→7; patches 0
+[chain] sub-module prose pre-fill: rewrote 7/8 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 124 entries (KPA=124, emitter=0, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 8 sub_modules checked, 8 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 0 pass / 0 fail; grammar 9 pass / 4 fail; total score 1390
+  ✗ [thermal_path_closes] grammar: 4 heat-source sub-module(s) without thermal_path: sensing_instrumentation::sensing_instrumentation__photodiode, energy_conversion_transduction::energy_conversion_transduction__led_source, power_distribution::power_distribution__dc_input_fuse, hmi_ergonomics::hmi_ergonomics__local_display. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [power_topology_closes] grammar: 1 power-consuming module(s) without cross-link to source: sensing_instrumentation
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): hmi_ergonomics::hmi_ergonomics__local_display (3 words), structure_containment::structure_containment__cuvette_holder (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 8 sub-module(s) with <3 priced lines: sensing_instrumentation::sensing_instrumentation__photodiode (0/5), energy_conversion_transduction::energy_conversion_transduction__led_source (0/5), control_compute_communication::control_compute_communication__microcontroller (0/5), power_distribution::power_distribution__dc_input_fuse (0/5), energy_storage_source::energy_storage_source__rechargeable_battery_pack (0/5), hmi_ergonomics::hmi_ergonomics__local_display (0/3) ...+2.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 3 module(s) name components in overview that are absent from sub-modules (procurement gap): sensing_instrumentation: overview mentions 3 concrete components not present in any sub-module word — odd-15w, opa380, ad7799 | energy_conversion_transduction: overview mentions 2 concrete components not present in any sub-module word — tps61040, g6sp | control_compute_communication: overview mentions 2 concrete components not present in any sub-module word — stm32f103c8t6, ubbp01. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 0: applied 5 patches, skipped 4, allowlist_rejected=4, state_changed=true
+    +cross_module_grammar_links.[+] (Close thermal path for photodiode)
+    +cross_module_grammar_links.[+] (Close thermal path for LED source)
+    +cross_module_grammar_links.[+] (Close thermal path for power distribution)
+    +cross_module_grammar_links.[+] (Close thermal path for HMI)
+    +cross_module_grammar_links.[+] (Close power topology for sensing_instrumentation)
+    [allowlist-strict] reject add_word with locked kind="material" value="EPDM Rubber" — Phase 2 LLM may not invent words carrying emitter-owned identity/spec modifiers (part_number/manufacturer/capacity/dimension/form/material/regulatory/rating_primary/rating_secondary/quantity); word_id=bezel_seal_word sub_module=hmi_ergonomics.sub_modules[0].words[+]. The deterministic-emitter must own all locked-identity words (determinism #86 — a non-cached, non-seeded LLM call in this file must never be the one deciding whether a locked word exists). If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one, or add a prose-only word with no locked-kind modifier. (Increase word density for hmi_ergonomics)
+    [allowlist-strict] reject add_word with locked kind="material" value="PVC" — Phase 2 LLM may not invent words carrying emitter-owned identity/spec modifiers (part_number/manufacturer/capacity/dimension/form/material/regulatory/rating_primary/rating_secondary/quantity); word_id=ribbon_cable_word sub_module=hmi_ergonomics.sub_modules[0].words[+]. The deterministic-emitter must own all locked-identity words (determinism #86 — a non-cached, non-seeded LLM call in this file must never be the one deciding whether a locked word exists). If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one, or add a prose-only word with no locked-kind modifier. (Increase word density for hmi_ergonomics)
+    [allowlist-strict] reject add_word with locked kind="material" value="Stainless Steel" — Phase 2 LLM may not invent words carrying emitter-owned identity/spec modifiers (part_number/manufacturer/capacity/dimension/form/material/regulatory/rating_primary/rating_secondary/quantity); word_id=chassis_screw_word sub_module=structure_containment.sub_modules[0].words[+]. The deterministic-emitter must own all locked-identity words (determinism #86 — a non-cached, non-seeded LLM call in this file must never be the one deciding whether a locked word exists). If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one, or add a prose-only word with no locked-kind modifier. (Increase word density for structure_containment)
+    [allowlist-strict] reject add_word with locked kind="material" value="Silicone" — Phase 2 LLM may not invent words carrying emitter-owned identity/spec modifiers (part_number/manufacturer/capacity/dimension/form/material/regulatory/rating_primary/rating_secondary/quantity); word_id=gasket_word sub_module=structure_containment.sub_modules[0].words[+]. The deterministic-emitter must own all locked-identity words (determinism #86 — a non-cached, non-seeded LLM call in this file must never be the one deciding whether a locked word exists). If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one, or add a prose-only word with no locked-kind modifier. (Increase word density for structure_containment)
+[chain] Phase 2 iter 1: arith 0 pass / 0 fail; grammar 11 pass / 2 fail; total score 2340
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): hmi_ergonomics::hmi_ergonomics__local_display (3 words), structure_containment::structure_containment__cuvette_holder (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 8 sub-module(s) with <3 priced lines: sensing_instrumentation::sensing_instrumentation__photodiode (0/5), energy_conversion_transduction::energy_conversion_transduction__led_source (0/5), control_compute_communication::control_compute_communication__microcontroller (0/5), power_distribution::power_distribution__dc_input_fuse (0/5), energy_storage_source::energy_storage_source__rechargeable_battery_pack (0/5), hmi_ergonomics::hmi_ergonomics__local_display (0/3) ...+2.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 3 module(s) name components in overview that are absent from sub-modules (procurement gap): sensing_instrumentation: overview mentions 3 concrete components not present in any sub-module word — odd-15w, opa380, ad7799 | energy_conversion_transduction: overview mentions 2 concrete components not present in any sub-module word — tps61040, g6sp | control_compute_communication: overview mentions 2 concrete components not present in any sub-module word — stm32f103c8t6, ubbp01. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2: repair LLM returned unfixable: parse failure
+[fill-blank-mpn] 29 blank catalogue word(s) for class "optical_instrument" (8 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__photodiode (Transimpedance Amplifier) → Texas Instruments OPA333AIDBVR
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__photodiode (Analog To Digital Converter) → Texas Instruments ADS1220IPWR
+[fill-blank-mpn]   ⊘ nohit sensing_instrumentation::sensing_instrumentation__photodiode (Signal Amplifier Stage): no DB row passed the rank bar for tokens [signal, amplifier, stage, instrumentation, photodiode] — staying generic
+[fill-blank-mpn]   ⊘ nohit energy_conversion_transduction::energy_conversion_transduction__led_source (LED Source): no DB row passed the rank bar for tokens [led, source, conversion, transduction] — staying generic
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__led_source (LED Driver) → Texas Instruments TLC5916IDR
+[fill-blank-mpn]   ⊘ nohit energy_conversion_transduction::energy_conversion_transduction__led_source (Wavelength Selection Module): no DB row passed the rank bar for tokens [wavelength, selection, conversion, transduction, led, source] — staying generic
+[fill-blank-mpn]   ⊘ nohit energy_conversion_transduction::energy_conversion_transduction__led_source (Collimating Optic): no DB row passed the rank bar for tokens [collimating, optic, conversion, transduction, led, source] — staying generic
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__led_source (DC DC Regulator) → Microchip Technology MCP1700T-3302E/TT
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller (Usb Interface): StarTech PEXUSB312A2C2V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller (Usb Interface): StarTech PEXUSB312C3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller (Usb Interface): StarTech PEXUSB321C fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__microcontroller (Usb Interface) → FTDI TTL-232RG-VSW3V3-PCB
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__microcontroller (Local Display): no DB row passed the rank bar for tokens [local, display, control, compute, communication, microcontroller] — staying generic
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__microcontroller (User Input Buttons): no DB row passed the rank bar for tokens [user, input, button, control, compute, communication] — staying generic
+[fill-blank-mpn]   ⊘ nohit power_distribution::power_distribution__dc_input_fuse (DC Input Fuse): no DB row passed the rank bar for tokens [dc, input, fuse, power, distribution] — staying generic
+[fill-blank-mpn]   ⊘ nohit power_distribution::power_distribution__dc_input_fuse (Power Input Connector): no DB row passed the rank bar for tokens [power, input, connector, distribution, dc, fuse] — staying generic
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__dc_input_fuse (Reverse Polarity Protection): Schneider Electric LV430630 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__dc_input_fuse (Reverse Polarity Protection): Phoenix Contact 2838199 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__dc_input_fuse (Power Indicator LED) → Banner Engineering S22LBRWPQ
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__dc_input_fuse (Ferrite Emc Bead) → Signal Transformer FCB-0805-601P
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Banner Engineering DBRQ fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Generac Power Systems SBE500 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Generac Power Systems SBE1000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Microchip Technology MCP73831T-2ACI/OT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): MICROCHIP MCP73831T-2ACI/OT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Eaton - Bussmann Electrical Division PV-15A10F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Bussmann / Eaton PV-15A10F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit energy_storage_source::energy_storage_source__rechargeable_battery_pack (Battery Charge Management Circuit): no DB row passed the rank bar for tokens [battery, charge, management, circuit, storage, source] — staying generic
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Usb Power Interface): StarTech PEXUSB312A2C2V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Usb Power Interface): StarTech PEXUSB312C3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Usb Power Interface): StarTech PEXUSB321C fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__rechargeable_battery_pack (Usb Power Interface) → FTDI TTL-232RG-VSW3V3-PCB
+[fill-blank-mpn]   ⊘ nohit energy_storage_source::energy_storage_source__rechargeable_battery_pack (Battery Protection Circuit): no DB row passed the rank bar for tokens [battery, protection, circuit, storage, source, rechargeable] — staying generic
+[fill-blank-mpn]   ⊘ nohit energy_storage_source::energy_storage_source__rechargeable_battery_pack (Power Switch): no DB row passed the rank bar for tokens [power, switch, storage, source, rechargeable, battery] — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__local_display (Status Indicator): no DB row passed the rank bar for tokens [status, indicator, hmi, ergonomic, local, display] — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__local_display (Control Switch): no DB row passed the rank bar for tokens [control, switch, hmi, ergonomic, local, display] — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__local_display (Mounting Bezel): no DB row passed the rank bar for tokens [mounting, bezel, hmi, ergonomic, local, display] — staying generic
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Bourns MF-PSML110/12-2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Littelfuse 0805L110WR-A fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Littelfuse LVSP0005TX2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Bussmann / Eaton FWP-100A22F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Bourns MF-RX020/72-0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Littelfuse 087406.3MXEP fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Bourns MF-R030-2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Input Fuse): Bel Fuse 3AG 750-R fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__input_fuse (Input Fuse): best DB row Bussmann / Eaton AMI-40 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__input_fuse (Overcurrent Protection) → Schneider Electric LV430630
+[fill-blank-mpn]   ⊘ nohit safety_protection::safety_protection__input_fuse (Esd Protection Network): no DB row passed the rank bar for tokens [esd, protection, network, safety, input, fuse] — staying generic
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Thermal Cutoff): Littelfuse 0708090.UR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__input_fuse (Polyfuse Resettable) → Littelfuse 1206L300SLTHYR
+[fill-blank-mpn] filled 10/29 blank word(s): 10 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 8 structural skipped.
+[chain] fill-blank-mpn: branded 10/29 blank catalogue word(s) (10 DB-first real MPN, 0 generated real-OEM), 8 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 206 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 21732 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 10 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=8 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 5 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"optical_instrument","resolved_to":"optical_instrument","hit":"db","nodes":8,"edges":20}
+[chain] K10 shadow: PASS_SHADOW — matched=16 missing=0 extra=0
+[chain] headline derived: Optical Path Length=10 mm [derived_from_brief]; Unit cost ceiling=200 GBP;  (0.00s)
+[chain] part verification: 10 parts checked — verified=10, unverified=0, uncertain=0, skip=0
+[chain] G5 RAG: 0 queries → 0 suggestions (high=0, medium=0, low=0, below_threshold=0, corpus=0 rows)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[chain] Stage 10.5 Part Reality Check: 10 checked, 9 real, 0 substituted, 1 warned (no substitute available). Nexar calls used: 0.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ photodiode_word: "? TBD (detailed design)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification: 4 structured MPN(s) scanned, 4 already DB-verified, 0 live-probed, 0 confirmed (kept), 0 demoted to honest descriptor.
+[chain] module-paragraph-llm: 8/8 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/8 capital (threshold 5); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 3 sections, 0 warnings
+[chain] design decisions review: 6 choices (1 applied, 5 flagged, 0 blocked)
+[chain] attribute-phantom cleanup: dropped 0 dimension/property phantom word(s) + 2 exact-id duplicate(s) (fixes phantom BoM lines + duplicate tags)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 0 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 0 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[fill-blank-mpn] 18 blank catalogue word(s) for class "optical_instrument" (7 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__dc_input_fuse (Reverse Polarity Protection): Schneider Electric LV430630 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__dc_input_fuse (Reverse Polarity Protection): Phoenix Contact 2838199 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Banner Engineering DBRQ fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Generac Power Systems SBE500 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Generac Power Systems SBE1000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Microchip Technology MCP73831T-2ACI/OT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): MICROCHIP MCP73831T-2ACI/OT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Eaton - Bussmann Electrical Division PV-15A10F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Bussmann / Eaton PV-15A10F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Thermal Cutoff): Littelfuse 0708090.UR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 0/18 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 7 structural skipped.
+[chain] INSTRUMENT signal-chain topology: 45 edge(s) (source→sample→detector→conditioning→digitiser→compute→display + power rails) — sealed sub-1 m³ instrument, no fluid/plant
+[chain] filter-on-dirty-stream invariant: not_applicable
+[chain] provenance rooting: 25/25 inputs trace to the brief (100%)
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.53%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.54%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.54%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.54%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.54%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.54%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 6 passes, settled at pass 6; as-routed supply demand 0.005 → 0.005 kW (Δ 0 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 35812) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/blender-bg.log
+[estimate] device-scale INSTRUMENT: estimated parts capped to COTS commodity ceilings (deviceScaleCeilingGbp)
+[estimate] product_class=optical_instrument annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'optical_instrument' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 26 parts need price estimates
+[estimate] corpus-classified 4/26; 22 need rule-based / Flash-Lite
+[estimate] rule-based classified 5 parts; 17 still need Flash-Lite
+[estimate] Flash-Lite classified 1 batches
+[estimate] 1 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] updated 1 existing, synthesised 25 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] C5 sanity clamp: 1 parts clamped to class sanity band (check price_sanity_note in partVerifications)
+[estimate] classification source: corpus=4 rule_based=5 flash_lite=17 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=26 flash_lite_unknown=0
+[estimate] top classes in BoM:
+  optical: 6
+  safety_consumable: 6
+  structural_polymer: 4
+  electronic_pcb: 3
+  electronic_ic: 1
+  electronic_connector: 1
+  electronic_discrete: 1
+  oem_subsystem: 1
+[estimate] estimated cost: GBP 0.000
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 35 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 35/35 results in 2.4s
+[engine-c] flags: in_range=7  over=1  under=11  no_reference=16
+[engine-c] 12/35 priced lines flagged out-of-range vs reference corpus (34.3%)
+[engine-c] 1 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "optical_instrument" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: optical_instrument
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/state.json
+[supplier-validate] no suppliers to validate
+[chain] Gemini i2i OFF (Excel embeds Blender views only) — set CHAIN_WANT_GEMINI_I2I=1 to enable
+[chain] deployment_envelope: no envelope mapped for optical_instrument (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £440 (raw materials £267, class optical_instrument)
+[chain] G2 cost-reality: PASS — BoM £267 across 35 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 3 gaps
+  ⚠ sub_modules: 8 sub-modules across 8 modules — expected ≥16
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 3 lines re-priced from DOE/NETL + cache (real), 1 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 3/10 · mean 6.7/10 · 1 blocking · below-8: brief_compliance=3, bill_of_materials=7, physics_fidelity=4
+  ✗ [brief_compliance] Banner asserts 'All 12 brief constraints PASS' with 0 unverified despite multiple missing/null values (mass cap, temp_min/max) in the brief
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 3/10).
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.44×) — ⚠ The brief asks for 1.00 unit AND a £200 ceiling — these CANNOT both be met: 1.00 unit costs £440 (2.2× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 0.440 unit at £258 (£587/unit) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_open_colorimeter.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323-converged
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £440 / 1 unit = £440/unit — within the £100–£5,000,000/unit industry band for unit output. (no scalable output metric — whole-system price treated as £/unit)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 35 disclosed; 0 take-off prices written into the BoM; purchased £261 → installed £783 (central)
+[advisor-engagement] 8/8 modules got an advisor block — 16 specialist cards, 32 grounded questions
+[chain] advisor-engagement: 8 module blocks, 16 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "optical_instrument" (11 tools, 28 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="optical_instrument" template=NONE hero=false modules=0 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="optical_instrument" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENER
+  ✗ BLENDER_NO_HERO: No hero/cover image (00-hero.png / blender-cover.png) in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323.
+[chain] tools-flow: rendered 201241 bytes (11 tools)
+[investor-section] 5 investors matched from 18 candidates: PhotonVentures, Constructor Capital, BDC Capital Deep Tech, Kindred Capital, Swanlaab Venture Factory
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 5/5 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Working Schematic — Line / Valve / Instrument Schedules (pipe runs, DN, valve locations)  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  log:
+    · reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323
+    · convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.54%); economic-conductor saving £0
+    ·   draw_distribution_interface.py: skipped (should_emit=False)
+    ·   draw_facility_layout.py: skipped (should_emit=False)
+    ·   draw_hvac.py: conditional gate/run failed: 'NoneType' object has no attribute '__dict__'
+    · shaded-hero: running INSPECT=0 Blender pass → 00-hero.png
+    · shaded-hero: 00-hero.png + blender-cover.png written
+    · exterior: running INSPECT=0 BLENDER_PLANT_SHELL=1 Blender pass → exterior/
+    · exterior: Blender ran (rc=0) but exterior/00-hero.png absent: …g: degenerated triangle detected, correcting
+Warning: degenerated triangle detected, correcting
+Warning: degenerated triangle detected, correcting
+Warning: degenerated triangle detected, correcting
+Warning: degenerated triangle detected, correcting
+Warning: degenerated triangle detected, correcting
+
+    · self-exam parts_ledger.py: ok — → CONNECTIVITY: 0 concern(s) — process 0/0 connected (0%) · instruments 0/0 associated (0%) · 0 origin(s) · 0 sink(s)
+    · self-exam render_ledger_html.py: ok — wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/parts-ledger.html  (0 equipment + 0 conn
+    · self-exam inspect_drawings.py: ok — OVERALL (floor) = 10.0  → general-arrangement   (2 defects)   wrote drawings-inspection.json
+    · hero-embed: hero-embed.png written (522 KB)
+    · renders: 5 captioned (canonical ≤31-char sheet names)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 5/5 drawings + hero → wired into the PDF
+[drawing-gates] 16 gates · 1 failing · ALL-PASS=False
+  ✓ [med ] legibility         single-line-diagram 2120x1280 aspect 1.7:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2200x1200 aspect 1.8:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x1240 aspect 1.8:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x1604 aspect 1.3:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2526x3404 aspect 1.3:1 (limit 4:1)
+  ✓ [med ] legibility         pid min text 6.26 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.7282 mm
+  ✓ [med ] legibility         block-flow-diagram min text 2.80 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.3255 mm
+  ✓ [med ] legibility         single-line-diagram min text 6.42 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.7557 mm
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [high] no_stray_beam      longest drawn run u_wire_trunk_u_dc_dc_regulator_power (DC power rail (instrument-internal)) spans 0.4 m (limit 16 m — a plant-crossing beam)
+  ✓ [high] connection_sanity  connection graph physically coherent (domain + direction + magnitude)
+  ✗ [high] tag_legibility     31 illegible tag(s): tag pile-up in elevation-aa: 'I-111' ∩ 'X-107' = 84% of the smaller bbox (max 20%) | tag pile-up in elevation-aa: 'I-111' ∩ 'I-101' = 71% of the smaller bbox (max 20%) | tag pile-up in elevation-aa: 'X-104' ∩ 'I-106' = 88% of the smaller bbox (max 20%) | tag pile-up in elevation-aa: 'X-115' ∩ 'I-105' = 87% of the smaller bbox (max 20%)
+  ✓ [high] interior_fill      interior fill 100% of the 0.00 m³ enclosure (floor 35% — below it the render is a hollow shell, not a product)
+  ✓ [high] drawing_domain     no plant-architecture markers on the device drawings
+  ✓ [high] render_view_quality 5 Excel-bound view(s) present, non-blank and correctly framed
+  ✓ [high] cad_geometry_coverage instrument geometry present — 26 manifest part(s), 0 instrument-proxy source(s), 0 CAD family(ies)
+[chain] drawing-gates: 1/16 failing — DRAWING >=8 FAIL (drawing-gates.json — each failing gate names its fix stage)
+[chain] drawing-gates PUNCH-LIST (1 defect(s) → 1 stage(s)) → drawing-gates-punchlist.md
+[chain]   → draw_ga _TagPlacer (view-bounds clip + title/dim obstacles + elev same-name range-collapse) + _draw_external_drain_points (same-edge EXT.DRAIN range-collapse + along-edge stagger): tag_legibility/general-arrangement
+[chain]   ⚠ lesson-loop: drawing:tag_legibility has recurred 11× on optical_instrument — council escalation flagged (tasks/harness-stubs/)
+[chain]   ↳ lesson-loop: 1 loss(es) logged to failure-ledger + invariant stub(s) drafted in tasks/harness-stubs/
+[census] 12 tie-in runs (12 units) = £12,177 (cable £12,177 + pipe £0)
+[census] routed major streams = £1,000  →  full interconnect ≈ £13,177
+  [corpus-median-lift] raised 1 under-priced principal line(s) to their engine corpus lower edge (+£21)
+[chain] cost-sanity re-derived on authoritative BoM (Σ £346): verdict pass — £571/unit
+[chain] requirements-driven BoM: 72 requirement lines (Σ £346) → state.requirementsBom; cost cascade reconciled to this total
+[chain] PCB STAGE (shadow): bearing=true disposition=bespoke categories=[analog_frontend,board_role,connectivity,display,power_electronics,processor] canAuthor=true canRoute=true canVerifyAndExport=true
+[chain] PCB atopile project: 17 component(s), 10 unresolved, 6 net(s) -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/pcb-project
+[chain] PCB pipeline: ok=true stage_reached=complete routed=true drc_violations=0
+[chain] PCB GATE (shadow): applicable=true fires=false reason=clean_board
+dossier_repair: 2 fix(es) over 1 pass(es); 3 gap(s) need input (1 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/state.json
+[chain] self-repair: 2 fix(es) over 1 pass(es); 3 gap(s) need input (1 blocking HIGH)
+[reconcile-hollow] 0 hollow sub-module(s); nothing to reconcile
+[deterministic-finalize] class-alien-renamed=0 scope-words-demoted=0 density-merged=0 modifiers=0 prose=0 overview=0 · residual violations {'modifier_consistency': 0, 'prose_covers': 0, 'overview_subset': 0, 'word_density_thin': 4}
+[deterministic-finalize] trace-reconcile: connection-ledger.json pruned=0 connection-schedule.json pruned=0
+[fill-blank-mpn] 18 blank catalogue word(s) for class "optical_instrument" (7 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__dc_input_fuse (Reverse Polarity Protection): Schneider Electric LV430630 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__dc_input_fuse (Reverse Polarity Protection): Phoenix Contact 2838199 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Banner Engineering DBRQ fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Generac Power Systems SBE500 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Generac Power Systems SBE1000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Microchip Technology MCP73831T-2ACI/OT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): MICROCHIP MCP73831T-2ACI/OT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Eaton - Bussmann Electrical Division PV-15A10F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__rechargeable_battery_pack (Rechargeable Battery Pack): Bussmann / Eaton PV-15A10F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__input_fuse (Thermal Cutoff): Littelfuse 0708090.UR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 0/18 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 7 structural skipped.
+[fill-blank-mpn]   ⊘ scrub power_distribution::power_distribution__dc_input_fuse (Power Indicator LED): cleared Banner Engineering S22LBRWPQ — industrial mis-pin on device instrument
+[fill-blank-mpn]   ⊘ scrub safety_protection::safety_protection__input_fuse (Overcurrent Protection): cleared Schneider Electric LV430630 — industrial mis-pin on device instrument
+[fill-blank-mpn] scrubbed 2 industrial-scale MPN(s) from device-instrument words
+  [corpus-median-lift] raised 1 under-priced principal line(s) to their engine corpus lower edge (+£21)
+[chain] ghost-snapshot re-derive: requirementsBom 70 → 72 row(s) on the FINAL settled tree (pruned 0 stale partVerifications entries)
+dossier_repair: 2 fix(es) over 1 pass(es); 3 gap(s) need input (1 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/state.json
+[chain] freshen-scorer-inputs: re-rendered schematics + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 0 HIGH · 0 corroborated (score) · 4 advisory (never score) — file + state.physicsCritique are the SAME canonical object
+[chain] state freeze: workbook built from state sha256 f865718c6f5c…
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/dossier.xlsx
+  · column contract [Line & velocity]: 37/37 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 70/70 rows PASS → 10.0/10
+  · column contract [Risk & Regulatory]: 1/1 rows PASS → 10.0/10
+  · column contract [Engineering Analysis]: 1/1 rows PASS → 10.0/10
+  · per-tab scorecard: min Executive Summary=10/10 · 0 FAIL, 0 UNSCORED
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Quantities
+  · Calculations
+  · Calculations: linked 9 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs Master (M0)
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+  ! Engineering Analysis raised, skipping: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>
+  · Process schedules — skipped (no source data)
+  · Line & velocity
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 5 views on one tab)
+  · Electrical (single-line + panel schedule)
+  · PCB
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+  · Drawings (register)
+  · Glossary
+  · Audit data
+Traceback (most recent call last):
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 28644, in <module>
+    main()
+    ~~~~^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 28594, in main
+    res = build(run_dir, out_path)
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 23286, in build
+    _finalise_tab_scores(wb, state, run_dir)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 22332, in _finalise_tab_scores
+    _TAB_SCORES[ws.title] = _merge_content(_TAB_SCORES.get(ws.title), res,
+                            ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                           _CELL_STATS.get(ws.title), ws.title)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 22311, in _merge_content
+    if prior.get("scored") is False:
+       ^^^^^^^^^
+AttributeError: 'int' object has no attribute 'get'
+[chain] ⚠ Excel staleness gate: dossier.xlsx did not advance past its pre-build snapshot — build-excel-export.py exited without a wb.save() (its own pre-save no-cheating gate almost certainly fired on stale content) — rebuilding ONCE
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260713-1323/dossier.xlsx
+  · column contract [Line & velocity]: 37/37 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 70/70 rows PASS → 10.0/10
+  · column contract [Risk & Regulatory]: 1/1 rows PASS → 10.0/10
+  · column contract [Engineering Analysis]: 1/1 rows PASS → 10.0/10
+  · per-tab scorecard: min Executive Summary=10/10 · 0 FAIL, 0 UNSCORED
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Quantities
+  · Calculations
+  · Calculations: linked 9 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs Master (M0)
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+  ! Engineering Analysis raised, skipping: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>
+  · Process schedules — skipped (no source data)
+  · Line & velocity
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 5 views on one tab)
+  · Electrical (single-line + panel schedule)
+  · PCB
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+  · Drawings (register)
+  · Glossary
+  · Audit data
+Traceback (most recent call last):
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 28644, in <module>
+    main()
+    ~~~~^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 28594, in main
+    res = build(run_dir, out_path)
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 23286, in build
+    _finalise_tab_scores(wb, state, run_dir)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 22332, in _finalise_tab_scores
+    _TAB_SCORES[ws.title] = _merge_content(_TAB_SCORES.get(ws.title), res,
+                            ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                           _CELL_STATS.get(ws.title), ws.title)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 22311, in _merge_content
+    if prior.get("scored") is False:
+       ^^^^^^^^^
+AttributeError: 'int' object has no attribute 'get'
+
+[chain] === FATAL GATE 38 excel-staleness (exit 38) — WRONGNESS, fix the source rule ===
+dossier.xlsx was not rewritten after 1 retry — build-excel-export.py refused to save over the same stale content twice; the shipped workbook would not reflect the delivered design (see the build-excel-export.py output above for the underlying ⚠Checks / LIVE-CHECK GATE finding to fix at source)

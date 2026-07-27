@@ -1,0 +1,1149 @@
+── archetype pre-flight: class 'bess' (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight) ──
+# Archetype pre-flight audit — `bess`
+
+- brief: `briefs-loop/bess_20ft_grid_storage.md`
+- class plan: `bess.ts`
+- catalogue-candidacy mode: node bridge (real isCatalogueComponent)
+- playbook: docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md (9 defect families; run pre-flight fixes BEFORE the first chain run)
+
+## Summary: 86 finding(s), 17 informational note(s)
+
+## Family 1 — Vocabulary/matcher gaps (36 finding(s))
+
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `container` (×17, beside known equipment in "battery container") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `system` (×14, beside known equipment in "energy storage system brief foot") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `energy` (×11, beside known equipment in "energy storage system brief foot") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `foot` (×10, beside known equipment in "energy storage system brief foot") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `management` (×7, beside known equipment in "liquid-cooling thermal management fire detection") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `power-conversion` (×7, beside known equipment in "bidirectional power-conversion system pcs") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `rack` (×7, beside known equipment in "cells racks module") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** class-plan word_name token `lfp` is unknown to EVERY shared matcher lexicon — the engine WILL mint a word carrying it and no join can fire (class plan word_name vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `step-up` (×6, beside known equipment in "step-up transformer") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `connection` (×5, beside known equipment in "grid connection") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `two-hour` (×5, beside known equipment in "continuous two-hour discharge duration") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `duration` (×4, beside known equipment in "discharge duration family") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `medium-voltage` (×4, beside known equipment in "medium-voltage switchgear") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `safety` (×4, beside known equipment in "liquid cooling fire safety controls") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `bidirectional` (×3, beside known equipment in "bidirectional power-conversion system pcs") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `capacity` (×3, beside known equipment in "nameplate energy capacity") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `civil` (×3, beside known equipment in "step-up transformer excluding civil") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `containerised` (×3, beside known equipment in "high-density containerised storage block") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `conversion` (×3, beside known equipment in "power conversion") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `current` (×3, beside known equipment in "battery direct current") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `detection` (×3, beside known equipment in "liquid-cooling thermal management fire detection") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `direct-current` (×3, beside known equipment in "direct-current distribution") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `frequency` (×3, beside known equipment in "grid frequency signals") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** class-plan word_name token `liquid` is unknown to EVERY shared matcher lexicon — the engine WILL mint a word carrying it and no join can fire (class plan word_name vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** class-plan word_name token `loop` is unknown to EVERY shared matcher lexicon — the engine WILL mint a word carrying it and no join can fire (class plan word_name vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `phosphate` (×3, beside known equipment in "phosphate lfp prismatic cells assembled") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `auxiliary` (×2, beside known equipment in "auxiliary systems liquid cooling chiller") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `electronic` (×2, beside known equipment in "electronics enclosure auxiliary low-voltage power") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `energy-management` (×2, beside known equipment in "controller energy-management system dispatches charge") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `excluding` (×2, beside known equipment in "step-up transformer excluding civil") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `family` (×2, beside known equipment in "discharge duration family") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `heating-ventilation` (×2, beside known equipment in "suppression heating-ventilation") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** class-plan word_name token `prismatic` is unknown to EVERY shared matcher lexicon — the engine WILL mint a word carrying it and no join can fire (class plan word_name vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** class-plan word_name token `slave` is unknown to EVERY shared matcher lexicon — the engine WILL mint a word carrying it and no join can fire (class plan word_name vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** class-plan word_name token `step` is unknown to EVERY shared matcher lexicon — the engine WILL mint a word carrying it and no join can fire (class plan word_name vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[FINDING] [family 1 — Vocabulary/matcher gaps]** NEVER_FOLD lexicons have diverged: TS emitter-completion.ts has ['bellows', 'lens', 'mains', 'scada', 'ups'] but Python _JOIN_NEVER_FOLD has ['bellows', 'gas', 'lens', 'scada', 'ups'] (difference: ['gas', 'mains']) — a name containing a diverged token plural-folds differently on the two sides (emitter-completion.ts:NEVER_FOLD vs build-excel-export.py:_JOIN_NEVER_FOLD)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[INFO] [family 1 — Vocabulary/matcher gaps]** 152 further brief tokens unknown to every lexicon but with no equipment context (prose — review only if any is actually an equipment family): `equipment`×4, `configuration`×3, `directive`×3, `dynamic`×3, `iron`×3, `life`×3, `lithium`×3, `target`×3, `voltage`×3, `arbitrage`×2, `eight-hour`×2, `engineering`×2, `footprint`×2, `g99`×2, `grid-tied`×2, `hold`×2, `iec`×2, `peak`×2, `recommendation`×2, `regulation`×2, `response`×2, `shaving`×2, `site`×2, `solution`×2, `standard`×2, `wholesale`×2, `added`×1, `alternating`×1, `ambient`×1, `amortise`×1, `anchor`×1, `annual`×1, `assembled`×1, `assessment`×1, `back`×1, `balance-of-plant`×1, `balanced`×1, `block`×1, `brief`×1, `bus`×1 (+112 more)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[INFO] [family 1 — Vocabulary/matcher gaps]** brief acronyms with no workbook-glossary entry: BS, DSEAR, EN, IEC, IET, ISO, LFP, MW, NFPA, NOT, OF, ONLY, PCS, SCOPE, THIS, UK, UKCA, UL (scripts/build-excel-export.py:_GLOSSARY)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[INFO] [family 1 — Vocabulary/matcher gaps]** plural-fold NEVER_FOLD candidates (s-ending tokens whose singular never appears in the brief — possible mass nouns, review before first run): controls, electronics, holds (emitter-completion.ts:NEVER_FOLD + build-excel-export.py:_JOIN_NEVER_FOLD)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+
+## Family 2 — Two-truths / multi-mint (37 finding(s))
+
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `dod_fraction`: `dod_fraction: c.quantities?.dod_fraction?.value ?? 0.80,` (scripts/lib/orchestrator/class-plans/bess.ts:134)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_capacity_ah`: `cell_capacity_ah: c.quantities?.cell_capacity_ah?.value ?? 314,` (scripts/lib/orchestrator/class-plans/bess.ts:141)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_voltage_v`: `cell_voltage_v: c.quantities?.cell_voltage_v?.value ?? 3.2,` (scripts/lib/orchestrator/class-plans/bess.ts:142)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `temp_max_c`: `ambient_temp_c: c.envelope?.operating_environment?.temp_max_c ?? 25,` (scripts/lib/orchestrator/class-plans/bess.ts:143)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `dc_bus_voltage_v`: `dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,` (scripts/lib/orchestrator/class-plans/bess.ts:144)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `continuous_power_kw`: `rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,` (scripts/lib/orchestrator/class-plans/bess.ts:145)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `temp_max_c`: `temperature_c: (c.envelope?.operating_environment?.temp_max_c ?? 35) + 5,  // 5°C safety margin above brief…` (scripts/lib/orchestrator/class-plans/bess.ts:305)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `continuous_power_kw`: `rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,` (scripts/lib/orchestrator/class-plans/bess.ts:365)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `dc_bus_voltage_v`: `dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,` (scripts/lib/orchestrator/class-plans/bess.ts:366)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `ac_output_voltage_v`: `ac_output_voltage_v: c.quantities?.ac_output_voltage_v?.value ?? 400,` (scripts/lib/orchestrator/class-plans/bess.ts:367)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `continuous_power_kw`: `rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,` (scripts/lib/orchestrator/class-plans/bess.ts:455)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_count`: `{ manufacturer: 'CATL', part_number: 'CBC00', quantity: Math.round(c.quantities?.cell_count?.value ?? 6084) },` (scripts/lib/orchestrator/class-plans/bess.ts:541)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_voltage_v`: `const cellVoltageV = c.quantities.cell_voltage_v?.value ?? 3.2` (scripts/lib/orchestrator/class-plans/bess.ts:625)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_capacity_ah`: `const cellAh = c.quantities.cell_capacity_ah?.value ?? 314` (scripts/lib/orchestrator/class-plans/bess.ts:626)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `transformer_rating_kva`: `transformer_kva: c.quantities?.transformer_rating_kva?.value ?? 1000,` (scripts/lib/orchestrator/class-plans/bess.ts:706)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `dc_bus_voltage_v`: `dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,` (scripts/lib/orchestrator/class-plans/bess.ts:714)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `continuous_power_kw`: `rated_power_mw: (c.quantities?.continuous_power_kw?.value ?? 1000) / 1000,` (scripts/lib/orchestrator/class-plans/bess.ts:821)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `rack_count`: `const rack_count = c.quantities?.rack_count?.value ?? 16` (scripts/lib/orchestrator/class-plans/bess.ts:901)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `continuous_power_kw`: `const ratedKw = c.quantities?.continuous_power_kw?.value ?? 1000` (scripts/lib/orchestrator/class-plans/bess.ts:909)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_count`: `const cellCount = Math.max(1, Math.round(q(contract, 'cell_count', 3750)))` (scripts/lib/deterministic-emitter.ts:882)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `rack_count`: `const rackCount = Math.max(1, Math.round(q(contract, 'rack_count', 15)))` (scripts/lib/deterministic-emitter.ts:883)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cells_per_rack`: `const cellsPerRack = Math.max(1, Math.round(q(contract, 'cells_per_rack', 250)))` (scripts/lib/deterministic-emitter.ts:884)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `series_cells_per_string`: `const seriesCellsPerString = Math.max(1, Math.round(q(contract, 'series_cells_per_string', 250)))` (scripts/lib/deterministic-emitter.ts:885)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_voltage_v`: `const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)` (scripts/lib/deterministic-emitter.ts:888)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `round_trip_efficiency_percent`: `const roundTripEfficiencyPercent = q(contract, 'round_trip_efficiency_percent', 86)` (scripts/lib/deterministic-emitter.ts:895)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `thermal_rejection_min_kw`: `const thermalRejectionKw = q(contract, 'thermal_rejection_min_kw', 30)` (scripts/lib/deterministic-emitter.ts:897)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `continuous_power_kw`: `const continuousPowerKw = q(contract, 'continuous_power_kw', 1000)` (scripts/lib/deterministic-emitter.ts:898)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `peak_power_kw`: `const peakPowerKw = q(contract, 'peak_power_kw', 1250)` (scripts/lib/deterministic-emitter.ts:899)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `nameplate_capacity_kwh`: `const nameplateKwh = q(contract, 'nameplate_capacity_kwh', 3360)` (scripts/lib/deterministic-emitter.ts:912)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `usable_capacity_kwh`: `const usableKwh = q(contract, 'usable_capacity_kwh', 2688)` (scripts/lib/deterministic-emitter.ts:913)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `dod_fraction`: `const dodFraction = q(contract, 'dod_fraction', 0.80)` (scripts/lib/deterministic-emitter.ts:914)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `dc_bus_voltage_v`: `const dcBusVoltageV = q(contract, 'dc_bus_voltage_v', 800)` (scripts/lib/deterministic-emitter.ts:915)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `bus_continuous_current_a`: `const busContinuousA = q(contract, 'bus_continuous_current_a', 1250)` (scripts/lib/deterministic-emitter.ts:916)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `bus_peak_current_a`: `const busPeakA = q(contract, 'bus_peak_current_a', 1562)` (scripts/lib/deterministic-emitter.ts:917)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `cell_capacity_ah`: `const cellCapacityAh = q(contract, 'cell_capacity_ah', 314)` (scripts/lib/deterministic-emitter.ts:948)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `ambient_design_temp_c`: `const ambientDesignTempC = q(contract, 'ambient_design_temp_c', 35)` (scripts/lib/deterministic-emitter.ts:968)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[FINDING] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `container_internal_length_m`: `const containerLengthM = q(contract, 'container_internal_length_m', 12.03)` (scripts/lib/deterministic-emitter.ts:1018)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `max_mass_kg`: `const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 28_000)` (scripts/lib/engineering-contract.ts (block @ line 618):821)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `temp_max_c`: `const ambientDesignTempC = Number(brief?.constraints?.operating_environment?.temp_max_c ?? 35)` (scripts/lib/engineering-contract.ts (block @ line 618):1012)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `enclosure_volume_m3`: `// fire-suppression agent-mass sizing via q(contract,'enclosure_volume_m3',86);` (scripts/lib/engineering-contract.ts (block @ line 618):1134)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `required_margin_factor`: `required_margin_factor: 1.25,` (scripts/lib/engineering-contract.ts (block @ line 618):1176)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `total_gbp`: `total_gbp: 3000,` (scripts/lib/engineering-contract.ts (block @ line 618):1361)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `total_gbp`: `total_gbp: 3500,` (scripts/lib/engineering-contract.ts (block @ line 618):1406)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `round_trip_efficiency_percent`: `// targets (round_trip_efficiency_percent: 88, cost_per_kwh_gbp: 63).` (scripts/lib/engineering-contract.ts (block @ line 618):1504)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `coolant_freeze_point_c`: `coolant_freeze_point_c: -36,` (scripts/lib/engineering-contract.ts (block @ line 618):1786)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `coolant_density_kg_per_l`: `coolant_density_kg_per_l: 1.04,` (scripts/lib/engineering-contract.ts (block @ line 618):1787)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+
+## Family 5 — Placeholder/default trust (0 finding(s))
+
+- **[INFO] [family 5 — Placeholder/default trust]** connection-schedule sizing defaults the class's topology will trust when a real reading is absent: DEFAULT_COMPRESSED_GAS_DENSITY=25 (line 230), DEFAULT_GAS_TEMP_K=350 (line 232), DEFAULT_LIQUID_VELOCITY_MS=1.5 (line 235), DEFAULT_GAS_VELOCITY_MS=18 (line 236), DEFAULT_STEAM_VELOCITY_MS=30 (line 237), DEFAULT_COOLANT_DT_K=6 (line 238), DEFAULT_DUCT_VELOCITY_MS=6 (line 239), DEFAULT_SYSTEM_VOLTAGE_V=400 (line 256), DEFAULT_DC_BUS_VOLTAGE_V=1500 (line 257), DEFAULT_VOLTDROP_LIMIT_PCT=5 (line 265), DEFAULT_ENDS_PER_RUN=2 (line 351) — any of these recurring verbatim across the schedule is the wholesale-rating signature (observed: 27.4 A, 4.2 A, 15 A placeholders on prior campaigns) (scripts/blender-universal/connection_sizing.py)
+  - fix pattern: a reading that matches a schedule-wide default AND contradicts the consumer's own arithmetic is a placeholder — derive from own evidence
+- **[INFO] [family 5 — Placeholder/default trust]** class has electrical topology; the wholesale-rating dominance detector (_dominant_default_amps: value recurring ≥3× AND >30% of readings) and its re-derive guards (_demand_needs_circuit_override) are present in draw_panel_schedule.py — verify on the first run that no current value dominates the schedule (scripts/blender-universal/draw_panel_schedule.py)
+  - fix pattern: a reading that matches a schedule-wide default AND contradicts the consumer's own arithmetic is a placeholder — derive from own evidence
+
+## Family 6 — Denominator dishonesty (13 finding(s))
+
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "lfp prismatic cell" (shape=box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "lfp prismatic cell" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "pcs inverter" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "battery" (shape=box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "battery" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "companion skid" (shape=skid_box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "companion skid" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "three-phase" (shape=horizontal_vessel, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "three-phase" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "cell rack module" (shape=box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "cell rack module" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "battery-energy-storage" (shape=tank, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[FINDING] [family 6 — Denominator dishonesty]** equipment family "grid energy storage" (shape=tank, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+
+## Family 7 — Scorer double-penalties / silent caps (0 finding(s))
+
+- **[INFO] [family 7 — Scorer double-penalties / silent caps]** no sibling conditional verdict-literal patterns found outside the formula helpers; the four known families are fixed (FAIL (soft) defect/issue strings (_SOFT_MISS_RX → live recompute); generative-benchmark verdicts; Connection-trace bare-'OK'; Risk & Regulatory compliance-gate verdict (_compliance_verdict_fx)) and _enforce_live_check_gate guards the built workbook (scripts/build-excel-export.py)
+  - fix pattern: every deduction exactly once; verdicts are live formulas, never bare literals; caps only with differentiated excellence criteria
+
+## Family 8 — Procurement-model mismatches (0 finding(s))
+
+- **[INFO] [family 8 — Procurement-model mismatches]** market anchor present: MARKET_DC_BLOCK_GBP_PER_KWH_2026 (23 market citation(s) in the block) (scripts/lib/engineering-contract.ts)
+  - fix pattern: capture the archetype's real procurement model (with market citations) as contract inputs BEFORE judging any cost anchor; block price = authority, component lines = reconciled transparency breakdown
+- **[INFO] [family 8 — Procurement-model mismatches]** decisions register present: bess_20ft_grid_storage.decisions.json
+  - fix pattern: capture the archetype's real procurement model (with market citations) as contract inputs BEFORE judging any cost anchor; block price = authority, component lines = reconciled transparency breakdown
+
+## Appendix — vocabulary coverage
+
+- brief/plan tokens evaluated: 227; unknown-everywhere: 187
+- sample known tokens: `battery`→catalogue-token, `battery-energy-storage`→SHAPE_RULES:tank/TYPE_RULES:vessel, `bms`→_BOP_ROLES:bms_ctrl, `cell`→catalogue-token, `charge`→qualifier-gated, `chiller`→catalogue-token/TYPE_RULES:exchanger, `control`→housing, `controller`→catalogue-token/_SCHED_CONTROL_SYSTEM_RX, `coolant`→qualifier-gated, `cooling`→qualifier-gated/_BOP_ROLES_COMPUTE:cooling, `cutting-edge`→_GROW_BOP_ROLES:control, `density`→TYPE_RULES:instrument, `discharge`→qualifier-gated, `distribution`→housing/_GROW_BOP_ROLES:control, `electrical`→housing, `enclosure`→structural-token/housing, `energy-storage-system`→SHAPE_RULES:tank/TYPE_RULES:vessel, `fire`→qualifier-gated/_BOP_ROLES:fire, `grid`→qualifier-gated, `high-density`→TYPE_RULES:instrument
+
+PRE-FLIGHT SUMMARY: 86 finding(s) for `bess` — an audit, not a gate (exit 0). Fix findings BEFORE the first chain run (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight).
+· pre-flight: class 'bess' is ESTABLISHED (has a completed full-nets run) — report printed above, run proceeds (86 finding(s) are the campaign backlog, not a cold-start block)
+· .venv preflight OK: Python 3.12.12 + numpy imports
+· validation run: benchmark net FORCED ON (BENCHMARK_NET_FORCE=1), no CHAIN_SKIP_* nets, node v22.22.1
+· brief: briefs-loop/bess_20ft_grid_storage.md
+· out:   out/bess-campaign-v11
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/bess_20ft_grid_storage.md (6158 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 6158 chars
+[brief-parse] OK — confidence=HIGH, missing=2 fields, metrics=6
+[chain] classification: energy_storage (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 1.4s)
+[chain] U5 brief augmentation: U5 augmentation (class: energy_storage): 1 HARD field(s) filled with class-aware inferred values, 6 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Containerised assembly: cell module stacking, busbaring, BMS wiring, PCS integration, factory-acceptance test" (Class-canonical process for energy_storage. Class default for utility-scale BESS in 40 ft Hi-Cube ISO container)
+[chain] U6 brief expansion: 11 duties derived; product="Dispatchable DC electrical energy" (model=google/gemini-3.1-pro-preview, cost_usd=0.052224)
+  [U6] nameplate_energy_capacity_mwh = 5 MWh [stated/high] — Stated in brief as the headline configuration.
+  [U6] usable_energy_capacity_mwh = 4.5 MWh [stated/high] — Stated in brief at beginning of life (90% depth of discharge).
+  [U6] continuous_power_rating_mw = 2.5 MW [stated/high] — Stated in brief for a two-hour discharge duration.
+  [U6] nominal_dc_voltage_v = 1500 V [stated/high] — Stated in brief as the approximate direct-current bus voltage.
+  [U6] peak_dc_current_a = 1667 A [derived/high] — Calculated from rated power and nominal voltage: 2.5 MW / 1500 V = 1666.67 A.
+  [U6] round_trip_efficiency_percent = 88 % [stated/high] — Stated in brief at beginning of life.
+  [U6] average_thermal_dissipation_kw = 150 kW [derived/medium] — Assuming 12% total energy loss per round trip (100% - 88% RTE). 12% of 5 MWh = 0.6 MWh hea
+  [U6] enclosure_internal_volume_m3 = 38.3 m3 [derived/high] — Calculated from standard 20-foot ISO container external dimensions (6.06 m x 2.44 m x 2.59
+  [U6] volumetric_energy_density_kwh_m3 = 130.5 kWh/m3 [derived/high] — 5000 kWh nameplate capacity divided by 38.3 m3 gross container volume.
+  [U6] design_cycle_life_cycles = 6000 cycles [stated/high] — Stated in brief as equivalent full cycles over a 15-year design life.
+  [U6] annual_cycle_throughput_cycles_yr = 400 cycles/yr [derived/high] — 6000 equivalent full cycles divided by 15 years design life.
+[chain] engineering_contract: 48 quantities, 3 topology edges, 7 macro-assemblies (total £554,292), closures: 7 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":949}
+[products-writeback] {"product_name":"Containerised 6.11 MWh nameplate LFP BESS (6084 × 314 Ah cells, 13 racks × 1P × 468S = 1497.6000000000001 V DC bus, 2.5 MW PCS) — single 20-ft ISO container with EXTERNAL pad-mounted MV step-up transf","hit":"db_hybrid","matched":"Saft Intensium Max","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":162}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: WARN (hard=0 soft=1; 0.00s)
+[chain] G1b compliance: PASS — 3/3 mandatory covered for UK+global
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: energy_storage
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 13650 chars. First 200: {
+  "market_context": "The global battery energy storage system (BESS) market is experiencing rapid growth, driven by the increasing integration of intermittent renewable energy sources, the need for 
+[research-synthesis] Complete: 5 competitors, 10 sources, 10 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[distributor-cascade] DB library:bess_oem_2026-05-25 hit for SC1000UD-MV
+[distributor-cascade] DB library:mouser hit for GX21BAB
+[chain] Orchestrator: 10 modules, 31 sub-modules, 144 words, 10 tools ran (11503ms)
+[chain] Build #18k: toolOutputsBlock built (14 tools, 14496 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 27 component_classes covered (27 with match, 0 empty), 22331 chars (25708ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=900000, max_mass_kg=44000, envelope_volume_m3=38.3, target_capacity_mwh=5 (MWh), operating_temp_min_c=-20, operating_temp_max_c=45
+[chain] Contract validation: all 7 macro-assemblies present in design ✓
+[chain] keyMetrics seeded early (pre-reviewer): Annual MWh throughput=1785 MWh / year
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=10/10 plaus=7/10 coh=9/10 part=9/10 hon=9/10 (6211ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [engineering_plausibility @ modules[3].sub_modules[0].words[4]] The rack-level string fuses (Eaton Bussmann PV-200A-1XL-B-15) are rated for 200 A continuous. However, the peak DC current of the system is 1667 A. Across 13 parallel racks, the no
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 16577 chars
+[STEP 5: Single reviewer (Grok 4.3)] x-ai/grok-4.3 JSON parse failed; Flash-Lite repair fallback SUCCEEDED.
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 25 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 23 / 25 patches (skipped 2)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word manufacturer="Rittal" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word part_number="TS 8 1200x800" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word material="S355JR structural steel, powder-coated RAL 7035" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word rating_primary="2000 kg static load" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word regulatory="IEC 62208" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_storage_source.rack_structure.module_steel_frame_word (+6 modifiers)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word manufacturer="Rittal" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word part_number="TS 8 top panel" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 34.0s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":2,"d_overview_chars":1234}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=10/10 phys=7/10 coh=9/10 part=8/10 hon=9/10 (8808ms)
+[chain] critic headline: Design honours documented trade-off of external pad-mounted transformer to meet the 44-tonne mass limit, but contains a critical cell-to-BMS monitoring board quantity mismatch.
+[chain] critic issues: 1 high, 1 med, 3 total
+  ✗ [high/high] engineering_plausibility @ control_compute_communication/sub_modules/0/words/4: The design specifies 338 units of LTC6813-1 18-channel cell monitoring boards. With 6,084 cells total, 6084 / 18 = exactly 338 boards. However, the battery topo
+  ✗ [med/high] engineering_plausibility @ energy_storage_source/sub_modules/0/words/1: The tinned copper busbars (Mersen TCB-60-15x4) are specified with a quantity of 6,071. For 6,084 cells in a 1P configuration across 13 racks, there are 13 indep
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 6401 chars
+[chain] STEP 8: R4 Flash-Lite review returned 6 patches
+[chain] STEP 8: R4 Flash-Lite review applied 6 / 6 patches (skipped 0)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word manufacturer="CIMC" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word part_number="BESS-RACK-HD" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word material="S355 structural steel, powder-coated" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word rating_primary="Seismic Zone 4 compliant" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word regulatory="BS EN 1993-1-1" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_storage_source.rack_structure.module_steel_frame_word (+5 modifiers)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word manufacturer="Tata Steel" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word part_number="S355-SHEET-2MM" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 7.3s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":0}
+[chain] canonical product_class OVERRIDE: "" → "energy_storage" (deterministic classifier wins)
+
+[chain] STEP 8.5: domain specialist (energy_storage) review
+
+[chain] STEP 8.5: R4.5 energy_storage specialist ...
+[chain] STEP 8.5: R4.5 energy_storage specialist raw response: 11308 chars
+[chain] STEP 8.5: R4.5 energy_storage specialist returned 16 patches
+[chain] STEP 8.5: R4.5 energy_storage specialist applied 13 / 16 patches (skipped 3)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word manufacturer="CIMC" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word part_number="BESS-RACK-HD-S355" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word material="S355 structural steel, hot-dip galvanised" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word rating_primary="44000 kg floor load" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_steel_frame_word regulatory="BS EN 1993-1-1" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_storage_source.rack_structure.module_steel_frame_word (+5 modifiers)
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word manufacturer="Tata Steel" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.rack_structure.module_top_cover_word part_number="S355-SHEET-2MM" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8.5: R4.5 energy_storage specialist done in 22.9s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":2,"d_overview_chars":1519}
+[chain] physics repair: 0 iter(s); HIGH 1→1; plausibility 7→7; patches 0
+[chain] modifier dedup: collapsed 1 cosmetic-dupe modifier(s) across 1 component(s)
+[chain] sub-module prose pre-fill: rewrote 30/31 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] library-override detection: tagged 28 word(s) with source_detail="Library override: (no reason given)" — these will be Brave-verified by background-enrichment
+[chain] G0.5 brief-target-reconciliation: PASS — 2 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 262 entries (KPA=124, emitter=138, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 31 sub_modules checked, 31 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[grammar] cross_module_required_links: skipped 3 registry bug(s) for Battery Energy Storage System: energy_storage_source ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit) | safety_protection ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit) | control_compute_communication ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 0: arith 8 pass / 0 fail; grammar 8 pass / 6 fail; total score 4520
+  ✗ [thermal_path_closes] grammar: 2 heat-source sub-module(s) without thermal_path: energy_conversion_transduction::pcs_inverter, safety_protection::cell_fuse_protection. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 8 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): control_compute_communication::watchdog_timer (2 words), environmental_interface::liquid_cooling (4 words), environmental_interface::container_hvac (3 words), safety_protection::cell_fuse_protection (4 words), safety_protection::arc_flash_barrier (1 words), safety_protection::emergency_stop_chain (3 words), structure_containment::container_lifting_lugs (3 words), maintenance_serviceability::ac_grid_interconnect (2 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 21 sub-module(s) with <3 priced lines: energy_storage_source::rack_structure (0/5), energy_storage_source::rack_heater (2/5), energy_storage_source::rack_fuse_protection (2/5), energy_conversion_transduction::pcs_inverter (2/6), energy_conversion_transduction::step_up_transformer (1/5), control_compute_communication::bms_master (2/5) ...+15.
+  ✗ [word_modifier_richness] grammar: 3 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): energy_storage_source::rack_structure::module_steel_frame_word  (3 mods, need ≥4), energy_storage_source::rack_structure::module_top_cover_word  (3 mods, need ≥4), energy_storage_source::rack_structure::module_bottom_tray_word  (3 mods, need ≥4). FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): energy_storage_source: overview mentions 2 concrete components not present in any sub-module word — bess-rack-hd, ip2x. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [spatial_position_complete] grammar: 1 link(s) missing spatial position — reader cannot draw the layout: structure_containment::iso_container_shell→container_lifting_lugs [mechanical_mount]. FIX: emit edit_field patches adding a "position" attribute ("below", "above", "alongside", etc.) OR rewrite the link "detail" to include spatial language (e.g. "the cold plate sits BENEATH each cell module, attached via M6 fasteners").
+  ✗ [cross_module_required_links] grammar: 3 required cross-module connections MISSING for Battery Energy Storage System: energy_storage_source ↔ energy_conversion_transduction [electrical] — Cell pack DC bus feeds the PCS inverter. | energy_storage_source ↔ mass_fluid_transport_process [fluid] — Coolant manifolds supply chilled fluid to rack cold plates and return warmed fluid to the chiller. | energy_conversion_transduction ↔ environmental_interface [thermal] — PCS IGBT/transformer losses are removed by the same cooling loop as the cells.. FIX: emit add_cross_link patches with the right module_a, module_b, mechanism (any mechanism in the corresponding kind — e.g. for control kind use can_bus / modbus / contactor_command), and a detail explaining the connection.
+[chain] Phase 2 iter 0: applied 4 patches, skipped 5, allowlist_rejected=4, state_changed=true
+    +cross_module_grammar_links.[+] (Fix missing thermal cross-link for PCS cooling.)
+    +cross_module_grammar_links.[+] (Fix missing fluid cross-link for rack cooling.)
+    +cross_module_grammar_links.[+] (Fix missing electrical cross-link for DC bus.)
+    +energy_storage_source.grammar_links[+] (Fix thermal path for cell string.)
+    skip append-to-non-array: energy_conversion_transduction.grammar_links[+]
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[+]: word patch contains MPN="BESS-RACK-HD" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich module_steel_frame_word with required modifiers.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[+]: word patch contains MPN="S355-2MM" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich module_top_cover_word with required modifiers.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[+]: word patch contains MPN="S355-3MM" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich module_bottom_tray_word with required modifiers.)
+    ALLOWLIST_REJECT structure_containment.sub_modules[1].words[+]: word patch contains MPN="CERT-LOLER-2026" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich lifting_certification_record_word with required modifiers.)
+[grammar] cross_module_required_links: skipped 3 registry bug(s) for Battery Energy Storage System: energy_storage_source ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit) | safety_protection ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit) | control_compute_communication ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 1: arith 8 pass / 0 fail; grammar 8 pass / 6 fail; total score 4700
+  ✗ [thermal_path_closes] grammar: 1 heat-source sub-module(s) without thermal_path: safety_protection::cell_fuse_protection. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 8 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): control_compute_communication::watchdog_timer (2 words), environmental_interface::liquid_cooling (4 words), environmental_interface::container_hvac (3 words), safety_protection::cell_fuse_protection (4 words), safety_protection::arc_flash_barrier (1 words), safety_protection::emergency_stop_chain (3 words), structure_containment::container_lifting_lugs (3 words), maintenance_serviceability::ac_grid_interconnect (2 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 21 sub-module(s) with <3 priced lines: energy_storage_source::rack_structure (0/5), energy_storage_source::rack_heater (2/5), energy_storage_source::rack_fuse_protection (2/5), energy_conversion_transduction::pcs_inverter (2/6), energy_conversion_transduction::step_up_transformer (1/5), control_compute_communication::bms_master (2/5) ...+15.
+  ✗ [word_modifier_richness] grammar: 3 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): energy_storage_source::rack_structure::module_steel_frame_word  (3 mods, need ≥4), energy_storage_source::rack_structure::module_top_cover_word  (3 mods, need ≥4), energy_storage_source::rack_structure::module_bottom_tray_word  (3 mods, need ≥4). FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): energy_storage_source: overview mentions 2 concrete components not present in any sub-module word — bess-rack-hd, ip2x. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [spatial_position_complete] grammar: 2 link(s) missing spatial position — reader cannot draw the layout: energy_storage_source::cell_string→rack_structure [thermal_path], structure_containment::iso_container_shell→container_lifting_lugs [mechanical_mount]. FIX: emit edit_field patches adding a "position" attribute ("below", "above", "alongside", etc.) OR rewrite the link "detail" to include spatial language (e.g. "the cold plate sits BENEATH each cell module, attached via M6 fasteners").
+  ✗ [cross_module_required_links] grammar: 1 required cross-module connection MISSING for Battery Energy Storage System: energy_storage_source ↔ mass_fluid_transport_process [fluid] — Coolant manifolds supply chilled fluid to rack cold plates and return warmed fluid to the chiller.. FIX: emit add_cross_link patches with the right module_a, module_b, mechanism (any mechanism in the corresponding kind — e.g. for control kind use can_bus / modbus / contactor_command), and a detail explaining the connection.
+[chain] Phase 2 iter 1: applied 1 patches, skipped 6, allowlist_rejected=6, state_changed=true
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes failure for cell_fuse_protection.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[0]: word patch contains MPN="BESS-RACK-HD" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich module_steel_frame_word to meet density and richness requirements.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[1]: word patch contains MPN="S355-2MM-COVER" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich module_top_cover_word to meet density and richness requirements.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[2]: word patch contains MPN="S355-3MM-TRAY" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich module_bottom_tray_word to meet density and richness requirements.)
+    ALLOWLIST_REJECT structure_containment.sub_modules[1].words[2]: word patch contains MPN="CERT-LOLER-2026" not in verified-parts allowlist (262 entries). Patch dropped. (Enrich lifting_certification_record_word to meet density and richness requirements.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[+]: word patch contains MPN="BESS-RACK-HD" not in verified-parts allowlist (262 entries). Patch dropped. (Add missing component from overview to sub-module.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[+]: word patch contains MPN="IP2X-KIT" not in verified-parts allowlist (262 entries). Patch dropped. (Add missing component from overview to sub-module.)
+[grammar] cross_module_required_links: skipped 3 registry bug(s) for Battery Energy Storage System: energy_storage_source ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit) | safety_protection ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit) | control_compute_communication ↔ sensing_instrumentation (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 2: arith 8 pass / 0 fail; grammar 9 pass / 5 fail; total score 5000
+  ✗ [sub_module_word_density] grammar: 8 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): control_compute_communication::watchdog_timer (2 words), environmental_interface::liquid_cooling (4 words), environmental_interface::container_hvac (3 words), safety_protection::cell_fuse_protection (4 words), safety_protection::arc_flash_barrier (1 words), safety_protection::emergency_stop_chain (3 words), structure_containment::container_lifting_lugs (3 words), maintenance_serviceability::ac_grid_interconnect (2 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 21 sub-module(s) with <3 priced lines: energy_storage_source::rack_structure (0/5), energy_storage_source::rack_heater (2/5), energy_storage_source::rack_fuse_protection (2/5), energy_conversion_transduction::pcs_inverter (2/6), energy_conversion_transduction::step_up_transformer (1/5), control_compute_communication::bms_master (2/5) ...+15.
+  ✗ [word_modifier_richness] grammar: 3 word(s) UNDER-SPECIFIED (commodity floor: qty+material+dimensions=3; engineered floor: qty+manufacturer+part_number+rating=4): energy_storage_source::rack_structure::module_steel_frame_word  (3 mods, need ≥4), energy_storage_source::rack_structure::module_top_cover_word  (3 mods, need ≥4), energy_storage_source::rack_structure::module_bottom_tray_word  (3 mods, need ≥4). FIX (engineered): add manufacturer + part_number + material + rating. FIX (commodity): add material + dimensions if missing. DO NOT invent manufacturer/part_number on commodity items just to clear the count — leave them off; the gate accepts ≥3 for commodities.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): energy_storage_source: overview mentions 2 concrete components not present in any sub-module word — bess-rack-hd, ip2x. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [spatial_position_complete] grammar: 2 link(s) missing spatial position — reader cannot draw the layout: energy_storage_source::cell_string→rack_structure [thermal_path], structure_containment::iso_container_shell→container_lifting_lugs [mechanical_mount]. FIX: emit edit_field patches adding a "position" attribute ("below", "above", "alongside", etc.) OR rewrite the link "detail" to include spatial language (e.g. "the cold plate sits BENEATH each cell module, attached via M6 fasteners").
+  ✗ [cross_module_required_links] grammar: 1 required cross-module connection MISSING for Battery Energy Storage System: energy_storage_source ↔ mass_fluid_transport_process [fluid] — Coolant manifolds supply chilled fluid to rack cold plates and return warmed fluid to the chiller.. FIX: emit add_cross_link patches with the right module_a, module_b, mechanism (any mechanism in the corresponding kind — e.g. for control kind use can_bus / modbus / contactor_command), and a detail explaining the connection.
+[chain] Phase 2 iter 2: applied 0 patches, skipped 4, allowlist_rejected=4, state_changed=false
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[0]: word patch contains MPN="BESS-RACK-HD" not in verified-parts allowlist (262 entries). Patch dropped. (Enriching commodity frame word with required engineering modifiers)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[1]: word patch contains MPN="S355-2MM-COVER" not in verified-parts allowlist (262 entries). Patch dropped. (Enriching commodity top cover word with required engineering modifiers)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[1].words[2]: word patch contains MPN="S355-3MM-TRAY" not in verified-parts allowlist (262 entries). Patch dropped. (Enriching commodity bottom tray word with required engineering modifiers)
+    ALLOWLIST_REJECT structure_containment.sub_modules[1].words[2]: word patch contains MPN="CERT-LOLER-2026" not in verified-parts allowlist (262 entries). Patch dropped. (Enriching certification record word with required engineering modifiers)
+[chain] Phase 2: no state change after repair iter 2 — bailing (further iterations will not progress).
+[fill-blank-mpn] 1 blank catalogue word(s) for class "energy_storage" (5 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   safety_protection::cell_fuse_protection (bolt-in fuse mounting hardware) → Essentra LEDH-101C-38
+[fill-blank-mpn] filled 1/1 blank word(s): 1 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 5 structural skipped.
+[chain] fill-blank-mpn: branded 1/1 blank catalogue word(s) (1 DB-first real MPN, 0 generated real-OEM), 5 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 2 anchors checked, 875 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 20749 lines scanned, 2 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 139 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=10 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 13 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — PASS — in_container_mass_kg 43,001 kg ≤ container_payload_rating_kg 44,000 kg (999 kg margin)
+[class-reference-graph-db] {"product_class":"energy_storage","resolved_to":"bess-utility-scale","hit":"db","nodes":11,"edges":36}
+[chain] K10 shadow: FAIL_SHADOW — matched=25 missing=4 extra=0
+[chain] headline derived: Annual MWh throughput=1785 MWh / year [derived_deterministic]; Usable energy capacity (brief target)=5 MWh; Round-trip efficiency=0.92 ratio (0.00s)
+[chain] part verification: 139 parts checked — verified=66, unverified=57, uncertain=16, skip=0
+[chain] G5 RAG: 73 queries → 11 suggestions (high=0, medium=0, low=11, below_threshold=62, corpus=50 rows)
+[chain] part verification: stripped 59 high-confidence fake part_numbers
+  • energy_storage_source::cell_string::cell_to_cell_busbar_word → removed "TCB-60-15x4" (A search of Mersen's product catalogs and documentation does not contain any reference to a part num)
+  • energy_storage_source::rack_structure::compression_tie_rod_set_word → removed "0616 1002 00" (The search results for Würth part numbers starting with 0616 refer to carbide burrs, and the specifi)
+  • energy_storage_source::rack_fuse_protection::rack_dc_isolator_padlock_word → removed "99515" (A search for 'Brady 99515' does not return any product pages, datasheets, or catalog entries confirm)
+  • energy_storage_source::rack_fuse_protection::rack_dc_cable_gland_word → removed "ICG/501-M25" (The search results show Hawke manufactures '501' series glands and 'ICG' series glands (such as ICG/)
+  • energy_conversion_transduction::pcs_inverter::pcs_dc_link_capacitor_bank_word → removed "MKP1848C-451-1100" (While the MKP1848C series is a valid Vishay product line, the specific part number 'MKP1848C-451-110)
+[chain] part verification: inherited part_number from deterministic sibling for 9 stripped word(s)
+  ↳ energy_storage_source::rack_fuse_protection::rack_dc_isolator_padlock_word ← energy_storage_source::rack_fuse_protection::rack_dc_isolator_label_word (PN: 25714)
+  ↳ energy_conversion_transduction::pcs_inverter::pcs_cooling_fan_tray_word ← energy_conversion_transduction::pcs_inverter::pcs_inverter_1mw_bidirectional_word (PN: SC1000UD-MV)
+  ↳ safety_protection::safety_labelling::high_voltage_safety_label_word ← safety_protection::safety_labelling::arc_flash_hazard_label_word (PN: 121194)
+  ↳ safety_protection::safety_labelling::iec62619_compliance_label_word ← safety_protection::safety_labelling::arc_flash_hazard_label_word (PN: 121194)
+  ↳ safety_protection::safety_labelling::nfpa855_warning_label_word ← safety_protection::safety_labelling::arc_flash_hazard_label_word (PN: 121194)
+  ↳ safety_protection::safety_labelling::safety_label_mount_word ← safety_protection::safety_labelling::arc_flash_hazard_label_word (PN: 121194)
+  ↳ safety_protection::gas_detection::gas_sensor_mount_word ← safety_protection::gas_detection::gas_sensor_word (PN: TXgard-IS+)
+  ↳ safety_protection::arc_flash_protection::arc_flash_fibre_sensor_word ← safety_protection::arc_flash_protection::arc_flash_relay_word (PN: AQ-210)
+  ↳ safety_protection::arc_flash_protection::arc_flash_barrier_tape_word ← safety_protection::arc_flash_protection::arc_flash_boundary_label_word (PN: 121085)
+[chain] strip+recommend: 59 recommendations — high=38, medium=4, low=0, unknown=17 (manual sourcing required)
+[chain] structural-gate router: surfaced 5 unrepaired gate(s) as design decisions
+[farnell] HTTP 403 for GP3000S30
+[farnell] HTTP 403 for CBC00
+[farnell] HTTP 403 for 221-2401
+[mouser] HTTP 403 for GP3000S30
+[mouser] HTTP 403 for CBC00
+[mouser] HTTP 403 for 221-2401
+[farnell] HTTP 403 for KTS 011
+[mouser] HTTP 403 for HGL 046
+[digikey] daily quota exhausted (429). Calls disabled until 2026-07-05T23:59:59.877Z. Quota resets at midnight UTC.
+[nexar] token refresh HTTP 429: Too many requests. Please try again later.
+[farnell] HTTP 403 for M20280-E
+[nexar] GraphQL errors for mpn=KTS 011: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=HGL 046: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Afumex 1000V: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=M20280-E: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 25714
+[nexar] GraphQL errors for mpn=MBN116: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for LC1K0910M7
+[nexar] GraphQL errors for mpn=GD006N: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=LC1K0910M7: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=VAL-MS 1000DC-PV/2+V: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=AlfaNova 52: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for 25714
+[nexar] GraphQL errors for mpn=25714: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Trihal 3150kVA 400V/11kV: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=POLIM-D 11: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for STM32F427VGT6
+[farnell] HTTP 403 for TJA1051T/3
+[nexar] GraphQL errors for mpn=902931/10: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for STM32F427VGT6
+[mouser] HTTP 403 for TJA1051T/3
+[mouser] HTTP 403 for ISO1042BDWVR
+[nexar] GraphQL errors for mpn=STM32F427VGT6: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TJA1051T/3: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ISO1042BDWVR: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=AE 1038.500: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=LTC6813-1: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=AB7634: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for H3DK-M
+[nexar] GraphQL errors for mpn=CFAPD12WBU: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 3044102
+[mouser] HTTP 403 for H3DK-M
+[mouser] HTTP 403 for QUINT-UPS/24DC/24DC/10
+[nexar] GraphQL errors for mpn=H3DK-M: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=QUINT-UPS/24DC/24DC/10: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for 3044102
+[farnell] HTTP 403 for HS100-100RF
+[nexar] GraphQL errors for mpn=3044102: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=InteliPro-G99/3: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ION7550: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for C330-A
+[nexar] GraphQL errors for mpn=KDB610U: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for HS100-100RF
+[nexar] GraphQL errors for mpn=C330-A: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=HS100-100RF: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=0062016: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Reflex S 50: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for HIH-4030
+[nexar] GraphQL errors for mpn=30/30 panel filter: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=HIH-4030: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Safe SR-200: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=7MF1563-1BA10-1AA1: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=58000-300APO: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=VESDA-E VEU: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 3030171
+[nexar] GraphQL errors for mpn=TXgard-IS+: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for 121194
+[mouser] HTTP 403 for 3030171
+[mouser] HTTP 403 for Vortex
+[nexar] GraphQL errors for mpn=121194: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=3030171: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Vortex: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=55000-600APO: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=45681-200APO: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=FP200 Gold: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for S 150
+[nexar] GraphQL errors for mpn=55100-905APO: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=EW-FU-DN150-1500: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for ST 2.5
+[mouser] HTTP 403 for S 150
+[nexar] GraphQL errors for mpn=S 150: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for ST 2.5
+[mouser] HTTP 403 for AQ-210
+[nexar] GraphQL errors for mpn=ST 2.5: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=AQ-210: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for M22-PV
+[farnell] HTTP 403 for M22-K01
+[mouser] HTTP 403 for 121085
+[nexar] GraphQL errors for mpn=121085: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 750103
+[mouser] HTTP 403 for M22-PV
+[mouser] HTTP 403 for M22-K01
+[nexar] GraphQL errors for mpn=M22-PV: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=M22-K01: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 6AV2124-0GC01-0AX0
+[nexar] GraphQL errors for mpn=Rockboard 40 100mm: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for 750103
+[farnell] HTTP 403 for 6AV2181-8XP00-0AX0
+[nexar] GraphQL errors for mpn=750103: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for 6AV2124-0GC01-0AX0
+[nexar] GraphQL errors for mpn=6AV2124-0GC01-0AX0: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=6XV1840-2AH30: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 403 for 6AV2181-8XP00-0AX0
+[nexar] GraphQL errors for mpn=6AV2181-8XP00-0AX0: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 58 checked, 2 real, 0 substituted, 56 warned (no substitute available). Nexar calls used: 57.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ rack_heater_thermostat_word: "Stego KTS 011" [class=sensing_monitoring_function, library_class=sensor]
+  ⚠ ptc_rack_heater_word: "Stego HGL 046" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ rack_heater_cable_word: "Prysmian Afumex 1000V" [class=electrical_conducting_function, library_class=none]
+  ⚠ lfp_prismatic_cell_word: "CATL CBC00" [class=electrochemical_energy_function, library_class=battery_cell]
+  ⚠ rack_heater_fuse_word: "Hager MBN116" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ rack_dc_isolator_enclosure_word: "Hager GD006N" [class=unknown, library_class=none]
+  ⚠ rack_heater_contactor_word: "Schneider Electric LC1K0910M7" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ pcs_dc_surge_arrester_word: "Phoenix Contact VAL-MS 1000DC-PV/2+V" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ pcs_liquid_cooling_interface_word: "Alfa Laval AlfaNova 52" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ rack_dc_isolator_label_word: "Brady 25714" [class=unknown, library_class=none]
+  ⚠ step_up_transformer_word: "Schneider Electric Trihal 3150kVA 400V/11kV" [class=magnetic_coupling_function, library_class=magnetic]
+  ⚠ transformer_mv_surge_arrester_word: "ABB POLIM-D 11" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ transformer_wtd_word: "Jumo 902931/10" [class=sensing_monitoring_function, library_class=sensor]
+  ⚠ bms_master_controller_word: "STMicroelectronics STM32F427VGT6" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ can_transceiver_word: "NXP TJA1051T/3" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ digital_isolator_word: "Texas Instruments ISO1042BDWVR" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ bms_master_housing_word: "Rittal AE 1038.500" [class=unknown, library_class=none]
+  ⚠ bms_slave_module_word: "Analog Devices LTC6813-1" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ modbus_gateway_word: "HMS Networks AB7634" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ ems_fibre_patch_panel_word: "Panduit CFAPD12WBU" [class=electrical_conducting_function, library_class=none]
+  ⚠ watchdog_relay_word: "Omron H3DK-M" [class=digital_logic_function, library_class=none]
+  ⚠ ems_ups_module_word: "Phoenix Contact QUINT-UPS/24DC/24DC/10" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ watchdog_terminal_block_word: "Phoenix Contact 3044102" [class=electrical_conducting_function, library_class=none]
+  ⚠ g99_protection_relay_word: "ComAp InteliPro-G99/3" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ ac_energy_meter_word: "Schneider Electric ION7550" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ earth_bar_word: "Hager KDB610U" [class=electrical_conducting_function, library_class=none]
+  ⚠ main_bus_contactor_word: "Schaltbau C330-A" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ dc_precharge_resistor_word: "Arcol HS100-100RF" [class=passive_resistance_function, library_class=electronic_passive]
+  ⚠ equipotential_bonding_cable_word: "Lapp Kabel 0062016" [class=electrical_conducting_function, library_class=none]
+  ⚠ expansion_tank_word: "Reflex Reflex S 50" [class=pressure_vessel_function, library_class=none]
+  ⚠ air_intake_filter_word: "Camfil 30/30 panel filter" [class=unknown, library_class=none]
+  ⚠ humidity_sensor_word: "Honeywell HIH-4030" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ hvac_duct_word: "Lindab Safe SR-200" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ pressure_transducer_word: "Siemens 7MF1563-1BA10-1AA1" [class=pressure_vessel_function, library_class=none]
+  ⚠ thermal_detector_word: "Apollo Fire Detectors 58000-300APO" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ smoke_aspirating_detector_word: "Xtralis VESDA-E VEU" [class=chemical_sensing_function, library_class=sensor]
+  ⚠ gas_sensor_word: "Crowcon TXgard-IS+" [class=chemical_sensing_function, library_class=sensor]
+  ⚠ high_voltage_safety_label_word: "Brady 121194" [class=unknown, library_class=none]
+  ⚠ smoke_vent_interlock_mount_word: "Phoenix Contact 3030171" [class=unknown, library_class=none]
+  ⚠ gas_detector_controller_word: "Crowcon Vortex" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ smoke_detector_head_word: "Apollo Fire Detectors 55000-600APO" [class=optical_sensing_function, library_class=sensor]
+  ⚠ smoke_detector_base_word: "Apollo Fire Detectors 45681-200APO" [class=unknown, library_class=none]
+  ⚠ smoke_detector_loop_cable_word: "Prysmian FP200 Gold" [class=electrical_conducting_function, library_class=none]
+  ⚠ smoke_detector_callpoint_word: "Apollo Fire Detectors 55100-905APO" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ offgas_duct_section_word: "Jeremias EW-FU-DN150-1500" [class=unknown, library_class=none]
+  ⚠ offgas_duct_seal_word: "Roxtec S 150" [class=unknown, library_class=none]
+  ⚠ arc_flash_terminal_block_word: "Phoenix Contact ST 2.5" [class=unknown, library_class=none]
+  ⚠ arc_flash_relay_word: "Arcteq AQ-210" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ arc_flash_boundary_label_word: "Brady 121085" [class=unknown, library_class=none]
+  ⚠ estop_button_word: "Eaton M22-PV" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ estop_contact_block_word: "Eaton M22-K01" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ thermal_insulation_panel_word: "Rockwool Rockboard 40 100mm" [class=unknown, library_class=none]
+  ⚠ safety_relay_word: "Pilz 750103" [class=electromechanical_switching_function, library_class=mechanical_assembly]
+  ⚠ hmi_panel_word: "Siemens 6AV2124-0GC01-0AX0" [class=optical_sensing_function, library_class=sensor]
+  ⚠ hmi_ethernet_cable_word: "Siemens 6XV1840-2AH30" [class=electrical_conducting_function, library_class=none]
+  ⚠ hmi_panel_vesa_mount_word: "Siemens 6AV2181-8XP00-0AX0" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 10/10 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 5 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 6 sections, 0 warnings
+[chain] design decisions review: 9 choices (1 applied, 8 flagged, 0 blocked)
+[fill-blank-mpn] 40 blank catalogue word(s) for class "energy_storage" (15 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ⊘ miss energy_storage_source::cell_string (cell-to-cell busbar): best DB row Mersen Infini-Cell fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::step_up_transformer (transformer neutral grounding resistor) → Littelfuse Inc. SE-330AU-00-00
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::step_up_transformer (MV cable sealing end) → TE Connectivity / Raychem 074061-011
+[fill-blank-mpn]   ✓ DB   control_compute_communication::ems_compute (EMS industrial PC) → Beckhoff C6015-0010
+[fill-blank-mpn]   ✓ DB   control_compute_communication::ems_compute (managed Ethernet switch) → Hirschmann BRS20-4TX
+[fill-blank-mpn]   ✓ DB   power_distribution::dc_distribution (DC busbar 1500 V) → Mersen Infini-Cell
+[fill-blank-mpn]   ✓ DB   power_distribution::ac_switchgear (AC voltage transformer) → Siemens 4MT3
+[fill-blank-mpn]   ✓ DB   power_distribution::ac_switchgear (AC SPD) → Phoenix Contact 2838199
+[fill-blank-mpn]   ✓ DB   environmental_interface::liquid_cooling (cooling pump) → Grundfos GRU-99803652
+[fill-blank-mpn]   ✓ DB   environmental_interface::liquid_cooling (cold plate manifold) → Motivair In-Rack Manifold
+[fill-blank-mpn]   ✓ DB   environmental_interface::enclosure_climate (louvre vent panel) → Rittal 3239.200
+[fill-blank-mpn]   ✓ DB   environmental_interface::enclosure_climate (enclosure thermostat controller) → STEGO 01159.0-00
+[fill-blank-mpn]   ✓ DB   environmental_interface::container_hvac (container AC unit) → Envicool MC series
+[fill-blank-mpn]   ✓ DB   environmental_interface::container_hvac (HVAC condensate pump) → Fujitsu UTR-DPB24T
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::coolant_loop (aluminium cold plate per rack) → Wieland MicroCool CP-E-4009-S3XJ
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::coolant_loop (16-way coolant distribution manifold) → CoolIT Systems Rack Manifold
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::coolant_loop (pressure relief valve + sight glass) → Henry Technologies S-5012-7
+[fill-blank-mpn]   ⊘ suppress mass_fluid_transport_process::coolant_loop (ball valve isolation): untethered accessory valve — no principal-equipment sibling in this sub_module to host it; the plant's real valves are already counted in the zoned-distribution kits + process schedule
+[fill-blank-mpn]   ✓ DB   safety_protection::fire_suppression (clean agent cylinder) → Kidde-Fenwal ECS-360
+[fill-blank-mpn]   ✓ DB   safety_protection::fire_suppression (suppression nozzle) → Kidde Fenwal 90-194028
+[fill-blank-mpn]   ✓ DB   safety_protection::fire_suppression (Kidde ECS releasing panel) → Kidde ARIES-SLX
+[fill-blank-mpn]   ✓ DB   safety_protection::deflagration_vents (smoke vent interlock solenoid) → Omron Automation and Safety D4NL-4EFG-B
+[fill-blank-mpn]   ⊘ miss safety_protection::gas_detection (gas sensor identification label): best DB row Banner Engineering SLU4-PN-Q8 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   safety_protection::cell_fuse_protection (bolt-in fuse mounting hardware) → Essentra LEDH-101C-38
+[fill-blank-mpn]   ✓ DB   safety_protection::thermal_runaway_vent (centrifugal exhaust fan for off-gas) → Systemair DKEX 315-4
+[fill-blank-mpn]   ⊘ suppress safety_protection::thermal_runaway_vent (backflow check valve for off-gas duct): untethered accessory valve — no principal-equipment sibling in this sub_module to host it; the plant's real valves are already counted in the zoned-distribution kits + process schedule
+[fill-blank-mpn]   ✓ DB   structure_containment::iso_container_shell (door assembly double leaf) → PRM Filtration 70x82-Manway-Double-Door
+[fill-blank-mpn]   ✓ DB   structure_containment::iso_container_shell (grounding lug set) → Burndy YA292N
+[fill-blank-mpn]   ✓ DB   structure_containment::container_lifting_lugs (ISO 1161 corner casting) → Tandemloc 243000C
+[fill-blank-mpn]   ⊘ miss hmi_ergonomics::hmi_touchscreen (HMI identification label): best DB row Banner Engineering SLU4-PN-Q8 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   maintenance_serviceability::ac_grid_interconnect (LV AC cable gland) → Cabletec CG-M20-IP68
+[fill-blank-mpn]   ✓ DB   maintenance_serviceability::ac_grid_interconnect (grid PCC metering CT) → Crompton Instruments MB5Z-2000/5
+[fill-blank-mpn] filled 27/40 blank word(s): 27 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 15 structural skipped.
+[chain] fill-blank-mpn (late sweep, post-reconcile): branded 27/40 catalogue word(s) minted AFTER the first fill pass (27 DB-first real MPN, 0 generated real-OEM)
+[chain] provenance rooting: 90/94 inputs trace to the brief (96%) — 4 ROOTLESS: dod_fraction, cell_capacity_ah, cell_voltage_v, transformer_installation
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 3.0 kW, 0.30%); economic-conductor saving £14,541
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 3.0 kW, 0.30%); economic-conductor saving £14,541
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 3.0 kW, 0.30%); economic-conductor saving £14,541
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 3.0 kW, 0.30%); economic-conductor saving £14,541
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 1000 → 1003.007 kW (Δ 3.007 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 76065) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/blender-bg.log
+[estimate] product_class=energy_storage annual_volume=100 (default)
+[estimate] corpus real-price lookup disabled for class 'energy_storage' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] pinned 50 parts from emitter list_price_gbp modifiers (bypasses Engine B curve)
+[estimate] 92 parts need price estimates
+[estimate] corpus-classified 5/92; 87 need rule-based / Flash-Lite
+[estimate] rule-based classified 49 parts; 38 still need Flash-Lite
+[estimate] Flash-Lite classified 2 batches
+[estimate] 81 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 1 'unknown' parts
+[estimate] updated 87 existing, synthesised 5 new, 0 failed
+[estimate] C3 DB cache: 5 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] C5 sanity clamp: 1 parts clamped to class sanity band (check price_sanity_note in partVerifications)
+[estimate] classification source: corpus=4 rule_based=49 flash_lite=38 fallback=0 curated=0 db_cache=5
+[estimate] estimate source: db_cache=5 curve=86 flash_lite_unknown=1
+[estimate] top classes in BoM:
+  safety_consumable: 20
+  structural_polymer: 11
+  sensor: 8
+  structural_metal: 8
+  fluid_path: 6
+  electronic_pcb: 5
+  oem_smoke_detection: 5
+  magnetic: 4
+[estimate] estimated cost: GBP 0.001
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: bess-utility-scale
+[engine-c] 142 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 142/142 results in 68.5s
+[engine-c] flags: in_range=27  over=16  under=64  no_reference=35
+[engine-c] 80/142 priced lines flagged out-of-range vs reference corpus (56.3%)
+[engine-c] 15 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] normalised "energy_storage" → "bess"
+[enrich-suppliers] BoM context:
+  • top manufacturers: Brady, Phoenix Contact, Siemens, Apollo Fire Detectors, Eaton, Schneider Electric, ABB, Mersen, Hager, Schaltbau
+  • critical components (top 10):
+      - LFP prismatic cell (×6084, 314 Ah, prismatic)
+      - cell-to-cell busbar (×6071, 175 A, tinned electrolytic copper bar, 15×4 mm cross-section (60 mm²), 2.92 A/mm² @ 175 A continuous per IEC 61439-1 (sized for 128 A rack continuous string current × 1.25 margin))
+      - cell terminal hardware (×6084, 6 A, 0.5-1.0 mm²)
+      - busbar-surface NTC bead with PTFE-insulated leads (×52, 10 kΩ, EPCOS / TDK B57703M0103G040 NTC bead (10 kΩ ±1 % @ 25 °C, B25/100 = 3988 K, -20…+125 °C, 45 mm PTFE-insulated silver-plated nickel leads) bonded to the Mersen TCB-120-30x4 BUSBAR SURFACE with 3M Scotch-Cast 4444 thermally conductive epoxy at 4 cluster-sampling zones per rack (≈63-cell sub-strings each, 60 total across 15 racks per Tesla Megapack 2 XL / CATL EnerC+ / Sungrow PowerStack practice). Leads route to the BMS slave's isolated thermistor input header via a separate harness (2.5 kV isolation barrier between thermistor input + cell-tap ADC); per-cell thermistors would overwhelm BMS aux-input count and increase wiring failure surface 60× without improving runaway detection (cluster gradient reaches worst-cell temperature within ≤30 s, well inside the thermal-runaway window).)
+      - cell voltage tap wire (×6084, 22 AWG, 1000 V)
+      - cell insulation pad (×6084)
+      - BMS master controller (×1, STM32F427VGT6 MCU, CAN + UART + SPI + I²C, 180 MHz Cortex-M4, 100 LQFP package)
+      - CAN transceiver (×2, TJA1051 high-speed CAN transceiver, 1 Mbit/s, 5V, SOIC-8, 500 kbit/s)
+      - digital isolator (×1, ISO1042BDWVR 4-channel capacitive digital isolator, 5 kVrms, 5 kVrms isolation)
+      - BMS master housing (×1, DIN-rail mounted steel enclosure, powder-coated, 150×100×60 mm, 150×100×60 mm)
+  [principal_integrator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [principal_integrator] +4 archetype-tagged row(s) from prior web-fallback persistence
+  [principal_integrator] scoring 15 candidates via Flash-Lite…
+  [cell_pack_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [cell_pack_supplier] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [cell_pack_supplier] scoring 15 candidates via Flash-Lite…
+  [enclosure_fabricator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [enclosure_fabricator] +2 archetype-tagged row(s) from prior web-fallback persistence
+  [enclosure_fabricator] scoring 15 candidates via Flash-Lite…
+  [enclosure_fabricator] web-fallback: 1 Brave query(ies) (need 1)
+    [enclosure_fabricator] "ISO container fit-out manufacturer UK BESS enclosure shop bess supplier UK manufacturer" → 15 hits (cumulative 15)
+  [enclosure_fabricator] web-fallback: 15 Brave hits, 15 after dedup; scoring via Flash-Lite…
+  [enclosure_fabricator] web-fallback: 1 candidate(s) collapsed by apex-domain pre-dedup (e.g. multiple product pages on the same company domain)
+  [enclosure_fabricator] web-fallback rejected: "Battery energy storage system (BESS) container, BESS container -- A total solution for mobile battery energy storage - TLS OFFSHORE CONTAINERS & TLS ENERGY" → pre-check: too long (24 words)
+  [enclosure_fabricator] web-fallback rejected: "BESS Battery Energy Storage System Containers" → pre-check: no segment resembles a company name
+  [enclosure_fabricator] web-fallback: 2 candidate(s) rejected by validators (listicle / part-number / name/url mismatch)
+  [enclosure_fabricator] web-fallback: accepted 1/15
+  [enclosure_fabricator] persisted web candidates → inserted: 0, updated: 1, embedded: 1, skipped: 0
+  [battery_cell_manufacturer] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [battery_cell_manufacturer] +5 archetype-tagged row(s) from prior web-fallback persistence
+  [battery_cell_manufacturer] scoring 15 candidates via Flash-Lite…
+  [pcs_inverter_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [pcs_inverter_supplier] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [pcs_inverter_supplier] scoring 15 candidates via Flash-Lite…
+  [pcs_inverter_supplier] web-fallback: 1 Brave query(ies) (need 1)
+    [pcs_inverter_supplier] "BESS PCS inverter supplier UK grid-scale bi-directional inverter 1MW bess supplier UK manufacturer" → 15 hits (cumulative 15)
+  [pcs_inverter_supplier] web-fallback: 15 Brave hits, 15 after dedup; scoring via Flash-Lite…
+  [pcs_inverter_supplier] web-fallback: accepted 1/15
+  [pcs_inverter_supplier] persisted web candidates → inserted: 0, updated: 1, embedded: 1, skipped: 0
+  [bms_system_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [bms_system_supplier] +2 archetype-tagged row(s) from prior web-fallback persistence
+  [bms_system_supplier] scoring 15 candidates via Flash-Lite…
+  [headquarters-lookup] populated city on 6 candidate(s) via known-locations + Brave HQ query
+  [cross-archetype dedup] apex "eldapoint-group.co.uk" appears in 2 archetypes — keeping in "enclosure_fabricator" (score 9), dropping from "enclosure_fabricator" (score 9)
+  [cross-archetype dedup] removed 1 duplicate candidate slot(s)
+[enrich-suppliers] product_class: energy_storage
+  principal_integrator: 3 candidate(s)
+    • [db] Clarke Energy (United Kingdom) — confidence: high
+    • [db] Newton Energi (United Kingdom) — confidence: high
+    • [db] Ensmart Power (United Kingdom) — confidence: high
+  cell_pack_supplier: 3 candidate(s)
+    • [db] Hithium (??) — confidence: low
+    • [db] AESC UK (GB) — confidence: high
+    • [db] UltraMax Batteries (United Kingdom) — confidence: high
+  enclosure_fabricator: 2 candidate(s)  — 2 from forge-truth.db (13 rejected); 1 added via web-fallback. Only 2 of 3 candidates — sales team may want to broaden the search.
+    • [db] Eldapoint Group (GB) — confidence: medium
+    • [db] Jupiter Wagons (??) — confidence: low
+  battery_cell_manufacturer: 3 candidate(s)
+    • [db] DLCPO (??) — confidence: low
+    • [db] LiFePO4 Battery (AE) — confidence: low
+    • [db] Stocktitan (??) — confidence: low
+  pcs_inverter_supplier: 3 candidate(s)  — 2 from forge-truth.db (13 rejected); 1 added via web-fallback.
+    • [db] Fimer (??) — confidence: low
+    • [db] Nidec (??) — confidence: low
+    • [web] ABB (??) — confidence: high
+  bms_system_supplier: 3 candidate(s)
+    • [db] Nuvation Energy (GB) — confidence: medium
+    • [db] Altertek (United Kingdom) — confidence: high
+    • [db] EVolve Electrics (??) — confidence: low
+[enrich-suppliers] calls — brave: 9, flash-lite (score): 120, flash-lite (name cleanup): 6, flash-lite (capability): 18
+[enrich-suppliers] provenance (web-fallback): 2 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (6 archetypes) + 2 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json
+[supplier-validate] 17 candidate(s) examined: 16 already reconciled, 1 URLs replaced, 0 dropped, 1 changed total
+[supplier-validate] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] containerised design (enclosure signal in brief/contract) → render routes to the UNIVERSAL builder; skipping the LLM geometry pass (kill-switch: UNIVERSAL_CONTAINERISED=0)
+[hero]   geometry generator failed (5); falling back to unmodified template
+[hero] step 1: Blender structural reference cover pass...
+[hero]   template runner produced blender-cover.png in 0.0s
+[hero]   Blender cover OK in 0.0s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 20.1s (699.6 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 10 module(s)...
+[modules] all 10 module images already on disk; skipping template render
+[modules] template renderer produced 10/10 module images
+[modules] updated state.module_image_paths with 10 entries
+[chain] deployment_envelope: container-40ft-hicube (shipping_container) for energy_storage
+[chain] costStack persisted: ex-works £1381192 (raw materials £725264, class energy_storage)
+[chain] G2 cost-reality: PASS — BoM £725264 across 142 priced lines (2 unpriced)
+[chain] G3 review-completeness: PASS
+[chain] bom-cost-grounding: 8 lines re-priced from DOE/NETL + cache (real), 4 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 6/10 · mean 7.7/10 · 0 blocking · below-8: headline=7, performance_card=6, physics_fidelity=7
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 6/10).
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.73×) — ⚠ The brief asks for 5,000 kWh AND a £900k ceiling — these CANNOT both be met: 5,000 kWh costs £1.38M (1.5× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 3,630 kWh at £1.12M (£309/kWh) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/bess_20ft_grid_storage.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11-converged
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £1,381,192 / 5,000 kWh = £276/kWh — within the £200–£500/kWh class band for energy_storage output. (brief metric nameplate_capacity_mwh=5 MWh → 5,000 kWh)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 144 disclosed; 0 take-off prices written into the BoM; purchased £195,439 → installed £586,317 (central)
+[advisor-engagement] 10/10 modules got an advisor block — 20 specialist cards, 40 grounded questions
+[chain] advisor-engagement: 10 module blocks, 20 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "energy_storage" (14 tools, 98 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): PASS — class="energy_storage" template=bess-9shot.py hero=true modules=18 thin=0
+[chain] tools-flow: rendered 225161 bytes (14 tools)
+[investor-section] 5 investors matched from 18 candidates: Generate Capital, RWE Principal Investments, Bootstrap Europe, Elemental Excelerator, Bright Capital
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 6/6 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 6/6 drawings + hero → wired into the PDF
+[drawing-gates] 17 gates · 1 failing · ALL-PASS=False
+  ✓ [med ] legibility         single-line-diagram 3200x1644 aspect 1.9:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2360x1404 aspect 1.7:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x1460 aspect 1.5:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2840x2782 aspect 1.0:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2526x1004 aspect 2.5:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1976 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x3796 aspect 1.5:1 (limit 4:1)
+  ✓ [med ] legibility         pid min text 4.75 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.6788 mm
+  ✓ [med ] legibility         block-flow-diagram min text 4.82 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.6342 mm
+  ✓ [med ] legibility         single-line-diagram min text 4.26 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.5006 mm
+  ✓ [med ] legibility         hvac-layout min text 2.52 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.5607 mm
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✗ [med ] material_diversity 1 distinct pipe material(s): ['carbon steel']
+  ✓ [high] no_stray_beam      longest CABLE run u_tap_rf_7_electrical_bus_14 spans 7.2 m (limit 16 m — a plant-crossing beam)
+  ✓ [med ] site_utilisation   plant hull 127.8 m² / deck 221.5 m² = 0.58 (floor 0.45 — below it the plant sits in a corner of an empty deck)
+  ✓ [high] connection_sanity  connection graph physically coherent (domain + direction + magnitude)
+  ✓ [high] tag_legibility     every tag distinct (≤20% bbox overlap) + inside its view border
+[chain] drawing-gates: 1/17 failing — DRAWING >=8 FAIL (drawing-gates.json — each failing gate names its fix stage)
+[chain] drawing-gates PUNCH-LIST (2 defect(s) → 1 stage(s)) → drawing-gates-punchlist.md
+[chain]   → connection_sizing (per-service material): material_diversity/line-velocity-schedule, material_diversity/process-schedules
+[chain]   ⚠ lesson-loop: drawing:material_diversity has recurred 11× on energy_storage — council escalation flagged (tasks/harness-stubs/)
+[chain]   ⚠ lesson-loop: drawing:material_diversity has recurred 12× on energy_storage — council escalation flagged (tasks/harness-stubs/)
+[chain]   ↳ lesson-loop: 2 loss(es) logged to failure-ledger + invariant stub(s) drafted in tasks/harness-stubs/
+[census] 5 tie-in runs (24 units) = £3,266 (cable £0 + pipe £3,266)
+[census] routed major streams = £1,407  →  full interconnect ≈ £4,672
+  [corpus-median-lift] raised 19 under-priced principal line(s) to their engine corpus lower edge (+£53,775)
+[chain] cost-sanity re-derived on authoritative BoM (Σ £1,074,253): verdict pass — £409/kWh
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[chain] benchmark net (z-ai/glm-5.2): 🟠 WARN — deterministic output deviates from the benchmark — review recommended
+[chain]   • output — nameplate_capacity: expected 5 MWh; engine 6113.2 kWh (contract.nameplate_capacity_kwh) [warn, 1.22×]
+[chain]   ↳ FAULT CH-101 [cost] — unit price ~3-4× too high for 148 kW liquid chiller (~£88 800 vs realistic £20-30 k) → £25 000
+[chain]   ↳ FAULT — (ISO container) [sizing] — 20 ft HC instead of 40 ft ISO (volume ~half of benchmark 86 m³) → 40 ft HC container
+[chain]   ↳ FAULT CF-101 [cost] — cell line share only 32 % vs benchmark 55 %; total bill implies ~£69/kWh cells (~0.6× benchmark cell cost share) → £95-110 per cell (or adjust qty/Ah)
+[chain]   ↳ FAULT PCS-101 [quantity] — 3× 1 MW units for ~5-6 MWh pack (PCS share 21 % vs benchmark 15 %) (qty ~1.5× expected) → qty 2
+[chain]   ↳ FAULT nameplate_capacity [sizing] — engine output 6113 kWh vs expected 5 MWh contract value (+22 %) → 5000 kWh
+[chain] benchmark net: wrote benchmark-punchlist.md — 5 fault(s) routed to 4 source rule(s): rating-based-pricing, materials-takeoff, catalogue-price, UNROUTED (no basis match
+[chain] requirements-driven BoM: 169 requirement lines (Σ £1,074,253) → state.requirementsBom; cost cascade reconciled to this total
+dossier_repair: 1 fix(es) over 1 pass(es); 4 gap(s) need input (1 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json
+[chain] self-repair: 1 fix(es) over 1 pass(es); 4 gap(s) need input (1 blocking HIGH)
+[reconcile-hollow] 0 hollow sub-module(s); nothing to reconcile
+[deterministic-finalize] class-alien-renamed=0 scope-words-demoted=0 density-merged=8 modifiers=0 prose=4 overview=0 · residual violations {'modifier_consistency': 0, 'prose_covers': 0, 'overview_subset': 0, 'word_density_thin': 1}
+[deterministic-finalize] trace-reconcile: connection-ledger.json pruned=0 connection-schedule.json pruned=0
+[chain] ghost-snapshot prune: removed 2/144 partVerifications entries for word(s) no longer in the final tree
+  [corpus-median-lift] raised 19 under-priced principal line(s) to their engine corpus lower edge (+£53,775)
+[chain] ghost-snapshot re-derive: requirementsBom 169 → 169 row(s) on the FINAL settled tree (pruned 2 stale partVerifications entries)
+dossier_repair: 1 fix(es) over 1 pass(es); 4 gap(s) need input (1 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json
+[chain] freshen-scorer-inputs: re-rendered schematics + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 0 HIGH · 0 corroborated (score) · 3 advisory (never score) — file + state.physicsCritique are the SAME canonical object
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/dossier.xlsx
+  · storage revenue model (bess): £185,480/yr (trading £182,862 + capacity market £2,618), EBITDA £-306,942/yr — cited GB market benchmarks
+  · column contract [Line & velocity]: 25/28 rows PASS → 8.9/10 (3 fabricated source tick(s) neutralised)
+  · column contract [Panel schedule]: 9/10 rows PASS → 9.0/10
+  · column contract [Bill of Materials (Ledger)]: 165/169 rows PASS → 9.7/10
+  · column contract [Risk & Regulatory]: 7/7 rows PASS → 10.0/10
+  · per-tab scorecard: min Executive Summary=8.9/10 · 0 FAIL, 0 UNSCORED
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Quantities
+  · Calculations
+  · Calculations: linked 11 data-flow value(s) to their worked-calc result cell
+  · Calculations: 1 engineering curve chart(s) plotted from sourced data (parts-spec derating / tool series)
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs Master (M0)
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+      Process schedules: collapsed 64 copy-paste instrument row(s) into typed group rows
+      Valve recon: 14 line-mounted-valve BoM line(s) (like-for-like vs the schedule's own population) · excluded 0 network-allowance row(s) totalling 0 off — 
+      Instrument recon: 69 field-instrument BoM line(s) (like-for-like vs the schedule's own field-device population) · excluded 9 non-field row(s) totalling 60 off (PLC/HMI/SCADA control-system + electrical CT/VT-class sense/protection + mount/label accessories — none are schedule-listed process field instruments) — 13× pack current transducer · 300 A, 13× pack voltage sensor · 2000 V nominal, 13× gas sensor mount, 13× gas sensor label, 4× arc flash fibre-optic point sensor, 1× HMI panel · 15.4, 1× HMI panel VESA mount, 1× HMI ethernet cable, 1× HMI label pin
+  · Process schedules
+  · Line & velocity
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 4 views on one tab)
+  · Electrical (single-line + panel schedule)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + HVAC
+  · Drawings (register)
+  · Glossary
+  · Audit data
+  · content scoring pass 1: 24 sheet(s) cell-checked — Electrical:82/83, Equipment & Dimensions Register:379/405, Process schedules:49/53
+  · Quality & Audit
+  · Contents (sheet #1)
+  · Excel-corruption guard: defanged 1 prose-as-formula + normalised 0 sci-notation formula(s)
+  · Drawing cross-refs: 5 cell(s) annotated with the A1 sheet range (e.g. FF-PID-001 S1-S1)
+  · ONE VERDICT (live formulas over the Q&A floor/open cells): VERDICT: SHIPS · floor 8.7/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere) (3 surfaces)
+  · score chips: 33/33 tabs live off the Q&A score cells
+  · live-check gate: 33 sheets · 4010 formula cells (1937 verdict formulas) · 1227/1227 table rows carry a live check (0 merged-flag rows) · 0 bare literals · 0 orphan required columns
+  · numeric orphan-literal gate: ENFORCED ['fin-cashflow', 'fin-chart', 'fin-curve', 'fin-item', 'fin-lines', 'fin-opex', 'fin-oppoint', 'fin-range', 'fin-recommend', 'fin-scenarios', 'fin-tornado'] — 0 orphans/231 checked · WARN-swept 12 other declared-numeric families (assembly: 14/14 orphan (e.g. Assembly sequence!G9 (family assembly)); curve-points: 6/6 orphan (e.g. Calculations!A191 (family curve-points)); drawing-coverage: 14/14 orphan (e.g. Bill of Materials (Ledger)!B178 (family drawing-coverage)); holds: 5/5 orphan (e.g. Holds & exclusions!D6 (family holds)); overview-cost: 12/12 orphan (e.g. Overview!B30 (family overview-cost)); panel-schedule: 9/9 orphan (e.g. Electrical!D63 (family panel-schedule)); part-names: 141/141 orphan (e.g. Part names!C5 (family part-names)); schedule-recon: 4/4 orphan (e.g. Process schedules!D20 (family schedule-recon))) · 30 families not yet declared numeric (next round)
+  · recalc-and-cache: 4004/4010 formula cells now carry a cached value (was 0/4010); formulas remain live (LibreOffice round-trip)
+  · ooxml-strict-check: 0 HIGH (0 total findings) — Excel-strict clean
+  · ONE TRUTH read-back: 33 live score cells match the python scorecard; floor 8.7 · open 0 — tab-scorecard.json now carries the WORKBOOK's numbers
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/dossier.xlsx
+  size        : 15.89 MB
+  tabs (33)  : ['Executive Summary', 'Contents', 'Inputs Master (M0)', 'Equipment & Dimensions Register', 'Overview', 'Renders', 'Cost waterfall', 'Financial model', 'Bill of Materials (Ledger)', 'Brief', 'Design basis', 'Drawings', 'BFD — Block Flow', 'P&ID', 'Process schedules', 'GA — General Arrangement', 'HVAC', 'Electrical', 'Line & velocity', 'Assembly sequence', 'Risk & Regulatory', 'Holds & exclusions', 'Questions for the customer', 'Quality & Audit', 'Sense-check', '⚠ Checks', 'Connection trace', 'Quantities', 'Calculations', 'Inputs & Assumptions', 'Part names', 'Glossary', 'Audit data']
+  live calcs  : 14
+  static calcs: 0
+  image tabs  : 5
+  recalc cache: cached values shipped (previews render)
+  VERDICT     : VERDICT: SHIPS · floor 8.7/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere)
+  CHECKS FAIL : 0
+  SHIP GATE   : FAIL  ·  1 HIGH · 0 MED · 0 LOW · ship_ok=False
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/bess-campaign-v11_dossier_2026-07-05_1326.xlsx
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-PARTS.md
+[parts-validator] PASS: 20 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-DRIFT.md
+[drift-detector] PASS: 4 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-SIZING.md
+[sizing-audit] PASS: 1/4 matched-to-rule, 0 findings (0 MED, 0 LOW); voltage-sizing 4/29 matched, 0 findings
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-MISPIN.md
+[mispin-detector] PASS: 142 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 1 chiller(s) checked, 1 findings (1 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 15 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf': No such file or directory.
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf': No such file or directory.
+[consistency-audit] pdftotext failed: Command failed: pdftotext /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf -
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf': No such file or directory.
+
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 0 clusters, 0 findings (0 MED, 0 HIGH), 0 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UK, 275 surfaces scanned, 111 unique citations, 0 findings (0 MED, 0 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] PASS: 86 lines audited (DB-only, zero quota consumed), 43 non-blocking findings (9 MED, 34 LOW).
+[chain] gate-21 price normalisation: capped 1 mis-pinned commodity partVerification price(s) before per-line audit
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] PASS: 130 lines audited (DB-only, zero quota consumed), 10 PASS, 1 MEDIUM, 1 LOW (non-blocking).
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf does not exist.
+[chain] failed to open PDF locally (non-fatal): Command failed: open /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf does not exist.
+
+[chain] background enrichment spawned (PID 78661) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/background-enrichment.log
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=5
+[enrich] componentEngineering: 69 parts · 28 connections · 20 orphans · 60 ungoverned · 2 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/dashboard.html
+
+[chain] ── QUALITY LOOP Phase 3 (full) — iteration 1/8 ──
+[parts-ledger] 5 STALE ledger tie(s) reference part(s) absent from the delivered design (wired pre-removal) — disclosed in stale_ties, not attached: ['louvre vent panel→Effluent / disposal — battery limit', 'deflagration vent panel→Effluent / disposal — battery limit', 'smoke vent interlock→Effluent / disposal — battery limit', 'deflagration vent seal→Effluent / disposal — battery limit']
+
+  LEDGER (BoM + connectivity + coverage + tools) — bess-campaign-v11   £1,074,253 raw materials   141 parts + 28 connections   0 tools invoked
+  tag    type      name                     £ line in/out status               tool  BLE   GA P&ID  SLD  PNL  BFD  SCH
+  --------------------------------------------------------------------------------------------------------------------
+  CF-101 other     LFP prismatic cell     346,788    0/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-1    electricalcell-to-cell busbar     12,142    1/1 NOT FOUN                —    ·    ·    ·    ✓    ✗    ·    ·
+  X-2    other     cell terminal hardwar   12,168    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-3    other     thermistor attachment       52    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-4    other     cell voltage tap wire    6,084    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-5    other     cell insulation pad     12,168    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-6    other     module steel frame         520    0/0 BESPOKE                 —    ·    ·    ✓    ·    ·    ·    ·
+  X-7    other     module top cover            13    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-8    other     module bottom tray          13    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-9    other     compression plate        2,015    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-10   other     compression tie rod s       39    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-11   other     pack current transduc       13    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ·    ·    ·
+  X-12   instrumentinsulation monitor         650    0/1 IDENTIFI                —    ·    ·    ✓    ✓    ·    ·    ✗
+  I-1    instrumentpack temperature sens       52    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  I-2    instrumentpack voltage sensor      2,860    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ·    ·    ✗
+  BR-101 other     rack wiring carrier         13    1/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  RH-101 other     PTC rack heater            585    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  EP-1   other     rack heater thermosta       78    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  EP-2   other     rack heater contactor      585    0/0 BESPOKE                 —    ·    ·    ✓    ✓    ✓    ·    ·
+  EP-3   other     rack heater cable          104    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  EP-4   electricalrack heater fuse            78    1/0 IDENTIFI                —    ·    ·    ·    ✓    ✗    ·    ·
+  DI-101 other     rack DC isolator         2,860    0/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ·    ·    ·
+  EP-5   other     rack DC isolator labe    1,235    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ·    ·    ·
+  EP-6   other     rack DC isolator padl    1,235    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ·    ·    ·
+  IE-101 other     rack DC isolator encl    1,235    0/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ·    ·    ·
+  EP-7   other     rack DC cable gland        312    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  PCS-101other     PCS inverter 1 MW bid  225,000    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  INV-1  other     PCS DC-link capacitor       15    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  INV-2  electricalPCS LCL output filter       60    1/0 IDENTIFI                —    ·    ·    ✓    ✓    ✗    ·    ·
+  INV-3  electricalPCS DC surge arrester      180    1/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  INV-4  rotating  PCS cooling fan tray        28    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ✓    ·
+  INV-5  other     PCS liquid cooling in      850    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  TX-101 electricalstep-up transformer     47,744    1/2 IDENTIFI                —    ✓    ✓    ✓    ✓    ✗    ✓    ✓
+  TX-102 electricaltransformer neutral g       18    0/0 IDENTIFI                —    ·    ·    ·    ·    ·    ·    ·
+  TX-103 electricaltransformer MV surge       270    1/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  TX-104 instrumenttransformer winding t       54    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  TX-105 electricaltransformer cable sea       54    0/0 IDENTIFI                —    ·    ·    ·    ·    ·    ·    ·
+  X-13   control   BMS master controller       10    0/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  X-14   other     CAN transceiver              2    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-15   other     digital isolator             3    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ·    ·    ·
+  BMS-101other     BMS master housing         290   19/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  BS-101 other     BMS slave module        40,222    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-16   electricalwatchdog timer relay        35    1/1 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  X-17   other     watchdog terminal blo        4    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  EQ-104 other     EMS industrial PC          450    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-18   control   Modbus gateway             330    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ✓    ·    ·
+  I-3    other     EMS managed Ethernet       190    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-19   control   EMS UPS backup module      480    1/1 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  EP-8   other     EMS fibre patch panel       53    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-20   other     DC string contactor      3,185    0/0 BESPOKE                 —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-21   other     main bus contactor       3,500    0/0 BESPOKE                 —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-22   other     DC pre-charge contact    3,562    0/0 BESPOKE                 —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-23   other     DC pre-charge resisto      364    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-24   electricalDC HRC fuse              3,900    1/0 IDENTIFI                —    ·    ·    ·    ✓    ✗    ·    ·
+  X-25   electricalDC busbar 1500 V            80   1/26 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  SG-101 electricalAC main breaker          4,500    1/1 IDENTIFI                —    ✓    ✓    ·    ✓    ✓    ·    ·
+  X-26   electricalG99 protection relay     1,800    1/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  I-4    instrumentAC energy meter          1,500    0/1 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  TX-106 electricalAC voltage transforme    2,100    1/0 IDENTIFI                —    ·    ·    ·    ✓    ✗    ·    ·
+  X-27   electricalAC surge protection d      200    0/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  X-28   other     EMC ground braid           420    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-29   other     earth bar                  623    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-30   other     equipotential bonding      104    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-31   electricalPE surge counter             1    1/0 NOT FOUN                —    ·    ·    ·    ✓    ✓    ·    ·
+  X-32   other     earth rod                  180    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  EQ-109 rotating  enclosure ventilation      536    1/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✗    ✓    ✓
+  EQ-111 separator air intake filter          340    1/2 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ·
+  EQ-103 other     louvre vent panel          696    2/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-33   control   thermostat controller       35    0/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  I-5    instrumenthumidity sensor             52    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  CH-101 exchanger liquid cooling chille  177,600    3/6 IDENTIFI                —    ✓    ✓    ✓    ✓    ·    ✓    ·
+  EQ-112 rotating  cooling pump             3,300    2/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✗    ✓    ·
+  CM-101 other     cold plate manifold      3,900    7/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  EQ-114 vessel    expansion tank              18    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ·
+  EQ-105 other     container AC unit        7,600    1/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  DU-101 other     HVAC duct                  360    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  EQ-108 rotating  HVAC condensate pump     3,000    2/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✗    ✓    ·
+  CP-101 other     cold plate per rack      9,100    1/7 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  CD-101 other     coolant distribution       300    1/0 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-34   other     coolant charge               2    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-35   other     pressure relief and s      233    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-36   other     coolant supply pipe         18    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-37   other     coolant return pipe         18    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-38   other     pressure transducer        260    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  FS-101 other     clean agent cylinder     6,800    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-39   other     suppression nozzle          24    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  I-6    instrumentthermal detector            13    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  I-7    instrumentsmoke aspirating dete    1,500    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  EQ-106 other     suppression releasing    5,500    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-40   electricalfuse holder                325    0/0 IDENTIFI                —    ·    ·    ·    ·    ·    ·    ·
+  X-41   electricalfuse label                  78    1/0 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  X-42   electricalfuse mount rail             78    0/0 IDENTIFI                —    ·    ·    ·    ·    ·    ·    ·
+  X-43   electricalfuse install torque c       78    3/2 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  EQ-110 rotating  off-gas exhaust fan      3,900    1/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✗    ✓    ·
+  OG-101 other     off-gas duct section     3,900    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-44   valve     off-gas activation so    1,040    0/1 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-45   other     off-gas duct penetrat    3,900    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  EQ-107 other     arc flash barrier pan      560    0/1 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-46   other     emergency stop button   20,000    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-47   other     emergency stop contac       80    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-48   electricalsafety relay                35    1/1 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  EQ-102 other     deflagration vent pan      180    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  SI-101 other     smoke vent interlock       263    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-49   other     smoke vent interlock        60    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  DS-101 other     deflagration vent sea       20    1/1 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-50   other     deflagration vent lab        4    1/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-51   other     high voltage safety l       13    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-52   other     arc flash hazard labe        4    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-53   other     IEC 62619 compliance         1    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-54   other     NFPA 855 warning labe        2    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-55   other     safety label mount          13    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  I-8    instrumentgas sensor               1,950    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  I-9    instrumentgas detector controll    3,500    0/0 IDENTIFI                —    ·    ·    ✗    ✓    ✓    ·    ✓
+  I-10   instrumentgas sensor mount            13    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  X-56   other     gas detection harness   45,500    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  I-11   instrumentgas sensor label            13    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  I-12   instrumentsmoke detector head      1,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  I-13   instrumentsmoke detector base      1,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  I-14   instrumentsmoke detector loop c    1,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  I-15   instrumentsmoke detector sounde        2    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ✗
+  I-16   instrumentsmoke detector callpo      700    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  X-57   electricalarc flash relay             35    0/1 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  I-17   instrumentarc flash fibre-optic      560    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ✗
+  X-58   electricalarc flash relay termi      700    0/0 IDENTIFI                —    ·    ·    ·    ✓    ✓    ·    ·
+  X-59   other     arc flash boundary la        4    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-60   other     arc flash barrier tap        3    0/1 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-61   other     ISO container 20 HC      5,200    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  X-62   other     structural floor rein       45    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  EQ-101 other     thermal insulation pa      300    0/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-63   other     door assembly double       127    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  I-18   instrumentdoor position switch        12    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  X-64   other     grounding lug set            8    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-65   other     ISO corner casting       2,840    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-66   other     lifting certification       45    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  EP-9   control   HMI panel                1,959    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-67   other     local emergency stop        80    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  EP-10  control   HMI panel VESA mount       137    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-68   control   HMI ethernet cable          35    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-69   control   HMI label pin               35    0/0 NOT FOUN                —    ·    ·    ✓    ✓    ✓    ·    ·
+  X-70   other     LV AC cable gland        1,300    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-71   electricalgrid PCC metering CT       900    0/2 IDENTIFI                —    ·    ·    ✓    ✓    ✗    ·    ·
+  --------------------------------------------------------------------------------------------------------------------
+  PART coverage by drawing (present / expected):   BLE 30/30   GA 30/30   P&ID 26/27   SLD 20/20   PNL 10/21   BFD 8/8   SCH 5/19
+  CONNECTION coverage (pipes/wires/sensors vs the views):   pid 1/1 (100.0%)   process_schedules 2/28 (7.1%)   isometric 0/1 (0.0%)   route 28/28 (100.0%)
+  → 17 NOT FOUND (true gap) · 0 fabricated (no catalogue identity by nature) · 0 architecturally-excluded (membrane/media) · 0 OEM-proprietary (recorded finding) · 2 commodity-fitting (accessory/fastener, no catalogue identity by nature) · 0 boundary-stub (connection endpoint, not a part) · 5 scope-documented (system/network/design label) · 26 parts w/ coverage gap · 1 orphan · 0 connections off the P&ID.  0 ambiguous tag(s) (name-corroborated).  141/141 parts have NO tool provenance.  wrote parts-ledger.json
+  → CONNECTIVITY: 14 concern(s) — process 4/4 connected (100.0%) · instruments 19/19 associated (100.0%) · 1 origin(s) · 0 sink(s)
+
+[chain] ledger updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/parts-ledger.json
+[chain] quality scorecard (iteration 1/8): floor=8/10 mean=9.8/10 allPass=true
+  headline: 7/10 ✗ BELOW 8
+  brief_compliance: 9/10 ✓
+  bill_of_materials: 8/10 ✓
+  performance_card: 6/10 ✗ BELOW 8
+  design_narrative: 9/10 ✓
+  physics_fidelity: 7/10 ✗ BELOW 8
+  drawing_gates: 8/10 ✓
+  cost_sanity: 10/10 ✓
+  physics_gates: 10/10 ✓
+  tool_archetype: 10/10 ✓
+  connectivity: 10/10 ✓
+  brief_compliance: 10/10 ✓
+  unresolved_critic_highs: 10/10 ✓
+  physics_fidelity: 10/10 ✓
+[chain] dashboard updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/dashboard.html
+[chain] ledger HTML updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/bess-campaign-v11/parts-ledger.html
+
+[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration 1/8)

@@ -1,0 +1,5 @@
+[board] GATE OPEN — every active defect on None is dispositioned
+scripts/run-loop.sh: line 26:  5920 Killed: 9                  npx tsx --no-cache scripts/serial-design-chain-v2.tsx "$BRIEF" "$OUT" > "out-$(basename "$OUT").log" 2>&1
+== colorimeter run exit: 137 17:22:23 — out/colorimeter-20260712-1701 ==
+[red-team] 5 finding(s) from x-ai/grok-4.3 → red-team-punchlist.md (harvested by loop_board; verify each vs state before acting)
+[board] colorimeter-20260712-1701: 39 defect(s) live — 39 new, 0 REOPENED, 0 resolved; board: 39 active (39 undispositioned)

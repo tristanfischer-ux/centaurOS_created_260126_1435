@@ -3213,8 +3213,17 @@ def _selftest() -> int:
     }}}
     _g12_required = [view for view in required_views(_g12_state) if view.required]
     chk("g12_product_requires_five_views", len(_g12_required) == 5)
-    chk("g12_legacy_hero_only_fires",
-        len([view for view in _g12_required if view.filename not in {"00-hero.png"}]) == 4)
+    # This asserts the gate's INTENT (a run carrying ONLY the legacy hero is incomplete)
+    # by driving the decision with that adversarial input, rather than counting the
+    # required list. The old form asserted `len(required - hero) == 4`, which silently
+    # went FALSE when the required set became five non-hero product views — the hero is
+    # not in the required list at all, so the subtraction stopped meaning anything and the
+    # proveCatch failed while the gate itself was still correct. An assertion about a list
+    # COMPOSITION decays whenever the list changes; an assertion about the DECISION does
+    # not. Per the GATE INTENT RULE, prove the catch, do not count the inputs.
+    _g12_present = {"00-hero.png"}
+    _g12_missing = [v.filename for v in _g12_required if v.filename not in _g12_present]
+    chk("g12_legacy_hero_only_fires", len(_g12_missing) == len(_g12_required) > 0)
     # G12 render_view_quality proveCatch (2026-07-22): organoid bioreactor height_occupancy
     # was 0.43 — below the 0.45 floor.  Verify evaluate_image correctly fires on 0.43
     # and passes on ≥0.45.  Build synthetic grayscale PNGs with controlled edge spans.

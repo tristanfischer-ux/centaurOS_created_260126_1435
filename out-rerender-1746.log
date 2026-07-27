@@ -1,0 +1,252 @@
+[render-scene] no template for product_class='pcb_assembly'; rendering with the UNIVERSAL deterministic builder
+[render-scene] no per-class template → UNIVERSAL builder build_universal_scene.py
+[univ] state=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/state.json
+[univ] out  =/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746
+[univ] physical parts kept = 22; non-physical dropped = 9
+[univ] dropped: Optical Path Baffle, Usb Interface, Firmware Storage, Battery Charge Management Circuit, Usb Power Interface, Status Indicator, Interface Membrane, Nameplate, maintenance serviceability  access panel
+[univ] undimensioned-tall cap = 0.2 m (= 1.6× tallest dimensioned vessel); capped parts: none
+[ledger] residual closer: +4 edge(s) — every remaining required connection terminated (nearest in-plant partner, else battery limit)
+[ledger] COMPLETENESS: ✓ all 22 parts show their required inputs + outputs
+[ledger] REFERENTIAL INTEGRITY: ✓ every connection names a real part on both ends (graph is fully traceable)
+[ledger] wrote connection-ledger.json — 32 authored connection(s), 0 dropped, 0 completeness concern(s), 0 integrity violation(s) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/connection-ledger.json
+[univ] region order (L->R): ['energy_conversion_transduction', 'structure_containment', 'hmi_ergonomics', 'energy_storage_source', 'sensing_instrumentation', 'control_compute_communication']
+[univ] geometry family = generic_assembly  (product_class=pcb_assembly; aero/flight-vehicle = 0, tower-machine = 0 [grounded=False], grow/panel = 2 (distinct 2), battery-system = 2, rack/cabinet/server = 3 (structure 0, rack_class=False), vessel = 0 (distinct 0), marine = 0 (is_marine=False), of 22 physical parts; true_aircraft=False, true_spacecraft=False)
+[univ] sealed-enclosure override: contract enclosure_volume_m3 < 1.0 m³ → 'generic_assembly' replaced by 'sealed_enclosure' (101×101×131 mm)
+[univ][sealed] enclosure 101×101×131 mm (interior 85×85×115); 22 parts
+[univ][sealed] INSTRUMENT interior layout (optical bench + PCB + power + interface) — not a BESS cabinet stack
+[univ][sealed] zone power: 4 part(s) in 4 row(s) × 1 col(s), band 18 mm at z 8
+[univ][sealed] zone electronics: 5 part(s) in 5 row(s) × 1 col(s), band 28 mm at z 26
+[univ][sealed] zone optical: 6 part(s) in 6 row(s) × 1 col(s), band 51 mm at z 54
+[univ][sealed] zone interface: 5 part(s) in 5 row(s) × 1 col(s), band 18 mm at z 105
+[univ][sealed] 2 skin part(s) as face plates
+[univ][sealed] containment clamp (mesh-level): 22 part(s) translated inside the 85×85×115 mm interior
+[univ][sealed] INTERIOR-FILL 178% (Σ part bboxes / interior volume)
+[univ] topology edge 10 UNRESOLVED (signal): Optical Path Baffle -> Wavelength Selection Module  [missing: Optical Path Baffle]
+[univ] topology edge 11 UNRESOLVED (signal): Firmware Storage -> Dual-Core Wi-Fi Microcontroller  [missing: Firmware Storage]
+[univ] topology edge 14 UNRESOLVED (electrical_bus): Usb Interface -> DC DC Regulator  [missing: Usb Interface]
+[univ] topology edge 15 UNRESOLVED (electrical_bus): Usb Power Interface -> DC DC Regulator  [missing: Usb Power Interface]
+[univ] topology edge 28 UNRESOLVED (electrical_bus): Power distribution — battery limit -> Signal Amplifier Stage  [missing: Power distribution — battery limit]
+[univ] topology edge 29 UNRESOLVED (electrical_bus): Power distribution — battery limit -> User Input Buttons  [missing: Power distribution — battery limit]
+[univ] topology edge 30 UNRESOLVED (electrical_bus): Power distribution — battery limit -> Control Switch  [missing: Power distribution — battery limit]
+[univ] topology edge 31 UNRESOLVED (electrical_bus): Power distribution — battery limit -> Annunciator  [missing: Power distribution — battery limit]
+[univ][spine] axis=x  spine_y=-45  aisle=14 mm  x∈[-62,62] y∈[-62,62]  (22 equip)
+[univ][wire] STAGE 4: spine router drew 0 abstract-boundary edge(s); DEFERRED 24 part-to-part edge(s) to wire_ports (each edge drawn once)
+[univ][sealed] topology routed = 0/32; unresolved = 8
+[univ][ground] per-part slab coverage: 22 parts, 0 centre(s) off slab (all on)
+[univ][ground] STAGE 4 floor — REQUESTED 6.1×6.1 m at (-0.0,-0.0); ACTUAL obj.dimensions=(6095, 6093, 400) mm location=(-8, -8, 100) mm (if ACTUAL≈half the request, add_box is halving boxes)
+[univ][ground] coverage VERIFIED — 0 equipment centres off the deck (6.1×6.1 m at (-0.0,-0.0))
+[univ][ports] STAGE 2 connection ports — 22/22 parts ported, 40 ports total (fluid stubs + small terminals; stored on part.ports for Stage-3 wiring)
+[univ][wire]   overhead deck Z = 1201 mm (equipment-bulk top + 450 mm clearance)
+[univ][wire]   SHARED TRAY DC DC Regulator → 5× power (trunk 0.0 m + 5 spurs)
+[univ][wire] STAGE 3/4 port-to-port wiring — 24/32 ledger edges ROUTED (5 drawn port-to-port, 19 length-only logical cable runs, 0 via a port fallback), 0 already drawn by the spine router (abstract boundary), 8 left unwired (abstract boundary / assembly); 1 fan-out(s) routed as a SHARED TRAY; total routed length 42.1 m
+[univ][wire]   routed length by service (m): {'power': 8.34, 'signal': 33.8}
+[univ][wire]   UNWIRED Optical Path Baffle→Wavelength Selection Module [signal/signal]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Firmware Storage→Dual-Core Wi-Fi Microcontroller [signal/signal]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Usb Interface→DC DC Regulator [electrical_bus/power]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Usb Power Interface→DC DC Regulator [electrical_bus/power]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Power distribution — battery limit→Signal Amplifier Stage [electrical_bus/power]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Power distribution — battery limit→User Input Buttons [electrical_bus/power]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Power distribution — battery limit→Control Switch [electrical_bus/power]: source is an abstract boundary / unported part
+[univ][wire]   UNWIRED Power distribution — battery limit→Annunciator [electrical_bus/power]: source is an abstract boundary / unported part
+[univ][wire]   wrote wired-lengths.json — 24 runs, 42.1 m total → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/wired-lengths.json
+[univ][conn-audit] 6 drawn run(s); 0 endpoint(s) NOT on a part (tol 1400 mm) — these are the 'random lines':
+[univ][conn-audit] MESH objects reaching >3 m BEYOND the plant: 0
+[univ][inventory] mesh families: u_wire_=13, u_wire_trunk=9, u_skid_encl=5, u_analog_to=4, u_constant_current=4, u_dual_core=4, u_se_backplane=4, u_transimpedance_amplifier=4, u_3d_printed_c=3, u_control_switch=3, u_dc_dc=3, u_high_power=3, u_local_display=3, u_signal_amplifier=3, u_silicon_pin=3, u_user_input=3, u_wavelength_selection=3, u_3d_printed_e=2
+[univ][inventory] THIN+LONG 'line' meshes (>8 m long, <0.7 m thick): 0
+[univ][inventory] OUTLIER meshes (>18 m from centre OR floating >1.2 m): 0
+[univ][route-audit] routes=6  over_equipment_segments=0  max_detour_ratio=1.0  same_elevation_crossings=0
+[univ][route-reconcile] DEFECT 1: dropped 0 fluid edge(s) routed onto a pure instrument (0 m of phantom pipe)
+[univ][route-reconcile] DEFECT 2: capped 0 detour route(s) at 2.5× straight-line + 5 m (0 m of routed length removed)
+[univ][route-reconcile] costed £ 539 → 539 (saved £0)
+[conn-schedule] 25 runs sized; cable-m by CSA: {'(unsized — no design current)': 8.3}; pipe-m by DN: {}; duct-m by size: {}; other-m: 33.8
+[conn-bom] cable £133 | pipe £0 | duct £0 | total £539 (terminations £108; source model:uk-2026-supply+install)
+[conn-schedule] volt-drop limit 5% (env CONN_VOLTDROP_LIMIT_PCT); D1 upsized 0 run(s); D2 design recommendations: 0
+[conn-schedule] rendered outer_dia_mm range: min=60.0 mm  max=60.0 mm  (1 distinct sizes)
+[parts-manifest] site utilisation: hull 6.2 m² / deck 37.1 m² = 0.168
+[parts-manifest] wrote 22 placed parts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/parts-manifest.json  (plant 0.1×0.1×0.1 m)
+[route-manifest] wrote 6 routed lines (20 waypoints, 7 fittings) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/route-manifest.json/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:17257: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  bsdf = m.node_tree.nodes.get("Principled BSDF") if m.use_nodes else None
+/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:17393: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  world.use_nodes = True
+00:00.760  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-hero.png'
+00:00.901  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-iso.png'
+00:01.042  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-top.png'
+00:01.163  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-front.png'
+00:01.286  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-side.png'
+
+[univ][callouts] drop X-113: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-114: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-103: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-112: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-107: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-102: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-117: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-121: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-104: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-106: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-109: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] drop X-119: resolved z 1814 exceeds the ladder ceiling 1310 (span 1000) — an unreadable sky chip; the GA/schedule carry the tag
+[univ][callouts] baked 0 equipment-tag chip(s) (text 55 mm, top-12 principals by footprint): X-113, X-114, X-103, X-112, X-107, X-102, X-117, X-121, X-104, X-106, X-109, X-119
+[univ] INSPECT mode ON — clean CAD-inspection render (set INSPECT=0 for the PDF pipeline)
+[univ][inspect] recoloured equip=62 frame=6 pipe=22 rack=0 unmatched=4
+[univ][inspect] view_transform=Standard
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-hero.png  (ortho_scale=6.9 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-iso.png  (ortho_scale=9.8 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-top.png  (ortho_scale=9.7 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-front.png  (ortho_scale=6.7 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/inspect-side.png  (ortho_scale=6.7 m)  slab_hidden=1
+[univ][inspect] DONE — inspect-iso/top/front/side.png in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746
+[univ] SUMMARY {"geometry_family": "sealed_enclosure", "aero_subtype": null, "physical_parts": 22, "dropped": 9, "topology_total": 32, "topology_routed": 0, "topology_unresolved": [["Optical Path Baffle", "Wavelength Selection Module", "signal"], ["Firmware Storage", "Dual-Core Wi-Fi Microcontroller", "signal"], ["Usb Interface", "DC DC Regulator", "electrical_bus"], ["Usb Power Interface", "DC DC Regulator", "electrical_bus"], ["Power distribution \u2014 battery limit", "Signal Amplifier Stage", "electrical_bus"], ["Power distribution \u2014 battery limit", "User Input Buttons", "electrical_bus"], ["Power distribution \u2014 battery limit", "Control Switch", "electrical_bus"], ["Power distribution \u2014 battery limit", "Annunciator", "electrical_bus"]], "regions": ["energy_conversion_transduction", "structure_containment", "hmi_ergonomics", "energy_storage_source", "sensing_instrumentation", "control_compute_communication"], "route_audit": {"routes": 6, "over_equipment_segments": 0, "over_equipment_routes": [], "max_detour_ratio": 1.0, "max_detour_route": "u_wire_trunk_u_dc_dc_regulator_power", "same_elevation_crossings": 0, "crossing_detail": [], "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"}, "route_reconcile": {"instrument_edges_dropped": 0, "routes_capped": 0, "length_saved_m": 0.0, "gbp_saved": 0.0}, "connection_schedule_totals": {"cable_m_by_csa": {"(unsized \u2014 no design current)": 8.3}, "pipe_m_by_dn": {}, "duct_m_by_size": {}, "other_m": 33.8, "runs_sized": 25, "runs_out_of_spec": 0, "runs_upsized": 0, "design_recommendations": 0, "cable_gbp": 133.02, "pipe_gbp": 0.0, "duct_gbp": 0.0, "transformer_gbp": 0.0, "other_gbp": 405.72, "terminations_gbp": 108.0, "install_gbp": 430.74, "grand_total_gbp": 538.74, "cost_source": "model:uk-2026-supply+install"}, "parts_manifest_count": 22, "route_manifest_count": 6, "tag_callouts": 0, "inspect": {"equip": 62, "frame": 6, "pipe": 22, "rack": 0, "unmatched": 4}}
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:46:23)
+
+Blender quit
+/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:18560: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  _sw.use_nodes = True
+00:27.953  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/04-product-exterior.png'
+01:00.685  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/05-product-left.png'
+01:31.136  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/06-product-right.png'
+02:19.397  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/07-product-service.png'
+02:56.173  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/00-hero.png'
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:46:23)
+Timer 'STL Import' took 1.01 ms
+Timer 'STL Import' took 1.35 ms
+Timer 'STL Import' took 1.71 ms
+Timer 'STL Import' took 1.09 ms
+Timer 'STL Import' took 1.06 ms
+Timer 'STL Import' took 0.45 ms
+Timer 'STL Import' took 0.36 ms
+Timer 'STL Import' took 0.41 ms
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:05.729  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-control_compute_communication.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:17.306  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-control_compute_communication-top-front.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:22.582  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-energy_conversion_transduction.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:27.364  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-energy_conversion_transduction-top-front.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:32.704  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-energy_storage_source.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:37.398  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-energy_storage_source-top-front.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:45.190  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-hmi_ergonomics.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:50.028  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-hmi_ergonomics-top-front.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+03:56.705  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-sensing_instrumentation.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+04:07.782  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-sensing_instrumentation-top-front.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+04:12.155  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-structure_containment.png'
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+Warning: edge 2 - 4 appears twice, correcting
+Warning: edge 4 - 2 appears twice, correcting
+04:24.603  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/module-structure_containment-top-front.png'
+[univ] state=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/state.json
+[univ] out  =/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746
+[univ] physical parts kept = 22; non-physical dropped = 9
+[univ] dropped: Optical Path Baffle, Usb Interface, Firmware Storage, Battery Charge Management Circuit, Usb Power Interface, Status Indicator, Interface Membrane, Nameplate, maintenance serviceability  access panel
+[univ] undimensioned-tall cap = 0.2 m (= 1.6× tallest dimensioned vessel); capped parts: none
+[ledger] residual closer: +4 edge(s) — every remaining required connection terminated (nearest in-plant partner, else battery limit)
+[ledger] COMPLETENESS: ✓ all 22 parts show their required inputs + outputs
+[ledger] REFERENTIAL INTEGRITY: ✓ every connection names a real part on both ends (graph is fully traceable)
+[ledger] wrote connection-ledger.json — 32 authored connection(s), 0 dropped, 0 completeness concern(s), 0 integrity violation(s) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/connection-ledger.json
+[univ] region order (L->R): ['energy_conversion_transduction', 'structure_containment', 'hmi_ergonomics', 'energy_storage_source', 'sensing_instrumentation', 'control_compute_communication']
+[univ] geometry family = generic_assembly  (product_class=pcb_assembly; aero/flight-vehicle = 0, tower-machine = 0 [grounded=False], grow/panel = 2 (distinct 2), battery-system = 2, rack/cabinet/server = 3 (structure 0, rack_class=False), vessel = 0 (distinct 0), marine = 0 (is_marine=False), of 22 physical parts; true_aircraft=False, true_spacecraft=False)
+[univ] sealed-enclosure override: contract enclosure_volume_m3 < 1.0 m³ → 'generic_assembly' replaced by 'sealed_enclosure' (101×101×131 mm)
+[univ][sealed] enclosure 101×101×131 mm (interior 85×85×115); 22 parts
+[univ][sealed] INSTRUMENT interior layout (optical bench + PCB + power + interface) — not a BESS cabinet stack
+[univ][sealed] zone power: 4 part(s) in 4 row(s) × 1 col(s), band 18 mm at z 8
+[univ][sealed] zone electronics: 5 part(s) in 5 row(s) × 1 col(s), band 28 mm at z 26
+[univ][sealed] zone optical: 6 part(s) in 6 row(s) × 1 col(s), band 51 mm at z 54
+[univ][sealed] zone interface: 5 part(s) in 5 row(s) × 1 col(s), band 18 mm at z 105
+[univ][sealed] 2 skin part(s) as face plates
+[univ][sealed] containment clamp (mesh-level): 22 part(s) translated inside the 85×85×115 mm interior
+[univ][sealed] INTERIOR-FILL 178% (Σ part bboxes / interior volume)
+[univ][cad] u_se_cad_heatsink <- heatsink_extruded 72b4f76ff925
+[univ][cad] u_se_cad_pcb <- pcb_board 958106ff88a9
+[univ][cad] u_se_cad_cell_0 <- lfp_prismatic_cell 69c045f295e0
+[univ][cad] u_se_cad_fan_0 <- axial_fan fb9ce024132b
+[univ][cad] u_se_cad_fan_1 <- axial_fan fb9ce024132b
+[univ][cad] u_se_cad_gland_0 <- cable_gland a4e7000396d6
+[univ][cad] u_se_cad_gland_1 <- cable_gland a4e7000396d6
+[univ][cad] u_se_cad_gland_2 <- cable_gland a4e7000396d6
+[univ][sealed] HERO functional detail: fin bank ×9, 3 capacitors, PCB + 4 chips, HV busbar, 2 bladed fans + duct, 6 pack seams, 3 interface terminals/glands
+[univ][sealed] HERO product-skin mode: closed body 101×101×131 mm, 1 vent slot(s) + mounting wall; tags + wire draws suppressed for the product shot
+[univ][sealed] HERO product-skin: 32 topology edge(s) not drawn
+[univ][ground] per-part slab coverage: 22 parts, 0 centre(s) off slab (all on)
+[univ][ground] STAGE 4 floor — REQUESTED 6.6×6.2 m at (0.0,-0.0); ACTUAL obj.dimensions=(6605, 6154, 400) mm location=(0, -3, 100) mm (if ACTUAL≈half the request, add_box is halving boxes)
+[univ][ground] coverage VERIFIED — 0 equipment centres off the deck (6.6×6.2 m at (0.0,-0.0))
+[univ][boundary] sealed-product hero — no external service beams on a product shot
+[univ][ports] sealed-product hero — port stubs suppressed
+[univ][ports] BLENDER_CONNECTION_PORTS=0 — Stage-2 ports suppressed
+[univ][wire] STAGE 3/4 skipped — Stage-2 ports are off (need ports to wire)
+[univ][route-audit] routes=0  over_equipment_segments=0  max_detour_ratio=1.0  same_elevation_crossings=0
+[univ][sealed] HERO product-skin: data-artefact writes skipped (schedule/manifests owned by the INSPECT pass)
+[univ][callouts] sealed-product hero — no tag chips on a product shot
+[univ][cad] resolution log -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746/cad-geometry-resolution.json
+[forge] 04-product-exterior.png
+[forge] 05-product-left.png
+[forge] 06-product-right.png
+[forge] 07-product-service.png
+[forge] 00-hero.png (Cycles)
+[forge] ── per-module best-view camera table ──────────────────
+[forge] scene bbox X[-3.30,3.30] Y[-3.08,3.07] Z[-0.10,0.43]
+[forge] module control_compute_communication    hint=front         target=(0.00,0.00,0.32) loc=(0.19,0.22,0.43) ortho=0.12  [MODULE-FRAMED]
+[forge] module-control_compute_communication.png
+[forge] module-control_compute_communication-top-front.png
+[forge] module energy_conversion_transduction   hint=three_quarter target=(0.00,0.00,0.32) loc=(0.19,0.22,0.48) ortho=0.13  [MODULE-FRAMED]
+[forge] module-energy_conversion_transduction.png
+[forge] module-energy_conversion_transduction-top-front.png
+[forge] module energy_storage_source            hint=three_quarter target=(0.00,0.00,0.32) loc=(0.18,0.22,0.48) ortho=0.12  [MODULE-FRAMED]
+[forge] module-energy_storage_source.png
+[forge] module-energy_storage_source-top-front.png
+[forge] module hmi_ergonomics                   hint=front         target=(0.00,0.00,0.36) loc=(0.28,0.33,0.54) ortho=0.18  [MODULE-FRAMED]
+[forge] module-hmi_ergonomics.png
+[forge] module-hmi_ergonomics-top-front.png
+[forge] module sensing_instrumentation          hint=three_quarter target=(0.00,-0.00,0.22) loc=(1.27,1.51,1.35) ortho=0.97  [MODULE-FRAMED]
+[forge] module-sensing_instrumentation.png
+[forge] module-sensing_instrumentation-top-front.png
+[forge] module structure_containment            hint=three_quarter target=(0.00,-0.00,0.17) loc=(15.10,18.00,13.73) ortho=10.57  [MODULE-FRAMED]
+[forge] module-structure_containment.png
+[forge] module-structure_containment-top-front.png
+[forge] DONE — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260712-1746
+[univ] SUMMARY {"geometry_family": "sealed_enclosure", "aero_subtype": null, "physical_parts": 22, "dropped": 9, "topology_total": 32, "topology_routed": 0, "topology_unresolved": [], "regions": ["energy_conversion_transduction", "structure_containment", "hmi_ergonomics", "energy_storage_source", "sensing_instrumentation", "control_compute_communication"], "route_audit": {"routes": 0, "over_equipment_segments": 0, "over_equipment_routes": [], "max_detour_ratio": 1.0, "max_detour_route": null, "same_elevation_crossings": 0, "crossing_detail": [], "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"}, "route_reconcile": {"instrument_edges_dropped": 0, "routes_capped": 0, "length_saved_m": 0.0, "gbp_saved": 0.0}, "connection_schedule_totals": null, "parts_manifest_count": 22, "route_manifest_count": null, "tag_callouts": 0, "inspect": null}
+
+Blender quit
+[render-scene] shaded hero pass: 00-hero=shaded OK
+[render-scene] UNIVERSAL OK — cover + 7 module page(s) from inspect-hero.png

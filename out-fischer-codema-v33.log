@@ -1,0 +1,719 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_codema.md (13435 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 13435 chars
+[brief-parse] OK — confidence=HIGH, missing=5 fields, metrics=8
+[chain] classification: water_treatment (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 9.7s)
+[chain] U5 brief augmentation: U5 augmentation (class: water_treatment): 1 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Continuous chemical process: capture; field-erected fixed plant with closed-loop solvent/reagent recovery and automated process control" (Process inferred from brief mission/description for water_treatment. class-agnostic inference from brief text for unmapp)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 14 duties derived; product="Conditioned, nutrient-dosed irrigation water (fertigation) and recovered drain water." (model=google/gemini-3.1-pro-preview, cost_usd=0.058868)
+  [U6] ro_feed_water_demand_m3_h = 10.7 m3/h [stated/high] — Stated in brief as 'at least 10.7 cubic metres per hour', which aligns with 8.0 m3/h perme
+  [U6] ro_reject_flow_m3_h = 2.7 m3/h [derived/high] — Calculated from feed minus permeate: 10.7 m3/h feed - 8.0 m3/h permeate = 2.7 m3/h.
+  [U6] total_fresh_water_production_m3_h = 9.6 m3/h [derived/high] — RO permeate capacity (8.0 m3/h) plus maximum raw-tap-water blending capacity (1.6 m3/h).
+  [U6] gac_filtration_capacity_m3_h = 14.5 m3/h [stated/high] — Stated nominal filtration capacity for the granular-activated-carbon filter.
+  [U6] softener_regeneration_interval_h = 8.5 h [derived/medium] — 91 m3 treated between regenerations divided by the continuous RO feed rate of 10.7 m3/h.
+  [U6] softener_salt_consumption_kg_h = 10.35 kg/h [derived/medium] — Maximum 88 kg of salt per regeneration divided by the 8.5 hour continuous operation interv
+  [U6] total_water_storage_volume_m3 = 120 m3 [derived/high] — One fresh-water tank (40 m3) plus two drain-water tanks (40 m3 each).
+  [U6] peak_fertigation_flow_m3_h = 90 m3/h [derived/high] — Two A/B nutrient-dosing units, each with a capacity of 45 m3/h, operating simultaneously.
+  [U6] hand_watering_capacity_m3_h = 25 m3/h [stated/high] — Stated hand-watering capacity.
+  [U6] nutrient_stock_volume_l = 8000 L [derived/high] — Eight 1,000-litre polyester fertiliser tanks (four A, four B).
+  [U6] fertigation_pump_power_kw = 15 kW [derived/high] — Two Lowara circulation pumps at 7.5 kW each.
+  [U6] ro_power_consumption_kw = 4.2 kW [stated/high] — Stated consumption for the reverse-osmosis unit (total installed is 5.5 kW).
+  [U6] total_estimated_continuous_electrical_load_kw = 19.2 kW [derived/medium] — RO consumption (4.2 kW) + Fertigation pumps (15 kW) + Softener (0.015 kW). Excludes interm
+  [U6] target_water_hardness_dh = 0.1 dH [stated/high] — Stated hardness reduction target for the water softener.
+[chain] engineering_contract build failed: Cannot read properties of undefined (reading 'length'); continuing without Contract (LLM-only fallback)
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":4}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":910}
+[standards-writeback] web search: EN 50604-1 — 1450ms
+[standards-writeback] REJECTED unverified web standard EN 50604-1: excerpt does not contain the claimed value "EN 50604-1" — unsupported (likely hallucinated)
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"miss","latency_ms":2302}
+[products-writeback] {"product_name":"Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → 14.5 m³/h granular-activated-car","hit":"db_hybrid","matched":"Pentair X-Flow XIGA UF + RO","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":157}
+[engineering-lock-gate] PASS — filled 0 slots + 2 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: water_treatment
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 21250 chars. First 200: {
+  "market_context": "The UK and European controlled-environment agriculture (CEA) sector has experienced significant investment in recent years, driven by food security concerns, supply-chain resili
+[research-synthesis] Complete: 5 competitors, 12 sources, 10 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for water_treatment: replaying 5 stored duty spec(s) (gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool gac-filter:liquid-phase-sizing (duty_hash=765d91123186, db id=29) — no LLM call.
+[tool-generator] REUSED stored generated tool ion-exchange:softener-sizing (duty_hash=1da257ad1145, db id=30) — no LLM call.
+[tool-generator] REUSED stored generated tool irrigation:ebb-flow-demand (duty_hash=11db9bbe8701, db id=31) — no LLM call.
+[tool-generator] REUSED stored generated tool mechanical-filtration:cloth-screen (duty_hash=df965805489c, db id=32) — no LLM call.
+[tool-generator] REUSED stored generated tool water-storage:buffer-sizing (duty_hash=37eebb6d6496, db id=33) — no LLM call.
+[tool-creation] DONE for water_treatment: created 5 self-test-passed tool(s) (gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for water_treatment: created+registered 5 self-test-passed tool(s) [gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=water_treatment:
+    ✗ UNSIZED heat pump / thermal hold
+    ✓ recirculation / process pumps → fluids:pipe-sizing
+    ✓ electrical distribution → electrical:transformer-sizing
+[bootstrap-tool-plan] COVERAGE GAP: checklist unit "heat pump / thermal hold" unsized — no selected/created tool covers it for slug=water_treatment.
+[bootstrap-tool-plan] REUSING stored candidate slug=water_treatment version=1 status=candidate (no LLM call; 26 steps, 24 tool_ids, coverage_gaps=1)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for water_treatment/medium — bootstrapped a 26-step tool plan (candidate id=31 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: arc-flash:ieee-1584, control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:transformer-sizing, electrical:cable-sizing, fluids:pipe-sizing, gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, irrigation:pump-sizing, lifecycle-co2:assessment, mechanical-filtration:cloth-screen, nutrient-solution:chemistry, ph-titration:sizing, pressure-vessel:design, mass-aggregator:envelope-check, process:pump-sizing, protection-coordination:dc-ac, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, water-treatment-ro:sizing, water-storage:buffer-sizing, yield-economics:npv
+[bootstrap-tool-plan] SEED-PROTECTED gac-filter:liquid-phase-sizing: kept the first-principles contract value(s) for [gac_filter_vessel_volume_m3(seed=1.8 vs tool=2.4166666666666665)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] SEED-PROTECTED ion-exchange:softener-sizing: kept the first-principles contract value(s) for [softener_vessel_volume_each_m3(seed=1.5 vs tool=0.4619932646875)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] SEED-PROTECTED irrigation:ebb-flow-demand: kept the first-principles contract value(s) for [irrigation_demand_m3_h(seed=90 vs tool=1200)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] FAIL-CLOSED nutrient-solution:chemistry: missing computed output field(s) → emitted nothing for [nutrient_concentrations_mg_l(nutrient-solution:chemistry.nutrient_concentrations_mg_l)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[class-reference-graph-db] {"product_class":"water_treatment","resolved_to":"water_treatment","hit":"db","nodes":11,"edges":28}
+[generic-emitter] physics-derived equipment: 40 word(s) sized from the contract; 8 principal item(s) synthesised (fertigation_dosing_pump, nutrient_tank, hand_watering_pump, drain_collection_sump, cloth_filter, gac_softener, transformer, irrigation_pump).
+[chain] Orchestrator: 11 modules, 20 sub-modules, 263 words, 18 tools ran (2529ms)
+[chain] Build #18k: toolOutputsBlock built (20 tools, 11459 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 23 component_classes covered (23 with match, 0 empty), 16644 chars (23989ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=1400000, target_performance_value=6000 (count)
+[chain] keyMetrics seeded early (pre-reviewer): Total Cultivation Containers=6,000 count
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=5/10 plaus=4/10 coh=6/10 part=5/10 hon=8/10 (25512ms)
+[chain] PHASE 4 skeleton critic: 2 HIGH-severity issues found before any LLM painting
+  ✗ [engineering_plausibility @ actuation_kinematics, safety_protection, environmental_interface, maintenance_serviceability] The design duplicates the '200' count across almost every valve type. It specifies 200 Solenoid Valves, 200 Pneumatic Actuated Valves, 200 Manual Isolation Valves, 200 Pneumatic Ac
+  ✗ [brief_to_design_fidelity @ maintenance_serviceability/Cleaning Tank/Cip Tank] The brief requires three 40 m3 storage tanks (1 fresh-water, 2 drain-water) with dimensions 3.64 m diameter by 3.88 m high. These are completely missing from the structural contain
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 9599 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 11 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 5 / 11 patches (skipped 6)
+    +overview structure_containment: +658 chars
+    +overview mass_fluid_transport_process: +607 chars
+    REJECT [structure-locked] add_sub_module structure_containment.structure_containment__fresh_water_tank: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "structure_containment" (0 flagged module(s): none)
+    REJECT [structure-locked] add_sub_module structure_containment.structure_containment__drain_water_tank: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "structure_containment" (0 flagged module(s): none)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word quantity="×8" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word manufacturer="Dow FilmTec" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word part_number="BW30-400" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_elements_word material="polyamide thin-film composite" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 29.3s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1730}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=6/10 phys=9/10 coh=5/10 part=6/10 hon=9/10 (31948ms)
+[chain] critic headline: The design features highly accurate pump and motor sizing but suffers from a missing storage tank, mislabeled vessels, and extreme valve duplication.
+[chain] critic issues: 1 high, 2 med, 4 total
+  ✗ [high/high] brief_to_design_fidelity @ maintenance_serviceability/Cleaning Tank/CIP Tank: The brief requires three 40 m³ storage tanks (1 fresh-water, 2 drain-water) with dimensions 3.64m dia x 3.88m high. The design only contains two 40 m³ tanks, wh
+  ✗ [med/high] internal_coherence @ actuation_kinematics: The design specifies multiple different valve types (Solenoid Valves, Pneumatic Actuated Valves, Manual Isolation Valves, Pneumatic Actuators, Flow Control Valv
+  ✗ [med/high] brief_to_design_fidelity @ mass_fluid_transport_process/Ultrafiltration Module: The design includes an 'Ultrafiltration Module', 'UF Membrane Bank', and 'UF Module Bank' (each rated at 15 m³/h). The brief does not request or require ultrafi
+[chain] physics-critic enforcement (shadow): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 2 module(s) for brief_fidelity structural adds: maintenance_serviceability, mass_fluid_transport_process
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 15924 chars
+[chain] STEP 8: R4 Flash-Lite review returned 17 patches
+[chain] STEP 8: R4 Flash-Lite review applied 6 / 17 patches (skipped 11)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.ro_membrane_element_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__ro_membrane_elements.high_pressure_pump_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word fertigation_dosing_system.fertigation_dosing_system__primary_assembly.dosing_pump_a: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word sensing_instrumentation.sensing_instrumentation__conductivity_sensor.ec_sensor_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word sensing_instrumentation.sensing_instrumentation__conductivity_sensor.ph_sensor_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word actuation_kinematics.actuation_kinematics__solenoid_valves.actuated_valve_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word structure_containment.structure_containment__painted_steel_skid_frame.storage_tank_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+[chain] STEP 8: R4 Flash-Lite review done in 15.2s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":271}
+[chain] canonical product_class OVERRIDE: "" → "water_treatment" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "water_treatment" — skipping
+[chain] physics repair: 0 iter(s); HIGH 1→1; plausibility 9→9; patches 0
+[chain] sub-module prose pre-fill: rewrote 18/20 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 110 entries (KPA=110, emitter=0, rag=0)
+[emitter-completion] 2 gap sub_module(s) for class "water_treatment" — DB-first → generate → write-back
+[emitter-completion]      ↳ wrote back Grundfos to pretraining_extracted_parts
+[emitter-completion]   ✓ GEN  fertigation_dosing_system::fertigation_dosing_system__primary_assembly → Grundfos [MPN deferred; LLM suggested "DDA 17-7 AR-PVC/V/C-F-31I001FG" stored in DB]
+[emitter-completion]      ↳ wrote back Hach to pretraining_extracted_parts
+[emitter-completion]   ✓ GEN  sensing_instrumentation::sensing_instrumentation__silica_analyzer → Hach [MPN deferred; LLM suggested "5500sc" stored in DB]
+[emitter-completion] filled 2 gap(s): 0 DB-first, 2 generated.
+[chain] emitter-completion: filled 2 gap sub_module(s) (0 DB-first, 2 generated+written-back) before gate-23
+[chain] gate-23 emitter-completeness: PASS — 20 sub_modules checked, 20 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 1 pass / 0 fail; grammar 8 pass / 5 fail; total score 1260
+  ✗ [thermal_path_closes] grammar: 1 heat-source sub-module(s) without thermal_path: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 2 concrete components not present in any sub-module word — dn50, dn160 | structure_containment: overview mentions 2 concrete components not present in any sub-module word — dn110, dn160. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: fertigation_dosing_system::fertigation_dosing_system__primary_assembly prose drops 1/1 words: DDA Digital Dosing Pump. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "364 m² area" AND "8 inch × 40 inch". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 0: applied 9 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    +cross_module_grammar_links.[+] (Resolve thermal_path_closes failure for RO membrane elements)
+    ~merge-into-existing fertigation_dosing_system.sub_modules[0].words[0] (Enrich DDA pump word to meet density requirements)
+    =fertigation_dosing_system.sub_modules[0].english_sentence (Fix prose coverage for DDA Digital Dosing Pump)
+    ~merge-into-existing sensing_instrumentation.sub_modules[1].words[0] (Enrich Silica Analyzer word to meet density requirements)
+    ~merge-into-existing mass_fluid_transport_process.sub_modules[0].words[0] (Remove duplicate dimension kind to resolve consistency failure)
+    +mass_fluid_transport_process.sub_modules[0].words[+] (Add missing DN50 component from overview)
+    +mass_fluid_transport_process.sub_modules[0].words[+] (Add missing DN160 component from overview)
+    +structure_containment.sub_modules[0].words[+] (Add missing DN110 component from overview)
+    +structure_containment.sub_modules[0].words[+] (Add missing DN160 component from overview)
+[chain] Phase 2 iter 1: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 2090
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [sub_module_prose_covers_words] grammar: 2 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements prose drops 2/104 words: DN50 PVC Pipe, DN160 PVC Pipe | structure_containment::structure_containment__painted_steel_skid_frame prose drops 2/33 words: DN110 PVC Pipe, DN160 PVC Pipe. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+[chain] Phase 2 iter 1: applied 3 patches, skipped 15, allowlist_rejected=15, state_changed=true
+    ~merge-into-existing mass_fluid_transport_process.sub_modules[0].words[0] (Enriching ro_membrane_elements_word with required modifiers for BoM density.)
+    =mass_fluid_transport_process.sub_modules[0].english_sentence (Updating prose to include all words in the sub-module.)
+    =structure_containment.sub_modules[0].english_sentence (Updating prose to include all words in the sub-module.)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="e-SHE 50-160/75" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="Composeal 125mm" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="CLS15D-AA11A1" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="CPS11D-7AA21" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="CPS12D-7AA21" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[1].words[+]: word patch contains MPN="CLS82D-AAA11" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[0].words[+]: word patch contains MPN="OVR T1-T2" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[0].words[+]: word patch contains MPN="6EP1333-3BA00" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="PVC-U" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="PVC-U" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[1].words[+]: word patch contains MPN="PVC-U" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[1].words[+]: word patch contains MPN="PVC-U" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="Type 546" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="Profile II" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="Ultipor" not in verified-parts allowlist (110 entries). Patch dropped. (Adding priced component to increase sub-module density.)
+[chain] Phase 2 iter 2: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 2: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 1800
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [sub_module_prose_covers_words] grammar: 2 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements prose drops 68/104 words: Casing, Impeller / Rotor, Drive Motor ...+65 | structure_containment::structure_containment__painted_steel_skid_frame prose drops 25/33 words: Shell Course, Top Head / Roof, Base / Floor Plate ...+22. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 2: applied 28 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Merge conflicting dimension modifiers into a single string)
+    =mass_fluid_transport_process.sub_modules[0].english_sentence (Update prose to include all sub-components for BoM consistency)
+    =structure_containment.sub_modules[0].english_sentence (Update prose to include all sub-components for BoM consistency)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Add modifier to increase word density)
+[chain] Phase 2 iter 3: emitter-identity re-assert corrected 5 word(s) before gate eval
+[chain] Phase 2 iter 3: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 1640
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: structure_containment::structure_containment__painted_steel_skid_frame prose drops 9/33 words: Pressure Vessel Shell, Filter Media / Membrane Elements, Upper Distribution Header ...+6. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch (364 m² area)" AND "364 m² area" | fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word has 2 conflicting "material" values: "PVC/FKM" AND "Stainless Steel 316" | sensing_instrumentation::sensing_instrumentation__silica_analyzer::sensing_instrumentation__silica_analyzer_completion_word has 2 conflicting "material" values: "Stainless Steel" AND "Glass" | sensing_instrumentation::sensing_instrumentation__silica_analyzer::sensing_instrumentation__silica_analyzer_completion_word has 2 conflicting "dimension" values: "400x300x200 mm" AND "12 mm diameter" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 3: applied 4 patches, skipped 13, allowlist_rejected=13, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension/area modifiers and consolidate)
+    =fertigation_dosing_system.sub_modules[0].words[0].modifier_characters (Remove conflicting material modifier)
+    =sensing_instrumentation.sub_modules[1].words[0].modifier_characters (Remove conflicting material and dimension modifiers)
+    =structure_containment.sub_modules[0].english_sentence (Update prose to include all 33 components listed in the sub-module)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="iSii" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="CLS15D-AA11A1" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT fertigation_dosing_system.sub_modules[0].words[+]: word patch contains MPN="CPS11D-7AA21" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="CPS12D" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[1].words[+]: word patch contains MPN="CLS15D" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[0].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[1].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[1].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[1].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="TBD" not in verified-parts allowlist (110 entries). Patch dropped. (Add component to increase density)
+[chain] Phase 2 iter 4: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 4: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 2180
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [modifier_consistency] grammar: 3 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area" | environmental_interface::environmental_interface__permeate_outlet::permeate_outlet_word has 2 conflicting "installation" values: "Internal / external placement confirmed at layout / detailed design" AND "Flanged" | maintenance_serviceability::maintenance_serviceability__cip_system_connections::cip_system_connections_word has 2 conflicting "installation" values: "Internal / external placement confirmed at layout / detailed design" AND "Threaded". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 4: applied 24 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension kind)
+    =environmental_interface.sub_modules[0].words[0].modifier_characters (Remove duplicate installation kind)
+    =maintenance_serviceability.sub_modules[0].words[0].modifier_characters (Remove duplicate installation kind)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Add density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Add density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Add density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +environmental_interface.sub_modules[1].words[0].modifier_characters[+] (Add density)
+    +maintenance_serviceability.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +maintenance_serviceability.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +maintenance_serviceability.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    +maintenance_serviceability.sub_modules[0].words[1].modifier_characters[+] (Add density)
+    dedup pass: collapsed 1 cosmetic-dupe modifier(s) across 1 component(s)
+[chain] Phase 2 iter 5: emitter-identity re-assert corrected 6 word(s) before gate eval
+[chain] Phase 2 iter 5: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 2100
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [modifier_consistency] grammar: 5 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area" | fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word has 2 conflicting "material" values: "PVC/FKM" AND "PVC" | fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word has 2 conflicting "regulatory" values: "NSF61" AND "CE" | sensing_instrumentation::sensing_instrumentation__silica_analyzer::sensing_instrumentation__silica_analyzer_completion_word has 2 conflicting "material" values: "Stainless Steel" AND "Glass" ...+1. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 5: applied 3 patches, skipped 1, allowlist_rejected=1, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension kind)
+    =fertigation_dosing_system.sub_modules[0].words[0].modifier_characters (Merge duplicate material and regulatory modifiers)
+    =sensing_instrumentation.sub_modules[1].words[0].modifier_characters (Merge duplicate material and regulatory modifiers)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="FMP51-AA11A1" not in verified-parts allowlist (110 entries). Patch dropped. (Merge modifiers to increase density)
+[chain] Phase 2 iter 6: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 6: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 2260
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 6: applied 20 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension field to resolve modifier_consistency)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Increase word density for sub_module_word_density)
+    dedup pass: collapsed 4 cosmetic-dupe modifier(s) across 4 component(s)
+[chain] Phase 2 iter 7: emitter-identity re-assert corrected 5 word(s) before gate eval
+[chain] Phase 2 iter 7: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 2020
+  ✗ [sub_module_word_density] grammar: 7 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1 words), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2 words), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1 words), energy_storage_source::energy_storage_source__mains_incomer (4 words), environmental_interface::environmental_interface__permeate_outlet (3 words), environmental_interface::environmental_interface__outlet_manifold (2 words), maintenance_serviceability::maintenance_serviceability__cip_system_connections (3 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 10 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6), energy_storage_source::energy_storage_source__mains_incomer (0/4) ...+4.
+  ✗ [modifier_consistency] grammar: 7 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area" | fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word has 2 conflicting "material" values: "PVC/FKM" AND "Stainless Steel" | fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word has 2 conflicting "dimension" values: "200x150x300 mm" AND "400x300x200 mm" | fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word has 2 conflicting "regulatory" values: "NSF61, CE" AND "BS EN 809" ...+3. FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 7: applied 22 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =fertigation_dosing_system.sub_modules[0].words[0].modifier_characters (Remove conflicting duplicate modifiers (material, dimensions, regulatory) to resolve consistency failure.)
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension modifier to resolve consistency failure.)
+    =sensing_instrumentation.sub_modules[1].words[0].modifier_characters (Merge duplicate installation and regulatory modifiers to resolve consistency failure.)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +fertigation_dosing_system.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +sensing_instrumentation.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +energy_storage_source.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +environmental_interface.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +environmental_interface.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +environmental_interface.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +environmental_interface.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +environmental_interface.sub_modules[1].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +maintenance_serviceability.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+    +maintenance_serviceability.sub_modules[0].words[+] (Add filler word to meet sub_module_word_density requirement.)
+[chain] Phase 2 iter 8: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 8: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 1980
+  ✗ [sub_module_word_density] grammar:  BoM-density: 14 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6) ...+8.
+  ✗ [sub_module_prose_covers_words] grammar: 6 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: fertigation_dosing_system::fertigation_dosing_system__primary_assembly prose drops 4/5 words: Dosing Pump Manifold, Dosing Pump Control Cable, Dosing Pump Mounting Bolt ...+1 | sensing_instrumentation::sensing_instrumentation__conductivity_sensor prose drops 3/5 words: Conductivity Sensor Cable, Conductivity Sensor Mounting Bracket, Conductivity Sensor Calibration Solution | energy_storage_source::energy_storage_source__mains_incomer prose drops 1/5 words: Mains Incomer Cable Gland | environmental_interface::environmental_interface__permeate_outlet prose drops 2/5 words: Permeate Outlet Gasket, Permeate Outlet Bolt Set ...+2. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 8: applied 6 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension modifier)
+    =fertigation_dosing_system.sub_modules[0].english_sentence (Update prose to cover all words in the sub-module)
+    =sensing_instrumentation.sub_modules[0].english_sentence (Update prose to cover all words in the sub-module)
+    =energy_storage_source.sub_modules[0].english_sentence (Update prose to cover all words in the sub-module)
+    =environmental_interface.sub_modules[0].english_sentence (Update prose to cover all words in the sub-module)
+    =environmental_interface.sub_modules[1].english_sentence (Update prose to cover all words in the sub-module)
+[chain] Phase 2 iter 9: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 9: arith 1 pass / 0 fail; grammar 10 pass / 3 fail; total score 2380
+  ✗ [sub_module_word_density] grammar:  BoM-density: 14 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6) ...+8.
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: maintenance_serviceability::maintenance_serviceability__cip_system_connections prose drops 2/5 words: Cip System Connection Seal, Cip System Connection Cap. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 9: applied 2 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension modifier to resolve consistency failure)
+    =maintenance_serviceability.sub_modules[0].english_sentence (Update prose to include all words in the sub-module to satisfy coverage requirements)
+[chain] Phase 2 iter 10: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 10: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 2760
+  ✗ [sub_module_word_density] grammar:  BoM-density: 14 sub-module(s) with <3 priced lines: power_distribution::power_distribution__power_distribution_block (0/6), control_compute_communication::control_compute_communication__plc_controller (0/6), control_compute_communication::control_compute_communication__hmi_touchscreen (0/5), fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), actuation_kinematics::actuation_kinematics__solenoid_valve (0/6) ...+8.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 10: applied 16 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension modifier to resolve consistency failure)
+    +power_distribution.sub_modules[1].words[0].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +power_distribution.sub_modules[1].words[1].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +power_distribution.sub_modules[1].words[2].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +control_compute_communication.sub_modules[0].words[0].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +control_compute_communication.sub_modules[0].words[1].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +control_compute_communication.sub_modules[0].words[2].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +control_compute_communication.sub_modules[1].words[0].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +control_compute_communication.sub_modules[1].words[1].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +control_compute_communication.sub_modules[1].words[2].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +actuation_kinematics.sub_modules[1].words[0].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +actuation_kinematics.sub_modules[1].words[1].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +actuation_kinematics.sub_modules[1].words[2].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +safety_protection.sub_modules[0].words[1].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +safety_protection.sub_modules[0].words[2].modifier_characters[+] (Add pricing to satisfy density requirement)
+    +safety_protection.sub_modules[0].words[3].modifier_characters[+] (Add pricing to satisfy density requirement)
+[chain] Phase 2 iter 11: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 11: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3010
+  ✗ [sub_module_word_density] grammar:  BoM-density: 9 sub-module(s) with <3 priced lines: fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1/5), actuation_kinematics::actuation_kinematics__solenoid_valves (2/7), sensing_instrumentation::sensing_instrumentation__conductivity_sensor (2/5), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1/5), energy_storage_source::energy_storage_source__mains_incomer (0/5), environmental_interface::environmental_interface__permeate_outlet (0/5) ...+3.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 11: applied 11 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension modifier to resolve consistency failure)
+    +fertigation_dosing_system.sub_modules[0].words[0].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +actuation_kinematics.sub_modules[0].words[0].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +actuation_kinematics.sub_modules[0].words[1].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +sensing_instrumentation.sub_modules[0].words[2].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +sensing_instrumentation.sub_modules[0].words[3].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +sensing_instrumentation.sub_modules[1].words[0].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +energy_storage_source.sub_modules[0].words[0].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +energy_storage_source.sub_modules[0].words[1].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +environmental_interface.sub_modules[0].words[0].modifier_characters[+] (Add missing price to satisfy density requirement)
+    +environmental_interface.sub_modules[0].words[1].modifier_characters[+] (Add missing price to satisfy density requirement)
+    dedup pass: collapsed 2 cosmetic-dupe modifier(s) across 2 component(s)
+[chain] Phase 2 iter 12: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 12: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3110
+  ✗ [sub_module_word_density] grammar:  BoM-density: 7 sub-module(s) with <3 priced lines: fertigation_dosing_system::fertigation_dosing_system__primary_assembly (1/5), sensing_instrumentation::sensing_instrumentation__silica_analyzer (1/5), energy_storage_source::energy_storage_source__mains_incomer (2/5), environmental_interface::environmental_interface__permeate_outlet (2/5), environmental_interface::environmental_interface__outlet_manifold (0/5), safety_protection::safety_protection__overcurrent_protection (0/5) ...+1.
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 12: applied 18 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension field to resolve modifier_consistency)
+    +fertigation_dosing_system.sub_modules[0].words[1].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +fertigation_dosing_system.sub_modules[0].words[2].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +fertigation_dosing_system.sub_modules[0].words[3].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +sensing_instrumentation.sub_modules[1].words[1].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +sensing_instrumentation.sub_modules[1].words[2].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +energy_storage_source.sub_modules[0].words[2].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +energy_storage_source.sub_modules[0].words[3].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +environmental_interface.sub_modules[0].words[3].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +environmental_interface.sub_modules[0].words[4].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +environmental_interface.sub_modules[1].words[0].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +environmental_interface.sub_modules[1].words[1].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +environmental_interface.sub_modules[1].words[2].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +safety_protection.sub_modules[1].words[0].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +safety_protection.sub_modules[1].words[1].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +safety_protection.sub_modules[1].words[3].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +maintenance_serviceability.sub_modules[0].words[3].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+    +maintenance_serviceability.sub_modules[0].words[4].modifier_characters[+] (Add price to satisfy sub_module_word_density)
+[chain] Phase 2 iter 13: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 13: arith 1 pass / 0 fail; grammar 11 pass / 2 fail; total score 3410
+  ✗ [sub_module_word_density] grammar:  BoM-density: 1 sub-module(s) with <3 priced lines: maintenance_serviceability::maintenance_serviceability__cip_system_connections (2/5).
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 13: applied 3 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate dimension modifier to resolve consistency conflict)
+    +maintenance_serviceability.sub_modules[0].words[0].modifier_characters[+] (Add price to sub-module to meet density requirement)
+    +maintenance_serviceability.sub_modules[0].words[1].modifier_characters[+] (Add price to sub-module to meet density requirement)
+[chain] Phase 2 iter 14: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 14: arith 1 pass / 0 fail; grammar 12 pass / 1 fail; total score 3860
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 14: applied 1 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate 'dimension' modifier by consolidating into 'dimensions' and 'area' fields.)
+[chain] Phase 2 iter 15: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 15: arith 1 pass / 0 fail; grammar 12 pass / 1 fail; total score 3860
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 15: applied 1 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate 'dimension' modifier by consolidating into 'dimensions' and 'area' fields.)
+[chain] Phase 2 iter 16: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 16: arith 1 pass / 0 fail; grammar 12 pass / 1 fail; total score 3860
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2 iter 16: applied 1 patches, skipped 0, allowlist_rejected=0, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].words[0].modifier_characters (Remove duplicate 'dimension' modifier by consolidating into 'dimensions' and 'area' fields.)
+[chain] Phase 2 iter 17: emitter-identity re-assert corrected 1 word(s) before gate eval
+[chain] Phase 2 iter 17: arith 1 pass / 0 fail; grammar 12 pass / 1 fail; total score 3860
+  ✗ [modifier_consistency] grammar: 1 component(s) carry duplicate-kind modifiers with conflicting values — BoM cannot pick a canonical value: mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word has 2 conflicting "dimension" values: "8 inch x 40 inch" AND "364 m² area". FIX: emit edit_sub_module_field patches to reduce each duplicate kind to a single value per component (or use add_word_to_sub_module with the SAME id to merge — but only ONE value per kind survives).
+[chain] Phase 2: hit max repair iterations (18); bailing
+[chain] post-Phase-2 prose pre-fill: rewrote 1/20 sub-modules
+[fill-blank-mpn] 60 blank catalogue word(s) for class "water_treatment" (228 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__electrical_control_panel (Motor Starter) → RFS Technologies GDM-8
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__power_distribution_block (Motor Control Center) → RFS Technologies GDM-8
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__power_distribution_block (Vfd Controller) → ABB ACS580-01-12A6-4
+[fill-blank-mpn]   ⊘ skip mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Non-Return Valve): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was Crouzet 81529907)
+[fill-blank-mpn]   ⊘ skip mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Non-Return Valve): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was Crouzet 81529907)
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Differential-Pressure Switch) → Honeywell HSCDLNN100MDSA5
+[fill-blank-mpn]   ⊘ skip mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Irrigation Pump): DB Grundfos CM3-3 ~3 m³/h << duty 90 m³/h — keeping generic spec
+[fill-blank-mpn]   ⊘ skip mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements (Non-Return Valve): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was Crouzet 81529907)
+[fill-blank-mpn]   ⊘ skip control_compute_communication::control_compute_communication__plc_controller (PLC Controller): electronics-IC vendor Renesas / Intersil on a process field instrument — generic spec, not a chip MPN (was ISL1571IRZ)
+[fill-blank-mpn]   ⊘ skip control_compute_communication::control_compute_communication__plc_controller (Dc3 Power Controller): electronics-IC vendor Renesas / Intersil on a process field instrument — generic spec, not a chip MPN (was ISL1571IRZ)
+[fill-blank-mpn]   ✓ DB   fertigation_dosing_system::fertigation_dosing_system__primary_assembly (DDA Digital Dosing Pump) → Grundfos DDA 17-7 AR-PVC/V/C-F-31I001
+[fill-blank-mpn]   ✓ DB   fertigation_dosing_system::fertigation_dosing_system__primary_assembly (Dosing Pump Manifold) → Watson-Marlow TUB-SAN-6.4
+[fill-blank-mpn]   ✓ DB   fertigation_dosing_system::fertigation_dosing_system__primary_assembly (Dosing Pump Control Cable) → Grundfos DDA 7.5-16 AR-PV/T/C-F-31I001
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__solenoid_valves (Solenoid Valves) → Crouzet 81519648
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__solenoid_valves (Inlet Flow Control Valve) → Altecnic CONTSETALT533K
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__solenoid_valve (Pneumatic Actuated Valve) → Swagelok SS-63TS8-12-12
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__silica_analyzer (Silica Analyzer Power Cable) → Hach 5500sc
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__pressure_relief_valve (Pressure Relief Valve) → Sartorius BB-34163124
+[fill-blank-mpn]   ⊘ skip safety_protection::safety_protection__pressure_relief_valve (Low Pressure Switch): electronics-IC vendor Analog Devices Inc./Maxim Integrated on a process field instrument — generic spec, not a chip MPN (was MAX31827ANTABRPF+T)
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__pressure_relief_valve (High Pressure Switch) → Daikin S1PH
+[fill-blank-mpn]   ⊘ skip safety_protection::safety_protection__pressure_relief_valve (Cable Trays): indicator/pilot-light part Banner Engineering K30LMBXXP on a non-light slot — generic spec
+[fill-blank-mpn]   ⊘ skip safety_protection::safety_protection__overcurrent_protection (Check Valve): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was Reliance CV-25)
+[fill-blank-mpn]   ✓ DB   maintenance_serviceability::maintenance_serviceability__leveling_feet (Cable Glands) → L-Com LCCA30725/BK-FT3
+[fill-blank-mpn] filled 14/60 blank word(s): 14 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 228 structural skipped.
+[chain] fill-blank-mpn: branded 14/60 blank catalogue word(s) (14 DB-first real MPN, 0 generated real-OEM), 228 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 1609 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 19545 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 14 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=11 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"water_treatment","resolved_to":"water_treatment","hit":"db","nodes":11,"edges":28}
+[chain] K10 shadow: PASS_SHADOW — matched=30 missing=0 extra=0
+[chain] headline derived: Total Cultivation Containers=6,000 count [derived_from_brief]; Unit cost ceiling=1,400,000 GBP;  (0.00s)
+[chain] part verification: 14 parts checked — verified=7, unverified=6, uncertain=1, skip=0
+[chain] G5 RAG: 7 queries → 3 suggestions (high=2, medium=0, low=1, below_threshold=4, corpus=50 rows)
+[chain] part verification: stripped 6 high-confidence fake part_numbers
+  • fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_completion_word → removed "DDA 17-7 AR-PVC/V/C-F-31I001" (While the DDA 17-7 series is a valid Grundfos product line, the specific configuration string 'DDA 1)
+  • fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_filler_1 → removed "TUB-SAN-6.4" (A search for the specific part number 'TUB-SAN-6.4' across Watson-Marlow's official documentation an)
+  • fertigation_dosing_system::fertigation_dosing_system__primary_assembly::fertigation_dosing_system__primary_assembly_filler_2 → removed "DDA 7.5-16 AR-PV/T/C-F-31I001" (The search results show similar part numbers (e.g., 97721947 and 97721967), but the specific string )
+  • actuation_kinematics::actuation_kinematics__solenoid_valves::actr_valve_on_nutrient_tank_synth_word → removed "CONTSETALT533K" (A search for the specific part number 'CONTSETALT533K' yielded no results across the manufacturer's )
+  • actuation_kinematics::actuation_kinematics__solenoid_valve::pneumatic_actuated_valve_word → removed "SS-63TS8-12-12" (The search results confirm the existence of the base part number 'SS-63TS8', but there is no evidenc)
+[chain] strip+recommend: 6 recommendations — high=4, medium=1, low=0, unknown=1 (manual sourcing required)
+[chain] design decisions: 1 unresolved conflict surfaced for human review
+  • mass_fluid_transport_process::mass_fluid_transport_process__ro_membrane_elements::ro_membrane_elements_word dimension: "8 inch x 40 inch" AND "364 m² area" → recommend "8 inch x 40 inch"
+[nexar] GraphQL errors for mpn=TBD (detailed design): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ACS580-01-12A6-4: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for TBD (field instrument — catalogue class)
+[nexar] GraphQL errors for mpn=5500sc: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=TBD (field instrument — catalogue class): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 9 checked, 4 real, 0 substituted, 5 warned (no substitute available). Nexar calls used: 5.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ electrical_control_panel_word: "? TBD (detailed design)" [class=unknown, library_class=none]
+  ⚠ vfd_controller_word: "ABB ACS580-01-12A6-4" [class=unknown, library_class=none]
+  ⚠ util_standby_generator: "? TBD (catalogue class)" [class=unknown, library_class=none]
+  ⚠ sensing_instrumentation__silica_analyzer_filler_3: "Hach 5500sc" [class=unknown, library_class=none]
+  ⚠ instr_level_consolidated: "? TBD (field instrument — catalogue class)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 11/11 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 2 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/11 capital (threshold 7); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 3 sections, 0 warnings
+[chain] design decisions review: 6 choices (1 applied, 5 flagged, 0 blocked)
+[chain] population-count re-assert: 13 word(s) corrected from an LLM population smear (e.g. valve ×200 stamped on every synonym → deterministic per-word count)
+[chain] attribute-phantom cleanup: dropped 0 dimension/property phantom word(s) + 1 exact-id duplicate(s) (fixes phantom BoM lines + duplicate tags)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 15 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 7 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[chain] derived process topology (no hand-authored edges): 27 edge(s) across the principal-equipment spine → P&ID + BFD
+[chain] derived SIGNAL topology: 10 instrument→control-hub signal edge(s) (wires the orphan sensors)
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.10%); economic-conductor saving £1,418
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.11%); economic-conductor saving £1,601
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.10%); economic-conductor saving £1,402
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.10%); economic-conductor saving £1,410
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.10%); economic-conductor saving £1,457
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.1 kW, 0.11%); economic-conductor saving £1,503
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.10%); economic-conductor saving £1,446
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.10%); economic-conductor saving £1,414
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 8 passes, DID NOT settle within 8 passes (cap) — ledger records the residual, no fixed point asserted; as-routed supply demand 48 → 48.049 kW (Δ 0.049 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 50795) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/blender-bg.log
+[estimate] product_class=water_treatment annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'water_treatment' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 369 parts need price estimates
+[estimate] corpus-classified 40/369; 329 need rule-based / Flash-Lite
+[estimate] rule-based classified 79 parts; 250 still need Flash-Lite
+[estimate] Engine B classifier override: 1 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 13 batches
+[estimate] 7 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 2 'unknown' parts
+[estimate] updated 8 existing, synthesised 361 new, 0 failed
+[estimate] C3 DB cache: 1 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=39 rule_based=79 flash_lite=250 fallback=0 curated=0 db_cache=1
+[estimate] estimate source: db_cache=1 curve=366 flash_lite_unknown=2
+[estimate] top classes in BoM:
+  fluid_path: 99
+  structural_metal: 74
+  structural_polymer: 50
+  mechanical_assembly: 33
+  oem_subsystem: 31
+  sensor: 17
+  electronic_connector: 15
+  mechanical_fastener: 13
+[estimate] estimated cost: GBP 0.004
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 374 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 374/374 results in 199.9s
+[engine-c] flags: in_range=14  over=10  under=150  no_reference=200
+[engine-c] 160/374 priced lines flagged out-of-range vs reference corpus (42.8%)
+[engine-c] 80 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "water_treatment" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: water_treatment
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/state.json
+[supplier-validate] no suppliers to validate
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] no template for product_class="water_treatment"; runner will use universal renderer
+[geom-gen] registry-miss authored path available: npx tsx scripts/author-blender-scene.tsx /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/state.json --out /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33
+[hero]   geometry generator failed (5); falling back to unmodified template
+[hero] step 1: Blender structural reference cover pass...
+[hero]   template runner produced blender-cover.png in 0.0s
+[hero]   Blender cover OK in 0.0s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 19.0s (604.0 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 11 module(s)...
+[modules] all 11 module images already on disk; skipping template render
+[modules] template renderer produced 11/11 module images
+[modules] updated state.module_image_paths with 11 entries
+[chain] deployment_envelope: no envelope mapped for water_treatment (returning null is intentional for some classes)
+[chain] physics-derived bottom-up pricing: 297 components priced from parent physics → rolled into 26 assemblies; raw BoM £493,833
+[chain] costStack persisted: ex-works £691367 (raw materials £493833, class water_treatment)
+[chain] G2 cost-reality: PASS — BoM £493833 across 374 priced lines (1 unpriced)
+[chain] G3 review-completeness: WARN — 3 gaps
+  ⚠ sub_modules: 20 sub-modules across 11 modules — expected ≥22
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 4 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] pre-render SKU restore: re-added 2 blanked part_number(s) a late stage stripped from real parts — emitter is the part-identity authority
+[chain] self-audit (shadow): floor 4/10 · mean 7.3/10 · 0 blocking · below-8: brief_compliance=4, physics_fidelity=5
+[chain] sweet-spot reconciliation: COMPATIBLE (objective=balanced, rescale=1.00×) — The brief is internally consistent: 360,000 unit/yr fits within the £1.40M ceiling. Recommended operating point: 360,000 unit/yr at £691k (£2/unit/yr). Objective: BALANCED (the best cost/output compromise).
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £691,367 / 360,000 unit/yr = £1.9/(m³·yr) — within the £0.3–£40/(m³·yr) class band for throughput output. (brief metric max_irrigation_demand_m3_per_hr=45 m^3/hr → 360,000 unit/yr)
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 375 disclosed; 0 take-off prices written into the BoM; purchased £655,505 → installed £1,966,515 (central)
+[advisor-engagement] 11/11 modules got an advisor block — 22 specialist cards, 43 grounded questions
+[chain] advisor-engagement: 11 module blocks, 22 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "water_treatment" (20 tools, 62 quantities scanned)
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="water_treatment" template=NONE hero=true modules=19 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="water_treatment" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENERIC 
+[chain] tools-flow: rendered 224282 bytes (20 tools)
+[investor-section] 5 investors matched from 18 candidates: Sony Innovation Fund, Newfund, NFT.VC, Bright Capital, EEC Ventures
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 6/6 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 6/6 drawings + hero → wired into the PDF
+[drawing-gates] 10 gates · 2 failing · ALL-PASS=False
+  ✓ [med ] legibility         single-line-diagram 3200x2280 aspect 1.4:1 (limit 4:1)
+  ✓ [med ] legibility         pid 14220x4800 aspect 3.0:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x1668 aspect 1.3:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x2320 aspect 1.1:1 (limit 4:1)
+  ✗ [med ] legibility         block-flow-diagram 15526x3836 aspect 4.0:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1848 aspect 1.2:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x7128 aspect 2.9:1 (limit 4:1)
+  ✗ [high] load_reconcile     panel total 62 kW vs contract 48 kW (ratio 1.29, ±15%)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 2 distinct pipe material(s): ['carbon steel', 'hdpe/pe100']
+[chain] drawing-gates: 2/10 failing — DRAWING >=8 FAIL (drawing-gates.json — each failing gate names its fix stage)
+[chain] drawing-gates PUNCH-LIST (3 defect(s) → 2 stage(s)) → drawing-gates-punchlist.md
+[chain]   → draw-script (layout / multi-sheet wrap): legibility/block-flow-diagram
+[chain]   → contract (connected_electrical_load_kw) + panel kW resolution: load_reconcile/panel-schedule, load_reconcile/single-line-diagram
+[chain]   ⚠ lesson-loop: drawing:legibility has recurred 33× on water_treatment — council escalation flagged (tasks/harness-stubs/)
+[chain]   ⚠ lesson-loop: drawing:load_reconcile has recurred 59× on water_treatment — council escalation flagged (tasks/harness-stubs/)
+[chain]   ⚠ lesson-loop: drawing:load_reconcile has recurred 60× on water_treatment — council escalation flagged (tasks/harness-stubs/)
+[chain]   ↳ lesson-loop: 3 loss(es) logged to failure-ledger + invariant stub(s) drafted in tasks/harness-stubs/
+[census] 78 tie-in runs (267 units) = £41,448 (cable £14,066 + pipe £27,382)
+[census] routed major streams = £10,571  →  full interconnect ≈ £52,019
+  [corpus-median-lift] raised 7 under-priced principal line(s) to their engine corpus lower edge (+£73,703)
+[chain] cost-sanity re-derived on authoritative BoM (Σ £781,382): verdict pass — £3/unit/yr
+[chain] requirements-driven BoM: 422 requirement lines (Σ £781,382) → state.requirementsBom; cost cascade reconciled to this total
+dossier_repair: 2 fix(es) over 1 pass(es); 5 gap(s) need input (2 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/state.json
+[chain] self-repair: 2 fix(es) over 1 pass(es); 5 gap(s) need input (2 blocking HIGH)
+[chain] freshen-scorer-inputs: re-rendered schematics + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 1 HIGH (Risk now reflects the shipped state)
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/dossier.xlsx
+  · per-tab scorecard: min Executive Summary=6/10 · 2 FAIL, 0 UNSCORED
+  · SHIP GATE: per-tab ≥8 floor NOT met — 2 tab(s) <8, 0 UNSCORED → ship_ok=False (every tab must be a genuine ≥8)
+  · Executive Summary
+  · Overview
+  · ⭐ Scorecard
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · ⚠ Audit
+  · Part names
+  · Quantities
+  · Calculations
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Financial model
+  · Panel schedule
+  · Process schedules
+  · Line & velocity
+  · Risk & Regulatory
+  · Assembly sequence
+  · Glossary
+  · Image tabs
+      + Render — Interior layout
+      + Render — Interior layout (view 2)
+      + Render — Interior layout (top)
+      + Render — Interior layout (view 3)
+      + Render — Building exterior
+      + Render — Building exterior (view 2)
+      + Render — Building exterior (top)
+      + Render — Building exterior (view 3)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + Single-line
+      + HVAC
+  · Contents (sheet #1)
+  · SHIP GATE (full workbook): min Executive Summary=6/10 · 12 <8 · 0 UNSCORED → ship_ok=False
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/dossier.xlsx
+  size        : 32.35 MB
+  tabs (34)  : ['Executive Summary', 'Contents', '⭐ Scorecard', 'Overview', 'Render — Interior layout', 'Brief', 'Inputs & Assumptions', 'Quantities', 'Calculations', 'Bill of Materials (Ledger)', 'Cost waterfall', 'Financial model', 'Line & velocity', 'Panel schedule', 'Process schedules', 'Assembly sequence', 'Risk & Regulatory', 'Render — Interior layout (view', 'Render — Interior layout (top)', 'Render — Interior layout (vie-2', 'Render — Building exterior', 'Render — Building exterior (vie', 'Render — Building exterior (top', 'Render — Building exterior (v-2', 'GA — General Arrangement', 'P&ID', 'BFD — Block Flow', 'Single-line', 'HVAC', '⚠ Checks', '⚠ Audit', 'Connection trace', 'Part names', 'Glossary']
+  live calcs  : 63
+  static calcs: 3
+  image tabs  : 13
+  CHECKS FAIL : 0
+  SHIP GATE   : FAIL  ·  1 HIGH · 3 MED · 0 LOW · ship_ok=False
+  PER-TAB ≥8 GATE: FAIL — min Executive Summary=6/10; <8: ['Executive Summary', 'Risk & Regulatory', 'Render — Interior layout', 'Render — Interior layout (view', 'Render — Interior layout (top)', 'Render — Interior layout (vie-2', 'Render — Building exterior', 'Render — Building exterior (vie', 'Render — Building exterior (top', 'Render — Building exterior (v-2', 'GA — General Arrangement', '⚠ Audit']; UNSCORED: []
+  → dossier is a DRAFT (not validated): every tab must reach a genuine ≥8.
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/fischer-codema-v33_dossier_2026-06-28_0535.xlsx
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/AUDIT-PARTS.md
+[parts-validator] PASS: 2 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v33/AUDIT-DRIFT.md
+[drift-detector] FAIL: 1 HIGH-severity drift(s)
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  CHAIN HARD-EXIT — Numeric-claim drift detector FAILED (code 12)    ║
+║  Orchestrator-computed count diverges from BoM-emitted quantity     ║
+║  by > 20% (e.g. BMS slave count 313 in narrative, 165 in BoM).      ║
+║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║
+║  See AUDIT-DRIFT.md for the diverging contract-vs-BoM quantities.   ║
+║  Fix area: align orchestrator tool assumption (e.g. PyBaMM cells/   ║
+║  slave) with deterministic-emitter constant (e.g. 24-channel       ║
+║  BMS slave). Whichever side is wrong, fix at the source.           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+[chain] === FATAL GATE 12 numeric-drift (exit 12) — WRONGNESS, fix the source rule ===
+Narrative count diverges from a BoM quantity — see AUDIT-DRIFT.md

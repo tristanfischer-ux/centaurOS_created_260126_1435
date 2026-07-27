@@ -1,0 +1,36 @@
+(eval):22: command not found: setsid
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_poseidon.md (4874 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: syringe_pump (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: syringe_pump): 0 HARD field(s) filled with class-aware inferred values, 1 field(s) retained from founder text. Still null after augmentation (no class default): unit_cost_ceiling, max_mass_kg, target_material, batch_size, design_life.
+  [U5] still null after augmentation: unit_cost_ceiling, max_mass_kg, target_material, batch_size, design_life
+[chain] U6 brief expansion: 10 duties derived; product="Precisely metered fluid flow (infusion and withdrawal) across four independent channels." (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] channel_count = 4 count [stated/high] — Stated in brief: '4 independent syringe drives (infuse + withdraw)'.
+  [U6] max_syringe_volume_ml = 60 mL [derived/high] — Brief specifies 'catalogue barrel sizes' covering 'microfluidics through reagent dosing'. 
+  [U6] linear_travel_mm = 120 mm [derived/high] — A standard 60 mL plastic syringe has a nominal stroke length of approximately 85-95 mm. 12
+  [U6] max_linear_thrust_n = 150 N [derived/medium] — Brief requires force/pressure limiting to fail safely on blocked lines. A typical microflu
+  [U6] min_flow_rate_ul_min = 1 uL/min [derived/medium] — Brief specifies 'microfluidics' flow rates. 1 uL/min is a standard baseline requirement fo
+  [U6] max_flow_rate_ml_min = 60 mL/min [derived/medium] — Brief specifies 'reagent dosing'. Emptying a maximum capacity 60 mL syringe in 1 minute (6
+  [U6] linear_step_resolution_um = 2.5 um/step [derived/high] — To achieve smooth 1 uL/min flow in a 1 mL syringe (ID ~4.7 mm, Area ~17.3 mm^2), linear sp
+  [U6] electrical_power_peak_w = 100 W [derived/high] — Four NEMA 17 stepper motors driven concurrently at ~1.2 A per phase (approx 15 W each) = 6
+  [U6] backlash_bound_mm = 0.1 mm [derived/medium] — Brief requires quantified backlash for repeatable direction changes. Standard T8 lead scre
+  [U6] concurrent_axes_count = 4 axes [stated/high] — Brief states 'Simultaneous, independently timed channels... no missed-step regimes'. The m
+[chain] engineering_contract: 9 quantities, 3 topology edges, 2 macro-assemblies (total £460), closures: 3 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":1626}
+[products-writeback] {"product_name":"Multi-channel benchtop syringe-pump platform, 4 independent lead-screw channels, syringe library up to 60 mL, pitch 2 mm. Peak panel ~87 W (0.087 kW). Macro-assembly raw BoM ≈ £460 (20-unit engineerin","hit":"db_hybrid","matched":"Multi-channel benchtop syringe-pump platform, 4 independent lead-screw channels, syringe library up to 60 mL, pitch 2 mm. Peak panel ~87 W (0.087 kW). Macro-assembly raw BoM ≈ £460 (20-unit engineerin","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":500}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: PASS — 1/7 mandatory covered for UK+EU+US
+  ⚠ LVD 2014/35/EU (missing_mandatory): Low Voltage Directive (EU). Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on t
+  ⚠ EMC 2014/30/EU (missing_mandatory): Electromagnetic Compatibility Directive (EU). Stepper drivers, MCU clocks and USB/serial interfaces must not emit or suc
+  ⚠ RoHS 2011/65/EU (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts Pb/Hg/Cd etc. in electrical equipment; applies to control 
+  ⚠ IEC 61010-1 (missing_mandatory): Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements
+  ⚠ IEC 61326-1 (missing_mandatory): Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements (IEC)
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: syringe_pump
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...

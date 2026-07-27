@@ -1,0 +1,4 @@
+[board] GATE OPEN — every active defect on None is dispositioned
+== colorimeter run exit: 0 20:17:07 — out/colorimeter-20260712-1954 ==
+[red-team] 5 finding(s) from x-ai/grok-4.3 → red-team-punchlist.md (harvested by loop_board; verify each vs state before acting)
+[board] colorimeter-20260712-1954: 26 defect(s) live — 26 new, 0 REOPENED, 0 resolved; board: 26 active (26 undispositioned)

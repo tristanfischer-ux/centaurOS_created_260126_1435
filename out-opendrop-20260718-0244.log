@@ -1,0 +1,46 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_opendrop.md (3116 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: digital_microfluidics (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: digital_microfluidics): 0 HARD field(s) filled with class-aware inferred values, 2 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, target_material, design_life.
+  [U5] still null after augmentation: max_mass_kg, target_material, design_life
+[chain] U6 brief expansion: 9 duties derived; product="Controlled droplet manipulation (movement, merging, splitting) for research protocols." (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] electrode_count = 64 count [derived/high] — Standard entry-level EWOD grid (e.g., 8x8 array) sufficient to demonstrate 2D droplet rout
+  [U6] electrode_pitch_mm = 2.5 mm [derived/high] — Typical pitch for handling 2-5 uL droplets. Allows fabrication on standard low-cost FR4 PC
+  [U6] nominal_droplet_volume_ul = 2.5 uL [derived/medium] — Derived from 2.5mm pitch. In a closed system with a typical 0.4mm gap, volume = Area * gap
+  [U6] actuation_voltage_v = 300 V [derived/high] — Lippmann-Young equation: To achieve a ~40 deg contact angle change on a 15um dielectric (e
+  [U6] hv_current_limit_ma = 5 mA [derived/high] — Capacitance per electrode is ~11 pF. Switching at 10Hz draws <1 uA. A 5mA hardware limit i
+  [U6] dielectric_thickness_um = 15 um [derived/medium] — Required to prevent dielectric breakdown at 300V. Standard PCB solder mask or applied Pary
+  [U6] switching_frequency_hz = 10 Hz [derived/high] — Droplet transit time between adjacent 2.5mm electrodes is typically 100-300ms depending on
+  [U6] interlock_response_time_ms = 50 ms [derived/high] — To prevent user shock, opening the enclosure lid must trigger a hardware interrupt that di
+  [U6] system_power_w = 10 W [derived/high] — MCU/SBC (~2W) + HV DC-DC converter (~2W) + switching ICs + optional camera/LEDs (~5W). All
+[chain] engineering_contract: 4 quantities, 1 topology edges, 2 macro-assemblies (total £236), closures: 1 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":7}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":234}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":345}
+[products-writeback] {"product_name":"Benchtop digital microfluidics controller, ~64 electrodes, HV EWOD drive + recipe UI. Peak ~25 W. Macro BoM ≈ £236. Research-use — not IVD.","hit":"db_hybrid","matched":"Benchtop digital microfluidics controller, ~64 electrodes, HV EWOD drive + recipe UI. Peak ~25 W. Macro BoM ≈ £236. Research-use — not IVD.","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":148}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: PASS — 1/7 mandatory covered for UK+EU+US
+  ⚠ LVD 2014/35/EU (missing_mandatory): Low Voltage Directive (EU). Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on t
+  ⚠ EMC 2014/30/EU (missing_mandatory): Electromagnetic Compatibility Directive (EU). Stepper drivers, MCU clocks and USB/serial interfaces must not emit or suc
+  ⚠ RoHS 2011/65/EU (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts Pb/Hg/Cd etc. in electrical equipment; applies to control 
+  ⚠ IEC 61010-1 (missing_mandatory): Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements
+  ⚠ IEC 61326-1 (missing_mandatory): Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements (IEC)
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for digital-microfluidics: replaying 5 stored duty spec(s) (ewod:lippmann-young, ewod:electrode-capacitance, ewod:droplet-kinematics, ewod:hv-drive-sizing, ewod:dielectric-breakdown) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool ewod:lippmann-young (duty_hash=99efa376c67e, db id=64) — no LLM call.
+[tool-generator] REUSED stored generated tool ewod:electrode-capacitance (duty_hash=c1e980e56f56, db id=65) — no LLM call.
+[tool-generator] REUSED stored generated tool ewod:droplet-kinematics (duty_hash=eaa118d6a2d6, db id=66) — no LLM call.
+[tool-generator] REUSED stored generated tool ewod:hv-drive-sizing (duty_hash=9f258f24b567, db id=67) — no LLM call.
+[tool-generator] REUSED stored generated tool ewod:dielectric-breakdown (duty_hash=3c3eb61c839f, db id=68) — no LLM call.
+[tool-creation] DONE for digital-microfluidics: created 5 self-test-passed tool(s) (ewod:lippmann-young, ewod:electrode-capacitance, ewod:droplet-kinematics, ewod:hv-drive-sizing, ewod:dielectric-breakdown), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for digital-microfluidics: created+registered 5 self-test-passed tool(s) [ewod:lippmann-young, ewod:electrode-capacitance, ewod:droplet-kinematics, ewod:hv-drive-sizing, ewod:dielectric-breakdown]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] author-scope signal for slug=digital_microfluidics: 18 tool(s) INCLUDE this class, 169 EXCLUDE, 0 no-signal — surfaced to the relevance sweep (signal, not veto).
+[relevance-sweep] SWEEPING slug=digital_microfluidics key=f79a105ac4c5ace1: 187 tools in 5 batch(es) of ≤40 (model google/gemini-3.1-pro-preview, temp 0) — every tool gets a YES/NO verdict.

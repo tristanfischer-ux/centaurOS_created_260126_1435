@@ -1,0 +1,584 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_open_colorimeter.md (5232 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: optical_instrument (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: optical_instrument): 2 HARD field(s) filled with class-aware inferred values, 3 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_material, design_life.
+  [U5] filled "target_material": "Injection-moulded / 3D-printed ABS-polycarbonate enclosure, FR-4 printed-circuit-board assembly, COTS optical + electronic components (no process-pressure fabrication)" (Material/products inferred from brief text for optical_instrument. class-agnostic inference from brief text for unmapped)
+  [U5] filled "design_life": "5–8 yr (portable laboratory/field electronic instrument service life; battery + LED source are user-replaceable consumables; no pressure-vessel re-inspection regime)" (Industry-standard service life for optical_instrument per applicable design standard. class-agnostic inference from brie)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 12 duties derived; product="Optical absorbance and concentration measurements (data)" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] optical_path_length_mm = 10 mm [stated/high] — Standard cuvette path length specified in the brief.
+  [U6] wavelength_min_nm = 430 nm [stated/high] — Lower bound of the visible-to-near-infrared range specified in the brief.
+  [U6] wavelength_max_nm = 940 nm [stated/high] — Upper bound of the visible-to-near-infrared range specified in the brief.
+  [U6] absorbance_max_au = 2 AU [derived/high] — Standard linear range for Beer-Lambert law in simple single-beam photometers before stray 
+  [U6] absorbance_resolution_au = 0.01 AU [derived/high] — Typical requirement for basic analytical and biological colorimetric assays to provide mea
+  [U6] stray_light_limit_percent = 0.1 % [derived/medium] — To achieve a maximum absorbance of 2.0 AU (1% transmittance) with <10% error, stray light 
+  [U6] adc_resolution_bits = 16 bits [derived/high] — Measuring 2.0 AU requires a 100:1 signal ratio. A 16-bit ADC (65,536 counts) provides ~650
+  [U6] battery_runtime_h = 8 h [derived/medium] — Standard requirement for portable field instruments to support a full working day of inter
+  [U6] battery_capacity_mah = 1000 mAh [derived/medium] — Estimated system draw of ~70mA (LED + MCU + display) over 8 hours = 560mAh. Rounded up to 
+  [U6] usb_input_voltage_v = 5 V [derived/high] — Standard USB power specification required for charging and tethered operation.
+  [U6] minimum_sample_volume_ml = 1.5 mL [derived/high] — Standard 10 mm macro cuvettes require approximately 1.5 mL to ensure the liquid meniscus i
+  [U6] production_batch_size_units = 20 units [stated/high] — Target manufacturing batch size specified in the brief.
+[chain] engineering_contract: 0 quantities, 0 topology edges, 0 macro-assemblies (total £0), closures: 0 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":6}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":1724}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":2052}
+[products-writeback] web search: Engineering Contract not registered for optical_instrument — falling back to LLM-only chain. — 6ms
+[products-writeback] {"product_name":"Engineering Contract not registered for optical_instrument — falling back to LLM-only chain.","hit":"miss","latency_ms":611}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: PASS — 2/8 mandatory covered for UK+EU+US
+  ⚠ LVD 2014/35/EU (missing_mandatory): Low Voltage Directive (EU). Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on t
+  ⚠ EMC 2014/30/EU (missing_mandatory): Electromagnetic Compatibility Directive (EU). LED drivers, MCU clocks and USB interfaces must not emit or succumb to int
+  ⚠ RoHS 2011/65/EU (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts Pb/Hg/Cd etc. in electrical equipment placed on the EU mar
+  ⚠ IEC 61010-1 (missing_mandatory): Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements
+  ⚠ IEC 61326-1 (missing_mandatory): Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements (IEC)
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for optical-instrument: replaying 3 stored duty spec(s) (photometry:beer-lambert-range, photodiode:tia-sizing, led-source:optical-power-budget) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool photometry:beer-lambert-range (duty_hash=dd5706c66c2a, db id=69) — no LLM call.
+[tool-generator] REUSED stored generated tool photodiode:tia-sizing (duty_hash=821403a87da1, db id=38) — no LLM call.
+[tool-generator] REUSED stored generated tool led-source:optical-power-budget (duty_hash=34aaf8e49963, db id=39) — no LLM call.
+[tool-creation] DONE for optical-instrument: created 3 self-test-passed tool(s) (photometry:beer-lambert-range, photodiode:tia-sizing, led-source:optical-power-budget), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for optical-instrument: created+registered 3 self-test-passed tool(s) [photometry:beer-lambert-range, photodiode:tia-sizing, led-source:optical-power-budget]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] REUSING stored candidate slug=optical_instrument version=1 status=candidate (no LLM call; 18 steps, 18 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for optical-instrument/generic — bootstrapped a 18-step tool plan (candidate id=34 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: battery-li-s:cell-sizing, cybersecurity-threat-model:stride, enclosure-emc:margin, extruder:thermal, iec-standards:lookup, led-source:optical-power-budget, lifecycle-co2:assessment, mass-aggregator:envelope-check, octopart:parts-lookup, photodiode:tia-sizing, photometry:beer-lambert-range, regulatory-cert-cost:lookup, reliability-fmea:system, runtime:peukert-discharge, supply-chain-risk:scoring, thermal-envelope:ladder, transport-logistics:routing, warranty-reliability:battery
+[bootstrap-tool-plan] FAIL-CLOSED iec-standards:lookup: missing computed output field(s) → emitted nothing for [iec_mandatory_standards_count(iec-standards:lookup.regulatory_mandatory_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED octopart:parts-lookup: missing computed output field(s) → emitted nothing for [critical_parts_in_stock_count(octopart:parts-lookup.parts_in_stock_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_certification_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp), regulatory_certification_months(regulatory-cert-cost:lookup.total_critical_path_months)] (no fabricated number written)
+[class-reference-graph-db] {"product_class":"optical-instrument","hit":"miss"}
+[generic-emitter] no class-reference graph for class='optical-instrument' (resolved slug='optical-instrument') — invoking E6a bootstrap-on-miss (corpus-first + one google/gemini-3.5-flash harvest, G1 candidate store)
+[bootstrap-class-graph] REUSING stored candidate slug=optical_instrument version=1 status=candidate (no LLM call)
+[generic-emitter] graph BOOTSTRAPPED for slug='optical_instrument': 8 nodes / 11 edges — bootstrap-candidate@v1 (candidate_id=5, version=1, status=candidate, reused=true, attempts=0). Stored row stays 'candidate' (G1): NOT promoted to class_reference_graphs.
+[generic-emitter] physics-derived equipment: 1 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 8 modules, 8 sub-modules, 38 words, 13 tools ran (601ms)
+[chain] Build #18k: toolOutputsBlock built (10 tools, 8055 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 13 component_classes covered (13 with match, 0 empty), 11717 chars (11277ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=200, target_performance_value=10 (mm)
+[chain] keyMetrics seeded early (pre-reviewer): Optical Path Length=10 mm
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=8/10 plaus=5/10 coh=9/10 part=2/10 hon=9/10 (5753ms)
+[chain] PHASE 4 skeleton critic: 2 HIGH-severity issues found before any LLM painting
+  ✗ [part_realism @ modules/all/sub_modules/words/modifier_characters] Every single component in the bill of materials is marked with part_number 'TBD (detailed design)' and lifecycle 'Concept design'. There are no real, catalogue-available manufactur
+  ✗ [engineering_plausibility @ modules/energy_storage_source] The 'energy_storage_source' module contains inputs, a polyfuse, and a regulator, but completely lacks a physical battery cell (e.g., a 1000mAh LiPo cell) to store energy, despite t
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 13362 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 22 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 12 / 22 patches (skipped 10)
+    REJECT [structure-locked] add_sub_module energy_storage_source.energy_storage_source__li_po_cell: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "energy_storage_source" (0 flagged module(s): none)
+    REJECT [structure-locked] add_sub_module sensing_instrumentation.sensing_instrumentation__tia_adc_board: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "sensing_instrumentation" (0 flagged module(s): none)
+    skip: sub-module "energy_storage_source.energy_storage_source__li_po_cell" not found
+    skip: sub-module "sensing_instrumentation.sensing_instrumentation__tia_adc_board" not found
+    skip merge [identity-locked A3]: energy_conversion_transduction.energy_conversion_transduction__led_source.led_source_word manufacturer="Kingbright" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_conversion_transduction.energy_conversion_transduction__led_source.led_source_word part_number="WP710A10LZGCK" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_conversion_transduction.energy_conversion_transduction__led_source.led_source_word rating_primary="470 nm 20 mA 3.2 V" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_conversion_transduction.energy_conversion_transduction__led_source.led_source_word (+6 modifiers)
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 36.0s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":688}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=6/10 phys=5/10 coh=8/10 part=2/10 hon=7/10 (22616ms)
+[chain] critic headline: The design establishes a logical module topology but completely lacks a physical battery and charger for portable operation, and relies entirely on TBD placeholders.
+[chain] critic issues: 2 high, 0 med, 3 total
+  ✗ [high/high] brief_to_design_fidelity @ modules/4/sub_modules/0/words: The brief requires a rechargeable internal battery for portable operation (derived capacity 1000 mAh). However, the energy_storage_source module contains no bat
+  ✗ [high/high] part_realism @ modules: 100% of the components in the bill of materials are marked as 'TBD (detailed design)'. This violates the brief's objective to prefer real, catalogue-available p
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: modules
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 12157 chars
+[chain] STEP 8: R4 Flash-Lite review returned 13 patches
+[chain] STEP 8: R4 Flash-Lite review applied 6 / 13 patches (skipped 7)
+    =sensing_instrumentation.overview_paragraph_en (prose)
+    REJECT [identity-locked A2] +word sensing_instrumentation.sensing_instrumentation__optical_detector_module.photodiode_sensor_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word sensing_instrumentation.sensing_instrumentation__optical_detector_module.adc_converter_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    =sensing_instrumentation.sensing_instrumentation__optical_detector_module.english_sentence (prose)
+    REJECT [identity-locked A2] +word energy_conversion_transduction.energy_conversion_transduction__led_source.led_emitter_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word energy_conversion_transduction.energy_conversion_transduction__led_source.led_driver_ic_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    =energy_conversion_transduction.energy_conversion_transduction__led_source.english_sentence (prose)
+    REJECT [identity-locked A2] +word control_compute_communication.control_compute_communication__compute_ui_module.mcu_board_word: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+[chain] STEP 8: R4 Flash-Lite review done in 11.0s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":374}
+[chain] canonical product_class OVERRIDE: "" → "optical_instrument" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "optical_instrument" — skipping
+[chain] physics repair: 1 iter(s); HIGH 2→2; plausibility 5→5; patches 0
+  iter 0: proposed 3 applied 0 | HIGH 2→2 plaus 5→5 | no patch applied — design unchanged; re-critique skipped (would re-roll the same design)
+[chain] sub-module prose pre-fill: rewrote 8/8 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 124 entries (KPA=124, emitter=0, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 8 sub_modules checked, 8 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 0 pass / 0 fail; grammar 9 pass / 4 fail; total score 1510
+  ✗ [thermal_path_closes] grammar: 4 heat-source sub-module(s) without thermal_path: sensing_instrumentation::sensing_instrumentation__optical_detector_module, energy_conversion_transduction::energy_conversion_transduction__led_source, power_distribution::power_distribution__ferrite_emc_bead, hmi_ergonomics::hmi_ergonomics__status_indicator. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [power_topology_closes] grammar: 1 power-consuming module(s) without cross-link to source: sensing_instrumentation
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): energy_storage_source::energy_storage_source__usb_5v_input (4 words), safety_protection::safety_protection__esd_protection_network (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 8 sub-module(s) with <3 priced lines: sensing_instrumentation::sensing_instrumentation__optical_detector_module (0/5), energy_conversion_transduction::energy_conversion_transduction__led_source (0/5), control_compute_communication::control_compute_communication__compute_ui_module (0/5), power_distribution::power_distribution__ferrite_emc_bead (0/5), energy_storage_source::energy_storage_source__usb_5v_input (0/4), hmi_ergonomics::hmi_ergonomics__status_indicator (0/5) ...+2.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): sensing_instrumentation: overview mentions 3 concrete components not present in any sub-module word — bpw34, ads1115, opa333. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 0: applied 5 patches, skipped 5, allowlist_rejected=5, state_changed=true
+    +cross_module_grammar_links.[+] (Close thermal path for optical detector.)
+    +cross_module_grammar_links.[+] (Close thermal path for LED source.)
+    +cross_module_grammar_links.[+] (Close thermal path for power distribution.)
+    +cross_module_grammar_links.[+] (Close thermal path for HMI.)
+    +cross_module_grammar_links.[+] (Close power topology for sensing_instrumentation.)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="BPW34" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview.)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="ADS1115IDGSR" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview.)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="OPA333AIDBVR" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview.)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[0].words[+]: word patch contains MPN="2011" not in verified-parts allowlist (124 entries). Patch dropped. (Increase word density for energy_storage_source.)
+    ALLOWLIST_REJECT safety_protection.sub_modules[0].words[+]: word patch contains MPN="D2F-01L" not in verified-parts allowlist (124 entries). Patch dropped. (Increase word density for safety_protection.)
+[chain] Phase 2 iter 1: arith 0 pass / 0 fail; grammar 11 pass / 2 fail; total score 2460
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): energy_storage_source::energy_storage_source__usb_5v_input (4 words), safety_protection::safety_protection__esd_protection_network (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 8 sub-module(s) with <3 priced lines: sensing_instrumentation::sensing_instrumentation__optical_detector_module (0/5), energy_conversion_transduction::energy_conversion_transduction__led_source (0/5), control_compute_communication::control_compute_communication__compute_ui_module (0/5), power_distribution::power_distribution__ferrite_emc_bead (0/5), energy_storage_source::energy_storage_source__usb_5v_input (0/4), hmi_ergonomics::hmi_ergonomics__status_indicator (0/5) ...+2.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): sensing_instrumentation: overview mentions 3 concrete components not present in any sub-module word — bpw34, ads1115, opa333. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 1: applied 0 patches, skipped 5, allowlist_rejected=5, state_changed=false
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="BPW34" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing BPW34 component to BoM)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="ADS1115IDGSR" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing ADS1115 component to BoM)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="OPA333AIDBVR" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing OPA333 component to BoM)
+    ALLOWLIST_REJECT energy_storage_source.sub_modules[0].words[+]: word patch contains MPN="2011" not in verified-parts allowlist (124 entries). Patch dropped. (Densify energy_storage_source sub-module)
+    ALLOWLIST_REJECT safety_protection.sub_modules[0].words[+]: word patch contains MPN="PESD5V0X1BCSF" not in verified-parts allowlist (124 entries). Patch dropped. (Densify safety_protection sub-module)
+[chain] Phase 2: no state change after repair iter 1 — bailing (further iterations will not progress).
+[fill-blank-mpn] 20 blank catalogue word(s) for class "optical_instrument" (18 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Sensor Interconnect Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Sensor Interconnect Cable): Legrand SRFL100G fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Qwiic Interconnect Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Qwiic Interconnect Cable): Legrand SRFL100G fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_conversion_transduction::energy_conversion_transduction__led_source (LED Source): Texas Instruments TLC5916IDR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__led_source (LED Driver) → Texas Instruments TLC5916IDR
+[fill-blank-mpn]   ⊘ nohit energy_conversion_transduction::energy_conversion_transduction__led_source (Wavelength Selection Module): no DB row passed the rank bar for tokens [wavelength, selection, conversion, transduction, led, source] — staying generic
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__led_source (DC DC Regulator) → Microchip Technology MCP1700T-3302E/TT
+[fill-blank-mpn]   ⊘ nohit energy_conversion_transduction::energy_conversion_transduction__led_source (Source Board Connector): no DB row passed the rank bar for tokens [source, board, connector, conversion, transduction, led] — staying generic
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__compute_ui_module (Compute Ui Module) → Adafruit Industries LLC 4062
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__compute_ui_module (Stemma Header): no DB row passed the rank bar for tokens [stemma, header, control, compute, communication] — staying generic
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__compute_ui_module (Debug Interface): ADLINK Technology PCI-C584 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__compute_ui_module (I2c Level Shifter) → SparkFun Electronics 19626
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__compute_ui_module (Firmware Storage): no DB row passed the rank bar for tokens [firmware, storage, control, compute, communication] — staying generic
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__ferrite_emc_bead (Power Indicator LED) → TE Connectivity 4-2489541-7
+[fill-blank-mpn]   ⊘ nohit power_distribution::power_distribution__ferrite_emc_bead (Board Level Decoupling): no DB row passed the rank bar for tokens [board, level, decoupling, power, distribution, ferrite] — staying generic
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__usb_5v_input (Low Noise Regulator): Microchip Technology MCP1700T-3302E/TT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__usb_5v_input (Low Noise Regulator): MICROCHIP MCP1700T-3302E/TT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator (Status Indicator) → Soldered 333099
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__status_indicator (Mounting Bezel): no DB row passed the rank bar for tokens [mounting, bezel, hmi, ergonomic, status, indicator] — staying generic
+[fill-blank-mpn]   ⊘ skip hmi_ergonomics::hmi_ergonomics__status_indicator (Control Switch): indicator/pilot-light part EAO 704.006.518 on a non-light slot — generic spec
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__status_indicator (Display Bezel): no DB row passed the rank bar for tokens [display, bezel, hmi, ergonomic, status, indicator] — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__status_indicator (User Facing Legend): no DB row passed the rank bar for tokens [user, facing, legend, hmi, ergonomic, status] — staying generic
+[fill-blank-mpn] filled 6/20 blank word(s): 6 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 18 structural skipped.
+[chain] fill-blank-mpn: branded 6/20 blank catalogue word(s) (6 DB-first real MPN, 0 generated real-OEM), 18 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 207 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 22823 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 6 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=8 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"optical_instrument","resolved_to":"optical_instrument","hit":"db","nodes":8,"edges":23}
+[chain] K10 shadow: PASS_SHADOW — matched=19 missing=0 extra=0
+[chain] headline derived: Optical Path Length=10 mm [derived_from_brief]; Unit cost ceiling=200 GBP;  (0.00s)
+[chain] part verification: 6 parts checked — verified=6, unverified=0, uncertain=0, skip=0
+[chain] G5 RAG: 0 queries → 0 suggestions (high=0, medium=0, low=0, below_threshold=0, corpus=0 rows)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[chain] Stage 10.5 Part Reality Check: 6 checked, 6 real, 0 substituted, 0 warned (no substitute available). Nexar calls used: 0.
+[chain] Stage 10.6 Part Verification: 1 structured MPN(s) scanned, 1 already DB-verified, 0 live-probed, 0 confirmed (kept), 0 demoted to honest descriptor.
+[chain] module-paragraph-llm: 8/8 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/8 capital (threshold 5); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 3 sections, 0 warnings
+[chain] design decisions review: 5 choices (1 applied, 4 flagged, 0 blocked)
+[chain] attribute-phantom cleanup: dropped 0 dimension/property phantom word(s) + 4 exact-id duplicate(s) (fixes phantom BoM lines + duplicate tags)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 0 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 0 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[fill-blank-mpn] 13 blank catalogue word(s) for class "optical_instrument" (15 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Sensor Interconnect Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Sensor Interconnect Cable): Legrand SRFL100G fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_conversion_transduction::energy_conversion_transduction__led_source (LED Source): Texas Instruments TLC5916IDR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__compute_ui_module (Debug Interface): ADLINK Technology PCI-C584 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__usb_5v_input (Low Noise Regulator): Microchip Technology MCP1700T-3302E/TT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__usb_5v_input (Low Noise Regulator): MICROCHIP MCP1700T-3302E/TT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ skip hmi_ergonomics::hmi_ergonomics__status_indicator (Control Switch): indicator/pilot-light part EAO 704.006.518 on a non-light slot — generic spec
+[fill-blank-mpn] filled 0/13 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 15 structural skipped.
+[chain] INSTRUMENT signal-chain topology: 27 edge(s) (source→sample→detector→conditioning→digitiser→compute→display + power rails) — sealed sub-1 m³ instrument, no fluid/plant
+[chain] filter-on-dirty-stream invariant: not_applicable
+[chain] provenance rooting: 23/23 inputs trace to the brief (100%)
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.06%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.06%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.06%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.06%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 0.005 → 0.005 kW (Δ 0 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 54402) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/blender-bg.log
+[estimate] device-scale INSTRUMENT: estimated parts capped to COTS commodity ceilings (deviceScaleCeilingGbp)
+[estimate] product_class=optical_instrument annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'optical_instrument' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 28 parts need price estimates
+[estimate] corpus-classified 0/28; 28 need rule-based / Flash-Lite
+[estimate] rule-based classified 6 parts; 22 still need Flash-Lite
+[estimate] Flash-Lite classified 2 batches
+[estimate] updated 0 existing, synthesised 28 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] classification source: corpus=0 rule_based=6 flash_lite=22 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=28 flash_lite_unknown=0
+[estimate] top classes in BoM:
+  structural_polymer: 5
+  electronic_connector: 5
+  electronic_passive: 4
+  structural_metal: 2
+  optical: 2
+  electronic_ic: 2
+  safety_consumable: 2
+  oem_smoke_detection: 1
+[estimate] estimated cost: GBP 0.000
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 34 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 34/34 results in 2.2s
+[engine-c] flags: in_range=5  over=3  under=18  no_reference=8
+[engine-c] 21/34 priced lines flagged out-of-range vs reference corpus (61.8%)
+[engine-c] 2 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "optical_instrument" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: optical_instrument
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/state.json
+[supplier-validate] no suppliers to validate
+[chain] Gemini i2i OFF for isInstrumentDevice — Excel embeds Blender CAD/Cycles views only
+[chain] deployment_envelope: no envelope mapped for optical_instrument (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £421 (raw materials £255, class optical_instrument)
+[chain] G2 cost-reality: PASS — BoM £255 across 34 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 2 gaps
+  ⚠ sub_modules: 8 sub-modules across 8 modules — expected ≥16
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 1 lines re-priced from DOE/NETL + cache (real), 1 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 2/10 · mean 6.3/10 · 2 blocking · below-8: brief_compliance=3, bill_of_materials=7, physics_fidelity=2
+  ✗ [brief_compliance] Banner asserts "All 12 PASS" while physics fidelity shows missing battery and 100% TBD parts
+  ✗ [physics_fidelity] High-severity issues on battery absence and all-TBD parts; part_realism=2
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 2/10).
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.47×) — ⚠ The brief asks for 1.00 unit AND a £200 ceiling — these CANNOT both be met: 1.00 unit costs £421 (2.1× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 0.474 unit at £259 (£547/unit) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_open_colorimeter.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008-converged
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £421 / 1 unit = £421/unit — within the £100–£5,000,000/unit industry band for unit output. (no scalable output metric — whole-system price treated as £/unit)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 34 disclosed; 0 take-off prices written into the BoM; purchased £253 → installed £759 (central)
+[advisor-engagement] 8/8 modules got an advisor block — 16 specialist cards, 32 grounded questions
+[chain] advisor-engagement: 8 module blocks, 16 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "optical_instrument" (10 tools, 26 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): FLAGS — class="optical_instrument" template=NONE hero=false modules=0 thin=0
+  ✗ BLENDER_NO_HERO: No hero/cover image (00-hero.png / blender-cover.png) in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008.
+[chain] tools-flow: rendered 208388 bytes (10 tools)
+[investor-section] 5 investors matched from 18 candidates: PhotonVentures, Celesta Capital, Blue Bear Ventures, Constructor Capital, GV (Google Ventures)
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 2/2 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Interconnect — device wiring & signal paths  (drawings/interconnect.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 2/2 drawings + hero → wired into the PDF
+[drawing-gates] 13 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         general-arrangement 2160x1892 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         interconnect 2560x2296 aspect 1.1:1 (limit 4:1)
+  ✓ [high] no_stray_beam      longest drawn run u_wire_trunk_u_usb_5v_input_power (DC power rail (instrument-internal)) spans 0.4 m (limit 16 m — a plant-crossing beam)
+  ✓ [high] connection_sanity  connection graph physically coherent (domain + direction + magnitude)
+  ✓ [high] tag_legibility     every tag distinct (≤20% bbox overlap) + inside its view border
+  ✓ [high] plan_lateral_spread plan has 21 distinct (x,y) cell(s) (≥3)
+  ✓ [high] drawing_domain     no plant-architecture markers on the device drawings
+  ✓ [high] render_view_quality 5 Excel-bound view(s) present, non-blank and correctly framed
+  ✓ [high] plan_render_coherence 00-hero.png + GA fresh vs parts-manifest (fp=3f6043e825dd872b, product cutaway) — same placement generation
+  ✓ [high] drawing_set_coherence 2 system drawing(s) share placement_fp=3f6043e825dd872b; no phantom tags; png≥svg; coverage ≥80% on applicable sheets
+  ✓ [high] ga_glance_coherence GA clears deterministic 5-second glance checks
+  ✓ [high] drawing_vision_glance vision glance clean on 2 image(s)
+  ✓ [high] cad_geometry_coverage instrument geometry present — 34 manifest part(s), 0 instrument-proxy source(s), 8 CAD family(ies)
+[chain] drawing-gates: 0/13 failing — DRAWING >=8 PASS
+[census] 14 tie-in runs (14 units) = £1,123 (cable £1,123 + pipe £0)
+[census] routed major streams = £950  →  full interconnect ≈ £2,072
+[chain] cost-sanity re-derived on authoritative BoM (Σ £125): verdict pass — £207/unit
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[benchmark] generation failed: fetch failed
+[chain] benchmark net: LLM returned no expectation — skipping (shadow never blocks)
+[chain] requirements-driven BoM: 34 requirement lines (Σ £125) → state.requirementsBom; cost cascade reconciled to this total
+[chain] PCB STAGE (shadow): bearing=true disposition=bespoke categories=[analog_frontend,connectivity,display,power_electronics,processor] canAuthor=true canRoute=true canVerifyAndExport=true
+[chain] PCB atopile project: 4 component(s), 26 off-board COTS, 0 unresolved, 3 net(s) -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/pcb-project
+[chain] PCB pipeline: ok=true stage_reached=complete routed=true drc_violations=0
+[chain] PCB GATE (shadow): applicable=true fires=false reason=clean_board
+dossier_repair: 1 fix(es) over 1 pass(es); 2 gap(s) need input (0 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/state.json
+[chain] self-repair: 1 fix(es) over 1 pass(es); 2 gap(s) need input (0 blocking HIGH)
+[reconcile-hollow] 0 hollow sub-module(s); nothing to reconcile
+[deterministic-finalize] class-alien-renamed=0 scope-words-demoted=0 density-merged=0 modifiers=0 prose=0 overview=2 · residual violations {'modifier_consistency': 0, 'prose_covers': 0, 'overview_subset': 0, 'word_density_thin': 4}
+[deterministic-finalize] trace-reconcile: connection-ledger.json pruned=0 connection-schedule.json pruned=0
+[fill-blank-mpn] 13 blank catalogue word(s) for class "optical_instrument" (15 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Sensor Interconnect Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__optical_detector_module (Sensor Interconnect Cable): Legrand SRFL100G fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_conversion_transduction::energy_conversion_transduction__led_source (LED Source): Texas Instruments TLC5916IDR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__compute_ui_module (Debug Interface): ADLINK Technology PCI-C584 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__usb_5v_input (Low Noise Regulator): Microchip Technology MCP1700T-3302E/TT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  energy_storage_source::energy_storage_source__usb_5v_input (Low Noise Regulator): MICROCHIP MCP1700T-3302E/TT fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ skip hmi_ergonomics::hmi_ergonomics__status_indicator (Control Switch): indicator/pilot-light part EAO 704.006.518 on a non-light slot — generic spec
+[fill-blank-mpn] filled 0/13 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 15 structural skipped.
+[chain] ghost-snapshot re-derive: requirementsBom 34 → 34 row(s) on the FINAL settled tree (pruned 0 stale partVerifications entries)
+dossier_repair: 1 fix(es) over 1 pass(es); 2 gap(s) need input (0 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/state.json
+[chain] freshen-scorer-inputs: re-rendered schematics + interconnect + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 0 HIGH · 0 corroborated (score) · 3 advisory (never score) — file + state.physicsCritique are the SAME canonical object
+[chain] state freeze: workbook built from state sha256 d21cabeb07cb…
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/dossier.xlsx
+  · column contract [Line & velocity]: 40/40 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 34/34 rows PASS → 10.0/10
+  · column contract [Engineering Analysis]: 1/1 rows PASS → 10.0/10
+  · verification spine: HARD 16 · open 0 · score 10.0/10 · SHIPS allowed
+  · per-tab scorecard: min Executive Summary=10/10 · 0 FAIL, 0 UNSCORED
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Calculations (includes contract-quantity consumers)
+  · Calculations: linked 9 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs — M0 primitives section
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+  ! Engineering Analysis raised, skipping: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Verification
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 5 views on one tab)
+  · Electrical — skipped (no single-line drawing or panel schedule)
+  · PCB
+      + Assembly
+      + Interconnect
+  · Drawings (register)
+  · Glossary
+  · Audit data
+  · content scoring pass 1: 21 sheet(s) cell-checked — Bill of Materials (Ledger):329/334
+  · Quality & Audit
+  · Contents (sheet #1)
+  · Excel-corruption guard: defanged 1 prose-as-formula + normalised 4 sci-notation + fixed 0 CEILING/FLOOR arity formula(s)
+  · SHIP GATE (full workbook): min Executive Summary=0.0/10 · 7 <8 · 0 UNSCORED → ship_ok=False
+  · ONE VERDICT (live formulas over the Q&A floor/open cells): VERDICT: DRAFT — 5 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere) (3 surfaces)
+  · score chips: 28/28 tabs live off the Q&A score cells
+  · live-check gate: 28 sheets · 2161 formula cells (1091 verdict formulas) · 825/825 table rows carry a live check (0 merged-flag rows) · 0 bare literals · 0 orphan required columns
+  · numeric orphan-literal gate: ENFORCED ['fin-cashflow', 'fin-chart', 'fin-curve', 'fin-item', 'fin-lines', 'fin-opex', 'fin-oppoint', 'fin-range', 'fin-recommend', 'fin-scenarios', 'fin-tornado'] — 0 orphans/229 checked · WARN-swept 13 other declared-numeric families (assembly: 5/5 orphan (e.g. Assembly sequence!G9 (family assembly)); drawing-coverage: 14/14 orphan (e.g. Bill of Materials (Ledger)!B43 (family drawing-coverage)); holds: 1/1 orphan (e.g. Holds & exclusions!D6 (family holds)); overview-cost: 3/3 orphan (e.g. Overview!B29 (family overview-cost)); part-names: 34/34 orphan (e.g. Part names!C5 (family part-names)); pcb-drill-tools: 2/2 orphan (e.g. PCB!B115 (family pcb-drill-tools)); pcb-offboard-cots: 26/26 orphan (e.g. PCB!D237 (family pcb-offboard-cots)); pcb-pnp: 12/12 orphan (e.g. PCB!C120 (family pcb-pnp)); pcba-bom: 4/4 orphan (e.g. PCB!H230 (family pcba-bom))) · 40 families not yet declared numeric (next round)
+  · recalc-and-cache: 2166/2166 formula cells now carry a cached value (was 0/2161); formulas remain live (LibreOffice round-trip)
+  · ooxml-strict-check: 0 HIGH (0 total findings) — Excel-strict clean
+  · ONE TRUTH read-back: 36 live score cells match the python scorecard; floor 0 · open 5 — tab-scorecard.json now carries the WORKBOOK's numbers
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/dossier.xlsx
+  size        : 23.30 MB
+  tabs (28)  : ['Executive Summary', 'Contents', 'Inputs & Assumptions', 'Equipment & Dimensions Register', 'Overview', 'Renders', 'Cost waterfall', 'Financial model', 'Bill of Materials (Ledger)', 'Brief', 'Verification', 'Design basis', 'Engineering Analysis', 'Drawings', 'Assembly', 'Interconnect', 'PCB', 'Assembly sequence', 'Audit data', 'Risk & Regulatory', 'Holds & exclusions', 'Questions for the customer', 'Quality & Audit', '⚠ Checks', 'Connection trace', 'Calculations', 'Part names', 'Glossary']
+  tab registry: 28 sheets = 27 content tabs + Contents; verdict floor spans 26 non-mirror tabs (mirrors: Executive Summary, Quality & Audit)
+  live calcs  : 39
+  static calcs: 0
+  image tabs  : 3
+  recalc cache: cached values shipped (previews render)
+  VERDICT     : VERDICT: DRAFT — 5 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere)
+  skipped     : ["Engineering Analysis (error: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>)", 'Process schedules (fluid-less instrument — not created)', 'Line & velocity (fluid-less instrument — not created)', 'Electrical (no source data)']
+  CHECKS FAIL : 0
+  SHIP GATE   : FAIL  ·  0 HIGH · 0 MED · 0 LOW · ship_ok=False
+  PER-TAB ≥8 GATE: FAIL — min Executive Summary=0/10; <8: ['Executive Summary', 'Risk & Regulatory', 'Quality & Audit', 'Renders', 'Assembly', 'Interconnect', 'Drawings']; UNSCORED: []
+  → dossier is a DRAFT (not validated): every tab must reach a genuine ≥8.
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/colorimeter-20260717-2008_dossier_2026-07-17_2028.xlsx
+[export_step] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/cad/colorimeter-20260717-2008-model.step  (837,130 bytes)  parts=34/34  pipes=20 (skipped 0 route lines with no usable data)
+[verify] equipment leaves: 34  (manifest: 34)  pipe leaves: 20
+[verify] ALL 34 part bboxes within 0.1 mm of manifest pos/dims; assembly names preserved
+[export_gltf] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/cad/colorimeter-20260717-2008-model.glb  (8,808 bytes)  parts=34/34  tris=408
+[chain] CAD download → /Users/tristanfischer/Downloads/colorimeter-20260717-2008_model_2026-07-17_2028.step
+[chain] CAD download → /Users/tristanfischer/Downloads/colorimeter-20260717-2008_model_2026-07-17_2028.glb
+[chain] CAD export: step=ok glb=ok → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/cad/
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-DRIFT.md
+[drift-detector] PASS: 0 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/0 matched-to-rule, 0 findings (0 MED, 0 LOW); voltage-sizing 0/0 matched, 0 findings
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-MISPIN.md
+[mispin-detector] PASS: 34 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 13 constraints, 0 non-blocking findings (0 MED, 0 LOW)
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf': No such file or directory.
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf': No such file or directory.
+[consistency-audit] pdftotext failed: Command failed: pdftotext /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf -
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf': No such file or directory.
+
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 0 clusters, 0 findings (0 MED, 0 HIGH), 0 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UK, 66 surfaces scanned, 0 unique citations, 0 findings (0 MED, 0 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] PASS: 30 lines audited (DB-only, zero quota consumed), 25 non-blocking findings (0 MED, 25 LOW).
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] PASS: 1 lines audited (DB-only, zero quota consumed), 0 PASS, 0 MEDIUM, 0 LOW (non-blocking).
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf does not exist.
+[chain] failed to open PDF locally (non-fatal): Command failed: open /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf does not exist.
+
+[chain] background enrichment spawned (PID 59960) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/background-enrichment.log
+[chain] supplier post-chain enrich spawned (PID 59968) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/supplier-post-chain-enrich.log
+[chain] wallclock-split: wall=21.17m baseline_comparable=18.02m new_stage=0.08m unlogged=3.07m → wallclock-split.json
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=2
+[enrich] componentEngineering: 34 parts · 20 connections · 5 orphans · 33 ungoverned · 0 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/dashboard.html
+
+[chain] ── QUALITY LOOP Phase 3 (full) — iteration 1/8 ──
+[parts-ledger] instrument ghost prune: dropped 3 absorbed-host / unresolved ties → 37 principal connection(s) (Connection trace honesty)
+[ledger] device-instrument: attached 6 authoritative-topology tie(s) the 3-D-declutter dropped from the connection schedule
+
+  LEDGER (BoM + connectivity + coverage + tools) — colorimeter-20260717-2008   £125 raw materials   34 parts + 37 connections   0 tools invoked
+  tag    type      name                     £ line in/out status               tool  BLE   GA P&ID  SLD  PNL  BFD  SCH
+  --------------------------------------------------------------------------------------------------------------------
+  I-110  instrumentOptical Detector Modu        8    2/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-103  instrumentSensor Interconnect C        1    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-109  instrumentDetector Mount Plate         8    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-108  other     Optical Window Seal          0    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-102  instrumentKingbright 470 nm LED        1    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-101  instrumentLED Driver                   1    2/1 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-104  instrumentWavelength Selection        14    2/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-103  electricalDC DC Regulator              1    6/4 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  EP-101 other     Source Board Connecto        0    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-104  other     Adafruit Feather M0         19    9/0 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-105  other     Stemma Header                0    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-106  other     Debug Interface              0    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-107  other     I2c Level Shifter            4    1/1 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-121  instrumentFirmware Storage             1    3/2 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  X-119  electricalBLM21PG221SN1D Ferrit        0    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-118  electricalPower Indicator LED          5    1/8 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-120  other     Host Power Rail On Co        3    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  EP-102 other     Board Level Decouplin        0    1/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-115  electricalUsb 5v Input                 0    0/6 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-117  electricalBench Psu Input             31    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-114  electricalPolyfuse Resettable          1    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-116  electricalLow Noise Regulator          1    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-108  instrumentSSD1306 0.96 inch OLE       11    3/0 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-106  other     Mounting Bezel               0    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-105  instrumentControl Switch               1    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-107  instrumentDisplay Bezel                2    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-112  other     User Facing Legend           0    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-111  instrumentCuvette Holder               4    2/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-110  instrumentOptical Path Baffle          0    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-109  other     Enclosure Shell              5    0/0 BESPOKE                 —    ✓    ✓    ·    ·    ·    ·    ·
+  X-113  other     Ambient Light Cap            0    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-122  instrumentCuvette Consumable           0    0/1 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  I-102  electricalEsd Protection Networ        0    1/2 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-101  other     Input Protection On C        0    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  --------------------------------------------------------------------------------------------------------------------
+  PART coverage by drawing (present / expected):   BLE 32/32   GA 32/32
+  CONNECTION coverage (pipes/wires/sensors vs the views):   pid 0/0   process_schedules 0/37 (0.0%)   isometric 0/0   route 17/37 (45.9%)
+  → 0 NOT FOUND (true gap) · 26 fabricated (no catalogue identity by nature) · 0 architecturally-excluded (membrane/media) · 0 OEM-proprietary (recorded finding) · 1 commodity-fitting (accessory/fastener, no catalogue identity by nature) · 0 boundary-stub (connection endpoint, not a part) · 0 scope-documented (system/network/design label) · 4 parts w/ coverage gap · 0 orphan · 0 connections off the P&ID.  0 ambiguous tag(s) (name-corroborated).  34/34 parts have NO tool provenance.  wrote parts-ledger.json
+  → CONNECTIVITY: 0 concern(s) — process 0/0 connected (0%) · instruments 13/13 associated (100.0%) · 1 origin(s) · 0 sink(s)
+
+[chain] ledger updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/parts-ledger.json
+[chain] quality scorecard (iteration 1/8): floor=7/10 mean=9.4/10 allPass=false (honest, all sections)  |  gating floor=10/10 mean=10.0/10 allPass=true (deterministic-only, drives the loop)
+  headline: 9/10 ✓
+  brief_compliance: 10/10 ✓
+  bill_of_materials: 7/10 ✗ BELOW 9
+  performance_card: 9/10 ✓
+  design_narrative: 8/10 ✗ BELOW 9
+  physics_fidelity: 10/10 ✓
+  drawing_gates: 10/10 ✓
+  cost_sanity: 10/10 ✓
+  physics_gates: 10/10 ✓
+  tool_archetype: 10/10 ✓
+  connectivity: 10/10 ✓
+  unresolved_critic_highs: 10/10 ✓
+[chain] dashboard updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/dashboard.html
+[chain] ledger HTML updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/parts-ledger.html
+
+[chain] ✦ quality loop COMPLETE — all DETERMINISTIC sections ≥9/10 (iteration 1/8; skip re-exec) (NOTE: honest floor=7/10 — an ADVISORY section is still below 9; not auto-fixable, needs a source-side improvement)
+[chain] state-freeze: state.json CHANGED after the workbook build (d21cabeb07cb… → 94eeb20f0549…) — rebuilding Excel once so the deliverable narrates the shipped state
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/dossier.xlsx
+  · column contract [Line & velocity]: 40/40 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 34/34 rows PASS → 10.0/10
+  · column contract [Engineering Analysis]: 1/1 rows PASS → 10.0/10
+  · verification spine: HARD 16 · open 0 · score 10.0/10 · SHIPS allowed
+  · per-tab scorecard: min Executive Summary=10.0/10 · 0 FAIL, 0 UNSCORED
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Calculations (includes contract-quantity consumers)
+  · Calculations: linked 9 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs — M0 primitives section
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+  ! Engineering Analysis raised, skipping: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Verification
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 5 views on one tab)
+  · Electrical — skipped (no single-line drawing or panel schedule)
+  · PCB
+      + Assembly
+      + Interconnect
+  · Drawings (register)
+  · Glossary
+  · Audit data
+  · content scoring pass 1: 21 sheet(s) cell-checked — Bill of Materials (Ledger):329/334
+  · Quality & Audit
+  · Contents (sheet #1)
+  · Excel-corruption guard: defanged 1 prose-as-formula + normalised 4 sci-notation + fixed 0 CEILING/FLOOR arity formula(s)
+  · SHIP GATE (full workbook): min Executive Summary=0.0/10 · 7 <8 · 0 UNSCORED → ship_ok=False
+  · ONE VERDICT (live formulas over the Q&A floor/open cells): VERDICT: DRAFT — 5 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere) (3 surfaces)
+  · score chips: 28/28 tabs live off the Q&A score cells
+  · live-check gate: 28 sheets · 2197 formula cells (1127 verdict formulas) · 843/843 table rows carry a live check (0 merged-flag rows) · 0 bare literals · 0 orphan required columns
+  · numeric orphan-literal gate: ENFORCED ['fin-cashflow', 'fin-chart', 'fin-curve', 'fin-item', 'fin-lines', 'fin-opex', 'fin-oppoint', 'fin-range', 'fin-recommend', 'fin-scenarios', 'fin-tornado'] — 0 orphans/229 checked · WARN-swept 14 other declared-numeric families (assembly: 5/5 orphan (e.g. Assembly sequence!G9 (family assembly)); drawing-coverage: 14/14 orphan (e.g. Bill of Materials (Ledger)!B43 (family drawing-coverage)); holds: 1/1 orphan (e.g. Holds & exclusions!D6 (family holds)); overview-cost: 3/3 orphan (e.g. Overview!B47 (family overview-cost)); overview-sections: 12/12 orphan (e.g. Overview!B21 (family overview-sections)); part-names: 34/34 orphan (e.g. Part names!C5 (family part-names)); pcb-drill-tools: 2/2 orphan (e.g. PCB!B115 (family pcb-drill-tools)); pcb-offboard-cots: 26/26 orphan (e.g. PCB!D237 (family pcb-offboard-cots)); pcb-pnp: 12/12 orphan (e.g. PCB!C120 (family pcb-pnp)); pcba-bom: 4/4 orphan (e.g. PCB!H230 (family pcba-bom))) · 40 families not yet declared numeric (next round)
+  · recalc-and-cache: 2202/2202 formula cells now carry a cached value (was 0/2197); formulas remain live (LibreOffice round-trip)
+  · ooxml-strict-check: 0 HIGH (0 total findings) — Excel-strict clean
+  · ONE TRUTH read-back: 36 live score cells match the python scorecard; floor 0 · open 5 — tab-scorecard.json now carries the WORKBOOK's numbers
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/colorimeter-20260717-2008/dossier.xlsx
+  size        : 23.30 MB
+  tabs (28)  : ['Executive Summary', 'Contents', 'Inputs & Assumptions', 'Equipment & Dimensions Register', 'Overview', 'Renders', 'Cost waterfall', 'Financial model', 'Bill of Materials (Ledger)', 'Brief', 'Verification', 'Design basis', 'Engineering Analysis', 'Drawings', 'Assembly', 'Interconnect', 'PCB', 'Assembly sequence', 'Audit data', 'Risk & Regulatory', 'Holds & exclusions', 'Questions for the customer', 'Quality & Audit', '⚠ Checks', 'Connection trace', 'Calculations', 'Part names', 'Glossary']
+  tab registry: 28 sheets = 27 content tabs + Contents; verdict floor spans 26 non-mirror tabs (mirrors: Executive Summary, Quality & Audit)
+  live calcs  : 39
+  static calcs: 0
+  image tabs  : 3
+  recalc cache: cached values shipped (previews render)
+  VERDICT     : VERDICT: DRAFT — 5 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere)
+  skipped     : ["Engineering Analysis (error: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>)", 'Process schedules (fluid-less instrument — not created)', 'Line & velocity (fluid-less instrument — not created)', 'Electrical (no source data)']
+  CHECKS FAIL : 0
+  SHIP GATE   : FAIL  ·  0 HIGH · 0 MED · 0 LOW · ship_ok=False
+  PER-TAB ≥8 GATE: FAIL — min Executive Summary=0/10; <8: ['Executive Summary', 'Risk & Regulatory', 'Quality & Audit', 'Renders', 'Assembly', 'Interconnect', 'Drawings']; UNSCORED: []
+  → dossier is a DRAFT (not validated): every tab must reach a genuine ≥8.

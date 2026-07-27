@@ -1,0 +1,707 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_poseidon.md (4874 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 4874 chars
+[brief-parse] OK — confidence=HIGH, missing=6 fields, metrics=1
+[chain] classification: syringe_pump (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 1.2s)
+[chain] U5 brief augmentation: U5 augmentation (class: syringe_pump): 0 HARD field(s) filled with class-aware inferred values, 1 field(s) retained from founder text. Still null after augmentation (no class default): unit_cost_ceiling, max_mass_kg, target_material, design_life.
+  [U5] still null after augmentation: unit_cost_ceiling, max_mass_kg, target_material, design_life
+[chain] U6 brief expansion: 11 duties derived; product="Precisely metered fluid flow (infusion and withdrawal)" (model=google/gemini-3.1-pro-preview, cost_usd=0.05388)
+  [U6] channel_count = 4 count [stated/high] — Explicitly stated in the brief.
+  [U6] max_syringe_volume_ml = 60 mL [derived/high] — Standard catalogue laboratory syringes range up to 60 mL (e.g., BD plastic). Required to s
+  [U6] linear_travel_mm = 120 mm [derived/high] — A standard 60 mL syringe has an internal diameter of ~26.7 mm (area ~560 mm2). Displacing 
+  [U6] max_linear_force_n = 100 N [derived/medium] — Typical commercial lab syringe pumps provide ~15-30 lbs (65-130 N) to overcome microfluidi
+  [U6] min_linear_speed_um_s = 1 um/s [derived/medium] — Microfluidic applications often require ~1 uL/min. Using a 1 mL syringe (ID ~4.7 mm, Area 
+  [U6] max_linear_speed_mm_s = 2 mm/s [derived/medium] — Reagent dosing requires rapid emptying/filling. Emptying a 60 mL syringe (107 mm stroke) i
+  [U6] step_resolution_um = 0.625 um [derived/high] — Assuming a standard 2 mm pitch lead screw (T8x2) and a 200-step/rev NEMA 17 motor with 1/1
+  [U6] backlash_limit_mm = 0.1 mm [derived/medium] — Brief requires quantified backlash for repeatable direction changes. Standard spring-loade
+  [U6] peak_electrical_power_w = 100 W [derived/high] — Four NEMA 17 stepper motors drawing ~1.5 A at 12 V = 72 W peak. Adding 10-15 W for the MCU
+  [U6] control_pulse_rate_hz = 15000 Hz [derived/high] — At max speed (2 mm/s) with a 2 mm pitch screw and 1/16 microstepping, one motor requires 3
+  [U6] blocked_line_trip_pressure_mpa = 0.3 MPa [derived/medium] — Standard microfluidic fittings (e.g., PDMS chips, slip-luer) often leak or delaminate abov
+[chain] engineering_contract: 9 quantities, 3 topology edges, 2 macro-assemblies (total £460), closures: 3 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":375}
+[products-writeback] {"product_name":"Multi-channel benchtop syringe-pump platform, 4 independent lead-screw channels, syringe library up to 60 mL, pitch 2 mm. Peak panel ~87 W (0.087 kW). Macro-assembly raw BoM ≈ £460 (20-unit engineerin","hit":"db_hybrid","matched":"Multi-channel benchtop syringe-pump platform, 4 independent lead-screw channels, syringe library up to 60 mL, pitch 2 mm. Peak panel ~87 W (0.087 kW). Macro-assembly raw BoM ≈ £460 (20-unit engineerin","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":145}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: PASS — 1/7 mandatory covered for UK+EU+US
+  ⚠ LVD 2014/35/EU (missing_mandatory): Low Voltage Directive (EU). Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on t
+  ⚠ EMC 2014/30/EU (missing_mandatory): Electromagnetic Compatibility Directive (EU). Stepper drivers, MCU clocks and USB/serial interfaces must not emit or suc
+  ⚠ RoHS 2011/65/EU (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts Pb/Hg/Cd etc. in electrical equipment; applies to control 
+  ⚠ IEC 61010-1 (missing_mandatory): Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements
+  ⚠ IEC 61326-1 (missing_mandatory): Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements (IEC)
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: syringe_pump
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research-synthesis] MiMo failed, retrying with Gemini 3.1 Flash-Lite (grounded)
+[research-synthesis] Complete: 3 competitors, 3 sources, 3 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for syringe-pump: replaying 4 stored duty spec(s) (syringe-pump:flow-kinematics, lead-screw:torque-sizing, stepper-motor:resolution-check, syringe-pump:occlusion-pressure) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool syringe-pump:flow-kinematics (duty_hash=82f0a0d5fa21, db id=47) — no LLM call.
+[tool-generator] REUSED stored generated tool lead-screw:torque-sizing (duty_hash=944ccb531438, db id=48) — no LLM call.
+[tool-generator] REUSED stored generated tool stepper-motor:resolution-check (duty_hash=5d771fac2f64, db id=49) — no LLM call.
+[tool-generator] REUSED stored generated tool syringe-pump:occlusion-pressure (duty_hash=bd99f4dc52c5, db id=50) — no LLM call.
+[tool-creation] DONE for syringe-pump: created 4 self-test-passed tool(s) (syringe-pump:flow-kinematics, lead-screw:torque-sizing, stepper-motor:resolution-check, syringe-pump:occlusion-pressure), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for syringe-pump: created+registered 4 self-test-passed tool(s) [syringe-pump:flow-kinematics, lead-screw:torque-sizing, stepper-motor:resolution-check, syringe-pump:occlusion-pressure]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=syringe_pump:
+    ✓ recirculation / process pumps → syringe-pump:flow-kinematics
+    ✓ electrical distribution → electrical:transformer-sizing
+    ✓ control & instrumentation → control-systems:pid-tuning
+[bootstrap-tool-plan] REUSING stored candidate slug=syringe_pump version=1 status=candidate (no LLM call; 19 steps, 19 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for syringe-pump/generic — bootstrapped a 19-step tool plan (candidate id=37 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:transformer-sizing, electrical:cable-sizing, enclosure-emc:margin, iec-standards:lookup, lead-screw:torque-sizing, lifecycle-co2:assessment, mass-aggregator:envelope-check, motion-kinematics:steps-per-mm, octopart:parts-lookup, regulatory-cert-cost:lookup, reliability-fmea:system, stepper-motor:resolution-check, supply-chain-risk:scoring, syringe-pump:flow-kinematics, syringe-pump:occlusion-pressure, thermal-envelope:ladder, transport-logistics:routing
+[bootstrap-tool-plan] FAIL-CLOSED iec-standards:lookup: missing computed output field(s) → emitted nothing for [regulatory_mandatory_count(iec-standards:lookup.regulatory_mandatory_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED octopart:parts-lookup: missing computed output field(s) → emitted nothing for [critical_parts_in_stock_count(octopart:parts-lookup.parts_in_stock_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_total_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp), regulatory_total_critical_path_months(regulatory-cert-cost:lookup.total_critical_path_months)] (no fabricated number written)
+[class-reference-graph-db] {"product_class":"syringe-pump","hit":"miss"}
+[generic-emitter] no class-reference graph for class='syringe-pump' (resolved slug='syringe-pump') — invoking E6a bootstrap-on-miss (corpus-first + one google/gemini-3.5-flash harvest, G1 candidate store)
+[bootstrap-class-graph] REUSING stored candidate slug=syringe_pump version=1 status=candidate (no LLM call)
+[generic-emitter] graph BOOTSTRAPPED for slug='syringe_pump': 9 nodes / 11 edges — bootstrap-candidate@v1 (candidate_id=8, version=1, status=candidate, reused=true, attempts=0). Stored row stays 'candidate' (G1): NOT promoted to class_reference_graphs.
+[generic-emitter] physics-derived equipment: 4 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 9 modules, 9 sub-modules, 49 words, 15 tools ran (1397ms)
+[chain] TOOL-IMPLIED-COMPONENT GROUNDING: 1 tool-implied component(s) absent from the design: usb_interface[from control-systems]→control_compute_communication
+[chain] TOOL-IMPLIED-COMPONENT GROUNDING ENFORCING: added 1 tool-grounded word(s)
+[chain] Build #18k: toolOutputsBlock built (14 tools, 10386 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 17 component_classes covered (17 with match, 0 empty), 15308 chars (14341ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: target_performance_value=4 (channels), operating_temp_min_c=15, operating_temp_max_c=30
+[chain] Contract validation: all 2 macro-assemblies present in design ✓
+[chain] keyMetrics seeded early (pre-reviewer): Channel Count=4 channels
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=9/10 plaus=8/10 coh=9/10 part=3/10 hon=10/10 (5076ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [part_realism @ modules/all/sub_modules/all/words/all/part_number] Every single component in the bill of materials uses 'TBD (detailed design)' as its part number. No real, purchasable manufacturer part numbers are specified, which fails the objec
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 11504 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 18 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 14 / 18 patches (skipped 4)
+    skip merge [identity-locked A3]: actuation_kinematics.actuation_kinematics__stepper_motor.stepper_motor_word quantity="×4" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: actuation_kinematics.actuation_kinematics__stepper_motor.stepper_motor_word manufacturer="Lin Engineering" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: actuation_kinematics.actuation_kinematics__stepper_motor.stepper_motor_word part_number="R256" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: actuation_kinematics.actuation_kinematics__stepper_motor.stepper_motor_word material="NEMA 17 hybrid" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: actuation_kinematics.actuation_kinematics__stepper_motor.stepper_motor_word rating_primary="1.5 A 1.8° 0.59 Nm" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word actuation_kinematics.actuation_kinematics__stepper_motor.stepper_motor_word (+7 modifiers)
+    skip merge [identity-locked A3]: control_compute_communication.control_compute_communication__main_controller_mcu.usb_interface_tool_grounded_word manufacturer="FTDI" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: control_compute_communication.control_compute_communication__main_controller_mcu.usb_interface_tool_grounded_word part_number="FT232RL" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 25.4s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1325}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=9/10 phys=8/10 coh=9/10 part=5/10 hon=8/10 (5520ms)
+[chain] critic headline: The design satisfies the 4-channel independent syringe pump brief with a highly coherent RP2040-based control architecture, though physical components are currently specified as conceptual placeholders.
+[chain] critic issues: 0 high, 1 med, 3 total
+  ✗ [med/high] part_realism @ modules/1/sub_modules/0/words/0/modifier_characters/2: The stepper motor is described in the english_sentence as a 'Lin Engineering R256 NEMA 17 stepper motor', but the part_number is listed as 'TBD (detailed design
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 15590 chars
+[chain] STEP 8: R4 Flash-Lite review returned 20 patches
+[chain] STEP 8: R4 Flash-Lite review applied 6 / 20 patches (skipped 14)
+    =mass_fluid_transport_process.overview_paragraph_en (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.syringe_barrel_cradle_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.plunger_clamp_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.tip_luer_fitting_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.tubing_set_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.barrel_seal_o_ring_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.plunger_tip_seal_part: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    =mass_fluid_transport_process.mass_fluid_transport_process__syringe_barrel_cradle.english_sentence (prose)
+[chain] STEP 8: R4 Flash-Lite review done in 22.3s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":-15}
+[chain] canonical product_class OVERRIDE: "" → "syringe_pump" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "syringe_pump" — skipping
+[chain] physics repair: skipped (no HIGH findings, plausibility 8/10)
+[chain] sub-module prose pre-fill: rewrote 9/9 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 124 entries (KPA=124, emitter=0, rag=0)
+[chain] isInstrumentDevice=true (enclosure_volume_m3=0.01688 < 1, class=syringe_pump, not plantish) — will stamp on state construction
+[chain] gate-23 emitter-completeness: PASS — 9 sub_modules checked, 9 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 0 pass / 0 fail; grammar 9 pass / 4 fail; total score 1640
+  ✗ [thermal_path_closes] grammar: 3 heat-source sub-module(s) without thermal_path: actuation_kinematics::actuation_kinematics__stepper_motor, control_compute_communication::control_compute_communication__main_controller_mcu, power_distribution::power_distribution__wire_harness. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [power_topology_closes] grammar: 1 power-consuming module(s) without cross-link to source: mass_fluid_transport_process
+  ✗ [sub_module_word_density] grammar:  BoM-density: 9 sub-module(s) with <3 priced lines: mass_fluid_transport_process::mass_fluid_transport_process__syringe_barrel_cradle (0/6), actuation_kinematics::actuation_kinematics__stepper_motor (0/6), control_compute_communication::control_compute_communication__main_controller_mcu (0/6), power_distribution::power_distribution__wire_harness (0/6), sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (0/5), safety_protection::safety_protection__estop_or_power_kill (0/5) ...+3.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 6 concrete components not present in any sub-module word — bd-309654, pem-ptl2-04-4cn, idex-p-207, idex-1520, iso-3601-1 ...+1 | power_distribution: overview mentions 1 concrete component not present in any sub-module word — tmc2209. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 0: applied 4 patches, skipped 3, allowlist_rejected=3, state_changed=true
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for stepper motor)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for MCU)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for wire harness)
+    +cross_module_grammar_links.[+] (Fix power_topology_closes for mass_fluid_transport_process)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="BD-309654" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="PEM-PTL2-04-4CN" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="IDEX-P-207" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+[chain] Phase 2 iter 1: arith 0 pass / 0 fail; grammar 11 pass / 2 fail; total score 2490
+  ✗ [sub_module_word_density] grammar:  BoM-density: 9 sub-module(s) with <3 priced lines: mass_fluid_transport_process::mass_fluid_transport_process__syringe_barrel_cradle (0/6), actuation_kinematics::actuation_kinematics__stepper_motor (0/6), control_compute_communication::control_compute_communication__main_controller_mcu (0/6), power_distribution::power_distribution__wire_harness (0/6), sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (0/5), safety_protection::safety_protection__estop_or_power_kill (0/5) ...+3.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 6 concrete components not present in any sub-module word — bd-309654, pem-ptl2-04-4cn, idex-p-207, idex-1520, iso-3601-1 ...+1 | power_distribution: overview mentions 1 concrete component not present in any sub-module word — tmc2209. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 1: applied 0 patches, skipped 6, allowlist_rejected=6, state_changed=false
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="BD-309654" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="PEM-PTL2-04-4CN" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="IDEX-P-207" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="IDEX-1520" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[+]: word patch contains MPN="ISO-3601-1" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="TMC2209" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+[chain] Phase 2: no state change after repair iter 1 — bailing (further iterations will not progress).
+[fill-blank-mpn] 28 blank catalogue word(s) for class "syringe_pump" (22 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  actuation_kinematics::actuation_kinematics__stepper_motor (Stepper Motor): TDK-Micronas HVC5223C-A1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  actuation_kinematics::actuation_kinematics__stepper_motor (Stepper Motor): Texas Instruments DRV8462DDWR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  actuation_kinematics::actuation_kinematics__stepper_motor (Stepper Motor): ROHM Semiconductor BD63740FM-E2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   actuation_kinematics::actuation_kinematics__stepper_motor (Stepper Motor) → Freescale Semiconductor MPC17550EVEL
+[fill-blank-mpn]   ⊘ nohit actuation_kinematics::actuation_kinematics__stepper_motor (Shaft Coupling): no DB row passed the rank bar for tokens [shaft, actuation, kinematic, stepper, motor] — staying generic
+[fill-blank-mpn]   ⊘ nohit actuation_kinematics::actuation_kinematics__stepper_motor (Lead Screw): no DB row passed the rank bar for tokens [lead, screw, actuation, kinematic, stepper, motor] — staying generic
+[fill-blank-mpn]   ↻ walk  actuation_kinematics::actuation_kinematics__stepper_motor (Guide Rail Pair): Crouzet 81514101 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit actuation_kinematics::actuation_kinematics__stepper_motor (Linear Carriage): no DB row passed the rank bar for tokens [linear, carriage, actuation, kinematic, stepper, motor] — staying generic
+[fill-blank-mpn]   ⊘ nohit actuation_kinematics::actuation_kinematics__stepper_motor (Syringe Drive Channel): no DB row passed the rank bar for tokens [syringe, drive, channel, actuation, kinematic, stepper] — staying generic
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__main_controller_mcu (Main Controller Mcu): no DB row passed the rank bar for tokens [controller, mcu, control, compute, communication] — staying generic
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech PEX4SFF8639 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech PEX4SFF8639U3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech PEXUSB3S24 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech 4P6G-PCIE-SATA-CARD fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech PEXUSB3S2EI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech PEXSAT34RH fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech PEXUSB3S44V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): StarTech P10Q4C-USB-CARD-LP fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__main_controller_mcu (Host Interface): best DB row StarTech P10Q4C-USB-CARD fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__main_controller_mcu (Flash Storage): no DB row passed the rank bar for tokens [flash, storage, control, compute, communication, controller] — staying generic
+[fill-blank-mpn]   ⊘ nohit control_compute_communication::control_compute_communication__main_controller_mcu (Debug Uart): no DB row passed the rank bar for tokens [debug, uart, control, compute, communication, controller] — staying generic
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): MICROCHIP ATSAMD21G18A-AU fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Microchip Technology ATSAMD21G18A-AU fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Siemens 6ES7241-1CH32-0XB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Infineon Technologies TLE95633QXWXUMA1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Infineon Technologies TLE9564QXWXUMA1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech PEXUSB3S24 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech PEXUSB3S2EI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech PEXUSB3S44V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech P10Q4C-USB-CARD-LP fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech P10Q4C-USB-CARD fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech PEXUSB312A2C2V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech PEXUSB312C3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): StarTech PEXUSB321C fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__main_controller_mcu (USB data / firmware interface): best DB row FTDI TTL-232RG-VSW3V3-PCB fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ nohit power_distribution::power_distribution__wire_harness (Wire Harness): no DB row passed the rank bar for tokens [wire, harness, power, distribution] — staying generic
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Phoenix Contact 0920229 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Phoenix Contact 3046511 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): WAGO 2002-1301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): WAGO 2002-1201 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Littelfuse L60030M3SQDIN fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__wire_harness (Polyfuse Resettable) → Littelfuse 1206L300SLTHYR
+[fill-blank-mpn]   ⊘ nohit power_distribution::power_distribution__wire_harness (Bulk Capacitor): no DB row passed the rank bar for tokens [bulk, capacitor, power, distribution, wire, harness] — staying generic
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Status LED): MEAN WELL XLG-240-L-DA2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Status LED): Texas Instruments TLC5916IDR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit power_distribution::power_distribution__wire_harness (Stepper Driver Board): no DB row passed the rank bar for tokens [stepper, driver, board, power, distribution, wire] — staying generic
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Current Sense On Driver) → Texas Instruments TLC5916IDR
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12A-04BFFB-SL7001 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12A-04BMMA-SL8001 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12A-04BMMB-SR7001 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12A-04BFFC-SL7001 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12T-04BMMB-SL7002 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12T-04BFFB-SL7002 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): Amphenol LTW M12A-04BFFA-SL8001 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__endstop_or_stall_sense (Sensor Cable): best DB row Legrand SRFL100G fails type-coherence — staying generic
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Overcurrent Polyfuse): Littelfuse 1206L300SLTHYR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Overcurrent Polyfuse): Littelfuse 30R400UMR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Bourns MF-PSML110/12-2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Littelfuse 0805L110WR-A fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Littelfuse LVSP0005TX2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Bussmann / Eaton FWP-100A22F fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Bourns MF-RX020/72-0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Littelfuse 087406.3MXEP fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Bourns MF-R030-2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): Bel Fuse 3AG 750-R fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__estop_or_power_kill (Mains Fuse): best DB row Bussmann / Eaton AMI-40 fails type-coherence — staying generic
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG30R050V-12E02-GY-BK-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRE15R240-36G03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG1512-E-11E03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG1507-S-11E03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG1518-E-12E03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG10R050-36E03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG1515-E-11E03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): Cincon TRG1512-E-12E03-Level-VI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss structure_containment::structure_containment__channel_frame_printed (Cable Tie Mount): best DB row Cincon TRG10R090-12E03-Level-VI fails type-coherence — staying generic
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Axiomtek GOT5152T-834-DC fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Siemens 6AV21232DB030AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Axiomtek GOT5120T-845 XGA-24VDC fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Schneider Electric HMIGTO4310 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Schneider Electric HMIGTO6310 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Advantech FPM-715W-P9AE fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): Advantech FPM-7211W-P3AE fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): EDATEC ED-HMI3010-101C-0832 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss hmi_ergonomics::hmi_ergonomics__touch_display (Touch Display): best DB row EDATEC ED-HMI3010-101C-0032 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__touch_display (Status Indicator): no DB row passed the rank bar for tokens [status, indicator, hmi, ergonomic, touch, display] — staying generic
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Siemens 6AV2123-2GB03-0AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Rittal 1180.000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Eaton 9SX5KI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Bürkert Type 2301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__touch_display (Mounting Bezel): no DB row passed the rank bar for tokens [mounting, bezel, hmi, ergonomic, touch, display] — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__touch_display (User Facing Legend): no DB row passed the rank bar for tokens [user, facing, legend, hmi, ergonomic, touch] — staying generic
+[fill-blank-mpn] filled 3/28 blank word(s): 3 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 22 structural skipped.
+[chain] fill-blank-mpn: branded 3/28 blank catalogue word(s) (3 DB-first real MPN, 0 generated real-OEM), 22 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 262 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 22348 lines scanned, 0 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 3 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=9 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"syringe_pump","resolved_to":"syringe_pump","hit":"db","nodes":9,"edges":18}
+[chain] K10 shadow: PASS_SHADOW — matched=20 missing=0 extra=0
+[chain] headline derived: Channel Count=4 channels [derived_from_brief]; ;  (0.00s)
+[chain] part verification: 3 parts checked — verified=3, unverified=0, uncertain=0, skip=0
+[chain] G5 RAG: 0 queries → 0 suggestions (high=0, medium=0, low=0, below_threshold=0, corpus=0 rows)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[chain] Stage 10.5 Part Reality Check: 4 checked, 4 real, 0 substituted, 0 warned (no substitute available). Nexar calls used: 0.
+[chain] scrubbed 1 industrial-scale MPN(s) from partVerifications (post Stage 10.5)
+[chain] Stage 10.6 Part Verification: 0 structured MPN(s) scanned, 0 already DB-verified, 0 live-probed, 0 confirmed (kept), 0 demoted to honest descriptor.
+[chain] module-paragraph-llm: 9/9 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/9 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 2 sections, 0 warnings
+[chain] design decisions review: 5 choices (1 applied, 4 flagged, 0 blocked)
+[chain] population-count re-assert: 1 word(s) corrected from an LLM population smear (e.g. valve ×200 stamped on every synonym → deterministic per-word count)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 0 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 0 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[fill-blank-mpn] 25 blank catalogue word(s) for class "syringe_pump" (22 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  actuation_kinematics::actuation_kinematics__stepper_motor (Guide Rail Pair): Crouzet 81514101 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): MICROCHIP ATSAMD21G18A-AU fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Microchip Technology ATSAMD21G18A-AU fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Siemens 6ES7241-1CH32-0XB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Infineon Technologies TLE95633QXWXUMA1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Infineon Technologies TLE9564QXWXUMA1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Phoenix Contact 0920229 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Phoenix Contact 3046511 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): WAGO 2002-1301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): WAGO 2002-1201 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Littelfuse L60030M3SQDIN fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Status LED): MEAN WELL XLG-240-L-DA2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Status LED): Texas Instruments TLC5916IDR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Overcurrent Polyfuse): Littelfuse 1206L300SLTHYR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Overcurrent Polyfuse): Littelfuse 30R400UMR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Siemens 6AV2123-2GB03-0AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Rittal 1180.000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Eaton 9SX5KI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Bürkert Type 2301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 0/25 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 22 structural skipped.
+[chain] filter-on-dirty-stream invariant: not_applicable
+[chain] provenance rooting: 35/37 inputs trace to the brief (95%) — 2 ROOTLESS: watts_per_channel_w, enclosure_volume_m3
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.12%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.12%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.12%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.12%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 0.087 → 0.087 kW (Δ 0 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 2000) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/blender-bg.log
+[estimate] device-scale INSTRUMENT: estimated parts capped to COTS commodity ceilings (deviceScaleCeilingGbp)
+[estimate] product_class=syringe_pump annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'syringe_pump' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 48 parts need price estimates
+[estimate] corpus-classified 11/48; 37 need rule-based / Flash-Lite
+[estimate] rule-based classified 10 parts; 27 still need Flash-Lite
+[estimate] Flash-Lite classified 2 batches
+[estimate] Flash-Lite (volume-aware) for 1 'unknown' parts
+[estimate] updated 1 existing, synthesised 47 new, 0 failed
+[estimate] C3 DB cache: 1 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=11 rule_based=10 flash_lite=26 fallback=0 curated=0 db_cache=1
+[estimate] estimate source: db_cache=1 curve=46 flash_lite_unknown=1
+[estimate] top classes in BoM:
+  structural_polymer: 7
+  structural_metal: 5
+  mechanical_assembly: 5
+  electronic_ic: 4
+  safety_consumable: 4
+  mechanical_fastener: 3
+  fluid_path: 3
+  electronic_connector: 3
+[estimate] estimated cost: GBP 0.001
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 50 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 50/50 results in 2.8s
+[engine-c] flags: in_range=5  over=1  under=20  no_reference=24
+[engine-c] 21/50 priced lines flagged out-of-range vs reference corpus (42.0%)
+[engine-c] 7 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "syringe_pump" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: syringe_pump
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/state.json
+[supplier-validate] no suppliers to validate
+[chain] Gemini i2i OFF for isInstrumentDevice — Excel embeds Blender CAD/Cycles views only
+[chain] deployment_envelope: no envelope mapped for syringe_pump (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £1334 (raw materials £808, class syringe_pump)
+[chain] G2 cost-reality: PASS — BoM £808 across 50 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 2 gaps
+  ⚠ sub_modules: 9 sub-modules across 9 modules — expected ≥18
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 1 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 3/10 · mean 7.2/10 · 1 blocking · below-8: brief_compliance=3, performance_card=7
+  ✗ [brief_compliance] Banner asserts 'All 9 PASS' over multiple missing/null targets (cost, mass, design life)
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 3/10).
+[chain] sweet-spot reconciliation: UNCONSTRAINED (objective=balanced, rescale=1.00×) — No cost ceiling stated, so no cost/output tension. Building the briefed 1.00 unit at £1k (£1k/unit).
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £1,334 / 1 unit = £1,334/unit — within the £100–£5,000,000/unit industry band for unit output. (no scalable output metric — whole-system price treated as £/unit)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 50 disclosed; 0 take-off prices written into the BoM; purchased £536 → installed £1,608 (central)
+[advisor-engagement] 9/9 modules got an advisor block — 18 specialist cards, 36 grounded questions
+[chain] advisor-engagement: 9 module blocks, 18 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "syringe_pump" (14 tools, 41 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): UNIVERSAL-FALLBACK (generic stock images — NOT this design) — class="syringe_pump" template=NONE hero=false modules=0 thin=0
+  ✗ BLENDER_UNIVERSAL_FALLBACK: No per-class Blender template for product_class="syringe_pump" (and no LLM-generated blender-scene.py) — the dossier's cover + module images are the GENERIC UNI
+  ✗ BLENDER_NO_HERO: No hero/cover image (00-hero.png / blender-cover.png) in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602.
+[chain] tools-flow: rendered 187272 bytes (14 tools)
+[investor-section] 5 investors matched from 18 candidates: Kindred Capital, Blue Bear Ventures, Celesta Capital, Constructor Capital, Ascendant Venture
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 2/2 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Interconnect — device wiring & signal paths  (drawings/interconnect.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 2/2 drawings + hero → wired into the PDF
+[drawing-gates] 13 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         general-arrangement 2160x1892 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         interconnect 2560x1816 aspect 1.4:1 (limit 4:1)
+  ✓ [high] no_stray_beam      longest drawn run u_wire_002_u_main_controller_mcu_water (channel-independent step/dir; stall / force-limit path) spans 0.8 m (limit 16 m — a plant-crossing beam)
+  ✓ [high] connection_sanity  connection graph physically coherent (domain + direction + magnitude)
+  ✓ [high] tag_legibility     every tag distinct (≤20% bbox overlap) + inside its view border
+  ✓ [high] plan_lateral_spread plan has 36 distinct (x,y) cell(s) (≥3)
+  ✓ [high] drawing_domain     no plant-architecture markers on the device drawings
+  ✓ [high] render_view_quality 5 Excel-bound view(s) present, non-blank and correctly framed
+  ✓ [high] plan_render_coherence 00-hero.png + GA fresh vs parts-manifest (fp=bcb296895fb12993, product cutaway) — same placement generation
+  ✓ [high] drawing_set_coherence 2 system drawing(s) share placement_fp=bcb296895fb12993; no phantom tags; png≥svg; coverage ≥80% on applicable sheets
+  ✓ [high] ga_glance_coherence GA clears deterministic 5-second glance checks
+  ✓ [high] drawing_vision_glance vision glance clean on 2 image(s)
+  ✓ [high] cad_geometry_coverage instrument geometry present — 46 manifest part(s), 0 instrument-proxy source(s), 2 CAD family(ies)
+[chain] drawing-gates: 0/13 failing — DRAWING >=8 PASS
+[census] 14 tie-in runs (14 units) = £734 (cable £734 + pipe £0)
+[census] routed major streams = £859  →  full interconnect ≈ £1,594
+  [corpus-median-lift] raised 3 under-priced principal line(s) to their engine corpus lower edge (+£356)
+[chain] cost-sanity re-derived on authoritative BoM (Σ £1,891): verdict pass — £3,124/unit
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[benchmark] generation failed: fetch failed
+[chain] benchmark net: LLM returned no expectation — skipping (shadow never blocks)
+[chain] requirements-driven BoM: 50 requirement lines (Σ £1,891) → state.requirementsBom; cost cascade reconciled to this total
+[chain] PCB STAGE (shadow): bearing=true disposition=bespoke categories=[analog_frontend,connectivity,display,power_electronics,processor] canAuthor=true canRoute=true canVerifyAndExport=true
+[chain] PCB atopile project: 8 component(s), 12 off-board COTS, 2 unresolved, 2 net(s) -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/pcb-project
+[chain] PCB pipeline: ok=false stage_reached=complete_with_defects routed=true drc_violations=2
+[chain] PCB GATE (shadow): applicable=true fires=true reason=bespoke_required_pipeline_not_clean — stage_reached=complete_with_defects; routed=true; drc_ran=true drc_violations=2; placement iteration 1 invalid (grew to 35 mm under cap): pad overlap: F1(9.9,18.8) vs F2(11.1,18.8) dist=1.20; DRC ran cleanly but reported 2 violation(s) — board is NOT manufacturable as-is
+dossier_repair: 1 fix(es) over 1 pass(es); 2 gap(s) need input (0 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/state.json
+[chain] self-repair: 1 fix(es) over 1 pass(es); 2 gap(s) need input (0 blocking HIGH)
+[reconcile-hollow] 0 hollow sub-module(s); nothing to reconcile
+[deterministic-finalize] class-alien-renamed=0 scope-words-demoted=0 density-merged=0 modifiers=0 prose=0 overview=0 · residual violations {'modifier_consistency': 0, 'prose_covers': 0, 'overview_subset': 0, 'word_density_thin': 0}
+[deterministic-finalize] trace-reconcile: connection-ledger.json pruned=0 connection-schedule.json pruned=0
+[fill-blank-mpn] 25 blank catalogue word(s) for class "syringe_pump" (22 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  actuation_kinematics::actuation_kinematics__stepper_motor (Guide Rail Pair): Crouzet 81514101 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): MICROCHIP ATSAMD21G18A-AU fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Microchip Technology ATSAMD21G18A-AU fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Siemens 6ES7241-1CH32-0XB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Infineon Technologies TLE95633QXWXUMA1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__main_controller_mcu (Firmware Watchdog): Infineon Technologies TLE9564QXWXUMA1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Phoenix Contact 0920229 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Phoenix Contact 3046511 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): WAGO 2002-1301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): WAGO 2002-1201 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Terminal Block): Littelfuse L60030M3SQDIN fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Status LED): MEAN WELL XLG-240-L-DA2 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  power_distribution::power_distribution__wire_harness (Status LED): Texas Instruments TLC5916IDR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Overcurrent Polyfuse): Littelfuse 1206L300SLTHYR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  safety_protection::safety_protection__estop_or_power_kill (Overcurrent Polyfuse): Littelfuse 30R400UMR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Siemens 6AV2123-2GB03-0AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Rittal 1180.000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Eaton 9SX5KI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__touch_display (Run Start Control): Bürkert Type 2301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 0/25 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 22 structural skipped.
+  [corpus-median-lift] raised 3 under-priced principal line(s) to their engine corpus lower edge (+£356)
+[chain] ghost-snapshot re-derive: requirementsBom 50 → 50 row(s) on the FINAL settled tree (pruned 0 stale partVerifications entries)
+dossier_repair: 1 fix(es) over 1 pass(es); 2 gap(s) need input (0 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/state.json
+[chain] freshen-scorer-inputs: re-rendered schematics + interconnect + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 0 HIGH · 0 corroborated (score) · 4 advisory (never score) — file + state.physicsCritique are the SAME canonical object
+[chain] state freeze: workbook built from state sha256 6d3fa2f6aa40…
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/dossier.xlsx
+  · column contract [Line & velocity]: 31/31 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 50/50 rows PASS → 10.0/10
+  · column contract [Risk & Regulatory]: 1/1 rows PASS → 9.9/10
+  · column contract [Engineering Analysis]: 2/2 rows PASS → 10.0/10
+  · verification spine: HARD 14 · open 1 · score 4.0/10 · SHIPS blocked
+  · per-tab scorecard: min Executive Summary=4.0/10 · 2 FAIL, 0 UNSCORED
+  · SHIP GATE: per-tab ≥8 floor NOT met — 2 tab(s) <8, 0 UNSCORED → ship_ok=False (every tab must be a genuine ≥8)
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Calculations (includes contract-quantity consumers)
+  · Calculations: linked 23 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs — M0 primitives section
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+  ! Engineering Analysis raised, skipping: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Verification
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 5 views on one tab)
+  · Electrical — skipped (no single-line drawing or panel schedule)
+  · PCB
+      + Assembly
+      + Interconnect
+  · Drawings (register)
+  · Glossary
+  · Audit data
+  · content scoring pass 1: 21 sheet(s) cell-checked — Bill of Materials (Ledger):473/478
+  · Quality & Audit
+  · Contents (sheet #1)
+  · Excel-corruption guard: defanged 1 prose-as-formula + normalised 9 sci-notation + fixed 0 CEILING/FLOOR arity formula(s)
+  · SHIP GATE (full workbook): min Executive Summary=0.0/10 · 5 <8 · 0 UNSCORED → ship_ok=False
+  · ONE VERDICT (live formulas over the Q&A floor/open cells): VERDICT: DRAFT — 3 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere) (3 surfaces)
+  · score chips: 28/28 tabs live off the Q&A score cells
+  · live-check gate: 28 sheets · 2550 formula cells (1272 verdict formulas) · 946/946 table rows carry a live check (0 merged-flag rows) · 0 bare literals · 0 orphan required columns
+  · numeric orphan-literal gate: ENFORCED ['fin-cashflow', 'fin-chart', 'fin-curve', 'fin-item', 'fin-lines', 'fin-opex', 'fin-oppoint', 'fin-range', 'fin-recommend', 'fin-scenarios', 'fin-tornado'] — 0 orphans/229 checked · WARN-swept 14 other declared-numeric families (assembly: 5/5 orphan (e.g. Assembly sequence!G9 (family assembly)); drawing-coverage: 14/14 orphan (e.g. Bill of Materials (Ledger)!B59 (family drawing-coverage)); holds: 1/1 orphan (e.g. Holds & exclusions!D6 (family holds)); overview-cost: 6/6 orphan (e.g. Overview!B26 (family overview-cost)); part-names: 50/50 orphan (e.g. Part names!C5 (family part-names)); pcb-drill-tools: 2/2 orphan (e.g. PCB!B115 (family pcb-drill-tools)); pcb-offboard-cots: 12/12 orphan (e.g. PCB!D249 (family pcb-offboard-cots)); pcb-pnp: 24/24 orphan (e.g. PCB!C120 (family pcb-pnp)); pcba-bom: 8/8 orphan (e.g. PCB!H238 (family pcba-bom))) · 40 families not yet declared numeric (next round)
+  · recalc-and-cache: 2555/2555 formula cells now carry a cached value (was 0/2550); formulas remain live (LibreOffice round-trip)
+  · ooxml-strict-check: 0 HIGH (0 total findings) — Excel-strict clean
+  · ONE TRUTH read-back: 36 live score cells match the python scorecard; floor 0 · open 3 — tab-scorecard.json now carries the WORKBOOK's numbers
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/dossier.xlsx
+  size        : 23.18 MB
+  tabs (28)  : ['Executive Summary', 'Contents', 'Inputs & Assumptions', 'Equipment & Dimensions Register', 'Overview', 'Renders', 'Cost waterfall', 'Financial model', 'Bill of Materials (Ledger)', 'Brief', 'Verification', 'Design basis', 'Engineering Analysis', 'Drawings', 'Assembly', 'Interconnect', 'PCB', 'Assembly sequence', 'Audit data', 'Risk & Regulatory', 'Holds & exclusions', 'Questions for the customer', 'Quality & Audit', '⚠ Checks', 'Connection trace', 'Calculations', 'Part names', 'Glossary']
+  tab registry: 28 sheets = 27 content tabs + Contents; verdict floor spans 26 non-mirror tabs (mirrors: Executive Summary, Quality & Audit)
+  live calcs  : 45
+  static calcs: 1
+  image tabs  : 3
+  recalc cache: cached values shipped (previews render)
+  VERDICT     : VERDICT: DRAFT — 3 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere)
+  skipped     : ["Engineering Analysis (error: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>)", 'Process schedules (fluid-less instrument — not created)', 'Line & velocity (fluid-less instrument — not created)', 'Electrical (no source data)']
+  CHECKS FAIL : 0
+  SHIP GATE   : FAIL  ·  0 HIGH · 0 MED · 0 LOW · ship_ok=False
+  PER-TAB ≥8 GATE: FAIL — min Executive Summary=0/10; <8: ['Executive Summary', 'Quality & Audit', 'Interconnect', 'Verification', 'PCB']; UNSCORED: []
+  → dossier is a DRAFT (not validated): every tab must reach a genuine ≥8.
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/poseidon-20260716-0602_dossier_2026-07-16_0624.xlsx
+[export_step] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/cad/poseidon-20260716-0602-model.step  (982,821 bytes)  parts=46/46  pipes=15 (skipped 0 route lines with no usable data)
+[verify] equipment leaves: 46  (manifest: 46)  pipe leaves: 15
+[verify] ALL 46 part bboxes within 0.1 mm of manifest pos/dims; assembly names preserved
+[export_gltf] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/cad/poseidon-20260716-0602-model.glb  (11,676 bytes)  parts=46/46  tris=552
+[chain] CAD download → /Users/tristanfischer/Downloads/poseidon-20260716-0602_model_2026-07-16_0624.step
+[chain] CAD download → /Users/tristanfischer/Downloads/poseidon-20260716-0602_model_2026-07-16_0624.glb
+[chain] CAD export: step=ok glb=ok → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/cad/
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-PARTS.md
+[parts-validator] PASS: 0 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-DRIFT.md
+[drift-detector] PASS: 2 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/0 matched-to-rule, 0 findings (0 MED, 0 LOW); voltage-sizing 0/0 matched, 0 findings
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-MISPIN.md
+[mispin-detector] PASS: 50 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 9 constraints, 0 non-blocking findings (0 MED, 0 LOW)
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf': No such file or directory.
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf': No such file or directory.
+[consistency-audit] pdftotext failed: Command failed: pdftotext /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf -
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf': No such file or directory.
+
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 0 clusters, 0 findings (0 MED, 0 HIGH), 0 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UNKNOWN, 74 surfaces scanned, 0 unique citations, 0 findings (0 MED, 0 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] PASS: 44 lines audited (DB-only, zero quota consumed), 40 non-blocking findings (0 MED, 40 LOW).
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] PASS: 1 lines audited (DB-only, zero quota consumed), 0 PASS, 0 MEDIUM, 0 LOW (non-blocking).
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf does not exist.
+[chain] failed to open PDF locally (non-fatal): Command failed: open /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf does not exist.
+
+[chain] background enrichment spawned (PID 7690) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/background-enrichment.log
+[chain] supplier post-chain enrich spawned (PID 7698) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/supplier-post-chain-enrich.log
+[chain] wallclock-split: wall=21.99m baseline_comparable=19.97m new_stage=0.05m unlogged=1.97m → wallclock-split.json
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=2
+[enrich] componentEngineering: 46 parts · 15 connections · 14 orphans · 37 ungoverned · 1 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/dashboard.html
+
+[chain] ── QUALITY LOOP Phase 3 (full) — iteration 1/8 ──
+[parts-ledger] instrument ghost prune: dropped 2 absorbed-host / unresolved ties → 29 principal connection(s) (Connection trace honesty)
+[ledger] device-instrument: attached 2 authoritative-topology tie(s) the 3-D-declutter dropped from the connection schedule
+
+  LEDGER (BoM + connectivity + coverage + tools) — poseidon-20260716-0602   £1,891 raw materials   50 parts + 29 connections   2 tools invoked
+  tag    type      name                     £ line in/out status               tool  BLE   GA P&ID  SLD  PNL  BFD  SCH
+  --------------------------------------------------------------------------------------------------------------------
+  X-103  other     Syringe Barrel Cradle      300    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-104  other     Plunger Clamp                1    2/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-106  other     Tip Luer Fitting             9    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-111  other     Tubing Set                   9    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-112  other     Barrel Seal O Ring           1    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-113  other     Plunger Tip Seal             1    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-114  other     Stepper Motor                4    1/0 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-115  other     Shaft Coupling              15    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-116  other     Lead Screw                   1    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-117  other     Guide Rail Pair             15    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-118  other     Linear Carriage             15    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  EP-101 other     Syringe Drive Channel      120    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-101  instrumentMain Controller Mcu        150    2/3 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-106  other     Host Interface              25   15/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-107  vessel    Flash Storage                5    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-108  other     Debug Uart                   1    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-132  instrumentFirmware Watchdog            5    0/0 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  X-133  electricalUSB data / firmware i        1    0/0 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  X-129  other     Wire Harness                30    1/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-130  other     Terminal Block               1    1/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-127  electricalPolyfuse Resettable          1    1/0 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-131  other     Bulk Capacitor               1    1/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-128  instrumentStatus LED                   5    1/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  EP-102 instrumentStepper Driver Board        12   2/13 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-109  other     Endstop Or Stall Sens       25    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-105  other     Current Sense On Driv        1    0/1 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-110  other     Home Reference              25    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-103  instrumentSensor Cable                 1    0/1 NOT FOUN  cable-sizing +1    ✓    ✓    ·    ·    ·    ·    ·
+  I-111  other     Force Limit Feedback        25    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-112  other     Estop Or Power Kill         40    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-113  other     Protective Earth             3    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  I-102  electricalOvercurrent Polyfuse         3    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-134  instrumentForce Limit Firmware        12    0/0 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  I-104  electricalMains Fuse                   3    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-119  other     Channel Frame Printed      676    0/0 BESPOKE                 —    ✓    ✓    ·    ·    ·    ·    ·
+  X-120  other     Base Plate                  55    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-110  other     Console Enclosure           18    0/0 BESPOKE                 —    ✓    ✓    ·    ·    ·    ·    ·
+  X-101  other     Control Console             12    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-121  other     Foot Pad                     1    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-109  other     Cable Tie Mount              1    0/0 NOT FOUN  cable-sizing +1    ✓    ✓    ·    ·    ·    ·    ·
+  X-108  instrumentTouch Display                6    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-105  electricalStatus Indicator             5    0/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-102  other     Run Start Control            3    1/1 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-107  other     Mounting Bezel               1    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-122  other     User Facing Legend           1    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-123  other     Channel Service Clear      120    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-124  other     Syringe Swap Fixture        15    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-125  other     Calibration Reference       86    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-126  other     Tool Free Carriage Ac       15    0/0 NOT FOUN                —    ✓    ✓    ·    ·    ·    ·    ·
+  X-135  other     Spare Plunger Seal Ki       10    0/0 NOT FOUN                —    ·    ·    ·    ·    ·    ·    ·
+  --------------------------------------------------------------------------------------------------------------------
+  PART coverage by drawing (present / expected):   BLE 46/46   GA 46/46
+  CONNECTION coverage (pipes/wires/sensors vs the views):   pid 0/0   process_schedules 0/29 (0.0%)   isometric 0/0   route 14/29 (48.3%)
+  TOOLS invoked (2):
+    electrical:cable-sizing                  →   2 parts    8 calcs    4 claims
+      └ I-103 Sensor Cable       De-rated tabulated-current target
+    electrical:transformer-sizing            →   2 parts   10 calcs    6 claims
+      └ I-103 Sensor Cable       Apparent power demand (informational)
+  → 0 NOT FOUND (true gap) · 42 fabricated (no catalogue identity by nature) · 0 architecturally-excluded (membrane/media) · 0 OEM-proprietary (recorded finding) · 3 commodity-fitting (accessory/fastener, no catalogue identity by nature) · 0 boundary-stub (connection endpoint, not a part) · 0 scope-documented (system/network/design label) · 0 parts w/ coverage gap · 0 orphan · 0 connections off the P&ID.  0 ambiguous tag(s) (name-corroborated).  48/50 parts have NO tool provenance.  wrote parts-ledger.json
+  → CONNECTIVITY: 1 concern(s) — process 1/1 connected (100.0%) · instruments 7/7 associated (100.0%) · 3 origin(s) · 0 sink(s)
+
+[chain] ledger updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/parts-ledger.json
+[chain] quality scorecard (iteration 1/8): floor=7/10 mean=9.3/10 allPass=false (honest, all sections)  |  gating floor=10/10 mean=10.0/10 allPass=true (deterministic-only, drives the loop)
+  headline: 9/10 ✓
+  brief_compliance: 10/10 ✓
+  bill_of_materials: 8/10 ✗ BELOW 9
+  performance_card: 7/10 ✗ BELOW 9
+  design_narrative: 8/10 ✗ BELOW 9
+  physics_fidelity: 10/10 ✓
+  drawing_gates: 10/10 ✓
+  cost_sanity: 10/10 ✓
+  physics_gates: 10/10 ✓
+  tool_archetype: 10/10 ✓
+  connectivity: 10/10 ✓
+  unresolved_critic_highs: 10/10 ✓
+[chain] dashboard updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/dashboard.html
+[chain] ledger HTML updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/parts-ledger.html
+
+[chain] ✦ quality loop COMPLETE — all DETERMINISTIC sections ≥9/10 (iteration 1/8; skip re-exec) (NOTE: honest floor=7/10 — an ADVISORY section is still below 9; not auto-fixable, needs a source-side improvement)
+[chain] state-freeze: state.json CHANGED after the workbook build (6d3fa2f6aa40… → 08fddad79e2a…) — rebuilding Excel once so the deliverable narrates the shipped state
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/dossier.xlsx
+  · column contract [Line & velocity]: 31/31 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 50/50 rows PASS → 10.0/10
+  · column contract [Risk & Regulatory]: 1/1 rows PASS → 9.9/10
+  · column contract [Engineering Analysis]: 2/2 rows PASS → 10.0/10
+  · verification spine: HARD 14 · open 1 · score 4.0/10 · SHIPS blocked
+  · per-tab scorecard: min Executive Summary=4.0/10 · 2 FAIL, 0 UNSCORED
+  · SHIP GATE: per-tab ≥8 floor NOT met — 2 tab(s) <8, 0 UNSCORED → ship_ok=False (every tab must be a genuine ≥8)
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Calculations (includes contract-quantity consumers)
+  · Calculations: linked 23 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs — M0 primitives section
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+  ! Engineering Analysis raised, skipping: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Verification
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 5 views on one tab)
+  · Electrical — skipped (no single-line drawing or panel schedule)
+  · PCB
+      + Assembly
+      + Interconnect
+  · Drawings (register)
+  · Glossary
+  · Audit data
+  · content scoring pass 1: 21 sheet(s) cell-checked — Bill of Materials (Ledger):473/478
+  · Quality & Audit
+  · Contents (sheet #1)
+  · Excel-corruption guard: defanged 1 prose-as-formula + normalised 9 sci-notation + fixed 0 CEILING/FLOOR arity formula(s)
+  · SHIP GATE (full workbook): min Executive Summary=0.0/10 · 5 <8 · 0 UNSCORED → ship_ok=False
+  · ONE VERDICT (live formulas over the Q&A floor/open cells): VERDICT: DRAFT — 3 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere) (3 surfaces)
+  · score chips: 28/28 tabs live off the Q&A score cells
+  · live-check gate: 28 sheets · 2586 formula cells (1308 verdict formulas) · 964/964 table rows carry a live check (0 merged-flag rows) · 0 bare literals · 0 orphan required columns
+  · numeric orphan-literal gate: ENFORCED ['fin-cashflow', 'fin-chart', 'fin-curve', 'fin-item', 'fin-lines', 'fin-opex', 'fin-oppoint', 'fin-range', 'fin-recommend', 'fin-scenarios', 'fin-tornado'] — 0 orphans/229 checked · WARN-swept 15 other declared-numeric families (assembly: 5/5 orphan (e.g. Assembly sequence!G9 (family assembly)); drawing-coverage: 14/14 orphan (e.g. Bill of Materials (Ledger)!B59 (family drawing-coverage)); holds: 1/1 orphan (e.g. Holds & exclusions!D6 (family holds)); overview-cost: 6/6 orphan (e.g. Overview!B44 (family overview-cost)); overview-sections: 12/12 orphan (e.g. Overview!B21 (family overview-sections)); part-names: 50/50 orphan (e.g. Part names!C5 (family part-names)); pcb-drill-tools: 2/2 orphan (e.g. PCB!B115 (family pcb-drill-tools)); pcb-offboard-cots: 12/12 orphan (e.g. PCB!D249 (family pcb-offboard-cots)); pcb-pnp: 24/24 orphan (e.g. PCB!C120 (family pcb-pnp)); pcba-bom: 8/8 orphan (e.g. PCB!H238 (family pcba-bom))) · 40 families not yet declared numeric (next round)
+  · recalc-and-cache: 2591/2591 formula cells now carry a cached value (was 0/2586); formulas remain live (LibreOffice round-trip)
+  · ooxml-strict-check: 0 HIGH (0 total findings) — Excel-strict clean
+  · ONE TRUTH read-back: 36 live score cells match the python scorecard; floor 0 · open 3 — tab-scorecard.json now carries the WORKBOOK's numbers
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/poseidon-20260716-0602/dossier.xlsx
+  size        : 23.18 MB
+  tabs (28)  : ['Executive Summary', 'Contents', 'Inputs & Assumptions', 'Equipment & Dimensions Register', 'Overview', 'Renders', 'Cost waterfall', 'Financial model', 'Bill of Materials (Ledger)', 'Brief', 'Verification', 'Design basis', 'Engineering Analysis', 'Drawings', 'Assembly', 'Interconnect', 'PCB', 'Assembly sequence', 'Audit data', 'Risk & Regulatory', 'Holds & exclusions', 'Questions for the customer', 'Quality & Audit', '⚠ Checks', 'Connection trace', 'Calculations', 'Part names', 'Glossary']
+  tab registry: 28 sheets = 27 content tabs + Contents; verdict floor spans 26 non-mirror tabs (mirrors: Executive Summary, Quality & Audit)
+  live calcs  : 45
+  static calcs: 1
+  image tabs  : 3
+  recalc cache: cached values shipped (previews render)
+  VERDICT     : VERDICT: DRAFT — 3 open issues · floor 0/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere)
+  skipped     : ["Engineering Analysis (error: expected <class 'openpyxl.worksheet.cell_range.MultiCellRange'>)", 'Process schedules (fluid-less instrument — not created)', 'Line & velocity (fluid-less instrument — not created)', 'Electrical (no source data)']
+  CHECKS FAIL : 0
+  SHIP GATE   : FAIL  ·  0 HIGH · 0 MED · 0 LOW · ship_ok=False
+  PER-TAB ≥8 GATE: FAIL — min Executive Summary=0/10; <8: ['Executive Summary', 'Quality & Audit', 'Interconnect', 'Verification', 'PCB']; UNSCORED: []
+  → dossier is a DRAFT (not validated): every tab must reach a genuine ≥8.

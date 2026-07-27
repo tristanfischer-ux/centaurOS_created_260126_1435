@@ -1,0 +1,73 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.md (8917 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief decisions loaded: 1 record(s) from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.commercial-decisions.json
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: energy_storage (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: energy_storage): 1 HARD field(s) filled with class-aware inferred values, 6 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Containerised assembly: cell module stacking, busbaring, BMS wiring, PCS integration, factory-acceptance test" (Class-canonical process for energy_storage. Class default for utility-scale BESS in 40 ft Hi-Cube ISO container)
+[chain] U6 brief expansion: 13 duties derived; product="Regulated AC electrical power (time-shifted storage and discharge)" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] usable_energy_kwh = 13.5 kWh [stated/high] — Stated requirement for beginning of life, AC-side usable energy.
+  [U6] nameplate_capacity_kwh = 14 kWh [stated/high] — Stated requirement for total pack energy before usable reserve/DoD margin.
+  [U6] depth_of_discharge_pct = 96.4 % [derived/high] — Calculated from usable energy divided by nameplate capacity (13.5 / 14.0).
+  [U6] continuous_ac_power_kw = 11.04 kW [stated/high] — Stated requirement for on-grid continuous AC power.
+  [U6] peak_ac_apparent_power_kva = 42.55 kVA [derived/high] — Derived from stated locked-rotor starting current of 185 A at 230 V single-phase (185 A * 
+  [U6] nominal_dc_bus_voltage_v = 409.6 V [derived/medium] — Derived to support 230V AC generation (requires >325V peak). A 128S LFP architecture (128 
+  [U6] cell_capacity_ah = 34.2 Ah [derived/medium] — Derived from nameplate capacity and nominal DC bus voltage (14,000 Wh / 409.6 V).
+  [U6] max_continuous_charge_power_kw = 5 kW [stated/high] — Stated requirement for master unit continuous charge.
+  [U6] pv_stc_input_kw = 20 kW [stated/high] — Stated requirement for aggregate STC PV input.
+  [U6] mppt_count = 3 count [stated/high] — Stated requirement for on-board solar DC inputs.
+  [U6] thermal_dissipation_duty_kw = 1.25 kW [derived/medium] — Derived from 11.04 kW continuous output and 89% round-trip efficiency (~94.3% one-way). Lo
+  [U6] lifetime_energy_throughput_kwh = 81000 kWh [derived/high] — Derived from 13.5 kWh usable capacity multiplied by the lower bound of the stated 6,000-10
+  [U6] enclosure_volume_m3 = 0.13 m3 [derived/high] — Derived from stated external envelope dimensions (1.105 m * 0.609 m * 0.193 m).
+[chain] engineering_contract: 56 quantities, 3 topology edges, 7 macro-assemblies (total £1,673), closures: 6 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":1849}
+[products-writeback] {"product_name":"Containerised 0.01 MWh nameplate LFP BESS (88 × 50 Ah cells, 1 racks × 1P × 88S = 281.6 V DC bus, 0.0 MW PCS) — single 20-ft ISO container with EXTERNAL pad-mounted MV step-up transformer per IEC 6293","hit":"db_hybrid","matched":"Saft Intensium Max","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":1141}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: PASS — 5/6 mandatory covered for UK+EU+global
+  ⚠ RoHS 2011/65 (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts lead, mercury, cadmium, and other substances in electrical
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU, global) without an explicit harmonisation plan. Each region adds £25-60k in cert
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[distributor-cascade] DB library:bess_oem_2026-05-25 hit for SC1000UD-MV
+[distributor-cascade] DB library:mouser hit for GX21BAB
+[generic-emitter] scale-aware graph selection: nameplate 14.1 kWh < 100 kWh — using 'residential-battery-storage' (wall-mount all-in-one) instead of the containerised utility graph
+[class-reference-graph-db] {"product_class":"residential-battery-storage","resolved_to":"residential-battery-storage","hit":"baked","nodes":10,"edges":14}
+[generic-emitter] physics-derived equipment: 4 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 10 modules, 20 sub-modules, 121 words, 5 tools ran (7968ms)
+[chain] WORD-DOMAIN-COHERENCE: 19 process-plant-vessel/industrial-power word(s) in device-scale "bess": energy_storage_source/energy_storage_source__lfp_prismatic_cells/battery_module_racks_word[industrial_power:module rack], energy_storage_source/energy_storage_source__lfp_prismatic_cells/cell_monitoring_units_word[industrial_power:cell monitoring unit], energy_storage_source/energy_storage_source__lfp_prismatic_cells/dc_busbar_assembly_word[industrial_power:dc busbar], energy_storage_source/energy_storage_source__lfp_prismatic_cells/dc_busbar_system_word[industrial_power:dc busbar], energy_storage_source/energy_storage_source__battery_module_rack/battery_module_rack_word[industrial_power:module rack], energy_storage_source/energy_storage_source__battery_module_rack/cell_monitoring_unit_word[industrial_power:cell monitoring unit], power_distribution/power_distribution__main_dc_contactor/main_dc_contactor_word[industrial_power:contactor], power_distribution/power_distribution__main_dc_contactor/dc_fuses_word[industrial_power:contactor], power_distribution/power_distribution__main_dc_contactor/auxiliary_power_supply_word[industrial_power:contactor], power_distribution/power_distribution__main_dc_contactor/busbar_connectors_word[industrial_power:contactor], power_distribution/power_distribution__main_dc_contactor/auxiliary_power_distribution_unit_word[industrial_power:contactor], power_distribution/power_distribution__main_dc_contactor/auxiliary_power_transformer_word[industrial_power:contactor], power_distribution/power_distribution__ac_switchgear/ac_switchgear_word[industrial_power:contactor], power_distribution/power_distribution__ac_switchgear/main_ac_breaker_word[industrial_power:contactor], power_distribution/power_distribution__ac_switchgear/ac_circuit_breaker_word[industrial_power:contactor], power_distribution/power_distribution__ac_switchgear/fuses_and_circuit_breakers_word[industrial_power:contactor], power_distribution/power_distribution__ac_switchgear/surge_protection_device_word[industrial_power:contactor], power_distribution/power_distribution__ac_switchgear/busbar_assembly_word[industrial_power:contactor], control_compute_communication/control_compute_communication__ems_controller/proc_scada[industrial_power:plc]
+  ✕ [industrial_power:module rack] energy_storage_source/energy_storage_source__lfp_prismatic_cells/battery_module_racks_word "Battery Module Racks"
+  ✕ [industrial_power:cell monitoring unit] energy_storage_source/energy_storage_source__lfp_prismatic_cells/cell_monitoring_units_word "Cell Monitoring Units"
+  ✕ [industrial_power:dc busbar] energy_storage_source/energy_storage_source__lfp_prismatic_cells/dc_busbar_assembly_word "DC Busbar Assembly"
+  ✕ [industrial_power:dc busbar] energy_storage_source/energy_storage_source__lfp_prismatic_cells/dc_busbar_system_word "DC Busbar System"
+  ✕ [industrial_power:module rack] energy_storage_source/energy_storage_source__battery_module_rack/battery_module_rack_word "Battery Module Rack"
+  ✕ [industrial_power:cell monitoring unit] energy_storage_source/energy_storage_source__battery_module_rack/cell_monitoring_unit_word "Cell Monitoring Unit"
+  ✕ [industrial_power:contactor] power_distribution/power_distribution__main_dc_contactor/main_dc_contactor_word "Main DC Contactor"
+  ✕ [industrial_power:contactor] power_distribution/power_distribution__main_dc_contactor/dc_fuses_word "DC Fuses"
+  ✕ [industrial_power:contactor] power_distribution/power_distribution__main_dc_contactor/auxiliary_power_supply_word "Auxiliary Power Supply"
+  ✕ [industrial_power:contactor] power_distribution/power_distribution__main_dc_contactor/busbar_connectors_word "Busbar Connectors"
+  ✕ [industrial_power:contactor] power_distribution/power_distribution__main_dc_contactor/auxiliary_power_distribution_unit_word "Auxiliary Power Distribution Unit"
+  ✕ [industrial_power:contactor] power_distribution/power_distribution__main_dc_contactor/auxiliary_power_transformer_word "Auxiliary Power Transformer"
+[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped 19 wrong-domain word(s) from the design
+[chain] Build #18k: toolOutputsBlock built (9 tools, 13012 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 19 component_classes covered (19 with match, 0 empty), 15584 chars (21859ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=8500, max_mass_kg=130, envelope_volume_m3=0.13, target_capacity_kwh=13.5 (kWh), operating_temp_min_c=-20, operating_temp_max_c=50
+[chain] Contract validation: 2 macro-assembly NOT FOUND in design — reviewers will be asked to add them
+  ✕ outdoor_cabinet_enclosure: Generator did NOT emit any word matching "outdoor_cabinet_enclosure" — Contract pricing £38 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+  ✕ main_bus_contactor: Generator did NOT emit any word matching "main_bus_contactor" — Contract pricing £420 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+[chain] keyMetrics seeded early (pre-reviewer): Usable energy=13.6 kWh
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] physics-critic CACHE HIT (skeleton): design-hash dbfa213674e4… — reusing the stored critique verbatim (no LLM call)
+[chain] PHASE 4 skeleton critic: brief=2/10 plaus=3/10 coh=4/10 part=2/10 hon=8/10 (6870ms)
+[chain] PHASE 4 skeleton critic: 3 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ contractAcceptedTradeOffs/brief_summary] The contract trade-off summary describes a 'Containerised 0.01 MWh nameplate LFP BESS' inside a 'single 20-ft ISO container' with an 'in-container mass of 7288 kg', which completel
+  ✗ [engineering_plausibility @ modules/0/sub_modules/0/words/0/modifier_characters/6] The battery pack uses 88 cells in series (88S). At 3.2V nominal per cell, the nominal DC bus voltage is 88 * 3.2V = 281.6V. However, to natively invert to 230V AC single-phase with
+  ✗ [internal_coherence @ modules/1/sub_modules/0/words/4] The BOM includes an 'MV Step Up Transformer' (Medium Voltage) under the energy conversion module. This is a utility-scale component completely inappropriate for a 230V single-phase
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...

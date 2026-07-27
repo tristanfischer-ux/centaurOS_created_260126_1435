@@ -1,0 +1,432 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_pioreactor.md (3691 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: benchtop_bioreactor (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: benchtop_bioreactor): 0 HARD field(s) filled with class-aware inferred values, 2 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, target_material, batch_size, design_life, operating_environment.
+  [U5] still null after augmentation: max_mass_kg, target_material, batch_size, design_life, operating_environment
+[chain] U6 brief expansion: 11 duties derived; product="Microbial biomass and reproducible continuous-culture experimental data." (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] working_volume_ml = 20 ml [stated/high] — Stated target for the culture vessel working volume.
+  [U6] total_vessel_volume_ml = 30 ml [derived/high] — Assumes a 1.5x multiplier on the 20 ml working volume to provide adequate headspace for su
+  [U6] heating_power_w = 10 W [derived/medium] — Heating 20 ml of water from 20°C to 40°C in 15 mins requires ~1.8 W sensible heat. Steady-
+  [U6] max_agitation_rpm = 1000 RPM [derived/medium] — Standard magnetic stirring requirement to maintain cell suspension and adequate surface ox
+  [U6] max_dilution_rate_ml_h = 30 ml/h [derived/high] — Maximum specific growth rate (mu_max) for fast-growing microbes like E. coli is ~1.0 h^-1.
+  [U6] dosing_pump_flow_rate_ml_min = 1 ml/min [derived/high] — To achieve a 30 ml/h (0.5 ml/min) average dilution rate, the pump must be capable of at le
+  [U6] optical_sensor_wavelength_nm = 600 nm [derived/high] — Standard wavelength for measuring microbial optical density (OD600) to minimize absorption
+  [U6] od_dynamic_range_au = 2 AU [derived/medium] — Typical linear range for simple transmission-based photodiode setups through a standard ~2
+  [U6] system_power_demand_w = 24 W [derived/high] — Sum of 10 W heater, 2 W stirrer motor, 3x 3 W dosing pumps, and 3 W for MCU/sensors. Fits 
+  [U6] spill_containment_volume_ml = 50 ml [derived/medium] — Must safely contain the 20 ml working volume plus a 150% safety margin for tubing leaks or
+  [U6] oxygen_transfer_rate_mmol_l_h = n/a mmol/L/h [derived/low] — Unquantifiable from the brief without knowing the specific organism and target cell densit
+[chain] engineering_contract: 4 quantities, 2 topology edges, 2 macro-assemblies (total £259), closures: 2 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":5}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":1365}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":1284}
+[products-writeback] {"product_name":"Benchtop continuous-culture bioreactor, working volume ~20 ml, OD sensing + agitation + thermal + dosing. Peak ~35 W. Macro BoM ≈ £259 (gold open kit midpoint). Research-use — not IVD.","hit":"db_hybrid","matched":"Benchtop continuous-culture bioreactor, working volume ~20 ml, OD sensing + agitation + thermal + dosing. Peak ~35 W. Macro BoM ≈ £259 (gold open kit midpoint). Research-use — not IVD.","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":171}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.01s)
+[chain] G1b compliance: PASS — 1/7 mandatory covered for UK+EU+US
+  ⚠ LVD 2014/35/EU (missing_mandatory): Low Voltage Directive (EU). Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on t
+  ⚠ EMC 2014/30/EU (missing_mandatory): Electromagnetic Compatibility Directive (EU). Stepper drivers, MCU clocks and USB/serial interfaces must not emit or suc
+  ⚠ RoHS 2011/65/EU (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts Pb/Hg/Cd etc. in electrical equipment; applies to control 
+  ⚠ IEC 61010-1 (missing_mandatory): Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements
+  ⚠ IEC 61326-1 (missing_mandatory): Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements (IEC)
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for benchtop-bioreactor: replaying 4 stored duty spec(s) (chemostat:steady-state, optical-sensor:beer-lambert, bioreactor-thermal:heat-balance, peristaltic-pump:micro-dosing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool chemostat:steady-state (duty_hash=1cddf1b750f6, db id=56) — no LLM call.
+[tool-generator] REUSED stored generated tool optical-sensor:beer-lambert (duty_hash=70da87d41344, db id=57) — no LLM call.
+[tool-generator] REUSED stored generated tool bioreactor-thermal:heat-balance (duty_hash=75c96a5fde6c, db id=58) — no LLM call.
+[tool-generator] REUSED stored generated tool peristaltic-pump:micro-dosing (duty_hash=7be8726112f0, db id=59) — no LLM call.
+[tool-creation] DONE for benchtop-bioreactor: created 4 self-test-passed tool(s) (chemostat:steady-state, optical-sensor:beer-lambert, bioreactor-thermal:heat-balance, peristaltic-pump:micro-dosing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for benchtop-bioreactor: created+registered 4 self-test-passed tool(s) [chemostat:steady-state, optical-sensor:beer-lambert, bioreactor-thermal:heat-balance, peristaltic-pump:micro-dosing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=benchtop_bioreactor:
+    ✓ heat pump / thermal hold → extruder:thermal
+    ✓ recirculation / process pumps → peristaltic-pump:micro-dosing
+    ✓ electrical distribution → cable:ampacity
+    ✓ control & instrumentation → control-systems:pid-tuning
+[bootstrap-tool-plan] REUSING stored candidate slug=benchtop_bioreactor version=1 status=candidate (no LLM call; 22 steps, 22 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for benchtop-bioreactor/generic — bootstrapped a 22-step tool plan (candidate id=39 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: control-systems:pid-tuning, cybersecurity-threat-model:stride, enclosure-emc:margin, extruder:thermal, lifecycle-co2:assessment, monod:growth-kinetics, chemostat:steady-state, motion-kinematics:steps-per-mm, optical-sensor:beer-lambert, cable:ampacity, mass-aggregator:envelope-check, peristaltic-pump:micro-dosing, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, thermal-envelope:ladder, thermo:fluid-properties, agitation:power, bioreactor-thermal:heat-balance, kla-oxygen:transfer, dissolved-oxygen:control, transport-logistics:routing
+[unit-coercion] monod:growth-kinetics.working_volume_l: 20 ml → 0.02 l (×0.001; from contract key "working_volume_ml", via declared-unit)
+[unit-coercion] cable:ampacity.length_m: 13.071895424836605 mm → 0.013071895424836605 m (×0.001; from contract key "optical_path_length_mm", via declared-unit)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_cert_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp)] (no fabricated number written)
+[unit-coercion] dissolved-oxygen:control.working_volume_l: 20 ml → 0.02 l (×0.001; from contract key "working_volume_ml", via declared-unit)
+[class-reference-graph-db] {"product_class":"benchtop-bioreactor","hit":"miss"}
+[generic-emitter] no class-reference graph for class='benchtop-bioreactor' (resolved slug='benchtop-bioreactor') — invoking E6a bootstrap-on-miss (corpus-first + one google/gemini-3.5-flash harvest, G1 candidate store)
+[bootstrap-class-graph] REUSING stored candidate slug=benchtop_bioreactor version=1 status=candidate (no LLM call)
+[generic-emitter] graph BOOTSTRAPPED for slug='benchtop_bioreactor': 8 nodes / 12 edges — bootstrap-candidate@v1 (candidate_id=10, version=1, status=candidate, reused=true, attempts=0). Stored row stays 'candidate' (G1): NOT promoted to class_reference_graphs.
+[generic-emitter] physics-derived equipment: 1 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 8 modules, 8 sub-modules, 79 words, 17 tools ran (2754ms)
+[chain] WORD-DOMAIN-COHERENCE: 10 process-plant-vessel/industrial-power word(s) in device-scale "benchtop_bioreactor": mass_fluid_transport_process/mass_fluid_transport_process__culture_vessel/culture_vessel_word__overflow_weir[process_plant_vessel:weir], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__pressure_vessel_shell[process_plant_vessel:pressure vessel shell], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__filter_media_membrane_elements[process_plant_vessel:filter media / membrane element], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__upper_distribution_header[process_plant_vessel:distribution header (vessel)], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__lower_underdrain_nozzle_plate[process_plant_vessel:underdrain / nozzle plate], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__backwash_service_valve_nest[process_plant_vessel:backwash], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__differential_pressure_gauges[process_plant_vessel:differential-pressure gauge], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__air_scour_vent[process_plant_vessel:air scour], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__sample_cock[process_plant_vessel:sample cock], environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__skid_frame_pipework[process_plant_vessel:skid frame & pipework]
+  ✕ [process_plant_vessel:weir] mass_fluid_transport_process/mass_fluid_transport_process__culture_vessel/culture_vessel_word__overflow_weir "Overflow / Weir"
+  ✕ [process_plant_vessel:pressure vessel shell] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__pressure_vessel_shell "Pressure Vessel Shell"
+  ✕ [process_plant_vessel:filter media / membrane element] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__filter_media_membrane_elements "Filter Media / Membrane Elements"
+  ✕ [process_plant_vessel:distribution header (vessel)] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__upper_distribution_header "Upper Distribution Header"
+  ✕ [process_plant_vessel:underdrain / nozzle plate] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__lower_underdrain_nozzle_plate "Lower Underdrain / Nozzle Plate"
+  ✕ [process_plant_vessel:backwash] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__backwash_service_valve_nest "Backwash / Service Valve Nest"
+  ✕ [process_plant_vessel:differential-pressure gauge] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__differential_pressure_gauges "Differential-Pressure Gauges"
+  ✕ [process_plant_vessel:air scour] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__air_scour_vent "Air Scour / Vent"
+  ✕ [process_plant_vessel:sample cock] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__sample_cock "Sample Cock"
+  ✕ [process_plant_vessel:skid frame & pipework] environmental_interface/environmental_interface__peltier_tec_module/cartridge_heater_word__skid_frame_pipework "Skid Frame & Pipework"
+[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped 10 wrong-domain word(s) from the design
+[chain] Build #18k: toolOutputsBlock built (18 tools, 10546 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 17 component_classes covered (17 with match, 0 empty), 14319 chars (13744ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=298, target_performance_value=20 (ml)
+[chain] Contract validation: 2 macro-assembly NOT FOUND in design — reviewers will be asked to add them
+  ✕ vessel_sensing_thermal: Generator did NOT emit any word matching "vessel_sensing_thermal" — Contract pricing £95 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+  ✕ dosing_control: Generator did NOT emit any word matching "dosing_control" — Contract pricing £164 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+[chain] keyMetrics seeded early (pre-reviewer): Working Volume Ml=20 ml
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=1/10 plaus=1/10 coh=2/10 part=2/10 hon=4/10 (18126ms)
+[chain] PHASE 4 skeleton critic: 4 HIGH-severity issues found before any LLM painting
+  ✗ [engineering_plausibility @ mass_fluid_transport_process/words[17] (Drive Motor)] The drive motor is rated at 37 kW and priced at £2,976. A 20 ml working volume culture vessel requires a tiny magnetic stirrer motor of approximately 2 W. A 37 kW motor is 18,500 t
+  ✗ [brief_to_design_fidelity @ sensing_instrumentation/words[5] (Redundant PLC racks + SCADA servers)] The design includes a redundant PLC rack and SCADA server system priced at £25,003. This directly violates the brief's cost ceiling of £298 and the explicit constraint: 'No plant-s
+  ✗ [engineering_plausibility @ mass_fluid_transport_process/words[1] (Shell Course)] The Shell Course dimension is specified as '0.2 m dia × 0.2 m', which calculates to a volume of ~6.28 liters (pi * 0.1^2 * 0.2). This is completely mismatched with the target worki
+  ✗ [internal_coherence @ mass_fluid_transport_process/words[18] (Variable-Speed Drive)] The variable-speed drive is rated at 37 kW and priced at £3,464, matching the absurdly oversized 37 kW motor. This is completely incompatible with the 12V DC power entry and 35 W p
+[chain] PHASE 4 FAIL_FAST: plausibility 1/10 — tool skeleton is unrecoverable; reviewer cascade will NOT fix this. Loop continues so PDF lands for diagnosis, but fix the orchestrator tool wiring first.
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 14351 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 19 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 15 / 19 patches (skipped 4)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.culture_vessel_word manufacturer="DWK Life Sciences" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.culture_vessel_word part_number="215-0124" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.culture_vessel_word material="borosilicate glass" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.culture_vessel_word capacity="30 ml total" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.culture_vessel_word rating_primary="autoclavable 121 °C" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.culture_vessel_word (+7 modifiers)
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.magnetic_stirrer_drive_word manufacturer="Pololu" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.magnetic_stirrer_drive_word part_number="2599" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 39.7s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1503}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=1/10 phys=1/10 coh=2/10 part=2/10 hon=4/10 (25635ms)
+[chain] critic headline: The design is critically flawed due to the inclusion of massive, multi-thousand-pound industrial plant components (such as a 37 kW motor and a £25k PLC/SCADA rack) in a 20 ml benchtop bioreactor.
+[chain] critic issues: 4 high, 0 med, 4 total
+  ✗ [high/high] brief_to_design_fidelity @ modules[1].sub_modules[0].words: The design includes industrial-scale components such as a 37 kW Drive Motor (£2,976) and a 37 kW Variable-Speed Drive (£3,464) which completely violates the uni
+  ✗ [high/high] brief_to_design_fidelity @ modules[4].sub_modules[0].words: The inclusion of a 'Redundant PLC racks + SCADA servers' component priced at £25,003 directly violates the brief's explicit instruction: 'Do not ship plant-scal
+  ✗ [high/high] engineering_plausibility @ modules[1].sub_modules[0].words: Sizing a 37 kW motor and drive for a 20 ml culture vessel is physically absurd. A 37 kW motor is designed for industrial-scale processing and would instantly de
+  ✗ [high/high] internal_coherence @ keyMetrics.supporting_metrics[3]: The enclosure volume is specified as 0.00403 m³ (approx. 4 liters), which is appropriate for a benchtop device, but it is physically impossible to fit a 37 kW m
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 2 module(s) for brief_fidelity structural adds: modules[1].sub_modules[0].words, modules[4].sub_modules[0].words
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 13457 chars
+[chain] STEP 8: R4 Flash-Lite review returned 16 patches
+[chain] STEP 8: R4 Flash-Lite review applied 4 / 16 patches (skipped 12)
+    =structure_containment.overview_paragraph_en (prose)
+    =mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.english_sentence (prose)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.peristaltic_pump_mfr: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.tubing_mfr: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.vial_mfr: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word mass_fluid_transport_process.mass_fluid_transport_process__culture_vessel.filter_mfr: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    =environmental_interface.environmental_interface__peltier_tec_module.english_sentence (prose)
+    REJECT [identity-locked A2] +word environmental_interface.environmental_interface__peltier_tec_module.peltier_mfr: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+[chain] STEP 8: R4 Flash-Lite review done in 14.1s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1552}
+[chain] canonical product_class OVERRIDE: "" → "benchtop_bioreactor" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "benchtop_bioreactor" — skipping
+[chain] physics repair: 1 iter(s); HIGH 4→4; plausibility 1→1; patches 0
+  iter 0: proposed 0 applied 0 | HIGH 4→4 plaus 1→1 | no patch applied — design unchanged; re-critique skipped (would re-roll the same design)
+[chain] sub-module prose pre-fill: rewrote 7/8 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 124 entries (KPA=124, emitter=0, rag=0)
+[chain] isInstrumentDevice=true (enclosure_volume_m3=0.00403 < 1, class=benchtop_bioreactor, not plantish) — will stamp on state construction
+[emitter-completion] 1 gap sub_module(s) for class "benchtop_bioreactor" — DB-first → generate → write-back
+[emitter-completion]   ✓ GEN  actuation_kinematics::actuation_kinematics__primary_assembly → actuation supplier [MPN deferred]
+[emitter-completion] filled 1 gap(s): 0 DB-first, 1 generated.
+[chain] emitter-completion: filled 1 gap sub_module(s) (0 DB-first, 1 generated+written-back) before gate-23
+[chain] gate-23 emitter-completeness: PASS — 8 sub_modules checked, 8 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 0 pass / 1 fail; grammar 9 pass / 4 fail; total score -270
+  ✗ [cost_ceiling] cost OVER: BoM Σ(unit×qty) £43770 > ceiling £298 (14588% over). Largest line: £25003 at sensing_instrumentation::sensing_instrumentation__culture_temperature_probe::proc_scada. FIX: reduce per-unit cost on the largest lines (substitute parts) OR reduce quantity OR raise the ceiling if the brief allows.
+  ✗ [thermal_path_closes] grammar: 3 heat-source sub-module(s) without thermal_path: mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel, actuation_kinematics::actuation_kinematics__primary_assembly, power_distribution::power_distribution__usb_power_entry. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [power_topology_closes] grammar: 1 power-consuming module(s) without cross-link to source: mass_fluid_transport_process
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): structure_containment::structure_containment__enclosure_shell (4 words), actuation_kinematics::actuation_kinematics__primary_assembly (1 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 5 sub-module(s) with <3 priced lines: structure_containment::structure_containment__enclosure_shell (0/4), sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (1/6), control_compute_communication::control_compute_communication__microcontroller_mcu (0/5), power_distribution::power_distribution__usb_power_entry (0/5), safety_protection::safety_protection__galvanic_isolator (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): environmental_interface: overview mentions 2 concrete components not present in any sub-module word — gcs-050ns-3, rtd-120 | sensing_instrumentation: overview mentions 2 concrete components not present in any sub-module word — rtd-120, bpw34. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 0: applied 6 patches, skipped 4, allowlist_rejected=4, state_changed=true
+    +cross_module_grammar_links.[+] (Close thermal path for culture vessel heat source.)
+    +cross_module_grammar_links.[+] (Close thermal path for motor heat source.)
+    +cross_module_grammar_links.[+] (Close thermal path for power board heat source.)
+    +cross_module_grammar_links.[+] (Close power topology for mass_fluid_transport_process.)
+    [locked-identity] REJECT sensing_instrumentation.sub_modules[0].words[5] word=proc_scada: Phase 2 attempted to CHANGE the locked-kind modifier kind="quantity" value="×0" (existing emitter value="x1" retained) — EMITTER_LOCKED_KINDS identity/spec modifiers are deterministic-emitter-owned; Phase 2 may enrich prose/non-locked fields only. (Remove expensive SCADA system to meet cost ceiling.)
+    ~merge-into-existing sensing_instrumentation.sub_modules[0].words[5] (Remove expensive SCADA system to meet cost ceiling.)
+    [locked-identity] REJECT actuation_kinematics.sub_modules[0].words[0] word=actuation_kinematics__primary_assembly_completion_word: Phase 2 attempted to ADD a new locked-kind modifier kind="material" value="Aluminum/Steel" (word was not emitter-pinned for this kind — the deterministic-emitter never asserted it) — EMITTER_LOCKED_KINDS identity/spec modifiers are deterministic-emitter-owned; Phase 2 may enrich prose/non-locked fields only. (Enrich actuation word density.)
+    [locked-identity] REJECT actuation_kinematics.sub_modules[0].words[0] word=actuation_kinematics__primary_assembly_completion_word: Phase 2 attempted to ADD a new locked-kind modifier kind="rating_primary" value="12V DC" (word was not emitter-pinned for this kind — the deterministic-emitter never asserted it) — EMITTER_LOCKED_KINDS identity/spec modifiers are deterministic-emitter-owned; Phase 2 may enrich prose/non-locked fields only. (Enrich actuation word density.)
+    [locked-identity] REJECT actuation_kinematics.sub_modules[0].words[0] word=actuation_kinematics__primary_assembly_completion_word: Phase 2 attempted to ADD a new locked-kind modifier kind="regulatory" value="RoHS" (word was not emitter-pinned for this kind — the deterministic-emitter never asserted it) — EMITTER_LOCKED_KINDS identity/spec modifiers are deterministic-emitter-owned; Phase 2 may enrich prose/non-locked fields only. (Enrich actuation word density.)
+    ~merge-into-existing actuation_kinematics.sub_modules[0].words[0] (Enrich actuation word density.)
+    ALLOWLIST_REJECT actuation_kinematics.sub_modules[0].words[+]: word patch contains MPN="DIN912" not in verified-parts allowlist (124 entries). Patch dropped. (Increase word density for actuation_kinematics.)
+    ALLOWLIST_REJECT structure_containment.sub_modules[0].words[+]: word patch contains MPN="DIN912" not in verified-parts allowlist (124 entries). Patch dropped. (Increase word density for structure_containment.)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="GCS-050NS-3.0" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing Peltier component word.)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="BPW34" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing photodiode component word.)
+[chain] Phase 2 iter 1: arith 0 pass / 1 fail; grammar 11 pass / 2 fail; total score 580
+  ✗ [cost_ceiling] cost OVER: BoM Σ(unit×qty) £43770 > ceiling £298 (14588% over). Largest line: £25003 at sensing_instrumentation::sensing_instrumentation__culture_temperature_probe::proc_scada. FIX: reduce per-unit cost on the largest lines (substitute parts) OR reduce quantity OR raise the ceiling if the brief allows.
+  ✗ [sub_module_word_density] grammar: 2 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): structure_containment::structure_containment__enclosure_shell (4 words), actuation_kinematics::actuation_kinematics__primary_assembly (1 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 5 sub-module(s) with <3 priced lines: structure_containment::structure_containment__enclosure_shell (0/4), sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (1/6), control_compute_communication::control_compute_communication__microcontroller_mcu (0/5), power_distribution::power_distribution__usb_power_entry (0/5), safety_protection::safety_protection__galvanic_isolator (0/5).
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): environmental_interface: overview mentions 2 concrete components not present in any sub-module word — gcs-050ns-3, rtd-120 | sensing_instrumentation: overview mentions 2 concrete components not present in any sub-module word — rtd-120, bpw34. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 1: applied 0 patches, skipped 4, allowlist_rejected=4, state_changed=false
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[5]: word patch contains MPN="N/A" not in verified-parts allowlist (124 entries). Patch dropped. (Remove high-cost SCADA system to meet cost ceiling)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="GCS-050NS-3.0" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing Peltier component to sub-module)
+    ALLOWLIST_REJECT environmental_interface.sub_modules[0].words[+]: word patch contains MPN="SA1-RTD-120" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing RTD sensor component to sub-module)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="BPW34" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing photodiode component to sub-module)
+[chain] Phase 2: no state change after repair iter 1 — bailing (further iterations will not progress).
+[chain] post-Phase-2 prose pre-fill: rewrote 1/8 sub-modules
+[fill-blank-mpn] 28 blank catalogue word(s) for class "benchtop_bioreactor" (41 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ⊘ nohit structure_containment::structure_containment__enclosure_shell (Front Panel Connector Ports): no DB row passed the rank bar for tokens [front, panel, connector, port, containment, enclosure] — staying generic
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__enclosure_shell (Cable Strain Relief): Goetze Series 851 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Magnetic Stirrer Drive): WEG M4-02FL112C3BIE3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Magnetic Stirrer Drive): ABB ACS355-03E-08A8-4 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Magnetic Stirrer Drive): Danfoss 132F0059 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Dosing Peristaltic Pump) → Watson-Marlow TUB-SAN-6.4
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): WEG M4-02FL112C3BIE3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): Allegro MicroSystems A89303KETSR-J fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): Siemens 3RU2126-4DB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ skip mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Variable-Speed Drive): motor drive — no DB drive in the 37 kW band — frame sized to the driven motor at detailed design
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Flexible Coupling) → KTR Rotex-28
+[fill-blank-mpn]   ⊘ nohit mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Coupling Guard): no DB row passed the rank bar for tokens [guard, dosing, peristaltic, pump, mass, fluid] — staying generic
+[fill-blank-mpn]   ⊘ suppress mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Suction Isolation Valve): untethered accessory valve — no principal-equipment sibling in this sub_module to host it; the plant's real valves are already counted in the zoned-distribution kits + process schedule
+[fill-blank-mpn]   ⊘ suppress mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Discharge Isolation Valve): untethered accessory valve — no principal-equipment sibling in this sub_module to host it; the plant's real valves are already counted in the zoned-distribution kits + process schedule
+[fill-blank-mpn]   ⊘ suppress mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Non-Return Valve): untethered accessory valve — no principal-equipment sibling in this sub_module to host it; the plant's real valves are already counted in the zoned-distribution kits + process schedule
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Sterile Filter Vent): Rittal 3239.200 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Peltier Tec Module): no DB row passed the rank bar for tokens [peltier, tec, environmental, interface] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Cartridge Heater): no DB row passed the rank bar for tokens [cartridge, heater, environmental, interface, peltier, tec] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Nameplate): no DB row passed the rank bar for tokens [nameplate, cartridge, heater, environmental, interface, peltier] — staying generic
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors GE-2103 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors GE-2102 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Sensirion SFM3003-300-CET fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors GE-1935 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors CTTS-302651-F01 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ skip environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): electronics-IC vendor Texas Instruments on a process field instrument — generic spec, not a chip MPN (was TMP117MAIDRVR)
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Heatsink Fan): no DB row passed the rank bar for tokens [heatsink, fan, environmental, interface, peltier, tec] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Fan Housing / Venturi): no DB row passed the rank bar for tokens [fan, housing, venturi, heatsink, environmental, interface] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Impeller): no DB row passed the rank bar for tokens [impeller, heatsink, fan, environmental, interface, peltier] — staying generic
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (EC Motor): WEG M4-02FL112C3BIE3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (EC Motor): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (EC Motor): Siemens 3RU2126-4DB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6AG15930AA007AA0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6AG15930AA017AA0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6AG15930AB007AA0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6ES7212-1AE40-0XB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Guard / Grille): no DB row passed the rank bar for tokens [guard, grille, heatsink, fan, environmental, interface] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Mounting Frame & Isolators): no DB row passed the rank bar for tokens [mounting, frame, isolator, heatsink, fan, environmental] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Thermal Insulation): no DB row passed the rank bar for tokens [insulation, environmental, interface, peltier, tec] — staying generic
+[fill-blank-mpn]   ⊘ nohit environmental_interface::environmental_interface__peltier_tec_module (Thermal Interface Pad): no DB row passed the rank bar for tokens [interface, pad, environmental, peltier, tec] — staying generic
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): Legrand SRFL100G fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): TDK NTCG163JF103FT1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): TE Connectivity NTC-DR25 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB312A2C2V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB312C3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB321C fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): FTDI TTL-232RG-VSW3V3-PCB fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): FTDI TTL-232R-3V3-PCB fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB4DP fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB3S24 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB3S2EI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): best DB row StarTech PEXUSB3S25 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__usb_power_entry (Power Indicator LED) → TE Connectivity 4-2489541-7
+[fill-blank-mpn] filled 3/28 blank word(s): 3 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 41 structural skipped.
+[chain] fill-blank-mpn: branded 3/28 blank catalogue word(s) (3 DB-first real MPN, 0 generated real-OEM), 41 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 360 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 22823 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 4 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=8 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"benchtop_bioreactor","resolved_to":"benchtop_bioreactor","hit":"db","nodes":8,"edges":18}
+[chain] K10 shadow: PASS_SHADOW — matched=16 missing=0 extra=1
+[chain] K10 writeback: persisted 1 discovered edge(s) to grow the benchtop_bioreactor reference graph (was dead code until 2026-05-31)
+[chain] K10 writeback: persisted 2 discovered node(s) to grow the benchtop_bioreactor reference graph
+[chain] headline derived: Working Volume Ml=20 ml [derived_from_brief]; Unit cost ceiling=298 GBP;  (0.00s)
+[class-reference-graph-db] wrote edge source=llm class=benchtop_bioreactor sensing_instrumentation->safety_protection
+[chain] part verification: 4 parts checked — verified=1, unverified=2, uncertain=1, skip=0
+[chain] G5 RAG: 3 queries → 2 suggestions (high=0, medium=0, low=2, below_threshold=1, corpus=50 rows)
+[chain] part verification: stripped 2 high-confidence fake part_numbers
+  • mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel::dosing_peristaltic_pump_word → removed "TUB-SAN-6.4" (The search results confirm Watson-Marlow manufactures tubing with a 6.4mm bore, but the specific par)
+  • actuation_kinematics::actuation_kinematics__primary_assembly::actuation_kinematics__primary_assembly_completion_word → removed "TBD (detailed design)" (The part number 'TBD (detailed design)' is a placeholder indicating that the design is not yet final)
+[chain] strip+recommend: 2 recommendations — high=1, medium=0, low=0, unknown=1 (manual sourcing required)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[chain] Stage 10.5 Part Reality Check: 4 checked, 3 real, 0 substituted, 1 warned (no substitute available). Nexar calls used: 0.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ proc_scada: "? TBD (catalogue class)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification: 0 structured MPN(s) scanned, 0 already DB-verified, 0 live-probed, 0 confirmed (kept), 0 demoted to honest descriptor.
+[chain] PHYSICS BLOCKED: engineering_plausibility=1/10 brief_fidelity=1/10 — promoting acceptanceStatus to 'blocked'
+[chain] module-paragraph-llm: 8/8 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/8 capital (threshold 5); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 2 sections, 0 warnings
+[chain] design decisions review: 5 choices (1 applied, 4 flagged, 0 blocked)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 0 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 0 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[fill-blank-mpn] 23 blank catalogue word(s) for class "benchtop_bioreactor" (41 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__enclosure_shell (Cable Strain Relief): Goetze Series 851 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Magnetic Stirrer Drive): WEG M4-02FL112C3BIE3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Magnetic Stirrer Drive): ABB ACS355-03E-08A8-4 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Magnetic Stirrer Drive): Danfoss 132F0059 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Dosing Peristaltic Pump) → Watson-Marlow TUB-SAN-6.4
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): WEG M4-02FL112C3BIE3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): Allegro MicroSystems A89303KETSR-J fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Drive Motor): Siemens 3RU2126-4DB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ skip mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Variable-Speed Drive): motor drive — no DB drive in the 37 kW band — frame sized to the driven motor at detailed design
+[fill-blank-mpn]   ↻ walk  mass_fluid_transport_process::mass_fluid_transport_process__culture_vessel (Sterile Filter Vent): Rittal 3239.200 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors GE-2103 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors GE-2102 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Sensirion SFM3003-300-CET fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors GE-1935 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): Amphenol Advanced Sensors CTTS-302651-F01 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ skip environmental_interface::environmental_interface__peltier_tec_module (Temperature Sensor): electronics-IC vendor Texas Instruments on a process field instrument — generic spec, not a chip MPN (was TMP117MAIDRVR)
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (EC Motor): WEG M4-02FL112C3BIE3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (EC Motor): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (EC Motor): Siemens 3RU2126-4DB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6AG15930AA007AA0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6AG15930AA017AA0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6AG15930AB007AA0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  environmental_interface::environmental_interface__peltier_tec_module (Speed Controller): Siemens 6ES7212-1AE40-0XB0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): TE Connectivity / Raychem 074061-011 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): Legrand SRFL100G fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): TDK NTCG163JF103FT1 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__culture_temperature_probe (Sensor Cable): TE Connectivity NTC-DR25 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 1/23 blank word(s): 1 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 41 structural skipped.
+[chain] fill-blank-mpn (late sweep, post-reconcile): branded 1/23 catalogue word(s) minted AFTER the first fill pass (1 DB-first real MPN, 0 generated real-OEM)
+[chain] filter-on-dirty-stream invariant: not_applicable
+[chain] provenance rooting: 34/35 inputs trace to the brief (97%) — 1 ROOTLESS: enclosure_volume_m3
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.20%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.20%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.20%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 0.20%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 0.035 → 0.035 kW (Δ 0 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 635) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/blender-bg.log
+[estimate] device-scale INSTRUMENT: estimated parts capped to COTS commodity ceilings (deviceScaleCeilingGbp)
+[estimate] product_class=benchtop_bioreactor annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'benchtop_bioreactor' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 66 parts need price estimates
+[estimate] corpus-classified 10/66; 56 need rule-based / Flash-Lite
+[estimate] rule-based classified 9 parts; 47 still need Flash-Lite
+[estimate] Flash-Lite classified 3 batches
+[estimate] 2 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] updated 3 existing, synthesised 63 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] classification source: corpus=10 rule_based=9 flash_lite=47 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=66 flash_lite_unknown=0
+[estimate] top classes in BoM:
+  structural_metal: 10
+  structural_polymer: 8
+  mechanical_assembly: 7
+  fluid_path: 7
+  oem_subsystem: 5
+  electronic_connector: 4
+  sensor: 4
+  thermal: 4
+[estimate] estimated cost: GBP 0.001
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 67 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 67/67 results in 2.9s
+[engine-c] flags: in_range=2  over=1  under=37  no_reference=27
+[engine-c] 38/67 priced lines flagged out-of-range vs reference corpus (56.7%)
+[engine-c] 12 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] normalised "benchtop_bioreactor" → "bioreactor"
+[enrich-suppliers] BoM context:
+  • top manufacturers: Watson-Marlow, KTR, actuation supplier, TE Connectivity
+  • critical components (top 10):
+      - Culture Vessel (×1, Culture Vessel — representative continuous-culture fluidic system (media feed, effluent, and acid/base dosing) component)
+      - Shell Course (×1, 0.2 m dia × 0.2 m, Shell Course (assembly component))
+      - Top Head / Roof (×1, Top Head / Roof (assembly component))
+      - Base / Floor Plate (×1, Base / Floor Plate (assembly component))
+      - Support Skirt / Legs (×1, Support Skirt / Legs (assembly component))
+      - Inlet Nozzle Set (×1, Inlet Nozzle Set (assembly component))
+      - Outlet Nozzle Set (×1, Outlet Nozzle Set (assembly component))
+      - Drain Nozzle (×1, Drain Nozzle (assembly component))
+      - Internal Distribution (×1, Internal Distribution (assembly component))
+      - Tank Vent / Pressure Relief (×1, Tank Vent / Pressure Relief (assembly component))
+  [principal_bioreactor_oem] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [principal_bioreactor_oem] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [principal_bioreactor_oem] scoring 15 candidates via Flash-Lite…
+  [principal_bioreactor_oem] web-fallback: 1 Brave query(ies) (need 1)
+    [principal_bioreactor_oem] "single-use bioreactor manufacturer mammalian cell culture bioreactor bioreactor supplier UK manufacturer" → 14 hits (cumulative 14)
+  [principal_bioreactor_oem] web-fallback: 14 Brave hits, 14 after dedup; scoring via Flash-Lite…
+  [principal_bioreactor_oem] web-fallback: 2 candidate(s) collapsed by apex-domain pre-dedup (e.g. multiple product pages on the same company domain)
+  [principal_bioreactor_oem] web-fallback rejected: "Top 7 Single Use Bioreactor Companies" → pre-check: listicle starter
+  [principal_bioreactor_oem] web-fallback: 1 candidate(s) rejected by validators (listicle / part-number / name/url mismatch)
+  [principal_bioreactor_oem] web-fallback: accepted 1/14
+  [principal_bioreactor_oem] persisted web candidates → inserted: 0, updated: 1, embedded: 1, skipped: 0
+  [stainless_fabricator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60)) — 2 semantic-only save(s) the keyword filter missed
+  [stainless_fabricator] +4 archetype-tagged row(s) from prior web-fallback persistence
+  [stainless_fabricator] scoring 15 candidates via Flash-Lite…
+  [instrumentation_integrator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [instrumentation_integrator] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [instrumentation_integrator] scoring 15 candidates via Flash-Lite…
+  [headquarters-lookup] populated city on 3 candidate(s) via known-locations + Brave HQ query
+  [cross-archetype dedup] apex "sartorius.com" appears in 2 archetypes — keeping in "principal_bioreactor_oem" (score 10), dropping from "principal_bioreactor_oem" (score 10)
+  [cross-archetype dedup] removed 1 duplicate candidate slot(s)
+[enrich-suppliers] product_class: benchtop_bioreactor
+  principal_bioreactor_oem: 2 candidate(s)  — 2 from forge-truth.db (13 rejected); 1 added via web-fallback. Only 2 of 3 candidates — sales team may want to broaden the search.
+    • [db] Sartorius (DE) — confidence: medium
+    • [db] Merck (United Kingdom) — confidence: low
+  stainless_fabricator: 3 candidate(s)
+    • [db] Fabdec (United Kingdom) — confidence: low
+    • [db] Gilwood Ltd (United Kingdom) — confidence: low
+    • [db] ZETA (??) — confidence: low
+  instrumentation_integrator: 3 candidate(s)
+    • [db] NeoDyne (Ireland) — confidence: low
+    • [db] Electrolab Biotech (United Kingdom) — confidence: low
+    • [db] Getinge (Sweden) — confidence: low
+[enrich-suppliers] calls — brave: 3, flash-lite (score): 59, flash-lite (name cleanup): 3, flash-lite (capability): 9
+[enrich-suppliers] provenance (web-fallback): 1 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (3 archetypes) + 1 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/state.json
+[supplier-validate] 8 candidate(s) examined: 8 already reconciled, 0 URLs replaced, 0 dropped, 0 changed total
+[supplier-validate] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236/state.json
+[chain] Gemini i2i OFF for isInstrumentDevice — Excel embeds Blender CAD/Cycles views only
+[chain] deployment_envelope: no envelope mapped for benchtop_bioreactor (returning null is intentional for some classes)
+[chain] demoted-word pricing exclusion: 1 line(s) carried mis_emission_note → excluded from the BoM total; raw BoM £17,464
+[chain] physics-derived bottom-up pricing: 30 components priced from parent physics → rolled into 4 assemblies; raw BoM £17,464
+[chain] costStack persisted: ex-works £28850 (raw materials £17464, class benchtop_bioreactor)
+[chain] G2 cost-reality: PASS — BoM £17464 across 67 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 1 gap
+  ⚠ sub_modules: 8 sub-modules across 8 modules — expected ≥16
+[chain] bom-cost-grounding: 0 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 1/10 · mean 4.5/10 · 5 blocking · below-8: brief_compliance=1, bill_of_materials=1, design_narrative=7, physics_fidelity=1
+  ✗ [brief_compliance] Banner asserts 'All 6 PASS' while cost ceiling £298 is violated by orders of magnitude
+  ✗ [bill_of_materials] Industrial-scale parts (37 kW motor, £11.9k Watson-Marlow pump, £5k vessel) in wrong product class
+  ✗ [bill_of_materials] Total £17k implausible for 20 ml benchtop
+  ✗ [physics_fidelity] 37 kW motor and SCADA rack for 20 ml vessel
+  ✗ [physics_fidelity] Enclosure volume 0.00403 m³ inconsistent with 20 ml scale
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 1/10).
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.20×) — ⚠ The brief asks for 1.00 unit AND a £298 ceiling — these CANNOT both be met: 1.00 unit costs £29k (96.8× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 0.200 unit at £10k (£51k/unit) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_pioreactor.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236-converged
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £28,850 / 1 unit = £28,850/unit — within the £100–£5,000,000/unit industry band for unit output. (no scalable output metric — whole-system price treated as £/unit)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 67 disclosed; 0 take-off prices written into the BoM; purchased £34,659 → installed £103,977 (central)
+[advisor-engagement] 8/8 modules got an advisor block — 15 specialist cards, 30 grounded questions
+[chain] advisor-engagement: 8 module blocks, 15 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "benchtop_bioreactor" (18 tools, 39 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): FLAGS — class="benchtop_bioreactor" template=bioreactor-9shot.py hero=false modules=0 thin=0
+  ✗ BLENDER_NO_HERO: No hero/cover image (00-hero.png / blender-cover.png) in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/pioreactor-20260718-0236.
+[chain] tools-flow: rendered 234188 bytes (18 tools)
+[investor-section] 5 investors matched from 18 candidates: Blue Bear Ventures, Constructor Capital, Celesta Capital, Kindred Capital, BDC Capital Deep Tech
+[investor] wrote 5-investor section to state (18 candidates)

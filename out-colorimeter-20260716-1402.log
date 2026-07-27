@@ -1,0 +1,13 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_open_colorimeter.md (5232 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 5232 chars
+[brief-parse] OK — confidence=HIGH, missing=6 fields, metrics=3
+[chain] classification: optical_instrument (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 1.3s)
+[chain] U5 brief augmentation: U5 augmentation (class: optical_instrument): 2 HARD field(s) filled with class-aware inferred values, 3 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_material, design_life.
+  [U5] filled "target_material": "Injection-moulded / 3D-printed ABS-polycarbonate enclosure, FR-4 printed-circuit-board assembly, COTS optical + electronic components (no process-pressure fabrication)" (Material/products inferred from brief text for optical_instrument. class-agnostic inference from brief text for unmapped)
+  [U5] filled "design_life": "5–8 yr (portable laboratory/field electronic instrument service life; battery + LED source are user-replaceable consumables; no pressure-vessel re-inspection regime)" (Industry-standard service life for optical_instrument per applicable design standard. class-agnostic inference from brie)
+  [U5] still null after augmentation: max_mass_kg, operating_environment

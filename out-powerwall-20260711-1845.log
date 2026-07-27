@@ -1,0 +1,93 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.md (8917 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief decisions loaded: 1 record(s) from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.commercial-decisions.json
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: energy_storage (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: energy_storage): 1 HARD field(s) filled with class-aware inferred values, 6 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Containerised assembly: cell module stacking, busbaring, BMS wiring, PCS integration, factory-acceptance test" (Class-canonical process for energy_storage. Class default for utility-scale BESS in 40 ft Hi-Cube ISO container)
+[chain] U6 brief expansion: 15 duties derived; product="Regulated AC power (230V, 50Hz) and stored electrical energy" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] nameplate_capacity_kwh = 14 kWh [stated/high] — Stated in brief as total pack energy before usable reserve.
+  [U6] usable_energy_kwh = 13.5 kWh [stated/high] — Stated in brief as beginning of life AC-side usable energy.
+  [U6] continuous_ac_power_kw = 11.04 kW [stated/high] — Stated in brief for on-grid operation at 230V single-phase.
+  [U6] peak_ac_current_a = 185 A [stated/high] — Stated in brief for locked-rotor starting of large residential loads.
+  [U6] peak_ac_power_kw = 42.55 kW [derived/high] — Derived from peak AC current (185 A) multiplied by nominal grid voltage (230 V).
+  [U6] max_continuous_charge_kw = 5 kW [stated/high] — Stated in brief for a single master unit.
+  [U6] pv_stc_input_kw = 20 kW [stated/high] — Stated in brief as aggregate STC input across all MPPTs.
+  [U6] mppt_count = 3 count [stated/high] — Stated in brief as minimum number of solar DC inputs.
+  [U6] dc_bus_voltage_v = 400 V [derived/medium] — Derived requirement for a transformerless 230V AC hybrid inverter. Peak AC voltage is 325V
+  [U6] cell_count = 128 count [derived/medium] — Derived from nominal DC bus voltage (~400V) divided by nominal LFP cell voltage (3.2V). 12
+  [U6] round_trip_efficiency_pct = 89 % [stated/high] — Stated in brief as minimum beginning of life efficiency.
+  [U6] thermal_cooling_duty_kw = 1.2 kW [derived/medium] — Estimated worst-case heat rejection. Assuming ~94% one-way efficiency at 20kW max power pr
+  [U6] thermal_heating_duty_kw = 0.7 kW [derived/medium] — Power required to heat ~100kg of LFP cells (Cp ~1000 J/kgK) from -20C to +5C in 1 hour to 
+  [U6] lifetime_energy_throughput_kwh = 81000 kWh [derived/high] — Derived from stated 6,000 equivalent full cycles multiplied by 13.5 kWh usable capacity.
+  [U6] enclosure_volume_m3 = 0.13 m3 [derived/high] — Derived from stated external envelope dimensions: 1.105 m x 0.609 m x 0.193 m.
+[chain] engineering_contract: 56 quantities, 3 topology edges, 7 macro-assemblies (total £1,673), closures: 6 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":2465}
+[products-writeback] {"product_name":"Containerised 0.01 MWh nameplate LFP BESS (88 × 50 Ah cells, 1 racks × 1P × 88S = 281.6 V DC bus, 0.0 MW PCS) — single 20-ft ISO container with EXTERNAL pad-mounted MV step-up transformer per IEC 6293","hit":"db_hybrid","matched":"Saft Intensium Max","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":189}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 5/6 mandatory covered for UK+EU+global
+  ⚠ RoHS 2011/65 (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts lead, mercury, cadmium, and other substances in electrical
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU, global) without an explicit harmonisation plan. Each region adds £25-60k in cert
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[distributor-cascade] DB library:bess_oem_2026-05-25 hit for SC1000UD-MV
+[distributor-cascade] DB library:mouser hit for GX21BAB
+[generic-emitter] scale-aware graph selection: nameplate 14.1 kWh < 100 kWh — using 'residential-battery-storage' (wall-mount all-in-one) instead of the containerised utility graph
+[class-reference-graph-db] {"product_class":"residential-battery-storage","resolved_to":"residential-battery-storage","hit":"baked","nodes":10,"edges":14}
+[generic-emitter] physics-derived equipment: 4 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 10 modules, 20 sub-modules, 121 words, 5 tools ran (7785ms)
+[chain] Build #18k: toolOutputsBlock built (9 tools, 13014 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 20 component_classes covered (20 with match, 0 empty), 16092 chars (21428ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=8500, max_mass_kg=130, envelope_volume_m3=0.13, target_capacity_kwh=14 (kWh), operating_temp_min_c=-20, operating_temp_max_c=50
+[chain] Contract validation: 1 macro-assembly NOT FOUND in design — reviewers will be asked to add them
+  ✕ outdoor_cabinet_enclosure: Generator did NOT emit any word matching "outdoor_cabinet_enclosure" — Contract pricing £38 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+[chain] keyMetrics seeded early (pre-reviewer): Usable energy=13.6 kWh
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=4/10 plaus=3/10 coh=5/10 part=2/10 hon=6/10 (6298ms)
+[chain] PHASE 4 skeleton critic: 4 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ modules[0].sub_modules[0].words[0]] The battery pack uses 88 series cells (88S) of 50 Ah. At 3.2V nominal, this yields a nominal DC bus voltage of 281.6 V. This is too low for a transformerless 230V AC single-phase h
+  ✗ [engineering_plausibility @ modules[1].sub_modules[0].words[4]] The design includes an 'MV Step Up Transformer' inside a residential wall-mounted BESS. Medium Voltage (MV) transformers are used for utility-scale grid injection (e.g., 11kV/33kV)
+  ✗ [internal_coherence @ modules[6].sub_modules[0].words[4]] The structure module includes an 'Iso Container Shell' and 'Iso 20ft Container Shell' alongside a 'Weatherproof Enclosure'. A residential wall-mounted unit cannot simultaneously be
+  ✗ [engineering_plausibility @ modules[4].sub_modules[0].words[6]] The control module includes a 'Redundant PLC rack + SCADA server' with an estimated cost of £25,017. This single component exceeds the entire product cost ceiling of £8,500 by 294%
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 7838 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 13 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 10 / 13 patches (skipped 3)
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word manufacturer="CATL" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word part_number="CB-50Ah-LFP-173" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word material="LFP cathode / graphite anode" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word rating_primary="50 Ah at 0.5 C" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word regulatory="UN 38.3, IEC 62619" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word (+8 modifiers)
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.dc_busbar_assembly_word manufacturer="Rittal" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.dc_busbar_assembly_word part_number="DK 3450.000" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 21.4s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":1,"d_overview_chars":956}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=4/10 phys=3/10 coh=5/10 part=6/10 hon=8/10 (7249ms)
+[chain] critic headline: The design suffers from a severe architectural identity crisis, mixing residential wall-mount constraints with utility-scale containerized components.
+[chain] critic issues: 3 high, 2 med, 5 total
+  ✗ [high/high] brief_to_design_fidelity @ modules[1].sub_modules[0].words[3]: The Bidirectional PCS is rated for 11.04 kW continuous, but the AC Filter Inductors (modules[1].sub_modules[1].words[0]) are rated for only 18 A continuous. At 
+  ✗ [high/high] engineering_plausibility @ modules[0].sub_modules[0].words[3]: The DC Busbar Assembly is rated for 39.2 A continuous. However, discharging 11.04 kW from a 281.6 V nominal battery pack requires a continuous current of approx
+  ✗ [high/high] internal_coherence @ modules[6].sub_modules[0].words[4]: The structure_containment module includes an 'Iso Container Shell' and 'Iso 20ft Container Shell' alongside a 'Weatherproof Enclosure' and 'Structural Rack Fram
+  ✗ [med/medium] engineering_plausibility @ modules[4].sub_modules[0].words[6]: The control_compute_communication module contains a 'Gems Digital Energy Platform' with an installed process system budget of £25,017. This single component cos
+  ✗ [med/high] internal_coherence @ modules[3].sub_modules[0].words[2]: The environmental_interface module includes a 'Liquid Coolant Loop', 'HVAC Chiller', 'Coolant Pump', and 'Liquid Coolant Chiller', but the parent description st
+
+[chain] STEP 7.5b: physics-critic PHASE-2 AUTO-CORRECT (ENABLED — patches the shipped design)
+[chain] physics auto-correct (enabled): selected 2 blocking finding(s) → corrected 0, declined 0, unlocatable 0, still-uncorrectable 2 after 2 pass(es)
+  • [uncleared] undersized-vs-load @ energy_conversion_transduction/sub_modules[0]/words[3] (part-token): {form=Bidirectional PCS — representative hybrid bidirectional inverter (dc ↔ 230 v 1φ ac) + integrated solar mppt inputs component, part_number=TBD (detailed design), rating_primary=11.04, performance=98.5 % efficiency} → {form=High-current AC filter inductor/choke module, part_number=FN3280H-60-35, rating_primary=60 A continuous, performance=98.5 % efficiency, manufacturer=Schaffner, list_price_gbp=185}
+  • [uncleared] chemical-incompatibility @ structure_containment/sub_modules[1]/words[2] (part-token): {form=Iso 20ft Container Shell — representative sealed ip55 outdoor enclosure (powder-coated steel/aluminium) + wall bracket / floor plinth component, part_number=TBD (detailed design)} → {form=Wall-mounted outdoor basic enclosure, single-walled, IP55, part_number=CS 9791.045, manufacturer=Rittal, rating_primary=IP55 / IK10 protection rating, dimension=1200x600x300 mm, material=Aluminium AlMg3, powder-coated, list_price_gbp=850}
+  • [uncleared] material-vs-temperature @ energy_conversion_transduction/sub_modules[1]/words[0] (part-token): {form=AC Filter Inductors — representative hybrid bidirectional inverter (dc ↔ 230 v 1φ ac) + integrated solar mppt inputs component, part_number=TBD (detailed design), rating_primary=18} → {form=AC Filter Inductor / EMI Filter — representative hybrid bidirectional inverter component, part_number=FN3280H-60-35, rating_primary=60 A, manufacturer=Schaffner, list_price_gbp=185}
+[chain] physics auto-correct ENABLED: enforcement gate will read the POST-correction critique (4 issue(s))
+[chain] physics-critic enforcement (ENFORCING): 2 BLOCKING known-failure fault(s) — a part the engine knows will fail:
+  ✗ [undersized-vs-load/high] @ modules[1].sub_modules[1].words[4]: The Power Filter Inductor is rated for only 18 A continuous. However, the continuous AC power target is 11.04 kW at 230V single-phase, which requires 11040 / 230 = 48 A continuous. An 18 A inductor wi…
+  ✗ [undersized-vs-load/high] @ modules[2].sub_modules[0].words[0]: The Main DC Contactor is rated for 51 A. The nominal DC bus voltage is 281.6 V (88 cells * 3.2 V). At the maximum continuous charge/discharge power of 11.04 kW, the DC current is 11040 / 281.6 = 39.2 …
+[chain] physics-critic ENFORCING: BLOCKING (exit 33) — the design recommends 2 part(s) the Physics Critic proved will FAIL. Refusing to ship a known-failing part. Fix the flagged part(s) (or run Phase-2 auto-correct) and re-run.

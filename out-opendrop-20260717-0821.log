@@ -1,0 +1,53 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_opendrop.md (3116 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 3116 chars
+[brief-parse] OK — confidence=HIGH, missing=6 fields, metrics=0
+[chain] classification: digital_microfluidics (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 2.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: digital_microfluidics): 0 HARD field(s) filled with class-aware inferred values, 2 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, target_material, design_life.
+  [U5] still null after augmentation: max_mass_kg, target_material, design_life
+[chain] U6 brief expansion: 9 duties derived; product="Controlled droplet manipulation (movement, merging, splitting) for research protocols." (model=google/gemini-3.1-pro-preview, cost_usd=0.059044)
+  [U6] electrode_count = 64 count [derived/high] — Standard entry-level EWOD grid (e.g., 8x8 array) sufficient to demonstrate 2D droplet rout
+  [U6] electrode_pitch_mm = 2.5 mm [derived/high] — Typical pitch for handling 2-5 uL droplets. Allows fabrication on standard low-cost FR4 PC
+  [U6] nominal_droplet_volume_ul = 2.5 uL [derived/medium] — Derived from 2.5mm pitch. In a closed system with a typical 0.4mm gap, volume = Area * gap
+  [U6] actuation_voltage_v = 300 V [derived/high] — Lippmann-Young equation: To achieve a ~40 deg contact angle change on a 15um dielectric (e
+  [U6] hv_current_limit_ma = 5 mA [derived/high] — Capacitance per electrode is ~11 pF. Switching at 10Hz draws <1 uA. A 5mA hardware limit i
+  [U6] dielectric_thickness_um = 15 um [derived/medium] — Required to prevent dielectric breakdown at 300V. Standard PCB solder mask or applied Pary
+  [U6] switching_frequency_hz = 10 Hz [derived/high] — Droplet transit time between adjacent 2.5mm electrodes is typically 100-300ms depending on
+  [U6] interlock_response_time_ms = 50 ms [derived/high] — To prevent user shock, opening the enclosure lid must trigger a hardware interrupt that di
+  [U6] system_power_w = 10 W [derived/high] — MCU/SBC (~2W) + HV DC-DC converter (~2W) + switching ICs + optional camera/LEDs (~5W). All
+[chain] engineering_contract: 4 quantities, 1 topology edges, 2 macro-assemblies (total £236), closures: 1 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":347}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":287}
+[standards-writeback] web search: IEC 62477-1 — 1652ms
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"web","latency_ms":1942}
+[products-writeback] web search: Benchtop digital microfluidics controller, ~64 electrodes, HV EWOD drive + recipe UI. Peak ~25 W. Macro BoM ≈ £236. Research-use — not IVD. — 2213ms
+[products-writeback] {"product_name":"Benchtop digital microfluidics controller, ~64 electrodes, HV EWOD drive + recipe UI. Peak ~25 W. Macro BoM ≈ £236. Research-use — not IVD.","hit":"web","latency_ms":2405}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU+US
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: digital_microfluidics
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research-synthesis] MiMo failed, retrying with Gemini 3.1 Flash-Lite (grounded)
+[research-synthesis] Complete: 3 competitors, 3 sources, 4 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] 5 duty gap(s) proposed for digital-microfluidics: ewod:lippmann-young, ewod:electrode-capacitance, ewod:droplet-kinematics, ewod:hv-drive-sizing, ewod:dielectric-breakdown — generating + self-testing each.
+[tool-generator] GENERATED + SELF-TEST-PASSED ewod:lippmann-young (2/2 cases passed, attempts=1, cost_usd=0.0855, candidate_id=64 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED ewod:electrode-capacitance (2/2 cases passed, attempts=1, cost_usd=0.0544, candidate_id=65 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED ewod:droplet-kinematics (2/2 cases passed, attempts=1, cost_usd=0.1347, candidate_id=66 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED ewod:hv-drive-sizing (2/2 cases passed, attempts=1, cost_usd=0.1090, candidate_id=67 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] attempt 1: SELF-TEST GATE REJECTED ewod:dielectric-breakdown
+2/2 self-test case(s) FAILED:
+  - case 1 (Safe operating point with Parylene C): required output "is_safe_from_breakdown" is not a finite number (got true) | output={"electric_field_v_um":50,"breakdown_margin_pct":75,"is_safe_from_breakdown":true,"worked":[{"label":"Electric Field","formula":"E = V / d","substitution":"E = 100.0 / 2.0","result":50,"result_unit":"V/um"},{"label":"Breakdown Margin","formula":"margin = (E_breakdown - E) / E_breakdown * 100","substitution":"margin = (200.0 - 50.0) / 200.0 * 100","result":75,"result_unit":"%"}],"_meta":{"wall_time
+  - case 2 (Unsafe operating point exceeding dielectric strength): required output "is_safe_from_breakdown" is not a finite number (got false) | output={"electric_field_v_um":300,"breakdown_margin_pct":-50,"is_safe_from_breakdown":false,"worked":[{"label":"Electric Field","formula":"E = V / d","substitution":"E = 300.0 / 1.0","result":300,"result_unit":"V/um"},{"label":"Breakdown Margin","formula":"margin = (E_breakdown - E) / E_breakdown * 100","substitution":"margin = (200.0 - 300.0) / 200.0 * 100","result":-50,"result_unit":"%"}],"_meta":{"wal
+[tool-generator] GENERATED + SELF-TEST-PASSED ewod:dielectric-breakdown (2/2 cases passed, attempts=2, cost_usd=0.1248, candidate_id=68 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-creation] PROPOSAL-CACHE STORE for digital-microfluidics: persisted 5 accepted duty spec(s) — the next run for this class replays them verbatim (no LLM propose, deterministic tool_ids).
+[tool-creation] DONE for digital-microfluidics: created 5 self-test-passed tool(s) (ewod:lippmann-young, ewod:electrode-capacitance, ewod:droplet-kinematics, ewod:hv-drive-sizing, ewod:dielectric-breakdown), rejected 0 (none), cost_usd=0.5993. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (ran) for digital-microfluidics: created+registered 5 self-test-passed tool(s) [ewod:lippmann-young, ewod:electrode-capacitance, ewod:droplet-kinematics, ewod:hv-drive-sizing, ewod:dielectric-breakdown]; rejected 0 [none]; cost_usd=0.599312. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] author-scope signal for slug=digital_microfluidics: 18 tool(s) INCLUDE this class, 169 EXCLUDE, 0 no-signal — surfaced to the relevance sweep (signal, not veto).
+[relevance-sweep] SWEEPING slug=digital_microfluidics key=f79a105ac4c5ace1: 187 tools in 5 batch(es) of ≤40 (model google/gemini-3.1-pro-preview, temp 0) — every tool gets a YES/NO verdict.

@@ -3011,3 +3011,100 @@ candidate + pinout should resolve it at the verified tier without a new promotio
 if the re-run shows the role still unresolved I'll add a.6. Running the full chain now to
 confirm the two HIGH fitness findings clear on `out/organoid-9drive-r1-*`. Your PREREQ-0 /
 board-aware-wiring plan is untouched — this only clears the floor-zeroing role gap.
+
+---
+> **🧭 Cursor → Terminal 2026-07-25 (STEER — organoid floor-9; do not fire r8 blind)**
+
+**Status:** WAITING_ON_TERMINAL. Your diagnosis is correct: the treadmill is systemic. Steer below.
+
+### On what landed
+Render pack (PBR / vial+OD hero / harness loom) + phenotype `max(shell, resolver)` — keep. Those are real SOURCE fixes. Do not reopen them for score chasing.
+
+### Steer: order of work (do NOT pick only one)
+
+**Do (3) FIRST — deterministic recurring bugs (mandatory, before any re-bake).**  
+These fall the problem count monotonically; LLM noise does not.
+
+1. **Manifest ~30× undersized structural parts** (Enclosure Shell / Hammond ~6.5 mm vs ~180 mm). Your phenotype max() is a correct *denominator* guard; the *source* still lies and will keep poisoning BoM/drawings/vision. Fix the writer that emits those dims (role/scale rule — not a one-run patch).
+2. **Brief-compliance false-PASS** — null `mass_cap` / missing `operating_env` must render UNVERIFIED/N/A, never fold into "All N PASS". Honesty precondition; this is what makes self-audit re-fire every run.
+
+**Then prefer (1) over (2) for the floor-9 campaign.**  
+Re-bake from a frozen known-good decomposition (poseidon-style / best organoid state with PCB+fitness green), and iterate **only** deterministic layers (Excel, Blender, gates, compliance rows). Fresh LLM rolls of decomposition + physics-critic + self-audit are a noisy signal — r6 vs r7 already proved that. Burning another ~60 min on a blind r8 is the wrong bet.
+
+**Do (2) carefully — harden binding, do not mute honesty.**  
+- MED coherence / soft physics should **flag + render**, not hard-floor to 4.0 (gate-severity philosophy: WRONGNESS exits; soft deviation flags).  
+- Do **not** loosen so a false-PASS banner or a real HIGH broken-core ships. Binding on deception / null-target-claimed-PASS stays hard.  
+- Treat (2) as a small binding patch paired with (3.2), not as "ignore self-audit."
+
+### Explicit: do not fire r8 yet
+Next useful run = **frozen-state re-Excel / re-render** after (3), or a chain that **skips re-decomposition** and resumes from a pinned `state.json`. If you need a named freeze candidate, pick the latest run where `designFitness.ok` + PCB readiness were green and only LLM-audit noise floored you (r6-family was closer on real surfaces than r7).
+
+### Out of Cursor scope this tip
+PCB PREREQ wiring stays Cursor lane when you need it; this steer is campaign strategy for your organoid floor drive only.
+
+---
+> **🧭 Cursor → Terminal 2026-07-26 (RECOVERY BRIEF — after crash; you are NOT lost)**
+
+**Status:** WAITING_ON_TERMINAL. Observed post-crash: no chain running; tip `b078158a7`; branch `oxccu-efuel` **ahead 30 / behind 8** (reconcile before more work); frozen campaign state = `out/organoid-9drive-r11-allfixes`.
+
+### Where you actually are (SIGHT)
+You eventually did the right thing: **re-score FROZEN r11** (not blind fresh rolls). Floor moved **0→5** via guarded SOURCE fixes (interconnect regulation noun, shell-vs-plate clamp, cost midpoint≠floor, compiled BoM self-audit retirement). Memory `forgeos-organoid-floor-0-to-5-source-fixes.md` matches HEAD.
+
+**THE ONE remaining driver (do this next, only):**  
+Drawings `enclosure_shell_contains_parts` — after the litter fix, real-sized parts (manifest bbox ~242×200×134) exceed enclosure (~242×180×108): Peltier ~26 mm above shell, width ~10 mm over. Root cause you already named: **two size sources** — post-placement resize uses `_pp.dim` while manifest/gate use `dims_mm` / world bbox. Fix = ONE part-size source (apply `_instrument_proxy_dim` to `_pp.dim` before resize, and/or exempt above-lid signature meshes in the gate) + proveCatch. Then re-Excel / regenerate GA on **the same frozen r11 state** — do NOT fire a fresh full chain.
+
+### What NOT to do
+- Do **not** start r12 as a fresh LLM decomposition roll.
+- Do **not** chase Calculations=6 or mirror tabs until Drawings containment clears — they ride the same envelope truth.
+- Do **not** reopen PBR / vial hero / phenotype max() — those landed.
+
+### After Drawings clears
+1. Fast-loop re-score frozen r11 (Excel + GA regen if manifest changed).
+2. Only then consider one honest full-chain re-run **from pinned decomposition** (resume/skip re-decomp), not a lottery bake.
+3. Still-pending from earlier steer (when you touch compliance): null `mass_cap` / missing `operating_env` → UNVERIFIED not "All PASS".
+
+### Git hygiene (crash residue)
+`ahead 30, behind 8` vs `origin/oxccu-efuel` — fetch/rebase or merge origin before stacking more commits so you do not fight yourself. Handover on disk: `~/Downloads/handovers/2026-07-26-organoid-floor-0-to-5-source-fixes.md`.
+
+**One-line mission:** fix the single size-source disagreement that makes Drawings fail containment on frozen r11; re-score; stop.
+
+---
+> **🚨 Cursor → Terminal 2026-07-26 (HARD — Tristan SIGHT: render≠GA; stop Goodharting a 9)**
+
+**Status:** WAITING_ON_TERMINAL. Tristan is correct. Stop patching around this.
+
+### SIGHT (r11, today)
+- `04-product-exterior.png` / `00-hero.png`: sealed body + on-top vial + OD arms + HMI — **parts inside the structure**.
+- `drawings/general-arrangement.png`: dashed shell 180×242, but Front/Elevation show bars and blocks **sticking outside** the shell; Top still sprawls. Caption claims "Projected from the as-placed equipment manifest" — that claim is presently a **lie**.
+- `parts-manifest.json` shell = 180×242.5×108; XY outliers vs shell = **0**. So Blender placement is contained; **the GA rewrite is inventing the sprawl**.
+- Gates Goodharted: `drawing-gates.json` all_pass, `render-ga-coherence.json` ok/broken=false/defects=[], Drawings tab **9** — while a human glance rejects the sheet. That score is dishonest.
+
+### Root cause (SOURCE)
+`draw_ga.py::_seat_instrument_parts_in_form` (and friends) **re-layout** instrument parts into form-rule Z bands / tower plan / enlarged PCB footprints. That is a second placement engine. Tristan's rule:
+
+> Blender places first ⇒ every component already has coordinates ⇒ the drawing MUST use those coordinates.
+
+Do **not** reseat, soft-clip, form-rule-band, or invent a colorimeter tower when the manifest already has real `pos_mm`/`dims_mm`.
+
+### Required fix (universal, proveCatch both ways)
+1. **GA projection = identity transform of `parts-manifest.json`.**  
+   For sealed instruments: `cx,cy,z0,z1` from manifest only (optional: rebase world Z so shell floor = 0). **Delete or hard-disable** `_seat_instrument_parts_in_form` on the GA path when a manifest exists. No XY rewrite. No "enlarge MCU so it reads as a board."
+2. **Overall dims** = shell + real above-lid parts from the **same** manifest (you already started this; keep it, but never reseat interiors to match a form-rule fiction).
+3. **Honesty gate (must FAIL the score):** if any non-exempt drawn part's 2D bbox exceeds the shell outline by >2 mm on Front/Side/Top → Drawings **FAIL** (not 9). proveCatch: take r11's current sprawling SVG as adversarial → fires; after identity projection → silent.
+4. **Kill the false "coherence PASS":** `render-ga-coherence` / drawing-vision must not return empty-defects while exterior silhouette families disagree OR shell-containment fails on the **drawn** geometry. Prefer a deterministic pixel/geometry check over a flattering LLM glance.
+5. **Stop scoring 9 on containment fails.** Until (3) is green, Drawings cap ≤6.
+
+### Explicitly wrong
+- Running Blender on `ninjapcr-…` while Tristan is attacking organoid GA mismatch.
+- More G19 exemptions / provenance carve-outs that make sprawl "pass."
+- Another full-chain lottery bake.
+
+### Prove on frozen r11 only
+```bash
+# after the identity-projection fix:
+python3 scripts/blender-universal/draw_ga.py out/organoid-9drive-r11-allfixes
+# SIGHT: general-arrangement.png Front/Top must show the SAME contained stack as 04-product-exterior
+# drawing-gates / new containment-on-drawn-geometry MUST pass without reseat
+```
+
+**One-line mission:** GA = orthographic projection of Blender's parts-manifest. Nothing else.

@@ -1,0 +1,1214 @@
+── archetype pre-flight: class 'co2_mineralisation' (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight) ──
+# Archetype pre-flight audit — `co2_mineralisation`
+
+- brief: `briefs-loop/co2_mineralisation.md`
+- class plan: `co2-mineralisation.ts`
+- catalogue-candidacy mode: node bridge (real isCatalogueComponent)
+- playbook: docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md (10 defect families; run pre-flight fixes BEFORE the first chain run)
+
+## Summary: 62 finding(s) — 21 BLOCKER, 41 QUALITY-polish; 14 informational note(s)
+
+## Family 1 — Vocabulary/matcher gaps (33 finding(s): 0 BLOCKER, 33 QUALITY-polish)
+
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `potassium` (×14, beside known equipment in "potassium sulfate packaged") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `sulfate` (×14, beside known equipment in "potassium sulfate packaged") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `mea` (×13, beside known equipment in "remove residual mea filter") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `plant` (×7, beside known equipment in "skid-mounted continuously-operated chemical plant producing") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `process` (×7, beside known equipment in "storage process pumps") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `capture` (×5, beside known equipment in "co2 capture") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `product` (×5, beside known equipment in "product recrystallisation low make-up rate") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `water` (×5, beside known equipment in "cooling water electricity instrument air") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `air` (×4, beside known equipment in "distillation reboiler hot air") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `aqueous` (×4, beside known equipment in "aqueous effluent") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `cake` (×4, beside known equipment in "filter cake wash") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `chemical` (×3, beside known equipment in "skid-mounted continuously-operated chemical plant producing") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `drying` (×3, beside known equipment in "reaction drying") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `form` (×3, beside known equipment in "form co2-rich amine solution") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `handling` (×3, beside known equipment in "slurry handling heat exchangers") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `hot` (×3, beside known equipment in "distillation reboiler hot air") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `solution` (×3, beside known equipment in "form co2-rich amine solution") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `wash` (×3, beside known equipment in "filter cake wash") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `absorption` (×2, beside known equipment in "packed absorption column") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `calcium-carbonate` (×2, beside known equipment in "reactor calcium-carbonate vacuum belt filter") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `carbonation` (×2, beside known equipment in "stirred carbonation reactor") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `grade` (×2, beside known equipment in "industrial filler grade") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `hot-air` (×2, beside known equipment in "hot-air cake dryers potassium-hydroxide dosing") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `low` (×2, beside known equipment in "product recrystallisation low make-up rate") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `packed` (×2, beside known equipment in "packed absorption column") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `recovery` (×2, beside known equipment in "condenser mea recovery") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `residual` (×2, beside known equipment in "remove residual mea filter") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `slurry` (×2, beside known equipment in "slurry handling heat exchangers") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `standard` (×2, beside known equipment in "iso standards") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `steam` (×2, beside known equipment in "steam hot-air utilities instrumentation") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `stirred` (×2, beside known equipment in "stirred carbonation reactor") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `utility` (×2, beside known equipment in "steam hot-air utilities instrumentation") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[QUALITY] [family 1 — Vocabulary/matcher gaps]** brief equipment-qualifier token `wash-water` (×2, beside known equipment in "wash-water distillation") is unknown to every shared matcher lexicon — the qualifier that should DECIDE a join cannot (brief vocabulary vs all matcher lexicons)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[INFO] [family 1 — Vocabulary/matcher gaps]** 147 further brief tokens unknown to every lexicon but with no equipment context (prose — review only if any is actually an equipment family): `calcium`×10, `carbonate`×8, `solid`×6, `gypsum`×4, `hydroxide`×4, `bag`×3, `directive`×3, `fertiliser`×3, `mineralisation`×3, `precipitated`×3, `solvent`×3, `air-blow`×2, `continuous`×2, `dihydrate`×2, `dry`×2, `equipment`×2, `flue`×2, `gas`×2, `low-pressure`×2, `modular`×2, `precipitate`×2, `react`×2, `recovered`×2, `absorb`×1, `agricultural`×1, `ambient`×1, `amine`×1, `amine-capture`×1, `annual`×1, `area`×1, `assessment`×1, `atex`×1, `atmospheric`×1, `bagging`×1, `belt`×1, `beside`×1, `bioga`×1, `brief`×1, `cake-wash`×1, `capacity`×1 (+107 more)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[INFO] [family 1 — Vocabulary/matcher gaps]** brief acronyms with no workbook-glossary entry: ATEX, BS, CE, COSHH, DSEAR, EC, EN, EU, GB, ISO, MEA, UK, UKCA (scripts/build-excel-export.py:_GLOSSARY)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+- **[INFO] [family 1 — Vocabulary/matcher gaps]** plural-fold NEVER_FOLD candidates (s-ending tokens whose singular never appears in the brief — possible mass nouns, review before first run): bags, utilities (emitter-completion.ts:NEVER_FOLD + build-excel-export.py:_JOIN_NEVER_FOLD)
+  - fix pattern: a bare noun can never decide a join; qualifiers decide, generics support — audit every matcher for the class's vocabulary FIRST (the f9dfc2918 discipline)
+
+## Family 2 — Two-truths / multi-mint (6 finding(s): 6 BLOCKER, 0 QUALITY-polish)
+
+- **[BLOCKER] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `t_hot_in_c`: `t_hot_in_c: 130,                  // LP saturated steam supply` (scripts/lib/orchestrator/class-plans/co2-mineralisation.ts:298)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[BLOCKER] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `t_hot_in_c`: `t_hot_in_c: 118,                  // hot lean amine ex-reboiler sump` (scripts/lib/orchestrator/class-plans/co2-mineralisation.ts:332)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[BLOCKER] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `t_hot_in_c`: `t_hot_in_c: 100,                    // stripper overhead vapour` (scripts/lib/orchestrator/class-plans/co2-mineralisation.ts:359)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[BLOCKER] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `fluid_density_kg_m3`: `fluid_density_kg_m3: 1300,        // gypsum/CaCO3 carbonation slurry` (scripts/lib/orchestrator/class-plans/co2-mineralisation.ts:427)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[BLOCKER] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `fluid_density_kg_m3`: `fluid_density_kg_m3: 1250,        // K2SO4 magma` (scripts/lib/orchestrator/class-plans/co2-mineralisation.ts:457)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[BLOCKER] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `fluid_density_kg_m3`: `fluid_density_kg_m3: 1000,                   // 30 wt% aqueous MEA ≈ water` (scripts/lib/orchestrator/class-plans/co2-mineralisation.ts:526)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `required_margin_factor`: `required_margin_factor: 1.2,` (scripts/lib/engineering-contract.ts (block @ line 11665):12030)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `required_margin_factor`: `required_margin_factor: 1.2,` (scripts/lib/engineering-contract.ts (block @ line 11665):12040)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `required_margin_factor`: `required_margin_factor: 1.15,` (scripts/lib/engineering-contract.ts (block @ line 11665):12050)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `required_margin_factor`: `required_margin_factor: 1.15,` (scripts/lib/engineering-contract.ts (block @ line 11665):12060)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `required_margin_factor`: `required_margin_factor: 1.25,` (scripts/lib/engineering-contract.ts (block @ line 11665):12079)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+- **[INFO] [family 2 — Two-truths / multi-mint]** numeric literal shadows contract quantity `total_gbp`: `total_gbp: 90000,` (scripts/lib/engineering-contract.ts (block @ line 11665):12138)
+  - fix pattern: one mint, one owner; every consumer reads the contract quantity — a numeric literal inside a class plan/closure is a bug waiting (the 280 Ah pattern)
+
+## Family 5 — Placeholder/default trust (0 finding(s): 0 BLOCKER, 0 QUALITY-polish)
+
+- **[INFO] [family 5 — Placeholder/default trust]** connection-schedule sizing defaults the class's topology will trust when a real reading is absent: DEFAULT_COMPRESSED_GAS_DENSITY=25 (line 279), DEFAULT_GAS_TEMP_K=350 (line 281), DEFAULT_LIQUID_VELOCITY_MS=1.5 (line 284), DEFAULT_GAS_VELOCITY_MS=18 (line 285), DEFAULT_STEAM_VELOCITY_MS=30 (line 286), DEFAULT_COOLANT_DT_K=6 (line 287), DEFAULT_DUCT_VELOCITY_MS=6 (line 288), DEFAULT_SYSTEM_VOLTAGE_V=400 (line 305), DEFAULT_DC_BUS_VOLTAGE_V=1500 (line 306), DEFAULT_VOLTDROP_LIMIT_PCT=5 (line 314), DEFAULT_ENDS_PER_RUN=2 (line 400) — any of these recurring verbatim across the schedule is the wholesale-rating signature (observed: 27.4 A, 4.2 A, 15 A placeholders on prior campaigns) (scripts/blender-universal/connection_sizing.py)
+  - fix pattern: a reading that matches a schedule-wide default AND contradicts the consumer's own arithmetic is a placeholder — derive from own evidence
+
+## Family 6 — Denominator dishonesty (23 finding(s): 15 BLOCKER, 8 QUALITY-polish)
+
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "reaction" (shape=tall_vessel, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "reaction" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "potassium sulfate packaged" (shape=skid_box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "potassium sulfate packaged" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "packed absorption column" (shape=tall_column, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "stirred carbonation reactor" (shape=tall_vessel, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "absorber" (shape=tall_column, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "absorber" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "recrystallise" (shape=cone_vessel, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "recrystallise" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "package" (shape=skid_box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "package" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "wash-water distillation" (shape=tall_column, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "wash-water distillation" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "packed column" (shape=tall_column, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "transportable skid module" (shape=skid_box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "transportable skid module" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "footprint containerised skid-mounted" (shape=skid_box, type=other) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[QUALITY] [family 6 — Denominator dishonesty]** equipment family "footprint containerised skid-mounted" falls to TYPE_RULES 'other' — its drawing-coverage expectation shrinks to {blender, general-arrangement} so it is never checked against P&ID/SLD/panel-schedule/BFD (scripts/blender-universal/parts_ledger.py:TYPE_RULES)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "pressurised vessel" (shape=vertical_vessel, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "distillation column" (shape=tall_column, type=vessel) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "reboiler" (shape=horizontal_vessel, type=exchanger) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+- **[BLOCKER] [family 6 — Denominator dishonesty]** equipment family "storage process pump" (shape=pump, type=rotating) matches NO _BOP_ROLES* placement regex — a BoM part of this family gets no dedicated 3D box (silent scene drop) (scripts/blender-universal/build_universal_scene.py:_BOP_ROLES*)
+  - fix pattern: the expectation derives from the same shared classification that governs rendering (ga_massing/TYPE_RULES) — one classification, both sides
+
+## Family 7 — Scorer double-penalties / silent caps (0 finding(s): 0 BLOCKER, 0 QUALITY-polish)
+
+- **[INFO] [family 7 — Scorer double-penalties / silent caps]** no sibling conditional verdict-literal patterns found outside the formula helpers; the four known families are fixed (FAIL (soft) defect/issue strings (_SOFT_MISS_RX → live recompute); generative-benchmark verdicts; Connection-trace bare-'OK'; Risk & Regulatory compliance-gate verdict (_compliance_verdict_fx)) and _enforce_live_check_gate guards the built workbook (scripts/build-excel-export.py)
+  - fix pattern: every deduction exactly once; verdicts are live formulas, never bare literals; caps only with differentiated excellence criteria
+
+## Family 8 — Procurement-model mismatches (0 finding(s): 0 BLOCKER, 0 QUALITY-polish)
+
+- **[INFO] [family 8 — Procurement-model mismatches]** market anchor present: MARKET_CO2_MINERALISATION_PILOT_EXWORKS_GBP_2026, MARKET_DC_BLOCK_GBP_PER_KWH_2026 (1 market citation(s) in the block) (scripts/lib/engineering-contract.ts)
+  - fix pattern: capture the archetype's real procurement model (with market citations) as contract inputs BEFORE judging any cost anchor; block price = authority, component lines = reconciled transparency breakdown
+- **[INFO] [family 8 — Procurement-model mismatches]** decisions register present: co2_mineralisation.decisions.json
+  - fix pattern: capture the archetype's real procurement model (with market citations) as contract inputs BEFORE judging any cost anchor; block price = authority, component lines = reconciled transparency breakdown
+
+## Family 10 — Unit-family comparison without normalization (0 finding(s): 0 BLOCKER, 0 QUALITY-polish)
+
+- **[INFO] [family 10 — Unit-family comparison without normalization]** no un-normalised unit-family comparisons detected in the known gate-32/caco3-closure comparison sites (independent-cost-sanity-audit.ts, co2-mineralisation.ts, deterministic_checks_lib.py, engineering-contract.ts)
+  - fix pattern: a value in unit A (kg, day, kWh, W…) compared or divided against a band/target in unit B of the SAME physical family (tonne, year, MWh, kW…) needs a canonical unit-family conversion (targetPerformanceValueAs / an explicit conversion factor) somewhere on the path — never compare raw magnitudes across a unit-family boundary (the gate-32 kg/tonne false-block + the caco3 closure t/day-vs-kg/day pattern, item-12 in CLAUDE.md's recurring-bug list)
+
+## Appendix — vocabulary coverage
+
+- brief/plan tokens evaluated: 214; unknown-everywhere: 180
+- sample known tokens: `absorber`→SHAPE_RULES:tall_column, `anaerobic-digestion`→SHAPE_RULES:vertical_vessel, `co2`→_GROW_BOP_ROLES:co2, `co2-rich`→_GROW_BOP_ROLES:co2, `column`→_VESSEL_SHAPE_RX/SHAPE_RULES:tall_column, `condenser`→SHAPE_RULES:horizontal_vessel/_BOP_ROLES:chiller, `control`→housing, `cooling`→qualifier-gated/_BOP_ROLES_COMPUTE:cooling, `distillation`→SHAPE_RULES:tall_column, `dosing`→catalogue-token/_GROW_BOP_ROLES:nutrient, `dryer`→SHAPE_RULES:vertical_vessel, `effluent`→_GROW_BOP_ROLES:water, `exchanger`→SHAPE_RULES:horizontal_vessel, `filter`→catalogue-token/GENERIC_HEADS, `heat`→qualifier-gated, `industrial`→qualifier-gated, `instrument`→housing/_INSTRUMENT_ROW_RX, `instrumentation`→housing/_INSTRUMENT_ROW_RX, `iso`→qualifier-gated, `module`→qualifier-gated/GENERIC_HEADS
+
+PRE-FLIGHT SUMMARY: 62 finding(s) for `co2_mineralisation` — 21 BLOCKER, 41 QUALITY-polish — an audit, not a gate (exit 0). Fix BLOCKERs first, then QUALITY-polish, BEFORE the first chain run (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight).
+· pre-flight: class 'co2_mineralisation' is ESTABLISHED (has a completed full-nets run) — report printed above, run proceeds (62 finding(s) are the campaign backlog, not a cold-start block)
+· .venv preflight OK: Python 3.12.12 + numpy imports
+· validation run: benchmark net FORCED ON (BENCHMARK_NET_FORCE=1), no CHAIN_SKIP_* nets, node v22.22.1
+· brief: briefs-loop/co2_mineralisation.md
+· out:   out/co2-campaign-v11
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/co2_mineralisation.md (4446 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: co2_mineralisation (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: co2_mineralisation): 3 HARD field(s) filled with class-aware inferred values, 3 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: max_mass_kg, target_material, design_life.
+  [U5] filled "max_mass_kg": 40000 (class-agnostic inference from brief text for unmapped class "co2_mineralisation")
+  [U5] filled "target_material": "316/316L stainless-steel process fabrication; products: calcium carbonate + potassium sulfate" (Material/products inferred from brief text for co2_mineralisation. class-agnostic inference from brief text for unmapped)
+  [U5] filled "design_life": "20–25 yr (chemical-process-plant design life; static process equipment + pressure vessels per PED / ASME VIII; periodic re-inspection)" (Industry-standard service life for co2_mineralisation per applicable design standard. class-agnostic inference from brie)
+[chain] U6 brief expansion: 11 duties derived; product="Precipitated calcium carbonate (industrial filler grade) and potassium sulfate (fertiliser grade)" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] co2_capture_capacity_kg_per_hr = 42 kg/h [stated/high] — Stated in brief (equivalent to 1 t/day continuous operation).
+  [U6] caco3_output_kg_per_hr = 95.8 kg/h [derived/high] — Derived from stated 2.3 t/day output (2300 kg / 24 h). Matches stoichiometry: 42 kg/h CO2 
+  [U6] k2so4_output_kg_per_hr = 162.5 kg/h [derived/high] — Derived from stated 3.9 t/day output (3900 kg / 24 h). Matches stoichiometry: 0.95 kmol/h 
+  [U6] calcium_sulfate_feed_kg_per_hr = 129.2 kg/h [derived/high] — Derived from stated 3.1 t/day (3100 kg / 24 h). Note: 3.1 t/day stoichiometrically aligns 
+  [U6] koh_feed_kg_per_hr = 108.3 kg/h [derived/high] — Derived from stated 2.6 t/day (2600 kg / 24 h). Matches stoichiometry: 2 moles KOH (MW=56)
+  [U6] bagging_throughput_bags_per_hr = 10.3 bags/h [derived/high] — Total solids = 95.8 kg/h (CaCO3) + 162.5 kg/h (K2SO4) = 258.3 kg/h. Packaged in 25 kg bags
+  [U6] mea_solvent_circulation_kg_per_hr = 777 kg/h [derived/medium] — 42 kg/h CO2 = 954 mol/h. Assuming a typical rich-lean delta loading of 0.25 mol CO2 / mol 
+  [U6] absorber_cooling_duty_kw = 22.5 kW [derived/medium] — Absorption of CO2 into MEA is exothermic (~85 kJ/mol). 954 mol/h CO2 * 85 kJ/mol = 81,090 
+  [U6] wash_water_distillation_duty_kw = 94 kW [derived/low] — Assuming wash water ratio of 1.5x CaCO3 cake mass to displace MEA = ~150 kg/h water to eva
+  [U6] solids_drying_duty_kw = 20 kW [derived/low] — Assuming 10% residual moisture in 258 kg/h combined filter cakes = ~28 kg/h water to evapo
+  [U6] flue_gas_handling_flow_kg_per_hr = n/a kg/h [derived/low] — Cannot be precisely quantified without knowing the source CO2 concentration (e.g., 5% vs 1
+  [U5b] dropped inferred plant-wide max_mass_kg cap (40000 kg) — field-erected co2_mineralisation; per-skid road limits apply
+[chain] engineering_contract: 61 quantities, 8 topology edges, 0 macro-assemblies (total £0), closures: 5 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":1002}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":963}
+[standards-writeback] web search: IEC 62477-1 — 826ms
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"web","latency_ms":1789}
+[products-writeback] {"product_name":"1.0 t/day CO₂ point-source capture (30 wt% MEA, 90% capture, ~42 kg/h) + single-sink gypsum mineralisation to solid products. Packed absorber DN300 × 24.5 m T-T (20 m packed, 316L); stripper DN300 × 1","hit":"db_hybrid","matched":"co2_mineralisation container","has_modules":false,"used_embedding":true,"candidates":1,"latency_ms":166}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[chain] Orchestrator: 12 modules, 24 sub-modules, 113 words, 20 tools ran (9417ms)
+[chain] Build #18k: toolOutputsBlock built (27 tools, 22202 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 19 component_classes covered (19 with match, 0 empty), 15336 chars (21360ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=1900000, envelope_volume_m3=77.02, target_performance_value=1 (t/day), operating_temp_min_c=0, operating_temp_max_c=120
+[chain] keyMetrics seeded early (pre-reviewer): Co2 Capture Capacity Tpd=1 t/day
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] physics-critic CACHE HIT (skeleton): design-hash 5c5f8d0e2924… — reusing the stored critique verbatim (no LLM call)
+[chain] PHASE 4 skeleton critic: brief=9/10 plaus=7/10 coh=9/10 part=8/10 hon=9/10 (8974ms)
+[chain] PHASE 4 skeleton critic: 2 HIGH-severity issues found before any LLM painting
+  ✗ [engineering_plausibility @ energy_conversion_transduction/sub_modules/0/words/0] The Gypsum Carbonation Reactor is specified as a 5 m³ vessel, and the maturation vessel is 3.6 m³. However, the contractAcceptedTradeOffs explicitly states that the engineering con
+  ✗ [engineering_plausibility @ energy_conversion_transduction/sub_modules/0/words/3] The K2SO4 forced-circulation crystalliser is specified as a 0.73 m dia × 2.6 m vessel (approx 1.1 m³), which matches the trade-off document. However, the feed vessel is listed as 3
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[callLlm] cache HIT (4075a1028b6388f00477850b23cd3966) for x-ai/grok-4.3 — LLM not called (determinism #86)
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 11886 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 17 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 12 / 17 patches (skipped 5)
+    skip merge [identity-locked A3]: energy_conversion_transduction.gypsum_carbonation_reactor_mass_fluid_transport_process.reactor_overflow_launder_word manufacturer="fabricated to order" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_conversion_transduction.gypsum_carbonation_reactor_mass_fluid_transport_process.reactor_overflow_launder_word material="316L stainless steel" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_conversion_transduction.gypsum_carbonation_reactor_mass_fluid_transport_process.reactor_overflow_launder_word rating_primary="open channel 150 mm wide" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_conversion_transduction.gypsum_carbonation_reactor_mass_fluid_transport_process.reactor_overflow_launder_word regulatory="PED 2014/68/EU" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_conversion_transduction.gypsum_carbonation_reactor_mass_fluid_transport_process.reactor_overflow_launder_word (+5 modifiers)
+    skip: sub-module "mass_fluid_transport_process.caco3_filter_dry_line_mass_fluid_transport_process" not found
+    skip merge [identity-locked A3]: structure_containment.skid_structure.column_plinth_word manufacturer="fabricated to order" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: structure_containment.skid_structure.column_plinth_word material="reinforced concrete + galvanised steel frame" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 28.6s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":2009}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] physics-critic CACHE HIT (stage-7.5): design-hash c9b48022d30a… — reusing the stored critique verbatim (no LLM call)
+[chain] critic scored: brief=9/10 phys=7/10 coh=9/10 part=8/10 hon=9/10 (5817ms)
+[chain] critic headline: The design honours the documented trade-off of a tall field-erected column beside a transportable skid, but exhibits a major thermal utility mismatch where the steam boiler is undersized for the combined reboiler and drying loads.
+[chain] critic issues: 1 high, 1 med, 3 total
+  ✗ [high/high] engineering_plausibility @ environmental_interface/sub_modules/0/words/0: The Fulton Electropack EP100 steam boiler is rated for 230 kW electrical input and 350 kg/h steam capacity. However, the thermal utility loads across the plant 
+  ✗ [med/high] engineering_plausibility @ mass_fluid_transport_process/sub_modules/0/words/0: The packed absorber column is specified with a height of 24.5 m. While the contract accepted trade-offs note that tall columns are shipped as flanged segments a
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[callLlm] cache HIT (62d4a937381a355c14e5f76a683038c3) for google/gemini-3.1-flash-lite — LLM not called (determinism #86)
+[chain] STEP 8: R4 Flash-Lite review raw response: 7530 chars
+[chain] STEP 8: R4 Flash-Lite review returned 9 patches
+[chain] STEP 8: R4 Flash-Lite review applied 3 / 9 patches (skipped 6)
+    skip: sub-module "mass_fluid_transport_process.caco3_filter_dry_line_mass_fluid_transport_process" not found
+    skip: sub-module "mass_fluid_transport_process.caco3_filter_dry_line_mass_fluid_transport_process" not found
+    REJECT [structure-locked] add_sub_module safety_protection.safety_protection_emc_grounding: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "safety_protection" (0 flagged module(s): none)
+    skip add_grammar_link: from_sub_module "safety_protection_emc_grounding" not in safety_protection
+    skip add_grammar_link: from_sub_module "safety_protection_emc_grounding" not in safety_protection
+    +overview mass_fluid_transport_process: +432 chars
+    +overview energy_conversion_transduction: +411 chars
+    +overview environmental_interface: +370 chars
+[chain] STEP 8: R4 Flash-Lite review done in 9.6s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1215}
+[chain] canonical product_class OVERRIDE: "" → "co2_mineralisation" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "co2_mineralisation" — skipping
+[chain] physics repair: 0 iter(s); HIGH 1→1; plausibility 7→7; patches 0
+[chain] modifier dedup: collapsed 3 cosmetic-dupe modifier(s) across 3 component(s)
+[chain] sub-module prose pre-fill: rewrote 24/24 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] library-override detection: tagged 14 word(s) with source_detail="Library override: (no reason given)" — these will be Brave-verified by background-enrichment
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 1 unable_to_compare
+[chain] verified-parts allowlist: 221 entries (KPA=124, emitter=97, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 24 sub_modules checked, 24 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 1 pass / 0 fail; grammar 9 pass / 4 fail; total score 1770
+  ✗ [no_orphan_sub_modules] grammar: 2 orphan sub-module(s) with no grammar_links: maintenance_serviceability::bagging_packaging_line_mass_fluid_transport_process, maintenance_serviceability::bagging_packaging_line_thermal_transfer
+  ✗ [thermal_path_closes] grammar: 5 heat-source sub-module(s) without thermal_path: energy_conversion_transduction::gypsum_carbonation_reactor_chemical_reaction_electromagnetic_actuator, power_distribution::electrical_distribution_electrical_conduction, power_distribution::electrical_distribution_silicon_semiconductor, power_distribution::electrical_distribution_electromagnetic_actuator, maintenance_serviceability::bagging_packaging_line_mass_fluid_transport_process. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [power_topology_closes] grammar: 1 power-consuming module(s) without cross-link to source: environmental_interface
+  ✗ [module_prose_subset_of_sub_modules] grammar: 1 module(s) name components in overview that are absent from sub-modules (procurement gap): mass_fluid_transport_process: overview mentions 1 concrete component not present in any sub-module word — htu-ntu. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[chain] Phase 2 iter 0: applied 6 patches, skipped 1, allowlist_rejected=0, state_changed=true
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for bagging_packaging_line_mass_fluid_transport_process)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for gypsum_carbonation_reactor_chemical_reaction_electromagnetic_actuator)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for power_distribution sub-modules)
+    +cross_module_grammar_links.[+] (Fix power_topology_closes for environmental_interface)
+    skip append-to-non-array: maintenance_serviceability.grammar_links[+]
+    +mass_fluid_transport_process.sub_modules[0].words[+] (merge 4 modifiers into existing word to meet density requirements)
+    +mass_fluid_transport_process.sub_modules[0].words[+] (add missing component mentioned in overview to satisfy procurement gap)
+[chain] Phase 2 iter 1: arith 1 pass / 0 fail; grammar 12 pass / 1 fail; total score 3470
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process prose drops 2/7 words: cake_wash_manifold_word, HTU-NTU analysis tool. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+[chain] Phase 2 iter 1: applied 1 patches, skipped 2, allowlist_rejected=2, state_changed=true
+    =mass_fluid_transport_process.sub_modules[0].english_sentence (Update prose to include missing words cake_wash_manifold_word and htu_ntu_analysis_word.)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[5]: word patch contains MPN="fabricated 316L wash-bar manifold — made to order" not in verified-parts allowlist (221 entries). Patch dropped. (Enrich cake_wash_manifold_word with missing part_number and rating_primary.)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[2].words[1]: word patch contains MPN="fabricated 316L wash-bar manifold — made to order" not in verified-parts allowlist (221 entries). Patch dropped. (Enrich cake_wash_manifold_word in filtration module with missing mandatory modifiers.)
+[chain] Phase 2 iter 2: arith 1 pass / 0 fail; grammar 12 pass / 1 fail; total score 3470
+  ✗ [sub_module_prose_covers_words] grammar: 1 sub-module(s) have prose that drops at least one word — the BoM-grade prose must name every word so the BoM table and the prose match: mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process prose drops 1/7 words: cake_wash_manifold_word. FIX: emit an edit_sub_module_field patch on the offending sub-module's english_sentence (or paragraph_en) that names every word in words[] by its name_human, weaving the modifiers naturally.
+[chain] Phase 2 iter 2: applied 1 patches, skipped 2, allowlist_rejected=2, state_changed=false
+    =mass_fluid_transport_process.sub_modules[0].english_sentence (Update prose to include cake_wash_manifold_word)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[0].words[5]: word patch contains MPN="fabricated 316L wash-bar manifold — made to order" not in verified-parts allowlist (221 entries). Patch dropped. (Add missing modifiers to cake_wash_manifold_word in absorber train)
+    ALLOWLIST_REJECT mass_fluid_transport_process.sub_modules[2].words[1]: word patch contains MPN="fabricated 316L wash-bar manifold — made to order" not in verified-parts allowlist (221 entries). Patch dropped. (Add missing modifiers to cake_wash_manifold_word in filtration line)
+[chain] Phase 2: no state change after repair iter 2 — bailing (further iterations will not progress).
+[chain] post-Phase-2 prose pre-fill: rewrote 1/24 sub-modules
+[fill-blank-mpn] 2 blank catalogue word(s) for class "co2_mineralisation" (2 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::k2so4_recovery_line_mass_fluid_transport_process (K2SO4 pusher centrifuge) → Andritz ecoOne
+[fill-blank-mpn]   ✓ DB   environmental_interface::thermal_utilities (electric steam generator) → Chromalox CHSI
+[fill-blank-mpn] filled 2/2 blank word(s): 2 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 2 structural skipped.
+[chain] fill-blank-mpn: branded 2/2 blank catalogue word(s) (2 DB-first real MPN, 0 generated real-OEM), 2 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 659 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 21011 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 97 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=12 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"co2_mineralisation","resolved_to":"co2_mineralisation","hit":"db","nodes":9,"edges":30}
+[chain] K10 shadow: PASS_SHADOW — matched=13 missing=0 extra=0
+[chain] headline derived: Co2 Capture Capacity Tpd=1 t/day [derived_from_brief]; Unit cost ceiling=1,900,000 GBP;  (0.00s)
+[chain] part verification: 97 parts checked — verified=64, unverified=25, uncertain=8, skip=0
+[chain] G5 RAG: 33 queries → 11 suggestions (high=0, medium=0, low=11, below_threshold=22, corpus=50 rows)
+[chain] part verification: stripped 32 high-confidence fake part_numbers
+  • mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process::packed_absorber_column_word → removed "fabricated 316L packed column — bespoke vessel" (The term 'fabricated 316L packed column — bespoke vessel' is a descriptive phrase for a custom-engin)
+  • mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process::flue_gas_blower_word → removed "centrifugal process fan — made to order" (The term 'centrifugal process fan — made to order' is a descriptive category for custom-engineered e)
+  • energy_conversion_transduction::gypsum_carbonation_reactor_chemical_reaction_electromagnetic_actuator::stirred_carbonation_reactor_word → removed "fabricated jacketed 316L stirred-tank reactor — bespoke vessel" (De Dietrich is primarily known for glass-lined steel equipment, and while they offer bespoke vessels)
+  • energy_conversion_transduction::gypsum_carbonation_reactor_mass_fluid_transport_process::slurry_recirculation_pump_word → removed "WGR 40" (The Warman WGR series is categorized by discharge size (e.g., 35mm to 250mm), and '40' does not corr)
+  • mass_fluid_transport_process::caco3_filter_dry_line_thermal_transfer::dryer_air_heater_battery_word → removed "finned process air-heater battery — made to order" (The search results provided do not contain any mention of the manufacturer 'Heating Energy Systems' )
+[chain] part verification: inherited part_number from deterministic sibling for 5 stripped word(s)
+  ↳ mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process::packed_absorber_column_word ← mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process::structured_packing_word (PN: MELLAPAK 250.Y)
+  ↳ mass_fluid_transport_process::caco3_filter_dry_line_thermal_transfer::dryer_heat_recovery_exchanger_word ← mass_fluid_transport_process::caco3_filter_dry_line_thermal_transfer::caco3_hot_air_dryer_word (PN: FLUIDBED VIBRO-FLUIDISER)
+  ↳ energy_conversion_transduction::k2so4_recovery_line_thermal_transfer::crystalliser_vacuum_condenser_word ← energy_conversion_transduction::k2so4_recovery_line_thermal_transfer::k2so4_hot_air_dryer_word (PN: FLUIDBED VIBRO-FLUIDISER)
+  ↳ control_compute_communication::process_control_system::plc_controller_word ← control_compute_communication::process_control_system::io_remote_rack_word (PN: 6ES7155-6AU01-0CN0)
+  ↳ safety_protection::safety_protection_chemical_sensing::amine_vapour_detector_word ← safety_protection::safety_protection_chemical_sensing::co2_gas_detector_word (PN: Polytron 8700)
+[chain] strip+recommend: 32 recommendations — high=11, medium=8, low=0, unknown=13 (manual sourcing required)
+[chain] structural-gate router: surfaced 1 unrepaired gate(s) as design decisions
+[mouser] HTTP 400 for fabricated 316L atmospheric storage tank — bespoke vessel
+[nexar] GraphQL errors for mpn=CRNE 5-8: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=fabricated 316L atmospheric storage tank — bespoke vessel: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=M10-BFG: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=M6-FG: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=MELLAPAK 250.Y: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for fabricated 316L maturation vessel — bespoke vessel
+[mouser] HTTP 400 for fabricated 316L ring sparger — made to order
+[nexar] GraphQL errors for mpn=fabricated 316L ring sparger — made to order: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=fabricated 316L maturation vessel — bespoke vessel: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ISOJET: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Cartex-DN: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=M3BP 132S: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=BN 35-6L: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=MULTICOR: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[digikey] daily quota exhausted (429). Calls disabled until 2026-07-06T23:59:59.412Z. Quota resets at midnight UTC.
+[nexar] GraphQL errors for mpn=M10-BFG plate pack: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CPS11D: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for fabricated 316L overflow launder — made to order
+[nexar] GraphQL errors for mpn=BF (horizontal vacuum belt filter): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CPS12D: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=fabricated 316L overflow launder — made to order: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Dolphin LB 0250: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=SV 8.190/2: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for fabricated 316L wash-bar manifold — made to order
+[nexar] GraphQL errors for mpn=FLUIDBED VIBRO-FLUIDISER: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=fabricated 316L wash-bar manifold — made to order: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRNE 10-4: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for ecoOne
+[mouser] HTTP 400 for fabricated 316L agitated dissolution tank — bespoke vessel
+[mouser] HTTP 400 for fabricated jacketed 316L stripping pot — bespoke vessel
+[nexar] GraphQL errors for mpn=ecoOne: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=fabricated jacketed 316L stripping pot — bespoke vessel: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=fabricated 316L agitated dissolution tank — bespoke vessel: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for CB110
+[nexar] GraphQL errors for mpn=BN 17-6L: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRNE 5-6: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRNE 3-5: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CRNE 10-5: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CB30 (brazed-plate condenser): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=CB60 (brazed-plate reboiler): [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 6AV2123-2MA03-0AX0
+[mouser] HTTP 400 for fabricated condensate/feedwater vessel — bespoke vessel
+[nexar] GraphQL errors for mpn=CB110: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 6GK5008-0BA10-1AB2
+[nexar] GraphQL errors for mpn=fabricated condensate/feedwater vessel — bespoke vessel: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Micro Motion 7826: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ECF0001600021: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Acti9 Isobar B: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for ATS22D32S6
+[nexar] GraphQL errors for mpn=CMP CW 20S: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ACS580-07: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for Trihal 630 kVA cast-resin transformer
+[nexar] GraphQL errors for mpn=FPNO-21: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Trihal 630 kVA cast-resin transformer: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for GRP 110% bunded containment tray — fabricated
+[nexar] GraphQL errors for mpn=GRP 110% bunded containment tray — fabricated: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for bolted structural-steel vessel saddle — fabricated
+[mouser] HTTP 400 for ATEX-bonded galvanised ventilation ductwork — fabricated to layout
+[nexar] GraphQL errors for mpn=bolted structural-steel vessel saddle — fabricated: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Polytron 8200: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=ATEX-bonded galvanised ventilation ductwork — fabricated to layout: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[farnell] HTTP 403 for 3SK1112-1BB40
+[nexar] GraphQL errors for mpn=PNOZ s3: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=KFD2-STC4-Ex1: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[nexar] GraphQL errors for mpn=Rotoplat 308: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[mouser] HTTP 400 for infrared bag-seam pre-heat bar — made to order
+[nexar] GraphQL errors for mpn=infrared bag-seam pre-heat bar — made to order: [{"message":"You have exceeded your part limit of 0. Please upgrade your plan. Contact us at api@nexar.com for assistance.","extensions":{"remote":{"message":"You have exceeded your part limit of 0. P
+[chain] Stage 10.5 Part Reality Check: 56 checked, 8 real, 0 substituted, 48 warned (no substitute available). Nexar calls used: 48.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ mea_circulation_pump_word: "Grundfos CRNE 5-8" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ mea_storage_tank_word: "? fabricated 316L atmospheric storage tank — bespoke vessel" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ rich_lean_mea_exchanger_word: "Alfa Laval M10-BFG" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ lean_amine_cooler_word: "Alfa Laval M6-FG" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ packed_absorber_column_word: "Sulzer MELLAPAK 250.Y" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ co2_sparger_ring_word: "? fabricated 316L ring sparger — made to order" [class=chemical_reaction_function, library_class=none]
+  ⚠ carbonation_maturation_vessel_word: "? fabricated 316L maturation vessel — bespoke vessel" [class=chemical_reaction_function, library_class=none]
+  ⚠ reactor_agitator_word: "Ekato ISOJET" [class=electromagnetic_actuator_function, library_class=motor_actuator]
+  ⚠ agitator_shaft_seal_word: "EagleBurgmann Cartex-DN" [class=electromagnetic_actuator_function, library_class=motor_actuator]
+  ⚠ agitator_drive_motor_word: "ABB M3BP 132S" [class=electromagnetic_actuator_function, library_class=motor_actuator]
+  ⚠ slurry_transfer_pump_word: "SEEPEX BN 35-6L" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ gypsum_feed_hopper_word: "Schenck Process MULTICOR" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ mea_exchanger_plate_pack_word: "Alfa Laval M10-BFG plate pack" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ reactor_ph_probe_word: "Endress+Hauser CPS11D" [class=chemical_sensing_function, library_class=sensor]
+  ⚠ caco3_vacuum_belt_filter_word: "BHS-Sonthofen BF (horizontal vacuum belt filter)" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ reactor_orp_probe_word: "Endress+Hauser CPS12D" [class=chemical_sensing_function, library_class=sensor]
+  ⚠ reactor_overflow_launder_word: "? fabricated 316L overflow launder — made to order" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ filter_vacuum_pump_word: "Busch Dolphin LB 0250" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ cake_air_blower_word: "Becker SV 8.190/2" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ caco3_hot_air_dryer_word: "GEA FLUIDBED VIBRO-FLUIDISER" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ cake_wash_manifold_word: "? fabricated 316L wash-bar manifold — made to order" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ filtrate_receiver_pump_word: "Grundfos CRNE 10-4" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ k2so4_centrifuge_word: "Andritz ecoOne" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ mea_stripper_pot_word: "? fabricated jacketed 316L stripping pot — bespoke vessel" [class=chemical_reaction_function, library_class=none]
+  ⚠ koh_dissolution_tank_word: "? fabricated 316L agitated dissolution tank — bespoke vessel" [class=chemical_reaction_function, library_class=none]
+  ⚠ k2so4_slurry_feed_pump_word: "SEEPEX BN 17-6L" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ mother_liquor_recycle_pump_word: "Grundfos CRNE 5-6" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ mea_recycle_pump_word: "Grundfos CRNE 3-5" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ wash_water_feed_pump_word: "Grundfos CRNE 10-5" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ overhead_condenser_word: "Alfa Laval CB30 (brazed-plate condenser)" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ reboiler_word: "Alfa Laval CB60 (brazed-plate reboiler)" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ crystalliser_heater_word: "Alfa Laval CB110" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ condensate_flash_vessel_word: "? fabricated condensate/feedwater vessel — bespoke vessel" [class=thermal_transfer_function, library_class=thermal]
+  ⚠ density_meter_word: "Emerson Micro Motion 7826" [class=chemical_sensing_function, library_class=sensor]
+  ⚠ roxtec_transits_word: "Roxtec ECF0001600021" [class=electrical_conduction_function, library_class=none]
+  ⚠ distribution_board_word: "Schneider Electric Acti9 Isobar B" [class=electrical_conduction_function, library_class=none]
+  ⚠ cable_glands_word: "CMP Products CMP CW 20S" [class=electrical_conduction_function, library_class=none]
+  ⚠ vsd_drive_large_word: "ABB ACS580-07" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ drive_fieldbus_module_word: "ABB FPNO-21" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ transformer_word: "Schneider Electric Trihal 630 kVA cast-resin transformer" [class=electromagnetic_actuator_function, library_class=motor_actuator]
+  ⚠ chemical_bund_word: "? GRP 110% bunded containment tray — fabricated" [class=mechanical_load_bearing_function, library_class=mechanical_assembly]
+  ⚠ vessel_supports_word: "? bolted structural-steel vessel saddle — fabricated" [class=mechanical_load_bearing_function, library_class=mechanical_assembly]
+  ⚠ co2_asphyxiation_detector_word: "Dräger Polytron 8200" [class=chemical_sensing_function, library_class=sensor]
+  ⚠ atex_ductwork_word: "? ATEX-bonded galvanised ventilation ductwork — fabricated to layout" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ atex_fan_interlock_relay_word: "Pilz PNOZ s3" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ sil_barrier_word: "Pepperl+Fuchs KFD2-STC4-Ex1" [class=silicon_semiconductor_function, library_class=electronic_power_module]
+  ⚠ palletiser_word: "Robopac Rotoplat 308" [class=mass_fluid_transport_process, library_class=fluid_path]
+  ⚠ bag_mouth_preheater_word: "? infrared bag-seam pre-heat bar — made to order" [class=thermal_transfer_function, library_class=thermal]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] module-paragraph-llm: 12/12 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 5 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/12 capital (threshold 8); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 2 sections, 0 warnings
+[chain] design decisions review: 6 choices (1 applied, 5 flagged, 0 blocked)
+[fill-blank-mpn] 16 blank catalogue word(s) for class "co2_mineralisation" (13 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::mea_absorption_train_mass_fluid_transport_process (flue-gas inlet blower) → CEM S.r.l. BLC-ex 12
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::gypsum_carbonation_reactor_chemical_reaction_electromagnetic_actuator (stirred carbonation reactor) → De Dietrich AE250
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::gypsum_carbonation_reactor_mass_fluid_transport_process (reactor slurry recirculation pump) → SEEPEX BN35-6L
+[fill-blank-mpn]   ✓ DB   mass_fluid_transport_process::caco3_filter_dry_line_thermal_transfer (dryer inlet air-heater battery) → Chromalox ADH Series
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::k2so4_recovery_line_mass_fluid_transport_process (KOH solids dosing feeder) → Coperion K-Tron K-ML-D5-KT20
+[fill-blank-mpn]   ✓ DB   environmental_interface::thermal_utilities (electric hot-air process heater) → Chromalox ADH Series
+[fill-blank-mpn]   ✓ DB   structure_containment::skid_structure (access platform and ladders) → Kee Safety Kee Platform
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection_mass_fluid_transport_process (pressure relief valves) → Goetze Series 851
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection_mass_fluid_transport_process (safety shower and eyewash) → Hughes Safety Showers L18GS34G
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection_mass_fluid_transport_process (MEA-tank nitrogen blanketing skid (O2 exclusion)) → Groth Corporation 3011
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection_mass_fluid_transport_process (ATEX-rated area extract fan) → Systemair AXC 100 A
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection_mass_fluid_transport_process (ATEX-zone make-up-air inlet louvre) → CVE Shop CVWL38-600
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection_silicon_semiconductor (addressable gas-detection controller) → Raritan EM-X2
+[fill-blank-mpn]   ✓ DB   maintenance_serviceability::bagging_packaging_line_thermal_transfer (bag heat sealer) → Fischbein B2600
+[fill-blank-mpn]   ✓ DB   maintenance_serviceability::bagging_packaging_line_thermal_transfer (band-sealer jaw heating element) → Foscott Packaging FRD675
+[fill-blank-mpn] filled 15/16 blank word(s): 15 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 13 structural skipped.
+[chain] fill-blank-mpn (late sweep, post-reconcile): branded 15/16 catalogue word(s) minted AFTER the first fill pass (15 DB-first real MPN, 0 generated real-OEM)
+[chain] provenance rooting: 103/141 inputs trace to the brief (73%) — 38 ROOTLESS: flue_gas_flow_m3_per_hour, mea_circulation_pump_kw, absorber_column_diameter_m, absorber_column_height_tt_m, lean_co2_loading_mol_l, lean_k2so4_mol_l, absorber_material, stripper_column_diameter_m, stripper_column_height_m, reboiler_area_m2, lean_rich_cross_exchanger_duty_kw, lean_rich_cross_exchanger_area_m2, overhead_condenser_duty_kw, overhead_condenser_area_m2, gypsum_carbonation_reactor_volume_m3, gypsum_reactor_agitator_kw, co2_fixed_gypsum_route_t_per_day, total_co2_fixed_t_per_day, k2so4_crystalliser_volume_m3, k2so4_crystalliser_evap_kw, flue_gas_blower_flow_m3_per_hour, flue_gas_blower_kw, dryer_heat_duty_kw, hot_air_process_heater_kw, dryer_air_heater_battery_kw, shrink_tunnel_heater_kw, boiler_steam_capacity_kg_h, electric_steam_generator_kw, electrical_consumer__mea_circulation_pump_kw, electrical_consumer__gypsum_reactor_agitator_kw, electrical_consumer__k2so4_crystalliser_evap_kw, electrical_consumer__flue_gas_blower_kw, electrical_consumer__electric_steam_generator_kw, electrical_consumer__hot_air_process_heater_pair_kw, electrical_consumer__dryer_air_heater_battery_kw, electrical_consumer__shrink_tunnel_heater_kw, co2_capture_efficiency_pct, carbonation_conversion_pct
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 6.2 kW, 1.10%); economic-conductor saving £52,648
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 6.2 kW, 1.10%); economic-conductor saving £52,648
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 6.2 kW, 1.10%); economic-conductor saving £52,648
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 6.2 kW, 1.10%); economic-conductor saving £52,648
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 558.75 → 564.909 kW (Δ 6.159 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 79543) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/blender-bg.log
+[estimate] product_class=co2_mineralisation annual_volume=100 (default)
+[estimate] corpus real-price lookup ENABLED for class 'co2_mineralisation' (88 priced corpus rows)
+[estimate] pinned 113 parts from emitter list_price_gbp modifiers (bypasses Engine B curve)
+[estimate] corpus pin-override: 25/113 pinned parts re-priced from a confident real corpus match (rounded author pins replaced by sourced prices; non-matching pins preserved)
+[estimate] 2 parts need price estimates
+[estimate] corpus-classified 0/2; 2 need rule-based / Flash-Lite
+[estimate] rule-based classified 0 parts; 2 still need Flash-Lite
+[estimate] Flash-Lite classified 1 batches
+[estimate] updated 0 existing, synthesised 2 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] classification source: corpus=0 rule_based=0 flash_lite=2 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=2 flash_lite_unknown=0
+[estimate] top classes in BoM:
+  fluid_path: 1
+  oem_subsystem: 1
+[estimate] estimated cost: GBP 0.000
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 115 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 115/115 results in 52.7s
+[engine-c] flags: in_range=77  over=14  under=1  no_reference=23
+[engine-c] 15/115 priced lines flagged out-of-range vs reference corpus (13.0%)
+[engine-c] 60 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "co2_mineralisation" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: co2_mineralisation
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[supplier-validate] no suppliers to validate
+[hero] step 0: per-project geometry generator (LLM)...
+[geom-gen] containerised design (enclosure signal in brief/contract) → render routes to the UNIVERSAL builder; skipping the LLM geometry pass (kill-switch: UNIVERSAL_CONTAINERISED=0)
+[hero]   geometry generator failed (5); falling back to unmodified template
+[hero] step 1: Blender structural reference cover pass...
+[render-scene] containerised design (enclosure signal in brief/contract) → UNIVERSAL deterministic builder (kill-switch: UNIVERSAL_CONTAINERISED=0)
+[render-scene] no per-class template → UNIVERSAL builder build_universal_scene.py
+[univ] state=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[univ] out  =/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11
+[univ] containerised layout: enclosure 12.19 × 2.44 m (aspect 5.0) → flat-pack equipment into the container footprint
+[univ] physical parts kept = 76; non-physical dropped = 39
+[univ] dropped: structured packing, spare cross-exchanger plate pack, CO2 sparger ring, agitator shaft mechanical seal, gypsum feed hopper + screw, reactor pH probe, reactor ORP probe, reactor temperature sensor, plant PLC controller, HMI panel, electromagnetic flow meters, radar level transmitters, pH/conductivity analysers, temperature transmitters, pressure transmitters, CO2 gas analyser, power + control cabling, cable transit frames, cable glands, variable-speed drives, blower/centrifuge VSDs, soft starters, drive fieldbus modules, motor contactors, motor-protection relays, motor-protection circuit breakers, process skid frame, access platform + ladders, pressure relief valves, safety shower + eyewash, CO2 + VOC gas detector, CO2 asphyxiation detectors, amine-vapour detectors, fan-trip gas-detection relay, emergency shutdown system, safety relays, SIL-rated isolation barriers, gas-detection controller, sealer jaw heating element
+[univ] undimensioned-tall cap = 39.2 m (= 1.6× tallest dimensioned vessel); capped parts: ['stirred carbonation reactor', 'reactor agitator', 'reactor overflow launder', 'reactor slurry density meter', 'KOH reaction vessel', 'MEA stripper reboil pot']
+[univ] orphan connector: +79 edge(s) — 3 distribution-spine, 30 power, 10 signal, 36 water (load hub=motor control centre, spine=distribution transformer→busbar + distribution board→motor control centre, control hub=remote I/O racks)
+[ledger] direction-closer: +25 edge(s) (20 input from upstream, 5 output to downstream) — flow-through parts connected both ways
+[ledger] air-closer: +3 air line(s) — air-movers feed their aeration consumer
+[ledger] power-closer: +1 power feed(s) from 'motor control centre' — every powered part now shows its supply
+[ledger] boundary closer: +10 edge(s) — sinks fed from their producer + discharged to disposal; feed/product stages tied to the battery limit
+[ledger] residual closer: +11 edge(s) — every remaining required connection terminated (nearest in-plant partner, else battery limit)
+[ledger] flow-demand join: 44 fluid edge(s) now carry their contract flow demand (required_value m3/h) — pipes size from true flows
+[ledger] power-demand join: 1 electrical edge(s) now carry their destination's real current demand (required_value A) — cables size from true loads
+[ledger] steam-to-reboiler redirect: 1 edge(s) re-homed onto 'distillation reboiler'
+[ledger] COMPLETENESS: ✓ all 76 parts show their required inputs + outputs
+[ledger] REFERENTIAL INTEGRITY: ✓ every connection names a real part on both ends (graph is fully traceable)
+[ledger] wrote connection-ledger.json — 137 authored connection(s), 0 dropped, 0 completeness concern(s), 0 integrity violation(s) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/connection-ledger.json
+[univ] region order (L->R): ['Gypsum Carbonation Reactor', 'K2SO4 Recovery & Crystallisation', 'MEA Recovery & Recycle', 'MEA Absorption & Capture', 'CaCO3 Filtration & Drying', 'Skid Structure & Containment', 'Bagging & Packaging', 'Thermal Utilities', 'Electrical Distribution', 'Process Control System', 'Process Instrumentation', 'Safety & Protection']
+[univ] geometry family = process_plant  (product_class=co2_mineralisation; aero/flight-vehicle = 0, tower-machine = 1 [grounded=True], grow/panel = 0 (distinct 0), battery-system = 2, rack/cabinet/server = 4 (structure 2, rack_class=False), vessel = 24 (distinct 22), marine = 0 (is_marine=False), of 76 physical parts; true_aircraft=False, true_spacecraft=False)
+[univ][flow] flow order (feed→product): ['K2SO4 Recovery & Crystallisation', 'Gypsum Carbonation Reactor', 'CaCO3 Filtration & Drying', 'Skid Structure & Containment', 'Bagging & Packaging', 'Safety & Protection', 'MEA Recovery & Recycle', 'MEA Absorption & Capture', 'Thermal Utilities']
+[univ][flow] periphery (non-flow → back row): ['Electrical Distribution', 'Process Control System', 'Process Instrumentation']
+[univ][det-layout] tiny train region 'Safety & Protection' (0.25 m² total) → periphery block (no solo corner bay)
+[univ][det-layout] periphery hug: 13 part(s) in 4 non-flow region bay(s) packed as a back row on the train top edge (+2500 mm aisle)
+[univ][det-layout] manifold hug: 3 inline manifold/header part(s) seated beside their ledger-tied host run (+800 mm)
+[univ][det-layout] DETERMINISTIC placement ON — 76 parts positioned by construction
+[univ][container] flat-pack 76 parts into 11.7 m internal length → 11.7 m × 15.1 m (rows wrap at length)
+[univ] plant bbox (mm): {'x0': -15650.0, 'x1': 17723.0, 'y0': -16400.0, 'y1': 16650.0}
+[univ][layout] co-located 5 field instrument(s) onto process equipment (was a floating instrument band)
+[univ][layout] grounded 0 floating part(s) + 44 unowned stray mesh(es) onto the deck: []
+[univ][spine] axis=x  spine_y=-1806  aisle=2528 mm  x∈[-15650,17723] y∈[-16400,16650]  (76 equip)
+[univ] topology edge 136 UNRESOLVED (signal): motor control centre -> Plant control system — battery limit  [missing: Plant control system — battery limit]
+[univ][wire] STAGE 4: spine router drew 2 abstract-boundary edge(s); DEFERRED 134 part-to-part edge(s) to wire_ports (each edge drawn once)
+[univ] routed edge 5 (electrical_bus) CABLE-TRAY: electrical_supply  ->  crystalliser circulation heater  (+0 load drops)
+[univ] DETOUR-RESCUE edge 8 (electrical_bus): spine route 45.7 m (5.05x straight) -> direct L 12.8 m
+[univ] routed edge 8 (electrical_bus) CABLE-TRAY: Utility Incomer  ->  distribution transformer  (+0 load drops)
+[univ] topology routed = 2/137; unresolved = 1
+[univ][ground] per-part slab coverage: 76 parts, 0 centre(s) off slab (all on)
+[univ][ground] STAGE 4 floor — REQUESTED 34.8×35.2 m at (1.0,-0.2); ACTUAL obj.dimensions=(34795, 35190, 400) mm location=(1048, -245, 100) mm (if ACTUAL≈half the request, add_box is halving boxes)
+[univ][ground] coverage VERIFIED — 0 equipment centres off the deck (34.8×35.2 m at (1.0,-0.2))
+[univ][ports] STAGE 2 connection ports — 76/76 parts ported, 155 ports total (fluid stubs + small terminals; stored on part.ports for Stage-3 wiring)
+[univ][wire]   overhead deck Z = 4450 mm (equipment-bulk top + 450 mm clearance)
+[univ][wire]   PLANT-SPANNING motor control centre → 31× power: dest span 30.2 m > 16 m → single-line/P&ID (no 3-D tray beam; lengths routed logically)
+[univ][wire] STAGE 3/4 port-to-port wiring — 134/137 ledger edges ROUTED (91 drawn port-to-port, 43 length-only logical cable runs, 0 via a port fallback), 2 already drawn by the spine router (abstract boundary), 1 left unwired (abstract boundary / assembly); 0 fan-out(s) routed as a SHARED TRAY; total routed length 2822.3 m
+[univ][wire]   routed length by service (m): {'air': 96.18, 'power': 887.39, 'signal': 193.08, 'thermal': 60.95, 'water': 1584.7}
+[univ][wire]   UNWIRED motor control centre→Plant control system — battery limit [signal/signal]: destination is an abstract boundary / unported part
+[univ][wire]   wrote wired-lengths.json — 134 runs, 2822.3 m total → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/wired-lengths.json
+[univ][conn-audit] 93 drawn run(s); 0 endpoint(s) NOT on a part (tol 1400 mm) — these are the 'random lines':
+[univ][conn-audit] MESH objects reaching >3 m BEYOND the plant: 0
+[univ][inventory] mesh families: u_vessel_supports=220, u_wire_=182, u_packed_absorber=122, u_k=83, u_caco=80, u_pipe_u=48, u_reactor_slurry=46, u_mea_distillation=45, u_route_=40, u_reactor_agitator=37, u_product_storage=36, u_reactor_overflow=36, u_stirred_carbonation=36, u_ladhoop_u=32, u_mea_stripper=32, u_carbonation_maturation=31, u_field_erection=30, u_dryer_inlet=28
+[univ][inventory] THIN+LONG 'line' meshes (>8 m long, <0.7 m thick): 10
+   len= 24.4m zc=15000mm  u_packed_absorber_column_shell/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:15587: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  bsdf = m.node_tree.nodes.get("Principled BSDF") if m.use_nodes else None
+/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:15723: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  world.use_nodes = True
+00:59.231  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-hero.png'
+00:59.661  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-iso.png'
+01:00.097  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-top.png'
+01:00.521  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-front.png'
+01:00.941  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-side.png'
+
+   len= 24.4m zc=14972mm  u_packed_absorber_column_ladrail-1
+   len= 24.4m zc=14972mm  u_packed_absorber_column_ladrail+1
+   len= 23.3m zc=11938mm  u_ladstr_u_packed_absorber_column_180
+   len= 23.3m zc=11938mm  u_ladstr_u_packed_absorber_column_-180
+   len= 22.9m zc=15000mm  u_packed_absorber_column_lagging
+   len= 16.8m zc= 4220mm  u_route_5_electrical_bus_leg1
+   len= 15.0m zc= 4220mm  u_route_5_electrical_bus_leg2
+   len=  9.8m zc= 4220mm  u_route_5_electrical_bus_leg3
+   len=  9.1m zc= 3900mm  u_route_8_electrical_bus_leg1
+[univ][inventory] OUTLIER meshes (>18 m from centre OR floating >1.2 m): 784
+   (17403,-11750) zmin=432mm  u_mother_liquor_recycle_pump_port_water_out_flange
+   (17403,-11750) zmin=603mm  u_wire_051_u_mother_liquor_recycle_pump_water_flange_A
+   (17223,-11750) zmin=498mm  u_mother_liquor_recycle_pump_port_water_out_neck
+   (16851,-11750) zmin=716mm  u_mother_liquor_recycle_pump_discharge
+   (16689,-11750) zmin=361mm  u_mother_liquor_recycle_pump_casing
+   (16689,-11750) zmin=839mm  u_mother_liquor_recycle_pump_suction
+   (16473,-11750) zmin=300mm  u_mother_liquor_recycle_pump_baseplate
+   (16455,-11750) zmin=508mm  u_mother_liquor_recycle_pump_coupling
+   (16271,-12060) zmin=315mm  u_mother_liquor_recycle_pump_port_power_in_term_power
+   (16239,-11750) zmin=373mm  u_mother_liquor_recycle_pump_motor
+   (15723,-11750) zmin=498mm  u_mother_liquor_recycle_pump_port_water_in_neck
+   (15543,-11750) zmin=432mm  u_mother_liquor_recycle_pump_port_water_in_flange
+   (15543,-11750) zmin=603mm  u_wire_124_u_caco3_slurry_transfer_pump_water_flange_B
+   (15380,-15150) zmin=1054mm  u_k2so4_recrystalliser_port_water_out_flange
+   (15380,-15150) zmin=1224mm  u_wire_108_u_k2so4_recrystalliser_water_flange_A
+   (15200,-15150) zmin=1120mm  u_k2so4_recrystalliser_port_water_out_neck
+   (14936,-11750) zmin=300mm  u_crystalliser_vacuum_condenser_0
+   (14915,-14930) zmin=850mm  u_k2so4_recrystalliser_ladrail+1
+   (14915,-15370) zmin=850mm  u_k2so4_recrystalliser_ladrail-1
+   (14915,-15150) zmin=986mm  u_k2so4_recrystalliser_ladrung0
+[univ][route-audit] routes=93  over_equipment_segments=0  max_detour_ratio=1.414  same_elevation_crossings=25
+[univ][route-audit]   same-Z crossings: [('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_098_u_reactor_slurry_recirculation_pump_water', 4580.0), ('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_035_u_caco3_vacuum_belt_filter_water', 4580.0), ('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_057_u_wash_water_feed_pump_water', 4580.0), ('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_076_u_field_erection_column_plinth_water', 4580.0), ('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_107_u_filter_vacuum_pump_water', 4580.0), ('u_wire_006_u_stirred_carbonation_reactor_water', 'u_wire_096_u_reactor_slurry_recirculation_pump_water', 5000.0), ('u_wire_014_u_mea_storage_tank_water', 'u_wire_094_u_wash_water_feed_pump_water', 4780.0), ('u_wire_014_u_mea_storage_tank_water', 'u_wire_109_u_electric_steam_generator_water', 4780.0)]
+[univ][route-reconcile] DEFECT 1: dropped 0 fluid edge(s) routed onto a pure instrument (0 m of phantom pipe)
+[univ][route-reconcile] DEFECT 2: capped 0 detour route(s) at 2.5× straight-line + 5 m (0 m of routed length removed)
+[univ][route-reconcile] costed £ 88,357 → 88,357 (saved £0)
+[conn-schedule] 136 runs sized; cable-m by CSA: {'1.5 mm²': 222.9, '2×300 mm²': 47.0, '300 mm²': 20.8, '50 mm²': 25.2, '6 mm²': 772.3, '630 mm² equiv. (2×185 mm² parallel)': 52.0}; pipe-m by DN: {'DN15': 746.7, 'DN25': 27.1, 'DN25 (nominal — flow unknown)': 25.5, 'DN300': 33.4, 'DN32': 84.2, 'DN40': 33.6, 'DN50': 659.5, 'DN65': 13.2, 'DN80': 22.7}; duct-m by size: {}; other-m: 96.2
+[conn-bom] cable £26,878 | pipe £60,325 | duct £0 | total £88,357 (terminations £7,621; source model:uk-2026-supply+install)
+[conn-schedule] volt-drop limit 5% (env CONN_VOLTDROP_LIMIT_PCT); D1 upsized 0 run(s); D2 design recommendations: 0
+[conn-schedule] rendered outer_dia_mm range: min=3.3 mm  max=323.9 mm  (14 distinct sizes)
+[parts-manifest] site utilisation: hull 705.8 m² / deck 1224.5 m² = 0.576
+[parts-manifest] wrote 88 placed parts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/parts-manifest.json  (plant 31.8×32.2×25.9 m)
+[route-manifest] wrote 93 routed lines (453 waypoints, 267 fittings) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/route-manifest.json
+[univ][callouts] place TK-105: u=466 z=5208 w=2431 (part top 2460; v12=5152 v33=4547)
+[univ][callouts] place H-103: u=5323 z=5208 w=2112 (part top 2500; v12=6218 v33=7188)
+[univ][callouts] place TK-102: u=-14238 z=6521 w=2431 (part top 2138; v12=7055 v33=7189)
+[univ][callouts] place TK-103: u=-5135 z=5208 w=2431 (part top 2822; v12=3865 v33=1358)
+[univ][callouts] place TK-104: u=-3357 z=8030 w=2431 (part top 2822; v12=6228 v33=2758)
+[univ][callouts] place C-104: u=322 z=5208 w=2112 (part top 3152; v12=7418 v33=10160)
+[univ][callouts] place R-101: u=-15592 z=6456 w=2112 (part top 5468; v12=5018 v33=2244)
+[univ][callouts] place R-102: u=-13612 z=10426 w=2112 (part top 5468; v12=8456 v33=4499)
+[univ][callouts] place R-107: u=-17642 z=6456 w=2112 (part top 5468; v12=6368 v33=5590)
+[univ][callouts] place R-108: u=-15662 z=11314 w=2112 (part top 5468; v12=10673 v33=8590)
+[univ][callouts] place R-105: u=-2563 z=6521 w=2112 (part top 3514; v12=2323 v33=-4537)
+[univ][callouts] place X-105: u=-742 z=6147 w=2112 (part top 2600; v12=3724 v33=-476)
+[univ][callouts] baked 12 equipment-tag chip(s) (text 515 mm, top-12 principals by footprint): TK-105, H-103, TK-102, TK-103, TK-104, C-104, R-101, R-102, R-107, R-108, R-105, X-105
+[univ] INSPECT mode ON — clean CAD-inspection render (set INSPECT=0 for the PDF pipeline)
+[univ][inspect] recoloured equip=1282 frame=1 pipe=276 rack=0 unmatched=0
+[univ][inspect] view_transform=Standard
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-hero.png  (ortho_scale=58.4 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-iso.png  (ortho_scale=83.4 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-top.png  (ortho_scale=56.3 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-front.png  (ortho_scale=43.8 m)
+[univ][inspect] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/inspect-side.png  (ortho_scale=43.8 m)
+[univ][inspect] DONE — inspect-iso/top/front/side.png in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11
+[univ] SUMMARY {"geometry_family": "process_plant", "aero_subtype": null, "physical_parts": 76, "dropped": 39, "topology_total": 137, "topology_routed": 2, "topology_unresolved": [["motor control centre", "Plant control system \u2014 battery limit", "signal"]], "regions": ["Gypsum Carbonation Reactor", "K2SO4 Recovery & Crystallisation", "MEA Recovery & Recycle", "MEA Absorption & Capture", "CaCO3 Filtration & Drying", "Skid Structure & Containment", "Bagging & Packaging", "Thermal Utilities", "Electrical Distribution", "Process Control System", "Process Instrumentation", "Safety & Protection"], "route_audit": {"routes": 93, "over_equipment_segments": 0, "over_equipment_routes": [], "max_detour_ratio": 1.414, "max_detour_route": "u_wire_099_u_reactor_slurry_recirculation_pump_water", "same_elevation_crossings": 25, "crossing_detail": [["u_wire_002_u_electric_steam_generator_thermal", "u_wire_098_u_reactor_slurry_recirculation_pump_water", 4580.0], ["u_wire_002_u_electric_steam_generator_thermal", "u_wire_035_u_caco3_vacuum_belt_filter_water", 4580.0], ["u_wire_002_u_electric_steam_generator_thermal", "u_wire_057_u_wash_water_feed_pump_water", 4580.0], ["u_wire_002_u_electric_steam_generator_thermal", "u_wire_076_u_field_erection_column_plinth_water", 4580.0], ["u_wire_002_u_electric_steam_generator_thermal", "u_wire_107_u_filter_vacuum_pump_water", 4580.0], ["u_wire_006_u_stirred_carbonation_reactor_water", "u_wire_096_u_reactor_slurry_recirculation_pump_water", 5000.0], ["u_wire_014_u_mea_storage_tank_water", "u_wire_094_u_wash_water_feed_pump_water", 4780.0], ["u_wire_014_u_mea_storage_tank_water", "u_wire_109_u_electric_steam_generator_water", 4780.0], ["u_wire_017_u_lean_amine_cooler_water", "u_wire_104_u_wash_water_feed_pump_water", 5000.0], ["u_wire_018_u_rich_amine_inlet_cooler_water", "u_wire_105_u_condensate_feedwater_vessel_water", 4450.0], ["u_wire_098_u_reactor_slurry_recirculation_pump_water", "u_wire_119_u_k2so4_slurry_feed_pump_water", 4560.0], ["u_wire_098_u_reactor_slurry_recirculation_pump_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_098_u_reactor_slurry_recirculation_pump_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_035_u_caco3_vacuum_belt_filter_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_128_u_caco3_vacuum_belt_filter_water", "u_wire_088_u_wash_water_feed_pump_water", 4780.0], ["u_wire_128_u_caco3_vacuum_belt_filter_water", "u_wire_094_u_wash_water_feed_pump_water", 4780.0], ["u_wire_039_u_filtrate_receiver_pump_water", "u_wire_105_u_condensate_feedwater_vessel_water", 4450.0], ["u_wire_045_u_dryer_condensate_cooler_water", "u_wire_109_u_electric_steam_generator_water", 4780.0], ["u_wire_057_u_wash_water_feed_pump_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_092_u_wash_water_feed_pump_water", "u_wire_107_u_filter_vacuum_pump_water", 4560.0]], "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"}, "route_reconcile": {"instrument_edges_dropped": 0, "routes_capped": 0, "length_saved_m": 0.0, "gbp_saved": 0.0}, "connection_schedule_totals": {"cable_m_by_csa": {"1.5 mm\u00b2": 222.9, "2\u00d7300 mm\u00b2": 47.0, "300 mm\u00b2": 20.8, "50 mm\u00b2": 25.2, "6 mm\u00b2": 772.3, "630 mm\u00b2 equiv. (2\u00d7185 mm\u00b2 parallel)": 52.0}, "pipe_m_by_dn": {"DN15": 746.7, "DN25": 27.1, "DN25 (nominal \u2014 flow unknown)": 25.5, "DN300": 33.4, "DN32": 84.2, "DN40": 33.6, "DN50": 659.5, "DN65": 13.2, "DN80": 22.7}, "duct_m_by_size": {}, "other_m": 96.2, "runs_sized": 136, "runs_out_of_spec": 0, "runs_upsized": 0, "design_recommendations": 0, "cable_gbp": 26877.8, "pipe_gbp": 60325.11, "duct_gbp": 0.0, "transformer_gbp": 0.0, "other_gbp": 1154.04, "terminations_gbp": 7621.0, "install_gbp": 80735.95, "grand_total_gbp": 88356.95, "cost_source": "model:uk-2026-supply+install"}, "parts_manifest_count": 88, "route_manifest_count": 93, "tag_callouts": 12, "inspect": {"equip": 1282, "frame": 1, "pipe": 276, "rack": 0, "unmatched": 0}}
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:46:23)
+
+Blender quit
+[univ] state=/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[univ] out  =/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11
+[univ] containerised layout: enclosure 12.19 × 2.44 m (aspect 5.0) → flat-pack equipment into the container footprint
+[univ] physical parts kept = 76; non-physical dropped = 39
+[univ] dropped: structured packing, spare cross-exchanger plate pack, CO2 sparger ring, agitator shaft mechanical seal, gypsum feed hopper + screw, reactor pH probe, reactor ORP probe, reactor temperature sensor, plant PLC controller, HMI panel, electromagnetic flow meters, radar level transmitters, pH/conductivity analysers, temperature transmitters, pressure transmitters, CO2 gas analyser, power + control cabling, cable transit frames, cable glands, variable-speed drives, blower/centrifuge VSDs, soft starters, drive fieldbus modules, motor contactors, motor-protection relays, motor-protection circuit breakers, process skid frame, access platform + ladders, pressure relief valves, safety shower + eyewash, CO2 + VOC gas detector, CO2 asphyxiation detectors, amine-vapour detectors, fan-trip gas-detection relay, emergency shutdown system, safety relays, SIL-rated isolation barriers, gas-detection controller, sealer jaw heating element
+[univ] undimensioned-tall cap = 39.2 m (= 1.6× tallest dimensioned vessel); capped parts: ['stirred carbonation reactor', 'reactor agitator', 'reactor overflow launder', 'reactor slurry density meter', 'KOH reaction vessel', 'MEA stripper reboil pot']
+[univ] orphan connector: +79 edge(s) — 3 distribution-spine, 30 power, 10 signal, 36 water (load hub=motor control centre, spine=distribution transformer→busbar + distribution board→motor control centre, control hub=remote I/O racks)
+[ledger] direction-closer: +25 edge(s) (20 input from upstream, 5 output to downstream) — flow-through parts connected both ways
+[ledger] air-closer: +3 air line(s) — air-movers feed their aeration consumer
+[ledger] power-closer: +1 power feed(s) from 'motor control centre' — every powered part now shows its supply
+[ledger] boundary closer: +10 edge(s) — sinks fed from their producer + discharged to disposal; feed/product stages tied to the battery limit
+[ledger] residual closer: +11 edge(s) — every remaining required connection terminated (nearest in-plant partner, else battery limit)
+[ledger] flow-demand join: 44 fluid edge(s) now carry their contract flow demand (required_value m3/h) — pipes size from true flows
+[ledger] power-demand join: 1 electrical edge(s) now carry their destination's real current demand (required_value A) — cables size from true loads
+[ledger] steam-to-reboiler redirect: 1 edge(s) re-homed onto 'distillation reboiler'
+[ledger] COMPLETENESS: ✓ all 76 parts show their required inputs + outputs
+[ledger] REFERENTIAL INTEGRITY: ✓ every connection names a real part on both ends (graph is fully traceable)
+[ledger] wrote connection-ledger.json — 137 authored connection(s), 0 dropped, 0 completeness concern(s), 0 integrity violation(s) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/connection-ledger.json
+[univ] region order (L->R): ['Gypsum Carbonation Reactor', 'K2SO4 Recovery & Crystallisation', 'MEA Recovery & Recycle', 'MEA Absorption & Capture', 'CaCO3 Filtration & Drying', 'Skid Structure & Containment', 'Bagging & Packaging', 'Thermal Utilities', 'Electrical Distribution', 'Process Control System', 'Process Instrumentation', 'Safety & Protection']
+[univ] geometry family = process_plant  (product_class=co2_mineralisation; aero/flight-vehicle = 0, tower-machine = 1 [grounded=True], grow/panel = 0 (distinct 0), battery-system = 2, rack/cabinet/server = 4 (structure 2, rack_class=False), vessel = 24 (distinct 22), marine = 0 (is_marine=False), of 76 physical parts; true_aircraft=False, true_spacecraft=False)
+[univ][flow] flow order (feed→product): ['Gypsum Carbonation Reactor', 'K2SO4 Recovery & Crystallisation', 'Skid Structure & Containment', 'Bagging & Packaging', 'Safety & Protection', 'MEA Recovery & Recycle', 'MEA Absorption & Capture', 'Thermal Utilities', 'CaCO3 Filtration & Drying']
+[univ][flow] periphery (non-flow → back row): ['Electrical Distribution', 'Process Control System', 'Process Instrumentation']
+[univ][det-layout] tiny train region 'Safety & Protection' (0.25 m² total) → periphery block (no solo corner bay)
+[univ][det-layout] periphery hug: 13 part(s) in 4 non-flow region bay(s) packed as a back row on the train top edge (+2500 mm aisle)
+[univ][det-layout] manifold hug: 3 inline manifold/header part(s) seated beside their ledger-tied host run (+800 mm)
+[univ][det-layout] DETERMINISTIC placement ON — 76 parts positioned by construction
+[univ][container] flat-pack 76 parts into 11.7 m internal length → 11.7 m × 15.1 m (rows wrap at length)
+[univ] plant bbox (mm): {'x0': -15650.0, 'x1': 17723.0, 'y0': -16400.0, 'y1': 16650.0}
+[univ][layout] co-located 5 field instrument(s) onto process equipment (was a floating instrument band)
+[univ][layout] consolidated 6 control sub-component(s) into ONE control cabinet (3.0×1.4×2.2 m) at (-2.7, 14.6)
+[univ][layout] hid 5 field-instrument / non-physical item(s) from the hero (on the P&ID/BoM, not the 3-D model)
+[univ][layout] grounded 0 floating part(s) + 44 unowned stray mesh(es) onto the deck: []
+[univ][spine] axis=x  spine_y=-1806  aisle=2528 mm  x∈[-15650,17723] y∈[-16400,16650]  (76 equip)
+[univ] topology edge 136 UNRESOLVED (signal): motor control centre -> Plant control system — battery limit  [missing: Plant control system — battery limit]
+[univ][wire] STAGE 4: spine router drew 2 abstract-boundary edge(s); DEFERRED 134 part-to-part edge(s) to wire_ports (each edge drawn once)
+[univ] routed edge 5 (electrical_bus) CABLE-TRAY: electrical_supply  ->  crystalliser circulation heater  (+0 load drops)
+[univ] DETOUR-RESCUE edge 8 (electrical_bus): spine route 47.7 m (4.22x straight) -> direct L 15.3 m
+[univ] routed edge 8 (electrical_bus) CABLE-TRAY: Utility Incomer  ->  distribution transformer  (+0 load drops)
+[univ] topology routed = 2/137; unresolved = 1
+[univ][ground] per-part slab coverage: 76 parts, 0 centre(s) off slab (all on)
+[univ][ground] STAGE 4 floor — REQUESTED 34.8×35.2 m at (1.0,-0.2); ACTUAL obj.dimensions=(34795, 35190, 400) mm location=(1048, -245, 100) mm (if ACTUAL≈half the request, add_box is halving boxes)
+[univ][ground] coverage VERIFIED — 0 equipment centres off the deck (34.8×35.2 m at (1.0,-0.2))
+[univ][boundary] 2 external service connection(s): water-in / effluent-out / power
+[univ][ports] STAGE 2 connection ports — 76/76 parts ported, 155 ports total (fluid stubs + small terminals; stored on part.ports for Stage-3 wiring)
+[univ][wire]   overhead deck Z = 4450 mm (equipment-bulk top + 450 mm clearance)
+[univ][wire]   PLANT-SPANNING motor control centre → 25× power: dest span 30.2 m > 16 m → single-line/P&ID (no 3-D tray beam; lengths routed logically)
+[univ][wire] STAGE 3/4 port-to-port wiring — 134/137 ledger edges ROUTED (85 drawn port-to-port, 49 length-only logical cable runs, 0 via a port fallback), 2 already drawn by the spine router (abstract boundary), 1 left unwired (abstract boundary / assembly); 0 fan-out(s) routed as a SHARED TRAY; total routed length 2814.3 m
+[univ][wire]   routed length by service (m): {'air': 95.74, 'power': 892.19, 'signal': 183.63, 'thermal': 60.95, 'water': 1581.84}
+[univ][wire]   UNWIRED motor control centre→Plant control system — battery limit [signal/signal]: destination is an abstract boundary / unported part
+[univ][wire]   wrote wired-lengths.json — 134 runs, 2814.3 m total → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/wired-lengths.json
+[univ][conn-audit] 87 drawn run(s); 0 endpoint(s) NOT on a part (tol 1400 mm) — these are the 'random lines':
+[univ][conn-audit] MESH objects reaching >3 m BEYOND the plant: 0
+[univ][inventory] mesh families: u_vessel_supports=220, u_wire_=170, u_packed_absorber=122, u_k=83, u_caco=80, u_pipe_u=48, u_reactor_slurry=46, u_mea_distillation=45, u_route_=40, u_reactor_agitator=37, u_product_storage=36, u_reactor_overflow=36, u_stirred_carbonation=36, u_ladhoop_u=32, u_mea_stripper=32, u_carbonation_maturation=31, u_field_erection=30, u_dryer_inlet=28/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/blender-universal/build_universal_scene.py:16790: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  _sw.use_nodes = True
+00:59.777  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/01-top.png'
+01:02.308  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/02-corner-FR.png'
+01:04.644  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/03-corner-BL.png'
+01:09.259  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/00-hero.png'
+01:14.406  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-control_compute_communication.png'
+01:18.787  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-control_compute_communication-top-front.png'
+01:24.712  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-energy_conversion_transduction.png'
+01:29.265  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-energy_conversion_transduction-top-front.png'
+01:34.478  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-environmental_interface.png'
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:46:23)
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+Warning: too many occluding levels
+01:38.792  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-environmental_interface-top-front.png'
+01:44.484  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-maintenance_serviceability.png'
+01:48.813  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-maintenance_serviceability-top-front.png'
+01:53.745  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-mass_fluid_transport_process.png'
+01:58.065  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-mass_fluid_transport_process-top-front.png'
+02:03.422  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-power_distribution.png'
+02:07.441  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-power_distribution-top-front.png'
+02:12.940  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-safety_protection.png'
+02:17.634  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-safety_protection-top-front.png'
+02:21.107  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-sensing_instrumentation.png'
+02:24.475  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-sensing_instrumentation-top-front.png'
+
+[univ][inventory] THIN+LONG 'line' meshes (>8 m long, <0.7 m thick): 10
+   len= 24.4m zc=15000mm  u_packed_absorber_column_shell
+   len= 24.4m zc=14972mm  u_packed_absorber_column_ladrail-1
+   len= 24.4m zc=14972mm  u_packed_absorber_column_ladrail+1
+   len= 23.3m zc=11938mm  u_ladstr_u_packed_absorber_column_180
+   len= 23.3m zc=11938mm  u_ladstr_u_packed_absorber_column_-180
+   len= 22.9m zc=15000mm  u_packed_absorber_column_lagging
+   len= 16.6m zc= 4220mm  u_route_5_electrical_bus_leg1
+   len= 12.8m zc= 4220mm  u_route_5_electrical_bus_leg2
+   len= 11.3m zc= 3900mm  u_route_8_electrical_bus_leg1
+   len=  9.8m zc= 4220mm  u_route_5_electrical_bus_leg3
+[univ][inventory] OUTLIER meshes (>18 m from centre OR floating >1.2 m): 781
+   (17403,-11750) zmin=432mm  u_mother_liquor_recycle_pump_port_water_out_flange
+   (17403,-11750) zmin=608mm  u_wire_051_u_mother_liquor_recycle_pump_water_flange_A
+   (17223,-11750) zmin=498mm  u_mother_liquor_recycle_pump_port_water_out_neck
+   (16851,-11750) zmin=716mm  u_mother_liquor_recycle_pump_discharge
+   (16689,-11750) zmin=361mm  u_mother_liquor_recycle_pump_casing
+   (16689,-11750) zmin=839mm  u_mother_liquor_recycle_pump_suction
+   (16473,-11750) zmin=300mm  u_mother_liquor_recycle_pump_baseplate
+   (16455,-11750) zmin=508mm  u_mother_liquor_recycle_pump_coupling
+   (16271,-12060) zmin=315mm  u_mother_liquor_recycle_pump_port_power_in_term_power
+   (16239,-11750) zmin=373mm  u_mother_liquor_recycle_pump_motor
+   (15723,-11750) zmin=498mm  u_mother_liquor_recycle_pump_port_water_in_neck
+   (15543,-11750) zmin=432mm  u_mother_liquor_recycle_pump_port_water_in_flange
+   (15543,-11750) zmin=615mm  u_wire_124_u_caco3_slurry_transfer_pump_water_flange_B
+   (15380,-15150) zmin=1054mm  u_k2so4_recrystalliser_port_water_out_flange
+   (15380,-15150) zmin=1236mm  u_wire_108_u_k2so4_recrystalliser_water_flange_A
+   (15200,-15150) zmin=1120mm  u_k2so4_recrystalliser_port_water_out_neck
+   (14936,-11750) zmin=300mm  u_crystalliser_vacuum_condenser_0
+   (14915,-14930) zmin=850mm  u_k2so4_recrystalliser_ladrail+1
+   (14915,-15370) zmin=850mm  u_k2so4_recrystalliser_ladrail-1
+   (14915,-15150) zmin=986mm  u_k2so4_recrystalliser_ladrung0
+[univ][route-audit] routes=87  over_equipment_segments=0  max_detour_ratio=1.414  same_elevation_crossings=18
+[univ][route-audit]   same-Z crossings: [('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_098_u_reactor_slurry_recirculation_pump_water', 4580.0), ('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_035_u_caco3_vacuum_belt_filter_water', 4580.0), ('u_wire_002_u_electric_steam_generator_thermal', 'u_wire_057_u_wash_water_feed_pump_water', 4580.0), ('u_wire_006_u_stirred_carbonation_reactor_water', 'u_wire_096_u_reactor_slurry_recirculation_pump_water', 5000.0), ('u_wire_014_u_mea_storage_tank_water', 'u_wire_094_u_wash_water_feed_pump_water', 4780.0), ('u_wire_017_u_lean_amine_cooler_water', 'u_wire_104_u_wash_water_feed_pump_water', 5000.0), ('u_wire_018_u_rich_amine_inlet_cooler_water', 'u_wire_111_u_open_mouth_bagging_machine_water', 4450.0), ('u_wire_098_u_reactor_slurry_recirculation_pump_water', 'u_wire_119_u_k2so4_slurry_feed_pump_water', 4560.0)]
+[univ][route-reconcile] DEFECT 1: dropped 0 fluid edge(s) routed onto a pure instrument (0 m of phantom pipe)
+[univ][route-reconcile] DEFECT 2: capped 0 detour route(s) at 2.5× straight-line + 5 m (0 m of routed length removed)
+[univ][route-reconcile] costed £ 87,789 → 87,789 (saved £0)
+[conn-schedule] 136 runs sized; cable-m by CSA: {'1.5 mm²': 213.5, '2×300 mm²': 44.5, '300 mm²': 20.8, '50 mm²': 25.2, '6 mm²': 779.6, '630 mm² equiv. (2×185 mm² parallel)': 52.0}; pipe-m by DN: {'DN15': 747.1, 'DN25': 26.4, 'DN25 (nominal — flow unknown)': 24.6, 'DN300': 33.4, 'DN32': 84.2, 'DN40': 33.6, 'DN50': 657.7, 'DN65': 13.2, 'DN80': 22.7}; duct-m by size: {}; other-m: 95.7
+[conn-bom] cable £26,401 | pipe £60,240 | duct £0 | total £87,789 (terminations £7,621; source model:uk-2026-supply+install)
+[conn-schedule] volt-drop limit 5% (env CONN_VOLTDROP_LIMIT_PCT); D1 upsized 0 run(s); D2 design recommendations: 0
+[conn-schedule] rendered outer_dia_mm range: min=3.3 mm  max=323.9 mm  (14 distinct sizes)
+[parts-manifest] site utilisation: hull 689.0 m² / deck 1224.5 m² = 0.563
+[parts-manifest] wrote 88 placed parts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/parts-manifest.json  (plant 31.8×32.2×25.9 m)
+[route-manifest] wrote 87 routed lines (423 waypoints, 249 fittings) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/route-manifest.json
+[univ][callouts] place TK-105: u=466 z=5175 w=2431 (part top 2460; v12=5120 v33=4519)
+[univ][callouts] place H-103: u=5323 z=5175 w=2112 (part top 2500; v12=6186 v33=7161)
+[univ][callouts] place TK-102: u=-14238 z=6488 w=2431 (part top 2138; v12=7023 v33=7162)
+[univ][callouts] place TK-103: u=-5135 z=5175 w=2431 (part top 2822; v12=3833 v33=1330)
+[univ][callouts] place TK-104: u=-3357 z=7997 w=2431 (part top 2822; v12=6196 v33=2731)
+[univ][callouts] place C-104: u=322 z=5175 w=2112 (part top 3152; v12=7385 v33=10133)
+[univ][callouts] place R-101: u=-15592 z=9947 w=2112 (part top 5468; v12=8424 v33=5174)
+[univ][callouts] place R-102: u=-13612 z=15269 w=2112 (part top 5468; v12=13181 v33=8563)
+[univ][callouts] place R-107: u=-17642 z=9999 w=2112 (part top 5468; v12=9825 v33=8563)
+[univ][callouts] place R-108: u=-15662 z=15320 w=2112 (part top 5468; v12=14582 v33=11952)
+[univ][callouts] place R-105: u=-2563 z=5175 w=2112 (part top 3514; v12=1009 v33=-5667)
+[univ][callouts] place X-105: u=-742 z=5175 w=2112 (part top 2600; v12=2775 v33=-1292)
+[univ][callouts] baked 12 equipment-tag chip(s) (text 515 mm, top-12 principals by footprint): TK-105, H-103, TK-102, TK-103, TK-104, C-104, R-101, R-102, R-107, R-108, R-105, X-105
+[forge] 01-top.png
+[forge] 02-corner-FR.png
+[forge] 03-corner-BL.png
+[forge] 00-hero.png
+[forge] ── per-module best-view camera table ──────────────────
+[forge] scene bbox X[-16.35,18.45] Y[-17.84,17.35] Z[-0.10,27.29]
+[forge] module control_compute_communication    hint=front         target=(-2.67,14.60,0.41) loc=(-3.96,16.14,1.22) ortho=0.91  [MODULE-FRAMED]
+[forge] module-control_compute_communication.png
+[forge] module-control_compute_communication-top-front.png
+[forge] module energy_conversion_transduction   hint=three_quarter target=(1.77,-0.66,2.83) loc=(76.33,88.19,69.80) ortho=50.18  [MODULE-FRAMED]
+[forge] module-energy_conversion_transduction.png
+[forge] module-energy_conversion_transduction-top-front.png
+[forge] module environmental_interface          hint=front         target=(2.04,8.95,1.40) loc=(18.68,28.77,11.85) ortho=11.70  [MODULE-FRAMED]
+[forge] module-environmental_interface.png
+[forge] module-environmental_interface-top-front.png
+[forge] module maintenance_serviceability       hint=front         target=(6.08,-5.93,2.04) loc=(35.18,-40.61,20.33) ortho=23.58  [MODULE-FRAMED]
+[forge] module-maintenance_serviceability.png
+[forge] module-maintenance_serviceability-top-front.png
+[forge] module mass_fluid_transport_process     hint=three_quarter target=(1.30,-0.01,13.79) loc=(88.01,103.33,91.67) ortho=51.69  [MODULE-FRAMED]
+[forge] module-mass_fluid_transport_process.png
+[forge] module-mass_fluid_transport_process-top-front.png
+[forge] module power_distribution               hint=front         target=(-8.00,14.97,1.35) loc=(-26.89,37.48,13.22) ortho=16.33  [MODULE-FRAMED]
+[forge] module-power_distribution.png
+[forge] module-power_distribution-top-front.png
+[forge] module safety_protection                hint=three_quarter target=(-3.11,1.67,0.53) loc=(-31.64,25.61,22.03) ortho=21.61  [MODULE-FRAMED]
+[forge] module-safety_protection.png
+[forge] module-safety_protection-top-front.png
+[forge] module sensing_instrumentation          hint=three_quarter target=(0.21,3.78,0.41) loc=(-0.47,4.59,1.02) ortho=0.42  [MODULE-FRAMED]
+[forge] module-sensing_instrumentation.png
+[forge] module-sensing_instrumentation-top-front.png
+[forge] module structure_containment            hint=three_quarter target=(1.05,-0.25,2.03) loc=(84.00,98.61,76.54) ortho=56.30  [MODULE-FRAMED]02:29.406  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-structure_containment.png'
+02:33.387  render           | Saved: '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/module-structure_containment-top-front.png'
+
+[forge] module-structure_containment.png
+[forge] module-structure_containment-top-front.png
+[forge] DONE — /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11
+[univ] SUMMARY {"geometry_family": "process_plant", "aero_subtype": null, "physical_parts": 76, "dropped": 39, "topology_total": 137, "topology_routed": 2, "topology_unresolved": [["motor control centre", "Plant control system \u2014 battery limit", "signal"]], "regions": ["Gypsum Carbonation Reactor", "K2SO4 Recovery & Crystallisation", "MEA Recovery & Recycle", "MEA Absorption & Capture", "CaCO3 Filtration & Drying", "Skid Structure & Containment", "Bagging & Packaging", "Thermal Utilities", "Electrical Distribution", "Process Control System", "Process Instrumentation", "Safety & Protection"], "route_audit": {"routes": 87, "over_equipment_segments": 0, "over_equipment_routes": [], "max_detour_ratio": 1.414, "max_detour_route": "u_wire_099_u_reactor_slurry_recirculation_pump_water", "same_elevation_crossings": 18, "crossing_detail": [["u_wire_002_u_electric_steam_generator_thermal", "u_wire_098_u_reactor_slurry_recirculation_pump_water", 4580.0], ["u_wire_002_u_electric_steam_generator_thermal", "u_wire_035_u_caco3_vacuum_belt_filter_water", 4580.0], ["u_wire_002_u_electric_steam_generator_thermal", "u_wire_057_u_wash_water_feed_pump_water", 4580.0], ["u_wire_006_u_stirred_carbonation_reactor_water", "u_wire_096_u_reactor_slurry_recirculation_pump_water", 5000.0], ["u_wire_014_u_mea_storage_tank_water", "u_wire_094_u_wash_water_feed_pump_water", 4780.0], ["u_wire_017_u_lean_amine_cooler_water", "u_wire_104_u_wash_water_feed_pump_water", 5000.0], ["u_wire_018_u_rich_amine_inlet_cooler_water", "u_wire_111_u_open_mouth_bagging_machine_water", 4450.0], ["u_wire_098_u_reactor_slurry_recirculation_pump_water", "u_wire_119_u_k2so4_slurry_feed_pump_water", 4560.0], ["u_wire_098_u_reactor_slurry_recirculation_pump_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_098_u_reactor_slurry_recirculation_pump_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_035_u_caco3_vacuum_belt_filter_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_128_u_caco3_vacuum_belt_filter_water", "u_wire_088_u_wash_water_feed_pump_water", 4780.0], ["u_wire_128_u_caco3_vacuum_belt_filter_water", "u_wire_094_u_wash_water_feed_pump_water", 4780.0], ["u_wire_057_u_wash_water_feed_pump_water", "u_wire_092_u_wash_water_feed_pump_water", 4560.0], ["u_wire_089_u_wash_water_feed_pump_water", "u_wire_107_u_filter_vacuum_pump_water", 4890.0], ["u_wire_093_u_wash_water_feed_pump_water", "u_wire_059_u_distillation_reboiler_water", 4670.0], ["u_wire_103_u_wash_water_feed_pump_water", "u_wire_061_u_reflux_subcooler_water", 4890.0], ["u_wire_103_u_wash_water_feed_pump_water", "u_wire_107_u_filter_vacuum_pump_water", 4890.0]], "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"}, "route_reconcile": {"instrument_edges_dropped": 0, "routes_capped": 0, "length_saved_m": 0.0, "gbp_saved": 0.0}, "connection_schedule_totals": {"cable_m_by_csa": {"1.5 mm\u00b2": 213.5, "2\u00d7300 mm\u00b2": 44.5, "300 mm\u00b2": 20.8, "50 mm\u00b2": 25.2, "6 mm\u00b2": 779.6, "630 mm\u00b2 equiv. (2\u00d7185 mm\u00b2 parallel)": 52.0}, "pipe_m_by_dn": {"DN15": 747.1, "DN25": 26.4, "DN25 (nominal \u2014 flow unknown)": 24.6, "DN300": 33.4, "DN32": 84.2, "DN40": 33.6, "DN50": 657.7, "DN65": 13.2, "DN80": 22.7}, "duct_m_by_size": {}, "other_m": 95.7, "runs_sized": 136, "runs_out_of_spec": 0, "runs_upsized": 0, "design_recommendations": 0, "cable_gbp": 26400.67, "pipe_gbp": 60239.51, "duct_gbp": 0.0, "transformer_gbp": 0.0, "other_gbp": 1148.76, "terminations_gbp": 7621.0, "install_gbp": 80167.94, "grand_total_gbp": 87788.94, "cost_source": "model:uk-2026-supply+install"}, "parts_manifest_count": 88, "route_manifest_count": 87, "tag_callouts": 12, "inspect": null}
+
+Blender quit
+[render-scene] shaded hero pass: 00-hero=shaded OK
+[render-scene] UNIVERSAL OK — cover + 12 module page(s) from inspect-hero.png
+[hero]   template runner produced blender-cover.png in 215.2s
+[hero]   Blender cover OK in 215.2s → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/blender-cover.png
+[hero] step 2: Gemini 3.1 Flash Image preview (i2i)...
+[hero]   Gemini OK in 24.9s (1533.4 KB)
+[hero] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/cover.png
+[hero] updated state.brief_hero_image_path
+[modules] building palette card for 12 module(s)...
+[modules] all 12 module images already on disk; skipping template render
+[modules] template renderer produced 9/12 module images
+[modules] updated state.module_image_paths with 9 entries
+[chain] deployment_envelope: no envelope mapped for co2_mineralisation (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £1480923 (raw materials £955434, class co2_mineralisation)
+[chain] G2 cost-reality: PASS — BoM £955434 across 115 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 2 gaps
+  ⚠ compliance: Compliance gate did not register any mandatory standards
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 17 lines re-priced from DOE/NETL + cache (real), 13 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 7/10 · mean 8.7/10 · 0 blocking · below-8: physics_fidelity=7
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 7/10).
+[chain] sweet-spot reconciliation: COMPATIBLE (objective=balanced, rescale=1.00×) — The brief is internally consistent: 365 t/yr fits within the £1.90M ceiling. Recommended operating point: 365 t/yr at £1.48M (£4k/t/yr). Objective: BALANCED (the best cost/output compromise).
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £1,480,923 / 365 t/yr = £4,057/(t·yr CO₂) — within the £1,500–£10,000/(t·yr CO₂) class band for throughput output. (brief metric co2_capture_capacity_tpd=1 t/day → 365 t/yr)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: refreshed cost_reality + costStack to the post-writeback BoM £1,185,808 (ex-works £1,838,003)
+[chain] cost-basis: 6 take-off + 3 curve + 4 catalogue + 102 disclosed; 6 take-off prices written into the BoM; purchased £1,187,070 → installed £3,561,210 (central)
+[advisor-engagement] 12/12 modules got an advisor block — 23 specialist cards, 46 grounded questions
+[chain] advisor-engagement: 12 module blocks, 23 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "co2_mineralisation" (27 tools, 145 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): PASS — class="co2_mineralisation" template=co2-mineralisation-9shot.py hero=true modules=18 thin=0
+[chain] tools-flow: rendered 202740 bytes (27 tools)
+[investor-section] 5 investors matched from 18 candidates: 8090 Industries, Bright Capital, Propeller Ventures, GV (Google Ventures), BDC Capital Deep Tech
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 6/6 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Single-Line Electrical Diagram  (drawings/single-line-diagram.png)
+  [system]   ✓ Piping & Instrumentation Diagram  (drawings/pid.png)
+  [schedule] ✓ Process Schedules — line / valve / instrument  (drawings/process-schedules.png)
+  [schedule] ✓ Panel / Load Schedule  (drawings/panel-schedule.png)
+  [schedule] ✓ HVAC Duct Layout  (drawings/hvac-layout.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 6/6 drawings + hero → wired into the PDF
+[drawing-gates] 17 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         single-line-diagram 6560x3368 aspect 1.9:1 (limit 4:1)
+  ✓ [med ] legibility         pid 2360x2572 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         panel-schedule 2212x2184 aspect 1.0:1 (limit 4:1)
+  ✓ [med ] legibility         general-arrangement 2160x2230 aspect 1.0:1 (limit 4:1)
+  ✓ [med ] legibility         block-flow-diagram 2526x2204 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         hvac-layout 2240x1930 aspect 1.2:1 (limit 4:1)
+  ✓ [med ] legibility         process-schedules 2492x6442 aspect 2.6:1 (limit 4:1)
+  ✓ [med ] legibility         pid min text 3.02 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.4308 mm
+  ✓ [med ] legibility         block-flow-diagram min text 3.82 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.5027 mm
+  ✓ [med ] legibility         single-line-diagram min text 3.23 mm at A1 print scale (≥2.5 mm ISO 3098) — 4 A1 sheet(s) [2x2], 1 px = 0.4788 mm
+  ✓ [med ] legibility         hvac-layout min text 2.58 mm at A1 print scale (≥2.5 mm ISO 3098) — 1 A1 sheet(s) [1x1], 1 px = 0.5741 mm
+  ✓ [high] load_reconcile     panel total 559 kW vs contract 559 kW (ratio 1.00, ±15%)
+  ✓ [high] part_coverage      all principal powered parts fed
+  ✓ [med ] material_diversity 3 distinct pipe material(s): ['carbon steel', 'hdpe/pe100', 'stainless steel']
+  ✓ [med ] site_utilisation   plant hull 689.0 m² / deck 1224.5 m² = 0.56 (floor 0.45 — below it the plant sits in a corner of an empty deck)
+  ✓ [high] connection_sanity  connection graph physically coherent (domain + direction + magnitude)
+  ✓ [high] tag_legibility     every tag distinct (≤20% bbox overlap) + inside its view border
+[chain] drawing-gates: 0/17 failing — DRAWING >=8 PASS
+[census] 160 tie-in runs (659 units) = £134,737 (cable £64,760 + pipe £69,977)
+[census] routed major streams = £87,789  →  full interconnect ≈ £222,526
+[chain] cost-sanity re-derived on authoritative BoM (Σ £1,381,822): verdict pass — £5,868/t/yr
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[chain] benchmark net (z-ai/glm-5.2): 🟢 OK — deterministic output is within the LLM benchmark on every checked dimension
+[chain] requirements-driven BoM: 250 requirement lines (Σ £1,381,822) → state.requirementsBom; cost cascade reconciled to this total
+dossier_repair: 1 fix(es) over 1 pass(es); 3 gap(s) need input (1 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[chain] self-repair: 1 fix(es) over 1 pass(es); 3 gap(s) need input (1 blocking HIGH)
+[reconcile-hollow] 0 hollow sub-module(s); nothing to reconcile
+[deterministic-finalize] class-alien-renamed=0 scope-words-demoted=0 density-merged=0 modifiers=0 prose=1 overview=0 · residual violations {'modifier_consistency': 0, 'prose_covers': 1, 'overview_subset': 0, 'word_density_thin': 0}
+[ledger] reconcile (connection-ledger.json): dropped 1 row(s) whose endpoint no longer resolves to any real part in the settled design
+[trace-reconcile] connection-ledger.json: pruned 1 dangling edge(s), rewrote rows/dropped/adjacency/completeness/referential_integrity
+[ledger] reconcile (connection-schedule.json): dropped 1 row(s) (+ its index-parallel specs/out_of_spec/upsized/design_feedback entries) whose endpoint no longer resolves to any real part in the settled design
+[trace-reconcile] connection-schedule.json: pruned 1 dangling row(s) (rows + index-parallel specs); recomputed runs_sized/install_gbp/terminations_gbp/grand_total_gbp/length-by-size (material-cost sub-totals cable_gbp/pipe_gbp/duct_gbp/transformer_gbp/other_gbp are NOT simple row sums and are left as-is — bounded stale by the 1 pruned row(s)' own small material share)
+[deterministic-finalize] trace-reconcile: connection-ledger.json pruned=1 connection-schedule.json pruned=1
+[chain] ghost-snapshot re-derive: requirementsBom 250 → 249 row(s) on the FINAL settled tree (pruned 0 stale partVerifications entries)
+dossier_repair: 1 fix(es) over 1 pass(es); 3 gap(s) need input (1 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json
+[chain] freshen-scorer-inputs: re-rendered schematics + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 0 HIGH · 0 corroborated (score) · 3 advisory (never score) — file + state.physicsCritique are the SAME canonical object
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/dossier.xlsx
+  · column contract [Line & velocity]: 130/135 rows PASS → 9.6/10 (5 fabricated source tick(s) neutralised)
+  · column contract [Panel schedule]: 34/35 rows PASS → 9.7/10
+  · column contract [Bill of Materials (Ledger)]: 243/249 rows PASS → 9.8/10
+  · column contract [Risk & Regulatory]: 6/6 rows PASS → 10.0/10
+  · per-tab scorecard: min Executive Summary=9/10 · 0 FAIL, 0 UNSCORED
+  · Executive Summary
+  · Overview
+  · Sense-check
+  · Brief
+  · ⚠ Checks
+  · Part names
+  · Quantities
+  · Calculations
+  · Calculations: linked 38 data-flow value(s) to their worked-calc result cell
+  · Bill of Materials (Ledger)
+  · Connection trace
+  · Cost waterfall
+  · Inputs & Assumptions
+  · Inputs Master (M0)
+  · Equipment & Dimensions Register
+  · Financial model
+  · Design basis
+      Process schedules: collapsed 32 copy-paste instrument row(s) into typed group rows
+      Valve recon: 6 line-mounted-valve BoM line(s) (like-for-like vs the schedule's own population) · excluded 0 network-allowance row(s) totalling 0 off — 
+      Instrument recon: 48 field-instrument BoM line(s) (like-for-like vs the schedule's own field-device population) · excluded 2 non-field row(s) totalling 2 off (PLC/HMI/SCADA control-system + electrical CT/VT-class sense/protection + mount/label accessories — none are schedule-listed process field instruments) — 1× plant PLC controller, 1× HMI panel
+  · Process schedules
+  · Line & velocity
+  · Risk & Regulatory
+  · Holds & exclusions
+  · Questions for the customer
+  · Assembly sequence
+  · Image tabs
+      + Renders (gallery — 4 views on one tab)
+  · Electrical (single-line + panel schedule)
+      + GA — General Arrangement
+      + P&ID
+      + BFD — Block Flow
+      + HVAC
+  · Drawings (register)
+  · Glossary
+  · Audit data
+  · content scoring pass 1: 24 sheet(s) cell-checked — Equipment & Dimensions Register:790/792, Process schedules:101/107
+  · Quality & Audit
+  · Contents (sheet #1)
+  · Excel-corruption guard: defanged 6 prose-as-formula + normalised 0 sci-notation formula(s)
+  · Drawing cross-refs: 11 cell(s) annotated with the A1 sheet range (e.g. FF-PID-001 S1-S2)
+  · ONE VERDICT (live formulas over the Q&A floor/open cells): VERDICT: SHIPS · floor 9/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere) (3 surfaces)
+  · score chips: 33/33 tabs live off the Q&A score cells
+  · live-check gate: 33 sheets · 5775 formula cells (2903 verdict formulas) · 1707/1707 table rows carry a live check (0 merged-flag rows) · 0 bare literals · 0 orphan required columns
+  · numeric orphan-literal gate: ENFORCED ['fin-cashflow', 'fin-chart', 'fin-curve', 'fin-item', 'fin-lines', 'fin-opex', 'fin-oppoint', 'fin-range', 'fin-recommend', 'fin-scenarios', 'fin-tornado'] — 0 orphans/239 checked · WARN-swept 11 other declared-numeric families (assembly: 15/15 orphan (e.g. Assembly sequence!G11 (family assembly)); drawing-coverage: 14/14 orphan (e.g. Bill of Materials (Ledger)!B258 (family drawing-coverage)); holds: 5/5 orphan (e.g. Holds & exclusions!D6 (family holds)); overview-cost: 12/12 orphan (e.g. Overview!B32 (family overview-cost)); panel-schedule: 52/52 orphan (e.g. Electrical!E65 (family panel-schedule)); part-names: 114/114 orphan (e.g. Part names!C5 (family part-names)); schedule-recon: 4/4 orphan (e.g. Process schedules!D26 (family schedule-recon))) · 31 families not yet declared numeric (next round)
+  · recalc-and-cache: 5753/5775 formula cells now carry a cached value (was 0/5775); formulas remain live (LibreOffice round-trip)
+  · ooxml-strict-check: 0 HIGH (0 total findings) — Excel-strict clean
+  · ONE TRUTH read-back: 33 live score cells match the python scorecard; floor 9 · open 0 — tab-scorecard.json now carries the WORKBOOK's numbers
+
+DONE
+  path        : /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/dossier.xlsx
+  size        : 18.04 MB
+  tabs (33)  : ['Executive Summary', 'Contents', 'Inputs Master (M0)', 'Equipment & Dimensions Register', 'Overview', 'Renders', 'Cost waterfall', 'Financial model', 'Bill of Materials (Ledger)', 'Brief', 'Design basis', 'Drawings', 'BFD — Block Flow', 'P&ID', 'Process schedules', 'GA — General Arrangement', 'HVAC', 'Electrical', 'Line & velocity', 'Assembly sequence', 'Risk & Regulatory', 'Holds & exclusions', 'Questions for the customer', 'Quality & Audit', 'Sense-check', '⚠ Checks', 'Connection trace', 'Quantities', 'Calculations', 'Inputs & Assumptions', 'Part names', 'Glossary', 'Audit data']
+  live calcs  : 107
+  static calcs: 0
+  image tabs  : 5
+  recalc cache: cached values shipped (previews render)
+  VERDICT     : VERDICT: SHIPS · floor 9/10 (min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit is advisory and never floors; ships at ≥8 everywhere)
+  CHECKS FAIL : 0
+  SHIP GATE   : REVIEW  ·  0 HIGH · 1 MED · 0 LOW · ship_ok=True
+[chain] Excel deliverable → /Users/tristanfischer/Downloads/co2-campaign-v11_dossier_2026-07-06_0907.xlsx
+[chain] PDF OFF by default (set CHAIN_WANT_PDF=1 to enable) — NOT rendering chain-v2.pdf (Excel deliverable + drawings + BoM are on disk; quality loop still runs)
+[chain] deliverable-copy step failed (non-fatal): ENOENT: no such file or directory, open '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf'
+[chain] PDF-off (Excel-only): skipping PDF-based audits (run/bom/layout); BoM validated by the Excel ⚠Checks tab + the state-based gates below.
+[parts-validator] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-PARTS.md
+[parts-validator] PASS: 19 parts checked, 0 findings (0 MED, 0 LOW)
+[drift-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-DRIFT.md
+[drift-detector] PASS: 0 contract quantities checked, 0 drifts (0 MED)
+[sizing-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-SIZING.md
+[sizing-audit] PASS: 0/0 matched-to-rule, 0 findings (0 MED, 0 LOW); voltage-sizing 0/0 matched, 0 findings
+[mispin-detector] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-MISPIN.md
+[mispin-detector] PASS: 115 candidates scanned, 0 mis-pins
+[thermal-derating-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-THERMAL.md
+[thermal-derating-audit] PASS: 0 chiller(s) checked, 0 findings (0 MED, 0 LOW)
+[brief-constraint-completeness-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-COMPLETENESS.md
+[brief-constraint-completeness-audit] PASS: 14 constraints, 1 non-blocking findings (0 MED, 1 LOW)
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf': No such file or directory.
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf': No such file or directory.
+[consistency-audit] pdftotext failed: Command failed: pdftotext /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf -
+I/O Error: Couldn't open file '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf': No such file or directory.
+
+[consistency-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-CONSISTENCY.md
+[consistency-audit] PASS: 0 clusters, 0 findings (0 MED, 0 HIGH), 0 money-format drift(s)
+[jurisdictional-standards-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-JURISDICTION.md
+[jurisdictional-standards-audit] PASS: jurisdiction=UNKNOWN, 162 surfaces scanned, 10 unique citations, 51 findings (0 MED, 51 LOW)
+[fictional-pn-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-FICTIONAL-PN.md
+[fictional-pn-audit] PASS: 69 lines audited (DB-only, zero quota consumed), 41 non-blocking findings (12 MED, 29 LOW).
+[chain] gate-21 price normalisation: capped 2 mis-pinned commodity partVerification price(s) before per-line audit
+[per-line-price-audit] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/AUDIT-PER-LINE-PRICE.md
+[per-line-price-audit] PASS: 100 lines audited (DB-only, zero quota consumed), 7 PASS, 0 MEDIUM, 4 LOW (non-blocking).
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf does not exist.
+[chain] failed to open PDF locally (non-fatal): Command failed: open /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf
+The file /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf does not exist.
+
+[chain] background enrichment spawned (PID 82402) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/background-enrichment.log
+
+[chain] === FINAL ===  state: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/state.json  pdf: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/chain-v2.pdf  status=accepted_with_decisions  gates_passed=false  design_decisions=1
+[enrich] componentEngineering: 90 parts · 87 connections · 22 orphans · 52 ungoverned · 2 balances
+[chain] componentEngineering → state (per-component physics + governance + balances)
+[chain] dashboard: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/dashboard.html
+
+[chain] ── QUALITY LOOP Phase 3 (full) — iteration 1/8 ──
+
+  LEDGER (BoM + connectivity + coverage + tools) — co2-campaign-v11   £1,380,328 raw materials   114 parts + 135 connections   5 tools invoked
+  tag    type      name                     £ line in/out status               tool  BLE   GA P&ID  SLD  PNL  BFD  SCH
+  --------------------------------------------------------------------------------------------------------------------
+  C-103  vessel    packed absorber colum   42,646    3/2 BESPOKE                 —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-111  other     structured packing       5,000    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  P-111  rotating  MEA circulation pump     7,700    2/1 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  K-102  rotating  flue-gas inlet blower   25,500    1/2 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  TK-105 vessel    MEA storage tank         7,500    1/1 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-109  other     HTU-NTU analysis tool      246    0/1 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  E-111  other     rich/lean MEA exchang   10,000    2/2 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  E-109  other     lean-amine cooler        6,200    1/1 IDENTIFI                —    ✓    ✓    ·    ·    ·    ·    ✓
+  E-110  other     rich-amine inlet cool    3,800    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-112  other     spare cross-exchanger   10,000    0/0 IDENTIFI                —    ✗    ✗    ✓    ·    ·    ·    ·
+  R-108  vessel    stirred carbonation r   20,843    2/2 BESPOKE         design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  R-103  vessel    carbonation maturatio   14,000    1/1 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-113  other     CO2 sparger ring         2,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  M-101  other     carbonation static mi    3,200    1/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  R-101  vessel    reactor agitator         1,600    2/1 IDENTIFI        design +1    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  EP-101 other     agitator drive motor     1,600    1/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  X-101  other     agitator reduction ge    2,250    2/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ✓
+  X-114  other     agitator shaft mechan    3,100    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-115  vessel    gypsum feed hopper +     9,800    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ✓    ·
+  P-101  rotating  CaCO3 slurry transfer   12,000   3/11 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  R-106  rotating  reactor slurry recirc    5,400    2/8 IDENTIFI        design +2    ✓    ✓    ✓    ✓    ✗    ✓    ✓
+  R-102  vessel    reactor overflow laun   62,529    1/1 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  TK-106 instrumentreactor pH probe         4,400    0/0 IDENTIFI        design +1    ·    ·    ✓    ·    ·    ·    ✓
+  TK-107 instrumentreactor ORP probe        1,500    0/0 IDENTIFI        design +1    ·    ·    ✓    ·    ·    ·    ✓
+  R-107  instrumentreactor slurry densit    7,800    0/2 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ·    ✓
+  TK-108 instrumentreactor temperature s    2,200    0/0 IDENTIFI        design +1    ·    ·    ✓    ·    ·    ·    ✓
+  EP-102 other     instrument junction b      160    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  V-102  separator CaCO3 vacuum belt fil   24,000    5/4 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  M-102  other     cake wash-water manif    2,800    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  P-109  rotating  filter vacuum pump       7,000   18/1 IDENTIFI      pump-sizing    ✓    ✓    ✗    ✓    ✓    ✓    ✓
+  P-110  rotating  filtrate receiver + p    4,100    2/1 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  K-101  rotating  cake air-blow blower     7,653    1/2 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  V-103  other     CaCO3 hot-air dryer     21,000    2/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  V-104  other     dryer inlet air-heate    4,200    1/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  E-107  other     dryer exhaust heat-re    6,800    2/1 NOT FOUN                —    ✓    ✓    ✓    ✓    ·    ·    ✓
+  E-108  other     dryer condensate cool    2,400    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  R-105  vessel    KOH reaction vessel     10,678    1/1 BESPOKE         design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  TK-101 vessel    KOH dissolution + mak   12,000    0/1 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  C-101  exchanger MEA stripper reboil p   94,623    4/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  R-104  vessel    K2SO4 recrystalliser    21,000   12/1 BESPOKE                 —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-103  other     KOH solids dosing fee   15,500    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-102  other     K2SO4 pusher centrifu   22,500    0/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  P-104  rotating  K2SO4 slurry feed pum   12,000    2/2 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  P-103  rotating  mother-liquor recycle    3,850    2/1 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  V-101  other     K2SO4 hot-air dryer     22,000    0/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  R-109  vessel    crystalliser circulat    8,500    3/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ·    ✓    ✓
+  E-102  vessel    crystalliser product     5,200    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  E-101  vessel    crystalliser vacuum c    9,200    0/0 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ✓    ·
+  C-102  vessel    MEA distillation colu   31,541    3/2 BESPOKE                 —    ✓    ✓    ✗    ·    ·    ✓    ✓
+  P-107  rotating  MEA recycle pump         7,700    2/1 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  P-106  rotating  wash-water feed pump     3,850   2/12 IDENTIFI      pump-sizing    ✓    ✓    ✓    ✓    ✓    ✓    ✓
+  TK-102 vessel    reclaimed wash-water     6,508    1/1 BESPOKE         design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  E-103  exchanger distillation reboiler    8,900    2/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  E-105  other     overhead condenser      21,500    1/2 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  E-104  other     feed/bottoms economis    4,800    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  X-104  other     reflux subcooler         3,000    1/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  H-103  electricalelectric steam genera   50,957    2/2 IDENTIFI                —    ✓    ✓    ·    ✓    ✓    ·    ✓
+  H-102  other     hot-air process heate   14,000    1/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  Z-101  other     cooling-water skid       9,000    1/0 NOT FOUN                —    ✓    ✓    ✓    ✓    ·    ·    ·
+  V-113  vessel    condensate + feedwate    4,600    3/2 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-116  control   plant PLC controller    15,000    0/0 NOT FOUN                —    ·    ·    ·    ✓    ✓    ·    ·
+  I-110  control   remote I/O racks         4,500   11/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  I-108  control   digital I/O cards        1,520    1/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  I-106  control   analogue I/O cards       2,160    1/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  EP-105 control   HMI panel                1,300    0/0 IDENTIFI  cable-sizing +1    ·    ·    ✓    ✓    ✓    ·    ·
+  I-107  control   control-network switc      440    1/1 IDENTIFI                —    ✓    ✓    ·    ✓    ✓    ·    ·
+  I-109  other     marshalling + control    3,200    1/1 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  X-117  instrumentelectromagnetic flow    14,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-118  instrumentradar level transmitt   18,000    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-119  instrumentpH/conductivity analy   11,200    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-120  instrumenttemperature transmitt    7,800    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-121  instrumentpressure transmitters    9,600    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  I-111  instrumentCO2 gas analyser        19,000    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  I-104  instrumentslurry density meters    8,400    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✗
+  EP-104 other     motor control centre    97,500   1/32 NOT FOUN                —    ✓    ✓    ✓    ·    ✓    ·    ·
+  X-122  other     power + control cabli    9,000    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ·
+  EP-103 electricalbusbar + distribution    2,400    1/1 IDENTIFI                —    ✓    ✓    ·    ✓    ✗    ·    ·
+  X-123  other     cable transit frames     1,920    0/0 IDENTIFI  cable-sizing +1    ·    ·    ✓    ·    ·    ·    ·
+  X-124  other     cable glands               720    0/0 IDENTIFI  cable-sizing +1    ·    ·    ✓    ·    ·    ·    ·
+  X-125  other     variable-speed drives   10,200    0/0 IDENTIFI                —    ·    ·    ✓    ·    ✓    ·    ·
+  P-112  rotating  blower/centrifuge VSD    8,400    0/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ✓    ·
+  X-126  other     soft starters            1,950    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  INV-1  other     drive fieldbus module    1,680    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  TX-101 electricaldistribution transfor   27,398    1/1 IDENTIFI  cable-sizing +1    ✓    ✓    ·    ✗    ✓    ·    ·
+  X-127  other     motor contactors         1,330    0/0 BESPOKE                 —    ·    ·    ✓    ·    ·    ·    ·
+  X-128  electricalmotor-protection rela    1,540    0/0 IDENTIFI                —    ·    ·    ·    ·    ·    ·    ·
+  X-129  electricalmotor-protection circ    1,190    0/0 IDENTIFI  cable-sizing +1    ·    ·    ·    ·    ·    ·    ·
+  X-130  other     process skid frame      15,000    0/0 BESPOKE                 —    ·    ·    ✓    ·    ·    ·    ·
+  C-104  vessel    field-erection column    7,500    1/1 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-110  other     chemical bund            7,000    2/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  V-105  vessel    vessel supports + sad    5,200    1/2 IDENTIFI        design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-131  other     access platform + lad    8,500    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-132  other     pressure relief valve    5,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-133  other     safety shower + eyewa    4,400    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  I-105  other     nitrogen blanketing s    3,400    0/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  I-103  rotating  ATEX area extract fan   19,200    1/2 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ✓    ·
+  I-102  other     ATEX-zone inlet louvr      900    2/2 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  I-101  other     ATEX-bonded ductwork     2,800    2/1 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  I-112  instrumentCO2 + VOC gas detecto    9,600    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✓
+  X-134  instrumentCO2 asphyxiation dete    7,600    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ✗
+  X-135  instrumentamine-vapour detector    6,300    0/0 NOT FOUN                —    ·    ·    ✓    ·    ·    ·    ✗
+  P-113  electricalfan-trip gas-detectio      360    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ✓    ·    ✓
+  X-136  other     emergency shutdown sy      200    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-137  electricalsafety relays            1,440    0/0 IDENTIFI                —    ·    ·    ·    ·    ·    ·    ·
+  X-138  other     SIL-rated isolation b    1,920    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  X-139  control   gas-detection control    4,800    0/0 IDENTIFI                —    ·    ·    ✓    ✓    ✓    ·    ✓
+  X-108  other     open-mouth bagging ma   35,000    1/1 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ·    ✓
+  TK-103 vessel    product storage silo    21,742    1/1 BESPOKE         design +1    ✓    ✓    ✓    ·    ·    ✓    ✓
+  X-105  other     pallet wrapper           6,800    0/0 IDENTIFI                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-106  other     bag take-away conveyo    4,800    0/0 NOT FOUN                —    ✓    ✓    ✓    ·    ·    ·    ·
+  X-107  other     bag heat sealer          3,500    1/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  X-140  other     sealer jaw heating el      640    0/0 IDENTIFI                —    ·    ·    ✓    ·    ·    ·    ·
+  H-101  other     shrink-wrap tunnel he    7,200    1/0 NOT FOUN                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  E-106  other     bag-mouth pre-heater     1,400    1/0 IDENTIFI                —    ✓    ✓    ✓    ✓    ✓    ·    ·
+  --------------------------------------------------------------------------------------------------------------------
+  PART coverage by drawing (present / expected):   BLE 66/67   GA 66/67   P&ID 47/49   SLD 14/15   PNL 17/19   BFD 35/35   SCH 11/14
+  CONNECTION coverage (pipes/wires/sensors vs the views):   pid 64/87 (73.6%)   process_schedules 84/135 (62.2%)   isometric 0/87 (0.0%)   route 86/135 (63.7%)
+  TOOLS invoked (5):
+    pressure-vessel:design                   →  16 parts   80 calcs   80 claims
+      └ TK-105 MEA storage tank  Internal design pressure
+    reactor:cstr-pfr-sizing                  →  16 parts   80 calcs   64 claims
+      └ TK-105 MEA storage tank  Reactor working volume (total)
+    process:pump-sizing                      →   9 parts   45 calcs   27 claims
+      └ P-111 MEA circulation pu Pipe velocity
+    electrical:cable-sizing                  →   5 parts   20 calcs   20 claims
+      └ EP-105 HMI panel         De-rated tabulated-current target
+    electrical:transformer-sizing            →   5 parts   25 calcs   15 claims
+      └ EP-105 HMI panel         Apparent power demand (informational)
+  → 6 NOT FOUND (true gap) · 0 fabricated (no catalogue identity by nature) · 0 architecturally-excluded (membrane/media) · 5 OEM-proprietary (recorded finding) · 1 commodity-fitting (accessory/fastener, no catalogue identity by nature) · 0 boundary-stub (connection endpoint, not a part) · 0 scope-documented (system/network/design label) · 9 parts w/ coverage gap · 2 orphan · 23 connections off the P&ID.  0 ambiguous tag(s) (name-corroborated).  85/114 parts have NO tool provenance.  wrote parts-ledger.json
+  → CONNECTIVITY: 11 concern(s) — process 27/31 connected (87.1%) · instruments 14/14 associated (100.0%) · 3 origin(s) · 0 sink(s)
+
+[chain] ledger updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/parts-ledger.json
+[chain] quality scorecard (iteration 1/8): floor=9/10 mean=9.9/10 allPass=true
+  headline: 9/10 ✓
+  brief_compliance: 8/10 ✓
+  bill_of_materials: 9/10 ✓
+  performance_card: 10/10 ✓
+  design_narrative: 9/10 ✓
+  physics_fidelity: 7/10 ✗ BELOW 8
+  drawing_gates: 10/10 ✓
+  cost_sanity: 10/10 ✓
+  physics_gates: 10/10 ✓
+  tool_archetype: 10/10 ✓
+  connectivity: 9/10 ✓
+  brief_compliance: 10/10 ✓
+  unresolved_critic_highs: 10/10 ✓
+  physics_fidelity: 10/10 ✓
+[chain] dashboard updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/dashboard.html
+[chain] ledger HTML updated: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v11/parts-ledger.html
+
+[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration 1/8)

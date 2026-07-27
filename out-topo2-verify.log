@@ -1,0 +1,9 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_codema.md (13435 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 13435 chars
+[chain] FATAL: Error: OpenRouter API 402: {"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 46235. To increase, visit https://openrouter.ai/settings/credits and add more credits","code":402,"metadata":{"provider_name":null,"previous_errors":[{"code":402,"message":"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 46235. To increase, visit https://openrouter.ai/settings/credits and add more credits"}]}},"user_id":"user_3CnZPY2moKiUBwYYxYMgp8qyvjv"}
+    at runBriefParsing (/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/src/lib/pdf-engine-v2/stages/0-brief-generation.ts:329:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async cachedDesignStage (/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/design-stage-cache.ts:153:17)
+    at async main (/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx:3619:73)

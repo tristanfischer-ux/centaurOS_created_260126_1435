@@ -1,0 +1,420 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_rodeostat.md (3042 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: potentiostat (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=low, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: potentiostat): 0 HARD field(s) filled with class-aware inferred values, 1 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, target_material, design_life, operating_environment.
+  [U5] still null after augmentation: max_mass_kg, target_material, design_life, operating_environment
+[chain] U6 brief expansion: 10 duties derived; product="Electrochemical measurement data (current/voltage time series)" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] max_input_power_w = 2.5 W [derived/high] — Standard USB 2.0 port limit (5V at 500mA) to ensure compatibility with standard host PCs w
+  [U6] compliance_voltage_v = 8 V [derived/medium] — Typical requirement for teaching/research potentiostats (Rodeostat class) to overcome cell
+  [U6] applied_potential_range_v = 3 V [derived/high] — A +/- 3V range comfortably covers the electrochemical window of water (~1.23V) and common 
+  [U6] max_measurable_current_a = 0.01 A [derived/high] — 10 mA is sufficient for macro-electrodes (e.g., 3mm glassy carbon) in standard teaching la
+  [U6] min_current_resolution_a = 1e-9 A [derived/medium] — 1 nA resolution is required to accurately measure microelectrode responses or low-concentr
+  [U6] dac_resolution_bits = 16 bits [derived/high] — Required to generate smooth voltage ramps for Cyclic Voltammetry. 16 bits over a 6V span (
+  [U6] sampling_rate_hz = 1000 Hz [derived/medium] — Supports fast-scan cyclic voltammetry up to 1 V/s with 1 mV resolution (1000 steps/sec), a
+  [U6] galvanic_isolation_rating_v = 2500 V [derived/high] — Standard basic isolation rating for catalogue digital isolators (e.g., ADuM series) to pro
+  [U6] thermal_dissipation_w = 2.5 W [derived/high] — The 3D-printed enclosure must passively dissipate the maximum USB power draw without excee
+  [U6] pcb_area_m2 = 0.01 m2 [derived/medium] — Derived from 'compact benchtop' requirement; a 100mm x 100mm (0.01 m2) footprint is standa
+[chain] engineering_contract: 4 quantities, 1 topology edges, 2 macro-assemblies (total £189), closures: 1 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":6}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":758}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":1436}
+[products-writeback] {"product_name":"USB benchtop potentiostat, compliance ±10 V class, CV + chronoamperometry. Peak ~8 W. Macro BoM ≈ £189. Research-use electrochemistry — not IVD.","hit":"db_hybrid","matched":"USB benchtop potentiostat, compliance ±10 V class, CV + chronoamperometry. Peak ~8 W. Macro BoM ≈ £189. Research-use electrochemistry — not IVD.","has_modules":true,"used_embedding":true,"candidates":1,"latency_ms":354}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: PASS — 1/7 mandatory covered for UK+EU+US
+  ⚠ LVD 2014/35/EU (missing_mandatory): Low Voltage Directive (EU). Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on t
+  ⚠ EMC 2014/30/EU (missing_mandatory): Electromagnetic Compatibility Directive (EU). Stepper drivers, MCU clocks and USB/serial interfaces must not emit or suc
+  ⚠ RoHS 2011/65/EU (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts Pb/Hg/Cd etc. in electrical equipment; applies to control 
+  ⚠ IEC 61010-1 (missing_mandatory): Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements
+  ⚠ IEC 61326-1 (missing_mandatory): Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements (IEC)
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] 5 duty gap(s) proposed for potentiostat: potentiostat:tia-noise-sizing, potentiostat:quantization-limits, potentiostat:control-amp-dissipation, pcb-design:isolation-creepage, potentiostat:opamp-bandwidth-slew — generating + self-testing each.
+[tool-generator] GENERATED + SELF-TEST-PASSED potentiostat:tia-noise-sizing (2/2 cases passed, attempts=1, cost_usd=0.1090, candidate_id=70 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED potentiostat:quantization-limits (2/2 cases passed, attempts=1, cost_usd=0.0673, candidate_id=71 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED potentiostat:control-amp-dissipation (2/2 cases passed, attempts=1, cost_usd=0.0705, candidate_id=72 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED pcb-design:isolation-creepage (3/3 cases passed, attempts=1, cost_usd=0.1507, candidate_id=73 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-generator] GENERATED + SELF-TEST-PASSED potentiostat:opamp-bandwidth-slew (2/2 cases passed, attempts=1, cost_usd=0.1366, candidate_id=74 status=candidate) — stored as CANDIDATE only (NO auto-promotion), registered=true.
+[tool-creation] PROPOSAL-CACHE STORE for potentiostat: persisted 5 accepted duty spec(s) — the next run for this class replays them verbatim (no LLM propose, deterministic tool_ids).
+[tool-creation] DONE for potentiostat: created 5 self-test-passed tool(s) (potentiostat:tia-noise-sizing, potentiostat:quantization-limits, potentiostat:control-amp-dissipation, pcb-design:isolation-creepage, potentiostat:opamp-bandwidth-slew), rejected 0 (none), cost_usd=0.6075. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (ran) for potentiostat: created+registered 5 self-test-passed tool(s) [potentiostat:tia-noise-sizing, potentiostat:quantization-limits, potentiostat:control-amp-dissipation, pcb-design:isolation-creepage, potentiostat:opamp-bandwidth-slew]; rejected 0 [none]; cost_usd=0.607546. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] stored candidate v1 for potentiostat fails current validation (4 errors) — re-harvesting
+[bootstrap-tool-plan] author-scope signal for slug=potentiostat: 18 tool(s) INCLUDE this class, 169 EXCLUDE, 0 no-signal — surfaced to the relevance sweep (signal, not veto).
+[relevance-sweep] SWEEPING slug=potentiostat key=b7a763d8a566ed8f: 187 tools in 5 batch(es) of ≤40 (model google/gemini-3.1-pro-preview, temp 0) — every tool gets a YES/NO verdict.
+[relevance-sweep] DONE slug=potentiostat key=b7a763d8a566ed8f: 18/187 tools RELEVANT (5 batch call(s), cost_usd=0.2854). Cached → re-runs replay this exact selection. Relevant: control-systems:pid-tuning, cybersecurity-threat-model:stride, enclosure-emc:margin, extruder:thermal, iec-standards:lookup, lifecycle-co2:assessment, mass-aggregator:envelope-check, octopart:parts-lookup, pcb-design:isolation-creepage, potentiostat:control-amp-dissipation, potentiostat:opamp-bandwidth-slew, potentiostat:quantization-limits, potentiostat:tia-noise-sizing, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, thermal-envelope:ladder, transport-logistics:routing
+[bootstrap-tool-plan] RELEVANCE SWEEP narrowed catalogue 187 → 19 tools (18 judged relevant + universal aggregators; from_cache=false) for slug=potentiostat. The wiring harvest now only WIRES this deterministic subset.
+[bootstrap-tool-plan] composing tool plan for novel slug=potentiostat (catalogue=19/187 swept tools, brief_metric_keys=0, contract_duties=13)
+[bootstrap-tool-plan] BOOTSTRAPPED slug=potentiostat steps=19 tool_ids=19 candidate_id=41 version=2 status=candidate attempts=1 cost_usd=0.4861 auto_wired=0 relevance_swept=18/187 coverage_gaps=0 (stored as CANDIDATE only — NO auto-promotion). Selected: control-systems:pid-tuning, cybersecurity-threat-model:stride, enclosure-emc:margin, extruder:thermal, iec-standards:lookup, lifecycle-co2:assessment, mass-aggregator:envelope-check, octopart:parts-lookup, pcb-design:isolation-creepage, potentiostat:control-amp-dissipation, potentiostat:opamp-bandwidth-slew, potentiostat:quantization-limits, potentiostat:tia-noise-sizing, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, thermal-envelope:ladder, transport-logistics:routing, yield-economics:npv
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for potentiostat/generic — bootstrapped a 19-step tool plan (candidate id=41 version=2 status=candidate reused=false attempts=1 cost_usd=0.486126). Stored as CANDIDATE only — NOT auto-promoted. Selected: control-systems:pid-tuning, cybersecurity-threat-model:stride, enclosure-emc:margin, extruder:thermal, iec-standards:lookup, lifecycle-co2:assessment, mass-aggregator:envelope-check, octopart:parts-lookup, pcb-design:isolation-creepage, potentiostat:control-amp-dissipation, potentiostat:opamp-bandwidth-slew, potentiostat:quantization-limits, potentiostat:tia-noise-sizing, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, thermal-envelope:ladder, transport-logistics:routing, yield-economics:npv
+[bootstrap-tool-plan] FAIL-CLOSED cybersecurity-threat-model:stride: missing computed output field(s) → emitted nothing for [cyber_stride_threats(cybersecurity-threat-model:stride.stride_threats)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED iec-standards:lookup: missing computed output field(s) → emitted nothing for [regulatory_mandatory_count(iec-standards:lookup.regulatory_mandatory_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED octopart:parts-lookup: missing computed output field(s) → emitted nothing for [critical_parts_in_stock_count(octopart:parts-lookup.parts_in_stock_count)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_total_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp), regulatory_total_critical_path_months(regulatory-cert-cost:lookup.total_critical_path_months)] (no fabricated number written)
+[class-reference-graph-db] {"product_class":"potentiostat","resolved_to":"potentiostat","hit":"db","nodes":7,"edges":9}
+[generic-emitter] physics-derived equipment: 1 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 7 modules, 7 sub-modules, 35 words, 14 tools ran (544064ms)
+[chain] WORD-DOMAIN-COHERENCE: 1 process-plant-vessel/industrial-power word(s) in device-scale "potentiostat": control_compute_communication/control_compute_communication__microcontroller_mcu/proc_scada[industrial_power:plc]
+  ✕ [industrial_power:plc] control_compute_communication/control_compute_communication__microcontroller_mcu/proc_scada "SCADA / Plant Control System"
+[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped 1 wrong-domain word(s) from the design
+[chain] TOOL-IMPLIED-COMPONENT GROUNDING: 1 tool-implied component(s) absent from the design: optical_detector_module[from photodiode-tia]→sensing_instrumentation
+[chain] TOOL-IMPLIED-COMPONENT GROUNDING ENFORCING: added 1 tool-grounded word(s)
+[chain] Build #18k: toolOutputsBlock built (13 tools, 9781 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 14 component_classes covered (14 with match, 0 empty), 12881 chars (9223ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=217
+[chain] Contract validation: 1 macro-assembly NOT FOUND in design — reviewers will be asked to add them
+  ✕ digital_host: Generator did NOT emit any word matching "digital_host" — Contract pricing £79 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+[chain] keyMetrics seeded early (pre-reviewer): Compliance Voltage=10 V
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=7/10 plaus=6/10 coh=5/10 part=2/10 hon=9/10 (17552ms)
+[chain] PHASE 4 skeleton critic: 1 HIGH-severity issues found before any LLM painting
+  ✗ [internal_coherence @ modules[3].sub_modules[0].words[5]] The sensing_instrumentation module includes an 'Optical detector module / breakout' and references a 'photodiode-tia' engineering tool. A potentiostat is an electrochemical instrum
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 14999 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 23 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 20 / 23 patches (skipped 3)
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.usb_power_entry_word manufacturer="Würth Elektronik" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.usb_power_entry_word part_number="632723300011" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.usb_power_entry_word material="PA9T housing, gold-plated brass contacts" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.usb_power_entry_word rating_primary="USB Type-C 5V/3A 15W" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.usb_power_entry_word regulatory="USB-IF, RoHS, IEC 62368-1" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word power_distribution.power_distribution__usb_power_entry.usb_power_entry_word (+6 modifiers)
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.esd_protection_network_word manufacturer="Texas Instruments" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: power_distribution.power_distribution__usb_power_entry.esd_protection_network_word part_number="TPD4E02B04DQAR" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 76.1s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":2006}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=6/10 phys=4/10 coh=5/10 part=8/10 hon=7/10 (31574ms)
+[chain] critic headline: The design establishes a reasonable conceptual framework for an isolated potentiostat, but suffers from critical physical implausibilities including op-amp overvoltage, missing isolated power, and thermal/power mismatches.
+[chain] critic issues: 2 high, 2 med, 6 total
+  ✗ [high/high] engineering_plausibility @ sensing_instrumentation/sub_modules[0]/english_sentence: The design specifies a compliance voltage of 10 V (keyMetrics) or 8 V (derived requirements), but selects the AD8606ARZ as the transimpedance amplifier. The AD8
+  ✗ [high/high] internal_coherence @ power_distribution: The brief mandates galvanic isolation (2500 V rating) for wet-bench safety. While a digital 'Galvanic Isolator' is included in safety_protection, there is no is
+  ✗ [med/high] engineering_plausibility @ keyMetrics/supporting_metrics[1]: The keyMetrics specifies a peak electrical power of 8 W, which violates the USB 2.0 limit of 2.5 W (5V @ 500mA) defined in the derived requirements. Furthermore
+  ✗ [med/high] brief_to_design_fidelity @ sensing_instrumentation/sub_modules[0]/english_sentence: The text states that a 330 Ω feedback resistor provides '1 nA resolution on the 10 µA current range'. A 330 Ω resistor with 10 µA full-scale current produces a 
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: sensing_instrumentation
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 13857 chars
+[chain] STEP 8: R4 Flash-Lite review returned 15 patches
+[chain] STEP 8: R4 Flash-Lite review applied 15 / 15 patches (skipped 0)
+    =sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.english_sentence (prose)
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.optical_detector_module_tool_grounded_word manufacturer="Vishay Semiconductor Opto Division" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.optical_detector_module_tool_grounded_word part_number="VEMD8083" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.optical_detector_module_tool_grounded_word material="Silicon PIN photodiode" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.optical_detector_module_tool_grounded_word regulatory="RoHS" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.optical_detector_module_tool_grounded_word (+6 modifiers)
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.electrode_interface_connector_word manufacturer="TE Connectivity AMP Connectors" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: sensing_instrumentation.sensing_instrumentation__electrode_interface_connector.electrode_interface_connector_word part_number="1-640456-0" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 11.7s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1372}
+[chain] canonical product_class OVERRIDE: "" → "potentiostat" (deterministic classifier wins)
+
+[chain] STEP 8.5: no specialist registered for "potentiostat" — skipping
+[chain] physics repair: 1 iter(s); HIGH 2→2; plausibility 4→4; patches 0
+  iter 0: proposed 2 applied 0 | HIGH 2→2 plaus 4→4 | no patch applied — design unchanged; re-critique skipped (would re-roll the same design)
+[chain] modifier dedup: collapsed 1 cosmetic-dupe modifier(s) across 1 component(s)
+[chain] sub-module prose pre-fill: rewrote 7/7 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 0 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 124 entries (KPA=124, emitter=0, rag=0)
+[chain] isInstrumentDevice=true (enclosure_volume_m3=0.00038 < 1, class=potentiostat, not plantish) — will stamp on state construction
+[chain] gate-23 emitter-completeness: PASS — 7 sub_modules checked, 7 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[chain] Phase 2 iter 0: arith 0 pass / 0 fail; grammar 10 pass / 3 fail; total score 2130
+  ✗ [thermal_path_closes] grammar: 1 heat-source sub-module(s) without thermal_path: power_distribution::power_distribution__usb_power_entry. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): structure_containment::structure_containment__enclosure_shell (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 7 sub-module(s) with <3 priced lines: power_distribution::power_distribution__usb_power_entry (0/5), energy_conversion_transduction::energy_conversion_transduction__analog_front_end (0/5), control_compute_communication::control_compute_communication__microcontroller_mcu (0/5), sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (0/6), structure_containment::structure_containment__enclosure_shell (0/4), hmi_ergonomics::hmi_ergonomics__status_indicator (0/5) ...+1.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 4 module(s) name components in overview that are absent from sub-modules (procurement gap): power_distribution: overview mentions 4 concrete components not present in any sub-module word — ltst-c191kgkt, blm18pg121sn1d, sbr2u30p1, c191kgkt | energy_conversion_transduction: overview mentions 2 concrete components not present in any sub-module word — tlv6741dckr, adr4525brz | control_compute_communication: overview mentions 2 concrete components not present in any sub-module word — stm32f303cct6, ft232rnl ...+1. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 0: applied 1 patches, skipped 5, allowlist_rejected=5, state_changed=true
+    +cross_module_grammar_links.[+] (Resolve thermal_path_closes failure for power_distribution)
+    [allowlist-strict] reject add_word with locked kind="quantity" value="×4" — Phase 2 LLM may not invent words carrying emitter-owned identity/spec modifiers (part_number/manufacturer/capacity/dimension/form/material/regulatory/rating_primary/rating_secondary/quantity); word_id=fastener_set_word sub_module=structure_containment.sub_modules[0].words[+]. The deterministic-emitter must own all locked-identity words (determinism #86 — a non-cached, non-seeded LLM call in this file must never be the one deciding whether a locked word exists). If the emitter is complete for this sub_module, the Phase 2 LLM should enrich the EXISTING emitter word instead of adding a new one, or add a prose-only word with no locked-kind modifier. (Increase word density for structure_containment__enclosure_shell)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="LTST-C191KGKT" not in verified-parts allowlist (124 entries). Patch dropped. (Add procurement-grade part to power_distribution)
+    ALLOWLIST_REJECT energy_conversion_transduction.sub_modules[0].words[+]: word patch contains MPN="TLV6741DCKR" not in verified-parts allowlist (124 entries). Patch dropped. (Add procurement-grade part to energy_conversion_transduction)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[0].words[+]: word patch contains MPN="STM32F303CCT6" not in verified-parts allowlist (124 entries). Patch dropped. (Add procurement-grade part to control_compute_communication)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[0].words[+]: word patch contains MPN="1-640456-0" not in verified-parts allowlist (124 entries). Patch dropped. (Add procurement-grade part to sensing_instrumentation)
+[chain] Phase 2 iter 1: arith 0 pass / 0 fail; grammar 11 pass / 2 fail; total score 2430
+  ✗ [sub_module_word_density] grammar: 1 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): structure_containment::structure_containment__enclosure_shell (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 7 sub-module(s) with <3 priced lines: power_distribution::power_distribution__usb_power_entry (0/5), energy_conversion_transduction::energy_conversion_transduction__analog_front_end (0/5), control_compute_communication::control_compute_communication__microcontroller_mcu (0/5), sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (0/6), structure_containment::structure_containment__enclosure_shell (0/4), hmi_ergonomics::hmi_ergonomics__status_indicator (0/5) ...+1.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 4 module(s) name components in overview that are absent from sub-modules (procurement gap): power_distribution: overview mentions 4 concrete components not present in any sub-module word — ltst-c191kgkt, blm18pg121sn1d, sbr2u30p1, c191kgkt | energy_conversion_transduction: overview mentions 2 concrete components not present in any sub-module word — tlv6741dckr, adr4525brz | control_compute_communication: overview mentions 2 concrete components not present in any sub-module word — stm32f303cct6, ft232rnl ...+1. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 1: applied 0 patches, skipped 7, allowlist_rejected=7, state_changed=false
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="LTST-C191KGKT" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="BLM18PG121SN1D" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT power_distribution.sub_modules[0].words[+]: word patch contains MPN="SBR2U30P1-7" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT energy_conversion_transduction.sub_modules[0].words[+]: word patch contains MPN="TLV6741DCKR" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT energy_conversion_transduction.sub_modules[0].words[+]: word patch contains MPN="ADR4525BRZ" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[0].words[+]: word patch contains MPN="STM32F303CCT6" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[0].words[+]: word patch contains MPN="FT232RNL" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to BoM)
+[chain] Phase 2: no state change after repair iter 1 — bailing (further iterations will not progress).
+[fill-blank-mpn] 15 blank catalogue word(s) for class "potentiostat" (20 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__usb_power_entry (Power Indicator LED) → TE Connectivity 4-2489541-7
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB312A2C2V fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB312C3 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB321C fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): FTDI TTL-232RG-VSW3V3-PCB fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): FTDI TTL-232R-3V3-PCB fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB4DP fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB3S24 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): StarTech PEXUSB3S2EI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__microcontroller_mcu (Usb Interface): best DB row StarTech PEXUSB3S25 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ nohit sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Electrode Interface Connector): no DB row passed the rank bar for tokens [electrode, interface, connector, instrumentation] — staying generic
+[fill-blank-mpn]   ⊘ nohit sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Current Measurement Tia): no DB row passed the rank bar for tokens [current, measurement, tia, instrumentation, electrode, interface] — staying generic
+[fill-blank-mpn]   ⊘ nohit sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Reference Input Buffer): no DB row passed the rank bar for tokens [reference, input, buffer, instrumentation, electrode, interface] — staying generic
+[fill-blank-mpn]   ⊘ nohit sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Voltage Sense Path): no DB row passed the rank bar for tokens [voltage, sense, path, instrumentation, electrode, interface] — staying generic
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Calibration Reference): Texas Instruments REF3025AIDBZR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Optical detector module / breakout): no DB row passed the rank bar for tokens [detector, breakout, instrumentation, electrode, interface, connector] — staying generic
+[fill-blank-mpn]   ⊘ nohit structure_containment::structure_containment__enclosure_shell (Front Panel Connector Ports): no DB row passed the rank bar for tokens [front, panel, connector, port, containment, enclosure] — staying generic
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__enclosure_shell (Cable Strain Relief): Goetze Series 851 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__status_indicator (Status Indicator): no DB row passed the rank bar for tokens [status, indicator, hmi, ergonomic] — staying generic
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Siemens 6AV2123-2GB03-0AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Rittal 1180.000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Eaton 9SX5KI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Bürkert Type 2301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Host Gui Software): Siemens 6AV21240GC010AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__status_indicator (Calibration Prompt Ui): no DB row passed the rank bar for tokens [calibration, prompt, hmi, ergonomic, status, indicator] — staying generic
+[fill-blank-mpn]   ⊘ nohit hmi_ergonomics::hmi_ergonomics__status_indicator (User Facing Legend): no DB row passed the rank bar for tokens [user, facing, legend, hmi, ergonomic, status] — staying generic
+[fill-blank-mpn] filled 1/15 blank word(s): 1 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 20 structural skipped.
+[chain] fill-blank-mpn: branded 1/15 blank catalogue word(s) (1 DB-first real MPN, 0 generated real-OEM), 20 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 0 anchors checked, 197 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 22823 lines scanned, 1 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 1 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=7 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 0 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: PASS — SKIP — container_payload_rating_kg absent; gate not applicable to this class
+[class-reference-graph-db] {"product_class":"potentiostat","resolved_to":"potentiostat","hit":"db","nodes":7,"edges":9}
+[chain] K10 shadow: PASS_SHADOW — matched=9 missing=0 extra=2
+[chain] K10 writeback: persisted 2 discovered edge(s) to grow the potentiostat reference graph (was dead code until 2026-05-31)
+[chain] K10 writeback: persisted 4 discovered node(s) to grow the potentiostat reference graph
+[chain] headline derived: Compliance Voltage=10 V [derived_deterministic]; Unit cost ceiling=217 GBP;  (0.00s)
+[class-reference-graph-db] wrote edge source=llm class=potentiostat safety_protection->energy_conversion_transduction
+[class-reference-graph-db] wrote edge source=llm class=potentiostat power_distribution->structure_containment
+[chain] part verification: 1 parts checked — verified=1, unverified=0, uncertain=0, skip=0
+[chain] G5 RAG: 0 queries → 0 suggestions (high=0, medium=0, low=0, below_threshold=0, corpus=0 rows)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[chain] Stage 10.5 Part Reality Check: 2 checked, 2 real, 0 substituted, 0 warned (no substitute available). Nexar calls used: 0.
+[chain] Stage 10.6 Part Verification: 0 structured MPN(s) scanned, 0 already DB-verified, 0 live-probed, 0 confirmed (kept), 0 demoted to honest descriptor.
+[chain] module-paragraph-llm: 7/7 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 0 structural mass quantities found, 0 module_mass_kg written (none); coverage 0/7 capital (threshold 5); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 1 sections, 0 warnings
+[chain] design decisions review: 5 choices (1 applied, 4 flagged, 0 blocked)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 0 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 0 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[fill-blank-mpn] 14 blank catalogue word(s) for class "potentiostat" (20 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Calibration Reference): Texas Instruments REF3025AIDBZR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__enclosure_shell (Cable Strain Relief): Goetze Series 851 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Siemens 6AV2123-2GB03-0AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Rittal 1180.000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Eaton 9SX5KI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Bürkert Type 2301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Host Gui Software): Siemens 6AV21240GC010AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 0/14 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 20 structural skipped.
+[chain] filter-on-dirty-stream invariant: not_applicable
+[chain] provenance rooting: 29/30 inputs trace to the brief (97%) — 1 ROOTLESS: enclosure_volume_m3
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.16%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.16%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.16%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 0.0 kW, 1.16%); economic-conductor saving £0
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 0.008 → 0.008 kW (Δ 0 kW parasitic)
+[chain] computed-twin reconcile: 0 computed_<base> quantities dropped (none); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 92692) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/blender-bg.log
+[estimate] device-scale INSTRUMENT: estimated parts capped to COTS commodity ceilings (deviceScaleCeilingGbp)
+[estimate] product_class=potentiostat annual_volume=1,000 (default)
+[estimate] corpus real-price lookup disabled for class 'potentiostat' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 34 parts need price estimates
+[estimate] corpus-classified 2/34; 32 need rule-based / Flash-Lite
+[estimate] rule-based classified 5 parts; 27 still need Flash-Lite
+[estimate] Flash-Lite classified 2 batches
+[estimate] Flash-Lite (volume-aware) for 3 'unknown' parts
+[estimate] updated 0 existing, synthesised 34 new, 0 failed
+[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy
+[estimate] classification source: corpus=2 rule_based=5 flash_lite=27 fallback=0 curated=0 db_cache=0
+[estimate] estimate source: db_cache=0 curve=31 flash_lite_unknown=3
+[estimate] top classes in BoM:
+  electronic_ic: 7
+  electronic_pcb: 6
+  electronic_connector: 4
+  structural_polymer: 3
+  safety_consumable: 3
+  unknown: 3
+  electronic_passive: 2
+  electronic_discrete: 1
+[estimate] estimated cost: GBP 0.002
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: (none — full-corpus search)
+[engine-c] 35 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 35/35 results in 2.1s
+[engine-c] flags: in_range=2  over=1  under=20  no_reference=12
+[engine-c] 21/35 priced lines flagged out-of-range vs reference corpus (60.0%)
+[engine-c] 0 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] no archetypes defined for product class "potentiostat" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.
+[enrich-suppliers] product_class: potentiostat
+[enrich-suppliers] calls — brave: 0, flash-lite (score): 0, flash-lite (name cleanup): 0, flash-lite (capability): 0
+[enrich-suppliers] provenance (web-fallback): 0 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (0 archetypes) + 0 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/state.json
+[supplier-validate] no suppliers to validate
+[chain] Gemini i2i OFF for isInstrumentDevice — Excel embeds Blender CAD/Cycles views only
+[chain] deployment_envelope: no envelope mapped for potentiostat (returning null is intentional for some classes)
+[chain] costStack persisted: ex-works £399 (raw materials £242, class potentiostat)
+[chain] G2 cost-reality: PASS — BoM £242 across 35 priced lines (0 unpriced)
+[chain] G3 review-completeness: WARN — 2 gaps
+  ⚠ sub_modules: 7 sub-modules across 7 modules — expected ≥14
+  ⚠ suppliers: No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)
+[chain] bom-cost-grounding: 0 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 2/10 · mean 5/10 · 3 blocking · below-8: brief_compliance=3, bill_of_materials=2, performance_card=7, design_narrative=6, physics_fidelity=4
+  ✗ [brief_compliance] banner asserts "All 5 PASS" with 0 unverified while brief provides only 1 constraint (cost); remaining 4 are null/missing
+  ✗ [bill_of_materials] Optical detector module / breakout (£30) belongs to wrong product class
+  ✗ [bill_of_materials] multiple £0 non-macro lines
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 2/10).
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.58×) — ⚠ The brief asks for 1.00 unit AND a £217 ceiling — these CANNOT both be met: 1.00 unit costs £399 (1.8× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 0.580 unit at £280 (£483/unit) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_rodeostat.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201-converged
+[chain] cost-sanity (shadow): PASS — Independent cost sanity PASS: £399 / 1 unit = £399/unit — within the £100–£5,000,000/unit industry band for unit output. (no scalable output metric — whole-system price treated as £/unit)
+[chain] cost-sanity enforcing: no HIGH magnitude error — ship allowed (verdict pass).
+[chain] cost-basis: 0 take-off + 0 curve + 0 catalogue + 35 disclosed; 0 take-off prices written into the BoM; purchased £240 → installed £720 (central)
+[advisor-engagement] 7/7 modules got an advisor block — 14 specialist cards, 28 grounded questions
+[chain] advisor-engagement: 7 module blocks, 14 specialist cards
+[chain] tool-archetype coherence (shadow): PASS — coherent — no domain-mismatched tool markers in "potentiostat" (13 tools, 33 quantities scanned)
+[chain] tool-archetype coherence enforcing: no domain-mismatched tool — ship allowed (verdict pass).
+[chain] render-quality (shadow): FLAGS — class="potentiostat" template=NONE hero=false modules=0 thin=0
+  ✗ BLENDER_NO_HERO: No hero/cover image (00-hero.png / blender-cover.png) in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201.
+[chain] tools-flow: rendered 162903 bytes (13 tools)
+[investor-section] 5 investors matched from 18 candidates: Constructor Capital, Celesta Capital, Blue Bear Ventures, BDC Capital Deep Tech, Ascendant Venture
+[investor] wrote 5-investor section to state (18 candidates)
+[drawing-set] 2/2 drawings generated (CAD artifacts available)
+  [system]   ✓ General Arrangement  (drawings/general-arrangement.png)
+  [system]   ✓ Interconnect — device wiring & signal paths  (drawings/interconnect.png)
+  → manifest: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/drawing-manifest.json
+[chain] drawing-set: drawings + hero generated on the SETTLED model (settle loop ran early, pre-cost-stack)
+[chain] drawing-set: 2/2 drawings + hero → wired into the PDF
+[drawing-gates] 13 gates · 0 failing · ALL-PASS=True
+  ✓ [med ] legibility         general-arrangement 2160x1892 aspect 1.1:1 (limit 4:1)
+  ✓ [med ] legibility         interconnect 2560x3376 aspect 1.3:1 (limit 4:1)
+  ✓ [high] no_stray_beam      longest drawn run u_wire_trunk_u_usb_power_entry_power (LV power feeder 400/415V 3ph) spans 0.5 m (limit 16 m — a plant-crossing beam)
+  ✓ [high] connection_sanity  connection graph physically coherent (domain + direction + magnitude)
+  ✓ [high] tag_legibility     every tag distinct (≤20% bbox overlap) + inside its view border
+  ✓ [high] plan_lateral_spread plan has 26 distinct (x,y) cell(s) (≥3)
+  ✓ [high] drawing_domain     no plant-architecture markers on the device drawings
+  ✓ [high] render_view_quality 5 Excel-bound view(s) present, non-blank and correctly framed
+  ✓ [high] plan_render_coherence 00-hero.png + GA fresh vs parts-manifest (fp=1e577aab7424dabb, product cutaway) — same placement generation
+  ✓ [high] drawing_set_coherence 2 system drawing(s) share placement_fp=1e577aab7424dabb; no phantom tags; png≥svg; coverage ≥80% on applicable sheets
+  ✓ [high] ga_glance_coherence GA clears deterministic 5-second glance checks
+  ✓ [high] drawing_vision_glance vision glance clean on 2 image(s)
+  ✓ [high] cad_geometry_coverage instrument geometry present — 34 manifest part(s), 0 instrument-proxy source(s), 4 CAD family(ies)
+[chain] drawing-gates: 0/13 failing — DRAWING >=8 PASS
+[census] 17 tie-in runs (17 units) = £420 (cable £420 + pipe £0)
+[census] routed major streams = £775  →  full interconnect ≈ £1,195
+[chain] cost-sanity re-derived on authoritative BoM (Σ £189): verdict pass — £312/unit
+[chain] benchmark net: generating independent top-down expectation (LLM)…
+[benchmark] generation failed: fetch failed
+[chain] benchmark net: LLM returned no expectation — skipping (shadow never blocks)
+[chain] requirements-driven BoM: 35 requirement lines (Σ £189) → state.requirementsBom; cost cascade reconciled to this total
+[chain] PCB STAGE (shadow): bearing=true disposition=bespoke categories=[analog_frontend,board_role,connectivity,power_electronics,processor] canAuthor=true canRoute=true canVerifyAndExport=true
+[chain] PCB atopile project: 6 component(s), 9 off-board COTS, 2 unresolved, 2 net(s) -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/pcb-project
+[chain] PCB pipeline: ok=false stage_reached=runner_output_parse routed=false drc_violations=null
+[chain] PCB GATE (shadow): applicable=true fires=true reason=bespoke_required_pipeline_not_clean — stage_reached=runner_output_parse; routed=false; drc_ran=false drc_violations=n/a; pcb_pipeline_runner.py produced no result marker (exit 1, signal null). stdout tail:  | stderr tail: re_output=True, text=True, timeout=90,
+    )
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 557, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1221, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 2154, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1268, in _check_timeout
+    raise TimeoutExpired(
+    ...<2 lines>...
+            stderr=b''.join(stderr_seq) if stderr_seq else None)
+subprocess.TimeoutExpired: Command '['/opt/homebrew/bin/kicad-cli', 'pcb', 'drc', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/pcb/board-routed.kicad_pcb', '--output', '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/pcb/drc-report.json', '--format', 'json', '--severity-all']' timed out after 90 seconds
+
+dossier_repair: 1 fix(es) over 1 pass(es); 3 gap(s) need input (2 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/state.json
+[chain] self-repair: 1 fix(es) over 1 pass(es); 3 gap(s) need input (2 blocking HIGH)
+[reconcile-hollow] 0 hollow sub-module(s); nothing to reconcile
+[deterministic-finalize] class-alien-renamed=0 scope-words-demoted=0 density-merged=0 modifiers=0 prose=0 overview=0 · residual violations {'modifier_consistency': 0, 'prose_covers': 0, 'overview_subset': 0, 'word_density_thin': 0}
+[deterministic-finalize] trace-reconcile: connection-ledger.json pruned=0 connection-schedule.json pruned=0
+[fill-blank-mpn] 14 blank catalogue word(s) for class "potentiostat" (20 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ↻ walk  sensing_instrumentation::sensing_instrumentation__electrode_interface_connector (Calibration Reference): Texas Instruments REF3025AIDBZR fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  structure_containment::structure_containment__enclosure_shell (Cable Strain Relief): Goetze Series 851 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Siemens 6AV2123-2GB03-0AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Eaton Freedom 2100 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Rittal 1180.000 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Eaton 9SX5KI fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Run Start Control): Bürkert Type 2301 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn]   ↻ walk  hmi_ergonomics::hmi_ergonomics__status_indicator (Host Gui Software): Siemens 6AV21240GC010AX0 fails type-coherence — trying the next ranked candidate
+[fill-blank-mpn] filled 0/14 blank word(s): 0 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 20 structural skipped.
+[chain] ghost-snapshot re-derive: requirementsBom 35 → 35 row(s) on the FINAL settled tree (pruned 0 stale partVerifications entries)
+dossier_repair: 1 fix(es) over 1 pass(es); 3 gap(s) need input (2 blocking HIGH) → wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/state.json
+[chain] freshen-scorer-inputs: re-rendered schematics + interconnect + parts_ledger on the FINAL state (post-cleanup, post-BoM)
+[chain] physics-critic RE-RUN on the final cleaned design → 0 HIGH · 0 corroborated (score) · 4 advisory (never score) — file + state.physicsCritique are the SAME canonical object
+[chain] state freeze: workbook built from state sha256 3254138fc4f6…
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/dossier.xlsx
+  · column contract [Line & velocity]: 27/27 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 35/35 rows PASS → 10.0/10
+  · column contract [Engineering Analysis]: 1/1 rows PASS → 10.0/10
+  · verification spine: HARD 7 · open 3 · score 4.0/10 · SHIPS blocked
+  · per-tab scorecard: min Executive Summary=4.0/10 · 3 FAIL, 0 UNSCORED
+  · SHIP GATE: per-tab ≥8 floor NOT met — 3 tab(s) <8, 0 UNSCORED → ship_ok=False (every tab must be a genuine ≥8)
+  · Executive Summary
+Traceback (most recent call last):
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 31539, in <module>
+    main()
+    ~~~~^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 31489, in main
+    res = build(run_dir, out_path)
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 25394, in build
+    tab_executive_summary(wb, state, run_dir, sha)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 3188, in tab_executive_summary
+    ws.cell(cmp_start, _c).value = None
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MergedCell' object attribute 'value' is read-only
+[chain] ⚠ Excel staleness gate: dossier.xlsx did not advance past its pre-build snapshot — build-excel-export.py exited without a wb.save() (its own pre-save no-cheating gate almost certainly fired on stale content) — rebuilding ONCE
+Building Excel review workbook for /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201 -> /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/rodeostat-20260718-0201/dossier.xlsx
+  · column contract [Line & velocity]: 27/27 rows PASS → 10.0/10
+  · column contract [Bill of Materials (Ledger)]: 35/35 rows PASS → 10.0/10
+  · column contract [Engineering Analysis]: 1/1 rows PASS → 10.0/10
+  · verification spine: HARD 7 · open 3 · score 4.0/10 · SHIPS blocked
+  · per-tab scorecard: min Executive Summary=4.0/10 · 3 FAIL, 0 UNSCORED
+  · SHIP GATE: per-tab ≥8 floor NOT met — 3 tab(s) <8, 0 UNSCORED → ship_ok=False (every tab must be a genuine ≥8)
+  · Executive Summary
+Traceback (most recent call last):
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 31539, in <module>
+    main()
+    ~~~~^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 31489, in main
+    res = build(run_dir, out_path)
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 25394, in build
+    tab_executive_summary(wb, state, run_dir, sha)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/build-excel-export.py", line 3188, in tab_executive_summary
+    ws.cell(cmp_start, _c).value = None
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MergedCell' object attribute 'value' is read-only
+
+[chain] === FATAL GATE 38 excel-staleness (exit 38) — WRONGNESS, fix the source rule ===
+dossier.xlsx was not rewritten after 1 retry — build-excel-export.py refused to save over the same stale content twice; the shipped workbook would not reflect the delivered design (see the build-excel-export.py output above for the underlying ⚠Checks / LIVE-CHECK GATE finding to fix at source)

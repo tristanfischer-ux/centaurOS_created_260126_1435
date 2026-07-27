@@ -1,0 +1,43 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.md (8917 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief decisions loaded: 1 record(s) from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.commercial-decisions.json
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: energy_storage (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: energy_storage): 1 HARD field(s) filled with class-aware inferred values, 6 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Containerised assembly: cell module stacking, busbaring, BMS wiring, PCS integration, factory-acceptance test" (Class-canonical process for energy_storage. Class default for utility-scale BESS in 40 ft Hi-Cube ISO container)
+[chain] U6 brief expansion: 13 duties derived; product="Dispatchable AC electrical power and energy storage" (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] usable_energy_capacity_kwh = 13.5 kWh [stated/high] — Stated AC-side usable energy at beginning of life.
+  [U6] nameplate_energy_capacity_kwh = 14 kWh [stated/high] — Stated total pack energy before usable reserve/DoD margin.
+  [U6] continuous_ac_discharge_power_kw = 11.04 kW [stated/high] — Stated continuous on-grid AC power at 230 V.
+  [U6] peak_ac_surge_power_kw = 42.55 kW [derived/high] — Derived from locked-rotor starting requirement: 185 A LRA * 230 V AC = 42,550 W.
+  [U6] continuous_charge_power_kw = 5 kW [stated/high] — Stated maximum continuous charge power for a single master unit.
+  [U6] pv_stc_input_capacity_kw = 20 kW [stated/high] — Stated aggregate PV DC input capacity.
+  [U6] mppt_count = 3 count [stated/high] — Stated minimum number of Maximum Power Point Trackers.
+  [U6] nominal_dc_bus_voltage_v = 400 V [derived/medium] — Derived from the requirement for a high-voltage DC architecture supporting a 230 V AC tran
+  [U6] min_configurable_export_limit_kw = 3.68 kW [stated/high] — Stated requirement for software-configurable lower steps to meet G98 notification path.
+  [U6] thermal_cooling_duty_kw = 1 kW [derived/medium] — Derived from max power flow (20 kW PV input) and estimated one-way efficiency. With an 89%
+  [U6] thermal_heating_duty_kw = 0.63 kW [derived/medium] — Derived from cold-weather charging limits. LFP cannot charge below 0 C. To heat ~90 kg of 
+  [U6] lifetime_energy_throughput_kwh = 81000 kWh [derived/high] — Derived from 13.5 kWh usable capacity * 6,000 equivalent full cycles minimum design life.
+  [U6] enclosure_volume_m3 = 0.13 m3 [derived/high] — Derived from stated external envelope dimensions: 1.105 m * 0.609 m * 0.193 m = 0.1299 m3.
+[chain] engineering_contract: 53 quantities, 3 topology edges, 7 macro-assemblies (total £1,673), closures: 6 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":2862}
+[products-writeback] {"product_name":"Containerised 0.01 MWh nameplate LFP BESS (88 × 50 Ah cells, 1 racks × 1P × 88S = 281.6 V DC bus, 0.0 MW PCS) — single 20-ft ISO container with EXTERNAL pad-mounted MV step-up transformer per IEC 6293","hit":"db_hybrid","matched":"Saft Intensium Max","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":790}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 5/6 mandatory covered for UK+EU+global
+  ⚠ RoHS 2011/65 (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts lead, mercury, cadmium, and other substances in electrical
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU, global) without an explicit harmonisation plan. Each region adds £25-60k in cert
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[distributor-cascade] DB library:bess_oem_2026-05-25 hit for SC1000UD-MV
+[distributor-cascade] DB library:mouser hit for GX21BAB
+[generic-emitter] scale-aware graph selection: nameplate 14.1 kWh < 100 kWh — using 'residential-battery-storage' (wall-mount all-in-one) instead of the containerised utility graph
+[class-reference-graph-db] {"product_class":"residential-battery-storage","resolved_to":"residential-battery-storage","hit":"baked","nodes":10,"edges":14}
+[generic-emitter] physics-derived equipment: 4 word(s) sized from the contract; 0 principal item(s) synthesised (—).
+[chain] Orchestrator: 10 modules, 20 sub-modules, 121 words, 5 tools ran (7582ms)
+[chain] Build #18k: toolOutputsBlock built (9 tools, 13014 chars) — will be injected into reviewer prompts

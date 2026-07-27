@@ -1,0 +1,32 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/yuri_openflexure.md (4880 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: lab_microscope (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: lab_microscope): 0 HARD field(s) filled with class-aware inferred values, 2 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, target_material, batch_size, design_life, operating_environment.
+  [U5] still null after augmentation: max_mass_kg, target_material, batch_size, design_life, operating_environment
+[chain] U6 brief expansion: 10 duties derived; product="Digital microscope images, tiled panoramas, and time-lapse image sequences." (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] focus_resolution_um = 1 um [stated/high] — Stated directly in the performance metrics.
+  [U6] z_step_size_um = 0.25 um [derived/high] — To achieve the claimed 'sub-micron' focus and reliable 1 um resolution, the mechanical ste
+  [U6] xy_travel_range_mm = 25 mm [derived/medium] — Must be sized for biological slides. 25 mm minimum travel is required to fully scan a stan
+  [U6] z_travel_range_mm = 4 mm [derived/medium] — Must accommodate standard slide thickness (1.0 mm) + coverslip (0.17 mm) + typical objecti
+  [U6] stage_payload_capacity_g = 100 g [derived/medium] — Must support biological culture vessels. A standard 96-well plate filled with culture medi
+  [U6] illumination_thermal_dissipation_w = 3 W [derived/high] — Transmitted brightfield requires a high-brightness LED (typically 1-3W). This heat must be
+  [U6] peak_electrical_power_w = 20 W [derived/high] — Sum of continuous and peak loads: Single-board computer/MCU (~10W) + 3x stepper motors (~4
+  [U6] max_thermal_drift_um_per_day = 1 um/day [derived/medium] — System must be stable over multi-day experiments. To maintain focus without continuous act
+  [U6] optical_resolution_limit_um = 0.4 um [derived/high] — Abbe diffraction limit (lambda / 2*NA) for a typical high-power RMS objective (e.g., 40x N
+  [U6] autofocus_cycle_time_s = 15 s [derived/medium] — Practical throughput limit for a contrast-based autofocus sweep, assuming a 30-frame Z-sta
+[chain] engineering_contract: 9 quantities, 3 topology edges, 3 macro-assemblies (total £198), closures: 4 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":4}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":299}
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"db_hybrid","latency_ms":269}
+[products-writeback] {"product_name":"Benchtop motorised research microscope, 3-axis stage, focus 1 µm, objective NA 0.45, camera pitch 2.2 µm. Peak panel ~41 W (0.041 kW). Macro-assembly raw BoM ≈ £198 (20-unit engineering build). Resear","hit":"db_hybrid","matched":"Keyence VHX-7000 digital microscope","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":181}
+[engineering-lock-gate] PASS — filled 0 slots + 3 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU+US
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: lab_microscope
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...

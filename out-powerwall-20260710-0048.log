@@ -1,0 +1,456 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.md (8917 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[brief-parse] PA Stage 1: parsing brief...
+[brief-parse] Input: 8917 chars
+[brief-parse] OK — confidence=HIGH, missing=2 fields, metrics=8
+[chain] classification: energy_storage (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 3.2s)
+[chain] U5 brief augmentation: U5 augmentation (class: energy_storage): 1 HARD field(s) filled with class-aware inferred values, 6 field(s) retained from founder text. All 7 HARD fields are now non-null. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Containerised assembly: cell module stacking, busbaring, BMS wiring, PCS integration, factory-acceptance test" (Class-canonical process for energy_storage. Class default for utility-scale BESS in 40 ft Hi-Cube ISO container)
+[chain] U6 brief expansion: 15 duties derived; product="Regulated AC power (backup and grid-tied) and energy arbitrage/self-consumption." (model=google/gemini-3.1-pro-preview, cost_usd=0.062906)
+  [U6] usable_energy_kwh = 13.5 kWh [stated/high] — Stated in brief as the beginning-of-life AC-side usable energy.
+  [U6] nameplate_capacity_kwh = 14 kWh [stated/high] — Stated in brief as the pack energy before usable reserve/DoD margin.
+  [U6] depth_of_discharge_pct = 96.4 % [derived/high] — Calculated from usable energy divided by nameplate capacity (13.5 / 14.0).
+  [U6] continuous_ac_power_kw = 11.04 kW [stated/high] — Stated in brief for on-grid continuous discharge.
+  [U6] peak_ac_power_kw = 42.55 kW [derived/high] — Derived from stated 185 A LRA peak current multiplied by 230 V nominal AC voltage.
+  [U6] max_continuous_charge_kw = 5 kW [stated/high] — Stated in brief for a single master unit.
+  [U6] dc_bus_voltage_v = 384 V [derived/medium] — Transformerless 230V AC output requires a DC bus > 325V (230 * sqrt(2)). A 120-cell series
+  [U6] cell_count = 120 count [derived/medium] — Derived from nominal DC bus voltage (384V) divided by nominal LFP cell voltage (3.2V).
+  [U6] cell_capacity_ah = 36.5 Ah [derived/medium] — Derived from nameplate capacity (14,000 Wh) divided by nominal DC bus voltage (384 V).
+  [U6] pv_stc_input_kw = 20 kW [stated/high] — Stated in brief as aggregate STC input.
+  [U6] mppt_count = 3 count [stated/high] — Stated in brief.
+  [U6] round_trip_efficiency_pct = 89 % [stated/high] — Stated in brief as minimum beginning-of-life efficiency.
+  [U6] max_thermal_dissipation_kw = 1.14 kW [derived/medium] — Derived from 20 kW max PV input and estimated one-way conversion efficiency of ~94.3% (sqr
+  [U6] lifetime_energy_throughput_mwh = 108 MWh [derived/medium] — Derived from midpoint of stated cycle life (8,000 cycles) multiplied by usable capacity (1
+  [U6] enclosure_volume_m3 = 0.13 m3 [derived/high] — Derived from stated dimensions: 1.105 m * 0.609 m * 0.193 m.
+[chain] engineering_contract: 48 quantities, 3 topology edges, 7 macro-assemblies (total £1,668), closures: 4 pass / 1 warn / 1 fail
+  ✕ [mass_closure] In-container mass 7288 kg vs brief cap 130 kg (5606%). Breakdown: cells 88 + shell 4000 + racks 200 + PCS 1500 + BMS/cable 500 + cooling 1000 kg. External pad-mounted 191 kg transformer NOT counted (industry standard utility-BESS layout — Tesla Megapack, Sungrow PowerStack, Wartsila GridSolv Quantum).
+[specs-writeback] web search: bess bess mass_feasibility — 446ms
+[specs-writeback] {"spec_key":"mass_feasibility","part_number":"bess","hit":"miss","latency_ms":2067}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":548}
+[products-writeback] {"product_name":"Containerised 0.01 MWh nameplate LFP BESS (175 × 25 Ah cells, 1 racks × 1P × 175S = 560 V DC bus, 0.0 MW PCS) — single 20-ft ISO container with EXTERNAL pad-mounted MV step-up transformer per IEC 6293","hit":"db_hybrid","matched":"Saft Intensium Max","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":182}
+[engineering-lock-gate] PASS — filled 0 slots + 1 standards; jurisdiction=default
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 5/6 mandatory covered for UK+EU+global
+  ⚠ RoHS 2011/65 (missing_mandatory): Restriction of Hazardous Substances Directive (EU). Restricts lead, mercury, cadmium, and other substances in electrical
+  ⚠ JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU, global) without an explicit harmonisation plan. Each region adds £25-60k in cert
+[research-synthesis] Starting PA Stage 3 Research Synthesis...
+[research-synthesis] Classification: energy_storage
+[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...
+[research] Response length: 12480 chars. First 200: {
+  "market_context": "The UK residential battery energy storage market has experienced rapid growth, driven by the proliferation of rooftop solar PV installations, rising electricity prices, and gove
+[research-synthesis] Complete: 5 competitors, 7 sources, 11 claims flagged for verification
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for bess: replaying 5 stored duty spec(s) (bess-thermal:liquid-cooling-loop, bess-layout:container-packing, dc-busbar:sizing, battery-fault:short-circuit, bess-structural:rack-seismic) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool bess-thermal:liquid-cooling-loop (duty_hash=b6b746c387b6, db id=24) — no LLM call.
+[tool-generator] REUSED stored generated tool bess-layout:container-packing (duty_hash=e9d327779295, db id=25) — no LLM call.
+[tool-generator] REUSED stored generated tool dc-busbar:sizing (duty_hash=b614971afc2d, db id=26) — no LLM call.
+[tool-generator] REUSED stored generated tool battery-fault:short-circuit (duty_hash=22880f77d935, db id=27) — no LLM call.
+[tool-generator] REUSED stored generated tool bess-structural:rack-seismic (duty_hash=e5075e24bafa, db id=28) — no LLM call.
+[tool-creation] DONE for bess: created 5 self-test-passed tool(s) (bess-thermal:liquid-cooling-loop, bess-layout:container-packing, dc-busbar:sizing, battery-fault:short-circuit, bess-structural:rack-seismic), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for bess: created+registered 5 self-test-passed tool(s) [bess-thermal:liquid-cooling-loop, bess-layout:container-packing, dc-busbar:sizing, battery-fault:short-circuit, bess-structural:rack-seismic]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] REUSING stored candidate slug=bess version=1 status=candidate (no LLM call; 30 steps, 30 tool_ids, coverage_gaps=0)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for bess/residential — bootstrapped a 30-step tool plan (candidate id=30 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: battery-fault:short-circuit, bess-layout:container-packing, cell-balance:model, cybersecurity-threat-model:stride, dc-busbar:sizing, electrical:cable-sizing, electrical:transformer-sizing, enclosure-emc:margin, fire-suppression:nfpa, g99:dynamic-compliance, grounding-lightning:ieee-998, ngspice:pcs-simulation, opendss:feeder-flow, pandapower:grid-integration, protection-coordination:dc-ac, arc-flash:ieee-1584, pybamm:cell-sizing, bess-structural:rack-seismic, bess-thermal:liquid-cooling-loop, fan-coil:sizing, hvac:load-sizing, refrigeration-cycle:cop, regulatory-cert-cost:lookup, runtime:peukert-discharge, stack-compression:pressure, mass-aggregator:envelope-check, supply-chain-risk:scoring, transport-logistics:routing, warranty-reliability:battery, reliability-fmea:system
+[bootstrap-tool-plan] FAIL-CLOSED enclosure-emc:margin: missing computed output field(s) → emitted nothing for [emc_compliance_pass(enclosure-emc:margin.compliance_pass)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED g99:dynamic-compliance: missing computed output field(s) → emitted nothing for [g99_freq_response_ok(g99:dynamic-compliance.freq_response_ok), g99_lvrt_ok(g99:dynamic-compliance.lvrt_ok)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_certification_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp), regulatory_certification_months(regulatory-cert-cost:lookup.total_critical_path_months)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[generic-emitter] scale-aware graph selection: nameplate 14 kWh < 100 kWh — using 'residential-battery-storage' (wall-mount all-in-one) instead of the containerised utility graph
+[class-reference-graph-db] {"product_class":"residential-battery-storage","resolved_to":"residential-battery-storage","hit":"baked","nodes":10,"edges":14}
+[universal-sizing] drive-train reconcile: 2 motor/VSD rating(s) re-asserted (pin-honour / single IEC rounding)
+[generic-emitter] physics-derived equipment: 14 word(s) sized from the contract; 2 principal item(s) synthesised (container_clearance, gsu_transformer).
+[chain] Orchestrator: 10 modules, 20 sub-modules, 117 words, 23 tools ran (11688ms)
+[chain] Build #18k: toolOutputsBlock built (25 tools, 16258 chars) — will be injected into reviewer prompts
+[chain] Stage 17.6: library candidates built — 19 component_classes covered (19 with match, 0 empty), 14996 chars (23941ms)
+[chain] brief constraints propagated to structure_containment.derived_parameters: unit_cost_ceiling_gbp=8500, max_mass_kg=130, envelope_volume_m3=0.13, target_capacity_kwh=13.5 (kWh), operating_temp_min_c=-20, operating_temp_max_c=50
+[chain] Contract validation: 2 macro-assembly NOT FOUND in design — reviewers will be asked to add them
+  ✕ iso_container_enclosure: Generator did NOT emit any word matching "iso_container_enclosure" — Contract pricing £247 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+  ✕ main_bus_contactor: Generator did NOT emit any word matching "main_bus_contactor" — Contract pricing £180 cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.
+[chain] keyMetrics seeded early (pre-reviewer): Annual MWh throughput=5 MWh / year
+
+[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)
+[chain] PHASE 4 skeleton critic: brief=2/10 plaus=3/10 coh=4/10 part=5/10 hon=8/10 (7512ms)
+[chain] PHASE 4 skeleton critic: 4 HIGH-severity issues found before any LLM painting
+  ✗ [brief_to_design_fidelity @ keyMetrics/headline_constraint/value] The delivered usable energy capacity is 0.01 MWh (10 kWh) which fails to meet the brief's target of 13.5 kWh. The cell configuration of 175 cells * 25 Ah * 3.2 V nominal yields 14,
+  ✗ [engineering_plausibility @ modules/energy_storage_source/sub_modules/0/words/3/modifier_characters/5/value] The DC Busbar Assembly is rated for 19.71 A continuous. However, the brief specifies a continuous AC power of 11.04 kW. At the nominal DC bus voltage of 560 V (175 cells * 3.2 V), 
+  ✗ [internal_coherence @ modules/structure_containment/sub_modules/0/words/5/modifier_characters/3/value] The module contains a 'Container Clearance' component with dimensions '3.2 m dia x 3.2 m' and volume '26.1 m³', alongside a 'Gsu Transformer' rated for 25 kW. These are utility-sca
+  ✗ [engineering_plausibility @ modules/environmental_interface/sub_modules/1/words/1/modifier_characters/6/value] The Active Ventilation Fan drive motor is rated at 1.7 kW. For a residential system with a maximum thermal dissipation duty of 1.14 kW, a 1.7 kW fan motor is physically absurd and 
+
+[chain] STEP 5: Single reviewer (Grok 4.3) ...
+[chain] STEP 5: Single reviewer (Grok 4.3) raw response: 13266 chars
+[chain] STEP 5: Single reviewer (Grok 4.3) returned 19 patches
+[chain] STEP 5: Single reviewer (Grok 4.3) applied 8 / 19 patches (skipped 11)
+    REJECT edit_field non-prose path "display_name" — tool-sourced quantities are read-only to reviewers
+    REJECT edit_field non-prose path "display_name" — tool-sourced quantities are read-only to reviewers
+    REJECT edit_field non-prose path "display_name" — tool-sourced quantities are read-only to reviewers
+    REJECT edit_field non-prose path "display_name" — tool-sourced quantities are read-only to reviewers
+    REJECT edit_field non-prose path "display_name" — tool-sourced quantities are read-only to reviewers
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word manufacturer="CATL" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word part_number="CB-280Ah-A-50" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word material="LFP cathode / graphite anode" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 5: Single reviewer (Grok 4.3) done in 28.9s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":1318}
+
+[chain] STEP 7.5: physics critic (post-R3, pre-R4)
+[chain] critic scored: brief=2/10 phys=3/10 coh=5/10 part=4/10 hon=8/10 (6991ms)
+[chain] critic headline: The design suffers from a severe architectural mismatch, attempting to satisfy a residential wall-mounted BESS brief using utility-scale containerized BESS parameters and components.
+[chain] critic issues: 4 high, 1 med, 5 total
+  ✗ [high/high] brief_to_design_fidelity @ keyMetrics/headline_constraint/value: The delivered usable energy capacity is 0.01 MWh (10 kWh) based on 175 cells * 25 Ah * 3.2 V * 0.8 DoD = 11.2 kWh nameplate (not 14 kWh as claimed in the notes)
+  ✗ [high/high] engineering_plausibility @ modules/energy_conversion_transduction/sub_modules/0/words/1/modifier_characters/6/value: The Bidirectional PCS is rated at 0.33 kW, which is completely inadequate for the continuous AC power requirement of 11.04 kW specified in the brief.
+  ✗ [high/high] engineering_plausibility @ modules/environmental_interface/sub_modules/1/words/1/modifier_characters/6/value: The Active Ventilation Fan is rated at 1.7 kW, which is excessively oversized for a residential system with a total thermal dissipation duty of 1.14 kW. This fa
+  ✗ [high/high] internal_coherence @ modules/structure_containment/sub_modules/0/words/5/modifier_characters/3/value: The module contains a 'Container Clearance' component with a volume of 26.1 m³ and a 'Gsu Transformer' rated at 25 kW. These are utility-scale containerized BES
+  ✗ [med/medium] part_realism @ modules/energy_storage_source/sub_modules/0/words/0/modifier_characters/0/value: The cell is listed as 'CATL CB-280Ah-A-50' but is modified to have a capacity of 25 Ah. A real 280 Ah prismatic cell has a mass of ~5.3 kg, but scaling its capa
+[chain] physics-critic enforcement (ENFORCING): no known-failure part — ship allowed.
+[chain] task-41 fidelity gates: Critic flagged 1 module(s) for brief_fidelity structural adds: keyMetrics
+
+[chain] STEP 8: R4 Flash-Lite review ...
+[chain] STEP 8: R4 Flash-Lite review raw response: 12456 chars
+[chain] STEP 8: R4 Flash-Lite review returned 18 patches
+[chain] STEP 8: R4 Flash-Lite review applied 18 / 18 patches (skipped 0)
+    =energy_storage_source.overview_paragraph_en (prose)
+    =energy_storage_source.energy_storage_source__lfp_prismatic_cells.english_sentence (prose)
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word manufacturer="CATL" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word rating_primary="25 Ah at 0.5 C" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word material="LFP cathode / graphite anode" rejected — word is emitter-pinned; reviewers may enrich prose only
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word regulatory="IEC 62619, UN 38.3" rejected — word is emitter-pinned; reviewers may enrich prose only
+    ~enriched word energy_storage_source.energy_storage_source__lfp_prismatic_cells.lfp_prismatic_cells_word (+6 modifiers)
+    skip merge [identity-locked A3]: energy_storage_source.energy_storage_source__lfp_prismatic_cells.battery_module_racks_word material="Powder-coated steel" rejected — word is emitter-pinned; reviewers may enrich prose only
+[chain] STEP 8: R4 Flash-Lite review done in 12.3s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":2,"d_overview_chars":1650}
+[chain] canonical product_class OVERRIDE: "" → "energy_storage" (deterministic classifier wins)
+
+[chain] STEP 8.5: domain specialist (energy_storage) review
+
+[chain] STEP 8.5: R4.5 energy_storage specialist ...
+[chain] STEP 8.5: R4.5 energy_storage specialist raw response: 7850 chars
+[chain] STEP 8.5: R4.5 energy_storage specialist returned 9 patches
+[chain] STEP 8.5: R4.5 energy_storage specialist applied 5 / 9 patches (skipped 4)
+    =energy_storage_source.overview_paragraph_en (prose)
+    =energy_storage_source.energy_storage_source__lfp_prismatic_cells.english_sentence (prose)
+    REJECT [identity-locked A2] +word energy_storage_source.energy_storage_source__lfp_prismatic_cells.catl_lfp_cell_280ah: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    REJECT [identity-locked A2] +word energy_storage_source.energy_storage_source__lfp_prismatic_cells.ebm_papst_fan_rer120: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)
+    +overview energy_conversion_transduction: +453 chars
+    REJECT [structure-locked] add_sub_module safety_protection.safety_protection__cell_fuse_assembly: design structure is emitter-owned; no matching Critic brief_fidelity flag for module "safety_protection" (1 flagged module(s): keyMetrics)
+    skip add_grammar_link: from_sub_module "safety_protection__cell_fuse_assembly" not in safety_protection
+    +cross_link: safety_protection→energy_storage_source/safety_isolation
+[chain] STEP 8.5: R4.5 energy_storage specialist done in 16.5s — Δ: {"d_modules":0,"d_sub_modules":0,"d_words":0,"d_dp_keys":0,"d_grammar_links":0,"d_overview_chars":551}
+[chain] physics repair: 1 iter(s); HIGH 4→4; plausibility 3→3; patches 3
+  iter 0: proposed 9 applied 3 | HIGH 4→4 plaus 3→3 | ROLLED BACK iter 0: high 4→6, plausibility 3→3. Restoring snapshot.
+[chain] modifier dedup: collapsed 4 cosmetic-dupe modifier(s) across 4 component(s)
+[chain] sub-module prose pre-fill: rewrote 20/20 sub-modules (LLM english_sentence dropped words; deterministic prose covers all)
+[chain] G0.5 brief-target-reconciliation: PASS — 2 comparisons, 0 mismatches, 0 unable_to_compare
+[chain] verified-parts allowlist: 124 entries (KPA=124, emitter=0, rag=0)
+[chain] gate-23 emitter-completeness: PASS — 20 sub_modules checked, 20 passing, 0 incomplete
+
+[chain] === PHASE 2: Translate + Gates + Repair ===
+[grammar] cross_module_required_links: skipped 1 registry bug(s) for Battery Energy Storage System: energy_storage_source ↔ mass_fluid_transport_process (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 0: arith 4 pass / 2 fail; grammar 11 pass / 3 fail; total score 490
+  ✗ [module_cell_count] module_cell_count INCOMPLETE on energy_storage_source: declared {cell_count=175} but missing [module_count, cells_per_module]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to energy_storage_source.derived_parameters.
+  ✗ [mass_budget] mass OVER: BoM Σ(mass×qty) 985kg > limit 130kg (657% over). Largest line: 928kg at energy_storage_source::energy_storage_source__lfp_prismatic_cells::lfp_prismatic_cells_word. FIX: lighter-spec parts or reduce quantity.
+  ✗ [thermal_path_closes] grammar: 6 heat-source sub-module(s) without thermal_path: sensing_instrumentation::sensing_instrumentation__voltage_transducers, sensing_instrumentation::sensing_instrumentation__current_transducers, structure_containment::structure_containment__weatherproof_enclosure, structure_containment::structure_containment__structural_steel_frame, hmi_ergonomics::hmi_ergonomics__status_indicator_leds. FIX: add a cross_module_grammar_link from the heat source's module (e.g. energy_storage_source) to a cooling-providing module (e.g. environmental_interface or mass_fluid_transport_process) with mechanism="thermal_path" or "cooling".
+  ✗ [sub_module_word_density] grammar: 5 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): control_compute_communication::control_compute_communication__bms_master_controller (4 words), sensing_instrumentation::sensing_instrumentation__current_transducers (4 words), structure_containment::structure_containment__structural_steel_frame (4 words), maintenance_serviceability::maintenance_serviceability__service_access_panels (2 words), maintenance_serviceability::maintenance_serviceability__maintenance_access_panels (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 18 sub-module(s) with <3 priced lines: energy_storage_source::energy_storage_source__lfp_prismatic_cells (0/6), energy_storage_source::energy_storage_source__battery_module_rack (0/6), energy_conversion_transduction::energy_conversion_transduction__silicon_carbide_inverter (0/5), energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (0/5), power_distribution::power_distribution__ac_switchgear (0/5), power_distribution::power_distribution__auxiliary_power_distribution_unit (0/5) ...+12.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): energy_conversion_transduction: overview mentions 1 concrete component not present in any sub-module word — fd450r12ke4phosa1 | environmental_interface: overview mentions 1 concrete component not present in any sub-module word — standby_aux_loss_kw. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 0: applied 5 patches, skipped 1, allowlist_rejected=1, state_changed=true
+    =energy_storage_source.derived_parameters (Fix missing module_count/cells_per_module and correct mass budget to fit 130kg limit)
+    ~energy_storage_source.sub_modules[0].words[0].modifier_characters[7] (Reduce cell mass to fit total system mass budget)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for sensing_instrumentation)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for structure_containment)
+    +cross_module_grammar_links.[+] (Fix thermal_path_closes for hmi_ergonomics)
+    ALLOWLIST_REJECT energy_conversion_transduction.sub_modules[0].words[+]: word patch contains MPN="FD450R12KE4PHOSA1" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing component from overview to sub-module)
+[grammar] cross_module_required_links: skipped 1 registry bug(s) for Battery Energy Storage System: energy_storage_source ↔ mass_fluid_transport_process (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 1: arith 5 pass / 1 fail; grammar 12 pass / 2 fail; total score 3290
+  ✗ [mass_budget] mass OVER: BoM Σ(mass×qty) 145kg > limit 130kg (11% over). Largest line: 88kg at energy_storage_source::energy_storage_source__lfp_prismatic_cells::lfp_prismatic_cells_word. FIX: lighter-spec parts or reduce quantity.
+  ✗ [sub_module_word_density] grammar: 5 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): control_compute_communication::control_compute_communication__bms_master_controller (4 words), sensing_instrumentation::sensing_instrumentation__current_transducers (4 words), structure_containment::structure_containment__structural_steel_frame (4 words), maintenance_serviceability::maintenance_serviceability__service_access_panels (2 words), maintenance_serviceability::maintenance_serviceability__maintenance_access_panels (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 18 sub-module(s) with <3 priced lines: energy_storage_source::energy_storage_source__lfp_prismatic_cells (0/6), energy_storage_source::energy_storage_source__battery_module_rack (0/6), energy_conversion_transduction::energy_conversion_transduction__silicon_carbide_inverter (0/5), energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (0/5), power_distribution::power_distribution__ac_switchgear (0/5), power_distribution::power_distribution__auxiliary_power_distribution_unit (0/5) ...+12.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): energy_conversion_transduction: overview mentions 1 concrete component not present in any sub-module word — fd450r12ke4phosa1 | environmental_interface: overview mentions 1 concrete component not present in any sub-module word — standby_aux_loss_kw. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 1: applied 1 patches, skipped 9, allowlist_rejected=7, state_changed=true
+    ~energy_storage_source.sub_modules[0].words[0].modifier_characters[7] (Reduce cell mass to meet total system mass budget)
+    [locked-identity] REJECT energy_conversion_transduction.sub_modules[0].words[0].modifier_characters[1]: patch targets an existing locked-kind modifier (kind="part_number" value="TBD (detailed design)") at index 1 — Phase 2 may not overwrite or delete a deterministic-emitter-owned identity/spec modifier. (Add missing Infineon part number to sub-module)
+    [locked-identity] REJECT environmental_interface.sub_modules[0].words[0].modifier_characters[+]  word=unknown: Phase 2 attempted to ADD a new locked-kind modifier kind="rating_secondary" value="0.07" (word was not emitter-pinned for this kind — the deterministic-emitter never asserted it) — EMITTER_LOCKED_KINDS identity/spec modifiers are deterministic-emitter-owned; Phase 2 may enrich prose/non-locked fields only. (Add missing standby loss component to sub-module)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[1].words[+]: word patch contains MPN="CAN-BUS-01" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 5 words)
+    ALLOWLIST_REJECT sensing_instrumentation.sub_modules[1].words[+]: word patch contains MPN="PT100-01" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 5 words)
+    ALLOWLIST_REJECT structure_containment.sub_modules[1].words[+]: word patch contains MPN="M10-BOLT-SET" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 5 words)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="DOC-BESS-01" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 3 words)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="TOOL-KIT-01" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 4 words)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="LABEL-01" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 5 words)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[1].words[+]: word patch contains MPN="LOG-01" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module density to 5 words)
+[grammar] cross_module_required_links: skipped 1 registry bug(s) for Battery Energy Storage System: energy_storage_source ↔ mass_fluid_transport_process (not in design — class-connections registry references a module the chain didn't emit)
+[chain] Phase 2 iter 2: arith 6 pass / 0 fail; grammar 12 pass / 2 fail; total score 5690
+  ✗ [sub_module_word_density] grammar: 5 sub-module(s) UNDER-DENSE (<5 words; need 5-7 for a real BoM): control_compute_communication::control_compute_communication__bms_master_controller (4 words), sensing_instrumentation::sensing_instrumentation__current_transducers (4 words), structure_containment::structure_containment__structural_steel_frame (4 words), maintenance_serviceability::maintenance_serviceability__service_access_panels (2 words), maintenance_serviceability::maintenance_serviceability__maintenance_access_panels (4 words). FIX: pack the splitter to ≥5-word children OR (for genuinely-thin emitter output) add specific real priced parts.  BoM-density: 18 sub-module(s) with <3 priced lines: energy_storage_source::energy_storage_source__lfp_prismatic_cells (0/6), energy_storage_source::energy_storage_source__battery_module_rack (0/6), energy_conversion_transduction::energy_conversion_transduction__silicon_carbide_inverter (0/5), energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (0/5), power_distribution::power_distribution__ac_switchgear (0/5), power_distribution::power_distribution__auxiliary_power_distribution_unit (0/5) ...+12.
+  ✗ [module_prose_subset_of_sub_modules] grammar: 2 module(s) name components in overview that are absent from sub-modules (procurement gap): energy_conversion_transduction: overview mentions 1 concrete component not present in any sub-module word — fd450r12ke4phosa1 | environmental_interface: overview mentions 1 concrete component not present in any sub-module word — standby_aux_loss_kw. FIX: emit add_word_to_sub_module patches to add the missing components as words (with full modifier_characters) to the appropriate sub-module — OR rephrase the overview to remove the orphan mention.
+[repair] routing through cached callLlm (determinism #86)
+[chain] Phase 2 iter 2: applied 0 patches, skipped 4, allowlist_rejected=4, state_changed=false
+    ALLOWLIST_REJECT energy_conversion_transduction.sub_modules[0].words[+]: word patch contains MPN="FD450R12KE4PHOSA1" not in verified-parts allowlist (124 entries). Patch dropped. (Add missing procurement-grade component mentioned in overview)
+    ALLOWLIST_REJECT control_compute_communication.sub_modules[1].words[+]: word patch contains MPN="DR-60-24" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module word density to meet minimum requirement)
+    ALLOWLIST_REJECT structure_containment.sub_modules[1].words[+]: word patch contains MPN="HST3-M12" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module word density to meet minimum requirement)
+    ALLOWLIST_REJECT maintenance_serviceability.sub_modules[0].words[+]: word patch contains MPN="E3-10-15" not in verified-parts allowlist (124 entries). Patch dropped. (Increase sub-module word density to meet minimum requirement)
+[chain] Phase 2: no state change after repair iter 2 — bailing (further iterations will not progress).
+[fill-blank-mpn] 77 blank catalogue word(s) for class "energy_storage" (40 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__lfp_prismatic_cells (LFP Prismatic Cells) → Gotion IFP51173203A
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__lfp_prismatic_cells (Battery Module Racks) → Sungrow ST2752UX
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__lfp_prismatic_cells (DC Busbar Assembly) → Mersen Infini-Cell
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__lfp_prismatic_cells (Battery Modules) → Texas Instruments BQ28400PW
+[fill-blank-mpn]   ⊘ fold energy_storage_source::energy_storage_source__lfp_prismatic_cells (DC Busbar System): duplicate representative population (key plain:busbar#1) already counted by an earlier filler in this sub_module — removed, never re-priced/re-listed
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__battery_module_rack (Battery Module Rack) → Sungrow ST2752UX
+[fill-blank-mpn]   ⊘ miss energy_storage_source::energy_storage_source__battery_module_rack (Battery Management System Slave): best DB row Pylontech FC1P-21 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__battery_module_rack (Blade Battery Cells) → Texas Instruments BQ29312APWRG4
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__silicon_carbide_inverter (Bidirectional PCS) → Sungrow SC2000UD-MV
+[fill-blank-mpn]   ↻ retry energy_conversion_transduction::energy_conversion_transduction__silicon_carbide_inverter (Bidirectional PCS Inverter): best DB row Sungrow SC2000UD-MV already claimed in this sub_module — re-ranking excluding claimed part(s) (exclusive assignment)
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__silicon_carbide_inverter (Bidirectional PCS Inverter) → Sungrow SC1000UD-MV
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (Power Filter Inductor) → Pulse Electronics PF0465.103NLT
+[fill-blank-mpn]   ✓ DB   energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (Power Semiconductors) → Panduit U02S14L
+[fill-blank-mpn]   ⊘ miss energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (Power Conversion System PCS): best DB row Axiomtek GOT5152T-834-DC fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__ac_switchgear (Auxiliary Power Supply) → APC by Schneider Electric LIBSMG95SGUL
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__ac_switchgear (Fuses And Circuit Breakers) → ABB 1SDA067417R1
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__auxiliary_power_distribution_unit (AC Circuit Breaker) → ABB 1SDA067417R1
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__auxiliary_power_distribution_unit (Surge Protection Device) → Phoenix Contact 2838199
+[fill-blank-mpn]   ✓ DB   power_distribution::power_distribution__auxiliary_power_distribution_unit (Busbar Assembly) → Mersen Infini-Cell
+[fill-blank-mpn]   ✓ DB   environmental_interface::environmental_interface__thermal_management_bay (Heat Exchanger) → Daikin E1HHEX
+[fill-blank-mpn]   ✓ DB   environmental_interface::environmental_interface__thermal_management_bay (Coolant Distribution Unit) → CoolIT Systems Rack Manifold
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__ems_controller (BMS Master) → Orion BMS ORIONBMS2-M
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__ems_controller (Remote Monitoring Module) → HMS Networks (Ewon) FLEXY20500_00MA
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__ems_controller (Gems Digital Energy Platform): best DB row ABB DPMP-01 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__bms_master_controller (BMS Slave): best DB row Siemens 6ES7241-1CH32-0XB0 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__bms_master_controller (Energy Management System EMS): best DB row Beckhoff C6015-0010 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   control_compute_communication::control_compute_communication__bms_master_controller (Modbus Tcp Interface) → Moxa MGate MB3180
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Current Sensors) → LEM LV 25-P
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Insulation Monitoring Device) → ABB TVOC
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__voltage_transducers (Cell Temperature Sensors): best DB row LEM LV 25-P fails type-coherence — staying generic
+[fill-blank-mpn]   ↻ retry sensing_instrumentation::sensing_instrumentation__voltage_transducers (Voltage Monitoring Sensors): best DB row LEM LV 25-P already claimed in this sub_module — re-ranking excluding claimed part(s) (exclusive assignment)
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__voltage_transducers (Voltage Monitoring Sensors): best DB row Uhome TWV-15-NPT fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Level Transmitter) → Endress+Hauser Waterpilot FMX21
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Temperature Transmitter) → Endress+Hauser iTHERM TM411
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__current_transducers (Humidity Sensors): best DB row LEM GO 20-SME/SP3 Demo Board fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__current_transducers (Temperature Thermistor) → TDK B59102R0070A010
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__current_transducers (Ground Fault Monitor): best DB row STMicroelectronics STEF12SPUR fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__fire_suppression_system (Smoke Detectors): best DB row System Sensor 5601P fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__fire_suppression_system (Gas Sensors): best DB row System Sensor 5601P fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__fire_suppression_system (Emergency Stop Button) → Eaton 216516
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__fire_suppression_system (Gas Detection Sensors): best DB row System Sensor 5601P fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__emergency_stop_buttons (Emergency Stop Buttons) → Eaton 216516
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__emergency_stop_buttons (Hydrogen Detection Sensor) → MSA Ultima X5000
+[fill-blank-mpn]   ✓ DB   safety_protection::safety_protection__emergency_stop_buttons (Smoke Detector) → Apollo 55000-392
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__emergency_stop_buttons (Gas Detection System): best DB row MSA Ultima X5000 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator_leds (Status Indicator Leds) → TE Connectivity 4-2489541-7
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator_leds (Local HMI Display) → NexCOBOT 10IH0010010X0
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator_leds (Warning Labels) → Brady Corporation 142266
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator_leds (Local HMI Touchscreen) → Panasonic Industrial Automation AWHS1R070
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator_leds (Status Indicator Lights) → IDEC CW1P-1EQ4G
+[fill-blank-mpn]   ⊘ miss hmi_ergonomics::hmi_ergonomics__audible_alarm_system (Local Touchscreen Display): best DB row Panasonic Industrial Automation AWHS1R070 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__audible_alarm_system (Status Indicator LED) → Banner Engineering K50LBRALSYPQ
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__audible_alarm_system (Remote Monitoring Interface) → Siemens 6ES7155-6AU01-0CN0
+[fill-blank-mpn] filled 36/77 blank word(s): 36 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 40 structural skipped.
+[chain] fill-blank-mpn: branded 36/77 blank catalogue word(s) (36 DB-first real MPN, 0 generated real-OEM), 40 structural skipped
+[chain] gate-24 shared-qty-consistency: PASS — 2 anchors checked, 694 values scanned, 0 violation(s)
+[chain] gate-25 brief-value-literal-scanner: PASS — 21511 lines scanned, 3 constraints checked, 0 literal hit(s)
+[chain] gate-26 per-rack-quantity: PASS — 0 prose hits scanned, 0 HIGH finding(s)
+[chain] gate-27 manufacturer-attribution: PASS — 36 words checked, 0 HIGH finding(s)
+[chain] gate-28 state-parse-guard: PASS — modules_found=10 modules_declared=(none) damaged=0
+[chain] gate-29 submodule-domain-guard: PASS — 5 words checked, 0 hit(s)
+[chain] gate-30 payload-rating-audit: FAIL — FAIL — in_container_mass_kg 7,288 kg EXCEEDS container_payload_rating_kg 130 kg by 7,158 kg. Fix: reduce in-container mass (fewer racks, lighter cooling, smaller BMS cabling) OR raise brief gross-mass cap (container_payload_rating_kg = brief_mass_cap_kg).
+[chain] gate-30 payload-rating: FLAGGED non-fatal (decision 3) — FAIL — in_container_mass_kg 7,288 kg EXCEEDS container_payload_rating_kg 130 kg by 7,158 kg. Fix: reduce in-container mass (fewer racks, lighter cooling, smaller BMS cabling) OR raise brief gross-mass cap (container_payload_rating_kg = brief_mass_cap_kg).
+[class-reference-graph-db] {"product_class":"energy_storage","resolved_to":"bess-utility-scale","hit":"db","nodes":11,"edges":36}
+[chain] K10 shadow: FAIL_SHADOW — matched=32 missing=1 extra=0
+[chain] headline derived: Annual MWh throughput=5 MWh / year [derived_deterministic]; Usable energy capacity (derived from cells)=0.01 MWh; Round-trip efficiency=0.92 ratio (0.00s)
+[chain] part verification: 36 parts checked — verified=23, unverified=4, uncertain=9, skip=0
+[chain] G5 RAG: 13 queries → 7 suggestions (high=0, medium=1, low=6, below_threshold=6, corpus=50 rows)
+[chain] part verification: stripped 4 high-confidence fake part_numbers
+  • energy_storage_source::energy_storage_source__lfp_prismatic_cells::lfp_prismatic_cells_word → removed "IFP51173203A" (A search for the specific part number 'IFP51173203A' yielded no results in the provided search snipp)
+  • energy_storage_source::energy_storage_source__battery_module_rack::battery_module_rack_word → removed "ST2752UX" (A search for the specific part number 'ST2752UX' yields no results in the provided search context or)
+  • environmental_interface::environmental_interface__thermal_management_bay::heat_exchanger_word → removed "E1HHEX" (A search of Daikin product catalogs and documentation does not yield any reference to a part number )
+  • hmi_ergonomics::hmi_ergonomics__status_indicator_leds::warning_labels_word → removed "142266" (A search for 'Brady Corporation 142266' does not yield any results confirming the existence of this )
+[chain] strip+recommend: 4 recommendations — high=2, medium=1, low=0, unknown=1 (manual sourcing required)
+[chain] structural-gate router: surfaced 2 unrepaired gate(s) as design decisions
+[chain] Stage 10.5 Part Reality Check: 25 checked, 24 real, 0 substituted, 1 warned (no substitute available). Nexar calls used: 0.
+[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):
+  ⚠ cell_monitoring_units_word: "? TBD (detailed design)" [class=unknown, library_class=none]
+[chain] Stage 10.6 Part Verification threw: Cannot find module '/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/lib/mpn-shape' imported from /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/serial-design-chain-v2.tsx; continuing (gate 20 backstop applies)
+[chain] PHYSICS BLOCKED: engineering_plausibility=3/10 brief_fidelity=2/10 — promoting acceptanceStatus to 'blocked'
+[chain] module-paragraph-llm: 10/10 module overviews written by LLM (x-ai/grok-4.3); the rest kept their deterministic fallback
+[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters
+[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer
+[chain] mass-attribution: 10 structural mass quantities found, 1 module_mass_kg written (rack_steel_mass_kg→structure_containment, stack_frame_mass_kg→structure_containment); coverage 2/10 capital (threshold 6); total_system_mass_kg NOT emitted — not emitted — class already carries 'total_system_mass_kg' (no-op; gate-17 already has a verified mass)
+[chain] performance card: 4 sections, 0 warnings
+[chain] design decisions review: 6 choices (1 applied, 5 flagged, 0 blocked)
+[chain] population-count re-assert: 2 word(s) corrected from an LLM population smear (e.g. valve ×200 stamped on every synonym → deterministic per-word count)
+[chain] attribute-phantom cleanup: dropped 0 dimension/property phantom word(s) + 1 exact-id duplicate(s) (fixes phantom BoM lines + duplicate tags)
+[chain] principal-equipment reconcile (deterministic, contract-keyed): 3 principal group(s); 0 identity repaired; 0 synonym duplicate(s) collapsed; 0 LLM duplicate(s) + 0 invented principal(s) dropped (+0 orphan sub-parts); 1 deleted principal(s) re-created; 0 building take-off line(s) re-derived to the final footprint.
+[fill-blank-mpn] 45 blank catalogue word(s) for class "energy_storage" (41 structural skipped) — DB-first → generate → write-back
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__lfp_prismatic_cells (LFP Prismatic Cells) → Gotion IFP51173203A
+[fill-blank-mpn]   ✓ DB   energy_storage_source::energy_storage_source__battery_module_rack (Battery Module Rack) → Sungrow ST2752UX
+[fill-blank-mpn]   ⊘ miss energy_storage_source::energy_storage_source__battery_module_rack (Battery Management System Slave): best DB row Pylontech FC1P-21 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss energy_conversion_transduction::energy_conversion_transduction__mv_step_up_transformer (Power Conversion System PCS): best DB row Axiomtek GOT5152T-834-DC fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   environmental_interface::environmental_interface__thermal_management_bay (Heat Exchanger) → Daikin E1HHEX
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__ems_controller (Gems Digital Energy Platform): best DB row ABB DPMP-01 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__bms_master_controller (BMS Slave): best DB row Siemens 6ES7241-1CH32-0XB0 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss control_compute_communication::control_compute_communication__bms_master_controller (Energy Management System EMS): best DB row Beckhoff C6015-0010 fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__voltage_transducers (Cell Temperature Sensors): best DB row LEM LV 25-P fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Voltage Monitoring Sensors) → LEM LV 25-P
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Level Transmitter) → Endress+Hauser Waterpilot FMX21
+[fill-blank-mpn]   ✓ DB   sensing_instrumentation::sensing_instrumentation__voltage_transducers (Temperature Transmitter) → Endress+Hauser iTHERM TM411
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__current_transducers (Humidity Sensors): best DB row LEM GO 20-SME/SP3 Demo Board fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss sensing_instrumentation::sensing_instrumentation__current_transducers (Ground Fault Monitor): best DB row STMicroelectronics STEF12SPUR fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__fire_suppression_system (Smoke Detectors): best DB row System Sensor 5601P fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__fire_suppression_system (Gas Sensors): best DB row System Sensor 5601P fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__fire_suppression_system (Gas Detection Sensors): best DB row System Sensor 5601P fails type-coherence — staying generic
+[fill-blank-mpn]   ⊘ miss safety_protection::safety_protection__emergency_stop_buttons (Gas Detection System): best DB row MSA Ultima X5000 fails type-coherence — staying generic
+[fill-blank-mpn]   ✓ DB   hmi_ergonomics::hmi_ergonomics__status_indicator_leds (Warning Labels) → Brady Corporation 142266
+[fill-blank-mpn]   ⊘ miss hmi_ergonomics::hmi_ergonomics__audible_alarm_system (Local Touchscreen Display): best DB row Panasonic Industrial Automation AWHS1R070 fails type-coherence — staying generic
+[fill-blank-mpn] filled 7/45 blank word(s): 7 DB-first (real MPN), 0 generated (real OEM, MPN deferred); 41 structural skipped.
+[chain] fill-blank-mpn (late sweep, post-reconcile): branded 7/45 catalogue word(s) minted AFTER the first fill pass (7 DB-first real MPN, 0 generated real-OEM)
+[chain] filter-on-dirty-stream invariant: not_applicable
+[chain] provenance rooting: 80/93 inputs trace to the brief (86%) — 13 ROOTLESS: dod_fraction, cell_count, cell_capacity_ah, cell_voltage_v, transformer_rating_kva, rack_count, cells_per_rack, series_cells_per_string, parallel_strings_per_rack, parallel_strings_total, string_voltage_nominal_v, container_count, transformer_installation
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 1.0 kW, 0.10%); economic-conductor saving £2,576
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] build: running headless Blender to produce CAD artifacts → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 1.0 kW, 0.10%); economic-conductor saving £2,576
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 1.0 kW, 0.10%); economic-conductor saving £2,576
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[drawing-set] reuse: CAD artifacts already in /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/_loop
+[drawing-set] convergence: physics<->CAD converged=True in 2 iters (parasitic 1.0 kW, 0.10%); economic-conductor saving £2,576
+[drawing-set] CAD_ARTIFACTS_ONLY: artifacts=ok, convergence=written — returning before drawings
+[chain] ✦ design loop CLOSED EARLY (before cost stack): 4 passes, settled at pass 2; as-routed supply demand 1000 → 1001.001 kW (Δ 1.001 kW parasitic)
+[chain] computed-twin reconcile: 2 computed_<base> quantities dropped (computed_system_thermal_dissipation_kw, computed_total_cell_mass_kg); 0 phantom word(s) + 0 dependent ref(s) + 0 CAD-manifest entries pruned; 0 twin-less computed_* kept (none).
+[chain] phase 5: blender bg pipeline spawned (PID 71332) → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/blender-bg.log
+[estimate] design scale: nameplate ≈ 14 kWh (utility-tail overrides GATED OFF — sub-utility scale)
+[estimate] product_class=energy_storage annual_volume=100 (default)
+[estimate] corpus real-price lookup disabled for class 'energy_storage' (no priced product-class-tagged corpus rows) — class-anchor pricing unchanged
+[estimate] 116 parts need price estimates
+[estimate] corpus-classified 29/116; 87 need rule-based / Flash-Lite
+[estimate] rule-based classified 27 parts; 60 still need Flash-Lite
+[estimate] Engine B classifier override: 2 parts moved out of oem_subsystem
+[estimate] Flash-Lite classified 3 batches
+[estimate] 31 parts identified as finished commodities — curve discount skipped (priced at reference)
+[estimate] Flash-Lite (volume-aware) for 2 'unknown' parts
+[estimate] updated 36 existing, synthesised 80 new, 0 failed
+[estimate] C3 DB cache: 4 parts priced from distributor_cascade_cache (0 live API calls)
+[estimate] classification source: corpus=27 rule_based=27 flash_lite=59 fallback=0 curated=0 db_cache=4
+[estimate] estimate source: db_cache=4 curve=110 flash_lite_unknown=2
+[estimate] top classes in BoM:
+  oem_subsystem: 30
+  sensor: 16
+  structural_metal: 11
+  mechanical_assembly: 8
+  safety_consumable: 6
+  electronic_pcb: 5
+  electronic_connector: 5
+  optical: 5
+[estimate] estimated cost: GBP 0.002
+[estimate] wrote → /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/state.json
+[engine-c] wrote backup state.json.bak
+[engine-c] product class hint: bess-utility-scale
+[engine-c] 116 priced BoM lines queued (skipped 0 TBD lines)
+[engine-c] spawning reference_lookup.py (batch)…
+[engine-c] retrieved 116/116 results in 2.9s
+[engine-c] flags: in_range=9  over=9  under=60  no_reference=38
+[engine-c] 69/116 priced lines flagged out-of-range vs reference corpus (59.5%)
+[engine-c] 18 bespoke-fabrication line(s) anchored on the equipment band instead of a noisy corpus median
+[engine-c] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/state.json
+[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)
+[apply-auto-improve] no over-priced material macros — no-op (design already grounded in commodity reality)
+[enrich-suppliers] normalised "energy_storage" → "bess"
+[enrich-suppliers] BoM context:
+  • top manufacturers: Sungrow, ABB, Mersen, Texas Instruments, LEM, Endress+Hauser, Eaton, Gotion, Pulse Electronics, Panduit
+  • critical components (top 10):
+      - Current Sensors (Current Sensors — representative cell voltage/temperature sensing chain, pack current shunt, ambient sensor component, ×1)
+      - Temperature Probes (×1, Temperature Probes — representative cell voltage/temperature sensing chain, pack current shunt, ambient sensor component)
+      - Insulation Monitoring Device (Insulation Monitoring Device — representative cell voltage/temperature sensing chain, pack current shunt, ambient sensor component, ×16)
+      - Cell Temperature Sensors (Cell Temperature Sensors — representative cell voltage/temperature sensing chain, pack current shunt, ambient sensor component, ×175, 25 Ah)
+      - Voltage Monitoring Sensors (Voltage Monitoring Sensors — representative cell voltage/temperature sensing chain, pack current shunt, ambient sensor component, ×16)
+      - Level Transmitter (×1, Guided-radar level transmitter, Container Clearance-mounted; 4–20 mA to PLC with high / low-level alarm)
+      - Temperature Transmitter (×1, Pt100 RTD + head transmitter in Container Clearance thermowell; 4–20 mA to PLC)
+      - LFP Prismatic Cells (LFP Prismatic Cells — representative lfp prismatic cell pack + module frames + integrated bms component, ×175, 25 Ah)
+      - Battery Module Racks (Battery Module Racks — representative lfp prismatic cell pack + module frames + integrated bms component, ×1)
+      - Cell Monitoring Units (Cell Monitoring Units — representative lfp prismatic cell pack + module frames + integrated bms component, ×16)
+  [principal_integrator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [principal_integrator] +4 archetype-tagged row(s) from prior web-fallback persistence
+  [principal_integrator] scoring 15 candidates via Flash-Lite…
+  [cell_pack_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [cell_pack_supplier] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [cell_pack_supplier] scoring 15 candidates via Flash-Lite…
+  [enclosure_fabricator] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [enclosure_fabricator] +2 archetype-tagged row(s) from prior web-fallback persistence
+  [enclosure_fabricator] scoring 15 candidates via Flash-Lite…
+  [enclosure_fabricator] web-fallback: 1 Brave query(ies) (need 1)
+    [enclosure_fabricator] "ISO container fit-out manufacturer UK BESS enclosure shop bess supplier UK manufacturer" → 15 hits (cumulative 15)
+  [enclosure_fabricator] web-fallback: 15 Brave hits, 15 after dedup; scoring via Flash-Lite…
+  [enclosure_fabricator] web-fallback rejected: "BESS Switch House Container Build for OCU Group" → pre-check: too long (8 words)
+  [enclosure_fabricator] web-fallback rejected: "Battery energy storage system (BESS) container, BESS container -- A total solution for mobile battery energy storage - TLS OFFSHORE CONTAINERS & TLS ENERGY" → pre-check: too long (24 words)
+  [enclosure_fabricator] web-fallback: 2 candidate(s) rejected by validators (listicle / part-number / name/url mismatch)
+  [enclosure_fabricator] web-fallback: accepted 1/15
+  [enclosure_fabricator] persisted web candidates → inserted: 0, updated: 1, embedded: 1, skipped: 0
+  [battery_cell_manufacturer] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [battery_cell_manufacturer] +5 archetype-tagged row(s) from prior web-fallback persistence
+  [battery_cell_manufacturer] scoring 15 candidates via Flash-Lite…
+  [pcs_inverter_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [pcs_inverter_supplier] +3 archetype-tagged row(s) from prior web-fallback persistence
+  [pcs_inverter_supplier] scoring 15 candidates via Flash-Lite…
+  [pcs_inverter_supplier] web-fallback: 1 Brave query(ies) (need 1)
+    [pcs_inverter_supplier] "BESS PCS inverter supplier UK grid-scale bi-directional inverter 1MW bess supplier UK manufacturer" → 15 hits (cumulative 15)
+  [pcs_inverter_supplier] web-fallback: 15 Brave hits, 15 after dedup; scoring via Flash-Lite…
+  [pcs_inverter_supplier] web-fallback rejected: "How to build the UK’s biggest BESS project - Energy Storage" → pre-check: listicle starter
+  [pcs_inverter_supplier] web-fallback rejected: "Top BESS Manufacturers & Battery Storage Companies 2026" → pre-check: contains year
+  [pcs_inverter_supplier] web-fallback: 2 candidate(s) rejected by validators (listicle / part-number / name/url mismatch)
+  [pcs_inverter_supplier] web-fallback: accepted 1/15
+  [pcs_inverter_supplier] persisted web candidates → inserted: 0, updated: 1, embedded: 1, skipped: 0
+  [bms_system_supplier] +15 hybrid candidate(s) (ok (hybrid: 75 lexical + 75 semantic → 15 fused, RRF k=60))
+  [bms_system_supplier] +2 archetype-tagged row(s) from prior web-fallback persistence
+  [bms_system_supplier] scoring 15 candidates via Flash-Lite…
+  [headquarters-lookup] populated city on 7 candidate(s) via known-locations + Brave HQ query
+  [cross-archetype dedup] apex "eldapoint-group.co.uk" appears in 2 archetypes — keeping in "enclosure_fabricator" (score 10), dropping from "enclosure_fabricator" (score 10)
+  [cross-archetype dedup] apex "nidec-conversion.com" appears in 2 archetypes — keeping in "pcs_inverter_supplier" (score 9), dropping from "pcs_inverter_supplier" (score 9)
+  [cross-archetype dedup] removed 2 duplicate candidate slot(s)
+[enrich-suppliers] product_class: energy_storage
+  principal_integrator: 3 candidate(s)
+    • [db] Clarke Energy (United Kingdom) — confidence: high
+    • [db] Newton Energi (GB) — confidence: high
+    • [db] Ensmart Power (United Kingdom) — confidence: high
+  cell_pack_supplier: 3 candidate(s)
+    • [db] AESC UK (GB) — confidence: high
+    • [db] UltraMax Batteries (United Kingdom) — confidence: high
+    • [db] Fogstar (United Kingdom) — confidence: high
+  enclosure_fabricator: 2 candidate(s)  — 2 from forge-truth.db (13 rejected); 1 added via web-fallback. Only 2 of 3 candidates — sales team may want to broaden the search.
+    • [db] Eldapoint Group (GB) — confidence: medium
+    • [db] Jupiter Wagons (??) — confidence: low
+  battery_cell_manufacturer: 3 candidate(s)
+    • [db] DLCPO (??) — confidence: low
+    • [db] Hithium (??) — confidence: low
+    • [db] LiFePO4 Battery (China) — confidence: low
+  pcs_inverter_supplier: 2 candidate(s)  — 2 from forge-truth.db (13 rejected); 1 added via web-fallback. Only 2 of 3 candidates — sales team may want to broaden the search.
+    • [db] Fimer (??) — confidence: low
+    • [db] Nidec (??) — confidence: low
+  bms_system_supplier: 3 candidate(s)
+    • [db] Nuvation Energy (GB) — confidence: medium
+    • [db] Altertek (United Kingdom) — confidence: high
+    • [db] EVolve Electrics (??) — confidence: low
+[enrich-suppliers] calls — brave: 10, flash-lite (score): 120, flash-lite (name cleanup): 4, flash-lite (capability): 18
+[enrich-suppliers] provenance (web-fallback): 2 archetype(s) hit Brave
+[enrich-suppliers] wrote state.suppliers (6 archetypes) + 2 provenance record(s) back to /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/state.json
+[supplier-validate] 16 candidate(s) examined: 15 already reconciled, 1 URLs replaced, 0 dropped, 1 changed total
+[supplier-validate] wrote /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048/state.json
+[chain] Gemini i2i OFF (Excel embeds Blender views only) — set CHAIN_WANT_GEMINI_I2I=1 to enable
+[chain] deployment_envelope: container-40ft-hicube (shipping_container) for energy_storage
+[chain] demoted-word pricing exclusion: 9 line(s) carried mis_emission_note → excluded from the BoM total; raw BoM £38,714
+[chain] physics-derived bottom-up pricing: 15 components priced from parent physics → rolled into 1 assemblies; raw BoM £38,714
+[chain] costStack persisted: ex-works £73727 (raw materials £38714, class energy_storage)
+[chain] G2 cost-reality: REJECT — BoM £38714 across 116 priced lines (0 unpriced)
+[chain] G3 review-completeness: PASS
+[chain] bom-cost-grounding: 3 lines re-priced from DOE/NETL + cache (real), 0 recorded-only (low-confidence kept at prior price)
+[chain] self-audit (shadow): floor 1/10 · mean 2.8/10 · 7 blocking · below-8: headline=2, brief_compliance=5, bill_of_materials=1, performance_card=4, design_narrative=3, physics_fidelity=2
+  ✗ [headline] physically impossible value (0.01 MWh nameplate from 175 cells is unit-confused by ~1000x)
+  ✗ [headline] annual throughput claim contradicts own cell math
+  ✗ [bill_of_materials] wrong-class parts (HVAC, gas detection, chiller, container enclosure for wall-mount residential BESS)
+  ✗ [bill_of_materials] total £38k vs £8.5k ceiling
+  ✗ [bill_of_materials] multiple macro-priced utility-scale items
+  ✗ [physics_fidelity] severe residential vs utility-scale mismatch
+[chain] self-audit enforcing (deterministic): no deception/broken-core signal — ship allowed (floor 1/10).
+[chain] sweet-spot reconciliation: INCOMPATIBLE (objective=balanced, rescale=0.20×) — ⚠ The brief asks for 13.5 kWh AND a £9k ceiling — these CANNOT both be met: 13.5 kWh costs £74k (8.7× the ceiling). Reconciled to your stated priority — BALANCED (the best cost/output compromise): the sweet spot is 2.70 kWh at £26k (£10k/kWh) — the best compromise between the two, closest to your ideal of full output at full budget.
+[chain] → REDIRECT (not just disclose): this design is OFF-TARGET. Converge a real design with:
+[chain]     npx tsx scripts/design-to-target-run.ts /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/residential_powerwall_clone.md /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/powerwall-20260710-0048-converged
+[chain] cost-sanity (shadow): HIGH — Independent cost sanity HIGH: £73,727 / 13.5 kWh = £5,461/kWh is 10.9× above the £500/kWh high edge of the £200–£500/kWh class band for energy_storage output — the cost is almost certainly INFLATED (premium-tier over-pinning, a £/kg or £/unit magnitude error, or class-rule miscalibration). (brief metric usable_energy_kwh=13.5 kWh → 13.5 kWh; Utility BESS LFP, ex-works £/kWh (BNEF 2H-2024 / Aurora / WoodMac £200-500/kWh raw-to-premium). Tighter than the £150-800 family band, which spans residential + solid-state.)
+[chain] cost-sanity ENFORCING: BLOCKING (exit 32) — Independent cost sanity HIGH: £73,727 / 13.5 kWh = £5,461/kWh is 10.9× above the £500/kWh high edge of the £200–£500/kWh class band for energy_storage output — the cost is almost certainly INFLATED (premium-tier over-pinning, a £/kg or £/unit magnitude error, or class-rule miscalibration). (brief metric usable_energy_kwh=13.5 kWh → 13.5 kWh; Utility BESS LFP, ex-works £/kWh (BNEF 2H-2024 / Aurora / WoodMac £200-500/kWh raw-to-premium). Tighter than the £150-800 family band, which spans residential + solid-state.)

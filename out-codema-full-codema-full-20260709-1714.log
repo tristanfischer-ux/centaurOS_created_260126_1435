@@ -1,0 +1,71 @@
+[chain] brief: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/briefs-loop/fischer_farms_codema.md (12520 chars)
+[chain] PREFLIGHT — preconditions OK  ·  enforcing: none (gates SHADOW — floor records but does not block)  ·  no degrading skips (full run)
+[chain] brief-parsing cache HIT — LLM not called (determinism #86)
+[chain] classification: water_treatment (confidence=HIGH)
+
+[chain] brief refinement iter 0: running plausibility critic ...
+[chain] brief-plausibility cache HIT (iter 0) — LLM not called (determinism #86)
+[chain] brief plausibility iter 0: possible=true (confidence=high, 0 contradictions, 0 revisions proposed, 0.0s)
+[chain] U5 brief augmentation: U5 augmentation (class: water_treatment): 1 HARD field(s) filled with class-aware inferred values, 4 field(s) retained from founder text. Still null after augmentation (no class default): max_mass_kg, operating_environment. Removed from missing_mandatory_fields: target_process.
+  [U5] filled "target_process": "Continuous chemical process: capture; field-erected fixed plant with closed-loop solvent/reagent recovery and automated process control" (Process inferred from brief mission/description for water_treatment. class-agnostic inference from brief text for unmapp)
+  [U5] still null after augmentation: max_mass_kg, operating_environment
+[chain] U6 brief expansion: 18 duties derived; product="Conditioned, nutrient-dosed, and oxygenated irrigation water delivered to crop trays." (model=google/gemini-3.1-pro-preview+cache, cost_usd=0)
+  [U6] ro_feed_flow_m3_per_hr = 11 m3/h [stated/high] — Stated city-water supply to the reverse-osmosis unit.
+  [U6] ro_permeate_flow_m3_per_hr = 8.25 m3/h [derived/high] — Calculated from 11 m3/h feed flow at the stated 75% recovery rate (11 * 0.75). This repres
+  [U6] ro_reject_flow_m3_per_hr = 2.75 m3/h [derived/high] — Calculated as feed minus permeate (11.0 - 8.25).
+  [U6] peak_irrigation_flow_m3_per_hr = 225 m3/h [derived/high] — Sum of the three independent pump units: Unit 1 (90) + Unit 2 (90) + Nursery (45).
+  [U6] irrigation_supply_pressure_bar = 2.9 bar [stated/high] — Stated discharge pressure for the main fertigation pump units.
+  [U6] peak_drain_recovery_flow_m3_per_hr = 225 m3/h [derived/medium] — To prevent drain pit overflow during peak irrigation, the gravity drain network, drain pit
+  [U6] hand_watering_flow_m3_per_hr = 25 m3/h [stated/high] — Stated capacity of the independent hand-watering pump unit.
+  [U6] hand_watering_pressure_bar = 3.3 bar [stated/high] — Stated discharge pressure for the hand-watering pump unit.
+  [U6] clean_water_storage_volume_m3 = 91 m3 [stated/high] — Stated volume for the single cleanwater reservoir.
+  [U6] drain_water_storage_volume_m3 = 222 m3 [derived/high] — Sum of two main drain-water reservoirs (91 m3 each) and one nursery drain-water reservoir 
+  [U6] drain_pit_total_volume_m3 = 15 m3 [derived/high] — Three zones, each with a 5,000-litre (5 m3) concrete drain pit.
+  [U6] total_growing_trays_count = 6000 trays [stated/high] — Stated approximate number of growing trays across the three zones.
+  [U6] ro_unit_power_kw = 8.5 kW [stated/high] — Stated power requirement for the reverse-osmosis unit.
+  [U6] main_irrigation_pumps_power_kw = 16.5 kW [derived/high] — Three active duty pumps (one per unit). Pump nomenclature '40-200/5.5' indicates 5.5 kW mo
+  [U6] hand_watering_pump_power_kw = 4 kW [stated/high] — Stated power requirement for the hand-watering pump.
+  [U6] estimated_total_electrical_load_kw = 35 kW [derived/medium] — Sum of RO (8.5 kW), main irrigation pumps (16.5 kW), hand-watering (4.0 kW), plus an estim
+  [U6] acid_dosing_inventory_l = 300 L [derived/high] — Three independent pump units, each with one 100-litre acid barrel.
+  [U6] peroxide_dosing_inventory_l = 300 L [derived/high] — Three independent pump units, each with one 100-litre peroxide barrel.
+[chain] engineering_contract: 109 quantities, 0 topology edges, 0 macro-assemblies (total £0), closures: 1 pass / 0 warn / 0 fail
+[standards-writeback] {"standard_name":"IEC 62477-1","hit":"db","latency_ms":6}
+[standards-writeback] web search: EN 50604-1 — 2ms
+[standards-writeback] REJECTED unverified web standard EN 50604-1: excerpt does not contain the claimed value "EN 50604-1" — unsupported (likely hallucinated)
+[standards-writeback] {"standard_name":"EN 50604-1","hit":"miss","latency_ms":1485}
+[standards-writeback] {"standard_name":"IEC 62619","hit":"db_hybrid","latency_ms":1868}
+[products-writeback] {"product_name":"Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → 14.5 m³/h granular-activated-car","hit":"db_hybrid","matched":"Pentair X-Flow XIGA UF + RO","has_modules":true,"used_embedding":true,"candidates":8,"latency_ms":187}
+[engineering-lock-gate] PASS — filled 0 slots + 2 standards; jurisdiction=eu
+[chain] G0 physics ledger: PASS (hard=0 soft=0; 0.00s)
+[chain] G1b compliance: WARN — 0/0 mandatory covered for UK+EU
+[chain] research-synthesis cache HIT — LLM not called (determinism #86)
+
+[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator
+[tool-creation] PROPOSAL-CACHE HIT for water_treatment: replaying 5 stored duty spec(s) (gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing) — SKIPPING the LLM propose. Identical tool_ids + duty_hashes → deterministic per-tool reuse, no re-harvest, no fallback.
+[tool-generator] REUSED stored generated tool gac-filter:liquid-phase-sizing (duty_hash=765d91123186, db id=29) — no LLM call.
+[tool-generator] REUSED stored generated tool ion-exchange:softener-sizing (duty_hash=1da257ad1145, db id=30) — no LLM call.
+[tool-generator] REUSED stored generated tool irrigation:ebb-flow-demand (duty_hash=11db9bbe8701, db id=31) — no LLM call.
+[tool-generator] REUSED stored generated tool mechanical-filtration:cloth-screen (duty_hash=df965805489c, db id=32) — no LLM call.
+[tool-generator] REUSED stored generated tool water-storage:buffer-sizing (duty_hash=37eebb6d6496, db id=33) — no LLM call.
+[tool-creation] DONE for water_treatment: created 5 self-test-passed tool(s) (gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing), rejected 0 (none), cost_usd=0.0000 [proposal-cache REUSED]. Created tools are now in the catalogue for the tool-plan bootstrap to wire.
+[orchestrator] UNIVERSAL_TOOL_CREATION (reused-proposal) for water_treatment: created+registered 5 self-test-passed tool(s) [gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, mechanical-filtration:cloth-screen, water-storage:buffer-sizing]; rejected 0 [none]; cost_usd=n/a. The bootstrap planner can now wire the created tools.
+[bootstrap-tool-plan] COVERAGE GATE (brief-named units, reuse) for slug=water_treatment:
+    ✗ UNSIZED heat pump / thermal hold
+    ✓ recirculation / process pumps → fluids:pipe-sizing
+    ✓ electrical distribution → electrical:transformer-sizing
+[bootstrap-tool-plan] COVERAGE GAP: checklist unit "heat pump / thermal hold" unsized — no selected/created tool covers it for slug=water_treatment.
+[bootstrap-tool-plan] REUSING stored candidate slug=water_treatment version=1 status=candidate (no LLM call; 26 steps, 24 tool_ids, coverage_gaps=1)
+[orchestrator] UNIVERSAL_TOOL_PLAN_BOOTSTRAP: no registered plan for water_treatment/medium — bootstrapped a 26-step tool plan (candidate id=31 version=1 status=candidate reused=true attempts=0 cost_usd=n/a). Stored as CANDIDATE only — NOT auto-promoted. Selected: arc-flash:ieee-1584, control-systems:pid-tuning, cybersecurity-threat-model:stride, electrical:transformer-sizing, electrical:cable-sizing, fluids:pipe-sizing, gac-filter:liquid-phase-sizing, ion-exchange:softener-sizing, irrigation:ebb-flow-demand, irrigation:pump-sizing, lifecycle-co2:assessment, mechanical-filtration:cloth-screen, nutrient-solution:chemistry, ph-titration:sizing, pressure-vessel:design, mass-aggregator:envelope-check, process:pump-sizing, protection-coordination:dc-ac, regulatory-cert-cost:lookup, reliability-fmea:system, supply-chain-risk:scoring, water-treatment-ro:sizing, water-storage:buffer-sizing, yield-economics:npv
+[bootstrap-tool-plan] SEED-PROTECTED gac-filter:liquid-phase-sizing: kept the first-principles contract value(s) for [gac_filter_vessel_volume_m3(seed=1.8 vs tool=2.4166666666666665)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] SEED-PROTECTED ion-exchange:softener-sizing: kept the first-principles contract value(s) for [softener_vessel_volume_each_m3(seed=1.5 vs tool=0.4619932646875)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] SEED-PROTECTED irrigation:ebb-flow-demand: kept the first-principles contract value(s) for [irrigation_demand_m3_h(seed=225 vs tool=1200)] (a bootstrapped stand-in tool may not clobber a 'calculator'-sourced quantity)
+[bootstrap-tool-plan] FAIL-CLOSED nutrient-solution:chemistry: missing computed output field(s) → emitted nothing for [nutrient_concentrations_mg_l(nutrient-solution:chemistry.nutrient_concentrations_mg_l)] (no fabricated number written)
+[unit-coercion] pressure-vessel:design.diameter_mm: 1.358748446131949 m → 1358.748446131949 mm (×1000; from contract key "gac_vessel_diameter_m", via declared-unit)
+[bootstrap-tool-plan] FAIL-CLOSED mass-aggregator:envelope-check: missing computed output field(s) → emitted nothing for [mass_budget_utilisation_pct(mass-aggregator:envelope-check.mass_budget_utilisation_pct)] (no fabricated number written)
+[bootstrap-tool-plan] FAIL-CLOSED regulatory-cert-cost:lookup: missing computed output field(s) → emitted nothing for [regulatory_cert_cost_gbp(regulatory-cert-cost:lookup.total_cost_gbp)] (no fabricated number written)
+[unit-coercion] pressure-vessel:design.diameter_mm: 1.358748446131949 m → 1358.748446131949 mm (×1000; from contract key "gac_vessel_diameter_m", via declared-unit)
+[class-reference-graph-db] {"product_class":"water_treatment","resolved_to":"water_treatment","hit":"db","nodes":11,"edges":37}
+[universal-sizing] duty-less drive words: 0 duty-derived, 3 flagged as mis-emissions (no driven-motor evidence)
+[generic-emitter] physics-derived equipment: 40 word(s) sized from the contract; 25 principal item(s) synthesised (uv_disinfection, softener_vessel, fertigation_dosing_pump, acid_dosing_pump, chemical_dosing_pump, nutrient_tank, hand_watering_pump, drain_collection_sump, drain_transfer_pump, cloth_filter, oxygen_dosing_pump, nursery_fertigation_dosing_pump, nursery_acid_dosing_pump, nursery_chemical_dosing_pump, nursery_cloth_filter, nursery_oxygen_dosing_pump, nursery_drain_water_tank, nursery_drain_collection_sump, nursery_drain_transfer_pump, gac_softener, transformer, irrigation_pump, cleanwater_reservoir_reserve_tank, distribution_manifold, fertigation_dosing_pump_backup).
+[chain] Orchestrator: 11 modules, 20 sub-modules, 456 words, 17 tools ran (2660ms)
+[chain] Build #18k: toolOutputsBlock built (20 tools, 13089 chars) — will be injected into reviewer prompts
