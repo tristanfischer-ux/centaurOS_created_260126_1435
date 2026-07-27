@@ -2634,10 +2634,33 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
                  "passed": isinstance(fl, (int, float)) and fl >= 8,
                  "detail": (f"floor {fl:g}/10" if isinstance(fl, (int, float)) else "floor —")})
     # 2. SELF-AUDIT — the engine's own audit found no blocking defect.
+    # ONE TRUTH. This axis used to count the RAW blocking_defects list while the verdict
+    # path routed each defect through its compiled deterministic check and partitioned it
+    # into BINDING vs RETIRED-as-noise. So the two surfaces disagreed about the same fact:
+    # the build log said "ALL RETIRED as noise by compiled checks — does NOT floor" and
+    # the shipped tab said "⛔ FAIL · 3 blocking defect(s)" on the very same run. A reader
+    # sees the FAIL, not the log. Worse, the defects here were two days stale and named a
+    # thermal pad, an NTC sensor and a ferrite that no longer exist anywhere in the
+    # 40-row BoM — which is precisely what the compiled checks had established.
+    # The axis now reads the partition the verdict already computed, so a defect that
+    # cannot be reproduced deterministically stops being reported as an open failure,
+    # and one that CAN still fails the axis. Falls back to the raw list when the
+    # partition is absent (verifier unavailable) — conservative, never weaker.
     _bd = (st.get("selfAudit") or {}).get("blocking_defects") or []
-    axes.append({"axis": "Self-audit — no blocking defects", "applicable": True,
-                 "passed": not _bd,
-                 "detail": ("clean" if not _bd else f"{len(_bd)} blocking defect(s)")})
+    _sav_part = st.get("_selfAuditVerify") if isinstance(st.get("_selfAuditVerify"), dict) else None
+    if _sav_part is not None:
+        _bind = _sav_part.get("binding") or []
+        _ret = _sav_part.get("retired") or []
+        _det = ("clean" if not _bind else f"{len(_bind)} blocking defect(s)")
+        if not _bind and _ret:
+            _det = (f"clean — {len(_ret)} self-audit claim(s) retired as noise by the "
+                    f"compiled deterministic checks")
+        axes.append({"axis": "Self-audit — no blocking defects", "applicable": True,
+                     "passed": not _bind, "detail": _det})
+    else:
+        axes.append({"axis": "Self-audit — no blocking defects", "applicable": True,
+                     "passed": not _bd,
+                     "detail": ("clean" if not _bd else f"{len(_bd)} blocking defect(s)")})
     # 3. COST CEILING over the BRIEF-WORDING layer (S4) — the SAME shared check the
     #    verdict bind + the HARD Verification row use, so the three surfaces cannot
     #    disagree. A "bill of materials ≤ £X" brief compares materials (organoid £287
@@ -28641,6 +28664,33 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch compute_ship_axes self-audit axis (2026-07-27) — ONE TRUTH ═══
+    # The axis must agree with the verdict's compiled-check partition, and must still be
+    # able to FAIL. Three cases: a defect the compiled checks RETIRED reads clean (it was
+    # reporting an unreproducible, two-day-stale claim as an open failure); a BINDING
+    # defect still fails; and with no partition at all the axis falls back to the raw
+    # list conservatively rather than silently passing.
+    def _sa_axis(state):
+        _ax = compute_ship_axes(state, "", {"floor": 9})
+        return next(a for a in _ax if a["axis"].startswith("Self-audit"))
+    _retired_state = {"selfAudit": {"blocking_defects": ["a", "b", "c"]},
+                      "_selfAuditVerify": {"binding": [], "retired": [{"family": "bom"}] * 3,
+                                           "uncompiled": []}}
+    _a = _sa_axis(_retired_state)
+    if not _a["passed"] or "retired as noise" not in _a["detail"]:
+        print(f"  FAIL ship-axis: retired defects must read clean, got {_a}"); bad += 1
+    _binding_state = {"selfAudit": {"blocking_defects": ["a", "b"]},
+                      "_selfAuditVerify": {"binding": [{"family": "cost"}], "retired": [],
+                                           "uncompiled": []}}
+    _a = _sa_axis(_binding_state)
+    if _a["passed"]:
+        print("  FAIL ship-axis: a BINDING defect must still fail the axis"); bad += 1
+    _a = _sa_axis({"selfAudit": {"blocking_defects": ["a"]}})
+    if _a["passed"]:
+        print("  FAIL ship-axis: with no partition the axis must bind conservatively"); bad += 1
+    _a = _sa_axis({"selfAudit": {"blocking_defects": []}})
+    if not _a["passed"]:
+        print("  FAIL ship-axis: a clean self-audit must pass"); bad += 1
     # ═══ proveCatch _cf_range_is_empty (OpenDrop 2026-07-18): a backwards/empty verdict
     # range (O10:O9, an empty EA section) must be recognised so _cf_verdict skips it instead
     # of raising 'expected MultiCellRange' → whole-tab SKIP. Valid ranges + single cells
