@@ -20,8 +20,9 @@ in the drawing's own space, and the view datum carries everything needed to repr
             y = front_y + (z_max_mm - z1_mm) * ppm      h = (z1-z0) * ppm
     top:    x = plan_x  + (x0_mm - x_min_mm) * ppm      w = (x1-x0) * ppm
             y = plan_y  + (y_max_mm - y1_mm) * ppm      h = (y1-y0) * ppm
-    side:   x = side_x  + (y0_mm - y_min_mm) * ppm      w = (y1-y0) * ppm
+    side:   x = side_x  + (y_max_mm - y1_mm) * ppm      w = (y1-y0) * ppm
             y = side_y  + (z_max_mm - z1_mm) * ppm      h = (z1-z0) * ppm
+            (SIDE inverts Y like the plan — verified against the loop, not assumed)
 
 Z NOTE: draw_ga rebases part z onto the shell floor (the FFL datum) before drawing, so
 the datum records `z_shift_mm` and the gate applies the same shift to the manifest row.
@@ -100,9 +101,16 @@ def expected_rect_px(row: Mapping, view: str, datum: Mapping) -> Optional[tuple]
         return (ox + (xmin - x_ref) * ppm, oy + (y_top - ymax) * ppm,
                 (xmax - xmin) * ppm, (ymax - ymin) * ppm)
     if view == "side":
-        y_ref = float(datum.get("y_min_mm") or 0.0)
+        # VERIFIED against the actual SIDE loop (draw_ga.py ~L2412), NOT assumed:
+        #     px = side_x + (y_max - p.y1) * ppm
+        # The side elevation INVERTS Y with the same handedness as the plan ("plan rows
+        # run north(top)->south"). An earlier version of this contract used
+        # (ymin - y_min_mm), which is a different quantity and would have false-fired on
+        # every side-view entity. The contract must describe the rectangle actually
+        # emitted, not the intuitive one.
+        y_top = float(datum.get("y_max_mm") or 0.0)
         z_top = float(datum.get("z_max_mm") or 0.0)
-        return (ox + (ymin - y_ref) * ppm, oy + (z_top - zmax) * ppm,
+        return (ox + (y_top - ymax) * ppm, oy + (z_top - zmax) * ppm,
                 (ymax - ymin) * ppm, (zmax - zmin) * ppm)
     return None
 

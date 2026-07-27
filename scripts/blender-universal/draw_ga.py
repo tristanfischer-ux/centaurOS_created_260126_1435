@@ -2117,6 +2117,11 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         ph = (p.y1 - p.y0) * ppm
         px = plan_x + mx(p.x0)
         py = plan_y + my(p.y1)        # my inverts → top edge is the larger y
+        if meta.get("instrument_faithful_projection"):
+            svg.rect(px, py, pw, ph, stroke="none", fill="none",
+                     extra=('class="manifest-projection-audit" '
+                            f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
+                            'data-view="top"'))
         # DECISION (2026-07-14): thin product TOP views draw outlines only — tags
         # live on FRONT (the cutaway-matched primary). Labelling a 182 mm-deep strip
         # is what made Powerwall GA look unrelated to the Blender hero.
@@ -2279,6 +2284,18 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                 f'data-ppm="{ppm:.6f}" data-x-min-mm="{x_min:.3f}" '
                 f'data-z-max-mm="{z_max:.3f}" '
                 f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
+        # TOP and SIDE carry the same contract (SOL round 3 item C). TOP needs y_max_mm;
+        # SIDE needs y_max_mm too, because the side elevation inverts Y with the plan's
+        # handedness — verified against the loop, not assumed.
+        svg.add(f'<g class="projection-view-datum" data-view="top" '
+                f'data-origin-x="{plan_x:.3f}" data-origin-y="{plan_y:.3f}" '
+                f'data-ppm="{ppm:.6f}" data-x-min-mm="{x_min:.3f}" '
+                f'data-y-max-mm="{y_max:.3f}" data-z-shift-mm="0.000"/>')
+        svg.add(f'<g class="projection-view-datum" data-view="side" '
+                f'data-origin-x="{side_x:.3f}" data-origin-y="{side_y:.3f}" '
+                f'data-ppm="{ppm:.6f}" data-y-max-mm="{y_max:.3f}" '
+                f'data-z-max-mm="{z_max:.3f}" '
+                f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
     _env_h = float(meta.get("envelope_hh") or 0.0)
     _env_w = float(meta.get("envelope_ww") or 0.0)
     if meta.get("is_instrument_device") and _env_h > 0 and _env_w > 0:
@@ -2418,6 +2435,11 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         px = side_x + (y_max - p.y1) * ppm
         py = side_y + (z_max - p.z1) * ppm
         _draw_elevation_item(svg, px, py, pw, ph, p)
+        if meta.get("instrument_faithful_projection"):
+            svg.rect(px, py, pw, ph, stroke="none", fill="none",
+                     extra=('class="manifest-projection-audit" '
+                            f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
+                            'data-view="side"'))
         side_items.append((p, px, py, pw, ph))
     if meta.get("is_instrument_device"):
         side_items = _instrument_zone_tag_items(side_items)
