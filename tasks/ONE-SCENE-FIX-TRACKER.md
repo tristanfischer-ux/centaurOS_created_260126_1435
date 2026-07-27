@@ -100,7 +100,21 @@ SOL's verdict: "Directionally correct, but not proven." Full text:
       be removed, not broadened." HELD DELIBERATELY: his design makes missing/ambiguous
       identity FATAL, and landing that across 16 untested archetypes overnight could
       break the morning ship. Do it after the conformance matrix exists.
-- [ ] **item 6 — 16-archetype conformance matrix.** In progress: rebake2.sh running.
+- [x] **item 6 — archetype sweep** DONE 2026-07-27, 13/13 clean (no duplicates, one build).
+      NO PROJECTION FAILURES anywhere — G23 passes or abstains on every archetype, so the
+      one-scene work broke no archetype's drawing<->manifest contract.
+      Remaining failures by gate, none attributable to tonight:
+        14 render_view_quality   — 17 washed-out/low-contrast + 13 missing product PNGs
+                                   (the sweep re-bakes scene+drawings, NOT shaded renders)
+         7 render_drawing_feature_coherence — the pre-existing optical-tower signature-family
+                                   gap (see KNOWN PRE-EXISTING below)
+         4 qty_coverage · 3 connection_sanity · 2 site_utilisation · 2 part_coverage
+         2 load_reconcile · 1 material_diversity  — plant-drawing gates, untouched paths
+         2 drawing_set_coherence — coverage floors; vertical_farm is a 5-part plant bake
+                                   (5 parts in the earlier sweep too), not an instrument
+      HONEST LIMIT: this proves no PROJECTION regression and that the failure CLASSES are
+      pre-existing. It is NOT a clean before/after gate diff per archetype — the earlier
+      sweep recorded shell/parts only, not gate results.
 
 ## KNOWN PRE-EXISTING (not caused by tonight's work)
 - colorimeter `render_drawing_feature_coherence` "drawn-but-not-rendered: optical-tower".
@@ -109,3 +123,24 @@ SOL's verdict: "Directionally correct, but not proven." Full text:
   is null and the gate fires by construction on EVERY optical_handheld product.
 - g12_legacy_hero_only_fires fails in drawing_gates --selftest, and failed at HEAD before
   today's work.
+
+## G23 COVERAGE — what is and is NOT measured (2026-07-27)
+MEASURED: instrument sheets on the faithful-projection path. The writer emits an audit
+rect from the same bounds it draws with + a view datum (origin, ppm, model extents,
+z_shift); G23 recomputes from the manifest and compares. organoid 36/36, colorimeter
+31/31, lab_microscope 23/23.
+NOT MEASURED: plant sheets. They route through _fit_product_parts_to_envelope which
+applies a SCALE as well as a rebase, so the rigid-transform contract does not describe
+them. G23 now ABSTAINS there ("no projection contract on this sheet") rather than
+false-firing — it was reporting 33 bogus disagreements on powerwall. Extending the datum
+to carry the fit scale would close this; until then plant drawings are unmeasured, which
+is no worse than before today but must not be mistaken for a pass.
+NOT MEASURED EITHER: the TOP and SIDE views — only FRONT emits audit rects so far.
+
+## TWO GATE-DESIGN RULES EARNED TONIGHT
+1. An exemption must require a CONJUNCTION of independently checkable facts, never one
+   broad token, and must ship with a proveCatch where a NEARBY-BUT-WRONG member of the
+   same family is REFUSED. (The blanket string exempted 7 interior parts.)
+2. A gate that false-fires is as harmful as one that never fires — it trains you to
+   ignore it, which is how the containment gate came to be trusted while blind. Where a
+   contract does not hold, ABSTAIN VISIBLY rather than loosen the comparison.
