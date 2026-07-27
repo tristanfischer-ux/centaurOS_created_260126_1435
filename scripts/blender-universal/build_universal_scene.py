@@ -25808,17 +25808,36 @@ def main():
                     _ecx, _ecy, _ecz = (_ex0+_ex1)/2, (_ey0+_ey1)/2, (_ez0+_ez1)/2
                     _emd = max(_ex1-_ex0, _ey1-_ey0, _ez1-_ez0)
                     _epd = _emd * 2.0 / math.sqrt(2)
-                    _eortho = (_hero_cam.get("ortho_scale") if isinstance(_hero_cam, dict)
-                               else None) or _emd * 1.20
                     _etgt = (_ecx, _ecy, _ecz)
-                    for _efn, _eloc in (
+                    _espan_x = max(_ex1 - _ex0, 1.0)
+                    _espan_y = max(_ey1 - _ey0, 1.0)
+                    _espan_z = max(_ez1 - _ez0, 1.0)
+                    # TRUE ORTHOGRAPHIC ELEVATIONS (Tristan 2026-07-27: "a top down
+                    # translucent and a front on translucent and a side translucent").
+                    # setup_camera defaults to an ORTHO camera, which is what an elevation
+                    # must be — a perspective "side view" is not a side view, it is a
+                    # three-quarter that happens to face sideways, and it cannot be read
+                    # against the GA. Each view is framed on the TWO AXES IT ACTUALLY
+                    # SHOWS rather than one global scale, so a deep-but-short product does
+                    # not render as a stripe in a square frame (which is also what the
+                    # render_framing occupancy floor exists to catch).
+                    # Front faces -Y, matching the hero convention and the GA datum.
+                    for _efn, _eloc, _escale in (
                         ("09-product-ghost-shell-side.png",
-                         (_ecx + _epd * 1.15, _ecy, _ecz + _emd * 0.30)),
+                         (_ecx + _epd * 1.15, _ecy, _ecz),
+                         max(_espan_y, _espan_z) * 1.15),
                         ("10-product-ghost-shell-back.png",
-                         (_ecx, _ecy + _epd * 1.15, _ecz + _emd * 0.30)),
+                         (_ecx, _ecy + _epd * 1.15, _ecz),
+                         max(_espan_x, _espan_z) * 1.15),
+                        ("11-product-ghost-shell-top.png",
+                         (_ecx, _ecy, _ecz + _epd * 1.15),
+                         max(_espan_x, _espan_y) * 1.15),
+                        ("12-product-ghost-shell-front.png",
+                         (_ecx, _ecy - _epd * 1.15, _ecz),
+                         max(_espan_x, _espan_z) * 1.15),
                     ):
                         fl.clear_cameras()
-                        fl.setup_camera(loc=_eloc, target=_etgt, ortho_scale=_eortho)
+                        fl.setup_camera(loc=_eloc, target=_etgt, ortho_scale=_escale)
                         fl.orient_billboards_to_camera(_eloc, _etgt)
                         fl.disable_freestyle()
                         fl.init_scene_cycles_hero()

@@ -497,6 +497,20 @@ _PRODUCT_VIEWS = (
         required=False,
     ),
     ViewSpec(
+        # True ORTHOGRAPHIC elevations of the translucent shell, so they can be read
+        # directly against the GA's plan/front/side views rather than only admired.
+        "product_cutaway_top", "11-product-ghost-shell-top.png",
+        "Interior — cutaway, top-down",
+        "Ghost-shell see-inside looking down, showing the internal plan arrangement.",
+        required=False,
+    ),
+    ViewSpec(
+        "product_cutaway_front", "12-product-ghost-shell-front.png",
+        "Interior — cutaway, front",
+        "Ghost-shell see-inside from the front, showing the internal stack-up.",
+        required=False,
+    ),
+    ViewSpec(
         "product_left", "05-product-left.png",
         "Exterior — left three-quarter",
         "Left-side product view showing enclosure depth and mounting relationship.",

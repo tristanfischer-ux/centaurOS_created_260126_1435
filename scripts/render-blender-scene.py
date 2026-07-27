@@ -45,7 +45,7 @@ BLENDER_BIN = os.environ.get(
 )
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 from blender_out_lock import blender_out_dir_lock  # noqa: E402
-from render_view_contract import is_product_scale  # noqa: E402
+from render_view_contract import is_product_scale, required_views  # noqa: E402
 
 # Plant-scale bespoke templates that must NEVER render a benchtop lab instrument. The
 # "bioreactor" key is a 200 L single-use skid; it wrongly substring-matches the benchtop
@@ -406,9 +406,30 @@ def main() -> int:
                     _stale_inputs.append(_src.name)
         except OSError:
             pass
+    # CONTRACT COMPLETENESS (2026-07-27). The staleness check above asks "is an INPUT
+    # newer than my output"; it never asks "is my output set COMPLETE under today's
+    # contract". So when a new REQUIRED view is added to render_view_contract, every
+    # pre-existing run skips forever and can never acquire it — the view is simply absent
+    # from those dossiers for good, and nothing reports it. Measured: the ghost-shell view
+    # was added 2026-07-23 and 220 of 480 skippable runs are still missing a required
+    # view; every one of them was rendered before that change landed (the 10 that looked
+    # like exceptions are all from 07-23 itself, hours before the commit), which confirms
+    # this is the additive-contract gap and not a second bug hiding underneath.
+    #
+    # Keyed on view.required ONLY. Optional views are "may not exist" by definition, so
+    # including them would re-render every legacy run forever and never converge.
+    _missing_required: list = []
+    _missing_optional: list = []
+    try:
+        for _v in required_views(state):
+            if (out_dir / _v.filename).exists():
+                continue
+            (_missing_required if _v.required else _missing_optional).append(_v.filename)
+    except Exception as _rv_exc:  # noqa: BLE001 — never let the contract read block a render
+        print(f"[render-scene] view-contract check skipped ({_rv_exc})", flush=True)
     if (not args.force and existing_hero.exists()
             and existing_cover.exists() and existing_modules
-            and not _stale_inputs):
+            and not _stale_inputs and not _missing_required):
         print(
             f"[render-scene] outputs already present "
             f"({len(existing_modules)} modules + hero + blender-cover); "
@@ -416,6 +437,22 @@ def main() -> int:
             flush=True,
         )
         return 0
+    if _missing_required:
+        print(
+            f"[render-scene] INCOMPLETE render set — {len(_missing_required)} required "
+            f"view(s) absent under the current contract "
+            f"({', '.join(sorted(_missing_required))}); re-rendering to backfill",
+            flush=True,
+        )
+    if _missing_optional:
+        # Reported, never gated (SOL round 7): an optional view that is absent is not a
+        # defect, but silently never noticing we failed to produce the nice-to-haves is
+        # how the ghost view went missing on 220 runs unremarked.
+        print(
+            f"[render-scene] optional view(s) not present: "
+            f"{', '.join(sorted(_missing_optional))} (not required — no re-render forced)",
+            flush=True,
+        )
     if _stale_inputs:
         print(
             f"[render-scene] STALE renders — {', '.join(sorted(set(_stale_inputs)))} "

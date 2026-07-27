@@ -448,6 +448,8 @@ def compute_render_deliverable_gate(run_dir: str) -> dict:
         # exactly that across every non-sealed product.
         "09-product-ghost-shell-side.png",
         "10-product-ghost-shell-back.png",
+        "11-product-ghost-shell-top.png",
+        "12-product-ghost-shell-front.png",
     ]
     present = [c for c in _candidates if os.path.isfile(os.path.join(run_dir, c))]
 
@@ -36004,6 +36006,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         # state so all three agree about what is visible; only the camera moves.
         "09-product-ghost-shell-side.png",
         "10-product-ghost-shell-back.png",
+        "11-product-ghost-shell-top.png",
+        "12-product-ghost-shell-front.png",
         "blender-cover.png",
     ]
     # 01-top.png is the INTERIOR ANNOTATED PLAN — a real customer view for PLANT-scale
@@ -36023,6 +36027,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "08-product-ghost-shell.png": "Product — translucent see-inside (internal components through a frosted shell)",
         "09-product-ghost-shell-side.png": "Product — translucent see-inside, side elevation",
         "10-product-ghost-shell-back.png": "Product — translucent see-inside, rear elevation",
+        "11-product-ghost-shell-top.png": "Product — translucent see-inside, top-down plan",
+        "12-product-ghost-shell-front.png": "Product — translucent see-inside, front elevation",
         "blender-cover.png": "Product hero — cover render",
     }
     # HARD ASSERTION (2026-07-23): no deliverable render may be a byte-copy of an
