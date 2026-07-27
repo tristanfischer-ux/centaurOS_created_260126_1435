@@ -25934,6 +25934,20 @@ def main():
                         _escale, _erx, _ery = _eframing
                         bpy.context.scene.render.resolution_x = _erx
                         bpy.context.scene.render.resolution_y = _ery
+                        # EXPOSURE FOR THE DOWN-AXIS VIEW. The studio key is overhead, so
+                        # the ONE elevation whose camera axis is aligned with it (top-down)
+                        # photographs a horizontal face lit head-on: it blew out flat at
+                        # mean 160 / std 33 while every other elevation of the same product
+                        # in the same state sat at mean 73-103 with std 51-66. That is a
+                        # real over-exposure on one view, not a threshold problem — the
+                        # wash-out rule is calibrated (flags 14.1% of 1,195 renders) and
+                        # the flag's own contract says ghost renders ARE checked, so
+                        # exempting this view would be a dodge. Keyed on the GEOMETRY
+                        # (camera looking down the key axis), never on a product.
+                        _edown = abs(_eloc[0] - _etgt[0]) < 1e-6 and abs(_eloc[1] - _etgt[1]) < 1e-6
+                        _eexp0 = float(bpy.context.scene.view_settings.exposure)
+                        if _edown:
+                            bpy.context.scene.view_settings.exposure = _eexp0 - 1.1
                         fl.clear_cameras()
                         _ecam = fl.setup_camera(loc=_eloc, target=_etgt,
                                                 ortho_scale=_escale)
@@ -25943,6 +25957,7 @@ def main():
                         bpy.context.scene.render.filepath = str(Path(out_dir) / _efn)
                         bpy.ops.render.render(write_still=True)
                         fl.init_scene_back_to_eevee()
+                        bpy.context.scene.view_settings.exposure = _eexp0
                         print(f"[univ][ghost] {_efn} → {out_dir}")
                     if _world_bg is not None:
                         try:

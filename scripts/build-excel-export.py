@@ -35772,6 +35772,37 @@ def _selftest() -> int:
 # renders/ subfolder; everything is keyed on what ACTUALLY exists on disk.
 # Called at the end of every Excel build — never a manual step.
 # ────────────────────────────────────────────────────────────────────────────────
+
+def deliverable_stem(state: dict, run_dir: str) -> str:
+    """`<what-it-is>` for the files a customer actually receives.
+
+    Tristan 2026-07-27: "make sure that all file names have the date and the time in the
+    file name, as well as what it is. Dossier is a useless name." A file called
+    `dossier.xlsx` tells the reader nothing about the product, the artefact or the
+    vintage, and two of them in a downloads folder are indistinguishable.
+
+    Universal: keyed on the design's OWN product_class (benchtop_bioreactor ->
+    benchtop-bioreactor), never a per-product table. Falls back to the run-directory name
+    only when the state carries no class at all.
+    """
+    _cls = ""
+    for _k in ("moduleDecomposition", "orchestratorContract", "keyMetrics", "parsedBrief"):
+        _v = (state or {}).get(_k)
+        if isinstance(_v, dict) and _v.get("product_class"):
+            _cls = str(_v.get("product_class"))
+            break
+    if not _cls:
+        _cls = os.path.basename(os.path.normpath(run_dir or "")) or "design"
+    _cls = re.sub(r"[^a-z0-9]+", "-", _cls.strip().lower()).strip("-")
+    return _cls or "design"
+
+
+def deliverable_stamp() -> str:
+    """`YYYYMMDD-HHMM` for the moment this build was produced."""
+    from datetime import datetime as _dtn
+    return _dtn.now().strftime("%Y%m%d-%H%M")
+
+
 def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     """Create <run>/<slug>-deliverable/ and <run>/<slug>-deliverable.zip.
 
@@ -35790,7 +35821,12 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     import zipfile as _zf
     import glob as _glob
 
-    bundle_name = f"{slug}-deliverable"
+    # WHAT IT IS + WHEN (Tristan 2026-07-27). Was f"{slug}-deliverable", where slug is the
+    # run-directory name ("organoid-9drive-r11-allfixes") — internal build shorthand that
+    # means nothing to a recipient and carries no vintage.
+    _bundle_state = load_json(os.path.join(run_dir, "state.json")) or {}
+    bundle_name = (f"{deliverable_stem(_bundle_state, run_dir)}"
+                   f"-design-pack-{deliverable_stamp()}")
     bundle_dir = os.path.join(run_dir, bundle_name)
     bundle_zip = os.path.join(run_dir, f"{bundle_name}.zip")
 
@@ -35823,7 +35859,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     # ── 1. DOSSIER ─────────────────────────────────────────────────────────────
     _dossier = os.path.join(run_dir, "dossier.xlsx")
     if os.path.exists(_dossier):
-        _cp(_dossier, "dossier.xlsx", "Excel review workbook (dossier)")
+        _cp(_dossier, f"{bundle_name}-engineering-workbook.xlsx",
+            "Excel review workbook")
     else:
         skipped.append("dossier.xlsx (not found)")
 
@@ -36273,7 +36310,28 @@ def main() -> None:
     out_path = sys.argv[2] if len(sys.argv) > 2 else os.path.join(run_dir, "dossier.xlsx")
     print(f"Building Excel review workbook for {run_dir} -> {out_path}")
     res = build(run_dir, out_path)
+    # NAMED COPY ALONGSIDE THE PIPELINE ARTEFACT (Tristan 2026-07-27: "all file names
+    # have the date and the time in the file name, as well as what it is. Dossier is a
+    # useless name."). `dossier.xlsx` stays put because 36 call sites across the chain,
+    # the gates, the guard scripts and the Next.js app read that exact path — renaming it
+    # to satisfy a naming rule would break the pipeline to fix a label. So the build also
+    # writes a self-describing copy that says WHAT it is and WHEN it was produced, and
+    # that is the file to send.
+    _named = None
+    try:
+        _nstate = load_json(os.path.join(run_dir, "state.json")) or {}
+        _named = os.path.join(
+            run_dir,
+            f"{deliverable_stem(_nstate, run_dir)}-engineering-workbook-"
+            f"{deliverable_stamp()}.xlsx")
+        import shutil as _nsh
+        _nsh.copyfile(res["out_path"], _named)
+    except Exception as _nexc:  # noqa: BLE001 — naming must never fail the build
+        print(f"  ! named copy skipped ({_nexc})")
+        _named = None
     print("\nDONE")
+    if _named:
+        print(f"  SEND THIS    : {_named}")
     print(f"  path        : {res['out_path']}")
     print(f"  size        : {res['size_mb']:.2f} MB")
     print(f"  tabs ({len(res['tabs'])})  : {res['tabs']}")

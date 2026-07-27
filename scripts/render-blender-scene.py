@@ -283,6 +283,26 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
                         shaded_ok = True
                 print(f"[render-scene] shaded hero pass: 00-hero="
                       f"{'shaded OK' if shaded_ok else 'MISSING'}", flush=True)
+                # REGENERATE THE DERIVED THUMBNAIL. hero-embed.png is a web-weight
+                # downscale of 00-hero.png (1600x1067 from 2400x1600) that the Excel cover
+                # prefers for size. NOTHING in the pipeline rewrote it when the hero was
+                # re-rendered, so every re-render left a stale derivative on disk and
+                # plan_render_coherence fired ("hero-embed.png older than 00-hero.png by
+                # 9655s — Exec cover would show a stale generation vs the Renders
+                # gallery"). A derived file must be rebuilt wherever its SOURCE is written,
+                # which is here.
+                if shaded_ok and hero_path.exists():
+                    try:
+                        from PIL import Image as _PIm
+                        _emb = out_dir / "hero-embed.png"
+                        _im = _PIm.open(hero_path)
+                        _im.thumbnail((1600, 1600), _PIm.LANCZOS)
+                        _im.save(_emb)
+                        print(f"[render-scene] hero-embed.png regenerated from 00-hero "
+                              f"({_im.size[0]}x{_im.size[1]})", flush=True)
+                    except Exception as _hexc:  # noqa: BLE001 — never block the render
+                        print(f"[render-scene] hero-embed regen skipped ({_hexc})",
+                              file=sys.stderr)
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 print(f"[render-scene] shaded hero pass failed ({e}) — falling back",
                       file=sys.stderr)
