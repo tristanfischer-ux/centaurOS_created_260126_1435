@@ -165,10 +165,22 @@ def _project_instrument_parts_as_placed(parts: list[GAPart]) -> bool:
     if not parts:
         return False
     _shells = [p for p in parts if _CANON_SHELL_RE.search(str(getattr(p, "name", "") or ""))]
-    if not _shells:
-        return False
-    _sh = max(_shells, key=lambda p: float(p.z1) - float(p.z0))
-    _sz0 = float(_sh.z0)
+    if _shells:
+        _sh = max(_shells, key=lambda p: float(p.z1) - float(p.z0))
+        _sz0 = float(_sh.z0)
+    else:
+        # NO CANONICAL SHELL (2026-07-27). Several archetypes carry no Enclosure Shell row
+        # (lab_microscope, syringe_pump, consumer_electronics). Returning False here left
+        # them un-rebased in WORLD z while the sheet's frame is local — the G23 projection
+        # gate caught exactly that: "u_compute_ui_module@front: y 230.0 vs -421.6". The old
+        # envelope clamp used to normalise them, and removing it (correctly — it was the
+        # second coordinate path) left nothing in its place.
+        # Same projection, different DATUM: rebase on the lowest placed part. That is still
+        # ONE path — the FFL datum is just derived from the parts rather than the shell.
+        _z0s = [float(p.z0) for p in parts if getattr(p, "z0", None) is not None]
+        if not _z0s:
+            return False
+        _sz0 = min(_z0s)
     for p in parts:
         p.z0 = float(p.z0) - _sz0
         p.z1 = float(p.z1) - _sz0

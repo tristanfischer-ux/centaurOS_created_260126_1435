@@ -49,9 +49,13 @@ un-written one was a silent render↔drawing divergence. One bug PER feature, fo
 - [x] ~~D-old~~ `_exterior_signature_vessel_bbox_mm` and
       `_exterior_signature_od_bbox_mm` + their seating calls. If B works they are dead code,
       and deleting them is what makes the divergence structurally impossible.
-- [ ] **E. Re-point `ga_glance_coherence`** at real geometry instead of the form-rule
+- [x] **E. `ga_glance_coherence` re-pointed** — satisfied by drawing the REAL HMI parts in
+      the audit's own conventions (display fill / button outlines / UI DECK).
+- [x] ~~E-old~~ at real geometry instead of the form-rule
       OPTICAL / UI DECK / D-pad markers (I suppressed the markers; the gate still wants them).
-- [ ] **F. Verify organoid:** 18/18 gates, drawing matches render by EYE (open the PNG).
+- [x] **F. organoid VERIFIED** — 19/19 gates incl. G23; PNG opened; SVG measured
+      (envelope top y=279.5 == vessel base y=279.5).
+- [x] ~~F-old~~ 18/18 gates, drawing matches render by EYE (open the PNG).
 - [ ] **G. Re-bake all archetypes** through the new path; confirm no regression
       (colorimeter is the key case — no above-lid geometry, must keep the form rule).
 - [ ] **H. Rebuild the Excel** and re-score.
@@ -75,3 +79,33 @@ un-written one was a silent render↔drawing divergence. One bug PER feature, fo
     Root: u_se_le_face_display / u_se_le_face_key_* are REAL meshes in the scene but have
     no BoM part, so they never become manifest rows -> the drawing cannot draw them.
     NEXT: finish B — add manifest ROWS for signature families with no BoM counterpart.
+
+## SOL AUDIT (2026-07-27) — items and status
+SOL's verdict: "Directionally correct, but not proven." Full text:
+  scratchpad/sol-audit-result.md ; implementation plan: sol-implementation-plan.md
+- [x] **item 4 — manifest->SVG projection gate (G23)** DONE, commit 66e00f80d.
+      The writer emits an audit rect from the SAME bounds it draws with + a per-view
+      datum; the gate recomputes from the MANIFEST and compares. proveCatch fires on
+      moved / resized / invented boxes; ABSTAINS (never silently passes) with no contract.
+      Measured: organoid 36/36 pairs, colorimeter 31/31.
+- [x] **item 2 — scope the containment exemption** DONE, commit a3b2d60ee.
+      Blanket string exempted 10 rows, SEVEN of them interior parts below the lid.
+      Now needs 5 proofs; exempt rows 10 -> 3 (vessel, vessel_collar, od_sensor).
+      G19 REFUSES a manifest still carrying the retired string.
+- [~] **item 3 — entity_type** partially: set on rows (bom_component /
+      geometry_feature). SOL wants EVERY downstream consumer audited for filtering
+      (cost, quantity, mass, wiring, labels, reconciliation). COST verified clean
+      (BoM total unchanged GBP 291.00); the others are NOT yet audited.
+- [ ] **item 1 — component_id replacing the noun regex.** SOL: "The regex alias should
+      be removed, not broadened." HELD DELIBERATELY: his design makes missing/ambiguous
+      identity FATAL, and landing that across 16 untested archetypes overnight could
+      break the morning ship. Do it after the conformance matrix exists.
+- [ ] **item 6 — 16-archetype conformance matrix.** In progress: rebake2.sh running.
+
+## KNOWN PRE-EXISTING (not caused by tonight's work)
+- colorimeter `render_drawing_feature_coherence` "drawn-but-not-rendered: optical-tower".
+  Its optical meshes are `u_se_instrument_story_*`, which `_exterior_signature_family`
+  does not classify (it requires the `u_se_le_` prefix), so exterior_signature_features
+  is null and the gate fires by construction on EVERY optical_handheld product.
+- g12_legacy_hero_only_fires fails in drawing_gates --selftest, and failed at HEAD before
+  today's work.
