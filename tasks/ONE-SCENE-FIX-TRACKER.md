@@ -144,3 +144,30 @@ NOT MEASURED EITHER: the TOP and SIDE views — only FRONT emits audit rects so 
 2. A gate that false-fires is as harmful as one that never fires — it trains you to
    ignore it, which is how the containment gate came to be trusted while blind. Where a
    contract does not hold, ABSTAIN VISIBLY rather than loosen the comparison.
+
+## SOL ITEM A (component_id) — NOT APPLIED, precondition measured false (2026-07-27)
+
+SOL's own instruction: "Do NOT apply A as written if either of these assumptions is
+false: (1) a BoM `tag` uniquely identifies one logical component line within an
+archetype; (2) every registered-signature prefix has exactly one known BoM tag. If
+signatures can legitimately span multiple BoM lines, component_id = BoM tag is the wrong
+identity model."
+
+MEASURED, both false:
+  (1) 224 of 412 archetypes with a BoM violate it. The duplicate is the PLACEHOLDER tag
+      '—' (em-dash), repeated up to 146 times in a single BoM (bess-20ft). So
+      `component_id = bom:<tag>` would mint one id for 146 different components.
+  (2) the `vessel` noun pattern matches TWO rows on the organoid — X-103 "Culture Vessel"
+      AND X-105 "Vial Holder Fixture" (because "vial" appears in the holder's name).
+      Today the ORDERED alias table masks this: collar is matched first and consumes the
+      mesh. The ambiguity is real and merely hidden by table order — which is exactly the
+      mis-binding SOL predicted, now demonstrated rather than feared.
+
+CONCLUSION: the BoM tag is not an identity. Before any component_id work:
+  * decide what a component IDENTITY actually is when 146 rows share '—' — probably a
+    minted stable id written back INTO the BoM at emit time, not derived from a tag;
+  * the signature join must bind to that id at CONSTRUCTION (where the part and its BoM
+    row are both in hand), never re-looked-up by noun afterwards;
+  * only then is fatal-on-ambiguous safe to enable.
+This is the measurement SOL's staged plan asked for; it says the design needs changing,
+not just staging.
