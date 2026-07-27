@@ -36320,9 +36320,17 @@ def main() -> None:
     _named = None
     try:
         _nstate = load_json(os.path.join(run_dir, "state.json")) or {}
+        # A DRAFT MUST SAY SO IN ITS NAME. Three builds minutes apart produced
+        # ...-workbook-1007 / -1009 / -1012, of which only 1012 was SHIPS and the other
+        # two were DRAFT floor 5 — three equally plausible filenames next to each other in
+        # Finder, with nothing but the timestamp to tell the shippable one from the
+        # rejects. That is the same "the name tells you nothing" defect the naming change
+        # was meant to remove, so the verdict belongs in the name too.
+        _ships = bool(((res or {}).get("audit") or {}).get("ship_ok"))
+        _mark = "" if _ships else "DRAFT-"
         _named = os.path.join(
             run_dir,
-            f"{deliverable_stem(_nstate, run_dir)}-engineering-workbook-"
+            f"{deliverable_stem(_nstate, run_dir)}-{_mark}engineering-workbook-"
             f"{deliverable_stamp()}.xlsx")
         import shutil as _nsh
         _nsh.copyfile(res["out_path"], _named)
