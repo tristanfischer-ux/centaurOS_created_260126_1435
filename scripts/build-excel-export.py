@@ -35807,10 +35807,57 @@ def deliverable_stem(state: dict, run_dir: str) -> str:
     return _cls or "design"
 
 
+# ONE stamp and ONE version per PROCESS. The bundle writer and the named-copy step each
+# build a filename independently, so if these recomputed per call the zip and the workbook
+# from a single build could disagree — a build straddling a minute boundary would stamp
+# 1141 on one and 1142 on the other, and an uncached bump would give the zip V1.3 and the
+# workbook V1.4. They must be the same release.
+_DELIVERABLE_STAMP: dict = {}
+_DELIVERABLE_VERSION: dict = {}
+
+
 def deliverable_stamp() -> str:
-    """`YYYYMMDD-HHMM` for the moment this build was produced."""
-    from datetime import datetime as _dtn
-    return _dtn.now().strftime("%Y%m%d-%H%M")
+    """`YYYYMMDD-HHMM` for the moment this build was produced (fixed per process)."""
+    if "v" not in _DELIVERABLE_STAMP:
+        from datetime import datetime as _dtn
+        _DELIVERABLE_STAMP["v"] = _dtn.now().strftime("%Y%m%d-%H%M")
+    return _DELIVERABLE_STAMP["v"]
+
+
+def deliverable_version(run_dir: str) -> str:
+    """Sequential `V<major>.<minor>` for this design, bumped once per build.
+
+    Mirrors the convention already in use for PHANTM (scripts/phantm/version.json, Tony
+    25 Jul: "multiple files with identical names is a documentation nightmare... a fully
+    sequential version number is the most effective — V1.3, 1.31 — a date and timestamp is
+    good too. So: BOTH."). Same semantics here: minor bumps on every build, major only on
+    a deliberate structural re-release.
+
+    Scoped to the RUN DIRECTORY rather than globally, because the sequence a recipient
+    needs is "which issue of THIS design is newer" — a global counter shared across
+    unrelated products would jump arbitrarily between successive issues of one dossier.
+    """
+    if run_dir in _DELIVERABLE_VERSION:
+        return _DELIVERABLE_VERSION[run_dir]
+    _vp = os.path.join(run_dir, "deliverable-version.json")
+    _v = {"major": 1, "minor": 0,
+          "note": "minor bumps on every build of this design; major only on a deliberate "
+                  "structural re-release. Stamped into every deliverable filename "
+                  "alongside the build datetime."}
+    try:
+        if os.path.exists(_vp):
+            _cur = json.load(open(_vp))
+            if isinstance(_cur, dict):
+                _v.update({k: _cur.get(k, _v[k]) for k in ("major", "minor")})
+                _v["note"] = _cur.get("note", _v["note"])
+        _v["minor"] = int(_v.get("minor") or 0) + 1
+        with open(_vp, "w") as _vf:
+            json.dump(_v, _vf, indent=1)
+    except Exception:  # noqa: BLE001 — versioning must never fail a build
+        pass
+    _ver = f"V{_v.get('major', 1)}.{_v.get('minor', 1)}"
+    _DELIVERABLE_VERSION[run_dir] = _ver
+    return _ver
 
 
 def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
@@ -35835,7 +35882,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     # run-directory name ("organoid-9drive-r11-allfixes") — internal build shorthand that
     # means nothing to a recipient and carries no vintage.
     _bundle_state = load_json(os.path.join(run_dir, "state.json")) or {}
-    bundle_name = (f"{deliverable_stamp()}-"
+    bundle_name = (f"{deliverable_stamp()}-{deliverable_version(run_dir)}-"
                    f"{deliverable_stem(_bundle_state, run_dir)}-design-pack")
     bundle_dir = os.path.join(run_dir, bundle_name)
     bundle_zip = os.path.join(run_dir, f"{bundle_name}.zip")
@@ -36345,8 +36392,8 @@ def main() -> None:
         # clumps because the slug is identical across every build of the same design.
         _named = os.path.join(
             run_dir,
-            f"{deliverable_stamp()}-{_mark}{deliverable_stem(_nstate, run_dir)}"
-            f"-engineering-workbook.xlsx")
+            f"{deliverable_stamp()}-{deliverable_version(run_dir)}-{_mark}"
+            f"{deliverable_stem(_nstate, run_dir)}-engineering-workbook.xlsx")
         import shutil as _nsh
         _nsh.copyfile(res["out_path"], _named)
     except Exception as _nexc:  # noqa: BLE001 — naming must never fail the build
