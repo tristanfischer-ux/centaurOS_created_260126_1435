@@ -64,15 +64,74 @@ class SmcMaterial:
         return [(float(b), float(h)) for b, h in zip(self.b, self.h)]
 
 
+# ---------------------------------------------------------------------------
+# Sintered-NdFeB grade table — the DEMAGNETISATION side of the magnet model.
+#
+# The recoil line below (B = Br + µ0·µr·H) is valid ONLY down to the knee of the
+# INTRINSIC curve. Past the knee the magnet loses flux irreversibly and never
+# recovers on removal of the field. FEMM's linear PM model has no knee, so the
+# solver will happily report an operating point far beyond it without complaint
+# — the knee has to be imposed as an EXTERNAL acceptance test on the FE result.
+# That is exactly what demag_gate.py does.
+#
+# Hcj values are catalogue MINIMA (the guaranteed floor, not a typical), in A/m.
+# t_max_c is the manufacturer's stated maximum operating temperature for a
+# moderate permeance coefficient — quoted for orientation only; the real limit
+# is the computed knee margin at THIS geometry's operating point, which is the
+# whole point of the gate.
+#
+# alpha_hcj_per_k is the intrinsic-coercivity temperature coefficient. It is
+# ~5x worse than Br's (-0.12 %/K), which is why demagnetisation is always a HOT
+# failure: the magnet's resistance to reverse field collapses long before its
+# remanence does. Band: -0.65..-0.55 %/K for N/M/H, -0.55..-0.45 %/K for SH and
+# above (higher-Dy grades derate more slowly).
+#
+# Sources: standard sintered-NdFeB catalogue data (Arnold/Eclipse/Bunting
+# families agree to within a grade step). Swap the table to a chosen supplier's
+# datasheet before tooling.
+NDFEB_GRADES = {
+    #  name      br_min  br_max   hcj_min     t_max_c  alpha_hcj_per_k
+    "N42":   dict(br=(1.29, 1.32), hcj=955e3,  t_max_c=80,  alpha_hcj=-0.0060),
+    "N42M":  dict(br=(1.29, 1.32), hcj=1114e3, t_max_c=100, alpha_hcj=-0.0060),
+    "N42H":  dict(br=(1.29, 1.32), hcj=1353e3, t_max_c=120, alpha_hcj=-0.0060),
+    "N42SH": dict(br=(1.29, 1.32), hcj=1592e3, t_max_c=150, alpha_hcj=-0.0050),
+    "N42UH": dict(br=(1.29, 1.32), hcj=1990e3, t_max_c=180, alpha_hcj=-0.0050),
+    "N42EH": dict(br=(1.29, 1.32), hcj=2388e3, t_max_c=200, alpha_hcj=-0.0050),
+    # Br ~1.45 class — note the ceiling: high remanence and high coercivity
+    # trade against each other, so there is NO high-temperature N52. N50M is
+    # about the limit of the family, and only to 100 C.
+    "N50M":  dict(br=(1.40, 1.45), hcj=1114e3, t_max_c=100, alpha_hcj=-0.0060),
+    "N52":   dict(br=(1.43, 1.48), hcj=876e3,  t_max_c=80,  alpha_hcj=-0.0060),
+}
+
+# Knee field as a fraction of Hcj. Good sintered material is specified with a
+# squareness Hk/Hcj >= 0.90; 0.85 is the conservative engineering default used
+# here, and the gate reports its sensitivity to this number explicitly.
+KNEE_FRACTION_DEFAULT = 0.85
+
+
 class NdFeBMaterial:
-    """Fully-magnetised NdFeB on its recoil line: B = Br(T) + µ0·µr·H."""
+    """Fully-magnetised NdFeB on its recoil line: B = Br(T) + µ0·µr·H.
+
+    Carries an optional GRADE, which adds the intrinsic-coercivity / knee model
+    needed to judge irreversible demagnetisation. Without a grade the object
+    behaves exactly as before (recoil line only) — existing callers are
+    unaffected.
+    """
 
     def __init__(self, br_t: float = 1.30, mu_r: float = 1.05,
-                 alpha_br_per_k: float = -0.0012, t_ref_c: float = 20.0):
+                 alpha_br_per_k: float = -0.0012, t_ref_c: float = 20.0,
+                 grade: str | None = None,
+                 knee_fraction: float = KNEE_FRACTION_DEFAULT):
         self.br20 = br_t
         self.mu_r = mu_r
         self.alpha = alpha_br_per_k
         self.t_ref = t_ref_c
+        self.grade = grade
+        self.knee_fraction = knee_fraction
+        if grade is not None and grade not in NDFEB_GRADES:
+            raise ValueError(f"unknown NdFeB grade {grade!r}; "
+                             f"known: {sorted(NDFEB_GRADES)}")
 
     def br_at(self, temp_c: float) -> float:
         return self.br20 * (1.0 + self.alpha * (temp_c - self.t_ref))
@@ -83,6 +142,56 @@ class NdFeBMaterial:
 
     def b_of_h(self, h, temp_c: float = 20.0):
         return self.br_at(temp_c) + MU0 * self.mu_r * np.asarray(h, float)
+
+    # --- demagnetisation side (requires a grade) ---------------------------
+
+    def _grade(self) -> dict:
+        if self.grade is None:
+            raise ValueError("no grade set — hcj_at/h_knee_at need a named "
+                             "NdFeB grade (e.g. NdFeBMaterial(grade='N42'))")
+        return NDFEB_GRADES[self.grade]
+
+    def hcj_at(self, temp_c: float) -> float:
+        """Intrinsic coercivity Hcj at temperature, A/m (positive magnitude).
+
+        Linear derating from the catalogue minimum at 20 C. Clamped at zero:
+        above the Curie-approach region the linear fit is meaningless, and a
+        negative Hcj would silently invert the gate's comparison.
+        """
+        g = self._grade()
+        hcj = g["hcj"] * (1.0 + g["alpha_hcj"] * (temp_c - self.t_ref))
+        return max(hcj, 0.0)
+
+    def h_knee_at(self, temp_c: float) -> float:
+        """Knee field magnitude, A/m — the reverse-H limit for reversible use.
+
+        Operating beyond this (i.e. H along the magnetisation axis more
+        negative than -h_knee_at) costs irreversible flux.
+        """
+        return self.knee_fraction * self.hcj_at(temp_c)
+
+    def t_max_reversible(self, h_reverse_a_per_m: float,
+                         t_lo: float = -40.0, t_hi: float = 250.0) -> float:
+        """Highest temperature at which h_reverse stays inside the knee, C.
+
+        h_reverse is the reverse field MAGNITUDE the magnet actually sees.
+        Returns t_lo if the magnet is already past its knee even when cold,
+        t_hi if it never crosses within the bracket. Monotone in T (Hcj falls
+        with T), so a bisection is exact to the tolerance.
+        """
+        h = abs(float(h_reverse_a_per_m))
+        if self.h_knee_at(t_lo) <= h:
+            return t_lo
+        if self.h_knee_at(t_hi) > h:
+            return t_hi
+        lo, hi = t_lo, t_hi
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            if self.h_knee_at(mid) > h:
+                lo = mid
+            else:
+                hi = mid
+        return 0.5 * (lo + hi)
 
 
 def cu_resistivity(temp_c: float, rho20: float = 1.72e-8, alpha: float = 0.00393) -> float:

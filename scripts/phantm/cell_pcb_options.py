@@ -60,6 +60,50 @@ crow("Commodity aerospace Al honeycomb (3.175 mm cell, 18–50 µm foil)", "fabr
 crow("Fine-blank/stamped lattice from strip", "fabrication",
      "155 µm slots at 7.75 mm depth unreachable by blanking (it is a 2D process)", "KILL",
      "wrong process class for a deep lattice — kept on record so nobody re-proposes it")
+crow("Folded/corrugated foil, welded, registered in a grooved base plate (Tony 25 Jul)",
+     "fabrication",
+     "bend-radius fc cost SOLVED (foil-corner.json): r 0.3 mm ≡ +7.9 µm interior-equiv, "
+     "r 0.5 ≡ +20.8 — inside the ±25 µm gate; corner seams must be RF-continuous "
+     "(braze/laser seam, not spot welds — slot-leak risk); tolerance carried by the "
+     "MACHINED groove plate (±10 µm easy), not foil springback",
+     "KEEP (pilot candidate)",
+     "the commercial corrugated-honeycomb process at custom precision; the grooved plate "
+     "both registers the foil and forms the drilled back wall; Tony's one-tape collision is "
+     "Euler parity (foil-topology.json) — row strips (node walls double, 1/3 of walls) are "
+     "the volume default, one-tape works with one orientation class doubled; seam continuity "
+     "+ the mixed-wall periodic unit cell are Vlad's checks")
+crow("HOBE-style expansion: print node-lines FLAT, stack, cure, expand (build round)",
+     "fabrication",
+     "node bonds made while FLAT (gravure/screen print ±5 µm routine) — no 3D weld access "
+     "ever needed; the 1/3-double topology is NATIVE to expanded honeycomb; cell size set "
+     "by node-line pitch + expansion fixture; corrugate-then-bond variant locks shape by "
+     "the roll if free expansion relaxes the hexes",
+     "KEEP (volume candidate)",
+     "adopts the industry that already solved the Euler problem at 10M-cells/yr (build "
+     "council consensus: grok #1, opus-4.8, sol, opus-5); gate = expanded-cell regularity "
+     "vs the ±25 µm interior gate → hot-calibrate on a precision mandrel; the periodic-"
+     "supercell RF check still applies (Vlad)")
+crow("Stacked etched PLATES — make HOLES, not walls (build round, opus-5 lateral)",
+     "fabrication",
+     "≈8 etched/fine-blanked ≈1 mm plates with hex HOLES, dowel-aligned, diffusion-bonded "
+     "or brazed, then through-plated: lithographic ±10 µm lands directly on THE RF "
+     "dimension; single-thickness webs everywhere (no anisotropy, no supercell re-solve); "
+     "axial registration steps are weakly coupled to cutoff",
+     "KEEP (strong prototype/pilot route)",
+     "inverts the topology problem out of existence — walls are never FORMED, they are "
+     "what REMAINS around etched holes; Precision Micro-class suppliers already on the "
+     "list; arguably the best Prototype-B path")
+crow("Adapt the DESIGN to COTS metal honeycomb (1/8\" = 3.175 mm cell class)",
+     "fabrication",
+     "fc scales as 1/AF: 3.175 mm → 52.29 GHz (band edge IMPROVES); actuator fits any "
+     "AF ≥ ≈2.8; BUT commercial cell tolerance ±5–10% ≡ ±2.6 GHz fc scatter, "
+     "expansion-process hexes are irregular, and adhesive node bonds are fine RF-wise "
+     "(every foil ≥ hundreds of skin depths)",
+     "KEEP (prototype accelerator; test first)",
+     "per-cell fc calibration in the phase map could absorb STATIC scatter (open-loop "
+     "steppers are calibratable); decide with the £100 Hexcel/Plascore slice — measure real "
+     "cells, eigensolve the ACTUAL shapes, Vlad benches it; volume advantage fades against "
+     "sub-£2/tile moulding")
 
 # geometry options
 for tol, cls in ((10, "electroform/EDM class"), (25, "good print class"), (50, "loose print class")):

@@ -226,15 +226,19 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M local")
     L = []
     A = L.append
-    A("# PHANTM beam-steering actuator — engineering verdict and a proposed fixed design (v5.1 — 25 Jul: optimisation campaign §10 + COMPLETE option ledgers with kills on the record + system-manufacturability §11; five-seat exhaustive red team applied; pending 3D-FE/prototype validation)")
+    A("# PHANTM — the actuator and hex-cell work package as a de-risking funnel (v6 — 25 Jul restructure: Part 0 executive · I concept & claims · II hardening: facts and testing · III design choices with kills on the record · IV how to manufacture · V who can manufacture; five-seat red team applied; pending 3D-FE/prototype validation)")
     A("")
-    A(f"**CONFIDENTIAL — core IP.** Scope: the actuator only. Generated **{stamp}**. "
+    A("**CONFIDENTIAL — core IP.** Scope: the actuator, single-cell waveguide "
+      "physics, drive electronics and firmware; array-level RF (gain, scan, "
+      f"nulling, feed) stays with Tony/Vlad. Generated **{stamp}**. "
       "All force numbers are 2D nonlinear finite-element results (native xfemm/FEMM solver, "
       "validated on a gapped C-core to 2.5%, mesh-converged <1%, force cross-checked "
-      "weighted-stress-tensor vs co-energy). Reviewed by a 4-seat cross-lineage LLM "
-      "council (GPT-5.6-Sol physics fact-check · Grok-4.5 adversarial · MiniMax-M3 "
-      "honesty audit; the Kimi-K3 seat returned empty and is recorded as such) — every "
-      "surviving finding is incorporated. Code + artefacts: `scripts/phantm/`.")
+      "weighted-stress-tensor vs co-energy). Reviewed across multiple cross-lineage "
+      "LLM council rounds (GPT-5.6-Sol physics fact-check · Grok-4.5 adversarial, "
+      "twice, incl. the wall-thickness attack · Kimi-K3 code audit · GLM-5.2 "
+      "structure/readability read of this v6 · MiniMax-M3 honesty audit) — every "
+      "surviving finding is incorporated; refutations and full transcripts are in "
+      "`out/`. Code + artefacts: `scripts/phantm/`.")
     A("")
     A("**One-paragraph verdict:** the actuator as specified in the brief (geometry Qs 5/6 noted) cannot generate its "
       "specified forces — the net zero-power detent saturates at ≈0.5 mN — ≈×15 below the "
@@ -252,7 +256,7 @@ def main():
     A("")
 
     # ---------------------------------------------------------- §0 Tony response
-    A("## 0. Response to Tony's feedback of 24 July (before reading on)")
+    A("## 0. Response to Tony's feedback of 24 July (rounds 1–4, the historical record)")
     A("")
     A("Tony confirmed the physics numbers \"mostly well match my own calculations\" "
       "and corrected the framing in four ways, each actioned below:")
@@ -307,7 +311,7 @@ def main():
     A("7. **Manufacturing methods and cost** — §5 (route, incl. the pressed-SMC "
       "impossibility and the coil sequencing) and §6 (ten supplier entries with "
       "evidence) answer this directly; raw materials are indeed tiny "
-      "($0.0014/unit, §8.1) — the unit price lives in process and gap-setting.")
+      "($0.0014/unit, §5) — the unit price lives in process and gap-setting.")
     A("")
     A("**Round 4 (24 Jul, from the call) — the ten-knob optimisation brief: executed "
       "same-day as a full FE campaign; results and the recommended BALANCED set in §10 "
@@ -633,6 +637,84 @@ def main():
       "pole pieces in the SAME alloy (thermal-expansion match across the field gap — "
       "Tony's 24 Jul point); no laminations needed for DC pulsing per the §0.10 "
       "flux-diffusion estimate, transient FE check pending.")
+    A("")
+    A("**1b. Tony's stamped-and-stacked challenge (25 Jul) — analysed, "
+      "council-reviewed, and promoted to volume co-lead CANDIDATE.** Tony's "
+      "transformer instinct — stack stamped laminations — holds at this scale for a "
+      "structural reason our earlier fallback note under-sold: every toothed part is "
+      "PRISMATIC (a constant 2D profile extruded along one axis), so the translator "
+      "is ≈8 stamped 0.20 mm leaves and each slot-section ≈12 of 0.15 mm, and "
+      "in-die interlocked stacking (motor-core standard: complete stacks exit the "
+      "progressive die) makes one stack = one handled part, matching MIM's part "
+      "count. Magnetically it is clean: laminations are UNNECESSARY here "
+      "(flux-diffusion cleared solid parts, §A.10) but harmless — so the stack may "
+      "be bonded/welded SOLID with no interlaminar insulation, and non-oriented "
+      "electrical-steel strip (Bsat ≈1.9–2.0 T) matches or beats MIM Fe-3%Si with "
+      "its sinter porosity. What GATES it is the tooth-tip EDGE: the gap-facing "
+      "tooth surface IS the sheared edge, whose full profile (roll + burnish + "
+      "fracture taper + burr) plus stack-registration scallop and anneal "
+      "distortion is 5–20 µm against a 20 µm working gap at dF/dg ≈ −8%/µm. The "
+      "honest framing (council-corrected): the Pm trim knob absorbs a STATIC mean "
+      "force loss, so the raw ≈1.25 µm/10% sensitivity is not a kill number — "
+      "REPRODUCIBILITY, step-ripple and positional error are the real limits, and "
+      "they are decided by a measured-edge FE variant plus a SUPPLIER COUPON, "
+      "never by generic feature rules. Fine blanking (roll 2–5% of t) and "
+      "photochemical etch + stack (near-zero roll, no work-hardening — Precision "
+      "Micro class) are the gate-friendly variants. Full screen, all eight routes "
+      "with verdicts (lamination-route.json; council: sol SOUND-WITH-CORRECTIONS, "
+      "grok CONFIRMED-WITH-CAVEATS — transcripts in out/):")
+    A("")
+    A("| Route | Verdict | Why |")
+    A("|---|---|---|")
+    _lr = json.load(open(os.path.join(OUT, "lamination-route.json")))
+    for r in _lr["options"]:
+        A(f"| {r['option']} | **{r['verdict']}** | {r['why']} |")
+    A("")
+    A("Electroforming deserves its one-line physics ruling on the record: 80/20 "
+      "permalloy saturates at ≈0.8 T against our 1.0–1.15 T working flux — the "
+      "MATERIAL, not the process, rules it out; 45–50% Ni (Bsat ≈1.5 T) clears "
+      "with margin but needs a re-solve with deposited-alloy properties. New RFQ "
+      "targets this adds: a precision motor-lamination house (progressive + "
+      "in-die stacking) and Precision Micro for etched stacks — both bolt onto "
+      "the existing Annexe A conversation.")
+    A("")
+    A("**1c. The build round (25 Jul, five seats: sol · grok · glm · Opus 4.8 · "
+      "Opus 5) — Tony's seeds grown into their strongest forms.** A second "
+      "council pass was tasked not to judge but to BUILD: fact-check everything, "
+      "then construct the modification that makes each seed work. Fact-check "
+      "corrections applied to the artefacts: the progressive die-roll band was "
+      "OPTIMISTIC (widened to 5–20% of strip — the raw-stamp gate is HARDER than "
+      "first stated); tip-edge-as-%-of-gap is a screening number, not a force "
+      "predictor (edge roll recesses LOCAL pole area — measured profiles go into "
+      "the FE); etch edges carry their own sidewall profile; the anneal sequence "
+      "is a qualification, not an assumption. And the two convergent builds that "
+      "route AROUND the sheared-edge gate rather than fighting it:")
+    A("")
+    A("- **Stack solid, then GRIND/EDM the gap face in one pass** — proposed "
+      "independently by ALL FIVE seats. Stamp oversize, bond the stack solid "
+      "(legal — flux diffusion cleared solid parts), anneal, then one fixtured "
+      "grind or wire-EDM across the assembled tooth face: N per-leaf edge "
+      "tolerances collapse into one 1–2 µm machining pass, the registration "
+      "scallop vanishes, and every upstream defect is removed simultaneously. "
+      "Standard motor-core practice. Cheapest test: hand-stack 8 leaves, grind, "
+      "interferometry — an afternoon.")
+    A("- **Never shear the tooth at all: profile-ROLL or COIN it** (Opus 4.8's "
+      "top move; sol/glm/Opus 5 variants). The 232 µm tooth at 464 µm pitch is "
+      "coarser than an M0.5 thread, and thread rolling holds a few µm at "
+      "billions/yr; a rolled/coined face replicates the die to <2 µm, "
+      "work-hardened, burr-free — the gap surface is FORMED, not cut. Blank the "
+      "outline cheaply; form the teeth in the rigid die. Cheapest test: one "
+      "coining die + profilometer — a week.")
+    A("- **Absorb the residual in electronics** (Opus 5): the array already "
+      "needs per-cell calibration, so a per-element force/gap measurement and "
+      "pulse-energy trim table makes ABSOLUTE tooth accuracy irrelevant — only "
+      "STABILITY matters. This is the modification that makes raw progressive "
+      "stamping credible at 10 M/yr even before the grind/roll steps.")
+    A("")
+    A("Together: Tony's transformer instinct survives its own hardest critique — "
+      "not by beating the sheared edge, but by changing WHEN and HOW the "
+      "accurate surface is created. Both enabling builds are now ledger rows "
+      "with their validation coupons; transcripts in out/council-build-*.txt.")
     A("2. **Coils — two viable routes (corrected 24 Jul after Tony's challenge, §0.8).** "
       "The assembled pole WITHOUT the translator is an open horseshoe — its magnetic "
       "circuit closes only through the translator, which slides in axially LAST — so "
@@ -735,7 +817,7 @@ def main():
     A("## 7. Open questions for Tony")
     A("")
     A("1. ANSWERED 24 Jul: reflector = mg-scale plastic + 20 µm Cu foil on a standoff "
-      "(<2% of Mt — budgets stand; see §0.6). Remaining ask: the standoff distance "
+      "(<2% of Mt — budgets stand; see §0.5). Remaining ask: the standoff distance "
       "(Vlad), only because it sets the moving-mass tail and the cell stack-up.")
     A("2. ANSWERED 24 Jul: 5 g was the test minimum; ambition is 20–30 g — see §0.3 "
       "ladder. Remaining ask: confirm whether 20–30 g is HOLD (detent) or survive "
@@ -743,8 +825,9 @@ def main():
     A("3. Orientation confirmed? (translator axis along beam depth — assumed)")
     A("4. Peak temperature (NdFeB demag margin check is one line once known) and the "
       "real driver voltage (1 V limits drive to reduced-margin stepping; 2 V unlocks "
-      "the full 2·Fd point). NEW: the cell's guide-wavelength/cutoff at ~70 GHz, so "
-      "the stroke requirement (λg/2) and phase-per-step can be finalised (§0.2).")
+      "the full 2·Fd point). The cell's cutoff/guide-wavelength ask is now ANSWERED "
+      "by derivation (§9.2: fc 53.56 GHz from the measured interior) — the remaining "
+      "ask is Vlad's confirmation on the metallised cell (§0.2).")
     A("5. **Pole spacing: brief 374 µm vs your CAD 400 µm vs exact 390 µm — which "
       "rules?** (374 ⇒ steps 172.6/146.1/145.3 µm, ±3.4° jitter at 80 GHz.)")
     A("6. **Tooth profile: brief 232+232 (pitch 464) vs the 465/620 dimensions "
@@ -923,7 +1006,7 @@ def main():
       "path to that short applies a reflection phase **φ = 4π·d/λg** to the cell's "
       "re-radiated field. Setting each cell's short depth d sets the aperture's phase "
       "profile — the beam is formed and steered with zero active electronics on the "
-      "aperture. The actuator of §1–§8 is the device that positions one cell's short: "
+      "aperture. The actuator of §1 is the device that positions one cell's short: "
       "one actuator per cell, translator axis along the cell (beam) axis.")
     A("")
     A("### 9.2 Single-cell physics — cutoff and guide wavelength (computed, validated)")
@@ -996,7 +1079,7 @@ def main():
       "fitting the 3.1 mm interior (§8.9, 0.35 mm width margin) remains the "
       "make-or-break packaging fact — and it fits (0.35 mm is the WIDTH margin at "
       "the actuator's 2.634 mm height; the height margin itself is 0.47 mm).")
-    A("2. **Stroke budget** — table above: single-group covers the band (cell "
+    A("2. **Stroke budget** — the §9.2 band table: single-group covers the band (cell "
       "depth binding); the two-group option (§0.3's force-doubler: TWO 3-pole "
       "stator groups on one translator, halving usable stroke to ≈3.7 mm) is a "
       "≥67 GHz option only.")
@@ -1053,8 +1136,10 @@ def main():
     A("")
     A("![D6](drawing-D6-pcb.png)")
     A("")
-    A("**The drive is UNIPOLAR — a council correction that simplified the whole "
-      "board.** The first-draft architecture (three shared full-H phase bridges + a "
+    A("**The BASELINE drive (original design / Prototype-A) is UNIPOLAR — a council "
+      "correction that simplified the whole board; the optimised sets take the "
+      "H-bridge upgrade of §10.4, as the reader has just seen.** The first-draft "
+      "architecture (three shared full-H phase bridges + a "
       "dual select-FET per cell) was killed in review (gemini-3.1): a dual FET "
       "cannot block a bipolar phase rail — body diodes conduct and deselected coils "
       "cross-feed. The fix is cheaper than the bug: step DIRECTION comes from the "
@@ -1080,7 +1165,7 @@ def main():
       "makes it between linear and quadratic — council items, gemini-3.1 + sol), and coil warming "
       "(+0.39%/K) trims current a few percent within a burst.")
     A("- **Idle power is zero** (the PM detent holds); the budget is re-pointing "
-      "bursts, quoted per regime. STEPPING (1.8 A): tile 0.65 J, 16.4 W pulses / "
+      "bursts, quoted per regime. STEPPING (1.8 A): tile 0.65 J, 15.4 W pulses / "
       "≈6 W average, 0.12 s at 8-parallel; a 10 × 10 cm panel (≈1,093 cells) "
       "29.3 J, 5.5 s at 8-parallel or 0.72 s at 64-parallel (131 W pulses). "
       "WORST-CASE FULL-DRIVE (3.35 A): tile 2.2 J, 53.6 W pulses / ≈20 W average; "
@@ -1184,7 +1269,85 @@ def main():
       "tolerance), plating continuity (DC resistance wall-to-wall), and an RF "
       "return-loss spot check per batch (Vlad's bench).")
     A("")
-    A("**Who can make them — contact routes researched and live-verified 24 Jul** "
+    A("**Tony's folded-foil route (25 Jul) — two physics checks done, and his "
+      "winding collision explained exactly.** Press a stiff metal foil into 60° "
+      "half-hex corrugations, build the lattice, weld at the node faces, and "
+      "register it in a GROOVED base plate. First check, corner radii "
+      "(foil-corner.json): a 0.3 mm bend shifts fc by only +137 MHz (≡ 7.9 µm of "
+      "interior; even r = 0.5 mm costs 20.8 µm-equivalent) — inside the ±25 µm "
+      "gate. Second, the collision Tony's CAD found when winding ONE continuous "
+      "tape is a THEOREM, not a process defect (foil-topology.json, verified on "
+      "7/19/37-cell lattices): every interior wall junction is 3-way — odd — and a "
+      "single tape laying every wall once is an Euler trail, which tolerates at "
+      "most TWO odd junctions. A 7-cell tile already has 12. The constructive fix "
+      "is exactly Tony's own mixed single/double-wall instinct, made systematic: "
+      "double the walls of ONE of the three orientation classes and every interior "
+      "junction becomes even — a 7-cell tile then needs only ≈3 extra boundary "
+      "walls doubled and one tape winds the lot (⅓ of walls double). Better "
+      "still, the commercial ROW-STRIP corrugation topology — one short strip per "
+      "row, node walls doubled — reaches the SAME ⅓-double lattice with trivial "
+      "paths, and both patterns are PERIODIC: Tony's software-correction idea "
+      "collapses from a per-cell table to two known lattice constants (pitch "
+      "across doubled walls grows by one tape thickness, ≈2.3% at 75 µm — an "
+      "array-level constant for the beam-forming, and fc is untouched because the "
+      "interior is held, §9.9). Council caveats on the record (sol + grok, "
+      "SOUND/CONFIRMED-WITH-CAVEATS): row-strip is the only volume-credible "
+      "default (per-node discrete welds at 3.25 mm pitch do not scale — line "
+      "bonding or brazing does); real node geometry is 2+1+1 tape layers with "
+      "fillets and belongs in Vlad's periodic unit-cell RF check along with the "
+      "75/150 µm mixed walls and the ≈2.3% biperiodic pitch; corner seams must "
+      "be RF-CONTINUOUS (a gappy seam is a slot antenna between cells); and the "
+      "MACHINED groove plate still carries the precision (±10 µm routine) while "
+      "doubling as the drilled back wall.")
+    A("")
+    A("**The build round on the cells (25 Jul, five seats) — from 'the winding "
+      "fails' to three routes that keep Tony's foil idea alive.** The same "
+      "build-not-judge council pass grew the foil seed into its strong forms: "
+      "**(1) HOBE-style expansion** (the aluminium-honeycomb industry's own "
+      "process, four seats independently): print the node-bond lines on FLAT "
+      "foil — a ±5 µm printing operation, no 3D weld access ever — stack, cure, "
+      "expand; the ⅓-double-wall topology Tony arrived at is NATIVE to expanded "
+      "honeycomb, which is the neatest possible confirmation of his instinct. "
+      "**(2) Move the RF precision to the LAST operation** (Opus 4.8/Opus 5): "
+      "build the lattice deliberately oversize, braze it rigid, then close the "
+      "interior to dimension by plating time — at 17.3 MHz/µm, one micron of Cu "
+      "on both walls trims fc by 34.6 MHz, and bath time is controllable to "
+      "±0.3 µm: a closed-loop chemistry knob replaces a forming tolerance. "
+      "**(3) Make HOLES, not walls** (Opus 5's inversion, now a ledger row): "
+      "stack ≈8 etched 1 mm plates with hex holes, dowel-align, braze, "
+      "through-plate — the topology problem never exists because walls are what "
+      "REMAINS, and lithographic ±10 µm lands directly on the RF dimension. "
+      "Honest boundaries from the same round: the one-tape Euler fix is a "
+      "topological ROUTE CANDIDATE, not yet a fold-path proof (finite-width "
+      "simulation before any tooling); isolated-cell fc invariance is "
+      "first-order — the ARRAY response of any mixed-wall lattice needs a "
+      "periodic-supercell/Floquet check, which is pure computation, costs a "
+      "day, and should run BEFORE any Seed-1 hardware; and glm's refinement "
+      "for the purist path: pre-roll a periodic thickness pattern into the "
+      "tape so 'doubled' walls are THICKER regions of one foil — restoring a "
+      "single lattice constant with no folded double layer at all.")
+    A("")
+    A("**And the COTS question (Tristan, 25 Jul): could we just fit the design to an "
+      "off-the-shelf honeycomb?** The wall-thickness proof makes this askable, and "
+      "the answer is: worth a £100 experiment, not yet a bet. What works: commodity "
+      "1/8\" (3.175 mm) cell honeycomb is one wall-thickness away from our 3.10 mm — "
+      "and since fc scales as 1/size, a 3.175 mm interior gives fc = 52.3 GHz, which "
+      "IMPROVES the band edge; the actuator fits any cell ≥ ≈2.8 mm; glued node "
+      "bonds are RF-irrelevant (every foil is hundreds of skin depths). What "
+      "doesn't: commercial cell tolerance is ±5–10% (≡ ±2.6 GHz of fc scatter, cell "
+      "to cell — a hundred times our gate) and expansion-process hexes are visibly "
+      "irregular. The honest mitigation is that an open-loop stepper aperture is "
+      "CALIBRATABLE: each cell's phase-vs-depth curve could be measured once and "
+      "absorbed into the host's per-cell target map, converting static geometry "
+      "scatter into a lookup table. Whether that survives contact with real "
+      "hardware is exactly what the Hexcel/Plascore slice decides: measure the "
+      "actual cells, eigensolve the ACTUAL shapes (the solver takes arbitrary "
+      "cross-sections), and put it on Vlad's bench. At volume the argument fades — "
+      "bespoke moulding at sub-£2/tile beats adapting to someone else's tolerance.")
+    A("")
+    A("### 9.6b Who can make the cells — fabricator table, contact routes live-verified")
+    A("")
+    A("**Contact routes researched and live-verified 24 Jul** "
       "(three parallel verification passes; every email read off the company's own "
       "page, never constructed; gaps stated):")
     A("")
@@ -1209,13 +1372,13 @@ def main():
       "(reference-grade metal tiles, both electroforming), **BMF + Cybershield or "
       "SAT** (the print-and-plate prototype pair), **SWISSto12** (integrated "
       "print+plate, space heritage), and a **Hexcel/Plascore honeycomb slice** as the "
-      "week-one bench experiment. Draft emails for the cell lattice are in §11 "
+      "week-one bench experiment. Draft emails for the cell lattice are in §13 "
       "alongside the actuator outreach (Annex E carries the cell specification).")
     A("")
 
     A("### 9.7 The hex-cell options ledger — fabrication, geometry, plating")
     A("")
-    A("16 cell options scored with the validated §9 sensitivities (fc moves "
+    A("20 cell options scored with the validated §9 sensitivities (fc moves "
       "17.3 MHz/µm of interior; band edge from usable travel; ≥10 skin depths of "
       "copper). Kills — including the as-drawn single-piece moulding, killed by its "
       "own 52:1 aspect ratio — stay on the record (cell-options.json):")
@@ -1235,11 +1398,11 @@ def main():
     A("")
     A("| Decision | RF consequence | Status |")
     A("|---|---|---|")
-    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by all 93 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter |")
+    A("| Interior across-flats 3.10 mm | THE RF dimension (fc, λg, phase scale) | **INVARIANT — untouched by 96 of the 97 options**; ±25 µm tolerance gate = ±0.43 GHz fc scatter; the one exception is the DELIBERATE §9.7 COTS-adapt candidate (3.10 → 3.175, fc 52.3 GHz — a band-edge improvement, Vlad/Tony call) |")
     A("| Tooth duty / slot depths / magnet / registration | change step FORCE + uniformity, not step SIZE — phase quantisation preserved at 154.7 µm ⇒ 16.7°/step at 70 GHz | invariant on phase scale; registration choice trades ±1.9° step jitter for detent (quantified, Tony's knob) |")
     A("| Phase levels: 21 per 2π at 70 GHz today | the UKDI bid's 32-level ambition needs step 108 µm ⇒ pitch 324 µm (scenario S108) | **OPEN — tracked, not built**; awaits Vlad's real λg before a pitch redesign |")
-    A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | gated to Vlad, flagged at every mention |")
-    A("| Damper vent Ø0.15 mm through the reflector | the hole is 17× below its own cutoff (1.17 THz); Bethe small-aperture leakage ∝(d/λ)⁴ ≈ 1.5×10⁻⁶ (−58 dB) before foil-thickness attenuation | **checked here: negligible perturbation of the short** |")
+    A("| Wall thickening option (0.15 → 0.30 mm) | interior unchanged ⇒ CELL RF unchanged; array PITCH grows 3.25 → 3.40 mm (grating-lobe/scan budget) | **PROVEN in §9.9** (deterministic 3-leg proof + adversarial pass); pitch budget gated to Vlad |")
+    A("| Damper vent Ø0.15 mm through the reflector | the hole is 17× below its own cutoff (1.17 THz); Bethe small-aperture leakage ∝(d/λ)⁴ ≈ 1.5×10⁻⁶ (−58 dB) before foil-thickness attenuation. §14.7 has since revised the vent DOWN to Ø0.138 mm, and since the leak goes as the fourth power of diameter this bound only becomes more conservative (a further ≈1.5 dB) | **checked here: negligible perturbation of the short** |")
     A("| Foil-edge running clearance | a real annular leak path past the short | OPEN interface (choke/lip) — Vlad's, flagged since §9.3 |")
     A("| Actuator inside the cell footprint | sits BEHIND the plane it controls; fields evanescent to first order | shielded by construction; residual = the edge-leak item above |")
     A("| Plating spec ≥3 µm Cu (+flash) | ≥12 skin depths — conductor loss floor; print roughness is the loss tax | PASS-gated; Vlad owns the loss budget on the print route |")
@@ -1256,6 +1419,115 @@ def main():
       "electronics punch list: the driver board must be laid out and shielded so "
       "re-pointing bursts (up to 26.8 A pulsed) stay out of the feed's band — easy at "
       "these edge rates, but it must be SPECIFIED, not assumed.")
+    A("")
+
+    # --- 9.8b the EMC layout specification (closes that open requirement) --
+    em = load("emc-spec.json")
+    if em:
+        A("### 9.8b The driver layout specification — the silent hold, made a requirement")
+        A("")
+        sp_ = em["spectrum"]
+        A("The line above says the layout rule must be specified rather than "
+          "assumed. Here it is. The first job is to establish what is *not* a "
+          "risk, because that decides where the effort goes.")
+        A("")
+        A(f"The drive is a millisecond pulse into a coil whose own electrical "
+          f"time constant is {em['drive']['tau_us']} µs. A trapezoidal pulse's "
+          f"spectral envelope breaks at 1/(π·t_rise) and falls at 40 dB/decade "
+          f"above it. Even with edges deliberately held to "
+          f"{em['layout_budget']['min_edge_ns']:.0f} ns — far faster than the "
+          f"coil can respond to — the break sits at "
+          f"{sp_['knee_at_slew_floor_mhz']:.1f} MHz, which is "
+          f"{sp_['decades_to_band']:.1f} decades below the "
+          f"{sp_['band_low_ghz']:.0f} GHz operating band: about "
+          f"**{sp_['attenuation_to_band_db']:.0f} dB** of envelope roll-off. "
+          f"In-band radiation from the driver is therefore not a credible "
+          f"mechanism — not because the layout is careful, but because the "
+          f"physics separates the two by more than four orders of magnitude.")
+        A("")
+        A("What can genuinely go wrong is narrower, and the rules target it: "
+          "near-field magnetic coupling from the drive loops (a broadband "
+          "desense problem, not an emission one), the hold state ceasing to be "
+          "silent, and 72 coils per tile switching as one. Only the second of "
+          "these attacks the actual claim — and it is the one that would fail "
+          "invisibly.")
+        A("")
+        A("| # | Rule | Verified by |")
+        A("|---|---|---|")
+        for r in em["rules"]:
+            A(f"| {r['id']} | **{r['title']}.** {r['rule']} | {r['verify']} |")
+        A("")
+        A("**EMC-4 is the load-bearing one.** The low-probability-of-intercept "
+          "property rests entirely on a held cell drawing zero current. That is "
+          "a property of the architecture — the detent is permanent-magnet, so "
+          "holding costs nothing — but a driver that idles with a switching "
+          "regulator live on the coil rail forfeits it completely, and the "
+          "aperture would look exactly the same while doing so. Rail voltage "
+          "already sets the current against the coil resistance, so no "
+          "regulation loop is needed at hold; the rule is there to stop one "
+          "being added later for convenience.")
+        A("")
+
+    A("### 9.9 The wall-thickness proof — thicker walls are RF-free (25 Jul, Tristan's challenge)")
+    A("")
+    A("Tristan asked for PROOF (not assertion) that the hex walls can be thickened "
+      "for manufacturability without touching the RF. The proof is deterministic "
+      "(wall_proof.py, self-testing, artefact out/wall-proof.json) and was then "
+      "attacked by an adversarial council seat. Three legs:")
+    A("")
+    A("**Leg A — the cutoff physics never sees the wall.** Every in-guide quantity "
+      "this report uses (cutoff, guide wavelength, reflection phase, stroke need) is "
+      "the eigenvalue of the Helmholtz problem on the INTERIOR cross-section. Wall "
+      "thickness is not a parameter of that problem: ∂fc/∂wall = 0 exactly at fixed "
+      "interior. Re-solved on the validated eigensolver: fc(interior 3.10) = "
+      "53.558 GHz for ANY wall.")
+    A("")
+    A("**Leg B — the wall's far side is electromagnetically invisible.** Fields "
+      "penetrate the copper only ≈0.3–0.4 µm (skin depth, worst-case rough plated "
+      "Cu). The 3 µm plating spec alone is 8–11 skin depths — a 72–93 dB field "
+      "shield across the band; the as-drawn 150 µm wall is ≈3,600 dB and 300 µm is "
+      "≈7,200 dB. The interior fields cannot know what is behind the first few "
+      "microns of metal, so added wall material changes nothing inside the cell and "
+      "only lowers the already-immeasurable cell-to-cell through-wall leak.")
+    A("")
+    A("**Leg C — the ONE real cost, priced.** In the shared-wall honeycomb, pitch = "
+      "interior + wall (3.10 + 0.15 = 3.25 ✓ vs the STL). Thicker walls grow the "
+      "ARRAY pitch — a grating-lobe/scan budget that belongs to Tony/Vlad. The "
+      "envelope (textbook square-lattice bound; hex tiling relaxes it ≈15%):")
+    A("")
+    A("| Wall (mm) | Pitch (mm) | fc (GHz) | Broadside grating limit | ±30° scan | Aperture open | Mould aspect (7.75 deep) |")
+    A("|---|---|---|---|---|---|---|")
+    wp_path = os.path.join(OUT, "wall-proof.json")
+    if os.path.exists(wp_path):
+        _wp = json.load(open(wp_path))
+        for r in _wp["leg_c_pitch"]["rows"]:
+            A(f"| {r['wall_mm']:.2f}{' (as drawn)' if r['wall_mm'] == 0.15 else ''} "
+              f"| {r['pitch_mm']:.2f} | {r['fc_ghz']} (unchanged) "
+              f"| {r['broadside_grating_limit_ghz']} GHz | {r['scan30_limit_ghz']} GHz "
+              f"| {r['aperture_open_fraction']*100:.0f}% | {r['mould_aspect_7p75_depth']}:1 |")
+    A("")
+    A("Every 50 µm of wall costs ≈1.4 GHz of grating-lobe headroom and 2–3 points "
+      "of aperture open fraction — and buys mouldability: at 0.30 mm walls the "
+      "single-piece moulding aspect ratio falls from the unmouldable 52:1 to a "
+      "standard 26:1, which is why the §9.7 ledger keeps thickened-wall moulding "
+      "as a volume route.")
+    A("")
+    A("**The mandatory drawing rule that makes all of this true: thicken OUTWARD.** "
+      "The held fabrication dimension is the INTERIOR 3.10 mm; the pitch grows. "
+      "Thickening INWARD at fixed 3.25 mm pitch shrinks the interior and moves the "
+      "cutoff at 17.3 MHz/µm — 0.30 mm walls inward would push fc up 2.6 GHz and "
+      "lose the bottom of the band. Any drawing sent to a fabricator must dimension "
+      "and tolerance the interior across-flats, never the wall.")
+    A("")
+    A("**Adversarial check (grok-4.5, eight attacks)**: aperture-plane septum width, "
+      "front-face mutual coupling, moving-short fit, plating uniformity on thicker "
+      "walls, thermal distortion, seams, higher-order modes, losses. Verdict: "
+      "**CONFIRMED-WITH-CAVEATS** — no attack breaks the claim; the residual "
+      "effects (aperture-rim perturbation, front-face coupling ≲0.2–0.4 dB) are "
+      "second-order and scale with the same pitch growth already priced above, and "
+      "several attacks FAVOUR thicker walls (stiffer core pins → better plating "
+      "uniformity; less thermal distortion; better bearing for the moving short). "
+      "Full transcript: out/council-wallproof-grok.txt.")
     A("")
     # ------------------------------------------------- §10 optimisation
     A("## 10. The optimisation campaign — from 5 g to a chosen Pareto (24 Jul)")
@@ -1342,6 +1614,188 @@ def main():
       "and, as §4.4 already holds, sustained slewing needs a duty-cycle + "
       "thermal-path check that is NOT modelled here.")
     A("")
+    # --- 10.2b demagnetisation gate (closes the block on dual drive) -------
+    dm = load("demag-fe.json")
+    if dm:
+        A("### 10.2b The demagnetisation gate — does the cancel coil wreck its own magnet?")
+        A("")
+        A("Dual drive asks one coil to push reverse flux through the magnet it is "
+          "wound around. That is a demagnetising field, and if it reaches the knee "
+          "of the magnet's intrinsic curve the loss is permanent: the detent comes "
+          "back weaker after every step until the cell stops holding. Nothing in "
+          "the force model of §10.2 would notice — every force sweep assumes a "
+          "fully-magnetised slug. This was logged as the open gate BLOCKING dual "
+          "drive; it is now closed, and it clears.")
+        A("")
+        A("Two things make the check non-trivial. First, the finite-element magnet "
+          "is a **linear recoil line with no knee anywhere in it** — drive the coil "
+          "as hard as you like and the solver reports a serenely converged "
+          "operating point that a real magnet would not have survived. The knee has "
+          "to be imposed from outside, as an acceptance test on the FE result. "
+          "Second, the statistic has to be the **worst point inside the slug, not "
+          "the average**: a magnet loses flux wherever the local reverse field is "
+          "worst, and that corner stays lost. A block-average would have "
+          "under-read the true reverse field by "
+          f"{max(c['worst_vs_mean_cold']['ratio'] for c in dm['configs']) - 1:.0%}"
+          + " here. The gate therefore probes a grid of points "
+          "inside the magnet, at the worst translator position over a whole tooth "
+          "pitch, and confirms that position does not move when the magnet is hot.")
+        A("")
+        A("| Set | Magnet | Worst reverse field at design cancel current | Knee at 20 °C | Margin |")
+        A("|---|---|---|---|---|")
+        for c in dm["configs"]:
+            g20 = next(v for v in c["verdicts"]
+                       if v["grade"] == c["workhorse_grade"])
+            sch = next(s for s in g20["schemes"]
+                       if s["i_cancel_a"] == c["i_cancel_design_a"])
+            r20 = next(x for x in sch["curve"] if x["temp_c"] == 20)
+            A(f"| {c['name']} | {c['workhorse_grade']} (Br {c['br_t']} T, "
+              f"Pm {c['pm_mm']} mm) | {r20['h_reverse_ka_m']:.0f} kA/m "
+              f"at {c['i_cancel_design_a']:+.2f} A | {r20['knee_ka_m']:.0f} kA/m "
+              f"| **{r20['margin']:.1f}×** |")
+        A("")
+        A("Because coercivity falls about five times faster with temperature than "
+          "remanence does (≈−0.6 %/K against −0.12 %/K), demagnetisation is always "
+          "a HOT failure, so the honest answer is not a single number but a "
+          "temperature ceiling per grade. Every magnet then has **two** limits — "
+          "its own catalogue thermal rating, and the temperature at which this "
+          "geometry's cancel coil reaches its knee — and the design is bounded by "
+          "the lower one:")
+        A("")
+        A("| Set | Grade | Catalogue max | Demagnetisation limit | Usable ceiling | What binds |")
+        A("|---|---|---|---|---|---|")
+        for c in dm["configs"]:
+            for ce in c["ceilings"]:
+                bold = "**" if ce["grade"] == c["workhorse_grade"] else ""
+                A(f"| {c['name']} | {bold}{ce['grade']}{bold} | "
+                  f"{ce['t_max_catalogue_c']} °C | {ce['t_max_reversible_c']:.0f} °C "
+                  f"| {ce['usable_ceiling_c']:.0f} °C | {ce['binding']} |")
+        A("")
+        bal = dm["configs"][0]
+        mx = dm["configs"][1]
+        bal_w = next(x for x in bal["ceilings"] if x["grade"] == bal["workhorse_grade"])
+        mx_w = next(x for x in mx["ceilings"] if x["grade"] == mx["workhorse_grade"])
+        A(f"**The verdict: the cancel coil is not the constraint.** For every grade "
+          f"one would actually specify, the magnet's own thermal rating runs out "
+          f"first — by {abs(bal_w['headroom_k']):.0f} K on the BALANCED set "
+          f"({bal['workhorse_grade']}) and {abs(mx_w['headroom_k']):.0f} K on "
+          f"MAX-FORCE ({mx['workhorse_grade']}). Dual pull-and-cancel drive is "
+          f"cleared to use. The ordering only inverts for the exotic "
+          f"high-coercivity grades, where the thermal rating runs so far above the "
+          f"knee curve that demagnetisation becomes the real ceiling — relevant "
+          f"only if the environment is specified above 180 °C, which PHANTM's is "
+          f"not.")
+        A("")
+        A(f"The result rests on two assumptions that are not measured on Tony's "
+          f"actual magnet — a knee at {dm['knee_fraction']:.2f}× coercivity "
+          f"(catalogue squareness is specified ≥0.90, so this is the conservative "
+          f"side) and the −0.6 %/K coercivity coefficient. Re-evaluating across "
+          f"the full plausible band of both "
+          f"(knee 0.75–0.95 × coercivity −0.65…−0.50 %/K) leaves the verdict "
+          f"unchanged in "
+          f"{bal['workhorse_corners_clear'][0]}/{bal['workhorse_corners_clear'][1]} "
+          f"and {mx['workhorse_corners_clear'][0]}/{mx['workhorse_corners_clear'][1]} "
+          f"corners respectively — it does not turn on the assumptions.")
+        A("")
+        A("**The honest caveat.** The magnet sits in the bridge limb, which is the "
+          "one region the unrolled 2D model treats approximately (the tooth and gap "
+          "region is exact — see §8.2). So this number carries the unrolled-model "
+          "uncertainty. It is worth stating what that would have to be worth to "
+          "change the answer: pushing the specified N42 past its knee at its own "
+          "80 °C rating would need the true reverse field to be **2.3×** the "
+          "computed value. An area-preserving unrolled model does not err by that "
+          "much, so the verdict is robust to the known weakness — but the 3D FE "
+          "already queued for the force curve should report this field too, and it "
+          "costs nothing extra to ask for it.")
+        A("")
+
+    # --- 10.2c eddy-current gate (the no-laminations claim) ---------------
+    ed = load("eddy-fe.json")
+    if ed:
+        A("### 10.2c The eddy-current gate — is skipping laminations really free?")
+        A("")
+        A("The design carries no laminations: the pulses are 1.5 ms of essentially "
+          "DC, and flux was estimated to diffuse into the solid steel far faster "
+          "than that. The estimate was flagged with an open gate, because the "
+          "margin on the thickest path was under 10× and a hand calculation that "
+          "close to the line is not something to cut tooling against. It has now "
+          "been run properly, and the flag was justified.")
+        A("")
+        A("**The estimate was made on the wrong material.** The brief assumes "
+          "pressed SMC, which is insulated powder — eddy currents barely exist in "
+          "it and the claim is trivially true. But SMC was killed as a process "
+          "(§19.1: it cannot form 232 µm teeth), and *both* surviving routes — "
+          "micro-MIM Fe-3%Si and Tony's stamped-and-bonded-solid electrical steel "
+          "— are roughly **850× more conductive**. The claim had to be re-tested "
+          "on the material that will actually be built.")
+        A("")
+        A("**A metric that looked right and was not.** The obvious probe is to "
+          "sweep frequency and watch the coil flux linkage roll off. It does not "
+          "work here: this is a *gapped* circuit, and the two 20 µm working gaps "
+          "dominate the reluctance, so terminal flux is set by the gaps almost "
+          "regardless of what the steel is doing — measured, it falls only 20% by "
+          "100 kHz, long after the steel has stopped carrying flux at its centre. "
+          "Worse, the first cut of this study read \"no corner found in the "
+          "sweep\" as \"the circuit is infinitely fast\" and reported a 576× "
+          "margin. That number was produced by a fallback, not by physics. It is "
+          "recorded here because it is exactly the kind of flattering artefact "
+          "that survives review when only the conclusion is checked.")
+        A("")
+        A("The gate instead measures inside the metal — |B| at the centreline of "
+          "each section against |B| just under its surface — and the method is "
+          "validated first against the closed-form slab solution, the same "
+          "discipline the force loop applies with its gapped C-core gate:")
+        A("")
+        A("| Frequency | FE centre/surface | Closed form | Error |")
+        A("|---|---|---|---|")
+        for v in ed["slab_validation"]:
+            A(f"| {v['f_hz']:.0f} Hz | {v['fe_ratio']:.4f} | "
+              f"{v['analytic_ratio']:.4f} | {v['rel_error']*100:.2f}% |")
+        A("")
+        mim = [r for r in ed["rows"] if r["sigma_ms"] > 0.01
+               and "MIM" in r["material"]]
+        A("Applied to the real geometry on solid Fe-3%Si, the slowest path is the "
+          "**translator core** — which is precisely the path the original hand "
+          "estimate singled out. (Note the slot-section back has almost the same "
+          "time constant at half the thickness: the eddy loop is set by the 2D "
+          "geometry, not by a section thickness, which is why no 1D formula could "
+          "have settled this.)")
+        A("")
+        A("| Permeability | Regime | τ (translator core) | Flux at pulse end | Force at pulse end | Margin |")
+        A("|---|---|---|---|---|---|")
+        regime = {100: "saturated working point",
+                  500: "working point, conservative",
+                  1500: "part-saturated",
+                  4000: "small-signal, cold/low-flux — pessimistic"}
+        for r in sorted(mim, key=lambda r: r["mu_r"]):
+            A(f"| µr {r['mu_r']} | {regime.get(r['mu_r'], '')} | "
+              f"{r['tau_ms']*1e3:.1f} µs | "
+              f"{r['penetration_at_pulse_end']*100:.2f}% | "
+              f"{r['force_fraction_at_pulse_end']*100:.1f}% | "
+              f"**{r['margin_pulse_over_tau']:.0f}×** |")
+        A("")
+        w = ed["worst_buildable"]
+        A(f"**The verdict: the claim holds, with an honest margin of "
+          f"{w['margin_pulse_over_tau']:.1f}× rather than a comfortable one.** At "
+          f"the working point the steel runs at 1.5–2 T, deep in saturation, "
+          f"where the differential permeability that governs a flux *change* is "
+          f"one to two orders below the small-signal figure — there the margin is "
+          f"22–70× and flux is fully in. The binding case is the pessimistic "
+          f"unsaturated corner (µr 4000), and even that delivers "
+          f"{w['penetration_at_pulse_end']*100:.1f}% of final flux, i.e. "
+          f"{w['force_fraction_at_pulse_end']*100:.0f}% of final force, by the end "
+          f"of the pulse. Against detent margins of 2.2× spec that ~7% shortfall "
+          f"is absorbable — but it is real, it is not zero, and it should be "
+          f"carried in the step-timing budget rather than rounded away. "
+          f"Laminations remain unnecessary; they were never harmful, and this "
+          f"says how much headroom is being spent to skip them.")
+        A("")
+        A("Ohmic loss in the steel is negligible against the step energy at these "
+          "rates, so the earlier note that eddy loss would \"add modestly\" to the "
+          "2.7 mJ/step budget stands — the cost of solid parts is the flux "
+          "*delay* quantified above, not the dissipation.")
+        A("")
+
     A("### 10.3 Dynamics: Tony's air-piston damper works, with a number")
     A("")
     A("![damper](opt/fig-damper.png)")
@@ -1362,10 +1816,98 @@ def main():
       "(γP₀A²/V₀ ≈ 296 N/m, now in the artefact) is isentropic — the isothermal "
       "limit is ≈30% softer and the truth at 310–355 Hz sits between; and the "
       "capture window is NARROW in vent size (Ø0.15 works, Ø0.20 already fails), so "
-      "a continuous vent/tolerance sweep with pressure-dependent discharge is on the "
-      "punch list before the foil is specified. The hold-then-release drive of §4.4 "
+      "a continuous vent/tolerance sweep with pressure-dependent discharge was put on "
+      "the punch list before the foil is specified. **That sweep has now been run — "
+      "see §14.7, which supersedes the Ø0.15 figure here.** It found the robust "
+      "centre is Ø0.138 mm rather than Ø0.15, and that the discharge coefficient "
+      "carries almost the whole tolerance. The hold-then-release drive of §4.4 "
       "remains the capture strategy; the damper makes it fast at the nominal point.")
     A("")
+    # --- 10.3b vent tolerance gate ---------------------------------------
+    vt = load(os.path.join("opt", "vent-tolerance.json"))
+    if vt and vt.get("specification"):
+        A("### 10.3b The vent tolerance gate — can the damper actually be made?")
+        A("")
+        A("The damper works, and §14.6 gives the number. But the study that "
+          "produced it sampled vent diameters at 0.15, 0.20, 0.25 mm — and "
+          "Ø0.20 already fails. A design whose only demonstrated working point "
+          "sits one sample away from failure, on a feature that is a drilled "
+          "hole in a foil, is not yet a specification: nobody can order it "
+          "without a tolerance. That was the open gate, and closing it produced "
+          "the least comfortable result in this document.")
+        A("")
+        A("The sweep was rerun at 5 µm resolution and, more importantly, "
+          "repeated across the things we had assumed rather than measured — "
+          "discharge coefficient 0.60–0.85, air column ±15%, air density from "
+          "−40 to +80 °C, and guide friction across the brief's own 0.2–0.5 mN "
+          "band, plus two compound corners. Friction is in there because it "
+          "competes with the same damping the vent provides; toleranced the "
+          "vent while holding friction nominal would have measured the wrong "
+          "thing.")
+        A("")
+        nb, rb = vt.get("nominal_band_mm"), vt.get("robust_band_mm")
+        sp = vt["specification"]
+        A("| Basis | Pass band | As a tolerance |")
+        A("|---|---|---|")
+        if nb:
+            A(f"| Nominal assumptions only | Ø{nb[0]:.3f}–Ø{nb[1]:.3f} mm | "
+              f"±{(nb[1]-nb[0])/2*1000:.0f} µm |")
+        if rb:
+            A(f"| **Every uncertainty corner** | Ø{rb[0]:.3f}–Ø{rb[1]:.3f} mm | "
+              f"**±{sp['tolerance_mm']*1000:.0f} µm** |")
+        cdb, cds = vt.get("cd_pinned_band_mm"), vt.get("cd_pinned_specification")
+        if cdb and cds:
+            A(f"| Every corner, **with discharge coefficient measured** | "
+              f"Ø{cdb[0]:.3f}–Ø{cdb[1]:.3f} mm | "
+              f"±{cds['tolerance_mm']*1000:.0f} µm |")
+        A("")
+        cr = vt.get("current_recommendation_check")
+        if cr and not cr.get("robust"):
+            A(f"**First finding: the Ø0.15 mm currently recommended is not "
+              f"robust.** It captures at nominal, and fails in "
+              f"{len(cr['fails_in_corners'])} of the corners tested "
+              f"({', '.join(cr['fails_in_corners'])}) — both driven by the high "
+              f"end of the discharge-coefficient range. It was never wrong; it "
+              f"was only ever validated against one set of assumptions. The "
+              f"robust centre is Ø{sp['centre_mm']:.3f} mm, not Ø0.15.")
+            A("")
+        A(f"**Second finding, and the useful one: the tolerance is being eaten "
+          f"almost entirely by one number.** Specified against every corner, "
+          f"the vent is Ø{sp['centre_mm']:.3f} ±{sp['tolerance_mm']*1000:.0f} µm "
+          f"— about ±{sp['tolerance_mm']/sp['centre_mm']*100:.0f}% on a "
+          f"{sp['centre_mm']*1000:.0f} µm hole, which is a demanding thing to "
+          f"buy and hold in production.")
+        if cds:
+            factor = cds["tolerance_mm"] / sp["tolerance_mm"]
+            A("")
+            A(f"But recomputing the same intersection with the discharge "
+              f"coefficient pinned — not assumed, *measured* — widens it to "
+              f"Ø{cds['centre_mm']:.3f} ±{cds['tolerance_mm']*1000:.0f} µm, "
+              f"roughly ±{cds['tolerance_mm']/cds['centre_mm']*100:.0f}%. That "
+              f"is **{factor:.0f}× the tolerance**, and it is an entirely "
+              f"ordinary specification that laser drilling holds without "
+              f"difficulty. Everything else we varied — temperature, air "
+              f"column, friction — barely moves the band.")
+            A("")
+            A("**So the recommendation is a measurement, not a tighter "
+              "process.** Drill a short orifice in the actual foil at the "
+              "actual thickness, measure its discharge coefficient on a flow "
+              "bench, and the vent becomes a routine part. Trying instead to "
+              "hold ±%.0f µm in production would be expensive, and might not be "
+              "achievable at all — for want of one afternoon's coupon test. "
+              "This is the cheapest open item in the programme and it should be "
+              "done before any damper hardware is ordered."
+              % (sp["tolerance_mm"] * 1000))
+        A("")
+        A("The honest caveat: the orifice model here is inviscid "
+          "(discharge-coefficient times area times root-two-delta-p-over-rho), "
+          "which is why the discharge coefficient carries so much of the "
+          "uncertainty — at 140 µm and these pressure differences the flow is "
+          "not obviously in the regime where that form is exact. The coupon "
+          "measurement settles the modelling question and the tolerance "
+          "question in the same experiment.")
+        A("")
+
     A("### 10.4 Consequence for the drive electronics (§9.5 amendment)")
     A("")
     A("The dual pull-and-cancel scheme requires the cancel coil to carry REVERSE "
@@ -1398,7 +1940,7 @@ def main():
     # ------------------------------------------------- §11 system DFM
     A("## 11. Making the SYSTEM easy to manufacture — the combined ledger")
     A("")
-    A("The three option funnels above (actuator 66 → 1 recommended, cells 16 → 2 "
+    A("The three option funnels above (actuator 66 → 1 recommended, cells 20 → 2 "
       "routes, drive 11 → 1 topology + 1 gate) combine into whole-system builds. "
       "The design-for-manufacture principles the campaign PROVED, then the builds:")
     A("")
@@ -1415,7 +1957,7 @@ def main():
       "glue costs 1.7%, not 5%/joint.")
     A("- **Deleted operations, by the numbers**: no lamination stacks (flux-diffusion "
       "15–60 µs ≪ pulses), magnetise-after-assembly as a supplier service, coils "
-      "wound in situ on the open horseshoe, damper drilled (one Ø0.15 mm hole) "
+      "wound in situ on the open horseshoe, damper drilled (one Ø0.138 mm hole — §14.7) "
       "rather than assembled.")
     A("")
     A("| System build | Cells | Actuator | Gap | Drive PCB | Flux joints | Gauged steps | Open gates | Verdict |")
@@ -1446,12 +1988,18 @@ def main():
     A("**Final verification round (" + stamp + "):** a deterministic harness "
       "(verify_report.py, wired into selftest) recomputes every hand-derivable "
       "number from first principles, cross-checks every FE number against its "
-      "artefact, enforces a stale-string blacklist, and pins the 3D model's "
-      "constants to the analysed geometry — 28/28 green. A 5-seat cross-lineage "
-      "council then reviewed physics validity, red-teamed both headline "
-      "conclusions, steel-manned the design, and re-verified all 11 figures; its "
+      "artefact, compiles and runs the firmware in both configurations, pins the "
+      "structure, claims register and Excel workbook, enforces a stale-string "
+      "blacklist, and pins the 3D model's constants to the analysed geometry — "
+      "ALL GREEN at every release. A 5-seat cross-lineage "
+      "council reviewed physics validity, red-teamed both headline "
+      "conclusions, steel-manned the design, and re-verified all figures; its "
       "one substantive catch (registration sensitivity of the detent residual) "
-      "was settled by a fresh FE solve and is now §4's F3 trade.")
+      "was settled by a fresh FE solve and is now §4's F3 trade. The v6 "
+      "restructure took a further fresh-eyes structure/readability seat "
+      "(GLM-5.2) plus a full human-directed proofread; every accepted finding "
+      "is fixed at source, and the two rejected findings carry their reasons "
+      "in out/council-v6-structure-glm.txt.")
 
     # ---------------------------------------------------------------- §10
     outreach = os.path.join(OUT, "SUPPLIER-OUTREACH-DRAFTS.md")
@@ -1464,13 +2012,143 @@ def main():
         body = body.split("\n", 1)[1] if body.startswith("#") else body
         A(body)
 
+    # ---------------- NEW v6 sections (placed by the restructure pass) ------
+    import claims as claims_mod
+    reg = claims_mod.build()
+    c = reg["counts"]
+
+    A("")
+    A("## NEW-EXEC Executive summary — the state of play")
+    A("")
+    A("This document is the PHANTM mechatronic-antenna work package: Tony's "
+      "actuator concept and hex-cell wave conformer taken through FE-backed "
+      "physics, a ten-knob optimisation campaign, drive electronics and firmware, "
+      "manufacturing routes and named fabricators with live-verified contacts. It "
+      "is organised as a **de-risking funnel**: Part I states the concept and the "
+      "claims it rests on; Part II hardens those claims with computation, "
+      "measurement and adversarial red-teaming; Part III records every design "
+      "choice — the failures kept on the record beside the winners; Part IV says "
+      "how to make it; Part V says who can.")
+    A("")
+    A("**The headline numbers (≈70 GHz operating point):**")
+    A("")
+    A("| Quantity | Value | Hardened where |")
+    A("|---|---|---|")
+    A("| Zero-power detent, fixed design (as-drawn registration) | 7.72 mN = 5.0 g | §4 |")
+    A("| BALANCED optimised set (worst-registration margin) | 14.6/11.0 g at 37 mJ/step | §10.2 |")
+    A("| Cell cutoff (interior 3.10 mm, measured) | fc = 53.56 GHz; full 2π from ≈57.4–58.0 GHz | §9.2 |")
+    A("| Phase quantisation at 70 GHz | 16.7°/step, 21 levels per 2π | §9.2 |")
+    A("| Unit cost at ≈10 M/yr | $0.10–0.25 (process-dominated) | §5 |")
+    A("")
+    A(f"**The claims register** (the funnel's spine, closing Part I) holds {reg['total']} "
+      f"load-bearing claims: {c['PROVEN-FE']} PROVEN-FE, {c['PROVEN-calc']} "
+      f"PROVEN-calc, {c['RED-TEAMED']} RED-TEAMED, {c['MEASURED']} MEASURED, "
+      f"{c['TESTED']} TESTED, {c['ESTIMATE']} ESTIMATE — with "
+      f"**{reg['open_gates']} open gates** ("
+      + "; ".join(reg.get("open_gate_labels", []))
+      + f") and {reg['external_inputs']} items awaiting an "
+      "external input or ruling.")
+    A("")
+    A("**Recommended first hardware — Prototype-A**: the ORIGINAL 5 g design with "
+      "unipolar drive. Zero open gates stand in its way, every part is orderable "
+      "now, and it delivers the single highest-value measurement in the "
+      "programme — a real force curve to collapse the FE residual — while the "
+      "optimised sets clear their gates in parallel.")
+    A("")
+    A("**Who can build it**: 24 fabricators with live-verified contacts (ten "
+      "actuator, fourteen cell) and ready-to-send request-for-quotation annexes "
+      "A–E — all in Part V. Cost band $0.10–0.25/actuator at ≈10 M/yr, "
+      "process-dominated.")
+    A("")
+    A("**Decision queue by owner:**")
+    A("")
+    A("- **Tristan** — send the fabricator RFQs (§13 + Annex E); UKDI Stage-1 bid tightenings (deadline 28 Jul 12:00).")
+    A("- **Tony** — gap 20-vs-30 ruling; vibration envelope (hold-vs-shock sizing); registration knob; pole-spacing/tooth-profile ruling; full technical question detail in §7.")
+    A("- **Vlad** — metallised-cell cutoff + loss budget; foil-edge choke; array pitch budget (how much wall-thickening headroom, §9.9); moulding-seam RF check.")
+    A("- **Engineering (us)** — demagnetisation FE (unlocks dual drive); transient eddy FE; vent tolerance sweep; PCB layout on the decided atopile→KiCad→FreeRouting stack; 3D FE or prototype force curve.")
+    A("")
+
+    A("## NEW-CLAIMS The claims register — every load-bearing assumption, its status and its evidence")
+    A("")
+    A("The spine of this report. Each claim's status names HOW it was hardened "
+      "(PROVEN-calc = closed-form, verifier-recomputed every run; PROVEN-FE = "
+      "validated nonlinear finite elements; MEASURED = from Tony's delivered "
+      "artefacts; TESTED = compiled and executed under CI gates; RED-TEAMED = "
+      "survived a named adversarial attack; ESTIMATE = honest band). The residual "
+      "column names what would still have to be true — and WHO owns closing it. "
+      "A blank residual would be a lie; \"closed\" is a statement.")
+    A("")
+    A("| # | Claim | Status | Evidence | Residual risk / owner |")
+    A("|---|---|---|---|---|")
+    for i, r in enumerate(reg["rows"], 1):
+        A(f"| {i} | {r['claim']} | **{r['status']}** | {r['evidence']} | {r['residual']} |")
+    A("")
+    A(f"Register generated by claims.py; counts ({reg['total']} claims, "
+      f"{reg['open_gates']} open gates) are pinned by the deterministic verifier "
+      "so the register cannot silently rot.")
+    A("")
+
     path = os.path.join(OUT, "PHANTM-ACTUATOR-REPORT.md")
     text = "\n".join(L) + "\n"
     # '~' pairs render as strikethrough in GFM — use '≈' for approximations
     text = text.replace("~", "≈")
+    # ---------------- v6 structure pass (the de-risking funnel) -------------
+    from restructure import restructure
+    # ---- v7 split (Tony, 26 Jul): current-state report + companion archive --
+    # "A report that had no history in it, but only analyses and info about the
+    # most recent iteration of design." Two files, same section numbers, so a
+    # cross-reference from one still lands in the other.
+    from restructure import ARCHIVE, CURRENT
+
+    changelog = [
+        "> **What is new in this issue** — so nothing here needs re-reading to "
+        "find the change.",
+        ">",
+        "> - **This report no longer carries its own history.** Everything "
+        "tried-and-killed, the optimisation campaign narrative, manufacturing "
+        "routes, fabricators and supplier outreach have moved to a companion "
+        "archive. Section numbers are unchanged, so a reference to §19 still "
+        "means §19 — it is just in the other file. This document is the latest "
+        "design and what is known about it, and nothing else.",
+        "> - **Three engineering gates closed** (open gates 5 → 1). "
+        "Demagnetisation (§14.4): the cancel coil does **not** demagnetise its "
+        "own magnet — 3.4× and 2.8× margin, and the magnet's own 80 °C rating "
+        "binds 60 K before demagnetisation does, so dual-coil drive is cleared. "
+        "Eddy currents (§14.5): solid unlaminated parts do pass flux inside the "
+        "pulse, but at 3.4× at the pessimistic corner, not the comfortable "
+        "margin the earlier estimate implied — the earlier estimate had been "
+        "made on SMC, which is no longer the process. Vent tolerance (§14.7): "
+        "**Ø0.15 mm is not robust** — the robust figure is Ø0.138 ±0.003 mm.",
+        "> - **One new action, and it is cheap.** The vent tolerance is being "
+        "eaten almost entirely by the orifice discharge coefficient. Measuring "
+        "it on a foil coupon widens the tolerance sevenfold, to a routine part. "
+        "Worth doing before any damper hardware is ordered.",
+        "> - **Driver electromagnetic-compatibility rules specified** (§13.1), "
+        "which closes the last open requirement on the electronics side.",
+        "> - Only the stamped-lamination sheared-edge coupon remains open, and "
+        "it needs a physical supplier part rather than more analysis.",
+    ]
+
+    cur = restructure(
+        text,
+        "PHANTM — the actuator and hex-cell work package: current design and "
+        "analysis (v7 — no history; the tried-and-killed record, manufacturing "
+        "routes and fabricator work are in the companion archive)",
+        doc=CURRENT, preamble_extra=changelog)
+    arc = restructure(
+        text,
+        "PHANTM — companion archive: the optimisation campaign, what was "
+        "killed, how to manufacture it and who can (v7 — section numbers match "
+        "the current-design report; nothing here is needed to read that one)",
+        doc=ARCHIVE)
+
     with open(path, "w") as f:
-        f.write(text)
-    print(f"wrote {path} + figures")
+        f.write(cur)
+    apath = path.replace("PHANTM-ACTUATOR-REPORT.md", "PHANTM-ARCHIVE.md")
+    with open(apath, "w") as f:
+        f.write(arc)
+    print(f"wrote {path} ({len(cur.splitlines())} lines, current design only)")
+    print(f"wrote {apath} ({len(arc.splitlines())} lines, history + manufacture)")
 
 
 if __name__ == "__main__":

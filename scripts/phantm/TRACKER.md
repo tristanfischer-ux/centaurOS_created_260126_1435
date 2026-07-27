@@ -103,11 +103,41 @@ harmonic permeance P = P0 + P1·(cosθ + k3·cos3θ)/(1+k3), k3 = 1/9 triangle s
   precision-assembly penalty → $0.10 only ≥100M/yr optimistic. Tolerance stack is the
   driver: dF/dg ≈ −8%/µm → ±5 µm scatter = ±40% force ⇒ active gap-setting needed.
 
+## Engineering gates — 2026-07-26 (open gates 5 → 1)
+| Gate | Verdict | Artefact |
+|---|---|---|
+| Demagnetisation FE (BLOCKED dual drive) | **CLEARED** — worst reverse field 238/269 kA/m vs knees 812/745 kA/m at 20 °C (3.4×/2.8×); demag limits 140/129 °C vs the grades' own 80 °C ratings, so the thermal rating binds 60/49 K first. Holds in 9/9 assumption corners. | `out/demag-fe.json`, report §14.4 |
+| Transient eddy FE (no-laminations claim) | **HOLDS at 3.4×, not comfortably** — original <10× flag was justified. Slowest path = translator core (as guessed). τ 21 µs saturated / 445 µs pessimistic; 96.6% flux = 93% force at pulse end worst case. Estimate had been made on SMC, which was killed as a process; retested on solid Fe-3%Si (850× more conductive). | `out/eddy-fe.json`, report §14.5 |
+| Vent tolerance sweep | **CLOSED, with an action** — Ø0.15 is NOT robust (fails 2/11 corners at high Cd). Robust = Ø0.138 ±0.003 mm (±2%, demanding). Cd carries nearly all of it: **measure Cd on a foil coupon → Ø0.140 ±0.020 mm, 7× looser and routine.** | `out/opt/vent-tolerance.json`, report §14.7 |
+| Driver-EMC layout rule | **SPECIFIED** — drive spectrum 4.3 decades / 171 dB below 60 GHz, so in-band radiation is not a mechanism; 6 rules each with a verification method. EMC-4 (zero coil current at hold) is the one that defends the LPI claim. | `out/emc-spec.json`, report §13.1 |
+| Stamped-lamination sheared edge | **STILL OPEN** — needs a physical supplier coupon; cannot be closed by computation. | — |
+
+Method notes worth keeping: both FE gates required a metric that the obvious
+one would have got wrong. Demag needed POINT probes inside the magnet (the
+block average under-reads the worst by 15%); eddy needed interior |B| probes
+because terminal flux linkage is nearly blind in a gapped circuit — and its
+first cut turned "no corner found" into a flattering 576× margin via a
+fallback. Both metrics are now validated against closed-form cases before they
+are allowed to rule (`slab_validation`, and the fast-integrator check in the
+vent gate). Selftest 50/50 pins every verdict.
+
+## Decision packs ready to send (2026-07-26)
+- `out/PHANTM-QUESTIONS-TONY.md` — 7 items: working gap 20-vs-30, hold-vs-survive
+  vibration, pole spacing, tooth profile, peak temperature (now a grade lookup off
+  the demag gate), drive rail, bearing/frame cross-section. Each with what it
+  unblocks, options with our numbers, our recommendation, and the default we
+  proceed on if there is no reply.
+- `out/PHANTM-QUESTIONS-VLAD.md` — 5 items: metallised-cell cutoff + loss budget,
+  foil-edge clearance/choke, array pitch growth budget, moulding bond seam,
+  reflector standoff.
+
 ## Blockers
 - RESOLVED 2026-07-24: all work pushed to origin/oxccu-efuel (086c8051a..08ee37b6f) with the
   full gate suite green under Node 22. Worktree needs: node_modules + .venv symlinked from
   the oxccu checkout, and pushes run with PATH=/opt/homebrew/opt/node@22/bin:$PATH
   (better-sqlite3 native module is built for Node 22, not system Node 25).
+- 2026-07-26: `phantm-work` confirmed fully pushed (== origin/oxccu-efuel); the earlier
+  "7 local commits classifier-blocked" tracker line was stale and is removed.
 
 ## Open questions to Tony (running list, → report §9)
 1. Brief §9 Q1–Q4 (reflector mass, Fd intent, orientation, temp/drive voltage).
@@ -133,5 +163,5 @@ pre-commit hook). Use `python -m pip` for installs (relocated-venv shebangs).
 | Excel: derived λc + interior/pitch lattice rows | ✅ v4.4 |
 | OPEN: Vlad items — standoff distance, foil-edge clearance/choke, metallised-cell λc confirm | ⏳ external |
 | OPEN: vibration envelope from Tony → hold-force spec (§9.4 row 4) | ⏳ external |
-| OPEN: push 7 local commits to origin (classifier-blocked) | ⏳ Tristan |
+| ~~push local commits to origin~~ | ✅ done — branch is level with origin/oxccu-efuel |
 | v4.5: D5/D6 CAD + 3D hexcell render + drive PCB power/control + cell tutorial + 14 verified suppliers + Annex E emails | ✅ committed |

@@ -141,8 +141,145 @@ def main() -> int:
     check("detent curve spike-free (max 2nd difference < 1.0·peak)",
           spike < 1.0 * np.abs(fdet).max(), f"2nd-diff {spike*1e3:.2f} mN")
 
-    # report-consistency guard (deterministic; skips if the report isn't built)
+    # --- NdFeB knee / demagnetisation model (the dual-drive gate) ----------
+    # These guard the ACCEPTANCE side of the demag gate, which is the half the
+    # FE cannot check itself: FEMM's magnet is a linear recoil line with no
+    # knee, so nothing in the solve would ever complain about an operating
+    # point past it.
+    n42 = NdFeBMaterial(br_t=1.30, grade="N42")
+    check("NdFeB Hcj derates ~5x faster than Br",
+          abs(n42.hcj_at(120) / n42.hcj_at(20)) < abs(n42.br_at(120) / n42.br_at(20)),
+          f"Hcj {n42.hcj_at(120)/1e3:.0f} vs {n42.hcj_at(20)/1e3:.0f} kA/m, "
+          f"Br {n42.br_at(120):.3f} vs {n42.br_at(20):.3f} T")
+    check("knee sits below Hcj (squareness < 1)",
+          0.5 < n42.h_knee_at(20) / n42.hcj_at(20) < 1.0,
+          f"{n42.h_knee_at(20)/n42.hcj_at(20):.2f}")
+    check("Hcj clamps at zero rather than going negative",
+          n42.hcj_at(1000) == 0.0)
+    # t_max_reversible must be monotone DECREASING in the applied reverse
+    # field: a harder push must never buy a higher temperature.
+    t_soft = n42.t_max_reversible(150e3)
+    t_hard = n42.t_max_reversible(400e3)
+    check("hotter limit for a weaker reverse field (monotone)", t_soft > t_hard,
+          f"{t_soft:.0f} °C at 150 kA/m vs {t_hard:.0f} °C at 400 kA/m")
+    check("N52 has lower coercivity than N42 (the remanence/coercivity trade)",
+          NdFeBMaterial(br_t=1.45, grade="N52").hcj_at(20) < n42.hcj_at(20),
+          f"{NdFeBMaterial(br_t=1.45, grade='N52').hcj_at(20)/1e3:.0f} vs "
+          f"{n42.hcj_at(20)/1e3:.0f} kA/m")
+    # Artefact guard: if the demag gate has been run, its headline verdict is
+    # pinned here so a geometry or drive-current change that silently pushes
+    # the magnet past its knee fails the build rather than shipping.
+    import json as _json
     import os as _os
+    _dg = _os.path.join(_os.path.dirname(__file__), "out", "demag-fe.json")
+    if _os.path.exists(_dg):
+        _d = _json.load(open(_dg))
+        for _c in _d["configs"]:
+            _work = next(x for x in _c["ceilings"]
+                         if x["grade"] == _c["workhorse_grade"])
+            check(f"demag gate: {_c['name']} specified grade "
+                  f"{_c['workhorse_grade']} is thermally bound, not demag-bound",
+                  _work["binding"] == "grade thermal rating",
+                  f"ceiling {_work['usable_ceiling_c']} °C "
+                  f"(catalogue {_work['t_max_catalogue_c']}, "
+                  f"demag {_work['t_max_reversible_c']})")
+            check(f"demag gate: {_c['name']} verdict survives every "
+                  f"assumption corner",
+                  _c["workhorse_corners_clear"][0] == _c["workhorse_corners_clear"][1],
+                  f"{_c['workhorse_corners_clear'][0]}/"
+                  f"{_c['workhorse_corners_clear'][1]} corners")
+            # The point-probe design decision itself: if worst and mean ever
+            # coincide the grid has collapsed and the gate is measuring the
+            # wrong statistic.
+            check(f"demag gate: {_c['name']} worst-in-slug exceeds the mean "
+                  f"(point probes are doing real work)",
+                  _c["worst_vs_mean_cold"]["ratio"] > 1.02,
+                  f"{_c['worst_vs_mean_cold']['ratio']}x")
+
+    # --- eddy-current gate (the no-laminations claim) ----------------------
+    _eg = _os.path.join(_os.path.dirname(__file__), "out", "eddy-fe.json")
+    if _os.path.exists(_eg):
+        _e = _json.load(open(_eg))
+        # The METHOD gate: the metric must reproduce the closed-form slab
+        # solution or it does not get to rule on tooling.
+        check("eddy gate: metric reproduces the closed-form slab solution",
+              all(v["ok"] for v in _e["slab_validation"]),
+              "; ".join(f"{v['f_hz']:.0f} Hz {v['rel_error']*100:.1f}%"
+                        for v in _e["slab_validation"]))
+        # Diffusion time must scale with permeability. If this ever goes flat,
+        # the solve has stopped seeing the steel (which is exactly how the
+        # first, wrong version of this gate looked).
+        _mim = [r for r in _e["rows"] if r["sigma_ms"] > 0.01]
+        _lo = min(_mim, key=lambda r: r["mu_r"])
+        _hi = max(_mim, key=lambda r: r["mu_r"])
+        check("eddy gate: diffusion time rises with permeability",
+              _hi["tau_ms"] > 3.0 * _lo["tau_ms"],
+              f"tau {_lo['tau_ms']*1e3:.1f} µs at µr {_lo['mu_r']} → "
+              f"{_hi['tau_ms']*1e3:.1f} µs at µr {_hi['mu_r']}")
+        _w = _e["worst_buildable"]
+        check("eddy gate: flux clears the pulse on the worst buildable route",
+              _w["margin_pulse_over_tau"] > 2.0
+              and _w["force_fraction_at_pulse_end"] > 0.90,
+              f"{_w['margin_pulse_over_tau']}× margin, flux "
+              f"{_w['penetration_at_pulse_end']*100:.2f}%, force "
+              f"{_w['force_fraction_at_pulse_end']*100:.1f}% at pulse end")
+        # The verdict must be computed on a route that will actually be built.
+        # SMC is ~850x less conductive and was killed as a process; if it ever
+        # became the worst case the study would be self-flattering.
+        check("eddy gate: verdict is set by a buildable route, not by SMC",
+              "SMC" not in _w["material"], _w["material"])
+
+    # --- vent tolerance gate ----------------------------------------------
+    _vt = _os.path.join(_os.path.dirname(__file__), "out", "opt",
+                        "vent-tolerance.json")
+    if _os.path.exists(_vt):
+        _v = _json.load(open(_vt))
+        # METHOD gate: the fast integrator must reproduce the reference one,
+        # or every tolerance number downstream is meaningless.
+        check("vent gate: fast integrator reproduces damper.simulate",
+              all(r["ok"] for r in _v["validation"]),
+              f"{sum(r['ok'] for r in _v['validation'])}/"
+              f"{len(_v['validation'])} cases match")
+        # The robust band must be a strict subset of the nominal one. If they
+        # ever coincide, the corners have stopped biting and the sweep is
+        # measuring nominal twice.
+        _nb, _rb = _v["nominal_band_mm"], _v["robust_band_mm"]
+        check("vent gate: uncertainty corners actually narrow the band",
+              _rb is not None and (_rb[1] - _rb[0]) < (_nb[1] - _nb[0]),
+              f"nominal {_nb} → robust {_rb}")
+        # The specified centre must sit inside the robust band it came from.
+        _sp = _v["specification"]
+        check("vent gate: specified centre lies inside the robust band",
+              _rb[0] <= _sp["centre_mm"] <= _rb[1],
+              f"Ø{_sp['centre_mm']} in {_rb}")
+        if _v.get("cd_pinned_specification"):
+            _cd = _v["cd_pinned_specification"]
+            check("vent gate: discharge coefficient is the dominant "
+                  "uncertainty (measuring it buys real tolerance)",
+                  _cd["tolerance_mm"] > 2.0 * _sp["tolerance_mm"],
+                  f"±{_sp['tolerance_mm']*1e3:.0f} µm → "
+                  f"±{_cd['tolerance_mm']*1e3:.0f} µm with Cd measured")
+
+    # --- driver EMC specification -----------------------------------------
+    _es = _os.path.join(_os.path.dirname(__file__), "out", "emc-spec.json")
+    if _os.path.exists(_es):
+        _e2 = _json.load(open(_es))
+        _sp2 = _e2["spectrum"]
+        check("EMC spec: drive spectrum is decades below the operating band",
+              _sp2["decades_to_band"] > 3.0
+              and _sp2["attenuation_to_band_db"] > 100,
+              f"{_sp2['decades_to_band']} decades = "
+              f"{_sp2['attenuation_to_band_db']:.0f} dB")
+        check("EMC spec: every rule carries a verification method",
+              all(r.get("verify", "").strip() and r.get("why", "").strip()
+                  for r in _e2["rules"]),
+              f"{len(_e2['rules'])} rules")
+        # The rule that defends the LPI claim must exist by name — the others
+        # are hygiene, this one IS the property being sold.
+        check("EMC spec: the silent-hold rule is present",
+              any("hold" in r["title"].lower() for r in _e2["rules"]))
+
+    # report-consistency guard (deterministic; skips if the report isn't built)
     if _os.path.exists(_os.path.join(_os.path.dirname(__file__), "out",
                                      "PHANTM-ACTUATOR-REPORT.md")):
         import subprocess as _sp
