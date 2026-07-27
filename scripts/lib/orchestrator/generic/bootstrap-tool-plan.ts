@@ -95,6 +95,7 @@
  */
 
 import Database from 'better-sqlite3'
+import { createHash } from 'crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
@@ -924,6 +925,13 @@ export function assertCandidateSlug(slug: string): void {
 interface CandidateRow { id: number; slug: string; version: number; plan_json: string; status: string }
 
 /** Newest stored candidate for a slug (any status), or null. Read-only. */
+/** `<class>__<8hex of application>`; bare class when there is no application. */
+export function scopeToolPlanSlugByApplication(baseSlug: string, application?: string): string {
+  const app = String(application ?? '').trim().toLowerCase()
+  if (!app) return baseSlug
+  return `${baseSlug}__${createHash('sha1').update(app).digest('hex').slice(0, 8)}`
+}
+
 export function latestCandidate(slug: string, dbPath: string = FORGE_TRUTH_DB): CandidateRow | null {
   assertCandidateSlug(slug)
   if (!existsSync(dbPath)) return null
@@ -2033,6 +2041,17 @@ export async function bootstrapToolPlan(
   // Normalise hyphens (genericEnvelope hyphenates non-minted novel slugs) to the
   // candidate-store alphabet, then validate at the boundary.
   const slug = String(rawSlug ?? '').trim().toLowerCase().replace(/-/g, '_')
+  // THIRD CLASS-KEYED STORE (2026-07-27). Same defect as class_graph_candidates and
+  // tool_creation_proposals: the plan is stored per CLASS, so the first product in a class
+  // fixes the tool plan for every later one. A benchtop battery cell cycler classified
+  // `consumer_electronics` reused version=2 of an RPM appliance's 20-step plan and was
+  // handed industrial refrigeration (shell-and-tube heat exchanger, evaporator and
+  // condenser coils) for a desk-sized Peltier bay.
+  //
+  // Scope the STORE KEY by the envelope's own `application` only — `slug` itself still
+  // names the class everywhere else, so nothing downstream sees a hashed name. A genuine
+  // re-run of the same product still reuses and stays deterministic.
+  const storeKey = scopeToolPlanSlugByApplication(slug, envelope?.application)
   if (!SLUG_RE.test(slug)) {
     return { ok: false, slug, attempts: 0, stage: 'invalid-slug', validation_errors: [], error: `slug "${rawSlug}" does not sanitise to /^[a-z0-9_]{1,64}$/` }
   }
@@ -2073,7 +2092,7 @@ export async function bootstrapToolPlan(
   // properties of the PLAN, stable across runs. A genuine registry drift (a tool
   // removed / a field renamed) still fails V1/V2 → regenerate. This is what makes
   // reuse byte-deterministic: same stored plan → re-validates → reused identically.
-  const prior = latestCandidate(slug)
+  const prior = latestCandidate(storeKey)
   if (prior) {
     try {
       const v = validateToolPlanSpec(JSON.parse(prior.plan_json), [], [])
@@ -2342,7 +2361,7 @@ export async function bootstrapToolPlan(
     // (f) Candidate store — row stays 'candidate'; the run consumes in-memory.
     let candidate: { id: number; version: number; status: string }
     try {
-      candidate = storeCandidate(slug, finalSpec, { selected_tool_ids: order, attempts })
+      candidate = storeCandidate(storeKey, finalSpec, { selected_tool_ids: order, attempts })
     } catch (err) {
       return {
         ok: false, slug, attempts, stage: 'candidate-store', validation_errors: [],

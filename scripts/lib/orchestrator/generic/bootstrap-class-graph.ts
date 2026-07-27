@@ -45,6 +45,7 @@
  */
 
 import Database from 'better-sqlite3'
+import { createHash } from 'crypto'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
@@ -435,6 +436,16 @@ function openCandidateDb(dbPath: string = FORGE_TRUTH_DB): Database.Database {
 }
 
 /** Boundary validation BEFORE any DB use (security item 18 pattern). */
+/** `<class>__<8hex of application>` — see the note in bootstrapClassGraph. Falls back to
+ *  the bare class when the envelope carries no application, which preserves the old
+ *  behaviour rather than inventing a key. */
+export function scopeSlugByApplication(baseSlug: string, application?: string): string {
+  const app = String(application ?? '').trim().toLowerCase()
+  if (!app) return baseSlug
+  const fp = createHash('sha1').update(app).digest('hex').slice(0, 8)
+  return `${baseSlug}__${fp}`
+}
+
 export function assertCandidateSlug(slug: string): void {
   if (typeof slug !== 'string' || !SLUG_RE.test(slug)) {
     throw new Error(`[bootstrap-class-graph] candidate-store input rejected: ${JSON.stringify({
@@ -506,13 +517,32 @@ export async function bootstrapClassGraph(
 ): Promise<ClassGraphBootstrapResult> {
   // Normalise hyphens (genericEnvelope hyphenates non-minted novel slugs) to
   // the candidate-store alphabet, then validate at the boundary.
+  // FUNCTION-SCOPED SLUG (2026-07-27). The candidate store is keyed on the class slug
+  // alone, so the FIRST product in a class permanently defines the module skeleton for
+  // every later product in it. Observed live: a benchtop battery cell cycler classified
+  // `consumer_electronics` reused candidate_id=13 (9 nodes / 15 edges, reused=true) that
+  // had been bootstrapped for a microgravity RPM appliance, and inherited an
+  // actuation_kinematics module with a 2-axis gimbal "to time-average gravity", a
+  // mass_fluid_transport_process module with a perfusion pump, and fluorescence imaging.
+  // The skeleton critic scored it 1/10 and called it unrecoverable.
+  //
+  // This directly contradicts the engine's own AIM — universal, any/unknown archetype.
+  // A class is a SHAPE hint, not a design: two products that share a class can be
+  // functionally unrelated. Scoping the stored graph by the envelope's own `application`
+  // means a functionally different product bootstraps its OWN graph, while a genuine
+  // re-run of the same product still reuses and stays deterministic (the reason the
+  // store exists).
   const slug = String(rawSlug ?? '').trim().toLowerCase().replace(/-/g, '_')
-  if (!SLUG_RE.test(slug)) {
+  // Scope only the STORE KEY, never `slug` itself: `slug` also becomes the graph's own
+  // product_class (below) and is what validation checks, so rewriting it would leak a
+  // hashed name into the graph's semantics and into any downstream class lookup.
+  const storeKey = scopeSlugByApplication(slug, envelope?.application)
+  if (!SLUG_RE.test(slug) || !SLUG_RE.test(storeKey)) {
     return { ok: false, slug, attempts: 0, stage: 'invalid-slug', validation_errors: [], error: `slug "${rawSlug}" does not sanitise to /^[a-z0-9_]{1,64}$/` }
   }
 
   // (0) Reuse: a previously stored candidate makes re-runs free + deterministic.
-  const prior = latestCandidate(slug)
+  const prior = latestCandidate(storeKey)
   if (prior) {
     try {
       const v = validateBootstrapGraph(JSON.parse(prior.graph_json), slug)
@@ -568,7 +598,7 @@ export async function bootstrapClassGraph(
     // (d) G1 candidate store — row stays 'candidate'; the run consumes in-memory.
     let candidate: { id: number; version: number; status: string }
     try {
-      candidate = storeCandidate(slug, v.graph)
+      candidate = storeCandidate(storeKey, v.graph)
     } catch (err) {
       return {
         ok: false, slug, attempts, stage: 'candidate-store', validation_errors: [],
