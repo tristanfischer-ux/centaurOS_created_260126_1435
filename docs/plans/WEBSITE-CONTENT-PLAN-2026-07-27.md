@@ -76,44 +76,34 @@ The footprints carry no 3D component models, so the render shows pads, traces an
 
 ---
 
-## 5. Proposed content
+## 5. Proposed content — IMAGES ONLY (revised 2026-07-27)
 
-### 5.1 New section — "One product, end to end" *(highest value)*
+**Decision (Tristan):** *"Maybe we are setting ourselves up for failure by putting this there. Can't we just have some images of various machines which it does, some PCB boards, but don't necessarily show the brief or the documentation or anything like that, and don't have the Excel spreadsheet?"*
 
-The single most persuasive thing we have is **one product shown at every stage**. Not a gallery — a sequence:
+Adopted. **No workbook, no brief, no documentation on the site.** Images only.
 
-1. **Exterior render** — what it looks like
-2. **Translucent cutaway** — every internal component, in place
-3. **GA drawing** — the same geometry, dimensioned, ISO A1
-4. **PCB** — the board inside it, routed and fab-ready
-5. **BoM extract** — real manufacturer part numbers and prices
-6. **Rotate it yourself** — the embedded 3D model
+### Why this is the right call, with evidence
 
-The argument this makes without a word of copy: *the render, the drawing, the board and the costs are the same object.* That is the actual product, and no competitor can show it because most "AI hardware design" output is a picture with a plausible parts list underneath.
+Publishing the workbook would make **every cell of 28 tabs a publishing surface**, policed forever. That is not theoretical: scrubbing one word out of the workbook today took the dossier floor from **9/10 to 0/10**, because a blanket string replacement hit PCB net identifiers as well as prose. The word survived in five more cells regenerated from cached artefacts I had not touched.
 
-Caption it with the honest provenance line: **"Blender scene → parts manifest → drawing → bill of materials. One geometry, four artefacts."**
+An image has ONE surface — what you can see in it. A spreadsheet has thousands, and they regenerate.
 
-### 5.2 New section — PCB & firmware
+### What goes on the site
 
-Currently claimed nowhere. Copy to write:
+1. **Product renders** — the machines. Exterior three-quarter, plus the translucent cutaway showing the internals. These carry no text at all.
+2. **PCB renders** — the boards, from `kicad-cli`. Bare fab-ready boards; no silkscreen product names visible at the sizes we would publish, but **check each render before it ships** (see §4d).
+3. **Interactive 3D model** — optional, high impact, still text-free.
 
-- schematic capture → layout → autoroute → DRC → gerbers, per board
-- 3 boards on this one instrument
-- fab-ready output; **honest status line: "FAB-READY — UNPROVEN IN HARDWARE"** until a board is populated and the firmware proof runs on it
+### What does NOT go on the site
 
-That last line is a differentiator, not a weakness. Everyone else's AI hardware demo implies more than it has built; stating the limit is the credibility play, and it matches the language already in the workbook.
+- the Excel workbook, or any screenshot of it
+- the brief, or any quotation from it
+- GA drawings **unless the title block is checked** — drawings carry a title block with product name, part names and a schedule, so they are a text surface like the workbook, just smaller. If we want one, crop to the drawing body and away from the title block, or regenerate it with a neutral title.
+- BoM extracts (real part numbers are fine; the surrounding prose is the risk)
 
-### 5.3 Replace the hero illustration
+### The copy carries the claims, the images carry the proof
 
-The AI-generated hero is the weakest image on the site — it is decorative, and everything around it is real. Replace with the organoid hero render (or the reference design, per §4a). Real beats illustrative when the whole pitch is "we actually build things".
-
-### 5.4 Breadth strip
-
-Six thumbnails: bioreactor, colorimeter, potentiostat, syringe pump, thermocycler, plant. Caption: *"one engine, from a 20 ml benchtop instrument to a 40-tonne process plant."* Answers "will this work for MY product?" without a paragraph.
-
-**Caveat:** only the organoid is at 9/10 with a current render set. The others were baked 07-12→19 and several are missing views. They need re-baking before they are shown — the contract-completeness fix I landed this morning will force that automatically on the next build of each.
-
----
+The site already states the numbers well (231 tools, 36,000 parts, £20k–£40k compressed). It does not need a spreadsheet to prove them — it needs to look like the work of people who build machines. Renders and boards do that; a screenshot of a spreadsheet does not.
 
 ## 6. Sequence
 
