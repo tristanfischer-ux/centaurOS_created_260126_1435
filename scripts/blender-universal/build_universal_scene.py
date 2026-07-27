@@ -6635,18 +6635,24 @@ def build_parts_manifest(parts):
     # was actually drawn — one source, no reconstruction. Noun-keyed on the role token and
     # the part name, never a product class; a design with no such mesh is untouched.
     try:
+        # (mesh-prefix, part-noun, signature_family). The FAMILY decides whether a row may
+        # claim containment exemption — see _ABOVE_LID_EXEMPT_FAMILIES. An HMI fascia is a
+        # real signature feature but it lives INSIDE the shell and must never be exempt.
         _SIG_ALIAS = (
-            ("u_se_le_vial_collar", r"collar|holder|sample\s*port|vial\s*holder"),
-            ("u_se_le_vial",        r"culture\s*vessel|\bvial\b|bioreactor\s*vessel"),
+            ("u_se_le_vial_collar", r"collar|holder|sample\s*port|vial\s*holder",
+             "vessel_collar"),
+            ("u_se_le_vial",        r"culture\s*vessel|\bvial\b|bioreactor\s*vessel",
+             "vessel"),
             ("u_se_le_od",          r"optical\s*density|\bod\b.*sensor|photodiode|"
-                                    r"led\s*source"),
-            ("u_se_le_face",        r"display|hmi|front\s*panel|fascia|keypad|user\s*input"),
+                                    r"led\s*source", "od_sensor"),
+            ("u_se_le_face",        r"display|hmi|front\s*panel|fascia|keypad|user\s*input",
+             "hmi_fascia"),
         )
         _sig_names = [n for n in _ABOVE_LID_SIGNATURE_MESHES]
         if _sig_names:
             _n_alias = 0
             _consumed: set = set()   # a mesh belongs to ONE family — the table is ordered
-            for _mesh_pref, _part_rx in _SIG_ALIAS:
+            for _mesh_pref, _part_rx, _sig_fam in _SIG_ALIAS:
                 _mm = [n for n in _sig_names
                        if n.startswith(_mesh_pref) and n not in _consumed]
                 if not _mm:
@@ -6675,7 +6681,7 @@ def build_parts_manifest(parts):
                         continue
                     _pf = _part_prefix(_p.name)
                     bbox_by_pref[_pf] = _acc      # the DRAWN geometry wins
-                    _SIG_ALIASED_PREFIXES.add(_pf)
+                    _SIG_ALIASED_PREFIXES[_pf] = _sig_fam
                     try:
                         _p.placed_xyz_mm = ((_acc[0]+_acc[1])/2.0,
                                             (_acc[2]+_acc[3])/2.0,
@@ -7455,9 +7461,23 @@ def write_parts_manifest(out_dir, parts, state=None):
     rows = build_parts_manifest(parts)
     # Stamp provenance on every row that took its geometry from a drawn
     # signature mesh, so the containment gate exempts a real on-top feature.
+    # SCOPED CONTAINMENT EXEMPTION (SOL audit item 2, 2026-07-27). The blanket
+    # `exterior_signature_mesh` stamp was over-broad: it exempted 10 rows of which SEVEN
+    # were ordinary INTERIOR parts (HMI display, 3 buttons, indicator, port, fascia — all
+    # below the 408 mm lid). A mis-aliased interior component could therefore escape shell
+    # containment merely by carrying a broad source string. Only the narrow physical
+    # above-lid families may claim the exemption; everything else records its provenance
+    # WITHOUT an exemption claim.
     for _r in rows:
-        if str(_r.get('tag') or '') in _SIG_ALIASED_PREFIXES:
-            _r['geometry_source'] = 'exterior_signature_mesh'
+        _fam_r = _SIG_ALIASED_PREFIXES.get(str(_r.get('tag') or ''))
+        if _fam_r is None:
+            continue
+        _r['geometry_source'] = 'registered_signature_component_mesh'
+        _r['signature_family'] = _fam_r
+        _r['entity_type'] = 'bom_component'
+        if _fam_r in _ABOVE_LID_EXEMPT_FAMILIES:
+            _r['placement_intent'] = 'exterior_above_lid'
+            _r['placement_proof'] = 'signature_mesh_family_join_v1'
     # ROWS FOR SIGNATURE MESHES WITH NO BoM PART (2026-07-26, completes "one scene").
     # The alias above gives a BoM part its DRAWN geometry. But some real exterior features
     # have no BoM counterpart at all — the HMI display and its keypad buttons exist only as
@@ -7503,8 +7523,10 @@ def write_parts_manifest(out_dir, parts, state=None):
                     "dims_mm": {"w": round(max(max(_xs) - min(_xs), 1.0), 1),
                                 "d": round(max(max(_ys) - min(_ys), 1.0), 1),
                                 "h": round(max(max(_zs) - min(_zs), 1.0), 1)},
-                    "geometry_source": "exterior_signature_mesh",
+                    "geometry_source": "registered_signature_component_mesh",
                     "signature_family": _fam,
+                    # geometry-only feature: no BoM part, and NEVER containment-exempt.
+                    "entity_type": "geometry_feature",
                 })
                 _n_extra += 1
         if _n_extra:
@@ -17405,11 +17427,16 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
 # their protrusion is INTENTIONAL, not a stray interior prop poking through the
 # shell. Role-keyed (provenance = "emitted as an exterior signature feature"),
 # never a product-class slug or a per-product table.
+# ONLY these physical families may claim containment exemption. An HMI feature is a
+# real signature mesh but sits inside the shell — it gets provenance, never a pass.
+_ABOVE_LID_EXEMPT_FAMILIES = frozenset({"vessel", "vessel_collar", "od_sensor"})
 _ABOVE_LID_SIGNATURE_MESHES: set = set()
 # Part prefixes whose manifest geometry came from a DRAWN signature mesh — the
 # rows are stamped `exterior_signature_mesh` so G19 exempts a genuine on-top
 # feature by PROVENANCE (aafce5dd6) rather than by where it happens to land.
-_SIG_ALIASED_PREFIXES: set = set()
+# {part_prefix: signature_family} for rows whose geometry came from a DRAWN
+# signature mesh. The family is what the containment gate scopes its exemption on.
+_SIG_ALIASED_PREFIXES: dict = {}
 
 # The exterior-VISIBLE signature prefixes the sealed-product view keeps on 04–07
 # (mirrors _prepare_sealed_product_view LE `_keep` tuple ~L13348). An exterior

@@ -582,17 +582,50 @@ _THIN_PLATE_RE = re.compile(
 # that cannot catch its adversarial input is decoration (GATE INTENT RULE). Provenance is
 # the same doctrine the Blender-side containment clamp already honours: an intentional
 # exterior feature is exempt because a builder SAID SO, never because of where it landed.
-_INTENTIONAL_ABOVE_LID_SOURCES = frozenset({
-    "vessel_seat_on_top_from_signature_mesh",
-    "exterior_signature_mesh",
-    "above_lid_signature",
-})
+# SCOPED CONTAINMENT EXEMPTION (SOL audit item 2, 2026-07-27).
+#
+# The previous allow-list accepted a broad `geometry_source` string. That exempted TEN
+# rows on the organoid, of which SEVEN were ordinary INTERIOR parts (HMI display, three
+# buttons, indicator, port, front fascia — all below the 408 mm lid). Any mis-aliased
+# interior component could escape shell containment just by carrying that string: the
+# same shape of hole as the geometric above-lid exemption this gate replaced in
+# aafce5dd6, re-created one layer up.
+#
+# A part must now PROVE all of the following to be exempt:
+#   1. it is a bom_component, not a drawing-only feature;
+#   2. its geometry came from a registered signature mesh (not a proxy or a guess);
+#   3. its signature family is one of the narrow PHYSICAL above-lid families;
+#   4. the builder explicitly declared the exterior_above_lid placement intent;
+#   5. it carries the join proof recording HOW that binding was made.
+# An HMI feature satisfies (1) and (2) and is still — correctly — refused.
+_ABOVE_LID_EXEMPT_FAMILIES = frozenset({"vessel", "vessel_collar", "od_sensor"})
+_RETIRED_BLANKET_SOURCE = "exterior_signature_mesh"
 
 
 def _is_intentional_above_lid(part: dict) -> bool:
-    """True when `part` carries provenance marking it a DELIBERATE above-lid feature."""
-    src = str((part or {}).get("geometry_source") or "").strip()
-    return src in _INTENTIONAL_ABOVE_LID_SOURCES
+    """True only for a BoM component bound to a registered PHYSICAL above-lid feature."""
+    if not isinstance(part, dict):
+        return False
+    return (
+        str(part.get("entity_type") or "").strip() == "bom_component"
+        and str(part.get("geometry_source") or "").strip()
+        == "registered_signature_component_mesh"
+        and str(part.get("signature_family") or "").strip() in _ABOVE_LID_EXEMPT_FAMILIES
+        and str(part.get("placement_intent") or "").strip() == "exterior_above_lid"
+        and str(part.get("placement_proof") or "").strip()
+        == "signature_mesh_family_join_v1"
+    )
+
+
+def _retired_blanket_exemptions(parts: list) -> list:
+    """Rows still carrying the retired blanket source — a build that predates the scoping.
+
+    Reported rather than silently honoured: the old string granted an unearned pass, so a
+    manifest still using it must be re-baked, not trusted.
+    """
+    return [str(p.get("equipment_tag") or p.get("tag") or "?")
+            for p in (parts or []) if isinstance(p, dict)
+            and str(p.get("geometry_source") or "") == _RETIRED_BLANKET_SOURCE]
 
 
 def _interior_bbox_from_parts(
@@ -604,7 +637,7 @@ def _interior_bbox_from_parts(
     - the shell itself
     - thin structural plates (min dim < 20 mm — base plates, brackets)
     - parts stamped as DELIBERATE above-lid features (provenance, not geometry —
-      see _INTENTIONAL_ABOVE_LID_SOURCES); for those that straddle the lid only the
+      see _is_intentional_above_lid); for those that straddle the lid only the
       interior PORTION counts.
 
     An UNSTAMPED part sitting proud of the lid is counted IN FULL — that protrusion is
@@ -681,12 +714,23 @@ def enclosure_shell_contains_check(
     Finds the Enclosure Shell part's dims, then computes the bbox of the parts the
     shell MUST contain — excluding thin structural plates (base plates, brackets) and
     parts stamped as DELIBERATE above-lid features via `geometry_source`
-    (_INTENTIONAL_ABOVE_LID_SOURCES). An UNSTAMPED part sitting proud of the lid counts
+    (_is_intentional_above_lid). An UNSTAMPED part sitting proud of the lid counts
     IN FULL: that protrusion is the defect this gate exists to catch, so it must move the
     span rather than earn an exemption. Checks containment of THIS filtered bbox, not the
     raw pm_bbox which includes deliberate exterior features.
     Returns (passed, detail).
     """
+    # A manifest still using the RETIRED blanket source predates the exemption scoping
+    # (SOL item 2). That string handed an unearned containment pass to interior parts —
+    # 7 of 10 exempted rows on the organoid — so such a manifest is refused outright
+    # rather than re-interpreted under the new rules.
+    _retired = _retired_blanket_exemptions(parts)
+    if _retired:
+        return (False,
+                f"{len(_retired)} row(s) carry the RETIRED blanket exemption "
+                f"'{_RETIRED_BLANKET_SOURCE}' (e.g. {', '.join(_retired[:4])}) — it "
+                "granted an unearned pass to interior parts; re-bake so rows carry a "
+                "scoped signature_family + placement_intent + placement_proof")
     # Find the Enclosure Shell part
     shell_w = shell_d = shell_h = None
     shell_pos_z = 0.0
@@ -3071,8 +3115,17 @@ def _selftest() -> int:
         # DIRECTION 2 — the SAME part, stamped as a deliberate exterior feature, is
         # exempt and the gate PASSES (a real on-top vessel / optical tower must not
         # be reported as a containment breach).
+        # A genuine above-lid feature must carry the FULL proof set (SOL item 2): a
+        # bom_component, from a registered signature mesh, in a PHYSICAL above-lid family,
+        # with an explicit placement intent and the join proof.
         _g19_stamped_rows = [dict(r) for r in _g19_roof_rows]
-        _g19_stamped_rows[-1]["geometry_source"] = "above_lid_signature"
+        _g19_stamped_rows[-1].update({
+            "entity_type": "bom_component",
+            "geometry_source": "registered_signature_component_mesh",
+            "signature_family": "vessel",
+            "placement_intent": "exterior_above_lid",
+            "placement_proof": "signature_mesh_family_join_v1",
+        })
         _g19_stamped_ok, _g19_stamped_msg = enclosure_shell_contains_check(
             _g19_stamped_rows, None)
         chk("g19_stamped_above_lid_feature_exempt", _g19_stamped_ok)
@@ -3083,6 +3136,31 @@ def _selftest() -> int:
         chk("g19_thin_base_plate_still_excluded", "120×100" in _g19_stamped_msg)
         # PER-AXIS proof: the roof part violates HEIGHT specifically, not "largest dim".
         chk("g19_roof_violation_names_height_axis", "height (z)" in _g19_roof_msg)
+        # SCOPE proveCatch (SOL item 2): an HMI feature has real provenance and is still
+        # REFUSED — it lives inside the shell, so it must never buy a containment pass.
+        # This is the hole the retired blanket string opened: 7 of 10 exempted rows on the
+        # organoid were interior parts.
+        _g19_hmi_rows = [dict(r) for r in _g19_roof_rows]
+        _g19_hmi_rows[-1].update({
+            "entity_type": "bom_component",
+            "geometry_source": "registered_signature_component_mesh",
+            "signature_family": "hmi_fascia",          # real, but NOT an above-lid family
+            "placement_intent": "exterior_above_lid",  # even if it claims the intent
+            "placement_proof": "signature_mesh_family_join_v1",
+        })
+        _g19_hmi_ok, _ = enclosure_shell_contains_check(_g19_hmi_rows, None)
+        chk("g19_hmi_family_cannot_claim_exemption", not _g19_hmi_ok)
+        # A geometry-only feature is refused even in an allowed family.
+        _g19_geo_rows = [dict(r) for r in _g19_stamped_rows]
+        _g19_geo_rows[-1]["entity_type"] = "geometry_feature"
+        _g19_geo_ok, _ = enclosure_shell_contains_check(_g19_geo_rows, None)
+        chk("g19_geometry_feature_cannot_claim_exemption", not _g19_geo_ok)
+        # The retired blanket string is refused outright, not silently honoured.
+        _g19_old_rows = [dict(r) for r in _g19_roof_rows]
+        _g19_old_rows[-1]["geometry_source"] = "exterior_signature_mesh"
+        _g19_old_ok, _g19_old_msg = enclosure_shell_contains_check(_g19_old_rows, None)
+        chk("g19_retired_blanket_source_refused", not _g19_old_ok)
+        chk("g19_retired_blanket_detail_says_retired", "RETIRED" in _g19_old_msg)
         # (f) proveCatch direction 2: interior parts that GENUINELY overflow
         # still cause FAIL even with the filter active.
         _g19_overflow_rows = [
