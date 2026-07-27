@@ -119,8 +119,18 @@ def _instrument_envelope_bbox(ww: float, dd: float, hh: float) -> dict:
     }
 
 
+def _svg_attr(v) -> str:
+    """Escape a value for use inside a double-quoted SVG attribute."""
+    return (str(v or "").replace("&", "&amp;").replace('"', "&quot;")
+            .replace("<", "&lt;").replace(">", "&gt;"))
+
+
 _CANON_SHELL_RE = re.compile(
     r"\benclosure\s*shell\b|\bhousing\s*shell\b|\bcabinet\s*shell\b", re.I)
+
+
+# FFL rebase applied to every part before drawing — recorded for the projection gate.
+_PROJECTION_Z_SHIFT: dict = {"mm": 0.0}
 
 
 def _project_instrument_parts_as_placed(parts: list[GAPart]) -> bool:
@@ -162,6 +172,9 @@ def _project_instrument_parts_as_placed(parts: list[GAPart]) -> bool:
     for p in parts:
         p.z0 = float(p.z0) - _sz0
         p.z1 = float(p.z1) - _sz0
+    # Record the exact rebase so the projection gate can apply the SAME shift to a
+    # manifest row and compare like with like (SOL item 4).
+    _PROJECTION_Z_SHIFT["mm"] = _sz0
     return True
 
 
@@ -2245,6 +2258,14 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # sample-port read as boxes floating above a gap: "why are all these components just
     # floating in the middle of the air? What are they connected to?". With it the reader
     # sees the internals INSIDE the box and the exterior features seated ON its lid.
+    # VIEW DATUM (SOL item 4): everything the projection gate needs to recompute the
+    # expected rect for this view straight from the manifest — origin, scale, the model
+    # reference extents, and the FFL rebase draw_ga applied before drawing.
+    svg.add(f'<g class="projection-view-datum" data-view="front" '
+            f'data-origin-x="{front_x:.3f}" data-origin-y="{front_y:.3f}" '
+            f'data-ppm="{ppm:.6f}" data-x-min-mm="{x_min:.3f}" '
+            f'data-z-max-mm="{z_max:.3f}" '
+            f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
     _env_h = float(meta.get("envelope_hh") or 0.0)
     _env_w = float(meta.get("envelope_ww") or 0.0)
     if meta.get("is_instrument_device") and _env_h > 0 and _env_w > 0:
@@ -2260,6 +2281,13 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         px = front_x + mx(p.x0)
         py = front_y + (z_max - p.z1) * ppm
         _draw_elevation_item(svg, px, py, pw, ph, p)
+        # PROJECTION AUDIT (SOL item 4). Emitted from the SAME bounds just drawn — never
+        # re-derived — so the gate can compare the SHEET against the manifest instead of
+        # scoring the manifest alone. Invisible; carries identity + view only.
+        svg.rect(px, py, pw, ph, stroke="none", fill="none",
+                 extra=('class="manifest-projection-audit" '
+                        f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
+                        'data-view="front"'))
         # LABEL THE REAL ABOVE-LID FEATURES (2026-07-26). Now that the GA projects the
         # as-placed geometry instead of synthesized zone boxes, the sheet must NAME what
         # it draws — both so a reader can tell what is standing on the lid, and so the

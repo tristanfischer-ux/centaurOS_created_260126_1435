@@ -1454,6 +1454,25 @@ def run_gates(out_dir: str) -> list:
             _g20_detail,
         ))
 
+    # ── G23 MANIFEST -> SVG PROJECTION (SOL audit item 4, 2026-07-27) ──────────────────
+    # The only gate that reads what was DRAWN. Every other drawing gate scores the
+    # manifest and is therefore blind to a sheet that misrepresents it.
+    try:
+        _g23_svg = ""
+        _g23_p = os.path.join(out_dir, "drawings", "general-arrangement.svg")
+        if os.path.exists(_g23_p):
+            _g23_svg = open(_g23_p, encoding="utf-8", errors="replace").read()
+        _g23_ok_r, _g23_detail = manifest_svg_projection_check(_parts_for_g20, _g23_svg)
+    except Exception as _g23e:  # noqa: BLE001 — never block the gate run
+        _g23_ok_r, _g23_detail = True, f"projection gate skipped ({_g23e}) — abstain"
+    gates.append(Gate(
+        "manifest_svg_projection",
+        ["general-arrangement"],
+        "high",
+        _g23_ok_r,
+        _g23_detail,
+    ))
+
     # ── G21 PART-SET COHERENCE (2026-07-22, step-d cross-artefact geometry) ─────────────
     # The GA drawing's equipment-tag set must EQUAL the manifest principal-part set.
     # Two directions: phantom (GA has a tag absent from manifest) + dropped (manifest tag
@@ -3415,6 +3434,45 @@ def _selftest() -> int:
         _g20_dual_dims is not None
         and abs(_g20_dual_dims[0] - 180.0) < 1.0
         and abs(_g20_dual_dims[2] - 108.0) < 1.0)
+    # ── G23 proveCatch (SOL item 4, 2026-07-27) ─────────────────────────────────────
+    # A gate that only ever passes is decoration. These drive the THREE real failure
+    # modes from 2026-07-26 and assert the gate FIRES on each. The datum below is the
+    # one draw_ga emits; the "correct" rect is what the contract computes from the row.
+    _g23_datum = ('<g class="projection-view-datum" data-view="front" '
+                  'data-origin-x="100.000" data-origin-y="200.000" data-ppm="2.000000" '
+                  'data-x-min-mm="-50.000" data-z-max-mm="100.000" '
+                  'data-z-shift-mm="0.000"/>')
+    _g23_rows = [{"tag": "u_widget", "name": "Widget",
+                  "pos_mm": [0.0, 0.0, 25.0], "dims_mm": {"w": 20.0, "d": 10.0, "h": 30.0}}]
+    # front: x = 100 + (-10 - -50)*2 = 180 ; y = 200 + (100 - 40)*2 = 320 ; w = 40 ; h = 60
+    def _g23_rect(x, y, w, h, tag="u_widget"):
+        return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0" fill="none" '
+                f'stroke="none" class="manifest-projection-audit" '
+                f'data-entity-tag="{tag}" data-view="front"/>')
+    _g23_ok_svg = "<svg>" + _g23_datum + _g23_rect("180.0", "320.0", "40.0", "60.0") + "</svg>"
+    _g23_ok, _g23_msg = manifest_svg_projection_check(_g23_rows, _g23_ok_svg)
+    chk("g23_faithful_projection_passes", _g23_ok)
+    # (a) MOVED — the 2026-07-26 sheet drew boxes outside the envelope.
+    _g23_moved = "<svg>" + _g23_datum + _g23_rect("260.0", "320.0", "40.0", "60.0") + "</svg>"
+    _g23_mv_ok, _g23_mv_msg = manifest_svg_projection_check(_g23_rows, _g23_moved)
+    chk("g23_moved_box_fires", not _g23_mv_ok)
+    chk("g23_moved_detail_names_axis", "x " in _g23_mv_msg)
+    # (b) RESIZED — the old _clamp_instrument_parts_to_envelope crushed every part to a
+    #     FRACTION of the envelope, so drawn size != real size.
+    _g23_resized = "<svg>" + _g23_datum + _g23_rect("180.0", "320.0", "12.0", "18.0") + "</svg>"
+    _g23_rs_ok, _ = manifest_svg_projection_check(_g23_rows, _g23_resized)
+    chk("g23_resized_box_fires", not _g23_rs_ok)
+    # (c) INVENTED — a synthesized zone box with no manifest counterpart (the phantom
+    #     OPTICAL rectangle drawn beside the real vessel).
+    _g23_invented = ("<svg>" + _g23_datum + _g23_rect("180.0", "320.0", "40.0", "60.0")
+                     + _g23_rect("400.0", "320.0", "40.0", "60.0", tag="u_phantom") + "</svg>")
+    _g23_iv_ok, _g23_iv_msg = manifest_svg_projection_check(_g23_rows, _g23_invented)
+    chk("g23_invented_box_fires", not _g23_iv_ok)
+    chk("g23_invented_detail_says_no_manifest_row", "NO manifest row" in _g23_iv_msg)
+    # ABSTAIN, never a silent pass, when the sheet carries no contract at all.
+    _g23_ab_ok, _g23_ab_msg = manifest_svg_projection_check(_g23_rows, "<svg></svg>")
+    chk("g23_no_contract_abstains", _g23_ab_ok and "abstain" in _g23_ab_msg)
+
     # (c) ABSTAIN: no Enclosure Shell part in manifest (plant-scale / non-enclosure).
     _g20_ok_abs, _g20_msg_abs = envelope_equality_cross_check(
         [], _g20_caption_coherent)
@@ -3706,6 +3764,95 @@ def _selftest() -> int:
         return 1
     print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip + G20 envelope-equality proveCatch both directions + G21 part-set coherence proveCatch both directions on synthetic data + G21 top-N schedule non-false-fire proveCatch + verified coherent/abstain on out/coherence-verify-2240 + G22 render↔drawing exterior-signature feature coherence proveCatch both directions: organoid tower coherent PASS / lost-tower incident FIRES / rendered-not-drawn FIRES / thermocycler + syringe-pump ABSTAIN)")
     return 0
+
+
+# ── G23 MANIFEST → SVG PROJECTION (SOL audit item 4, 2026-07-27) ────────────────────
+# THE GAP EVERY OTHER DRAWING GATE HAD: they score the parts-manifest, never the sheet
+# produced from it. So a drawing could misrepresent its own parts list and still pass —
+# on 2026-07-26 an Assembly sheet showed boxes outside the enclosure while every gate was
+# green and the tab read "TAB QUALITY 9/10". A human caught it; no gate could.
+#
+# This one reads what was DRAWN. The GA writer emits an invisible audit rect from the
+# SAME bounds it drew with, plus a per-view datum; this gate independently recomputes the
+# expected rect from the MANIFEST row and compares. Three failure modes, all real:
+#   * MOVED/RESIZED — drawn rect disagrees with the manifest projection
+#   * MISSING       — a manifest part that should appear in the view was never drawn
+#   * INVENTED      — an audit rect with no manifest counterpart
+def manifest_svg_projection_check(parts: list, ga_svg_text: str) -> tuple:
+    """PURE G23 — every drawn entity must equal its manifest projection.
+
+    Abstains when the sheet carries no projection contract (a drawing generated before
+    the writer emitted one, or a non-instrument sheet) — an abstain here means "not
+    measurable", never "fine".
+    """
+    if not ga_svg_text or "projection-view-datum" not in ga_svg_text:
+        return (True, "no projection contract on this sheet — abstain")
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from ga_projection_contract import expected_rect_px, compare_rect
+    except Exception as exc:  # noqa: BLE001
+        return (True, f"projection contract unavailable ({exc}) — abstain")
+
+    _dat = {}
+    for m in re.finditer(r'<g class="projection-view-datum"([^>]*)/?>', ga_svg_text):
+        a = m.group(1)
+        v = re.search(r'data-view="([^"]+)"', a)
+        if not v:
+            continue
+        def _f(key, _a=a):
+            mm = re.search(rf'data-{key}="([-\d.]+)"', _a)
+            return float(mm.group(1)) if mm else 0.0
+        _dat[v.group(1)] = {"origin_x": _f("origin-x"), "origin_y": _f("origin-y"),
+                            "ppm": _f("ppm"), "x_min_mm": _f("x-min-mm"),
+                            "y_min_mm": _f("y-min-mm"), "y_max_mm": _f("y-max-mm"),
+                            "z_max_mm": _f("z-max-mm"), "z_shift_mm": _f("z-shift-mm")}
+    if not _dat:
+        return (True, "projection datum unparseable — abstain")
+
+    _drawn = {}
+    for m in re.finditer(
+            r'<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"'
+            r'[^>]*class="manifest-projection-audit"[^>]*?'
+            r'data-entity-tag="([^"]*)"[^>]*?data-view="([^"]+)"', ga_svg_text):
+        _drawn.setdefault((m.group(6), m.group(5)), []).append(
+            (float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4))))
+    if not _drawn:
+        return (True, "no audit rects emitted — abstain")
+
+    _rows = {str(p.get("tag") or ""): p for p in (parts or []) if isinstance(p, dict)}
+    bad, missing, invented = [], [], []
+    for (view, tag), rects in sorted(_drawn.items()):
+        row = _rows.get(tag)
+        if row is None:
+            invented.append(f"{tag or '(untagged)'}@{view}")
+            continue
+        exp = expected_rect_px(row, view, _dat.get(view) or {})
+        if exp is None:
+            continue
+        if not any(compare_rect(r, exp) is None for r in rects):
+            why = compare_rect(rects[0], exp)
+            bad.append(f"{tag}@{view}: {why}")
+    _drawn_tags = {t for _v, t in _drawn}
+    for tag, row in sorted(_rows.items()):
+        if tag and tag not in _drawn_tags and (row.get("dims_mm") or {}):
+            missing.append(tag)
+
+    n = len(_drawn)
+    if bad or invented:
+        detail = []
+        if bad:
+            detail.append(f"{len(bad)} drawn box(es) disagree with the manifest: "
+                          + "; ".join(bad[:3]))
+        if invented:
+            detail.append(f"{len(invented)} drawn box(es) have NO manifest row: "
+                          + ", ".join(invented[:5]))
+        return (False, " | ".join(detail)
+                + f" (checked {n} entity/view pair(s) — the sheet must project the parts "
+                  "list, not re-invent it)")
+    _miss_note = (f"; {len(missing)} manifest row(s) not drawn in any view "
+                  f"(e.g. {', '.join(missing[:3])})" if missing else "")
+    return (True, f"all {n} drawn entity/view pair(s) equal their manifest projection"
+                  f"{_miss_note}")
 
 
 if __name__ == "__main__":
