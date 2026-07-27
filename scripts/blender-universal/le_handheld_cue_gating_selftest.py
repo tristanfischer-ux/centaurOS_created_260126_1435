@@ -119,42 +119,34 @@ if '"vial_bioreactor"' not in _sig_src and "'vial_bioreactor'" not in _sig_src:
         "has been removed"
     )
 
-# ── (e) vial exterior gate: translucent glass must NOT be in exterior keep-list ──
-# ROOT: The old keep-list prefix "u_se_le_vial" matched the transparent culture
-# vessel (u_se_le_vial, u_se_le_vial_fluid) AND the opaque collar
-# (u_se_le_vial_collar), causing the glass cylinder to float above the sealed
-# product top deck on view 04 (2026-07-22 organoid-bioreactor defect, iter-2).
-# FIX: keep-list uses "u_se_le_vial_collar" (collar only), not the broad
-# "u_se_le_vial" (which also catches the glass vial + fluid).
+# ── (e) vial exterior gate — SUPERSEDED 2026-07-25, REWRITTEN TO THE LIVE RULE ──
+# HISTORY. On 2026-07-22 (88d26de24) this section asserted the OPPOSITE of what it
+# asserts now: that "u_se_le_vial" must NOT be a keep-list element, because the broad
+# prefix also matched the translucent vessel and it appeared to float above the deck.
+# On 2026-07-25 (fa3361e63) SIGHT on the delivered hero showed that hiding the vessel
+# was the worse defect — it left the OD source/detector heads clamped to NOTHING,
+# "an H-fork floating over a hockey puck". The float was a POSITIONING bug, since
+# fixed (the vial seats on the deck, the collar wraps its base, the heads flank it at
+# mid-vial), and for a Pioreactor-style OD bioreactor the amber culture vessel IS the
+# defining exterior silhouette. The decision was reversed deliberately.
+#
+# The 07-22 assertion was never retired, so from 2026-07-25 it failed on every run and
+# the pre-push hook blocked EVERY push for two days — 67 commits accumulated unpushed.
+# A guard that outlives the decision it encodes does not protect the rule, it blocks
+# the work. Rewritten to assert the CURRENT contract.
+#
+# NOTE the keep-list is PREFIX-matched: "u_se_le_vial" covers u_se_le_vial,
+# u_se_le_vial_fluid AND u_se_le_vial_collar, so the opaque collar the old (e2) demanded
+# is still kept — it just no longer needs its own literal tuple element.
 _psp_src = inspect.getsource(b._prepare_sealed_product_view)
-
-# (e1) The _keep tuple assignment must NOT include the bare "u_se_le_vial" as a
-# standalone element (without the _collar suffix).  We search for the tuple element
-# exactly — either '"u_se_le_vial",' or '"u_se_le_vial")' — NOT '"u_se_le_vial_collar"'.
-# This avoids false-positive matches in comments that explain the change.
 import re as _re
-_bare_vial_in_tuple = bool(
-    _re.search(r'"u_se_le_vial"(?:\s*[,)])', _psp_src)
-)
-if _bare_vial_in_tuple:
+if not _re.search(r'"u_se_le_vial"(?:\s*[,)])', _psp_src):
     fails.append(
-        "REGRESSION (iter-2 vial-exterior): \"u_se_le_vial\" found as a keep-list "
-        "tuple element in _prepare_sealed_product_view — the broad prefix was "
-        "restored and will make the translucent glass culture vessel visible on "
-        "view 04 again.  The keep-list must use 'u_se_le_vial_collar' (opaque ring)."
-    )
-
-# (e2) The collar prefix MUST appear in a tuple element so the opaque sample-port
-# ring is kept visible on the exterior view.
-_collar_in_tuple = bool(
-    _re.search(r'"u_se_le_vial_collar"(?:\s*[,)])', _psp_src)
-)
-if not _collar_in_tuple:
-    fails.append(
-        "REGRESSION (iter-2 vial-exterior): \"u_se_le_vial_collar\" NOT found as a "
-        "keep-list tuple element in _prepare_sealed_product_view — the opaque holder "
-        "collar was removed.  The vial_bioreactor exterior must show the collar as "
-        "the sealed sample-port face on views 04–07."
+        "REGRESSION (2026-07-25 OD-tower SIGHT fix): \"u_se_le_vial\" is NOT a keep-list "
+        "tuple element in _prepare_sealed_product_view — the culture vessel would be "
+        "hidden on views 04-07 again, leaving the OD heads clamped to nothing (the "
+        "'H-fork floating over a hockey puck' defect). The prefix must stay so the "
+        "vessel, amber media and collar all render."
     )
 
 # ── Report ────────────────────────────────────────────────────────────────────
@@ -168,5 +160,5 @@ print(
     "le_handheld_cue_gating selftest: OK "
     "(a: LE suppressed, b: optical_handheld allowed, c: gate text present, "
     "d: vial_bioreactor signature recognised as lab_electronics, "
-    "e: translucent vial absent from exterior keep-list / collar present)"
+    "e: culture vessel KEPT on the exterior keep-list (prefix covers vessel+media+collar))"
 )

@@ -35584,8 +35584,16 @@ def _selftest() -> int:
         # Run the bundle writer
         _slug = "selftest-product-20260101-0000"
         _db_res = _write_deliverable_bundle(str(_bd), _slug)
-        _db_dir = _bd / f"{_slug}-deliverable"
-        _db_zip = _bd / f"{_slug}-deliverable.zip"
+        # Assert against what the writer RETURNED, not a literal folder name. The bundle is
+        # now named "<product-class>-design-pack-<YYYYMMDD-HHMM>" (self-describing +
+        # timestamped, 2026-07-27), so a hardcoded f"{slug}-deliverable" made this selftest
+        # look for a directory that no longer exists and report 10 phantom "missing file"
+        # failures about gerbers, MANIFEST and firmware that were all present. Testing the
+        # RETURNED path tests the contract and survives any future naming change.
+        from pathlib import Path as _DbPath
+        _db_dir = _DbPath(_db_res["bundle_dir"])
+        _db_zip = (_DbPath(_db_res["bundle_zip"]) if _db_res.get("bundle_zip")
+                   else _bd / "missing.zip")
         # Assert folder created
         if not _db_dir.is_dir():
             print(f"  FAIL _write_deliverable_bundle: folder not created at {_db_dir}"); bad += 1
@@ -35593,8 +35601,10 @@ def _selftest() -> int:
         if not _db_zip.is_file():
             print(f"  FAIL _write_deliverable_bundle: zip not created at {_db_zip}"); bad += 1
         # Assert dossier.xlsx in folder
-        if not (_db_dir / "dossier.xlsx").exists():
-            print("  FAIL _write_deliverable_bundle: dossier.xlsx not in bundle folder"); bad += 1
+        # The workbook inside the pack now carries the pack's own descriptive name.
+        if not list(_db_dir.glob("*engineering-workbook.xlsx")):
+            print("  FAIL _write_deliverable_bundle: engineering workbook not in bundle "
+                  f"folder (have: {[p.name for p in _db_dir.glob('*.xlsx')]})"); bad += 1
         # Assert all 3 boards' gerbers present in folder
         for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
             _bdir = _db_dir / "pcb" / _bname / "gerbers"
@@ -35656,7 +35666,7 @@ def _selftest() -> int:
                 # Assert all 3 boards represented in zip under pcb/
                 for _bname in ("wet_lab_hat", "od_optics", "wet_actuation"):
                     _board_entries = [n for n in _zip_names
-                                      if _bname in n and n.startswith(f"{_slug}-deliverable/pcb/")]
+                                      if _bname in n and n.startswith(f"{_db_dir.name}/pcb/")]
                     if not _board_entries:
                         print(f"  FAIL _write_deliverable_bundle: zip has no pcb/ entries for board {_bname}"); bad += 1
                 # Assert firmware/mcu-bringup/main.c lands at pack root (top-level firmware/)
@@ -35668,7 +35678,7 @@ def _selftest() -> int:
                     _fw_mcu_arc = _fw_mcu_zip[0]
                     if _fw_mcu_arc.startswith("/") or "/Users/" in _fw_mcu_arc:
                         print(f"  FAIL _write_deliverable_bundle: firmware zip arcname is absolute: {_fw_mcu_arc}"); bad += 1
-                    if not _fw_mcu_arc.startswith(f"{_slug}-deliverable/firmware/mcu-bringup/"):
+                    if not _fw_mcu_arc.startswith(f"{_db_dir.name}/firmware/mcu-bringup/"):
                         print(f"  FAIL _write_deliverable_bundle: mcu-bringup arcname not under firmware/mcu-bringup/: {_fw_mcu_arc}"); bad += 1
                 # Assert per-board proof lands under firmware/boards/<boardId>/
                 _fw_board_zip = [n for n in _zip_names
@@ -35677,7 +35687,7 @@ def _selftest() -> int:
                     print("  FAIL _write_deliverable_bundle: firmware/boards/wet_lab_hat/proof_main.c not found in zip"); bad += 1
                 else:
                     _fw_board_arc = _fw_board_zip[0]
-                    if not _fw_board_arc.startswith(f"{_slug}-deliverable/firmware/boards/wet_lab_hat/"):
+                    if not _fw_board_arc.startswith(f"{_db_dir.name}/firmware/boards/wet_lab_hat/"):
                         print(f"  FAIL _write_deliverable_bundle: board proof arcname not under firmware/boards/wet_lab_hat/: {_fw_board_arc}"); bad += 1
                 # Assert firmware is NOT under pcb/ in the zip
                 _fw_under_pcb = [n for n in _zip_names
