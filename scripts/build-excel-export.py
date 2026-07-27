@@ -35835,8 +35835,8 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     # run-directory name ("organoid-9drive-r11-allfixes") — internal build shorthand that
     # means nothing to a recipient and carries no vintage.
     _bundle_state = load_json(os.path.join(run_dir, "state.json")) or {}
-    bundle_name = (f"{deliverable_stem(_bundle_state, run_dir)}"
-                   f"-design-pack-{deliverable_stamp()}")
+    bundle_name = (f"{deliverable_stamp()}-"
+                   f"{deliverable_stem(_bundle_state, run_dir)}-design-pack")
     bundle_dir = os.path.join(run_dir, bundle_name)
     bundle_zip = os.path.join(run_dir, f"{bundle_name}.zip")
 
@@ -36338,10 +36338,15 @@ def main() -> None:
         # was meant to remove, so the verdict belongs in the name too.
         _ships = bool(((res or {}).get("audit") or {}).get("ship_ok"))
         _mark = "" if _ships else "DRAFT-"
+        # DATE-TIME FIRST, THEN SUBJECT (Tristan 2026-07-27: "better to have the date,
+        # time, and then the subject"). Leading the name with the stamp makes a directory
+        # of builds sort CHRONOLOGICALLY by name, which is how you actually scan for the
+        # latest one; a leading product slug sorts them into meaningless alphabetical
+        # clumps because the slug is identical across every build of the same design.
         _named = os.path.join(
             run_dir,
-            f"{deliverable_stem(_nstate, run_dir)}-{_mark}engineering-workbook-"
-            f"{deliverable_stamp()}.xlsx")
+            f"{deliverable_stamp()}-{_mark}{deliverable_stem(_nstate, run_dir)}"
+            f"-engineering-workbook.xlsx")
         import shutil as _nsh
         _nsh.copyfile(res["out_path"], _named)
     except Exception as _nexc:  # noqa: BLE001 — naming must never fail the build
