@@ -52,6 +52,7 @@ import { resolve } from 'node:path'
 import { homedir } from 'node:os'
 
 import type { BriefEnvelope, ParsedConstraints } from '../types'
+import { DEVICE_SCALE_FORBIDDEN_TOOLS } from '../../structural-admission-gate'
 import type { ToolCatalogueEntry } from './bootstrap-tool-plan'
 import type { DesignScaleTier } from './design-scale-tier'
 
@@ -70,21 +71,30 @@ export function isLabScaleTier(tier: DesignScaleTier | undefined | null): boolea
   return tier === 'handheld' || tier === 'benchtop'
 }
 
-/** Apply the F1f Layer-1 hard veto to a completed verdict set: on a lab-scale identity, force
- *  every PLANT-ONLY tool to relevant=false (hard_veto), regardless of the LLM/cache verdict.
- *  Returns the (verdicts, relevant_ids) with the veto applied. Deterministic post-filter — no
- *  cache-key change; applied on BOTH the cache-hit and fresh paths so the selection is identical.
- *  A no-tier / non-lab identity is a strict no-op (fully backward-compatible). */
+/**
+ * @description Apply the F1f hard veto to cached or fresh relevance verdicts.
+ * A lab tier or explicit device-scale identity forces plant-only tools and the
+ * Gate 39 thermal denylist to relevant=false regardless of the LLM verdict.
+ * @param verdicts - Completed per-tool relevance verdicts.
+ * @param scaleTier - Early physics-derived design scale tier, when available.
+ * @param deviceScale - Gate-39-compatible device identity for unknown-tier cases.
+ * @returns Verdicts with deterministic vetoes plus the rejected tool IDs.
+ */
 export function applyScaleVeto(
   verdicts: ToolRelevanceVerdict[],
   scaleTier: DesignScaleTier | undefined,
+  deviceScale: boolean = false,
 ): { verdicts: ToolRelevanceVerdict[]; vetoed: string[] } {
-  if (!isLabScaleTier(scaleTier)) return { verdicts, vetoed: [] }
+  if (!isLabScaleTier(scaleTier) && !deviceScale) return { verdicts, vetoed: [] }
   const vetoed: string[] = []
   const out = verdicts.map((v) => {
-    if (PLANT_ONLY_TOOL_RX.test(v.tool_id)) {
+    if (PLANT_ONLY_TOOL_RX.test(v.tool_id) || DEVICE_SCALE_FORBIDDEN_TOOLS.has(v.tool_id)) {
       vetoed.push(v.tool_id)
-      return { ...v, relevant: false, reason: `hard_veto:scale_tier_mismatch (${scaleTier} identity; plant-only tool)` }
+      return {
+        ...v,
+        relevant: false,
+        reason: `hard_veto:device_scale_mismatch (${scaleTier ?? 'unknown'} tier; plant-only tool)`,
+      }
     }
     return v
   })
@@ -516,6 +526,10 @@ export interface RelevanceSweepInput {
    *  sweep) — a keyword YES can no longer drag a fish-farm / process-plant tool onto a device.
    *  Absent → no veto (fully backward-compatible). */
   scaleTier?: DesignScaleTier
+  /** Gate-39-compatible device-scale identity available before state.json is stamped.
+   * Keeps the veto active when the early scale tier is unknown but brief dimensions,
+   * envelope or instrument identity already prove this is a device. */
+  deviceScale?: boolean
 }
 
 /**
@@ -564,7 +578,7 @@ export async function sweepToolRelevance(input: RelevanceSweepInput): Promise<Re
     if (verdicts.length === catalogueToolIds.length) {
       // F1f Layer 1 hard veto — applied on the cache path too so a lab-scale identity's plant-
       // only tools are excluded deterministically, whatever the cached LLM verdict said.
-      const { verdicts: _vv, vetoed } = applyScaleVeto(verdicts, input.scaleTier)
+      const { verdicts: _vv, vetoed } = applyScaleVeto(verdicts, input.scaleTier, input.deviceScale)
       const relevant = _vv.filter(v => v.relevant).map(v => v.tool_id).sort()
       console.error(
         `[relevance-sweep] CACHE HIT slug=${slug} key=${cacheKey}: ${relevant.length}/${catalogueToolIds.length} tools relevant ` +
@@ -644,7 +658,7 @@ export async function sweepToolRelevance(input: RelevanceSweepInput): Promise<Re
   writeCache(cacheKey, slug, verdicts)
 
   // F1f Layer 1 hard veto — plant-only tools are invisible to a lab-scale identity.
-  const { verdicts: _vetoedVerdicts, vetoed } = applyScaleVeto(verdicts, input.scaleTier)
+  const { verdicts: _vetoedVerdicts, vetoed } = applyScaleVeto(verdicts, input.scaleTier, input.deviceScale)
   const relevant = _vetoedVerdicts.filter(v => v.relevant).map(v => v.tool_id).sort()
 
   console.error(

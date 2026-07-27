@@ -41,6 +41,7 @@ import {
   bootstrapToolPlan,
   economicsRevenueBasisMissing,
   buildStepInput,
+  bootstrapScaleContext,
   type ToolPlanSpec,
   type ToolPlanStepSpec,
 } from './bootstrap-tool-plan'
@@ -152,6 +153,45 @@ function pureTests(): void {
   check('V3 unproduced+unsupplied brief metric rejected', !v.ok && v.errors.some(e => /production_capacity_tpy/.test(e)))
   v = validateToolPlanSpec(goodSpec(), ['production_capacity_tpy'], ['production_capacity_tpy'])
   check('V3 brief metric supplied by contract passes', v.ok, v.errors.join('; '))
+
+  const compactDeviceContext = bootstrapScaleContext(
+    {
+      product_class: 'generic_electronic_device',
+      product_description: 'Compact multi-channel benchtop measurement instrument',
+      max_dimensions_mm: { w: 450, d: 450, h: 450 },
+    },
+    {
+      class: 'generic_electronic_device',
+      scale_tier: 'unclassified',
+      voltage_tier: 'low',
+      form_factor: 'sealed_bench_enclosure',
+      application: 'laboratory_measurement',
+    },
+    [],
+  )
+  check(
+    'brief dimensions prove device scale before isInstrumentDevice is stamped',
+    compactDeviceContext.deviceScale && compactDeviceContext.scaleTier === 'unknown',
+    JSON.stringify(compactDeviceContext),
+  )
+
+  // Device-scale composition proveCatch: even a globally registered industrial
+  // HX tool must be inadmissible when the pinned design identity is a device.
+  const deviceHxSpec = goodSpec()
+  deviceHxSpec.steps.splice(1, 0, {
+    tool_id: 'ht:ntu-heat-exchanger',
+    purpose: 'size benchtop bay heat rejection',
+    inputs: [],
+    outputs: [],
+  })
+  v = validateToolPlanSpec(deviceHxSpec, [], [], { deviceScale: true })
+  check(
+    'device-scale plan validation rejects a registered industrial HX tool',
+    !v.ok && v.errors.some(e => /DEVICE-SCALE TOOL VETO/.test(e) && /ht:ntu-heat-exchanger/.test(e)),
+    v.errors.join('; '),
+  )
+  v = validateToolPlanSpec(deviceHxSpec, [], [], { deviceScale: false })
+  check('the same HX step remains admissible for a plant-scale plan', v.ok, v.errors.join('; '))
 
   // ── FAIL-CLOSED materialiser: a MISSING computed output field must NOT
   //    fabricate a number — it emits nothing for that key + records it skipped.
@@ -425,6 +465,10 @@ function pureTests(): void {
 async function smokeTest(): Promise<void> {
   console.log('\nSMOKE — bootstrapToolPlan on the RAS brief (one real google/gemini-3.5-flash call)')
 
+  if (process.env.SKIP_TOOL_PLAN_NETWORK_SMOKE === '1') {
+    check('RAS smoke (skipped: SKIP_TOOL_PLAN_NETWORK_SMOKE=1)', true)
+    return
+  }
   const statePath = join(REPO, 'out', 'ras-r5-20260613', 'state.json')
   if (!existsSync(statePath)) {
     check('RAS smoke (skipped: state.json not found — vacuous pass)', true)

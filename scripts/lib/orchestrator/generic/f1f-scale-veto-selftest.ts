@@ -18,6 +18,9 @@ function main(): number {
     { tool_id: 'pressure-vessel:design', relevant: true, reason: 'keyword: vessel' },
     { tool_id: 'irrigation:pump-sizing', relevant: true, reason: 'keyword: pump' },
     { tool_id: 'hvac:load-sizing', relevant: true, reason: 'keyword: thermal' },
+    { tool_id: 'ht:ntu-heat-exchanger', relevant: true, reason: 'keyword: heat rejection' },
+    { tool_id: 'ht:shell-tube-hx', relevant: true, reason: 'keyword: heat exchanger' },
+    { tool_id: 'refrigeration-cycle:cop', relevant: true, reason: 'keyword: cooling' },
     { tool_id: 'pcb:resolve-components', relevant: true, reason: 'real lab electronics' },
     { tool_id: 'optics:beer-lambert', relevant: true, reason: 'real lab optics' },
   ]
@@ -26,17 +29,21 @@ function main(): number {
   const bench = applyScaleVeto(verdicts, 'benchtop')
   const benchRelevant = new Set(bench.verdicts.filter(v => v.relevant).map(v => v.tool_id))
   for (const plant of ['aquaculture:tank-heat-sizing', 'pressure-vessel:design',
-                       'irrigation:pump-sizing', 'hvac:load-sizing']) {
+                       'irrigation:pump-sizing', 'hvac:load-sizing',
+                       'ht:ntu-heat-exchanger', 'ht:shell-tube-hx',
+                       'refrigeration-cycle:cop']) {
     ok(!benchRelevant.has(plant), `benchtop identity must HARD-VETO the plant-only tool '${plant}'`)
   }
   ok(benchRelevant.has('thermal:cartridge-heater'), 'the LAB cartridge-heater tool must survive on benchtop')
   ok(benchRelevant.has('pcb:resolve-components') && benchRelevant.has('optics:beer-lambert'),
     'real lab electronics/optics tools must survive the veto')
-  ok(bench.vetoed.length === 4, `benchtop veto count must be 4 (got ${bench.vetoed.length})`)
+  ok(bench.vetoed.length === 7, `benchtop veto count must be 7 (got ${bench.vetoed.length})`)
 
   // (2) HANDHELD identity vetoes too (isLabScaleTier).
   ok(isLabScaleTier('handheld') && isLabScaleTier('benchtop'), 'handheld+benchtop are lab-scale')
-  ok(applyScaleVeto(verdicts, 'handheld').vetoed.length === 4, 'handheld identity must veto the same 4')
+  ok(applyScaleVeto(verdicts, 'handheld').vetoed.length === 7, 'handheld identity must veto the same 7')
+  ok(applyScaleVeto(verdicts, 'unknown', true).vetoed.length === 7,
+    'explicit device-scale identity must veto plant tools even when the early tier is unknown')
 
   // (3) PLANT identity → NO veto (the plant tools are legitimate there).
   const plant = applyScaleVeto(verdicts, 'plant')
@@ -55,8 +62,8 @@ function main(): number {
     for (const f of fails) console.error('  ✗ ' + f)
     return 1
   }
-  console.error('[f1f-scale-veto] _selftest passed — plant-only tools hard-vetoed on benchtop/handheld '
-    + 'identity (heater→aquaculture/RAS/pressure-vessel/HVAC excluded); kept on plant; no-op without a tier')
+  console.error('[f1f-scale-veto] _selftest passed — plant-only tools hard-vetoed on device scale '
+    + '(including Gate 39 HT/refrigeration denylist); kept on plant; no-op without device evidence')
   return 0
 }
 

@@ -118,6 +118,10 @@ import {
   reusableCandidateWhereSql,
   ensureQuarantineColumn,
 } from './structural-cache-policy'
+import {
+  DEVICE_SCALE_FORBIDDEN_TOOLS,
+  isDeviceScaleDesign,
+} from '../../structural-admission-gate'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -494,8 +498,12 @@ export interface PlanValidation {
   spec?: ToolPlanSpec
 }
 
+export interface ToolPlanValidationOptions {
+  deviceScale?: boolean
+}
+
 /**
- * Validate a raw harvested object into a ToolPlanSpec. Pure + deterministic.
+ * @description Validate a raw harvested object into a ToolPlanSpec. Pure + deterministic.
  *   V1 every step.tool_id exists via getTool (no hallucinated tool ids).
  *   V2 every inputs[].param is a real input field of that tool, AND every
  *      outputs[].tool_output_field is a real OUTPUT field of that tool — THE key
@@ -508,11 +516,17 @@ export interface PlanValidation {
  * brief's scale/performance metric keys). Coverage is satisfied if a metric key
  * is produced by SOME step OR already supplied by the contract (passed via
  * `contractSuppliedKeys`) — a brief input the design echoes need not be recomputed.
+ * @param raw - Untrusted plan object returned by harvest or loaded from cache.
+ * @param briefMetricKeys - Contract keys demanded by the parsed brief.
+ * @param contractSuppliedKeys - Brief keys already supplied by deterministic state.
+ * @param options - Admission context, including the device-scale tool veto.
+ * @returns Validated serialisable plan or deterministic validation errors.
  */
 export function validateToolPlanSpec(
   raw: unknown,
   briefMetricKeys: string[] = [],
   contractSuppliedKeys: string[] = [],
+  options: ToolPlanValidationOptions = {},
 ): PlanValidation {
   const errors: string[] = []
   const g = raw as Record<string, any>
@@ -533,6 +547,13 @@ export function validateToolPlanSpec(
     // V1 — tool id exists in the live registry.
     if (!toolId || !getTool(toolId)) {
       errors.push(`step[${i}] tool_id "${toolId}" is not a registered tool (V1)`) // hallucinated/dangling id
+      continue
+    }
+    if (options.deviceScale === true && DEVICE_SCALE_FORBIDDEN_TOOLS.has(toolId)) {
+      errors.push(
+        `step[${i}] DEVICE-SCALE TOOL VETO: industrial thermal tool "${toolId}" is inadmissible ` +
+          `for a device-scale/instrument plan (Gate 39 canonical denylist)`,
+      )
       continue
     }
     const fields = io.get(toolId)
@@ -2035,6 +2056,56 @@ function briefMetricsSatisfiedByContract(
   return { satisfiedBriefKeys, supplyingContractKeys }
 }
 
+export interface BootstrapScaleContext {
+  scaleTier: ReturnType<typeof deriveDesignScaleTier>
+  deviceScale: boolean
+}
+
+/**
+ * @description Derive the early plan-admission scale context from brief physics.
+ * Tool planning runs before state.isInstrumentDevice is stamped, so this mirrors
+ * Gate 39's device-scale signals without relying on a product-class branch.
+ * @param brief - Parsed brief constraints available to the generic orchestrator.
+ * @param envelope - Product envelope selected before tool planning.
+ * @param contractQuantities - Deterministic duties available before tool execution.
+ * @returns Pinned scale tier plus Gate-39-compatible device-scale identity.
+ */
+export function bootstrapScaleContext(
+  brief: ParsedConstraints,
+  envelope: BriefEnvelope,
+  contractQuantities: ReadonlyArray<{ key: string; value: number; unit: string; condition?: string | null }>,
+): BootstrapScaleContext {
+  const dutyNumber = (pattern: RegExp): number | undefined => {
+    for (const quantity of contractQuantities) {
+      if (!pattern.test(String(quantity.key))) continue
+      const value = Number(quantity.value)
+      if (Number.isFinite(value)) return value
+    }
+    return undefined
+  }
+  const dimensions = brief.max_dimensions_mm
+    ? Object.values(brief.max_dimensions_mm)
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value) && value > 0)
+    : []
+  const scaleTier = deriveDesignScaleTier({
+    enclosure_volume_m3: dutyNumber(/^enclosure_volume_m3$/),
+    peak_electrical_power_w: dutyNumber(/^peak_electrical_power_w$/),
+    connected_electrical_load_kw: dutyNumber(/^connected_electrical_load_kw$/),
+    working_volume_ml: dutyNumber(/^working_volume_ml$/),
+    max_edge_mm: dimensions.length > 0 ? Math.max(...dimensions) : undefined,
+  })
+  const quantities = Object.fromEntries(
+    contractQuantities.map(quantity => [quantity.key, { value: quantity.value }]),
+  )
+  const deviceScale = isDeviceScaleDesign({
+    designIdentity: { scale_tier: scaleTier },
+    orchestratorContract: { envelope, quantities },
+    parsedBrief: { constraints: { max_dimensions_mm: brief.max_dimensions_mm } },
+  })
+  return { scaleTier, deviceScale }
+}
+
 /**
  * Bootstrap a tool plan for a NOVEL slug. The returned plan is an in-memory
  * pass-through for THIS run; the stored row stays status 'candidate' (promotion
@@ -2087,6 +2158,7 @@ export async function bootstrapToolPlan(
     ...satisfiedBriefKeys, // the brief's own name, now treated as supplied
     ...supplyingContractKeys,
   ]
+  const scaleContext = bootstrapScaleContext(brief, envelope, contractQuantities)
 
   // (0) DB-FIRST REUSE: a previously stored candidate makes re-runs free +
   // deterministic. Re-validate against the CURRENT registry (a registry change
@@ -2108,7 +2180,12 @@ export async function bootstrapToolPlan(
   const prior = latestCandidate(storeKey)
   if (prior) {
     try {
-      const v = validateToolPlanSpec(JSON.parse(prior.plan_json), [], [])
+      const v = validateToolPlanSpec(
+        JSON.parse(prior.plan_json),
+        [],
+        [],
+        { deviceScale: scaleContext.deviceScale },
+      )
       if (v.ok && v.spec) {
         // Re-apply the deterministic auto-wire (idempotent) so a candidate stored
         // before auto-wire existed still gets the wiring floor on reuse.
@@ -2147,9 +2224,21 @@ export async function bootstrapToolPlan(
     return { ok: false, slug, attempts: 0, stage: 'no-api-key', validation_errors: [], error: 'OPENROUTER_API_KEY not set — cannot harvest' }
   }
 
-  const fullCatalogue = buildToolCatalogue()
+  const registeredCatalogue = buildToolCatalogue()
+  const vetoedDeviceTools = scaleContext.deviceScale
+    ? registeredCatalogue.filter(entry => DEVICE_SCALE_FORBIDDEN_TOOLS.has(entry.tool_id))
+    : []
+  const fullCatalogue = scaleContext.deviceScale
+    ? registeredCatalogue.filter(entry => !DEVICE_SCALE_FORBIDDEN_TOOLS.has(entry.tool_id))
+    : registeredCatalogue
   if (fullCatalogue.length === 0) {
     return { ok: false, slug, attempts: 0, stage: 'empty-catalogue', validation_errors: [], error: 'tool catalogue empty — register-all must be imported before bootstrapToolPlan so listTools() is populated' }
+  }
+  if (vetoedDeviceTools.length > 0) {
+    console.error(
+      `[bootstrap-tool-plan] DEVICE-SCALE TOOL VETO: removed ${vetoedDeviceTools.length} industrial thermal ` +
+        `tool(s) before relevance/harvest for slug=${slug}: ${vetoedDeviceTools.map(entry => entry.tool_id).join(', ')}`,
+    )
   }
 
   const processText = targetProcessText(brief)
@@ -2209,40 +2298,14 @@ export async function bootstrapToolPlan(
     )
   }
 
-  // F1f Layer 1: pin the physics scale tier from the signals available at tool-plan time
-  // (brief metrics + the contract duties), so the sweep can HARD-VETO plant-only tools on a
-  // lab-scale identity BEFORE the LLM — a "heater" noun can no longer pull a fish-farm tool.
-  // (state.designIdentity is stamped later at state-save; this derives the SAME tier early.)
-  const _dutyNum = (rx: RegExp): number | undefined => {
-    for (const q2 of contractQuantities) if (rx.test(String(q2.key))) {
-      const n = Number(q2.value); if (Number.isFinite(n)) return n
-    }
-    return undefined
-  }
-  const _briefMetric = (key: string): number | undefined => {
-    const ms = (brief as { constraints?: { target_performance?: { metrics?: Array<{ key_metric?: string; value?: unknown }> } } })
-      ?.constraints?.target_performance?.metrics ?? []
-    for (const m of ms) if (String(m?.key_metric ?? '').toLowerCase() === key) {
-      const n = Number(m?.value); if (Number.isFinite(n)) return n
-    }
-    return undefined
-  }
-  const _md = (brief as { constraints?: { max_dimensions_mm?: Record<string, unknown> } })?.constraints?.max_dimensions_mm
-  const _edges = _md ? Object.values(_md).map(v => Number(v)).filter(n => Number.isFinite(n) && n > 0) : []
-  const _scaleTier = deriveDesignScaleTier({
-    enclosure_volume_m3: _dutyNum(/^enclosure_volume_m3$/),
-    peak_electrical_power_w: _dutyNum(/^peak_electrical_power_w$/),
-    connected_electrical_load_kw: _dutyNum(/^connected_electrical_load_kw$/),
-    working_volume_ml: _dutyNum(/^working_volume_ml$/) ?? _briefMetric('working_volume_ml'),
-    max_edge_mm: _edges.length ? Math.max(..._edges) : undefined,
-  })
   const sweep = await sweepToolRelevance({
     slug, brief, envelope,
     duties: contractQuantities.map(q2 => ({ key: q2.key, value: q2.value, unit: q2.unit })),
     catalogue: fullCatalogue,
     targetProcess: processText,
     applicableToThisClass,
-    scaleTier: _scaleTier,
+    scaleTier: scaleContext.scaleTier,
+    deviceScale: scaleContext.deviceScale,
   })
   if (sweep.ok) {
     // UNION the swept-relevant set with the universal aggregators V3 requires (mass
@@ -2332,7 +2395,12 @@ export async function bootstrapToolPlan(
       lastErrors = []
       continue
     }
-    const v = validateToolPlanSpec(outcome.parsed, briefMetricKeys, contractSuppliedKeys)
+    const v = validateToolPlanSpec(
+      outcome.parsed,
+      briefMetricKeys,
+      contractSuppliedKeys,
+      { deviceScale: scaleContext.deviceScale },
+    )
     if (!v.ok || !v.spec) {
       lastErrors = v.errors
       lastError = `deterministic validation failed (${v.errors.length} errors)`
