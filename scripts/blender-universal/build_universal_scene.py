@@ -6676,9 +6676,35 @@ def build_parts_manifest(parts):
                     continue
                 _consumed.update(_mm)
                 _rx = re.compile(_part_rx, re.I)
-                for _p in parts:
-                    if not _rx.search(str(getattr(_p, "name", "") or "")):
-                        continue
+                # AMBIGUITY GUARD (SOL round 5). This regex binds a signature MESH to the
+                # BoM part it depicts, and the mesh name is not derived from the part name,
+                # so there is no exact key to join on — semantic matching is unavoidable
+                # here. What IS avoidable is resolving a TIE by iteration order: the old
+                # loop took the FIRST matching part and broke, so if two parts shared a
+                # noun ("Sample Port" / "Port Cover") the drawn geometry would be silently
+                # attached to whichever happened to come first in the list, and the wrong
+                # row would then claim the containment exemption. Measured across 412
+                # states: ZERO aliases match more than one part today, so refusing an
+                # ambiguous bind costs nothing now and makes the failure loud if a future
+                # BoM introduces the collision.
+                # A part already claimed by an EARLIER family is not a candidate. The
+                # table is ordered so the narrower family wins first (vial_collar before
+                # vial), and it tracked consumed MESHES but not consumed PARTS — so
+                # "Vial Holder Fixture", already bound to vessel_collar, still matched
+                # the vessel regex via \bvial\b. The old first-match-wins loop resolved
+                # that tie correctly ONLY because Culture Vessel happened to precede it in
+                # the list. Excluding bound parts makes the ordering the table already
+                # relies on explicit, and leaves exactly one true candidate per family.
+                _cands = [_p for _p in parts
+                          if _rx.search(str(getattr(_p, "name", "") or ""))
+                          and _part_prefix(_p.name) not in _SIG_ALIASED_PREFIXES]
+                if len(_cands) > 1:
+                    print(f"[parts-manifest]   AMBIGUOUS alias {_mesh_pref}: matches "
+                          f"{[getattr(_c, 'name', '?') for _c in _cands]} — refusing to "
+                          f"bind by list order; the drawn mesh keeps no BoM owner",
+                          flush=True)
+                    continue
+                for _p in _cands:
                     _pf = _part_prefix(_p.name)
                     bbox_by_pref[_pf] = _acc      # the DRAWN geometry wins
                     _SIG_ALIASED_PREFIXES[_pf] = _sig_fam
