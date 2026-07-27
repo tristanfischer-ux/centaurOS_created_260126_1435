@@ -4198,9 +4198,15 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
 def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
     ws = wb.create_sheet("Overview")
     set_widths(ws, {"A": 30, "B": 16, "C": 14, "D": 60})
+    # TITLE BY PRODUCT, NOT BUILD FOLDER (2026-07-27). This read "ForgeOS Review Workbook
+    # — organoid-9drive-r11-allfixes": the internal run-directory slug, complete with
+    # iteration number and the word "allfixes", printed on a CUSTOMER-FACING tab. A
+    # dossier should be titled by the thing it describes. The run slug is still recorded
+    # below as build provenance, where it belongs.
     run_name = os.path.basename(os.path.normpath(run_dir))
+    _title_product = deliverable_stem(state, run_dir).replace("-", " ").title()
     row = title_row(
-        ws, f"ForgeOS Review Workbook — {run_name}", 4,
+        ws, f"ForgeOS Review Workbook — {_title_product}", 4,
         "Live Excel review surface. Yellow cells are editable inputs; green cells are "
         "live formulas that recompute downstream. See the '⚠ Checks' tab for invariants "
         "that go RED where the engine's numbers do not reconcile.",
