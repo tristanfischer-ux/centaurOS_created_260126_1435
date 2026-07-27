@@ -654,6 +654,29 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                                 break
                 except Exception:  # noqa: BLE001
                     pass
+                # EXTERIOR SIGNATURE EVIDENCE (SOL round 6). The GA used to stamp an
+                # OPTICAL tower zone purely from `instrument_form_rule_mm` — a
+                # "plausible instrument anatomy" story, not a statement about THIS
+                # product. That drew an optical tower on a SYRINGE PUMP and on
+                # CONSUMER ELECTRONICS, neither of which has any optical function, and
+                # on a digital-microfluidics box whose render evidences only electrodes.
+                # The drawing lane must represent the product, not generate plausible
+                # fiction, so the zone is now gated on the SAME provenance the coherence
+                # gate reads: form-meshes.json's `exterior_signature_features`, which is
+                # the RENDER's own record of what it actually built and left visible.
+                # Deliberately NOT a new noun/token vocabulary — a second naming scheme
+                # for the same fact is how the two lanes drifted apart in the first place.
+                try:
+                    _fm_p = Path(out_dir) / "form-meshes.json"
+                    if _fm_p.is_file():
+                        with open(_fm_p) as _fmh:
+                            _fm = json.load(_fmh)
+                        _esf = _fm.get("exterior_signature_features") or []
+                        meta["exterior_signature_families"] = sorted(
+                            {str(_e.get("family") or "") for _e in _esf
+                             if isinstance(_e, dict)} - {""})
+                except Exception:  # noqa: BLE001 — absent evidence == no evidence
+                    pass
                 try:
                     _op = _q("optical_path_mm") or _q("optical_path_length_mm")
                     if _op is not None:
@@ -1748,6 +1771,7 @@ def _draw_instrument_form_silhouettes(
     plan_x, plan_y, plan_w, plan_h, L, W, ppm, mx, my,
     front_x, front_y, z_max, mz,
     assembly_cutaway: bool = False,
+    has_optical_evidence: bool = False,
 ) -> None:
     """Envelope + zone context for the instrument Assembly / product sheet.
 
@@ -1762,13 +1786,19 @@ def _draw_instrument_form_silhouettes(
     tx, ty, tz = form["tower_loc"]
     body_h = float(form["body_size"][2])
     # ----- TOP: optical chamber + UI deck zones -----
+    # The OPTICAL tower is drawn ONLY when the render evidences one. Without that gate
+    # the form rule stamped a tower on a syringe pump, a potentiostat, a microscope and
+    # a digital-microfluidics box — a feature none of their renders contain. The UI deck
+    # and HMI cues below are NOT gated: they are reader-orientation furniture that the
+    # coherence gate does not treat as a product feature claim.
     tpx = plan_x + mx(tx - tw / 2)
     tpy = plan_y + my(ty + td / 2)
-    svg.rect(tpx, tpy, tw * ppm, td * ppm, stroke=EQ_INK, width=1.4,
-             fill="#eef2f6" if assembly_cutaway else "#dde3ea",
-             dash="4,3" if assembly_cutaway else None)
-    svg.text(tpx + tw * ppm / 2, tpy + 11, "OPTICAL",
-             size=7.5, anchor="middle", fill=MUTED)
+    if has_optical_evidence:
+        svg.rect(tpx, tpy, tw * ppm, td * ppm, stroke=EQ_INK, width=1.4,
+                 fill="#eef2f6" if assembly_cutaway else "#dde3ea",
+                 dash="4,3" if assembly_cutaway else None)
+        svg.text(tpx + tw * ppm / 2, tpy + 11, "OPTICAL",
+                 size=7.5, anchor="middle", fill=MUTED)
     dw, dd, dh = form["deck_size"]
     dcx, dcy, _ = form["deck_loc"]
     dpx = plan_x + mx(dcx - dw / 2)
@@ -1809,11 +1839,12 @@ def _draw_instrument_form_silhouettes(
     tower_z0 = body_h
     ftx = front_x + mx(tower_x0)
     fty = front_y + (z_max - (tower_z0 + th)) * ppm
-    svg.rect(ftx, fty, tw * ppm, th * ppm, stroke=EQ_INK, width=1.5,
-             fill="none" if assembly_cutaway else "#eef1f4",
-             dash="4,3" if assembly_cutaway else None)
-    svg.text(ftx + tw * ppm / 2, fty + 10, "OPTICAL",
-             size=7.0, anchor="middle", fill=MUTED)
+    if has_optical_evidence:
+        svg.rect(ftx, fty, tw * ppm, th * ppm, stroke=EQ_INK, width=1.5,
+                 fill="none" if assembly_cutaway else "#eef1f4",
+                 dash="4,3" if assembly_cutaway else None)
+        svg.text(ftx + tw * ppm / 2, fty + 10, "OPTICAL",
+                 size=7.0, anchor="middle", fill=MUTED)
     dw, _dd, _dh = form["deck_size"]
     dcx, _dcy, _ = form["deck_loc"]
     deck_band_h_mm = max(body_h * 0.18, 12.0)
@@ -2312,9 +2343,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
             L=L, W=W, ppm=ppm, mx=mx, my=my,
             front_x=front_x, front_y=front_y, z_max=z_max, mz=mz,
             assembly_cutaway=_assembly_cutaway,
+            has_optical_evidence=(
+                "optical-tower" in (meta.get("exterior_signature_families") or [])),
         )
         print("[ga] instrument form context drawn "
-              f"(assembly_cutaway={_assembly_cutaway})")
+              f"(assembly_cutaway={_assembly_cutaway}, optical_evidence="
+              f"{'optical-tower' in (meta.get('exterior_signature_families') or [])})")
     elif _form is not None:
         print(f"[ga] form-rule zone boxes SUPPRESSED — "
               f"{len(meta.get('above_lid_offsets_mm') or {})} real above-lid part(s) "

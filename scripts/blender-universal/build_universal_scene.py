@@ -25794,6 +25794,99 @@ def main():
                 bpy.ops.render.render(write_still=True)
                 fl.init_scene_back_to_eevee()
                 print(f"[univ][ghost] 08-product-ghost-shell.png → {out_dir}")
+                # ADDITIONAL CUTAWAY PERSPECTIVES (Tristan 2026-07-27): "show another
+                # cutaway render from two other perspectives — the side and the back."
+                # Rendered INSIDE the ghost state, before it is torn down, so all three
+                # images show the SAME translucent shell and the SAME internals — only the
+                # camera moves. Re-preparing the ghost state per view would risk the three
+                # images disagreeing about what is visible, which is the whole defect class
+                # this session has been closing.
+                # Orientation follows the hero fallback convention below: the product FRONT
+                # faces -Y (the hero camera sits at +X,-Y), so BACK is +Y and SIDE is +X.
+                try:
+                    (_ex0, _ex1), (_ey0, _ey1), (_ez0, _ez1) = fl.compute_scene_bbox()
+                    _ecx, _ecy, _ecz = (_ex0+_ex1)/2, (_ey0+_ey1)/2, (_ez0+_ez1)/2
+                    _emd = max(_ex1-_ex0, _ey1-_ey0, _ez1-_ez0)
+                    _epd = _emd * 2.0 / math.sqrt(2)
+                    _eortho = (_hero_cam.get("ortho_scale") if isinstance(_hero_cam, dict)
+                               else None) or _emd * 1.20
+                    _etgt = (_ecx, _ecy, _ecz)
+                    for _efn, _eloc in (
+                        ("09-product-ghost-shell-side.png",
+                         (_ecx + _epd * 1.15, _ecy, _ecz + _emd * 0.30)),
+                        ("10-product-ghost-shell-back.png",
+                         (_ecx, _ecy + _epd * 1.15, _ecz + _emd * 0.30)),
+                    ):
+                        fl.clear_cameras()
+                        fl.setup_camera(loc=_eloc, target=_etgt, ortho_scale=_eortho)
+                        fl.orient_billboards_to_camera(_eloc, _etgt)
+                        fl.disable_freestyle()
+                        fl.init_scene_cycles_hero()
+                        bpy.context.scene.render.filepath = str(Path(out_dir) / _efn)
+                        bpy.ops.render.render(write_still=True)
+                        fl.init_scene_back_to_eevee()
+                        print(f"[univ][ghost] {_efn} → {out_dir}")
+                except Exception as _gx_exc:  # noqa: BLE001 — extra views never block 08
+                    print(f"[univ][ghost] extra cutaway views skipped: {_gx_exc}")
+                # INTERACTIVE 3D DELIVERABLE (Tristan 2026-07-27): "a 3D version of the
+                # image with the ghost shell on and off, which you can manipulate in 3D."
+                # Exported from INSIDE the same prepared ghost state as the three stills,
+                # so the 3D files and the images are the SAME object set by construction —
+                # a customer rotating the model cannot find a part the renders never showed.
+                # Two formats because "double-click and rotate" differs by platform: USDZ
+                # Quick-Looks natively on macOS; GLB is the universal web/Windows format.
+                # Two states: shell ON (translucent, see-through) and shell OFF (internals
+                # bare) — the toggle Tristan asked for, delivered as two files because a
+                # plain viewer offers no layer control.
+                try:
+                    # BOTH exporters must see the SAME object set. The scene expresses
+                    # visibility through hide_render (the clutter-suppress pass hides ~37
+                    # meshes that way), but the glTF and USD exporters filter on VIEWPORT
+                    # visibility. Sync viewport to render for the duration of the export,
+                    # then put it back — otherwise the 3D files would silently ship the
+                    # suppressed interior clutter that no render shows.
+                    _vis_snap = {}
+                    for _vo in bpy.data.objects:
+                        _vis_snap[_vo.name] = _vo.hide_viewport
+                        _vo.hide_viewport = bool(_vo.hide_render)
+
+                    def _export_3d(_stem):
+                        _glb = str(Path(out_dir) / f"{_stem}.glb")
+                        try:
+                            bpy.ops.export_scene.gltf(
+                                filepath=_glb, export_format='GLB',
+                                use_renderable=True, export_apply=True)
+                            print(f"[univ][ghost3d] {_stem}.glb → {out_dir}")
+                        except Exception as _ge:  # noqa: BLE001
+                            print(f"[univ][ghost3d] {_stem}.glb skipped: {_ge}")
+                        _usd = str(Path(out_dir) / f"{_stem}.usdz")
+                        try:
+                            bpy.ops.wm.usd_export(
+                                filepath=_usd, visible_objects_only=True,
+                                export_materials=True)
+                            print(f"[univ][ghost3d] {_stem}.usdz → {out_dir}")
+                        except Exception as _ue:  # noqa: BLE001
+                            print(f"[univ][ghost3d] {_stem}.usdz skipped: {_ue}")
+
+                    _export_3d("product-3d-shell-on")
+                    # SHELL OFF — hide the shell panels + front cover only. Everything
+                    # else keeps the visibility the ghost state gave it, so the two files
+                    # differ by exactly the shell and nothing else.
+                    _off_snap = {}
+                    for _gob in _ghost_objs:
+                        if _gob:
+                            _off_snap[_gob.name] = (_gob.hide_render, _gob.hide_viewport)
+                            _gob.hide_render = True
+                            _gob.hide_viewport = True
+                    _export_3d("product-3d-shell-off")
+                    for _gob in _ghost_objs:
+                        if _gob and _gob.name in _off_snap:
+                            _gob.hide_render, _gob.hide_viewport = _off_snap[_gob.name]
+                    for _vo in bpy.data.objects:
+                        if _vo.name in _vis_snap:
+                            _vo.hide_viewport = _vis_snap[_vo.name]
+                except Exception as _g3_exc:  # noqa: BLE001 — 3D export never blocks renders
+                    print(f"[univ][ghost3d] 3D export skipped: {_g3_exc}")
                 # Exit the view preparer state.
                 if _prepare_sealed_product_view is not None:
                     _prepare_sealed_product_view("00-hero", False)

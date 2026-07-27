@@ -2325,10 +2325,25 @@ def _drawing_exterior_feature_families(
     drawn: set = set()
     if ga_drew_optical_tower:
         drawn.add("optical-tower")
-        # the instrument silhouette that carries the tower also carries the collar/fascia
-        # the render placed on the same body — mirror the render's non-optical families.
-        drawn |= {f for f in render_families if f != "optical-tower"}
+    # NO MIRRORING (2026-07-27). This used to do, inside the branch above:
+    #     drawn |= {f for f in render_families if f != "optical-tower"}
+    # i.e. it COPIED the render's non-optical families into the "drawn" set and then
+    # compared the two. For those families the gate was comparing the render against
+    # itself and reporting agreement — a tautology, and the same defect class SOL warned
+    # about for the projection contract. It was also conditional on the optical tower for
+    # no stated reason: the moment the GA stopped drawing a fictional tower on OpenDrop,
+    # the mirroring switched off and its `electrode` family suddenly read as
+    # "rendered-but-not-drawn" — a defect the gate had been masking, not one newly caused.
+    # optical-tower is the ONLY family this gate can independently observe in the drawing
+    # (via _ga_drew_optical_tower reading the GA SVG's own zone label). Everything else is
+    # UNVERIFIED, and the comparison below now says so rather than manufacturing a match.
     return drawn
+
+
+# The families the DRAWING lane can be independently interrogated for. Anything outside
+# this set cannot be confirmed present-or-absent in the GA, so it must be reported as
+# unverified rather than compared. Grow this as real per-family detectors are written.
+_DRAWN_OBSERVABLE_FAMILIES = frozenset({"optical-tower"})
 
 
 def render_drawing_feature_coherence_check(
@@ -2375,8 +2390,14 @@ def render_drawing_feature_coherence_check(
     if not render_set and not drawing_set:
         return (True, "no exterior signature feature on either artefact — abstain")
 
-    rendered_not_drawn = sorted(render_set - drawing_set)   # in render, not drawn
-    drawn_not_rendered = sorted(drawing_set - render_set)   # drawn, not rendered
+    # Compare ONLY over families the drawing lane can actually be observed for; report
+    # the rest as unverified. Comparing an unobservable family could only ever produce a
+    # false verdict in one direction or the other.
+    _cmp_render = render_set & _DRAWN_OBSERVABLE_FAMILIES
+    _cmp_drawn = drawing_set & _DRAWN_OBSERVABLE_FAMILIES
+    _unverified = sorted(render_set - _DRAWN_OBSERVABLE_FAMILIES)
+    rendered_not_drawn = sorted(_cmp_render - _cmp_drawn)   # in render, not drawn
+    drawn_not_rendered = sorted(_cmp_drawn - _cmp_render)   # drawn, not rendered
 
     if rendered_not_drawn or drawn_not_rendered:
         parts_list = []
@@ -2397,9 +2418,16 @@ def render_drawing_feature_coherence_check(
                 f"feature set INCOHERENT — {len(drawn_not_rendered)} drawn-not-rendered + "
                 f"{len(rendered_not_drawn)} rendered-not-drawn: " + "; ".join(parts_list))
 
+    # Say what was NOT checked. A green tick that silently covers only one of three
+    # families reads as "the drawing matches the render" when it means "the one family I
+    # can see matches". That gap is how this gate previously shipped a tautology.
+    _unv_note = (f"; {len(_unverified)} family(ies) NOT verifiable in the drawing "
+                 f"({', '.join(_unverified)}) — no independent detector, so they are "
+                 f"reported, not compared" if _unverified else "")
     return (True,
-            f"feature set COHERENT — {len(render_set)} exterior signature family(ies) "
-            f"in both artefacts: {', '.join(sorted(render_set)) or '—'}")
+            f"feature set COHERENT — {len(_cmp_render)} exterior signature family(ies) "
+            f"compared in both artefacts: {', '.join(sorted(_cmp_render)) or '—'}"
+            f"{_unv_note}")
 
 
 # A single routed CABLE line whose PLAN span exceeds this is a stray plant-crossing beam

@@ -477,6 +477,26 @@ _PRODUCT_VIEWS = (
         alternates=("00-hero.png",),
     ),
     ViewSpec(
+        # Two further cutaway perspectives of the same ghost shell (Tristan 2026-07-27:
+        # "show another cutaway render from two other perspectives — the side and the
+        # back"). required=False DELIBERATELY: they are shown and bundled whenever the
+        # ghost pass produced them, but a product whose ghost pass does not run (no sealed
+        # shell) must not start failing the render gate for their absence. They also have
+        # NO alternates — falling back to another image would put a non-cutaway under a
+        # cutaway caption, which is the exact defect that made 00-hero an "empty
+        # translucent box" under this same slot on 2026-07-25.
+        "product_cutaway_side", "09-product-ghost-shell-side.png",
+        "Interior — cutaway, side",
+        "Ghost-shell see-inside from the side, showing the internal stack depth.",
+        required=False,
+    ),
+    ViewSpec(
+        "product_cutaway_back", "10-product-ghost-shell-back.png",
+        "Interior — cutaway, rear",
+        "Ghost-shell see-inside from the rear, showing service-side internals.",
+        required=False,
+    ),
+    ViewSpec(
         "product_left", "05-product-left.png",
         "Exterior — left three-quarter",
         "Left-side product view showing enclosure depth and mounting relationship.",
