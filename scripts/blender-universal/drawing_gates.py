@@ -1281,13 +1281,24 @@ def run_gates(out_dir: str) -> list:
                 _product_bbox_mm = (_bw, _bh)
         except (TypeError, ValueError):
             pass
-    view_failures = []
+    # THREE GATES, NOT ONE (SOL round 6). `render_view_quality` was a junk-drawer
+    # conflating three unrelated failures with three different owners and three different
+    # fixes: a MISSING file is pipeline orchestration, a WASHED-OUT image is
+    # lighting/exposure, and low OCCUPANCY is camera framing. Collapsed into one verdict
+    # you cannot tell whether a change fixed anything — the gate read 13/13 failing across
+    # the sweep whether the cause was "the shaded pass never ran" or "the render is pale".
+    # Separating them is a pure re-partition of the SAME evidence: no threshold moves here,
+    # because moving a number until the sweep goes green is Goodharting, and calibrating
+    # the wash-out rule needs a labelled set that does not exist yet.
+    missing_failures: list = []
+    washed_failures: list = []
+    framing_failures: list = []
     checked_views = 0
     for view in required_views(state):
         path = os.path.join(out_dir, view.filename)
         if not os.path.exists(path):
             if view.required:
-                view_failures.append(f"{view.view_id}: missing {view.filename}")
+                missing_failures.append(f"{view.view_id}: missing {view.filename}")
             continue
         checked_views += 1
         # pass the enclosure volume so a compact benchtop product's smooth (low-edge but
@@ -1299,17 +1310,63 @@ def run_gates(out_dir: str) -> list:
             product_bbox_mm=_product_bbox_mm,
         )
         if not quality.passed:
-            view_failures.append(
-                f"{view.view_id}: " + "; ".join(quality.reasons))
+            # Route each reason to its own gate by the vocabulary render_image_quality
+            # emits. "washed-out/low-contrast" is the exposure rule; edge-density and the
+            # width/height/dominant occupancy floors are all framing.
+            _wash = [r for r in quality.reasons if "washed-out" in r]
+            _frame = [r for r in quality.reasons if "washed-out" not in r]
+            if _wash:
+                washed_failures.append(f"{view.view_id}: " + "; ".join(_wash))
+            if _frame:
+                framing_failures.append(f"{view.view_id}: " + "; ".join(_frame))
+    # (1) PRESENCE — a required Excel-bound view is not on disk. This is pipeline
+    #     orchestration, NOT image quality: the archetype sweep re-bakes scene + drawings
+    #     but not the shaded Cycles pass, so 8 of 13 archetypes reported "missing
+    #     08-product-ghost-shell.png" purely because that pass had not been run. Keeping
+    #     it inside an image-quality gate made "never rendered" indistinguishable from
+    #     "rendered badly".
     gates.append(Gate(
-        "render_view_quality",
+        "render_presence",
         ["renders"],
         "high",
-        not view_failures and checked_views > 0,
-        (f"{checked_views} Excel-bound view(s) present, non-blank and correctly framed"
-         if not view_failures and checked_views > 0 else
-         f"{len(view_failures)} invalid/missing Excel-bound view(s): "
-         + " | ".join(view_failures[:5])),
+        not missing_failures and checked_views > 0,
+        # `checked_views` counts every Excel-bound view found on disk, which includes
+        # OPTIONAL ones (the two extra cutaway perspectives are required=False). Calling
+        # that total "required" overstates what was verified.
+        (f"every required Excel-bound view present ({checked_views} view(s) on disk)"
+         if not missing_failures and checked_views > 0 else
+         (f"{len(missing_failures)} required view(s) absent: "
+          + " | ".join(missing_failures[:5])) if missing_failures else
+         "no Excel-bound view was checked — nothing rendered"),
+    ))
+    # (2) EXPOSURE — the wash-out rule (mean >= 152 AND std <= 48) on product renders.
+    #     NOT recalibrated here. It currently fires on ~17 of ~20 product renders, and a
+    #     rule that flags most of its population is asserting the renderer's whole output
+    #     is defective rather than discriminating good from bad. Deciding that needs a
+    #     threshold-INDEPENDENT labelled set (binary acceptable/unacceptable over ~30
+    #     renders, compared against the recorded mean/std). Until that exists, moving the
+    #     numbers would be Goodharting, so the gate keeps firing honestly and says so.
+    gates.append(Gate(
+        "render_washed_out",
+        ["renders"],
+        "high",
+        not washed_failures,
+        (f"{checked_views} product render(s) within the exposure/contrast rule"
+         if not washed_failures else
+         f"{len(washed_failures)} washed-out/low-contrast render(s) "
+         f"(threshold UNCALIBRATED — see render_image_quality.washed_out): "
+         + " | ".join(washed_failures[:5])),
+    ))
+    # (3) FRAMING — occupancy + edge-density floors: the camera/fit problem.
+    gates.append(Gate(
+        "render_framing",
+        ["renders"],
+        "high",
+        not framing_failures,
+        (f"{checked_views} render(s) correctly framed and non-blank"
+         if not framing_failures else
+         f"{len(framing_failures)} badly framed/blank render(s): "
+         + " | ".join(framing_failures[:5])),
     ))
 
     # ── G15 GA↔BLENDER COHERENCE (Codema plant + Powerwall product 2026-07-14) ─
@@ -2459,7 +2516,9 @@ GATE_STAGE = {
     "drawing_vision_glance": "drawing_vision_glance.critique_drawing_set (GA PNG + product exterior — flag-only residue; proveCatch on known-bad fixture)",
     "render_ga_vision_coherence": "drawing_vision_glance.render_ga_coherent (RENDER + GA shown together — flag-only cross-artefact residue; retry+tiebreak on nameless-broken; catches vessel-on-top-vs-inside G22 can't see)",
     "drawing_domain": "deriveDeviceEnergyTopology (device-scale topology override) + draw_single_line/_apply_distribution_voltage_model DC-product branch",
-    "render_view_quality": "render_view_contract required_views + build_universal_scene product cameras + render_image_quality",
+    "render_presence": "render_view_contract required_views + the shaded render pass (render-blender-scene.py) — a required view was never written",
+    "render_washed_out": "build_universal_scene lighting/exposure + render_image_quality.washed_out thresholds (UNCALIBRATED — needs a labelled set before any threshold move)",
+    "render_framing": "build_universal_scene product cameras + render_image_quality occupancy/edge-density floors",
     "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",
     "enclosure_shell_contains_parts": "minimum_working_envelope (functional-stack height pack) + place_sealed_enclosure env_mm — shell must contain the real mechanical+fluidic part stack",
     "envelope_equality": "generate_drawing_set._manifest_envelope_dims (must read the canonical parts-manifest Enclosure Shell dims_mm — a fallback to the superseded state pre-estimate makes the emitted caption diverge from the shell) + build-excel-export tab_equipment_register (already canonical)",
