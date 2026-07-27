@@ -25804,14 +25804,44 @@ def main():
                 # Orientation follows the hero fallback convention below: the product FRONT
                 # faces -Y (the hero camera sits at +X,-Y), so BACK is +Y and SIDE is +X.
                 try:
-                    (_ex0, _ex1), (_ey0, _ey1), (_ez0, _ez1) = fl.compute_scene_bbox()
+                    # FRAME ON THE PRODUCT, NOT THE SCENE. fl.compute_scene_bbox() spans
+                    # the studio backdrop and floor plane as well as the product, so an
+                    # ortho_scale derived from it framed the organoid at roughly 15% of
+                    # the frame — a correct image of the right thing, unreadably small,
+                    # and exactly what the render_framing occupancy floor exists to catch.
+                    # The shell objects ARE the product envelope, so their world bbox is
+                    # the extent worth filling the frame with.
+                    import mathutils as _emu
+                    _epts = []
+                    for _eo in _ghost_objs:
+                        if _eo is None or getattr(_eo, "type", None) != "MESH":
+                            continue
+                        for _ec in _eo.bound_box:
+                            _epts.append(_eo.matrix_world @ _emu.Vector(_ec))
+                    if _epts:
+                        _ex0 = min(_p.x for _p in _epts); _ex1 = max(_p.x for _p in _epts)
+                        _ey0 = min(_p.y for _p in _epts); _ey1 = max(_p.y for _p in _epts)
+                        _ez0 = min(_p.z for _p in _epts); _ez1 = max(_p.z for _p in _epts)
+                    else:
+                        (_ex0, _ex1), (_ey0, _ey1), (_ez0, _ez1) = fl.compute_scene_bbox()
                     _ecx, _ecy, _ecz = (_ex0+_ex1)/2, (_ey0+_ey1)/2, (_ez0+_ez1)/2
                     _emd = max(_ex1-_ex0, _ey1-_ey0, _ez1-_ez0)
                     _epd = _emd * 2.0 / math.sqrt(2)
+                    print(f"[univ][ghost3d][frame] shell_objs={len(_ghost_objs)} "
+                          f"pts={len(_epts)} bbox_mm x[{_ex0*1000:.0f}..{_ex1*1000:.0f}] "
+                          f"y[{_ey0*1000:.0f}..{_ey1*1000:.0f}] z[{_ez0*1000:.0f}..{_ez1*1000:.0f}]",
+                          flush=True)
                     _etgt = (_ecx, _ecy, _ecz)
-                    _espan_x = max(_ex1 - _ex0, 1.0)
-                    _espan_y = max(_ey1 - _ey0, 1.0)
-                    _espan_z = max(_ez1 - _ez0, 1.0)
+                    # METRES, NOT MILLIMETRES. The degenerate-span guard was written as
+                    # max(span, 1.0) by copying the mm-based idiom used elsewhere in this
+                    # file — but Blender units here are METRES, so a 180x248x108 mm product
+                    # (0.180/0.248/0.108) lost every axis to a ONE-METRE floor and all four
+                    # elevations rendered at ortho_scale 1.15, framing the product at ~13%
+                    # of the frame. The guard only exists to avoid a zero-scale camera on a
+                    # degenerate bbox, so it belongs at sub-millimetre magnitude.
+                    _espan_x = max(_ex1 - _ex0, 1e-4)
+                    _espan_y = max(_ey1 - _ey0, 1e-4)
+                    _espan_z = max(_ez1 - _ez0, 1e-4)
                     # TRUE ORTHOGRAPHIC ELEVATIONS (Tristan 2026-07-27: "a top down
                     # translucent and a front on translucent and a side translucent").
                     # setup_camera defaults to an ORTHO camera, which is what an elevation
@@ -25822,22 +25852,91 @@ def main():
                     # not render as a stripe in a square frame (which is also what the
                     # render_framing occupancy floor exists to catch).
                     # Front faces -Y, matching the hero convention and the GA datum.
-                    for _efn, _eloc, _escale in (
+                    # Blender's ortho_scale spans the LONGER image axis (sensor fit AUTO,
+                    # 2400x1600), so fitting only the horizontal span lets a view whose
+                    # VERTICAL extent is the larger one overflow the frame. The top-down
+                    # view is exactly that case: it shows X across (180 mm) but the 248 mm
+                    # Y depth up the image, and it clipped at h_occ 0.96. Solve both axes:
+                    # scale >= h_span, and scale >= v_span * (res_x/res_y).
+                    # HIDE THE STUDIO FLOOR FOR THE ELEVATIONS. The top-down camera looks
+                    # straight down at the bright ground slab, which then fills the frame
+                    # behind a grey product: mean 192, low variance, and the (correctly
+                    # calibrated) wash-out rule fires. The horizontal elevations see the
+                    # slab edge-on so they are unaffected either way. An engineering
+                    # elevation should not include the studio floor regardless, so this is
+                    # the honest fix rather than an exposure tweak — and per the 07-27
+                    # calibration the threshold itself must not move.
+                    _ground_hidden = []
+                    for _go in bpy.data.objects:
+                        # BOTH ground prefixes. The studio floor for an instrument scene is
+                        # `fl_ground_instrument_studio` (a 1.94 x 1.94 m plane sitting at the
+                        # product's own base height), NOT `u_ground_*` — matching only the
+                        # latter left it visible, and the top-down camera stared straight at
+                        # it. Matched by explicit PREFIX, never `"ground" in name`, because
+                        # that would also hide electrical grounding/earth-bonding parts.
+                        if (_go.name.startswith(("u_ground_", "fl_ground_"))
+                                and not _go.hide_render):
+                            _go.hide_render = True
+                            _ground_hidden.append(_go)
+                    # DARK WORLD FOR THE ELEVATIONS. The three horizontal elevations look
+                    # into the dark world and land at mean 83-112 with good variance; the
+                    # top-down camera looks into the BRIGHT upper world and lands at mean
+                    # 161 / std 32, which the (correctly calibrated) wash-out rule flags on
+                    # an otherwise clean, readable view. Pinning one dark background for the
+                    # whole elevation set is a real quality fix, not a gate dodge: it raises
+                    # subject contrast AND makes the four elevations a consistent set
+                    # instead of three dark plates and one pale one.
+                    _world_bg = None
+                    try:
+                        _wnodes = bpy.context.scene.world.node_tree.nodes
+                        _wbg = _wnodes.get("Background")
+                        if _wbg is not None:
+                            _world_bg = tuple(_wbg.inputs[0].default_value)
+                            _wbg.inputs[0].default_value = (0.045, 0.047, 0.052, 1.0)
+                    except Exception:  # noqa: BLE001 — world tweak is never load-bearing
+                        _world_bg = None
+                    _eres_x0 = int(bpy.context.scene.render.resolution_x)
+                    _eres_y0 = int(bpy.context.scene.render.resolution_y)
+                    _elong, _eshort = max(_eres_x0, _eres_y0), min(_eres_x0, _eres_y0)
+
+                    def _eframe(_h, _v):
+                        """(ortho_scale, res_x, res_y) framing a subject of h x v extent.
+
+                        A PORTRAIT subject gets a PORTRAIT frame. The organoid's plan is
+                        180 x 248 mm, so in the fixed 3:2 landscape frame ~40% of the image
+                        was uniform backdrop either side of the product — which reads as
+                        mean 192 / low variance and trips the (correctly calibrated)
+                        wash-out rule on an otherwise excellent, readable elevation.
+                        Widening the exposure or exempting the view would both be gaming a
+                        gate that is right; framing the subject properly is the actual fix,
+                        and it raises width occupancy at the same time.
+                        """
+                        if _v > _h:
+                            _rx, _ry = _eshort, _elong
+                        else:
+                            _rx, _ry = _elong, _eshort
+                        _asp = float(_rx) / max(1.0, float(_ry))
+                        return max(_h, _v * _asp) * 1.15, _rx, _ry
+                    for _efn, _eloc, _eframing in (
                         ("09-product-ghost-shell-side.png",
                          (_ecx + _epd * 1.15, _ecy, _ecz),
-                         max(_espan_y, _espan_z) * 1.15),
+                         _eframe(_espan_y, _espan_z)),
                         ("10-product-ghost-shell-back.png",
                          (_ecx, _ecy + _epd * 1.15, _ecz),
-                         max(_espan_x, _espan_z) * 1.15),
+                         _eframe(_espan_x, _espan_z)),
                         ("11-product-ghost-shell-top.png",
                          (_ecx, _ecy, _ecz + _epd * 1.15),
-                         max(_espan_x, _espan_y) * 1.15),
+                         _eframe(_espan_x, _espan_y)),
                         ("12-product-ghost-shell-front.png",
                          (_ecx, _ecy - _epd * 1.15, _ecz),
-                         max(_espan_x, _espan_z) * 1.15),
+                         _eframe(_espan_x, _espan_z)),
                     ):
+                        _escale, _erx, _ery = _eframing
+                        bpy.context.scene.render.resolution_x = _erx
+                        bpy.context.scene.render.resolution_y = _ery
                         fl.clear_cameras()
-                        fl.setup_camera(loc=_eloc, target=_etgt, ortho_scale=_escale)
+                        _ecam = fl.setup_camera(loc=_eloc, target=_etgt,
+                                                ortho_scale=_escale)
                         fl.orient_billboards_to_camera(_eloc, _etgt)
                         fl.disable_freestyle()
                         fl.init_scene_cycles_hero()
@@ -25845,6 +25944,16 @@ def main():
                         bpy.ops.render.render(write_still=True)
                         fl.init_scene_back_to_eevee()
                         print(f"[univ][ghost] {_efn} → {out_dir}")
+                    if _world_bg is not None:
+                        try:
+                            bpy.context.scene.world.node_tree.nodes["Background"] \
+                                .inputs[0].default_value = _world_bg
+                        except Exception:  # noqa: BLE001
+                            pass
+                    bpy.context.scene.render.resolution_x = _eres_x0
+                    bpy.context.scene.render.resolution_y = _eres_y0
+                    for _go in _ground_hidden:
+                        _go.hide_render = False
                 except Exception as _gx_exc:  # noqa: BLE001 — extra views never block 08
                     print(f"[univ][ghost] extra cutaway views skipped: {_gx_exc}")
                 # INTERACTIVE 3D DELIVERABLE (Tristan 2026-07-27): "a 3D version of the
