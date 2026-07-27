@@ -15592,10 +15592,22 @@ def _place_instrument_interior_layout(
                     or o.name.startswith("u_se_exterior_")
                 )
             )
+            # REGISTER the optical train as exterior signature geometry (SOL round 3).
+            # _exterior_signature_features only considers meshes present in
+            # _ABOVE_LID_SIGNATURE_MESHES, so classifying the prefixes is not enough on
+            # its own — without this the render lane still reports nothing and
+            # render_drawing_feature_coherence keeps firing on every colorimeter-class
+            # product. Exact-prefix only: a build that did not instantiate the optical
+            # train registers nothing and correctly reports no family.
+            for _onm in _names:
+                if _onm.startswith(_OPTICAL_HANDHELD_SIGNATURE_PREFIXES):
+                    _ABOVE_LID_SIGNATURE_MESHES.add(_onm)
             Path(_out).joinpath("form-meshes.json").write_text(
                 json.dumps(
                     {"form": "optical_handheld", "form_id": "optical_handheld",
-                     "meshes": _names},
+                     "meshes": _names,
+                     "exterior_signature_features":
+                         _exterior_signature_features(_names)},
                     indent=2,
                 )
             )
@@ -17447,9 +17459,33 @@ _SIG_ALIASED_PREFIXES: dict = {}
 # such as the bare u_se_le_vial / u_se_le_vial_fluid, which are registered but hidden
 # on the exterior). This is the SAME provenance the containment-clamp exemption and
 # the sealed-view keep both honour — one predicate, never a per-product name guess.
+# OPTICAL-HANDHELD SIGNATURE REGISTRY (SOL round 3, 2026-07-27).
+#
+# render_drawing_feature_coherence fired BY CONSTRUCTION on every colorimeter-class
+# product — 7 of the 13-archetype sweep's failures. Its optical train is instantiated as
+# `u_se_instrument_story_*` / `u_se_exterior_detail_*` meshes, but the family classifier
+# only recognised the legacy `u_se_le_*` naming, so exterior_signature_features came out
+# null, the render lane reported no families, and the GA's OPTICAL zone was forever
+# "drawn-but-not-rendered".
+#
+# SOL's constraint, kept: the family is derived from OBSERVED INSTANTIATED MESH NAMES.
+# Registration is EXACT — no noun matching ("cuvette" in name), and no product-class
+# fallback. A colorimeter that failed to build its optical train must still report no
+# family, because the point is to evidence rendered geometry, not to restate design
+# intent. The proveCatch below asserts unregistered lookalikes are REFUSED.
+_OPTICAL_HANDHELD_SIGNATURE_FAMILY_BY_PREFIX: dict = {
+    "u_se_instrument_story_cuvette": "optical-tower",
+    "u_se_instrument_story_detector": "optical-tower",
+    "u_se_instrument_story_led": "optical-tower",
+    "u_se_exterior_detail_cuvette_insert": "optical-tower",
+}
+_OPTICAL_HANDHELD_SIGNATURE_PREFIXES: tuple = tuple(
+    _OPTICAL_HANDHELD_SIGNATURE_FAMILY_BY_PREFIX)
+
 _EXTERIOR_KEEP_PREFIXES: tuple = (
     "u_se_le_lead", "u_se_le_electrode", "u_se_le_grid", "u_se_le_cartridge",
     "u_se_le_vial_collar", "u_se_le_od", "u_se_le_face",
+    *_OPTICAL_HANDHELD_SIGNATURE_PREFIXES,
 )
 
 
@@ -17467,6 +17503,11 @@ def _exterior_signature_family(mesh_name: str) -> str | None:
     — diffing the raw form-meshes list would false-fire on those).
     """
     nm = str(mesh_name or "")
+    # Exact registered optical-handheld prefixes first — the handheld optical train does
+    # not use the legacy u_se_le_* convention (SOL round 3).
+    for _opref, _ofam in _OPTICAL_HANDHELD_SIGNATURE_FAMILY_BY_PREFIX.items():
+        if nm.startswith(_opref):
+            return _ofam
     if not nm.startswith(_EXTERIOR_KEEP_PREFIXES):
         return None
     if nm.startswith("u_se_le_od"):
@@ -17478,6 +17519,29 @@ def _exterior_signature_family(mesh_name: str) -> str | None:
     # lead / electrode / grid / cartridge → their own role token
     token = nm[len("u_se_le_"):].split("_", 1)[0]
     return token or None
+
+
+def _prove_optical_handheld_signature_registry() -> list:
+    """proveCatch for the optical-handheld registry (SOL round 3, 2026-07-27).
+
+    Two directions, and the SECOND is the one that matters: an UNREGISTERED lookalike
+    must be REFUSED. The whole point of an exact registry is that a family is evidence of
+    instantiated geometry, not a noun that happens to appear in a part name. If someone
+    later "simplifies" this to `"cuvette" in name`, these assertions fail.
+
+    @returns list of disagreements; empty when the registry behaves.
+    """
+    bad = []
+    for _nm, _want in _OPTICAL_HANDHELD_SIGNATURE_FAMILY_BY_PREFIX.items():
+        _got = _exterior_signature_family(_nm)
+        if _got != _want:
+            bad.append(f"{_nm}: expected {_want!r}, got {_got!r}")
+    for _nm in ("customer_cuvette_storage", "detector_access_panel",
+                "status_led_button", "generic_optical_tower",
+                "u_se_interior_cuvette_holder"):
+        if _exterior_signature_family(_nm) == "optical-tower":
+            bad.append(f"{_nm}: invented optical-tower from an UNREGISTERED alias")
+    return bad
 
 
 def _exterior_signature_features(mesh_names) -> list:
