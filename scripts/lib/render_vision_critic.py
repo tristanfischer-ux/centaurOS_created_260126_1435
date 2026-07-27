@@ -546,6 +546,23 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
     scores (cap ≤4); a clean retry is clean; nameless twice keeps the honest cap-at-7.
     A named first verdict is NEVER retried away (flag-only council rule intact)."""
     res = _critique_once(image_path, model, timeout)
+    # OUTPUT-CONTRACT RETRY (2026-07-27). The rubric demands a JSON verdict; a model that
+    # answers in PROSE yields "no verdict: ..." and ok=False, which caps the Assembly tab
+    # at 6 for want of a vision pass. Observed verbatim on the organoid GA:
+    #     "no verdict: Decision:** * None of the mandatory `broken=true` conditions are met."
+    # The model plainly judged the drawing FINE. It is NOT parsed out of the prose:
+    #   - that string contains the literal `broken=true` inside backticks, so a loose regex
+    #     would read "not broken" as BROKEN — inverting a safety verdict;
+    #   - and this module's own contract is that the critic may FLAG/FAIL, never RESCUE, so
+    #     manufacturing a clean verdict from unparseable text is precisely what is barred.
+    # A contract violation is a FAILED CALL, so it gets the same single retry the nameless-
+    # broken flake gets. Two failures leave ok=False and the tab stays honestly capped.
+    if (isinstance(res, dict) and not res.get("ok")
+            and str(res.get("error") or "").startswith("no verdict")):
+        _retry_nv = _critique_once(image_path, model, timeout)
+        if isinstance(_retry_nv, dict) and _retry_nv.get("ok"):
+            _retry_nv["contract_retry"] = True
+            res = _retry_nv
     if isinstance(res, dict) and res.get("ok") and res.get("broken") is True and not res.get("defects"):
         retry = _critique_once(image_path, model, timeout)
         if isinstance(retry, dict) and retry.get("ok"):

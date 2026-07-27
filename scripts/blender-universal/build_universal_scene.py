@@ -25861,9 +25861,17 @@ def main():
                             print(f"[univ][ghost3d] {_stem}.glb skipped: {_ge}")
                         _usd = str(Path(out_dir) / f"{_stem}.usdz")
                         try:
+                            # This Blender's usd_export has NO `visible_objects_only`
+                            # (verified against the operator's own RNA: it exposes only
+                            # `selected_objects_only`). Because viewport visibility has
+                            # already been synced to render visibility above, a select-all
+                            # can only pick up objects that are actually visible — hidden
+                            # ones are not selectable — so selection IS the visible set.
+                            bpy.ops.object.select_all(action='SELECT')
                             bpy.ops.wm.usd_export(
-                                filepath=_usd, visible_objects_only=True,
+                                filepath=_usd, selected_objects_only=True,
                                 export_materials=True)
+                            bpy.ops.object.select_all(action='DESELECT')
                             print(f"[univ][ghost3d] {_stem}.usdz → {out_dir}")
                         except Exception as _ue:  # noqa: BLE001
                             print(f"[univ][ghost3d] {_stem}.usdz skipped: {_ue}")
