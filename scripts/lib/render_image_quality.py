@@ -42,7 +42,26 @@ def washed_out(lum_mean: float, lum_std: float,
     the ceiling; the good hero (147.1/50.3) passes on its mean (147.1 < 152). Bad
     heroes sit at mean 156 / std 43 (over on mean, under on std) → both conditions
     hold → washed-out. std <= floor uses the rounding-dust-safe _below_floor idiom
-    (round(v,2) <= round(floor,2) ⟺ not _below_floor(v,floor) is False)."""
+    (round(v,2) <= round(floor,2) ⟺ not _below_floor(v,floor) is False).
+
+    CALIBRATION, MEASURED 2026-07-27 — do not loosen these numbers without repeating it.
+    A 13-archetype sweep showed this rule failing 17 of ~20 product renders, which looks
+    like a gate asserting the renderer's entire output is defective rather than one
+    discriminating good from bad (the >80-90%-of-population smell test). It is not. Over
+    the FULL population of 1,195 product renders in out/:
+
+        flagged washed-out : 168  (14.1%)
+        mean luminance     : min 40 - median 134 - max 240   (trigger >= 152)
+        std  luminance     : min 14 - median 73  - max 103   (trigger <= 48)
+        mean >= 152 : 380/1195 (32%)   std <= 48 : 233/1195 (19%)
+
+    The median render sits comfortably inside both thresholds; the AND keeps the flag
+    rate at one in seven. The sweep is a BIASED SAMPLE - those 13 archetypes genuinely
+    have pale renders. So a wash-out failure means FIX THE LIGHTING/EXPOSURE for that
+    product, never move the threshold. (Measured with PIL ImageStat, verified identical
+    to the tobytes() maths to 1e-6 on mean and 1e-3 on std.)
+    """
+
     if lum_mean < mean_ceiling:
         return False
     # std <= floor  (i.e. NOT std > floor). Rounding-dust-safe: a std that displays

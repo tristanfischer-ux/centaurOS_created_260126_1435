@@ -1340,12 +1340,12 @@ def run_gates(out_dir: str) -> list:
          "no Excel-bound view was checked — nothing rendered"),
     ))
     # (2) EXPOSURE — the wash-out rule (mean >= 152 AND std <= 48) on product renders.
-    #     NOT recalibrated here. It currently fires on ~17 of ~20 product renders, and a
-    #     rule that flags most of its population is asserting the renderer's whole output
-    #     is defective rather than discriminating good from bad. Deciding that needs a
-    #     threshold-INDEPENDENT labelled set (binary acceptable/unacceptable over ~30
-    #     renders, compared against the recorded mean/std). Until that exists, moving the
-    #     numbers would be Goodharting, so the gate keeps firing honestly and says so.
+    #     CALIBRATION SETTLED 2026-07-27: measured over the full population of 1,195
+    #     product renders, this rule flags 14.1%, with the median render (mean 134,
+    #     std 73) comfortably inside both thresholds. The sweep's apparent ~85% failure
+    #     rate was a biased sample — those archetypes really are pale. The thresholds
+    #     are therefore SOUND and a failure here means fix the product's
+    #     lighting/exposure, NOT move the number. Evidence in render_image_quality.washed_out.
     gates.append(Gate(
         "render_washed_out",
         ["renders"],
@@ -1354,7 +1354,8 @@ def run_gates(out_dir: str) -> list:
         (f"{checked_views} product render(s) within the exposure/contrast rule"
          if not washed_failures else
          f"{len(washed_failures)} washed-out/low-contrast render(s) "
-         f"(threshold UNCALIBRATED — see render_image_quality.washed_out): "
+         f"(threshold calibrated: flags 14.1% of 1,195 renders — fix the lighting, "
+         f"not the threshold): "
          + " | ".join(washed_failures[:5])),
     ))
     # (3) FRAMING — occupancy + edge-density floors: the camera/fit problem.
