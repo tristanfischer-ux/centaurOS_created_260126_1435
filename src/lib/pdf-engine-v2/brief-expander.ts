@@ -71,9 +71,21 @@ const EXPAND_MODEL = 'x-ai/grok-4.5'
 // result is cached to disk by prompt hash, so the cost is paid once per distinct brief
 // while every downstream stage inherits the quality. This is the cheapest place in the
 // engine to spend money.
+// PANEL MEMBERSHIP (revised 2026-07-27). kimi-k3 was dropped after failing BOTH live
+// attempts at this task — once "aborted due to timeout" at 180 s, once truncated JSON at
+// position 7308 — so the panel was really running 2/3 and paying for a third that never
+// landed. Replaced with gemini-3.1-pro-preview for two reasons: it is a FOURTH DISTINCT
+// FAMILY, so no producer shares a lineage with the xAI reducer, and it is the model that
+// WAS the brief expander before grok-4.5 — proven on exactly this derivation.
+//
+// grok-4.5 was considered and rejected as a producer: it is the REDUCER, and a
+// synthesiser that judges its own expansion alongside two others has an obvious
+// self-preference problem and breaks maker-is-not-checker. Diversity across families is
+// worth more here than any single model's peak score, because corroboration is the
+// evidence standard — three models from one family agreeing proves less.
 const EXPAND_PANEL = [
   'anthropic/claude-fable-5',   // Fable
-  'moonshotai/kimi-k3',          // Kimi 3
+  'google/gemini-3.1-pro-preview',  // was kimi-k3 — see note below
   'openai/gpt-5.6-sol',          // SOL — the NAMED 5.6 variant, not gpt-5.2
 ] as const
 

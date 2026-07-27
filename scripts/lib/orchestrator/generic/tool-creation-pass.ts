@@ -24,6 +24,7 @@
  */
 
 import Database from 'better-sqlite3'
+import { createHash } from 'crypto'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { homedir } from 'node:os'
@@ -233,9 +234,30 @@ function isCacheableSlug(slug: string): boolean {
 /** Normalise a class label to the proposal-cache slug alphabet (hyphens → '_',
  *  lower-case), matching how bootstrap-tool-plan keys class_tool_plan_candidates.
  *  Returns null if it cannot sanitise. */
-function proposalSlugFor(rawClass: string): string | null {
+function proposalSlugFor(rawClass: string, application?: string): string | null {
   const slug = String(rawClass ?? '').trim().toLowerCase().replace(/-/g, '_')
-  return isCacheableSlug(slug) ? slug : null
+  if (!isCacheableSlug(slug)) return null
+  // CLASS ALONE IS NOT A SAFE KEY (2026-07-27). The cache existed to make tool
+  // selection deterministic — same class, same tool_ids, no re-harvest. But two
+  // products that merely SHARE a class have nothing else in common, and the second
+  // one silently inherits the first one's tools. Observed live: a benchtop battery
+  // cell cycler classified `consumer_electronics` replayed the stored proposal from
+  // an earlier microgravity RPM appliance and was handed
+  // rpm-kinematics:microgravity-simulation, microfluidics:shear-stress and
+  // gimbal-dynamics:torque-sizing. The chain then declared "plausibility 1/10 — tool
+  // skeleton is unrecoverable" and emitted an 'Imaging Intensity' word sized at
+  // 229 m2 on a desktop instrument.
+  //
+  // `application` is the envelope's own functional descriptor, so including it means a
+  // functionally different product MISSES and proposes fresh — which is the fail-safe
+  // path this cache already documents ("A cache miss / parse error falls through to
+  // the LLM propose"). Determinism is preserved for genuine re-runs of the same
+  // product, which is what the cache was for.
+  if (!application) return slug
+  const app = String(application).trim().toLowerCase()
+  if (!app) return slug
+  const fp = createHash('sha1').update(app).digest('hex').slice(0, 8)
+  return `${slug}__${fp}`
 }
 
 function openProposalDb(dbPath: string = FORGE_TRUTH_DB): Database.Database {
@@ -264,8 +286,8 @@ interface ProposalRow { id: number; slug: string; version: number; duties_json: 
  * Returns null on miss/parse-error/empty (the caller then proposes via the LLM —
  * current behaviour, the fail-safe).
  */
-export function loadProposalForClass(rawClass: string, dbPath: string = FORGE_TRUTH_DB): DutySpec[] | null {
-  const slug = proposalSlugFor(rawClass)
+export function loadProposalForClass(rawClass: string, dbPath: string = FORGE_TRUTH_DB, application?: string): DutySpec[] | null {
+  const slug = proposalSlugFor(rawClass, application)
   if (!slug) return null
   if (!existsSync(dbPath)) return null
   let db: Database.Database | null = null
@@ -319,8 +341,8 @@ export function loadProposalForClass(rawClass: string, dbPath: string = FORGE_TR
  * a store failure just means the next run re-proposes (fail-safe). No-op when the
  * class slug doesn't sanitise or the duty list is empty.
  */
-export function storeProposalForClass(rawClass: string, duties: DutySpec[], dbPath: string = FORGE_TRUTH_DB): void {
-  const slug = proposalSlugFor(rawClass)
+export function storeProposalForClass(rawClass: string, duties: DutySpec[], dbPath: string = FORGE_TRUTH_DB, application?: string): void {
+  const slug = proposalSlugFor(rawClass, application)
   if (!slug || duties.length === 0) return
   let db: Database.Database | null = null
   try {
@@ -437,7 +459,7 @@ export async function runToolCreationPass(
     // LLM call → byte-identical tool_ids → the cached tool-plan candidate stays
     // valid → NO re-harvest → NO domain-blind auto-planner fallback. A cache miss /
     // parse error falls through to the LLM propose (current behaviour — fail-safe).
-    const cachedDuties = loadProposalForClass(envelope.class)
+    const cachedDuties = loadProposalForClass(envelope.class, undefined, envelope.application)
     let duties: DutySpec[]
     let proposalReused = false
     if (cachedDuties && cachedDuties.length > 0) {
@@ -518,7 +540,7 @@ export async function runToolCreationPass(
     // re-propose + complete, then store the full set. (When the cache was hit, the
     // stored set is by definition already complete + accepted, so no re-store.)
     if (!proposalReused && acceptedDuties.length === duties.length && acceptedDuties.length > 0) {
-      storeProposalForClass(envelope.class, acceptedDuties)
+      storeProposalForClass(envelope.class, acceptedDuties, undefined, envelope.application)
       console.error(
         `[tool-creation] PROPOSAL-CACHE STORE for ${envelope.class}: persisted ${acceptedDuties.length} accepted duty spec(s) ` +
         `— the next run for this class replays them verbatim (no LLM propose, deterministic tool_ids).`,
