@@ -56,6 +56,46 @@ import { resolve } from 'path'
 // hallucination; gpt-5.6-sol is deeper but its 11% non-hallucination risks inventing
 // brief requirements on the single most load-bearing derivation).
 const EXPAND_MODEL = 'x-ai/grok-4.5'
+
+// ─── PANEL (Tristan 2026-07-27) ──────────────────────────────────────────────
+// "the higher the quality of the information in the brief, the better the output is
+// downstream. You can start with a small brief, but it needs to be expanded properly."
+// and: "expanded independently [by] three really high-quality briefs and then have one of
+// them pick the best parts of the overall brief and actually think about it."
+//
+// So: three strong reasoners expand the SAME brief INDEPENDENTLY (they never see each
+// other's work — independence is the whole point, a panel that has read the first answer
+// just ratifies it), then ONE synthesiser reconciles them.
+//
+// Expensive models are correct HERE specifically: expansion runs ONCE per chain and the
+// result is cached to disk by prompt hash, so the cost is paid once per distinct brief
+// while every downstream stage inherits the quality. This is the cheapest place in the
+// engine to spend money.
+const EXPAND_PANEL = [
+  'anthropic/claude-fable-5',   // Fable
+  'moonshotai/kimi-k3',          // Kimi 3
+  'openai/gpt-5.6-sol',          // SOL — the NAMED 5.6 variant, not gpt-5.2
+] as const
+
+// THE SYNTHESISER IS NOT A PANEL MEMBER, AND IS DELIBERATELY THE LOW-HALLUCINATION MODEL.
+// The note above records why gpt-5.6-sol was rejected as the SINGLE expander: "deeper but
+// its 11% non-hallucination risks inventing brief requirements on the single most
+// load-bearing derivation". A panel answers that objection for the PRODUCER role — an
+// invented duty that appears in only one of three independent expansions is visible as an
+// outlier, which is the entire point of fanning out. It does NOT answer it for the
+// REDUCER role: a synthesiser that invents can inject a requirement that was in none of
+// the three, and nothing downstream would catch it.
+//
+// So SOL stays a producer and grok-4.5 — the incumbent, chosen on 2026-07-25 for exactly
+// this property — does the reduction. It is also the graceful-degradation choice: if the
+// whole panel fails, the fallback single-model path is already this model, so a failed
+// panel returns the same expansion the engine produced before this change.
+const SYNTH_MODEL = EXPAND_MODEL
+
+// The panel members are deep reasoners and the default 180 s cut kimi-k3 off mid-answer on
+// the first real run ("The operation was aborted due to timeout"), costing a third of the
+// panel's diversity. Expansion is cached, so a slow call is paid once per distinct brief.
+const PANEL_TIMEOUT_MS = 600_000
 const MAX_OUTPUT_TOKENS = 12_000
 
 export type RequirementProvenance = 'stated' | 'derived'
@@ -221,6 +261,8 @@ function buildExpansionPrompt(
 
 async function callReasoner(
   prompt: string,
+  model: string = EXPAND_MODEL,
+  timeoutMs: number = 180_000,
 ): Promise<{ parsed: unknown | null; costUsd: number | null; error: string | null }> {
   const apiKey = process.env.OPENROUTER_API_KEY ?? ''
   if (!apiKey) return { parsed: null, costUsd: null, error: 'OPENROUTER_API_KEY not set' }
@@ -234,13 +276,13 @@ async function callReasoner(
         'X-Title': 'ForgeOS brief expansion',
       },
       body: JSON.stringify({
-        model: EXPAND_MODEL,
+        model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0,
         max_tokens: MAX_OUTPUT_TOKENS,
         usage: { include: true },
       }),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) {
       return { parsed: null, costUsd: null, error: `OpenRouter HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` }
@@ -361,6 +403,47 @@ export function sanitiseExpansion(raw: any): BriefExpansion | null {
  * PURE: does not mutate the brief. The caller decides how to attach the result.
  * Fail-safe: returns expansion:null + error on any failure.
  */
+function buildSynthesisPrompt(
+  panel: { model: string; expansion: BriefExpansion }[],
+  productClass: string,
+  rawBriefText: string,
+): string {
+  const bodies = panel.map((p, i) => `### EXPANSION ${i + 1}\n${JSON.stringify(p.expansion, null, 2)}`).join('\n\n')
+  return `You are reconciling ${panel.length} INDEPENDENT expansions of the same engineering brief.
+Each was produced without sight of the others. Your job is to produce ONE expansion that is
+better than any of them individually.
+
+PRODUCT CLASS: ${productClass}
+
+ORIGINAL BRIEF:
+${rawBriefText}
+
+${bodies}
+
+HOW TO RECONCILE — follow these rules exactly:
+
+1. CORROBORATION IS EVIDENCE. A quantified requirement that appears in two or more
+   expansions is probably real. One that appears in only ONE expansion is a claim, not a
+   fact: keep it ONLY if the original brief supports it, and if you keep it, set its
+   confidence to "low". If nothing in the brief supports it, DROP it. Independent
+   expanders inventing different numbers is the failure mode this panel exists to catch.
+2. NEVER AVERAGE CONFLICTING NUMBERS. If two expansions disagree on a value, choose the
+   one the ORIGINAL BRIEF supports, or the one that is physically consistent with the rest
+   of the duty set. Averaging two guesses produces a third guess that no one can defend.
+3. PROVENANCE IS NOT NEGOTIABLE. A requirement is "stated" ONLY if it is actually in the
+   brief text. Anything you inferred is "derived", however obvious it seems.
+4. DO NOT PREFER AN ANSWER BECAUSE OF WHO WROTE IT. You have no information about which
+   model produced which expansion and must not speculate.
+5. ADD NOTHING NEW. You are reconciling, not expanding. If none of the ${panel.length}
+   expansions contains a requirement, it does not go in the output. This is the single
+   most load-bearing derivation in the pipeline and an invented duty propagates into the
+   design, the bill of materials and the costs.
+6. In "notes", record every conflict you resolved and why, and list anything you dropped
+   for lack of corroboration.
+
+Return ONE JSON object in exactly the same shape as the expansions above. No prose.`
+}
+
 export async function expandBrief(
   brief: StructuredBriefJSON,
   productClass: string,
@@ -380,14 +463,80 @@ export async function expandBrief(
       if (cachedExpansion) return { expansion: cachedExpansion, costUsd: 0, error: null, model: `${EXPAND_MODEL}+cache` }
     } catch { /* corrupt cache → regenerate */ }
   }
-  const { parsed, costUsd, error } = await callReasoner(prompt)
-  if (error || parsed == null) {
-    return { expansion: null, costUsd, error: error ?? 'no completion', model: EXPAND_MODEL }
+  // PANEL: three independent expansions, then one reconciliation. Disable with
+  // CHAIN_BRIEF_PANEL=0 to fall back to the single-model path.
+  const panelOn = process.env.CHAIN_BRIEF_PANEL !== '0'
+  let expansion: BriefExpansion | null = null
+  let costUsd: number | null = null
+  let error: string | null = null
+  let usedModel = EXPAND_MODEL
+
+  if (panelOn) {
+    const results = await Promise.all(
+      EXPAND_PANEL.map(async (m) => {
+        // ONE retry per member. Observed on the first two real runs: kimi-k3 failed once
+        // on timeout and once on truncated JSON ("Expected ',' or ']' ... at position
+        // 7308") — transport/format flakes on a long structured answer, not a refusal to
+        // do the task. A member lost to a flake costs a third of the panel's diversity,
+        // and the whole expansion is cached, so the retry is paid once per distinct brief.
+        let r = await callReasoner(prompt, m, PANEL_TIMEOUT_MS)
+        let exp = r.parsed == null ? null : sanitiseExpansion(r.parsed)
+        if (exp == null) {
+          console.error(`[brief-panel] ${m} attempt 1 failed (${r.error ?? 'invalid'}) — retrying once`)
+          const r2 = await callReasoner(prompt, m, PANEL_TIMEOUT_MS)
+          const exp2 = r2.parsed == null ? null : sanitiseExpansion(r2.parsed)
+          if (exp2 != null) { r = r2; exp = exp2 }
+          else r = { ...r2, costUsd: (r.costUsd ?? 0) + (r2.costUsd ?? 0) }
+        }
+        return { model: m, exp, cost: r.costUsd, err: r.error }
+      }),
+    )
+    const panelCost = results.reduce((a, r) => a + (r.cost ?? 0), 0)
+    const survivors = results.filter((r) => r.exp != null).map((r) => ({ model: r.model, expansion: r.exp as BriefExpansion }))
+    for (const r of results) {
+      if (r.exp == null) console.error(`[brief-panel] ${r.model} produced nothing usable: ${r.err ?? 'failed validation'}`)
+    }
+    console.error(`[brief-panel] ${survivors.length}/${EXPAND_PANEL.length} expansions usable, $${panelCost.toFixed(4)}`)
+
+    if (survivors.length >= 2) {
+      const synth = await callReasoner(buildSynthesisPrompt(survivors, productClass, rawBriefText), SYNTH_MODEL, PANEL_TIMEOUT_MS)
+      const merged = synth.parsed == null ? null : sanitiseExpansion(synth.parsed)
+      costUsd = panelCost + (synth.costUsd ?? 0)
+      if (merged) {
+        expansion = merged
+        usedModel = `panel(${survivors.length})+${SYNTH_MODEL}`
+      } else {
+        // Synthesis failed — fall back to the RICHEST surviving expansion rather than
+        // losing the panel's work entirely. Richest by duty count, which is what
+        // sanitiseExpansion already validates on.
+        const best = survivors.slice().sort((a, b) => b.expansion.derived_requirements.length - a.expansion.derived_requirements.length)[0]
+        expansion = best.expansion
+        usedModel = `${best.model}(synthesis-failed)`
+        console.error(`[brief-panel] synthesis failed (${synth.error ?? 'invalid'}) — using the richest single expansion`)
+      }
+    } else if (survivors.length === 1) {
+      expansion = survivors[0].expansion
+      costUsd = panelCost
+      usedModel = `${survivors[0].model}(panel-degraded)`
+      console.error('[brief-panel] only one usable expansion — no reconciliation possible')
+    } else {
+      costUsd = panelCost
+      console.error('[brief-panel] whole panel failed — falling back to the single-model path')
+    }
   }
-  const expansion = sanitiseExpansion(parsed)
+
+  if (expansion == null) {
+    const single = await callReasoner(prompt)
+    costUsd = (costUsd ?? 0) + (single.costUsd ?? 0)
+    error = single.error
+    if (error || single.parsed == null) {
+      return { expansion: null, costUsd, error: error ?? 'no completion', model: EXPAND_MODEL }
+    }
+    expansion = sanitiseExpansion(single.parsed)
+  }
   if (!expansion) {
-    return { expansion: null, costUsd, error: 'expansion failed validation (<2 valid duties)', model: EXPAND_MODEL }
+    return { expansion: null, costUsd, error: 'expansion failed validation (<2 valid duties)', model: usedModel }
   }
   try { mkdirSync(cacheDir, { recursive: true }); writeFileSync(cachePath, JSON.stringify(expansion, null, 2)) } catch { /* non-fatal */ }
-  return { expansion, costUsd, error: null, model: EXPAND_MODEL }
+  return { expansion, costUsd, error: null, model: usedModel }
 }
