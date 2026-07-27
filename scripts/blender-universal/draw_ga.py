@@ -2273,11 +2273,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # VIEW DATUM (SOL item 4): everything the projection gate needs to recompute the
     # expected rect for this view straight from the manifest — origin, scale, the model
     # reference extents, and the FFL rebase draw_ga applied before drawing.
-    svg.add(f'<g class="projection-view-datum" data-view="front" '
-            f'data-origin-x="{front_x:.3f}" data-origin-y="{front_y:.3f}" '
-            f'data-ppm="{ppm:.6f}" data-x-min-mm="{x_min:.3f}" '
-            f'data-z-max-mm="{z_max:.3f}" '
-            f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
+    if meta.get("instrument_faithful_projection"):
+        svg.add(f'<g class="projection-view-datum" data-view="front" '
+                f'data-origin-x="{front_x:.3f}" data-origin-y="{front_y:.3f}" '
+                f'data-ppm="{ppm:.6f}" data-x-min-mm="{x_min:.3f}" '
+                f'data-z-max-mm="{z_max:.3f}" '
+                f'data-z-shift-mm="{float(_PROJECTION_Z_SHIFT.get("mm") or 0.0):.3f}"/>')
     _env_h = float(meta.get("envelope_hh") or 0.0)
     _env_w = float(meta.get("envelope_ww") or 0.0)
     if meta.get("is_instrument_device") and _env_h > 0 and _env_w > 0:
@@ -2296,10 +2297,18 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         # PROJECTION AUDIT (SOL item 4). Emitted from the SAME bounds just drawn — never
         # re-derived — so the gate can compare the SHEET against the manifest instead of
         # scoring the manifest alone. Invisible; carries identity + view only.
-        svg.rect(px, py, pw, ph, stroke="none", fill="none",
-                 extra=('class="manifest-projection-audit" '
-                        f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
-                        'data-view="front"'))
+        #
+        # ONLY on the faithful-projection path. A plant sheet routes through
+        # _fit_product_parts_to_envelope, which applies a SCALE as well as a shift, so the
+        # rigid-transform contract does not hold and the gate would false-fire — measured
+        # on powerwall: "33 drawn box(es) disagree with the manifest". A gate that
+        # false-fires is as useless as one that never fires, so the contract is emitted
+        # only where it is true and G23 ABSTAINS (visibly) elsewhere.
+        if meta.get("instrument_faithful_projection"):
+            svg.rect(px, py, pw, ph, stroke="none", fill="none",
+                     extra=('class="manifest-projection-audit" '
+                            f'data-entity-tag="{_svg_attr(getattr(p, "obj_tag", "") or getattr(p, "tag", ""))}" '
+                            'data-view="front"'))
         # LABEL THE REAL ABOVE-LID FEATURES (2026-07-26). Now that the GA projects the
         # as-placed geometry instead of synthesized zone boxes, the sheet must NAME what
         # it draws — both so a reader can tell what is standing on the lid, and so the
