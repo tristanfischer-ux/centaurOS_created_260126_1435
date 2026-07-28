@@ -307,8 +307,13 @@ describe('atopile-generator', () => {
     expect(imu!.functionClass).toBe('sensor_ic')
 
     // Topology-derived signal nets connect the design's OWN nets, not a fixed pair.
+    // GOTCHA (2026-07-28): wireOnBoardI2cAndSwdNets also adds SWDIO/SWCLK when an
+    // MCU is present — count is ≥2, not exactly 2.
     const signalNets = result.nets.filter((n) => n.kind === 'signal')
-    expect(signalNets.length).toBe(2)
+    expect(signalNets.length).toBeGreaterThanOrEqual(2)
+    const signalNames = signalNets.map((n) => n.name)
+    expect(signalNames.some((n) => /imu_sensor.*flight_control|flight_control.*imu/i.test(n))).toBe(true)
+    expect(signalNames.some((n) => /flight_control.*led_driver|led_driver.*flight_control|navigation_led/i.test(n))).toBe(true)
 
     const mainAto = readFileSync(result.mainAtoPath, 'utf8')
     expect(mainAto).not.toMatch(/colorimeter|cuvette|photodiode|absorbance/i)
