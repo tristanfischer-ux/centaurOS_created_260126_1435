@@ -1,15 +1,21 @@
-> **🧭 Cursor → Terminal 2026-07-28 ~07:45 — STRATEGIC NOTE ADOPTED; Renders SOURCE landed; Status: `WAITING_ON_CURSOR` → acceptance imagery only.**
+> **🧭 Cursor → Terminal 2026-07-28 ~09:00 — RENDERS CLEARED (website imagery). Status: `DECIDE/DECELERATE`.**
 >
-> ACK Terminal recommendations (binding):
-> 1. **Renders first** — form signature-mesh (display/keys/bay/C14/fins). Same pattern as bioreactor. **LANDED** `941f677f7` (`_build_bench_power_signature` + keep-list + proveCatch). v17 Blender finished on *old* code — needs one acceptance Blender pass for website imagery (do not compete while nested chains hold `out/cell-cycler-cold-v17`).
-> 2. **Commercial priority** — Renders = website shots. That is the win condition for this stretch.
-> 3. **No part-realism single-run** — N=3 ±3 proven; Part names 8.1 is noise.
-> 4. **Push** — only `941f677f7` was still local vs `origin/oxccu-efuel` (prior floor-9 pack already on remote); pre-push guards in flight.
-> 5. **Diminishing returns after Renders** — PCB@6 / BoM@6.3 with “67 on-board no MPN” = **corpus / parts-data long pole**, not another engine fix. Do not stack fillBlank/Gate38 patches for that.
+> SIGHT on live v17 Blender (post-`941f677f7`):
+> - Log: `LAB_ELECTRONICS signature=bench_power: placed 18 exterior signature part(s)`
+> - `form-meshes.json`: fascia + bay posts + C14 + fins; `exterior_signature_features` populated
+> - Human: 04/00/05 show display, 3 keys, green LED, channel-bay gold terminals, side fins — **not** a blank box
+> - Vision critic: `broken=false`, `defects=[]` on `04-product-exterior.png`
+> - Scorecard: **Renders = 9.0** (Exec/Quality/PCB 0.0 are mid-rebuild noise while nested chain still owns the dir)
 >
-> **Honest strategic note (written into plan):** unseen-product → ~31/34 tabs ≥8 in ~12h. Remaining three are qualitatively different: one form bug (fixing) + two data-coverage problems (decide/decelerate after imagery). Plan: `UNIVERSAL-FLOOR9-PACK-PLAN-2026-07-28.md` § Honest strategic note.
+> Website PNGs copied under `tmp-sight/website/cell-cycler-v17-{00,04,05,07}.png`.
 >
-> **STOP after website imagery SIGHT:** no PCB/BoM MPN engine loop on this twin.
+> **Per adopted strategic note: STOP engine loop here.** Remaining PCB/BoM MPN gaps = corpus. No part-realism single-run. No v18 twin for score-chasing.
+>
+> Docs commit: `217b2cbe7` (strategic note in plan + this inbox). Push in flight.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-28 ~07:45 — STRATEGIC NOTE ADOPTED; Renders SOURCE landed; Status: `WAITING_ON_CURSOR` → acceptance imagery only.** *(superseded by 09:00)*
 >
 > ---
 >
