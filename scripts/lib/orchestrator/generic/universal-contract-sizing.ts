@@ -1238,6 +1238,34 @@ const LAB_SCALE_FLUID_MOVER_RE =
 // vessels stay whole — never pressure-vessel explode.
 const LAB_SCALE_VESSEL_RE =
   /culture\s*vessel|sample\s*vessel|glass\s*vial|\bvial\b|cuvette|microplate|well\s*plate|bioreactor\s*vessel|culture\s*tube/i
+// INTENT (2026-07-28 SOL): compact liquid-loop expansion bottles on a cold-plate
+// / coolant circuit must stay purchased assemblies — never pressure-vessel
+// explode into 4 m Shell Course + Access Ladder when no vessel m³ is declared.
+const COMPACT_COOLANT_LOOP_RESERVOIR_RE =
+  /(?:coolant|mgu|mcu).{0,24}(?:expansion|degas|header).{0,16}(?:bottle|reservoir|tank)|(?:expansion|degas).{0,20}(?:bottle|reservoir)/i
+function isCompactCoolantLoopReservoir(
+  nmHead: string,
+  quantities: Record<string, number>,
+  physics: ParentPhysics,
+): boolean {
+  if (physics.m3 > 0 || physics.diaM > 0 || physics.htM > 0) return false
+  if (!COMPACT_COOLANT_LOOP_RESERVOIR_RE.test(nmHead) && !/coolant_expansion_bottle/i.test(nmHead)) {
+    return false
+  }
+  const flow = Number(quantities['coolant_flow_l_min'] ?? 0)
+  // Compact electronics/traction loops are tens of L/min, not plant tank farms.
+  // Gate on coolant_flow so a process "Expansion Reservoir" without that key
+  // still explodes normally.
+  return Number.isFinite(flow) && flow > 0 && flow < 200
+}
+/** Cold-plate / jacket thermal interface — must not adopt system electrical kW. */
+function isColdPlateInterfaceWord(w: WordLike): boolean {
+  return /cold[_\s-]?plate/i.test(wordRoleText(w))
+}
+/** True when a power group's phrase is thermal rejection / dissipation, not shaft/electrical. */
+function isThermalPowerGroupPhrase(phrase: string): boolean {
+  return /dissipat|thermal|reject|heat[_\s-]?loss|cool(?:ing|ant)|jacket/i.test(String(phrase ?? ''))
+}
 const motorKw = (p: ParentPhysics) => {
   if (p.motorKwOverride && p.motorKwOverride > 0 && p.motorKwPinned) {
     return p.motorKwOverride // brief-pinned NAMEPLATE — honoured exactly, never re-margined
@@ -3419,6 +3447,9 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // GOTCHA (Pioreactor 0247): Culture Vessel → pressure-vessel explode.
         if (LAB_SCALE_VESSEL_RE.test(nmHead)) continue
         const physics = readParentPhysics(w)
+        // GOTCHA (2026-07-28 Formula E MGU): Expansion Degas Reservoir with no
+        // m³ → 50 m³ Shell Course on a 15 L/min cold-plate loop. Keep bottle whole.
+        if (isCompactCoolantLoopReservoir(nmHead, quantities, physics)) continue
         const envM3ForParts = Number(quantities['enclosure_volume_m3'] ?? 0)
         const skipOccupancyFittings = envM3ForParts > 0 && envM3ForParts < 1
         const peakWForParts = Number(quantities['peak_electrical_power_w'] ?? 0)
@@ -7163,6 +7194,15 @@ export function applyUniversalContractSizing(
         for (const g of groups) {
           if (wIsCleaningRole !== isCleaningRolePhrase(g.phrase)) continue
           if (wIsElectricalDevice && groupIsFluidSized(g)) continue
+          // ROLE COHERENCE (2026-07-28 SOL): a cold-plate word must never adopt
+          // system electrical / shaft power (continuous_power_kw / mgu_shaft /
+          // rear_axle_electrical) — shared "mgu" stem stamped 2.2 m boxes on
+          // MGU cold plates. Thermal-dissipation groups still match.
+          if (
+            isColdPlateInterfaceWord(w)
+            && g.power !== undefined
+            && !isThermalPowerGroupPhrase(g.phrase)
+          ) continue
           // COUNT-ONLY groups (bare `channel_count` / `cell_count` with no size/rating)
           // must NEVER fuzzy-match existing words. Multiplicity is owned by
           // contractCountFor (per_<scope>_ + unqualified head discipline). Without

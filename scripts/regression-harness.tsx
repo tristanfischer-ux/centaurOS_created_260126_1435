@@ -14618,6 +14618,99 @@ function checkPcbStageInvariants(): Assertion[] {
     () => `pcb-stage cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/pcb/pcb-stage.ts + disposition.ts.`,
   ))
 
+  // ── EXTENSION 2026-07-28 (Formula E rear MGU / traction-drive pack): cold-plate
+  // + shaft/phase-current seeds TRACTION_DRIVE_MODULE_FLOORS principals that
+  // match contract macros; coolant bottle never plant-explodes; tool-implied
+  // motor:ipmsm / inverter:sic / gear:traction-ratio backstop the same three.
+  {
+    const failedTr: string[] = []
+    const wantTr = (label: string, cond: boolean) => { if (!cond) failedTr.push(label) }
+    const tractionGraph: any = {
+      product_class: 'formula_e_rear_mgu',
+      nodes: [
+        { class: 'actuation_kinematics', display: 'Actuation', role: 'principal', required: true },
+        { class: 'energy_conversion_transduction', display: 'MCU', role: 'principal', required: true },
+        { class: 'environmental_interface', display: 'Cooling', role: 'subsystem', required: true },
+        { class: 'structure_containment', display: 'Structure', role: 'support', required: true },
+      ],
+      edges: [],
+    }
+    const tractionContract: any = {
+      product_class: 'formula_e_rear_mgu',
+      quantities: {
+        coolant_flow_l_min: { value: 15 },
+        coolant_inlet_c: { value: 55 },
+        mgu_shaft_torque_nm: { value: 77 },
+        phase_current_max_a: { value: 530 },
+        continuous_power_kw: { value: 250 },
+        rear_axle_electrical_power_kw: { value: 350 },
+      },
+      topology: [
+        { from_part: 'coolant_loop', to_part: 'rear_mgu_mcu_cold_plates', mechanism: 'fluid_loop' },
+      ],
+      _tools_run: [
+        'motor:ipmsm-analytical-sizing',
+        'inverter:sic-loss',
+        'inverter:current-voltage-envelope',
+        'gear:traction-ratio',
+      ],
+    }
+    const modsTr = deriveGenericSkeleton(
+      tractionGraph, {} as any, { class: 'formula_e_rear_mgu' } as any, tractionContract, new Map(),
+    ) as any[]
+    const trAll = modsTr
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || w.id || ''))))
+      .join(' | ')
+    wantTr('traction floor emits Traction Ipmsm Motor Generator', /Traction Ipmsm Motor Generator|traction_ipmsm_motor_generator/i.test(trAll))
+    wantTr('traction floor emits Sic Traction Inverter', /Sic Traction Inverter|sic_traction_inverter/i.test(trAll))
+    wantTr('traction floor emits Reduction Gear Stage', /Reduction Gear Stage|reduction_gear_stage/i.test(trAll))
+    wantTr('traction floor emits Mgu Cold Plate', /Mgu Cold Plate|mgu_cold_plate/i.test(trAll))
+    wantTr('traction floor emits Coolant Expansion Bottle (not reservoir)', /Coolant Expansion Bottle|coolant_expansion_bottle/i.test(trAll))
+    wantTr('traction floor does NOT emit Expansion Degas Reservoir', !/Expansion Degas Reservoir/i.test(trAll))
+    wantTr('traction floor does NOT emit Chiller', !/\bChiller\b/i.test(trAll))
+    wantTr('traction floor does NOT emit Scroll Compressor', !/Scroll Compressor/i.test(trAll))
+
+    // Tool-implied backstop on a design missing the three principals.
+    const {
+      computeToolImpliedComponents,
+      addImpliedWords,
+    } = require('../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit') as typeof import('../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit')
+    const emptyTractionDesign: any = {
+      modules: [
+        { module: 'actuation_kinematics', sub_modules: [{ sub_module: 'a', words: [] }] },
+        { module: 'energy_conversion_transduction', sub_modules: [{ sub_module: 'e', words: [] }] },
+      ],
+    }
+    const groundState: any = {
+      moduleDecomposition: emptyTractionDesign,
+      toolsUsedPage: {
+        tools: [
+          { tool_id: 'motor:ipmsm-analytical-sizing', tool_name: 'IPMSM analytical sizing' },
+          { tool_id: 'inverter:sic-loss', tool_name: 'SiC inverter loss' },
+          { tool_id: 'gear:traction-ratio', tool_name: 'Traction gear ratio' },
+        ],
+      },
+    }
+    const rImp = computeToolImpliedComponents(groundState)
+    const comps = rImp.missing.map((m: any) => m.component).sort().join(',')
+    wantTr('tool-implied reports three traction principals missing',
+      comps === 'reduction_gear_stage,sic_traction_inverter,traction_ipmsm_motor_generator')
+    const added = addImpliedWords(emptyTractionDesign, rImp.missing)
+    wantTr('tool-implied adds three principals', added.added === 3)
+    const groundedText = JSON.stringify(added.design)
+    wantTr('tool-implied grounded traction_ipmsm_motor_generator', /traction_ipmsm_motor_generator/i.test(groundedText))
+    wantTr('tool-implied grounded sic_traction_inverter', /sic_traction_inverter/i.test(groundedText))
+    wantTr('tool-implied grounded reduction_gear_stage', /reduction_gear_stage/i.test(groundedText))
+
+    out.push(assertEq(
+      'UNIVERSAL.traction_drive_pack_floor_and_tool_implied_principals',
+      'SOL overnight proveCatch (2026-07-28): a cold-plate + shaft-torque + phase-current contract with motor:ipmsm / inverter:sic / gear:traction-ratio tools makes derive-skeleton emit traction_ipmsm_motor_generator + sic_traction_inverter + reduction_gear_stage + cold-plate loop (coolant_expansion_bottle, never Expansion Degas Reservoir / Chiller / Scroll Compressor). TOOL_IMPLIED_COMPONENTS backstop reports and adds the same three principals when the generator omitted them.',
+      failedTr.length,
+      (n) => n === 0,
+      () => `traction-drive pack cases failed: ${failedTr.join(' ; ')}. Check derive-skeleton TRACTION_DRIVE_MODULE_FLOORS / hasTractionDrivePackSignal and word-domain-coherence TOOL_IMPLIED motor-ipmsm/inverter-sic/gear-traction-ratio.`,
+    ))
+  }
+
   return out
 }
 

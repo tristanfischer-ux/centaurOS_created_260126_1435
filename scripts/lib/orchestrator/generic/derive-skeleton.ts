@@ -104,9 +104,42 @@ const COLD_PLATE_LOOP_FLOOR = [
   'mcu_cold_plate',
   'coolant_manifold',
   'coolant_hose_set',
-  'expansion_degas_reservoir',
+  // DECISION (2026-07-28 SOL): name as bottle, not "reservoir" — the plant
+  // vessel explode path matches /reservoir|degass|tank/ and defaults to 50 m³
+  // Shell Course anatomy when no volume is declared.
+  'coolant_expansion_bottle',
   'coolant_temperature_sensor',
 ]
+
+// INTENT (2026-07-28 Formula E rear MGU / traction-drive pack): when the
+// contract seeds a cold-plate liquid loop PLUS traction electrical/mechanical
+// quantities (or motor:ipmsm tools), the generic Tier-C floors would still
+// emit plant HVAC / empty actuation. Floor the three principal macros the
+// analytical tool pack sizes — universal for any future traction MGU+MCU kit,
+// never a product-name branch.
+const TRACTION_DRIVE_MODULE_FLOORS: Record<string, string[]> = {
+  actuation_kinematics: [
+    'traction_ipmsm_motor_generator',
+    'reduction_gear_stage',
+    'motor_bearings',
+    'output_shaft_coupling',
+    'resolver_encoder',
+  ],
+  energy_conversion_transduction: [
+    'sic_traction_inverter',
+    'dc_link_capacitor_bank',
+    'gate_driver_board',
+    'phase_current_sensor',
+    'hv_dc_connector',
+  ],
+  structure_containment: [
+    'traction_drive_housing',
+    'hv_shield_cover',
+    'mounting_ear_set',
+    'fastener_set',
+    'nameplate',
+  ],
+}
 const REFRIGERATION_PLANT_COMPONENT_RE =
   /chill(?:er)?|scroll[_\s-]?compressor|refriger|evaporator|condenser|expansion[_\s-]?valve|air[_\s-]?damper|packaged[_\s-]?chiller|tube[_\s-]?bundle|shell[_\s-]?and[_\s-]?tube/i
 
@@ -169,6 +202,26 @@ export function hasColdPlateLoopInterface(contract: ContractInProgress): boolean
     const blob = `${e?.from_part ?? ''} ${e?.to_part ?? ''}`
     return /cold[_\s-]?plates?/i.test(blob)
   })
+}
+
+/**
+ * Traction-drive pack (MGU + SiC MCU + gear) — cold-plate loop plus shaft /
+ * phase-current duty OR a motor:ipmsm tool selection. PURE — never a class slug.
+ */
+export function hasTractionDrivePackSignal(contract: ContractInProgress): boolean {
+  if (!hasColdPlateLoopInterface(contract)) return false
+  const q = contract?.quantities ?? {}
+  const torque = Number((q.mgu_shaft_torque_nm as { value?: unknown } | undefined)?.value)
+  const iph = Number((q.phase_current_max_a as { value?: unknown } | undefined)?.value)
+  const tools = Array.isArray((contract as { _tools_run?: unknown[] })._tools_run)
+    ? (contract as { _tools_run: unknown[] })._tools_run
+    : []
+  const hasMotorTool = tools.some((t) => /motor:ipmsm|ipmsm-analytical|ipmsm/i.test(String(t ?? '')))
+  return (
+    (Number.isFinite(torque) && torque > 0)
+    || (Number.isFinite(iph) && iph >= 100)
+    || hasMotorTool
+  )
 }
 
 /** The environmental_interface floor that matches the contract's thermal duty sign. */
@@ -991,6 +1044,7 @@ function componentsForModule(
   const isLowPowerLabElectronics = !isBenchPower && hasLowPowerLabElectronicsSignal(contract)
   const isBenchtopCulture = hasBenchtopCultureSignal(contract)
   const isColdPlateLoop = isThermal && hasColdPlateLoopInterface(contract)
+  const isTractionDrive = hasTractionDrivePackSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -1057,6 +1111,9 @@ function componentsForModule(
     || (isOpticalInstrument && !isLabMicroscope && OPTICAL_MODULE_FLOORS[moduleKey])
     || (cultureFloor && cultureFloor[moduleKey])
     || (isLowPowerLabElectronics && LAB_ELECTRONICS_MODULE_FLOORS[moduleKey])
+    // Traction MGU+MCU pack: authoritative principals (macros) on actuation /
+    // energy_conversion / structure — cold-plate thermal stays on thermalFloorFor.
+    || (isTractionDrive && TRACTION_DRIVE_MODULE_FLOORS[moduleKey])
     || null
   if (instrumentFloor) {
     for (const c of instrumentFloor) push(c)

@@ -728,6 +728,47 @@ export const TOOL_IMPLIED_COMPONENTS: ToolImpliedComponentRule[] = [
       { module: 'environmental_interface', component: 'heatsink_fan_assembly', name_human: 'Forced-convection heatsink assembly', presence_re: /\bheatsink\b|\bheat\s*sink\b|\bcooling\s+fan\b/i },
     ],
   },
+  // INTENT (2026-07-28 SOL overnight): traction-drive analytical tools imply the
+  // three principal assemblies a cold-plate MGU+MCU kit must price. Tool-identity
+  // keyed — any future class that selects motor:ipmsm / inverter:sic-loss /
+  // gear:traction-ratio gets the same grounding (backstop to derive-skeleton
+  // TRACTION_DRIVE_MODULE_FLOORS).
+  {
+    id: 'motor-ipmsm',
+    re: /\bmotor:ipmsm\b|\bipmsm-analytical\b|\bipmsm\b/,
+    implies: [
+      {
+        module: 'actuation_kinematics',
+        component: 'traction_ipmsm_motor_generator',
+        name_human: 'Traction IPMSM motor-generator (MGU)',
+        presence_re: /\btraction[_\s-]?ipmsm\b|\bipmsm\b|\bmotor[_\s-]?generator\b|\brear[_\s-]?mgu\b/i,
+      },
+    ],
+  },
+  {
+    id: 'inverter-sic-traction',
+    re: /\binverter:(?:sic-loss|current-voltage-envelope|field-weakening)\b|\bsic[-\s]?loss\b/,
+    implies: [
+      {
+        module: 'energy_conversion_transduction',
+        component: 'sic_traction_inverter',
+        name_human: 'SiC traction inverter (MCU)',
+        presence_re: /\bsic[_\s-]?traction[_\s-]?inverter\b|\btraction[_\s-]?inverter\b|\brear[_\s-]?mcu\b|\bsic[_\s-]?inverter\b/i,
+      },
+    ],
+  },
+  {
+    id: 'gear-traction-ratio',
+    re: /\bgear:traction-ratio\b|\btraction[-\s]?ratio\b/,
+    implies: [
+      {
+        module: 'actuation_kinematics',
+        component: 'reduction_gear_stage',
+        name_human: 'Reduction gear stage',
+        presence_re: /\breduction[_\s-]?gear\b|\bgear[_\s-]?stage\b|\btraction[_\s-]?gear\b/i,
+      },
+    ],
+  },
 ]
 
 /** A target module named by a rule may not exist in every design (the

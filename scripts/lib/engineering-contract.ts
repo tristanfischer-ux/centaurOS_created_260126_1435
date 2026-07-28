@@ -16228,9 +16228,12 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     },
   ]
 
+  // DECISION (2026-07-28 SOL): macro word_names match the universal
+  // TRACTION_DRIVE_MODULE_FLOORS / TOOL_IMPLIED component ids so contract
+  // pricing lands on the emitted principals (not Formula-E-only tokens).
   const macros: MacroAssemblyPrice[] = [
     {
-      word_name: 'rear_mgu_ipmsm',
+      word_name: 'traction_ipmsm_motor_generator',
       unit_price_gbp: 18000,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -16238,7 +16241,7 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
       source_detail: 'trial order-of-magnitude OEM transfer for high-speed IPMSM MGU (replace with team quote)',
     },
     {
-      word_name: 'rear_mcu_sic_inverter',
+      word_name: 'sic_traction_inverter',
       unit_price_gbp: 12000,
       dimension_basis: 'each',
       dimension_value: 1,

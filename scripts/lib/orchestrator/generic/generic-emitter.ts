@@ -35,7 +35,7 @@ import {
   getClassReferenceGraphDBFirst,
   resolveClassGraphSlug,
 } from '../../../../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
-import { deriveGenericSkeleton } from './derive-skeleton'
+import { deriveGenericSkeleton, hasTractionDrivePackSignal } from './derive-skeleton'
 import { loadClassComponents } from './component-source'
 import { buildCrossModuleLinks } from './build-links'
 // E6a (tracker #22): bootstrap-on-miss for the class-reference graph. A NOVEL
@@ -217,12 +217,17 @@ export async function emitGenericDesign(
         (Number(_q.channel_count?.value) >= 1 && Number(_q.lead_screw_pitch_mm?.value) > 0)
         || Number(_q.max_syringe_volume_ml?.value) > 0
       ))
+    // INTENT (2026-07-28 SOL): cold-plate traction packs are device products —
+    // plant synthesize/explode minted 4 m Shell Course tanks + HVAC on the
+    // MGU coolant loop. Keep contract sizing on existing words only.
+    const _isTractionDrivePack = hasTractionDrivePackSignal(contract as never)
+    const _skipPlantSynthExplode = _isBenchInstrument || _isTractionDrivePack
     const r = applyUniversalContractSizing(modules as never[], contract, {
       onlyUnsized: true,
       // Device-scale: keep contract sizing on existing words; do not mint plant equipment.
-      synthesizeMissing: !_isBenchInstrument,
-      instrument: !_isBenchInstrument,
-      explode: !_isBenchInstrument,
+      synthesizeMissing: !_skipPlantSynthExplode,
+      instrument: !_skipPlantSynthExplode,
+      explode: !_skipPlantSynthExplode,
       briefMetrics,
     })
     physicsEquipment = { sized: r.sized, synthesized: r.synthesized }

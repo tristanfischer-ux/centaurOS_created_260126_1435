@@ -63,6 +63,20 @@ const plantTotal = Object.values(plantPrices).reduce((s, v) => s + v, 0)
 expect(plantTotal > 9000,
   `plant-scale size-less tank keeps the 50 m³ default calibration (got £${Math.round(plantTotal)})`)
 
+// ── 4b. CATCH (2026-07-28 SOL): size-less Expansion Degas Reservoir on a
+// cold-plate coolant loop (no enclosure_volume_m3) must NOT explode Shell Course.
+const mguRes: any = { sub_modules: [{ words: [
+  mkWord('expansion_degas_reservoir_word', 'Expansion Degas Reservoir', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+explodeEquipmentSubAssemblies([mguRes], { coolant_flow_l_min: 15 })
+const mguResNames = mguRes.sub_modules[0].words.map((w: any) => String(w.name_human ?? ''))
+expect(!mguResNames.some((n: string) => /shell\s*course/i.test(n)),
+  `cold-plate Expansion Degas Reservoir must not explode Shell Course (got ${mguResNames.join(' | ')})`)
+expect(!mguResNames.some((n: string) => /access\s*ladder/i.test(n)),
+  `cold-plate Expansion Degas Reservoir must not explode Access Ladder`)
+expect(mguResNames.length === 1,
+  `compact coolant reservoir stays a whole assembly (got ${mguResNames.length} words)`)
+
 // ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
 import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'
 const airMod: any = { sub_modules: [{ words: [
