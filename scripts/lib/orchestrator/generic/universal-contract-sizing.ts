@@ -1128,7 +1128,12 @@ const ZONED_NETWORK_PRINCIPAL_RE = /(^|_)distribution_manifold$/i
 // ── cleanup (Round 3): physics-first BoM — drop the skeleton's leftover junk ──
 // Small generic detailed-design filler that is never PRINCIPAL equipment (keeps it
 // out of the GA + the headline cost). Structure/enclosure are NOT here — they're real.
-const PADDING_RE = /mounting\s+(bracket|hardware)|fastener\s+set|wiring\s+harness|gasket\s+seal|access\s+panel|service\s+connector|diagnostic\s+port|labelling\s+set|lifting\s+(point|lug)|\b(primary|secondary)\s+assembly\b/i
+// INTENT (P5 floor-9 / cell-cycler cold-v17): Phase-2 LLM mints
+// "Energy Storage Source Subcomponent 1" with MPN TBD — a skeleton index, not a
+// part. The plausibility name-honesty check floors Overview/Checks on it.
+// Drop numbered "… Subcomponent N" placeholders with the same padding rule
+// (only when isPlaceholder — a real MPN on a oddly-named line is kept).
+const PADDING_RE = /mounting\s+(bracket|hardware)|fastener\s+set|wiring\s+harness|gasket\s+seal|access\s+panel|service\s+connector|diagnostic\s+port|labelling\s+set|lifting\s+(point|lug)|\b(primary|secondary)\s+assembly\b|\bsubcomponent\s*\d+\b|\binstrumentation\s+subc\b/i
 // Generic head-nouns that must NOT trigger a duplicate-drop (every pump/tank shares
 // them); dedup fires only on a SPECIFIC shared stem (filt, degas, biofi…).
 const DEDUP_GENERIC_STOP = new Set(['pump', 'tank', 'unit', 'syst', 'modu', 'pane', 'devi', 'asse'])

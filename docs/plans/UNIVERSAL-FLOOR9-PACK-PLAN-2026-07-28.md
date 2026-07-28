@@ -54,16 +54,22 @@ Confirm bay-temp / provenance / Assembly optical SOURCE actually raise Exec Summ
 **proveCatch:** resolveVerified + live fillBlank pins all four channel roles; wrong-voltage reject on identity path.  
 **Unblocks:** BoM, PCB fitness (await acceptance twin).
 
-### P4 — Hazard/capability risk (no class table) — LANDED (this pack)
+### P4 — Hazard/capability risk (no class table) — LANDED (TS + Excel mirror)
 **Disease:** “No class-standards for consumer_electronics” WARN.  
-**SOURCE:** `LAB_BENCHTOP_INSTRUMENT_FLOOR` + `isLabBenchtopInstrumentCapability(brief)` via `getClassStandards`/`getClassStandardsDBFirst`; battery/channel energy hazard in Excel `_HAZARD_LIB`.  
-**proveCatch:** cell-cycler brief → mandatory≥1 / not empty WARN; phone brief stays empty WARN.  
-**Unblocks:** Risk.
+**SOURCE:** `LAB_BENCHTOP_INSTRUMENT_FLOOR` + `isLabBenchtopInstrumentCapability(brief)` via `getClassStandards`/`getClassStandardsDBFirst`; Excel `_effective_compliance_gate` re-derives at render when chain wrote empty WARN before `isInstrumentDevice`.  
+**proveCatch:** cell-cycler brief → mandatory≥1 / not empty WARN; phone brief stays empty WARN; Excel mirror both directions.  
+**SIGHT (v17 rebuild):** Risk & Regulatory off fail list (no longer capped at 7 by stale WARN).
 
-### P5 — HARD claims: close or honest-block
-**Disease:** open HARD claims mix ledger-closable vs HIL-only.  
-**SOURCE:** Verification spine — ledger→VERIFIED; HIL→`FAB-READY — UNPROVEN IN HARDWARE`.  
-**Unblocks:** Verification.
+### P5 — HARD claims: close or honest-block — PARTIAL (invariants cleared on v17 SIGHT)
+**Disease:** open HARD claims; Calculations false-pair bay max vs stability; Overview/Checks floored by 9 FAILs.  
+**SOURCE:**
+- `_match_quantity` polarity (min/max ≠ stability)
+- provenance `_TEMP_DELTA_TOKENS` += stability/tolerance/accuracy
+- `enclosure_emc.py` material+standard aliases (`aluminum`→`die_cast_alu`, `CISPR 11`→Class-B) — bootstrap SE=0 disease
+- bootstrap EMC power inject also reads dissipation quantities
+- `PADDING_RE` drops numbered `… Subcomponent N` placeholders
+**proveCatch:** provenance bay envelope; enclosure_emc `--selftest` aluminum PASS / plastic FAIL / 35 W unshielded PASS.  
+**SIGHT (v17 rebuild after SOURCE + artefact re-derive):** CHECKS FAIL **0**; Overview/Risk off fail list. Residual <9: Calculations (calc-coverage MED), Verification/PCB (PnP fitness + readiness), Renders (vision/washed-out), BoM MPNs await P6 twin with P3 fillBlank. Firmware stays `FAB-READY — UNPROVEN IN HARDWARE` without HIL.
 
 ### P6 — One acceptance twin (+ part N=3 if needed)
 After proveCatches green: one cold twin with Blender+PCB. Do not twin-per-patch.  

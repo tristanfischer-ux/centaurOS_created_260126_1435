@@ -383,7 +383,14 @@ def _vessel_class_group(key: str) -> Optional[str]:
 # TEMPERATURE kinds (NinjaPCR 2026-07-15): an ABSOLUTE temperature (heatsink base,
 # junction, ambient) and a DELTA / spread / uniformity are NEVER the same physical
 # role — they share only the measurement noun 'temp' after generic strip.
-_TEMP_DELTA_TOKENS = {"spread", "delta", "rise", "drop", "uniformity", "gradient", "diff"}
+# INTENT (P5 floor-9 / cell-cycler cold-v17): stability/tolerance/accuracy are
+# control-band deltas (±0.5 °C), not absolute setpoints — cell_bay_temp_max_c
+# (45 °C) vs cell_bay_temp_stability_c (0.5 °C) share only {cell,bay} after
+# generic strip and false-flagged 90× as "same physical role".
+_TEMP_DELTA_TOKENS = {
+    "spread", "delta", "rise", "drop", "uniformity", "gradient", "diff",
+    "stability", "tolerance", "ripple", "accuracy", "precision", "band",
+}
 _TEMP_ABS_HINT = {"temp", "temperature", "celsius", "kelvin", "degc", "deg"}
 
 
@@ -675,6 +682,25 @@ def _selftest() -> int:
     }}}
     expect(any(f.kind == "divergence" for f in audit_provenance(same_heatsink).findings),
            "two competing heatsink-base absolute temperatures that disagree must still flag")
+
+    # TEMPERATURE envelope-vs-stability guard (cell-cycler cold-v17 Calculations):
+    # bay operating max (45 °C absolute) vs bay control stability (±0.5 °C delta)
+    # share stem tokens {cell,bay} — must NOT cluster. Two competing bay-max
+    # absolutes still flag.
+    bay_env = {"orchestratorContract": {"quantities": {
+        "cell_bay_temp_min_c": {"value": 15.0, "unit": "degC", "source": "brief"},
+        "cell_bay_temp_max_c": {"value": 45.0, "unit": "degC", "source": "brief"},
+        "cell_bay_temp_stability_c": {"value": 0.5, "unit": "degC", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(bay_env).findings),
+           "bay temp min/max envelope vs bay stability band must NOT be same-role "
+           "(absolute setpoint vs control delta)")
+    same_bay_max = {"orchestratorContract": {"quantities": {
+        "cell_bay_temp_max_c": {"value": 45.0, "unit": "degC", "source": "brief"},
+        "cell_bay_hot_side_temp_max_c": {"value": 0.5, "unit": "degC", "source": "brief"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_bay_max).findings),
+           "two competing bay-max absolute temperatures that disagree must still flag")
 
     # LIFECYCLE-vs-EMBODIED aggregate guard (CO2-mineralisation v2 cross-val 2026-07-05):
     # a cradle-to-grave lifecycle total (embodied + years of operation) legitimately dwarfs

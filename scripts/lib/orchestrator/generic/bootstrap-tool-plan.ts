@@ -1461,7 +1461,11 @@ function _injectEmcPowerInputs(
     const v = qv && typeof qv === 'object' ? Number((qv as { value?: unknown }).value) : Number(qv)
     return Number.isFinite(v) ? v : undefined
   }
+  // Prefer nameplate/connected load; fall back to thermal dissipation already
+  // on the contract when EMC is topo-sorted BEFORE the electrical load tool
+  // (cold-v17: enclosure-emc ran at step 5, connected_electrical_load_kw at 6).
   const w = readQty('total_power_w') ?? readQty('peak_power_w') ?? readQty('nameplate_power_w')
+    ?? readQty('max_simultaneous_dissipation_w') ?? readQty('aggregate_dissipation_w')
   const kw = readQty('connected_electrical_load_kw') ?? readQty('nameplate_power_kw')
     ?? readQty('total_electrical_load_kw')
   const p_w = w !== undefined ? w : (kw !== undefined ? kw * 1000 : undefined)

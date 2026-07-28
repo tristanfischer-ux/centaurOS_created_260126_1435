@@ -52,6 +52,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import sys
 import time
 
@@ -122,6 +123,95 @@ MATERIAL_SE = {
     "iron_phosphate_paint": [(10, 35), (100, 25), (1000, 15)],
 }
 
+# INTENT (P5 floor-9 / cell-cycler cold-v17): bootstrap plans constantly wire
+# enclosure_material="aluminum" / "aluminium" / "steel" — tokens that are NOT
+# keys in MATERIAL_SE. interpolate_se then returned SE=0 (plastic-equivalent),
+# so a die-cast / sheet-metal instrument computed margin = 30−60 = −30 dB and
+# floored Overview/Checks on a fabricated EMC fail. Normalise common LLM /
+# engineer nouns onto the Ott-table keys — universal, never a product class.
+_MATERIAL_ALIASES = {
+    "aluminum": "die_cast_alu",
+    "aluminium": "die_cast_alu",
+    "al": "die_cast_alu",
+    "alu": "die_cast_alu",
+    "diecast_alu": "die_cast_alu",
+    "diecast_aluminum": "die_cast_alu",
+    "die_cast_aluminum": "die_cast_alu",
+    "die_cast_aluminium": "die_cast_alu",
+    "cast_aluminum": "die_cast_alu",
+    "cast_aluminium": "die_cast_alu",
+    "steel": "sheet_steel",
+    "mild_steel": "sheet_steel",
+    "stainless": "sheet_steel",
+    "stainless_steel": "sheet_steel",
+    "ss": "sheet_steel",
+    "abs": "abs_plastic_metallised",
+    "metallised_abs": "abs_plastic_metallised",
+    "metallized_abs": "abs_plastic_metallised",
+    "abs_metallised": "abs_plastic_metallised",
+    "conductive_plastic": "abs_plastic_metallised",
+    "polymer": "plastic",
+    "abs_plastic": "plastic",
+    "pc_abs": "plastic",
+}
+
+
+def _normalise_material(material: str) -> str:
+    """Map free-text enclosure material nouns onto MATERIAL_SE keys."""
+    raw = str(material or "").strip().lower()
+    key = re.sub(r"[\s\-]+", "_", raw)
+    if key in MATERIAL_SE:
+        return key
+    if key in _MATERIAL_ALIASES:
+        return _MATERIAL_ALIASES[key]
+    # soft contains: "die cast aluminium housing" → die_cast_alu
+    if "steel" in key or "stainless" in key:
+        return "sheet_steel"
+    if "aluminium" in key or "aluminum" in key or "die_cast" in key or "diecast" in key:
+        return "die_cast_alu"
+    if "metall" in key and ("abs" in key or "plastic" in key or "polymer" in key):
+        return "abs_plastic_metallised"
+    if "plastic" in key or "polymer" in key or "abs" in key:
+        return "plastic"
+    return key
+
+
+# Standard name aliases — plans emit "CISPR 11" / "EN 55032 Class B" with spaces.
+_STANDARD_ALIASES = {
+    "cispr_11": "CISPR_22_B",       # ISM → residential Class-B floor (conservative)
+    "cispr11": "CISPR_22_B",
+    "cispr_11_b": "CISPR_22_B",
+    "cispr_11_a": "CISPR_22_A",
+    "cispr_22": "CISPR_22_B",
+    "cispr22": "CISPR_22_B",
+    "cispr_22_class_b": "CISPR_22_B",
+    "cispr_22_class_a": "CISPR_22_A",
+    "en_55032": "EN_55032_B",
+    "en55032": "EN_55032_B",
+    "en_55032_class_b": "EN_55032_B",
+    "en_55032_class_a": "EN_55032_A",
+    "fcc_b": "FCC_Class_B",
+    "fcc_a": "FCC_Class_A",
+    "fcc_part_15_b": "FCC_Class_B",
+    "iec_61326": "CISPR_22_B",
+    "iec_61326_1": "CISPR_22_B",
+}
+
+
+def _normalise_standard(standard: str) -> str:
+    raw = str(standard or "").strip()
+    if raw in EMC_LIMITS:
+        return raw
+    key = re.sub(r"[\s\-]+", "_", raw.lower())
+    key = re.sub(r"_+", "_", key)
+    if key.upper() in EMC_LIMITS:
+        return key.upper()
+    # title-case variants already in EMC_LIMITS (FCC_Class_B)
+    for canon in EMC_LIMITS:
+        if canon.lower() == key:
+            return canon
+    return _STANDARD_ALIASES.get(key, raw if raw in EMC_LIMITS else "CISPR_22_B")
+
 
 def get_emc_limit(standard: str, freq_mhz: float) -> float:
     """Return the radiated-emission limit (dBuV/m at 3m) for freq_mhz."""
@@ -165,7 +255,9 @@ def _device_power_w(payload: dict):
     unshielded-emission default), or None."""
     for k, scale in (("total_power_w", 1.0), ("nameplate_power_w", 1.0),
                      ("peak_power_w", 1.0), ("connected_electrical_load_kw", 1000.0),
-                     ("nameplate_power_kw", 1000.0), ("heating_duty_w", 1.0)):
+                     ("nameplate_power_kw", 1000.0), ("heating_duty_w", 1.0),
+                     ("max_simultaneous_dissipation_w", 1.0),
+                     ("aggregate_dissipation_w", 1.0)):
         v = payload.get(k)
         try:
             if v is not None and float(v) > 0:
@@ -176,9 +268,12 @@ def _device_power_w(payload: dict):
 
 
 def compute(payload: dict) -> dict:
-    material = str(payload.get("enclosure_material", "die_cast_alu"))
+    material_raw = str(payload.get("enclosure_material", "die_cast_alu"))
+    material = _normalise_material(material_raw)
     explicit_shielding_dB = payload.get("shielding_dB")
-    target_standard = str(payload.get("target_standard", "CISPR_22_B"))
+    target_standard = _normalise_standard(
+        str(payload.get("target_standard", "CISPR_22_B"))
+    )
     # POWER-AWARE UNSHIELDED SOURCE (2026-07-21, the organoid -30 dB EMC margin): radiated
     # emission grows with switching power. The flat 60 dBuV/m default is a moderate/high
     # emitter — on a 35 W benchtop instrument (MCU + small DC drivers, short traces, an
@@ -266,6 +361,7 @@ def compute(payload: dict) -> dict:
 
     return {
         "enclosure_material": material,
+        "enclosure_material_input": material_raw,
         "frequency_mhz": freq_mhz,
         "source_dBuV_m_at_3m": source_dBuV,
         "material_intrinsic_shielding_dB": round(material_se_dB, 2),
@@ -289,7 +385,61 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """proveCatch: aluminum alias must not collapse to SE=0 / −30 dB margin."""
+    fails: list[str] = []
+
+    def expect(cond: bool, msg: str) -> None:
+        if not cond:
+            fails.append(msg)
+
+    # cold-v17 bootstrap shape: material="aluminum", standard="CISPR 11", no power
+    alu = compute({
+        "enclosure_material": "aluminum",
+        "target_standard": "CISPR 11",
+        "frequency_mhz": 100.0,
+        "source_dBuV_m_at_3m": 60.0,
+    })
+    expect(alu["enclosure_material"] == "die_cast_alu",
+           f"aluminum must normalise to die_cast_alu, got {alu['enclosure_material']}")
+    expect(float(alu["material_intrinsic_shielding_dB"]) >= 40.0,
+           f"die-cast Al SE at 100 MHz must be ≫0, got {alu['material_intrinsic_shielding_dB']}")
+    expect(float(alu["compliance_margin_dB"]) > 0.0,
+           f"aluminum+60 dBuV source must PASS Class-B after alias fix, "
+           f"got margin={alu['compliance_margin_dB']} (the cold-v17 −30 dB disease)")
+
+    # plastic + high source still fails (alias must not invent metal)
+    plas = compute({
+        "enclosure_material": "plastic",
+        "target_standard": "CISPR_22_B",
+        "frequency_mhz": 100.0,
+        "source_dBuV_m_at_3m": 60.0,
+    })
+    expect(float(plas["compliance_margin_dB"]) < 0.0,
+           "unshielded plastic + 60 dBuV source must still FAIL (catch stays live)")
+
+    # power-aware: low-power plastic passes without shielding (organoid path)
+    low = compute({
+        "enclosure_material": "plastic",
+        "target_standard": "CISPR_22_B",
+        "frequency_mhz": 100.0,
+        "total_power_w": 35.0,
+    })
+    expect(float(low["compliance_margin_dB"]) > 0.0,
+           f"35 W plastic instrument must pass Class-B unshielded, got {low['compliance_margin_dB']}")
+
+    if fails:
+        print("enclosure_emc selftest FAILED:")
+        for m in fails:
+            print("  -", m)
+        return 1
+    print("enclosure_emc selftest: OK")
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--selftest":
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)
