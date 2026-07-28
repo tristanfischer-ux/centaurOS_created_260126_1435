@@ -1870,7 +1870,7 @@ describe('atopile-generator', () => {
       powerPin: null,
       groundPin: 'S',
       designatorPrefix: 'Q',
-    } satisfies Partial<AtopileComponentRecord> as AtopileComponentRecord
+    } satisfies Partial<AtopileComponentRecord> as unknown as AtopileComponentRecord
 
     const expanded = expandPhysicalInstances(base)
     expect(expanded).toHaveLength(8)

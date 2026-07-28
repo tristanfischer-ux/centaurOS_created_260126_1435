@@ -9837,6 +9837,7 @@ async function main() {
       const onDisk = JSON.parse(readFileSync(statePath, 'utf-8'))
       onDisk.drawingGates = card
       writeFileSync(statePath, JSON.stringify(onDisk))
+      ensurePcbPreservedOnDisk()
       console.log(`[chain] drawing-gates: ${card.n_failing}/${card.n_gates} failing — DRAWING >=8 ${card.all_pass ? 'PASS' : 'FAIL (drawing-gates.json — each failing gate names its fix stage)'}`)
 
       // ── PUNCH-LIST + ENFORCING — the drawings→tools feedback as a first-class loud signal ──
