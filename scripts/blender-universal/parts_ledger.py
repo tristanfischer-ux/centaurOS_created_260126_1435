@@ -106,11 +106,15 @@ TYPE_RULES = [
                    # caused a FALSE 'no downstream connection' connectivity concern on a PCS
                    # cabinet-internal component that was never meant to have a discrete flow path).
                    r"\bLCL\b|filter\s+inductor|filter\s+capacitor|filter\s+choke|filter\s+reactor|"
-                   r"\bEMI\s+filter\b|\bRFI\s+filter\b|harmonic\s+filter|"
+                   r"\bEMI\s+filter\b|\bRFI\s+filter\b|\bEMC\s+(?:line\s+)?filter\b|"
+                   r"\bline\s+filter\b|harmonic\s+filter|"
                    # a bare 'Output Filter' / 'AC Filter' on an inverter/PCS is the AC output
                    # LCL stage — power electronics, never a process separator (Powerwall v13:
                    # 'Output Filter' typed separator → false 'fluid in+out' connectivity FAIL
                    # on a solid-state product; process plants say inlet/outlet/discharge filter).
+                   # INTENT (cell-cycler cold-v15 Connection-trace): 'Emc Line Filter' matched
+                   # bare `\bfilter\b` → separator → process fluid in+out FAIL on a dry bench
+                   # instrument. EMC/EMI/RFI/line filters are electrical — must match HERE.
                    r"\boutput\s+filter\b|\bac\s+filter\b|"
                    # 'panel' means an ELECTRICAL distribution/control panel — but a bare match also
                    # caught non-electrical HVAC/fire/insulation/data compounds sharing the same head
@@ -999,6 +1003,42 @@ def _is_grid_electrical_origin(name: str) -> bool:
     ))
 
 
+def _is_non_fluid_boundary_noun(name: str) -> bool:
+    """INTENT (cell-cycler cold-v15 Connection-trace / P1 dry-instrument): sink/origin
+    keywords fire on ELECTRICAL discharge and AIR exhaust nouns that are NOT process-
+    fluid battery limits.
+
+    - 'discharge' in MOSFET / pass-bank / load-switch names = electrical energy dump
+    - 'exhaust air path' / ventilation exhaust = air boundary, not a piped fluid sink
+
+    A wet-plant 'effluent discharge' / 'process drain' still matches fluid sink nouns
+    without these electrical/air collocates — proveCatch both directions.
+    Universal: noun-keyed, never a product-class table.
+    """
+    name_l = (name or "").lower()
+    if not name_l:
+        return False
+    # Electrical discharge / dump stage (channel power path) — not a fluid sink.
+    if re.search(
+        r"(?:discharge|dump)\s+(?:load\s+)?(?:mosfet|fet|transistor|pass\s*bank|"
+        r"bank|resistor|heatsink)|"
+        r"(?:linear|resistive|electronic)\s+discharge|"
+        r"discharge\s+(?:path|stage|leg|rail)|"
+        r"load\s+switch\s+mosfet|power\s+mosfet",
+        name_l,
+    ):
+        return True
+    # Air exhaust / ventilation path — air mover boundary, not process-fluid sink.
+    if re.search(
+        r"(?:exhaust|vent(?:ilation)?)\s+air|"
+        r"air\s+(?:exhaust|vent(?:ilation)?|path|outlet)|"
+        r"exhaust\s+(?:path|duct|port|grille)",
+        name_l,
+    ):
+        return True
+    return False
+
+
 def _electrical_edge_needs(
     name: str, *, has_any: bool, is_origin: bool, is_sink: bool,
 ) -> tuple:
@@ -1017,7 +1057,8 @@ def _electrical_edge_needs(
     is_ac_filter_sink = bool(re.search(
         r"(?:\bac\s+filter\b|\boutput\s+filter\b|\bLCL\b|"
         r"filter\s+(?:inductor|capacitor|choke|reactor)|"
-        r"\bEMI\s+filter\b|\bRFI\s+filter\b|harmonic\s+filter)",
+        r"\bEMI\s+filter\b|\bRFI\s+filter\b|\bEMC\s+(?:line\s+)?filter\b|"
+        r"\bline\s+filter\b|harmonic\s+filter)",
         name_l, re.I))
     is_terminal_elec = is_bus_hardware or bool(re.search(
         r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|safety relay|"
@@ -1025,6 +1066,7 @@ def _electrical_edge_needs(
         r"\bMCCB\b|circuit\s+breakers?\b|breaker\b|"
         r"cable tray|terminal block|enclosure|junction box|\bgland\b|"
         r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
+        r"operator\s+deck|front\s+panel|"
         r"\bhmi\b|touchscreen|control\s+panel\b|"
         r"\bindicator\b|pilot\s*(?:light|lamp)|status\s+(?:light|lamp|led)|"
         r"annunciator|\bbeacon\b|buzzer|\bsounder\b|signal\s+(?:lamp|light)",
@@ -1102,6 +1144,10 @@ def _passive_boundary_concern(name: str, has_in: bool, has_out: bool):
     # predicate first. Caller must pass status via name alone here — so also skip
     # when the name itself declares a zoned-distribution materials take-off.
     if "zoned distribution" in name_l or name_l.startswith("zoned distribution"):
+        return None
+    # INTENT (P1 dry-instrument): electrical discharge / air-exhaust nouns share
+    # sink keywords ('discharge','exhaust') but are not process-fluid boundaries.
+    if _is_non_fluid_boundary_noun(name):
         return None
     is_origin = _name_has_boundary_keyword(name_l, _ORIGIN_KEYWORDS)
     is_sink = _name_has_boundary_keyword(name_l, _SINK_KEYWORDS)
@@ -2254,6 +2300,10 @@ def main() -> int:
         if instrument_device and not is_origin and _is_instrument_power_origin(name_l):
             is_origin = True
         is_sink = _name_has_boundary_keyword(name_l, SINK_KEYWORDS)
+        # Electrical discharge / air-exhaust nouns share sink keywords but are not
+        # process-fluid sinks (P1 dry-instrument; cold-v15 Connection-trace).
+        if is_sink and _is_non_fluid_boundary_noun(e["name"]):
+            is_sink = False
 
         if is_origin and not has_in:
             origin_parts.append({"tag": tag, "name": e["name"], "type": etype})
@@ -2818,6 +2868,35 @@ def _selftest() -> int:
     if not _is_grid_electrical_origin("Mains Incomer"):
         print("  FAIL _is_grid_electrical_origin: 'Mains Incomer' must match")
         bad += 1
+    # P1 dry-instrument (cell-cycler cold-v15 Connection-trace): EMC line filter is
+    # ELECTRICAL (not process separator); electrical discharge / air-exhaust nouns
+    # must NOT raise fluid-sink missing_output; a real process drain still fires.
+    if _classify("Emc Line Filter", "") != "electrical":
+        print(f"  FAIL type: 'Emc Line Filter' must be electrical, not "
+              f"{_classify('Emc Line Filter', '')!r} (bare filter→separator disease)")
+        bad += 1
+    for _nf in (
+        "Per Channel Discharge Load Mosfet",
+        "Per Channel Linear Discharge Pass Bank",
+        "Exhaust Air Path",
+    ):
+        if not _is_non_fluid_boundary_noun(_nf):
+            print(f"  FAIL non-fluid-boundary: '{_nf}' must be recognised as "
+                  f"electrical/air (not process-fluid sink)")
+            bad += 1
+        if _passive_boundary_concern(_nf, has_in=False, has_out=False) is not None:
+            print(f"  FAIL passive-boundary: '{_nf}' must NOT raise missing_output "
+                  f"(dry-instrument false fluid sink)")
+            bad += 1
+    if _is_non_fluid_boundary_noun("Effluent Discharge Header"):
+        print("  FAIL non-fluid-boundary: wet-plant 'Effluent Discharge Header' must "
+              "STILL be a fluid sink (not swallowed by the electrical/air guard)")
+        bad += 1
+    if _passive_boundary_concern("Effluent Discharge Header", has_in=False, has_out=False) is None:
+        print("  FAIL passive-boundary: wet-plant effluent discharge with no out must "
+              "still raise missing_output")
+        bad += 1
+
     # DC-DC regulation-board absorption (organoid r11 Interconnect 0/10, 2026-07-26):
     # a power-regulation host peripheral rides the compute kit (no drawn downstream
     # LOAD edge), same as the polyfuse / reverse-polarity / usb-power siblings on the
