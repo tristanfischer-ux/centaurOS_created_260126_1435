@@ -16169,6 +16169,13 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     continuous_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief', {
       source_detail: 'trial continuous design duty for loss tools (peak remains rear_axle_electrical_power_kw)',
     }),
+    // Alias so universal contract sizing can stamp the IPMSM principal (stems
+    // overlap "traction"+"motor") without a coupling/bearing stealing a bare
+    // continuous_power_kw match. Same value as continuous_power_kw.
+    traction_motor_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'module', 'calculator', {
+      source_detail: 'alias of continuous_power_kw for IPMSM envelope sizing (universal stem match)',
+      from: ['continuous_power_kw'],
+    }),
     dc_bus_voltage_v: q(vDcNom, 'V', 'voltage', 'rated', 'system', 'brief', {
       source_detail: 'mid of assumed usable DC window under race SoC/temp',
     }),
