@@ -229,6 +229,11 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   // parts — without these tokens "Precision Afe" / "Current Shunt Measurement" never
   // reach fillBlank (structural skip) even when Yuri verified candidates exist.
   'afe', 'shunt', 'thermistor', 'ntc',
+  // LEXICON (2026-07-28, cell-cycler closure_honesty): benchtop channel/safety/
+  // thermal COTS nouns that sat TBD while verified candidates + cascade seeds
+  // already existed — fillBlank never saw them (isCatalogueComponent false).
+  // Universal instrument nouns — not a product-class table.
+  'heatsink', 'comparator', 'cutout', 'psu',
   'coupling', 'compressor', 'chiller', 'heater', 'thermocouple', 'solenoid',
   // LEXICON (2026-07-21, organoid-bioreactor H10 mispin-resolve): a PCB mounting
   // STANDOFF is a purchased Würth/Keystone fastener (970060354), not a fabricated
@@ -449,7 +454,9 @@ const HOUSING_QUALIFIERS = new Set<string>([
 //   detector (unchanged from round 3) stays as-is below.
 const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
   stop: new Set(['emergency']),
-  module: new Set(['ethernet', 'ip', 'comms', 'communication', 'communications']),
+  // GOTCHA: ac/dc/isolated admit "Isolated AC DC Power Module" without flipping
+  // "Module Support System" / "Modular Stack Design" (no ac/dc/isolated there).
+  module: new Set(['ethernet', 'ip', 'comms', 'communication', 'communications', 'ac', 'dc', 'isolated', 'power']),
   protection: new Set(['overcurrent', 'surge']),
   supply: new Set(['power']),
   pc: new Set(['industrial']),
@@ -462,8 +469,17 @@ const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
   ct: new Set(['metering', 'pcc', 'grid']),
   lug: new Set(['grounding']),
   door: new Set(['assembly', 'leaf']),
-  detector: new Set(['thermal', 'smoke', 'heat']),
+  // polarity/reverse: channel reverse-polarity detector (BSS84) — fire detectors stay thermal/smoke/heat.
+  detector: new Set(['thermal', 'smoke', 'heat', 'polarity', 'reverse']),
   skid: new Set(['exclusion']),
+  // Benchtop mains / channel power-stage heads (2026-07-28 closure_honesty).
+  inlet: new Set(['iec', 'c14', 'mains', 'fused', 'power']),
+  bank: new Set(['pass', 'discharge', 'load', 'resistor']),
+  stage: new Set(['source', 'sink', 'linear', 'power']),
+  source: new Set(['charge', 'current', 'sink']),
+  loop: new Set(['control', 'current']),
+  trip: new Set(['overtemp', 'temp', 'thermal', 'over']),
+  holder: new Set(['cell']),
 }
 
 // COMPOUND (AND-of-N) qualifier gate — a stricter sibling of QUALIFIER_GATED_HEADS
@@ -1213,6 +1229,8 @@ export function isVerifiedIngestRow(p: Pick<DbPart, 'confidence' | 'discovery_so
 // true same-family synonyms; 'transmitter' is NEVER a synonym of 'switch'
 // (proveCatch: a pressure transmitter must not join a pressure switch).
 const HEAD_NOUN_SYNONYMS: Record<string, string[]> = {
+  // Channel hardware trip words end in "Latch" but the bought part is a comparator IC.
+  latch: ['comparator', 'lm393', 'window'],
   button: ['switch', 'pushbutton'],
   pushbutton: ['button', 'switch'],
   analyser: ['analyzer'],
@@ -2617,6 +2635,10 @@ export async function fillBlankWordMpns(
       // dbFirstLookup. Closes the cold-v15 disease where PCB arch already knew
       // IRLB3813 / TL072 but BoM fillBlank never consulted the verified table.
       // Universal — function/role keyed, never a product-class branch.
+      //
+      // P3b (2026-07-28): off-board COTS (C14 / AC-DC / heatsink) may not hit
+      // classifyFunction — still try roleTest-keyed verified rules by probing
+      // each rule's functionClass when the character_id class is null.
       {
         const characterId = String(
           cand.word.content_character?.character_id
@@ -2624,37 +2646,50 @@ export async function fillBlankWordMpns(
           || '',
         )
         const fnClass = characterId ? classifyFunction(characterId) : null
-        if (fnClass) {
+        const tryClasses: Array<string | null> = fnClass ? [fnClass] : [null]
+        // Role-only fallback classes used by off-board instrument COTS rules.
+        if (!fnClass) {
+          tryClasses.push('connector', 'regulator', 'passive_r', 'sensor_ic', 'power_mosfet', 'diode_protection', 'op_amp')
+        }
+        let verifiedHit: ReturnType<typeof resolveVerifiedFunctionCandidate> = null
+        let usedClass: string | null = null
+        for (const fc of tryClasses) {
+          if (fc == null) continue
           const verified = resolveVerifiedFunctionCandidate(
             {
               wordId: String(cand.word.id ?? characterId),
               nameHuman: cand.name,
-              characterId,
-              functionClass: fnClass,
+              characterId: characterId || cand.name,
+              functionClass: fc,
             },
             lookupCached,
           )
           if (verified) {
-            // GOTCHA: do NOT exclusive-assign verified MPNs across roles — AFE and
-            // Kelvin sense may both resolve TL072 (same Yuri identity, two BoM lines).
-            setWordMpn(cand.word, verified.manufacturer, verified.partNumber, 'db')
-            cand.word.source_detail =
-              `Discover-on-miss: verified PCB candidate (${verified.compatibleFunctionClass}) — ${verified.provenance.slice(0, 180)}`
-            mutated = true
-            filled.push({
-              module_id: cand.moduleId,
-              sub_module_id: cand.subId,
-              source: 'db',
-              manufacturer: verified.manufacturer,
-              part_number: verified.partNumber,
-              name: cand.name,
-            })
-            log(
-              `[fill-blank-mpn]   ✓ VERIFIED ${cand.moduleId}::${cand.subId} (${cand.name}) → ` +
-              `${verified.manufacturer} ${verified.partNumber} [${fnClass}]`,
-            )
-            continue
+            verifiedHit = verified
+            usedClass = fc
+            break
           }
+        }
+        if (verifiedHit) {
+          // GOTCHA: do NOT exclusive-assign verified MPNs across roles — AFE and
+          // Kelvin sense may both resolve TL072 (same Yuri identity, two BoM lines).
+          setWordMpn(cand.word, verifiedHit.manufacturer, verifiedHit.partNumber, 'db')
+          cand.word.source_detail =
+            `Discover-on-miss: verified PCB candidate (${verifiedHit.compatibleFunctionClass}) — ${verifiedHit.provenance.slice(0, 180)}`
+          mutated = true
+          filled.push({
+            module_id: cand.moduleId,
+            sub_module_id: cand.subId,
+            source: 'db',
+            manufacturer: verifiedHit.manufacturer,
+            part_number: verifiedHit.partNumber,
+            name: cand.name,
+          })
+          log(
+            `[fill-blank-mpn]   ✓ VERIFIED ${cand.moduleId}::${cand.subId} (${cand.name}) → ` +
+            `${verifiedHit.manufacturer} ${verifiedHit.partNumber} [${usedClass}]`,
+          )
+          continue
         }
       }
 
@@ -2834,6 +2869,38 @@ export async function fillBlankWordMpns(
 /** On a device-scale instrument run, clear any pinned MPN that fails
  *  dbHitAcceptableForWord (Banner tower on status LED, NSX breaker on device fuse, etc.).
  *  Catches pins from paths that skipped the fill loop's acceptance bar (restore, Stage 10.5). */
+/**
+ * True when a pinned MPN is plant-scale industrial hardware that must not
+ * survive on a device instrument (Banner tower light, Schneider MCCB, …).
+ * DECISION: do NOT reuse dbHitAcceptableForWord here — that also rejects
+ * MAKER_VENDORS (TI / ST / Infineon), which ARE correct for board ICs.
+ * TRIED (cold-v17): full dbHitAcceptable scrub cleared LM393DR on the
+ * over/under-voltage comparator latch after verified fillBlank pinned it.
+ */
+export function isIndustrialScaleMisPinOnInstrument(
+  manufacturer: string,
+  partNumber: string,
+  wordName: string,
+  componentClass = '',
+): boolean {
+  if (!RUN_IS_INSTRUMENT_DEVICE) return false
+  const mfr = manufacturer.trim().toLowerCase()
+  const mpn = partNumber.toUpperCase()
+  const blob = `${wordName} ${partNumber} ${componentClass}`
+  if (_DEVICE_REJECT_INDUSTRIAL_VENDORS.has(mfr)) return true
+  if (_DEVICE_REJECT_CLASS_RE.test(componentClass)) return true
+  if (/\b(adc|converter|analog[_ -]?to[_ -]?digital)\b/i.test(wordName) && _FLOW_TDC_MPN_RE.test(mpn)) {
+    return true
+  }
+  if (
+    /\b(motor|fan|impeller|blower)\b/i.test(wordName)
+    && /\b(?:tefc|ip55|ip65|iec[\s-]?frame|frame\s*size|cast[\s-]?iron\s+motor|industrial\s+motor)\b/i.test(blob)
+  ) {
+    return true
+  }
+  return false
+}
+
 export function scrubInstrumentIndustrialMisPins(
   modules: DesignModuleLike[],
   log: (line: string) => void = () => {},
@@ -2850,14 +2917,8 @@ export function scrubInstrumentIndustrialMisPins(
         const mfr = mods.find((x) => x.kind === 'manufacturer')?.value?.trim() ?? ''
         if (!mpn || isBlankOrPlaceholderMpn(mpn)) continue
         const nm = String(w.name_human ?? w.content_character?.character_id ?? '')
-        const hit: DbPart = {
-          part_name: nm,
-          manufacturer: mfr,
-          part_number: mpn,
-          component_class: String(w.content_character?.function_radical_primary ?? ''),
-          unit_price_gbp: null,
-        }
-        if (dbHitAcceptableForWord(hit, nm)) continue
+        const cls = String(w.content_character?.function_radical_primary ?? '')
+        if (!isIndustrialScaleMisPinOnInstrument(mfr, mpn, nm, cls)) continue
         w.modifier_characters = mods.filter((x) => x.kind !== 'part_number' && x.kind !== 'manufacturer')
         w.source_detail = 'Device instrument: industrial-scale MPN cleared (wrong scale for handheld slot)'
         cleared++
@@ -2887,14 +2948,8 @@ export function scrubInstrumentIndustrialPartVerifications(
     const mfr = String(pv.manufacturer ?? '').trim()
     if (!mpn || isBlankOrPlaceholderMpn(mpn)) continue
     const nm = String(pv.word_name ?? '')
-    const hit: DbPart = {
-      part_name: String(pv.source_title ?? pv.word_name ?? mpn),
-      manufacturer: mfr,
-      part_number: mpn,
-      component_class: String(pv.component_class ?? ''),
-      unit_price_gbp: typeof pv.distributor_price_gbp === 'number' ? pv.distributor_price_gbp : null,
-    }
-    if (dbHitAcceptableForWord(hit, nm)) continue
+    const cls = String(pv.component_class ?? '')
+    if (!isIndustrialScaleMisPinOnInstrument(mfr, mpn, nm, cls)) continue
     const clearedMfr = mfr
     const clearedMpn = mpn
     pv.manufacturer = null

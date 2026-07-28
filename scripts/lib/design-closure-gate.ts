@@ -336,8 +336,9 @@ export function computeDesignClosure(state: unknown): DesignClosureResult {
     for (const w of words) {
       if (!isCriticalRole(w.name, w.id)) continue
       if (!isTbdPart(w.word)) continue
-      // Genuine-unknown carve-out: shared fasteners / legend / foot pad stay TBD-ok
-      if (/fastener|foot[_\s-]?pad|legend|bezel|wire_harness|status_led|decoupling/i.test(`${w.name} ${w.id}`)) {
+      // Genuine-unknown carve-out: shared fasteners / legend / foot pad stay TBD-ok.
+      // Cell holder fixtures are made-to-spec mechanical (not catalogue MPN slots).
+      if (/fastener|foot[_\s-]?pad|legend|bezel|wire_harness|status_led|decoupling|cell[_\s-]?holder|holder[_\s-]?fixture/i.test(`${w.name} ${w.id}`)) {
         continue
       }
       fillableTbd++
@@ -355,7 +356,7 @@ export function computeDesignClosure(state: unknown): DesignClosureResult {
 
   // Honesty: all-critical-TBD → ≤2; each fillable TBD docks; closed → 10
   const critical = words.filter((w) => isCriticalRole(w.name, w.id)
-    && !/fastener|foot[_\s-]?pad|legend|bezel|wire_harness|status_led|decoupling/i.test(`${w.name} ${w.id}`))
+    && !/fastener|foot[_\s-]?pad|legend|bezel|wire_harness|status_led|decoupling|cell[_\s-]?holder|holder[_\s-]?fixture/i.test(`${w.name} ${w.id}`))
   const criticalTbd = critical.filter((w) => isTbdPart(w.word)).length
   let honesty = 10
   if (critical.length > 0 && criticalTbd === critical.length) honesty = 2

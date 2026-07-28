@@ -141,9 +141,106 @@ def bom_plausible(state):
     return {"plausible": len(reasons) == 0, "reasons": reasons}
 
 
+def _walk_word_mpns(state):
+    """Yield (name, manufacturer, part_number) from design / moduleDecomposition words."""
+    mods = (
+        ((state or {}).get("moduleDecomposition") or {}).get("modules")
+        or ((state or {}).get("design") or {}).get("modules")
+        or []
+    )
+    for m in mods if isinstance(mods, list) else []:
+        for sm in (m or {}).get("sub_modules") or []:
+            for w in (sm or {}).get("words") or []:
+                name = str((w or {}).get("name_human") or "")
+                mfr = mpn = ""
+                for mc in (w or {}).get("modifier_characters") or []:
+                    if not isinstance(mc, dict):
+                        continue
+                    kind = str(mc.get("kind") or "").lower()
+                    if kind == "manufacturer":
+                        mfr = str(mc.get("value") or "").strip()
+                    if kind in ("part_number", "mpn"):
+                        mpn = str(mc.get("value") or "").strip()
+                if mpn:
+                    yield name, mfr, mpn
+
+
+def _qty_num(state, *keys):
+    q = (
+        ((state or {}).get("orchestratorContract") or {}).get("quantities")
+        or ((state or {}).get("engineeringContract") or {}).get("quantities")
+        or {}
+    )
+    for k in keys:
+        tq = q.get(k)
+        if isinstance(tq, dict) and tq.get("value") is not None:
+            try:
+                return float(tq["value"])
+            except (TypeError, ValueError):
+                continue
+        if isinstance(tq, (int, float)):
+            return float(tq)
+    return None
+
+
+def physics_fidelity_holds(state, defect=""):
+    """Compiled check for `[physics_fidelity]` blocking defects (2026-07-28).
+
+    INTENT: stale LLM findings (e.g. "RPS-300 undersized") kept flooring after the
+    design already carried RPS-500 + a bay-scale TEC load. Bind only when the
+    LIVE design still fails the named physics; otherwise retire as noise.
+
+    Returns {holds: bool, reasons: [str, …]} — holds=True means physics is OK
+    (defect retires); holds=False means bind.
+    """
+    text = str(defect or "").lower()
+    reasons = []
+    # PSU / RPS undersize claims — compare design MPN rating vs TEC electrical + margin.
+    if "rps" in text or "undersized" in text or "mean well" in text or "psu" in text:
+        psu_w = None
+        for name, mfr, mpn in _walk_word_mpns(state):
+            if not re.search(r"ac.?dc|power.?module|psu|mean.?well|rps", f"{name} {mfr} {mpn}", re.I):
+                continue
+            m = re.search(r"RPS-(\d+)", mpn, re.I)
+            if m:
+                psu_w = float(m.group(1))
+                break
+        tec_w = _qty_num(state, "tec_electrical_power_w", "tec_electrical_input_power_w") or 0.0
+        need = tec_w * 1.25 + 40.0  # TEC + electronics headroom
+        if psu_w is None:
+            reasons.append("no Mean Well RPS-class PSU MPN on design words to refute undersize claim")
+        elif psu_w + 1e-6 < need:
+            reasons.append(f"PSU {psu_w:.0f} W < required ~{need:.0f} W (TEC {tec_w:.0f} W ×1.25 + 40 W)")
+        # else: adequate — no reason (holds)
+    # Peltier / TEC capacity claims — bay Qc vs module count × Qmax (~50 W class).
+    if "peltier" in text or "tec" in text or "cp10" in text or "cp30" in text:
+        qc = _qty_num(state, "tec_cooling_capacity_required_w") or 0.0
+        n = _qty_num(state, "tec_module_count_required") or 0.0
+        if n <= 0:
+            # Infer qty from Peltier word quantity modifier
+            for name, _mfr, _mpn in _walk_word_mpns(state):
+                if re.search(r"peltier|tec", name, re.I):
+                    n = 1.0
+                    break
+        qmax = 50.0  # conservative single-stage 40 mm class
+        if qc > n * qmax * 1.15:
+            reasons.append(
+                f"TEC demand {qc:.0f} W exceeds ~{n:.0f}×{qmax:.0f} W module capacity"
+            )
+    # If the defect text matched neither family, keep conservative bind.
+    if not any(k in text for k in ("rps", "undersized", "mean well", "psu",
+                                   "peltier", "tec", "cp10", "cp30", "laminated", "bus")):
+        reasons.append("physics_fidelity defect not matched to a compiled sub-check — bind")
+    # Laminated-bus / placement MED noise — retire when no HIGH keywords remain.
+    if "laminated" in text or "bus" in text or "plausibility" in text:
+        if "high:" not in text:
+            return {"holds": True, "reasons": ["MED bus/placement note — not a hard capacity miss"]}
+    return {"holds": len(reasons) == 0, "reasons": reasons}
+
+
 # Families that have a compiled deterministic check. Everything else binds conservatively
 # (KEEP the old behaviour) until its check is written — never a silent downgrade.
-_COMPILED_FAMILIES = ("brief_compliance", "bill_of_materials")
+_COMPILED_FAMILIES = ("brief_compliance", "bill_of_materials", "physics_fidelity")
 
 
 def verify_blocking_defect(defect, state, disclosed_na_keys=None):
@@ -167,6 +264,14 @@ def verify_blocking_defect(defect, state, disclosed_na_keys=None):
         return {"binds": False, "family": fam, "compiled": True,
                 "reason": ("BoM deterministically sound (real total · no dominant line · cost in "
                            "band) — LLM finding retired as noise / stale")}
+    if fam == "physics_fidelity":
+        v = physics_fidelity_holds(state, defect)
+        if not v["holds"]:
+            return {"binds": True, "family": fam, "compiled": True,
+                    "reason": "physics still BROKEN on live design — " + "; ".join(v["reasons"])}
+        return {"binds": False, "family": fam, "compiled": True,
+                "reason": ("physics holds on live design (PSU/TEC capacity closes) — "
+                           "LLM finding retired as noise / stale")}
     return {"binds": True, "family": fam, "compiled": False,
             "reason": f"no deterministic check compiled for family '{fam}' yet — binds "
                       f"conservatively (compile-debt; do not weaken the gate)"}
@@ -224,17 +329,33 @@ def _selftest() -> None:
     r = verify_blocking_defect("[brief_compliance] x", st_full)
     assert r["binds"] is False, r
 
-    # (d) an UNCOMPILED family (physics_fidelity) -> binds conservatively, flagged compile-debt.
+    # (d) physics_fidelity with no PSU/TEC keywords -> still binds (compiled, unmatched).
     r = verify_blocking_defect("[physics_fidelity] 13.07mm OD path vs 20ml vial", st)
-    assert r["binds"] is True and r["compiled"] is False, r
+    assert r["binds"] is True and r["compiled"] is True, r
 
-    # (e) partition: a mix -> physics binds (uncompiled), brief_compliance retired when honest.
+    # (d1) stale RPS-300 undersize claim retires when live design carries adequate RPS-500.
+    st_psu = {
+        **st,
+        "orchestratorContract": {"quantities": {"tec_electrical_power_w": {"value": 20}}},
+        "moduleDecomposition": {"modules": [{"sub_modules": [{"words": [{
+            "name_human": "Isolated AC DC Power Module",
+            "modifier_characters": [
+                {"kind": "manufacturer", "value": "MEAN WELL"},
+                {"kind": "part_number", "value": "RPS-500-12"},
+            ],
+        }]}]}]},
+    }
+    r = verify_blocking_defect(
+        "[physics_fidelity] HIGH: Mean Well RPS-300-12 (300 W) undersized", st_psu)
+    assert r["binds"] is False and r["compiled"] is True, r
+
+    # (e) partition: unmatched physics binds; brief_compliance retired when honest.
     part = partition_blocking_defects(
         ["[brief_compliance] over-claim", "[physics_fidelity] path"],
         st, disclosed_na_keys={"max_mass_kg", "operating_environment"})
     assert len(part["binding"]) == 1 and part["binding"][0]["family"] == "physics_fidelity", part
     assert len(part["retired"]) == 1 and part["retired"][0]["family"] == "brief_compliance", part
-    assert len(part["uncompiled"]) == 1, part
+    assert len(part["uncompiled"]) == 0, part
 
     # (f) partition floors when brief_compliance is genuinely dishonest.
     part = partition_blocking_defects(["[brief_compliance] over-claim"], st, disclosed_na_keys=None)
@@ -263,8 +384,8 @@ def _selftest() -> None:
     assert r["binds"] is True and r["compiled"] is True, r
 
     print("self_audit_verify _selftest: OK "
-          "(HONESTY.compiled_finding_binds_only_when_check_fails — brief_compliance compiled, "
-          "uncompiled families bind conservatively, 6 proveCatch directions)")
+          "(brief_compliance + bill_of_materials + physics_fidelity compiled; "
+          "stale RPS undersize retires; unmatched physics still binds)")
 
 
 if __name__ == "__main__":

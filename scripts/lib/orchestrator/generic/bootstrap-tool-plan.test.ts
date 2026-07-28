@@ -42,6 +42,9 @@ import {
   economicsRevenueBasisMissing,
   buildStepInput,
   bootstrapScaleContext,
+  injectCableAmpacityInputs,
+  deviceScaleInletCurrentA,
+  isWattScaleFeederDuty,
   type ToolPlanSpec,
   type ToolPlanStepSpec,
 } from './bootstrap-tool-plan'
@@ -240,6 +243,81 @@ function pureTests(): void {
     r.contract.quantities['total_water_storage_volume_m3']?.value === 313
     && (r.protected_keys?.length ?? 0) === 1,
     `got ${r.contract.quantities['total_water_storage_volume_m3']?.value}; protected=${JSON.stringify(r.protected_keys)}`)
+
+  // ── WATT-SCALE CABLE AMPACITY INLET (2026-07-28, cold-v17 35 mm² / 40 A) ───
+  // ADVERSARIAL: plan wires absent aggregate_channel_current_capacity_a → fallback 40 A
+  // @ cell 5 V. Inject must overwrite with inlet current from connected_electrical_load_kw
+  // @ 230 V 1φ; applyStepOutputs must refuse a ≥16 mm² CSA mint on watt-scale.
+  const wattCableContract: ContractInProgress = {
+    ...baseContract,
+    quantities: {
+      connected_electrical_load_kw: { value: 0.12, unit: 'kW', family: 'power' } as any,
+      channel_count: { value: 8, unit: '', family: 'count' } as any,
+      current_range_a: { value: 5, unit: 'A', family: 'current' } as any,
+      voltage_range_v: { value: 5, unit: 'V', family: 'voltage' } as any,
+    },
+  }
+  check('watt-scale feeder duty detected from connected_electrical_load_kw=0.12',
+    isWattScaleFeederDuty(wattCableContract))
+  const inletA = deviceScaleInletCurrentA(wattCableContract)!
+  check('device-scale inlet current ≈ P/(230·0.9)·1.25 (~0.72 A), NOT 40 A channel duty',
+    inletA > 0.5 && inletA < 1.5, `inletA=${inletA}`)
+  const cableStep: ToolPlanStepSpec = {
+    tool_id: 'cable:ampacity',
+    inputs: [
+      { param: 'continuous_current_a', from_contract_key: 'aggregate_channel_current_capacity_a', fallback: 40 } as any,
+      { param: 'voltage_class_v', constant: 5 } as any,
+      { param: 'length_m', constant: 10 } as any,
+    ],
+    outputs: [
+      { contract_key: 'cable_csa_mm2', tool_output_field: 'csa_mm2', unit: 'mm2', family: 'area' },
+      { contract_key: 'cable_mass_kg', tool_output_field: 'total_mass_kg', unit: 'kg', family: 'mass' },
+    ],
+  }
+  const cablePayload = buildStepInput(cableStep, wattCableContract)
+  check('cable:ampacity payload overwrites 40 A fallback with watt-scale inlet current',
+    typeof cablePayload.continuous_current_a === 'number'
+    && (cablePayload.continuous_current_a as number) < 2
+    && (cablePayload.continuous_current_a as number) > 0.5,
+    JSON.stringify(cablePayload))
+  check('cable:ampacity payload uses 230 V mains, not cell 5 V',
+    cablePayload.voltage_class_v === 230, JSON.stringify(cablePayload))
+  check('cable:ampacity payload shortens plant-default length on watt-scale',
+    Number(cablePayload.length_m) <= 2, JSON.stringify(cablePayload))
+  // inject seam alone (proveCatch without full buildStepInput wiring)
+  const injected = injectCableAmpacityInputs(cableStep, wattCableContract, {
+    continuous_current_a: 40, voltage_class_v: 5, length_m: 10,
+  })
+  check('injectCableAmpacityInputs proveCatch: 40 A → inlet A @ 230 V',
+    Number(injected.continuous_current_a) < 2 && injected.voltage_class_v === 230)
+  const plantCsaRefuse = applyStepOutputs(cableStep, wattCableContract, {
+    csa_mm2: 35, total_mass_kg: 0.392,
+  })
+  check('applyStepOutputs refuses ≥16 mm² CSA mint on watt-scale (backstop)',
+    plantCsaRefuse.contract.quantities['cable_csa_mm2'] === undefined
+    && (plantCsaRefuse.protected_keys?.some((k) => /refuse plant CSA/.test(k)) ?? false),
+    JSON.stringify(plantCsaRefuse.protected_keys))
+  const okCsaWrite = applyStepOutputs(cableStep, wattCableContract, {
+    csa_mm2: 1.5, total_mass_kg: 0.04,
+  })
+  check('applyStepOutputs allows appliance-cord CSA (1.5 mm²) on watt-scale',
+    (okCsaWrite.contract.quantities['cable_csa_mm2'] as any)?.value === 1.5,
+    JSON.stringify(okCsaWrite.contract.quantities['cable_csa_mm2']))
+  // Plant-scale BESS: inject must NOT clobber a real feeder current.
+  const plantCableContract: ContractInProgress = {
+    ...baseContract,
+    quantities: {
+      connected_electrical_load_kw: { value: 1200, unit: 'kW', family: 'power' } as any,
+    },
+  }
+  check('plant load is NOT watt-scale feeder duty',
+    !isWattScaleFeederDuty(plantCableContract))
+  const plantPayload = injectCableAmpacityInputs(cableStep, plantCableContract, {
+    continuous_current_a: 1800, voltage_class_v: 400, length_m: 50,
+  })
+  check('plant cable:ampacity payload untouched by watt-scale inject',
+    plantPayload.continuous_current_a === 1800 && plantPayload.voltage_class_v === 400,
+    JSON.stringify(plantPayload))
 
   // ── DERIVED THERMAL-STABILITY WIRING (council H9, 2026-07-21) ───────────────
   // ADVERSARIAL INPUT: a control-systems PID step whose LLM-authored plan declares

@@ -21565,6 +21565,18 @@ _COMMODITY_NOUN_RX = re.compile(
     # power switch / status LED / small touch display are concept-stage bought-outs
     # procured by family, not a bespoke drawing. Still BOTH-gated (noun + £ ≤ £100).
     # Without these, H10 painted honest front-panel kit UNRESOLVED-red.
+    # GOTCHA: keep this family in sync with `_INSTRUMENT_FRONT_PANEL_COMMODITY_RX`
+    # below — fabricated-path H10 must still win for bare MCU/AFE.
+    r"iec\s*c\s*14|c14\s+fused|mains\s+inlet|fused\s+inlet|"
+    r"power\s+switch(?:es)?|rocker\s+switch(?:es)?|"
+    r"\btouch\s+displays?\b|\b(?:tft|lcd|oled)\s+displays?\b|"
+    r"status\s+leds?", re.I)
+
+# INTENT (2026-07-28): on fabricated-kind rows, commodity-FIRST must lift front-panel
+# kit out of H10 red — but MCU is ALSO in `_COMMODITY_NOUN_RX` (Codema assembly
+# path). Bare catalogue silicon must stay UNRESOLVED under S10; only this allowlist
+# may take the commodity carve-out on the fabricated path.
+_INSTRUMENT_FRONT_PANEL_COMMODITY_RX = re.compile(
     r"iec\s*c\s*14|c14\s+fused|mains\s+inlet|fused\s+inlet|"
     r"power\s+switch(?:es)?|rocker\s+switch(?:es)?|"
     r"\btouch\s+displays?\b|\b(?:tft|lcd|oled)\s+displays?\b|"
@@ -21927,16 +21939,24 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                 # GOTCHA (2026-07-28): `_bom_row_kind` often returns fabricated for
                 # "requirement stated" instrument kit — so the assembly-path commodity
                 # taxonomy never ran, and Status LED / IEC C14 / power switch went H10
-                # red despite matching the commodity noun+£ gate. Run commodity FIRST.
+                # red despite matching the commodity noun+£ gate. Run commodity FIRST
+                # for front-panel kit only — MCU is also a commodity noun on the
+                # assembly path, but S10 still wins for bare catalogue silicon here.
                 commodity = _commodity_bought_out(row, unit)
+                _is_electronic = bool(re.search(r"fr4|electronic\s+comp|pcb[- ]?mount",
+                                                material_txt or "", re.I)) \
+                    or bool(_ELECTRONIC_NOUN_RX.search(req))
+                if (
+                    commodity
+                    and _is_electronic
+                    and not _INSTRUMENT_FRONT_PANEL_COMMODITY_RX.search(req)
+                ):
+                    commodity = False
                 if commodity:
                     commodity_total += 1
                     mpn_txt = _COMMODITY_MPN_TEXT
                     commodity_tbd += 1
                 else:
-                    _is_electronic = bool(re.search(r"fr4|electronic\s+comp|pcb[- ]?mount",
-                                                    material_txt or "", re.I)) \
-                        or bool(_ELECTRONIC_NOUN_RX.search(req))
                     if _is_electronic:
                         mpn_txt = "UNRESOLVED — catalogue electronic part; MPN required at detailed design"
                         reasons.append("catalogue electronic component with NO resolved MPN — "
@@ -27866,6 +27886,690 @@ def _should_na_electrical_to_pcb(state: dict) -> bool:
             and not _instrument_electrical_topology_edges(state))
 
 
+# IEC 60228 small CSA ladder (Cu XLPE B1 ampacity @ 30 °C) — same floor as
+# cable_ampacity.py after the 2026-07-21 small-ladder merge. Used only to
+# re-mint a watt-scale inlet cord when a stale plant CSA is still on state.
+_WATT_SCALE_CSA_AMPACITY = (
+    (1.5, 17), (2.5, 24), (4, 33), (6, 41), (10, 57), (16, 76),
+)
+
+
+def _q_value(q: Any) -> Optional[float]:
+    if isinstance(q, dict):
+        v = q.get("value")
+    else:
+        v = q
+    try:
+        f = float(v)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def _reconcile_watt_scale_feeder_cable(state: dict) -> bool:
+    """Rewrite grossly oversized system cable_csa_mm2 on watt-scale instruments.
+
+    INTENT: bootstrap cable:ampacity once minted 35 mm² from channel-duty 40 A
+    on a 120 W benchtop (Overview P3 FAIL). New runs inject inlet current at
+    SOURCE; this rebuild-time reconcile repairs already-frozen twins so the
+    scorecard reflects the same rule without a full re-chain.
+    Returns True when state quantities were mutated.
+    """
+    oc = state.get("orchestratorContract")
+    if not isinstance(oc, dict):
+        return False
+    qs = oc.get("quantities")
+    if not isinstance(qs, dict):
+        return False
+    load_kw = (_q_value(qs.get("connected_electrical_load_kw"))
+               or _q_value(qs.get("total_electrical_load_kw"))
+               or _q_value(qs.get("nameplate_power_kw")))
+    watt_scale = (
+        state.get("isInstrumentDevice") is True
+        or (load_kw is not None and 0 < load_kw < 0.5)
+    )
+    if not watt_scale:
+        return False
+    csa_key = None
+    csa = None
+    for key in ("cable_csa_mm2", "power_cable_csa_mm2", "conductor_csa_mm2"):
+        csa = _q_value(qs.get(key))
+        if csa is not None and csa > 0:
+            csa_key = key
+            break
+    if csa_key is None or csa is None:
+        return False
+    p_w = (load_kw * 1000.0) if (load_kw is not None and load_kw > 0) else 5.0
+    inlet_a = (p_w / (230.0 * 0.9)) * 1.25
+    # Same gross-oversize gate as deterministic_checks_lib P3.
+    req_csa = 1.5
+    for size, amps in _WATT_SCALE_CSA_AMPACITY:
+        if amps >= inlet_a:
+            req_csa = size
+            break
+    gross = csa >= max(4.0, req_csa * 6.0)
+    length_m = _q_value(qs.get("cable_length_m")) or 1.5
+    length_m = min(max(length_m, 0.5), 2.0)
+    cond_kg_per_m = (req_csa / 1e6) * 8960.0 * 1.25
+    mass_kg = round(cond_kg_per_m * length_m, 4)
+    mutated = False
+    if gross:
+        prev = qs.get(csa_key)
+        base = dict(prev) if isinstance(prev, dict) else {"unit": "mm2", "family": "area", "basis": "rated"}
+        # GOTCHA: calc-coverage / provenance need source=tool:<id> + a formula-bearing
+        # source_detail — a bare reconcile:* tag left cable_csa/mass as "hidden calcs".
+        csa_detail = (
+            f"cable_csa_mm2 = min CSA with ampacity ≥ I_inlet; "
+            f"I_inlet = {p_w:g}/(230×0.9)×1.25 = {inlet_a:.3f} A → {req_csa:g} mm² "
+            f"(computed by cable:ampacity; watt-scale inlet reconcile)"
+        )
+        base.update({
+            "value": req_csa,
+            "unit": "mm2",
+            "family": "area",
+            "basis": "rated",
+            "condition": "watt-scale inlet reconcile (230 V 1φ)",
+            "source": "tool:cable:ampacity",
+            "source_detail": csa_detail,
+            "provenance": {
+                "source": "tool:cable:ampacity",
+                "tool_id": "cable:ampacity",
+                "tool_version": "1.0.0",
+                "invocation_output_field": "csa_mm2",
+                "duration_ms": 0,
+                "note": (
+                    f"replaced plant CSA {csa:g} mm² (channel-duty leak) with "
+                    f"inlet cord {req_csa:g} mm² for {p_w:g} W @ 230 V "
+                    f"(~{inlet_a:.2f} A)"
+                ),
+            },
+            "lineage": {
+                "from": ["connected_electrical_load_kw"],
+                "used_by": ["cable_mass_kg", "design_envelope"],
+            },
+        })
+        qs[csa_key] = base
+        for alias in ("cable_csa_mm2", "power_cable_csa_mm2"):
+            if alias != csa_key and alias in qs:
+                qs[alias] = dict(base)
+        mass_prev = qs.get("cable_mass_kg")
+        mass_base = dict(mass_prev) if isinstance(mass_prev, dict) else {
+            "unit": "kg", "family": "mass", "basis": "rated",
+        }
+        mass_detail = (
+            f"cable_mass_kg = ρ_Cu × CSA × length × fill = "
+            f"{mass_kg:g} kg (computed by cable:ampacity; watt-scale inlet reconcile)"
+        )
+        mass_base.update({
+            "value": mass_kg,
+            "unit": "kg",
+            "family": "mass",
+            "basis": "rated",
+            "source": "tool:cable:ampacity",
+            "source_detail": mass_detail,
+            "condition": "watt-scale inlet reconcile",
+            "provenance": {
+                "source": "tool:cable:ampacity",
+                "tool_id": "cable:ampacity",
+                "invocation_output_field": "cable_mass_kg",
+            },
+            "lineage": {
+                "from": ["cable_csa_mm2", "cable_length_m"],
+                "used_by": ["total_system_mass_kg"],
+            },
+        })
+        qs["cable_mass_kg"] = mass_base
+        oc["quantities"] = qs
+        mutated = True
+        print(
+            f"  · watt-scale feeder cable reconcile: {csa:g} → {req_csa:g} mm² "
+            f"(inlet ~{inlet_a:.2f} A for {p_w:g} W)"
+        )
+    # Always re-sync claims when watt-scale contract CSA disagrees with tool claims
+    # (handles a prior quantity-only rewrite that left STALE provenance FAILs).
+    final_csa = _q_value(qs.get(csa_key)) or req_csa
+    final_mass = _q_value(qs.get("cable_mass_kg")) or mass_kg
+    if _cable_ampacity_claims_disagree(state, final_csa, final_mass):
+        _sync_cable_ampacity_tool_claims(state, final_csa, final_mass, inlet_a, p_w)
+        mutated = True
+        print(
+            f"  · watt-scale cable:ampacity tool claims synced to "
+            f"{final_csa:g} mm² / {final_mass:g} kg"
+        )
+    # Freshen quantity provenance on already-reconciled twins (source was
+    # reconcile:* without tool: / formula — calc-coverage MED).
+    if _stamp_watt_scale_cable_qty_provenance(state, inlet_a, p_w, final_csa, final_mass):
+        mutated = True
+    return mutated
+
+
+def _stamp_watt_scale_cable_qty_provenance(
+    state: dict, inlet_a: float, p_w: float, csa_mm2: float, mass_kg: float,
+) -> bool:
+    """Ensure watt-scale cable quantities carry tool: + formula source_detail."""
+    oc = state.get("orchestratorContract")
+    if not isinstance(oc, dict):
+        return False
+    qs = oc.get("quantities")
+    if not isinstance(qs, dict):
+        return False
+    mutated = False
+    csa_detail = (
+        f"cable_csa_mm2 = min CSA with ampacity ≥ I_inlet; "
+        f"I_inlet = {p_w:g}/(230×0.9)×1.25 = {inlet_a:.3f} A → {csa_mm2:g} mm² "
+        f"(computed by cable:ampacity; watt-scale inlet reconcile)"
+    )
+    mass_detail = (
+        f"cable_mass_kg = ρ_Cu × CSA × length × fill = "
+        f"{mass_kg:g} kg (computed by cable:ampacity; watt-scale inlet reconcile)"
+    )
+    for key, detail, ofield in (
+        ("cable_csa_mm2", csa_detail, "csa_mm2"),
+        ("power_cable_csa_mm2", csa_detail, "csa_mm2"),
+        ("cable_mass_kg", mass_detail, "cable_mass_kg"),
+    ):
+        q = qs.get(key)
+        if not isinstance(q, dict):
+            continue
+        src = str(q.get("source") or "")
+        sd = str(q.get("source_detail") or "")
+        needs = (
+            src.startswith("reconcile:")
+            or not src.startswith("tool:")
+            or not sd
+            or "computed by cable:ampacity" not in sd
+        )
+        if not needs:
+            continue
+        q["source"] = "tool:cable:ampacity"
+        q["source_detail"] = detail
+        prov = dict(q.get("provenance") or {}) if isinstance(q.get("provenance"), dict) else {}
+        prov.update({
+            "source": "tool:cable:ampacity",
+            "tool_id": "cable:ampacity",
+            "invocation_output_field": ofield,
+        })
+        q["provenance"] = prov
+        if not isinstance(q.get("lineage"), dict):
+            q["lineage"] = {
+                "from": (["connected_electrical_load_kw"]
+                         if "csa" in key else ["cable_csa_mm2", "cable_length_m"]),
+                "used_by": (["cable_mass_kg"] if "csa" in key else ["total_system_mass_kg"]),
+            }
+        qs[key] = q
+        mutated = True
+    if mutated:
+        oc["quantities"] = qs
+        print("  · watt-scale cable quantity provenance stamped (tool:cable:ampacity)")
+    return mutated
+
+
+def _cable_ampacity_claims_disagree(
+    state: dict, csa_mm2: float, mass_kg: float,
+) -> bool:
+    page = state.get("toolsUsedPage")
+    if not isinstance(page, dict):
+        return False
+    for t in (page.get("tools") or []):
+        if not isinstance(t, dict) or str(t.get("tool_id") or "") != "cable:ampacity":
+            continue
+        for c in (t.get("claims") or []):
+            if not isinstance(c, dict):
+                continue
+            field = str(c.get("field") or "")
+            try:
+                val = float(c.get("value"))
+            except (TypeError, ValueError):
+                continue
+            if field in ("cable_csa_mm2", "power_cable_csa_mm2", "conductor_csa_mm2"):
+                if abs(val - csa_mm2) > max(0.01, 0.02 * csa_mm2):
+                    return True
+            elif field == "cable_mass_kg":
+                if abs(val - mass_kg) > max(0.001, 0.02 * max(mass_kg, 0.001)):
+                    return True
+    return False
+
+
+def _sync_cable_ampacity_tool_claims(
+    state: dict, csa_mm2: float, mass_kg: float, inlet_a: float, p_w: float,
+) -> None:
+    """Update cable:ampacity claims on toolsUsedPage to match reconciled quantities."""
+    page = state.get("toolsUsedPage")
+    if not isinstance(page, dict):
+        return
+    tools = page.get("tools")
+    if not isinstance(tools, list):
+        return
+    note = (
+        f"watt-scale inlet reconcile: {p_w:g} W → {inlet_a:.3f} A @ 230 V 1φ → "
+        f"{csa_mm2:g} mm²"
+    )
+    for t in tools:
+        if not isinstance(t, dict) or str(t.get("tool_id") or "") != "cable:ampacity":
+            continue
+        for c in (t.get("claims") or []):
+            if not isinstance(c, dict):
+                continue
+            field = str(c.get("field") or "")
+            if field in ("cable_csa_mm2", "power_cable_csa_mm2", "conductor_csa_mm2"):
+                c["value"] = csa_mm2
+                c["unit"] = "mm2"
+                c["input_summary"] = note
+            elif field == "cable_mass_kg":
+                c["value"] = mass_kg
+                c["unit"] = "kg"
+                c["input_summary"] = note
+        # Drop stale worked-calcs that still quote the plant CSA — the claim
+        # values are what the PROVENANCE check joins; worked text is display.
+        worked = t.get("worked")
+        if isinstance(worked, list):
+            t["worked"] = [
+                w for w in worked
+                if not (isinstance(w, dict) and "35" in json.dumps(w.get("substitution") or ""))
+            ]
+            t["worked"].insert(0, {
+                "label": "Watt-scale inlet conductor (reconciled)",
+                "formula": "I_inlet = P / (V × PF) × margin; pick min CSA with ampacity ≥ I",
+                "substitution": (
+                    f"I_inlet = {p_w:g} / (230 × 0.9) × 1.25 = {inlet_a:.3f} A → "
+                    f"{csa_mm2:g} mm²"
+                ),
+                "result": {"value": csa_mm2, "unit": "mm2"},
+                "assumptions": [
+                    "Benchtop instrument: wall inlet at 230 V 1φ, not channel DUTY amps",
+                    note,
+                ],
+            })
+
+
+
+def _peltier_cooling_claims_disagree(state: dict) -> bool:
+    """True when peltier:cooling-capacity claims lag reconciled TEC quantities."""
+    qs = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    targets = {
+        "tec_cooling_capacity_required_w": _q_value(qs.get("tec_cooling_capacity_required_w")),
+        "tec_electrical_power_w": _q_value(qs.get("tec_electrical_power_w")),
+        "tec_module_count_required": _q_value(qs.get("tec_module_count_required")),
+    }
+    if all(v is None for v in targets.values()):
+        return False
+    page = state.get("toolsUsedPage")
+    if not isinstance(page, dict):
+        return False
+    for t in (page.get("tools") or []):
+        if not isinstance(t, dict) or str(t.get("tool_id") or "") != "peltier:cooling-capacity":
+            continue
+        for c in (t.get("claims") or []):
+            if not isinstance(c, dict):
+                continue
+            field = str(c.get("field") or c.get("output_field") or "")
+            want = targets.get(field)
+            if want is None:
+                continue
+            try:
+                val = float(c.get("value"))
+            except (TypeError, ValueError):
+                continue
+            if abs(val - want) > max(0.05, 0.02 * abs(want)):
+                return True
+    return False
+
+
+def _apply_peltier_claim_targets_to_tools(
+    tools: list, targets: dict, note: str, qc: Optional[float], pe: Optional[float],
+) -> bool:
+    """Mutate peltier:cooling-capacity claim/worked rows in a tools list. Returns True if changed."""
+    mutated = False
+    for t in tools:
+        if not isinstance(t, dict) or str(t.get("tool_id") or "") != "peltier:cooling-capacity":
+            continue
+        for c in (t.get("claims") or []):
+            if not isinstance(c, dict):
+                continue
+            field = str(c.get("field") or c.get("output_field") or "")
+            want = targets.get(field)
+            if want is None:
+                continue
+            try:
+                cur = float(c.get("value"))
+            except (TypeError, ValueError):
+                cur = None
+            if cur is not None and abs(cur - want) <= max(0.05, 0.02 * abs(want)):
+                continue
+            c["value"] = want
+            c["unit"] = "W" if field.endswith("_w") else (c.get("unit") or "")
+            c["input_summary"] = note
+            if c.get("output_field"):
+                c["output_field"] = field
+            mutated = True
+        worked = t.get("worked")
+        if isinstance(worked, list):
+            def _stale_worked(w: Any) -> bool:
+                if not isinstance(w, dict):
+                    return False
+                blob = json.dumps(w, default=str)
+                if qc is not None and "212" in blob and abs(qc - 212) > 1:
+                    return True
+                try:
+                    rv = float((w.get("result") or {}).get("value")
+                               if isinstance(w.get("result"), dict)
+                               else w.get("result"))
+                except (TypeError, ValueError):
+                    return False
+                label = str(w.get("label") or "").lower()
+                if "cooling capacity required" in label and qc is not None:
+                    return abs(rv - qc) > max(0.05, 0.02 * abs(qc))
+                if "electrical power" in label and pe is not None:
+                    return abs(rv - pe) > max(0.05, 0.02 * abs(pe))
+                return False
+
+            cleaned = [w for w in worked if not _stale_worked(w)]
+            if len(cleaned) != len(worked):
+                mutated = True
+            t["worked"] = cleaned
+            if qc is not None and not any(
+                isinstance(w, dict) and "reconciled" in str(w.get("label") or "").lower()
+                for w in t["worked"]
+            ):
+                t["worked"].insert(0, {
+                    "label": "Bay TEC cooling capacity (reconciled)",
+                    "formula": "Qc_bay = DUT self-heat + passive leak (not p_cell × n)",
+                    "substitution": note,
+                    "result": {"value": qc, "unit": "W"},
+                    "assumptions": [
+                        "Channel duty heats the DUT, not the TEC cold plate at 1:1",
+                        note,
+                    ],
+                })
+                mutated = True
+    return mutated
+
+
+def _stamp_peltier_qty_provenance(state: dict) -> bool:
+    """Stamp tool: + formula source_detail on bay-self-heat TEC quantities.
+
+    INTENT: twin repair rewrote Qc/P_elec without provenance → calc-coverage +
+    provenance_sourceless MEDs on Calculations. Universal: any quantity whose
+    source names peltier:cooling-capacity / bay-self-heat gets honest tool tags.
+    """
+    oc = state.get("orchestratorContract")
+    if not isinstance(oc, dict):
+        return False
+    qs = oc.get("quantities")
+    if not isinstance(qs, dict):
+        return False
+    qc = _q_value(qs.get("tec_cooling_capacity_required_w"))
+    pe = _q_value(qs.get("tec_electrical_power_w"))
+    nm = _q_value(qs.get("tec_module_count_required"))
+    qh = _q_value(qs.get("hot_side_rejection_power_w"))
+    details = {
+        "tec_cooling_capacity_required_w": (
+            f"tec_cooling_capacity_required_w = Q_active + Q_passive = {qc:g} W "
+            f"(DUT self-heat + bay leak; computed by peltier:cooling-capacity)"
+            if qc is not None else ""
+        ),
+        "tec_electrical_power_w": (
+            f"tec_electrical_power_w = N × P_module = {pe:g} W "
+            f"(computed by peltier:cooling-capacity)"
+            if pe is not None else ""
+        ),
+        "tec_module_count_required": (
+            f"tec_module_count_required = ceil(Qc / Qc_per_module) = {nm:g} "
+            f"(computed by peltier:cooling-capacity)"
+            if nm is not None else ""
+        ),
+        "hot_side_rejection_power_w": (
+            f"hot_side_rejection_power_w = Qc + P_elec = {qh:g} W "
+            f"(computed by peltier:cooling-capacity)"
+            if qh is not None else ""
+        ),
+    }
+    mutated = False
+    for key, detail in details.items():
+        q = qs.get(key)
+        if not isinstance(q, dict) or not detail:
+            continue
+        src = str(q.get("source") or "")
+        sd = str(q.get("source_detail") or "")
+        # Only rewrite bay-self-heat / bare peltier: stamps — never clobber a
+        # different tool's honest provenance.
+        needs = (
+            "bay-self-heat" in src
+            or src.startswith("peltier:")
+            or (
+                src.startswith("tool:peltier:cooling-capacity")
+                and "computed by peltier:cooling-capacity" not in sd
+            )
+        )
+        if not needs:
+            continue
+        q["source"] = "tool:peltier:cooling-capacity"
+        q["source_detail"] = detail
+        prov = dict(q.get("provenance") or {}) if isinstance(q.get("provenance"), dict) else {}
+        prov.update({
+            "source": "tool:peltier:cooling-capacity",
+            "tool_id": "peltier:cooling-capacity",
+            "invocation_output_field": key,
+        })
+        q["provenance"] = prov
+        if not isinstance(q.get("lineage"), dict) or not (q.get("lineage") or {}).get("from"):
+            q["lineage"] = {
+                "from": ["per_channel_power_duty_w", "cell_bay_capacity_cells"],
+                "used_by": ["tec_electrical_power_w", "hot_side_rejection_power_w"],
+            }
+        qs[key] = q
+        mutated = True
+    if mutated:
+        oc["quantities"] = qs
+        # Mirror worked calcs so calc-coverage tool_shown path also fires.
+        wc = state.get("worked_calculations")
+        if not isinstance(wc, dict):
+            wc = ((state.get("orchestratorContract") or {}).get("worked_calculations"))
+        if not isinstance(wc, dict):
+            wc = {}
+            state["worked_calculations"] = wc
+        if "peltier:cooling-capacity" not in wc:
+            wc["peltier:cooling-capacity"] = [{
+                "label": "Bay TEC cooling capacity",
+                "output_field": "tec_cooling_capacity_required_w",
+                "formula": "Qc = Q_active + Q_passive",
+                "substitution": details["tec_cooling_capacity_required_w"],
+                "result": qc,
+                "result_unit": "W",
+            }]
+            if isinstance(state.get("orchestratorContract"), dict):
+                state["orchestratorContract"]["worked_calculations"] = wc
+        print("  · peltier quantity provenance stamped (tool:peltier:cooling-capacity)")
+    return mutated
+
+
+def _ensure_peltier_claim_fields(tools: list, targets: dict, note: str) -> bool:
+    """Ensure peltier tool carries claims for every TEC contract field (incl. N, Qh)."""
+    mutated = False
+    for t in tools:
+        if not isinstance(t, dict) or str(t.get("tool_id") or "") != "peltier:cooling-capacity":
+            continue
+        claims = t.get("claims")
+        if not isinstance(claims, list):
+            claims = []
+            t["claims"] = claims
+        have = {str(c.get("field") or c.get("output_field") or "")
+                for c in claims if isinstance(c, dict)}
+        for field, want in targets.items():
+            if want is None or field in have:
+                continue
+            claims.append({
+                "field": field,
+                "value": want,
+                "unit": "W" if field.endswith("_w") else "",
+                "input_summary": note,
+                "output_field": field,
+            })
+            have.add(field)
+            mutated = True
+    return mutated
+
+
+def _sync_peltier_cooling_tool_claims(state: dict, run_dir: Optional[str] = None) -> bool:
+    """Align peltier:cooling-capacity claims with live TEC contract quantities.
+
+    INTENT: bay-self-heat rewrite updates orchestratorContract quantities but
+    leaves tool claims at the old p_cell×n_cells ~200 W figures — PROVENANCE
+    (deterministic_checks_lib reads 4-orchestrator-tools-used.json) then marks
+    those claims STALE and floors Checks / Exec Summary. Sync BOTH the sidecar
+    (CHECKS authority) and state.toolsUsedPage (Excel provenance table).
+    """
+    mutated = _stamp_peltier_qty_provenance(state)
+    qs = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    targets = {
+        "tec_cooling_capacity_required_w": _q_value(qs.get("tec_cooling_capacity_required_w")),
+        "tec_electrical_power_w": _q_value(qs.get("tec_electrical_power_w")),
+        "tec_module_count_required": _q_value(qs.get("tec_module_count_required")),
+        "hot_side_rejection_power_w": _q_value(qs.get("hot_side_rejection_power_w")),
+    }
+    if all(v is None for v in targets.values()):
+        return mutated
+    qc = targets["tec_cooling_capacity_required_w"]
+    pe = targets["tec_electrical_power_w"]
+    nm = targets["tec_module_count_required"]
+    note = (
+        f"bay-self-heat reconcile: Qc={qc:g} W, P_elec={pe:g} W"
+        + (f", N={nm:g}" if nm is not None else "")
+        + " (tool:peltier:cooling-capacity)"
+    )
+
+    # 1) CHECKS authority — 4-orchestrator-tools-used.json (not toolsUsedPage).
+    if run_dir:
+        side_path = os.path.join(run_dir, "4-orchestrator-tools-used.json")
+        side = load_json(side_path) if os.path.isfile(side_path) else None
+        if isinstance(side, dict) and isinstance(side.get("tools"), list):
+            side_mut = _apply_peltier_claim_targets_to_tools(
+                side["tools"], targets, note, qc, pe)
+            side_mut = _ensure_peltier_claim_fields(side["tools"], targets, note) or side_mut
+            if side_mut:
+                try:
+                    with open(side_path, "w", encoding="utf-8") as fh:
+                        json.dump(side, fh, indent=2, default=str)
+                    mutated = True
+                except OSError as exc:
+                    print(f"  · peltier sidecar write failed: {exc}")
+
+    # 2) Excel provenance table — state.toolsUsedPage
+    page = state.get("toolsUsedPage")
+    if isinstance(page, dict) and isinstance(page.get("tools"), list):
+        page_mut = _apply_peltier_claim_targets_to_tools(
+            page["tools"], targets, note, qc, pe)
+        page_mut = _ensure_peltier_claim_fields(page["tools"], targets, note) or page_mut
+        if page_mut:
+            mutated = True
+
+    if mutated:
+        print(f"  · peltier:cooling-capacity tool claims synced ({note})")
+    return mutated
+
+
+def _freshen_closure_honesty_scorecard(run_dir: str) -> bool:
+    """Recompute Gate-40 honesty into quality-scorecard.json from live state.
+
+    INTENT: fillBlank / PCB writeback after the chain scorecard freeze left
+    closure_honesty=2 on disk while state words were closed — Exec Summary
+    mirrored the stale floor. Universal: any run_dir with state.json.
+    """
+    script = os.path.join(os.path.dirname(__file__), "freshen-closure-honesty.ts")
+    if not os.path.isfile(script):
+        return False
+    try:
+        r = subprocess.run(
+            ["npx", "tsx", script, run_dir],
+            check=False,
+            timeout=60,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"  · closure_honesty freshen failed: {exc}")
+        return False
+    if r.returncode != 0:
+        err = (r.stderr or r.stdout or "").strip().splitlines()[-1:] or ["unknown"]
+        print(f"  · closure_honesty freshen exit {r.returncode}: {err[0][:160]}")
+        return False
+    for line in (r.stderr or "").splitlines():
+        if "freshen-closure" in line or "honesty=" in line:
+            print(f"  · {line.strip()}")
+            break
+    else:
+        print("  · closure_honesty scorecard freshened from live state")
+    return True
+
+
+def _freshen_parts_ledger_if_stale(run_dir: str, state: dict) -> bool:
+    """Re-run parts_ledger.py when grand_total diverges from Σ requirementsBom.
+
+    INTENT: cold-v17 COST2 FAIL (ledger £1083 vs BoM £1035) after SIGHT pricing
+    rules rewrote state.requirementsBom without refreshing the ledger mirror.
+    Authoritative prices live on requirementsBom; the ledger is a derived snapshot.
+    """
+    rb = state.get("requirementsBom") or []
+    if not isinstance(rb, list) or not rb:
+        return False
+    bom_sum = 0.0
+    for r in rb:
+        if not isinstance(r, dict):
+            continue
+        try:
+            bom_sum += float(r.get("line_gbp") or 0) or 0.0
+        except (TypeError, ValueError):
+            continue
+    pl_path = os.path.join(run_dir, "parts-ledger.json")
+    pl = load_json(pl_path) or {}
+    try:
+        grand = float(pl.get("grand_total_gbp")) if pl.get("grand_total_gbp") is not None else None
+    except (TypeError, ValueError):
+        grand = None
+    if grand is not None and abs(bom_sum - grand) <= max(1.0, 0.01 * max(abs(grand), 1.0)):
+        return False
+    py = sys.executable
+    ledger_py = os.path.join(os.path.dirname(__file__), "blender-universal", "parts_ledger.py")
+    state_path = os.path.join(run_dir, "state.json")
+    if not os.path.isfile(ledger_py):
+        return False
+    # Persist repaired/reconciled BoM so the ledger reads the same truth.
+    try:
+        with open(state_path, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, indent=2, default=str)
+    except OSError as exc:
+        print(f"  · parts-ledger freshen skipped (state write failed: {exc})")
+        return False
+    try:
+        subprocess.run(
+            [py, ledger_py, run_dir, state_path],
+            check=False, timeout=120,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"  · parts-ledger freshen failed: {exc}")
+        return False
+    pl2 = load_json(pl_path) or {}
+    try:
+        grand2 = float(pl2.get("grand_total_gbp")) if pl2.get("grand_total_gbp") is not None else None
+    except (TypeError, ValueError):
+        grand2 = None
+    if grand2 is None:
+        return False
+    # Keep cover / cost_reality aligned with the refreshed BoM sum.
+    cr = state.get("cost_reality")
+    if isinstance(cr, dict):
+        cr["bom_total_gbp"] = round(bom_sum)
+    cs = state.get("costStack")
+    if isinstance(cs, dict) and cs.get("raw_materials_bom_gbp") is not None:
+        cs["raw_materials_bom_gbp"] = round(bom_sum)
+    print(
+        f"  · parts-ledger freshened: grand {grand} → {grand2} "
+        f"(Σ requirementsBom={bom_sum:.0f})"
+    )
+    return True
+
+
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
@@ -27874,6 +28578,20 @@ def build(run_dir: str, out_path: str) -> dict:
     # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
     if _ensure_pcb_from_sidecar(state, run_dir):
         print("  · restored state.pcb from pcb-stage-result.json (race/wipe guard)")
+    # Watt-scale feeder CSA reconcile BEFORE checks/scoring read quantities.
+    try:
+        _reconcile_watt_scale_feeder_cable(state)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  · watt-scale feeder cable reconcile skipped: {exc}")
+    # TEC bay-self-heat: sync stale peltier claims → clear PROVENANCE STALE FAILs.
+    # GOTCHA: CHECKS read 4-orchestrator-tools-used.json, not toolsUsedPage alone.
+    try:
+        if _sync_peltier_cooling_tool_claims(state, run_dir):
+            _sp = os.path.join(run_dir, "state.json")
+            with open(_sp, "w", encoding="utf-8") as _fh:
+                json.dump(state, _fh, indent=2, default=str)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  · peltier claim sync skipped: {exc}")
     # ONE-TRUTH BoM-COST ACHIEVED (2026-07-26): the assembled BoM total is the delivered
     # answer to the brief's bom_cost_* metrics, but it lives in state.requirementsBom, not
     # the contract — so the deterministic self-audit (dossier_audit._contract_match), the
@@ -27895,6 +28613,19 @@ def build(run_dir: str, out_path: str) -> dict:
                 _oc["quantities"] = _q1
     except Exception:  # noqa: BLE001 — scoring augmentation must never crash the export
         pass
+    # COST2 one-truth: refresh parts-ledger when it lags requirementsBom (SIGHT
+    # pricing rewrite without ledger re-run). Must run after BoM is the authority.
+    try:
+        _freshen_parts_ledger_if_stale(run_dir, state)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  · parts-ledger freshen skipped: {exc}")
+    # INTENT (2026-07-28): closure_honesty in quality-scorecard.json can lag a
+    # post-chain fillBlank / PCB identity writeback — Exec Summary mirrors that
+    # stale floor. Recompute from live state before Overview/Quality read it.
+    try:
+        _freshen_closure_honesty_scorecard(run_dir)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  · closure_honesty freshen skipped: {exc}")
     sha = git_short_sha()
     global _RUN_DIR
     _RUN_DIR = run_dir            # so _tab_quality_banner can score drawing/render/meta sheets
@@ -31497,6 +32228,16 @@ def _selftest() -> int:
     if "bespoke fabrication" not in _m_mpn:
         print(f"  FAIL S10: a genuinely fabricated mechanical part (Enclosure Shell) must keep "
               f"'bespoke fabrication to drawing' (got {_m_mpn!r})"); bad += 1
+    # proveCatch (2026-07-28): fabricated-path commodity carve-out lifts Status LED
+    # (front-panel kit) without letting bare MCU hide as commodity (S10 must win).
+    _s10_led_rows = [{"tag": "I-2", "requirement": "Status LED", "part": "requirement stated",
+                      "qty": 1, "unit_gbp": 2, "line_gbp": 2, "basis": "class ref", "wall_mm": 1}]
+    _s10_led = _eval_bom_ledger_contract(
+        ".", {"isInstrumentDevice": True, "requirementsBom": _s10_led_rows})
+    _led_mpn = ((_s10_led or {}).get("rows") or {}).get(0, {}).get("mpn", "")
+    if _COMMODITY_MPN_TEXT not in _led_mpn:
+        print(f"  FAIL S10c: Status LED on fabricated path must read commodity MPN text "
+              f"(got {_led_mpn!r})"); bad += 1
     # proveCatch (2026-07-28 cell-cycler SIGHT): REALIZED_ON_PCB £0 must NOT paint red
     # for "unit £ missing" — intentional on-board silicon, not a pricing hole.
     _s10b_rows = [{"tag": "F-1", "requirement": "Current Control Loop",

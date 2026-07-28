@@ -1473,6 +1473,92 @@ function _injectEmcPowerInputs(
   return payload
 }
 
+// INTENT: cable:ampacity continuous_current_a must be FEEDER / wall-inlet current,
+// never channel DUTY (channel_count × current_range_a). Cold-v17 wired an absent
+// aggregate_channel_current_capacity_a → LLM fallback 40 A @ cell 5 V → 35 mm² CSA
+// on a 120 W benchtop instrument (plant-scale leak; Overview P3 FAIL). Same model as
+// sizeMainIncomer: I = P/(V·PF)·1.25 at 230 V 1φ on watt/device scale.
+// UNIVERSAL — keyed on tool id + connected load / instrument signal; plant BESS
+// duties with real feeder amps are untouched when load ≥ 0.5 kW.
+const _CABLE_AMPACITY_TOOL_RE = /cable[:_-]?ampacity/i
+const _DEVICE_SCALE_LOAD_KW_CEILING = 0.5
+const _INLET_PF = 0.9
+const _INLET_MARGIN = 1.25
+const _INLET_V_LINE = 230
+
+/** @description Read a finite quantity value from a ContractInProgress. */
+function _readContractQty(c: ContractInProgress, key: string): number | undefined {
+  const qv = (c.quantities as Record<string, { value?: unknown } | number> | undefined)?.[key]
+  const v = qv && typeof qv === 'object' ? Number((qv as { value?: unknown }).value) : Number(qv)
+  return Number.isFinite(v) ? v : undefined
+}
+
+/**
+ * @description True when the contract is a watt/device-scale electrical load
+ * (benchtop inlet, not a plant feeder). Prefer connected_electrical_load_kw < 0.5;
+ * also honour isInstrumentDevice on the contract envelope when present.
+ */
+export function isWattScaleFeederDuty(c: ContractInProgress): boolean {
+  const loadKw = _readContractQty(c, 'connected_electrical_load_kw')
+    ?? _readContractQty(c, 'total_electrical_load_kw')
+    ?? _readContractQty(c, 'nameplate_power_kw')
+  if (loadKw !== undefined && loadKw > 0 && loadKw < _DEVICE_SCALE_LOAD_KW_CEILING) return true
+  const w = _readContractQty(c, 'total_power_w')
+    ?? _readContractQty(c, 'peak_power_w')
+    ?? _readContractQty(c, 'nameplate_power_w')
+  if (w !== undefined && w > 0 && w < _DEVICE_SCALE_LOAD_KW_CEILING * 1000) return true
+  const env = (c as { envelope?: { is_instrument_device?: boolean }; isInstrumentDevice?: boolean })
+  return env.isInstrumentDevice === true || env.envelope?.is_instrument_device === true
+}
+
+/**
+ * @description Inlet / feeder continuous current (A) for a watt-scale instrument
+ * from connected load at 230 V 1φ — mirrors sizeMainIncomer (without the 6 A MCB floor,
+ * so ampacity can select a real appliance-cord CSA).
+ */
+export function deviceScaleInletCurrentA(c: ContractInProgress): number | undefined {
+  const loadKw = _readContractQty(c, 'connected_electrical_load_kw')
+    ?? _readContractQty(c, 'total_electrical_load_kw')
+    ?? _readContractQty(c, 'nameplate_power_kw')
+  const w = _readContractQty(c, 'total_power_w')
+    ?? _readContractQty(c, 'peak_power_w')
+    ?? _readContractQty(c, 'nameplate_power_w')
+  const pW = w !== undefined && w > 0
+    ? w
+    : (loadKw !== undefined && loadKw > 0 ? loadKw * 1000 : undefined)
+  if (pW === undefined || !(pW > 0)) return undefined
+  return (pW / (_INLET_V_LINE * _INLET_PF)) * _INLET_MARGIN
+}
+
+/**
+ * @description Inject wall-inlet current + mains voltage into cable:ampacity payloads
+ * on watt/device-scale contracts so channel-duty fallbacks cannot mint plant CSA.
+ * Exported as a proveCatch seam.
+ */
+export function injectCableAmpacityInputs(
+  step: ToolPlanStepSpec, c: ContractInProgress, payload: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!_CABLE_AMPACITY_TOOL_RE.test(step.tool_id)) return payload
+  if (!isWattScaleFeederDuty(c)) return payload
+  const inletA = deviceScaleInletCurrentA(c)
+  if (inletA === undefined || !(inletA > 0)) return payload
+  const prevI = Number(payload['continuous_current_a'])
+  // Always overwrite on watt-scale: plan fallbacks / channel aggregates are the disease.
+  payload['continuous_current_a'] = inletA
+  payload['voltage_class_v'] = _INLET_V_LINE
+  // Short appliance cord — plant default length_m=10 inflates mass on a benchtop.
+  const len = Number(payload['length_m'])
+  if (!Number.isFinite(len) || len > 2) payload['length_m'] = 1.5
+  if (Number.isFinite(prevI) && prevI > inletA * 3) {
+    console.warn(
+      `[cable-ampacity] ${step.tool_id}: watt-scale inlet override ` +
+      `${prevI} A → ${inletA.toFixed(3)} A @ ${_INLET_V_LINE} V 1φ ` +
+      `(connected load, not channel duty)`,
+    )
+  }
+  return payload
+}
+
 // ── ECONOMICS REVENUE-BASIS VETO (2026-07-02, the v55 £580M phantom NPV) ─────
 // The yield-economics NPV tool minted plant_npv_gbp = £580M on a WATER plant from
 // FABRICATED revenue inputs: annual_yield_kg = 100,000 @ market_price = £1,000/kg —
@@ -1567,8 +1653,9 @@ export function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): R
       payload[inp.param] = inp.constant
     }
   }
-  return _injectEmcPowerInputs(step, c,
-    _injectThermalStabilityInputs(step, c, _normalisePumpSizingInput(step, c, payload)))
+  return injectCableAmpacityInputs(step, c,
+    _injectEmcPowerInputs(step, c,
+      _injectThermalStabilityInputs(step, c, _normalisePumpSizingInput(step, c, payload))))
 }
 
 /**
@@ -1648,6 +1735,19 @@ export function applyStepOutputs(
         )
         continue
       }
+    }
+    // BACKSTOP (2026-07-28, cell-cycler cold-v17): refuse plant-scale CSA writes
+    // on watt-scale instruments even if injectCableAmpacityInputs was skipped
+    // (cached plan / old executor). ≥16 mm² on a <0.5 kW device is never a
+    // legitimate inlet cord — honest ABSENT beats a 35 mm² mint.
+    if (_CABLE_AMPACITY_TOOL_RE.test(step.tool_id)
+      && /^(power_)?cable_csa_mm2$|^conductor_csa_mm2$/i.test(o.contract_key)
+      && isWattScaleFeederDuty(c)
+      && Number.isFinite(v) && v >= 16) {
+      protectedKeys.push(
+        `${o.contract_key}(refuse plant CSA ${v} mm² on watt-scale inlet — inject inlet current upstream)`,
+      )
+      continue
     }
     quantities[o.contract_key] = mkQty(v, o.unit, o.family, p(o.tool_output_field), o.condition ?? 'rated')
   }

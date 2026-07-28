@@ -1,0 +1,70 @@
+---
+description: Blender and BoM are one geometry truth; drawings only after Blender settles; lengths and layout-driven equipment come from the scene
+alwaysApply: true
+---
+
+# Blender ↔ BoM Integration + Drawing Order
+
+**STANDING DIRECTIVE (Tristan 2026-07-28):** The Blender scene and the bill of materials are **one integrated geometry truth**. Drawings are a **downstream consumer** of a finalized Blender layout — never the other way around.
+
+## The bar (pass/fail)
+
+| Must be TRUE | Must be FALSE |
+|---|---|
+| Every placed Blender part has a BoM line (identity + qty) that names it | Orphan Blender meshes with no BoM row |
+| Every BoM physical part appears as a placed Blender part (or an honest off-board / COTS disposition) | BoM lines that exist only as Excel prose with no spatial home |
+| Cable / wire / pipe **lengths** come from the settled layout (route-manifest / wired-lengths / connection-ledger) | Lengths guessed before parts are placed |
+| Extra layout-driven equipment (boost pumps, longer harnesses, mid-run junctions) is discovered **from** the layout and written **back** into the BoM | BoM frozen first, then Blender forced to decorate it |
+| Engineering drawings (GA, interconnect, P&ID views, etc.) regenerate **after** Blender is final | Drawings treated as the authority that Blender must match |
+
+## Why (the physics)
+
+Blender is not a pretty picture pass. It is the **spatial model** of how parts interact:
+
+- Part A ↔ Part B distance → cable / loom / pipe length
+- Long fluid runs (e.g. vertical-farm water) → may require **additional pumps** or larger line sizes you cannot know until the layout exists
+- Harness routing, service loops, and tray fills are layout outputs, not brief inputs
+
+Until Blender settles, length- and topology-derived BoM lines are provisional. Freezing Excel/BoM scores while the scene and the bill disagree is Goodhart.
+
+## Canonical loop order
+
+```
+brief → tools/contract → BoM skeleton
+      → Blender place + route (settle)
+      → measure lengths / discover layout-driven parts
+      → write back into BoM + ledger (bidirectional reconcile)
+      → ONLY THEN regenerate drawings
+      → Excel / scorecard SIGHT of the reconciled pair
+```
+
+**Forbidden shortcuts:**
+
+1. Declaring floor-9 / SHIPS from Excel alone while Blender↔BoM coverage is open
+2. Regenerating drawings from a stale scene, then painting Blender to match the drawings
+3. Editing BoM identities (MPNs, quantities) without re-checking the scene + route lengths
+4. Inventing pipe/cable metres from brief text when a route-manifest exists (or should)
+
+## Code hooks (where this lives)
+
+| Concern | Where |
+|---|---|
+| Scene + parts-manifest | `scripts/blender-universal/build_universal_scene.py` |
+| Routes / lengths | `route-manifest.json`, `wired-lengths.json`, `connection-ledger.json` |
+| BoM ↔ connectivity ledger | `scripts/blender-universal/parts_ledger.py` |
+| Drawing set (after scene) | `scripts/blender-universal/generate_drawing_set.py` |
+| Form converge → drawings | `form_converge_loop` → `generate_drawing_set` (see UNIVERSAL-ENCODE-CHECKLIST) |
+
+## Checklist before calling a twin "done"
+
+- [ ] Bidirectional coverage: Blender parts ⊆ BoM and BoM physical parts ⊆ Blender (or explicit off-board disposition)
+- [ ] `wired-lengths` / route-manifest lengths drove (or refreshed) cable/pipe BoM quantities
+- [ ] No layout-driven equipment still missing from the BoM after the settle
+- [ ] Drawings regenerated **after** the final Blender settle (timestamps / dirty stamp)
+- [ ] Excel scorecard re-run on the reconciled pair — not on a BoM-only or Excel-only patch
+
+## Relationship to other rules
+
+- **CORE FIX PRINCIPLE** — fix the reconcile rule, not one twin's spreadsheet
+- **Photoreal CAD / instrument form** — Blender geometry honesty; this rule adds **BoM co-identity**
+- **Gate intent** — a green Excel tab over a Blender/BoM split is a walk-through gate
