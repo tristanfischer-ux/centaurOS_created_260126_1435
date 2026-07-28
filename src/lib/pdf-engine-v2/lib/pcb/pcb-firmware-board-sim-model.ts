@@ -154,6 +154,26 @@ export function resolveChannelNetNames(
     if (en && out) return { enable_net: en, output_net: out }
     return null
   }
+  // INTENT (2026-07-28): multi-channel electrical instruments — semantic nets
+  // from wireChannelInstrumentNets (POWER_/SENSE_/SAFETY_CHANNEL_EN|OUT_i).
+  if (r.includes('power')) {
+    const en = pick(`POWER_CHANNEL_EN_${index}`, `PWR_CHANNEL_EN_${index}`)
+    const out = pick(`POWER_CHANNEL_OUT_${index}`, `PWR_CHANNEL_OUT_${index}`)
+    if (en && out) return { enable_net: en, output_net: out }
+    return null
+  }
+  if (r.includes('sense')) {
+    const en = pick(`SENSE_CHANNEL_EN_${index}`, `SNS_CHANNEL_EN_${index}`)
+    const out = pick(`SENSE_CHANNEL_OUT_${index}`, `SNS_CHANNEL_OUT_${index}`)
+    if (en && out) return { enable_net: en, output_net: out }
+    return null
+  }
+  if (r.includes('safety')) {
+    const en = pick(`SAFETY_CHANNEL_EN_${index}`, `SFTY_CHANNEL_EN_${index}`)
+    const out = pick(`SAFETY_CHANNEL_OUT_${index}`, `SFTY_CHANNEL_OUT_${index}`)
+    if (en && out) return { enable_net: en, output_net: out }
+    return null
+  }
   return null
 }
 
@@ -371,6 +391,45 @@ export function proveCatchBoardSimModel(): void {
   }
   if (!good.channels[0]?.enable_bound) {
     throw new Error('proveCatch expected stir enable bound to STIR_MOTOR_CTRL')
+  }
+
+  // proveCatch: power_channel binds to POWER_CHANNEL_EN/OUT_* copper names.
+  const powerGood = buildBoardSimModel({
+    proofTargetId: 'channel_instrument',
+    kind: 'custom_board',
+    mcuMpn: 'ATSAMD21G18A-AU',
+    buses: [{
+      bus_id: 'i2c0',
+      protocol: 'i2c',
+      pins: { sda: 'PA22', scl: 'PA23', gnd: 'GND' },
+      expected_devices: [],
+    }],
+    channels: [{
+      role: 'power_channel',
+      instances: [{ instance_id: 'power_channel_0' }],
+    }],
+    nets: [
+      { name: 'I2C_SDA', members: [{ instanceName: 'mcu', pin: 'PA22' }] },
+      { name: 'I2C_SCL', members: [{ instanceName: 'mcu', pin: 'PA23' }] },
+      { name: 'POWER_CHANNEL_EN_0', members: [{ instanceName: 'mcu', pin: 'PWR_EN_0' }] },
+      { name: 'POWER_CHANNEL_OUT_0', members: [{ instanceName: 'fet', pin: 'D' }] },
+    ],
+    components: [
+      mcu,
+      {
+        instanceName: 'tmp',
+        functionClass: 'temperature_sensor',
+        partNumber: 'TMP1075DSGR',
+      },
+    ],
+  })
+  if (powerGood.bind_errors.length !== 0) {
+    throw new Error(
+      `proveCatch power_channel expected 0 bind_errors, got ${JSON.stringify(powerGood.bind_errors)}`,
+    )
+  }
+  if (!powerGood.channels[0]?.enable_bound || !powerGood.channels[0]?.output_bound) {
+    throw new Error('proveCatch expected POWER_CHANNEL_EN_0 / OUT_0 bound')
   }
 
   const bad = buildBoardSimModel({

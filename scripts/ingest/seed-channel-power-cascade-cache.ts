@@ -1,10 +1,10 @@
 /**
  * @file Seed forge-truth cascade cache for channel electronics PCB identities.
  * @description Verified-candidate promotion requires a DB hit. Channel MOSFET /
- * AFE / shunt / thermistor identities are evidenced by frozen Yuri boards +
- * manufacturer datasheets — seed distributor_cascade_cache so identity
- * resolution and fillBlank can close without a live distributor call (chain
- * stays DB-only).
+ * AFE / shunt / thermistor / safety / mains / thermal identities are evidenced by
+ * frozen Yuri boards + manufacturer datasheets — seed distributor_cascade_cache
+ * so identity resolution and fillBlank can close without a live distributor call
+ * (chain stays DB-only).
  *
  * Run: npx tsx scripts/ingest/seed-channel-power-cascade-cache.ts
  */
@@ -33,6 +33,36 @@ const SEEDS: ReadonlyArray<{ manufacturer: string; partNumber: string; note: str
     manufacturer: 'Murata Electronics',
     partNumber: 'NCP15XH103F03RC',
     note: '10 kOhm NTC thermistor 0402 — channel cell temperature sense',
+  },
+  {
+    manufacturer: 'Diodes Incorporated',
+    partNumber: 'BSS84-7-F',
+    note: 'P-channel 50 V MOSFET SOT-23 — reverse polarity protection',
+  },
+  {
+    manufacturer: 'Texas Instruments',
+    partNumber: 'LM393DR',
+    note: 'Dual differential comparator SO-8 — channel OV/UV / OC / OT hardware trips',
+  },
+  {
+    manufacturer: 'Vishay Dale',
+    partNumber: 'RH05010R00FE02',
+    note: '10 Ohm 50 W wirewound — linear discharge pass bank',
+  },
+  {
+    manufacturer: 'Schurter',
+    partNumber: '6100.4215',
+    note: 'IEC C14 panel-mount fused inlet 10 A / 250 VAC',
+  },
+  {
+    manufacturer: 'MEAN WELL',
+    partNumber: 'RPS-500-12',
+    note: '500 W medical/ITE 12 V open-frame AC-DC — instrument bulk supply',
+  },
+  {
+    manufacturer: 'Fischer Elektronik',
+    partNumber: 'SK 81 50 SA',
+    note: 'Extruded finned heatsink for TO-220 / channel power stages',
   },
 ]
 

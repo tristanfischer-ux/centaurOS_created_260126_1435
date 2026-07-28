@@ -140,11 +140,15 @@ export function buildFirmwareProofContract(args: {
         }
       : null,
     buses,
+    // DECISION (2026-07-28): expandPhysicalInstances mint N copies that share
+    // one BoM wordId (`…_word`) but unique instanceName (`…_word__1`). Tier-0
+    // firmware_proof keys uniqueness on word_id — emit the physical instance
+    // id so ×8 channel parts are not component_binding_duplicate theatre.
     components: components
       .filter((c) => Boolean(c.mpn))
       .map((c) => ({
-        word_id: c.wordId,
-        refdes: c.refdes ?? 'U?',
+        word_id: c.instanceName ?? c.refdes ?? c.wordId,
+        refdes: c.refdes ?? c.instanceName ?? 'U?',
         mpn: c.mpn,
         driver_key: 'generic',
         identity_check: { kind: 'mpn_match' },

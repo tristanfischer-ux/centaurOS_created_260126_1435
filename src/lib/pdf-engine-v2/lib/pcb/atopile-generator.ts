@@ -148,20 +148,25 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // INTENT (Sol+Fable 2026-07-27): channel power/sense/safety roles must classify
   // before generic `detector`/`sensor` smear (reverse_polarity_detector was SOIC).
   { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient|input[_-]?protection(?:[_-]?network)?/i },
-  { id: 'passive_r', test: /current[_-]?shunt|sense[_-]?shunt|shunt[_-]?measurement|shunt[_-]?resistor|pass[_-]?bank|discharge[_-]?pass[_-]?bank|cell[_-]?thermistor|thermistor[_-]?input/i },
+  { id: 'passive_r', test: /current[_-]?shunt|sense[_-]?shunt|shunt[_-]?measurement|shunt[_-]?resistor|pass[_-]?bank|discharge[_-]?pass[_-]?bank|cell[_-]?thermistor|thermistor[_-]?input|(?:power|finned)?[_-]?heatsink/i },
   { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance|precision[_-]?afe|(^|[_-])afe($|[_-])|current[_-]?control[_-]?loop|kelvin[_-]?(?:voltage[_-]?)?sense/i },
   // INTENT (Sol+Fable 2026-07-28): a discharge/load MOSFET is a discrete FET
   // (power_mosfet), not a gate-driver IC. Drivers stay on gate_driver_ic.
-  { id: 'power_mosfet', test: /discharge[_-]?load[_-]?mosfet|(^|[_-])mosfet($|[_-])|power[_-]?mosfet|load[_-]?switch[_-]?mosfet|tec[_-]?power[_-]?mosfet/i },
+  // GOTCHA: hardware_cutout must classify as power_mosfet (series FET pair), not
+  // sensor_ic — otherwise verified IRLB3813 never selects (functionClass mismatch).
+  { id: 'power_mosfet', test: /discharge[_-]?load[_-]?mosfet|hardware[_-]?cutout|(^|[_-])mosfet($|[_-])|power[_-]?mosfet|load[_-]?switch[_-]?mosfet|tec[_-]?power[_-]?mosfet/i },
   { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
-  { id: 'regulator', test: /charge[_-]?current[_-]?source|source[_-]?sink[_-]?stage|linear[_-]?source[_-]?sink|controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
-  { id: 'sensor_ic', test: /over[_-]?under[_-]?voltage|overvoltage|undervoltage|overcurrent[_-]?comparator|overtemp[_-]?trip|hardware[_-]?cutout|comparator[_-]?latch|photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
+  { id: 'regulator', test: /charge[_-]?current[_-]?source|source[_-]?sink[_-]?stage|linear[_-]?source[_-]?sink|isolated[_-]?ac[_-]?dc|ac[_-]?dc[_-]?power[_-]?module|controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
+  { id: 'sensor_ic', test: /over[_-]?under[_-]?voltage|overvoltage|undervoltage|overcurrent[_-]?comparator|overtemp[_-]?trip|comparator[_-]?latch|photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless|wi[_-]?fi|host[_-]?protocol[_-]?bridge|protocol[_-]?bridge|level[_-]?shifter/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
   // INTENT (Poseidon 2026-07-16): stepper/microstep/H-bridge driver boards are
   // gate-drive ICs (SOIC-8 class default) — without this, `stepper_driver_board`
   // landed in unresolved[] and floored the PCB readiness gate.
+  // GOTCHA: iec_c14_fused_inlet contains "fuse" via "fused" — classify as connector
+  // before the bare fuse rule so Schurter C14 verified candidate can select.
+  { id: 'connector', test: /iec[_-]?c14|c14[_-]?fused[_-]?inlet|fused[_-]?inlet/i },
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
   // INTENT (organoid 2026-07-24): a digital/USB galvanic isolator (ADuM120x/316x/416x) is a
   // real SOIC signal-isolation IC. Without this it landed unresolved → the wet_lab_hat's
@@ -2661,6 +2666,288 @@ function wireInterBoardConnectorNets(
 }
 
 /**
+ * @description Index suffix from expanded instance names (`…__1` → 0).
+ */
+function channelIndexFromInstanceName(instanceName: string): number | null {
+  const match = /__(\d+)$/.exec(instanceName)
+  if (!match) return null
+  const oneBased = Number(match[1])
+  if (!Number.isFinite(oneBased) || oneBased < 1) return null
+  return oneBased - 1
+}
+
+/**
+ * @description Role-matched, non-decouple components sorted by `__N` index.
+ * Noun/characterId keyed — never a product-class table.
+ */
+function listIndexedRoleComponents(
+  components: AtopileComponentRecord[],
+  rolePattern: RegExp,
+): AtopileComponentRecord[] {
+  return components
+    .filter((c) => {
+      const blob = `${c.characterId} ${c.wordId} ${c.nameHuman}`
+      if (/decouple[_ -]/i.test(blob)) return false
+      return rolePattern.test(blob)
+    })
+    .sort((a, b) => {
+      const ia = channelIndexFromInstanceName(a.instanceName) ?? 0
+      const ib = channelIndexFromInstanceName(b.instanceName) ?? 0
+      return ia - ib
+    })
+}
+
+function mcuAlreadyOnNetNamed(
+  nets: Map<string, AtopileNetRecord>,
+  mcu: AtopileComponentRecord,
+  namePattern: RegExp,
+): boolean {
+  for (const net of nets.values()) {
+    if (!namePattern.test(net.name)) continue
+    if (net.members.some((m) => m.instanceName === mcu.instanceName)) return true
+  }
+  return false
+}
+
+/**
+ * @description On-board I²C + SWD MCU pad membership for custom boards that
+ * carry a microcontroller without the organoid heater-FFC / OD-mate path.
+ *
+ * INTENT (cell-cycler Tier-2): firmware proof claims SAMD21 PA22/PA23 + SWD
+ * pads from the reference pin-map; without copper membership board-sim fails
+ * `firmware_pad_not_on_netlist`. Wire TMP1075/ADS111* (and any SDA+SCL part)
+ * onto `I2C_SDA`/`I2C_SCL`, and park SWD pads on `SWDIO`/`SWCLK` even when no
+ * debug header is densified yet (concept-stage — connector join stays optional).
+ *
+ * DECISION: skip I²C attach when MCU is already on HEATER_I2C_* / OD_I2C_* /
+ * I2C_* (inter-board wirer owns the bus — never dual-home SERCOM pads).
+ */
+function wireOnBoardI2cAndSwdNets(
+  components: AtopileComponentRecord[],
+  nets: Map<string, AtopileNetRecord>,
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+): void {
+  const mcu = components.find((c) => c.functionClass === 'microcontroller')
+  if (!mcu) return
+  const mcuBlob = `${mcu.manufacturer ?? ''} ${mcu.partNumber ?? ''} ${mcu.characterId}`
+
+  // GOTCHA: resolveMcuReferencePad returns bare pad names (PA31) that may not
+  // yet exist on the component — always ensureComponentPin before addMember or
+  // atopile KeyError: "Couldn't find main_controller_mcu_word.PA31".
+  const resolveOrEnsureMcuPad = (
+    fn: 'swdio' | 'swclk' | 'i2c_sda' | 'i2c_scl',
+    fallbacks: RegExp[],
+    synth: string,
+  ): string => {
+    const ref = resolveMcuReferencePad(mcuBlob, fn)
+    const patterns = [
+      ...(ref ? [new RegExp(`^${ref}(?:_|$)`, 'i')] : []),
+      ...fallbacks,
+    ]
+    return findPinMatching(mcu, patterns) ?? ensureComponentPin(mcu, ref ?? synth)
+  }
+
+  // ── SWD: always park reference pads on named nets (debug header optional) ─
+  if (!mcuAlreadyOnNetNamed(nets, mcu, /^SWDIO$/i)) {
+    const swdioPad = resolveOrEnsureMcuPad('swdio', [/^PA31(?:_|$)/i, /^SWDIO/i], 'SWDIO')
+    const swdioNet = ensureNet('SWDIO', 'signal')
+    addMember(swdioNet, mcu.instanceName, swdioPad)
+    const debug = components.find((c) => c.functionClass === 'debug_connector')
+    if (debug) {
+      const dPin = findPinMatching(debug, [/SWDIO/i])
+      if (dPin) addMember(swdioNet, debug.instanceName, dPin)
+    }
+  }
+  if (!mcuAlreadyOnNetNamed(nets, mcu, /^SWCLK$/i)) {
+    const swclkPad = resolveOrEnsureMcuPad('swclk', [/^PA30(?:_|$)/i, /^SWCLK/i], 'SWCLK')
+    const swclkNet = ensureNet('SWCLK', 'signal')
+    addMember(swclkNet, mcu.instanceName, swclkPad)
+    const debug = components.find((c) => c.functionClass === 'debug_connector')
+    if (debug) {
+      const dPin = findPinMatching(debug, [/SWCLK/i])
+      if (dPin) addMember(swclkNet, debug.instanceName, dPin)
+    }
+  }
+
+  // ── I²C: only when MCU not already on a bus and peripherals exist ────────
+  if (mcuAlreadyOnNetNamed(nets, mcu, /I2C[_-]?SDA|^SDA$/i)) return
+
+  const i2cPeripherals = components.filter((c) => {
+    if (c.functionClass === 'microcontroller') return false
+    if (/decouple[_ -]/i.test(componentRoleBlob(c))) return false
+    const sda = findPinMatching(c, [/^SDA$/i, /^SDA__/i])
+    const scl = findPinMatching(c, [/^SCL$/i, /^SCL__/i])
+    return Boolean(sda && scl)
+  })
+  if (i2cPeripherals.length === 0) return
+
+  const sdaPad = resolveOrEnsureMcuPad('i2c_sda', [/^PA22(?:_|$)/i, /^SDA/i], 'PA22')
+  const sclPad = resolveOrEnsureMcuPad('i2c_scl', [/^PA23(?:_|$)/i, /^SCL/i], 'PA23')
+  const i2cSda = ensureNet('I2C_SDA', 'signal')
+  const i2cScl = ensureNet('I2C_SCL', 'signal')
+  addMember(i2cSda, mcu.instanceName, sdaPad)
+  addMember(i2cScl, mcu.instanceName, sclPad)
+  for (const peri of i2cPeripherals) {
+    const sda = findPinMatching(peri, [/^SDA$/i, /^SDA__/i])
+    const scl = findPinMatching(peri, [/^SCL$/i, /^SCL__/i])
+    if (sda) addMember(i2cSda, peri.instanceName, sda)
+    if (scl) addMember(i2cScl, peri.instanceName, scl)
+  }
+}
+
+/**
+ * @description Wire multi-channel instrument spines: MCU GPIO ↔ power/sense/
+ * safety enable + output nets named for firmware Tier-2 bind.
+ *
+ * INTENT (2026-07-28): architecture + channel-evidence mint power/sense/safety
+ * ×N from MOSFET∧charge / shunt∧AFE / trip∧polarity, but `buildNets` never
+ * created `POWER_CHANNEL_EN_*` copper — board-sim invented those names and
+ * failed closed (correct). Mirror `wireHostHatActuationDriveNets` for the
+ * linear-channel-spine instrument family, keyed on characterId nouns.
+ *
+ * FLOW: MCU `PWR_EN_i` → MOSFET gate (+ charge EN) on POWER_CHANNEL_EN_i;
+ * MOSFET drain (+ charge out) on POWER_CHANNEL_OUT_i; same pattern for sense
+ * (AFE) and safety (hardware cutout / comparator).
+ */
+function wireChannelInstrumentNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+): void {
+  const mcu = components.find((c) => c.functionClass === 'microcontroller')
+  if (!mcu) return
+
+  // DECISION: discharge-load MOSFET is the power-channel enable actuator.
+  // Prefer that noun over generic "mosfet" so charge-path AO3400s are not
+  // double-counted as both charge and discharge.
+  const mosfets = listIndexedRoleComponents(
+    components,
+    /discharge[_ -]?load[_ -]?mosfet/i,
+  )
+  // GOTCHA: both charge_current_source AND linear_source_sink may coexist
+  // (8+8). Channel evidence takes max(family), not union — pick one family.
+  const chargeOnly = listIndexedRoleComponents(
+    components,
+    /charge[_ -]?current[_ -]?source/i,
+  )
+  const sourceSink = listIndexedRoleComponents(
+    components,
+    /linear[_ -]?source[_ -]?sink|source[_ -]?sink[_ -]?stage/i,
+  )
+  const chargeSources = chargeOnly.length >= sourceSink.length ? chargeOnly : sourceSink
+  const shunts = listIndexedRoleComponents(
+    components,
+    /current[_ -]?shunt|shunt[_ -]?measurement/i,
+  )
+  const afes = listIndexedRoleComponents(
+    components,
+    /precision[_ -]?afe|(?:^|[_ -])afe(?:$|[_ -])/i,
+  )
+  // Prefer hardware cutout FETs; fall back to comparator/trip ICs.
+  const cutouts = listIndexedRoleComponents(
+    components,
+    /hardware[_ -]?cutout/i,
+  )
+  const trips = cutouts.length > 0
+    ? cutouts
+    : listIndexedRoleComponents(
+      components,
+      /overcurrent[_ -]?comparator|over[_ -]?under[_ -]?voltage|overtemp[_ -]?trip/i,
+    )
+  const polarities = listIndexedRoleComponents(
+    components,
+    /reverse[_ -]?polarity/i,
+  )
+
+  const powerCount = Math.min(mosfets.length, chargeSources.length)
+  const senseCount = Math.min(shunts.length, afes.length)
+  // Mirror channel-evidence: complete safety channel = trip ∧ polarity when both
+  // exist; cutout-only still wires when polarity was claimed by USB VBUS path.
+  const safetyWireCount = polarities.length > 0
+    ? Math.min(trips.length, polarities.length)
+    : trips.length
+
+  if (powerCount === 0 && senseCount === 0 && safetyWireCount === 0) return
+
+  const attachMcuEnable = (net: AtopileNetRecord, synthPin: string): void => {
+    const pin = ensureComponentPin(mcu, synthPin)
+    addMember(net, mcu.instanceName, pin)
+  }
+
+  for (let i = 0; i < powerCount; i += 1) {
+    const fet = mosfets[i]!
+    const charge = chargeSources[i]!
+    const en = ensureNet(`POWER_CHANNEL_EN_${i}`, 'signal')
+    const out = ensureNet(`POWER_CHANNEL_OUT_${i}`, 'power')
+    attachMcuEnable(en, `PWR_EN_${i}`)
+    const gate =
+      findPinMatching(fet, [/^G$/i, /^GATE$/i, /^EN$/i])
+      ?? ensureComponentPin(fet, 'G')
+    const drain =
+      findPinMatching(fet, [/^D$/i, /^DRAIN$/i, /^OUT$/i])
+      ?? ensureComponentPin(fet, 'D')
+    addMember(en, fet.instanceName, gate)
+    addMember(out, fet.instanceName, drain)
+    const chargeEn =
+      findPinMatching(charge, [/^EN$/i, /^ENABLE$/i, /^G$/i, /^GATE$/i])
+    if (chargeEn) addMember(en, charge.instanceName, chargeEn)
+    const chargeOut =
+      findPinMatching(charge, [/^VOUT$/i, /^OUT$/i, /^D$/i, /^DRAIN$/i])
+    if (chargeOut) addMember(out, charge.instanceName, chargeOut)
+  }
+
+  for (let i = 0; i < senseCount; i += 1) {
+    const shunt = shunts[i]!
+    const afe = afes[i]!
+    const en = ensureNet(`SENSE_CHANNEL_EN_${i}`, 'signal')
+    const out = ensureNet(`SENSE_CHANNEL_OUT_${i}`, 'signal')
+    attachMcuEnable(en, `SNS_EN_${i}`)
+    const afeEn =
+      findPinMatching(afe, [/^EN$/i, /^ENABLE$/i, /^SHDN$/i])
+      ?? ensureComponentPin(afe, 'EN')
+    const afeOut =
+      findPinMatching(afe, [/^OUT$/i, /^VOUT$/i, /^OUTA$/i])
+      ?? ensureComponentPin(afe, 'OUT')
+    addMember(en, afe.instanceName, afeEn)
+    addMember(out, afe.instanceName, afeOut)
+    const shuntSense =
+      findPinMatching(shunt, [/^P1$/i, /^1__/i, /^A$/i])
+      ?? shunt.pins[0]
+    if (shuntSense) addMember(out, shunt.instanceName, shuntSense)
+  }
+
+  for (let i = 0; i < safetyWireCount; i += 1) {
+    const trip = trips[i]
+    const polarity = polarities[i]
+    if (!trip && !polarity) continue
+    const en = ensureNet(`SAFETY_CHANNEL_EN_${i}`, 'signal')
+    const out = ensureNet(`SAFETY_CHANNEL_OUT_${i}`, 'signal')
+    attachMcuEnable(en, `SFTY_EN_${i}`)
+    if (trip) {
+      const gate =
+        findPinMatching(trip, [/^G$/i, /^GATE$/i, /^EN$/i])
+        ?? ensureComponentPin(trip, 'G')
+      const drain =
+        findPinMatching(trip, [/^D$/i, /^DRAIN$/i, /^OUT$/i, /^VO$/i])
+        ?? ensureComponentPin(trip, 'D')
+      addMember(en, trip.instanceName, gate)
+      addMember(out, trip.instanceName, drain)
+    }
+    if (polarity) {
+      const gate =
+        findPinMatching(polarity, [/^G$/i, /^GATE$/i])
+        ?? ensureComponentPin(polarity, 'G')
+      const drain =
+        findPinMatching(polarity, [/^D$/i, /^DRAIN$/i])
+        ?? ensureComponentPin(polarity, 'D')
+      addMember(en, polarity.instanceName, gate)
+      addMember(out, polarity.instanceName, drain)
+    }
+  }
+}
+
+/**
  * @description Drop empty nets and topology invent stubs (`NET_*`) that never
  * got a second endpoint. Never prune power/ground, crossBoard cable nets with
  * ≥1 member, or intentional single-node actuator outputs (e.g. STIR_MOTOR_A).
@@ -2767,6 +3054,10 @@ function buildNets(
   wireHeaterDaughterboardNets(components, ensureNet, addMember, vcc, gnd)
   wireHostHatActuationDriveNets(components, ensureNet, addMember, vcc, gnd)
   wireInterBoardConnectorNets(components, ensureNet, addMember, vcc, gnd, opts)
+  // INTENT: custom channel instruments (MCU+TMP1075, no heater FFC) still need
+  // I²C/SWD pad copper + POWER_/SENSE_/SAFETY_CHANNEL_* spines for Tier-2 bind.
+  wireOnBoardI2cAndSwdNets(components, nets, ensureNet, addMember)
+  wireChannelInstrumentNets(components, ensureNet, addMember)
 
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
@@ -3127,13 +3418,22 @@ export function generateAtopileProject(
       c.functionClass === 'usb_connector' || c.functionClass === 'debug_connector')
   // GOTCHA (organoid 2026-07-21): heater_stir boards are ≤12 parts but need the
   // plant ≥50 mm floor — compact 25 mm outline forced placement retry (C2 off-board).
+  // GOTCHA (2026-07-28): TMP1075 alone must NOT classify a channel_power_afe
+  // board as thermal-actuation — cell-bay temp sense is not a heater FFC board,
+  // and the mis-label hid missing multi_channel_power_afe outline datums.
+  const isChannelPowerAfeBoard =
+    opts.boardRole === 'channel_power_afe_controller'
+    || opts.boardShape?.shapeFamily === 'multi_channel_power_afe'
   const hasThermalActuationEdge =
-    opts.boardRole === 'heater_stir_actuation_board' ||
-    (opts.requiredFunctionRoles ?? []).includes('heater_channel') ||
-    allComponents.some((c) =>
-      /heat(?:er|ing)|tmp1075|esr18|ffc[_ -]?connector|cartridge[_ -]?heater/i.test(
-        `${c.characterId} ${c.wordId} ${c.partNumber ?? ''}`,
-      ),
+    !isChannelPowerAfeBoard
+    && (
+      opts.boardRole === 'heater_stir_actuation_board'
+      || (opts.requiredFunctionRoles ?? []).includes('heater_channel')
+      || allComponents.some((c) =>
+        /heat(?:er|ing)|esr18|ffc[_ -]?connector|cartridge[_ -]?heater/i.test(
+          `${c.characterId} ${c.wordId} ${c.partNumber ?? ''}`,
+        ),
+      )
     )
   const isCompactInstrumentBoard =
     instrumentDeviceContext(state, electronicWords) &&

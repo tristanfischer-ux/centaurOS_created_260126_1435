@@ -1944,4 +1944,127 @@ describe('atopile-generator', () => {
     expect(usb!.footprint?.footprint).toMatch(/USB_C_Receptacle/i)
     expect(usb!.footprint?.footprint).not.toMatch(/PinHeader/i)
   })
+
+  // INTENT (2026-07-28): channel instruments need POWER_/SENSE_/SAFETY_CHANNEL_*
+  // copper + MCU I²C/SWD pad membership — Tier-2 board-sim bind SOURCE.
+  it('proveCatch: channel instrument wires POWER_CHANNEL_* + on-board I2C/SWD', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/ATSAMD21/i.test(mpn ?? '')) {
+        return cacheHit('Microchip Technology', 'ATSAMD21G18A-AU', 'MCU')
+      }
+      if (/TMP1075/i.test(mpn ?? '')) {
+        return cacheHit('Texas Instruments', 'TMP1075DSGR', 'temp')
+      }
+      if (/IRLB3813/i.test(mpn ?? '')) {
+        return cacheHit('Infineon Technologies', 'IRLB3813PBF', 'MOSFET')
+      }
+      if (/AO3400/i.test(mpn ?? '')) {
+        return cacheHit('Alpha & Omega Semiconductor Inc.', 'AO3400A', 'charge FET')
+      }
+      if (/WSL2512/i.test(mpn ?? '')) {
+        return cacheHit('Vishay Dale', 'WSL2512R0100FEA', 'shunt')
+      }
+      if (/TL072/i.test(mpn ?? '')) {
+        return cacheHit('STMicroelectronics', 'TL072CDT', 'AFE')
+      }
+      if (/LM393/i.test(mpn ?? '')) {
+        return cacheHit('Texas Instruments', 'LM393DR', 'comparator')
+      }
+      if (/BSS84/i.test(mpn ?? '')) {
+        return cacheHit('Diodes Incorporated', 'BSS84-7-F', 'rev-pol')
+      }
+      if (/CC0603/i.test(mpn ?? '')) {
+        return cacheHit('YAGEO', 'CC0603KRX7R9BB104', 'cap')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-channel-instrument-')
+    tmpDirs.push(outDir)
+    const qty8 = [{ kind: 'quantity', value: '×8' }]
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'channel',
+          sub_modules: [{
+            id: 'channel__power',
+            words: [
+              {
+                id: 'main_controller_mcu_word',
+                name_human: 'Main Controller Mcu',
+                content_character: { character_id: 'main_controller_mcu' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'cell_bay_temperature_sensor_word',
+                name_human: 'Cell Bay Temperature Sensor',
+                content_character: { character_id: 'cell_bay_temperature_sensor' },
+                modifier_characters: [{ kind: 'quantity', value: '×1' }],
+              },
+              {
+                id: 'per_channel_discharge_load_mosfet_word',
+                name_human: 'Per Channel Discharge Load Mosfet',
+                content_character: { character_id: 'per_channel_discharge_load_mosfet' },
+                modifier_characters: qty8,
+              },
+              {
+                id: 'per_channel_charge_current_source_word',
+                name_human: 'Per Channel Charge Current Source',
+                content_character: { character_id: 'per_channel_charge_current_source' },
+                modifier_characters: qty8,
+              },
+              {
+                id: 'per_channel_current_shunt_measurement_word',
+                name_human: 'Per Channel Current Shunt Measurement',
+                content_character: { character_id: 'per_channel_current_shunt_measurement' },
+                modifier_characters: qty8,
+              },
+              {
+                id: 'per_channel_precision_afe_word',
+                name_human: 'Per Channel Precision Afe',
+                content_character: { character_id: 'per_channel_precision_afe' },
+                modifier_characters: qty8,
+              },
+              {
+                id: 'per_channel_hardware_cutout_word',
+                name_human: 'Per Channel Hardware Cutout',
+                content_character: { character_id: 'per_channel_hardware_cutout' },
+                modifier_characters: qty8,
+              },
+              {
+                id: 'per_channel_reverse_polarity_detector_word',
+                name_human: 'Per Channel Reverse Polarity Detector',
+                content_character: { character_id: 'per_channel_reverse_polarity_detector' },
+                modifier_characters: qty8,
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const netNames = new Set(result.nets.map((n) => n.name))
+    expect(netNames.has('POWER_CHANNEL_EN_0')).toBe(true)
+    expect(netNames.has('POWER_CHANNEL_OUT_7')).toBe(true)
+    expect(netNames.has('SENSE_CHANNEL_EN_0')).toBe(true)
+    expect(netNames.has('SAFETY_CHANNEL_EN_0')).toBe(true)
+    expect(netNames.has('I2C_SDA')).toBe(true)
+    expect(netNames.has('I2C_SCL')).toBe(true)
+    expect(netNames.has('SWDIO')).toBe(true)
+    expect(netNames.has('SWCLK')).toBe(true)
+    const mcu = result.components.find((c) => c.functionClass === 'microcontroller')
+    expect(mcu).toBeDefined()
+    // proveCatch: reference pads must be declared on the MCU component or
+    // `ato build` KeyError's on main_controller_mcu_word.PA31.
+    expect(mcu!.pins.some((p) => /^PA22/i.test(p))).toBe(true)
+    expect(mcu!.pins.some((p) => /^PA23/i.test(p))).toBe(true)
+    expect(mcu!.pins.some((p) => /^PA31/i.test(p) || /^SWDIO/i.test(p))).toBe(true)
+    expect(mcu!.pins.some((p) => /^PA30/i.test(p) || /^SWCLK/i.test(p))).toBe(true)
+    const i2cSda = result.nets.find((n) => n.name === 'I2C_SDA')
+    expect(i2cSda?.members.some((m) => m.instanceName === mcu!.instanceName)).toBe(true)
+    const swdio = result.nets.find((n) => n.name === 'SWDIO')
+    expect(swdio?.members.some((m) => m.instanceName === mcu!.instanceName)).toBe(true)
+    const pwr0 = result.nets.find((n) => n.name === 'POWER_CHANNEL_EN_0')
+    expect((pwr0?.members.length ?? 0) >= 2).toBe(true)
+  })
 })

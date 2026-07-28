@@ -150,6 +150,11 @@ describe('derivePcbArchitecture', () => {
       { role: 'safety_channel', count: 8 },
     ])
     expect(plan.rationale).toContain('electrical_channels_require_power_afe_safety_board')
+    // proveCatch: outline datums follow channel pitch (not empty → 110 mm square).
+    const width = plan.boards[0].shape.datums?.find((d) => d.id === 'outline_width_mm')
+    const height = plan.boards[0].shape.datums?.find((d) => d.id === 'outline_height_mm')
+    expect(width?.valueMm).toBeGreaterThanOrEqual(8 * 28 + 50)
+    expect(height?.valueMm).toBeGreaterThanOrEqual(160)
   })
 
   it('records motion channel capacity only when motion evidence is present', () => {

@@ -161,7 +161,16 @@ export function runPcbPipeline(
     // DECISION (2026-07-21): default 8 matches pcb_pipeline_runner.py — dense
     // boards need more grow-retries once margin-clamp stacking is forbidden.
     '--max-iterations', String(opts.maxIterations ?? 8),
-    '--freerouting-timeout-s', String(opts.freeroutingTimeoutS ?? 300),
+    // INTENT (2026-07-28): multi-channel power/AFE boards (180+ parts, TO-220
+    // banks) routinely exceed the sparse 300s Freerouting budget — fail was
+    // freerouting_timeout with a valid netlist. Scale by shape family, never a
+    // product slug.
+    '--freerouting-timeout-s', String(
+      opts.freeroutingTimeoutS
+        ?? (/multi_channel|linear_channel|thermal_power/i.test(opts.shapeFamily ?? '')
+          ? 900
+          : 300),
+    ),
   ]
   if (opts.boardRole) {
     args.push('--board-role', opts.boardRole)
@@ -177,9 +186,13 @@ export function runPcbPipeline(
     PATH: `${resolve(capability.atopile.path!, '..')}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH ?? ''}`,
   }
 
-  // Overall wall-clock budget: ato build (~3min) + up to 4 placement iterations
-  // each potentially re-running Freerouting (up to 300s) + DRC + exports.
-  const timeoutMs = 20 * 60 * 1000
+  // Overall wall-clock budget: ato build (~3min) + placement retries + Freerouting
+  // (up to 900s on multi-channel) + DRC + exports.
+  const freeroutingBudgetS = opts.freeroutingTimeoutS
+    ?? (/multi_channel|linear_channel|thermal_power/i.test(opts.shapeFamily ?? '')
+      ? 900
+      : 300)
+  const timeoutMs = Math.max(20 * 60 * 1000, (freeroutingBudgetS + 600) * 1000)
   const proc = spawnSync('python3', args, {
     encoding: 'utf8',
     env,

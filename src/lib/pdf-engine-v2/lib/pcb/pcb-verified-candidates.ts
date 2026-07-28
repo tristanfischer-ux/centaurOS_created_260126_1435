@@ -166,7 +166,10 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'ADuM1201 R-8 pinout 1=VDD1 2=VOA 3=VIB 4=GND1 5=GND2 6=VOB 7=VIA 8=VDD2; KiCad Isolator:ADuM1201AR with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
   },
   {
-    roleTest: /photodiode[_ -]?(?:adc|converter)|optical[_ -]?(?:adc|measurement)/i,
+    // INTENT: precision_adc is the same 16-bit delta-sigma role as optical ADC —
+    // function-keyed (never product-named). optical_* stays first-class via the
+    // same ADS1114 identity.
+    roleTest: /photodiode[_ -]?(?:adc|converter)|optical[_ -]?(?:adc|measurement)|(?:^|[_ -])precision[_ -]?adc(?:$|[_ -])/i,
     functionClass: 'sensor_ic',
     manufacturer: 'Texas Instruments',
     partNumber: 'ADS1114IDGSR',
@@ -348,7 +351,8 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
   {
     // INTENT: Host-HAT heater PWM low-side switch — NEVER matches heater_element /
     // ESR18 roles (those stay resistive loads on the FFC daughterboard).
-    roleTest: /heater[_ -]?pwm[_ -]?(?:switch|mosfet)|(?:host[_ -]?hat[_ -]?)?heater[_ -]?drive[_ -]?mosfet|ao3400a/i,
+    // Also covers bare power_switch (board-level load/power path FET).
+    roleTest: /heater[_ -]?pwm[_ -]?(?:switch|mosfet)|(?:host[_ -]?hat[_ -]?)?heater[_ -]?drive[_ -]?mosfet|ao3400a|(?:^|[_ -])power[_ -]?switch(?:$|[_ -])/i,
     excludedRoleTest: /(?:cartridge|resistive)[_ -]?heater|heater[_ -]?element|esr18|reverse[_ -]?polarity/i,
     functionClass: 'switch',
     // GOTCHA: forge-truth library row is "Alpha & Omega Semiconductor Inc." —
@@ -454,7 +458,7 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     // INTENT (P3 floor-9 / Yuri transfer): multi-channel precision AFE + Kelvin
     // sense are the same op-amp function class as Rodeostat's TIA front-end —
     // never a DAC op-amp (OP07) and never an OD densify OPA334.
-    roleTest: /precision[_ -]?afe|analog[_ -]?front[_ -]?end|(?:^|[_ -])afe(?:$|[_ -])|kelvin[_ -]?(?:voltage[_ -]?)?sense/i,
+    roleTest: /precision[_ -]?afe|analog[_ -]?front[_ -]?end|(?:^|[_ -])afe(?:$|[_ -])|kelvin[_ -]?(?:voltage[_ -]?)?sense|current[_ -]?control[_ -]?loop/i,
     excludedRoleTest: /current[_ -]?measurement[_ -]?tia|selectable[_ -]?gain[_ -]?tia|opa334|dac[_ -]?output|droplet[_ -]?feedback/i,
     functionClass: 'op_amp',
     manufacturer: 'STMicroelectronics',
@@ -556,7 +560,7 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'pads 1=K, 2=A on LED_0603_1608Metric',
   },
   {
-    roleTest: /status[_ -]?indicator[_ -]?word|kpt[_ -]?1608seck/i,
+    roleTest: /status[_ -]?indicator(?:[_ -]?word)?|(?:^|[_ -])status[_ -]?led(?:$|[_ -])|kpt[_ -]?1608seck/i,
     excludedRoleTest: /pioreactor|rodeostat|power[_ -]?indicator/i,
     functionClass: 'led',
     manufacturer: 'Kingbright',
@@ -620,6 +624,98 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     ratings: { voltageV: 50, currentA: 0.13 },
     packageEvidence: 'forge-truth cache: BSS84-7-F, P-channel 50 V MOSFET, SOT-23-3',
     referenceEvidence: 'universal low-voltage reverse-polarity switch role; DB-only candidate evidence',
+  },
+  {
+    // INTENT (2026-07-28 closure_honesty): channel OV/UV / overcurrent / overtemp
+    // hardware trips share a dual comparator — never leave fillable-TBD when the
+    // role is already on the board as package_family.
+    roleTest: /over[_ -]?under[_ -]?voltage[_ -]?comparator|overcurrent[_ -]?comparator|overtemp[_ -]?trip|comparator[_ -]?latch/i,
+    excludedRoleTest: /precision[_ -]?afe|kelvin|shunt|thermistor/i,
+    functionClass: 'sensor_ic',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'LM393DR',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    // GOTCHA: KiCad 8 ships LM393 under Comparator.kicad_sym (extends LM2903),
+    // not Amplifier_Comparator — wrong library left every channel trip as package_family.
+    symbol: { library: 'Comparator', symbol: 'LM393' },
+    ratings: { voltageV: 36 },
+    packageEvidence: 'TI LM393DR: dual differential comparator SO-8',
+    referenceEvidence: 'universal channel hardware trip / window-comparator role; TI LM393 datasheet',
+    pinoutEvidence: 'TI SO-8 dual comparator; local KiCad Comparator:LM393 (extends LM2903)',
+  },
+  {
+    roleTest: /hardware[_ -]?cutout/i,
+    excludedRoleTest: /optical|laser/i,
+    functionClass: 'power_mosfet',
+    manufacturer: 'Infineon Technologies',
+    partNumber: 'IRLB3813PBF',
+    footprint: { library: 'Package_TO_SOT_THT', footprint: 'TO-220-3_Vertical' },
+    symbol: { library: 'Transistor_FET', symbol: 'Q_NMOS_GDS' },
+    ratings: { voltageV: 30, currentA: 120 },
+    packageEvidence: 'Infineon IRLB3813PBF TO-220AB — series cutout FET pair role',
+    referenceEvidence: 'same discrete power-FET identity as channel discharge load (Yuri transfer)',
+  },
+  {
+    roleTest: /linear[_ -]?discharge[_ -]?pass[_ -]?bank|discharge[_ -]?pass[_ -]?bank|pass[_ -]?bank/i,
+    excludedRoleTest: /current[_ -]?shunt|sense[_ -]?shunt/i,
+    functionClass: 'passive_r',
+    manufacturer: 'Vishay Dale',
+    partNumber: 'RH05010R00FE02',
+    footprint: { library: 'Resistor_THT', footprint: 'R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal' },
+    symbol: { library: 'Device', symbol: 'R' },
+    ratings: { voltageV: 50, currentA: 2 },
+    packageEvidence: 'Vishay RH050 10 Ω 50 W wirewound — linear pass/discharge bank element',
+    referenceEvidence: 'universal linear discharge pass-bank role; Vishay RH chassis-mount family',
+  },
+  {
+    roleTest: /charge[_ -]?current[_ -]?source|linear[_ -]?source[_ -]?sink[_ -]?stage|source[_ -]?sink[_ -]?stage/i,
+    excludedRoleTest: /discharge[_ -]?load[_ -]?mosfet|pass[_ -]?bank/i,
+    functionClass: 'regulator',
+    manufacturer: 'Infineon Technologies',
+    partNumber: 'IRLB3813PBF',
+    footprint: { library: 'Package_TO_SOT_THT', footprint: 'TO-220-3_Vertical' },
+    symbol: { library: 'Transistor_FET', symbol: 'Q_NMOS_GDS' },
+    ratings: { voltageV: 30, currentA: 120 },
+    packageEvidence: 'Infineon IRLB3813PBF — linear source/sink / charge-path power element',
+    referenceEvidence: 'channel power-stage discrete FET (same family as discharge load); not a gate driver',
+  },
+  {
+    roleTest: /iec[_ -]?c14|c14[_ -]?fused[_ -]?inlet|fused[_ -]?inlet/i,
+    excludedRoleTest: /usb|dc[_ -]?jack/i,
+    functionClass: 'connector',
+    manufacturer: 'Schurter',
+    partNumber: '6100.4215',
+    footprint: { library: 'Connector', footprint: 'Screw_Terminal_01x03' },
+    symbol: { library: 'Connector', symbol: 'Screw_Terminal_01x03' },
+    ratings: { voltageV: 250, currentA: 10 },
+    packageEvidence: 'Schurter 6100.4215: IEC C14 panel-mount inlet, 10 A / 250 VAC',
+    referenceEvidence: 'universal benchtop mains inlet role; Schurter 6100 series',
+  },
+  {
+    roleTest: /isolated[_ -]?ac[_ -]?dc[_ -]?power[_ -]?module|ac[_ -]?dc[_ -]?power[_ -]?module/i,
+    excludedRoleTest: /dc[_ -]?dc|ldo|usb/i,
+    functionClass: 'regulator',
+    manufacturer: 'MEAN WELL',
+    partNumber: 'RPS-500-12',
+    footprint: { library: 'Converter_DCDC', footprint: 'Converter_DCDC_Generic' },
+    symbol: { library: 'Converter_DCDC', symbol: 'Converter_DCDC_Generic' },
+    ratings: { voltageV: 12, currentA: 41.7 },
+    packageEvidence: 'MEAN WELL RPS-500-12: 500 W medical/ITE 12 V open-frame PSU',
+    referenceEvidence: 'universal isolated AC-DC instrument supply; MEAN WELL RPS-500 datasheet',
+  },
+  {
+    roleTest: /(?:per[_ -]?channel[_ -]?)?power[_ -]?heatsink|finned[_ -]?heatsink|(?:^|[_ -])heatsink(?:$|[_ -])/i,
+    excludedRoleTest: /fan[_ -]?assembly|thermal[_ -]?interface/i,
+    // DECISION: reuse passive_r as the closest existing class for a bought
+    // thermal part (no thermal_sink FunctionClass yet). RoleTest is the gate.
+    functionClass: 'passive_r',
+    manufacturer: 'Fischer Elektronik',
+    partNumber: 'SK 81 50 SA',
+    footprint: { library: 'Heatsink', footprint: 'Heatsink_Fischer_SK81' },
+    symbol: { library: 'Device', symbol: 'Heatsink' },
+    ratings: {},
+    packageEvidence: 'Fischer SK 81 50 SA: extruded finned heatsink for TO-220 / power stages',
+    referenceEvidence: 'universal channel / TEC rejection heatsink role; Fischer Elektronik SK series',
   },
   {
     roleTest: /high[_ -]?voltage[_ -]?(?:boost|step[_ -]?up)[_ -]?(?:controller|converter)|adjustable[_ -]?boost[_ -]?controller/i,

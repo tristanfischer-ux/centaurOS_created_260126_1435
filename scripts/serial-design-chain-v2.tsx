@@ -86,6 +86,7 @@ import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
 import { runBespokeMultiBoardPcb } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-multi-board-run'
 import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
+import { stampPcbResolvedIdentitiesOntoDesign } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-identity-writeback'
 import { deriveFirmwareProofSpecs } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-spec'
 import { buildBoardSimModel } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-board-sim-model'
 import { buildFirmwareProofContract } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-firmware-proof-contract'
@@ -10560,6 +10561,29 @@ async function main() {
           console.error('[chain] PCB pipeline SKIPPED (canAuthor=false) — recorded honest toolchain-missing failure')
           logAction({ step: 'pcb_pipeline', ok: false, error: 'toolchain_discovery: canAuthor=false' })
         }
+      }
+
+      // INTENT (2026-07-28): PCB generator already resolved real MPNs onto
+      // pipeline.generator.components while design words still say TBD — stamp
+      // those identities onto matching words before Gate 38 / Excel / closure.
+      try {
+        const designRoot =
+          (stPcb as { moduleDecomposition?: { modules?: unknown } }).moduleDecomposition?.modules
+          ?? (stPcb as { design?: { modules?: unknown } }).design?.modules
+        if (designRoot && stPcb.pcb) {
+          const wb = stampPcbResolvedIdentitiesOntoDesign(designRoot, stPcb.pcb)
+          ;(stPcb as { pcbIdentityWriteback?: unknown }).pcbIdentityWriteback = wb
+          if (wb.stamped > 0) {
+            console.error(
+              `[chain] PCB identity writeback: stamped ${wb.stamped} word(s) from resolved board identities`,
+            )
+            logAction({ step: 'pcb_identity_writeback', ok: true, stamped: wb.stamped, unmatched: wb.unmatched })
+          }
+        }
+      } catch (wbErr) {
+        console.error(
+          `[chain] PCB identity writeback skipped: ${(wbErr as Error).message?.slice(0, 160)}`,
+        )
       }
 
       writeFileSync(statePath, JSON.stringify(stPcb))

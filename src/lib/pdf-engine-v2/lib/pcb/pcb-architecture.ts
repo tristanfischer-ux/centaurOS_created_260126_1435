@@ -780,8 +780,29 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     } else if (hasElectricalChannelEvidence(state)) {
       // Multi-channel electrical instrument (power + AFE + independent trips).
       // Never mint a motion_driver_board from bare channel_count + AFE nouns.
+      // INTENT (2026-07-28): area-derived ~110 mm square starved TO-220 ×N
+      // placement (pad overlap ~1.3 mm). Outline follows channel pitch.
+      const channelPitchMm = 28
+      const outlineWidthMm = Math.max(160, nCh * channelPitchMm + 50)
+      const outlineHeightMm = Math.max(160, 100 + nCh * 10)
       systemDisposition = 'single_custom'
-      boards = [board('channel_instrument', 'channel_power_afe_controller', ['logic', 'analog', 'power'])]
+      boards = [board(
+        'channel_instrument',
+        'channel_power_afe_controller',
+        ['logic', 'analog', 'power'],
+        [
+          datum(
+            'outline_width_mm',
+            outlineWidthMm,
+            `${nCh} channels × ${channelPitchMm}mm power-stage pitch + MCU/USB margins`,
+          ),
+          datum(
+            'outline_height_mm',
+            outlineHeightMm,
+            `${nCh}-channel AFE + safety stack depth`,
+          ),
+        ],
+      )]
       boards[0].channelRequirements.push(
         { role: 'power_channel', count: nCh },
         { role: 'sense_channel', count: nCh },

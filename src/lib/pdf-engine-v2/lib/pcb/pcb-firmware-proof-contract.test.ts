@@ -93,6 +93,46 @@ describe('buildFirmwareProofContract', () => {
     expect(i2c?.pins.scl).toBe('PA23')
   })
 
+  it('proveCatch: expanded channel instances use unique word_id (not shared BoM wordId)', () => {
+    const channelThin: PcbFirmwareProofSpec = {
+      ...thin,
+      proofTargetId: 'channel_instrument',
+      boardRole: 'channel_instrument',
+      channels: [{ role: 'power_channel', requiredCount: 2 }],
+    }
+    const fat = buildFirmwareProofContract({
+      thin: channelThin,
+      designFitnessOk: true,
+      mcu: { mpn: 'ATSAMD21G18A-AU' },
+      components: [
+        {
+          wordId: 'main_controller_mcu_word',
+          instanceName: 'main_controller_mcu_word',
+          mpn: 'ATSAMD21G18A-AU',
+          functionClass: 'microcontroller',
+        },
+        {
+          wordId: 'per_channel_discharge_load_mosfet_word',
+          instanceName: 'per_channel_discharge_load_mosfet_word__1',
+          mpn: 'IRLB3813PBF',
+        },
+        {
+          wordId: 'per_channel_discharge_load_mosfet_word',
+          instanceName: 'per_channel_discharge_load_mosfet_word__2',
+          mpn: 'IRLB3813PBF',
+        },
+      ],
+      implementedChannels: { power_channel: 2 },
+    })
+    const comps = fat.components as Array<{ word_id: string }>
+    const ids = comps.map((c) => c.word_id)
+    expect(ids).toEqual(expect.arrayContaining([
+      'per_channel_discharge_load_mosfet_word__1',
+      'per_channel_discharge_load_mosfet_word__2',
+    ]))
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
   it('proveCatch: instances come from implementedChannels, never requiredCount', () => {
     const actuation: PcbFirmwareProofSpec = {
       ...thin,
