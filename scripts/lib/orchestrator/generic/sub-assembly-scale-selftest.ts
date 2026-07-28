@@ -4,7 +4,7 @@
 // chiller) and a size-less "Coolant Expansion Tank" defaulted to the 50 m³ template
 // (4.0 m GRP tank + walkway + gelcoat, £13.6k) inside a 0.13 m³ wall cabinet.
 /* eslint-disable no-console */
-import { explodeEquipmentSubAssemblies } from './universal-contract-sizing'
+import { explodeEquipmentSubAssemblies, applyUniversalContractSizing } from './universal-contract-sizing'
 
 function mkWord(id: string, name: string, mods: Array<{ kind: string; value: string; unit?: string }>): any {
   return { id, name_human: name, content_character: { character_id: id, name_human: name },
@@ -76,6 +76,37 @@ expect(!mguResNames.some((n: string) => /access\s*ladder/i.test(n)),
   `cold-plate Expansion Degas Reservoir must not explode Access Ladder`)
 expect(mguResNames.length === 1,
   `compact coolant reservoir stays a whole assembly (got ${mguResNames.length} words)`)
+
+// ── 4c. CATCH (2026-07-28 SOL C): power-only groups must NOT stamp boxFromRatingKw
+// onto a shaft coupling (and must leave the match free for the IPMSM principal).
+const coupMods: any = [{
+  module: 'actuation_kinematics',
+  sub_modules: [{ words: [
+    mkWord('traction_ipmsm_motor_generator_word', 'Traction Ipmsm Motor Generator', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('output_shaft_coupling_word', 'Output Shaft Coupling', [{ kind: 'quantity', value: '×1' }]),
+  ] }],
+}]
+const coupContract: any = {
+  // Phrase "traction motor" shares stems with the IPMSM word; coupling must not
+  // steal the match (the 2249 FAIL_FAST: coupling got 2205×1874×2426 mm).
+  quantities: {
+    traction_motor_power_kw: { value: 250, unit: 'kW', kind: 'power' },
+  },
+}
+applyUniversalContractSizing(coupMods, coupContract, {
+  onlyUnsized: true, synthesizeMissing: false, instrument: false, explode: false,
+})
+const coupWords = coupMods[0].sub_modules[0].words
+const coupling = coupWords.find((w: any) => /coupling/i.test(String(w.name_human)))
+const motor = coupWords.find((w: any) => /ipmsm|motor/i.test(String(w.name_human)))
+const coupDim = (coupling?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const motorDim = (motor?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const coupRating = (coupling?.modifier_characters ?? []).find((m: any) => m.kind === 'rating_primary')
+expect(!coupDim, `shaft coupling must not receive a kW envelope box (got ${coupDim?.value})`)
+expect(!coupRating, `shaft coupling must not steal the power-group rating (got ${coupRating?.value})`)
+expect(!!motorDim, `IPMSM principal should receive the power-group envelope (got ${motorDim?.value ?? 'none'})`)
+expect(!/2205|1874|2426/.test(String(motorDim?.value ?? '')),
+  `IPMSM envelope must not be the absurd 2.2 m litter box from a mis-match`)
 
 // ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
 import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'

@@ -1266,6 +1266,18 @@ function isColdPlateInterfaceWord(w: WordLike): boolean {
 function isThermalPowerGroupPhrase(phrase: string): boolean {
   return /dissipat|thermal|reject|heat[_\s-]?loss|cool(?:ing|ant)|jacket/i.test(String(phrase ?? ''))
 }
+/**
+ * INTENT (2026-07-28 SOL C): `boxFromRatingKw` may only stamp a bounding box on
+ * words whose role is a powered machine / conversion principal that OWNS an
+ * equipment envelope. Couplings, bearings, fasteners, sensors, hoses, bottles
+ * may sit near a kW duty but must never derive a 2 m machine box from it —
+ * and must not consume the power group's match so the real principal stays
+ * eligible to size. Positive eligibility (not a growing denylist).
+ */
+function wordAcceptsKwDerivedEnvelope(w: WordLike): boolean {
+  const t = wordRoleText(w).replace(/_/g, ' ')
+  return /\b(?:pump|motor|generator|inverter|compressor|chiller|blower|\bfan\b|transformer|genset|turbine|engine|converter|rectifier|\bups\b|boiler|heater|reactor|skid|heat[\s-]?pump|ipmsm|\bmgu\b|\bmcu\b|traction[\s-]?inverter|drive[\s-]?unit)\b/i.test(t)
+}
 const motorKw = (p: ParentPhysics) => {
   if (p.motorKwOverride && p.motorKwOverride > 0 && p.motorKwPinned) {
     return p.motorKwOverride // brief-pinned NAMEPLATE — honoured exactly, never re-margined
@@ -7202,6 +7214,17 @@ export function applyUniversalContractSizing(
             isColdPlateInterfaceWord(w)
             && g.power !== undefined
             && !isThermalPowerGroupPhrase(g.phrase)
+          ) continue
+          // SOL C (2026-07-28): power-only groups stamp boxFromRatingKw — only
+          // envelope-owning principals may match. Output Shaft Coupling stole
+          // continuous_power_kw (2205×1874×2426 mm) and starved the IPMSM.
+          if (
+            g.power !== undefined
+            && g.volume === undefined
+            && g.area === undefined
+            && g.throughput === undefined
+            && !isThermalPowerGroupPhrase(g.phrase)
+            && !wordAcceptsKwDerivedEnvelope(w)
           ) continue
           // COUNT-ONLY groups (bare `channel_count` / `cell_count` with no size/rating)
           // must NEVER fuzzy-match existing words. Multiplicity is owned by
