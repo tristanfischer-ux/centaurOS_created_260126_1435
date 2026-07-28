@@ -9217,6 +9217,28 @@ _GENERIC_MEASURE_TOKENS = {
     "peak", "max", "min", "required", "target", "delivery", "department",
 }
 
+# INTENT (P5 floor-9 / cell-cycler cold-v15): min/max are stripped as generic
+# measure tokens so cell_bay_temp_min_c subject-collapses to {cell,bay,temp} and
+# fuzzy-matches cell_bay_temp_stability_c (0.5) → false FAIL on bay envelope.
+# Polarity families must AGREE on the fuzzy path; exact-name match (pass 1) is
+# unaffected. Universal — envelope vs tolerance nouns, never a product class.
+_MEASURE_POLARITY_FAMILIES: Dict[str, frozenset] = {
+    "min": frozenset({"min", "minimum", "lower", "lo"}),
+    "max": frozenset({"max", "maximum", "upper", "hi", "peak"}),
+    "stability": frozenset({
+        "stability", "tolerance", "ripple", "accuracy", "precision", "band",
+    }),
+}
+
+
+def _measure_polarity(tokens: set) -> frozenset:
+    """Polarity families present in a metric/quantity token set (may be empty)."""
+    found: set = set()
+    for fam, members in _MEASURE_POLARITY_FAMILIES.items():
+        if tokens & members:
+            found.add(fam)
+    return frozenset(found)
+
 
 def _norm_qty_name(s: str) -> str:
     return _QTY_UNIT_SUFFIX.sub("", str(s or "").lower())
@@ -9367,6 +9389,14 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
         q_tokens = set(re.findall(r"[a-z]+", _norm_qty_name(ql)))
         overlap = len(b_subject & q_tokens)
         if overlap < need:
+            continue
+        # Polarity gate: envelope min/max must not bind a stability/tolerance figure.
+        b_pol = _measure_polarity(b_tokens)
+        q_pol = _measure_polarity(q_tokens)
+        if b_pol and q_pol and b_pol.isdisjoint(q_pol):
+            continue
+        if b_pol and not q_pol:
+            # Brief names an envelope pole; quantity has none — leave for exact match.
             continue
         # rank ties by the FULL-token overlap too (richer context wins among equally-valid subject
         # matches), then the existing peak/max/surge penalty.
@@ -30341,6 +30371,28 @@ def _selftest() -> int:
     m = _match_quantity({"key_metric": "rated_power_kw", "value": 2500, "unit": "kW"}, qs)
     if not m or m[0] != "continuous_power_kw":   # rated→continuous, not peak
         print(f"  FAIL matcher power → {m} (want continuous_power_kw)"); bad += 1
+    # (1a-pol) P5 floor-9: bay-temp MIN/MAX must not fuzzy-bind stability (cold-v15).
+    _bay_qs = {
+        "cell_bay_temp_stability_c": {"value": 0.5, "unit": "°C"},
+        "cell_bay_temp_min_c": {"value": 15, "unit": "°C"},
+        "cell_bay_temp_max_c": {"value": 45, "unit": "°C"},
+    }
+    _bay_min = _match_quantity(
+        {"key_metric": "cell_bay_temp_min_c", "value": 15, "unit": "°C"}, _bay_qs)
+    if not _bay_min or _bay_min[0] != "cell_bay_temp_min_c" or _bay_min[1] != 15:
+        print(f"  FAIL polarity: cell_bay_temp_min_c must match min ledger (got {_bay_min})"); bad += 1
+    _bay_max = _match_quantity(
+        {"key_metric": "cell_bay_temp_max_c", "value": 45, "unit": "°C"}, _bay_qs)
+    if not _bay_max or _bay_max[0] != "cell_bay_temp_max_c" or _bay_max[1] != 45:
+        print(f"  FAIL polarity: cell_bay_temp_max_c must match max ledger (got {_bay_max})"); bad += 1
+    _bay_stab_only = {
+        "cell_bay_temp_stability_c": {"value": 0.5, "unit": "°C"},
+    }
+    if _match_quantity(
+        {"key_metric": "cell_bay_temp_min_c", "value": 15, "unit": "°C"}, _bay_stab_only,
+    ) is not None:
+        print("  FAIL polarity: cell_bay_temp_min_c must NOT bind stability alone"); bad += 1
+
     # (1b) proveCatch the EXACT fake match Tristan caught (2026-06-27): a hand-watering metric (25 m³/h)
     # must NOT match a fertigation pump (90 m³/h) — a different subsystem sharing only the unit +
     # generic word. The rate-unit (…_m3_per_hr) must not leak {m3,hr} into identity overlap.
