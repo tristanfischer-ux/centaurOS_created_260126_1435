@@ -199,6 +199,32 @@ _ABSORB_INTO_STEPPER_NODE_RE = re.compile(
     r"shaft\s*coupl|channel\s*frame",
     re.I,
 )
+# INTENT (P2 floor-9 / cell-cycler cold-v15 Interconnect): multi-channel instruments
+# emit one BoM line per channel ROLE (AFE, shunt, MOSFET, OV latch, …). Even after
+# host-peripheral absorb, ~12 "Per Channel …" boxes + rail litter → 33 nodes /
+# max_col_depth 23 → layout_ok false while story_ok true. Fold channel-electronics
+# constituents into ONE channel-power/AFE principal; keep Channel Power Bus + MCU
+# + brick + thermal + shell. Universal — `per channel` name prefix, not a class.
+_PER_CHANNEL_ROLE_RE = re.compile(r"^per\s*channel\b", re.I)
+_CHANNEL_POWER_ANCHOR_RE = re.compile(
+    r"precision\s*afe|analog\s*front\s*end|"
+    r"linear\s*source\s*(?:sink\s*)?stage|channel\s*power\s*(?:stage|afe)",
+    re.I,
+)
+# Remaining PCB/power/thermal litter that is not itself a glance principal on a
+# sealed bench instrument (rides the brick / bus / TEC / shell story).
+_ABSORB_BENCH_POWER_LITTER_RE = re.compile(
+    r"bulk\s*dc|holdup\s*capacit|analog\s*digital\s*rail|rail\s*split|"
+    r"precision\s*adc|precision\s*voltage\s*reference|voltage\s*reference|"
+    r"schedule\s*state\s*machine|exhaust\s*air|emc\s*line\s*filter|"
+    r"iec\s*c\d+|fused\s*inlet|mains\s*fuse|"
+    r"finned\s*heatsink|power\s*stage\s*cooling\s*fan|cooling\s*fan|"
+    r"chassis\s*base|operator\s*deck|front\s*panel|"
+    r"interior\s*mounting|mounting\s*frame|"
+    r"firmware\s*independent\s*interlock|hardware\s*cutout|"
+    r"current\s*control\s*loop",
+    re.I,
+)
 
 
 def _load_json(path: Path) -> dict:
@@ -477,7 +503,72 @@ def _bom_principals(state: dict) -> list[dict]:
                 continue
             kept.append(p)
         out = kept
+    # P2: fold multi-channel role explosion + bench-power litter into glanceable set.
+    out = _collapse_channel_electronics_principals(out, state)
     return out
+
+
+def _collapse_channel_electronics_principals(
+    principals: list[dict], state: Optional[dict] = None,
+) -> list[dict]:
+    """Fold Per Channel * roles into one AFE/power-stage principal (+ ×N label).
+
+    INTENT: Interconnect is a block diagram, not a per-role BoM reprint. A design
+    with channel_count≥2 and ≥3 "Per Channel …" lines keeps Channel Power Bus +
+    one channel-electronics anchor; other per-channel constituents and rail/filter
+    litter absorb. proveCatch: cold-v15-shaped BoM → ≤ MAX_PRINCIPAL_NODES and
+    max_col_depth ≤ 10; wet-plant / single-channel lists unchanged.
+    """
+    if not principals:
+        return principals
+    n_ch = 0
+    try:
+        q = ((state or {}).get("orchestratorContract") or {}).get("quantities") or {}
+        n_ch = int(float((q.get("channel_count") or {}).get("value") or 0))
+    except (TypeError, ValueError):
+        n_ch = 0
+    per_ch = [p for p in principals if _PER_CHANNEL_ROLE_RE.search(p.get("name") or "")]
+    # Only fold when the sheet would actually explode (multi-role channel pack).
+    if len(per_ch) < 3 and n_ch < 2:
+        # Still drop obvious bench-power litter when a compute kit is present.
+        if any(_COMPUTE_PRINCIPAL_NAME_RE.search(p.get("name") or "") for p in principals):
+            return [
+                p for p in principals
+                if not _ABSORB_BENCH_POWER_LITTER_RE.search(p.get("name") or "")
+            ]
+        return principals
+
+    # Prefer Precision AFE (measurement face) over linear source/sink stage so
+    # the glance box names the channel electronics pack, not one power MOSFET.
+    anchor: dict | None = None
+    for p in per_ch:
+        nm = p.get("name") or ""
+        if re.search(r"precision\s*afe|analog\s*front\s*end", nm, re.I):
+            anchor = p
+            break
+    if anchor is None:
+        for p in per_ch:
+            if _CHANNEL_POWER_ANCHOR_RE.search(p.get("name") or ""):
+                anchor = p
+                break
+    if anchor is None and per_ch:
+        anchor = per_ch[0]
+
+    kept: list[dict] = []
+    for p in principals:
+        nm = p.get("name") or ""
+        if _PER_CHANNEL_ROLE_RE.search(nm):
+            if anchor is not None and p is anchor:
+                label = nm
+                if n_ch >= 2 and "×" not in nm and "x" + str(n_ch) not in nm.lower():
+                    # Glance label: one box standing for the replicated channel pack.
+                    label = f"{nm} ×{n_ch}"
+                kept.append({**p, "name": label})
+            continue
+        if _ABSORB_BENCH_POWER_LITTER_RE.search(nm):
+            continue
+        kept.append(p)
+    return kept
 
 
 def _find_compute_principal(principals: list[dict]) -> Optional[str]:
@@ -1815,6 +1906,73 @@ def _selftest() -> int:
     _svg_stamped = embed_svg_placement_fp(_svg_raw, _fp_demo)
     chk("write_time_placement_fp",
         extract_svg_placement_fp(_svg_stamped) == _fp_demo)
+
+    # proveCatch (P2 / cell-cycler cold-v15): multi-channel role explosion must
+    # collapse to a glanceable board-centric graph. v15 failed with n_nodes=33 /
+    # max_col_depth=23 while story_ok stayed true — layout budget is the bar.
+    state_ch = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "X-109", "requirement": "Enclosure Shell", "status": "OK"},
+            {"tag": "X-116", "requirement": "Bench Psu Input", "status": "OK"},
+            {"tag": "I-101", "requirement": "Main Controller MCU", "status": "OK"},
+            {"tag": "X-123", "requirement": "Channel Power Bus", "status": "OK"},
+            {"tag": "X-102", "requirement": "Per Channel Linear Source Sink Stage", "status": "OK"},
+            {"tag": "X-104", "requirement": "Per Channel Linear Discharge Pass Bank", "status": "OK"},
+            {"tag": "X-147", "requirement": "Per Channel Synchronous Buck Charge Source", "status": "OK"},
+            {"tag": "X-105", "requirement": "Per Channel Discharge Load Mosfet", "status": "OK"},
+            {"tag": "X-101", "requirement": "Per Channel Current Control Loop", "status": "OK"},
+            {"tag": "X-103", "requirement": "Per Channel Power Heatsink", "status": "OK"},
+            {"tag": "X-140", "requirement": "Per Channel Precision Afe", "status": "OK"},
+            {"tag": "X-139", "requirement": "Per Channel Kelvin Voltage Sense Input", "status": "OK"},
+            {"tag": "X-142", "requirement": "Per Channel Current Shunt Measurement", "status": "OK"},
+            {"tag": "X-141", "requirement": "Per Channel Cell Thermistor Input", "status": "OK"},
+            {"tag": "X-144", "requirement": "Per Channel Hardware Cutout Relay", "status": "OK"},
+            {"tag": "X-136", "requirement": "Per Channel Over Under Voltage Comparator Latch", "status": "OK"},
+            {"tag": "X-133", "requirement": "Per Channel Overcurrent Comparator", "status": "OK"},
+            {"tag": "X-135", "requirement": "Per Channel Overtemp Trip", "status": "OK"},
+            {"tag": "X-137", "requirement": "Per Channel Reverse Polarity Detector", "status": "OK"},
+            {"tag": "X-106", "requirement": "Per Channel Cell Holder Fixture", "status": "OK"},
+            {"tag": "X-113", "requirement": "DC Distribution Rail", "status": "OK"},
+            {"tag": "X-121", "requirement": "Emc Line Filter", "status": "OK"},
+            {"tag": "X-124", "requirement": "Analog Digital Rail Split", "status": "OK"},
+            {"tag": "X-108", "requirement": "SSD1306 OLED Display", "status": "OK"},
+            {"tag": "X-115", "requirement": "Usb 5v Input", "status": "OK"},
+            {"tag": "K-101", "requirement": "Cooling Fan", "status": "OK"},
+        ],
+        "orchestratorContract": {
+            "quantities": {
+                "channel_count": {
+                    "value": 8, "unit": "", "family": "dimensionless",
+                    "basis": "rated", "scope": "system", "source": "brief",
+                },
+            },
+            "topology": [],
+        },
+    }
+    n_ch, e_ch = _collect_graph(Path("/tmp"), state_ch)
+    m_ch = layout_metrics(n_ch, e_ch, content_bottom=200, title_top=500)
+    ch_names = {_norm(v["name"]) for v in n_ch.values()}
+    ch_raw = [v["name"] for v in n_ch.values()]
+    chk("ch_under_node_cap", len(n_ch) <= MAX_PRINCIPAL_NODES)
+    chk("ch_under_edge_cap", len(e_ch) <= MAX_EDGES)
+    chk("ch_absorbs_per_channel_roles", not any(
+        n.startswith("per channel kelvin")
+        or n.startswith("per channel current shunt")
+        or n.startswith("per channel overcurrent")
+        for n in ch_names
+    ))
+    # × survives in the display name; _norm strips it to a digit token.
+    chk("ch_keeps_afe_xn", any(
+        "precision afe" in (nm or "").lower() and ("×" in (nm or "") or "x8" in (nm or "").lower())
+        for nm in ch_raw
+    ))
+    chk("ch_absorbs_rail_litter", "emc line filter" not in ch_names
+        and "analog digital rail split" not in ch_names)
+    chk("ch_keeps_bus_and_mcu", any("channel power bus" in n for n in ch_names)
+        and any("mcu" in n for n in ch_names))
+    chk("ch_layout_ok", m_ch.get("ok") is True)
+    chk("ch_max_col_depth", (m_ch.get("max_col_depth") or 0) <= 10)
 
     print("draw_interconnect selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
