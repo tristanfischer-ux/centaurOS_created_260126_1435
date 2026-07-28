@@ -347,6 +347,16 @@ import './tools/mpd-thrust'                // propulsion:mpd-thrust — self-fie
 import './tools/magnetics-vr-detent'        // magnetics:vr-detent-force — toothed VR + PM net detent (PHANTM 2026-07-24; analytic upper bound, FE-calibratable)
 import './tools/magnetics-coil-rl'          // magnetics:coil-rl-risetime — micro-coil R/L/tau + voltage-limited MMF ceiling N*V/R
 import './tools/magnetics-vr-drive'         // magnetics:vr-stepper-drive — one-coil-aiding-PM drive force + stall estimate
+// 2026-07-28 — Formula E MGU/MCU analytical pack (promoted from prototypes/mgu-mcu-pack/)
+import './tools/inverter-sic-loss'          // inverter:sic-loss — 3-ph SiC conduction + switching loss
+import './tools/inverter-current-voltage-envelope' // inverter:current-voltage-envelope — Vdc/Iph power & torque ceiling
+import './tools/field-weakening-mtpa'       // inverter:field-weakening-mtpa — IPMSM MTPA / field-weakening (id,iq)
+import './tools/ipmsm-analytical-sizing'    // motor:ipmsm-analytical-sizing — D²L radial-flux first sizing
+import './tools/motor-loss-point'           // motor:loss-point — Cu/Fe/magnet/mech loss at one (T,ω)
+import './tools/rotor-centrifugal-stress'   // motor:rotor-centrifugal-stress — rim/sleeve hoop stress vs rpm
+import './tools/mgu-thermal-lumped'         // motor:thermal-lumped — two-node winding/magnet thermal RC
+import './tools/gear-ratio-traction'        // gear:traction-ratio — wheel↔MGU kinematics (not bicycle)
+import './tools/duty-cycle-energy'          // powertrain:duty-cycle-energy — net race/duty electrical energy
 import './tools/tdoa-fdoa-geolocation'     // rf:tdoa-fdoa-geolocation — emitter CRLB: sigma_pos~c sigma_t GDOP (+FDOA) (Torrieri 1984)
 import './tools/deployable-boom'           // structures:deployable-boom — cantilever: delta=F L^3/(3 E I); f1=(1.875^2/2pi)sqrt(EI/rho A L^4) (Blevins 1979)
 import './tools/reflector-surface-rms'     // antenna:reflector-surface-rms — Ruze: eta=exp(-(4pi eps/lambda)^2); G=G0-L_ruze (Ruze 1966)

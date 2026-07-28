@@ -1160,3 +1160,23 @@ Run: `.venv/bin/python3 scripts/lib/orchestrator/tools/python/test_priority_clas
 
 Pre-change mempalace search: "evtol quantum cryostat fso phased_array solid_state_battery pemfc smr humanoid dac priority class wrapper" → no prior drawer found for these 10 specific classes as a coordinated extension.
 
+---
+
+## Formula E MGU / MCU pack (2026-07-28)
+
+Promoted from `prototypes/mgu-mcu-pack/` into the permanent catalogue. Analytical first-pass tools for rear powertrain trials (MCU + MGU + gear + duty cycle). Each has `--selftest`; TS wrappers registered in `register-all.ts`.
+
+| Tool id | Physics | Smoke | Wrapper |
+|---|---|---|---|
+| `inverter:sic-loss` | 3-ph SiC conduction + switching loss | PASS | `inverter_sic_loss.py` |
+| `inverter:current-voltage-envelope` | Vdc/Iph → electrical & torque ceiling | PASS | `inverter_current_voltage_envelope.py` |
+| `inverter:field-weakening-mtpa` | IPMSM MTPA / field-weakening (id, iq) | PASS | `field_weakening_mtpa.py` |
+| `motor:ipmsm-analytical-sizing` | D²L radial-flux first sizing | PASS | `ipmsm_analytical_sizing.py` |
+| `motor:loss-point` | Cu/Fe/magnet/mech loss at one (T, ω) | PASS | `motor_loss_point.py` |
+| `motor:rotor-centrifugal-stress` | Rim/sleeve hoop stress vs rpm | PASS | `rotor_centrifugal_stress.py` |
+| `motor:thermal-lumped` | Two-node winding/magnet thermal RC | PASS | `mgu_thermal_lumped.py` |
+| `gear:traction-ratio` | Wheel ↔ MGU kinematics (not bicycle) | PASS | `gear_ratio_traction.py` |
+| `powertrain:duty-cycle-energy` | Net race/duty electrical energy | PASS | `duty_cycle_energy.py` |
+
+Plan / promote recipe: `docs/plans/ANVIL-MGU-MCU-PACK-PREP-2026-07-28.md`.
+
