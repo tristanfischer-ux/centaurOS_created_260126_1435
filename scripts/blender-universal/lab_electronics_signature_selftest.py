@@ -16,6 +16,7 @@ build_universal_scene.py; if it ever collapses two signatures back to one story,
 this proveCatch FAILS the build.
 """
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock
 
 sys.modules["bpy"] = MagicMock()
@@ -131,6 +132,29 @@ if "_build_bench_power_signature" not in _place_src:
     fails.append(
         "place_sealed_enclosure must call _build_bench_power_signature "
         "(empty elif = featureless chassis regression)"
+    )
+
+# 7. Overlapping front panels (2026-07-28 SIGHT): bench_power must call fascia
+#    with face_band="left" so HMI and channel bay do not share the same X span.
+_bp_src = _insp.getsource(b._build_bench_power_signature)
+if 'face_band="left"' not in _bp_src and "face_band='left'" not in _bp_src:
+    fails.append(
+        "_build_bench_power_signature must pass face_band='left' to the fascia "
+        "(full-width fascia + bay = overlapping front panels)"
+    )
+# Pack-vs-story: lab_electronics must KEEP signature interior (not hide it for
+# BoM proxy boxes) — catch the random-boxes regression at source.
+_mod_src = Path(__file__).with_name("build_universal_scene.py").read_text(
+    encoding="utf-8")
+if "anti random-boxes" not in _mod_src:
+    fails.append(
+        "lab_electronics pack de-dupe must KEEP signature story over BoM proxies "
+        "(random-boxes disease)"
+    )
+if "ledger harness SKIPPED" not in _mod_src:
+    fails.append(
+        "lab_electronics must skip ledger harness when signature story wins "
+        "(fake-wiring disease)"
     )
 
 if fails:

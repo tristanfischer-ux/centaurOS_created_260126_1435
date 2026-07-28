@@ -19480,11 +19480,18 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     r += 1
 
     # ── Board renders (2026-07-25, Tristan "I can't see any PCB images at all"): embed each
-    #    fabricated board's 3D render (pcb-boards/<id>/pcb/board-3d.png). The renders exist on
-    #    disk (KiCad 3D export) but were never placed in the tab, so the PCB tab showed only
-    #    hygiene tables with no picture of the boards. Universal — one image per board present.
+    #    fabricated board's 3D render. Prefers pcb-boards/<id>/pcb/board-3d.png (multi-board);
+    #    ALSO accepts the single-board pipeline path pcb/board-3d.png (cell-cycler SIGHT
+    #    2026-07-28: image on disk, Excel tab empty because only the multi-board glob ran).
     import glob as _glob_b3d
     _b3d = sorted(_glob_b3d.glob(os.path.join(run_dir, "pcb-boards", "*", "pcb", "board-3d.png")))
+    if not _b3d:
+        for _single in (
+            os.path.join(run_dir, "pcb", "board-3d.png"),
+            os.path.join(run_dir, "pcb", "board-top.png"),
+        ):
+            if os.path.isfile(_single):
+                _b3d.append(_single)
     if _b3d:
         sub_banner(ws, r, f"Board renders — {len(_b3d)} fabricated board(s) (KiCad 3D)", 8)
         r += 1
@@ -21553,7 +21560,15 @@ _COMMODITY_NOUN_RX = re.compile(
     # + stated basis). A £218 E-stop or £1.6k DO analyser stays engineered-TBD.
     r"(?:motor\s+)?overload(?:\s+protections?|\s+relays?)?|thermal\s+overloads?|"
     r"pressure\s+relief\s+valves?|"
-    r"\b(?:microcontrollers?|mcus?)\b", re.I)
+    r"\b(?:microcontrollers?|mcus?)\b|"
+    # INSTRUMENT FRONT-PANEL HARDWARE (2026-07-28 cell-cycler SIGHT): IEC C14 /
+    # power switch / status LED / small touch display are concept-stage bought-outs
+    # procured by family, not a bespoke drawing. Still BOTH-gated (noun + £ ≤ £100).
+    # Without these, H10 painted honest front-panel kit UNRESOLVED-red.
+    r"iec\s*c\s*14|c14\s+fused|mains\s+inlet|fused\s+inlet|"
+    r"power\s+switch(?:es)?|rocker\s+switch(?:es)?|"
+    r"\btouch\s+displays?\b|\b(?:tft|lcd|oled)\s+displays?\b|"
+    r"status\s+leds?", re.I)
 
 
 # ── COMMODITY PROCESS VALVE (Bar B, 2026-07-03; SPLIT OUT to its own GENERIC-SPEC
@@ -21831,11 +21846,26 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         generic_spec = False
         oem_proprietary = False
 
-        if is_sub and not (line or 0):
-            # apportioned child — unit/line/material/MPN live on the PARENT line; the
-            # ledger renders 'incl. in parent', and that disclosure IS the reason.
-            material_txt = material_txt or "incl. in parent"
-            mpn_txt = mpn_txt or "incl. in parent"
+        # INTENT (2026-07-28 cell-cycler SIGHT): REALIZED_ON_PCB / GEOMETRY rows are
+        # intentionally £0 (on-board silicon or geometry-only) — painting them red
+        # for "unit £ missing" is a false FAIL that floods the BoM ledger. Treat
+        # like apportioned children: disclosure text, no price/MPN obligation.
+        _row_status = str(row.get("status") or "").strip().upper()
+        _zero_ok = _row_status in (
+            "REALIZED_ON_PCB", "GEOMETRY", "SUB-COMPONENT", "IN ASSEMBLY",
+        )
+        if (is_sub or _zero_ok) and not (line or 0):
+            # apportioned child OR intentional zero — unit/line/material/MPN live
+            # on the parent / PCB; the ledger disclosure IS the reason.
+            if _row_status == "REALIZED_ON_PCB":
+                material_txt = material_txt or "on PCB (see PCB tab)"
+                mpn_txt = mpn_txt or "realized on PCB — not a separate purchasable line"
+            elif _row_status == "GEOMETRY":
+                material_txt = material_txt or "geometry / clearance only"
+                mpn_txt = mpn_txt or "geometry — no purchasable identity"
+            else:
+                material_txt = material_txt or "incl. in parent"
+                mpn_txt = mpn_txt or "incl. in parent"
         else:
             if unit is None or unit <= 0:
                 reasons.append("unit £ missing/zero")
@@ -21883,7 +21913,7 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                         mpn_txt = _TBD_MPN_TEXT
                         tbd = True
                         tbd_count += 1
-            elif kind == "fabricated" and not mpn_txt:
+            elif kind == "fabricated" and not mpn_txt and not _zero_ok:
                 # S10 (council H10, 2026-07-20): "bespoke fabrication to drawing" is honest for a
                 # genuinely FABRICATED mechanical part (an enclosure / bracket machined to a
                 # drawing — no catalogue MPN exists). It is a FALSE-SATISFIED claim for a
@@ -21893,17 +21923,28 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                 # board MPN, so only genuinely-unresolved electronics reach here.) Flag it as a
                 # real gap so the row FAILs (honest red beats fake green). Keyed on the FR4/
                 # electronic material signal + an electronic-noun family, no product class.
-                _is_electronic = bool(re.search(r"fr4|electronic\s+comp|pcb[- ]?mount",
-                                                material_txt or "", re.I)) \
-                    or bool(_ELECTRONIC_NOUN_RX.search(req))
-                if _is_electronic:
-                    mpn_txt = "UNRESOLVED — catalogue electronic part; MPN required at detailed design"
-                    reasons.append("catalogue electronic component with NO resolved MPN — "
-                                   "'bespoke fabrication to drawing' is not a valid identity for a "
-                                   "catalogue part (council H10); resolve a real MPN or mark it "
-                                   "OEM-proprietary with evidence")
+                # GOTCHA: REALIZED_ON_PCB / GEOMETRY already disclosed above — never H10 them.
+                # GOTCHA (2026-07-28): `_bom_row_kind` often returns fabricated for
+                # "requirement stated" instrument kit — so the assembly-path commodity
+                # taxonomy never ran, and Status LED / IEC C14 / power switch went H10
+                # red despite matching the commodity noun+£ gate. Run commodity FIRST.
+                commodity = _commodity_bought_out(row, unit)
+                if commodity:
+                    commodity_total += 1
+                    mpn_txt = _COMMODITY_MPN_TEXT
+                    commodity_tbd += 1
                 else:
-                    mpn_txt = "bespoke fabrication to drawing — see sizing basis"
+                    _is_electronic = bool(re.search(r"fr4|electronic\s+comp|pcb[- ]?mount",
+                                                    material_txt or "", re.I)) \
+                        or bool(_ELECTRONIC_NOUN_RX.search(req))
+                    if _is_electronic:
+                        mpn_txt = "UNRESOLVED — catalogue electronic part; MPN required at detailed design"
+                        reasons.append("catalogue electronic component with NO resolved MPN — "
+                                       "'bespoke fabrication to drawing' is not a valid identity for a "
+                                       "catalogue part (council H10); resolve a real MPN or mark it "
+                                       "OEM-proprietary with evidence")
+                    else:
+                        mpn_txt = "bespoke fabrication to drawing — see sizing basis"
         if not str(row.get("basis") or "").strip():
             reasons.append("pricing basis missing")
         # CLASS FIT (fix 6): a foreign-domain product fails its row — routed upstream.
@@ -31456,6 +31497,18 @@ def _selftest() -> int:
     if "bespoke fabrication" not in _m_mpn:
         print(f"  FAIL S10: a genuinely fabricated mechanical part (Enclosure Shell) must keep "
               f"'bespoke fabrication to drawing' (got {_m_mpn!r})"); bad += 1
+    # proveCatch (2026-07-28 cell-cycler SIGHT): REALIZED_ON_PCB £0 must NOT paint red
+    # for "unit £ missing" — intentional on-board silicon, not a pricing hole.
+    _s10b_rows = [{"tag": "F-1", "requirement": "Current Control Loop",
+                   "part": "requirement stated", "qty": 1, "unit_gbp": 0,
+                   "line_gbp": 0, "basis": "realized on PCB", "status": "REALIZED_ON_PCB"}]
+    _s10b = _eval_bom_ledger_contract(
+        ".", {"isInstrumentDevice": True, "requirementsBom": _s10b_rows})
+    _s10b_v = ((_s10b or {}).get("rows") or {}).get(0, {}).get("verdict")
+    _s10b_rs = " ".join(((_s10b or {}).get("rows") or {}).get(0, {}).get("reasons") or [])
+    if _s10b_v != "PASS" or "unit £" in _s10b_rs.lower():
+        print(f"  FAIL S10b: REALIZED_ON_PCB £0 must PASS the ledger (not red for "
+              f"unit £ missing); got verdict={_s10b_v!r} reasons={_s10b_rs!r}"); bad += 1
     # ═══ S9 (council H9, 2026-07-20): a STABILITY derived-requirement must appear as a HARD
     # verification row and resolve to UNVERIFIED absent a DERIVED stability figure — never
     # silently dropped, never PASS-by-setpoint-echo. ═══

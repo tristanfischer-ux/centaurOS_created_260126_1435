@@ -1972,15 +1972,25 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
             except Exception as _ale:  # noqa: BLE001 — never block the drawing
                 print(f"[ga] above-lid scan skipped: {_ale}")
             meta["above_lid_offsets_mm"] = _above_lid_off
+            _has_optical_sig = (
+                "optical-tower" in (meta.get("exterior_signature_families") or []))
             if _above_lid_off:
                 _top_local = _body_h + max(o1 for _, o1 in _above_lid_off.values())
                 z_max = max(z_max, _top_local)
                 print(f"[ga] above-lid geometry PRESENT ({len(_above_lid_off)} part(s)) — "
                       f"overall {_top_local:.0f} mm from REAL geometry, not the form-rule "
                       f"tower ({float(_form['total_height_mm']):.0f} mm)")
-            else:
+            elif _has_optical_sig:
+                # Only inflate the envelope with the form-rule optical tower when
+                # the RENDER actually carries an optical-tower family. Otherwise a
+                # bench_power / potentiostat sheet grows a phantom tower (SIGHT
+                # 2026-07-28: drawings showed a tower the cutaway never had).
                 z_max = max(z_max, float(_form["total_height_mm"]))
-                print("[ga] no above-lid geometry — form-rule tower supplies the envelope")
+                print("[ga] no above-lid geometry — form-rule optical tower supplies "
+                      "the envelope (optical-tower signature present)")
+            else:
+                print("[ga] no above-lid geometry and no optical-tower signature — "
+                      "body envelope only (no phantom form-rule tower)")
             H = max(z_max - z_min, 1.0)
             # DECISION (2026-07-14 Tristan): Assembly must show PCB + parts stack-up.
             # Seat BoM proxies into form-rule Z bands BEFORE drawing — the old
@@ -2509,13 +2519,21 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                  stroke=EQ_INK, width=1.5,
                  fill="none" if _assembly_cutaway else "#f4f6f8",
                  dash="5,3" if _assembly_cutaway else None)
-        tw, td, th = _form["tower_size"]
-        _tx, ty, _tz = _form["tower_loc"]
-        stx = side_x + (y_max - (ty + td / 2)) * ppm
-        sty = side_y + (z_max - (body_h + th)) * ppm
-        svg.rect(stx, sty, td * ppm, th * ppm, stroke=EQ_INK, width=1.5,
-                 fill="none" if _assembly_cutaway else "#eef1f4",
-                 dash="4,3" if _assembly_cutaway else None)
+        # GOTCHA (2026-07-28): FRONT/TOP gated the optical tower on
+        # exterior_signature_families, but SIDE always drew tower_size — an
+        # unlabeled grey rect that G22 could not see (it only looks for the
+        # OPTICAL text). Gate SIDE on the same optical evidence.
+        if "optical-tower" in (meta.get("exterior_signature_families") or []):
+            tw, td, th = _form["tower_size"]
+            _tx, ty, _tz = _form["tower_loc"]
+            stx = side_x + (y_max - (ty + td / 2)) * ppm
+            sty = side_y + (z_max - (body_h + th)) * ppm
+            svg.rect(stx, sty, td * ppm, th * ppm, stroke=EQ_INK, width=1.5,
+                     fill="none" if _assembly_cutaway else "#eef1f4",
+                     dash="4,3" if _assembly_cutaway else None,
+                     extra='data-glance="side-optical-tower"')
+            svg.text(stx + td * ppm / 2, sty + 10, "OPTICAL",
+                     size=7.0, anchor="middle", fill=MUTED)
     for p in sorted(parts, key=lambda q: -(max(q.y1 - q.y0, 1) * max(q.z1 - q.z0, 1))):
         if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
             continue

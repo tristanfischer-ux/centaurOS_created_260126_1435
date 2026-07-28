@@ -772,6 +772,23 @@ def _materials_takeoff(name, mods, geom=None, service=None, qcontract=None):
     _lab = _lab_culture_vessel_price(name, md, qcontract)
     if _lab is not None:
         return _lab
+    # INTENT (2026-07-28 cell-cycler SIGHT): "Interior Mounting Frame" on a dry
+    # bench instrument was priced as a carbon-steel hoop shell (⌀0.4×0.1 m,
+    # σ=120 MPa) because the typed service was absent and `_materials_takeoff`
+    # fell through to the plant vessel path. Enclosure Shell already hit
+    # `_structural_takeoff` (polymer); the mounting frame must take the SAME
+    # instrument-structure route — never plant carbon steel in an Engineering
+    # tab for a sealed electronics box.
+    # DECISION: redirect BEFORE geom/hoop, keyed on instrument + noun family
+    # (same `_INSTRUMENT_PRINTED_STRUCTURE_RE` / `_ENCLOSURE_FAMILY_RE` as the
+    # structural helper). Plant-scale / non-instrument lines are untouched.
+    if _IS_INSTRUMENT_DEVICE and (
+        _ENCLOSURE_FAMILY_RE.search(name or "")
+        or _INSTRUMENT_PRINTED_STRUCTURE_RE.search(name or "")
+    ):
+        st_inst = _structural_takeoff(name, md, geom)
+        if st_inst is not None:
+            return st_inst
     # Prefer word mm-scale dims over plant-scale AS-BUILT when they disagree by
     # orders of magnitude (Blender type-default vertical_vessel ⌀700–1600 mm on
     # an undimensioned/unparsed lab vial).
@@ -2424,6 +2441,41 @@ def _zero_pcb_realized_functions(rows: list) -> int:
     return n
 
 
+def _floor_identified_zero_prices(rows: list) -> int:
+    """INTENT (2026-07-28 cell-cycler SIGHT): IDENTIFIED catalogue lines with a
+    real manufacturer+MPN but £0 unit (industrial scrub cleared the price join)
+    were painting the BoM ledger red for 'unit £ missing' while still claiming
+    a pin. Apply the same noun-keyed commodity floor used elsewhere — never
+    invent an MPN, only a conservative price so the ledger stays honest.
+
+    Universal: instrument flag + IDENTIFIED + structured/named part + £0.
+    Plant designs untouched. Returns count of floored rows.
+    """
+    if not _IS_INSTRUMENT_DEVICE:
+        return 0
+    n = 0
+    for row in rows:
+        if str(row.get("status") or "") != "IDENTIFIED":
+            continue
+        if float(row.get("unit_gbp") or 0) > 0:
+            continue
+        part = str(row.get("part") or "").strip()
+        if not part or part.lower() in ("requirement stated", "tbd", "generic", "—", "-"):
+            continue
+        req = str(row.get("requirement") or part)
+        floor, noun = _commodity_zero_floor(req)
+        qty = float(row.get("qty") or 1) or 1.0
+        row["unit_gbp"] = float(floor)
+        row["line_gbp"] = round(float(floor) * qty, 2)
+        row["basis"] = (
+            (str(row.get("basis") or "") + " · ").lstrip(" ·")
+            + f"IDENTIFIED catalogue pin with £0 price join — noun floor "
+              f"£{floor:g} ({noun}); not a blank identity"
+        )
+        n += 1
+    return n
+
+
 def _instrument_materials_target_gbp(st: dict) -> float | None:
     """Yuri gold materials midpoint for a makers instrument, else contract macro.
 
@@ -3626,6 +3678,34 @@ def _selftest() -> int:
         print(f"  FAIL instrument printed frame must be polymer makers-part, not steel: {_frame_dev}"); bad += 1
     if not (_frame_plant and "structural steelwork" in _frame_plant[1]):
         print(f"  FAIL non-instrument frame must still take steel take-off: {_frame_plant}"); bad += 1
+    # proveCatch (2026-07-28 cell-cycler): materials take-off must NOT carbon-steel
+    # an Interior Mounting Frame when the instrument flag is set (service absent —
+    # the live disease: hoop wall @ σ=120 MPa on a dry bench box).
+    _IS_INSTRUMENT_DEVICE = True
+    _mt_frame = _materials_takeoff(
+        "Interior Mounting Frame",
+        {"dimension": "0.05 m² footprint"},
+        geom=(0.4, 0.1),
+        service=None,
+    )
+    _IS_INSTRUMENT_DEVICE = False
+    _mt_frame_plant = _materials_takeoff(
+        "Interior Mounting Frame",
+        {"dimension": "30 m² footprint"},
+        geom=(4.0, 3.0),
+        service=None,
+    )
+    _IS_INSTRUMENT_DEVICE = _saved_dev
+    if not (_mt_frame and "polymer" in str(_mt_frame[1]).lower()
+            and "carbon steel" not in str(_mt_frame[1]).lower()
+            and "carbon steel" not in str((_mt_frame[2] or {}).get("material") or "").lower()):
+        print(f"  FAIL instrument Interior Mounting Frame must be polymer via "
+              f"_materials_takeoff, not carbon-steel hoop: {_mt_frame}"); bad += 1
+    if (_mt_frame_plant and "carbon steel" not in str(
+            (_mt_frame_plant[2] or {}).get("material") or "").lower()
+            and "steel" not in str(_mt_frame_plant[1]).lower()):
+        print(f"  FAIL plant-scale Interior Mounting Frame must still take a "
+              f"steel/structural path when instrument flag is off: {_mt_frame_plant}"); bad += 1
     # proveCatch: commodity exactly-10× corpus lift must REJECT (Poseidon cradle £30→£300)
     _pv_cradle = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 2000,
                   "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 300}
@@ -3666,6 +3746,18 @@ def _selftest() -> int:
     _zero_pcb_realized_functions(_fn_rows)
     if _fn_rows[0]["line_gbp"] != 0 or _fn_rows[0]["status"] != "REALIZED_ON_PCB":
         print(f"  FAIL TBD circuit function must zero as REALIZED_ON_PCB: {_fn_rows[0]}"); bad += 1
+    # proveCatch (2026-07-28): IDENTIFIED + MPN + £0 must get a noun floor (not
+    # stay £0 and paint the Excel ledger red while claiming a catalogue pin).
+    _id0 = [{"requirement": "Per Channel Discharge Load Mosfet",
+             "part": "Infineon Technologies IRLB3813PBF", "qty": 4,
+             "unit_gbp": 0.0, "line_gbp": 0.0, "status": "IDENTIFIED",
+             "basis": "catalogue"}]
+    _saved_id0 = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _n_id0 = _floor_identified_zero_prices(_id0)
+    _IS_INSTRUMENT_DEVICE = _saved_id0
+    if not (_n_id0 == 1 and _id0[0]["unit_gbp"] > 0 and _id0[0]["line_gbp"] > 0):
+        print(f"  FAIL IDENTIFIED £0 must receive noun floor: {_id0[0]}"); bad += 1
     if _fn_rows[1]["line_gbp"] != 16:
         print(f"  FAIL physical shunt must stay billed: {_fn_rows[1]}"); bad += 1
     if _fn_rows[2]["line_gbp"] != 3.2 or _fn_rows[2]["status"] != "IDENTIFIED":
@@ -9150,6 +9242,7 @@ def assemble(out_dir: str):
     # honour contract/gold materials midpoint when plant parametrics still overshoot.
     _zero_instrument_non_parts(rows)
     _zero_pcb_realized_functions(rows)
+    _floor_identified_zero_prices(rows)
     _rescale_instrument_materials_to_gold(rows, _pv_state if isinstance(_pv_state, dict) else {})
     # LAST — after pricing/rescale (which read the raw part name): prefix the compute/optical
     # anchor line with its gold-spine principal so the render/GA "Compute UI Module" reconciles

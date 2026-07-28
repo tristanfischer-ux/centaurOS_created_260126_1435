@@ -7292,7 +7292,9 @@ def _exterior_signature_od_bbox_mm():
 
 
 
-def _build_lab_electronics_front_fascia(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy):
+def _build_lab_electronics_front_fascia(
+    fl, W, D, H, base_z, _skin_mod, MO, tt, _fy, *, face_band: str = "full",
+):
     """Shared front HMI fascia for sealed lab_electronics exteriors.
 
     INTENT (2026-07-19 / 2026-07-28): vision critic flags a featureless closed
@@ -7304,33 +7306,50 @@ def _build_lab_electronics_front_fascia(fl, W, D, H, base_z, _skin_mod, MO, tt, 
     bench_power (source/sink instrument HMI). NOT a product-named branch —
     both signatures need the same operator-face language.
 
+    @param face_band ``\"full\"`` = fascia spans the operator face (vial /
+        potentiostat). ``\"left\"`` = HMI confined to the left band so a
+        right-hand channel bay cannot sit on top of it (cell-cycler SIGHT
+        2026-07-28: overlapping front panels).
     @returns list of created Blender objects.
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
+
+    # DECISION: left band keeps a clear X gap to a right-hand bay strip
+    # (bay starts ~+0.10·W). Full band keeps the pre-2026-07-28 layout.
+    if face_band == "left":
+        _pcx, _pw = -W * 0.28, W * 0.42
+        _dcx, _dw = -W * 0.30, W * 0.28
+        _k0, _kstep = -W * 0.42, W * 0.10
+        _ledx, _portx = -W * 0.10, -W * 0.40
+    else:
+        _pcx, _pw = -W * 0.14, W * 0.50
+        _dcx, _dw = -W * 0.16, W * 0.34
+        _k0, _kstep = -W * 0.28, W * 0.12
+        _ledx, _portx = W * 0.06, W * 0.30
 
     _sig_new = []
     _pan_face = _fy - tt                    # operator face plane (mm)
     _panelm = fl.make_mat("m_se_le_panel", fl._to_linear((0.16, 0.17, 0.19)),
                           metallic=0.4, roughness=0.5)
     _panel = fl.add_box("u_se_le_face_panel",
-                        _mm3((-W * 0.14, _pan_face - 2.0, base_z + H * 0.32)),
-                        _mm3((W * 0.50, 4.0, H * 0.40)), _panelm,
+                        _mm3((_pcx, _pan_face - 2.0, base_z + H * 0.32)),
+                        _mm3((_pw, 4.0, H * 0.40)), _panelm,
                         module=_skin_mod, module_objects=MO)
-    _panel.dimensions = _mm3((W * 0.50, 4.0, H * 0.40))
+    _panel.dimensions = _mm3((_pw, 4.0, H * 0.40))
     _sig_new.append(_panel)
     _dispm = fl.make_mat("m_se_le_display", fl._to_linear((0.03, 0.10, 0.16)),
                          metallic=0.1, roughness=0.12, kind="glass", alpha=0.92)
     _disp = fl.add_box("u_se_le_face_display",
-                       _mm3((-W * 0.16, _pan_face - 6.0, base_z + H * 0.42)),
-                       _mm3((W * 0.34, 6.0, H * 0.16)), _dispm,
+                       _mm3((_dcx, _pan_face - 6.0, base_z + H * 0.42)),
+                       _mm3((_dw, 6.0, H * 0.16)), _dispm,
                        module=_skin_mod, module_objects=MO)
-    _disp.dimensions = _mm3((W * 0.34, 6.0, H * 0.16))
+    _disp.dimensions = _mm3((_dw, 6.0, H * 0.16))
     _sig_new.append(_disp)
     _keym = fl.make_mat("m_se_le_key", fl._to_linear((0.07, 0.07, 0.09)),
                         metallic=0.3, roughness=0.55)
     for _ki in range(3):
-        _kx = -W * 0.28 + _ki * (W * 0.12)
+        _kx = _k0 + _ki * _kstep
         _key = fl.add_box(f"u_se_le_face_key_{_ki}",
                           _mm3((_kx, _pan_face - 6.0, base_z + H * 0.20)),
                           _mm3((W * 0.08, 6.0, H * 0.10)), _keym,
@@ -7340,7 +7359,7 @@ def _build_lab_electronics_front_fascia(fl, W, D, H, base_z, _skin_mod, MO, tt, 
     _ledm = fl.make_mat("m_se_le_status_led", fl._to_linear((0.15, 0.90, 0.38)),
                         kind="led_emissive", emission_strength=3.0)
     _led = fl.add_cyl("u_se_le_face_led",
-                      _mm3((W * 0.06, _pan_face - 6.0, base_z + H * 0.20)),
+                      _mm3((_ledx, _pan_face - 6.0, base_z + H * 0.20)),
                       2.6 * fl.MM, 6.0 * fl.MM, _ledm,
                       module=_skin_mod, module_objects=MO,
                       rotation=(math.radians(90), 0.0, 0.0))
@@ -7348,7 +7367,7 @@ def _build_lab_electronics_front_fascia(fl, W, D, H, base_z, _skin_mod, MO, tt, 
     _portm = fl.make_mat("m_se_le_face_port", fl._to_linear((0.08, 0.08, 0.10)),
                          metallic=0.45, roughness=0.4)
     _port = fl.add_box("u_se_le_face_port",
-                       _mm3((W * 0.30, _pan_face - 5.0, base_z + H * 0.30)),
+                       _mm3((_portx, _pan_face - 5.0, base_z + H * 0.30)),
                        _mm3((14.0, 5.0, 9.0)), _portm,
                        module=_skin_mod, module_objects=MO)
     _port.dimensions = _mm3((14.0, 5.0, 9.0))
@@ -7406,27 +7425,33 @@ def _build_bench_power_signature(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy):
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
+    # GOTCHA (2026-07-28 SIGHT): full-width fascia + bay at +0.22·W overlapped in
+    # X (and Z) → two front panels sitting on top of each other. Left-band HMI
+    # + right-band bay with a clear gap is the form-follows-function layout.
     _sig_new = list(_build_lab_electronics_front_fascia(
-        fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
+        fl, W, D, H, base_z, _skin_mod, MO, tt, _fy, face_band="left"))
     _pan_face = _fy - tt
-    # Front cell-bay terminal strip (proud of fascia, right of HMI).
+    # Front cell-bay terminal strip — RIGHT of HMI only (no X overlap with fascia).
     _baym = fl.make_mat("m_se_le_bay", fl._to_linear((0.22, 0.23, 0.26)),
                         metallic=0.55, roughness=0.4)
+    _bay_cx, _bay_w = W * 0.28, W * 0.36
     _bay = fl.add_box(
         "u_se_le_bay_strip",
-        _mm3((W * 0.22, _pan_face - 4.0, base_z + H * 0.55)),
-        _mm3((W * 0.38, 8.0, H * 0.28)),
+        _mm3((_bay_cx, _pan_face - 4.0, base_z + H * 0.42)),
+        _mm3((_bay_w, 8.0, H * 0.36)),
         _baym, module=_skin_mod, module_objects=MO)
-    _bay.dimensions = _mm3((W * 0.38, 8.0, H * 0.28))
+    _bay.dimensions = _mm3((_bay_w, 8.0, H * 0.36))
     _sig_new.append(_bay)
     _postm = fl.make_mat("m_se_le_bay_post", fl._to_linear((0.72, 0.55, 0.18)),
                          metallic=0.75, roughness=0.35)
     _n_posts = 4
+    _post0 = _bay_cx - _bay_w * 0.36
+    _post_step = _bay_w * 0.24
     for _pi in range(_n_posts):
-        _px = W * 0.08 + _pi * (W * 0.09)
+        _px = _post0 + _pi * _post_step
         _post = fl.add_cyl(
             f"u_se_le_bay_post_{_pi}",
-            _mm3((_px, _pan_face - 10.0, base_z + H * 0.55)),
+            _mm3((_px, _pan_face - 10.0, base_z + H * 0.42)),
             2.8 * fl.MM, 10.0 * fl.MM, _postm,
             module=_skin_mod, module_objects=MO,
             rotation=(math.radians(90), 0.0, 0.0))
@@ -16130,14 +16155,21 @@ def _place_lab_electronics_interior_layout(
             _c14.dimensions = _mm3((28.0, 10.0, 20.0))
             _count(_c14, "auth")
         elif _role == "pass_bank_heatsink":
-            # Linear discharge pass-bank heatsink fin stack (bench_power).
-            _hs = fl.add_box(
-                "u_se_le_pass_bank_heatsink",
-                _mm3((-W * 0.18, D * 0.10, base_z + H * 0.32)),
-                _mm3((W * 0.30, D * 0.22, H * 0.20)),
-                heater_mat, module=story_mod, module_objects=MO)
-            _hs.dimensions = _mm3((W * 0.30, D * 0.22, H * 0.20))
-            _count(_hs, "box")
+            # Linear discharge pass-bank heatsink — fin STACK (not one grey slab).
+            # INTENT (2026-07-28 SIGHT): a single cuboid read as a "random box";
+            # thin parallel fins read as a real pass-bank thermal path.
+            _fin_mat = fl.make_mat(
+                "m_se_le_pass_fins", fl._to_linear((0.45, 0.46, 0.48)),
+                metallic=0.65, roughness=0.4)
+            for _fi in range(5):
+                _fy_fin = D * 0.02 + _fi * (D * 0.04)
+                _fin = fl.add_box(
+                    f"u_se_le_pass_bank_heatsink_fin_{_fi}",
+                    _mm3((-W * 0.18, _fy_fin, base_z + H * 0.32)),
+                    _mm3((W * 0.28, max(1.2, D * 0.012), H * 0.22)),
+                    _fin_mat, module=story_mod, module_objects=MO)
+                _fin.dimensions = _mm3((W * 0.28, max(1.2, D * 0.012), H * 0.22))
+                _count(_fin, "auth")
 
     # Coin cell / backup under the board edge.
     try:
@@ -17484,24 +17516,54 @@ def _populate_instrument_interior(parts, base_z, margin, ih, iw, idep,
     # by _draw_ledger_harness — so every conduit joins two REAL connected parts (from the authored
     # from_part→to_part edges), never a fabricated bus or a position-guessed run. See ~L24390.
 
-    # DE-DUPLICATE: the bespoke per-product interior story (u_se_le_pcb / stir_motor /
-    # heater_block / cell / chip, built earlier by _place_lab_electronics_interior_layout)
-    # is now REPLACED by this universal pack — hide those interior meshes so we don't render
-    # two PCBs / two motors. KEEP the exterior-signature families (OD optical tower, vial
-    # collar, HMI fascia — _EXTERIOR_KEEP_PREFIXES): they are the product's above-lid identity,
-    # not interior clutter. Universal (keyed on the exterior-keep prefix set, no product table).
+    # DE-DUPLICATE vs SIGNATURE STORY (2026-07-28 cell-cycler SIGHT inverted):
+    # The universal BoM pack used to HIDE the lab_electronics form interior
+    # (PCB / AFE / C14 / pass-bank) and leave grey proxy boxes + a red ledger
+    # harness — Tristan's "random boxes / fake wiring". When a signature
+    # interior exists, KEEP that story and hide the pack component meshes
+    # instead (manifest placement still stands). Non-LE instruments keep the
+    # old pack-wins behaviour.
+    # Universal: keyed on `_IS_LAB_ELECTRONICS_FORM` + presence of u_se_le_*
+    # interior meshes — never a product-name table.
     n_hidden_story = 0
-    for _o in list(bpy.data.objects):
-        if getattr(_o, "type", None) != "MESH":
-            continue
-        _nm = _o.name
-        if _nm.startswith("u_se_le_") and not _nm.startswith(_EXTERIOR_KEEP_PREFIXES):
-            _o.hide_render = True
-            n_hidden_story += 1
-    if n_hidden_story:
-        print(f"[univ][sealed][interior] hid {n_hidden_story} redundant bespoke story "
-              f"mesh(es) (u_se_le_* interior — replaced by universal pack; exterior "
-              f"signature kept)")
+    n_hidden_pack = 0
+    if _IS_LAB_ELECTRONICS_FORM:
+        for _o in list(bpy.data.objects):
+            if getattr(_o, "type", None) != "MESH":
+                continue
+            _nm = _o.name
+            # Hide BoM proxy boxes / harness nodes; keep the chassis frame plate
+            # (reads as the mounting deck under the PCB story).
+            if (_nm.startswith("u_se_cutaway_cue_int_")
+                    and "frame_baseplate" not in _nm
+                    and "frame_standoff" not in _nm):
+                _o.hide_render = True
+                n_hidden_pack += 1
+            elif _nm.startswith("u_se_le_"):
+                _o.hide_render = False
+        # Tall corner standoffs read as a "random tower" in the cutaway — hide
+        # them when the signature story already carries the interior narrative.
+        for _o in list(bpy.data.objects):
+            if getattr(_o, "type", None) != "MESH":
+                continue
+            if _o.name.startswith("u_se_cutaway_cue_int_frame_standoff"):
+                _o.hide_render = True
+                n_hidden_pack += 1
+        if n_hidden_pack:
+            print(f"[univ][sealed][interior] lab_electronics: kept signature story; "
+                  f"hid {n_hidden_pack} BoM-pack proxy mesh(es) (anti random-boxes)")
+    else:
+        for _o in list(bpy.data.objects):
+            if getattr(_o, "type", None) != "MESH":
+                continue
+            _nm = _o.name
+            if _nm.startswith("u_se_le_") and not _nm.startswith(_EXTERIOR_KEEP_PREFIXES):
+                _o.hide_render = True
+                n_hidden_story += 1
+        if n_hidden_story:
+            print(f"[univ][sealed][interior] hid {n_hidden_story} redundant bespoke story "
+                  f"mesh(es) (u_se_le_* interior — replaced by universal pack; exterior "
+                  f"signature kept)")
 
     _bbw = (max(xs) - min(xs)) if xs else 0.0
     _bbd = (max(ys) - min(ys)) if ys else 0.0
@@ -25428,8 +25490,16 @@ def main():
         bbox, region_centres, frame_h, routed, unresolved = place_sealed_enclosure(
             parts, regions, topology, MAT, MO, _se_env_mm)
         # WIRING HARNESS + TUBING from the REAL ledger — after placement (positions set), using the
-        # authored topology edges; each conduit joins two REAL placed parts, smooth NURBS curves.
-        _draw_ledger_harness(topology, parts, MO)
+        # authored topology edges; each conduit joins two REAL connected parts, smooth NURBS curves.
+        # GOTCHA (2026-07-28 cell-cycler SIGHT): on lab_electronics the signature
+        # interior story wins over BoM pack boxes — a ledger harness between those
+        # (now-hidden) proxies reads as fake red spaghetti. Skip when the form
+        # story is the cutaway truth; plant/optical sealed boxes keep the harness.
+        if _IS_LAB_ELECTRONICS_FORM:
+            print("[univ][sealed][interior] ledger harness SKIPPED — lab_electronics "
+                  "signature story is the cutaway (anti fake-wiring)")
+        else:
+            _draw_ledger_harness(topology, parts, MO)
     elif family == "rack_farm":
         global _RACKFARM_QUANTITIES
         _RACKFARM_QUANTITIES = quantities
