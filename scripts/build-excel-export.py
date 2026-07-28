@@ -27007,6 +27007,34 @@ def _sc_schedules(wb, ws, state, run_dir):
                    "resolve any diverging item-count reconciliation at its source"}
 
 
+def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
+    """INTENT (P6 / cell-cycler cold-v17): nested chain races null state.pcb while
+    pcb/ Gerbers+positions remain. Restore from pcb-stage-result.json (durable
+    authority written by the chain PCB stage). Returns True if rehydrated.
+
+    @description Never invents a green board — only restores a prior recorded pcb.
+    @param state Mutable run state
+    @param run_dir Chain out directory
+    @returns Whether state.pcb was restored from the sidecar
+    """
+    pcb = state.get("pcb")
+    if isinstance(pcb, dict) and isinstance(pcb.get("pipeline"), dict):
+        return False
+    side = os.path.join(run_dir or "", "pcb-stage-result.json")
+    if not os.path.isfile(side):
+        return False
+    try:
+        with open(side, encoding="utf-8") as fh:
+            restored = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"  ! pcb sidecar read failed ({exc})")
+        return False
+    if not isinstance(restored, dict) or not isinstance(restored.get("pipeline"), dict):
+        return False
+    state["pcb"] = restored
+    return True
+
+
 def _sc_pcb(wb, ws, state, run_dir):
     """PCB-TAB-UX (2026-07-12): scores the tab on TWO INDEPENDENT axes — HYGIENE (does the
     pipeline's own real signals say DRC-clean/routed/Gerbers-present, PLUS the new
@@ -27021,6 +27049,7 @@ def _sc_pcb(wb, ws, state, run_dir):
     pcb-gate.ts's evaluatePcbGate at the chain level: never a green PCB tab without a
     real, fit board). Reads the SAME _pcb_two_axis_assessment tab_pcb() rendered from —
     the tab and its score can never diverge."""
+    _ensure_pcb_from_sidecar(state, run_dir)
     pcb = state.get("pcb") or {}
     if not isinstance(pcb.get("pipeline"), dict):
         return {"components": [], "issues": [], "score_cap": None, "mech": "", "fix": ""}
@@ -27797,6 +27826,10 @@ def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
         raise SystemExit(f"No state.json in {run_dir}")
+    # INTENT (P6 / cold-v17): restore state.pcb from sidecar when a nested chain
+    # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
+    if _ensure_pcb_from_sidecar(state, run_dir):
+        print("  · restored state.pcb from pcb-stage-result.json (race/wipe guard)")
     # ONE-TRUTH BoM-COST ACHIEVED (2026-07-26): the assembled BoM total is the delivered
     # answer to the brief's bom_cost_* metrics, but it lives in state.requirementsBom, not
     # the contract — so the deterministic self-audit (dossier_audit._contract_match), the
@@ -35606,6 +35639,42 @@ def _selftest() -> int:
                   f"3-pos must still FAIL (got {_pcb_pnp_fail})"); bad += 1
     finally:
         _sh_pcb.rmtree(_pcb_td, ignore_errors=True)
+
+    # ═══ proveCatch PCB sidecar rehydrate (P6 / cell-cycler cold-v17) ═══
+    # Nested quality-loop chains race-null state.pcb while pcb/ artifacts remain.
+    # Excel must restore from pcb-stage-result.json — never invent a green board.
+    _side_td = _tmpfile.mkdtemp(prefix="bex_pcb_sidecar_")
+    try:
+        _side_pcb = {
+            "isPcbBearing": True,
+            "disposition": "bespoke",
+            "pipeline": {
+                "ok": False,
+                "stageReached": "complete",
+                "routed": True,
+                "drc": {"ran": True, "violations": 5},
+                "generator": {"componentCount": 3, "components": []},
+            },
+        }
+        with open(os.path.join(_side_td, "pcb-stage-result.json"), "w", encoding="utf-8") as _sf:
+            json.dump(_side_pcb, _sf)
+        _st_null = {"pcb": None}
+        if not _ensure_pcb_from_sidecar(_st_null, _side_td):
+            print("  FAIL pcb-sidecar: null state.pcb must rehydrate from sidecar"); bad += 1
+        if (_st_null.get("pcb") or {}).get("pipeline", {}).get("drc", {}).get("violations") != 5:
+            print("  FAIL pcb-sidecar: must preserve honest DRC violation count"); bad += 1
+        _st_live = {"pcb": {"pipeline": {"ok": True, "drc": {"ran": True, "violations": 0}}}}
+        if _ensure_pcb_from_sidecar(_st_live, _side_td):
+            print("  FAIL pcb-sidecar: must NOT overwrite a live state.pcb"); bad += 1
+        _st_empty = {"pcb": None}
+        _noside = os.path.join(_side_td, "noside")
+        os.makedirs(_noside, exist_ok=True)
+        if _ensure_pcb_from_sidecar(_st_empty, _noside):
+            print("  FAIL pcb-sidecar: missing sidecar must not invent a board"); bad += 1
+    except Exception as _side_exc:
+        print(f"  FAIL pcb-sidecar proveCatch raised: {_side_exc!r}"); bad += 1
+    finally:
+        _sh_pcb.rmtree(_side_td, ignore_errors=True)
 
     # ── proveCatch: instrument-path zero-orphan driver gate (Fix 1, 2026-07-22) ─
     # isInstrumentDevice=True → only load_factor + hours should be emitted (2 rows);

@@ -7899,6 +7899,38 @@ async function main() {
   }
   ensureInstrumentDeviceOnDisk()
 
+  // INTENT (P6 floor-9 / cell-cycler cold-v17): nested quality-loop chain processes
+  // race on state.json and null `state.pcb` even when pcb/ Gerbers+positions exist.
+  // Sidecar is the durable authority — write after PCB stage; restore on every late
+  // rewrite that would drop it. Excel also rehydrates from the same file.
+  const pcbSidecarPath = resolve(outDir, 'pcb-stage-result.json')
+  const writePcbSidecar = (pcbObj: unknown): void => {
+    if (!pcbObj || typeof pcbObj !== 'object') return
+    try {
+      writeFileSync(pcbSidecarPath, JSON.stringify(pcbObj, null, 2))
+    } catch (err) {
+      console.error(`[chain] pcb sidecar write failed (non-fatal): ${(err as Error).message}`)
+    }
+  }
+  const ensurePcbPreservedOnDisk = (): void => {
+    if (!existsSync(statePath)) return
+    try {
+      const disk = JSON.parse(readFileSync(statePath, 'utf-8')) as Record<string, unknown>
+      const live = disk.pcb
+      if (live && typeof live === 'object' && (live as { pipeline?: unknown }).pipeline) {
+        writePcbSidecar(live)
+        return
+      }
+      if (!existsSync(pcbSidecarPath)) return
+      disk.pcb = JSON.parse(readFileSync(pcbSidecarPath, 'utf-8'))
+      writeFileSync(statePath, JSON.stringify(disk, null, 2))
+      console.error('[chain] restored state.pcb from pcb-stage-result.json (race/wipe guard)')
+    } catch (err) {
+      console.error(`[chain] pcb preserve failed (non-fatal): ${(err as Error).message}`)
+    }
+  }
+  ensurePcbPreservedOnDisk()
+
   // ══════════════════════════════════════════════════════════════════════════════════════════
   // EARLY DESIGN-LOOP CLOSURE (Increments 2+3 — UNIVERSAL-DESIGN-LOOP-DESIGN.md §3, §7.2/§7.3)
   // ══════════════════════════════════════════════════════════════════════════════════════════
@@ -10530,6 +10562,9 @@ async function main() {
       }
 
       writeFileSync(statePath, JSON.stringify(stPcb))
+      // Durable PCB authority — survives nested-chain state.json races that null pcb.
+      writePcbSidecar(stPcb.pcb)
+      ensurePcbPreservedOnDisk()
 
       // ── PHASE D STEP 3 — honest-failure GATE (2026-07-12): fires ONLY when the
       // design's own disposition required a bespoke board but the pipeline did not
@@ -10541,7 +10576,11 @@ async function main() {
       const gateMode = pcbGateEnforceModeFromEnv(process.env.PCB_GATE_ENFORCING)
       const onDiskForGate = JSON.parse(readFileSync(statePath, 'utf8'))
       onDiskForGate.pcbGate = { ...gateResult, mode: gateMode }
+      // GOTCHA: gate write must not drop pcb if a racing process nulled it mid-flight.
+      if (!onDiskForGate.pcb && stPcb.pcb) onDiskForGate.pcb = stPcb.pcb
       writeFileSync(statePath, JSON.stringify(onDiskForGate))
+      writePcbSidecar(onDiskForGate.pcb ?? stPcb.pcb)
+      ensurePcbPreservedOnDisk()
       if (gateResult.applicable) {
         console.error(
           `[chain] PCB GATE (${gateMode}): applicable=true fires=${gateResult.fires} reason=${gateResult.reason}` +
