@@ -1003,6 +1003,15 @@ def _is_grid_electrical_origin(name: str) -> bool:
     ))
 
 
+def _is_filler_pad_controller(name: str) -> bool:
+    """INTENT (P6 / cell-cycler cold-v17): Phase-2 'HMI Filler N' / 'Filler N' /
+    '… Subcomponent N' placeholders are not real controllers. Universal noun key."""
+    return bool(re.search(
+        r"\bhmi\s+filler\b|\bfiller\s+\d+\b|\bsubcomponent\s*\d+\b",
+        (name or "").lower(),
+    ))
+
+
 def _is_non_fluid_boundary_noun(name: str) -> bool:
     """INTENT (cell-cycler cold-v15 Connection-trace / P1 dry-instrument): sink/origin
     keywords fire on ELECTRICAL discharge and AIR exhaust nouns that are NOT process-
@@ -2493,7 +2502,12 @@ def main() -> int:
             # 'controls' edge false-orphans it on every compact product whose comms
             # ride the control bus (2026-07-11 run 59, X-141 SCADA Gateway).
             _is_net_edge = bool(re.search(r"gateway|telemetry|remote\s+monitor|router|modem", name_l, re.I))
-            if not has_any and not _is_net_edge:
+            # INTENT (P6 floor-9 / cell-cycler cold-v17): Phase-2 "HMI Filler N"
+            # / "Filler N" placeholders are not real controllers — flagging them
+            # as orphan_controller demotes Interconnect + Connection-trace while
+            # the sizing pass drops them. Skip here so freshen-scorer (ledger
+            # only) cannot re-floor on a word the BoM cleanup already rejects.
+            if not has_any and not _is_net_edge and not _is_filler_pad_controller(name_l):
                 connectivity_concerns.append({
                     "tag": tag, "name": e["name"], "type": etype,
                     "issue": "orphan_controller",
@@ -2895,6 +2909,18 @@ def _selftest() -> int:
     if _passive_boundary_concern("Effluent Discharge Header", has_in=False, has_out=False) is None:
         print("  FAIL passive-boundary: wet-plant effluent discharge with no out must "
               "still raise missing_output")
+        bad += 1
+
+    # P6 filler-pad controllers (cell-cycler cold-v17 Interconnect/Connection-trace):
+    # "HMI Filler 2" must NOT count as an orphan_controller candidate.
+    for _fp in ("HMI Filler 2", "Filler 3", "Energy Storage Source Subcomponent 1"):
+        if not _is_filler_pad_controller(_fp):
+            print(f"  FAIL filler-pad: '{_fp}' must be recognised as padding "
+                  f"(not a real orphan_controller)")
+            bad += 1
+    if _is_filler_pad_controller("Touchscreen HMI Controller"):
+        print("  FAIL filler-pad: real 'Touchscreen HMI Controller' must NOT be "
+              "swallowed as padding")
         bad += 1
 
     # DC-DC regulation-board absorption (organoid r11 Interconnect 0/10, 2026-07-26):

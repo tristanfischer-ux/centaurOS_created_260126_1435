@@ -797,8 +797,51 @@ function run() {
     }
   }
 
+  // P6 (cell-cycler cold-v17): Phase-2 "HMI Filler N" / "… Subcomponent N"
+  // placeholders must drop under dedupeAndStrip — they otherwise orphan_controller
+  // demote Interconnect + Connection-trace.
+  {
+    const padMods = [{
+      id: 'm',
+      sub_modules: [{
+        id: 'sm',
+        words: [
+          {
+            id: 'hmi_filler_2',
+            name_human: 'HMI Filler 2',
+            content_character: { character_id: 'hmi_filler', name_human: 'HMI Filler 2' },
+            modifier_characters: [{ kind: 'part_number', value: 'TBD' }],
+          },
+          {
+            id: 'real_hmi',
+            name_human: 'Touchscreen HMI Controller',
+            content_character: { character_id: 'hmi', name_human: 'Touchscreen HMI Controller' },
+            modifier_characters: [{ kind: 'part_number', value: 'DSP-320240' }],
+          },
+          {
+            id: 'subc_1',
+            name_human: 'Energy Storage Source Subcomponent 1',
+            content_character: { character_id: 'subc', name_human: 'Energy Storage Source Subcomponent 1' },
+            modifier_characters: [{ kind: 'part_number', value: 'TBD' }],
+          },
+        ],
+      }],
+    }]
+    applyUniversalContractSizing(padMods as never[], { quantities: {} } as any, {
+      synthesizeMissing: false, dedupeAndStrip: true, explode: false, instrument: false,
+    })
+    const names = (padMods[0].sub_modules[0].words as { name_human?: string }[])
+      .map((w) => w.name_human ?? '')
+    if (names.some((n) => /hmi\s+filler|subcomponent\s*\d+/i.test(n))) {
+      throw new Error(`padding-drop: HMI Filler / Subcomponent N must be stripped (got ${JSON.stringify(names)})`)
+    }
+    if (!names.some((n) => /touchscreen\s+hmi/i.test(n))) {
+      throw new Error('padding-drop: real Touchscreen HMI Controller must be kept')
+    }
+  }
+
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated LT BANDED by standard range (codema v61): one line per range band with the smallest standard range ≥ each vessel, ≥-tallest kept per band, count conserved, uniform set = 1 line, above-ladder band flagged at a ≥-height custom range, contract-ranged PT never splits; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied; heatsink sub-1 m² area projects nonzero from tool area)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated LT BANDED by standard range (codema v61): one line per range band with the smallest standard range ≥ each vessel, ≥-tallest kept per band, count conserved, uniform set = 1 line, above-ladder band flagged at a ≥-height custom range, contract-ranged PT never splits; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied; heatsink sub-1 m² area projects nonzero from tool area; HMI Filler / Subcomponent padding drop)')
 }
 
 run()

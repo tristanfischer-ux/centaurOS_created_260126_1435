@@ -1133,7 +1133,10 @@ const ZONED_NETWORK_PRINCIPAL_RE = /(^|_)distribution_manifold$/i
 // part. The plausibility name-honesty check floors Overview/Checks on it.
 // Drop numbered "… Subcomponent N" placeholders with the same padding rule
 // (only when isPlaceholder — a real MPN on a oddly-named line is kept).
-const PADDING_RE = /mounting\s+(bracket|hardware)|fastener\s+set|wiring\s+harness|gasket\s+seal|access\s+panel|service\s+connector|diagnostic\s+port|labelling\s+set|lifting\s+(point|lug)|\b(primary|secondary)\s+assembly\b|\bsubcomponent\s*\d+\b|\binstrumentation\s+subc\b/i
+// INTENT (P6 / cold-v17 Connection+Interconnect): Phase-2 also mints
+// "HMI Filler 2" / "Filler N" control placeholders — they survive as
+// orphan_controller and demote Interconnect to 0. Same padding family.
+const PADDING_RE = /mounting\s+(bracket|hardware)|fastener\s+set|wiring\s+harness|gasket\s+seal|access\s+panel|service\s+connector|diagnostic\s+port|labelling\s+set|lifting\s+(point|lug)|\b(primary|secondary)\s+assembly\b|\bsubcomponent\s*\d+\b|\binstrumentation\s+subc\b|\bhmi\s+filler\b|\bfiller\s+\d+\b/i
 // Generic head-nouns that must NOT trigger a duplicate-drop (every pump/tank shares
 // them); dedup fires only on a SPECIFIC shared stem (filt, degas, biofi…).
 const DEDUP_GENERIC_STOP = new Set(['pump', 'tank', 'unit', 'syst', 'modu', 'pane', 'devi', 'asse'])

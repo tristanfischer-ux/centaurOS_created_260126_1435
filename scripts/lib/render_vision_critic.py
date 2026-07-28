@@ -451,6 +451,21 @@ def _is_bench_power_instrument_mode(image_path: str) -> bool:
         product_class=pc, part_blob=blob, is_instrument=is_inst,
     ):
         return True
+    # GOTCHA: consumer_electronics fallthrough is NOT in LAB_ELECTRONICS_CLASS_RE,
+    # but Blender already wrote form-meshes.json as lab_electronics /
+    # bench_power_instrument. Trust that form family so vision cannot optical-
+    # false-fail a correct channel-bay hero when part_blob is temporarily thin.
+    try:
+        run_dir = os.path.dirname(os.path.abspath(image_path))
+        fm_path = os.path.join(run_dir, "form-meshes.json")
+        if os.path.isfile(fm_path):
+            with open(fm_path, encoding="utf-8") as fh:
+                fm = json.load(fh)
+            form = str((fm or {}).get("form") or (fm or {}).get("form_id") or "").lower()
+            if form in ("bench_power_instrument", "lab_electronics"):
+                return True
+    except Exception:  # noqa: BLE001
+        pass
     return False
 
 
@@ -1104,6 +1119,24 @@ def _selftest() -> int:
             fails.append("BENCH-POWER MODE: colorimeter state must NOT select bench-power")
         if _prompt_for_image(_bp_img) is not _INSTRUMENT_PROMPT:
             fails.append("BENCH-POWER ROUTING: colorimeter must keep optical _INSTRUMENT_PROMPT")
+        # form-meshes.json family wins when class is consumer_electronics fallthrough
+        # and part_blob is empty (Blender already classified lab_electronics).
+        _fm_state = {
+            "isInstrumentDevice": True,
+            "parsedBrief": {"product_class": "consumer_electronics"},
+            "orchestratorContract": {"product_class": "consumer_electronics"},
+            "moduleDecomposition": {"product_class": "consumer_electronics", "modules": []},
+        }
+        with open(os.path.join(_td_bp, "state.json"), "w", encoding="utf-8") as fh:
+            json.dump(_fm_state, fh)
+        with open(os.path.join(_td_bp, "form-meshes.json"), "w", encoding="utf-8") as fh:
+            json.dump({"form": "lab_electronics", "form_id": "lab_electronics", "meshes": []}, fh)
+        if not _is_bench_power_instrument_mode(_bp_img):
+            fails.append("BENCH-POWER MODE: form-meshes lab_electronics must select "
+                         "bench-power mode even with empty part_blob")
+        if _prompt_for_image(_bp_img) is not _BENCH_POWER_INSTRUMENT_PROMPT:
+            fails.append("BENCH-POWER ROUTING: form-meshes lab_electronics must route "
+                         "to _BENCH_POWER_INSTRUMENT_PROMPT")
     finally:
         import shutil as _sh
         _sh.rmtree(_td_bp, ignore_errors=True)
