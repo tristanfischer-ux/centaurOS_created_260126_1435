@@ -64,6 +64,9 @@ import { homedir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { runEmitterCompletenessGate } from './emitter-completeness-gate'
 import { callFastExtract, GROK_4_3, GEMINI_3_1_FLASH_LITE } from './openrouter-models'
+import { lookupCached } from './distributors/db-only-cascade'
+import { classifyFunction } from './pcb/atopile-generator'
+import { resolveVerifiedFunctionCandidate } from './pcb/pcb-verified-candidates'
 
 // ── Embedding (text-embedding-3-small, 1536-d, Float32LE BLOB) ───────────────
 // MUST match the read side (Stage 17.6 cosine RAG) + the other write paths
@@ -222,6 +225,10 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   'mosfet', 'battery', 'cell', 'pump', 'valve', 'fan', 'gps', 'imu', 'gyro',
   'accelerometer', 'magnetometer', 'altimeter', 'camera', 'lidar', 'sonar', 'encoder',
   'amplifier', 'oscillator', 'led', 'display', 'gimbal', 'bearing', 'gearbox',
+  // P3 floor-9: channel electronics nouns (AFE / shunt / NTC) are bought catalogue
+  // parts — without these tokens "Precision Afe" / "Current Shunt Measurement" never
+  // reach fillBlank (structural skip) even when Yuri verified candidates exist.
+  'afe', 'shunt', 'thermistor', 'ntc',
   'coupling', 'compressor', 'chiller', 'heater', 'thermocouple', 'solenoid',
   // LEXICON (2026-07-21, organoid-bioreactor H10 mispin-resolve): a PCB mounting
   // STANDOFF is a purchased Würth/Keystone fastener (970060354), not a fabricated
@@ -1225,6 +1232,10 @@ const HEAD_NOUN_SYNONYMS: Record<string, string[]> = {
   transducer: ['sensor'],
   thermistor: ['sensor'],
   probe: ['sensor'],
+  // Channel AFE head noun ↔ catalogue op-amp family (Yuri / Rodeostat TL072 rows).
+  afe: ['amplifier', 'opamp', 'op'],
+  amplifier: ['afe', 'opamp'],
+  shunt: ['resistor'],
 }
 
 /** Does the candidate hay contain the word's HEAD NOUN (fold- and
@@ -2598,6 +2609,53 @@ export async function fillBlankWordMpns(
           )
         }
         continue
+      }
+
+      // YURI VERIFIED-CANDIDATE BRIDGE (P3 floor-9): when classifyFunction maps the
+      // word's character_id to a curated role (channel AFE / shunt / MOSFET / …)
+      // AND the cascade cache confirms the identity, pin that MPN before loose
+      // dbFirstLookup. Closes the cold-v15 disease where PCB arch already knew
+      // IRLB3813 / TL072 but BoM fillBlank never consulted the verified table.
+      // Universal — function/role keyed, never a product-class branch.
+      {
+        const characterId = String(
+          cand.word.content_character?.character_id
+          || cand.word.id
+          || '',
+        )
+        const fnClass = characterId ? classifyFunction(characterId) : null
+        if (fnClass) {
+          const verified = resolveVerifiedFunctionCandidate(
+            {
+              wordId: String(cand.word.id ?? characterId),
+              nameHuman: cand.name,
+              characterId,
+              functionClass: fnClass,
+            },
+            lookupCached,
+          )
+          if (verified) {
+            // GOTCHA: do NOT exclusive-assign verified MPNs across roles — AFE and
+            // Kelvin sense may both resolve TL072 (same Yuri identity, two BoM lines).
+            setWordMpn(cand.word, verified.manufacturer, verified.partNumber, 'db')
+            cand.word.source_detail =
+              `Discover-on-miss: verified PCB candidate (${verified.compatibleFunctionClass}) — ${verified.provenance.slice(0, 180)}`
+            mutated = true
+            filled.push({
+              module_id: cand.moduleId,
+              sub_module_id: cand.subId,
+              source: 'db',
+              manufacturer: verified.manufacturer,
+              part_number: verified.partNumber,
+              name: cand.name,
+            })
+            log(
+              `[fill-blank-mpn]   ✓ VERIFIED ${cand.moduleId}::${cand.subId} (${cand.name}) → ` +
+              `${verified.manufacturer} ${verified.partNumber} [${fnClass}]`,
+            )
+            continue
+          }
+        }
       }
 
       // 1. DB-FIRST — cache-real structured MPN (gate-20-safe). Per-word matching

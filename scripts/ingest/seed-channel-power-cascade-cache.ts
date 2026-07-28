@@ -1,9 +1,10 @@
 /**
- * @file Seed forge-truth cascade cache for channel power-stage PCB identities.
- * @description Verified-candidate promotion requires a DB hit. IRLB3813PBF is
- * evidenced by frozen NinjaPCR + Infineon datasheet and already lives in
- * pretraining_extracted_parts — seed distributor_cascade_cache so identity
- * resolution can close without a live distributor call (chain stays DB-only).
+ * @file Seed forge-truth cascade cache for channel electronics PCB identities.
+ * @description Verified-candidate promotion requires a DB hit. Channel MOSFET /
+ * AFE / shunt / thermistor identities are evidenced by frozen Yuri boards +
+ * manufacturer datasheets — seed distributor_cascade_cache so identity
+ * resolution and fillBlank can close without a live distributor call (chain
+ * stays DB-only).
  *
  * Run: npx tsx scripts/ingest/seed-channel-power-cascade-cache.ts
  */
@@ -16,12 +17,27 @@ const SEEDS: ReadonlyArray<{ manufacturer: string; partNumber: string; note: str
   {
     manufacturer: 'Infineon Technologies',
     partNumber: 'IRLB3813PBF',
-    note: 'channel / TEC low-side power MOSFET (TO-220AB)',
+    note: 'Power MOSFET N-channel 30 V TO-220AB — channel / TEC low-side switch',
+  },
+  {
+    manufacturer: 'STMicroelectronics',
+    partNumber: 'TL072CDT',
+    note: 'Dual low-noise JFET-input operational amplifier SO-8 — channel precision AFE',
+  },
+  {
+    manufacturer: 'Vishay Dale',
+    partNumber: 'WSL2512R0100FEA',
+    note: '10 mOhm 1% metal-strip current-sense resistor 2512 — channel shunt',
+  },
+  {
+    manufacturer: 'Murata Electronics',
+    partNumber: 'NCP15XH103F03RC',
+    note: '10 kOhm NTC thermistor 0402 — channel cell temperature sense',
   },
 ]
 
 /**
- * @description Upsert channel power-stage MPNs into distributor_cascade_cache.
+ * @description Upsert channel electronics MPNs into distributor_cascade_cache.
  * @param dbPath Path to forge-truth.db
  * @returns Number of rows written (manufacturer + blank-mfr keys).
  */
@@ -49,7 +65,7 @@ export function seedChannelPowerCascadeCache(
         mpn: seed.partNumber,
         manufacturer: seed.manufacturer,
         description: seed.note,
-        priceGBP: [{ qty: 1, unitPriceGbp: 1.2 }],
+        priceGBP: [{ qty: 1, unitPriceGbp: 0.5 }],
         stockUK: 1,
       })
       for (const manufacturer of [seed.manufacturer, '']) {

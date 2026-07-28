@@ -451,6 +451,52 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'Infineon TO-220AB leads 1=Gate, 2=Drain, 3=Source, tab=Drain',
   },
   {
+    // INTENT (P3 floor-9 / Yuri transfer): multi-channel precision AFE + Kelvin
+    // sense are the same op-amp function class as Rodeostat's TIA front-end —
+    // never a DAC op-amp (OP07) and never an OD densify OPA334.
+    roleTest: /precision[_ -]?afe|analog[_ -]?front[_ -]?end|(?:^|[_ -])afe(?:$|[_ -])|kelvin[_ -]?(?:voltage[_ -]?)?sense/i,
+    excludedRoleTest: /current[_ -]?measurement[_ -]?tia|selectable[_ -]?gain[_ -]?tia|opa334|dac[_ -]?output|droplet[_ -]?feedback/i,
+    functionClass: 'op_amp',
+    manufacturer: 'STMicroelectronics',
+    partNumber: 'TL072CDT',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Amplifier_Operational', symbol: 'TL072' },
+    ratings: { voltageV: 36 },
+    packageEvidence: 'ST TL072CDT: dual low-noise JFET-input amplifier in SO-8',
+    referenceEvidence: 'Rodeostat frozen high-current BOM LCSC C6961=TL072CDT (U9 TIA / sense front-end), revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd; universal channel precision AFE',
+    pinoutEvidence: 'ST SO-8 pinout 1=OUT1, 2=IN1-, 3=IN1+, 4=VCC-, 5=IN2+, 6=IN2-, 7=OUT2, 8=VCC+; local KiCad Amplifier_Operational:TL072',
+  },
+  {
+    // INTENT: channel current shunt is a low-ohm SMD sense resistor — not the
+    // OD LED series 100 kΩ ballast and not a heater element.
+    roleTest: /current[_ -]?shunt|sense[_ -]?shunt|shunt[_ -]?measurement|shunt[_ -]?resistor/i,
+    excludedRoleTest: /(?:led[_ -]?series|series|feedback|front[_ -]?end[_ -]?feedback)[_ -]?resistor|heater[_ -]?element|cartridge[_ -]?heater/i,
+    functionClass: 'passive_r',
+    manufacturer: 'Vishay Dale',
+    partNumber: 'WSL2512R0100FEA',
+    footprint: { library: 'Resistor_SMD', footprint: 'R_2512_6332Metric' },
+    symbol: { library: 'Device', symbol: 'R' },
+    ratings: { voltageV: 5, currentA: 10 },
+    packageEvidence: 'Vishay WSL2512R0100FEA: 10 mΩ 1% 1 W metal-strip current-sense in 2512',
+    referenceEvidence: 'Vishay WSL2512 datasheet; universal channel current-shunt measurement role (Yuri transfer — function-keyed, not product-named)',
+    pinoutEvidence: 'two-terminal 2512; local KiCad Device:R with Resistor_SMD:R_2512_6332Metric',
+  },
+  {
+    // INTENT: cell bay NTC is a 10 kΩ thermistor passive — not TMP1075 digital IC
+    // (that stays on culture_temperature_sensor). classifyFunction → passive_r.
+    roleTest: /cell[_ -]?thermistor|thermistor[_ -]?input|(?:^|[_ -])ntc(?:$|[_ -])/i,
+    excludedRoleTest: /(?:culture[_ -]?)?temperature[_ -]?(?:sensor|probe|ic)|tmp1075/i,
+    functionClass: 'passive_r',
+    manufacturer: 'Murata Electronics',
+    partNumber: 'NCP15XH103F03RC',
+    footprint: { library: 'Resistor_SMD', footprint: 'R_0402_1005Metric' },
+    symbol: { library: 'Device', symbol: 'R_NTC' },
+    ratings: { voltageV: 5 },
+    packageEvidence: 'Murata NCP15XH103F03RC: 10 kΩ ±1% NTC thermistor in 0402',
+    referenceEvidence: 'Murata NCP15XH103F03RC product data; universal per-channel cell thermistor input',
+    pinoutEvidence: 'two-terminal 0402 NTC; local KiCad Device:R_NTC with Resistor_SMD:R_0402_1005Metric',
+  },
+  {
     // DECISION: Do not match bare dc_dc_regulator_word — that role is owned by
     // MCP1700 for ≤6 V instrument rails. CJT1117 only matches gold NinjaPCR
     // 12 V→3.3 V / CJT / ESP-WROOM evidence so the two LDOs cannot steal each other.

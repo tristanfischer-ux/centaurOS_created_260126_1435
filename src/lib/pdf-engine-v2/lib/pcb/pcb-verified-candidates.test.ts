@@ -741,4 +741,82 @@ describe('verified function-keyed PCB candidates', () => {
       lookup,
     )).toBeNull()
   })
+
+  it('proveCatch: channel AFE / shunt / thermistor resolve Yuri identities (P3 floor-9)', () => {
+    const byMpn: Record<string, { mpn: string; manufacturer: string }> = {
+      TL072CDT: { mpn: 'TL072CDT', manufacturer: 'STMicroelectronics' },
+      WSL2512R0100FEA: { mpn: 'WSL2512R0100FEA', manufacturer: 'Vishay Dale' },
+      NCP15XH103F03RC: { mpn: 'NCP15XH103F03RC', manufacturer: 'Murata Electronics' },
+    }
+    const lookup = (_mfr: string | null, mpn: string): DbCascadeResult => {
+      const hit = byMpn[mpn]
+      if (!hit) {
+        return { found: false, result: null, source: 'unknown', ageHours: null }
+      }
+      return {
+        ...CACHE_HIT,
+        result: {
+          ...CACHE_HIT.result!,
+          mpn: hit.mpn,
+          manufacturer: hit.manufacturer,
+          description: hit.mpn,
+        },
+      }
+    }
+
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'afe_w',
+        nameHuman: 'Per Channel Precision Afe',
+        characterId: 'per_channel_precision_afe',
+        functionClass: 'op_amp',
+      },
+      lookup,
+    )).toMatchObject({ partNumber: 'TL072CDT', compatibleFunctionClass: 'op_amp' })
+
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'shunt_w',
+        nameHuman: 'Per Channel Current Shunt Measurement',
+        characterId: 'per_channel_current_shunt_measurement',
+        functionClass: 'passive_r',
+      },
+      lookup,
+    )).toMatchObject({ partNumber: 'WSL2512R0100FEA', compatibleFunctionClass: 'passive_r' })
+
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'ntc_w',
+        nameHuman: 'Per Channel Cell Thermistor Input',
+        characterId: 'per_channel_cell_thermistor_input',
+        functionClass: 'passive_r',
+      },
+      lookup,
+    )).toMatchObject({ partNumber: 'NCP15XH103F03RC', compatibleFunctionClass: 'passive_r' })
+
+    // Wrong-voltage reject on identity path (MOSFET rated 30 V vs required 60 V).
+    const root = mkdtempSync(join(tmpdir(), 'pcb-verified-vrate-'))
+    roots.push(root)
+    expect(resolveVerifiedComponentIdentity(
+      {
+        wordId: 'fet_w',
+        nameHuman: 'Discharge Load MOSFET',
+        characterId: 'per_channel_discharge_load_mosfet',
+        functionClass: 'power_mosfet',
+        requiredRatings: { voltageV: 60 },
+      },
+      () => ({
+        ...CACHE_HIT,
+        result: {
+          ...CACHE_HIT.result!,
+          mpn: 'IRLB3813PBF',
+          manufacturer: 'Infineon Technologies',
+        },
+      }),
+      { symbolsRoot: join(root, 'symbols'), footprintsRoot: join(root, 'footprints') },
+    )).toMatchObject({
+      status: 'unresolved',
+      reason: expect.stringMatching(/below required 60/),
+    })
+  })
 })
