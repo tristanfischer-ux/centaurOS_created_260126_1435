@@ -309,6 +309,49 @@ _LAB_MICROSCOPE_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
+# INTENT (P6 floor-9 / cell-cycler cold-v17): optical _INSTRUMENT_PROMPT
+# false-fails a correct sealed multi-channel SOURCE/SINK / lab-electronics
+# instrument (channel terminal strip, C14, AFE chips, Peltier bay, PCB — form
+# family bench_power_instrument / lab_electronics) as "featureless empty box
+# with NO optical path". There is no optical cube by design. Form gates:
+# ifg.is_bench_power_instrument_form / is_lab_electronics_form.
+_BENCH_POWER_INSTRUMENT_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D render of a "
+    "BENCHTOP MULTI-CHANNEL POWER / MEASUREMENT INSTRUMENT (cell/battery cycler, "
+    "source-measure unit, potentiostat-class lab electronics — NOT a colorimeter, "
+    "NOT a PCR tip-back box, NOT a wall battery, NOT a plant skid).\n\n"
+    "Expect a sealed charcoal / dark polymer bench instrument: L-body or quiet "
+    "rectangular chassis, recessed dark display glass + finger-sized keys on the "
+    "operator deck, a multi-channel CELL BAY or terminal strip (Kelvin / banana / "
+    "fixture contacts — often 4–16 channels), IEC C14 / fused mains inlet and/or "
+    "USB host, rubber feet, and — on cutaways — a main PCB with AFE/shunt/MOSFET "
+    "power stages plus a Peltier / heatsink thermal block under the bay. Status LED "
+    "beside the glass is normal.\n\n"
+    "INTENTIONAL / DO NOT FLAG (correct bench-power / lab-electronics language):\n"
+    "  • missing optical cube / cuvette / beam path / ambient-light LID — those "
+    "belong to colorimeters, not channel power instruments\n"
+    "  • a dense channel terminal strip or fixture bay as the primary sample face\n"
+    "  • pass-bank / MOSFET heatsink fins visible on a cutaway or rear face\n"
+    "  • green FR4 under the UI deck on a cutaway (controller + AFE board)\n"
+    "  • IEC C14 inlet, fuse holder, USB-C — mains/host interconnect\n"
+    "  • missing battery-pack density / inverter stacks / plant pipes\n\n"
+    "Flag broken=true ONLY when any of these are present:\n"
+    "  • blank / empty render (no product visible)\n"
+    "  • a featureless sealed block with NO display, NO keys, NO channel bay/"
+    "terminals, NO mains/USB port, and NO cutaway electronics cues\n"
+    "  • colorimeter optical tower / cuvette well / ambient-light LID wrongly as "
+    "the product face\n"
+    "  • tip-back PCR wood box / sample-block wells wrongly as the product\n"
+    "  • parts floating OUTSIDE the chassis envelope or wildly overlapping\n"
+    "  • plant-room language (access ladders, expansion vessels, industrial EC "
+    "motors as the product)\n"
+    "  • product cropped so small it is unreadable\n"
+    "  • absurd scale (one part dwarfing the whole device unrealistically)\n\n"
+    "A clean sealed multi-channel bench instrument with fascia + bay/terminals + "
+    "mounted electronics must PASS. Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
+)
+
 # INTENT: optical-instrument rubric false-fails a correct PCR thermocycler cutaway
 # (wood box + hinged lid + sample-block wells + PCB) because it demands
 # cuvette/optical-path language. Tip-back-lid PCR form is a DIFFERENT family —
@@ -393,6 +436,24 @@ def _is_thermocycler_mode(image_path: str) -> bool:
     )
 
 
+def _is_bench_power_instrument_mode(image_path: str) -> bool:
+    """True for sealed multi-channel source/sink / lab-electronics — not optical."""
+    st = _load_run_state(image_path)
+    pc = _product_class(image_path)
+    blob = _part_blob_from_state(st)
+    is_inst = bool(st.get("isInstrumentDevice", True))
+    if ifg.is_bench_power_instrument_form(
+        product_class=pc, part_blob=blob, is_instrument=is_inst,
+    ):
+        return True
+    fn = getattr(ifg, "is_lab_electronics_form", None)
+    if callable(fn) and fn(
+        product_class=pc, part_blob=blob, is_instrument=is_inst,
+    ):
+        return True
+    return False
+
+
 def _is_syringe_pump_mode(image_path: str) -> bool:
     """True for OPEN multi-channel linear dosing — uses _SYRINGE_PUMP_PROMPT."""
     st = _load_run_state(image_path)
@@ -448,6 +509,10 @@ def _prompt_for_image(image_path: str) -> str:
         return _THERMOCYCLER_PROMPT
     if _is_lab_microscope_mode(image_path):
         return _LAB_MICROSCOPE_PROMPT
+    # GOTCHA: bench_power / lab_electronics must win before optical _INSTRUMENT —
+    # otherwise "no optical path" falsely breaks a correct channel-bay product.
+    if _is_bench_power_instrument_mode(image_path):
+        return _BENCH_POWER_INSTRUMENT_PROMPT
     if _is_instrument_mode(image_path):
         return _INSTRUMENT_PROMPT
     if _is_product_mode(image_path):
@@ -983,6 +1048,66 @@ def _selftest() -> int:
             import shutil as _sh
             _sh.rmtree(_td, ignore_errors=True)
 
+    # ── BENCH-POWER / LAB-ELECTRONICS rubric routing (P6 floor-9, cold-v17).
+    # Optical _INSTRUMENT_PROMPT false-fails a correct channel-bay cutaway as
+    # "featureless empty box with NO optical path". proveCatch: a sealed
+    # multi-channel SOURCE/SINK state must select _BENCH_POWER_INSTRUMENT_PROMPT
+    # (not optical / PCR / plant), and that rubric must NOT demand an optical cube.
+    _td_bp = _tf.mkdtemp(prefix="rvc_bench_power_")
+    try:
+        _bp_state = {
+            "isInstrumentDevice": True,
+            "parsedBrief": {"product_class": "consumer_electronics"},
+            "orchestratorContract": {"product_class": "consumer_electronics"},
+            "moduleDecomposition": {
+                "product_class": "consumer_electronics",
+                "modules": [{
+                    "sub_modules": [{
+                        "words": [
+                            {"name_human": "8-channel source-sink pass bank"},
+                            {"name_human": "precision AFE current shunt"},
+                            {"name_human": "Peltier cell bay TEC module"},
+                            {"name_human": "IEC C14 mains inlet"},
+                        ],
+                    }],
+                }],
+            },
+        }
+        with open(os.path.join(_td_bp, "state.json"), "w", encoding="utf-8") as fh:
+            json.dump(_bp_state, fh)
+        _bp_img = os.path.join(_td_bp, "00-hero.png")
+        with open(_bp_img, "wb") as fh:
+            fh.write(b"\x89PNG\r\nbench-power-fixture")
+        if not _is_bench_power_instrument_mode(_bp_img):
+            fails.append("BENCH-POWER MODE: cell-cycler channel+AFE+Peltier state "
+                         "must select bench-power / lab-electronics mode")
+        _bp_prompt = _prompt_for_image(_bp_img)
+        if _bp_prompt is not _BENCH_POWER_INSTRUMENT_PROMPT:
+            fails.append("BENCH-POWER ROUTING: _prompt_for_image must return "
+                         "_BENCH_POWER_INSTRUMENT_PROMPT before optical instrument")
+        # Absence of optical path is intentional — must be in DO NOT FLAG, not a PASS demand.
+        if "missing optical cube" not in _bp_prompt.lower():
+            fails.append("BENCH-POWER RUBRIC: must explicitly DO NOT FLAG missing optical cube")
+        _flag_sec = _bp_prompt.split("Flag broken=true")[-1].lower()
+        if "expect" in _flag_sec and "optical cube" in _flag_sec and "wrongly" not in _flag_sec:
+            fails.append("BENCH-POWER RUBRIC: Flag-broken must not require an optical cube")
+        # Optical sealed instrument must keep the colorimeter rubric.
+        _opt_state = {
+            "isInstrumentDevice": True,
+            "parsedBrief": {"product_class": "colorimeter"},
+            "orchestratorContract": {"product_class": "colorimeter"},
+            "moduleDecomposition": {"product_class": "colorimeter", "modules": []},
+        }
+        with open(os.path.join(_td_bp, "state.json"), "w", encoding="utf-8") as fh:
+            json.dump(_opt_state, fh)
+        if _is_bench_power_instrument_mode(_bp_img):
+            fails.append("BENCH-POWER MODE: colorimeter state must NOT select bench-power")
+        if _prompt_for_image(_bp_img) is not _INSTRUMENT_PROMPT:
+            fails.append("BENCH-POWER ROUTING: colorimeter must keep optical _INSTRUMENT_PROMPT")
+    finally:
+        import shutil as _sh
+        _sh.rmtree(_td_bp, ignore_errors=True)
+
     if fails:
         print("render_vision_critic _selftest: FAIL")
         for f in fails:
@@ -990,7 +1115,7 @@ def _selftest() -> int:
         return 1
     print("render_vision_critic _selftest passed "
           f"({len(known_bad)} incoherence-floor catches, 1 no-relax, {len(clean)} clean-pass, "
-          "deliverable-fold + inspect-proxy proveCatch)")
+          "deliverable-fold + inspect-proxy + bench-power-routing proveCatch)")
     return 0
 
 
