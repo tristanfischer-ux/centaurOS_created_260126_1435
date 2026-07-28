@@ -172,9 +172,15 @@ const seriesStackVoltageGate: ArithmeticGate = {
       const mps = mpsRaw === null ? 1 : mpsRaw
       const V = num(dp, 'cell_voltage_v', 'cell_voltage_nominal_v')
       const bus = num(dp, 'string_voltage_nominal_v', 'dc_bus_voltage_v', 'dc_bus_voltage_nominal_v', 'nominal_voltage_v')
-      // Trigger: bus voltage OR cells_per_module declared on a module signals
-      // electrochemical stack topology. Either alone is enough to demand the
-      // series-V arithmetic be verifiable.
+      // INTENT (2026-07-28 Formula E rear MGU): a traction inverter / IPMSM
+      // legitimately carries dc_bus_voltage_v with NO electrochemical cell stack.
+      // Trigger only on battery-topology evidence (cell count / cell voltage),
+      // not bare DC-bus presence — otherwise MGU modules FAIL incomplete for
+      // missing cells_per_module. Incomplete BESS packs still fail when cpm or
+      // cell_voltage is present without the full set.
+      const cellCountHint = num(dp, 'cell_count', 'total_cell_count', 'cells_in_series')
+      const hasBatteryTopology = cpm !== null || V !== null || cellCountHint !== null
+      if (!hasBatteryTopology) continue
       const hasTrigger = bus !== null || cpm !== null
       if (!hasTrigger) continue
       const present: string[] = []

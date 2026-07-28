@@ -375,6 +375,7 @@ import './class-plans/humanoid'
 import './class-plans/dac'
 import './class-plans/co2-mineralisation' // 2026-06-03: on-topic chemical tools; stops the spacecraft/battery auto-plan contamination
 import './class-plans/e-fuel-synthesis'   // 2026-06-05: Power-to-Liquid Fischer-Tropsch SAF plant; on-topic chemical-process tool graph (no marine/irrigation tools — gate 34)
+import './class-plans/formula-e-rear-mgu' // 2026-07-28: Formula E rear MGU+MCU analytical pack (beats vehicle mis-route)
 
 // ===========================================================================
 // 2026-05-22 — 6 satellite/ground-segment EMITTERS — BESS-quality

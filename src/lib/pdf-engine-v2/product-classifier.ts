@@ -69,6 +69,12 @@ const DECLARED_CLASS_SIGNATURES: Array<{ re: RegExp; cls: string }> = [
   // leafy-greens vertical-farm brief never names a "water-handling / fertigation / irrigation
   // plant" as its deliverable, so it falls through to vertical_farm.
   { re: /\b(?:irrigation|fertigation)\s+(?:and\s+\w+\s+)?(?:plant|system|installation)\b|water[\s-]?handling(?:\s+(?:and|,))?|\bwater[\s-]?treatment\s+(?:plant|system)|water[\s-]?purification|(?:reverse[\s-]?osmosis|ebb[\s\/.-]*and[\s\/.-]*flow|ebb[\s\/.-]*flow)[^.]{0,160}(?:fertigation|irrigation|nutrient|storage\s+tank|plant|installation)/, cls: 'water_treatment' },
+  // Formula E rear MGU + MCU (2026-07-28) — manufacturer-perimeter traction
+  // motor-generator + SiC inverter. MUST beat the generic vehicle catch
+  // (`car` / `homologation` / `drivetrain`) which otherwise empties the
+  // contract and skips the MGU/MCU tool pack. Keys on the PRODUCT noun
+  // (rear MGU / motor-generator unit / MGU+MCU), not the race-car context.
+  { re: /formula[\s-]?e.{0,120}(?:rear\s+)?(?:mgu|motor[\s-]?generator)|(?:rear\s+)?motor[\s-]?generator\s+unit|\bformula_e_rear_mgu\b|\bmgu\b.{0,60}\bmcu\b|motor\s+control\s+unit\s*\(inverter\)|manufacturer[\s-]?perimeter\s+rear\s+(?:mgu|motor)/, cls: 'formula_e_rear_mgu' },
 ]
 
 export function classifyProduct(briefText: string): ProductClassification {

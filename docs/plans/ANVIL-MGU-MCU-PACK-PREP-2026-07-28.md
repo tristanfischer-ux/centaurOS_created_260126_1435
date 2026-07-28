@@ -1,6 +1,7 @@
 # Anvil MGU / MCU pack — preparation (2026-07-28)
 
 **Status:** PROMOTED into orchestrator (2026-07-28) — Tier 0 + Tier 1 registered.  
+**Class stub (2026-07-28):** `formula_e_rear_mgu` — classifier declared signature + thin contract + envelope detectors + class plan wiring the 9 tools (beats `vehicle` mis-route).  
 **Staging code (source of truth for physics drafts):** `prototypes/mgu-mcu-pack/`  
 **Live code:** `scripts/lib/orchestrator/tools/*.ts` + `tools/python/*.py` + `register-all.ts` imports.  
 **Pattern:** formula → deterministic Python (`stdin` JSON → `stdout` JSON + `--selftest`) → TS wrapper + `register-all.ts` import (PHANTM recipe).

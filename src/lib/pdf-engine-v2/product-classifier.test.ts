@@ -175,4 +175,17 @@ describe('classifyProduct — edge cases', () => {
       + 'mammalian cell culture for CDMO Phase I supply.'
     expect(classifyProduct(brief).productClass).toBe('bioreactor')
   })
+
+  // INTENT (2026-07-28 Formula E): rear MGU+MCU must beat vehicle (car/homologation).
+  it('classifies Formula E rear MGU+MCU brief as formula_e_rear_mgu (beats vehicle)', () => {
+    const brief = 'Formula E GEN4 Rear Motor-Generator Unit (MGU) + MCU — Anvil Trial Brief. '
+      + 'We are designing a manufacturer-perimeter rear motor-generator unit and its '
+      + 'motor control unit (inverter) for a Formula E GEN4-class race car. Homologation '
+      + 'of one rear MGU/MCU specification per cycle. Product class: formula_e_rear_mgu.'
+    expect(classifyProduct(brief).productClass).toBe('formula_e_rear_mgu')
+  })
+  it('MGU + MCU product nouns classify as formula_e_rear_mgu', () => {
+    expect(classifyProduct('Rear MGU + MCU SiC inverter traction drive unit, not a full vehicle.').productClass)
+      .toBe('formula_e_rear_mgu')
+  })
 })

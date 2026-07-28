@@ -48,7 +48,7 @@ import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constrai
 import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
-import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities, hasOpticalInstrumentToolSignal, hasThermocyclerToolSignal } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities, hasOpticalInstrumentToolSignal, hasThermocyclerToolSignal, hasDedicatedInverterDuty } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal, deriveInstrumentTopology, instrumentRole } from './lib/orchestrator/generic/derive-topology'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
@@ -13666,6 +13666,79 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     wantB('(5) scanner catches "Module Rack"', scanWordTextForIndustrialPowerMarkers('Module Rack').includes('module rack'))
     wantB('(5) scanner does not flag "Power Converter"', scanWordTextForIndustrialPowerMarkers('Power Converter').length === 0)
     wantB('(5) scanner does not flag "Main Controller"', scanWordTextForIndustrialPowerMarkers('Main Controller').length === 0)
+  }
+
+  // (5b) TRACTION MCU / inverter duty — Formula E rear MGU (2026-07-28).
+  // Device-scale by class (not a process plant) BUT selected inverter tools +
+  // Vdc/power mean inverter bridge / DC-link / gate driver / contactor are the
+  // product. Plant chiller still strips. Colorimeter path above must stay flagged.
+  {
+    const mguWords = {
+      energy_conversion_transduction: [
+        mkWord('inverter_bridge_word', 'Inverter Bridge'),
+        mkWord('dc_link_capacitor_word', 'DC Link Capacitor'),
+        mkWord('gate_driver_word', 'Gate Driver'),
+      ],
+      power_distribution: [
+        mkWord('power_contactor_word', 'Power Contactor'),
+      ],
+      control_compute_communication: [
+        // form mentions "gate drivers" — must NOT reclassify the controller
+        {
+          id: 'main_controller_word',
+          name_human: 'Main Controller',
+          content_character: { character_id: 'main_controller', name_human: 'Main Controller' },
+          modifier_characters: [
+            { kind: 'form', value: 'representative mcu control electronics and gate drivers component' },
+          ],
+        },
+      ],
+      environmental_interface: [
+        mkWord('chiller_unit_word', 'Chiller Unit'),
+        mkWord('chiller_unit_word__scroll_compressor', 'Scroll Compressor'),
+      ],
+    }
+    const mguState = {
+      parsedBrief: { product_class: 'formula_e_rear_mgu' },
+      moduleDecomposition: {
+        modules: Object.entries(mguWords).map(([moduleId, words]) => ({
+          module: moduleId,
+          sub_modules: [{ id: `${moduleId}__sub`, words }],
+        })),
+      },
+      toolsUsedPage: {
+        tools: [
+          { tool_id: 'inverter:sic-loss', tool_name: 'SiC inverter loss' },
+          { tool_id: 'inverter:current-voltage-envelope', tool_name: 'Current voltage envelope' },
+          { tool_id: 'motor:ipmsm-analytical-sizing', tool_name: 'IPMSM sizing' },
+        ],
+      },
+      orchestratorContract: {
+        product_class: 'formula_e_rear_mgu',
+        quantities: {
+          dc_bus_voltage_v: { value: 750 },
+          continuous_power_kw: { value: 350 },
+          phase_current_max_a: { value: 450 },
+        },
+      },
+    }
+    wantB('(5b) hasDedicatedInverterDuty true on MGU fixture', hasDedicatedInverterDuty(mguState) === true)
+    const rMgu = computeWordDomainCoherence(mguState)
+    const flaggedMgu = new Set(rMgu.flagged.map((f) => f.word_id))
+    for (const id of ['inverter_bridge_word', 'dc_link_capacitor_word', 'gate_driver_word', 'power_contactor_word', 'main_controller_word']) {
+      wantB(`(5b) keeps MCU word ${id}`, !flaggedMgu.has(id))
+    }
+    wantB('(5b) still flags chiller unit', flaggedMgu.has('chiller_unit_word'))
+    wantB('(5b) still flags scroll compressor', flaggedMgu.has('chiller_unit_word__scroll_compressor'))
+    // Colorimeter must NOT gain inverter-duty exemption (no inverter tools / no Vdc duty)
+    const colorNoDuty = {
+      parsedBrief: { product_class: 'pcb_assembly' },
+      moduleDecomposition: mkBessTemplateDesign(),
+      orchestratorContract: { product_class: 'pcb_assembly', quantities: {} },
+      toolsUsedPage: colorimeterToolsUsedPage,
+    }
+    wantB('(5b) colorimeter still has no inverter duty', hasDedicatedInverterDuty(colorNoDuty) === false)
+    wantB('(5b) colorimeter still flags inverter bridge', computeWordDomainCoherence(colorNoDuty).flagged.some((f) => f.word_id === 'inverter_bridge_word'))
   }
 
   // (6) TOOL-IMPLIED-COMPONENT GROUNDING (the ADD side) — the colorimeter's own

@@ -283,6 +283,14 @@ const CLASS_ALIASES: Record<string, string> = {
   digital_microfluidics: 'digital_microfluidics',
   opendrop: 'digital_microfluidics',
   electrowetting: 'digital_microfluidics',
+  // formula_e_rear_mgu — rear MGU + MCU (2026-07-28). Must alias so
+  // envelope.class stays underscore form (matches tool applicable_to).
+  formula_e_rear_mgu: 'formula_e_rear_mgu',
+  traction_mgu: 'formula_e_rear_mgu',
+  electric_powertrain: 'formula_e_rear_mgu',
+  ev_drive_unit: 'formula_e_rear_mgu',
+  rear_mgu: 'formula_e_rear_mgu',
+  formula_e_mgu: 'formula_e_rear_mgu',
 }
 
 function normaliseClass(raw: string): string | null {
@@ -1034,6 +1042,32 @@ function eBikeFormFactor(_: string | null, c: ParsedConstraints): string {
 }
 function eBikeApplication(_: string | null, _c: ParsedConstraints): string {
   return 'urban_transport'
+}
+
+// formula_e_rear_mgu — rear MGU + MCU (inverter) only -------------
+// INTENT: Keep envelope.class = formula_e_rear_mgu (underscore) so
+// MGU/MCU tools' applicable_to matches. Scale from axle electrical kW.
+function formulaERearMguScaleTier(c: ParsedConstraints): string | null {
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'mgu|mcu|rear|axle|traction|formula')
+    if (viaDesc !== null) kw = viaDesc
+  }
+  // Public GEN4 rear electrical cap is 350 kW — class default when brief omits.
+  if (Number.isNaN(kw)) return 'formula_e_gen4_rear'
+  if (kw <= 150) return 'compact_traction'
+  if (kw <= 350) return 'formula_e_gen4_rear'
+  return 'high_power_traction'
+}
+function formulaERearMguVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
+  if (c.voltage_class_v) return classifyVoltage(c.voltage_class_v)
+  return 'medium' // ~600–1000 Vdc traction bus
+}
+function formulaERearMguFormFactor(_: string | null, _c: ParsedConstraints): string {
+  return 'rear_mgu_mcu_pair'
+}
+function formulaERearMguApplication(_: string | null, _c: ParsedConstraints): string {
+  return 'formula_e_rear_powertrain'
 }
 
 // satellite_cubesat -------------------------------------------
@@ -1922,6 +1956,12 @@ const DETECTORS: Record<string, ClassDetectors> = {
     voltageTier: eBikeVoltageTier,
     formFactor: eBikeFormFactor,
     application: eBikeApplication,
+  },
+  formula_e_rear_mgu: {
+    scaleTier: formulaERearMguScaleTier,
+    voltageTier: formulaERearMguVoltageTier,
+    formFactor: formulaERearMguFormFactor,
+    application: formulaERearMguApplication,
   },
   satellite_cubesat: {
     scaleTier: cubesatScaleTier,

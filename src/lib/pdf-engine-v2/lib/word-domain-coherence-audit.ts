@@ -314,6 +314,50 @@ export function scanWordTextForIndustrialPowerMarkers(text: string): string[] {
   return hits
 }
 
+/**
+ * INTENT (2026-07-28 Formula E rear MGU): INDUSTRIAL_POWER_MARKERS correctly
+ * strip BESS template pollution from a colorimeter — but a traction MCU
+ * (SiC inverter + gate drivers + DC-link) IS industrial power electronics by
+ * product duty. When the run's OWN selected tools + contract quantities show a
+ * dedicated inverter stage, keep the inverter-duty marker subset and still
+ * strip plant-HVAC / pack-storage pollution (chiller, scroll compressor,
+ * storage cell, module rack, …). Tool-backed, never product-name keyed.
+ */
+const DEDICATED_INVERTER_TOOL_RE =
+  /\binverter:(?:current-voltage-envelope|sic-loss|field-weakening-mtpa)\b/
+
+/** Markers that are legitimate on a dedicated inverter / MCU stage. */
+export const INVERTER_DUTY_POWER_MARKERS = new Set<string>([
+  'inverter bridge',
+  'dc link capacitor',
+  'gate driver',
+  'dc busbar',
+  'contactor',
+  'i/o module',
+  'communication gateway',
+])
+
+/**
+ * True when this run selected a dedicated inverter tool AND the contract
+ * carries a positive DC-bus voltage with a power or phase-current duty.
+ * PURE — never throws.
+ */
+export function hasDedicatedInverterDuty(state: any): boolean {
+  const tools = selectedToolIdentities(state)
+  const hasTool = tools.some((id) => DEDICATED_INVERTER_TOOL_RE.test(id))
+  if (!hasTool) return false
+  const q = state?.orchestratorContract?.quantities ?? {}
+  const dcV = Number(q.dc_bus_voltage_v?.value ?? q.v_dc_max_v?.value ?? 0)
+  const powerKw = Number(
+    q.continuous_power_kw?.value
+      ?? q.rear_axle_electrical_power_kw?.value
+      ?? q.rated_power_kw?.value
+      ?? 0,
+  )
+  const phaseA = Number(q.phase_current_max_a?.value ?? q.ac_rms_current_a?.value ?? 0)
+  return dcV > 0 && (powerKw > 0 || phaseA > 0)
+}
+
 // ---------------------------------------------------------------------------
 // The finding shape + the pure compute
 // ---------------------------------------------------------------------------
@@ -371,6 +415,7 @@ export function computeWordDomainCoherence(state: any): WordDomainCoherenceResul
   const isProcessPlant = isProcessPlantClass(productClass)
   const enclosureVolumeM3 = getEnclosureVolumeM3(state)
   const deviceScale = isDeviceScaleDesign(state)
+  const hasInverterDuty = hasDedicatedInverterDuty(state)
 
   const base: WordDomainCoherenceResult = {
     verdict: 'pass',
@@ -408,9 +453,16 @@ export function computeWordDomainCoherence(state: any): WordDomainCoherenceResul
         // LEGITIMATE on every BESS — only strip them from non-BESS devices
         // (colorimeter / pcb_assembly). Process-plant VESSEL markers still strip
         // on wall ESS (no sand-filter underdrain on a Powerwall).
+        //
+        // GOTCHA (2026-07-28 Formula E rear MGU): scan industrial markers against
+        // IDENTITY text only — a controller whose `form` prose mentions "gate
+        // drivers" must not be reclassified as a gate driver. When the run has a
+        // dedicated inverter duty (tools + Vdc + power/current), keep the
+        // inverter-duty marker subset; still strip chiller / pack-storage pollution.
         const industrialHits = isProcessPlant
           ? []
-          : scanWordTextForIndustrialPowerMarkers(text)
+          : scanWordTextForIndustrialPowerMarkers(wordIdentityText(w))
+              .filter((marker) => !(hasInverterDuty && INVERTER_DUTY_POWER_MARKERS.has(marker)))
         if (vesselHits.length === 0 && industrialHits.length === 0) continue
         const [marker, marker_family]: [string, 'process_plant_vessel' | 'industrial_power'] =
           vesselHits.length > 0 ? [vesselHits[0], 'process_plant_vessel'] : [industrialHits[0], 'industrial_power']

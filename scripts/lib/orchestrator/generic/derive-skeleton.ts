@@ -96,6 +96,19 @@ const GENERIC_FLOOR = ['primary_assembly', 'secondary_assembly', 'mounting_hardw
 const THERMAL_COOLING_FLOOR = ['heat_exchanger', 'cooling_fan', 'chiller_unit', 'temperature_sensor', 'air_damper', 'condensate_drain']
 const THERMAL_HEATING_FLOOR = ['heat_pump', 'heat_exchanger', 'circulation_pump', 'temperature_sensor', 'expansion_vessel', 'insulation_jacket']
 const THERMAL_BOTH_FLOOR    = ['heat_exchanger', 'heat_pump', 'chiller_unit', 'cooling_fan', 'temperature_sensor', 'air_damper']
+// INTENT (2026-07-28 Formula E rear MGU): manufacturer-perimeter liquid cold-plate
+// loop interfaces — NOT a packaged refrigeration plant. Selected when the contract
+// seeds coolant flow/inlet + a fluid_loop edge to cold plates.
+const COLD_PLATE_LOOP_FLOOR = [
+  'mgu_cold_plate',
+  'mcu_cold_plate',
+  'coolant_manifold',
+  'coolant_hose_set',
+  'expansion_degas_reservoir',
+  'coolant_temperature_sensor',
+]
+const REFRIGERATION_PLANT_COMPONENT_RE =
+  /chill(?:er)?|scroll[_\s-]?compressor|refriger|evaporator|condenser|expansion[_\s-]?valve|air[_\s-]?damper|packaged[_\s-]?chiller|tube[_\s-]?bundle|shell[_\s-]?and[_\s-]?tube/i
 
 // ── STORAGE-AWARE ENERGY-SOURCE FLOOR (Tristan 2026-06-26 — the water-plant battery contamination) ──
 // The default `energy_storage_source` floor is a fixed BATTERY kit (storage cell + cell module +
@@ -139,8 +152,28 @@ function thermalModeFromContract(contract: ContractInProgress): ThermalMode {
   return 'unknown'
 }
 
+/**
+ * Liquid cold-plate loop interface (MGU/MCU jackets) — not plant HVAC.
+ * PURE: coolant flow + inlet temp quantities AND a fluid_loop topology edge
+ * naming cold plates. Universal — any future traction / high-power electronics
+ * brief that seeds the same signals gets the same floor.
+ */
+export function hasColdPlateLoopInterface(contract: ContractInProgress): boolean {
+  const quantities = contract?.quantities ?? {}
+  const flow = Number((quantities.coolant_flow_l_min as { value?: unknown } | undefined)?.value)
+  const tin = Number((quantities.coolant_inlet_c as { value?: unknown } | undefined)?.value)
+  if (!(Number.isFinite(flow) && flow > 0 && Number.isFinite(tin))) return false
+  const edges = Array.isArray(contract?.topology) ? contract.topology : []
+  return edges.some((e: any) => {
+    if (String(e?.mechanism ?? '') !== 'fluid_loop') return false
+    const blob = `${e?.from_part ?? ''} ${e?.to_part ?? ''}`
+    return /cold[_\s-]?plates?/i.test(blob)
+  })
+}
+
 /** The environmental_interface floor that matches the contract's thermal duty sign. */
 function thermalFloorFor(contract: ContractInProgress): string[] {
+  if (hasColdPlateLoopInterface(contract)) return COLD_PLATE_LOOP_FLOOR
   switch (thermalModeFromContract(contract)) {
     case 'heating': return THERMAL_HEATING_FLOOR
     case 'both': return THERMAL_BOTH_FLOOR
@@ -826,6 +859,8 @@ function thermalFloorForContract(contract: ContractInProgress, brief?: ParsedCon
   // GOTCHA (Pioreactor 0121): net_heating_required_w matches HEATING_DUTY_RE
   // and selected industrial heat_pump. Watt-scale instruments always use TEC.
   if (hasLowPowerLabElectronicsSignal(contract)) return LAB_DEVICE_THERMAL_FLOOR
+  // Cold-plate liquid-loop BEFORE unknown→chiller default (Formula E MGU 2026-07-28).
+  if (hasColdPlateLoopInterface(contract)) return COLD_PLATE_LOOP_FLOOR
   return thermalFloorFor(contract)
 }
 
@@ -955,6 +990,7 @@ function componentsForModule(
   const isBenchPower = hasBenchPowerInstrumentSignal(contract, opts.brief)
   const isLowPowerLabElectronics = !isBenchPower && hasLowPowerLabElectronicsSignal(contract)
   const isBenchtopCulture = hasBenchtopCultureSignal(contract)
+  const isColdPlateLoop = isThermal && hasColdPlateLoopInterface(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -967,8 +1003,12 @@ function componentsForModule(
       && thermalMode === 'heating'
       && !isLowPowerLabElectronics
       && !isBenchPower
+      && !isColdPlateLoop
       && COOLING_COMPONENT_RE.test(c)
     ) return
+    // Cold-plate liquid-loop: never admit packaged refrigeration / HVAC plant parts
+    // (corpus neighbour graphs otherwise inject Daikin HX / condenser / chiller).
+    if (isColdPlateLoop && REFRIGERATION_PLANT_COMPONENT_RE.test(c)) return
     // Thermocycler: never admit plant chillers / LV switchboard vocabulary.
     if (isThermocycler && THERMOCYCLER_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Syringe-pump: never admit plant circulation / ladder / membrane vocabulary.

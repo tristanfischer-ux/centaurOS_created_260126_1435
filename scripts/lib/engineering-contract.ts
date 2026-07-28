@@ -592,6 +592,15 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   irrigation_system: 'water_treatment',
   water_purification: 'water_treatment',
   reverse_osmosis_plant: 'water_treatment',
+  // formula_e_rear_mgu — rear MGU + MCU (inverter) only (2026-07-28).
+  // Beats vehicle mis-route; seeds traction powertrain quantities for the
+  // MGU/MCU analytical tool pack. Not a full race-car archetype.
+  formula_e_rear_mgu: 'formula_e_rear_mgu',
+  traction_mgu: 'formula_e_rear_mgu',
+  electric_powertrain: 'formula_e_rear_mgu',
+  ev_drive_unit: 'formula_e_rear_mgu',
+  rear_mgu: 'formula_e_rear_mgu',
+  formula_e_mgu: 'formula_e_rear_mgu',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -16097,6 +16106,166 @@ export function seedBriefHardScalarMetrics(
 
   return contract
 }
+
+// ---------------------------------------------------------------------------
+// formula_e_rear_mgu — rear MGU + MCU (SiC inverter) only (2026-07-28)
+// INTENT: Seed public GEN4 outer-box + trial assumptions so the MGU/MCU
+// analytical tool pack has HARD inputs. Not a full race-car archetype —
+// front MGU, chassis, and battery pack are out of perimeter.
+// ---------------------------------------------------------------------------
+registerArchetype('formula_e_rear_mgu', (brief: any) => {
+  const desc = String(brief?.product_description ?? brief?.original_text ?? '')
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kW').toLowerCase()
+
+  // Rear axle electrical power cap (DC-bus flow) — public GEN4 ≤350 kW rear.
+  const rearAxleKw = (() => {
+    const m = desc.match(/(?:≤|<=|max(?:imum)?|up\s+to)\s*(\d{2,4})\s*kW\s+rear/i)
+      ?? desc.match(/(\d{2,4})\s*kW\s+rear/i)
+    if (m) return Math.min(350, parseFloat(m[1]))
+    if (Number(tp.value ?? 0) > 0 && (u === 'kw' || u === 'kilowatt' || u === 'kilowatts')) {
+      return Math.min(350, Number(tp.value))
+    }
+    return 350
+  })()
+
+  const vDcMin = extractRangeFromDesc(desc, /(?:dc\s*bus|vdc).{0,40}?(\d{3})\s*-?\s*(\d{3})?\s*V/i, 600)
+  const vDcMaxMatch = desc.match(/(?:600|650)\s*[-–]\s*(\d{3})\s*V/i)
+  const vDcMax = vDcMaxMatch ? parseFloat(vDcMaxMatch[1]) : extractRangeFromDesc(desc, /(?:absolute|vehicle)\s+max(?:imum)?\s+(\d{3,4})\s*V/i, 900)
+  const vDcNom = (vDcMin + Math.min(vDcMax, 1000)) / 2
+  // DECISION (2026-07-28 SOL overnight): peak electrical cap stays 350 kW; continuous
+  // design duty for loss tools is a trial assumption 250 kW. Phase current must close
+  // P ≈ √3 · V_ac · I_ph at Vdc,min — with V_ac≈Vdc/√2, I_ph ≈ 350e3/(√3·600/√2) ≈ 528 A.
+  // Default 530 Arms (was 450 — envelope tool only reached ~298 kW at 600 V).
+  const continuousKw = Math.min(rearAxleKw, 250)
+  const phaseCurrentNeededA = Math.ceil(
+    (rearAxleKw * 1000) / (Math.sqrt(3) * (vDcMin / Math.SQRT2)),
+  )
+  const phaseCurrentMaxA = extractRangeFromDesc(
+    desc,
+    /(\d{2,4})\s*A\s*(?:phase|rms|iph)/i,
+    Math.max(530, phaseCurrentNeededA),
+  )
+  const baseSpeedRpm = extractRangeFromDesc(desc, /(\d{4,5})\s*-?\s*(\d{4,5})?\s*rpm/i, 40000)
+  // Illustrative shaft torque from P = Tω at base speed for the rear electrical cap
+  // with chain η ≈ 0.92 (inv × mgu × gear) → mechanical ~322 kW → T ≈ 77 Nm @ 40 krpm.
+  const omega = baseSpeedRpm * 2 * Math.PI / 60
+  const shaftTorqueNm = extractRangeFromDesc(desc, /(\d{2,3})\s*-?\s*(\d{2,3})?\s*Nm/i,
+    Math.round((rearAxleKw * 1000 * 0.92) / Math.max(omega, 1) * 10) / 10)
+  const gearRatio = extractRangeFromDesc(desc, /gear\s*ratio[^0-9]{0,12}(\d{1,2}(?:\.\d+)?)/i, 8)
+  const wheelRadiusM = 0.33
+  const massCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 35)
+  const coolantInletC = extractRangeFromDesc(desc, /inlet\s+(\d{2})\s*-?\s*(\d{2})?\s*°?\s*C/i, 55)
+  const coolantFlowLMin = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{2})?\s*L\s*\/\s*min/i, 15)
+  const fswKhz = extractRangeFromDesc(desc, /(\d{1,3})\s*kHz/i, 40)
+  const polePairs = 2
+  const airgapBT = 0.9
+  const electricLoading = 60000
+
+  const quantities: Record<string, Quantity> = {
+    rear_axle_electrical_power_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'FIA GEN4-class rear DC-bus electrical power-flow cap (public outer box)',
+    }),
+    continuous_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief', {
+      source_detail: 'trial continuous design duty for loss tools (peak remains rear_axle_electrical_power_kw)',
+    }),
+    dc_bus_voltage_v: q(vDcNom, 'V', 'voltage', 'rated', 'system', 'brief', {
+      source_detail: 'mid of assumed usable DC window under race SoC/temp',
+    }),
+    v_dc_min_v: q(vDcMin, 'V', 'voltage', 'min', 'system', 'brief'),
+    v_dc_max_v: q(Math.min(vDcMax, 1000), 'V', 'voltage', 'max', 'system', 'brief', {
+      source_detail: 'usable window; absolute vehicle max 1000 V',
+    }),
+    ac_output_voltage_v: q(Math.round(vDcNom / Math.SQRT2), 'V', 'voltage', 'rated', 'module', 'calculator', {
+      source_detail: '≈ Vdc/√2 modulation headroom proxy for 3-ph bridge',
+    }),
+    phase_current_max_a: q(phaseCurrentMaxA, 'A', 'current', 'peak', 'module', 'brief'),
+    mgu_base_speed_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'rated', 'module', 'brief'),
+    mgu_shaft_torque_nm: q(shaftTorqueNm, 'Nm', 'force', 'rated', 'module', 'calculator', {
+      source_detail: 'P=Tω at base speed with η_chain≈0.92; replace with dyno when available',
+      formula: 'T = P_elec * 0.92 / ω_base',
+      from: ['rear_axle_electrical_power_kw', 'mgu_base_speed_rpm'],
+    }),
+    gear_ratio: q(gearRatio, '', 'dimensionless', 'rated', 'module', 'brief'),
+    wheel_radius_m: q(wheelRadiusM, 'm', 'length', 'rated', 'system', 'brief'),
+    mgu_mcu_mass_cap_kg: q(massCapKg > 0 ? massCapKg : 35, 'kg', 'mass', 'max', 'system', 'brief'),
+    coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief'),
+    coolant_flow_l_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'rated', 'system', 'brief'),
+    switching_frequency_khz: q(fswKhz, 'kHz', 'frequency', 'rated', 'module', 'brief'),
+    pole_pairs: q(polePairs, '', 'dimensionless', 'rated', 'module', 'brief'),
+    airgap_b_t: q(airgapBT, 'T', 'dimensionless', 'rated', 'module', 'brief'),
+    electric_loading_a_per_m: q(electricLoading, 'A/m', 'dimensionless', 'rated', 'module', 'brief'),
+    mosfet_rdson_mohm: q(8, 'mΩ', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'illustrative SiC Rdson — replace with device datasheet',
+    }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'hv_battery_dc_bus',
+      to_part: 'rear_mcu_inverter',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: Math.min(vDcMax, 1000),
+      required_unit: 'V',
+    },
+    {
+      from_part: 'rear_mcu_inverter',
+      to_part: 'rear_mgu_stator',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: phaseCurrentMaxA,
+      required_unit: 'A',
+      required_margin_factor: 1.1,
+    },
+    {
+      from_part: 'coolant_loop',
+      to_part: 'rear_mgu_mcu_cold_plates',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: coolantFlowLMin,
+      required_unit: 'L/min',
+    },
+  ]
+
+  const macros: MacroAssemblyPrice[] = [
+    {
+      word_name: 'rear_mgu_ipmsm',
+      unit_price_gbp: 18000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 18000,
+      source_detail: 'trial order-of-magnitude OEM transfer for high-speed IPMSM MGU (replace with team quote)',
+    },
+    {
+      word_name: 'rear_mcu_sic_inverter',
+      unit_price_gbp: 12000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 12000,
+      source_detail: 'trial order-of-magnitude SiC MCU (replace with team quote)',
+    },
+    {
+      word_name: 'reduction_gear_stage',
+      unit_price_gbp: 4500,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 4500,
+      source_detail: 'trial gear stage within manufacturer perimeter',
+    },
+  ]
+
+  return {
+    product_class: 'formula_e_rear_mgu',
+    brief_summary: `Formula E GEN4-class rear MGU + MCU (SiC inverter) + gear/cooling interfaces — `
+      + `${rearAxleKw} kW rear electrical, ~${shaftTorqueNm} Nm @ ${baseSpeedRpm} rpm base, `
+      + `Vdc ${vDcMin}–${Math.min(vDcMax, 1000)} V. Front MGU and full vehicle out of scope.`,
+    quantities,
+    topology,
+    macro_assembly_prices: macros,
+    closures: [],
+  }
+})
 
 export function buildContractForChain(
   productClass: string,
