@@ -117,28 +117,80 @@ def coil(temp_c: float = 20.0):
     )
 
 
-def mechanics(mass_mg: float, fd_mn: float, step_um: float, f_step_mn: float):
-    """Step time, energy, power, and the magnetic-spring resonance."""
+def mechanics(mass_mg: float, fd_mn: float, step_um: float, f_step_mn: float,
+              pitch_um: float = PITCH_UM):
+    """Step time, energy, power, and the magnetic-spring resonance.
+
+    TWO stiffness models are reported, because they disagree by a factor of six
+    and the difference is not a rounding matter.
+
+    Tony's worksheet uses k = 2.pi.F_d/(S/2) with S the STEP (pitch/3). The
+    standard result for a detent that varies sinusoidally over one tooth PITCH,
+    F(x) = F_d.sin(2.pi.x/pitch), is the derivative at the zero crossing:
+
+        k = dF/dx|_0 = F_d . 2.pi / pitch
+
+    Substituting S/2 = pitch/6 in place of pitch inflates the stiffness by 6x
+    and the resonant frequency by sqrt(6) = 2.45x. The sinusoidal form is the
+    defensible one; Tony's is reported alongside it so the discrepancy is
+    visible rather than silently resolved in our favour. (Caught by the 28 Jul
+    red team.)
+    """
     m = mass_mg * 1e-6
     s = step_um * 1e-6
+    p = pitch_um * 1e-6
     f = f_step_mn * 1e-3
     # ballistic estimate: constant net force over the step, from rest
     t_step = math.sqrt(2 * s / (f / m)) if f > 0 else float("inf")
-    # Tony's stiffness form: k ~ 2*pi*F_d / (S/2)
-    k = 2 * math.pi * (fd_mn * 1e-3) / (s / 2) if s > 0 else 0.0
-    f_res = (1 / (2 * math.pi)) * math.sqrt(k / m) if k > 0 else 0.0
+
+    def res(k):
+        return (1 / (2 * math.pi)) * math.sqrt(k / m) if k > 0 else 0.0
+
+    k_tony = 2 * math.pi * (fd_mn * 1e-3) / (s / 2) if s > 0 else 0.0
+    k_sin = 2 * math.pi * (fd_mn * 1e-3) / p if p > 0 else 0.0
     return dict(step_time_ms=round(t_step * 1e3, 3),
-                stiffness_n_per_m=round(k, 1),
-                f_resonance_hz=round(f_res, 1),
-                margin_over_step_rate=round(f_res / STEPS_PER_S, 1))
+                stiffness_tony_n_per_m=round(k_tony, 1),
+                f_resonance_tony_hz=round(res(k_tony), 1),
+                stiffness_sinusoidal_n_per_m=round(k_sin, 1),
+                f_resonance_sinusoidal_hz=round(res(k_sin), 1),
+                ratio=round(res(k_tony) / res(k_sin), 2) if k_sin else None,
+                # the defensible figure is the sinusoidal one
+                f_resonance_hz=round(res(k_sin), 1),
+                stiffness_n_per_m=round(k_sin, 1),
+                margin_over_step_rate=round(res(k_sin) / STEPS_PER_S, 1))
+
+
+def supply_ceiling(r_ohm: float, supply_v: float = 5.0,
+                   delta_t_k: float = 0.0, alpha: float = 0.00393):
+    """Maximum current the rail can actually deliver, hot as well as cold.
+
+    Copper resistance rises ~0.39 %/K, so a coil that just reaches its target
+    current cold falls below it once it has warmed by even a few kelvin. A
+    design sitting a couple of percent inside the rail has no margin at all —
+    it works on the first pulse of a burst and not on the second.
+    """
+    r_hot = r_ohm * (1 + alpha * delta_t_k)
+    return supply_v / r_hot
 
 
 def pm_options(mmf_required_at: float):
-    """Magnet thickness per material for a required magnetomotive force.
+    """FIRST-PASS SCREEN of magnet materials — explicitly NOT a verdict.
 
-    t = MMF / Hc. The point of the table is that the high-energy materials give
-    an UNBUILDABLY thin slice, so the sensible move is a lower-coercivity
-    material at a thickness a supplier will actually sell.
+    LIMITATION, flagged independently by two seats of the 28 Jul red team and
+    accepted. Comparing H_c x thickness against a coil's ampere-turns is NOT a
+    valid way to rank magnets. The flux a magnet actually drives depends on its
+    LOAD LINE — the external permeance it sees — together with its recoil
+    permeability and the shape of its B-H curve. Two magnets with identical
+    H_c.t can deliver very different flux into the same circuit. This is an
+    order-of-magnitude screen for ruling candidates in or out and nothing more;
+    thickness must finally be chosen from a magnetic-circuit solve with the
+    magnet PRESENT.
+
+    Minimum thicknesses are what each material is realistically SOLD in, which
+    is not what is physically makeable, and they are not generic: 0.30 mm
+    sintered ferrite is a ground ceramic part rather than catalogue plate, and
+    0.20 mm bonded NdFeB means calendered/flexible sheet rather than ordinary
+    moulded stock. Both carry a cost premium.
     """
     mats = [
         ("NdFeB sintered (N42-class)", 900e3, 1.30, 0.30,
@@ -147,12 +199,14 @@ def pm_options(mmf_required_at: float):
          "as thin a problem as NdFeB, but tolerates far more heat"),
         ("Alnico 5", 50e3, 1.25, 0.50,
          "thick enough to handle easily, but low coercivity means it is easy "
-         "to demagnetise in service — the cancel-coil field is a real risk"),
+         "to demagnetise in service — an adjacent coil reverse field is a real risk"),
         ("Sintered ferrite (Sr/Ba)", 250e3, 0.40, 0.30,
-         "Tony's suggestion; cheap, corrosion-proof, sold as thin plate"),
+         "Tony's suggestion; cheap and corrosion-proof, but 0.30 mm is a "
+         "GROUND part, not catalogue plate — and its H_c is close enough to "
+         "the coil reverse field that demagnetisation needs a real check"),
         ("Bonded NdFeB", 600e3, 0.65, 0.20,
-         "compression/injection moulded — thin sections are ROUTINE here, "
-         "which is the real reason to look at it"),
+         "0.20 mm means calendered/flexible sheet rather than ordinary "
+         "moulded stock; thin sections are routine in that form"),
     ]
     rows = []
     for name, hc, br, t_min_mm, note in mats:

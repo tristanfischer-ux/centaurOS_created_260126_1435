@@ -18,6 +18,8 @@ import os
 
 import numpy as np
 
+from tony_v2 import pm_options, supply_ceiling
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
 
@@ -87,6 +89,12 @@ def main():
 
     cu_vol = (c["wire_length_mm"] * 1e-3) * math.pi * (20e-6) ** 2
     dT = e_ohmic / (CU_C_VOL * cu_vol)
+    i_hot = supply_ceiling(r_ohm, SUPPLY_V, dT)
+
+    # The rail ceiling, cold and after one pulse. A design that only just
+    # reaches its target current cold does not reach it at all once warm.
+    i_cold = supply_ceiling(r_ohm, SUPPLY_V, 0.0)
+    margin_pct = (i_cold - i_rec) / i_rec * 100.0
 
     vpat_40 = volts_per_at(c["mean_turn_length_um"], 40)
     vpat_50 = volts_per_at(c["mean_turn_length_um"], 50)
@@ -106,10 +114,13 @@ def main():
       f"the currents in your worksheet (0.30–0.40 A) the actuator produces "
       f"**{rows[0]['force_mn']:.2f}–{rows[2]['force_mn']:.2f} mN**, against your "
       f"own 30 g detent target of **{fd:.1f} mN** — roughly **{fd/rows[2]['force_mn']:.0f}× "
-      f"short**. The shortfall is not the geometry, it is the ampere-turns: "
-      f"70 turns × 0.40 A is 28 A-turns, and you need about "
-      f"{at_needed:.0f}. Everything else follows from that, and there is a "
-      f"clean fix — see §8.")
+      f"short in force**. The shortfall is not the geometry, it is the "
+      f"ampere-turns: 70 turns × 0.40 A is 28 A-turns. Because force goes as "
+      f"the SQUARE of current, that 7× force gap is only a "
+      f"{i_fd/0.40:.1f}× current gap — you need about {70*i_fd:.0f} A-turns "
+      f"to hold the detent and about {at_needed:.0f} to step it at 1.5×. "
+      f"There is a clean fix, but it is now mandatory rather than optional — "
+      f"see §8.")
     A("")
 
     # ---- 0. geometry closure ------------------------------------------
@@ -162,8 +173,16 @@ def main():
     A("")
     A(f"**Peak dL/dx = {rows[0]['peak_dL_dx_h_per_m']:.4f} H/m** in the "
       f"unsaturated region, falling to "
-      f"{min(r['peak_dL_dx_h_per_m'] for r in rows):.4f} H/m as the iron "
-      f"begins to saturate above ~1.2 A.")
+      f"{min(r['peak_dL_dx_h_per_m'] for r in rows):.4f} H/m above ~1.2 A as "
+      f"the iron starts to saturate.")
+    A("")
+    A("Two honest notes on that column, because it can be read wrongly. It is "
+      "a **secant** inductance (flux linkage ÷ current), and its peak over the "
+      "pitch is at a *different position* from the peak force — so ½·i²·dL/dx "
+      "and the tabulated force are not two ways of computing the same number "
+      "and should not be expected to agree exactly. The force column is the "
+      "one to use: it comes from the Maxwell stress tensor, which stays valid "
+      "when the iron saturates, whereas ½·i²·dL/dx does not.")
     A("")
     A("**The three points you asked for are the first three rows, and they are "
       "the problem.** Reading the target back off the curve:")
@@ -180,10 +199,24 @@ def main():
             A(f"| {lbl} ({tgt:.1f} mN) | **{i_:.2f} A** | {v:.2f} V | "
               f"{'yes' if v <= SUPPLY_V else '**no — over the rail**'} |")
     A("")
-    A(f"So the recommended operating point is **≈{i_rec:.2f} A**, not 0.35 A. "
-      f"That is {i_rec/0.35:.1f}× the current in your worksheet, and it lands "
-      f"essentially exactly on the 5 V rail ({i_rec*r_ohm:.2f} V) with 40 µm "
-      f"wire. §8 says how to buy that back.")
+    A(f"So the operating point has to be **≈{i_rec:.2f} A**, not 0.35 A — "
+      f"{i_rec/0.35:.1f}× the current in your worksheet.")
+    A("")
+    A("**And this is where the design currently fails, which is the most "
+      "important thing in this document.** With 40 µm wire the coil is "
+      f"{r_ohm:.2f} Ω, so a 5 V rail can deliver at most "
+      f"**{i_cold:.3f} A** — against the {i_rec:.2f} A needed. That is a "
+      f"margin of {margin_pct:.1f}%.")
+    A("")
+    A(f"Copper resistance rises about 0.39 %/K. The pulse itself puts "
+      f"{dT:.1f} K into the winding (§5), which raises the resistance by about "
+      f"{dT*0.393:.1f}% and drops the achievable current to "
+      f"**{i_hot:.3f} A** — *below* what the step needs. In other words the "
+      f"actuator makes its first step of a burst and then stops making them, "
+      f"and it would do so intermittently and temperature-dependently, which "
+      f"is the worst possible failure to diagnose on a bench.")
+    A("")
+    A("**So thicker wire is not an optimisation, it is a requirement.** §8.")
     A("")
 
     # ---- 3. electrical --------------------------------------------------
@@ -242,16 +275,31 @@ def main():
     mech = num["mechanics"]
     A("## 6. Resonant frequency under the magnetic restoring force")
     A("")
-    A(f"Using your form k ≈ 2π·F_d/(S/2) with F_d = {fd:.1f} mN and "
-      f"S = {t['step_um']:.0f} µm:")
+    A("**A correction here, and it matters by a factor of 2.4.** Your worksheet "
+      "uses k ≈ 2π·F_d/(S/2) with S the step. For a detent that varies "
+      "sinusoidally over one tooth *pitch*, F(x) = F_d·sin(2πx/pitch), the "
+      "small-signal stiffness is the slope at the zero crossing:")
     A("")
-    A(f"- **k ≈ {mech['stiffness_n_per_m']:.0f} N/m**")
-    A(f"- **f_res = (1/2π)·√(k/M_t) ≈ {mech['f_resonance_hz']:.0f} Hz**")
+    A("> k = dF/dx|₀ = 2π·F_d / pitch")
     A("")
-    A(f"That is **{mech['margin_over_step_rate']:.0f}× above** the nominal "
-      f"10 steps/s, so the mechanical resonance is nowhere near the operating "
-      f"rate — comfortable, as you expected. It does mean the settling "
-      f"behaviour is governed by damping rather than by the step rate.")
+    A(f"Putting S/2 = pitch/6 in place of the pitch inflates k by six and the "
+      f"frequency by √6. Both are below:")
+    A("")
+    A("| Model | Stiffness | Resonance |")
+    A("|---|---|---|")
+    A(f"| Your worksheet form, k = 2π·F_d/(S/2) | "
+      f"{mech['stiffness_tony_n_per_m']:.0f} N/m | "
+      f"{mech['f_resonance_tony_hz']:.0f} Hz |")
+    A(f"| **Sinusoidal detent over one pitch** | "
+      f"**{mech['stiffness_sinusoidal_n_per_m']:.0f} N/m** | "
+      f"**{mech['f_resonance_sinusoidal_hz']:.0f} Hz** |")
+    A("")
+    A(f"I would use **{mech['f_resonance_sinusoidal_hz']:.0f} Hz**. Your "
+      f"conclusion is unaffected — it is still "
+      f"{mech['margin_over_step_rate']:.0f}× above the 10 steps/s rate, so "
+      f"resonance is nowhere near the operating point — but the number itself "
+      f"was {mech['ratio']:.1f}× optimistic and it is worth having right "
+      f"before it propagates into a settling or control calculation.")
     A("")
 
     # ---- 7. permanent magnet -------------------------------------------
@@ -271,15 +319,23 @@ def main():
     A("")
     A("| Material | H_c (kA/m) | Thinnest practical stock | MMF it then gives | vs required | Verdict |")
     A("|---|---|---|---|---|---|")
-    from tony_v2 import pm_options
     for r in pm_options(at_needed):
         A(f"| {r['material']} | {r['hc_ka_m']} | "
           f"{r['supplier_min_thickness_mm']:.2f} mm | "
           f"{r['mmf_at_min_thickness_at']:.0f} At | "
           f"{r['ratio_to_required']:.2f}× | {r['verdict']} |")
     A("")
-    A("**This is the useful result: sintered ferrite and bonded NdFeB bracket "
-      "what you need, and the high-energy materials overshoot badly.**")
+    A("**A limitation you should know before using this table.** Comparing "
+      "H_c × thickness against coil ampere-turns is a screen, not a circuit "
+      "analysis. What a magnet actually drives depends on its *load line* — "
+      "the external permeance it sees — and on its recoil permeability. Two "
+      "magnets with the same H_c·t can deliver quite different flux into the "
+      "same circuit. This table is good for ruling candidates in or out by an "
+      "order of magnitude; the final thickness has to come from a solve with "
+      "the magnet actually in the model. That solve is not yet done.")
+    A("")
+    A("With that caveat: **sintered ferrite and bonded NdFeB bracket what you "
+      "need, and the high-energy materials overshoot badly.**")
     A("")
     A("- **Sintered ferrite at 0.30 mm gives about 0.8× the required MMF** — "
       "slightly under, and recoverable by going a little thicker. It is cheap, "
@@ -303,6 +359,17 @@ def main():
     A("2. **I would not use Alnico.** Its coercivity is so low that the "
       "reverse field from an adjacent coil during stepping is a genuine "
       "demagnetisation risk — a slow failure designed in from the start.")
+    A("3. **Ferrite needs the same demagnetisation check, and I have not done "
+      "it yet.** Its coercivity is 250 kA/m, and the reverse field a "
+      "neighbouring coil puts across a 0.3 mm magnet at these ampere-turns is "
+      "the same order. That is close enough that it must be computed rather "
+      "than assumed — it is the one thing that could rule ferrite out, and it "
+      "is exactly the check we built for the previous design.")
+    A("4. **Neither 0.30 mm sintered ferrite nor 0.20 mm bonded NdFeB is "
+      "ordinary catalogue stock.** The first is a ground ceramic part; the "
+      "second means calendered or flexible bonded sheet rather than "
+      "conventional moulded material. Both are obtainable, both carry a price "
+      "premium, and neither should be quoted to a buyer as standard.")
     A("")
 
     # ---- 8. the fix ------------------------------------------------------
@@ -320,18 +387,28 @@ def main():
     A("")
     A(f"At your mean turn of {c['mean_turn_length_um']:.0f} µm:")
     A("")
-    A("| Wire | Volts per ampere-turn | Volts for the required "
-      f"{at_needed:.0f} A-turns |")
-    A("|---|---|---|")
+    A("| Wire | Volts per A-turn | Volts for "
+      f"{at_needed:.0f} A-turns | Turns that fit the 1521 µm window (3 layers) | Current needed |")
+    A("|---|---|---|---|---|")
     for d, v in ((40, vpat_40), (50, vpat_50), (63, vpat_63)):
-        A(f"| {d} µm | {v*1e3:.1f} mV/At | **{v*at_needed:.2f} V** |")
+        od = d * 1.2                       # enamelled OD, grade-2 class
+        fit = int(1521.0 // od) * 3
+        i_need = at_needed / fit if fit else float("nan")
+        A(f"| {d} µm | {v*1e3:.1f} mV/At | **{v*at_needed:.2f} V** | "
+          f"~{fit} | {i_need:.2f} A |")
     A("")
-    A(f"So 40 µm wire puts you right on the edge of the rail with nothing in "
-      f"hand. Going to 50 µm takes the same drive to about "
-      f"{vpat_50*at_needed:.1f} V, and 63 µm to about {vpat_63*at_needed:.1f} V "
-      f"— real margin for temperature, tolerance and the 2× stepping point "
-      f"that 40 µm cannot reach at all. The cost is winding window: fewer "
-      f"turns per layer, so more layers or a longer window.")
+    A(f"So 40 µm puts you on the edge of the rail with nothing in hand — and "
+      f"§2 shows that margin is already negative once the coil warms. 50 µm "
+      f"takes the same drive to about {vpat_50*at_needed:.1f} V and 63 µm to "
+      f"about {vpat_63*at_needed:.1f} V, which is real margin for temperature, "
+      f"tolerance and the 2× stepping point that 40 µm cannot reach at all.")
+    A("")
+    A("The last two columns are the check that is easy to skip: thicker wire "
+      "means fewer turns in the same window, so the *current* has to rise to "
+      "keep the ampere-turns. That is fine — the voltage still falls, which is "
+      "the whole point — but it does mean the driver must be sized for the "
+      "higher current, and the fill factor at these diameters wants "
+      "confirming with whoever winds it rather than assumed from geometry.")
     A("")
     A("Three other levers, in order of how much they buy:")
     A("")
@@ -359,17 +436,25 @@ def main():
     A("")
     A("| Route | Verdict | The governing number |")
     A("|---|---|---|")
-    A("| **Photochemical etch + stack** | **recommended** | minimum feature ≈ "
-      "material thickness. Your 125 µm teeth need foil ≤125 µm; at 100 µm foil "
-      "you need 12 laminations to build 1200 µm. Near-zero edge roll, no "
-      "work-hardening, no anneal-distortion risk from the cutting step. |")
+    A("| **Photochemical etch + stack** | **recommended, but near the process "
+      "edge — not comfortably inside it** | the real rule is minimum slot "
+      "≈1.0–1.5× strip thickness and minimum surviving web ≈1.0× (1.25–1.5× "
+      "for repeatable yield). At 100 µm foil your 187 µm slot is comfortable "
+      "but the 125 µm tooth is right on the limit — expect ±10–20 µm feature "
+      "variation, sidewall taper and root radii unless a supplier demonstrates "
+      "better. 12 laminations build 1200 µm. Still the best route: no edge "
+      "roll, no work hardening. |")
     A("| Fine blanking + stack | viable, cheaper at volume | die roll is 5–20% "
       "of strip thickness, so 5–20 µm on a 100 µm strip. Against a 60 µm gap "
       "that is 8–33% — significant but survivable, and far more forgiving than "
       "it would have been at a 20 µm gap. |")
-    A("| Micro-MIM, one piece | viable, keep as the volume alternative | "
-      "125 µm features and 187 × 280 µm slots (1.5:1 aspect) are inside "
-      "published micro-MIM capability at ±10 µm. No stacking, no registration. |")
+    A("| Micro-MIM, one piece | **downgraded — high risk, not a robust "
+      "recommendation** | I had this as comfortably viable and that was too "
+      "optimistic. A 187 µm-wide slot with a ±10 µm claim is demanding for "
+      "micro-powder-injection moulding once tooling, shrinkage, slot closure, "
+      "distortion and the resulting magnetic properties are all accounted for. "
+      "A specialist micro-PIM house may demonstrate it; treat it as an "
+      "alternative to be proven, not a fallback to be assumed. |")
     A("| Wire EDM | prototype only | it will cut this accurately, but not at "
       "any sensible rate for thousands of parts. |")
     A("")
@@ -378,11 +463,14 @@ def main():
       "which is exactly the thickness band the lamination route wants.")
     A("")
     A("**The real risk is the anneal, not the cutting.** Fe-Co needs a "
-      "magnetic anneal at around 850 °C to develop its properties, and a "
-      "7.6 mm long × 0.84 mm tall part is slender enough to distort. Anneal "
-      "the laminations flat and stack afterwards; do not anneal the assembled "
-      "stack. This is a process-order decision worth fixing early because it "
-      "is expensive to discover late.")
+      "magnetic anneal at around 850 °C to develop its properties (confirmed "
+      "for the 49Fe-49Co-2V class), and a 7.6 mm long × 0.84 mm tall part is "
+      "slender enough to distort. Annealing laminations flat and stacking "
+      "afterwards is the right direction — but it is not a complete answer: "
+      "annealed Fe-Co is brittle, so flat-annealed laminations bring their own "
+      "handling and assembly-stress problems, and any stress applied during "
+      "stacking or bonding partly undoes the anneal you just paid for. This "
+      "needs a process trial, not a decision on paper.")
     A("")
     A("### The pole pieces: the core is easy, the winding is the problem")
     A("")
@@ -410,9 +498,19 @@ def main():
     A("| **Wind on a separate bobbin, assemble the core around it** | same "
       "joint problem, but the winding itself becomes a standard bought-in "
       "operation on standard machinery. Probably the cheapest at volume. |")
-    A("| **Pre-wound self-supporting air coil slipped over a limb** | no "
-      "bobbin, no joint if the limb is open-ended, but self-supporting coils "
-      "at 40 µm need bonded wire and careful handling. |")
+    A("| **Pre-wound self-supporting bonded-wire air coil, core assembled "
+      "around it** — *the realistic production route* | this is what the "
+      "micro-coil industry actually does at this scale, and split-core "
+      "assembly around a pre-wound coil is standard practice rather than a "
+      "workaround. Bondable (self-adhering) wire is a catalogue product. It "
+      "still costs a joint in the flux path, but it puts the winding on "
+      "ordinary machinery instead of demanding shuttle access nobody can give "
+      "you. |")
+    A("")
+    A("Worth noting what is *not* the answer: planar or deposited coils. They "
+      "are possible in principle, but at 70 turns and ampere-level pulse "
+      "current they are unattractive — the copper cross-section you can "
+      "deposit is nowhere near what §8 says you need.")
     A("")
     A("**My recommendation: treat the winding as the thing that drives the "
       "pole-piece design, not the other way round.** Right now the core "
@@ -445,6 +543,50 @@ def main():
     A(f"| Translator manufacturable? | **yes** — etched Fe-Co laminations |")
     A(f"| Pole pieces manufacturable? | **core yes; the winding is the real "
       f"question** |")
+    A("")
+    A("## 10. What a red team changed in this document")
+    A("")
+    A("Before sending, this was attacked by four independent models on four "
+      "different briefs (adversarial physics, numerical audit, internal "
+      "consistency, manufacturing reality). Transcripts are in `out/`. What "
+      "they changed, so you can see what was corrected rather than take the "
+      "result on trust:")
+    A("")
+    A("| Finding | Effect |")
+    A("|---|---|")
+    A("| The 5 V rail leaves ~1.4% current margin, which goes NEGATIVE once "
+      "the coil warms by one pulse | **the most important correction — turned "
+      "thicker wire from a suggestion into a requirement (§2, §8)** |")
+    A("| Your resonance formula inflates stiffness 6× and frequency 2.4× | "
+      "corrected to 387 Hz; conclusion unchanged (§6) |")
+    A("| H_c × thickness is not a valid way to rank magnets — it ignores the "
+      "load line (raised independently by two seats) | magnet table demoted "
+      "from verdict to screen (§7) |")
+    A("| Ferrite's own demagnetisation risk was never checked, though Alnico's "
+      "was | added as an explicit open item (§7) |")
+    A("| Force gap and ampere-turn gap were conflated in one sentence | "
+      "separated — 7× in force is 2.7× in current (headline) |")
+    A("| dL/dx peak and force peak are at different positions, so they are not "
+      "two routes to one number | labelled; force taken from the stress "
+      "tensor only (§2) |")
+    A("| Micro-MIM at a 187 µm slot with ±10 µm was over-optimistic | "
+      "downgraded to prove-it-first (§9) |")
+    A("| Etch limits: minimum slot ≈1–1.5× thickness, web ≈1×, with ±10–20 µm "
+      "real variation | 125 µm tooth is at the edge, not comfortable (§9) |")
+    A("| Pre-wound bonded-wire coil with split-core assembly is what the "
+      "industry actually does | promoted from third option to recommended "
+      "route (§9) |")
+    A("| Quoted magnet stock thicknesses are not generic catalogue items | "
+      "flagged as special order with a price premium (§7) |")
+    A("")
+    A("Two of their objections I did **not** accept. One seat read the "
+      "280 µm core as the total thickness from which slots are cut and "
+      "concluded the geometry was impossible; it is not — core 280 + tooth "
+      "280 + tooth 280 = 840, which is your own L_x. Another argued the "
+      "approximate back iron invalidates the force numbers; at these flux "
+      "densities the two 60 µm air gaps carry essentially all the "
+      "magnetomotive drop and the iron carries under one percent, so the "
+      "approximation is not load-bearing.")
     A("")
     A("---")
     A("")
