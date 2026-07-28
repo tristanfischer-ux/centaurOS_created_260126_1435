@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _worked import worked_calc  # noqa: E402
 
 HARD = ["gear_ratio", "wheel_radius_m", "mgu_speed_rpm"]
 
@@ -30,8 +36,19 @@ def solve(inp: dict) -> dict:
     v_mps = (n_wheel / 60.0) * 2.0 * math.pi * r
     v_kph = v_mps * 3.6
 
+    n_wheel_r = round(n_wheel, 3)
+    worked = []
+    worked.append(worked_calc(
+        label="Wheel speed",
+        formula="n_wheel = n_mgu / g",
+        values={"n_mgu": (n_mgu, "rpm"), "g": (g, "")},
+        result=n_wheel_r,
+        result_unit="rpm",
+        assumptions=["fixed reduction, no clutch slip"],
+    ))
+
     out: dict = {
-        "wheel_speed_rpm": round(n_wheel, 3),
+        "wheel_speed_rpm": n_wheel_r,
         "vehicle_speed_m_s": round(v_mps, 3),
         "vehicle_speed_kph": round(v_kph, 3),
         "gear_efficiency": eta,
@@ -41,8 +58,17 @@ def solve(inp: dict) -> dict:
         t_wheel = t_mgu_f * g * eta
         f_trac = t_wheel / r
         p_shaft = t_mgu_f * (n_mgu * 2.0 * math.pi / 60.0)
+        t_wheel_r = round(t_wheel, 3)
+        worked.append(worked_calc(
+            label="Wheel torque",
+            formula="T_wheel = T_mgu x g x eta",
+            values={"T_mgu": (t_mgu_f, "Nm"), "g": (g, ""), "eta": (eta, "")},
+            result=t_wheel_r,
+            result_unit="Nm",
+            assumptions=["gear efficiency applied on torque path"],
+        ))
         out.update({
-            "wheel_torque_nm": round(t_wheel, 3),
+            "wheel_torque_nm": t_wheel_r,
             "tractive_force_n": round(f_trac, 2),
             "mgu_shaft_power_w": round(p_shaft, 2),
             "wheel_power_w": round(p_shaft * eta, 2),
@@ -59,6 +85,7 @@ def solve(inp: dict) -> dict:
     out["warnings"] = []
     if g > 20:
         out["warnings"].append("gear_ratio >20 — check packaging / mesh speed / reflected inertia")
+    out["worked"] = worked
     return out
 
 
@@ -74,6 +101,7 @@ def _selftest() -> None:
     assert out["vehicle_speed_kph"] > 100
     assert out["wheel_torque_nm"] > out.get("mgu_torque_nm", 0) or True
     assert "suggested_gear_ratio_for_target" in out
+    assert len(out.get("worked") or []) >= 1
     print("gear_ratio_traction selftest OK")
 
 

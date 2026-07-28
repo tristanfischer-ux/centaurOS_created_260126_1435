@@ -12,7 +12,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _worked import worked_calc  # noqa: E402
 
 HARD = []  # either samples or bins required — checked in solve
 
@@ -88,15 +94,30 @@ def solve(inp: dict) -> dict:
     if e_elec_j < 0:
         warnings.append("net electrical energy negative — regen-dominated segment")
 
+    e_elec_j_r = round(e_elec_j, 2)
+    e_kwh_r = round(e_elec_j / 3.6e6, 6)
+    j_per_kwh = 3.6e6
+
+    worked = []
+    worked.append(worked_calc(
+        label="Net electrical energy",
+        formula="E_kWh = E_J / J_per_kWh",
+        values={"E_J": (e_elec_j_r, "J"), "J_per_kWh": (j_per_kwh, "J/kWh")},
+        result=e_kwh_r,
+        result_unit="kWh",
+        assumptions=["1 kWh = 3.6e6 J", "signed: positive = net from DC bus"],
+    ))
+
     return {
-        "net_electrical_energy_j": round(e_elec_j, 2),
-        "net_electrical_energy_kwh": round(e_elec_j / 3.6e6, 6),
+        "net_electrical_energy_j": e_elec_j_r,
+        "net_electrical_energy_kwh": e_kwh_r,
         "shaft_energy_j": round(e_shaft_j, 2),
         "loss_energy_j": round(e_loss_j, 2),
         "motoring_time_s": round(t_mot, 3),
         "regen_time_s": round(t_regen, 3),
         "peak_abs_electrical_power_w": round(p_elec_peak, 2),
         "warnings": warnings,
+        "worked": worked,
     }
 
 
@@ -113,6 +134,7 @@ def _selftest() -> None:
     assert bins["motoring_time_s"] == 10
     assert bins["regen_time_s"] == 5
     assert bins["loss_energy_j"] > 0
+    assert len(bins.get("worked") or []) >= 1
 
     samples = solve({
         "samples": [
@@ -122,6 +144,7 @@ def _selftest() -> None:
         ]
     })
     assert samples["net_electrical_energy_j"] != 0
+    assert len(samples.get("worked") or []) >= 1
     print("duty_cycle_energy selftest OK")
 
 

@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _worked import worked_calc  # noqa: E402
 
 HARD = ["rotor_od_mm", "speed_rpm", "density_kg_m3", "allowable_stress_mpa"]
 
@@ -44,6 +50,7 @@ def solve(inp: dict) -> dict:
         t = float(sleeve_thk_mm) / 1000.0
         sleeve_hoop_mpa = rho * (omega ** 2) * (r ** 2) * (r / max(t, 1e-6)) / 1e6
         _ = sleeve_e_gpa  # reserved for interference-fit extension
+        _ = rs
 
     warnings: list[str] = []
     if margin < 1.5:
@@ -51,16 +58,56 @@ def solve(inp: dict) -> dict:
     if tip > 250:
         warnings.append(f"tip speed {tip:.0f} m/s extreme for most magnet retention systems")
 
+    tip_r = round(tip, 2)
+    sigma_r = round(sigma_mpa, 2)
+    margin_r = round(margin, 3)
+    omega_r = round(omega, 4)
+    r_r = round(r, 6)
+    pa_per_mpa = 1e6
+
+    worked = []
+    worked.append(worked_calc(
+        label="Rotor tip speed",
+        formula="v_tip = omega x r",
+        values={"omega": (omega_r, "rad/s"), "r": (r_r, "m")},
+        result=tip_r,
+        result_unit="m/s",
+        assumptions=["rim radius = rotor OD / 2"],
+    ))
+    # DECISION: omega x omega / r x r (not ^2) so harness arithmetic re-evaluates cleanly
+    worked.append(worked_calc(
+        label="Rim hoop stress (thin ring)",
+        formula="sigma = rho x omega x omega x r x r / pa_per_MPa",
+        values={
+            "rho": (rho, "kg/m3"),
+            "omega": (omega_r, "rad/s"),
+            "r": (r_r, "m"),
+            "pa_per_MPa": (pa_per_mpa, "Pa/MPa"),
+        },
+        result=sigma_r,
+        result_unit="MPa",
+        assumptions=["thin rotating ring σ = ρ ω² r²"],
+    ))
+    worked.append(worked_calc(
+        label="Stress margin vs allowable",
+        formula="margin = allow / sigma",
+        values={"allow": (allow_mpa, "MPa"), "sigma": (sigma_r, "MPa")},
+        result=margin_r,
+        result_unit="",
+        assumptions=["pass criterion typically margin >= 1.5"],
+    ))
+
     return {
-        "tip_speed_m_s": round(tip, 2),
-        "rim_hoop_stress_mpa": round(sigma_mpa, 2),
+        "tip_speed_m_s": tip_r,
+        "rim_hoop_stress_mpa": sigma_r,
         "allowable_stress_mpa": allow_mpa,
-        "stress_margin": round(margin, 3),
+        "stress_margin": margin_r,
         "sleeve_hoop_stress_mpa_estimate": (
             None if sleeve_hoop_mpa is None else round(sleeve_hoop_mpa, 2)
         ),
         "pass": margin >= 1.5,
         "warnings": warnings,
+        "worked": worked,
     }
 
 
@@ -72,6 +119,7 @@ def _selftest() -> None:
         "allowable_stress_mpa": 800.0,
     })
     assert ok["rim_hoop_stress_mpa"] > 0
+    assert len(ok.get("worked") or []) >= 1
     bad = solve({
         "rotor_od_mm": 120.0,
         "speed_rpm": 100000.0,
@@ -79,6 +127,7 @@ def _selftest() -> None:
         "allowable_stress_mpa": 200.0,
     })
     assert bad["pass"] is False
+    assert len(bad.get("worked") or []) >= 1
     print("rotor_centrifugal_stress selftest OK")
 
 

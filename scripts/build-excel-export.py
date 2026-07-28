@@ -2184,6 +2184,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Sense-check": "Independent market benchmark versus the engine's numbers.",
     "Brief": "Original client brief and the engine's structured interpretation.",
     "Verification": "Governing proof spine — brief, physics, realisation, holds.",
+    "Decision Register": "Durable owned engineering decisions, evidence, freezes and residual risk.",
     "Design basis": "Codes, design duties, fluid and utilisation basis — with sources.",
     "Engineering Analysis": "Allowable stress, safety factor and stress-strain per part.",
     "⚠ Checks": "Live arithmetic invariants — red rows show numbers that don't reconcile.",
@@ -22547,7 +22548,101 @@ def tab_holds_register(wb: Workbook, state: dict, run_dir: str) -> bool:
 # fields renders questions; a fully-specified state renders 'No open questions'
 # honestly.
 # ============================================================================
+DECISION_REGISTER_SHEET = "Decision Register"
 QUESTIONS_SHEET = "Questions for the customer"
+
+
+def tab_decision_register(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """Render the durable owned decision register, including an honest empty state."""
+    raw = state.get("decisionRegister") or []
+    decisions = [d for d in raw if isinstance(d, dict)] if isinstance(raw, list) else []
+    ws = wb.create_sheet(DECISION_REGISTER_SHEET)
+    set_widths(ws, {
+        "A": 12, "B": 54, "C": 24, "D": 14, "E": 42,
+        "F": 38, "G": 44, "H": 14, "I": 36, "J": 24,
+    })
+    title_row(
+        ws, "Decision Register — owned engineering freezes", 10,
+        "Durable record of what was decided, who owns it, the evidence used, which "
+        "contract quantities it freezes, and the residual risk. Unlike Questions and "
+        "Holds, approved decisions remain visible after their triggering issue clears.",
+    )
+    r = 4
+    if decisions:
+        header(ws, r, [
+            "ID", "Decision", "Owner", "Status", "Evidence", "Freezes",
+            "Residual risk", "Date", "Notes", "Provenance",
+        ])
+        r += 1
+        first = r
+        for decision in decisions:
+            freezes = decision.get("freezes") or []
+            if isinstance(freezes, list):
+                freezes = " · ".join(str(v) for v in freezes if str(v).strip())
+            values = [
+                decision.get("id"), decision.get("decision"), decision.get("owner"),
+                decision.get("status"), decision.get("evidence"), freezes,
+                decision.get("residual_risk"), decision.get("date"),
+                decision.get("notes"), decision.get("provenance"),
+            ]
+            for ci, value in enumerate(values, 1):
+                cell = ws.cell(r, ci, clean_cell(value))
+                cell.border = BORDER
+                cell.alignment = WRAP_TOP
+                cell.font = Font(size=10, bold=(ci in (1, 2, 4)))
+            status = str(decision.get("status") or "").upper()
+            if status == "APPROVED":
+                ws.cell(r, 4).fill, ws.cell(r, 4).font = FILL_PASS, FONT_PASS
+            elif status in ("OPEN", "PROPOSED"):
+                ws.cell(r, 4).fill, ws.cell(r, 4).font = FILL_ADVISORY, FONT_ADVISORY
+            else:
+                ws.cell(r, 4).fill = FILL_CONST
+            longest = max(len(str(v or "")) for v in values)
+            ws.row_dimensions[r].height = 14.5 * min(7, max(2, -(-longest // 50)))
+            r += 1
+        ws.freeze_panes = f"A{first}"
+    else:
+        cell = ws.cell(r, 1, "No decisions recorded")
+        cell.font = Font(size=10, bold=True, color="375623")
+        cell.fill = FILL_PASS
+        cell.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=10)
+        ws.row_dimensions[r].height = 30
+    back_link(ws, 10)
+    return True
+
+
+def _sc_decision_register(wb, ws, state, run_dir):
+    """Score only source-to-render row-count fidelity, plus the honest empty statement."""
+    raw = state.get("decisionRegister") or []
+    live = [d for d in raw if isinstance(d, dict)] if isinstance(raw, list) else []
+    rendered = _fam_rows(wb, ws.title, "decision-register")
+    issues = []
+    if live:
+        total = max(len(live), len(rendered))
+        matched = min(len(live), len(rendered))
+        if len(live) != len(rendered):
+            issues.append(
+                f"Decision Register row count differs from state.decisionRegister: "
+                f"rendered {len(rendered)}, state {len(live)}"
+            )
+        components = [("rendered decision-row count matches state.decisionRegister",
+                       matched if len(live) == len(rendered) else min(matched, total - 1),
+                       total)]
+    else:
+        blob = " ".join(str(c.value) for row in ws.iter_rows() for c in row
+                        if isinstance(c.value, str))
+        stated = "no decisions recorded" in blob.lower()
+        components = [("empty register states 'No decisions recorded' honestly",
+                       1 if stated else 0, 1)]
+        if not stated:
+            issues.append("state.decisionRegister is empty but the sheet does not say so")
+    return {
+        "components": components,
+        "issues": issues,
+        "mech": "state-to-render row-count fidelity for the durable Decision Register",
+        "fix": "render every state.decisionRegister entry exactly once, then rebuild",
+    }
 
 # still_missing fields → what concretely changes if the customer supplies a value
 # (universal field semantics, not per-class).
@@ -24140,6 +24235,7 @@ _TAB_RANK = {
     "Assembly": 9.5, "Interconnect": 9.7,
     "Process schedules": 9, "Electrical": 12, "PCB": 12.2, "Line & velocity": 13,
     "Assembly sequence": 14, "Risk & Regulatory": 15, "Holds & exclusions": 16,
+    "Decision Register": 16.25,
     "Questions for the customer": 16.5,
     "Quality & Audit": 17, "Sense-check": 17.5, "⚠ Checks": 18,
     "Connection trace": 19, "Calculations": 21,
@@ -24161,7 +24257,7 @@ _TAB_GROUPS = {
                    "Engineering Analysis"},
     "drawings": {"Drawings", "Assembly", "Interconnect", "Process schedules", "Electrical",
                  "PCB", "Line & velocity", "Assembly sequence"},
-    "verification": {"Verification", "Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
+    "verification": {"Verification", "Risk & Regulatory", "Holds & exclusions", "Decision Register", "Quality & Audit",
                      "Questions for the customer", "Sense-check", "⚠ Checks"},
     "reference": {"Connection trace", "Calculations", "Inputs & Assumptions",
                   "Part names", "Glossary", "Equipment & Dimensions Register"},
@@ -25196,6 +25292,10 @@ _dt(["Hold", "Item", "Scope (live count)", "Impact (£ or %)", "Owner", "Derived
      "Clears when"], "holds",
     ["Hold", "Item", "Scope", "Impact", "Owner", "Derived from", "Clears when"],
     numeric=["Impact"])
+_dt(["ID", "Decision", "Owner", "Status", "Evidence", "Freezes", "Residual risk",
+     "Date", "Notes", "Provenance"], "decision-register",
+    ["ID", "Decision", "Owner", "Status", "Evidence", "Freezes", "Residual risk",
+     "Provenance"])
 _dt(["Q#", "Question for the customer",
      "Why it matters — what changes if the answer differs",
      "Assumption in force (until answered)",
@@ -27189,6 +27289,7 @@ _TAB_SCORERS = [
     ("Part names", _sc_partnames),
     ("Glossary", _sc_glossary),
     ("Holds & exclusions", _sc_holds),
+    (DECISION_REGISTER_SHEET, _sc_decision_register),
     (QUESTIONS_SHEET, _sc_questions),
     ("PCB", _sc_pcb),
     ("Sense-check", _sc_benchmark),
@@ -29028,6 +29129,9 @@ def build(run_dir: str, out_path: str) -> dict:
     # contract results) — _TAB_RANK 5.2 places it immediately after Brief in the strip.
     print("  · Verification")
     tab_verification(wb, state, run_dir)
+    # Durable decisions build immediately after the governing proof spine and before
+    # transient customer questions. The tab always exists, including an honest empty state.
+    add_tab(DECISION_REGISTER_SHEET, lambda: tab_decision_register(wb, state, run_dir))
     # Questions for the customer builds AFTER Brief (its recon-divergence source is
     # state._clientOfferRecon, set by tab_brief) — always renders, honestly empty or not.
     add_tab(QUESTIONS_SHEET, lambda: tab_questions(wb, state, run_dir))
@@ -35120,6 +35224,56 @@ def _selftest() -> int:
     except SystemExit as _pe:
         if "Quality & Audit" not in str(_pe) or "bare" not in str(_pe):
             print(f"  FAIL soft-miss: refusal must name the literal cell (got {_pe})"); bad += 1
+
+    # ═══ DECISION REGISTER proveCatch (2026-07-28, both directions): durable
+    # decisions render one row per state entry; an empty register states that honestly;
+    # the scorer catches a dropped/stale rendered row. ═══
+    _sv_tables_dr = list(_RENDERED_TABLES); _sv_done_dr = set(_CELLCON_DONE)
+    try:
+        from openpyxl import Workbook as _WbDr
+        _dr_state = {"decisionRegister": [
+            {"id": "DEC-001", "decision": "Freeze the phase-current basis",
+             "owner": "Power electronics lead", "status": "OPEN",
+             "evidence": "tool:inverter:current-voltage-envelope",
+             "freezes": ["phase_current_max_a", "traction_inverter_power_kw"],
+             "residual_risk": "Dyno confirmation remains open",
+             "date": "2026-07-28", "notes": "Customer approval required",
+             "provenance": "traction-drive seed"}]}
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbdr = _WbDr(); _wbdr.remove(_wbdr.active)
+        if not tab_decision_register(_wbdr, _dr_state, "."):
+            print("  FAIL decision-register: tab must ALWAYS render"); bad += 1
+        _wsdr = _wbdr[DECISION_REGISTER_SHEET]
+        _dr_rows = _fam_rows(_wbdr, DECISION_REGISTER_SHEET, "decision-register")
+        if len(_dr_rows) != 1 or _cell_txt(_dr_rows[0][1].get("id")) != "DEC-001":
+            print(f"  FAIL decision-register: expected the one state row (got {_dr_rows})")
+            bad += 1
+        _scdr = _sc_decision_register(_wbdr, _wsdr, _dr_state, ".")
+        if not _scdr["components"] or _scdr["components"][0][1:] != (1, 1):
+            print(f"  FAIL decision-register: rendered count must match state "
+                  f"(got {_scdr['components']})"); bad += 1
+        _scdr_stale = _sc_decision_register(
+            _wbdr, _wsdr,
+            {"decisionRegister": _dr_state["decisionRegister"] + [
+                {**_dr_state["decisionRegister"][0], "id": "DEC-002"}]},
+            ".",
+        )
+        if not _scdr_stale["issues"]:
+            print("  FAIL decision-register: scorer must flag a dropped/stale row")
+            bad += 1
+
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbdr2 = _WbDr(); _wbdr2.remove(_wbdr2.active)
+        tab_decision_register(_wbdr2, {}, ".")
+        _wsdr2 = _wbdr2[DECISION_REGISTER_SHEET]
+        _blobdr2 = " ".join(str(c.value) for row in _wsdr2.iter_rows() for c in row
+                            if isinstance(c.value, str))
+        if "no decisions recorded" not in _blobdr2.lower():
+            print("  FAIL decision-register: empty state must say 'No decisions recorded'")
+            bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables_dr)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done_dr)
 
     # ═══ QUESTIONS-FOR-THE-CUSTOMER proveCatch (WAVE 1, 2026-07-03, both directions):
     # a state with still_missing / inferred fields / contradictions / uncovered recon

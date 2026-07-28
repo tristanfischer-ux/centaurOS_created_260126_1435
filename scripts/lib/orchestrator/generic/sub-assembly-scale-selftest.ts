@@ -84,29 +84,59 @@ const coupMods: any = [{
   sub_modules: [{ words: [
     mkWord('traction_ipmsm_motor_generator_word', 'Traction Ipmsm Motor Generator', [{ kind: 'quantity', value: '×1' }]),
     mkWord('output_shaft_coupling_word', 'Output Shaft Coupling', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('motor_bearings_word', 'Motor Bearings', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('sic_traction_inverter_word', 'SiC Traction Inverter', [{ kind: 'quantity', value: '×1' }]),
   ] }],
 }]
 const coupContract: any = {
   // Phrase "traction motor" shares stems with the IPMSM word; coupling must not
   // steal the match (the 2249 FAIL_FAST: coupling got 2205×1874×2426 mm).
+  // Cold-plate + phase current → traction-drive pack signal → high-density mm cap
+  // (2301 FAIL_FAST: plant cube-root box 2026×1722×2229 mm @ 250 kW).
   quantities: {
-    traction_motor_power_kw: { value: 250, unit: 'kW', kind: 'power' },
+    traction_motor_power_kw: { value: 350, unit: 'kW', kind: 'power' },
+    traction_inverter_power_kw: { value: 350, unit: 'kW', kind: 'power' },
+    mgu_shaft_torque_nm: { value: 77, unit: 'Nm', kind: 'force' },
+    phase_current_max_a: { value: 530, unit: 'A', kind: 'current' },
+    coolant_flow_l_min: { value: 15, unit: 'L/min', kind: 'flow_rate' },
+    coolant_inlet_c: { value: 40, unit: '°C', kind: 'temperature' },
   },
+  topology: [{
+    from_part: 'coolant_loop', to_part: 'rear_mgu_mcu_cold_plates',
+    mechanism: 'fluid_loop', constraint_kind: 'flow_capacity',
+    required_value: 15, required_unit: 'L/min',
+  }],
 }
 applyUniversalContractSizing(coupMods, coupContract, {
   onlyUnsized: true, synthesizeMissing: false, instrument: false, explode: false,
 })
 const coupWords = coupMods[0].sub_modules[0].words
 const coupling = coupWords.find((w: any) => /coupling/i.test(String(w.name_human)))
-const motor = coupWords.find((w: any) => /ipmsm|motor/i.test(String(w.name_human)))
+const bearings = coupWords.find((w: any) => /bearing/i.test(String(w.name_human)))
+const motor = coupWords.find((w: any) => /ipmsm|motor generator/i.test(String(w.name_human)))
+const inverter = coupWords.find((w: any) => /inverter/i.test(String(w.name_human)))
 const coupDim = (coupling?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const bearDim = (bearings?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
 const motorDim = (motor?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const invDim = (inverter?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const motorRating = (motor?.modifier_characters ?? []).find((m: any) => m.kind === 'rating_primary')
 const coupRating = (coupling?.modifier_characters ?? []).find((m: any) => m.kind === 'rating_primary')
 expect(!coupDim, `shaft coupling must not receive a kW envelope box (got ${coupDim?.value})`)
 expect(!coupRating, `shaft coupling must not steal the power-group rating (got ${coupRating?.value})`)
+expect(!bearDim, `motor bearings must not inherit the IPMSM kW envelope (got ${bearDim?.value})`)
 expect(!!motorDim, `IPMSM principal should receive the power-group envelope (got ${motorDim?.value ?? 'none'})`)
-expect(!/2205|1874|2426/.test(String(motorDim?.value ?? '')),
-  `IPMSM envelope must not be the absurd 2.2 m litter box from a mis-match`)
+expect(!!invDim, `SiC inverter should receive a traction envelope (got ${invDim?.value ?? 'none'})`)
+expect(!/2205|1874|2426|2026|1722|2229/.test(String(motorDim?.value ?? '')),
+  `IPMSM envelope must not be the absurd 2 m plant litter box (got ${motorDim?.value})`)
+const parseEdges = (v: string): number[] =>
+  String(v).match(/(\d+(?:\.\d+)?)/g)?.map(Number) ?? []
+for (const [label, dim] of [['IPMSM', motorDim], ['inverter', invDim]] as const) {
+  const edges = parseEdges(String(dim?.value ?? ''))
+  expect(edges.every((e) => e <= 650),
+    `${label} traction envelope edge must be ≤650 mm (got ${dim?.value})`)
+}
+expect(/350/.test(String(motorRating?.value ?? '')),
+  `IPMSM nameplate must be peak electrical 350 kW (got ${motorRating?.value})`)
 
 // ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
 import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'

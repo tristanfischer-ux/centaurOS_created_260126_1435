@@ -11,7 +11,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _worked import worked_calc  # noqa: E402
 
 HARD = ["omega_elec_rad_s", "lambda_pm_wb", "ld_h", "lq_h", "i_max_a", "v_max_v"]
 
@@ -91,17 +97,49 @@ def solve(inp: dict) -> dict:
     n_pp = int(inp.get("pole_pairs", 1))
     torque *= n_pp
 
+    omega_base_r = round(omega_base, 3)
+    torque_r = round(torque, 4)
+    id_r = round(id_c, 4)
+    iq_r = round(iq_c, 4)
+    dL = ld - lq
+
+    worked = []
+    worked.append(worked_calc(
+        label="Base electrical speed (back-EMF limit)",
+        formula="omega_base = V_max / lam",
+        values={"V_max": (v_max, "V"), "lam": (lam, "Wb")},
+        result=omega_base_r,
+        result_unit="rad/s",
+        assumptions=["i=0 open-circuit back-EMF limit"],
+    ))
+    # DECISION: reluctance term as dL x Id x Iq so harness re-evaluates without sqrt()
+    worked.append(worked_calc(
+        label="Electromagnetic torque",
+        formula="T = 1.5 x pp x (lam x Iq + dL x Id x Iq)",
+        values={
+            "pp": (n_pp, ""),
+            "lam": (lam, "Wb"),
+            "Iq": (iq_r, "A"),
+            "dL": (dL, "H"),
+            "Id": (id_r, "A"),
+        },
+        result=torque_r,
+        result_unit="Nm",
+        assumptions=["1.5·pp·(λ·Iq + (Ld−Lq)·Id·Iq); Id/Iq at selected operating mode"],
+    ))
+
     return {
-        "omega_base_elec_rad_s": round(omega_base, 3),
+        "omega_base_elec_rad_s": omega_base_r,
         "operating_mode": mode,
-        "i_d_a": round(id_c, 4),
-        "i_q_a": round(iq_c, 4),
+        "i_d_a": id_r,
+        "i_q_a": iq_r,
         "v_d_v": round(vd, 3),
         "v_q_v": round(vq, 3),
         "v_mag_v": round(vmag, 3),
-        "torque_nm": round(torque, 4),
+        "torque_nm": torque_r,
         "saliency_ratio_lq_over_ld": round(lq / ld, 4),
         "warnings": warnings,
+        "worked": worked,
     }
 
 
@@ -118,6 +156,7 @@ def _selftest() -> None:
     })
     assert lo["operating_mode"] == "mtpa"
     assert abs(lo["i_d_a"]) < 1e-6
+    assert len(lo.get("worked") or []) >= 1
     # High speed — must field-weaken
     hi = solve({
         "omega_elec_rad_s": 20000.0,
@@ -130,6 +169,7 @@ def _selftest() -> None:
     })
     assert hi["operating_mode"] == "field_weakening"
     assert hi["i_d_a"] < 0
+    assert len(hi.get("worked") or []) >= 1
     print("field_weakening_mtpa selftest OK")
 
 

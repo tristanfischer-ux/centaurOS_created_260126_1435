@@ -16169,12 +16169,16 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     continuous_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief', {
       source_detail: 'trial continuous design duty for loss tools (peak remains rear_axle_electrical_power_kw)',
     }),
-    // Alias so universal contract sizing can stamp the IPMSM principal (stems
-    // overlap "traction"+"motor") without a coupling/bearing stealing a bare
-    // continuous_power_kw match. Same value as continuous_power_kw.
-    traction_motor_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'module', 'calculator', {
-      source_detail: 'alias of continuous_power_kw for IPMSM envelope sizing (universal stem match)',
-      from: ['continuous_power_kw'],
+    // DECISION (2026-07-28 SOL overnight): nameplate principals must survive the
+    // peak electrical cap (350 kW). continuous_power_kw stays the loss-tool duty;
+    // these aliases are the envelope/rating stamps (stem match per principal).
+    traction_motor_power_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'alias of rear_axle_electrical_power_kw for IPMSM nameplate + envelope sizing',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
+    traction_inverter_power_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'alias of rear_axle_electrical_power_kw for SiC MCU nameplate + envelope sizing',
+      from: ['rear_axle_electrical_power_kw'],
     }),
     dc_bus_voltage_v: q(vDcNom, 'V', 'voltage', 'rated', 'system', 'brief', {
       source_detail: 'mid of assumed usable DC window under race SoC/temp',

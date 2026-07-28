@@ -44,7 +44,7 @@
 import type { ContractInProgress } from '../types'
 import { mod, type ModifierCharacter } from './emitter-primitives'
 import { mergeMods, type ModuleLike, type WordLike } from './sizing'
-import { contractCountFor } from './derive-skeleton'
+import { contractCountFor, hasTractionDrivePackSignal } from './derive-skeleton'
 
 // ── measure taxonomy ───────────────────────────────────────────────────────
 type Measure =
@@ -529,6 +529,24 @@ function boxFromRatingKw(kw: number): string {
   const mm = Math.round(side * 1000)
   return `${mm}x${Math.round(mm * 0.85)}x${Math.round(mm * 1.1)} mm`
 }
+/**
+ * INTENT (2026-07-28 SOL overnight): traction MGU/MCU packs are high power-density
+ * automotive/race machines — NOT plant cube-root boxes. `boxFromRatingKw(250)` yielded
+ * 2026×1722×2229 mm and FAIL_FAST'd plausibility. Soft-scale from a ~250 kW class
+ * reference; hard-cap every edge so a kW match can never ship a 2 m litter box on a
+ * cold-plate traction pack (signal via hasTractionDrivePackSignal — never a class slug).
+ */
+const TRACTION_DRIVE_EDGE_CAP_MM = 650
+function boxFromHighDensityDriveKw(kw: number): string {
+  const s = Math.cbrt(Math.max(50, kw) / 250)
+  const cap = (n: number): number =>
+    Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(140, Math.round(n)))
+  return `${cap(280 * s)}x${cap(260 * s)}x${cap(320 * s)} mm`
+}
+const TRACTION_DRIVE_POWER_PHRASE_RE =
+  /\b(?:ipmsm|traction|motor\s*generator|\bmgu\b|\bmcu\b|inverter|converter|drive\s*unit)\b/i
+/** Module-scoped: set for the duration of applyUniversalContractSizing. */
+let _tractionDrivePackSizingActive = false
 /** Pump-set envelope from shaft/motor kW (when no flow is on the group). Continuous
  *  in power so two different kW pumps never share a dims signature. */
 function pumpSetDimsFromKw(kw: number, phrase = ''): string {
@@ -848,9 +866,21 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
     // Pump/blower with only kW: scale the pump-set envelope by power so small dosing
     // pumps never collapse to the shared 600×510×660 litter cluster. Pass phrase so
     // serviceEnvelopeScale keeps same-kW acid/chemical/oxygen/nursery pumps distinct.
+    // Traction-drive packs (cold-plate + shaft/Iph signal): high-density envelope +
+    // hard mm cap — never the plant cube-root box (2026 mm @ 250 kW FAIL_FAST).
     const p = g.phrase.replace(/[_\s]+/g, ' ').toLowerCase()
-    add.push(mod('dimension',
-      PUMPLIKE_NOUN_RE.test(p) ? pumpSetDimsFromKw(g.power, g.phrase) : boxFromRatingKw(g.power)))
+    let dim: string
+    if (PUMPLIKE_NOUN_RE.test(p)) {
+      dim = pumpSetDimsFromKw(g.power, g.phrase)
+    } else if (
+      _tractionDrivePackSizingActive
+      && TRACTION_DRIVE_POWER_PHRASE_RE.test(p)
+    ) {
+      dim = boxFromHighDensityDriveKw(g.power)
+    } else {
+      dim = boxFromRatingKw(g.power)
+    }
+    add.push(mod('dimension', dim))
   }
   // Prefer 1-dp kW display (formatRatingKw) so 5.04 / 7.5 stay honest vs integer round.
   if (g.power !== undefined) add.push(mod('rating_primary', formatRatingKw(g.power), 'kW'))
@@ -1276,6 +1306,11 @@ function isThermalPowerGroupPhrase(phrase: string): boolean {
  */
 function wordAcceptsKwDerivedEnvelope(w: WordLike): boolean {
   const t = wordRoleText(w).replace(/_/g, ' ')
+  // GOTCHA (2026-07-28 overnight 2301): "Motor Bearings" matched `\bmotor\b` and
+  // inherited the same 2026 mm plant box as the IPMSM. Sub-aspect nouns veto first.
+  if (/\b(?:bearings?|bushings?|couplings?|sensors?|fasteners?|seals?|hoses?|bottles?|connectors?|flanges?|keyways?|washers?|bolts?|shims?|gaskets?)\b/i.test(t)) {
+    return false
+  }
   return /\b(?:pump|motor|generator|inverter|compressor|chiller|blower|\bfan\b|transformer|genset|turbine|engine|converter|rectifier|\bups\b|boiler|heater|reactor|skid|heat[\s-]?pump|ipmsm|\bmgu\b|\bmcu\b|traction[\s-]?inverter|drive[\s-]?unit)\b/i.test(t)
 }
 const motorKw = (p: ParentPhysics) => {
@@ -7145,6 +7180,7 @@ export function applyUniversalContractSizing(
   const synthesizeMissing = opts.synthesizeMissing ?? true
   const dedupeAndStrip = opts.dedupeAndStrip ?? true
   const minScore = opts.minScore ?? 1
+  _tractionDrivePackSizingActive = hasTractionDrivePackSignal(contract as never)
 
   const quantities: Record<string, number> = {}
   const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>

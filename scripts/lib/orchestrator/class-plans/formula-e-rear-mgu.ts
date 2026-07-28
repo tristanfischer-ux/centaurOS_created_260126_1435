@@ -325,21 +325,31 @@ const stepThermal: ToolStep = {
     thermal_resistance_magnet_to_winding_k_per_w: 0.05,
   }),
   contract_update: (c, output) => {
-    const out = output as { winding_temp_c?: number; magnet_temp_c?: number; pass?: boolean }
+    // GOTCHA: Python emits winding_temperature_c / magnet_temperature_c;
+    // accept short aliases too so a rename cannot silently drop writeback.
+    const out = output as {
+      winding_temperature_c?: number
+      magnet_temperature_c?: number
+      winding_temp_c?: number
+      magnet_temp_c?: number
+      pass?: boolean
+    }
     const tid = 'motor:thermal-lumped'
     const next = { ...c.quantities }
-    if (typeof out.winding_temp_c === 'number') {
+    const tw = out.winding_temperature_c ?? out.winding_temp_c
+    const tm = out.magnet_temperature_c ?? out.magnet_temp_c
+    if (typeof tw === 'number') {
       next.mgu_winding_temp_c = {
-        value: out.winding_temp_c, unit: '°C', family: 'temperature', basis: 'peak',
+        value: tw, unit: '°C', family: 'temperature', basis: 'peak',
         scope: 'module', uncertainty_pct: 25, temporal_resolution_s: null, condition: 'lumped RC',
-        provenance: prov(tid, 'winding_temp_c'),
+        provenance: prov(tid, 'winding_temperature_c'),
       }
     }
-    if (typeof out.magnet_temp_c === 'number') {
+    if (typeof tm === 'number') {
       next.mgu_magnet_temp_c = {
-        value: out.magnet_temp_c, unit: '°C', family: 'temperature', basis: 'peak',
+        value: tm, unit: '°C', family: 'temperature', basis: 'peak',
         scope: 'module', uncertainty_pct: 30, temporal_resolution_s: null, condition: 'lumped RC',
-        provenance: prov(tid, 'magnet_temp_c'),
+        provenance: prov(tid, 'magnet_temperature_c'),
       }
     }
     return { ...c, quantities: next }

@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _worked import worked_calc  # noqa: E402
 
 HARD = ["torque_nm", "speed_rpm", "phase_current_rms_a", "phase_resistance_ohm"]
 
@@ -67,17 +73,68 @@ def solve(inp: dict) -> dict:
     if eta < 0.7 and t >= 0:
         warnings.append("motoring efficiency <70% at this point — check current density / iron model")
 
+    p_cu_r = round(p_cu, 2)
+    p_fe_r = round(p_fe, 2)
+    p_mag_r = round(p_mag, 2)
+    p_mech_r = round(p_mech, 2)
+    p_loss_r = round(p_loss, 2)
+    p_shaft_r = round(p_shaft, 2)
+    p_elec_r = round(p_elec, 2)
+    eta_r = round(max(eta, 0.0), 5)
+
+    worked = []
+    worked.append(worked_calc(
+        label="Copper loss (I2R)",
+        formula="P_cu = n_ph x I x I x R",
+        values={"n_ph": (n_ph, ""), "I": (i, "A_rms"), "R": (r, "ohm")},
+        result=p_cu_r,
+        result_unit="W",
+        assumptions=["phase resistance at operating temperature"],
+    ))
+    worked.append(worked_calc(
+        label="Total electromagnetic + mechanical loss",
+        formula="P_loss = P_cu + P_fe + P_mag + P_mech",
+        values={
+            "P_cu": (p_cu_r, "W"),
+            "P_fe": (p_fe_r, "W"),
+            "P_mag": (p_mag_r, "W"),
+            "P_mech": (p_mech_r, "W"),
+        },
+        result=p_loss_r,
+        result_unit="W",
+        assumptions=["iron + magnet eddy + windage/bearing summed with copper"],
+    ))
+    if t >= 0 and p_elec_r > 0:
+        worked.append(worked_calc(
+            label="Motoring efficiency",
+            formula="eta = P_shaft / P_elec",
+            values={"P_shaft": (p_shaft_r, "W"), "P_elec": (p_elec_r, "W")},
+            result=eta_r,
+            result_unit="",
+            assumptions=["P_elec = P_shaft + P_loss at this operating point"],
+        ))
+    else:
+        worked.append(worked_calc(
+            label="Regen efficiency",
+            formula="eta = P_elec / P_shaft_abs",
+            values={"P_elec": (p_elec_r, "W"), "P_shaft_abs": (abs(p_shaft_r), "W")},
+            result=eta_r,
+            result_unit="",
+            assumptions=["regen: electrical out over |shaft| in"],
+        ))
+
     return {
-        "shaft_power_w": round(p_shaft, 2),
-        "copper_loss_w": round(p_cu, 2),
-        "iron_loss_w": round(p_fe, 2),
-        "magnet_eddy_loss_w": round(p_mag, 2),
-        "mechanical_loss_w": round(p_mech, 2),
-        "total_loss_w": round(p_loss, 2),
-        "electrical_power_w": round(p_elec, 2),
-        "efficiency": round(max(eta, 0.0), 5),
+        "shaft_power_w": p_shaft_r,
+        "copper_loss_w": p_cu_r,
+        "iron_loss_w": p_fe_r,
+        "magnet_eddy_loss_w": p_mag_r,
+        "mechanical_loss_w": p_mech_r,
+        "total_loss_w": p_loss_r,
+        "electrical_power_w": p_elec_r,
+        "efficiency": eta_r,
         "electrical_frequency_hz": round(f_hz, 2),
         "warnings": warnings,
+        "worked": worked,
     }
 
 
@@ -98,6 +155,7 @@ def _selftest() -> None:
     assert out["copper_loss_w"] > 0
     assert out["total_loss_w"] > out["copper_loss_w"]
     assert 0.5 < out["efficiency"] < 1.0
+    assert len(out.get("worked") or []) >= 1
     print("motor_loss_point selftest OK")
 
 

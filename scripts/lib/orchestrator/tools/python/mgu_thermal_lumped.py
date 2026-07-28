@@ -7,7 +7,13 @@ STAGED → motor:thermal-lumped
 from __future__ import annotations
 
 import json
+import os
 import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _worked import worked_calc  # noqa: E402
 
 HARD = [
     "copper_loss_w",
@@ -58,15 +64,49 @@ def solve(inp: dict) -> dict:
     if not magnet_ok:
         warnings.append(f"magnet {t_magnet:.1f}°C exceeds limit {t_m_max}°C")
 
+    t_coolant_r = round(t_coolant, 2)
+    t_winding_r = round(t_winding, 2)
+    t_magnet_r = round(t_magnet, 2)
+    p_total_r = round(p_total, 2)
+    dt_coolant_r = round(dt_coolant, 4)
+    mdot_r = round(mdot, 6)
+    p_w_r = round(p_cu + p_fe, 2)
+
+    worked = []
+    worked.append(worked_calc(
+        label="Coolant temperature rise",
+        formula="dT_coolant = P_total / (mdot x cp)",
+        values={"P_total": (p_total_r, "W"), "mdot": (mdot_r, "kg/s"), "cp": (cp, "J/kg/K")},
+        result=dt_coolant_r,
+        result_unit="K",
+        assumptions=["water-glycol cp≈3500 J/kg/K, rho≈1020 kg/m3", "steady-state energy balance"],
+    ))
+    worked.append(worked_calc(
+        label="Winding node temperature",
+        formula="T_w = T_coolant + P_w x R_wc",
+        values={
+            "T_coolant": (t_coolant_r, "C"),
+            "P_w": (p_w_r, "W"),
+            "R_wc": (r_wc, "K/W"),
+        },
+        result=t_winding_r,
+        result_unit="C",
+        assumptions=["winding node sees copper + iron loss into coolant"],
+    ))
+
     return {
-        "coolant_outlet_c": round(t_coolant, 2),
-        "winding_temperature_c": round(t_winding, 2),
-        "magnet_temperature_c": round(t_magnet, 2),
-        "total_loss_w": round(p_total, 2),
+        "coolant_outlet_c": t_coolant_r,
+        "winding_temperature_c": t_winding_r,
+        "magnet_temperature_c": t_magnet_r,
+        # INTENT: alias keys for consumers that use the shorter naming convention
+        "winding_temp_c": t_winding_r,
+        "magnet_temp_c": t_magnet_r,
+        "total_loss_w": p_total_r,
         "winding_ok": winding_ok,
         "magnet_ok": magnet_ok,
         "pass": winding_ok and magnet_ok,
         "warnings": warnings,
+        "worked": worked,
     }
 
 
@@ -81,6 +121,9 @@ def _selftest() -> None:
         "thermal_resistance_magnet_to_winding_k_per_w": 0.05,
     })
     assert ok["pass"] is True
+    assert ok["winding_temp_c"] == ok["winding_temperature_c"]
+    assert ok["magnet_temp_c"] == ok["magnet_temperature_c"]
+    assert len(ok.get("worked") or []) >= 1
     hot = solve({
         "copper_loss_w": 20000.0,
         "iron_loss_w": 10000.0,
@@ -91,6 +134,7 @@ def _selftest() -> None:
         "thermal_resistance_magnet_to_winding_k_per_w": 0.1,
     })
     assert hot["pass"] is False
+    assert len(hot.get("worked") or []) >= 1
     print("mgu_thermal_lumped selftest OK")
 
 

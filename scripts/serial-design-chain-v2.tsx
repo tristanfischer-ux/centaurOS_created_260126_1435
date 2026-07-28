@@ -186,6 +186,7 @@ import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engin
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { settlePassesFromEnv, runEarlyDesignLoop } from './lib/design-loop/settle-loop'
+import { seedTractionDriveDecisionRegister } from './lib/decision-register'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -7311,10 +7312,28 @@ async function main() {
   if (design.brief_overview_prose) applyJurisdictionFilterToBriefProse(design.brief_overview_prose as any)
   console.error('[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer')
 
+  // INTENT: Questions and holds disappear when resolved; this durable register keeps
+  // engineering freezes, owners, evidence and residual risk visible across rebuilds.
+  // Safe assertion: the orchestrator result is runtime-guarded as an object here.
+  const decisionRegister = orchEngineeringContract && typeof orchEngineeringContract === 'object'
+    ? seedTractionDriveDecisionRegister(
+        orchEngineeringContract as Parameters<typeof seedTractionDriveDecisionRegister>[0],
+      )
+    : []
+  if (decisionRegister.length > 0) {
+    writeFileSync(
+      resolve(outDir, '10-decision-register.json'),
+      JSON.stringify(decisionRegister, null, 2),
+    )
+    console.error(`[chain] decision register: seeded ${decisionRegister.length} durable decision(s)`)
+    logAction({ step: 'decision_register_seed', count: decisionRegister.length })
+  }
+
   const state = {
     projectId: 'chain-v2-' + Date.now(),
     parsedBrief: parsedResult.data,
     decisionHolds,   // brief-adjacent NAMED decisions (disclosure records — see the loader)
+    decisionRegister,
     moduleDecomposition: design,
     naturalLanguageLayer: nl,
     // AUTHORITATIVE instrument-device flag (2026-07-15 NinjaPCR): same gate as
