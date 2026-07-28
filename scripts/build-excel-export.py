@@ -9391,8 +9391,11 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
         if overlap < need:
             continue
         # Polarity gate: envelope min/max must not bind a stability/tolerance figure.
-        b_pol = _measure_polarity(b_tokens)
-        q_pol = _measure_polarity(q_tokens)
+        # GOTCHA: _QTY_STOP_TOKENS includes "min" (minutes) — that also strips the
+        # envelope pole from cell_bay_temp_min_c. Read polarity from the RAW key
+        # tokens so minutes-stop never silences min/max/stability families.
+        b_pol = _measure_polarity(set(re.findall(r"[a-z]+", b_key)))
+        q_pol = _measure_polarity(set(re.findall(r"[a-z]+", ql)))
         if b_pol and q_pol and b_pol.isdisjoint(q_pol):
             continue
         if b_pol and not q_pol:
