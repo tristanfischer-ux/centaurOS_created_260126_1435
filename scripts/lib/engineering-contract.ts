@@ -15927,15 +15927,182 @@ export function validateAgainstContract(
 // Generator receives as immutable constraint context.
 // ---------------------------------------------------------------------------
 
+/**
+ * INTENT (Sol+Fable 2026-07-27, UNIVERSAL-BRIEF-TO-HARDWARE-CLOSURE Block 1):
+ * Unregistered classes used to ship `quantities: {}`, so brief scale axes like
+ * `channel_count=8` never reached `contractCountFor` / tool payloads as typed
+ * obligations — per-channel hardware rendered ×1. Lift brief
+ * `target_performance` count metrics into the contract when absent. Never
+ * overwrites an archetype- or tool-authored value. Keyed on metric key shape
+ * (`*_count` / `*_qty` / unit channels|count), never a product-class table.
+ */
+export function seedBriefScaleCountMetrics(
+  contract: EngineeringContract,
+  parsedBrief: any,
+): EngineeringContract {
+  const tp = parsedBrief?.constraints?.target_performance
+  const metrics: Array<{ key_metric?: string; metric?: string; name?: string; value?: unknown; unit?: string }> =
+    Array.isArray(tp?.metrics) && tp.metrics.length > 0
+      ? tp.metrics
+      : tp?.key_metric
+        ? [{ key_metric: tp.key_metric, value: tp.value, unit: tp.unit }]
+        : []
+  if (metrics.length === 0) return contract
+  if (!contract.quantities) contract.quantities = {}
+  for (const m of metrics) {
+    const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').trim()
+    if (!key) continue
+    const unit = String(m?.unit ?? '').toLowerCase()
+    const isCountKey = /_(count|qty|quantity|number)$/i.test(key)
+      || /^(channels?|count)$/i.test(unit)
+      || unit === 'channels'
+    if (!isCountKey) continue
+    const raw = Number(m?.value)
+    if (!Number.isFinite(raw) || raw < 1 || raw >= 1e7) continue
+    const value = Math.round(raw)
+    if (contract.quantities[key]?.value !== undefined) continue
+    contract.quantities[key] = q(
+      value,
+      '',
+      'dimensionless',
+      'rated',
+      'system',
+      'brief',
+      {
+        source_detail: `brief.constraints.target_performance.metrics[${key}] — scale multiplicity axis`,
+        condition: 'brief hard target',
+      },
+    )
+  }
+  return contract
+}
+
+/** Hard brief scalars we seed as typed ledger targets (P3 — finish Phase 1). */
+const BRIEF_HARD_SCALAR_SEED: ReadonlyArray<{
+  key: RegExp
+  unit: string
+  family: UnitFamily
+  /** When true, value is a per-channel figure (compliance must not steal for aggregates). */
+  perChannel?: boolean
+}> = [
+  { key: /^(voltage_range_v|channel_voltage_range_v|voltage_range)$/i, unit: 'V', family: 'voltage', perChannel: true },
+  { key: /^(current_range_a|channel_current_magnitude_a|current_range)$/i, unit: 'A', family: 'current', perChannel: true },
+  { key: /^(max_simultaneous_dissipation_w|aggregate_.*dissipation_w|total_instrument_dissipation_w)$/i, unit: 'W', family: 'power' },
+  { key: /^(voltage_measurement_accuracy_pct_fs|voltage_measurement_accuracy)$/i, unit: '%_FS', family: 'dimensionless' },
+  { key: /^(current_measurement_accuracy_pct_fs|current_measurement_accuracy)$/i, unit: '%_FS', family: 'dimensionless' },
+  // INTENT: cell-bay operating envelope is a HARD brief range (15–45 °C on the
+  // benchtop cycler). Stability alone was seeded; min/max were left UNVERIFIED
+  // and floored Exec Summary / Verification / Brief to 0–4 (cold-v15 punchlist).
+  { key: /^(cell_bay_temp_min_c|cell_bay_temperature_min)/i, unit: '°C', family: 'temperature' },
+  { key: /^(cell_bay_temp_max_c|cell_bay_temperature_max)/i, unit: '°C', family: 'temperature' },
+  { key: /^(cell_bay_temp_stability_c|cell_bay_temperature_stability)/i, unit: '°C', family: 'temperature' },
+  { key: /^(data_logging_rate_hz_per_channel|logging_rate)/i, unit: 'Hz', family: 'frequency', perChannel: true },
+  { key: /^(design_life_years)$/i, unit: 'years', family: 'dimensionless' },
+  { key: /^(design_life_channel_hours)$/i, unit: 'channel-hours', family: 'dimensionless' },
+  { key: /^(prototype_bom_cost_ceiling_gbp|unit_cost_ceiling|cost_ceiling)/i, unit: 'GBP', family: 'currency' },
+]
+
+/**
+ * INTENT (Sol+Fable P3/P4): Count-only seeding left 13/29 brief constraints
+ * UNVERIFIED and let a per-channel 25 W figure satisfy a 200 W aggregate demand.
+ * Seed hard scalar targets from the brief and ensure an aggregate dissipation
+ * entry exists (either stated, or per-channel × channel_count).
+ */
+export function seedBriefHardScalarMetrics(
+  contract: EngineeringContract,
+  parsedBrief: any,
+): EngineeringContract {
+  const tp = parsedBrief?.constraints?.target_performance
+  const metrics: Array<{ key_metric?: string; metric?: string; name?: string; value?: unknown; unit?: string }> =
+    Array.isArray(tp?.metrics) && tp.metrics.length > 0
+      ? tp.metrics
+      : tp?.key_metric
+        ? [{ key_metric: tp.key_metric, value: tp.value, unit: tp.unit }]
+        : []
+  if (!contract.quantities) contract.quantities = {}
+
+  for (const m of metrics) {
+    const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').trim()
+    if (!key) continue
+    const spec = BRIEF_HARD_SCALAR_SEED.find((s) => s.key.test(key))
+    if (!spec) continue
+    const raw = Number(m?.value)
+    if (!Number.isFinite(raw) || raw <= 0 || raw >= 1e12) continue
+    if (contract.quantities[key]?.value !== undefined) continue
+    contract.quantities[key] = q(
+      raw,
+      spec.unit,
+      spec.family,
+      'rated',
+      'system',
+      'brief',
+      {
+        source_detail: `brief.constraints.target_performance.metrics[${key}] — hard scalar target`
+          + (spec.perChannel ? ' (per-channel; not an aggregate)' : ''),
+        condition: spec.perChannel ? 'per_channel brief hard target' : 'brief hard target',
+      },
+    )
+  }
+
+  // P4: aggregate dissipation must exist as its OWN key. Prefer a stated
+  // aggregate; else derive from per-channel × channel_count when both present.
+  const qmap = contract.quantities
+  const hasAggregate = Object.keys(qmap).some((k) =>
+    /^(max_simultaneous_dissipation_w|aggregate_.*dissipation_w|total_instrument_dissipation_w)$/i.test(k)
+      && Number(qmap[k]?.value) > 0,
+  )
+  if (!hasAggregate) {
+    const perCh = Number(
+      qmap.channel_max_dissipation_w?.value
+      ?? qmap.per_channel_dissipation_w?.value
+      ?? qmap.per_channel_power_duty_w?.value,
+    )
+    const nCh = Number(qmap.channel_count?.value)
+    if (Number.isFinite(perCh) && perCh > 0 && Number.isFinite(nCh) && nCh >= 2) {
+      qmap.aggregate_dissipation_w = q(
+        perCh * nCh,
+        'W',
+        'power',
+        'rated',
+        'system',
+        'calculator',
+        {
+          source_detail: 'channel_max_dissipation_w × channel_count',
+          condition: 'aggregate simultaneous',
+          from: ['channel_max_dissipation_w', 'channel_count'],
+          formula: 'channel_max_dissipation_w * channel_count',
+        },
+      )
+    }
+  } else if (qmap.max_simultaneous_dissipation_w?.value !== undefined
+    && qmap.aggregate_dissipation_w?.value === undefined) {
+    // Alias so compliance matchers that look for aggregate_* resolve.
+    const agg = Number(qmap.max_simultaneous_dissipation_w.value)
+    if (Number.isFinite(agg) && agg > 0) {
+      qmap.aggregate_dissipation_w = q(
+        agg,
+        'W',
+        'power',
+        'rated',
+        'system',
+        'brief',
+        {
+          source_detail: 'alias of max_simultaneous_dissipation_w',
+          condition: 'aggregate simultaneous',
+          from: ['max_simultaneous_dissipation_w'],
+        },
+      )
+    }
+  }
+
+  return contract
+}
+
 export function buildContractForChain(
   productClass: string,
   parsedBrief: any,
 ): EngineeringContract {
-  const contract = buildContract(productClass, parsedBrief)
-  if (contract) return contract
-  // Fallback: empty contract for unregistered classes. The chain continues
-  // with current behaviour (LLM-only) but logs a warning.
-  return {
+  const contract = buildContract(productClass, parsedBrief) ?? {
     product_class: productClass,
     brief_summary: `Engineering Contract not registered for ${productClass} — falling back to LLM-only chain.`,
     quantities: {},
@@ -15943,4 +16110,11 @@ export function buildContractForChain(
     macro_assembly_prices: [],
     closures: [],
   }
+  // Always fill ABSENT brief scale counts + hard scalar targets (registered
+  // archetypes keep their own authored values; unregistered classes stop
+  // shipping an empty / count-only ledger).
+  return seedBriefHardScalarMetrics(
+    seedBriefScaleCountMetrics(contract, parsedBrief),
+    parsedBrief,
+  )
 }

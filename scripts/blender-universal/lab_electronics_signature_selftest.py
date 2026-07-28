@@ -84,6 +84,18 @@ if {"bnc_electrode", "bnc_cell"} & ewo:
 if not _partset("") or not _partset("nonsense-xyz"):
     fails.append("unknown/blank signature did not fall back to a generic part-set")
 
+# 5. Bench power instrument (2026-07-27 cell-cycler): cell-bay + C14 + pass-bank,
+#    NEVER electrochemistry BNC (cold-v4 clipboard/BNC morphology leak).
+bp = set(_partset("bench_power"))
+if not ({"channel_terminal_strip", "c14_inlet", "pass_bank_heatsink", "peltier_block"} <= bp):
+    fails.append(
+        f"bench_power interior missing cell-bay/C14/pass-bank/peltier roles — got {sorted(bp)}"
+    )
+if {"bnc_electrode", "bnc_cell"} & bp:
+    fails.append("bench_power interior WRONGLY carries electrochemistry BNC coax")
+if Counter(bp) == Counter(sets["potentiostat"]):
+    fails.append("bench_power collapsed to potentiostat morphology")
+
 if fails:
     for f in fails:
         print(f"  ✗ {f}")

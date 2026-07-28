@@ -40,6 +40,18 @@ import { missingHardSlots } from '../../src/lib/pdf-engine-v2/lib/engineering-lo
 import { runPayloadRatingAudit } from '../../src/lib/pdf-engine-v2/lib/payload-rating-audit'
 import { evaluateSelfAuditEnforcement } from './semantic-self-audit'
 import { scanContractForBriefLiterals, selftestContractStrict } from './brief-value-literal-scanner'
+import {
+  computeStructuralAdmission,
+  evaluateStructuralAdmissionEnforcement,
+  structuralAdmissionEnforceModeFromEnv,
+  selftestStructuralAdmission,
+} from './structural-admission-gate'
+import {
+  computeDesignClosure,
+  evaluateDesignClosureEnforcement,
+  designClosureEnforceModeFromEnv,
+  selftestDesignClosure,
+} from './design-closure-gate'
 
 export interface GateProof {
   code: number
@@ -257,7 +269,27 @@ export const GATES: GateProof[] = [
       // proveNoFalsePositive: the SAME device UNDER its ceiling (£300) is not S6-flagged HIGH.
       const s6OkSt: any = { ...s6St, costStack: { oem_transfer_price_gbp: 300 } }
       const s6Ok = computeCostSanity(s6OkSt).verdict !== 'high'
-      return bessFires && s6Fires && s6Ok
+      // proveNoFalsePositive (Sol 2026-07-27): dissipation W on a multi-channel lab
+      // instrument must NOT become a power-plant £/kW denominator.
+      const dissSt: any = {
+        keyMetrics: { product_class: 'consumer_electronics' },
+        isInstrumentDevice: true,
+        parsedBrief: {
+          constraints: {
+            target_performance: {
+              metrics: [
+                { key_metric: 'channel_count', value: 8, unit: 'channels', category: 'scale' },
+                { key_metric: 'max_simultaneous_dissipation_w', value: 200, unit: 'W', category: 'scale' },
+              ],
+            },
+          },
+        },
+        costStack: { oem_transfer_price_gbp: 2757 },
+      }
+      const diss = computeCostSanity(dissSt)
+      const dissNotPowerPlant = diss.output_family !== 'power'
+        && !/£\/kW|\/kW/.test(String(diss.message ?? ''))
+      return bessFires && s6Fires && s6Ok && dissNotPowerPlant
     },
     enforcedByDefault: () => costSanityEnforceModeFromEnv(undefined) !== 'off',
   },
@@ -350,12 +382,65 @@ export const GATES: GateProof[] = [
     },
     enforcedByDefault: () => true, // gate 25 is an always-on hard process.exit(25) (no flag)
   },
+  {
+    code: 39, name: 'structural-admission',
+    intent: 'class-only justification OR plant/liquid anatomy (shell-and-tube, distribution manifold, ht:ntu-heat-exchanger) on a device-scale instrument — the cell-cycler contamination class',
+    proveCatch: () => {
+      // Bundled selftest covers class-only fire, liquid-on-benchtop fire, HX tool fire,
+      // clean instrument pass, plant BESS no-false-positive, and enforcement mode.
+      return selftestStructuralAdmission() === 0
+        && evaluateStructuralAdmissionEnforcement(
+          computeStructuralAdmission({
+            keyMetrics: { product_class: 'consumer_electronics' },
+            isInstrumentDevice: true,
+            structuralJustifications: [{ justified_by: 'class=consumer_electronics' }],
+          }),
+          'on',
+        ).shouldExit === true
+    },
+    enforcedByDefault: () => structuralAdmissionEnforceModeFromEnv(undefined) !== 'off',
+  },
+  {
+    code: 40, name: 'design-closure',
+    intent: 'pre-paint ledger closure — bare OR per_<scope>_ channel roles unbound vs channel_count, zero dim/rating on thermal demand, nonconserving heatsink watt allocation (cold-v13 8×200 W), fillable-TBD on critical roles (cold-v5 disease)',
+    proveCatch: () => {
+      // Representative of DELIVERED cold-v5: bare-named channel role at ×1.
+      const bareOpen = computeDesignClosure({
+        orchestratorContract: {
+          quantities: {
+            channel_count: { value: 8 },
+            channel_max_dissipation_w: { value: 25 },
+          },
+        },
+        moduleDecomposition: {
+          modules: [{
+            module: 'safety_protection',
+            sub_modules: [{
+              words: [{
+                name_human: 'Charge Current Source',
+                content_character: { character_id: 'charge_current_source' },
+                modifier_characters: [
+                  { kind: 'quantity', value: '×1' },
+                  { kind: 'part_number', value: 'TBD (detailed design)' },
+                ],
+              }],
+            }],
+          }],
+        },
+      })
+      return selftestDesignClosure() === 0
+        && bareOpen.unbound_words >= 1
+        && bareOpen.findings.some((f) => f.kind === 'unbound_multiplicity' && /Charge Current Source/.test(f.issue))
+        && evaluateDesignClosureEnforcement(bareOpen, 'on').shouldExit === true
+    },
+    enforcedByDefault: () => designClosureEnforceModeFromEnv(undefined) !== 'off',
+  },
 ]
 
 // COVERAGE: every gate code here MUST have a proof in GATES, else the meta-test fails — so a NEW
 // gate cannot land without a full adversarial proof. (23-29 are pre-render STATE-structural guards
 // with direct un-swallowed exits — a separate extension; tracked here so they aren't forgotten.)
-export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 30, 31, 32, 33, 34, 35, 36]
+export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 30, 31, 32, 33, 34, 35, 36, 39, 40]
 
 function _selftest() {
   let bad = 0

@@ -15,7 +15,8 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { classifyFunction, generateAtopileProject } from './atopile-generator'
+import { classifyFunction, expandPhysicalInstances, generateAtopileProject } from './atopile-generator'
+import type { AtopileComponentRecord } from './atopile-generator'
 import { derivePcbArchitecture } from './pcb-architecture'
 import { lookupCached } from '../distributors/db-only-cascade'
 
@@ -1849,5 +1850,98 @@ describe('atopile-generator', () => {
         'sensing_instrumentation_subcomponent_2_word',
       ]),
     )
+  })
+
+  it('proveCatch: expandPhysicalInstances mints N unique instanceNames (MCU×1 stays 1)', () => {
+    const base = {
+      instanceName: 'per_channel_discharge_load_mosfet_word',
+      wordId: 'per_channel_discharge_load_mosfet_word',
+      nameHuman: 'Discharge MOSFET',
+      characterId: 'per_channel_discharge_load_mosfet',
+      manufacturer: null,
+      partNumber: null,
+      footprint: { library: 'Package_TO_SOT_SMD', footprint: 'TO-263-7' },
+      functionClass: 'power_mosfet' as const,
+      resolutionTier: 'function_class' as const,
+      quantityInDesign: 8,
+      pins: ['G', 'D', 'S'],
+      pinSpecs: [],
+      pinPadMap: {},
+      powerPin: null,
+      groundPin: 'S',
+      designatorPrefix: 'Q',
+    } satisfies Partial<AtopileComponentRecord> as AtopileComponentRecord
+
+    const expanded = expandPhysicalInstances(base)
+    expect(expanded).toHaveLength(8)
+    expect(expanded.map((c) => c.instanceName)).toEqual([
+      'per_channel_discharge_load_mosfet_word__1',
+      'per_channel_discharge_load_mosfet_word__2',
+      'per_channel_discharge_load_mosfet_word__3',
+      'per_channel_discharge_load_mosfet_word__4',
+      'per_channel_discharge_load_mosfet_word__5',
+      'per_channel_discharge_load_mosfet_word__6',
+      'per_channel_discharge_load_mosfet_word__7',
+      'per_channel_discharge_load_mosfet_word__8',
+    ])
+    expect(expandPhysicalInstances({ ...base, quantityInDesign: 1, instanceName: 'main_controller_mcu_word' }))
+      .toHaveLength(1)
+  })
+
+  it('proveCatch: classifyFunction maps channel power chain roles (cold-v10 disease words)', () => {
+    expect(classifyFunction('per_channel_discharge_load_mosfet')).toBe('power_mosfet')
+    expect(classifyFunction('per_channel_charge_current_source')).toBe('regulator')
+    expect(classifyFunction('per_channel_current_shunt_measurement')).toBe('passive_r')
+    expect(classifyFunction('per_channel_precision_afe')).toBe('op_amp')
+    expect(classifyFunction('per_channel_current_control_loop')).toBe('op_amp')
+    expect(classifyFunction('per_channel_overcurrent_comparator')).toBe('sensor_ic')
+    expect(classifyFunction('per_channel_reverse_polarity_detector')).toBe('diode_protection')
+    expect(classifyFunction('per_channel_cell_thermistor_input')).toBe('passive_r')
+    expect(classifyFunction('usb_c_host_interface')).toBe('usb_connector')
+  })
+
+  // INTENT (cold-v12 → v13): Gate 38 fired clean_toolchain_but_architecture_unfit
+  // because curated Amphenol + P7 never saw usb_c_host_interface (host between c/interface).
+  it('proveCatch: usb_c_host_interface resolves curated Amphenol USB-C (cold-v12 disease)', () => {
+    mockedLookup.mockImplementation((_manufacturer, mpn) => {
+      if (/12401610/i.test(mpn ?? '')) {
+        return cacheHit('Amphenol ICC', '12401610E4#2A', 'USB Type-C receptacle')
+      }
+      return { found: false, result: null, source: 'unknown', ageHours: null }
+    })
+    const outDir = makeTmpDir('atopile-usb-c-host-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'control',
+          sub_modules: [{
+            id: 'control__usb',
+            words: [{
+              id: 'usb_c_host_interface_word',
+              name_human: 'Usb C Host Interface',
+              content_character: { character_id: 'usb_c_host_interface' },
+              modifier_characters: [{ kind: 'quantity', value: '×1' }],
+            }],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir, {
+      requiredWordIds: ['usb_c_host_interface_word'],
+    })
+    const usb = result.components.find((c) => c.wordId === 'usb_c_host_interface_word')
+    const gap = result.unresolved.find((u) => u.wordId === 'usb_c_host_interface_word')
+
+    expect(gap).toBeUndefined()
+    expect(usb).toBeDefined()
+    expect(usb!.functionClass).toBe('usb_connector')
+    expect(usb!.mpnVerified).toBe(true)
+    expect(usb!.partNumber).toMatch(/12401610/i)
+    expect(usb!.footprint?.library).toBe('Connector_USB')
+    expect(usb!.footprint?.footprint).toMatch(/USB_C_Receptacle/i)
+    expect(usb!.footprint?.footprint).not.toMatch(/PinHeader/i)
   })
 })

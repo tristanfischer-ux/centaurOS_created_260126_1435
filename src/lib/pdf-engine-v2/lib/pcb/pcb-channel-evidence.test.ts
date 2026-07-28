@@ -126,4 +126,50 @@ describe('pcb-channel-evidence', () => {
     expect(counts.stir_channel).toBe(1)
     expect(counts.pump_channel).toBe(1)
   })
+
+  it('proveCatch: eight expanded MOSFET/shunt/comparator instances mint power/sense/safety=8', () => {
+    const components = Array.from({ length: 8 }, (_, i) => ([
+      { characterId: 'per_channel_discharge_load_mosfet', nameHuman: `MOSFET ${i + 1}` },
+      { characterId: 'per_channel_charge_current_source', nameHuman: `Charge ${i + 1}` },
+      { characterId: 'per_channel_current_shunt_measurement', nameHuman: `Shunt ${i + 1}` },
+      { characterId: 'per_channel_precision_afe', nameHuman: `AFE ${i + 1}` },
+      { characterId: 'per_channel_overcurrent_comparator', nameHuman: `OC ${i + 1}` },
+      { characterId: 'per_channel_reverse_polarity_detector', nameHuman: `RP ${i + 1}` },
+    ])).flat()
+    const counts = deriveImplementedChannelCounts({
+      components,
+      functionRequirements: [],
+      requiredRoles: ['power_channel', 'sense_channel', 'safety_channel'],
+    })
+    expect(counts.power_channel).toBe(8)
+    expect(counts.sense_channel).toBe(8)
+    expect(counts.safety_channel).toBe(8)
+  })
+
+  it('proveCatch: MOSFET×8 without charge source does not mint power_channel (incomplete path)', () => {
+    const components = Array.from({ length: 8 }, (_, i) => ({
+      characterId: 'per_channel_discharge_load_mosfet',
+      nameHuman: `MOSFET ${i + 1}`,
+    }))
+    const counts = deriveImplementedChannelCounts({
+      components,
+      functionRequirements: [],
+      requiredRoles: ['power_channel'],
+    })
+    expect(counts.power_channel).toBe(0)
+  })
+
+  it('proveCatch: missing channel power instances stay at 0 (token board)', () => {
+    const counts = deriveImplementedChannelCounts({
+      components: [
+        { characterId: 'main_controller_mcu', nameHuman: 'MCU' },
+        { characterId: 'precision_adc', nameHuman: 'ADC' },
+      ],
+      functionRequirements: [],
+      requiredRoles: ['power_channel', 'sense_channel', 'safety_channel'],
+    })
+    expect(counts.power_channel).toBe(0)
+    expect(counts.sense_channel).toBe(0)
+    expect(counts.safety_channel).toBe(0)
+  })
 })

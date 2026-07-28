@@ -15,6 +15,7 @@ function plan(): PcbArchitecturePlan {
       requiresKiCadDeliverable: true,
     }],
     unassignedWordIds: [], rationale: [], confidence: 'medium',
+    onBoardElectronicPartCount: 1,
   }
 }
 

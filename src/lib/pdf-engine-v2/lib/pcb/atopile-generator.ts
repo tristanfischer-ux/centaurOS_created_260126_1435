@@ -114,6 +114,7 @@ export type FunctionClass =
   | 'io_connector'
   | 'regulator'
   | 'gate_driver_ic'
+  | 'power_mosfet'
   | 'power_module'
   | 'passive_c'
   | 'passive_r'
@@ -144,18 +145,24 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // GOTCHA: od_*_feedback_resistor / series_resistor contain "tia"/"amplifier"
   // substrings — passive_r must win for ballast/Rf densify companions.
   { id: 'passive_r', test: /(?:led[_-]?series|series|feedback|front[_-]?end[_-]?feedback)[_-]?resistor|(?:^|[_-])(?:ballast|feedback)[_-]?r(?:$|[_-])/i },
-  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance/i },
-  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
+  // INTENT (Sol+Fable 2026-07-27): channel power/sense/safety roles must classify
+  // before generic `detector`/`sensor` smear (reverse_polarity_detector was SOIC).
+  { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient|input[_-]?protection(?:[_-]?network)?/i },
+  { id: 'passive_r', test: /current[_-]?shunt|sense[_-]?shunt|shunt[_-]?measurement|shunt[_-]?resistor|pass[_-]?bank|discharge[_-]?pass[_-]?bank|cell[_-]?thermistor|thermistor[_-]?input/i },
+  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance|precision[_-]?afe|(^|[_-])afe($|[_-])|current[_-]?control[_-]?loop|kelvin[_-]?(?:voltage[_-]?)?sense/i },
+  // INTENT (Sol+Fable 2026-07-28): a discharge/load MOSFET is a discrete FET
+  // (power_mosfet), not a gate-driver IC. Drivers stay on gate_driver_ic.
+  { id: 'power_mosfet', test: /discharge[_-]?load[_-]?mosfet|(^|[_-])mosfet($|[_-])|power[_-]?mosfet|load[_-]?switch[_-]?mosfet|tec[_-]?power[_-]?mosfet/i },
+  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
+  { id: 'regulator', test: /charge[_-]?current[_-]?source|source[_-]?sink[_-]?stage|linear[_-]?source[_-]?sink|controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
+  { id: 'sensor_ic', test: /over[_-]?under[_-]?voltage|overvoltage|undervoltage|overcurrent[_-]?comparator|overtemp[_-]?trip|hardware[_-]?cutout|comparator[_-]?latch|photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless|wi[_-]?fi|host[_-]?protocol[_-]?bridge|protocol[_-]?bridge|level[_-]?shifter/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
   // INTENT (Poseidon 2026-07-16): stepper/microstep/H-bridge driver boards are
   // gate-drive ICs (SOIC-8 class default) — without this, `stepper_driver_board`
   // landed in unresolved[] and floored the PCB readiness gate.
-  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
-  { id: 'regulator', test: /controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
-  { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient|input[_-]?protection(?:[_-]?network)?/i },
   // INTENT (organoid 2026-07-24): a digital/USB galvanic isolator (ADuM120x/316x/416x) is a
   // real SOIC signal-isolation IC. Without this it landed unresolved → the wet_lab_hat's
   // `isolate_wet_peripherals` role stayed unfilled → design-fitness FAIL → pcbGate fired → PCB 0.
@@ -167,7 +174,9 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // role-only collection started seeing the word.
   { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?(?:storage|memory)|eeprom|nonvolatile[_-]?memory/i },
   // P4: USB power/receptacle roles must not share PinHeader defaults with SWD/UART.
-  { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port|entry)|type[_-]?c/i },
+  // GOTCHA (cold-v12): `usb_c_host_interface` missed usb[_-]?interface — underscore
+  // `usb_c_host` sits between usb and interface.
+  { id: 'usb_connector', test: /usb[_-]?(?:c[_-]?)?(?:host[_-]?)?(?:interface|power|connector|receptacle|port|entry)|type[_-]?c/i },
   { id: 'debug_connector', test: /debug[_-]?(?:interface|header|uart)|swd[_-]?header|uart[_-]?header|jtag[_-]?header/i },
   { id: 'passive_c', test: /capacitor|decoupling/i },
   // current_sense_on_driver / sense_shunt → SMD resistor (shunt), not unresolved.
@@ -342,6 +351,17 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     decouple: true,
     resolutionTier: 'package_family',
   },
+  // Discrete power FET (TO-220 / DPAK class) — never a SOIC gate-driver default.
+  power_mosfet: {
+    library: 'Package_TO_SOT_THT',
+    filenameTest: /^TO-220-3_Vertical\.kicad_mod$/,
+    designatorPrefix: 'Q',
+    pins: ['G', 'D', 'S'],
+    powerPin: null,
+    groundPin: 'S',
+    decouple: false,
+    resolutionTier: 'package_family',
+  },
   power_module: {
     library: 'Connector_PinHeader_2.54mm',
     filenameTest: /^PinHeader_1x04_P2\.54mm_Vertical\.kicad_mod$/,
@@ -489,7 +509,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
  * area heuristic (Phase C recomputes from the real chosen footprint bbox). */
 const AREA_MM2_BY_CLASS: Partial<Record<FunctionClass, number>> = {
   microcontroller: 64, sensor_ic: 20, op_amp: 20, connectivity_ic: 25,
-  io_connector: 60, regulator: 15, gate_driver_ic: 20, power_module: 80,
+  io_connector: 60, regulator: 15, gate_driver_ic: 20, power_mosfet: 40, power_module: 80,
   passive_c: 1.3, passive_r: 1.3, passive_l: 1.3, fuse_protection: 4, diode_protection: 2,
   memory_ic: 20, usb_connector: 120, debug_connector: 20, battery_connector: 32, display_module: 600,
   led: 1.3, switch: 12, connector: 40,
@@ -642,8 +662,10 @@ function isRealPartNumber(pn: string | undefined): pn is string {
 // INTENT (P7): Roles that define the human/power/firmware interface of a board
 // must carry a catalogue MPN — a silent package_family default is an architecture lie.
 // Keyed on character_id nouns (universal), not product class.
+// GOTCHA (cold-v12): must include optional c_/host_ so usb_c_host_interface is
+// forced through curated Amphenol (same pattern as classifyFunction / candidates).
 const PCB_INTERFACE_CRITICAL_ROLE =
-  /usb[_-]?(?:power|interface|connector|entry)|power[_-]?indicator[_-]?led|esd[_-]?protection|microcontroller_mcu|firmware[_-]?storage|current[_-]?limit[_-]?polyfuse/i
+  /usb[_-]?(?:c[_-]?)?(?:host[_-]?)?(?:power|interface|connector|entry|receptacle|port)|power[_-]?indicator[_-]?led|esd[_-]?protection|microcontroller_mcu|firmware[_-]?storage|current[_-]?limit[_-]?polyfuse/i
 
 // ── Component + net records ─────────────────────────────────────────────────────
 
@@ -1636,7 +1658,8 @@ function resolveComponent(
   // P4: USB power/interface roles must never ship as debug pin headers.
   const fpName = footprint.footprint ?? ''
   if (
-    /usb[_-]?(?:power|interface|connector|entry|receptacle|port)/i.test(word.characterId)
+    /usb[_-]?(?:c[_-]?)?(?:host[_-]?)?(?:power|interface|connector|entry|receptacle|port)|type[_-]?c/i
+      .test(word.characterId)
     && /PinHeader/i.test(fpName)
   ) {
     return {
@@ -1767,8 +1790,44 @@ function findComponentByPartName(
   components: AtopileComponentRecord[],
   partName: string,
 ): AtopileComponentRecord | null {
+  return findComponentsByPartName(components, partName)[0] ?? null
+}
+
+/**
+ * INTENT (Sol 2026-07-27): after expandPhysicalInstances, a topology edge
+ * named against a ×N word must resolve to ALL physical copies — `.find()` alone
+ * left 7 of 8 channel instances un-netted (token board / Gate 38).
+ */
+function findComponentsByPartName(
+  components: AtopileComponentRecord[],
+  partName: string,
+): AtopileComponentRecord[] {
   const norm = partName.trim().toLowerCase()
-  return components.find((c) => c.nameHuman.trim().toLowerCase() === norm) ?? null
+  return components.filter((c) => c.nameHuman.trim().toLowerCase() === norm)
+}
+
+/**
+ * INTENT (Sol+Fable 2026-07-27): quantityInDesign was recorded but
+ * generateAtopileProject pushed one Part_* — Gate 38 counted BoM ×8 vs one
+ * footprint. Expand to N physical instances with unique instanceNames before
+ * net building. Shared roles (MCU ×1) stay one naturally.
+ */
+export function expandPhysicalInstances(
+  component: AtopileComponentRecord,
+): AtopileComponentRecord[] {
+  const raw = Number(component.quantityInDesign)
+  const n = Number.isFinite(raw) ? Math.min(64, Math.max(1, Math.floor(raw))) : 1
+  if (n === 1) {
+    return [{ ...component, quantityInDesign: 1 }]
+  }
+  return Array.from({ length: n }, (_, i) => ({
+    ...component,
+    quantityInDesign: 1,
+    instanceName: `${component.instanceName}__${i + 1}`,
+    pins: [...component.pins],
+    pinSpecs: [...component.pinSpecs],
+    pinPadMap: { ...component.pinPadMap },
+  }))
 }
 
 function slug(text: string): string {
@@ -2712,21 +2771,32 @@ function buildNets(
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
   // engine's own "exact pinout confirmed at detailed design" maturity marker).
+  // Fan-out: N↔1 and 1↔N zip across expanded instances; equal N↔N pairs 1:1;
+  // unequal N↔M (>1 both sides) is skipped (cardinality mismatch — fail-closed).
   let edgeIndex = 0
   for (const edge of topology) {
     if (!edge.from_part || !edge.to_part) continue
-    const fromComponent = findComponentByPartName(components, edge.from_part)
-    const toComponent = findComponentByPartName(components, edge.to_part)
-    if (!fromComponent || !toComponent) continue
-    edgeIndex += 1
-    const netName = `NET_${slug(edge.from_part)}_${slug(edge.to_part)}_${edgeIndex}`
-    const net = ensureNet(netName, 'signal')
-    const fromPin = `SIG_OUT_${edgeIndex}`
-    const toPin = `SIG_IN_${edgeIndex}`
-    fromComponent.pins.push(fromPin)
-    toComponent.pins.push(toPin)
-    addMember(net, fromComponent.instanceName, fromPin)
-    addMember(net, toComponent.instanceName, toPin)
+    const fromComponents = findComponentsByPartName(components, edge.from_part)
+    const toComponents = findComponentsByPartName(components, edge.to_part)
+    if (!fromComponents.length || !toComponents.length) continue
+    if (fromComponents.length > 1 && toComponents.length > 1
+      && fromComponents.length !== toComponents.length) {
+      continue
+    }
+    const pairCount = Math.max(fromComponents.length, toComponents.length)
+    for (let i = 0; i < pairCount; i++) {
+      const fromComponent = fromComponents[fromComponents.length === 1 ? 0 : i]!
+      const toComponent = toComponents[toComponents.length === 1 ? 0 : i]!
+      edgeIndex += 1
+      const netName = `NET_${slug(edge.from_part)}_${slug(edge.to_part)}_${edgeIndex}`
+      const net = ensureNet(netName, 'signal')
+      const fromPin = `SIG_OUT_${edgeIndex}`
+      const toPin = `SIG_IN_${edgeIndex}`
+      fromComponent.pins.push(fromPin)
+      toComponent.pins.push(toPin)
+      addMember(net, fromComponent.instanceName, fromPin)
+      addMember(net, toComponent.instanceName, toPin)
+    }
   }
 
   // Generic decoupling: one 100nF 0603 cap per powered IC-class component that
@@ -3011,7 +3081,7 @@ export function generateAtopileProject(
       continue
     }
     const result = resolveComponent(word, footprintsRoot, symbolsRoot)
-    if ('component' in result) components.push(result.component)
+    if ('component' in result) components.push(...expandPhysicalInstances(result.component))
     else unresolved.push(result.unresolved)
   }
 
@@ -3044,9 +3114,16 @@ export function generateAtopileProject(
   // GOTCHA (organoid HAT 2026-07-21 solo): MCU + USB-C host-edge connectors also
   // cannot pack under 40 mm — ≤12 parts alone was wrongly clamping wet_lab_hat
   // to 30 mm → placement/DRC soup. Host-interface density forces the plant floor.
+  // GOTCHA (cold-v13): MCU+USB alone is not a Pi-HAT — channel_power_afe boards
+  // must stay on the plant [50,250] outline path. HAT floor only for wet_lab_hat.
   const hasHostInterfaceEdge =
-    allComponents.some((c) => c.functionClass === 'microcontroller') &&
-    allComponents.some((c) =>
+    (opts.boardRole === 'wet_lab_hat'
+      || opts.boardShape?.shapeFamily === 'wet_lab_hat'
+      || ((opts.boardRole == null || opts.boardRole === '')
+        && allComponents.some((c) =>
+          /pinsocket_2x20|ssq[_ -]?120/i.test(`${c.footprint?.footprint ?? ''} ${c.partNumber ?? ''}`))))
+    && allComponents.some((c) => c.functionClass === 'microcontroller')
+    && allComponents.some((c) =>
       c.functionClass === 'usb_connector' || c.functionClass === 'debug_connector')
   // GOTCHA (organoid 2026-07-21): heater_stir boards are ≤12 parts but need the
   // plant ≥50 mm floor — compact 25 mm outline forced placement retry (C2 off-board).

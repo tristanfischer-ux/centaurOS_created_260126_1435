@@ -73,6 +73,10 @@ export interface PcbPipelineOptions {
   freeroutingTimeoutS?: number
   /** Override the discovered capability manifest (mainly for tests). */
   capability?: PcbCapabilityManifest
+  /** pcb-architecture board.role — gates the HAT 100 mm placement cap (cold-v13). */
+  boardRole?: string
+  /** pcb-architecture shape.shapeFamily — secondary HAT-envelope signal. */
+  shapeFamily?: string
 }
 
 function honestFailure(stageReached: string, errors: string[]): PcbPipelineResult {
@@ -159,6 +163,12 @@ export function runPcbPipeline(
     '--max-iterations', String(opts.maxIterations ?? 8),
     '--freerouting-timeout-s', String(opts.freeroutingTimeoutS ?? 300),
   ]
+  if (opts.boardRole) {
+    args.push('--board-role', opts.boardRole)
+  }
+  if (opts.shapeFamily) {
+    args.push('--shape-family', opts.shapeFamily)
+  }
 
   // ato build reads $PATH to resolve its own dependencies; ~/.local/bin (where
   // `ato` itself lives) must be present for `ato build`'s internal tool calls.

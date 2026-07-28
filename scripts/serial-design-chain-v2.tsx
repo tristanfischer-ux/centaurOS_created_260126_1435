@@ -57,6 +57,7 @@ import {
   computeHonestShipFloor,
   dedupeScorecardSections,
   buildBriefComplianceSection,
+  buildClosureHonestySection,
   buildUnresolvedCriticHighsSection,
   buildPhysicsFidelitySection,
   type ComplianceRowInput,
@@ -68,6 +69,18 @@ import { adoptCascadePrices } from './lib/cascade-price-adoption'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import {
+  computeStructuralAdmission,
+  evaluateStructuralAdmissionEnforcement,
+  structuralAdmissionEnforceModeFromEnv,
+} from './lib/structural-admission-gate'
+import {
+  computeDesignClosure,
+  evaluateDesignClosureEnforcement,
+  designClosureEnforceModeFromEnv,
+  buildClosureHonestyFromState,
+  DESIGN_CLOSURE_EXIT_CODE,
+} from './lib/design-closure-gate'
 import { runWordDomainCoherence, type WordDomainCoherenceResult, runToolImpliedComponentGrounding, type ToolImpliedComponentResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
@@ -121,6 +134,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { completeEmitterGaps, fillBlankWordMpns, reopenMispinnedActiveMachineWords, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins, scrubInstrumentIndustrialPartVerifications } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { computeIsInstrumentDevice, type InstrumentDeviceFlagInput } from './lib/instrument-device-flag'
 // Stage 10.6 synchronous part-verification leg. The live call is delegated to
 // background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
 // needs the type here — verifyProposedParts is dynamically imported in-stage.
@@ -2910,6 +2924,17 @@ function computeQualityScorecard(state: any): QualityScorecard {
     )
   }
 
+  // Deterministic closure_honesty (Sol+Fable Block 2): docks fillable-TBD /
+  // unbound multiplicity / zero-dim — never let LLM honesty_signal Goodhart a void.
+  try {
+    const chIn = buildClosureHonestyFromState(state)
+    const ch = buildClosureHonestySection(chIn)
+    sections.push({ name: ch.name, score: ch.score, defects: ch.defects ?? [] })
+    state.designClosureHonesty = chIn
+  } catch (err) {
+    console.error(`[chain] ⚠ closure_honesty section UNAVAILABLE: ${(err as Error).message}`)
+  }
+
   // ── SCORECARD HONESTY (Tristan 2026-07-08) ──────────────────────────────────────
   // Several sources above can push a section under the SAME conceptual name (e.g. the
   // LLM self-audit's own 'brief_compliance'/'physics_fidelity' opinion at the top of
@@ -4975,6 +5000,48 @@ async function main() {
     logAction({ step: 'derive_headline_early', ok: false, error: String(err) })
   }
 
+  // ── GATE 40 design-closure (Sol+Fable Block 2, 2026-07-27) ─────────────────
+  // INTENT: close the demand→multiplicity→dim ledger BEFORE LLM paint. Gate 39
+  // (structural admission) fires post-reviewer and cannot stop paint of an
+  // unclosed skeleton. Shadow by default; DESIGN_CLOSURE_ENFORCING=1 → exit 40.
+  if (process.env.CHAIN_SKIP_DESIGN_CLOSURE !== '1') {
+    try {
+      // GOTCHA: isInstrumentDevice is declared ~700 lines later (enclosure-volume
+      // stamp). Referencing it here throws TDZ and used to skip Gate 40 entirely.
+      const closureState = {
+        moduleDecomposition: design,
+        orchestratorContract: orchEngineeringContract ?? engineeringContract,
+        parsedBrief: parsedResult.data,
+      }
+      const closure = computeDesignClosure(closureState)
+      writeFileSync(resolve(outDir, '4-design-closure.json'), JSON.stringify(closure, null, 2))
+      console.error(`[chain] GATE 40 design-closure: ${closure.message}`)
+      for (const f of closure.findings.filter((x) => x.severity === 'high').slice(0, 10)) {
+        console.error(`  ✕ [${f.kind}] ${f.where}: ${f.issue.slice(0, 160)}`)
+      }
+      logAction({
+        step: 'gate-40-design-closure',
+        ok: closure.verdict === 'pass',
+        verdict: closure.verdict,
+        unbound_words: closure.unbound_words,
+        zero_dim_on_demand: closure.zero_dim_on_demand,
+        fillable_tbd: closure.fillable_tbd,
+        honesty_score: closure.honesty_score,
+      })
+      const closureMode = designClosureEnforceModeFromEnv()
+      const closureEnf = evaluateDesignClosureEnforcement(closure, closureMode)
+      if (closureEnf.shouldExit) {
+        console.error(`\n[chain] === FATAL GATE 40 design-closure (exit ${DESIGN_CLOSURE_EXIT_CODE}) — close the ledger before paint ===`)
+        for (const r of closureEnf.reasons.slice(0, 12)) console.error(`  ✕ ${r.slice(0, 200)}`)
+        process.exit(DESIGN_CLOSURE_EXIT_CODE)
+      } else if (closure.verdict === 'fail') {
+        console.error(`[chain] GATE 40 SHADOW: would block paint (set DESIGN_CLOSURE_ENFORCING=1 to hard-exit ${DESIGN_CLOSURE_EXIT_CODE})`)
+      }
+    } catch (err) {
+      console.error(`[chain] GATE 40 design-closure threw: ${(err as Error).message}; continuing (non-fatal in shadow)`)
+    }
+  }
+
   // ── Build #19b (2026-05-22): PHASE 4 — physics critic on skeleton + fail-fast.
   // Per Tristan's plan: run physics critic on the tool-derived skeleton BEFORE
   // the expensive reviewer cascade. If plausibility is unrecoverable (<3/10),
@@ -5638,27 +5705,21 @@ async function main() {
   //
   // Universal: runs for ALL classes. BESS arc_flash_protection + hmi_panel
   // are now covered by deterministic-emitter.ts (commit accompanying this gate).
-  const _encVolForDevice = Number((engineeringContract?.quantities?.enclosure_volume_m3 as any)?.value)
+  // INTENT (cold-v12): cascade eng → orch → brief dims. Eng alone was empty on
+  // consumer_electronics while orch already had derived_device_scale 0.09 m³ —
+  // flag stayed false → FN3359 400 A pinned before scrub. See instrument-device-flag.ts.
   const _pcForDevice = String(currentProductClass ?? '').toLowerCase()
-  // GOTCHA (2026-07-16 Poseidon): bare `pump` matched `syringe_pump` → plantish=true
-  // → isInstrumentDevice=false → industrial MPN scrub off + plant BoM vocabulary.
-  // Plant pumps are NAMED (circulation/centrifugal/process); instrument forms win.
-  // GOTCHA (2026-07-17 Pioreactor): bare `reactor` matched `benchtop_bioreactor`
-  // → plantish=true → isInstrumentDevice=false → £81k plant BoM vs gold £259.
-  // Use `\breactor\b` (not substring) + explicit instrument-form allowlist.
-  const _isInstrumentFormForDevice =
-    /syringe[_ -]?pump|thermo[_ -]?cycler|thermal[_ -]?cycler|\bpcr\b|colorimeter|colourimeter|spectrophotometer|optical[_ -]?instrument|optical[_ -]?handheld|lab[_ -]?microscope|openflexure|flexure[_ -]?stage|benchtop[_ -]?bioreactor|pioreactor|turbidostat|chemostat|potentiostat|rodeostat|digital[_ -]?microfluidics|opendrop/.test(
-      _pcForDevice,
-    )
-  const _isPlantishForDevice =
-    /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|\breactor\b|boiler|hvac|chiller|circulation[_ -]?pump|centrifugal[_ -]?pump|process[_ -]?pump/.test(
-      _pcForDevice,
-    ) && !_isInstrumentFormForDevice
-  const isInstrumentDevice =
-    Number.isFinite(_encVolForDevice) &&
-    _encVolForDevice > 0 &&
-    _encVolForDevice < 1 &&
-    (!_isPlantishForDevice || _isInstrumentFormForDevice)
+  const _instrumentFlag = computeIsInstrumentDevice({
+    engineeringContract: engineeringContract as { quantities?: Record<string, unknown> } | null,
+    orchestratorContract: (orchEngineeringContract ?? engineeringContract) as {
+      quantities?: Record<string, unknown>
+      envelope?: { scale_tier?: string }
+    } | null,
+    productClass: _pcForDevice,
+    parsedBrief: parsedResult?.data as InstrumentDeviceFlagInput['parsedBrief'],
+  })
+  const _encVolForDevice = _instrumentFlag.enclosureVolumeM3
+  const isInstrumentDevice = _instrumentFlag.isInstrumentDevice
   setInstrumentDeviceContext(isInstrumentDevice)
   // INTENT (2026-07-15 NinjaPCR): isInstrumentDevice is computed HERE (enclosure < 1
   // + not plantish) and stamped onto `state` at construction (~line 7199). Do NOT
@@ -5670,12 +5731,13 @@ async function main() {
   if (isInstrumentDevice) {
     console.error(
       `[chain] isInstrumentDevice=true (enclosure_volume_m3=${_encVolForDevice} < 1, ` +
-      `class=${_pcForDevice || '∅'}, not plantish) — will stamp on state construction`,
+      `basis=${_instrumentFlag.basis}, class=${_pcForDevice || '∅'}) — will stamp on state construction`,
     )
     logAction({
       step: 'stamp_is_instrument_device',
       enclosure_volume_m3: _encVolForDevice,
       product_class: _pcForDevice,
+      basis: _instrumentFlag.basis,
     })
   }
   {
@@ -9486,6 +9548,56 @@ async function main() {
     }
   }
 
+  // ── GATE 39 — structural admission + device-scale magnitude (2026-07-27) ──
+  //    Council: class may propose structure but must never commit via class-only
+  //    justification; order-of-magnitude anatomy (liquid loop / industrial HX on
+  //    benchtop) is a HIGH failure. Cold cell-cycler measurement settled the fork
+  //    (plaus=3 with caches cold) — this gate makes contamination un-reintroducible.
+  //    SHADOW by default; STRUCTURAL_ADMISSION_ENFORCING=1 → exit 39 on HIGH.
+  //    Kill: CHAIN_SKIP_STRUCTURAL_ADMISSION=1.
+  if (!process.env.CHAIN_SKIP_STRUCTURAL_ADMISSION) {
+    const tSA = Date.now()
+    try {
+      const saState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      const sa = computeStructuralAdmission(saState)
+      saState.structuralAdmission = sa
+      writeFileSync(statePath, JSON.stringify(saState, null, 2))
+      console.error(`[chain] structural admission (shadow): ${sa.message}`)
+      for (const f of sa.findings.slice(0, 8)) {
+        console.error(`  ✗ [${f.severity}/${f.kind}] @ ${f.where}: ${f.issue}`)
+      }
+      logAction({
+        step: 'structural_admission_shadow', ok: true, verdict: sa.verdict,
+        device_scale: sa.device_scale, product_class: sa.product_class,
+        findings: sa.findings.length,
+        high: sa.findings.filter((f) => f.severity === 'high').length,
+        latency_ms: Date.now() - tSA,
+      })
+      const saMode = structuralAdmissionEnforceModeFromEnv(process.env.STRUCTURAL_ADMISSION_ENFORCING)
+      if (saMode === 'on') {
+        const decision = evaluateStructuralAdmissionEnforcement(sa, saMode)
+        if (decision.shouldExit) {
+          console.error(
+            `[chain] structural admission ENFORCING: BLOCKING (exit ${decision.exitCode}) — ` +
+              `${decision.reasons.length} HIGH finding(s). Class-only provenance or device-scale ` +
+              `magnitude anatomy is forbidden. Fix bootstrap/emitter admission + re-run.`,
+          )
+          for (const r of decision.reasons.slice(0, 8)) console.error(`  ✗ ${r}`)
+          logAction({
+            step: 'structural_admission_enforce', ok: false,
+            exit_code: decision.exitCode, reasons: decision.reasons, latency_ms: Date.now() - tSA,
+          })
+          process.exit(decision.exitCode)
+        }
+        console.error(`[chain] structural admission enforcing: PASS — ship allowed.`)
+        logAction({ step: 'structural_admission_enforce', ok: true, verdict: sa.verdict })
+      }
+    } catch (err) {
+      console.error(`[chain] structural admission (shadow) threw: ${(err as Error).message}; continuing (shadow never blocks)`)
+      logAction({ step: 'structural_admission_shadow', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tSA })
+    }
+  }
+
   // ── Render-quality gate (2026-06-06, Tristan: "the code should have stopped a
   //    bad blender model automatically"). The OXCCU e_fuel dossier shipped GENERIC
   //    flat-box images at exit 0 because the brand-new class had no per-class Blender
@@ -10041,6 +10153,13 @@ async function main() {
             const pcbProjectDir = multi.boardPipelines[0]?.projectDir ?? resolve(outDir, 'pcb-project')
             stPcb.pcb.architecture = architecture
             pcb.architecture = architecture
+            // INTENT (Sol+Fable 2026-07-27): Gate 38 + Excel coverage use on_board
+            // fitted quantity, not the collector's inflated scan (heatsink/fan).
+            if (typeof architecture.onBoardElectronicPartCount === 'number'
+              && architecture.onBoardElectronicPartCount > 0) {
+              stPcb.pcb.electronicPartCount = architecture.onBoardElectronicPartCount
+              pcb.electronicPartCount = architecture.onBoardElectronicPartCount
+            }
             stPcb.pcb.multiBoardMerged = multi.multiBoardMerged
             pcb.multiBoardMerged = multi.multiBoardMerged
             stPcb.pcb.boardPipelines = multi.boardPipelines.map((b) => ({

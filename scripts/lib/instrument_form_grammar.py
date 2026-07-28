@@ -381,6 +381,54 @@ TIPBACK_LID_VISION_IMAGE_CANDIDATES = (
 )
 
 
+def is_bench_power_instrument_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> bool:
+    """True for multi-channel source/sink bench power instruments (not PCR).
+
+    @description Universal form gate keyed on channel power + precision AFE +
+                 thermal/mains signals — NEVER a cell_cycler product class.
+                 Must win before is_thermocycler_form: bare Peltier/heatsink-fan
+                 part vocab would otherwise select tip-back PCR skin.
+    """
+    if not is_instrument:
+        return False
+    pc = product_class or ""
+    blob = part_blob or ""
+    # Authoritative class/alias tokens (training synonyms only — not a new class table).
+    if re.search(
+        r"cell[_ -]?cycler|battery[_ -]?cycler|source[_ -]?sink|"
+        r"electronic[_ -]?load|channel[_ -]?cycler",
+        pc,
+        re.I,
+    ):
+        return True
+    has_channel_power = bool(re.search(
+        r"source[_ -]?sink|linear[_ -]?discharge|pass[_ -]?bank|"
+        r"channel[_ -]?power|hardware[_ -]?cutout|over[_ -]?under[_ -]?voltage|"
+        r"discharge[_ -]?load|charge[_ -]?current",
+        blob,
+        re.I,
+    ))
+    has_precision_afe = bool(re.search(
+        r"\bafe\b|kelvin|precision[_ -]?adc|current[_ -]?shunt|"
+        r"precision[_ -]?voltage[_ -]?reference",
+        blob,
+        re.I,
+    ))
+    has_thermal_or_mains = bool(re.search(
+        r"peltier|tec[_ -]?module|cell[_ -]?bay|iec[_ -]?c14|"
+        r"isolated[_ -]?ac[_ -]?dc|mains[_ -]?fuse",
+        blob,
+        re.I,
+    ))
+    # Need channel power + measurement; thermal/mains confirms instrument envelope.
+    return has_channel_power and has_precision_afe and has_thermal_or_mains
+
+
 def is_thermocycler_form(
     *,
     product_class: str = "",
@@ -411,6 +459,12 @@ def is_thermocycler_form(
     # Lab-electronics class slugs are authoritative — TEC/cartridge heater is
     # vial thermal control, not a PCR sample-block product.
     if LAB_ELECTRONICS_CLASS_RE.search(pc):
+        return False
+    # GOTCHA (2026-07-27 cell-cycler): Peltier + heatsink_fan also appear on
+    # source/sink power instruments — those must never get tip-back PCR lids.
+    if is_bench_power_instrument_form(
+        product_class=pc, part_blob=blob, is_instrument=is_instrument,
+    ):
         return False
     return bool(THERMOCYCLER_PART_RE.search(blob))
 
@@ -707,6 +761,15 @@ FORM_FAMILIES: dict[str, dict] = {
         "gold_why": "docs/plans/GOLD-WHY-instrument-rules.md",
         "vision_images": ("04-product-exterior.png", "00-hero.png"),
     },
+    # INTENT (2026-07-27 cell-cycler cold-v4): multi-channel source/sink + AFE +
+    # Peltier bay must NOT inherit tip-back PCR lid (THERMOCYCLER_PART_RE matches
+    # bare peltier|heatsink_fan). Sealed power-instrument envelope — never a class.
+    "bench_power_instrument": {
+        "detect": "is_bench_power_instrument_form",
+        "glance_id": "lab_electronics",
+        "gold_why": "docs/plans/GOLD-WHY-instrument-rules.md",
+        "vision_images": ("04-product-exterior.png", "00-hero.png"),
+    },
     "thermocycler": {
         "detect": "is_thermocycler_form",
         "glance_id": "thermocycler",
@@ -854,6 +917,11 @@ def resolve_form_family(
         product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
     ):
         return "lab_microscope"
+    # Bench power BEFORE thermocycler: shared Peltier vocab must not tip-back PCR.
+    if is_bench_power_instrument_form(
+        product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return "bench_power_instrument"
     if is_thermocycler_form(
         product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
     ):
@@ -1050,6 +1118,26 @@ def _selftest() -> None:
         part_blob="random peltier mention",
         is_instrument=False,
     ), "plant + part vocab must NOT select PCR form"
+    # Bench power vs PCR tip-back (2026-07-27 cold-v4 clipboard hero):
+    _bp_blob = (
+        "Per Channel Linear Source Sink Stage | Per Channel Linear Discharge Pass Bank | "
+        "Per Channel Precision Afe | Per Channel Kelvin Voltage Sense | Peltier Tec Module | "
+        "Heatsink Fan Assembly | IEC C14 Fused Inlet | Per Channel Hardware Cutout"
+    )
+    assert is_bench_power_instrument_form(
+        product_class="consumer_electronics", part_blob=_bp_blob, is_instrument=True,
+    ), "source/sink + AFE + Peltier + C14 must select bench_power_instrument"
+    assert not is_thermocycler_form(
+        product_class="consumer_electronics", part_blob=_bp_blob, is_instrument=True,
+    ), "bench power must NEVER select tip-back PCR form"
+    assert resolve_form_family(
+        product_class="consumer_electronics", part_blob=_bp_blob, is_instrument=True,
+    ) == "bench_power_instrument"
+    assert is_thermocycler_form(
+        product_class="",
+        part_blob="Peltier TEC module and aluminum sample block with tube wells",
+        is_instrument=True,
+    ), "genuine PCR sample-block vocab must still select thermocycler"
     assert tipback_lid_open_rx_deg() < 0.0, (
         "Blender +Y=rear tip-back open must be −Rx (front edge rises)")
     _cam = tipback_lid_product_cam_fractions()

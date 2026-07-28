@@ -63,6 +63,7 @@ run "re-open mispin resolve (F3 pump→real pump)"    npx tsx scripts/lib/reopen
 run "gate-25 brief-literal scanner (mains vs £)"  npx tsx scripts/lib/brief-value-literal-scanner.ts --selftest
 run "interconnect F1e device-scale tubing"        "$PY" scripts/blender-universal/interconnect_device_scale_selftest.py
 run "F1a cartridge-heater homonym guard"          npx tsx scripts/lib/orchestrator/generic/f1a-cartridge-heater-selftest.ts
+run "F1a OV/UV electrical vs UV disinfection"     npx tsx scripts/lib/orchestrator/generic/f1a-ov-uv-electrical-selftest.ts
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "B4 lab_electronics signature split"          "$PY" scripts/blender-universal/lab_electronics_signature_selftest.py
 run "LE handheld-cue form-gate (vial_bioreactor)" "$PY" scripts/blender-universal/le_handheld_cue_gating_selftest.py
@@ -119,6 +120,7 @@ run "civils-scope --selftest (T-06)"          npx tsx scripts/lib/orchestrator/g
 run "pump-unit-skid --selftest (T-22)"        npx tsx scripts/lib/orchestrator/generic/pump-unit-skid-selftest.ts
 run "recovery-oxygen-dosing --selftest"      npx tsx scripts/lib/orchestrator/generic/recovery-oxygen-dosing-selftest.ts
 run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts
+run "brief-scale-seed --selftest"             npx tsx scripts/lib/orchestrator/generic/brief-scale-seed-selftest.ts
 run "unit-coercion --selftest (prove-catch)"  npx tsx scripts/lib/orchestrator/generic/unit-coercion.ts --selftest
 run "numeric-drift-matcher --selftest"       npx tsx scripts/lib/numeric-drift-matcher-selftest.ts
 run "population-count --selftest"             npx tsx scripts/lib/orchestrator/generic/population-count-selftest.ts
@@ -136,6 +138,8 @@ run "scenario-planning.ts --selftest"         npx tsx scripts/lib/scenario-plann
 # PROVE-THE-CATCH: every registered gate must catch its own adversarial input (intent, not just
 # existence). A gate that can no longer block the exact failure it exists to catch fails here.
 run "gate-registry --selftest (prove-catch)"  npx tsx scripts/lib/gate-registry.ts --selftest
+run "structural-admission-gate --selftest"  npx tsx scripts/lib/structural-admission-gate.ts --selftest
+run "design-closure-gate --selftest"        npx tsx scripts/lib/design-closure-gate.ts --selftest
 # PCB firmware honesty doctrine (Anvil SSOT — not LLM memory / docs alone).
 # proveCatch: contract JSON loads; tier≥3 never FUNCTIONALLY VERIFIED; state prefer path.
 run "pcb-firmware-honesty.py --selftest"      "$PY" scripts/lib/pcb_firmware_honesty.py --selftest

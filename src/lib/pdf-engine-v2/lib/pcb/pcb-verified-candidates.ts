@@ -435,8 +435,11 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'frozen NinjaPCR eight-pin symbol maps load commons 1/2, shared feeds 3/4 and coils 5/6 plus 7/8 against the Panasonic bottom-view drawing',
   },
   {
-    roleTest: /tec[_ -]?power[_ -]?mosfet[_ -]?constituent|irlb3813pbf/i,
-    excludedRoleTest: /h[_ -]?bridge[_ -]?tec[_ -]?driver[_ -]?word/i,
+    // INTENT (Sol+Fable 2026-07-28): channel discharge/load MOSFETs and TEC
+    // low-side switches share the same discrete power-FET identity — never a
+    // gate-driver IC and never a 5 A SOT-23 PWM switch for ≥25 W stages.
+    roleTest: /tec[_ -]?power[_ -]?mosfet[_ -]?constituent|discharge[_ -]?load[_ -]?mosfet|load[_ -]?switch[_ -]?mosfet|power[_ -]?mosfet|irlb3813pbf/i,
+    excludedRoleTest: /h[_ -]?bridge[_ -]?tec[_ -]?driver[_ -]?word|heater[_ -]?pwm[_ -]?(?:switch|mosfet)|ao3400a/i,
     functionClass: 'power_mosfet',
     manufacturer: 'Infineon Technologies',
     partNumber: 'IRLB3813PBF',
@@ -444,7 +447,7 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     symbol: { library: 'Transistor_FET', symbol: 'Q_NMOS_GDS' },
     ratings: { voltageV: 30, currentA: 120 },
     packageEvidence: 'Infineon IRLB3813PBF: three-lead TO-220AB, package-limited 120 A continuous current',
-    referenceEvidence: 'Infineon IRLB3813PbF and frozen NinjaPCR Q1 TO220BV land pattern, revision 181768d6ec068a6dd68593042167699285744768',
+    referenceEvidence: 'Infineon IRLB3813PbF and frozen NinjaPCR Q1 TO220BV land pattern, revision 181768d6ec068a6dd68593042167699285744768; universal channel power-stage discrete FET',
     pinoutEvidence: 'Infineon TO-220AB leads 1=Gate, 2=Drain, 3=Source, tab=Drain',
   },
   {
@@ -599,7 +602,9 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
   {
     // GOTCHA: include usb_interface — mid-mount 12401548 from briefs must not win
     // over this SMT land (see atopile 12401548→12401610 remap).
-    roleTest: /usb[_ -]?(?:c[_ -]?)?(?:power[_ -]?entry|interface|receptacle)|type[_ -]?c[_ -]?receptacle/i,
+    // GOTCHA (cold-v12): `usb_c_host_interface` — `host` sits between c and interface;
+    // without (?:host[_ -]?)? the curated Amphenol never selects → Gate 38 unfit.
+    roleTest: /usb[_ -]?(?:c[_ -]?)?(?:host[_ -]?)?(?:power[_ -]?entry|interface|connector|receptacle|port|entry)|type[_ -]?c(?:[_ -]?receptacle)?/i,
     functionClass: 'usb_connector',
     manufacturer: 'Amphenol ICC',
     partNumber: '12401610E4#2A',

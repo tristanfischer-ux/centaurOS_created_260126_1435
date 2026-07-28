@@ -1407,10 +1407,67 @@ def run_gates(out_dir: str) -> list:
         except OSError:
             _ga_svg_txt = ""
         if _ga_svg_txt:
+            # INTENT (2026-07-28): OPTICAL silhouette is only mandatory for the
+            # optical-handheld form. draw_ga already gates the OPTICAL stamp on
+            # exterior_signature_families containing optical-tower — G17 must
+            # match or bench-power / lab-electronics dossiers fail forever.
+            _need_optical = False
+            if _instrument:
+                try:
+                    from instrument_form_grammar import (  # type: ignore
+                        is_optical_handheld_form,
+                        resolve_form_family,
+                    )
+                    _pc = str(
+                        (state.get("parsedBrief") or {}).get("product_class")
+                        or (state.get("moduleDecomposition") or {}).get("product_class")
+                        or state.get("product_class")
+                        or ""
+                    )
+                    _blob_parts: list[str] = []
+                    for _m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+                        for _sm in (_m.get("sub_modules") or []):
+                            for _w in (_sm.get("words") or []):
+                                _blob_parts.append(str(_w.get("id") or ""))
+                                _blob_parts.append(str(_w.get("name_human") or ""))
+                                _cc = _w.get("content_character") or {}
+                                if isinstance(_cc, dict):
+                                    _blob_parts.append(str(_cc.get("character_id") or ""))
+                    _blob = " ".join(_blob_parts)
+                    _family = resolve_form_family(
+                        product_class=_pc, part_blob=_blob, is_instrument=True,
+                    )
+                    _need_optical = (
+                        _family == "optical_handheld"
+                        or is_optical_handheld_form(
+                            product_class=_pc, part_blob=_blob, is_instrument=True,
+                        )
+                    )
+                    # Also honour the render's own optical-tower signature when present.
+                    _fm_path = os.path.join(out_dir, "form-meshes.json")
+                    if os.path.isfile(_fm_path):
+                        try:
+                            _fm = json.loads(open(_fm_path, encoding="utf-8").read())
+                            _feats = _fm.get("exterior_signature_features") or []
+                            if any(
+                                (isinstance(f, dict) and "optical-tower" in str(
+                                    f.get("family") or f.get("name") or ""
+                                ))
+                                or (isinstance(f, str) and "optical-tower" in f)
+                                for f in _feats
+                            ):
+                                _need_optical = True
+                        except (OSError, json.JSONDecodeError, TypeError):
+                            pass
+                except Exception:
+                    # Fail closed for true optical unknowns only when SVG already
+                    # stamped OPTICAL (sheet claimed the chamber).
+                    _need_optical = bool(re.search(r">\s*OPTICAL\s*<", _ga_svg_txt, re.I))
             _g17_ok, _g17_detail = ga_glance_coherent(
                 _ga_svg_txt,
                 is_instrument_device=bool(_instrument),
                 is_product_scale=bool(is_product_scale(state) or _instrument),
+                requires_optical_silhouette=_need_optical if _instrument else None,
             )
             gates.append(Gate(
                 "ga_glance_coherence",

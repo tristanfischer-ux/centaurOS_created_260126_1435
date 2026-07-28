@@ -377,7 +377,14 @@ function familyFromUnit(unitRaw: string, keyMetric: string): { family: OutputFam
   }
 
   // POWER — £/kW. Watt family (W/kW/MW/GW). Excludes Wh handled above.
+  // GOTCHA (Sol 2026-07-27): dissipation / loss / parasitic / standby / power_draw
+  // are thermal or electrical BUDGETS on a measurement instrument — NOT productive
+  // nameplate output. Scoring them as £/kW against solar/wind/EV bands false-blocked
+  // the cell-cycler twin (£13k/kW on 200 W heat). Universal key-shape filter.
   if (/^(g|m|k)?w$/.test(u) || /\b(kw|mw|gw)\b/.test(u) || (u === 'w')) {
+    if (/(dissipation|waste_heat|heat_loss|parasitic|standby|power_draw|power_budget|thermal_rejection)/i.test(key)) {
+      return null
+    }
     return { family: 'power', toCanonical: (v) => powerToKw(v, u), unit_label: 'kW' }
   }
 

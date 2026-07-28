@@ -93,6 +93,28 @@ export interface PcbArchitecturePlan {
   unassignedWordIds: string[]
   rationale: string[]
   confidence: 'high' | 'medium' | 'low'
+  /**
+   * INTENT (Sol+Fable 2026-07-27): Gate 38 footprint coverage denominator.
+   * Sum of quantities for words assigned `on_board` — excludes heatsink/fan/
+   * purchased modules so an honest ≥80% is reachable without green-washing.
+   */
+  onBoardElectronicPartCount: number
+}
+
+/**
+ * @description Sum design quantities for architecture `on_board` assignments.
+ */
+export function countOnBoardElectronicParts(
+  assignments: PcbWordAssignment[],
+  words: ElectronicWordRef[],
+): number {
+  const byId = new Map(words.map((w) => [w.wordId, w]))
+  let total = 0
+  for (const assignment of assignments) {
+    if (assignment.placement !== 'on_board') continue
+    total += byId.get(assignment.wordId)?.quantity ?? 1
+  }
+  return total
 }
 
 function quantity(state: Record<string, unknown>, key: string): number | null {
@@ -197,6 +219,24 @@ function hasFinishedMotionStack(state: Record<string, unknown>): boolean {
   return hasControllerCarrier && hasFinishedDriverCarrier
 }
 
+/**
+ * INTENT (Sol+Fable 2026-07-27): bare `channel_count` used to mint a
+ * motion_driver_board — wrong physics for multi-channel electrical instruments
+ * (cell cycler / AFE / power-stage). Domain evidence selects the board family.
+ */
+function hasMotionChannelEvidence(state: Record<string, unknown>): boolean {
+  const text = architectureEvidenceBlob(state)
+  return /\b(?:stepper|servo|bldc|lead[_\s-]?screw|gantry|cnc|motion[_\s-]?channel|motor[_\s-]?(?:driver|channel|axis)|axis[_\s-]?count)\b/.test(text)
+}
+
+function hasElectricalChannelEvidence(state: Record<string, unknown>): boolean {
+  const text = architectureEvidenceBlob(state)
+  // GOTCHA: trailing `\b` fails mid-token (`discharge_load_mosfet` — after `load`
+  // the next `_` is still a word char). Use underscore-aware edges.
+  return /(?:^|[_ -])(?:precision[_ -]?afe|afe|source[_ -]?sink|charge[_ -]?current|discharge[_ -]?(?:load|mosfet|pass)|current[_ -]?shunt|kelvin|cell[_ -]?thermistor|over[_ -]?(?:current|temp|under[_ -]?voltage)|reverse[_ -]?polarity|hardware[_ -]?cutout|cell[_ -]?cycler|potentiostat|galvanostat)(?:$|[_ -])/i
+    .test(` ${text} `)
+}
+
 function datum(id: string, valueMm: number, basis: string): PcbBoardShapeDatum {
   return { id, valueMm, basis }
 }
@@ -211,6 +251,12 @@ function board(
     optical_source_daughterboard: { work: ['drive_optical_source', 'mate_source_harness'], shape: 'optical_registration_plate', basis: 'optical_axis_and_cube_face', holes: 4 },
     thermal_power_controller: { work: ['sense_sample_temperature', 'drive_heater_peltier_fan', 'enforce_thermal_cutoff'], shape: 'thermal_power_base', basis: 'thermal_connectors_and_heatsink', holes: 4 },
     motion_driver_board: { work: ['drive_repeated_motion_channels', 'sense_channel_current'], shape: 'linear_channel_spine', basis: 'channel_count_and_connector_pitch', holes: 4 },
+    channel_power_afe_controller: {
+      work: ['source_sink_channel_power', 'measure_channel_voltage_current', 'enforce_channel_safety_trips'],
+      shape: 'multi_channel_power_afe',
+      basis: 'channel_count_and_power_dissipation',
+      holes: 4,
+    },
     analog_front_end_shield: { work: ['drive_cell_voltage', 'measure_cell_current', 'switch_measurement_range'], shape: 'precision_analog_shield', basis: 'host_header_and_guarded_input_edge', holes: 4 },
     wet_lab_hat: { work: ['interface_host_compute', 'isolate_wet_peripherals'], shape: 'wet_lab_hat', basis: 'host_header_standard', holes: 4 },
     od_optics_board: { work: ['drive_od_source', 'measure_od_detector'], shape: 'optical_registration_plate', basis: 'vial_optical_axis', holes: 2 },
@@ -371,10 +417,16 @@ function nonBoardPlacement(
   const hasIntegratedFirmwareMcu =
     /\b(?:samd21|esp8266|esp32|stm32)\b/i.test(evidence)
     || (!hasCotsComputeHost && hasBareMcuRole)
+  // INTENT: a fitted Type-C / USB receptacle land (including usb_c_host_interface
+  // as the board's only USB role). Logical `usb_interface` alone is NOT physical.
+  const isPhysicalUsbLand = (blob: string): boolean =>
+    /usb[_ -]?(?:c[_ -]?)?(?:host[_ -]?)?(?:power[_ -]?entry|connector|receptacle|port)|usb[_ -]?(?:c[_ -]?)?host[_ -]?interface|type[_ -]?c/i
+      .test(blob)
   const hasPhysicalUsbEntry = allWords.some((candidate) =>
-    /usb[_ -]?(?:power[_ -]?entry|connector|receptacle|port)/i.test(
-      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
-    ))
+    isPhysicalUsbLand(`${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`))
+  const hasOtherPhysicalUsbEntry = allWords.some((candidate) =>
+    candidate.wordId !== word.wordId
+    && isPhysicalUsbLand(`${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`))
   const hasRadioAndDebugAccess =
     allWords.some((candidate) => /wi-?fi|wifi[_ -]?module/i.test(
       `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
@@ -392,13 +444,33 @@ function nonBoardPlacement(
   }
   // INTENT: Peltier modules, heatsink fans, insulation and TIM pads are purchased
   // thermal assemblies — not PCB footprints (same gold WHY as NinjaPCR TEC path).
+  // GOTCHA (Sol+Fable 2026-07-27): `per_channel_power_cooling_fan` never matched
+  // heatsink_fan — it was assigned on_board and bloated Gate 38's denominator.
   if (
-    /peltier|\btec\b|thermoelectric|heatsink(?:[_ -]?fan)?|heat[_ -]?sink|thermal[_ -]?insulation|thermal[_ -]?interface|thermal[_ -]?pad|tim[_ -]?pad/i
+    /peltier|\btec\b|thermoelectric|heatsink(?:[_ -]?fan)?|heat[_ -]?sink|cooling[_ -]?fan|heatsink[_ -]?fan|finned[_ -]?heatsink|thermal[_ -]?insulation|thermal[_ -]?interface|thermal[_ -]?pad|tim[_ -]?pad/i
       .test(roleText)
   ) {
     return {
       placement: 'off_board_module',
       reasons: ['purchased_thermal_assembly_not_pcb_footprint'],
+    }
+  }
+  // INTENT: chassis AC-DC brick / touch HMI are purchased modules, not FR4 parts.
+  if (
+    /isolated[_ -]?ac[_ -]?dc|ac[_ -]?dc[_ -]?power[_ -]?module|bench[_ -]?psu|touch[_ -]?display|local[_ -]?hmi|display[_ -]?panel/i
+      .test(roleText)
+  ) {
+    return {
+      placement: 'off_board_module',
+      reasons: ['purchased_or_host_side_module'],
+    }
+  }
+  // INTENT: channel power bus is copper pour / backplane, not a fitted package.
+  if (/channel[_ -]?power[_ -]?bus|power[_ -]?bus[_ -]?bar/i.test(roleText)) {
+    return {
+      placement: 'interconnect_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['board_copper_or_bus_not_fitted_package'],
     }
   }
   // INTENT: Stir tach remains a host-HAT sense obligation until Pioreactor-class
@@ -482,10 +554,16 @@ function nonBoardPlacement(
       }
     }
   }
+  // DECISION: park a *logical* usb_interface as interconnect only when a
+  // distinct physical receptacle already exists. A lone usb_c_host_interface
+  // IS the physical land (cold-v12) — never self-collapse it.
+  const isLogicalUsbInterfaceOnly =
+    /usb[_ -]?(?:c[_ -]?)?(?:host[_ -]?)?interface/.test(roleText)
+    && !isPhysicalUsbLand(roleText)
   if (
     !hasExplicitPartIdentity &&
-    /usb[_ -]?interface/.test(roleText) &&
-    hasPhysicalUsbEntry
+    isLogicalUsbInterfaceOnly &&
+    hasOtherPhysicalUsbEntry
   ) {
     return {
       placement: 'interconnect_only',
@@ -495,7 +573,7 @@ function nonBoardPlacement(
   }
   if (
     !hasExplicitPartIdentity &&
-    /usb[_ -]?interface/.test(roleText) &&
+    isLogicalUsbInterfaceOnly &&
     hasRadioAndDebugAccess
   ) {
     return {
@@ -695,14 +773,29 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     })
     rationale.push('optical_path_with_cots_host_requires_source_daughterboard')
   } else if ((quantity(state, 'channel_count') ?? 0) > 0) {
+    const nCh = Math.max(1, Math.floor(quantity(state, 'channel_count') ?? 1))
     if (hasFinishedMotionStack(state)) {
       systemDisposition = 'cots_only'
       rationale.push('motion_channels_resolved_by_finished_controller_modules')
-    } else {
+    } else if (hasElectricalChannelEvidence(state)) {
+      // Multi-channel electrical instrument (power + AFE + independent trips).
+      // Never mint a motion_driver_board from bare channel_count + AFE nouns.
+      systemDisposition = 'single_custom'
+      boards = [board('channel_instrument', 'channel_power_afe_controller', ['logic', 'analog', 'power'])]
+      boards[0].channelRequirements.push(
+        { role: 'power_channel', count: nCh },
+        { role: 'sense_channel', count: nCh },
+        { role: 'safety_channel', count: nCh },
+      )
+      rationale.push('electrical_channels_require_power_afe_safety_board')
+    } else if (hasMotionChannelEvidence(state)) {
       systemDisposition = 'single_custom'
       boards = [board('motion_controller', 'motion_driver_board', ['logic', 'power', 'motion_actuation'])]
-      boards[0].channelRequirements.push({ role: 'motion_channel', count: Math.max(1, Math.floor(quantity(state, 'channel_count') ?? 1)) })
+      boards[0].channelRequirements.push({ role: 'motion_channel', count: nCh })
       rationale.push('motion_channels_require_integrated_driver_board')
+    } else {
+      // Bare channel_count with no domain evidence — do not invent motion hardware.
+      rationale.push('channel_count_without_domain_evidence')
     }
   } else if ((quantity(state, 'stage_axis_count') ?? 0) >= 2) {
     if (hasFinishedMotionStack(state) ||
@@ -738,6 +831,7 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     return { wordId: word.wordId, placement: 'unassigned', reasons: ['no_board_plan'] }
   })
   const unassignedWordIds = assignments.filter((item) => item.placement === 'unassigned').map((item) => item.wordId)
+  const onBoardElectronicPartCount = countOnBoardElectronicParts(assignments, words)
 
   return {
     schema: 'pcb-architecture/v1',
@@ -748,5 +842,6 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     unassignedWordIds,
     rationale,
     confidence: systemDisposition === 'unresolved' ? 'low' : 'medium',
+    onBoardElectronicPartCount,
   }
 }

@@ -13901,6 +13901,111 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     ))
   }
 
+  // ── EXTENSION 2026-07-27 (cell cycler cold): multi-channel source/sink bench
+  // power instruments at 100–500 W must NOT fall through to Tier-C plant floors
+  // just because they exceed the ≤100 W lab-electronics band.
+  {
+    const failedCyc: string[] = []
+    const wantCyc = (label: string, cond: boolean) => { if (!cond) failedCyc.push(label) }
+    const cycGraph: any = {
+      product_class: 'consumer_electronics',
+      nodes: [
+        { class: 'energy_conversion_transduction', display: 'Channel Power', role: 'principal', required: true },
+        { class: 'sensing_instrumentation', display: 'Precision AFE', role: 'subsystem', required: true },
+        { class: 'safety_protection', display: 'Channel Safety', role: 'safety', required: true },
+        { class: 'environmental_interface', display: 'Cell Bay Thermal', role: 'subsystem', required: true },
+        // GOTCHA (cold-v3): real bootstrap graphs often OMIT energy_storage —
+        // mains C14 + AC-DC must land on power_distribution, not energy_storage.
+        { class: 'power_distribution', display: 'Mains Ingress', role: 'subsystem', required: true },
+        { class: 'mass_fluid_transport_process', display: 'Air Path', role: 'subsystem', required: false },
+        { class: 'control_compute_communication', display: 'Control', role: 'communications', required: true },
+      ],
+      edges: [],
+    }
+    const cycBrief: any = {
+      product_description:
+        'Eight independent test channels each source and sink current against a single cell. '
+        + 'Precision analogue front end per channel with four-wire Kelvin sense. '
+        + 'Linear-assisted power stage dissipates discharge energy as heat. '
+        + 'Peltier-controlled cell bay against a finned heatsink and fan. Benchtop, 450 mm.',
+      constraints: {
+        target_performance: {
+          metrics: [
+            { key_metric: 'channel_count', value: 8, unit: 'channels' },
+            { key_metric: 'max_simultaneous_dissipation_w', value: 200, unit: 'W' },
+            { key_metric: 'voltage_measurement_accuracy_pct_fs', value: 0.05, unit: '%_FS' },
+          ],
+        },
+      },
+    }
+    const cycContract: any = {
+      product_class: 'consumer_electronics',
+      brief_summary: cycBrief.product_description,
+      quantities: {
+        connected_electrical_load_kw: { value: 0.12 },
+        enclosure_volume_m3: { value: 0.091 },
+        max_simultaneous_dissipation_w: { value: 200 },
+        channel_count: { value: 8 },
+      },
+      _tools_run: ['tec:peltier-sizing', 'instrumentation:adc-resolution'],
+    }
+    const modsCyc = deriveGenericSkeleton(cycGraph, cycBrief, { scale_tier: 'benchtop' } as any, cycContract, new Map()) as any[]
+    const cycAll = modsCyc
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || w.id || ''))))
+      .join(' | ')
+    for (const bad of [
+      'Pipework Run', 'Distribution Manifold', 'Expansion Reservoir', 'Fluid Filter',
+      'Inverter Bridge', 'Chiller Unit', 'Scroll Compressor', 'Buck Boost', 'Main Breaker',
+    ]) {
+      wantCyc(`cycler floor does NOT emit ${bad}`, !new RegExp(bad.replace(/\s+/g, '\\s+'), 'i').test(cycAll))
+    }
+    for (const good of [
+      'Per Channel Precision Afe', 'Per Channel Kelvin Voltage Sense', 'Per Channel Hardware Cutout',
+      'Per Channel Linear Discharge Pass Bank', 'Per Channel Charge Current Source',
+      'Per Channel Discharge Load Mosfet', 'Per Channel Current Shunt', 'Per Channel Cell Thermistor',
+      'Per Channel Over Under Voltage', 'Per Channel Overcurrent Comparator',
+      'Peltier Tec', 'Heatsink Fan', 'IEC C14',
+      'Isolated AC DC Power Module', 'Mains Fuse Holder', 'Per Channel Power Cooling Fan',
+    ]) {
+      wantCyc(`cycler floor emits ${good}`, new RegExp(good.replace(/\s+/g, '\\s+'), 'i').test(cycAll))
+    }
+    // Block 1/2 closure: per-channel words must render ×8 when channel_count=8; shared ×1.
+    const qtyOf = (nameRe: RegExp): number => {
+      for (const m of modsCyc) {
+        for (const sm of m.sub_modules || []) {
+          for (const w of sm.words || []) {
+            if (!nameRe.test(String(w.name_human || ''))) continue
+            const qMod = (w.modifier_characters || []).find((x: any) => x.kind === 'quantity')
+            const mm = String(qMod?.value ?? '').match(/×\s*(\d+)/)
+            return mm ? Number(mm[1]) : 1
+          }
+        }
+      }
+      return 0
+    }
+    wantCyc('Per Channel Precision Afe ×8', qtyOf(/Per\s+Channel\s+Precision\s+Afe/i) === 8)
+    wantCyc('Per Channel Hardware Cutout ×8', qtyOf(/Per\s+Channel\s+Hardware\s+Cutout/i) === 8)
+    wantCyc('Per Channel Linear Source Sink Stage ×8', qtyOf(/Per\s+Channel\s+Linear\s+Source\s+Sink\s+Stage/i) === 8)
+    wantCyc('Per Channel Charge Current Source ×8', qtyOf(/Per\s+Channel\s+Charge\s+Current\s+Source/i) === 8)
+    wantCyc('Per Channel Discharge Load Mosfet ×8', qtyOf(/Per\s+Channel\s+Discharge\s+Load\s+Mosfet/i) === 8)
+    wantCyc('Per Channel Current Shunt ×8', qtyOf(/Per\s+Channel\s+Current\s+Shunt/i) === 8)
+    wantCyc('Channel Power Bus stays ×1', qtyOf(/Channel\s+Power\s+Bus/i) === 1)
+    wantCyc('IEC C14 stays ×1', qtyOf(/IEC\s*C14/i) === 1)
+    const pdWords = modsCyc
+      .filter((m: any) => /power_distribution/i.test(String(m.module || m.module_id || m.id || '')))
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || ''))))
+      .join(' | ')
+    wantCyc('IEC C14 lands on power_distribution', /IEC\s*C14/i.test(pdWords))
+    wantCyc('isolated AC-DC lands on power_distribution', /Isolated\s*AC\s*DC\s*Power\s*Module/i.test(pdWords))
+    out.push(assertEq(
+      'UNIVERSAL.bench_power_instrument_skeleton_floor_replaces_plant_floor',
+      'Cell-cycler proveCatch (2026-07-27 cold): 8-channel source/sink + 200 W dissipation + Kelvin/AFE + Peltier air-cooling on consumer_electronics must emit precision AFE / per-channel hardware cutout / linear discharge / TEC+fan floors and NEVER liquid pipework/manifold/reservoir or inverter-bridge plant parts — no cell_cycler product class.',
+      failedCyc.length,
+      (n) => n === 0,
+      () => `bench-power instrument skeleton cases failed: ${failedCyc.join(' ; ')}. Check derive-skeleton.ts BENCH_POWER_* floors and hasBenchPowerInstrumentSignal.`,
+    ))
+  }
+
   // ── EXTENSION 2026-07-18 (Pioreactor): ml-scale culture + watt-scale load must
   // NEVER select industrial heat_pump / scroll compressor / access ladder floors
   // just because net_heating_required_w matches HEATING_DUTY_RE.

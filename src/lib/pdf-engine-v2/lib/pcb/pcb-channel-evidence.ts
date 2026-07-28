@@ -136,7 +136,58 @@ export function deriveImplementedChannelCounts(args: {
     counts.pump_channel = 1
   }
 
+  // INTENT (Sol+Fable 2026-07-27): multi-channel electrical instruments require
+  // power/sense/safety channel counts from indexed physical instances — never from
+  // a bare role name in architecture. A complete channel is the MIN across the
+  // constituent families (MOSFET ∧ charge ∧ shunt ∧ trip), not the sum — summing
+  // would Goodhart 8×MOSFET+8×charge as "16 power channels".
+  if ((counts.power_channel ?? 0) === 0) {
+    const mos = countRoleInstances(components, /discharge[_ -]?load[_ -]?mosfet|(^|[_ -])mosfet($|[_ -])/i)
+    // DECISION: charge path is charge_current_source OR source_sink_stage — take
+    // max of the two families, then min with MOSFET (not sum of both families).
+    const charge = Math.max(
+      countRoleInstances(components, /charge[_ -]?current[_ -]?source/i),
+      countRoleInstances(components, /source[_ -]?sink[_ -]?stage|linear[_ -]?source[_ -]?sink/i),
+    )
+    counts.power_channel = minPositive(mos, charge)
+  }
+  if ((counts.sense_channel ?? 0) === 0) {
+    const shunt = countRoleInstances(components, /current[_ -]?shunt|shunt[_ -]?measurement/i)
+    const afe = countRoleInstances(components, /precision[_ -]?afe|(^|[_ -])afe($|[_ -])/i)
+    counts.sense_channel = minPositive(shunt, afe)
+  }
+  if ((counts.safety_channel ?? 0) === 0) {
+    const trip = countRoleInstances(components, /overcurrent[_ -]?comparator|over[_ -]?under[_ -]?voltage|overtemp[_ -]?trip|hardware[_ -]?cutout/i)
+    const polarity = countRoleInstances(components, /reverse[_ -]?polarity/i)
+    counts.safety_channel = minPositive(trip, polarity)
+  }
+
   return counts
+}
+
+/**
+ * @description Count distinct physical instances matching a role pattern.
+ * Prefers expanded `__N` suffixes; falls back to 1 when a single match exists.
+ */
+export function countRoleInstances(
+  components: ChannelEvidenceComponent[],
+  rolePattern: RegExp,
+): number {
+  const matched = components.filter((c) => {
+    const blob = `${c.characterId ?? ''} ${c.nameHuman ?? ''}`
+    // GOTCHA (cold-v12): decoupling companions reuse the parent role name and
+    // would double-count power/sense/safety channels (8 MOSFET → 16).
+    if (/decouple[_ -]/i.test(blob)) return false
+    return rolePattern.test(blob)
+  })
+  if (matched.length === 0) return 0
+  return matched.length
+}
+
+/** @description Min of positive counts; 0 if any constituent is missing. */
+function minPositive(...counts: number[]): number {
+  if (counts.length === 0 || counts.some((n) => n <= 0)) return 0
+  return Math.min(...counts)
 }
 
 /**

@@ -119,8 +119,56 @@ describe('derivePcbArchitecture', () => {
     expect(plan.unassignedWordIds).toEqual([])
   })
 
-  it('records required repeated channel capacity on board plans', () => {
+  it('does not invent a motion board from bare channel_count alone', () => {
     const plan = derivePcbArchitecture(stateWithQuantities({ channel_count: 4 }))
+    expect(plan.systemDisposition).toBe('unresolved')
+    expect(plan.boards).toHaveLength(0)
+    expect(plan.rationale).toContain('channel_count_without_domain_evidence')
+  })
+
+  it('records electrical channel capacity when AFE/power evidence is present', () => {
+    const state = stateWithQuantities({ channel_count: 8 })
+    state.moduleDecomposition = {
+      modules: [{
+        module: 'sensing',
+        sub_modules: [{
+          id: 'afe',
+          words: [{
+            id: 'afe',
+            name_human: 'Per Channel Precision Afe',
+            content_character: { character_id: 'per_channel_precision_afe' },
+            modifier_characters: [],
+          }],
+        }],
+      }],
+    }
+    const plan = derivePcbArchitecture(state)
+    expect(plan.boards[0].role).toBe('channel_power_afe_controller')
+    expect(plan.boards[0].channelRequirements).toEqual([
+      { role: 'power_channel', count: 8 },
+      { role: 'sense_channel', count: 8 },
+      { role: 'safety_channel', count: 8 },
+    ])
+    expect(plan.rationale).toContain('electrical_channels_require_power_afe_safety_board')
+  })
+
+  it('records motion channel capacity only when motion evidence is present', () => {
+    const state = stateWithQuantities({ channel_count: 4 })
+    state.moduleDecomposition = {
+      modules: [{
+        module: 'control',
+        sub_modules: [{
+          id: 'motion',
+          words: [{
+            id: 'driver',
+            name_human: 'Stepper motor driver channel',
+            content_character: { character_id: 'stepper_motor_driver' },
+            modifier_characters: [],
+          }],
+        }],
+      }],
+    }
+    const plan = derivePcbArchitecture(state)
     expect(plan.boards[0].channelRequirements).toEqual([{ role: 'motion_channel', count: 4 }])
   })
 
@@ -619,5 +667,67 @@ describe('derivePcbArchitecture', () => {
     ]))
     expect(plan.boards.find((item) => item.boardId === 'wet_lab_hat')?.requiredWordIds)
       .not.toContain('firmware_storage_word')
+  })
+
+  // INTENT (Sol+Fable 2026-07-27): cold-v10 token board — channel power roles
+  // were dropped at collectElectronicWords; cooling fan bloated the Gate 38 denom.
+  it('proveCatch: channel power/sense/safety roles collect on_board; fan/heatsink off_board', () => {
+    const state = withElectronicWords(
+      stateWithQuantities({ channel_count: 8 }),
+      [
+        { id: 'per_channel_discharge_load_mosfet_word', nameHuman: 'Discharge MOSFET', characterId: 'per_channel_discharge_load_mosfet', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_charge_current_source_word', nameHuman: 'Charge Source', characterId: 'per_channel_charge_current_source', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_current_shunt_measurement_word', nameHuman: 'Shunt', characterId: 'per_channel_current_shunt_measurement', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_current_control_loop_word', nameHuman: 'Control Loop', characterId: 'per_channel_current_control_loop', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_overcurrent_comparator_word', nameHuman: 'OC Comp', characterId: 'per_channel_overcurrent_comparator', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_precision_afe_word', nameHuman: 'AFE', characterId: 'per_channel_precision_afe', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_power_heatsink_word', nameHuman: 'Heatsink', characterId: 'per_channel_power_heatsink', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'per_channel_power_cooling_fan_word', nameHuman: 'Cooling Fan', characterId: 'per_channel_power_cooling_fan', modifiers: [{ kind: 'quantity', value: '×8' }] },
+        { id: 'main_controller_mcu_word', nameHuman: 'MCU', characterId: 'main_controller_mcu' },
+      ],
+    )
+    const plan = derivePcbArchitecture(state)
+    expect(plan.boards[0]?.role).toBe('channel_power_afe_controller')
+    const byId = Object.fromEntries(plan.assignments.map((a) => [a.wordId, a.placement]))
+    expect(byId.per_channel_discharge_load_mosfet_word).toBe('on_board')
+    expect(byId.per_channel_charge_current_source_word).toBe('on_board')
+    expect(byId.per_channel_current_shunt_measurement_word).toBe('on_board')
+    expect(byId.per_channel_current_control_loop_word).toBe('on_board')
+    expect(byId.per_channel_overcurrent_comparator_word).toBe('on_board')
+    expect(byId.per_channel_power_heatsink_word).toBe('off_board_module')
+    expect(byId.per_channel_power_cooling_fan_word).toBe('off_board_module')
+    expect(plan.boards[0]?.requiredWordIds).toEqual(expect.arrayContaining([
+      'per_channel_discharge_load_mosfet_word',
+      'per_channel_current_shunt_measurement_word',
+    ]))
+    expect(plan.boards[0]?.requiredWordIds).not.toContain('per_channel_power_cooling_fan_word')
+    // 6 channel roles ×8 + MCU ×1 = 49 on-board fitted instances
+    expect(plan.onBoardElectronicPartCount).toBe(49)
+  })
+
+  // proveCatch (cold-v12): lone usb_c_host_interface is the physical Type-C land —
+  // must stay on_board required, not self-collapse to interconnect_only.
+  it('proveCatch: lone usb_c_host_interface stays on_board (not duplicate self-collapse)', () => {
+    const state = withElectronicWords(
+      stateWithQuantities({ channel_count: 8 }),
+      [
+        { id: 'main_controller_mcu_word', nameHuman: 'MCU', characterId: 'main_controller_mcu' },
+        {
+          id: 'usb_c_host_interface_word',
+          nameHuman: 'Usb C Host Interface',
+          characterId: 'usb_c_host_interface',
+        },
+        {
+          id: 'per_channel_discharge_load_mosfet_word',
+          nameHuman: 'MOSFET',
+          characterId: 'per_channel_discharge_load_mosfet',
+          modifiers: [{ kind: 'quantity', value: '×8' }],
+        },
+      ],
+    )
+    const plan = derivePcbArchitecture(state)
+    const byId = Object.fromEntries(plan.assignments.map((a) => [a.wordId, a.placement]))
+    expect(byId.usb_c_host_interface_word).toBe('on_board')
+    expect(plan.boards[0]?.requiredWordIds).toContain('usb_c_host_interface_word')
   })
 })

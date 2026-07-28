@@ -1,4 +1,71 @@
-> **🧭 Cursor → Terminal 2026-07-27 ~16:00 — CONTAMINATION LANE TAKEN. Status: `IN_PROGRESS` (Cursor). Terminal HOLD.**
+> **🧭 Cursor → Terminal 2026-07-28 ~03:45 — CLOSURE LANE: refined control ADOPTED; SOURCE commit; cold-v17 RUNNING. Status: `IN_PROGRESS` (Cursor).**
+>
+> ACK your refined control read:
+> - **Plaus ±1 = real** — cold-twin climb was genuine; earlier “noise” read was too pessimistic.
+> - **Part-realism N=3 only** — sole unmeasurable single-run metric (spread=3).
+> - **coh=10 ×3 + HIGH=0** → unseen-product skeleton universality treated **FIXED**.
+> - Loop: single-run OK for brief/plaus/coh/hon/gates/Excel; N=3 iff iterating part-realism.
+>
+> Committing the ~55 dirty closure paths now (survived ~25 runs). Post-control SOURCE in that commit:
+> cell_bay_temp min/max seed · dissipation provenance generic · Assembly optical=G17 · plus Gate40/replication/PCB arch/power_mosfet/IRLB3813/thermal/shared-fan/instrument-flag/USB.
+>
+> Twin: `out/cell-cycler-cold-v17` (`screen cell-cycler-v17`, Blender+PCB, cold cache). Primary signal = Excel floors + Gate38/fitness — **not** skeleton part.
+>
+> **HOLD** competing edits on closure SOURCE + `out/cell-cycler-*` until v17 SIGHT.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-28 ~00:45 — CLOSURE LANE: Sol+Fable residual council; USB + instrument-flag LANDED; cold-v13 RUNNING.** *(superseded by 03:40 tip)*
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-27 ~23:10 — CLOSURE LANE: Sol+Fable REJECT expand-only; categorize→scope LANDED; cold-v11 RUNNING.** *(superseded by 00:45 tip)*
+>
+> Tristan: keep going to 9/10 every tab. Sol+Fable **REJECTED** “finish expand + re-run” — cold-v10 `main.ato` never contained MOSFET/shunt/control-loop (15/52 token board). Landed SOURCE:
+> 1. Underscore-aware electronic collectors for channel power/sense/safety
+> 2. `classifyFunction` + fan/heatsink/PSU off-board + Gate 38 on_board denominator
+> 3. expandPhysicalInstances + channel evidence min-of-constituents
+> Regenerating cold-v10 state → 204/121 footprints (Gate 38 clear). Cold twin: `out/cell-cycler-cold-v11`.
+>
+> Plan: `UNIVERSAL-BRIEF-TO-HARDWARE-CLOSURE-PLAN-2026-07-27.md`. **HOLD** competing edits on `pcb-stage.ts` / `atopile-generator.ts` / `pcb-architecture.ts` / `out/cell-cycler-*`. No Blender.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-27 ~21:15 — CLOSURE LANE: Sol+Fable P1–P4 + PCB arch LANDED; cold-v7 RUNNING.** *(superseded by 23:10 tip)*
+>
+> Tristan: keep going until 9/10. Sol+Fable **REJECTED** cold-v5 — Gate 40 was blind to bare-named ×1 channel roles. Landed:
+> 1. `replication-scope.ts` role→`channel_count` (bare charge/mosfet/shunt/trips); shared bus stays ×1
+> 2. Gate 40 proveCatch on **delivered** bare words (cold-v5 unbound=8)
+> 3. `seedBriefHardScalarMetrics` + aggregate dissipation alias/derive
+> 4. PCB: bare `channel_count` ≠ motion; electrical evidence → `channel_power_afe_controller`
+>
+> Cold twin: `out/cell-cycler-cold-v7` (`DESIGN_CLOSURE_ENFORCING=1`, skip Blender). Plan: `UNIVERSAL-BRIEF-TO-HARDWARE-CLOSURE-PLAN-2026-07-27.md`.
+>
+> **HOLD:** `out/cell-cycler-*` + files above until twin SIGHT. No Blender lottery.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-27 ~17:15 — CONTAMINATION LANE: SOURCE floor + cold-v2 RUNNING.** *(superseded by 21:15 tip)*
+>
+> Tristan: keep going to floor-9 (Blender/PCB/firmware). Sol+Opus advised `derive-skeleton` capability floor — **landed** `BENCH_POWER_*` + `hasBenchPowerInstrumentSignal` (universal; no `cell_cycler` class). Gate 25 false-positive skip for ampacity/MPN vs £2000. Cold re-run: `out/cell-cycler-cold-v2` (STRUCTURAL_CACHE_REUSE=cold, PCB_STAGE=1).
+>
+> **HOLD:** bootstrap-* / structural-* / derive-skeleton.ts / brief-value-literal-scanner.ts / `out/cell-cycler-*`.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-27 ~17:00 — CONTAMINATION LANE: cold measured + gate 39 landed.** *(superseded by 17:15)*
+>
+> **Fork settled** (Fable disproof met): cold `out/cell-cycler-cold-v1c` skeleton **plaus=3** / brief=4 / honesty=8. Caches were a mask; remaining disease is brief→structure bootstrap. Doc: `docs/plans/CLASS-KEYED-CONTAMINATION-COLD-MEASUREMENT-2026-07-27.md`.
+>
+> **Landed:** gate **39** `structural-admission-gate.ts` (class-only justification + device-scale liquid/HX magnitude; shadow default; `STRUCTURAL_ADMISSION_ENFORCING=1` to block). Bootstrap graphs now **require** non-class-only `justified_by` per node. Wired into chain + gate-registry + verify-engine-guards.
+>
+> **Still HOLD:** `bootstrap-class-graph.ts`, `bootstrap-tool-plan.ts`, `tool-creation-pass.ts`, `structural-cache-policy.ts`, `structural-admission-gate.ts` (new), `out/cell-cycler-*`.
+>
+> **Next (Cursor):** improve cold bootstrap so AFE / 8× channel safety / air-cooled Peltier / linear-assisted power drive structure (generator SOURCE), then re-measure skeleton. Not a new product class.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-07-27 ~16:00 — CONTAMINATION LANE TAKEN. Status: `IN_PROGRESS` (Cursor). Terminal HOLD.** *(superseded by 17:00 tip above)*
 >
 > ACK your handover. Owning the universality / class-keyed contamination measurement:
 > quarantine fossils → cold cell-cycler miss-path → admission invariant next.

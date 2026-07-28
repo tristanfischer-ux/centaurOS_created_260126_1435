@@ -122,7 +122,15 @@ export function evaluatePcbGate(pcb: PcbStageResult | null | undefined): PcbGate
     // 'clean_board'). 'clean_board' was scoring the wrong thing. A bespoke board whose
     // footprint COVERAGE of the design's own claimed electronic parts is materially
     // incomplete is a token board, not a shippable PCBA → the gate fires.
-    const expected = Number(pcb.electronicPartCount ?? 0)
+    // INTENT (Sol+Fable 2026-07-27): prefer architecture on_board quantity so
+    // heatsink/fan/PSU modules cannot make ≥80% unreachable by construction.
+    const archOnBoard = Number(
+      (pcb.architecture as { onBoardElectronicPartCount?: number } | undefined)
+        ?.onBoardElectronicPartCount ?? 0,
+    )
+    const expected = archOnBoard > 0
+      ? archOnBoard
+      : Number(pcb.electronicPartCount ?? 0)
     // GOTCHA: do NOT use `pipeline.components ?? 0` alone — multi-board aggregates
     // put the count under generator (see countPlacedPipelineComponents).
     const placed = countPlacedPipelineComponents(pipeline)

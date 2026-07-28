@@ -260,6 +260,12 @@ _GENERIC_ROLE = {
     # discriminate ROLE — only genuine domain tokens like supply/demand/electrical do)
     "area", "cost", "price", "mass", "load", "power", "capacity", "rate", "size",
     "volume", "length", "width", "height", "weight", "value", "flow", "duty",
+    # INTENT (cell-cycler cold-v15 Calculations HIGH): instrument aggregate thermal
+    # duty (max_simultaneous_dissipation_w = 200 W) and a per-channel shunt resistor
+    # loss (channel_shunt_dissipation_w = 0.5 W) share only the measurement noun
+    # 'dissipation' — different physical roles (system heat vs sense-element I²R).
+    # Domain tokens (simultaneous/aggregate vs shunt/channel) discriminate.
+    "dissipation", "dissipated", "loss",
     "demand_kw",  # never a token, but guard
     # device-type + flow-descriptor nouns — shared across UNRELATED equipment, so they don't
     # discriminate ROLE either. A metering pump and a circulation pump are both "dosing pumps" but
@@ -680,6 +686,26 @@ def _selftest() -> int:
     expect(not any(f.kind == "divergence" for f in audit_provenance(lifecycle).findings),
            "a plant's lifecycle (cradle-to-grave) CO2 total and its embodied-only component "
            "are a roll-up relation, not a same-role contradiction")
+
+    # DISSIPATION measurement-noun guard (cell-cycler cold-v15 Calculations):
+    # aggregate instrument heat (200 W) vs channel shunt I²R (0.5 W) share only
+    # 'dissipation' — must NOT flag. Two competing aggregate thermal claims still flag.
+    dissip = {"orchestratorContract": {"quantities": {
+        "max_simultaneous_dissipation_w": {"value": 200.0, "unit": "W", "source": "brief"},
+        "channel_shunt_dissipation_w": {"value": 0.5, "unit": "W", "source": "calculator"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(dissip).findings),
+           "aggregate instrument dissipation vs channel shunt dissipation must NOT "
+           "cluster merely because both carry the measurement noun 'dissipation'")
+    # GOTCHA: total_* is an aggregate qualifier vs max_* (per-unit/peak) — that
+    # pair is skipped by the roll-up guard. Use two non-aggregate keys that share
+    # the domain token 'simultaneous' so the catch stays live.
+    same_agg_dissip = {"orchestratorContract": {"quantities": {
+        "max_simultaneous_dissipation_w": {"value": 200.0, "unit": "W", "source": "brief"},
+        "peak_simultaneous_dissipation_w": {"value": 0.5, "unit": "W", "source": "calculator"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_agg_dissip).findings),
+           "two competing simultaneous dissipation claims that disagree must still flag")
 
     # TOOL-CLAIM ORIGIN (both directions): a quantity matching the run's recorded tool
     # claim is TRACED (the tool run IS its recorded origin); a claim whose value

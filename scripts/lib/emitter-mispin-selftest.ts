@@ -7,6 +7,7 @@
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
 import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, scrubInstrumentIndustrialPartVerifications, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, headNounLeadsPartName, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { computeIsInstrumentDevice, selftestInstrumentDeviceFlag } from './instrument-device-flag'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -132,6 +133,30 @@ expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === false,
 setInstrumentDeviceContext(false)
 expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === true,
   'PLANT: the SAME NSX breaker IS accepted off a device (guard is flag-gated → no plant regression)')
+// ── DEVICE EMC filter ampacity (2026-07-27 cell-cycler cold-v4): Schaffner makes
+//    both benchtop FN2090-6-06 and industrial FN 3359HV-400-99 — refuse by rating.
+const _fn3359: DbPart = {
+  part_name: 'Power Line Filters 3 PHASE 400A 690VAC',
+  manufacturer: 'Schaffner',
+  part_number: 'FN 3359HV-400-99',
+  component_class: 'electronic_pcb',
+  unit_price_gbp: 1353,
+}
+const _fn2090: DbPart = {
+  part_name: 'Single-phase EMC filter 6 A 250 VAC',
+  manufacturer: 'Schaffner',
+  part_number: 'FN2090-6-06',
+  component_class: 'electronic_pcb',
+  unit_price_gbp: 28,
+}
+setInstrumentDeviceContext(true)
+expect(dbHitAcceptableForWord(_fn3359, 'Emc Line Filter') === false,
+  'DEVICE: FN 3359HV-400-99 (400 A 3φ) must be refused on an EMC line-filter slot')
+expect(dbHitAcceptableForWord(_fn2090, 'Emc Line Filter') === true,
+  'DEVICE: FN2090-6-06 (~6 A 1φ) must still be accepted on an EMC line-filter slot')
+setInstrumentDeviceContext(false)
+expect(dbHitAcceptableForWord(_fn3359, 'Emc Line Filter') === true,
+  'PLANT: the SAME 400 A filter IS accepted off a device (flag-gated)')
 // ── HEAD-NOUN-LEADS ranking (2026-07-13, colorimeter seed gap): a web_verified_ingest row
 //    whose part_name LEADS with the design vocabulary must outrank a distributor row whose
 //    head noun only appears mid-name ("16-bit Microcontrollers - MCU" vs "Microcontroller — ATSAMD21").
@@ -504,5 +529,23 @@ expect(isCatalogueComponent('cooling-water skid thermal_utilities') === false,
 expect(isCatalogueComponent('platform assembly maintenance_serviceability__leveling_feet') === false,
   "a bare 'platform' with no access+skid compound qualifier MUST stay refused")
 
+// proveCatch (cold-v12): engContract enclosure empty + orch derived_device_scale
+// must still set isInstrumentDevice before fillBlank (FN3359 ampacity refuse path).
+try {
+  selftestInstrumentDeviceFlag()
+  const flag = computeIsInstrumentDevice({
+    engineeringContract: { quantities: {} },
+    orchestratorContract: {
+      quantities: { enclosure_volume_m3: { value: 0.091125, source: 'derived_device_scale' } },
+    },
+    productClass: 'consumer_electronics',
+  })
+  expect(flag.isInstrumentDevice === true,
+    'cold-v12 empty eng + orch 0.09 m³ MUST set isInstrumentDevice before MPN fill')
+} catch (err) {
+  failures++
+  console.error('  ✗ instrument-device-flag selftest: ' + (err instanceof Error ? err.message : String(err)))
+}
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + lexicon-round-4 + exclusive-assignment + untethered-accessory-valve tether-or-suppress + duplicate-representative-population fold proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + lexicon-round-4 + exclusive-assignment + untethered-accessory-valve tether-or-suppress + duplicate-representative-population fold proven + instrument-device-flag)')

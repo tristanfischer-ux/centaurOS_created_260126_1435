@@ -13453,6 +13453,21 @@ def _sealed_enclosure_env_mm(state, quantities):
             is_instrument=_IS_INSTRUMENT_DEVICE,
         )) if callable(_le_detect) else False
     )
+    # INTENT (2026-07-27 cell-cycler): bench power instruments share the sealed
+    # lab-electronics envelope path (not tip-back PCR). Detect wins over
+    # THERMOCYCLER_PART_RE (peltier|heatsink_fan) which previously rendered a
+    # clipboard-like lid hero for a source/sink cycler.
+    _bp_detect = getattr(ifg, "is_bench_power_instrument_form", None)
+    _IS_BENCH_POWER_FORM = (
+        bool(_bp_detect(
+            product_class=pc or "",
+            part_blob=part_blob,
+            is_instrument=_IS_INSTRUMENT_DEVICE,
+        )) if callable(_bp_detect) else False
+    )
+    if _IS_BENCH_POWER_FORM:
+        _IS_LAB_ELECTRONICS_FORM = True
+        _IS_THERMOCYCLER_FORM = False
     # LAB-ELECTRONICS SIGNATURE (Tristan 2026-07-18): the shared lab_electronics family
     # covers three morphologically DIFFERENT products. Sub-type by CONTRACT SIGNAL (never a
     # product-name table, per CORE FIX PRINCIPLE) so each gets its recognisable signature
@@ -13464,7 +13479,11 @@ def _sealed_enclosure_env_mm(state, quantities):
     _wv = qval(quantities, "working_volume_ml", None)
     _ec = qval(quantities, "electrode_count", None)
     _pcs = (pc or "").lower()
-    if (_ec is not None and float(_ec) >= 8) or re.search(r"microfluid|opendrop|ewod|electrowet", _pcs):
+    if _IS_BENCH_POWER_FORM:
+        # GOTCHA: electrode_count≥8 used to select ewod — channel_count on a
+        # power instrument is NOT an EWOD electrode grid.
+        _LE_SIGNATURE = "bench_power"
+    elif (_ec is not None and float(_ec) >= 8) or re.search(r"microfluid|opendrop|ewod|electrowet", _pcs):
         _LE_SIGNATURE = "ewod"
     elif (_wv is not None and 0 < float(_wv) <= 250) or re.search(r"bioreactor|pioreactor|ferment|chemostat|turbidostat", _pcs):
         _LE_SIGNATURE = "vial_bioreactor"
@@ -15753,6 +15772,13 @@ _LE_INTERIOR_SIGNATURE_PARTS = {
     # boost/driver stack + the ribbon/FFC cartridge connector feeding the planar
     # electrode grid. NO BNC coax (droplets are actuated, not measured on coax).
     "ewod": ("hv_driver", "hv_driver", "ribbon_connector", "electrode_fanout"),
+    # Bench multi-channel source/sink power instrument (2026-07-27 cell-cycler):
+    # precision AFE + cell-bay contacts + Peltier block + IEC C14 inlet + pass-bank
+    # heatsink. NEVER BNC electrochemistry coax (wrong morphology).
+    "bench_power": (
+        "afe_chip", "afe_chip", "channel_terminal_strip",
+        "peltier_block", "c14_inlet", "pass_bank_heatsink",
+    ),
     # Generic sealed AFE box: the original shared PCB/USB/BNC story.
     "generic": ("afe_chip", "afe_chip", "afe_chip", "bnc_electrode", "bnc_cell"),
 }
@@ -15952,6 +15978,42 @@ def _place_lab_electronics_interior_layout(
                              ribbon_mat, module=story_mod, module_objects=MO)
             _ef.dimensions = _mm3((pcb_w * 0.58, pcb_d * 0.44, 1.2))
             _count(_ef, "box")
+        elif _role == "channel_terminal_strip":
+            # Front cell-bay Kelvin/power terminals (bench_power) — not BNC.
+            _ts = fl.add_box(
+                "u_se_le_channel_terminal_strip",
+                _mm3((0.0, _face_y + 2.0, base_z + H * 0.42)),
+                _mm3((W * 0.55, 8.0, H * 0.22)),
+                conn_mat, module=story_mod, module_objects=MO)
+            _ts.dimensions = _mm3((W * 0.55, 8.0, H * 0.22))
+            _count(_ts, "auth")
+        elif _role == "peltier_block":
+            # Cell-bay TEC under the sample locus (bench_power).
+            _pb = fl.add_box(
+                "u_se_le_peltier_block",
+                _mm3((W * 0.18, D * 0.08, base_z + H * 0.28)),
+                _mm3((W * 0.28, D * 0.30, H * 0.16)),
+                heater_mat, module=story_mod, module_objects=MO)
+            _pb.dimensions = _mm3((W * 0.28, D * 0.30, H * 0.16))
+            _count(_pb, "box")
+        elif _role == "c14_inlet":
+            # Rear IEC C14 fused inlet (bench_power mains ingress).
+            _c14 = fl.add_box(
+                "u_se_le_c14_inlet",
+                _mm3((-W * 0.28, D / 2 - tt - 4.0, base_z + H * 0.35)),
+                _mm3((28.0, 10.0, 20.0)),
+                conn_mat, module=story_mod, module_objects=MO)
+            _c14.dimensions = _mm3((28.0, 10.0, 20.0))
+            _count(_c14, "auth")
+        elif _role == "pass_bank_heatsink":
+            # Linear discharge pass-bank heatsink fin stack (bench_power).
+            _hs = fl.add_box(
+                "u_se_le_pass_bank_heatsink",
+                _mm3((-W * 0.18, D * 0.10, base_z + H * 0.32)),
+                _mm3((W * 0.30, D * 0.22, H * 0.20)),
+                heater_mat, module=story_mod, module_objects=MO)
+            _hs.dimensions = _mm3((W * 0.30, D * 0.22, H * 0.20))
+            _count(_hs, "box")
 
     # Coin cell / backup under the board edge.
     try:

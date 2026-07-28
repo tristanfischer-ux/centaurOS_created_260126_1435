@@ -625,8 +625,180 @@ function run() {
   if (JSON.stringify(bessC2) !== bessBefore2)
     throw new Error('demand-coverage rules 3+4: a BESS-like contract (no m³/h flows, metrics already-verifiable or basis-less) must stay BYTE-IDENTICAL with briefMetrics + modules supplied')
 
+  // ── COUNT-ONLY smear (Block 1): bare channel_count must NOT ×8 Channel Power Bus ──
+  {
+    const busMods: any = [{
+      module: 'power_distribution',
+      sub_modules: [{
+        id: 'sm',
+        words: [
+          {
+            id: 'channel_power_bus_word',
+            name_human: 'Channel Power Bus',
+            content_character: { character_id: 'channel_power_bus', name_human: 'Channel Power Bus' },
+            modifier_characters: [{ kind: 'quantity', value: '×1' }],
+          },
+          {
+            id: 'per_channel_precision_afe_word',
+            name_human: 'Per Channel Precision Afe',
+            content_character: { character_id: 'per_channel_precision_afe', name_human: 'Per Channel Precision Afe' },
+            modifier_characters: [{ kind: 'quantity', value: '×8' }],
+          },
+        ],
+      }],
+    }]
+    applyUniversalContractSizing(busMods as never[], {
+      quantities: { channel_count: { value: 8 } },
+    } as any, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+    const busQty = String(modsOf(busMods, 'Channel Power Bus').find((x) => x.kind === 'quantity')?.value ?? '')
+    if (!/×\s*1\b/.test(busQty)) {
+      throw new Error(
+        `count-only-smear: Channel Power Bus must stay ×1 when only channel_count is on the contract ` +
+        `(got "${busQty}" — bare count groups must not fuzzy-stamp shared power nouns)`,
+      )
+    }
+    const afeQty = String(modsOf(busMods, 'Per Channel Precision Afe').find((x) => x.kind === 'quantity')?.value ?? '')
+    if (!/×\s*8\b/.test(afeQty)) {
+      throw new Error(`count-only-smear: Per Channel Precision Afe must keep its pre-bound ×8 (got "${afeQty}")`)
+    }
+  }
+
+  // ── HEATSINK AREA PROJECTION (cold-v5 / Block 1 closure, 2026-07-27) ─────────
+  // THE BUG: heatsink_fin_surface_area_m2 ≈ 0.153 stamped as `0 m² area` via
+  // Math.round — authoritative tool area erased. Dissipation >0 with a nonzero
+  // contract area MUST project a nonzero m² dimension onto a heatsink word.
+  const hsModules: any = [{
+    module: 'energy_conversion_transduction',
+    sub_modules: [{
+      id: 'sm',
+      words: [
+        {
+          id: 'per_channel_power_heatsink_word',
+          name_human: 'Per Channel Power Heatsink',
+          content_character: { character_id: 'per_channel_power_heatsink', name_human: 'Per Channel Power Heatsink' },
+          modifier_characters: [{ kind: 'quantity', value: '×8' }],
+        },
+        {
+          id: 'finned_heatsink_word',
+          name_human: 'Finned Heatsink',
+          content_character: { character_id: 'finned_heatsink', name_human: 'Finned Heatsink' },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }],
+        },
+      ],
+    }],
+  }]
+  const hsContract: any = {
+    quantities: {
+      heatsink_fin_surface_area_m2: { value: 0.15302999387880026, unit: 'm2', family: 'area' },
+      aggregate_linear_stage_dissipation_w: { value: 200, unit: 'W', family: 'power' },
+    },
+  }
+  applyUniversalContractSizing(hsModules as never[], hsContract, {
+    synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false,
+  })
+  const hsDim = (name: string): string => {
+    const mods = modsOf(hsModules, name)
+    const d = mods.find((x) => x.kind === 'dimension' || x.kind === 'dimensions')
+    return String(d?.value ?? '')
+  }
+  const sinkDim = hsDim('Per Channel Power Heatsink') || hsDim('Finned Heatsink')
+  const areaMatch = sinkDim.match(/([0-9]*\.?[0-9]+)\s*m²\s*area/i)
+  const areaVal = areaMatch ? Number(areaMatch[1]) : 0
+  if (!(areaVal > 0)) {
+    throw new Error(
+      `heatsink-area: dissipation=200 W + heatsink_fin_surface_area_m2=0.153 must project a NONZERO m² ` +
+      `dimension onto a heatsink word (cold-v5 stamped "0 m² area" via Math.round) — got "${sinkDim}"`,
+    )
+  }
+  // Dissipation-only path (no area key): must stamp a watt rating, never leave blank.
+  const dissOnly: any = [{
+    module: 'energy_conversion_transduction',
+    sub_modules: [{
+      id: 'sm',
+      words: [{
+        id: 'per_channel_power_heatsink_word3',
+        name_human: 'Per Channel Power Heatsink',
+        content_character: { character_id: 'per_channel_power_heatsink', name_human: 'Per Channel Power Heatsink' },
+        modifier_characters: [{ kind: 'quantity', value: '×8' }],
+      }],
+    }],
+  }]
+  applyUniversalContractSizing(dissOnly as never[], {
+    quantities: { channel_max_dissipation_w: { value: 25, unit: 'W' } },
+  } as any, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+  const dissMods = modsOf(dissOnly, 'Per Channel Power Heatsink')
+  const hasW = dissMods.some((x) => x.kind === 'rating_primary' && Number(x.value) === 25 && /w/i.test(String(x.unit ?? 'W')))
+  if (!hasW) {
+    throw new Error(
+      `heatsink-dissipation: channel_max_dissipation_w=25 with no area must stamp rating_primary 25 W ` +
+      `(got ${JSON.stringify(dissMods.filter((x) => x.kind === 'rating_primary' || x.kind === 'dimension'))})`,
+    )
+  }
+  // proveCatch (cold-v13): aggregate 200 W must NOT stamp 200 W onto each of ×8
+  // channel sinks — stamp the per-channel share (25 W) and repair a diseased 200 W.
+  const overStamp: any = [{
+    module: 'energy_conversion_transduction',
+    sub_modules: [{
+      id: 'sm',
+      words: [{
+        id: 'per_channel_power_heatsink_word4',
+        name_human: 'Per Channel Power Heatsink',
+        content_character: { character_id: 'per_channel_power_heatsink', name_human: 'Per Channel Power Heatsink' },
+        modifier_characters: [
+          { kind: 'quantity', value: '×8' },
+          { kind: 'rating_primary', value: '200', unit: 'W' },
+        ],
+      }],
+    }],
+  }]
+  applyUniversalContractSizing(overStamp as never[], {
+    quantities: {
+      channel_count: { value: 8 },
+      aggregate_dissipation_w: { value: 200, unit: 'W' },
+      max_simultaneous_dissipation_w: { value: 200, unit: 'W' },
+    },
+  } as any, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false, onlyUnsized: true })
+  const overMods = modsOf(overStamp, 'Per Channel Power Heatsink')
+  const fixedW = overMods.find((x) => x.kind === 'rating_primary')
+  if (!fixedW || Number(fixedW.value) !== 25) {
+    throw new Error(
+      `heatsink-conservation: aggregate=200 + channel_count=8 must repair ×8@200 W → 25 W/channel ` +
+      `(got ${JSON.stringify(fixedW)})`,
+    )
+  }
+  if (areaVal < 0.1 || areaVal > 0.2) {
+    throw new Error(
+      `heatsink-area: projected area must stay near the tool value 0.153 m² (got ${areaVal} from "${sinkDim}")`,
+    )
+  }
+  // NEGATIVE: no area on contract ⇒ do NOT invent a heatsink dimension.
+  const bareHs: any = [{
+    module: 'environmental_interface',
+    sub_modules: [{
+      id: 'sm',
+      words: [{
+        id: 'finned_heatsink_word2',
+        name_human: 'Finned Heatsink',
+        content_character: { character_id: 'finned_heatsink', name_human: 'Finned Heatsink' },
+        modifier_characters: [{ kind: 'quantity', value: '×1' }],
+      }],
+    }],
+  }]
+  applyUniversalContractSizing(bareHs as never[], { quantities: { aggregate_linear_stage_dissipation_w: { value: 200 } } } as any, {
+    synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false,
+  })
+  {
+    const bareMods = modsOf(bareHs, 'Finned Heatsink')
+    const invented = bareMods.some(
+      (x) => (x.kind === 'dimension' || x.kind === 'dimensions') && /m²\s*area/i.test(String(x.value ?? '')),
+    )
+    if (invented) {
+      throw new Error('heatsink-area: without heatsink_fin_surface_area_m2 the word must stay unsized — never invent a m² dimension from dissipation alone')
+    }
+  }
+
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated LT BANDED by standard range (codema v61): one line per range band with the smallest standard range ≥ each vessel, ≥-tallest kept per band, count conserved, uniform set = 1 line, above-ladder band flagged at a ≥-height custom range, contract-ranged PT never splits; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated LT BANDED by standard range (codema v61): one line per range band with the smallest standard range ≥ each vessel, ≥-tallest kept per band, count conserved, uniform set = 1 line, above-ladder band flagged at a ≥-height custom range, contract-ranged PT never splits; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied; heatsink sub-1 m² area projects nonzero from tool area)')
 }
 
 run()

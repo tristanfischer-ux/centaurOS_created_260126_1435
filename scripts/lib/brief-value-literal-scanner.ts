@@ -367,6 +367,24 @@ export function scanEmitterForBriefLiterals(
       if (expectedFamily === 'money'
           && /sqrt\(\s*3\s*\)|√3|\b3~|\/\s*(?:50|60)\s*Hz\b|\bAC\s+\d[\d.\s]*3~/i.test(lineText)) continue
 
+      // Current/ampacity threshold vs a COST constraint (2026-07-27, cell-cycler £2000):
+      // `mainBusContactorCapacityA > 2000` is a CURRENT threshold (amperes), not a stale
+      // unit_cost_ceiling mirror. The unquoted-key family skip requires `:`/`=` immediately
+      // before the number; a comparison operator breaks that path. Money family only.
+      if (expectedFamily === 'money'
+          && /(?:capacity|current|ampacity|amps?|busbar|contactor)[A-Za-z0-9_]{0,24}\s*[><=!]+/i.test(beforeNum)) {
+        continue
+      }
+
+      // Catalogue model / MPN string vs a COST constraint (same cell-cycler £2000 run):
+      // `partNumber = … ? 'DVL 2000' : 'LV 25-1000'` embeds 2000 inside a product-family
+      // model token — never a GBP ceiling literal.
+      if (expectedFamily === 'money'
+          && /partNumber|part_number|mpn|model/i.test(lineText)
+          && /['"][A-Z]{1,8}[\s-]?\d{3,5}['"]/.test(lineText)) {
+        continue
+      }
+
       // Value-key family (gate-25 false-positive fix, 2026-05-30): the mod()/q()
       // KEY wrapping the literal tells us what the value IS (a price, a voltage).
       // If that differs from the constraint's family it's a coincidental collision

@@ -69,6 +69,7 @@ import {
   reusableCandidateWhereSql,
   ensureQuarantineColumn,
 } from './structural-cache-policy'
+import { isClassOnlyJustification } from '../../structural-admission-gate'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -150,6 +151,10 @@ export interface GraphValidation {
  * role + non-empty display; every edge endpoint exists; no duplicate edges;
  * mechanism present on every edge. `derived_parameter_hints` (string[]) is
  * preserved per node — extra field, harmless to the emitter, useful provenance.
+ *
+ * ADMISSION (council 2026-07-27): every node MUST carry `justified_by` naming a
+ * brief duty / requirement / hazard / interface. Class-only justification
+ * (`class=X`, bare slug) fails validation — class may propose, never commit.
  */
 export function validateBootstrapGraph(raw: unknown, slug: string): GraphValidation {
   const errors: string[] = []
@@ -175,13 +180,23 @@ export function validateBootstrapGraph(raw: unknown, slug: string): GraphValidat
     if (!NODE_ROLES.has(role)) { errors.push(`node[${i}] "${cls}" role "${role}" not in {${[...NODE_ROLES].join(', ')}}`); continue }
     const display = typeof n?.display === 'string' ? n.display.trim() : ''
     if (!display) { errors.push(`node[${i}] "${cls}" display missing or empty`); continue }
+    const justifiedBy = typeof n?.justified_by === 'string' ? n.justified_by.trim() : ''
+    if (!justifiedBy) {
+      errors.push(`node[${i}] "${cls}" justified_by missing — every node must name a brief duty/hazard (admission invariant)`)
+      continue
+    }
+    if (isClassOnlyJustification(justifiedBy, slug)) {
+      errors.push(`node[${i}] "${cls}" justified_by is class-only ("${justifiedBy}") — name a brief duty, not the class label`)
+      continue
+    }
     if (role === 'principal') principals++
     nodeIds.add(cls)
-    const node: GraphNode & { derived_parameter_hints?: string[] } = {
+    const node: GraphNode & { derived_parameter_hints?: string[]; justified_by?: string } = {
       class: cls,
       role: role as NodeRole,
       required: n?.required !== false, // default true (the emitter treats required as confidence)
       display,
+      justified_by: justifiedBy.slice(0, 280),
     }
     if (Array.isArray(n?.derived_parameter_hints)) {
       const hints = n.derived_parameter_hints.filter((h: unknown) => typeof h === 'string' && h).slice(0, 12)
@@ -231,6 +246,119 @@ export function validateBootstrapGraph(raw: unknown, slug: string): GraphValidat
       edges,
     },
   }
+}
+
+/** Liquid-loop / plant-cooling brief markers — presence means mass_fluid cooling is legitimate. */
+const BRIEF_LIQUID_COOLING_RE =
+  /\b(?:liquid\s+cool(?:ing|ant)|glycol|coolant\s+loop|chilled\s+water|shell[\s-]?and[\s-]?tube|microfluidic|perfusion)\b/i
+
+/** Air-cooled / solid-state thermal brief markers. */
+const BRIEF_AIR_COOLED_RE =
+  /\b(?:peltier|thermoelectric|\btec\b|heatsink|heat\s*sink|air[\s-]?cooled|forced[\s-]?air|axial\s+fan)\b/i
+
+/** Donor-contamination anatomy that must not appear unless the brief asks for it. */
+const BRIEF_GATED_ANATOMY: Array<{ id: string; graphRe: RegExp; briefNeed: RegExp }> = [
+  {
+    id: 'microgravity gimbal',
+    graphRe: /\bgimbal\b|\bmicrogravity\b|\btime[\s-]?average(?:d)?\s+gravity\b|\bclinostat\b/i,
+    briefNeed: /\bgimbal\b|\bmicrogravity\b|\bclinostat\b|\brpm\s+appliance\b|\bgravity[\s-]?averag/i,
+  },
+  {
+    id: 'microfluidic perfusion',
+    graphRe: /\bmicrofluidic\b|\bperfusion\s+pump\b/i,
+    briefNeed: /\bmicrofluidic\b|\bperfusion\b|\borganoid\b|\bbioreactor\b/i,
+  },
+]
+
+/**
+ * INTENT: Cold cell-cycler (2026-07-27) still emitted mass_fluid_transport_process
+ * with pipework/manifold/reservoir on an air-cooled Peltier brief — caches cold,
+ * generator wrong. Reject that anatomy at graph validation when the brief does
+ * not ask for liquid cooling (universal magnitude veto, not a product table).
+ *
+ * @description Extra deterministic errors for a validated graph vs the brief/envelope.
+ * Empty array = magnitude admission passes.
+ */
+export function validateGraphMagnitudeAgainstBrief(
+  graph: ProductClassGraph,
+  brief: ParsedConstraints,
+  envelope: BriefEnvelope,
+): string[] {
+  const errors: string[] = []
+  const desc = String(
+    (brief as any)?.product_description ??
+      (brief as any)?.original_text ??
+      (brief as any)?.brief_text ??
+      '',
+  )
+  const tier = String(envelope?.scale_tier ?? '').toLowerCase()
+  const deviceScale =
+    tier === 'benchtop' ||
+    tier === 'handheld' ||
+    tier === 'cabinet' ||
+    tier === 'portable' ||
+    /\bbenchtop\b|\bhandheld\b|\bdesk(?:top)?\b|\binstrument\b/i.test(desc)
+
+  if (!deviceScale) return errors
+
+  const briefHasLiquid = BRIEF_LIQUID_COOLING_RE.test(desc)
+  const briefAirCooled = BRIEF_AIR_COOLED_RE.test(desc)
+
+  // Liquid plant module on device-scale brief with no liquid-cooling duty
+  if (!briefHasLiquid) {
+    // GOTCHA: even without explicit "peltier" wording, a device-scale brief that
+    // never mentions liquid coolant must not grow a mass_fluid cooling plant.
+    const hint = briefAirCooled
+      ? 'brief signals air-cooled/Peltier — use environmental_interface + fans/heatsink, not a fluid loop'
+      : 'air-cooled / solid-state instruments use environmental_interface + fans/heatsink/Peltier, not a fluid loop'
+    for (const n of graph.nodes) {
+      if (n.class === 'mass_fluid_transport_process') {
+        errors.push(
+          `node "mass_fluid_transport_process" forbidden on device-scale brief without liquid-cooling duty ` +
+            `(magnitude admission — ${hint})`,
+        )
+      }
+    }
+    for (const [i, e] of graph.edges.entries()) {
+      const mech = String(e.mechanism ?? '')
+      if (mech === 'cooling_loop' || mech === 'refrigerant_line') {
+        errors.push(
+          `edge[${i}] mechanism "${mech}" forbidden on device-scale brief without liquid-cooling duty`,
+        )
+      }
+    }
+  }
+
+  // Donor-contamination anatomy (gimbal / microfluidics) without brief support
+  const surfaces = [
+    ...graph.nodes.map((n) => `${n.class} ${n.display ?? ''} ${(n as any).justified_by ?? ''}`),
+    ...graph.edges.map((e) => `${e.mechanism} ${e.notes ?? ''}`),
+  ].join('\n')
+  for (const m of BRIEF_GATED_ANATOMY) {
+    if (m.graphRe.test(surfaces) && !m.briefNeed.test(desc)) {
+      errors.push(
+        `graph contains "${m.id}" anatomy but the brief does not require it — class/donor contamination (admission)`,
+      )
+    }
+  }
+
+  return errors
+}
+
+/**
+ * @description Structural + magnitude admission for a harvested/reused graph.
+ */
+export function validateBootstrapGraphAgainstBrief(
+  raw: unknown,
+  slug: string,
+  brief: ParsedConstraints,
+  envelope: BriefEnvelope,
+): GraphValidation {
+  const base = validateBootstrapGraph(raw, slug)
+  if (!base.ok || !base.graph) return base
+  const mag = validateGraphMagnitudeAgainstBrief(base.graph, brief, envelope)
+  if (mag.length === 0) return base
+  return { ok: false, errors: [...base.errors, ...mag] }
 }
 
 // ── (a) Corpus-first material (read-only) ───────────────────────────────────
@@ -366,15 +494,21 @@ function buildHarvestPrompt(
     `3. node.role ∈ {principal, subsystem, sensor, actuator, communications, enclosure, safety, service}.\n` +
     `4. node.display = short human-readable label naming the REAL hardware (like "Generator (PMSG direct-drive) + AC-DC-AC inverter").\n` +
     `5. node.derived_parameter_hints = 2-6 snake_case quantity names an engineer would size this module by (e.g. rated_power_kw, tether_length_m).\n` +
-    `6. Every edge's from_class/to_class MUST be node ids from YOUR node list. No duplicate edges.\n` +
-    `7. edge.mechanism — STRONGLY prefer one of: ${MECHANISMS.join(', ')}. direction: "mutual" or "directional".\n` +
-    `8. required: true for mission-critical nodes/edges, false for optional ones.\n` +
+    `6. ADMISSION (mandatory): every node MUST include justified_by — one sentence naming the BRIEF duty, ` +
+    `requirement, interface, or hazard that forces this node to exist. FORBIDDEN: "class=${slug}", bare class labels, ` +
+    `"standard for ${slug}", or any justification that terminates at the product class alone. ` +
+    `Example good: "brief: 8 independent hardware OV/UV/OC cutouts per channel, firmware-independent".\n` +
+    `7. Every edge's from_class/to_class MUST be node ids from YOUR node list. No duplicate edges.\n` +
+    `8. edge.mechanism — STRONGLY prefer one of: ${MECHANISMS.join(', ')}. direction: "mutual" or "directional".\n` +
+    `9. required: true for mission-critical nodes/edges, false for optional ones.\n` +
+    `10. Respect magnitude: do NOT invent liquid cooling loops, plant HX, gimbals, or microfluidics unless the BRIEF ` +
+    `explicitly requires them. An air-cooled Peltier bay is NOT a glycol loop.\n` +
     (priorErrors.length > 0
       ? `\nYOUR PREVIOUS ATTEMPT FAILED DETERMINISTIC VALIDATION. Fix EVERY error:\n${priorErrors.map(e => `- ${e}`).join('\n')}\n`
       : '') +
     `\nReturn STRICT JSON only (no markdown fence, no commentary):\n` +
     `{"display_name": "<class display name>", "scope_notes": "<2-4 sentences: what is in/out of scope>", ` +
-    `"nodes": [{"class": "...", "role": "...", "required": true, "display": "...", "derived_parameter_hints": ["..."]}], ` +
+    `"nodes": [{"class": "...", "role": "...", "required": true, "display": "...", "justified_by": "<brief duty>", "derived_parameter_hints": ["..."]}], ` +
     `"edges": [{"from_class": "...", "to_class": "...", "mechanism": "...", "required": true, "direction": "mutual", "notes": "<=200 chars"}]}`
   )
 }
@@ -566,7 +700,7 @@ export async function bootstrapClassGraph(
   const prior = latestCandidate(storeKey)
   if (prior) {
     try {
-      const v = validateBootstrapGraph(JSON.parse(prior.graph_json), slug)
+      const v = validateBootstrapGraphAgainstBrief(JSON.parse(prior.graph_json), slug, brief, envelope)
       if (v.ok && v.graph) {
         console.error(
           `[bootstrap-class-graph] REUSING stored candidate slug=${slug} version=${prior.version} status=${prior.status} (no LLM call)`,
@@ -608,7 +742,7 @@ export async function bootstrapClassGraph(
       lastErrors = []
       continue
     }
-    const v = validateBootstrapGraph(outcome.parsed, slug)
+    const v = validateBootstrapGraphAgainstBrief(outcome.parsed, slug, brief, envelope)
     if (!v.ok || !v.graph) {
       lastErrors = v.errors
       lastError = `deterministic validation failed (${v.errors.length} errors)`

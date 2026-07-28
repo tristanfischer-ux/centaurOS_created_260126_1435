@@ -1621,7 +1621,7 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   if (RUN_IS_INSTRUMENT_DEVICE) {
     const _mpn = (dbHit.part_number ?? '').toUpperCase()
     const _cls = (dbHit.component_class ?? '')
-    const _hitBlob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''} ${dbHit.component_class ?? ''}`
+    const _hitBlob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''} ${dbHit.component_class ?? ''} ${dbHit.raw_excerpt ?? ''}`
     if (_DEVICE_REJECT_INDUSTRIAL_VENDORS.has(mfr)) return false
     if (_DEVICE_REJECT_CLASS_RE.test(_cls)) return false
     // a generic ADC / converter slot must not accept a flow/ultrasonic metering TDC
@@ -1631,6 +1631,25 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
     if (/\b(motor|fan|impeller|blower)\b/i.test(name)
       && /\b(?:tefc|ip55|ip65|iec[\s-]?frame|frame\s*size|cast[\s-]?iron\s+motor|industrial\s+motor)\b/i.test(_hitBlob)) {
       return false
+    }
+    // INTENT (2026-07-27 cell-cycler cold-v4): EMC/line-filter slots on a
+    // device-scale instrument must not accept industrial 3-phase / HV / high-amp
+    // cabinet filters. Schaffner makes BOTH FN2090-6-06 (correct, ~6 A 1φ) and
+    // FN 3359HV-400-99 (~400 A 3φ 690 VAC) — vendor rejection alone is wrong;
+    // refuse by rating/form. IEC C14 inlet instruments are ≤16 A single-phase.
+    // GOTCHA: do NOT parse the series digits (FN2090 → 2090 A); amps are the
+    // first numeric group AFTER the series token (FN2090-6-06 → 6 A).
+    if (/\b(emc|emi|rfi|line\s*filter|mains\s*filter|power\s*line\s*filter)\b/i.test(name)
+      || (/\b(emc|emi|line)\b/i.test(name) && /\bfilter\b/i.test(name))) {
+      if (/\b3[\s-]?phase\b|\bthree[\s-]?phase\b|\b690\s*v(?:ac)?\b|\b800\s*v(?:ac)?\b/i.test(_hitBlob)) {
+        return false
+      }
+      const ampFromText = /\b(\d{1,4})\s*A\b/i.exec(_hitBlob)
+      const mpnCompact = _mpn.replace(/\s+/g, '')
+      const ampFromMpn = /FN\d+[A-Z]*-(\d{1,4})(?:-|$)/i.exec(mpnCompact)
+      const amps = ampFromText ? parseInt(ampFromText[1], 10)
+        : ampFromMpn ? parseInt(ampFromMpn[1], 10) : null
+      if (amps != null && Number.isFinite(amps) && amps > 16) return false
     }
   }
   const toks = tokenize(name)

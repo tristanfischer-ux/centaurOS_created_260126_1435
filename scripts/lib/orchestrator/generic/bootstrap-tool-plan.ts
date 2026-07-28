@@ -120,6 +120,7 @@ import {
 } from './structural-cache-policy'
 import {
   DEVICE_SCALE_FORBIDDEN_TOOLS,
+  isClassOnlyJustification,
   isDeviceScaleDesign,
 } from '../../structural-admission-gate'
 
@@ -646,9 +647,21 @@ export function validateToolPlanSpec(
       producedContractKeys.add(contractKey)
     }
 
+    const purposeRaw = typeof s?.purpose === 'string' ? s.purpose.trim() : ''
+    // ADMISSION (council 2026-07-27): if purpose is present, reject class-only
+    // justification. Missing purpose is still allowed on legacy cached plans so
+    // reuse→revalidate does not thrash every row; the harvest prompt requires it
+    // on new bootstraps.
+    if (purposeRaw && isClassOnlyJustification(purposeRaw)) {
+      errors.push(
+        `step[${i}] "${toolId}" purpose is class-only ("${purposeRaw.slice(0, 80)}") — name a brief duty, not the class label`,
+      )
+      continue
+    }
+
     steps.push({
       tool_id: toolId,
-      purpose: typeof s?.purpose === 'string' ? s.purpose.slice(0, 200) : undefined,
+      purpose: purposeRaw ? purposeRaw.slice(0, 200) : undefined,
       inputs,
       outputs,
     })
@@ -833,6 +846,8 @@ function buildHarvestPrompt(
     `4. You MUST include the tool "${UNIVERSAL_MASS_PRODUCER}" and wire its "${UNIVERSAL_MASS_KEY}" output field to a contract_key "${UNIVERSAL_MASS_KEY}" (the whole-system mass + envelope check every design needs). FEED IT the principal-equipment masses: give it ONE "*_mass_kg" input per major component (e.g. the tanks, the filtration vessels, the pumps/skids, the electrical gear), each wired with from_contract_key from an upstream sizing tool's mass output OR an available contract mass key — every "*_mass_kg" input you give is summed. Wire AS MANY component masses as you have sources for (≥2 where possible); do NOT leave it with no mass inputs (its total would be 0). Do NOT wire its OWN total back into it — never feed "total_system_mass_kg" or any "total_*_mass_kg" as an INPUT (that is the value it COMPUTES, not a component). Also wire its "max_mass_kg_envelope" input from the brief's mass cap if one exists.\n` +
     `5. You MUST produce at least one cost/capex key (wire a cost-bearing tool output, e.g. regulatory-cert-cost:lookup → total_cost_gbp, or a tool's estimated_capex_gbp).\n` +
     `6. Do NOT worry about run ORDER — it is computed deterministically from your wiring. Wire data dependencies via matching contract_key → from_contract_key across steps.\n` +
+    `7. ADMISSION: every step's "purpose" MUST name the BRIEF duty/hazard it sizes — NEVER "class=<slug>" or "standard for this class". ` +
+    `Respect magnitude: do NOT select plant-scale HX / refrigeration tools for a benchtop air-cooled instrument unless the brief requires them.\n` +
     (priorErrors.length > 0
       ? `\nYOUR PREVIOUS ATTEMPT FAILED DETERMINISTIC VALIDATION. Fix EVERY error (do NOT invent field names — use ONLY the catalogue's exact spellings):\n${priorErrors.map(e => `- ${e}`).join('\n')}\n` +
         (priorErrors.some(e => /DIMENSIONAL MISMATCH/.test(e))

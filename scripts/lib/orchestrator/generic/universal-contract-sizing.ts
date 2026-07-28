@@ -648,6 +648,185 @@ function formatRatingKw(kw: number): string {
   }
   return String(Math.round(kw))
 }
+/**
+ * INTENT (Sol+Fable 2026-07-27 Block 1): tool-authored heatsink areas are often
+ * <1 m² (e.g. 0.153 m² for 200 W forced-air). `Math.round` stamped `0 m² area`
+ * and erased the authoritative projection. Keep whole m² for plant-scale areas;
+ * three significant figures below 1 m².
+ */
+function formatAreaM2(area: number): string {
+  if (!(area > 0) || !Number.isFinite(area)) return '0 m² area'
+  if (area >= 10) return `${Math.round(area)} m² area`
+  if (area >= 1) {
+    const v = Math.round(area * 10) / 10
+    return `${Number.isInteger(v) ? String(v) : String(v)} m² area`
+  }
+  return `${Number(area.toPrecision(3))} m² area`
+}
+
+/**
+ * INTENT: project tool thermal demand onto heatsink / heat-pipe words that the
+ * plant SUFFIX_RULES never match (`*_dissipation_w` is not `_duty_kw`). Prefer
+ * fin surface area when present; otherwise stamp a watt rating so the closure
+ * gate never sees a positive dissipation with a blank heatsink.
+ *
+ * DECISION (Sol+Fable 2026-07-28 residual): NEVER stamp the aggregate
+ * dissipation onto every channel-replicated sink. Cold-v13 shipped
+ * `per_channel_power_heatsink ×8 @ 200 W` while `aggregate_dissipation_w=200`
+ * — 8× over-allocation → impossible volume, 8× fans, cost bust. Scope the
+ * stamp: channel-axis sinks get per-channel share; shared sinks get the
+ * aggregate (or a residual when both families exist). Overwrite a rating
+ * that already violates conservation (onlyUnsized must not protect disease).
+ */
+function dissipBudgetsFromQuantities(quantities: Record<string, number>): {
+  aggregateW: number
+  perChannelW: number
+  channelCount: number
+  areaM2: number
+} {
+  let aggregateW = 0
+  let perChannelW = 0
+  let areaM2 = 0
+  const channelCount = Number(quantities.channel_count)
+  for (const [k, v] of Object.entries(quantities)) {
+    if (!Number.isFinite(v) || v <= 0) continue
+    if (/heatsink.*area_m2$|_fin_surface_area_m2$/i.test(k)) areaM2 = Math.max(areaM2, v)
+    // Skip TEC / hot-side rejection loads — those size the chamber sink, not
+    // the linear power-stage channel sinks (heatsink_rejection_load_w ≫ 200).
+    if (/heatsink_rejection|hot_side_rejection|tec_|peltier_/i.test(k)) continue
+    if (/^(channel_max|per_channel).*dissipation_w$/i.test(k) || /per_channel_.*_dissipation_w$/i.test(k)) {
+      perChannelW = Math.max(perChannelW, v)
+      continue
+    }
+    if (
+      /^(max_simultaneous|aggregate|total_instrument).*dissipation_w$/i.test(k)
+      || /aggregate_.*_dissipation_w$/i.test(k)
+      || /linear_stage_dissipation_w$/i.test(k)
+    ) {
+      aggregateW = Math.max(aggregateW, v)
+      continue
+    }
+    // Other *_dissipation_w: treat as a candidate aggregate floor only when no
+    // explicit aggregate key won (pass_transistor_max_dissipation_w=25 must NOT
+    // become the device budget that stamps every sink).
+    if (/(dissipation|thermal_rejection)_w$/i.test(k) && aggregateW <= 0 && perChannelW <= 0) {
+      aggregateW = Math.max(aggregateW, v)
+    }
+  }
+  const nCh = Number.isFinite(channelCount) && channelCount >= 2 ? Math.round(channelCount) : 0
+  if (!(perChannelW > 0) && aggregateW > 0 && nCh >= 2) {
+    perChannelW = aggregateW / nCh
+  }
+  if (!(aggregateW > 0) && perChannelW > 0 && nCh >= 2) {
+    aggregateW = perChannelW * nCh
+  }
+  return { aggregateW, perChannelW, channelCount: nCh, areaM2 }
+}
+
+function isChannelHeatsinkWord(label: string): boolean {
+  const t = label.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+  if (/^per_channel_/.test(t) || /per_channel/.test(t)) return true
+  return /power_heatsink|channel.*heatsink|heatsink.*channel/.test(t)
+}
+
+function wordQuantity(w: WordLike): number {
+  const mods = w.modifier_characters ?? []
+  for (const mc of mods) {
+    if (mc.kind !== 'quantity') continue
+    const m = String(mc.value ?? '').match(/×\s*(\d+)/)
+    if (m) return Number(m[1])
+  }
+  return 1
+}
+
+function replaceOrAddRatingW(w: WordLike, watts: number): void {
+  const mods = [...(w.modifier_characters ?? [])]
+  const idx = mods.findIndex((mc) => mc.kind === 'rating_primary')
+  const next = mod('rating_primary', String(Math.round(watts)), 'W')
+  if (idx >= 0) mods[idx] = next
+  else mods.push(next)
+  w.modifier_characters = mods
+}
+
+function stampHeatsinkThermalFromContract(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+  onlyUnsized: boolean,
+): number {
+  const { aggregateW, perChannelW, channelCount, areaM2 } = dissipBudgetsFromQuantities(quantities)
+  if (!(areaM2 > 0) && !(aggregateW > 0) && !(perChannelW > 0)) return 0
+
+  // First pass: classify sinks so shared+channel coexistence can residual-share.
+  type Sink = { w: WordLike; label: string; channel: boolean; qty: number }
+  const sinks: Sink[] = []
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const label = `${w.name_human ?? ''} ${w.content_character?.character_id ?? ''} ${w.content_character?.name_human ?? ''}`
+        if (!/heatsink|heat[_\s-]?sink|heatpipe|heat[_\s-]?pipe/i.test(label)) continue
+        // Fan assemblies are airflow, not the fin area principal — skip.
+        if (/\bfan\b/i.test(label) && !/heatsink|heat[_\s-]?sink|heatpipe/i.test(String(w.name_human ?? ''))) continue
+        if (/\bfan\s+assembly\b/i.test(label)) continue
+        sinks.push({ w, label, channel: isChannelHeatsinkWord(label), qty: Math.max(1, wordQuantity(w)) })
+      }
+    }
+  }
+  if (sinks.length === 0) return 0
+
+  const hasChannelSinks = sinks.some((s) => s.channel)
+  const hasSharedSinks = sinks.some((s) => !s.channel)
+  let n = 0
+  for (const s of sinks) {
+    const existing = s.w.modifier_characters ?? []
+    const hasRealDim = existing.some((mc) => {
+      if (mc.kind !== 'dimension' && mc.kind !== 'dimensions') return false
+      const v = String(mc.value ?? '')
+      return v.trim().length > 0 && !/^0(\.0+)?\s*m²/i.test(v.trim())
+    })
+    const ratingMc = existing.find((mc) => mc.kind === 'rating_primary' && Number(mc.value) > 0)
+    const existingRating = ratingMc ? Number(ratingMc.value) : 0
+
+    // Scope the watt stamp.
+    let targetW = 0
+    if (s.channel) {
+      targetW = perChannelW > 0 ? perChannelW : (aggregateW > 0 && channelCount >= 2 ? aggregateW / channelCount : 0)
+    } else if (hasChannelSinks && hasSharedSinks) {
+      // DECISION: when channel sinks already carry the linear-stage budget,
+      // do not ALSO stamp the full aggregate onto the shared sink from the
+      // same dissipation keys (double bill). Leave shared blank unless it
+      // already has a coherent rating; TEC loads are skipped above.
+      targetW = 0
+    } else {
+      targetW = aggregateW > 0 ? aggregateW : perChannelW
+    }
+
+    const allocatedIfKeep = existingRating > 0 ? existingRating * s.qty : 0
+    const budget = aggregateW > 0 ? aggregateW : (perChannelW * Math.max(1, channelCount || s.qty))
+    const violates = budget > 0 && allocatedIfKeep > budget * 1.15
+
+    // Watt rating: stamp when blank, or overwrite when the existing rating × qty
+    // violates conservation (onlyUnsized must not protect the cold-v13 disease).
+    if (targetW > 0 && (!ratingMc || violates)) {
+      replaceOrAddRatingW(s.w, targetW)
+      n += 1
+    } else if (
+      areaM2 > 0
+      && !hasRealDim
+      && !(onlyUnsized && hasRealDim)
+      && !(targetW > 0 && ratingMc && !violates)
+    ) {
+      // Area: channel sinks get a per-unit share; shared gets the tool area.
+      // Prefer watt stamp over inventing m² when dissipation already closed.
+      const stampArea = s.channel && channelCount >= 2 ? areaM2 / channelCount : areaM2
+      if (stampArea > 0) {
+        mergeMods(s.w, [mod('dimension', formatAreaM2(stampArea))])
+        n += 1
+      }
+    }
+  }
+  return n
+}
+
 function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   const add: ModifierCharacter[] = []
   if (g.volume !== undefined) {
@@ -661,7 +840,7 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
     }
     add.push(mod('capacity', formatCapacityM3(g.volume), 'm³'))
   } else if (g.area !== undefined) {
-    add.push(mod('dimension', `${Math.round(g.area)} m² area`))
+    add.push(mod('dimension', formatAreaM2(g.area)))
   } else if (g.throughput !== undefined) {
     // Flow first (pump-set / media-bed continuous dims) — preferred over power box.
     add.push(mod('dimension', dimsForThroughputDevice(g.throughput, g.phrase)))
@@ -891,9 +1070,22 @@ function sizeCleaningServiceVessels(modules: ModuleLike[], quantities: Record<st
 //   · rule 6 sums the DELIVERED storage-vessel principals against every brief storage pin,
 //     synthesises the shortfall as real tank principals, and mints the `_delivered_m3`
 //     total either way so every reader diffs the DELIVERED quantity, never a per-scope key.
-const DISINFECTION_STAGE_WORD_RE = /(^|\s)uv(\s|$)|disinfect|steril|ozon|chlorinat/i
+const DISINFECTION_STAGE_WORD_RE = /(^|\s)uv(\s|$)|ultraviolet|disinfect|steril|ozon|chlorinat/i
+// INTENT (2026-07-27 cell-cycler): electrical OV/UV (over/under-voltage) protection
+// must never count as an ultraviolet disinfection stage. Bare `\buv\b` matched
+// "Ov UV Comparator Latch" and poisoned hygiene/disinfection coverage + SUB_ASSEMBLY.
+function isElectricalOverUnderVoltagePhrase(s: string): boolean {
+  const t = String(s ?? '').replace(/[_-]/g, ' ')
+  if (!/\buv\b|\bov\b|under\s*voltage|over\s*voltage|over\s*under\s*voltage/i.test(t)) return false
+  // Electrical sense: comparator / latch / trip / cutout / protect — without disinfection nouns.
+  if (!/comparat|latch|trip|cutout|protect|sense|monitor|detector|interlock/i.test(t)) return false
+  if (/ultraviolet|disinfect|steril|ozon|chlorinat|uv\s*lamp|uv\s*reactor|uv\s*dose|uvt/i.test(t)) return false
+  return true
+}
 function isDisinfectionPhrase(s: string): boolean {
-  return DISINFECTION_STAGE_WORD_RE.test(String(s ?? '').replace(/[_-]/g, ' '))
+  const t = String(s ?? '').replace(/[_-]/g, ' ')
+  if (isElectricalOverUnderVoltagePhrase(t)) return false
+  return DISINFECTION_STAGE_WORD_RE.test(t)
 }
 // hygiene-critical loop signal (potable / drinking / irrigation / fertigation / hygiene /
 // recirculating water) — the brief/contract noun families whose water demands a disinfection
@@ -2708,7 +2900,23 @@ const SUB_ASSEMBLY: {
       { name: 'Frame & Panels', derive: (p) => ({ gbp: 1500 + (p.kw || 200) * 4 }) },
       { name: 'Anti-Vibration Mounts', derive: () => ({ gbp: 280 }) },
     ] },
-  { re: /oxygen|aerat|\buv\b|ozone|steriliz|disinfe|skimming/i,
+  // GOTCHA (2026-07-27 cell-cycler): bare `\buv\b` matched "Ov UV Comparator Latch"
+  // (electrical over/under-voltage) and exploded Process Unit / Inlet-Outlet Manifolds /
+  // Dosing-Lamp Module into safety_protection on a dry benchtop power instrument.
+  // Require ultraviolet / disinfection context for UV; reject electrical OV/UV sense words.
+  { re: /oxygen|aerat|\buv\b|ultraviolet|ozone|steriliz|disinfe|skimming/i,
+    match: (name: string) => {
+      if (isElectricalOverUnderVoltagePhrase(name)) return false
+      // Bare "UV" alone is ambiguous — require disinfection/process context OR an
+      // explicit ultraviolet / UV-reactor / UV-lamp / ozone / oxygen / aeration noun.
+      const n = String(name || '')
+      if (/oxygen|aerat|ultraviolet|ozone|steriliz|disinfe|skimming/i.test(n)) return true
+      if (/\buv\b/i.test(n)
+        && /lamp|reactor|chamber|steril|disinfect|dose|module|transmitt|intensity|skimmer/i.test(n)) {
+        return true
+      }
+      return false
+    },
     parts: [
       { name: 'Process Unit', derive: (p) => ({ gbp: 3000 + (p.m3h || p.kw || 100) * 3 }) },
       { name: 'Inlet / Outlet Manifolds', derive: () => ({ gbp: 1200 }) },
@@ -2836,7 +3044,7 @@ const WATT_SCALE_FAN_ANATOMY_RE =
 // Shell / Filter Media / Underdrain / Skid Frame on a 20 mL device). Single source of truth
 // for both the explode-site skip and its proveCatch (`isWattScalePlantAnatomyPart`).
 const WATT_SCALE_PLANT_ANATOMY_PART_RE =
-  /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller|pressure\s*vessel\s*shell|filter\s*media|distribution\s*header|underdrain|nozzle\s*plate|backwash|air\s*scour|sample\s*cock|skid\s*frame/i
+  /drive\s*motor|variable[- ]speed\s*drive|support\s*skirt|manway|access\s*(?:ladder|walkway)|shell\s*course|tank\s*wall|fan\s*housing|ec\s*motor|speed\s*controller|pressure\s*vessel\s*shell|filter\s*media|distribution\s*header|underdrain|nozzle\s*plate|backwash|air\s*scour|sample\s*cock|skid\s*frame|process\s*unit|inlet\s*\/\s*outlet\s*manifolds|dosing\s*\/\s*lamp\s*module|flow\s*control\s*valve/i
 export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
   const dissipation = Number(quantities['system_thermal_dissipation_kw'] ?? 0)
   const airCooled = dissipation > 0 && dissipation * 1.2 < 2
@@ -6947,6 +7155,17 @@ export function applyUniversalContractSizing(
         for (const g of groups) {
           if (wIsCleaningRole !== isCleaningRolePhrase(g.phrase)) continue
           if (wIsElectricalDevice && groupIsFluidSized(g)) continue
+          // COUNT-ONLY groups (bare `channel_count` / `cell_count` with no size/rating)
+          // must NEVER fuzzy-match existing words. Multiplicity is owned by
+          // contractCountFor (per_<scope>_ + unqualified head discipline). Without
+          // this, seeding brief channel_count=8 stamps ×8 onto "Channel Power Bus"
+          // via the shared "channel" stem (cold-v5 Block 1 / Powerwall smear family).
+          const countOnly = g.count !== undefined
+            && g.volume === undefined && g.area === undefined
+            && g.power === undefined && g.throughput === undefined
+            && g.duty === undefined && g.rate === undefined && g.current === undefined
+            && g.mass === undefined
+          if (countOnly) continue
           // rule-6 shortfall group: full-stem containment only (see RESERVE_COVERAGE_PHRASE_RE)
           if (RESERVE_COVERAGE_PHRASE_RE.test(g.phrase) && !g.stems.every((s) => wStems.includes(s))) continue
           // rule-8 zoned-network principal: full-stem containment only (see ZONED_NETWORK_PRINCIPAL_RE)
@@ -6976,6 +7195,13 @@ export function applyUniversalContractSizing(
       }
     }
   }
+
+  // ── A1b. HEATSINK THERMAL PROJECTION (Block 1/3 closure, 2026-07-27) ────────
+  // Tool plans often emit `*_dissipation_w` + optionally `*_area_m2` / R_th, but
+  // `_dissipation_w` is not a plant SUFFIX_RULE — heatsink words stayed unsized
+  // (cold-v5 "0 m²" / missing rating while channel_max_dissipation_w=25). Stamp
+  // area when present; else a watt rating from the dissipation demand. UNIVERSAL.
+  sized += stampHeatsinkThermalFromContract(modules, quantities, onlyUnsized)
 
   // ── A2. CLEANING-SERVICE VESSELS: one-charge rule (see sizeCleaningServiceVessels) ──
   // Runs after the contract match (so the role-coherence gate above has already kept the

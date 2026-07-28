@@ -384,6 +384,20 @@ describe('verified function-keyed PCB candidates', () => {
       expectedSymbol: 'Connector:USB_C_Receptacle',
       expectedFootprint: 'USB_C_Receptacle_Amphenol_12401610E4-2A',
     },
+    // proveCatch (cold-v12): host sits between c and interface — must still select Amphenol.
+    {
+      request: {
+        wordId: 'usb_c_host_interface_word',
+        nameHuman: 'Usb C Host Interface',
+        characterId: 'usb_c_host_interface',
+        functionClass: 'usb_connector',
+        requiredRatings: { voltageV: 5, currentA: 5 },
+      },
+      manufacturer: 'Amphenol ICC',
+      partNumber: '12401610E4#2A',
+      expectedSymbol: 'Connector:USB_C_Receptacle',
+      expectedFootprint: 'USB_C_Receptacle_Amphenol_12401610E4-2A',
+    },
     {
       request: {
         wordId: 'dc_dc_regulator_word',
@@ -690,5 +704,41 @@ describe('verified function-keyed PCB candidates', () => {
       status: 'unresolved',
       reason: 'CC0603KRX7R9BB104 voltage rating 50 V is below required 60 V',
     })
+  })
+
+  it('proveCatch: channel discharge MOSFET resolves IRLB3813 as power_mosfet (not gate driver)', () => {
+    const lookup = (manufacturer: string | null, mpn: string): DbCascadeResult => ({
+      ...CACHE_HIT,
+      result: {
+        ...CACHE_HIT.result!,
+        mpn: 'IRLB3813PBF',
+        manufacturer: 'Infineon Technologies',
+        description: 'N-Channel 30 V MOSFET TO-220AB',
+      },
+    })
+
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'per_channel_discharge_load_mosfet_word',
+        nameHuman: 'Discharge Load MOSFET',
+        characterId: 'per_channel_discharge_load_mosfet',
+        functionClass: 'power_mosfet',
+      },
+      lookup,
+    )).toMatchObject({
+      partNumber: 'IRLB3813PBF',
+      compatibleFunctionClass: 'power_mosfet',
+    })
+
+    // Gate-driver class must NOT steal the discrete FET identity.
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'per_channel_discharge_load_mosfet_word',
+        nameHuman: 'Discharge Load MOSFET',
+        characterId: 'per_channel_discharge_load_mosfet',
+        functionClass: 'gate_driver_ic',
+      },
+      lookup,
+    )).toBeNull()
   })
 })

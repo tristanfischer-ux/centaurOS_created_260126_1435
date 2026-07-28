@@ -2370,6 +2370,60 @@ def _zero_instrument_non_parts(rows: list) -> int:
     return n
 
 
+# INTENT (Sol+Fable 2026-07-28 residual): circuit FUNCTIONS realized by bespoke-PCB
+# silicon were billed as purchasable TBD lines (£12–£40 × N channels) — double-counting
+# the board's own comparators/latches. Physical realizers (MOSFET, shunt, thermistor)
+# stay billed; a real MPN'd comparator IC stays billed; plant protection relays stay
+# billed (_IS_INSTRUMENT_DEVICE False).
+_PCB_REALIZED_FUNCTION_RE = re.compile(
+    r"comparator[_ -]?latch|overcurrent[_ -]?comparator|"
+    r"over[_ -]?current[_ -]?(?:comparator|detect\w*|trip|protection)|"
+    r"over[_ -]?temp\w*[_ -]?(?:trip|comparator|detect\w*|protection)|"
+    r"reverse[_ -]?polarity[_ -]?(?:detect\w*|protection|sense)|"
+    r"current[_ -]?control[_ -]?loop|"
+    r"over[_ -]?under[_ -]?voltage[_ -]?(?:comparator|latch)|"
+    r"\blatch[_ -]?logic\b",
+    re.I,
+)
+_PHYSICAL_REALIZER_RE = re.compile(
+    r"\bmosfet\b|\bshunt\b|thermistor|\bntc\b|heat[_ -]?sink|heatsink|"
+    r"\bdiode\b|\bresistor\b|\bcapacitor\b|\bconnector\b|\bbead\b|\brelay\b",
+    re.I,
+)
+
+
+def _zero_pcb_realized_functions(rows: list) -> int:
+    """Zero TBD circuit-function roles realized by bespoke-PCB silicon.
+
+    Returns count of zeroed rows. Universal — noun-keyed; plant designs and
+    IDENTIFIED / structured-MPN comparator ICs are untouched.
+    """
+    if not _IS_INSTRUMENT_DEVICE:
+        return 0
+    n = 0
+    for row in rows:
+        req = str(row.get("requirement") or row.get("part") or "")
+        if not _PCB_REALIZED_FUNCTION_RE.search(req):
+            continue
+        if _PHYSICAL_REALIZER_RE.search(req):
+            continue
+        pn = str(row.get("part_number") or row.get("part") or "")
+        if row.get("status") == "IDENTIFIED" or _is_structured_pn(pn):
+            continue
+        if float(row.get("line_gbp") or 0) <= 0:
+            continue
+        row["unit_gbp"] = 0
+        row["line_gbp"] = 0
+        row["status"] = "REALIZED_ON_PCB"
+        row["basis"] = (
+            (str(row.get("basis") or "") + " · ").lstrip(" ·")
+            + "circuit function realized by bespoke-PCB silicon — not a "
+              "separately purchasable part (double-count of on-board ICs)"
+        )
+        n += 1
+    return n
+
+
 def _instrument_materials_target_gbp(st: dict) -> float | None:
     """Yuri gold materials midpoint for a makers instrument, else contract macro.
 
@@ -3595,6 +3649,34 @@ def _selftest() -> int:
     _IS_INSTRUMENT_DEVICE = _saved_clr
     if _clr_rows[0]["line_gbp"] != 0 or _clr_rows[0]["status"] != "GEOMETRY":
         print(f"  FAIL instrument clearance must zero: {_clr_rows[0]}"); bad += 1
+    # proveCatch (cold-v13/v14): TBD circuit functions zeroed; physical + MPN stay billed
+    _saved_fn = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _fn_rows = [
+        {"requirement": "Overcurrent Comparator", "status": "NOT FOUND",
+         "part_number": "TBD (detailed design)", "unit_gbp": 18, "line_gbp": 144, "qty": 8,
+         "basis": "budget allowance"},
+        {"requirement": "Sense Shunt Resistor", "status": "NOT FOUND",
+         "part_number": "TBD (detailed design)", "unit_gbp": 2, "line_gbp": 16, "qty": 8,
+         "basis": "budget allowance"},
+        {"requirement": "Overcurrent Comparator", "status": "IDENTIFIED",
+         "part_number": "LM393DR", "unit_gbp": 0.4, "line_gbp": 3.2, "qty": 8,
+         "basis": "catalogue"},
+    ]
+    _zero_pcb_realized_functions(_fn_rows)
+    if _fn_rows[0]["line_gbp"] != 0 or _fn_rows[0]["status"] != "REALIZED_ON_PCB":
+        print(f"  FAIL TBD circuit function must zero as REALIZED_ON_PCB: {_fn_rows[0]}"); bad += 1
+    if _fn_rows[1]["line_gbp"] != 16:
+        print(f"  FAIL physical shunt must stay billed: {_fn_rows[1]}"); bad += 1
+    if _fn_rows[2]["line_gbp"] != 3.2 or _fn_rows[2]["status"] != "IDENTIFIED":
+        print(f"  FAIL MPN'd comparator IC must stay billed: {_fn_rows[2]}"); bad += 1
+    _IS_INSTRUMENT_DEVICE = False
+    _fn_plant = [{"requirement": "Overcurrent Comparator", "status": "NOT FOUND",
+                  "part_number": "TBD", "unit_gbp": 18, "line_gbp": 144, "qty": 8}]
+    _zero_pcb_realized_functions(_fn_plant)
+    if _fn_plant[0]["line_gbp"] != 144:
+        print(f"  FAIL plant comparator must NOT zero: {_fn_plant[0]}"); bad += 1
+    _IS_INSTRUMENT_DEVICE = _saved_fn
     # proveCatch: gold-band rescale brings over-bill to gold mid
     _saved_rs = _IS_INSTRUMENT_DEVICE
     _IS_INSTRUMENT_DEVICE = True
@@ -9067,6 +9149,7 @@ def assemble(out_dir: str):
     # Yuri instrument cost hygiene (2026-07-16): drop clearance phantoms, then
     # honour contract/gold materials midpoint when plant parametrics still overshoot.
     _zero_instrument_non_parts(rows)
+    _zero_pcb_realized_functions(rows)
     _rescale_instrument_materials_to_gold(rows, _pv_state if isinstance(_pv_state, dict) else {})
     # LAST — after pricing/rescale (which read the raw part name): prefix the compute/optical
     # anchor line with its gold-spine principal so the render/GA "Compute UI Module" reconciles

@@ -268,10 +268,57 @@ def _assembly_glance_verdict(run_dir: str) -> dict:
             _prod = bool(is_product_scale(st))
         except Exception:  # noqa: BLE001
             _prod = False
+        # INTENT (2026-07-28): drawing_gates G17 only demands OPTICAL for
+        # optical_handheld / optical-tower. Assembly Excel scoring must match —
+        # bench_power / lab_electronics otherwise floor at 4 forever (cold-v15).
+        _need_optical = None
+        if is_inst:
+            _need_optical = False
+            try:
+                from instrument_form_grammar import (  # type: ignore
+                    is_optical_handheld_form,
+                    resolve_form_family,
+                )
+                _pc = str(
+                    ((st.get("parsedBrief") or {}).get("product_class"))
+                    or ((st.get("orchestratorContract") or {}).get("product_class"))
+                    or ((st.get("moduleDecomposition") or {}).get("product_class"))
+                    or ""
+                )
+                _blob = " ".join(
+                    str(x)
+                    for x in (
+                        (st.get("parsedBrief") or {}).get("product_description"),
+                        (st.get("parsedBrief") or {}).get("mission"),
+                        ((st.get("orchestratorContract") or {}).get("brief_summary")),
+                    )
+                    if x
+                )
+                _family = resolve_form_family(
+                    product_class=_pc, part_blob=_blob, is_instrument=True,
+                )
+                _need_optical = (
+                    _family == "optical_handheld"
+                    or is_optical_handheld_form(
+                        product_class=_pc, part_blob=_blob, is_instrument=True,
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                # Fail closed only when the SVG already claims an OPTICAL chamber.
+                import re as _re
+                _need_optical = bool(_re.search(r">\s*OPTICAL\s*<", svg, _re.I))
         ok, detail = _gga.ga_glance_coherent(
-            svg, is_instrument_device=is_inst, is_product_scale=_prod or is_inst)
+            svg,
+            is_instrument_device=is_inst,
+            is_product_scale=_prod or is_inst,
+            requires_optical_silhouette=_need_optical,
+        )
         findings = _gga.audit_ga_svg(
-            svg, is_instrument_device=is_inst, is_product_scale=_prod or is_inst)
+            svg,
+            is_instrument_device=is_inst,
+            is_product_scale=_prod or is_inst,
+            requires_optical_silhouette=_need_optical,
+        )
         return {"ok": bool(ok), "detail": detail, "n_findings": len(findings)}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "detail": f"glance audit unavailable: {exc}", "n_findings": 1}

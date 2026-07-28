@@ -83,6 +83,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--freerouting-jar", default="", help="path to freerouting .jar; routing skipped if absent")
     p.add_argument("--kicad-footprints-root", required=True, help="global KiCad SharedSupport/footprints dir")
     p.add_argument("--board-outline", default="", help="Phase B board-outline.json (PcbBoardGeometry)")
+    # INTENT (cold-v13): HAT 100 mm growth cap must key on architecture role /
+    # HAT socket — not bare MCU+USB (channel_power_afe_controller has both).
+    p.add_argument("--board-role", default="", help="pcb-architecture board.role (e.g. wet_lab_hat)")
+    p.add_argument("--shape-family", default="", help="pcb-architecture shape.shapeFamily")
     p.add_argument("--max-passes", type=int, default=500)
     # DECISION (2026-07-21): 8 retries — organoid HAT pad-soup needed board growth
     # past the old 4-iter ceiling once clamp-stacking was removed (off-board → grow).
@@ -679,23 +683,70 @@ def _looks_like_compact_source_board(components: List[Component]) -> bool:
     has_motherboard_roles = bool(re.search(r"\b(mcu|microcontroller|processor|controller|display|screen|detector|photodiode|sensor)\b", text))
     return has_source and not has_motherboard_roles and len(components) <= 32
 
-def _looks_like_host_interface_board(components: List[Component]) -> bool:
-    """MCU + USB receptacle netlists need edge keepout the 50 mm plant floor lacks."""
-    text = " ".join(f"{c.ref} {c.value} {c.footprint}" for c in components).lower()
+# Roles that are NEVER a Pi-HAT host envelope (cold-v13: MCU+USB on a channel
+# power/AFE board must grow under plant [50,250], not the 100 mm HAT cap).
+_NON_HAT_BOARD_ROLES = frozenset({
+    "channel_power_afe_controller",
+    "motion_driver_board",
+    "thermal_power_controller",
+    "heater_stir_actuation_board",
+    "high_voltage_controller",
+    "analog_front_end_shield",
+    "od_optics_board",
+    "electrode_cartridge",
+    "optical_source_daughterboard",
+})
+
+
+def _component_text(components: List[Component]) -> str:
+    return " ".join(f"{c.ref} {c.value} {c.footprint}" for c in components).lower()
+
+
+def _has_hat_socket_evidence(components: List[Component]) -> bool:
+    return bool(re.search(r"pinsocket_2x20|ssq[_ -]?120", _component_text(components)))
+
+
+def _looks_like_host_interface_board(
+    components: List[Component],
+    board_role: str = "",
+    shape_family: str = "",
+) -> bool:
+    """True only for Pi-HAT / wet_lab_hat envelopes — not bare MCU+USB.
+
+    GOTCHA (cold-v13): channel_power_afe_controller carries MCU+USB-C and was
+    wrongly clamped to 100 mm host-interface cap (U1 pad X=132.5 off-board).
+    Cap applies iff role/shape is wet_lab_hat OR (legacy) MCU+USB+HAT socket.
+    """
+    role = (board_role or "").strip().lower()
+    shape = (shape_family or "").strip().lower()
+    if role in _NON_HAT_BOARD_ROLES or shape in {
+        "multi_channel_power_afe",
+        "linear_channel_spine",
+        "thermal_power_base",
+        "wet_actuation_base",
+        "high_voltage_controller",
+        "precision_analog_shield",
+        "optical_registration_plate",
+        "electrode_cartridge",
+    }:
+        return False
+    if role == "wet_lab_hat" or shape == "wet_lab_hat":
+        return True
+    text = _component_text(components)
     has_mcu = bool(re.search(r"\b(qfp|lqfp|tqfp|qfn|bga|mcu|microcontroller)\b", text))
     has_usb = bool(re.search(r"\busb[_ ]?c|usb_c_receptacle\b", text))
-    return has_mcu and has_usb
+    return has_mcu and has_usb and _has_hat_socket_evidence(components)
 
 
 def _host_interface_max_side_mm(components: List[Component]) -> float:
-    """Placement growth ceiling for MCU+USB host boards.
+    """Placement growth ceiling for HAT / wet_lab_hat host boards.
 
     DECISION: sparse Pi HAT stays ≤100 mm. Dense densify (2×20 + actuation ICs +
     heater FFC mate + OD host mate) cannot pack under 100 — allow ≤120 mm, still
     well under the old 140 mm balloon the 100 mm cap was meant to stop.
     """
-    text = " ".join(f"{c.ref} {c.value} {c.footprint}" for c in components).lower()
-    has_hat_socket = bool(re.search(r"pinsocket_2x20|ssq[_ -]?120", text))
+    text = _component_text(components)
+    has_hat_socket = _has_hat_socket_evidence(components)
     has_actuation = bool(re.search(r"drv8876|ao3400", text))
     has_cable_mates = bool(
         re.search(r"52207|200528|boomele|1\.0t-4p|molex_200528", text)
@@ -705,7 +756,13 @@ def _host_interface_max_side_mm(components: List[Component]) -> float:
     return 100.0
 
 
-def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path) -> Tuple[float, float]:
+def auto_board_size(
+    components: List[Component],
+    cfg: ChainConfig,
+    fp_root: Path,
+    board_role: str = "",
+    shape_family: str = "",
+) -> Tuple[float, float]:
     total_area = 0.0
     for c in components:
         fp = parse_footprint(c.footprint, cfg, fp_root)
@@ -718,7 +775,7 @@ def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path
         # INTENT (fixpack15): dense densify HAT (2×20 + DRV + cable mates) cannot
         # pack at the sparse 90 mm floor — starting there wastes grow iters
         # (90→110→120) with off-board pads. Floor near the dense packable size.
-        if _looks_like_host_interface_board(components):
+        if _looks_like_host_interface_board(components, board_role, shape_family):
             dense_cap = _host_interface_max_side_mm(components)
             min_size = 110.0 if dense_cap >= 120.0 else 90.0
         else:
@@ -766,16 +823,32 @@ def selftest() -> None:
     ]
     if _looks_like_compact_source_board(motherboard):
         raise AssertionError("MCU+LED netlist must NOT classify as compact source board")
-    # proveCatch (2026-07-21): MCU+USB host HAT floors at ≥90 mm (densify keepout).
-    host = [
+    # proveCatch (cold-v13): bare MCU+USB is NOT a HAT envelope (channel AFE disease).
+    bare_mcu_usb = [
         Component("U1", "MCU microcontroller", "Package_QFP:TQFP-48_7x7mm_P0.5mm"),
         Component("J1", "USB-C", "Connector_USB:USB_C_Receptacle_Amphenol_12401610E4-2A"),
     ]
-    _footprint_cache[host[0].footprint] = FootprintData(bbox_w=10.0, bbox_h=10.0, resolved_from="fixture")
-    _footprint_cache[host[1].footprint] = FootprintData(
+    _footprint_cache[bare_mcu_usb[0].footprint] = FootprintData(bbox_w=10.0, bbox_h=10.0, resolved_from="fixture")
+    _footprint_cache[bare_mcu_usb[1].footprint] = FootprintData(
         bbox_w=11.0, bbox_h=10.0, resolved_from="fixture", is_th=True,
     )
-    assert _looks_like_host_interface_board(host), "MCU+USB must classify as host-interface"
+    assert not _looks_like_host_interface_board(bare_mcu_usb), (
+        "MCU+USB alone must NOT classify as host-interface (cold-v13 channel AFE)"
+    )
+    assert not _looks_like_host_interface_board(
+        bare_mcu_usb, board_role="channel_power_afe_controller",
+    ), "channel_power_afe_controller must never take the HAT 100 mm cap"
+    # proveCatch (2026-07-21): sparse HAT = MCU+USB+2×20 socket → ≥90 floor, ≤100 cap.
+    host = bare_mcu_usb + [
+        Component("J2", "SSQ-120-03-T-D", "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical"),
+    ]
+    _footprint_cache[host[2].footprint] = FootprintData(
+        bbox_w=50.0, bbox_h=10.0, resolved_from="fixture", is_th=True,
+    )
+    assert _looks_like_host_interface_board(host), "MCU+USB+HAT socket must classify as host-interface"
+    assert _looks_like_host_interface_board(bare_mcu_usb, board_role="wet_lab_hat"), (
+        "wet_lab_hat role must classify as host-interface even without socket evidence"
+    )
     host_w, host_h = auto_board_size(host, cfg, Path("/tmp/unused"))
     if host_w < 90.0 or host_h < 90.0:
         raise AssertionError(f"host-interface PCB must floor ≥90 mm, got {host_w:g}×{host_h:g}")
@@ -789,7 +862,6 @@ def selftest() -> None:
         raise AssertionError(f"host-interface placement growth must clamp ≤{host_cap:g} mm")
     # proveCatch: dense densify host (HAT socket + actuation + cable mates) may use 120.
     dense_host = host + [
-        Component("J2", "SSQ-120-03-T-D", "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical"),
         Component("U2", "DRV8876PWPR", "Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm"),
         Component("Q1", "AO3400A", "Package_TO_SOT_SMD:SOT-23"),
         Component("J3", "52207-0760", "Connector_FFC-FPC:Molex_200528-0070_1x07-1MP_P1.00mm_Horizontal"),
@@ -2182,7 +2254,11 @@ def run(args) -> dict:
     # INTENT: capture hole phenotype before flooring may null the outline —
     # otherwise culture boards lose MountingHole footprints entirely.
     hole_plan = mounting_hole_plan_from_outline(outline)
-    auto_w, auto_h = auto_board_size(components, cfg, fp_root)
+    board_role = str(getattr(args, "board_role", "") or "")
+    shape_family = str(getattr(args, "shape_family", "") or "")
+    auto_w, auto_h = auto_board_size(
+        components, cfg, fp_root, board_role=board_role, shape_family=shape_family,
+    )
     if outline is not None:
         min_x, min_y, max_x, max_y = outline_bbox(outline)
         base_w, base_h = max_x - min_x, max_y - min_y
@@ -2224,7 +2300,7 @@ def run(args) -> dict:
     # Phase-B 30 mm estimate for an MCU+stepper control board is NOT a compact
     # optical source. Only `_looks_like_compact_source_board` may set the cap.
     compact_source = _looks_like_compact_source_board(components)
-    host_interface = _looks_like_host_interface_board(components)
+    host_interface = _looks_like_host_interface_board(components, board_role, shape_family)
     host_cap_mm = _host_interface_max_side_mm(components) if host_interface else None
     # DECISION (2026-07-21): host HAT must not balloon to 140 mm via retries —
     # sparse ≤100 mm; dense densify (mates+drivers) ≤120 mm.

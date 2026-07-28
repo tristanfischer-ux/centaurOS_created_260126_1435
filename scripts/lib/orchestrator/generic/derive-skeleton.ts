@@ -42,6 +42,7 @@ import type { BriefEnvelope, ContractInProgress, ParsedConstraints } from '../ty
 import type { DesignModule } from '../assembler'
 import type { GraphNode, ProductClassGraph } from '../../../../src/lib/pdf-engine-v2/class-reference-graph'
 import { cc, makeSubModule, mod, word, type SubModule, type Word } from './emitter-primitives'
+import { roleReplicationCount } from './replication-scope'
 // A1 — the optical/instrument skeleton floor (Tristan 2026-07-12, Open Colorimeter
 // TRAINING/REFERENCE-AIDED run). SHARES the tool-identity signal the word-domain-
 // coherence-audit's ADD backstop (A2) already uses — never a duplicated list, never a
@@ -570,6 +571,172 @@ const LAB_ELECTRONICS_MODULE_FLOORS: Record<string, string[]> = {
 const LAB_ELECTRONICS_FORBIDDEN_COMPONENT_RE =
   /main_breaker|distribution_busbar|power_contactor|protective_relay|emergency_stop|fire_detector|interlock_switch|warning_beacon|network_switch|communication_gateway|(?:io_module|i\/o\s*module)|scada|plc|pressure_sensor|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|dc_link_capacitor|gate_driver|chiller|scroll\s*compressor|heat_pump|circulation_pump|pipework_run|skid_frame|access_ladder|lifting_point|walkway_grating|expansion_vessel|expansion_reservoir|air_damper|condensate_drain|process_water|optical_detector|cuvette|photodiode_path|led_emitter|square_cuvette/i
 
+// ── BENCHTOP MULTI-CHANNEL POWER INSTRUMENT FLOOR (2026-07-27 cell-cycler) ───
+// INTENT: Cold miss-path for a novel 8-channel source/sink cell cycler scored
+// plaus=3 because hasLowPowerLabElectronicsSignal requires peakW≤100 / load≤0.1 kW
+// — a 200 W dissipative instrument fell through to Tier-C plant floors (liquid
+// mass_fluid, buck-boost, global estop). Sol+Opus council: add a UNIVERSAL
+// capability floor keyed on channel count + source/sink + precision measurement
+// + linear dissipative power + air-cooled Peltier — NEVER a cell_cycler class.
+// Checked BEFORE low-power lab electronics when the multi-channel power signal
+// fires; optical/thermocycler/syringe/microscope still win first.
+// INTENT (Sol+Opus 2026-07-27): mains C14 + isolated AC-DC live on
+// power_distribution — not energy_storage_source. Cold-v3's bootstrapped graph
+// omitted energy_storage entirely, so C14/PSU never landed and the skeleton
+// critic scored a HIGH against the brief's fused/earthed IEC C14 mandate.
+const BENCH_POWER_ENERGY_FLOOR = [
+  // No battery plant on a mains-powered bench instrument. If the graph still
+  // emits energy_storage_source, keep DC hold-up only — never cell racks.
+  'bulk_dc_holdup_capacitance', 'soft_start_inrush_limiter', 'dc_distribution_rail',
+]
+// GOTCHA (cold-v4): Channel Power Heatsink alone failed engineering_plausibility
+// HIGH for 200 W dissipative discharge — critic requires active cooling colocated
+// with the linear pass bank (Peltier bay fan in environmental_interface is a
+// different thermal loop and does not cool the power stage).
+// GOTCHA: parts that replicate once per brief channel MUST use the `per_channel_`
+// prefix so contractCountFor binds channel_count (Block 1 closure plan). A bare
+// `channel_power_*` / `linear_discharge_*` head cannot bind an unqualified count
+// without reopening the Powerwall cell_count smear.
+const BENCH_POWER_ENERGY_CONVERSION_FLOOR = [
+  'per_channel_linear_source_sink_stage', 'per_channel_linear_discharge_pass_bank',
+  'per_channel_charge_current_source', 'per_channel_discharge_load_mosfet',
+  'per_channel_current_control_loop',
+  // Heatsinks stay per-channel; the forced-air bank is SHARED across the
+  // aggregate dissipation (cold-v14: per_channel_power_cooling_fan ×8 × £60
+  // bust the £2k ceiling). Name must NOT carry per_channel_ or role-scope
+  // binds channel_count.
+  'per_channel_power_heatsink', 'power_stage_cooling_fan',
+]
+const BENCH_POWER_SENSING_FLOOR = [
+  'per_channel_precision_afe', 'per_channel_kelvin_voltage_sense_input', 'precision_adc',
+  'per_channel_current_shunt_measurement', 'precision_voltage_reference',
+  'per_channel_cell_thermistor_input',
+]
+// GOTCHA: never name a floor part with bare "UV" — SUB_ASSEMBLY `\buv\b` once
+// exploded electrical over/under-voltage into ultraviolet Process Unit anatomy.
+// Per-channel comparators/detectors must use per_channel_ so channel_count binds
+// (cold-v5 critic: shared ×1 OV/UV/overcurrent cannot protect 8 independent channels).
+const BENCH_POWER_SAFETY_FLOOR = [
+  'per_channel_hardware_cutout', 'per_channel_over_under_voltage_comparator_latch',
+  'per_channel_overcurrent_comparator', 'per_channel_overtemp_trip',
+  'per_channel_reverse_polarity_detector', 'firmware_independent_interlock',
+]
+const BENCH_POWER_THERMAL_FLOOR = [
+  'peltier_tec_module', 'finned_heatsink', 'heatsink_fan_assembly',
+  'thermal_interface_pad', 'cell_bay_temperature_sensor', 'exhaust_air_path',
+]
+const BENCH_POWER_POWER_DISTRIBUTION_FLOOR = [
+  'iec_c14_fused_inlet', 'isolated_ac_dc_power_module', 'mains_fuse_holder',
+  'protective_earth_bond', 'emc_line_filter', 'power_switch',
+  'analog_digital_rail_split', 'channel_power_bus', 'board_level_decoupling',
+  'wire_harness', 'polyfuse_resettable', 'status_led',
+]
+const BENCH_POWER_CONTROL_FLOOR = [
+  'main_controller_mcu', 'touch_display', 'usb_c_host_interface',
+  'ethernet_host_interface', 'firmware_storage', 'schedule_state_machine',
+]
+const BENCH_POWER_STRUCTURE_FLOOR = [
+  'enclosure_shell', 'removable_cell_bay', 'per_channel_cell_holder_fixture',
+  'front_panel_operator_deck', 'fastener_set', 'foot_pad',
+]
+const BENCH_POWER_HMI_FLOOR = [
+  'touch_display', 'status_indicator', 'run_start_control',
+  'mounting_bezel', 'user_facing_legend',
+]
+/** Forced-air path if a class graph still carries mass_fluid — never liquid loop. */
+const BENCH_POWER_AIR_PATH_FLOOR = [
+  'forced_air_duct', 'axial_cooling_fan', 'heatsink_air_path',
+  'inlet_grille', 'exhaust_grille',
+]
+const BENCH_POWER_MODULE_FLOORS: Record<string, string[]> = {
+  energy_storage_source: BENCH_POWER_ENERGY_FLOOR,
+  energy_conversion_transduction: BENCH_POWER_ENERGY_CONVERSION_FLOOR,
+  sensing_instrumentation: BENCH_POWER_SENSING_FLOOR,
+  safety_protection: BENCH_POWER_SAFETY_FLOOR,
+  environmental_interface: BENCH_POWER_THERMAL_FLOOR,
+  power_distribution: BENCH_POWER_POWER_DISTRIBUTION_FLOOR,
+  control_compute_communication: BENCH_POWER_CONTROL_FLOOR,
+  structure_containment: BENCH_POWER_STRUCTURE_FLOOR,
+  hmi_ergonomics: BENCH_POWER_HMI_FLOOR,
+  human_machine_interface: BENCH_POWER_HMI_FLOOR,
+  mass_fluid_transport_process: BENCH_POWER_AIR_PATH_FLOOR,
+}
+const BENCH_POWER_FORBIDDEN_COMPONENT_RE =
+  /main_breaker|distribution_busbar|power_contactor|protective_relay|fire_detector|warning_beacon|network_switch|communication_gateway|(?:io_module|i\/o\s*module)|scada|plc|pressure_sensor|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|dc_link_capacitor|gate_driver|buck_boost|chiller|scroll\s*compressor|heat_pump|circulation_pump|pipework_run|distribution_manifold|expansion_reservoir|fluid_filter|skid_frame|access_ladder|lifting_point|walkway_grating|expansion_vessel|air_damper|condensate_drain|process_water|gimbal|microfluidic|perfusion|optical_detector|cuvette|photodiode_path|led_emitter|square_cuvette|process_unit|inlet[_\s/-]*outlet|outlet_manifold|inlet_manifold|flow_control_valve|dosing|lamp_module|chemical_dosing|uv_lamp|membrane_module|reactor_vessel/i
+
+/**
+ * @description Universal detector for multi-channel benchtop source/sink power
+ * instruments (cell cyclers, battery testers, electronic loads with precision AFE).
+ * PURE — noun/unit/tool/brief signals; never a product-class table.
+ */
+export function hasBenchPowerInstrumentSignal(
+  contract: ContractInProgress,
+  brief?: ParsedConstraints | null,
+): boolean {
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  const peakW = Number(q.peak_electrical_power_w?.value ?? q.max_simultaneous_dissipation_w?.value
+    ?? q.total_instrument_dissipation_w?.value ?? q.aggregate_cell_electrical_transfer_power_w?.value)
+  const loadKw = Number(q.connected_electrical_load_kw?.value)
+  const enclosureM3 = Number(q.enclosure_volume_m3?.value)
+  const channels = Number(
+    q.channel_count?.value
+      ?? q.independent_hardware_channel_isolation_paths_count?.value
+      ?? q.cell_bay_capacity_cells?.value,
+  )
+  const briefText = [
+    String(contract?.brief_summary ?? ''),
+    String((brief as any)?.product_description ?? ''),
+    String((brief as any)?.original_text ?? ''),
+    String((brief as any)?.mission_statement ?? ''),
+  ].join('\n').toLowerCase()
+
+  const metrics = (brief as any)?.constraints?.target_performance?.metrics
+  let metricChannels = 0
+  let hasAccuracy = false
+  let hasDissipation = false
+  if (Array.isArray(metrics)) {
+    for (const m of metrics) {
+      const key = String(m?.key_metric ?? m?.name ?? '').toLowerCase()
+      const val = Number(m?.value)
+      if (/channel/.test(key) && Number.isFinite(val) && val >= 2) metricChannels = Math.max(metricChannels, val)
+      if (/accuracy|kelvin|shunt/.test(key)) hasAccuracy = true
+      if (/dissipation|power_w|current_range/.test(key) && Number.isFinite(val) && val > 0) hasDissipation = true
+    }
+  }
+
+  const nChannels = Number.isFinite(channels) && channels >= 2 ? channels : metricChannels
+  const multiChannel = nChannels >= 2 || /\b\d+\s*independent\s+channels?\b|\b八|\beight\s+independent\b/.test(briefText)
+  const sourceSink =
+    /\bsource\s+and\s+sink\b|\bcharge\s+and\s+discharge\b|\blinear[\s-]?assisted\b|\bdissipat(?:e|es|ion)\s+(?:discharge|energy)\b|\bkelvin\b|\bfour[\s-]?wire\b|\bper[\s-]?channel\b/.test(briefText)
+    || /\b(charge|discharge|source|sink)/.test(String(q.channel_current_magnitude_a?.value ?? ''))
+    || hasAccuracy
+    || hasDissipation
+  const tools = contract?._tools_run ?? []
+  const toolHint = tools.some((t) =>
+    /instrumentation:adc|tec:peltier|battery-c-rate|battery-safety/i.test(String(t)),
+  )
+  const precisionHint =
+    Number(q.voltage_measurement_accuracy_pct_fs?.value) > 0
+    || Number(q.current_measurement_accuracy_pct_fs?.value) > 0
+    || Number(q.required_adc_bit_depth_bits?.value) >= 12
+    || /0\.05\s*%|0\.1\s*%|precision\s+analogue|precision\s+analog/.test(briefText)
+
+  // Must be multi-channel source/sink (or tool+precision) on a device-scale power band.
+  const deviceOk =
+    (Number.isFinite(peakW) && peakW > 0 && peakW <= 500)
+    || (Number.isFinite(loadKw) && loadKw > 0 && loadKw <= 1.0)
+    || (Number.isFinite(enclosureM3) && enclosureM3 > 0 && enclosureM3 < 1)
+    || /\bbenchtop\b|\bdesktop\s+instrument\b|\b450\s*mm\b/.test(briefText)
+
+  if (!deviceOk) return false
+  if (multiChannel && (sourceSink || precisionHint || toolHint)) return true
+  // Strong brief alone: "independent test channels" + Peltier + linear-assisted
+  if (multiChannel && /\bpeltier\b/.test(briefText) && /\blinear[\s-]?assisted\b|\bsource\s+and\s+sink\b/.test(briefText)) {
+    return true
+  }
+  return false
+}
+
 /** ml-scale continuous-culture / turbidostat — fluid path is vial + dosing, not plant manifold. */
 function hasBenchtopCultureSignal(contract: ContractInProgress): boolean {
   const pc = String((contract as { product_class?: unknown })?.product_class ?? '').toLowerCase()
@@ -639,8 +806,12 @@ function hasLowPowerLabElectronicsSignal(contract: ContractInProgress): boolean 
  *  stray quantity key happens to match ENERGY_STORAGE_RE), else a battery kit for a
  *  genuine storage plant, else the mains electrical supply for a plant that only DRAWS
  *  power (no battery). */
-function energyFloorFor(contract: ContractInProgress): string[] {
+function energyFloorFor(contract: ContractInProgress, brief?: ParsedConstraints | null): string[] {
   if (hasOpticalInstrumentSignal(contract)) return OPTICAL_ENERGY_STORAGE_FLOOR
+  // GOTCHA (2026-07-27): tec:peltier-sizing also fires hasThermocyclerToolSignal.
+  // Multi-channel source/sink instruments (cell cyclers) must win BEFORE the
+  // PCR/thermocycler floor or they inherit sample-block / lid-heater vocabulary.
+  if (hasBenchPowerInstrumentSignal(contract, brief)) return BENCH_POWER_ENERGY_FLOOR
   if (hasThermocyclerSignal(contract)) return THERMOCYCLER_ENERGY_FLOOR
   if (hasSyringePumpSignal(contract)) return SYRINGE_PUMP_ENERGY_FLOOR
   if (hasLabMicroscopeSignal(contract)) return LAB_MICROSCOPE_ENERGY_FLOOR
@@ -649,7 +820,8 @@ function energyFloorFor(contract: ContractInProgress): string[] {
 }
 
 /** Thermal floor: solid-state TEC kit for thermocycler / lab electronics; else duty-sign plant set. */
-function thermalFloorForContract(contract: ContractInProgress): string[] {
+function thermalFloorForContract(contract: ContractInProgress, brief?: ParsedConstraints | null): string[] {
+  if (hasBenchPowerInstrumentSignal(contract, brief)) return BENCH_POWER_THERMAL_FLOOR
   if (hasThermocyclerSignal(contract)) return THERMOCYCLER_THERMAL_FLOOR
   // GOTCHA (Pioreactor 0121): net_heating_required_w matches HEATING_DUTY_RE
   // and selected industrial heat_pump. Watt-scale instruments always use TEC.
@@ -661,6 +833,7 @@ const ACRONYMS: Record<string, string> = {
   lfp: 'LFP', nmc: 'NMC', pcs: 'PCS', dc: 'DC', ac: 'AC', ems: 'EMS', bms: 'BMS',
   hvac: 'HVAC', led: 'LED', igbt: 'IGBT', sic: 'SiC', io: 'I/O', hmi: 'HMI',
   scada: 'SCADA', pv: 'PV', mv: 'MV', lv: 'LV', uv: 'UV', rcd: 'RCD', plc: 'PLC',
+  iec: 'IEC', // IEC C14 fused inlet labels on bench-power instruments
 }
 
 function sanitizeId(s: string): string {
@@ -690,8 +863,20 @@ function headToken(component: string): string {
  * noun to a contract `<noun>_count` / `<noun>_qty` / `<noun>_quantity` quantity
  * (head-noun match avoids `cell_monitoring_units` grabbing `cell_count`). Returns
  * 1 when the contract knows no matching count — never invents a number.
+ *
+ * DECISION (Sol+Fable 2026-07-27 Block 1 + P1): a leading `per_<scope>_` id /
+ * "Per <Scope> …" human name is an explicit replication-axis marker — bind
+ * `<scope>_count` BEFORE head-noun matching. P1 also binds CHANNEL-REPLICATED
+ * ROLES (charge source, shunt, OV comparator, …) to `channel_count` even when
+ * the surface name lacks the prefix — naming whim must not leave ×1 hardware
+ * against an 8-channel ledger. Unqualified head discipline (Powerwall
+ * cell_count ≠ Cell Temperature Sensor) stays byte-identical: role binding
+ * never looks up cell_count. Shared axis nouns ("Channel Power Bus") stay ×1.
  */
 export function contractCountFor(component: string, contract: ContractInProgress): number {
+  const quantities = contract?.quantities ?? {}
+  const roleN = roleReplicationCount(component, quantities as Record<string, { value?: unknown }>)
+  if (roleN !== null) return roleN
   const head = headToken(component)
   if (!head) return 1
   const singular = head.replace(/s$/, '')
@@ -706,7 +891,6 @@ export function contractCountFor(component: string, contract: ContractInProgress
   )
   let best = 1
   let bestSpecificity = -1
-  const quantities = contract?.quantities ?? {}
   for (const [key, tq] of Object.entries(quantities)) {
     const m = key.match(/^(.+?)_(count|qty|quantity|number)$/i)
     if (!m) continue
@@ -760,7 +944,7 @@ function componentsForModule(
   moduleKey: string,
   componentsByModule: Map<string, string[]>,
   contract: ContractInProgress,
-  opts: { syringeHasActuationNode?: boolean } = {},
+  opts: { syringeHasActuationNode?: boolean; brief?: ParsedConstraints | null } = {},
 ): string[] {
   const isThermal = moduleKey === 'environmental_interface'
   const isEnergyStore = moduleKey === 'energy_storage_source'
@@ -768,7 +952,8 @@ function componentsForModule(
   const isThermocycler = hasThermocyclerSignal(contract)
   const isSyringePump = hasSyringePumpSignal(contract)
   const isLabMicroscope = hasLabMicroscopeSignal(contract)
-  const isLowPowerLabElectronics = hasLowPowerLabElectronicsSignal(contract)
+  const isBenchPower = hasBenchPowerInstrumentSignal(contract, opts.brief)
+  const isLowPowerLabElectronics = !isBenchPower && hasLowPowerLabElectronicsSignal(contract)
   const isBenchtopCulture = hasBenchtopCultureSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
@@ -781,6 +966,7 @@ function componentsForModule(
       isThermal
       && thermalMode === 'heating'
       && !isLowPowerLabElectronics
+      && !isBenchPower
       && COOLING_COMPONENT_RE.test(c)
     ) return
     // Thermocycler: never admit plant chillers / LV switchboard vocabulary.
@@ -791,6 +977,8 @@ function componentsForModule(
     if (isLabMicroscope && LAB_MICROSCOPE_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Low-power lab electronics: never admit plant power/safety/process sensors.
     if (isLowPowerLabElectronics && LAB_ELECTRONICS_FORBIDDEN_COMPONENT_RE.test(c)) return
+    // Bench multi-channel power instrument: never admit plant liquid/HX/buck-boost.
+    if (isBenchPower && BENCH_POWER_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Never admit a DIMENSION/PROPERTY name as a part (it is an attribute of its parent device).
     if (PROPERTY_COMPONENT_RE.test(c)) return
     const id = sanitizeId(c)
@@ -820,7 +1008,10 @@ function componentsForModule(
   const instrumentFloor =
     (syringeFloors && syringeFloors[moduleKey])
     || (isLabMicroscope && LAB_MICROSCOPE_MODULE_FLOORS[moduleKey])
-    || (isThermocycler && THERMOCYCLER_MODULE_FLOORS[moduleKey])
+    // Bench multi-channel power BEFORE thermocycler: shared tec:peltier tool
+    // must not force PCR sample-block / lid-heater floors onto a cell cycler.
+    || (isBenchPower && BENCH_POWER_MODULE_FLOORS[moduleKey])
+    || (isThermocycler && !isBenchPower && THERMOCYCLER_MODULE_FLOORS[moduleKey])
     // GOTCHA: lab_microscope must NOT fall through to OPTICAL_MODULE_FLOORS
     // (cuvette/colorimeter vocabulary) — checked before optical.
     || (isOpticalInstrument && !isLabMicroscope && OPTICAL_MODULE_FLOORS[moduleKey])
@@ -831,8 +1022,8 @@ function componentsForModule(
     for (const c of instrumentFloor) push(c)
   } else if (out.length < MIN_WORDS) {
     // Duty-aware thermal / energy / Tier-C plant floors still pad to density.
-    const floor = isThermal ? thermalFloorForContract(contract)
-      : isEnergyStore ? energyFloorFor(contract)
+    const floor = isThermal ? thermalFloorForContract(contract, opts.brief)
+      : isEnergyStore ? energyFloorFor(contract, opts.brief)
       : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
     for (const c of floor) {
       if (out.length >= MIN_WORDS) break
@@ -910,7 +1101,8 @@ function componentWord(component: string, moduleDisplay: string, contract: Contr
  * Derive the module skeleton from a class-reference graph + corpus components.
  *
  * @param graph              the typed class-reference graph (DB-first or baked TS)
- * @param _brief             parsed brief constraints (reserved — Tier C taxonomy refinement)
+ * @param brief              parsed brief — used for bench-power instrument capability
+ *                           detection when contract quantities lag (channel_count etc.)
  * @param _envelope          brief envelope (reserved — scale-tier-aware structure)
  * @param contract           the validated engineering contract (source of quantities)
  * @param componentsByModule corpus component lists keyed by universal module
@@ -918,7 +1110,7 @@ function componentWord(component: string, moduleDisplay: string, contract: Contr
  */
 export function deriveGenericSkeleton(
   graph: ProductClassGraph,
-  _brief: ParsedConstraints,
+  brief: ParsedConstraints,
   _envelope: BriefEnvelope,
   contract: ContractInProgress,
   componentsByModule: Map<string, string[]> = new Map(),
@@ -956,6 +1148,7 @@ export function deriveGenericSkeleton(
     const display = node.display ?? humanize(moduleName)
     const components = componentsForModule(moduleName, componentsByModule, contract, {
       syringeHasActuationNode,
+      brief,
     })
     const groups = splitIntoSubModuleGroups(components)
 

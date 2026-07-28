@@ -18,6 +18,7 @@ import { join } from 'node:path'
 
 import {
   validateBootstrapGraph,
+  validateGraphMagnitudeAgainstBrief,
   assertCandidateSlug,
   storeCandidate,
   latestCandidate,
@@ -37,14 +38,14 @@ function goodGraphRaw(): any {
     display_name: 'Tidal Kite Subsea Generator (test fixture)',
     scope_notes: 'Tethered subsea tidal-stream kite. Fixture only.',
     nodes: [
-      { class: 'energy_conversion_transduction', role: 'principal', required: true, display: 'PMSG generator + shrouded rotor', derived_parameter_hints: ['rated_power_kw', 'rotor_diameter_m'] },
-      { class: 'actuation_kinematics', role: 'actuator', required: true, display: 'Wing + control surfaces + winch' },
-      { class: 'structure_containment', role: 'enclosure', required: true, display: 'Pressure-tolerant hull + fairings' },
-      { class: 'power_distribution', role: 'subsystem', required: true, display: 'Subsea export cable + slip ring' },
-      { class: 'control_compute_communication', role: 'communications', required: true, display: 'Flight controller + acoustic link' },
-      { class: 'sensing_instrumentation', role: 'sensor', required: true, display: 'IMU + DVL + current profiler' },
-      { class: 'safety_protection', role: 'safety', required: true, display: 'Emergency surfacing + tether release' },
-      { class: 'mooring_foundation', role: 'subsystem', required: true, display: 'Gravity base + tether' },
+      { class: 'energy_conversion_transduction', role: 'principal', required: true, display: 'PMSG generator + shrouded rotor', justified_by: 'brief: harvest tidal-stream kinetic power via shrouded rotor + PMSG', derived_parameter_hints: ['rated_power_kw', 'rotor_diameter_m'] },
+      { class: 'actuation_kinematics', role: 'actuator', required: true, display: 'Wing + control surfaces + winch', justified_by: 'brief: kite must fly a figure-8 path and reel for station-keeping' },
+      { class: 'structure_containment', role: 'enclosure', required: true, display: 'Pressure-tolerant hull + fairings', justified_by: 'brief: subsea pressure + biofouling enclosure duty' },
+      { class: 'power_distribution', role: 'subsystem', required: true, display: 'Subsea export cable + slip ring', justified_by: 'brief: export generated power ashore via tether conductors' },
+      { class: 'control_compute_communication', role: 'communications', required: true, display: 'Flight controller + acoustic link', justified_by: 'brief: closed-loop flight control + telemetry to surface' },
+      { class: 'sensing_instrumentation', role: 'sensor', required: true, display: 'IMU + DVL + current profiler', justified_by: 'brief: navigation and inflow sensing for flight autonomy' },
+      { class: 'safety_protection', role: 'safety', required: true, display: 'Emergency surfacing + tether release', justified_by: 'brief hazard: loss of control requires emergency surface + release' },
+      { class: 'mooring_foundation', role: 'subsystem', required: true, display: 'Gravity base + tether', justified_by: 'brief: seabed reaction and tether anchorage' },
     ],
     edges: [
       { from_class: 'energy_conversion_transduction', to_class: 'power_distribution', mechanism: 'ac_busbar', required: true, direction: 'directional' },
@@ -103,6 +104,60 @@ function main(): void {
   bad = goodGraphRaw(); bad.nodes[2].class = 'Bad-Class-Id!'
   v = validateBootstrapGraph(bad, SLUG)
   check('non-snake_case node id fails', !v.ok && v.errors.some(e => /must match/.test(e)))
+
+  bad = goodGraphRaw(); delete bad.nodes[0].justified_by
+  v = validateBootstrapGraph(bad, SLUG)
+  check('missing justified_by fails admission', !v.ok && v.errors.some(e => /justified_by missing/.test(e)))
+
+  bad = goodGraphRaw(); bad.nodes[0].justified_by = `class=${SLUG}`
+  v = validateBootstrapGraph(bad, SLUG)
+  check('class-only justified_by fails admission', !v.ok && v.errors.some(e => /class-only/.test(e)))
+
+  check('valid graph preserves justified_by on principal',
+    typeof (ok.graph?.nodes[0] as any)?.justified_by === 'string' &&
+      String((ok.graph?.nodes[0] as any).justified_by).length > 10)
+
+  // ── M: device-scale magnitude admission (cold cell-cycler class) ────
+  console.log('\nM — validateGraphMagnitudeAgainstBrief')
+  const cyclerBrief = {
+    product_description:
+      'Benchtop 8-channel battery cell cycler with Peltier-controlled air-cooled cell bay, ' +
+      'linear-assisted discharge, precision AFE, 450 mm envelope.',
+  } as any
+  const cyclerEnv = { scale_tier: 'benchtop', application: 'battery cell cycler' } as any
+  const liquidGraph = ok.graph!
+  // Inject the cold-v1c failure: mass_fluid on an air-cooled instrument
+  const polluted = {
+    ...liquidGraph,
+    nodes: [
+      ...liquidGraph.nodes,
+      {
+        class: 'mass_fluid_transport_process',
+        role: 'subsystem' as const,
+        required: true,
+        display: 'Pipework + manifold (forced air)',
+        justified_by: 'brief: cooling',
+      },
+    ],
+  }
+  const magBad = validateGraphMagnitudeAgainstBrief(polluted as any, cyclerBrief, cyclerEnv)
+  check('mass_fluid on air-cooled benchtop fails magnitude', magBad.some((e) => /mass_fluid_transport_process/.test(e)))
+
+  const gimbalPolluted = {
+    ...liquidGraph,
+    nodes: liquidGraph.nodes.map((n, i) =>
+      i === 1
+        ? { ...n, display: '2-axis gimbal to time-average gravity', justified_by: 'class default kinematics' }
+        : n,
+    ),
+  }
+  const magGimbal = validateGraphMagnitudeAgainstBrief(gimbalPolluted as any, cyclerBrief, cyclerEnv)
+  check('gimbal without brief microgravity fails magnitude', magGimbal.some((e) => /gimbal|microgravity/i.test(e)))
+
+  const magClean = validateGraphMagnitudeAgainstBrief(liquidGraph, {
+    product_description: 'Subsea tidal kite with tethered PMSG generator at 50 m depth.',
+  } as any, { scale_tier: 'plant', application: 'tidal kite' } as any)
+  check('plant-scale graph without liquid veto noise passes', magClean.length === 0)
 
   // ── S: candidate-store boundary (security item 18 pattern) ──────────
   console.log('\nS — candidate-store slug boundary')

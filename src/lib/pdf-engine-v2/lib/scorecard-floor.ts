@@ -458,6 +458,34 @@ function resolveComplianceRow(row: ComplianceRowInput, ctx?: ComplianceContext):
 }
 
 /**
+ * Deterministic `closure_honesty` section (advisory:false — it GATES).
+ *
+ * INTENT (Sol+Fable Block 2, 2026-07-27): the LLM physics-critic `honesty_signal`
+ * rewards disclosed TBD (all-TBD → 8–10). That is Goodhart. This section docks
+ * fillable-TBD / unbound multiplicity / zero-dim-on-demand from a precomputed
+ * closure result (see `design-closure-gate.ts::buildClosureHonestyFromState`).
+ *
+ * SCORING: caller supplies the score (≤2 all-critical-TBD; 10 when closed).
+ */
+export function buildClosureHonestySection(input: {
+  score: number
+  defects?: string[]
+  fillable_tbd?: number
+}): ScorecardSection {
+  const score = Math.max(0, Math.min(10, Math.round(Number(input.score) || 0)))
+  const defects = [...(input.defects ?? [])]
+  if ((input.fillable_tbd ?? 0) > 0 && !defects.some((d) => /fillable-TBD|TBD/i.test(d))) {
+    defects.unshift(`${input.fillable_tbd} fillable-TBD critical role(s) — defect, not disclosure`)
+  }
+  return {
+    name: 'closure_honesty',
+    score,
+    defects,
+    advisory: false,
+  }
+}
+
+/**
  * Deterministic `brief_compliance` section (advisory:false — it GATES).
  *
  * SCORING RULE (Tristan 2026-07-02):
@@ -796,5 +824,35 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
     JSON.stringify(shipReal),
   )
 
-  return { passed: 14 - failed.length, failed }
+  // (14) proveCatch — closure honesty: all-TBD docks to ≤3; closed = 10; gates ship floor
+  const allTbdHonesty = buildClosureHonestySection({
+    score: 2,
+    fillable_tbd: 12,
+    defects: ['Per Channel Precision Afe is TBD while ledger carries channel_count=8'],
+  })
+  check(
+    'closure_honesty.all_tbd_is_defect_not_disclosure',
+    allTbdHonesty.name === 'closure_honesty'
+      && allTbdHonesty.advisory === false
+      && allTbdHonesty.score <= 3
+      && (allTbdHonesty.defects?.length ?? 0) >= 1,
+    JSON.stringify(allTbdHonesty),
+  )
+  const closedHonesty = buildClosureHonestySection({ score: 10, fillable_tbd: 0, defects: [] })
+  check(
+    'closure_honesty.closed_slots_score_10',
+    closedHonesty.score === 10 && closedHonesty.advisory === false,
+    JSON.stringify(closedHonesty),
+  )
+  const shipWithTbd = computeHonestShipFloor([
+    { name: 'brief_compliance', score: 10, defects: [] },
+    allTbdHonesty,
+  ])
+  check(
+    'closure_honesty.docks_honest_ship_floor',
+    shipWithTbd.floor <= 3 && shipWithTbd.allPass === false,
+    JSON.stringify(shipWithTbd),
+  )
+
+  return { passed: 17 - failed.length, failed }
 }

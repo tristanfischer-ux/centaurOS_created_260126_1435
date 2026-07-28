@@ -5,7 +5,20 @@ describe('deriveFirmwareProofSpecs', () => {
   it('creates one proof target per custom board with channel requirements', () => {
     const architecture = derivePcbArchitecture({
       orchestratorContract: { quantities: { channel_count: { value: 4 } } },
-      moduleDecomposition: { modules: [] },
+      moduleDecomposition: {
+        modules: [{
+          module: 'control',
+          sub_modules: [{
+            id: 'motion',
+            words: [{
+              id: 'driver',
+              name_human: 'Stepper motor driver channel',
+              content_character: { character_id: 'stepper_motor_driver' },
+              modifier_characters: [],
+            }],
+          }],
+        }],
+      },
     })
     const specs = deriveFirmwareProofSpecs(architecture)
     expect(specs).toHaveLength(1)

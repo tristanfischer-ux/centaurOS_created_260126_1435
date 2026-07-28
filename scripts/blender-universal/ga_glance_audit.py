@@ -129,6 +129,7 @@ def audit_ga_svg(
     *,
     is_instrument_device: bool = False,
     is_product_scale: bool = False,
+    requires_optical_silhouette: bool | None = None,
 ) -> list[GaGlanceFinding]:
     """PURE glance audit — findings a 5-second human look would raise.
 
@@ -137,6 +138,9 @@ def audit_ga_svg(
     @param svg_text Full general-arrangement.svg contents.
     @param is_instrument_device Handheld / optical instrument signal.
     @param is_product_scale Sealed cabinet / product (non-plant) signal.
+    @param requires_optical_silhouette When False, skip OPTICAL chamber demand
+           (lab_electronics / bench_power / non-optical forms). When None,
+           default True for backward-compatible optical-family selftests.
     @returns List of GaGlanceFinding (empty = glance PASS).
     """
     if not svg_text or len(svg_text) < 80:
@@ -210,7 +214,14 @@ def audit_ga_svg(
                     "draw_ga._draw_thermocycler_form_silhouettes",
                 ))
         else:
-            if markers["optical"] < 1:
+            # INTENT (2026-07-28): draw_ga only stamps OPTICAL when
+            # exterior_signature_families contains optical-tower. Lab electronics /
+            # bench power instruments must NOT fail for a missing optical chamber.
+            _need_optical = (
+                True if requires_optical_silhouette is None
+                else bool(requires_optical_silhouette)
+            )
+            if _need_optical and markers["optical"] < 1:
                 findings.append(GaGlanceFinding(
                     "instrument_missing_optical_silhouette",
                     "instrument GA has no OPTICAL form-rule marker — sheet cannot "
@@ -293,12 +304,14 @@ def ga_glance_coherent(
     *,
     is_instrument_device: bool = False,
     is_product_scale: bool = False,
+    requires_optical_silhouette: bool | None = None,
 ) -> tuple[bool, str]:
     """Gate-shaped wrapper — (ok, detail) for drawing_gates G17."""
     findings = audit_ga_svg(
         svg_text,
         is_instrument_device=is_instrument_device,
         is_product_scale=is_product_scale,
+        requires_optical_silhouette=requires_optical_silhouette,
     )
     if not findings:
         return True, "GA clears deterministic 5-second glance checks"
@@ -379,10 +392,18 @@ def _selftest() -> None:
     </svg>'''
     assert audit_ga_svg(good_ext, is_instrument_device=True) == []
 
-    # Missing OPTICAL on instrument must fire.
+    # Missing OPTICAL on instrument must fire (optical-family default).
     no_opt = good_ext.replace("OPTICAL", "CHAMBER")
     no_f = audit_ga_svg(no_opt, is_instrument_device=True)
     assert any(f.code == "instrument_missing_optical_silhouette" for f in no_f)
+
+    # proveCatch: lab_electronics / bench_power must NOT demand OPTICAL.
+    no_opt_ok = audit_ga_svg(
+        no_opt, is_instrument_device=True, requires_optical_silhouette=False,
+    )
+    assert not any(f.code == "instrument_missing_optical_silhouette" for f in no_opt_ok), [
+        f.code for f in no_opt_ok
+    ]
 
     ok, _ = ga_glance_coherent(bad, is_instrument_device=True, is_product_scale=True)
     assert ok is False

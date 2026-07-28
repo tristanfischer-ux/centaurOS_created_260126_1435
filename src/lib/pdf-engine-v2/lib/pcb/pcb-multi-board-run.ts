@@ -26,7 +26,7 @@ import {
   evaluatePcbDesignFitness,
   type PcbDesignFitnessResult,
 } from './pcb-design-fitness'
-import type { PcbPipelineResult } from './pcb-pipeline'
+import type { PcbPipelineOptions, PcbPipelineResult } from './pcb-pipeline'
 import type { PcbPipelineRecord } from './pcb-stage'
 
 export interface BoardPipelineRun {
@@ -195,7 +195,11 @@ export function kicadDeliverableBoards(architecture: PcbArchitecturePlan): PcbBo
 export function runBespokeMultiBoardPcb(
   state: Record<string, unknown>,
   outDir: string,
-  runPipeline: (projectDir: string, chainOutDir: string) => PcbPipelineResult,
+  runPipeline: (
+    projectDir: string,
+    chainOutDir: string,
+    opts?: PcbPipelineOptions,
+  ) => PcbPipelineResult,
 ): MultiBoardPcbRunResult {
   const architecture = derivePcbArchitecture(state)
   const boards = kicadDeliverableBoards(architecture)
@@ -228,7 +232,10 @@ export function runBespokeMultiBoardPcb(
       systemNets,
       requiredFunctionRoles: board.channelRequirements.map((r) => r.role),
     })
-    const pipelineResult = runPipeline(projectDir, chainOutDir)
+    const pipelineResult = runPipeline(projectDir, chainOutDir, {
+      boardRole: board.role,
+      shapeFamily: board.shape?.shapeFamily,
+    })
     const record: PcbPipelineRecord = {
       ...pipelineResult,
       generator: toGeneratorSummary(genResult),
