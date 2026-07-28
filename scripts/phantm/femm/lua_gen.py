@@ -48,6 +48,7 @@ TRANSL_XL, TRANSL_XR = -1.16, 1.508            # translator drawn span (pre-offs
 COND_W = 0.126                                 # coil conductor block width
 AIR = 3.2, 2.6                                 # half-box
 DEPTH = 1.55            # out-of-plane depth (mm) — the translator transverse width
+MESH_SCALE = 1.0        # multiplies every meshsize — halve it to test convergence
 GAP_STRIP_X = 0.75      # half-span of the fine-mesh air strip inside each gap
 GAP_STRIP_INSET = 0.006 # clearance from the strip to each tooth face
 
@@ -199,7 +200,7 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     L += _poly_lua(tp)
     L.append("mi_addblocklabel(0.05,0)")
     L.append("mi_selectlabel(0.05,0)")
-    L.append('mi_setblockprop("smc", 0, 0.05, "<None>", 0, 1, 0)')
+    L.append(f'mi_setblockprop("smc", 0, {0.05*MESH_SCALE:.5f}, "<None>", 0, 1, 0)')
     L.append("mi_clearselected()")
 
     # slot-sections (top/bottom) with stubs
@@ -209,7 +210,7 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
         ly = s * (SS_BACK_Y0 + SS_BACK_DRAWN / 2.0)
         L.append(f"mi_addblocklabel(0,{ly:.6f})")
         L.append(f"mi_selectlabel(0,{ly:.6f})")
-        L.append('mi_setblockprop("smc", 0, 0.04, "<None>", 0, 2, 0)')
+        L.append(f'mi_setblockprop("smc", 0, {0.04*MESH_SCALE:.5f}, "<None>", 0, 2, 0)')
         L.append("mi_clearselected()")
 
     # bridge limb: vertical bar spanning between the two stub inner faces,
@@ -228,13 +229,13 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
         ly = (ya + yb) / 2.0
         L.append(f"mi_addblocklabel({(x0+x1)/2:.6f},{ly:.6f})")
         L.append(f"mi_selectlabel({(x0+x1)/2:.6f},{ly:.6f})")
-        L.append('mi_setblockprop("smc", 0, 0.05, "<None>", 0, 3, 0)')
+        L.append(f'mi_setblockprop("smc", 0, {0.05*MESH_SCALE:.5f}, "<None>", 0, 3, 0)')
         L.append("mi_clearselected()")
     # PM block (magnetised +y → drives flux up the bridge)
     L += _poly_lua([(x0, -ph), (x1, -ph), (x1, ph), (x0, ph)])
     L.append(f"mi_addblocklabel({(x0+x1)/2:.6f},0)")
     L.append(f"mi_selectlabel({(x0+x1)/2:.6f},0)")
-    L.append('mi_setblockprop("ndfeb", 0, 0.03, "<None>", 90, 4, 0)')
+    L.append(f'mi_setblockprop("ndfeb", 0, {0.03*MESH_SCALE:.5f}, "<None>", 90, 4, 0)')
     L.append("mi_clearselected()")
 
     # coil conductors flanking the bridge. Sign convention: POSITIVE circuit
@@ -259,7 +260,7 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
         lx_ = 0.93 * gx
         L.append(f"mi_addblocklabel({lx_:.6f},{ (y0_+y1_)/2 :.6f})")
         L.append(f"mi_selectlabel({lx_:.6f},{ (y0_+y1_)/2 :.6f})")
-        L.append('mi_setblockprop("air", 0, 0.015, "<None>", 0, 6, 0)')
+        L.append(f'mi_setblockprop("air", 0, {0.015*MESH_SCALE:.5f}, "<None>", 0, 6, 0)')
         L.append("mi_clearselected()")
 
     # outer air box + A=0

@@ -79,7 +79,12 @@ def main():
     m_kg = t["mass_mg"] * 1e-6
     s_m = t["step_um"] * 1e-6
     f_rec = f15
-    i_rec = i_15
+    # The stepping target is no longer reachable inside the swept current
+    # range on the corrected model, so there is no interpolated operating
+    # point to quote. Fall back to a clearly-labelled PLANNING current for the
+    # energy and pulse-width arithmetic rather than inventing a result.
+    i_rec = i_15 if i_15 is not None else 1.00
+    i_rec_is_planning = i_15 is None
     t_step = math.sqrt(2 * s_m / ((f_rec * 1e-3) / m_kg))
     pulse_ms = max(1.5 * t_step * 1e3, 1.0)
     e_ohmic = i_rec ** 2 * r_ohm * (pulse_ms * 1e-3)
@@ -99,7 +104,7 @@ def main():
     vpat_40 = volts_per_at(c["mean_turn_length_um"], 40)
     vpat_50 = volts_per_at(c["mean_turn_length_um"], 50)
     vpat_63 = volts_per_at(c["mean_turn_length_um"], 63)
-    at_needed = 70 * i_15
+    at_needed = 70 * i_rec   # planning figure when the target is unreachable
 
     L = []
     A = L.append
@@ -110,17 +115,30 @@ def main():
       "sent on 28 July. It does not depend on the main report and does not "
       "repeat any of it.")
     A("")
+    A("> **Read this first — a correction to my own numbers.** An earlier "
+      "version of this answer gave a force-versus-current table. On a "
+      "fine-tooth-comb review it did not survive: the finite-element model I "
+      "used does not converge. Moving the translator's end boundary from 3 to "
+      "12 tooth pitches away makes the computed force fall steadily "
+      "(1.07 → 0.81 → 0.62 → 0.49 mN at 0.40 A) instead of settling, and a "
+      "spurious constant term stays at a quarter of the peak throughout. The "
+      "mesh is fine — halving it moves the answer 0.5% — so it is the model's "
+      "geometry, not its numerics. **I am therefore withdrawing the force "
+      "magnitudes.** What survives, and why, is set out in §2. Everything "
+      "outside the force question — mass, targets, electrical, resonance, "
+      "magnet screening and manufacturability — is arithmetic on your "
+      "dimensions and stands.")
+    A("")
     A("**Headline.** The geometry is sound and it closes to the micron. But at "
       f"the currents in your worksheet (0.30–0.40 A) the actuator produces "
       f"**{rows[0]['force_mn']:.2f}–{rows[2]['force_mn']:.2f} mN**, against your "
       f"own 30 g detent target of **{fd:.1f} mN** — roughly **{fd/rows[2]['force_mn']:.0f}× "
-      f"short in force**. The shortfall is not the geometry, it is the "
-      f"ampere-turns: 70 turns × 0.40 A is 28 A-turns. Because force goes as "
-      f"the SQUARE of current, that 7× force gap is only a "
-      f"{i_fd/0.40:.1f}× current gap — you need about {70*i_fd:.0f} A-turns "
-      f"to hold the detent and about {at_needed:.0f} to step it at 1.5×. "
-      f"There is a clean fix, but it is now mandatory rather than optional — "
-      f"see §8.")
+      f"short in force** — and by more than that on the better-converged "
+      f"models. The shortfall is not the geometry, it is the ampere-turns: "
+      f"70 turns × 0.40 A is 28 A-turns, which is simply not many however the "
+      f"iron is modelled. Because force goes as the SQUARE of current, even a "
+      f"7× force gap is only about a 2.7× current gap — so the fix is "
+      f"reachable, but it is now mandatory rather than optional. See §8.")
     A("")
 
     # ---- 0. geometry closure ------------------------------------------
@@ -184,8 +202,11 @@ def main():
       "one to use: it comes from the Maxwell stress tensor, which stays valid "
       "when the iron saturates, whereas ½·i²·dL/dx does not.")
     A("")
-    A("**The three points you asked for are the first three rows, and they are "
-      "the problem.** Reading the target back off the curve:")
+    A("**These magnitudes are withdrawn — see the box at the top.** They are "
+      "printed because the SHAPE and the DIRECTION are informative, not "
+      "because the numbers are results. Reading a required current off a curve "
+      "that has not converged would be false precision, so the table below is "
+      "labelled as indicative only:")
     A("")
     A("| To reach | Needs | Volts | Inside 5 V? |")
     A("|---|---|---|---|")
@@ -193,14 +214,32 @@ def main():
                          ("stepping 1.5 × F_d", f15, i_15),
                          ("stepping 2 × F_d", f20, i_20)):
         if i_ is None:
-            A(f"| {lbl} ({tgt:.1f} mN) | beyond 2.0 A | — | no |")
+            A(f"| {lbl} ({tgt:.1f} mN) | **not reached below 2.0 A** | — | — |")
         else:
             v = i_ * r_ohm
             A(f"| {lbl} ({tgt:.1f} mN) | **{i_:.2f} A** | {v:.2f} V | "
               f"{'yes' if v <= SUPPLY_V else '**no — over the rail**'} |")
     A("")
-    A(f"So the operating point has to be **≈{i_rec:.2f} A**, not 0.35 A — "
-      f"{i_rec/0.35:.1f}× the current in your worksheet.")
+    A("")
+    A("**What DOES survive, and it is the thing that matters.** I have now "
+      "modelled this four ways — the original, then with the end clearance "
+      "corrected, then with the spurious constant removed, then with the ends "
+      "moved progressively further out. **Every single refinement made the "
+      "force smaller**, from 1.59 mN down to 0.49 mN at 0.40 A. So while I "
+      "cannot tell you the magnitude, I can tell you the sign of the error "
+      "with confidence: the actuator is short of its 11.1 mN detent target at "
+      "0.30–0.40 A by **at least** sevenfold, and on the better-converged "
+      "models by rather more. The ampere-turn diagnosis in §8 does not depend "
+      "on the magnitude at all — 70 turns × 0.40 A is 28 A-turns however you "
+      "model the iron, and that is simply not many.")
+    A("")
+    A(f"For planning purposes the operating point is of order **1 A or more**, "
+      f"not 0.35 A. I will give you a firm number when the model earns it. "
+      f"The arithmetic in §4 and §5 below therefore uses "
+      f"{i_rec:.2f} A as a PLANNING figure"
+      + (" (the stepping target is not reached anywhere in the swept range on "
+         "the corrected model, so there is no interpolated point to quote)"
+         if i_rec_is_planning else "") + ".")
     A("")
     A("**And this is where the design currently fails, which is the most "
       "important thing in this document.** With 40 µm wire the coil is "
