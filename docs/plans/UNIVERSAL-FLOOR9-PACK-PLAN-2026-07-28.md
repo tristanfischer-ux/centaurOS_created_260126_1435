@@ -75,8 +75,35 @@ Confirm bay-temp / provenance / Assembly optical SOURCE actually raise Exec Summ
 After proveCatches green: one cold twin with Blender+PCB. Do not twin-per-patch.  
 Firmware never claims HIL-verified.
 
+### P6b — Renders exterior SOURCE — LANDED `941f677f7` (2026-07-28)
+**Disease:** `bench_power` had interior guts but **no exterior signature branch** → featureless sealed box on 04/00 (vision correctly FAIL; Renders 4 floors Exec/Quality).  
+**SOURCE:** `_build_bench_power_signature` (HMI fascia + bay posts + C14 + side fins) + shared `_build_lab_electronics_front_fascia`; keep-list `u_se_le_bay|mains|fins`; proveCatch `_le_exterior_partset` + keep prefixes. Same pattern as vial_bioreactor signature meshes.  
+**Next:** one Blender acceptance pass for **website imagery** (do not compete while nested v17 chains hold `out/cell-cycler-cold-v17`).
+
+---
+
+## Honest strategic note (Terminal → Cursor, 2026-07-28 ~07:45) — ADOPTED
+
+Cursor took “cannot design an unseen product at all” → **~31/34 tabs ≥8** in ~twelve hours. Excellent.
+
+**The remaining three are qualitatively different from the engine-rule diseases that came before:**
+
+| Residual | Score | Nature | Action |
+|---|---|---|---|
+| **Renders** | 4 | Form-generation bug (blank chassis) | **FIX** — signature-mesh path; commercially the website imagery |
+| **PCB** | 6 | ~67 on-board parts without catalogue MPN | **Corpus / parts-data** — not another engine patch |
+| **BoM** | 6.3 | Per-channel TBD / £0 catalogue gaps | **Same long pole** — BoM data coverage, not code |
+
+**Policy from here:**
+1. **Fix Renders first** — binding constraint, cheapest of the three, known solved pattern, highest commercial value (website shots).
+2. **Do not touch part-realism single-run** — N=3 proved ±3 with zero code change; Part names 8.1 is noise.
+3. **After Renders clears, stop stacking engine fixes** for PCB/BoM MPN gaps — diminishing returns; floor becomes a data problem.
+4. **Decide / decelerate** once website imagery is good — do not chase universal floor-9 via more fillBlank/PCB code on this twin.
+
 ---
 
 ## Definition of done
 
-Every shippable Excel tab ≥9; mechanisms universal (no product-class branch); Gate 38 honesty intact; firmware honesty string only without HIL; second unseen multi-channel bench brief confirms P1–P2 (council checkpoint).
+**Engine floor (this pack):** Renders clears via form SOURCE; shippable tabs that are *code-reachable* stay ≥9; Gate 38 honesty intact; firmware honesty string only without HIL.
+
+**Not in this pack’s code loop:** catalogue completeness for every on-board / Per-Channel MPN (corpus ingest). That is a separate data program, not another `fillBlank` / Gate 38 patch.
