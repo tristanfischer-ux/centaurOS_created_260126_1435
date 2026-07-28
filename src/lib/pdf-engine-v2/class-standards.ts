@@ -415,6 +415,23 @@ const DIGITAL_MICROFLUIDICS: ClassStandards = {
   ],
 }
 
+// INTENT (P4 floor-9 / 2026-07-28): unseen multi-channel bench instruments
+// (cell cycler, battery tester, …) classify as consumer_electronics and hit
+// empty CLASS_STANDARDS → Risk WARN "No class-standards registered" forever.
+// Capability floor = the same LVD/EMC/RoHS + IEC 61010-1 + IEC 61326-1 matrix
+// already proven on syringe_pump / potentiostat — never a new product class.
+export const LAB_BENCHTOP_INSTRUMENT_FLOOR: ClassStandards = {
+  product_class: 'lab_benchtop_instrument',
+  display_name: 'Benchtop Laboratory Measurement / Control Instrument',
+  compliance_summary:
+    'Research-use benchtop laboratory instruments are CE-marked electrical equipment: '
+    + 'Low Voltage + EMC + RoHS as the market-access floor, IEC 61010-1 for measurement / '
+    + 'control / laboratory use, and IEC 61326-1 for lab EMC. Clinical IVD / medical-device '
+    + 'routes are OUT OF SCOPE unless the brief explicitly requires them. Applied by '
+    + 'capability (lab measurement-control signals), not by inventing a per-product class.',
+  standards: SYRINGE_PUMP.standards.map((s) => ({ ...s })),
+}
+
 export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   energy_storage: ENERGY_STORAGE,
   e_fuel_synthesis:     E_FUEL_SYNTHESIS,
@@ -434,6 +451,7 @@ export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   benchtop_bioreactor: BENCHTOP_BIOREACTOR,
   potentiostat: POTENTIOSTAT,
   digital_microfluidics: DIGITAL_MICROFLUIDICS,
+  lab_benchtop_instrument: LAB_BENCHTOP_INSTRUMENT_FLOOR,
 }
 
 // Map common display-name variants and synonyms to canonical class keys. The
@@ -465,7 +483,7 @@ function resolveClassKey(productClass: string): string | null {
     [/\b(syringe[\s_-]?pump|multi[\s_-]?channel\s+syringe|poseidon)\b/, 'syringe_pump'],
     [/\b(lab[\s_-]?microscope|flexure[\s_-]?stage|openflexure|inverted\s+microscope)\b/, 'lab_microscope'],
     [/\b(benchtop[\s_-]?bioreactor|pioreactor|turbidostat|chemostat)\b/, 'benchtop_bioreactor'],
-    [/\b(potentiostat|rodeostat|electrochemical\s+workstation)\b/, 'potentiostat'],
+    [/\b(potentiostat|rodeostat|electrochemical\s+workstation|cell[\s_-]?cycler|battery[\s_-]?cycler|battery[\s_-]?tester)\b/, 'potentiostat'],
     [/\b(digital[\s_-]?microfluidics|opendrop|ewod)\b/, 'digital_microfluidics'],
   ]
   for (const [rx, key] of aliases) {
@@ -474,10 +492,70 @@ function resolveClassKey(productClass: string): string | null {
   return null
 }
 
-/** Get the standards block for a product class. Resolves display names + aliases. Falls back to empty stub. */
-export function getClassStandards(productClass: string): ClassStandards {
+/** Fallthrough classifier buckets that hide real lab instruments. */
+const _LAB_FALLTHROUGH_CLASS_RE =
+  /^(consumer_electronics|generic|industrial_machine|edge_ai_server)$/i
+
+/**
+ * Capability signal that a brief describes a benchtop lab measurement/control
+ * instrument even when the classifier chose a fallthrough class.
+ */
+const _LAB_INSTRUMENT_CAPABILITY_RE = new RegExp(
+  [
+    String.raw`\b(?:cell|battery)\s*cycler\b`,
+    String.raw`\bbattery\s*tester\b`,
+    String.raw`\bpotentiostat\b`,
+    String.raw`\b(?:colorimeter|colourimeter|photometer|spectrophotometer)\b`,
+    String.raw`\bthermo(?:\s*|-)?cycler\b`,
+    String.raw`\bbenchtop\b.{0,60}\b(?:instrument|meter|tester|channel)\b`,
+    String.raw`\blaboratory\b.{0,40}\b(?:instrument|measurement|equipment)\b`,
+    String.raw`\biec\s*61010\b`,
+    String.raw`\bchannel_count\b`,
+    String.raw`\bprecision\s*afe\b`,
+    String.raw`\bmeasurement[_\s-]?control\b`,
+  ].join('|'),
+  'i',
+)
+
+/**
+ * @description True when class registry is empty/fallthrough AND brief capability
+ * tokens say lab measurement-control instrument → apply IEC 61010 floor.
+ * @param productClass Classifier product class (may be a fallthrough bucket).
+ * @param briefText Raw / refined brief text for capability tokens.
+ */
+export function isLabBenchtopInstrumentCapability(
+  productClass: string,
+  briefText: string = '',
+): boolean {
+  const cls = String(productClass || '')
+  if (!cls) return false
+  // Named lab classes already have registry rows — never re-route those.
+  const named = resolveClassKey(cls)
+  if (named && !_LAB_FALLTHROUGH_CLASS_RE.test(cls)) return false
+  if (!_LAB_FALLTHROUGH_CLASS_RE.test(cls) && CLASS_STANDARDS[cls]) return false
+  const blob = `${cls}\n${briefText}`
+  return _LAB_INSTRUMENT_CAPABILITY_RE.test(blob)
+}
+
+/**
+ * Get the standards block for a product class.
+ * Resolves display names + aliases. When the classifier dumped a lab instrument
+ * into a fallthrough bucket (consumer_electronics), applies the IEC 61010
+ * capability floor from brief tokens — never an empty WARN forever.
+ */
+export function getClassStandards(
+  productClass: string,
+  briefText: string = '',
+): ClassStandards {
   const key = resolveClassKey(productClass)
-  if (key) return CLASS_STANDARDS[key]
+  if (key) return CLASS_STANDARDS[key]!
+  if (isLabBenchtopInstrumentCapability(productClass, briefText)) {
+    return {
+      ...LAB_BENCHTOP_INSTRUMENT_FLOOR,
+      // Preserve the classifier slug so audit trails still show the fallthrough.
+      product_class: productClass || LAB_BENCHTOP_INSTRUMENT_FLOOR.product_class,
+    }
+  }
   return {
     product_class: productClass,
     display_name: productClass,

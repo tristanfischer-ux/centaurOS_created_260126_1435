@@ -159,7 +159,9 @@ export function runComplianceGate(
   productClass: string,
   briefText: string,
 ): ComplianceGateResult {
-  const cls = getClassStandards(productClass)
+  // GOTCHA: pass briefText so fallthrough classes (consumer_electronics) that
+  // are actually lab instruments get the IEC 61010 capability floor (P4).
+  const cls = getClassStandards(productClass, briefText)
   let jurisdictions = detectJurisdictions(parsedBrief, briefText)
   const declared = detectDeclaredStandards(parsedBrief, briefText)
   const ts = new Date().toISOString()

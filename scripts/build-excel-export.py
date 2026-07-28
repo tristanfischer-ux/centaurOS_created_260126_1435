@@ -16527,6 +16527,17 @@ _HAZARD_LIB = [
      4, 2, "BS 7671 installation, arc-flash assessment, lock-off, IP-rated enclosures, RCD + earthing.",
      ["Electricity at Work Regulations 1989",
       "BS 7671 Requirements for Electrical Installations"]),
+    # INTENT (P4 floor-9): multi-channel cell/battery instruments store electrical
+    # energy in the DUT + channel power stage — not plant switchgear vocabulary.
+    # Universal capability tokens (channel / lithium / discharge load), never a
+    # product-class branch. Complements the IEC 61010 compliance-gate floor.
+    (r"lithium|\bli[\s-]?ion\b|cell\s*cycler|battery\s*cycler|channel\s+power|"
+     r"discharge\s+load|per\s*channel|source\s*sink|kelvin\s*sense",
+     "Stored electrical energy — cell / channel power stage",
+     "Lithium cells under test and multi-amp channel power stages store electrical energy that can arc, overheat or reverse-bias on a fault.",
+     4, 2, "Independent hardware cut-outs (OV/UV/OC/OT/reverse-polarity), fused mains inlet, earthing, IEC 61010-1 abnormal-operation assessment.",
+     ["Electricity at Work Regulations 1989",
+      "IEC 61010-1 Safety requirements for electrical equipment for measurement, control, and laboratory use"]),
     (r"\btank\b|\bvessel\b|\bcolumn\b|\bsump\b|\bbasin\b|\bsilo\b|\bpit\b|reactor",
      "Working at height / confined space (tanks & vessels)",
      "Tank tops present a fall risk; tank interiors are confined spaces (atmosphere / drowning).",

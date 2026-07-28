@@ -42,21 +42,22 @@ Confirm bay-temp / provenance / Assembly optical SOURCE actually raise Exec Summ
 **proveCatch:** selftest both directions (Emc Line Filter electrical; mosfet/exhaust no concern; Effluent Discharge Header still fires).  
 **Unblocks:** Connection trace → helps Drawings / Checks. Await twin SIGHT.
 
-### P2 — Board-centric interconnect (one graph, two projections)
+### P2 — Board-centric interconnect (one graph, two projections) — LANDED `56ea3af4f`
 **Disease:** plant-fluid / exploded graphs; Interconnect empty or unreadably capped.  
-**SOURCE:** connection ledger electrical edges from replication-scope + PCB arch; `draw_interconnect.py` fold `×N` lanes.  
-**proveCatch:** channel_count=N → N harness edges; on-board electronics>0 ∧ edges=0 → FIRE.  
+**SOURCE:** `draw_interconnect.py` collapses `Per Channel *` roles → Precision AFE ×N + absorb rail litter.  
+**proveCatch:** cold-v15-shaped BoM → layout_ok (10 nodes, depth 4); regenerate on v15 state PASS.  
 **Unblocks:** Interconnect, Drawings.
 
-### P3 — Part fitting on closed slots (N=3)
+### P3 — Part fitting on closed slots (N=3) — LANDED `8d650f5c8` (N=3 part score still at P6)
 **Disease:** slots closed but TBD/£0 / package_family-only.  
-**SOURCE:** `fillBlank` + cascade cache + `pcb-verified-candidates` (Yuri transfer); `requirements_bom` £0 on REALIZED_ON_PCB already.  
-**proveCatch:** fillable-TBD=DEFECT; wrong-voltage reject; N=3 part protocol.  
-**Unblocks:** BoM, PCB fitness.
+**SOURCE:** Yuri rules (TL072/WSL2512/NCP15/IRLB) + cascade seed + `fillBlank` verified-candidate bridge + catalogue tokens `afe/shunt/thermistor`.  
+**proveCatch:** resolveVerified + live fillBlank pins all four channel roles; wrong-voltage reject on identity path.  
+**Unblocks:** BoM, PCB fitness (await acceptance twin).
 
-### P4 — Hazard/capability risk (no class table)
+### P4 — Hazard/capability risk (no class table) — LANDED (this pack)
 **Disease:** “No class-standards for consumer_electronics” WARN.  
-**SOURCE:** hazard/capability → IEC 61010 / EMC matrix, not `consumer_electronics` registry paste.  
+**SOURCE:** `LAB_BENCHTOP_INSTRUMENT_FLOOR` + `isLabBenchtopInstrumentCapability(brief)` via `getClassStandards`/`getClassStandardsDBFirst`; battery/channel energy hazard in Excel `_HAZARD_LIB`.  
+**proveCatch:** cell-cycler brief → mandatory≥1 / not empty WARN; phone brief stays empty WARN.  
 **Unblocks:** Risk.
 
 ### P5 — HARD claims: close or honest-block

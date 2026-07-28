@@ -306,8 +306,16 @@ export function buildClassStandardsFromDB(productClass: string): ClassStandards 
  *
  * Never throws. Drop-in replacement for getClassStandards() — same return shape.
  */
-export function getClassStandardsDBFirst(productClass: string): ClassStandards {
-  const baked = getClassStandards(productClass)
+/**
+ * @description DB-first overlay around baked getClassStandards. briefText is
+ * forwarded so the lab-instrument capability floor (P4) still fires when the
+ * classifier dumped an instrument into consumer_electronics.
+ */
+export function getClassStandardsDBFirst(
+  productClass: string,
+  briefText: string = '',
+): ClassStandards {
+  const baked = getClassStandards(productClass, briefText)
 
   // Baked curated entry present → it wins, always.
   const bakedHasContent = Array.isArray(baked.standards) && baked.standards.length > 0
