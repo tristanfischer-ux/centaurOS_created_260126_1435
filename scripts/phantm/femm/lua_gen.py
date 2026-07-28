@@ -47,6 +47,9 @@ BRIDGE_X0 = BRIDGE_X1 - BRIDGE_T
 TRANSL_XL, TRANSL_XR = -1.16, 1.508            # translator drawn span (pre-offset)
 COND_W = 0.126                                 # coil conductor block width
 AIR = 3.2, 2.6                                 # half-box
+DEPTH = 1.55            # out-of-plane depth (mm) — the translator transverse width
+GAP_STRIP_X = 0.75      # half-span of the fine-mesh air strip inside each gap
+GAP_STRIP_INSET = 0.006 # clearance from the strip to each tooth face
 
 
 def _toothed_outline_top(x0, x1, tip_y, slot_bottom_y, land_centres, side):
@@ -171,7 +174,7 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     freq = float(harmonic["freq_hz"]) if harmonic else 0.0
 
     L = ["show_console()", "newdocument(0)",
-         f'mi_probdef({freq:g}, "millimeters", "planar", 1e-8, 1.55, 30)']
+         f'mi_probdef({freq:g}, "millimeters", "planar", 1e-8, {DEPTH:g}, 30)']
 
     # materials
     L.append('mi_addmaterial("air", 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
@@ -248,11 +251,14 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
 
     # fine-mesh air strips inside the two working gaps (floating segments in air)
     for s in (1.0, -1.0):
-        ya, yb = s * (HT + 0.006), s * (SS_TIP_Y - 0.006)
+        ins = min(GAP_STRIP_INSET, 0.25 * GAP)
+        ya, yb = s * (HT + ins), s * (SS_TIP_Y - ins)
         y0_, y1_ = min(ya, yb), max(ya, yb)
-        L += _poly_lua([(-0.75, y0_), (0.75, y0_), (0.75, y1_), (-0.75, y1_)])
-        L.append(f"mi_addblocklabel(0.7,{ (y0_+y1_)/2 :.6f})")
-        L.append(f"mi_selectlabel(0.7,{ (y0_+y1_)/2 :.6f})")
+        gx = GAP_STRIP_X
+        L += _poly_lua([(-gx, y0_), (gx, y0_), (gx, y1_), (-gx, y1_)])
+        lx_ = 0.93 * gx
+        L.append(f"mi_addblocklabel({lx_:.6f},{ (y0_+y1_)/2 :.6f})")
+        L.append(f"mi_selectlabel({lx_:.6f},{ (y0_+y1_)/2 :.6f})")
         L.append('mi_setblockprop("air", 0, 0.015, "<None>", 0, 6, 0)')
         L.append("mi_clearselected()")
 
