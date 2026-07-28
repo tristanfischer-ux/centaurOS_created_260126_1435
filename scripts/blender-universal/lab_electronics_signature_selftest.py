@@ -96,6 +96,43 @@ if {"bnc_electrode", "bnc_cell"} & bp:
 if Counter(bp) == Counter(sets["potentiostat"]):
     fails.append("bench_power collapsed to potentiostat morphology")
 
+# 6. Exterior signature (2026-07-28 cold-v17 SIGHT): bench_power must NOT ship a
+#    featureless sealed box — HMI fascia + channel bay + C14 + heatsink fins.
+#    Pure `_le_exterior_partset` is the SOURCE the geometry builder consumes;
+#    empty exterior partset = the blank-chassis disease that floored Renders at 4.
+def _ext(sig: str) -> tuple[str, ...]:
+    return tuple(b._le_exterior_partset(sig))
+
+
+bp_ext = set(_ext("bench_power"))
+_need_ext = {"face_panel", "face_display", "face_key", "bay_strip", "mains_c14",
+             "heatsink_fin"}
+if not (_need_ext <= bp_ext):
+    fails.append(
+        f"bench_power exterior missing HMI/bay/C14/fins roles — got {sorted(bp_ext)}"
+    )
+if "lead_we" in bp_ext or "bnc_electrode" in bp_ext:
+    fails.append("bench_power exterior WRONGLY carries potentiostat banana/BNC cues")
+# Keep-list must retain the new exterior prefixes (else 04 hides them again).
+for pfx in ("u_se_le_bay", "u_se_le_mains", "u_se_le_fins", "u_se_le_face"):
+    if pfx not in b._EXTERIOR_KEEP_PREFIXES:
+        fails.append(f"exterior keep-list missing {pfx!r} — 04 would cull bench_power cues")
+# Family tokens the vision/drawing gates compare against.
+if b._exterior_signature_family("u_se_le_bay_strip") != "channel-bay":
+    fails.append("u_se_le_bay_* must map to family channel-bay")
+if b._exterior_signature_family("u_se_le_mains_c14") != "mains-inlet":
+    fails.append("u_se_le_mains_* must map to family mains-inlet")
+if b._exterior_signature_family("u_se_le_fins_heatsink_0") != "pass-bank-heatsink":
+    fails.append("u_se_le_fins_* must map to family pass-bank-heatsink")
+# Dispatcher source must call the bench_power builder (catch branch deletion).
+import inspect as _insp  # noqa: E402
+_place_src = _insp.getsource(b.place_sealed_enclosure)
+if "_build_bench_power_signature" not in _place_src:
+    fails.append(
+        "place_sealed_enclosure must call _build_bench_power_signature "
+        "(empty elif = featureless chassis regression)"
+    )
+
 if fails:
     for f in fails:
         print(f"  ✗ {f}")

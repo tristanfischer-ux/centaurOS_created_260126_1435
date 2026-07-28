@@ -7292,6 +7292,170 @@ def _exterior_signature_od_bbox_mm():
 
 
 
+def _build_lab_electronics_front_fascia(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy):
+    """Shared front HMI fascia for sealed lab_electronics exteriors.
+
+    INTENT (2026-07-19 / 2026-07-28): vision critic flags a featureless closed
+    chassis with no display/keys/ports. Dark recessed bezel + display + keys +
+    status LED + host port on the operator face. Every mesh uses the
+    `u_se_le_face` prefix so the exterior keep-list retains them on 04–07.
+
+    Shared by vial_bioreactor (culture kit still needs a front panel) and
+    bench_power (source/sink instrument HMI). NOT a product-named branch —
+    both signatures need the same operator-face language.
+
+    @returns list of created Blender objects.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    _sig_new = []
+    _pan_face = _fy - tt                    # operator face plane (mm)
+    _panelm = fl.make_mat("m_se_le_panel", fl._to_linear((0.16, 0.17, 0.19)),
+                          metallic=0.4, roughness=0.5)
+    _panel = fl.add_box("u_se_le_face_panel",
+                        _mm3((-W * 0.14, _pan_face - 2.0, base_z + H * 0.32)),
+                        _mm3((W * 0.50, 4.0, H * 0.40)), _panelm,
+                        module=_skin_mod, module_objects=MO)
+    _panel.dimensions = _mm3((W * 0.50, 4.0, H * 0.40))
+    _sig_new.append(_panel)
+    _dispm = fl.make_mat("m_se_le_display", fl._to_linear((0.03, 0.10, 0.16)),
+                         metallic=0.1, roughness=0.12, kind="glass", alpha=0.92)
+    _disp = fl.add_box("u_se_le_face_display",
+                       _mm3((-W * 0.16, _pan_face - 6.0, base_z + H * 0.42)),
+                       _mm3((W * 0.34, 6.0, H * 0.16)), _dispm,
+                       module=_skin_mod, module_objects=MO)
+    _disp.dimensions = _mm3((W * 0.34, 6.0, H * 0.16))
+    _sig_new.append(_disp)
+    _keym = fl.make_mat("m_se_le_key", fl._to_linear((0.07, 0.07, 0.09)),
+                        metallic=0.3, roughness=0.55)
+    for _ki in range(3):
+        _kx = -W * 0.28 + _ki * (W * 0.12)
+        _key = fl.add_box(f"u_se_le_face_key_{_ki}",
+                          _mm3((_kx, _pan_face - 6.0, base_z + H * 0.20)),
+                          _mm3((W * 0.08, 6.0, H * 0.10)), _keym,
+                          module=_skin_mod, module_objects=MO)
+        _key.dimensions = _mm3((W * 0.08, 6.0, H * 0.10))
+        _sig_new.append(_key)
+    _ledm = fl.make_mat("m_se_le_status_led", fl._to_linear((0.15, 0.90, 0.38)),
+                        kind="led_emissive", emission_strength=3.0)
+    _led = fl.add_cyl("u_se_le_face_led",
+                      _mm3((W * 0.06, _pan_face - 6.0, base_z + H * 0.20)),
+                      2.6 * fl.MM, 6.0 * fl.MM, _ledm,
+                      module=_skin_mod, module_objects=MO,
+                      rotation=(math.radians(90), 0.0, 0.0))
+    _sig_new.append(_led)
+    _portm = fl.make_mat("m_se_le_face_port", fl._to_linear((0.08, 0.08, 0.10)),
+                         metallic=0.45, roughness=0.4)
+    _port = fl.add_box("u_se_le_face_port",
+                       _mm3((W * 0.30, _pan_face - 5.0, base_z + H * 0.30)),
+                       _mm3((14.0, 5.0, 9.0)), _portm,
+                       module=_skin_mod, module_objects=MO)
+    _port.dimensions = _mm3((14.0, 5.0, 9.0))
+    _sig_new.append(_port)
+    return _sig_new
+
+
+# INTENT (2026-07-28 cell-cycler SIGHT): bench_power selected the sealed
+# lab_electronics envelope + interior guts (AFE / cell bay / C14 / pass-bank)
+# but the exterior signature dispatcher only had potentiostat / ewod /
+# vial_bioreactor branches — so `_sig_new` stayed empty and 04 shipped a
+# featureless grey block. Pure role list (no bpy) so proveCatch can fire
+# without Blender; the geometry builder consumes the same tokens.
+_LE_EXTERIOR_SIGNATURE_PARTS = {
+    "potentiostat": ("face_panel", "face_display", "face_key", "face_led",
+                     "face_port", "lead_we", "lead_re", "lead_ce"),
+    "ewod": ("electrode_grid", "cartridge_oled"),
+    "vial_bioreactor": ("vial", "vial_fluid", "vial_collar", "od_src", "od_det",
+                        "face_panel", "face_display", "face_key", "face_led",
+                        "face_port"),
+    "bench_power": (
+        "face_panel", "face_display", "face_key", "face_led", "face_port",
+        "bay_strip", "bay_post", "mains_c14", "heatsink_fin",
+    ),
+    "generic": ("face_panel", "face_display", "face_key", "face_led", "face_port"),
+}
+
+
+def _le_exterior_partset(signature: str) -> tuple[str, ...]:
+    """Pure: exterior signature role tags for a lab_electronics sub-type.
+
+    @description Geometry-free decision the exterior builder + proveCatch share.
+                 Unknown signature → generic HMI fascia (never an empty keep-list).
+    @param signature One of potentiostat / vial_bioreactor / ewod / bench_power / generic.
+    @returns Ordered tuple of exterior part role tags.
+    """
+    return _LE_EXTERIOR_SIGNATURE_PARTS.get(
+        (signature or "generic"), _LE_EXTERIOR_SIGNATURE_PARTS["generic"]
+    )
+
+
+def _build_bench_power_signature(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy):
+    """Exterior signature for multi-channel bench source/sink power instruments.
+
+    INTENT (2026-07-28): form follows function — HMI fascia + front cell-bay
+    Kelvin/power terminals + rear IEC C14 + side pass-bank heatsink fins. Never
+    BNC electrochemistry leads (wrong morphology) and never a blank sealed box.
+
+    Mesh prefixes (`u_se_le_face` / `u_se_le_bay` / `u_se_le_mains` / `u_se_le_fins`)
+    are in `_EXTERIOR_KEEP_PREFIXES` so 04–07 retain them; interior
+    `u_se_le_channel_terminal_strip` / `u_se_le_c14_inlet` stay cutaway-only.
+
+    @returns list of created Blender objects.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    _sig_new = list(_build_lab_electronics_front_fascia(
+        fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
+    _pan_face = _fy - tt
+    # Front cell-bay terminal strip (proud of fascia, right of HMI).
+    _baym = fl.make_mat("m_se_le_bay", fl._to_linear((0.22, 0.23, 0.26)),
+                        metallic=0.55, roughness=0.4)
+    _bay = fl.add_box(
+        "u_se_le_bay_strip",
+        _mm3((W * 0.22, _pan_face - 4.0, base_z + H * 0.55)),
+        _mm3((W * 0.38, 8.0, H * 0.28)),
+        _baym, module=_skin_mod, module_objects=MO)
+    _bay.dimensions = _mm3((W * 0.38, 8.0, H * 0.28))
+    _sig_new.append(_bay)
+    _postm = fl.make_mat("m_se_le_bay_post", fl._to_linear((0.72, 0.55, 0.18)),
+                         metallic=0.75, roughness=0.35)
+    _n_posts = 4
+    for _pi in range(_n_posts):
+        _px = W * 0.08 + _pi * (W * 0.09)
+        _post = fl.add_cyl(
+            f"u_se_le_bay_post_{_pi}",
+            _mm3((_px, _pan_face - 10.0, base_z + H * 0.55)),
+            2.8 * fl.MM, 10.0 * fl.MM, _postm,
+            module=_skin_mod, module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0))
+        _sig_new.append(_post)
+    # Rear IEC C14 fused inlet (mains ingress — readable on 07 service view).
+    _c14m = fl.make_mat("m_se_le_mains", fl._to_linear((0.12, 0.12, 0.14)),
+                        metallic=0.4, roughness=0.45)
+    _c14 = fl.add_box(
+        "u_se_le_mains_c14",
+        _mm3((-W * 0.28, D / 2 + tt + 2.0, base_z + H * 0.35)),
+        _mm3((32.0, 12.0, 22.0)),
+        _c14m, module=_skin_mod, module_objects=MO)
+    _c14.dimensions = _mm3((32.0, 12.0, 22.0))
+    _sig_new.append(_c14)
+    # Side pass-bank heatsink fins (linear discharge thermal path).
+    _finm = fl.make_mat("m_se_le_fins", fl._to_linear((0.45, 0.46, 0.48)),
+                        metallic=0.65, roughness=0.4)
+    for _fi in range(5):
+        _fz = base_z + H * 0.22 + _fi * (H * 0.12)
+        _fin = fl.add_box(
+            f"u_se_le_fins_heatsink_{_fi}",
+            _mm3((-W / 2 - 3.0, D * 0.08, _fz)),
+            _mm3((6.0, D * 0.35, H * 0.06)),
+            _finm, module=_skin_mod, module_objects=MO)
+        _fin.dimensions = _mm3((6.0, D * 0.35, H * 0.06))
+        _sig_new.append(_fin)
+    return _sig_new
+
+
 def _build_vial_bioreactor_signature(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy):
     """ONE canonical build of the vial_bioreactor on-top signature geometry.
 
@@ -7411,59 +7575,9 @@ def _build_vial_bioreactor_signature(fl, W, D, H, base_z, _skin_mod, MO, tt, _fy
                           module=_skin_mod, module_objects=MO)
         _arm.dimensions = _mm3((abs(_sx) + 4.0, 3.0, 3.0))
         _sig_new.append(_arm)
-    # FRONT CONTROL-PANEL FASCIA (2026-07-19 — the render_vision_critic
-    # flagged "featureless closed chassis with no visible display, keys,
-    # ports"). Group the controls on a recessed dark bezel in the lower
-    # front (clear of the top handle strip), proud of the face so they cast
-    # shadow and read as a real fascia. Dark panel + dark keys CONTRAST the
-    # light body. CRITICAL: every mesh MUST use the `u_se_le_face` prefix —
-    # the lab_electronics exterior keep-list (build ~L13045 `_keep`) hides
-    # any u_se_le_* NOT in its allowlist, and `u_se_le_face` is the allowed
-    # front-face signature prefix (a bare u_se_le_display/key/panel is culled
-    # on 04, the bug that hid the first fascia attempt).
-    _pan_face = _fy - tt                    # operator face plane (mm)
-    _panelm = fl.make_mat("m_se_le_panel", fl._to_linear((0.16, 0.17, 0.19)),
-                          metallic=0.4, roughness=0.5)
-    _panel = fl.add_box("u_se_le_face_panel",
-                        _mm3((-W * 0.14, _pan_face - 2.0, base_z + H * 0.32)),
-                        _mm3((W * 0.50, 4.0, H * 0.40)), _panelm,
-                        module=_skin_mod, module_objects=MO)
-    _panel.dimensions = _mm3((W * 0.50, 4.0, H * 0.40))
-    _sig_new.append(_panel)
-    _dispm = fl.make_mat("m_se_le_display", fl._to_linear((0.03, 0.10, 0.16)),
-                         metallic=0.1, roughness=0.12, kind="glass", alpha=0.92)
-    _disp = fl.add_box("u_se_le_face_display",
-                       _mm3((-W * 0.16, _pan_face - 6.0, base_z + H * 0.42)),
-                       _mm3((W * 0.34, 6.0, H * 0.16)), _dispm,
-                       module=_skin_mod, module_objects=MO)
-    _disp.dimensions = _mm3((W * 0.34, 6.0, H * 0.16))
-    _sig_new.append(_disp)
-    _keym = fl.make_mat("m_se_le_key", fl._to_linear((0.07, 0.07, 0.09)),
-                        metallic=0.3, roughness=0.55)
-    for _ki in range(3):
-        _kx = -W * 0.28 + _ki * (W * 0.12)
-        _key = fl.add_box(f"u_se_le_face_key_{_ki}",
-                          _mm3((_kx, _pan_face - 6.0, base_z + H * 0.20)),
-                          _mm3((W * 0.08, 6.0, H * 0.10)), _keym,
-                          module=_skin_mod, module_objects=MO)
-        _key.dimensions = _mm3((W * 0.08, 6.0, H * 0.10))
-        _sig_new.append(_key)
-    _ledm = fl.make_mat("m_se_le_status_led", fl._to_linear((0.15, 0.90, 0.38)),
-                        kind="led_emissive", emission_strength=3.0)
-    _led = fl.add_cyl("u_se_le_face_led",
-                      _mm3((W * 0.06, _pan_face - 6.0, base_z + H * 0.20)),
-                      2.6 * fl.MM, 6.0 * fl.MM, _ledm,
-                      module=_skin_mod, module_objects=MO,
-                      rotation=(math.radians(90), 0.0, 0.0))
-    _sig_new.append(_led)
-    _portm = fl.make_mat("m_se_le_face_port", fl._to_linear((0.08, 0.08, 0.10)),
-                         metallic=0.45, roughness=0.4)
-    _port = fl.add_box("u_se_le_face_port",
-                       _mm3((W * 0.30, _pan_face - 5.0, base_z + H * 0.30)),
-                       _mm3((14.0, 5.0, 9.0)), _portm,
-                       module=_skin_mod, module_objects=MO)
-    _port.dimensions = _mm3((14.0, 5.0, 9.0))
-    _sig_new.append(_port)
+    # Shared front HMI fascia (extracted 2026-07-28 — also used by bench_power).
+    _sig_new.extend(_build_lab_electronics_front_fascia(
+        fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
     return _sig_new
 
 def write_parts_manifest(out_dir, parts, state=None):
@@ -13806,6 +13920,12 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert any(
         "u_se_le_vial_collar".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
     ), "vial_bioreactor vial collar must match a keep prefix"
+    # proveCatch bench_power exterior (2026-07-28): bay/mains/fins must survive
+    # exterior keep — otherwise 04 ships a featureless sealed box again.
+    for _bp_nm in ("u_se_le_bay_strip", "u_se_le_mains_c14",
+                   "u_se_le_fins_heatsink_0", "u_se_le_face_display"):
+        assert any(_bp_nm.startswith(p) for p in _EXTERIOR_KEEP_PREFIXES), (
+            f"bench_power exterior mesh {_bp_nm!r} must match _EXTERIOR_KEEP_PREFIXES")
     assert not any(
         "u_power_distribution_slab".startswith(p)
         for p in _INSTRUMENT_MESH_KEEP_PREFIXES
@@ -14023,9 +14143,13 @@ def _prepare_sealed_product_view(view_name, entering):
             # base, OD heads flank it at mid-vial). Keep "u_se_le_vial" so the vessel +
             # amber media + collar all render — the heads now clamp a real vial.
             # proveCatch: _selftest_le_vial_exterior_gating (below in selftest block).
+            # GOTCHA (2026-07-28): bench_power exterior uses bay/mains/fins
+            # prefixes (not face-*), and must stay visible on 04–07. Keep in
+            # sync with `_EXTERIOR_KEEP_PREFIXES` below.
             _keep = ("u_se_le_lead", "u_se_le_electrode", "u_se_le_grid",
                      "u_se_le_cartridge", "u_se_le_vial", "u_se_le_od",
-                     "u_se_le_enclosure", "u_se_le_face")
+                     "u_se_le_enclosure", "u_se_le_face",
+                     "u_se_le_bay", "u_se_le_mains", "u_se_le_fins")
             _shell_ids = {id(o) for o in _SEALED_SHELL_OBJECTS if o}
             if _SEALED_FRONT_COVER is not None:
                 _shell_ids.add(id(_SEALED_FRONT_COVER))
@@ -17582,6 +17706,8 @@ _OPTICAL_HANDHELD_SIGNATURE_PREFIXES: tuple = tuple(
 _EXTERIOR_KEEP_PREFIXES: tuple = (
     "u_se_le_lead", "u_se_le_electrode", "u_se_le_grid", "u_se_le_cartridge",
     "u_se_le_vial_collar", "u_se_le_od", "u_se_le_face",
+    # bench_power exterior (2026-07-28): cell-bay / IEC C14 / pass-bank fins
+    "u_se_le_bay", "u_se_le_mains", "u_se_le_fins",
     *_OPTICAL_HANDHELD_SIGNATURE_PREFIXES,
 )
 
@@ -17613,6 +17739,12 @@ def _exterior_signature_family(mesh_name: str) -> str | None:
         return "sample-port"
     if nm.startswith("u_se_le_face"):
         return "hmi-fascia"
+    if nm.startswith("u_se_le_bay"):
+        return "channel-bay"
+    if nm.startswith("u_se_le_mains"):
+        return "mains-inlet"
+    if nm.startswith("u_se_le_fins"):
+        return "pass-bank-heatsink"
     # lead / electrode / grid / cartridge → their own role token
     token = nm[len("u_se_le_"):].split("_", 1)[0]
     return token or None
@@ -18634,6 +18766,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _sig_new.append(_oled)
             elif _LE_SIGNATURE == "vial_bioreactor":
                 _sig_new.extend(_build_vial_bioreactor_signature(
+                    fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
+            elif _LE_SIGNATURE == "bench_power":
+                # INTENT (2026-07-28): without this branch, bench_power inherits
+                # the sealed shell alone → featureless grey block on 04/00
+                # (cold-v17 SIGHT; vision critic correctly FAIL).
+                _sig_new.extend(_build_bench_power_signature(
+                    fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
+            elif _LE_SIGNATURE == "generic":
+                # Sealed AFE box with no special interface — still needs HMI
+                # fascia so it never ships as a blank chassis.
+                _sig_new.extend(_build_lab_electronics_front_fascia(
                     fl, W, D, H, base_z, _skin_mod, MO, tt, _fy))
             # Register the above-lid signature parts so the UNIVERSAL INTERIOR
             # CONTAINMENT CLAMP (below, ~L18408) does NOT crush them back inside
