@@ -28,6 +28,11 @@ from scripts.lib.fpk_physics_tree import (  # noqa: E402
     generate_checklist_disposition,
     render_checklist_md,
 )
+from scripts.lib.fpk_bus_esl import (  # noqa: E402
+    build_fpk_esl_thermal,
+    evaluate_cfd_open_gate,
+    render_esl_thermal_markdown,
+)
 
 
 def main() -> int:
@@ -54,6 +59,23 @@ def main() -> int:
         qs[k] = v
 
     stamped_at = datetime.now(ZoneInfo("Europe/London")).isoformat(timespec="seconds")
+    bus_esl, cold_plate_thermal = build_fpk_esl_thermal(qs)
+    cfd_gate = evaluate_cfd_open_gate(
+        cold_plate_thermal["open_until"],
+        requested_ship_ok=True,
+    )
+    state["fpkBusEsl"] = {
+        "stamped_at": stamped_at,
+        "source": "scripts/lib/fpk_bus_esl.py",
+        **bus_esl,
+    }
+    state["fpkColdPlateThermal"] = {
+        "stamped_at": stamped_at,
+        "source": "scripts/lib/fpk_bus_esl.py",
+        **cold_plate_thermal,
+        "ship_gate": cfd_gate,
+        "ship_ok": cfd_gate["ship_ok"],
+    }
     state["fpkPhysicsTree"] = {
         "stamped_at": stamped_at,
         "source": "scripts/lib/fpk_physics_tree.py",
@@ -61,6 +83,7 @@ def main() -> int:
         "coverage": cov,
         "tree": root.to_dict(),
         "ship_ok": False,
+        "mandatory_open_gate": cfd_gate,
         "part_index": [
             {
                 "id": n.id,
@@ -81,6 +104,10 @@ def main() -> int:
     state_path.write_text(json.dumps(state, indent=2) + "\n")
     md_path = args.twin / "JLR-FE-FRONT-FPK-PHYSICS-TREE.md"
     md_path.write_text(render_checklist_md(root))
+    esl_thermal_md_path = args.twin / "JLR-FE-FRONT-FPK-ESL-THERMAL.md"
+    esl_thermal_md_path.write_text(
+        render_esl_thermal_markdown(bus_esl, cold_plate_thermal, cfd_gate)
+    )
     checklist_path = args.twin / "_physics_checklist_council" / "merged.json"
     if not checklist_path.is_file():
         print(f"missing {checklist_path}", file=sys.stderr)
@@ -135,6 +162,10 @@ def main() -> int:
         f"  nodes={cov['node_count']} leaves={cov['leaf_count']} "
         f"coverage={cov['physics_coverage_pct']}%\n"
         f"  report={md_path}\n"
+        f"  esl_thermal={esl_thermal_md_path} "
+        f"ESL={bus_esl['esl_nh_range']} nH "
+        f"source_to_inlet_dT="
+        f"{cold_plate_thermal['temperature_rise_k']['source_interface_to_inlet']} K\n"
         f"  disposition={disposition_path} "
         f"mapped={disposition['counts']['mapped']} "
         f"duplicate={disposition['counts']['duplicate']} "

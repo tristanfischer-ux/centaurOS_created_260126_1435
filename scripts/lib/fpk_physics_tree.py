@@ -24,6 +24,11 @@ import sys
 from dataclasses import asdict, dataclass, field
 from typing import Any, Mapping, Optional
 
+try:
+    from scripts.lib.fpk_bus_esl import build_fpk_esl_thermal
+except ModuleNotFoundError:
+    from fpk_bus_esl import build_fpk_esl_thermal
+
 
 # ── Material handbook seeds (provenance: typical handbook; not lab-measured) ─
 
@@ -768,37 +773,18 @@ def _build_laminations(ctx: FpkContext, parent: str) -> PhysicsNode:
     return root
 
 
-def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
-    egw = _mat("EGW_50_50")
-    q_w = ctx.inv_loss_kw * 1000.0
-    # assume MCU takes ~55% of cassette coolant share; motor jacket the rest — seed split
-    q_mcu = q_w
-    mdot = (ctx.coolant_lpm / 60.0e3) * egw["density_kg_m3"]  # kg/s from L/min
-    # L/min → m³/s = /60000; × ρ → kg/s
-    mdot = (ctx.coolant_lpm / 60000.0) * egw["density_kg_m3"]
-    cp = egw["specific_heat_j_kgk"]
-    dt = q_mcu / max(mdot * cp, 1e-9)
-    # Channel sizing seed: n parallel rectangular channels under module footprint
-    n_ch = 8
-    # target velocity 1.5 m/s; area = V̇ / (n·v)
-    vdot = ctx.coolant_lpm / 60000.0
-    v = 1.5
-    a_one = vdot / (n_ch * v)
-    # aspect 4:1 → w = 2√a, h = √a/2 … use w/h=4
-    h = math.sqrt(a_one / 4.0)
-    w = 4.0 * h
-    dh = 2.0 * w * h / (w + h)
-    # Re, Nu rough (Dittus–Boelter-ish)
-    mu = egw["dynamic_viscosity_pa_s"]
-    re = egw["density_kg_m3"] * v * dh / mu
-    pr = cp * mu / egw["thermal_conductivity_w_mk"]
-    nu = 0.023 * max(re, 1.0) ** 0.8 * max(pr, 1.0) ** 0.4
-    h_conv = nu * egw["thermal_conductivity_w_mk"] / max(dh, 1e-6)
-    # plate footprint seed ~120×80 mm under 3 modules
-    area_wall = n_ch * (2.0 * (w + h) * 0.12)  # 120 mm length
-    r_conv = 1.0 / max(h_conv * area_wall, 1e-9)
-    tim = _mat("TIM_grease")
-    r_tim = (tim["thickness_mm"] / 1000.0) / (tim["thermal_conductivity_w_mk"] * 0.12 * 0.08)
+def _build_cold_plate(
+    ctx: FpkContext,
+    parent: str,
+    thermal: Mapping[str, Any],
+) -> PhysicsNode:
+    """INTENT: tree nodes consume the canonical P4 network, not duplicate maths."""
+    hydraulics = thermal["channel_hydraulics"]
+    network = thermal["thermal_network"]
+    temperature = thermal["temperature_rise_k"]
+    n_ch = int(hydraulics["channel_count"])
+    dt = float(temperature["fluid_inlet_to_outlet"])
+    r_tim = float(network["tim_rth_k_per_w"])
 
     root = PhysicsNode(
         id="mcu_cold_plate",
@@ -811,28 +797,28 @@ def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
         special_manufacture=True,
         domains=("thermal", "fluid", "mechanical", "material", "manufacturing"),
         physics={
-            "heat_load_w": round(q_mcu, 1),
+            **dict(thermal),
+            "heat_load_w": thermal["heat_load_w"],
             "coolant_flow_l_min": ctx.coolant_lpm,
             "coolant_inlet_c": ctx.coolant_in_c,
-            "delta_t_fluid_k": round(dt, 3),
+            "delta_t_fluid_k": dt,
             "outlet_c": round(ctx.coolant_in_c + dt, 2),
             "channel_count": n_ch,
-            "channel_width_mm": round(w * 1000.0, 2),
-            "channel_height_mm": round(h * 1000.0, 2),
-            "hydraulic_diameter_mm": round(dh * 1000.0, 2),
-            "mean_velocity_m_s": v,
-            "reynolds": round(re, 0),
-            "nusselt": round(nu, 2),
-            "h_conv_w_m2k": round(h_conv, 1),
-            "r_conv_k_w": round(r_conv, 4),
-            "r_tim_k_w": round(r_tim, 4),
+            "channel_width_mm": hydraulics["channel_width_mm"],
+            "channel_height_mm": hydraulics["channel_height_mm"],
+            "hydraulic_diameter_mm": hydraulics["hydraulic_diameter_mm"],
+            "mean_velocity_m_s": hydraulics["mean_velocity_m_s"],
+            "reynolds": hydraulics["reynolds"],
+            "nusselt": hydraulics["nusselt"],
+            "h_conv_w_m2k": network["h_conv_w_m2k"],
+            "r_conv_k_w": network["convection_rth_k_per_w"],
+            "r_tim_k_w": r_tim,
             "why_geometry": (
-                "Channels sized so V≈1.5 m/s at 12 L/min under module footprint; "
-                "width/height from n parallel ducts; plate must match SiC baseplate area "
-                "to keep spreading resistance low"
+                "Channels follow flow, target velocity, and MCU-bay footprint; "
+                "TIM + Al land + convection form the analytical source-to-fluid network"
             ),
         },
-        open_until=("CFD_cold_plate", "pressure_drop_bench"),
+        open_until=tuple(thermal["open_until"]),
     )
     root.children = [
         PhysicsNode(
@@ -844,9 +830,11 @@ def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
             domains=("fluid", "thermal", "manufacturing"),
             physics={
                 "count": n_ch,
-                "width_mm": round(w * 1000.0, 2),
-                "height_mm": round(h * 1000.0, 2),
-                "dh_mm": round(dh * 1000.0, 2),
+                "width_mm": hydraulics["channel_width_mm"],
+                "height_mm": hydraulics["channel_height_mm"],
+                "dh_mm": hydraulics["hydraulic_diameter_mm"],
+                "reynolds": hydraulics["reynolds"],
+                "pressure_drop_pa": hydraulics["pressure_drop_pa"],
             },
             special_manufacture=True,
         ),
@@ -869,7 +857,11 @@ def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
             "mcu",
             "TIM_grease",
             ("thermal", "manufacturing"),
-            {"r_th_k_w": round(r_tim, 4)},
+            {
+                "r_th_k_w": r_tim,
+                "thickness_mm": network["tim_thickness_mm"],
+                "conductivity_w_mk": network["tim_conductivity_w_mk"],
+            },
             kind="process",
         ),
         _leaf(
@@ -879,7 +871,7 @@ def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
             "mcu",
             "EGW_50_50",
             ("fluid", "thermal", "material"),
-            {"flow_l_min": ctx.coolant_lpm, "delta_t_k": round(dt, 3)},
+            {"flow_l_min": ctx.coolant_lpm, "delta_t_k": dt},
             kind="fluid",
         ),
         PhysicsNode(
@@ -891,7 +883,7 @@ def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
             material_id="Al_6061_T6",
             manufacturing="machined boss + O-ring face seal (ICD XYZ OPEN)",
             domains=("fluid", "mechanical", "manufacturing"),
-            physics={"flow_l_min": ctx.coolant_lpm, "role": "inlet"},
+            physics=dict(thermal["ports"][0]),
             open_until=("FIA_port_xyz",),
         ),
         PhysicsNode(
@@ -903,14 +895,18 @@ def _build_cold_plate(ctx: FpkContext, parent: str) -> PhysicsNode:
             material_id="Al_6061_T6",
             manufacturing="machined boss + O-ring face seal (ICD XYZ OPEN)",
             domains=("fluid", "mechanical", "manufacturing"),
-            physics={"flow_l_min": ctx.coolant_lpm, "role": "outlet"},
+            physics=dict(thermal["ports"][1]),
             open_until=("FIA_port_xyz",),
         ),
     ]
     return root
 
 
-def _build_dc_link(ctx: FpkContext, parent: str) -> PhysicsNode:
+def _build_dc_link(
+    ctx: FpkContext,
+    parent: str,
+    bus_esl: Mapping[str, Any],
+) -> PhysicsNode:
     dv = 0.02 * ctx.v_dc
     c_f = ctx.i_ph_design / (8.0 * ctx.f_sw * max(dv, 1.0))
     c_uf = c_f * 1e6
@@ -918,8 +914,6 @@ def _build_dc_link(ctx: FpkContext, parent: str) -> PhysicsNode:
     n = max(4, int(math.ceil(c_uf / each)))
     # ripple current seed ~0.65·I_rms for 3ph PWM order-of-magnitude
     i_ripple = 0.65 * ctx.i_ph_rms
-    # ESL seed for laminated bus — 10 nH class
-    esl_nh = 10.0
     esr_mohm = 0.8  # per cap seed
     root = PhysicsNode(
         id="dc_link_capacitor_bank",
@@ -940,7 +934,9 @@ def _build_dc_link(ctx: FpkContext, parent: str) -> PhysicsNode:
             "cap_each_uf": each,
             "ripple_current_a_rms_seed": round(i_ripple, 1),
             "esr_each_mohm": esr_mohm,
-            "esl_bus_nh_seed": esl_nh,
+            "esl_bus_nh_seed": bus_esl["esl_nh_nominal"],
+            "esl_bus_nh_range": bus_esl["esl_nh_range"],
+            "esl_provenance": bus_esl["provenance"],
             "i2r_bank_w": round(n * (i_ripple / n) ** 2 * (esr_mohm / 1000.0), 2),
             "why": "Supports DC voltage during PWM current pulses; sizing from ripple ΔV not 50 Hz grid formula",
         },
@@ -1021,7 +1017,11 @@ def _build_dc_link(ctx: FpkContext, parent: str) -> PhysicsNode:
     return root
 
 
-def _build_busbars(ctx: FpkContext, parent: str) -> list[PhysicsNode]:
+def _build_busbars(
+    ctx: FpkContext,
+    parent: str,
+    bus_esl: Mapping[str, Any],
+) -> list[PhysicsNode]:
     cu = _mat("Cu_ETP")
     j = 5.0  # A/mm² bus seed
     a_dc = (ctx.p_cont_kw * 1000.0 / max(ctx.v_dc, 1.0)) / j  # DC current / j
@@ -1043,16 +1043,17 @@ def _build_busbars(ctx: FpkContext, parent: str) -> list[PhysicsNode]:
         special_manufacture=True,
         domains=("electrical", "thermal", "magnetic", "material", "manufacturing"),
         physics={
+            **dict(bus_esl),
             "v_dc_v": ctx.v_dc,
             "i_dc_a": round(i_dc, 1),
             "section_mm2": round(a_dc, 1),
             "thickness_mm": t,
             "width_mm": round(w_dc, 1),
             "j_a_per_mm2": j,
-            "esl_target_nh": 10.0,
+            "esl_target_nh": bus_esl["esl_nh_nominal"],
             "why_laminated": "Minimise commutation loop inductance between caps and SiC half-bridges",
         },
-        open_until=("bus_3D_inductance",),
+        open_until=tuple(bus_esl["open_until"]),
     )
     dc.children = [
         _leaf(
@@ -2227,6 +2228,7 @@ def _build_joint_hardware(ctx: FpkContext, parent: str) -> list[PhysicsNode]:
 def build_fpk_physics_tree(quantities: Mapping[str, Any]) -> PhysicsNode:
     """Full recursive tree for the front FPK."""
     ctx = context_from_quantities(quantities)
+    bus_esl, cold_plate_thermal = build_fpk_esl_thermal(quantities)
     root = PhysicsNode(
         id="front_fpk",
         name="Front Powertrain Kit (unitised)",
@@ -2266,10 +2268,10 @@ def build_fpk_physics_tree(quantities: Mapping[str, Any]) -> PhysicsNode:
     )
     mcu.children = (
         _build_mcu_shell(ctx, mcu.id)
-        + [_build_cold_plate(ctx, mcu.id)]
+        + [_build_cold_plate(ctx, mcu.id, cold_plate_thermal)]
         + [_build_sic_stack(ctx, mcu.id)]
-        + [_build_dc_link(ctx, mcu.id)]
-        + _build_busbars(ctx, mcu.id)
+        + [_build_dc_link(ctx, mcu.id, bus_esl)]
+        + _build_busbars(ctx, mcu.id, bus_esl)
         + [_build_gate_drive_pcb(ctx, mcu.id)]
         + [_build_control_pcb(ctx, mcu.id)]
         + _build_mcu_protection_and_sensing(ctx, mcu.id)
@@ -2385,6 +2387,7 @@ def extract_quantity_writeback(root: PhysicsNode) -> dict[str, dict[str, Any]]:
     w = idx["stator_windings"].physics
     c = idx["dc_link_capacitor_bank"].physics
     cp = idx["mcu_cold_plate"].physics
+    bus = idx["hv_dc_busbar_link"].physics
     out: dict[str, dict[str, Any]] = {
         "fpk_physics_tree_nodes": q(
             coverage_report(root)["node_count"], "", "recursive physics tree node count"
@@ -2409,9 +2412,36 @@ def extract_quantity_writeback(root: PhysicsNode) -> dict[str, dict[str, Any]]:
             cp["channel_height_mm"], "mm", "aspect 4:1 channel seed", "length"
         ),
         "cold_plate_h_conv_w_m2k": q(
-            cp["h_conv_w_m2k"], "W/(m²·K)", "Dittus–Boelter seed on Dh"
+            cp["h_conv_w_m2k"],
+            "W/(m²·K)",
+            "laminar/Gnielinski transitional bracket on Dh; CFD OPEN",
         ),
         "cold_plate_delta_t_k": q(cp["delta_t_fluid_k"], "K", "Q/(ṁ·cp) on MCU loss"),
+        "cold_plate_source_to_inlet_delta_t_k": q(
+            cp["temperature_rise_k"]["source_interface_to_inlet"],
+            "K",
+            "TIM + Al land + convection + half fluid rise; ANALYTICAL only",
+        ),
+        "cold_plate_pressure_drop_pa": q(
+            cp["channel_hydraulics"]["pressure_drop_pa"],
+            "Pa",
+            "Darcy-Weisbach channel + port minor losses; CFD/bench OPEN",
+        ),
+        "fpk_bus_esl_nominal_nh": q(
+            bus["esl_nh_nominal"],
+            "nH",
+            "laminated partial inductance + explicit joints/terminals; ANALYTICAL",
+        ),
+        "fpk_bus_esl_low_nh": q(
+            bus["esl_nh_range"][0],
+            "nH",
+            "lower analytical uncertainty bound",
+        ),
+        "fpk_bus_esl_high_nh": q(
+            bus["esl_nh_range"][1],
+            "nH",
+            "upper analytical uncertainty bound",
+        ),
         "gate_drive_channels_required": q(
             6, "", "3ph × HS/LS — must be implemented on GDB"
         ),
@@ -2746,6 +2776,9 @@ def _selftest() -> None:
     assert cp["delta_t_fluid_k"] > 0
     wb = extract_quantity_writeback(root)
     assert "turns_per_phase" in wb and "cold_plate_h_conv_w_m2k" in wb
+    assert wb["fpk_bus_esl_low_nh"]["value"] < wb["fpk_bus_esl_nominal_nh"]["value"]
+    assert wb["fpk_bus_esl_high_nh"]["value"] > wb["fpk_bus_esl_nominal_nh"]["value"]
+    assert wb["cold_plate_source_to_inlet_delta_t_k"]["value"] > cp["delta_t_fluid_k"]
     md = render_checklist_md(root)
     assert "turns/phase" in md
     disposition = generate_checklist_disposition(
