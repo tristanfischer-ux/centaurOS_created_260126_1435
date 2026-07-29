@@ -73,7 +73,10 @@ function isInstrumentFormClass(productClass: string): boolean {
 
 function isPlantishClass(productClass: string): boolean {
   if (isInstrumentFormClass(productClass)) return false
-  return /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|\breactor\b|boiler|hvac|chiller|circulation[_ -]?pump|centrifugal[_ -]?pump|process[_ -]?pump/.test(
+  // INTENT (2026-07-29 SOL): traction MGU/MCU packs are product-scale sealed cabinets
+  // (Blender + ship axes), not lab handheld instruments — even when volume < 1 m³.
+  // Noun signal on the class slug (same pattern as bess / inverter / pcs).
+  return /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|\breactor\b|boiler|hvac|chiller|circulation[_ -]?pump|centrifugal[_ -]?pump|process[_ -]?pump|\bmgu\b|_mgu\b|mgu_|motor[_ -]?generator|traction|powertrain|drive[_ -]?unit/.test(
     productClass,
   )
 }
@@ -172,6 +175,16 @@ export function selftestInstrumentDeviceFlag(): void {
     productClass: 'bess',
   })
   assert(sealedBess.isInstrumentDevice === false, 'bess token stays plantish under 1 m³')
+
+  // proveCatch (2026-07-29 SOL): Formula E rear MGU+MCU pack must NOT take the
+  // handheld instrument path (0453 hero = featureless box under isInstrumentDevice).
+  const tractionMgu = computeIsInstrumentDevice({
+    orchestratorContract: {
+      quantities: { enclosure_volume_m3: { value: 0.07936 } },
+    },
+    productClass: 'formula_e_rear_mgu',
+  })
+  assert(tractionMgu.isInstrumentDevice === false, 'traction MGU pack must not be instrument')
 
   // brief dims fallback when both contracts silent
   const briefDims = computeIsInstrumentDevice({

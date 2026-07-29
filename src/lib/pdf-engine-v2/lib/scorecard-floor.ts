@@ -292,6 +292,9 @@ export function complianceRowStatus(row: ComplianceRowInput, briefText?: string)
   // INTENT (2026-07-29 SOL): regulatory/absolute CEILINGS are lower-is-better —
   // max_rotor_speed_rpm=100000 with design base 40000 must PASS (under the ceiling),
   // not FAIL higher-is-better. Exclude capability floors (max_simultaneous_dissipation).
+  // INTENT (2026-07-29 SOL): any *_max_rpm key is a speed CEILING (FIA / illustrative
+  // band top). Design base 40k vs illustrative_mgu_base_speed_max_rpm=50k must PASS —
+  // not FAIL higher-is-better. Same for max_rotor_speed_rpm.
   const isCeilingMetric =
     kl.includes('_ceiling') ||
     kl.includes('_cap_kg') ||
@@ -301,7 +304,8 @@ export function complianceRowStatus(row: ComplianceRowInput, briefText?: string)
     kl === 'max_system_voltage_v' ||
     kl.includes('_temp_limit') ||
     /_limit_c$/.test(kl) ||
-    (kl.startsWith('max_') && (kl.includes('voltage') || kl.includes('rotor_speed')))
+    /_max_rpm$/.test(kl) ||
+    (kl.startsWith('max_') && (kl.includes('voltage') || kl.includes('rotor_speed') || kl.includes('rpm')))
   const lowerBetter =
     isCeilingMetric ||
     kl.includes('fcr') ||
@@ -868,5 +872,38 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
     JSON.stringify(shipWithTbd),
   )
 
-  return { passed: 17 - failed.length, failed }
+  // (15) proveCatch — *_max_rpm is a speed CEILING (MGU illustrative band / FIA).
+  // Design base 40k under illustrative max 50k must PASS, not FAIL higher-is-better.
+  check(
+    'ceiling_metric.illustrative_base_speed_max_rpm_under_is_pass',
+    complianceRowStatus({
+      key: 'illustrative_mgu_base_speed_max_rpm',
+      unit: 'rpm',
+      target: 50000,
+      matched: 'mgu_base_speed_rpm',
+      achieved: 40000,
+    }) === 'PASS',
+  )
+  check(
+    'ceiling_metric.max_rotor_speed_under_is_pass',
+    complianceRowStatus({
+      key: 'max_rotor_speed_rpm',
+      unit: 'rpm',
+      target: 100000,
+      matched: 'mgu_base_speed_rpm',
+      achieved: 40000,
+    }) === 'PASS',
+  )
+  check(
+    'ceiling_metric.max_rpm_over_ceiling_still_fails',
+    complianceRowStatus({
+      key: 'illustrative_mgu_base_speed_max_rpm',
+      unit: 'rpm',
+      target: 50000,
+      matched: 'mgu_base_speed_rpm',
+      achieved: 60000,
+    }) === 'FAIL',
+  )
+
+  return { passed: 20 - failed.length, failed }
 }

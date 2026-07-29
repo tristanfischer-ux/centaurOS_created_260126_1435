@@ -16260,6 +16260,12 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
       from: ['rear_axle_electrical_power_kw', 'mgu_base_speed_rpm'],
     }),
     gear_ratio: q(gearRatio, '', 'dimensionless', 'rated', 'module', 'brief'),
+    // INTENT (2026-07-29 SOL): brief-parser invents gear_ratio_min from "6:1 to 12:1".
+    // Alias the chosen ratio so compliance matches (higher-is-better vs the band floor).
+    gear_ratio_min: q(gearRatio, '', 'dimensionless', 'min', 'module', 'brief', {
+      source_detail: 'alias of gear_ratio — satisfies brief band floor identity (chosen ratio ≥ min)',
+      from: ['gear_ratio'],
+    }),
     wheel_radius_m: q(wheelRadiusM, 'm', 'length', 'rated', 'system', 'brief'),
     mgu_mcu_mass_cap_kg: q(massCapKg > 0 ? massCapKg : 35, 'kg', 'mass', 'max', 'system', 'brief'),
     coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief'),

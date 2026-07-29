@@ -2739,8 +2739,15 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
                      "passed": True, "detail": "no unit-cost ceiling in the brief"})
     # 4. PCB READINESS — only when the design is PCB-bearing; fab-ready (any disclosed
     #    FAB-READY string) passes, ENGINEERING DRAFT / FAIL does not.
+    # INTENT (2026-07-29 SOL): cots-modules / none dispositions are purchased-parent
+    # boards — fab-ready is N/A (never demand a bespoke KiCad pack for OEM MCU boards).
     _pcb = st.get("pcb") or {}
-    if _pcb.get("isPcbBearing"):
+    _pcb_disp = str(_pcb.get("disposition") or "").lower()
+    if _pcb.get("isPcbBearing") and _pcb_disp in ("cots-modules", "cots_modules", "none"):
+        axes.append({"axis": "PCB readiness — fab-ready", "applicable": False,
+                     "passed": True,
+                     "detail": f"disposition={_pcb_disp} — purchased assemblies; no bespoke fab pack"})
+    elif _pcb.get("isPcbBearing"):
         try:
             _rd = str(_pcb_two_axis_assessment(_pcb, run_dir or "").get("readiness") or "")
             # DETAIL must be descriptive, never a BARE verdict word: a failing board's readiness
@@ -9880,6 +9887,7 @@ def _brief_metric_is_lower_better(key: str) -> bool:
     kl = (key or "").lower()
     # INTENT (2026-07-29 SOL): regulatory/absolute CEILINGS — under the cap is PASS.
     # Must stay aligned with scorecard-floor.ts::complianceRowStatus.
+    # INTENT (2026-07-29 SOL): *_max_rpm = speed ceiling (aligned with scorecard-floor).
     is_ceiling = (
         "_ceiling" in kl
         or "_cap_kg" in kl
@@ -9889,7 +9897,8 @@ def _brief_metric_is_lower_better(key: str) -> bool:
         or kl == "max_system_voltage_v"
         or "_temp_limit" in kl
         or kl.endswith("_limit_c")
-        or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl))
+        or kl.endswith("_max_rpm")
+        or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl or "rpm" in kl))
     )
     return (
         is_ceiling
@@ -30057,6 +30066,13 @@ def _selftest() -> int:
         _ecb_selftest()
     except Exception as _ecb_exc:  # noqa: BLE001
         print(f"  FAIL excel_closure_blocks --selftest: {_ecb_exc}"); bad += 1
+    # ═══ proveCatch *_max_rpm ceilings (2026-07-29 SOL) — under band top = PASS ═══
+    if not _brief_metric_is_lower_better("illustrative_mgu_base_speed_max_rpm"):
+        print("  FAIL ceiling: illustrative_mgu_base_speed_max_rpm must be lower-is-better"); bad += 1
+    if not _brief_metric_is_lower_better("max_rotor_speed_rpm"):
+        print("  FAIL ceiling: max_rotor_speed_rpm must be lower-is-better"); bad += 1
+    if _brief_metric_is_lower_better("gear_ratio_min"):
+        print("  FAIL: gear_ratio_min is a floor (higher-is-better), not a ceiling"); bad += 1
     # Contract signatures for the three new tables must be registered (uncontracted
     # header() → hard-fail at build). proveCatch: signature lookup succeeds.
     for _cols, _fam in (
