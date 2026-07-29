@@ -16271,6 +16271,24 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     mosfet_rdson_mohm: q(8, 'mΩ', 'dimensionless', 'rated', 'module', 'brief', {
       source_detail: 'illustrative SiC Rdson — replace with device datasheet',
     }),
+    // INTENT (2026-07-29 SOL): without a design envelope the drawing form factor
+    // falls to "plant" → Blender Mech Plant scaffold / cyan litter. Stamp a
+    // race-credible MGU+MCU+gear pack box (≤650 mm edges) so form=sealed_cabinet.
+    design_envelope_width_mm: q(620, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'IPMSM + SiC MCU side-by-side pack width (trial; CAD replaces)',
+    }),
+    design_envelope_depth_mm: q(400, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'pack depth covering motor OD + inverter brick + cold plates',
+    }),
+    design_envelope_height_mm: q(320, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'pack height from IPMSM stack + housing (≤650 mm edge cap)',
+    }),
+    enclosure_volume_m3: q(
+      Math.round((620 * 400 * 320) / 1e9 * 1e6) / 1e6,
+      'm³', 'volume', 'max', 'system', 'calculator', {
+        source_detail: '0.620×0.400×0.320 m traction pack envelope — product-scale, not plant',
+      },
+    ),
   }
 
   const topology: TopologyEdge[] = [

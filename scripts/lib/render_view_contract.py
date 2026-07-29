@@ -685,6 +685,17 @@ def _selftest() -> None:
     assert drawing_form_factor(_cab) == "sealed_cabinet"
     assert "interconnect" not in pack_drawings(_cab)
     assert "general-arrangement" in pack_drawings(_cab)
+    # proveCatch (2026-07-29 SOL): traction MGU+MCU pack envelope must NOT fall
+    # to plant form (2340 hero used Mech Plant scaffold / cyan litter).
+    _traction = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": {"value": 0.07936},
+        "design_envelope_width_mm": {"value": 620},
+        "design_envelope_depth_mm": {"value": 400},
+        "design_envelope_height_mm": {"value": 320},
+    }}, "isInstrumentDevice": False}
+    assert is_product_scale(_traction), "traction pack ≤650 mm edges must be product-scale"
+    assert drawing_form_factor(_traction) == "sealed_cabinet"
+    assert resolve_design_envelope_mm(_traction) == (620.0, 400.0, 320.0)
     _plant = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 40.0}}}
     assert drawing_form_factor(_plant) == "plant"
     assert "pid" in pack_drawings(_plant)
