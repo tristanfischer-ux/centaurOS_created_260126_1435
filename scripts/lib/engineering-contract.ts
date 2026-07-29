@@ -16415,22 +16415,22 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     mosfet_rdson_mohm: q(8, 'mΩ', 'dimensionless', 'rated', 'module', 'brief', {
       source_detail: 'illustrative SiC Rdson — replace with device datasheet',
     }),
-    // INTENT (2026-07-29): pack envelope sized to IPMSM + SiC brick + gear —
-    // 620×400×320 was a hollow appliance box the vision critic rejected.
-    // ~400×250×180 mm ≈ 0.018 m³ still <1 m³ (sealed product) without BESS scale.
-    design_envelope_width_mm: q(400, 'mm', 'length', 'max', 'system', 'calculator', {
-      source_detail: 'IPMSM housing + SiC MCU + gear stage axial pack width (trial; CAD replaces)',
+    // INTENT (2026-07-29): seed pack envelope; applyUniversalContractSizing
+    // syncTractionPackEnclosureFromPrincipals rewrites from stamped motor/MCU/gear.
+    // 0806 critic: 0.018 m³ shell vs ~47 L principals — seed must not starve the pack.
+    design_envelope_width_mm: q(520, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'seed IPMSM+SiC+gear axial pack width — sizing sync overwrites',
     }),
-    design_envelope_depth_mm: q(250, 'mm', 'length', 'max', 'system', 'calculator', {
-      source_detail: 'pack depth covering motor OD + inverter brick + cold plates',
+    design_envelope_depth_mm: q(280, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'seed pack depth — sizing sync overwrites from principals',
     }),
-    design_envelope_height_mm: q(180, 'mm', 'length', 'max', 'system', 'calculator', {
-      source_detail: 'pack height from IPMSM stack + housing',
+    design_envelope_height_mm: q(220, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'seed pack height — sizing sync overwrites from principals',
     }),
     enclosure_volume_m3: q(
-      Math.round((400 * 250 * 180) / 1e9 * 1e6) / 1e6,
+      Math.round((520 * 280 * 220) / 1e9 * 1e6) / 1e6,
       'm³', 'volume', 'max', 'system', 'calculator', {
-        source_detail: '0.400×0.250×0.180 m traction pack envelope — product-scale, not plant',
+        source_detail: '0.520×0.280×0.220 m seed traction pack — sizing sync overwrites',
       },
     ),
   }

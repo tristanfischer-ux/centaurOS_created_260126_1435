@@ -541,22 +541,41 @@ const TRACTION_DRIVE_EDGE_CAP_MM = 650
  * Distinct silhouettes: IPMSM ≈ near-cubic machine; SiC MCU ≈ flatter brick.
  * INTENT (2026-07-29 SOL): identical 313×291×358 on motor AND inverter was a
  * skeleton HIGH — one box formula for every traction power phrase.
+ * INTENT (2026-07-29 / 0806): prefer IPMSM OD×stack from tools when present;
+ * smaller SiC brick so motor+inverter+gear fit the sealed pack envelope
+ * (critic HIGH: 47 L principals vs 18 L enclosure).
  */
-function boxFromHighDensityDriveKw(kw: number, phrase = ''): string {
+function boxFromHighDensityDriveKw(
+  kw: number,
+  phrase = '',
+  quantities?: Record<string, number>,
+): string {
   const s = Math.cbrt(Math.max(50, kw) / 250)
   const cap = (n: number): number =>
-    Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(120, Math.round(n)))
+    Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(90, Math.round(n)))
   const p = phrase.replace(/[_\s]+/g, ' ').toLowerCase()
   const isInverter =
     /\b(?:inverter|mcu|converter|rectifier)\b/.test(p)
     && !/\b(?:motor|ipmsm|mgu|generator)\b/.test(p)
-  const base = isInverter ? [380, 280, 140] : [260, 240, 300]
+  if (!isInverter) {
+    const rotorOd = Number(quantities?.rotor_airgap_diameter_mm ?? 0)
+    const stack = Number(quantities?.stack_length_mm ?? 0)
+    if (rotorOd > 20 && stack > 20) {
+      const od = cap(rotorOd * 1.45)
+      const len = cap(stack * 1.55)
+      return `${len}x${od}x${od} mm`
+    }
+  }
+  // Compact race-pack references (not plant cube-root; not appliance boxes).
+  const base = isInverter ? [240, 180, 90] : [200, 180, 220]
   return `${cap(base[0] * s)}x${cap(base[1] * s)}x${cap(base[2] * s)} mm`
 }
 const TRACTION_DRIVE_POWER_PHRASE_RE =
   /\b(?:ipmsm|traction|motor\s*generator|\bmgu\b|\bmcu\b|inverter|converter|drive\s*unit)\b/i
 /** Module-scoped: set for the duration of applyUniversalContractSizing. */
 let _tractionDrivePackSizingActive = false
+/** Snapshot of numeric contract quantities for traction high-density dim formulas. */
+let _tractionSizingQuantities: Record<string, number> = {}
 /** Pump-set envelope from shaft/motor kW (when no flow is on the group). Continuous
  *  in power so two different kW pumps never share a dims signature. */
 function pumpSetDimsFromKw(kw: number, phrase = ''): string {
@@ -886,7 +905,9 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
       _tractionDrivePackSizingActive
       && TRACTION_DRIVE_POWER_PHRASE_RE.test(p)
     ) {
-      dim = boxFromHighDensityDriveKw(g.power, g.phrase)
+      // quantities closed over from applyUniversalContractSizing via module flag path —
+      // pass through global snapshot set at sizing entry.
+      dim = boxFromHighDensityDriveKw(g.power, g.phrase, _tractionSizingQuantities)
     } else {
       dim = boxFromRatingKw(g.power)
     }
@@ -1362,12 +1383,91 @@ function stampTractionPackAuxiliaryEnvelopes(
             mod('sizing_basis', 'MCU cold-plate footprint from continuous inverter loss proxy'),
           ])
           n += 1
+        } else if (/desat|gate[_\s-]?driv|phase[_\s-]?overcurrent|isolation[_\s-]?monitor/i.test(role)) {
+          // INTENT (2026-07-29 / 0806): desat / protection are PCB functions, not
+          // 350 kW power bricks (critic HIGH on copy-pasted inverter dims).
+          mergeMods(w, [
+            mod('dimension', '80x55x12 mm'),
+            mod('rating_primary', 'gate-drive', ''),
+            mod('sizing_basis', 'gate-drive / protection PCB envelope (not a power stage)'),
+          ])
+          n += 1
         }
       }
     }
   }
   return n
 }
+
+/**
+ * INTENT (2026-07-29 / 0806): after principals are stamped, rewrite the sealed
+ * pack envelope so enclosure_volume_m3 can contain motor+MCU+gear (with margin).
+ * Never leave a 0.018 m³ shell around 47 L of principals (critic HIGH).
+ */
+function syncTractionPackEnclosureFromPrincipals(
+  modules: ModuleLike[],
+  contract: ContractInProgress,
+): void {
+  if (!_tractionDrivePackSizingActive) return
+  const dims: Array<{ w: number; d: number; h: number }> = []
+  const dimRe = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)\s*mm$/i
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const role = wordRoleText(w)
+        if (!/(?:ipmsm|motor\s*generator|\bmgu\b|traction\s*inverter|sic\s*traction|reduction\s*gear|gear\s*stage)/i.test(role)) {
+          continue
+        }
+        if (/\b(?:bearing|coupling|sensor|cold\s*plate|desat|protection)\b/i.test(role)) continue
+        const dim = (w.modifier_characters ?? []).find(
+          (mc) => mc.kind === 'dimension' || mc.kind === 'dimensions',
+        )?.value
+        const hit = typeof dim === 'string' ? dimRe.exec(dim.trim()) : null
+        if (!hit) continue
+        dims.push({ w: parseFloat(hit[1]), d: parseFloat(hit[2]), h: parseFloat(hit[3]) })
+      }
+    }
+  }
+  if (dims.length === 0) return
+  let sumW = 0
+  let maxD = 0
+  let maxH = 0
+  for (const d of dims) {
+    sumW += d.w
+    maxD = Math.max(maxD, d.d)
+    maxH = Math.max(maxH, d.h)
+  }
+  const margin = 1.12
+  // 0.72 packs principals with axial overlap / side-by-side packing, not a linear sum.
+  const envW = Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(320, Math.round(sumW * 0.72 * margin)))
+  const envD = Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(200, Math.round(maxD * margin)))
+  const envH = Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(160, Math.round(maxH * margin)))
+  const vol = Math.round((envW * envD * envH) / 1e9 * 1e6) / 1e6
+  const cq = (contract.quantities ?? {}) as Record<string, Record<string, unknown>>
+  const stamp = (key: string, value: number, unit: string, family: string, detail: string): void => {
+    const prev = cq[key] ?? {}
+    cq[key] = {
+      ...prev,
+      value,
+      unit,
+      family,
+      basis: 'max',
+      scope: 'system',
+      source: 'calculator',
+      source_detail: detail,
+    }
+  }
+  stamp('design_envelope_width_mm', envW, 'mm', 'length',
+    'synced from stamped MGU+MCU+gear principal dims (axial pack)')
+  stamp('design_envelope_depth_mm', envD, 'mm', 'length',
+    'synced from stamped principal max depth')
+  stamp('design_envelope_height_mm', envH, 'mm', 'length',
+    'synced from stamped principal max height')
+  stamp('enclosure_volume_m3', vol, 'm³', 'volume',
+    `${(envW / 1000).toFixed(3)}×${(envD / 1000).toFixed(3)}×${(envH / 1000).toFixed(3)} m traction pack — synced from principals`)
+  contract.quantities = cq as typeof contract.quantities
+}
+
 /** True when a power group's phrase is thermal rejection / dissipation, not shaft/electrical. */
 function isThermalPowerGroupPhrase(phrase: string): boolean {
   return /dissipat|thermal|reject|heat[_\s-]?loss|cool(?:ing|ant)|jacket/i.test(String(phrase ?? ''))
@@ -1391,6 +1491,12 @@ function wordAcceptsKwDerivedEnvelope(w: WordLike): boolean {
   // and stole the SiC MCU 350 kW / 425×313×157 mm envelope. Control / interface /
   // harness boards are not power conversion principals.
   if (/\b(?:control\s*board|interface|harness|interlock|gateway|signal\s*board)\b/i.test(t)) {
+    return false
+  }
+  // GOTCHA (2026-07-29 0806): "Inverter Desat Protection" inherited the full
+  // SiC MCU 425×313×157 mm / 350 kW envelope — desat is a gate-drive function.
+  if (/\b(?:desat|gate[\s-]?driv|overcurrent|isolation\s*monitor|protection)\b/i.test(t)
+    && !/\b(?:ipmsm|motor\s*generator|traction\s*inverter|sic\s*traction)\b/i.test(t)) {
     return false
   }
   return /\b(?:pump|motor|generator|inverter|compressor|chiller|blower|\bfan\b|transformer|genset|turbine|engine|converter|rectifier|\bups\b|boiler|heater|reactor|skid|heat[\s-]?pump|ipmsm|\bmgu\b|\bmcu\b|traction[\s-]?inverter|drive[\s-]?unit)\b/i.test(t)
@@ -7270,6 +7376,7 @@ export function applyUniversalContractSizing(
     const val = v?.value
     if (typeof val === 'number' && Number.isFinite(val)) quantities[k] = val
   }
+  _tractionSizingQuantities = quantities
 
   // DEMAND-COVERAGE (choke-point feed — codema v51): mint the delivered supply-pump
   // quantities for any uncovered fluid-delivery demand + the motor floor for any motorless
@@ -7392,6 +7499,7 @@ export function applyUniversalContractSizing(
   // area when present; else a watt rating from the dissipation demand. UNIVERSAL.
   sized += stampHeatsinkThermalFromContract(modules, quantities, onlyUnsized)
   sized += stampTractionPackAuxiliaryEnvelopes(modules, quantities, onlyUnsized)
+  syncTractionPackEnclosureFromPrincipals(modules, contract)
 
   // ── A2. CLEANING-SERVICE VESSELS: one-charge rule (see sizeCleaningServiceVessels) ──
   // Runs after the contract match (so the role-coherence gate above has already kept the
