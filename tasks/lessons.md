@@ -22,6 +22,17 @@ RELATED: [files or patterns]
 
 <!-- Add lessons below this line -->
 
+## 2026-07-29 - RULE: Exercise new file-write branches before live corpus runs
+
+**ALWAYS** make a regression test reach the final atomic write for any new
+ingest/download branch before running it against forge-truth.
+
+**REASON:** The first OA-PDF regression caught a missing `os` import in the
+atomic rename path before any live corpus document was modified.
+
+**RELATED:** `scripts/ingest/harvest-fpk-literature.py`,
+`scripts/ingest/harvest-fpk-literature.test.py`
+
 ## 2026-07-23 - RULE: PCB firmware honesty + first-class tree
 
 **NEVER** claim the product firmware “works” / is **FUNCTIONALLY VERIFIED** from QEMU, host bind, or Tier-0 contract alone.
