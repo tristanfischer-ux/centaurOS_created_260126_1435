@@ -424,6 +424,32 @@ export interface DispositionSignals {
 const REPEATED_PRODUCTION_THRESHOLD = 10
 
 /**
+ * INTENT (2026-07-29 SOL): a traction MGU + SiC MCU pack's control electronics
+ * live INSIDE the purchased / OEM inverter assembly — Forge must not author a
+ * bespoke ATSAMD21 board. Detected from contract quantities (cold-plate loop +
+ * shaft torque / phase current), never a class slug.
+ */
+function hasTractionDrivePurchasedElectronics(state: Record<string, unknown>): boolean {
+  const contract =
+    (state.orchestratorContract as { quantities?: Record<string, { value?: unknown }>; topology?: unknown[] } | undefined)
+    ?? (state.engineeringContract as { quantities?: Record<string, { value?: unknown }>; topology?: unknown[] } | undefined)
+  const q = contract?.quantities ?? {}
+  const flow = Number(q.coolant_flow_l_min?.value)
+  const tin = Number(q.coolant_inlet_c?.value)
+  if (!(Number.isFinite(flow) && flow > 0 && Number.isFinite(tin))) return false
+  const edges = Array.isArray(contract?.topology) ? contract.topology : []
+  const hasColdPlateEdge = edges.some((e) => {
+    const edge = e as { mechanism?: unknown; from_part?: unknown; to_part?: unknown }
+    if (String(edge?.mechanism ?? '') !== 'fluid_loop') return false
+    return /cold[_\s-]?plates?/i.test(`${edge?.from_part ?? ''} ${edge?.to_part ?? ''}`)
+  })
+  if (!hasColdPlateEdge) return false
+  const torque = Number(q.mgu_shaft_torque_nm?.value)
+  const iph = Number(q.phase_current_max_a?.value)
+  return (Number.isFinite(torque) && torque > 0) || (Number.isFinite(iph) && iph >= 100)
+}
+
+/**
  * @description Derives the disposition policy's constraint-evidence signals from the
  * design's own brief + electronic scan — never a product-class table.
  */
@@ -439,22 +465,24 @@ export function deriveDispositionSignals(
 
   const compactProductEnvelope = COMPACT_ENVELOPE_PATTERN.test(combinedBrief)
   const rfOrHighSpeedLayout = scan.distinctElectronicCategories.includes('connectivity') && RF_TERM_PATTERN.test(combinedBrief)
+  // DECISION (2026-07-29 SOL): SiC traction MCU = purchased OEM assembly — do not
+  // explode gate-drive / control into a forge-authored KiCad board.
+  const parentIsPurchasedAssembly = hasTractionDrivePurchasedElectronics(state)
 
   return {
     compactProductEnvelope,
     // A compact custom-housed electronic product implies a custom board form factor
     // (no COTS DIN-rail/rack module fits inside a bespoke handheld enclosure).
-    customFormFactor: compactProductEnvelope,
+    // Traction OEM inverter: form factor is the purchased MCU brick, not a custom PCB.
+    customFormFactor: compactProductEnvelope && !parentIsPurchasedAssembly,
     multiFunctionIntegration: scan.distinctElectronicCategories.length >= 3,
     safetySpecificIntegration: SAFETY_PATTERN.test(combinedBrief),
     rfOrHighSpeedLayout,
     repeatedApplicationSpecificBoard:
       (productionVolumeUnits ?? 0) >= REPEATED_PRODUCTION_THRESHOLD,
-    explicitCustomIntent: EXPLICIT_CUSTOM_PATTERN.test(combinedBrief),
-    explicitCotsIntent: EXPLICIT_COTS_PATTERN.test(combinedBrief),
-    // Phase A has no OEM-parent resolution pass yet (that lives in the orchestrator's
-    // catalogue-module matching, not built for PCB candidates); conservative default.
-    parentIsPurchasedAssembly: false,
+    explicitCustomIntent: EXPLICIT_CUSTOM_PATTERN.test(combinedBrief) && !parentIsPurchasedAssembly,
+    explicitCotsIntent: EXPLICIT_COTS_PATTERN.test(combinedBrief) || parentIsPurchasedAssembly,
+    parentIsPurchasedAssembly,
     productionVolumeUnits,
   }
 }

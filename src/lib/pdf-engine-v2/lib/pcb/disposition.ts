@@ -318,6 +318,18 @@ function selftest(): void {
       expected: 'catalogue_module',
     },
     {
+      // INTENT (2026-07-29 SOL): SiC traction MCU = purchased OEM assembly —
+      // gate-drive / control must not force bespoke KiCad authorship.
+      name: 'purchased SiC traction MCU keeps control electronics as catalogue',
+      evidence: fixture({
+        name: 'OEM inverter control board inside SiC traction MCU',
+        parentIsPurchasedAssembly: true,
+        multiFunctionIntegration: true,
+        repeatedApplicationSpecificBoard: true,
+      }),
+      expected: 'catalogue_module',
+    },
+    {
       name: 'confirmed Siemens-class PLC remains a catalogue module',
       evidence: fixture({
         name: 'Industrial PLC controller',

@@ -86,6 +86,9 @@ const coupMods: any = [{
     mkWord('output_shaft_coupling_word', 'Output Shaft Coupling', [{ kind: 'quantity', value: '×1' }]),
     mkWord('motor_bearings_word', 'Motor Bearings', [{ kind: 'quantity', value: '×1' }]),
     mkWord('sic_traction_inverter_word', 'SiC Traction Inverter', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('reduction_gear_stage_word', 'Reduction Gear Stage', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('mgu_cold_plate_word', 'Mgu Cold Plate', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('mcu_cold_plate_word', 'Mcu Cold Plate', [{ kind: 'quantity', value: '×1' }]),
   ] }],
 }]
 const coupContract: any = {
@@ -96,7 +99,9 @@ const coupContract: any = {
   quantities: {
     traction_motor_power_kw: { value: 350, unit: 'kW', kind: 'power' },
     traction_inverter_power_kw: { value: 350, unit: 'kW', kind: 'power' },
+    continuous_power_kw: { value: 250, unit: 'kW', kind: 'power' },
     mgu_shaft_torque_nm: { value: 77, unit: 'Nm', kind: 'force' },
+    gear_ratio: { value: 8, unit: '', kind: 'dimensionless' },
     phase_current_max_a: { value: 530, unit: 'A', kind: 'current' },
     coolant_flow_l_min: { value: 15, unit: 'L/min', kind: 'flow_rate' },
     coolant_inlet_c: { value: 40, unit: '°C', kind: 'temperature' },
@@ -115,10 +120,16 @@ const coupling = coupWords.find((w: any) => /coupling/i.test(String(w.name_human
 const bearings = coupWords.find((w: any) => /bearing/i.test(String(w.name_human)))
 const motor = coupWords.find((w: any) => /ipmsm|motor generator/i.test(String(w.name_human)))
 const inverter = coupWords.find((w: any) => /inverter/i.test(String(w.name_human)))
+const gear = coupWords.find((w: any) => /gear/i.test(String(w.name_human)))
+const mguPlate = coupWords.find((w: any) => /mgu\s*cold/i.test(String(w.name_human)))
+const mcuPlate = coupWords.find((w: any) => /mcu\s*cold/i.test(String(w.name_human)))
 const coupDim = (coupling?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
 const bearDim = (bearings?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
 const motorDim = (motor?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
 const invDim = (inverter?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const gearDim = (gear?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const mguPlateDim = (mguPlate?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const mcuPlateDim = (mcuPlate?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
 const motorRating = (motor?.modifier_characters ?? []).find((m: any) => m.kind === 'rating_primary')
 const coupRating = (coupling?.modifier_characters ?? []).find((m: any) => m.kind === 'rating_primary')
 expect(!coupDim, `shaft coupling must not receive a kW envelope box (got ${coupDim?.value})`)
@@ -126,11 +137,17 @@ expect(!coupRating, `shaft coupling must not steal the power-group rating (got $
 expect(!bearDim, `motor bearings must not inherit the IPMSM kW envelope (got ${bearDim?.value})`)
 expect(!!motorDim, `IPMSM principal should receive the power-group envelope (got ${motorDim?.value ?? 'none'})`)
 expect(!!invDim, `SiC inverter should receive a traction envelope (got ${invDim?.value ?? 'none'})`)
+expect(!!gearDim, `reduction gear stage must receive a compact envelope (got ${gearDim?.value ?? 'none'})`)
+expect(!!mguPlateDim, `MGU cold plate must receive a footprint (got ${mguPlateDim?.value ?? 'none'})`)
+expect(!!mcuPlateDim, `MCU cold plate must receive a footprint (got ${mcuPlateDim?.value ?? 'none'})`)
 expect(!/2205|1874|2426|2026|1722|2229/.test(String(motorDim?.value ?? '')),
   `IPMSM envelope must not be the absurd 2 m plant litter box (got ${motorDim?.value})`)
 const parseEdges = (v: string): number[] =>
   String(v).match(/(\d+(?:\.\d+)?)/g)?.map(Number) ?? []
-for (const [label, dim] of [['IPMSM', motorDim], ['inverter', invDim]] as const) {
+for (const [label, dim] of [
+  ['IPMSM', motorDim], ['inverter', invDim], ['gear', gearDim],
+  ['mgu plate', mguPlateDim], ['mcu plate', mcuPlateDim],
+] as const) {
   const edges = parseEdges(String(dim?.value ?? ''))
   expect(edges.every((e) => e <= 650),
     `${label} traction envelope edge must be ≤650 mm (got ${dim?.value})`)
@@ -139,6 +156,8 @@ expect(/350/.test(String(motorRating?.value ?? '')),
   `IPMSM nameplate must be peak electrical 350 kW (got ${motorRating?.value})`)
 expect(String(motorDim?.value) !== String(invDim?.value),
   `motor and inverter must not share an identical envelope (got ${motorDim?.value})`)
+expect(String(mguPlateDim?.value) !== String(mcuPlateDim?.value),
+  `MGU and MCU cold plates must not share an identical footprint`)
 
 // ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
 import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'

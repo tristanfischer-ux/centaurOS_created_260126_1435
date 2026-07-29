@@ -12825,7 +12825,11 @@ function checkQualityLoopInvariants(): Assertion[] {
       passed:
         complianceRowStatus({ key: 'fcr_feed_conversion', category: 'performance', target: 1.4, matched: 'fcr', achieved: 1.3 }) === 'PASS' &&
         complianceRowStatus({ key: 'rated_power_kw', category: 'performance', target: 100, matched: 'rated_power_kw', achieved: 90 }) === 'FAIL' &&
-        complianceRowStatus({ key: 'rated_power_kw', category: 'performance', target: 100, matched: 'rated_power_kw', achieved: 98.5 }) === 'PASS',
+        complianceRowStatus({ key: 'rated_power_kw', category: 'performance', target: 100, matched: 'rated_power_kw', achieved: 98.5 }) === 'PASS' &&
+        // Ceiling metrics: under the cap is PASS (rotor speed / temp limits).
+        complianceRowStatus({ key: 'max_rotor_speed_rpm', category: 'performance', target: 100000, matched: 'mgu_base_speed_rpm', achieved: 40000 }) === 'PASS' &&
+        complianceRowStatus({ key: 'winding_temp_limit_c', category: 'performance', target: 180, matched: 'winding_temperature_c', achieved: 150 }) === 'PASS' &&
+        complianceRowStatus({ key: 'rotor_stress_margin_min', category: 'performance', target: 1.5, matched: 'rotor_stress_margin', achieved: 1.443 }) === 'FAIL',
     })
     // e) advisory sections STILL cannot drag the floor with the new sections present (B3 stands).
     const advisoryStillCaged = computeScorecardFloor([

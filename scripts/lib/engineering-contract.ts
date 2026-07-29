@@ -16129,9 +16129,19 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     return 350
   })()
 
-  const vDcMin = extractRangeFromDesc(desc, /(?:dc\s*bus|vdc).{0,40}?(\d{3})\s*-?\s*(\d{3})?\s*V/i, 600)
+  // GOTCHA (2026-07-29): extractRangeFromDesc averages capture groups — unusable
+  // for a window floor/ceiling. Parse the Vdc window endpoints explicitly so
+  // assumed_vdc_min_v = 600 (not 750 = mid of 600–900).
+  const vDcWindow = desc.match(/(?:dc\s*bus|vdc|usable\s+dc\s+window)\s*[:=]?\s*(\d{3})\s*[-–]\s*(\d{3})\s*V/i)
+  const vDcMin = vDcWindow
+    ? parseFloat(vDcWindow[1])
+    : extractRangeFromDesc(desc, /(?:dc\s*bus|vdc).{0,40}?(\d{3})\s*V/i, 600)
   const vDcMaxMatch = desc.match(/(?:600|650)\s*[-–]\s*(\d{3})\s*V/i)
-  const vDcMax = vDcMaxMatch ? parseFloat(vDcMaxMatch[1]) : extractRangeFromDesc(desc, /(?:absolute|vehicle)\s+max(?:imum)?\s+(\d{3,4})\s*V/i, 900)
+  const vDcMax = vDcWindow
+    ? parseFloat(vDcWindow[2])
+    : (vDcMaxMatch
+      ? parseFloat(vDcMaxMatch[1])
+      : extractRangeFromDesc(desc, /(?:absolute|vehicle)\s+max(?:imum)?\s+(\d{3,4})\s*V/i, 900))
   const vDcNom = (vDcMin + Math.min(vDcMax, 1000)) / 2
   // DECISION (2026-07-28 SOL overnight): peak electrical cap stays 350 kW; continuous
   // design duty for loss tools is a trial assumption 250 kW. Phase current must close
@@ -16209,6 +16219,36 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
         source_detail: 'upper illustrative MGU shaft-torque band from brief (dyno replaces)',
       },
     ),
+    // INTENT (2026-07-29 SOL Verification spine): remaining brief metric keys must
+    // exist as delivered quantities so Exec/Brief stop UNVERIFIED on identity miss.
+    rear_electrical_power_cap_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'alias of rear_axle_electrical_power_kw for brief-compliance identity',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
+    rear_regen_electrical_cap_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'GEN4 rear regen electrical cap (same public outer box as motoring for trial)',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
+    assumed_mgu_mcu_mass_cap_kg: q(massCapKg > 0 ? massCapKg : 35, 'kg', 'mass', 'max', 'system', 'brief', {
+      source_detail: 'alias of mgu_mcu_mass_cap_kg for brief-compliance identity',
+      from: ['mgu_mcu_mass_cap_kg'],
+    }),
+    assumed_coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief', {
+      source_detail: 'alias of coolant_inlet_c for brief-compliance identity',
+      from: ['coolant_inlet_c'],
+    }),
+    min_lamination_thickness_mm: q(0.05, 'mm', 'length', 'min', 'module', 'brief', {
+      source_detail: 'brief hard regulatory outer-box (lamination thickness floor)',
+    }),
+    winding_temp_limit_c: q(180, '°C', 'temperature', 'max', 'module', 'brief', {
+      source_detail: 'brief winding insulation temperature ceiling',
+    }),
+    magnet_temp_limit_c: q(150, '°C', 'temperature', 'max', 'module', 'brief', {
+      source_detail: 'brief magnet temperature ceiling',
+    }),
+    rotor_stress_margin_min: q(1.5, '—', 'dimensionless', 'min', 'module', 'brief', {
+      source_detail: 'brief minimum rotor stress safety factor — HOLD if tool margin is below',
+    }),
     ac_output_voltage_v: q(Math.round(vDcNom / Math.SQRT2), 'V', 'voltage', 'rated', 'module', 'calculator', {
       source_detail: '≈ Vdc/√2 modulation headroom proxy for 3-ph bridge',
     }),

@@ -299,6 +299,8 @@ export function complianceRowStatus(row: ComplianceRowInput, briefText?: string)
     kl === 'max_mass_kg' ||
     kl === 'max_rotor_speed_rpm' ||
     kl === 'max_system_voltage_v' ||
+    kl.includes('_temp_limit') ||
+    /_limit_c$/.test(kl) ||
     (kl.startsWith('max_') && (kl.includes('voltage') || kl.includes('rotor_speed')))
   const lowerBetter =
     isCeilingMetric ||

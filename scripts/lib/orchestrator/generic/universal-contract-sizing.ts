@@ -1302,6 +1302,72 @@ function isCompactCoolantLoopReservoir(
 function isColdPlateInterfaceWord(w: WordLike): boolean {
   return /cold[_\s-]?plate/i.test(wordRoleText(w))
 }
+/**
+ * INTENT (2026-07-29 SOL): gear stage + cold plates were left unsized while
+ * motor/inverter got high-density envelopes — Blender then fell to plant scaffold.
+ * Stamp compact mechanical/thermal interfaces from torque + continuous duty when
+ * the traction-drive pack signal is active. Never a class slug.
+ */
+function stampTractionPackAuxiliaryEnvelopes(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+  onlyUnsized: boolean,
+): number {
+  if (!_tractionDrivePackSizingActive) return 0
+  const torque = Number(quantities['mgu_shaft_torque_nm'] ?? quantities['mgu_shaft_torque_max_nm'] ?? 0)
+  const continuousKw = Number(
+    quantities['continuous_power_kw']
+    ?? quantities['traction_motor_power_kw']
+    ?? quantities['rear_axle_electrical_power_kw']
+    ?? 0,
+  )
+  const gearRatio = Number(quantities['gear_ratio'] ?? 8)
+  // Compact single-stage reduction: scale a ~160×110×130 mm reference at 80 Nm × 8:1.
+  const gearScale = Math.cbrt(
+    Math.max(0.4, (Math.max(40, torque) * Math.max(4, gearRatio)) / (80 * 8)),
+  )
+  const gearDim = `${Math.round(160 * gearScale)}x${Math.round(110 * gearScale)}x${Math.round(130 * gearScale)} mm`
+  // Cold-plate footprint tracks continuous loss duty (~7% of continuous electrical).
+  const rejectKw = Math.max(5, continuousKw * 0.07)
+  const plateSide = Math.min(420, Math.max(140, Math.round(90 * Math.sqrt(rejectKw / 10))))
+  const mguPlate = `${plateSide}x${Math.round(plateSide * 0.85)}x18 mm`
+  const mcuPlate = `${Math.round(plateSide * 1.1)}x${Math.round(plateSide * 0.7)}x16 mm`
+  let n = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const role = wordRoleText(w)
+        const hasDim = (w.modifier_characters ?? []).some(
+          (mc) => mc.kind === 'dimension' || mc.kind === 'dimensions',
+        )
+        if (onlyUnsized && hasDim) continue
+        if (/reduction[_\s-]?gear|gear[_\s-]?stage/i.test(role)) {
+          mergeMods(w, [
+            mod('dimension', gearDim),
+            mod('rating_primary', String(Math.round(gearRatio * 10) / 10), 'ratio'),
+            mod('sizing_basis', 'traction gear stage envelope from shaft torque × ratio (trial; dyno replaces)'),
+          ])
+          n += 1
+        } else if (/mgu[_\s-]?cold[_\s-]?plate|motor[_\s-]?cold[_\s-]?plate/i.test(role)) {
+          mergeMods(w, [
+            mod('dimension', mguPlate),
+            mod('rating_primary', String(Math.round(rejectKw * 10) / 10), 'kW'),
+            mod('sizing_basis', 'MGU cold-plate footprint from continuous thermal duty proxy'),
+          ])
+          n += 1
+        } else if (/mcu[_\s-]?cold[_\s-]?plate|inverter[_\s-]?cold[_\s-]?plate/i.test(role)) {
+          mergeMods(w, [
+            mod('dimension', mcuPlate),
+            mod('rating_primary', String(Math.round(rejectKw * 0.9 * 10) / 10), 'kW'),
+            mod('sizing_basis', 'MCU cold-plate footprint from continuous inverter loss proxy'),
+          ])
+          n += 1
+        }
+      }
+    }
+  }
+  return n
+}
 /** True when a power group's phrase is thermal rejection / dissipation, not shaft/electrical. */
 function isThermalPowerGroupPhrase(phrase: string): boolean {
   return /dissipat|thermal|reject|heat[_\s-]?loss|cool(?:ing|ant)|jacket/i.test(String(phrase ?? ''))
@@ -7319,6 +7385,7 @@ export function applyUniversalContractSizing(
   // (cold-v5 "0 m²" / missing rating while channel_max_dissipation_w=25). Stamp
   // area when present; else a watt rating from the dissipation demand. UNIVERSAL.
   sized += stampHeatsinkThermalFromContract(modules, quantities, onlyUnsized)
+  sized += stampTractionPackAuxiliaryEnvelopes(modules, quantities, onlyUnsized)
 
   // ── A2. CLEANING-SERVICE VESSELS: one-charge rule (see sizeCleaningServiceVessels) ──
   // Runs after the contract match (so the role-coherence gate above has already kept the

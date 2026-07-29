@@ -9736,6 +9736,8 @@ def _brief_metric_is_lower_better(key: str) -> bool:
         or kl == "max_mass_kg"
         or kl == "max_rotor_speed_rpm"
         or kl == "max_system_voltage_v"
+        or "_temp_limit" in kl
+        or kl.endswith("_limit_c")
         or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl))
     )
     return (

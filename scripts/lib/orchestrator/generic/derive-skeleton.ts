@@ -139,6 +139,17 @@ const TRACTION_DRIVE_MODULE_FLOORS: Record<string, string[]> = {
     'fastener_set',
     'nameplate',
   ],
+  // DECISION (2026-07-29 SOL): Formula-E "MCU" = SiC motor-control UNIT (inverter),
+  // not a Cortex-M0+ COTS microcontroller. The Tier-C `main_controller` floor was
+  // pinning ATSAMD21 as "Traction Control MCU" — wrong product class. Interface
+  // boards stay OEM/proprietary TBD; never emit a catalogue MCU for this shape.
+  control_compute_communication: [
+    'oem_inverter_control_board',
+    'can_fd_vehicle_interface',
+    'hv_interlock_interface',
+    'resolver_signal_interface',
+    'control_harness_set',
+  ],
 }
 const REFRIGERATION_PLANT_COMPONENT_RE =
   /chill(?:er)?|scroll[_\s-]?compressor|refriger|evaporator|condenser|expansion[_\s-]?valve|air[_\s-]?damper|packaged[_\s-]?chiller|tube[_\s-]?bundle|shell[_\s-]?and[_\s-]?tube/i
