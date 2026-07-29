@@ -2762,8 +2762,11 @@ def _selftest() -> None:
         ],
     )
     assert disposition["coverage_pct"] == 100.0
+    assert sum(disposition["counts"].values()) == disposition["checklist_paths_total"]
     assert disposition["counts"]["open"] == 1
     assert disposition["entries"][2]["owner"] == "Transmission & Driveline"
+    assert disposition["ship_ok"] is False
+    assert disposition["race_open_items_closed"] == 0
     json.dumps(root.to_dict())
     print(
         f"fpk_physics_tree selftest OK — nodes={cov['node_count']} "
