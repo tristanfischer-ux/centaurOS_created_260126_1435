@@ -13486,6 +13486,8 @@ _IS_LAB_MICROSCOPE_FORM = False
 _IS_OPTICAL_HANDHELD_FORM = False
 # USB/AFE/EWOD/culture sealed box — PCB-first, never cuvette story.
 _IS_LAB_ELECTRONICS_FORM = False
+# Traction MGU+MCU+gear pack — motor/shaft/gear/inverter morphology (not lab instrument).
+_IS_TRACTION_DRIVE_FORM = False
 # Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
 _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
@@ -13505,7 +13507,7 @@ def _sealed_enclosure_env_mm(state, quantities):
     global _IS_THERMOCYCLER_FORM, _THERMOCYCLER_TUBE_COUNT
     global _IS_SYRINGE_PUMP_FORM, _SYRINGE_PUMP_CHANNEL_COUNT
     global _IS_LAB_MICROSCOPE_FORM
-    global _IS_OPTICAL_HANDHELD_FORM, _IS_LAB_ELECTRONICS_FORM
+    global _IS_OPTICAL_HANDHELD_FORM, _IS_LAB_ELECTRONICS_FORM, _IS_TRACTION_DRIVE_FORM
     pc = product_class_of(state) if isinstance(state, dict) else ""
     # Part-name evidence when class slug is thin / missing (needed before plantish).
     part_blob = ""
@@ -13539,21 +13541,49 @@ def _sealed_enclosure_env_mm(state, quantities):
         r"benchtop[_ -]?bioreactor|pioreactor|turbidostat|chemostat|"
         r"potentiostat|rodeostat|digital[_ -]?microfluidics|opendrop",
         pc or "", re.I))
-    _plantish = (not _form_instrument) and (not _instrument_allow) and bool(re.search(
-        r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
-        r"switchgear|plant|\breactor\b|boiler|hvac|chiller|"
-        r"water[_ -]?treatment|circulation[_ -]?pump|process[_ -]?pump", pc or ""))
-    _flag = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
-    _IS_INSTRUMENT_DEVICE = _flag or _form_instrument or _instrument_allow or (
-        0 < float(vol) < 1.0 and not _plantish)
+    # GOTCHA (2026-07-29 / 0733): Blender plantish lagged TS instrument-device-flag
+    # (missing mgu|traction|powertrain) → vol<1 re-derived isInstrumentDevice=True
+    # → optical/lab shell + clutter-suppress hid all 27 BoM meshes → featureless box.
+    _td_detect = getattr(ifg, "is_traction_drive_pack_form", None)
+    _IS_TRACTION_DRIVE_FORM = (
+        bool(_td_detect(
+            product_class=pc or "",
+            part_blob=part_blob,
+            quantities=quantities if isinstance(quantities, dict) else None,
+        )) if callable(_td_detect) else False
+    )
+    _plantish = (not _form_instrument) and (not _instrument_allow) and (
+        _IS_TRACTION_DRIVE_FORM
+        or bool(re.search(
+            r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
+            r"switchgear|plant|\breactor\b|boiler|hvac|chiller|"
+            r"water[_ -]?treatment|circulation[_ -]?pump|process[_ -]?pump|"
+            r"\bmgu\b|_mgu\b|mgu_|motor[_ -]?generator|traction|powertrain|"
+            r"drive[_ -]?unit",
+            pc or "", re.I))
+    )
+    _flag_raw = state.get("isInstrumentDevice") if isinstance(state, dict) else None
+    _flag = bool(_flag_raw)
+    # Explicit False from the chain must win over vol<1 re-derive (traction packs).
+    if _flag_raw is False and not _form_instrument and not _instrument_allow:
+        _IS_INSTRUMENT_DEVICE = False
+    else:
+        _IS_INSTRUMENT_DEVICE = _flag or _form_instrument or _instrument_allow or (
+            0 < float(vol) < 1.0 and not _plantish)
+    if _IS_TRACTION_DRIVE_FORM:
+        _IS_INSTRUMENT_DEVICE = False
     if _IS_INSTRUMENT_DEVICE and not _flag:
         print(f"[univ][sealed] isInstrumentDevice derived from enclosure "
               f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
+    if _IS_TRACTION_DRIVE_FORM:
+        print(f"[univ][sealed] TRACTION drive-pack form "
+              f"(class={pc or '∅'}; instrument path suppressed)")
     # F1e (2026-07-20): tell the connection sizer this is a device so a no-flow
     # fluid edge defaults to lab micro-tubing, not a plant DN25 process pipe.
+    # Traction packs stay device-scale interconnect (coolant ports, not DN25).
     _set_dsi = getattr(cs, "set_device_scale_interconnect", None)
     if callable(_set_dsi):
-        _set_dsi(_IS_INSTRUMENT_DEVICE)
+        _set_dsi(_IS_INSTRUMENT_DEVICE or _IS_TRACTION_DRIVE_FORM)
     # FLOW: form gate lives in instrument_form_grammar — class + part vocab,
     # never a product-noun branch (see ifg.is_thermocycler_form proveCatch).
     _IS_THERMOCYCLER_FORM = ifg.is_thermocycler_form(
@@ -13908,6 +13938,11 @@ def _thermocycler_exterior_keep_visible(name: str) -> bool:
     )
 
 
+def _traction_drive_exterior_keep_visible(name: str) -> bool:
+    """Motor/shaft/gear/SiC/ports stay visible on traction pack product shots."""
+    return (name or "").startswith("u_se_td_")
+
+
 def _selftest_thermocycler_exterior_keep() -> None:
     """proveCatch: exterior product shots must not strip the PCR guts / maker skin."""
     assert _thermocycler_exterior_keep_visible("u_se_tc_sample_block")
@@ -13929,9 +13964,11 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     light tower" defect (Tristan 2026-07-23). proveCatch: u_se_le_od_src must
     match a keep prefix so clutter-suppress skips it.
     """
-    for pfx in ("u_se_tc_", "u_se_lm_", "u_se_sp_", "u_se_le_"):
+    for pfx in ("u_se_tc_", "u_se_lm_", "u_se_sp_", "u_se_le_", "u_se_td_"):
         assert pfx in _INSTRUMENT_MESH_KEEP_PREFIXES, (
             f"clutter-suppress must keep {pfx}* form meshes")
+    assert _traction_drive_exterior_keep_visible("u_se_td_motor_housing")
+    assert not _traction_drive_exterior_keep_visible("u_se_le_pcb")
     assert any(
         "u_se_lm_body".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
     ), "lab_microscope body must match a keep prefix"
@@ -13962,9 +13999,11 @@ def _prepare_sealed_product_view(view_name, entering):
     # OPEN mechanism forms (syringe_pump / lab_microscope) have no front cover —
     # still must toggle mesh visibility.
     if _SEALED_FRONT_COVER is None and not (
-            _IS_SYRINGE_PUMP_FORM or _IS_LAB_MICROSCOPE_FORM):
+            _IS_SYRINGE_PUMP_FORM or _IS_LAB_MICROSCOPE_FORM
+            or _IS_TRACTION_DRIVE_FORM):
         return
-    exterior_views = sealed_exterior_view_names(_IS_INSTRUMENT_DEVICE)
+    exterior_views = sealed_exterior_view_names(
+        _IS_INSTRUMENT_DEVICE or _IS_TRACTION_DRIVE_FORM)
     # Always restore the cutaway baseline first. This also makes cleanup after
     # each view deterministic if Blender changes render order.
     # DECISION (colorimeter 2026-07-14): handheld optical instruments keep the
@@ -14211,6 +14250,28 @@ def _prepare_sealed_product_view(view_name, entering):
                     if obj and obj.data:
                         obj.data.materials.clear()
                         obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
+        elif _IS_TRACTION_DRIVE_FORM:
+            # INTENT (2026-07-29 / 0733): opaque closed shell hid the pack → featureless
+            # box. Product shots keep motor/shaft/gear/SiC/ports visible and use the
+            # translucent cutaway shell so the drive unit reads as a real assembly.
+            if _SEALED_FRONT_COVER is not None:
+                _SEALED_FRONT_COVER.hide_render = True
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) not in ("MESH", "CURVE", "SURFACE"):
+                    continue
+                nm = obj.name
+                if _traction_drive_exterior_keep_visible(nm):
+                    obj.hide_render = False
+                elif nm.startswith("u_skid_encl_") or nm.startswith("u_se_product_"):
+                    obj.hide_render = False
+                elif nm.startswith(("u_se_det_", "u_se_cad_", "u_wire_", "u_pipe_",
+                                    "u_se_instrument_story_", "u_se_cutaway_cue_")):
+                    obj.hide_render = True
+            if _SEALED_CUTAWAY_MATERIAL is not None:
+                for obj in _SEALED_SHELL_OBJECTS:
+                    if obj and obj.data:
+                        obj.data.materials.clear()
+                        obj.data.materials.append(_SEALED_CUTAWAY_MATERIAL)
         else:
             _SEALED_FRONT_COVER.hide_render = False
             for obj in bpy.data.objects:
@@ -17712,6 +17773,8 @@ _INSTRUMENT_MESH_KEEP_PREFIXES = (
     # suppress skips them → exterior view hides interior boards explicitly → correct.
     # proveCatch: _selftest_le_vial_exterior_gating confirms collar kept, bare vial hidden.
     "u_se_le_",
+    # INTENT (2026-07-29 traction pack): motor/shaft/gear/SiC signature meshes.
+    "u_se_td_",
 )
 
 
@@ -17770,6 +17833,8 @@ _EXTERIOR_KEEP_PREFIXES: tuple = (
     "u_se_le_vial_collar", "u_se_le_od", "u_se_le_face",
     # bench_power exterior (2026-07-28): cell-bay / IEC C14 / pass-bank fins
     "u_se_le_bay", "u_se_le_mains", "u_se_le_fins",
+    # traction MGU+MCU pack (2026-07-29): motor / shaft / gear / SiC / ports
+    "u_se_td_",
     *_OPTICAL_HANDHELD_SIGNATURE_PREFIXES,
 )
 
@@ -18091,6 +18156,112 @@ def _selftest_sealed_zone_pack_dominance() -> None:
     print("[univ][sealed] _selftest_sealed_zone_pack_dominance OK")
 
 
+def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
+    """Compound traction pack: IPMSM housing + shaft + gear + SiC brick + ports.
+
+    INTENT (2026-07-29 / 0733 SIGHT): sealed vol<1 without this placer fell into
+    optical-handheld / lab-electronics → clutter-suppress hid BoM → featureless box.
+    Morphology is forced by use-physics (rotating machine + inverter + coolant),
+    never a product silhouette paste. Mesh stems `u_se_td_*` are keep-listed on
+    exterior views so 04–07 show shafts/ports/connector, not a blank shell.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    mat_alum = fl.make_mat("m_se_td_alum", (0.55, 0.56, 0.58), metallic=0.75, roughness=0.35)
+    mat_steel = fl.make_mat("m_se_td_steel", (0.35, 0.36, 0.38), metallic=0.85, roughness=0.28)
+    mat_sic = fl.make_mat("m_se_td_sic", (0.12, 0.14, 0.16), metallic=0.4, roughness=0.45)
+    mat_port = fl.make_mat("m_se_td_port", (0.75, 0.22, 0.08), metallic=0.3, roughness=0.4)
+    mat_hv = fl.make_mat("m_se_td_hv", (0.55, 0.05, 0.05), metallic=0.2, roughness=0.5)
+
+    cy = 0.0
+    # Motor left, gear mid-left, inverter right — axial pack along +X.
+    motor_od = min(D * 0.72, H * 0.78, 140.0)
+    motor_len = min(W * 0.32, 130.0)
+    gear_w = min(W * 0.18, 90.0)
+    gear_d = min(D * 0.55, 110.0)
+    gear_h = min(H * 0.70, 100.0)
+    inv_w = min(W * 0.28, 120.0)
+    inv_d = min(D * 0.70, 160.0)
+    inv_h = min(H * 0.55, 80.0)
+    z_mid = base_z + H * 0.48
+    x_motor = -W * 0.28
+    ry = (0.0, 1.5707963, 0.0)  # cylinder axis along +X
+
+    fl.add_cyl(
+        "u_se_td_motor_housing",
+        _mm3((x_motor, cy, z_mid)),
+        motor_od * 0.5 * fl.MM,
+        motor_len * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=ry,
+    )
+    shaft_len = motor_len * 0.55 + gear_w * 0.35
+    fl.add_cyl(
+        "u_se_td_output_shaft",
+        _mm3((x_motor + motor_len * 0.35, cy, z_mid)),
+        max(6.0, motor_od * 0.08) * fl.MM,
+        shaft_len * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=ry,
+    )
+    x_gear = x_motor + motor_len * 0.55 + gear_w * 0.55
+    fl.add_box(
+        "u_se_td_gearbox",
+        _mm3((x_gear, cy, z_mid)),
+        _mm3((gear_w, gear_d, gear_h)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+    x_inv = W * 0.22
+    fl.add_box(
+        "u_se_td_sic_inverter",
+        _mm3((x_inv, cy, base_z + H * 0.42)),
+        _mm3((inv_w, inv_d, inv_h)),
+        mat_sic,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # Coolant ports on +Y face; HV connector on −Y (readable on product shots).
+    for i, name in enumerate(("u_se_td_coolant_in", "u_se_td_coolant_out")):
+        fl.add_cyl(
+            name,
+            _mm3((x_inv + (i - 0.5) * 28.0, D * 0.48 - t, base_z + H * 0.62)),
+            7.0 * fl.MM,
+            18.0 * fl.MM,
+            mat_port,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(1.5707963, 0.0, 0.0),
+        )
+    fl.add_box(
+        "u_se_td_hv_connector",
+        _mm3((x_inv, -D * 0.48 + t + 8.0, base_z + H * 0.55)),
+        _mm3((36.0, 22.0, 28.0)),
+        mat_hv,
+        module=story_mod,
+        module_objects=MO,
+    )
+    ear_w, ear_d, ear_h = 28.0, 18.0, 10.0
+    for xi, yi, tag in (
+        (-1, -1, "fl"), (-1, 1, "fr"), (1, -1, "rl"), (1, 1, "rr"),
+    ):
+        fl.add_box(
+            f"u_se_td_mount_ear_{tag}",
+            _mm3((xi * (W * 0.42), yi * (D * 0.42), base_z + ear_h * 0.5 + 2.0)),
+            _mm3((ear_w, ear_d, ear_h)),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+    print("[univ][sealed] TRACTION interior: motor+shaft+gear+SiC+ports+ears")
+
+
 def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     """SEALED-ENCLOSURE placer: one cabinet at the brief envelope, equipment stacked
     in role zones inside it, skin parts as face plates, edges wired port-to-port at
@@ -18110,8 +18281,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     # INSTRUMENT vs BESS-cabinet interior layout (2026-07-12): a device-scale optical/
     # electronic instrument lays out as an optical bench + PCB + small power + interface,
     # NOT a 52%-battery BESS stack. Universal — keyed on the authoritative device flag.
+    # TRACTION packs use compound motor/inverter morphology (not BESS zone slabs).
     zones = _SE_ZONES_INSTRUMENT if _IS_INSTRUMENT_DEVICE else _SE_ZONES
-    if _IS_INSTRUMENT_DEVICE:
+    if _IS_TRACTION_DRIVE_FORM:
+        print("[univ][sealed] TRACTION drive-pack layout (motor/shaft/gear/SiC) — not instrument/BESS")
+    elif _IS_INSTRUMENT_DEVICE:
         print("[univ][sealed] INSTRUMENT interior layout (optical bench + PCB + power + interface) — not a BESS cabinet stack")
     zone_parts = {z[0]: [] for z in zones}
     skin = []
@@ -18166,7 +18340,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     z_cursor = base_z + margin
     gap = max(4.0, iw * 0.015)
     min_slot_w = max(40.0, iw / 8.0)
-    if _IS_INSTRUMENT_DEVICE:
+    if _IS_TRACTION_DRIVE_FORM:
+        _place_traction_drive_pack_layout(W, D, H, base_z, t, _story_mod, MO)
+    elif _IS_INSTRUMENT_DEVICE:
         # COMPOSER=1: build the product from functional_form's geometry PLAN (universal,
         # works on an unseen archetype). Falls back to the hardcoded family placer when no
         # plan resolves, so the 7 known forms are untouched unless COMPOSER is set.
@@ -18178,7 +18354,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     for key, frac, _rx in zones:
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
-        if _IS_INSTRUMENT_DEVICE:
+        if _IS_INSTRUMENT_DEVICE or _IS_TRACTION_DRIVE_FORM:
             z_cursor += band_h
             continue
         if plist:
@@ -18493,11 +18669,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     # long-narrow pack (Tristan 2026-07-23). Runs BEFORE suppress (so the old role-XY
     # zone boxes get hidden while these u_se_cutaway_cue_int_* meshes are kept) and BEFORE
     # the post-placement resize (so the shell sizes to THIS packed bbox → long-narrow).
-    if _IS_INSTRUMENT_DEVICE:
+    if _IS_INSTRUMENT_DEVICE and not _IS_TRACTION_DRIVE_FORM:
         _populate_instrument_interior(
             parts, base_z, margin, ih, iw, idep, _story_mod, MO)
 
-    if _IS_INSTRUMENT_DEVICE:
+    # GOTCHA: never clutter-suppress traction signature meshes (0733 hid all BoM).
+    if _IS_INSTRUMENT_DEVICE and not _IS_TRACTION_DRIVE_FORM:
         _suppress_instrument_boilerplate_meshes()
 
     # ── POST-PLACEMENT ENVELOPE RESIZE (council fix #2, 2026-07-22) ──────────────

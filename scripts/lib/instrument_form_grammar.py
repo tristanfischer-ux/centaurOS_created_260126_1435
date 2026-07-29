@@ -429,6 +429,63 @@ def is_bench_power_instrument_form(
     return has_channel_power and has_precision_afe and has_thermal_or_mains
 
 
+# INTENT (2026-07-29): traction MGU+MCU+gear packs are sealed product-scale
+# cabinets with rotating-machine morphology — never optical-handheld / lab-electronics.
+# Noun signal on class + part vocab + contract quantities (phase current / shaft torque).
+TRACTION_DRIVE_CLASS_RE = re.compile(
+    r"\bmgu\b|_mgu\b|mgu_|motor[_ -]?generator|traction|powertrain|"
+    r"drive[_ -]?unit|ev[_ -]?drive|rear[_ -]?mgu|ipmsm",
+    re.I,
+)
+TRACTION_DRIVE_PART_RE = re.compile(
+    r"traction[_ -]?ipmsm|sic[_ -]?traction|reduction[_ -]?gear|"
+    r"mgu[_ -]?cold[_ -]?plate|output[_ -]?shaft|hv[_ -]?dc[_ -]?connector|"
+    r"phase[_ -]?current[_ -]?sensor|motor[_ -]?generator|ipmsm",
+    re.I,
+)
+
+
+def is_traction_drive_pack_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    quantities: dict | None = None,
+) -> bool:
+    """True for sealed traction MGU+MCU+gear packs (universal noun/quantity signal).
+
+    @description Form gate for motor housing + shaft + gearbox + inverter brick
+                 morphology. Never product-named. Class/part vocab wins; contract
+                 quantities (shaft torque / phase current ≥100 A) corroborate when
+                 class slug is thin. Independent of isInstrumentDevice — traction
+                 packs are plantish-product sealed cabinets, not lab instruments.
+    """
+    pc = product_class or ""
+    blob = part_blob or ""
+    if TRACTION_DRIVE_CLASS_RE.search(pc):
+        return True
+    if TRACTION_DRIVE_PART_RE.search(blob):
+        return True
+    q = quantities or {}
+    def _qv(key: str) -> float:
+        raw = q.get(key)
+        if isinstance(raw, dict):
+            try:
+                return float(raw.get("value"))
+            except (TypeError, ValueError):
+                return float("nan")
+        try:
+            return float(raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return float("nan")
+    torque = _qv("mgu_shaft_torque_nm")
+    iph = _qv("phase_current_max_a")
+    if (torque == torque and torque > 0) or (iph == iph and iph >= 100):
+        # Quantity-only path still needs a traction noun somewhere so a random
+        # high-current plant does not flip (CORE FIX PRINCIPLE — noun signal).
+        return bool(re.search(r"mgu|traction|ipmsm|inverter|gear", blob + " " + pc, re.I))
+    return False
+
+
 def is_thermocycler_form(
     *,
     product_class: str = "",
@@ -1100,6 +1157,25 @@ def syringe_pump_checklist_ok(mesh_names: list[str], channel_count: int) -> tupl
 def _selftest() -> None:
     """proveCatch: grammar floors are stable; accessory cap ≠ knob; silhouette holds."""
     hfi._selftest()
+    # proveCatch (2026-07-29): Formula E rear MGU pack must select traction form,
+    # never optical-handheld — 0733 rendered a featureless instrument box.
+    assert is_traction_drive_pack_form(product_class="formula_e_rear_mgu"), (
+        "formula_e_rear_mgu class must select traction drive pack form")
+    assert is_traction_drive_pack_form(
+        product_class="",
+        part_blob="Traction Ipmsm Motor Generator SiC Traction Inverter Reduction Gear Stage",
+    ), "part vocabulary alone must select traction pack form"
+    assert is_traction_drive_pack_form(
+        product_class="consumer_electronics",
+        part_blob="traction ipmsm mgu cold plate",
+        quantities={"mgu_shaft_torque_nm": {"value": 77}, "phase_current_max_a": {"value": 530}},
+    )
+    assert not is_traction_drive_pack_form(product_class="colorimeter")
+    assert not is_traction_drive_pack_form(
+        product_class="bess",
+        part_blob="battery module rack",
+        quantities={"phase_current_max_a": {"value": 200}},
+    ), "BESS + high current without traction nouns must NOT select traction form"
     # Thermocycler form: class alone (no brand), part vocab, aliases, negatives.
     assert is_thermocycler_form(product_class="thermocycler"), (
         "class slug thermocycler must select tip-back lid form without brand nouns")

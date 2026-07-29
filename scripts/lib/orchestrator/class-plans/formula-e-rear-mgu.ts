@@ -97,6 +97,14 @@ const stepIpmsmSizing: ToolStep = {
           scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null, condition: null,
           provenance: prov(tid, 'shaft_power_kw'),
         },
+        // GOTCHA (0733 critic HIGH): peak_mechanical must track MGU shaft, not a
+        // stale η_chain≈0.92 seed that disagrees with η_machine from loss-point.
+        peak_mechanical_power_kw: {
+          value: out.shaft_power_kw, unit: 'kW', family: 'power', basis: 'peak',
+          scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
+          condition: 'alias of mgu_shaft_power_kw (P=Tω from IPMSM sizing)',
+          provenance: prov(tid, 'shaft_power_kw'),
+        },
         electrical_frequency_hz: {
           value: out.electrical_frequency_hz, unit: 'Hz', family: 'frequency', basis: 'rated',
           scope: 'module', uncertainty_pct: 5, temporal_resolution_s: null, condition: null,
@@ -264,6 +272,10 @@ const stepMotorLoss: ToolStep = {
       efficiency: number
     }
     const tid = 'motor:loss-point'
+    const shaftKw = qv(c, 'mgu_shaft_power_kw', qv(c, 'peak_mechanical_power_kw', 0))
+    const eta = out.efficiency > 0.05 && out.efficiency <= 1 ? out.efficiency : 0.97
+    // INTENT: electrical input to the MACHINE (not DC-bus cap) so η×P_ac ≈ shaft.
+    const mguAcInKw = shaftKw > 0 ? Math.round((shaftKw / eta) * 1000) / 1000 : 0
     return {
       ...c,
       quantities: {
@@ -286,6 +298,12 @@ const stepMotorLoss: ToolStep = {
         mgu_efficiency: {
           value: out.efficiency, unit: '', family: 'dimensionless', basis: 'rated',
           scope: 'module', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'single (T,ω)',
+          provenance: prov(tid, 'efficiency'),
+        },
+        mgu_ac_electrical_input_kw: {
+          value: mguAcInKw, unit: 'kW', family: 'power', basis: 'peak',
+          scope: 'module', uncertainty_pct: 15, temporal_resolution_s: null,
+          condition: 'shaft / η_mgu — NOT the 350 kW DC-bus cap (that is rear_axle_electrical_power_kw)',
           provenance: prov(tid, 'efficiency'),
         },
       },
@@ -410,10 +428,20 @@ const stepGearRatio: ToolStep = {
         provenance: prov(tid, 'wheel_torque_nm'),
       }
     }
+    const etaGear = out.gear_efficiency ?? 0.97
     next.gear_efficiency = {
-      value: out.gear_efficiency ?? 0.97, unit: '', family: 'dimensionless', basis: 'rated',
+      value: etaGear, unit: '', family: 'dimensionless', basis: 'rated',
       scope: 'module', uncertainty_pct: 5, temporal_resolution_s: null, condition: null,
       provenance: prov(tid, 'gear_efficiency'),
+    }
+    const shaftKw = qv(c, 'mgu_shaft_power_kw', qv(c, 'peak_mechanical_power_kw', 0))
+    if (shaftKw > 0) {
+      next.gear_output_power_kw = {
+        value: Math.round(shaftKw * etaGear * 10) / 10, unit: 'kW', family: 'power', basis: 'peak',
+        scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
+        condition: 'post-gear axle power = mgu_shaft × η_gear (not the DC-bus cap)',
+        provenance: prov(tid, 'gear_efficiency'),
+      }
     }
     return { ...c, quantities: next }
   },

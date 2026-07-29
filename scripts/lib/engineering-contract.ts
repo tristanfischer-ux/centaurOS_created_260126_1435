@@ -16157,12 +16157,59 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     Math.max(530, phaseCurrentNeededA),
   )
   const baseSpeedRpm = extractRangeFromDesc(desc, /(\d{4,5})\s*-?\s*(\d{4,5})?\s*rpm/i, 40000)
-  // Illustrative shaft torque from P = Tω at base speed for the rear electrical cap
-  // with chain η ≈ 0.92 (inv × mgu × gear) → mechanical ~322 kW → T ≈ 77 Nm @ 40 krpm.
+  // DECISION (2026-07-29): MGU shaft power is DC-bus × η_inv × η_mgu — NOT a
+  // lumped 0.92 that also folds gear loss. Critic HIGH on 0733: prose cited
+  // 350 kW electrical + 322 kW shaft + η_machine=0.985 (inconsistent). Gear
+  // loss lands on gear_output_power_kw separately.
+  const etaInvSeed = 0.985
+  const etaMguSeed = 0.97
+  const etaGearSeed = 0.97
   const omega = baseSpeedRpm * 2 * Math.PI / 60
+  const mguShaftPowerKw = Math.round(rearAxleKw * etaInvSeed * etaMguSeed * 10) / 10
+  const gearOutputPowerKw = Math.round(mguShaftPowerKw * etaGearSeed * 10) / 10
   const shaftTorqueNm = extractRangeFromDesc(desc, /(\d{2,3})\s*-?\s*(\d{2,3})?\s*Nm/i,
-    Math.round((rearAxleKw * 1000 * 0.92) / Math.max(omega, 1) * 10) / 10)
-  const gearRatio = extractRangeFromDesc(desc, /gear\s*ratio[^0-9]{0,12}(\d{1,2}(?:\.\d+)?)/i, 8)
+    Math.round((mguShaftPowerKw * 1000) / Math.max(omega, 1) * 10) / 10)
+  // INTENT: brief band 6:1–12:1 must stay as FLOOR/CEILING identities — aliasing
+  // them to the chosen ratio made gear_ratio_max=8 vs brief 12 look like a miss
+  // under any higher-is-better path (self-audit COMPLIANCE_FAIL on 0733).
+  // GOTCHA: extractRangeFromDesc on "6:1 to 12:1" returns 6 (first capture) —
+  // never use that as the chosen homologated ratio.
+  const gearRatioBand = (() => {
+    const metrics = brief?.constraints?.target_performance?.metrics
+    let min = 6
+    let max = 12
+    if (Array.isArray(metrics)) {
+      for (const m of metrics) {
+        const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+        const v = Number((m as { value?: number })?.value)
+        if (!Number.isFinite(v) || v <= 0) continue
+        if (k === 'gear_ratio_min') min = v
+        if (k === 'gear_ratio_max') max = v
+      }
+    }
+    return { min, max }
+  })()
+  const gearRatio = (() => {
+    const bandHit = desc.match(
+      /gear\s*ratio[^0-9]{0,24}(\d{1,2}(?:\.\d+)?)\s*:?\s*1?\s*(?:to|–|-|—)\s*(\d{1,2}(?:\.\d+)?)/i,
+    )
+    if (bandHit) {
+      // Trial homologation seed inside the stated window (not the band floor).
+      const lo = parseFloat(bandHit[1])
+      const hi = parseFloat(bandHit[2])
+      if (Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo) {
+        const seed = 8
+        if (seed >= lo && seed <= hi) return seed
+        return Math.round((lo + hi) / 2)
+      }
+    }
+    const single = desc.match(/gear\s*ratio[^0-9]{0,12}(\d{1,2}(?:\.\d+)?)\s*:?\s*1?\b/i)
+    if (single) {
+      const v = parseFloat(single[1])
+      if (Number.isFinite(v) && v >= gearRatioBand.min && v <= gearRatioBand.max) return v
+    }
+    return 8
+  })()
   const wheelRadiusM = 0.33
   const massCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 35)
   // INTENT (2026-07-29 SOL): brief metric assumed_coolant_inlet_c=60 is the seed;
@@ -16246,9 +16293,26 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
       source_detail: 'alias of rear_axle_electrical_power_kw for brief peak-electrical identity',
       from: ['rear_axle_electrical_power_kw'],
     }),
-    peak_mechanical_power_kw: q(Math.round(rearAxleKw * 0.92), 'kW', 'power', 'peak', 'module', 'calculator', {
-      source_detail: 'peak electrical × η_chain≈0.92 — brief peak-mechanical identity',
+    peak_mechanical_power_kw: q(mguShaftPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: `MGU shaft = P_dc×η_inv×η_mgu (seeds ${etaInvSeed}×${etaMguSeed}); tools overwrite`,
       from: ['rear_axle_electrical_power_kw'],
+    }),
+    mgu_shaft_power_kw: q(mguShaftPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'seed MGU shaft power before motor:ipmsm-analytical-sizing overwrite',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
+    gear_output_power_kw: q(gearOutputPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: `post-gear axle power = shaft×η_gear (seed ${etaGearSeed})`,
+      from: ['mgu_shaft_power_kw'],
+    }),
+    inverter_efficiency: q(etaInvSeed, '', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'seed — overwritten by inverter:sic-loss',
+    }),
+    mgu_efficiency: q(etaMguSeed, '', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'seed — overwritten by motor:loss-point',
+    }),
+    gear_efficiency: q(etaGearSeed, '', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'seed — overwritten by gear:traction-ratio',
     }),
     peak_power_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
       source_detail: 'alias of rear_axle_electrical_power_kw for generic peak_power identity',
@@ -16284,20 +16348,19 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     phase_current_max_a: q(phaseCurrentMaxA, 'A', 'current', 'peak', 'module', 'brief'),
     mgu_base_speed_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'rated', 'module', 'brief'),
     mgu_shaft_torque_nm: q(shaftTorqueNm, 'Nm', 'force', 'rated', 'module', 'calculator', {
-      source_detail: 'P=Tω at base speed with η_chain≈0.92; replace with dyno when available',
-      formula: 'T = P_elec * 0.92 / ω_base',
+      source_detail: 'P=Tω at base speed for MGU shaft (η_inv×η_mgu on DC cap); dyno replaces',
+      formula: 'T = P_dc * η_inv * η_mgu / ω_base',
       from: ['rear_axle_electrical_power_kw', 'mgu_base_speed_rpm'],
     }),
-    gear_ratio: q(gearRatio, 'ratio', 'dimensionless', 'rated', 'module', 'brief'),
-    // INTENT (2026-07-29 SOL): brief-parser invents gear_ratio_min/max from "6:1 to 12:1".
-    // Alias the chosen ratio so compliance matches (floor/ceiling vs the band).
-    gear_ratio_min: q(gearRatio, 'ratio', 'dimensionless', 'min', 'module', 'brief', {
-      source_detail: 'alias of gear_ratio — satisfies brief band floor identity (chosen ratio ≥ min)',
-      from: ['gear_ratio'],
+    gear_ratio: q(gearRatio, 'ratio', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: `chosen homologated ratio within brief band ${gearRatioBand.min}–${gearRatioBand.max}`,
     }),
-    gear_ratio_max: q(gearRatio, 'ratio', 'dimensionless', 'max', 'module', 'brief', {
-      source_detail: 'alias of gear_ratio — satisfies brief band ceiling identity (chosen ratio ≤ max)',
-      from: ['gear_ratio'],
+    // Brief band endpoints are the design-space floor/ceiling — NOT the chosen ratio.
+    gear_ratio_min: q(gearRatioBand.min, 'ratio', 'dimensionless', 'min', 'module', 'brief', {
+      source_detail: 'brief gear-ratio band floor (chosen gear_ratio must be ≥ this)',
+    }),
+    gear_ratio_max: q(gearRatioBand.max, 'ratio', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'brief gear-ratio band ceiling (chosen gear_ratio must be ≤ this)',
     }),
     wheel_radius_m: q(wheelRadiusM, 'm', 'length', 'rated', 'system', 'brief'),
     mgu_mcu_mass_cap_kg: q(massCapKg > 0 ? massCapKg : 35, 'kg', 'mass', 'max', 'system', 'brief'),
@@ -16352,22 +16415,22 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     mosfet_rdson_mohm: q(8, 'mΩ', 'dimensionless', 'rated', 'module', 'brief', {
       source_detail: 'illustrative SiC Rdson — replace with device datasheet',
     }),
-    // INTENT (2026-07-29 SOL): without a design envelope the drawing form factor
-    // falls to "plant" → Blender Mech Plant scaffold / cyan litter. Stamp a
-    // race-credible MGU+MCU+gear pack box (≤650 mm edges) so form=sealed_cabinet.
-    design_envelope_width_mm: q(620, 'mm', 'length', 'max', 'system', 'calculator', {
-      source_detail: 'IPMSM + SiC MCU side-by-side pack width (trial; CAD replaces)',
+    // INTENT (2026-07-29): pack envelope sized to IPMSM + SiC brick + gear —
+    // 620×400×320 was a hollow appliance box the vision critic rejected.
+    // ~400×250×180 mm ≈ 0.018 m³ still <1 m³ (sealed product) without BESS scale.
+    design_envelope_width_mm: q(400, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'IPMSM housing + SiC MCU + gear stage axial pack width (trial; CAD replaces)',
     }),
-    design_envelope_depth_mm: q(400, 'mm', 'length', 'max', 'system', 'calculator', {
+    design_envelope_depth_mm: q(250, 'mm', 'length', 'max', 'system', 'calculator', {
       source_detail: 'pack depth covering motor OD + inverter brick + cold plates',
     }),
-    design_envelope_height_mm: q(320, 'mm', 'length', 'max', 'system', 'calculator', {
-      source_detail: 'pack height from IPMSM stack + housing (≤650 mm edge cap)',
+    design_envelope_height_mm: q(180, 'mm', 'length', 'max', 'system', 'calculator', {
+      source_detail: 'pack height from IPMSM stack + housing',
     }),
     enclosure_volume_m3: q(
-      Math.round((620 * 400 * 320) / 1e9 * 1e6) / 1e6,
+      Math.round((400 * 250 * 180) / 1e9 * 1e6) / 1e6,
       'm³', 'volume', 'max', 'system', 'calculator', {
-        source_detail: '0.620×0.400×0.320 m traction pack envelope — product-scale, not plant',
+        source_detail: '0.400×0.250×0.180 m traction pack envelope — product-scale, not plant',
       },
     ),
   }
