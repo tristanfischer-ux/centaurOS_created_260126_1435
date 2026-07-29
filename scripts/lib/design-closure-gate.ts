@@ -223,10 +223,24 @@ function areaM2(quantities: Record<string, { value?: unknown }>): number {
 function isCriticalRole(name: string, id: string): boolean {
   // Principal power / sense / safety / thermal on a multi-channel instrument.
   // Universal noun keys — never a class slug.
+  const blob = `${name} ${id}`
+  // GOTCHA (2026-07-29 SOL): Formula-E "MCU" = motor-control UNIT (inverter).
+  // `mcu_cold_plate` / sic_traction_* matched /mcu|controller/ and scored the
+  // whole traction pack as all-critical-TBD → honesty=2 (false open skeleton).
+  // OEM-quote principals stay TBD until team dyno — not fillable catalogue slots.
+  if (
+    /traction_ipmsm|sic_traction|reduction_gear|mgu_cold_plate|mcu_cold_plate|hv_dc_fuse|phase_cable_set|hv_interlock_loop|inverter_desat/i.test(
+      blob,
+    )
+  ) {
+    return false
+  }
   return (
     isChannelAxisWord(name, id)
     || isHeatsinkRole(name, id)
-    || /afe|mosfet|shunt|thermistor|comparator|cutout|peltier|c14|power[_\s-]?module|mcu|controller/i.test(`${name} ${id}`)
+    || /afe|mosfet|shunt|thermistor|comparator|cutout|peltier|c14|power[_\s-]?module|(?:^|[^a-z])mcu(?:[^a-z]|$)|microcontroller|\bcontroller\b/i.test(
+      blob,
+    )
   )
 }
 
@@ -680,6 +694,53 @@ export function selftestDesignClosure(): number {
   const okR = computeDesignClosure(okAlloc)
   if (okR.findings.some((f) => f.kind === 'nonconserving_demand_allocation')) {
     console.error('FAIL: 8×25 W against 200 W aggregate must NOT fire nonconserving', okR.findings)
+    bad++
+  }
+
+  // proveCatch (2026-07-29 SOL): traction MGU+MCU OEM-quote TBD must NOT score
+  // honesty=2 via /mcu/ matching mcu_cold_plate (false open-skeleton).
+  const tractionTbd = {
+    orchestratorContract: {
+      quantities: {
+        coolant_flow_l_min: { value: 15 },
+        coolant_inlet_c: { value: 60 },
+        phase_current_max_a: { value: 530 },
+        mgu_shaft_torque_nm: { value: 77 },
+        rear_axle_electrical_power_kw: { value: 350 },
+      },
+    },
+    moduleDecomposition: {
+      modules: [{
+        module: 'energy_conversion_transduction',
+        sub_modules: [{
+          words: [
+            {
+              name_human: 'SiC Traction Inverter',
+              content_character: { character_id: 'sic_traction_inverter' },
+              modifier_characters: [
+                { kind: 'quantity', value: '×1' },
+                { kind: 'part_number', value: 'TBD (detailed design)' },
+              ],
+            },
+            {
+              name_human: 'Mcu Cold Plate',
+              content_character: { character_id: 'mcu_cold_plate' },
+              modifier_characters: [
+                { kind: 'quantity', value: '×1' },
+                { kind: 'part_number', value: 'TBD (detailed design)' },
+              ],
+            },
+          ],
+        }],
+      }],
+    },
+  }
+  const trR = computeDesignClosure(tractionTbd)
+  if (trR.honesty_score < 9) {
+    console.error(
+      `FAIL: traction OEM-quote TBD pack honesty must be ≥9 (got ${trR.honesty_score}) — mcu_cold_plate must not trip all-critical-TBD`,
+      trR,
+    )
     bad++
   }
 
