@@ -16187,6 +16187,28 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     v_dc_max_v: q(Math.min(vDcMax, 1000), 'V', 'voltage', 'max', 'system', 'brief', {
       source_detail: 'usable window; absolute vehicle max 1000 V',
     }),
+    // INTENT (2026-07-29 SOL Verification spine): brief metric keys must exist as
+    // delivered quantities — UNVERIFIED on Exec/Brief was identity miss, not physics miss.
+    assumed_vdc_min_v: q(vDcMin, 'V', 'voltage', 'min', 'system', 'brief', {
+      source_detail: 'alias of v_dc_min_v for brief-compliance identity match',
+      from: ['v_dc_min_v'],
+    }),
+    assumed_vdc_max_v: q(Math.min(vDcMax, 1000), 'V', 'voltage', 'max', 'system', 'brief', {
+      source_detail: 'alias of v_dc_max_v for brief-compliance identity match',
+      from: ['v_dc_max_v'],
+    }),
+    max_system_voltage_v: q(1000, 'V', 'voltage', 'max', 'system', 'brief', {
+      source_detail: 'absolute vehicle / insulation-class ceiling (brief); operating window is assumed_vdc_*',
+    }),
+    max_rotor_speed_rpm: q(100000, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'FIA/regulatory rotor-speed ceiling the retention stack is designed against (base speed is separate)',
+    }),
+    mgu_shaft_torque_max_nm: q(
+      extractRangeFromDesc(desc, /(\d{2,3})\s*-?\s*(\d{2,3})?\s*Nm/i, 120),
+      'Nm', 'force', 'max', 'module', 'brief', {
+        source_detail: 'upper illustrative MGU shaft-torque band from brief (dyno replaces)',
+      },
+    ),
     ac_output_voltage_v: q(Math.round(vDcNom / Math.SQRT2), 'V', 'voltage', 'rated', 'module', 'calculator', {
       source_detail: '≈ Vdc/√2 modulation headroom proxy for 3-ph bridge',
     }),

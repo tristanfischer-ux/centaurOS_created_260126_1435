@@ -273,6 +273,11 @@ _GENERIC_ROLE = {
     # pump with the 45 m³/h circulation pump and false-flagged the real difference (Tristan 2026-06-30).
     "pump", "valve", "tank", "vessel", "skid", "unit", "motor", "filter", "blower", "fan",
     "mixer", "agitator", "sensor", "transmitter", "exchanger", "column", "tower", "compressor",
+    # INTENT (2026-07-29 Formula E MGU Calculations HIGH): nameplate throughput
+    # (traction_inverter_power_kw = 350) and loss/heat (inverter_dissipated_kw ≈ 2.7)
+    # shared only the device noun 'inverter' after generic strip and false-flagged
+    # 128×. Same pattern as motor/pump above — device type ≠ physical role.
+    "inverter", "converter", "rectifier", "pcs", "mgu", "mcu", "drive",
     "dosing", "metering", "throughput", "transfer", "circulation", "recirc", "feed", "pressure",
     # location / zone qualifiers (Codema ship 2026-07-08 P2-J): 'nursery' is a WHERE, not a
     # WHAT — nursery_acid_dosing (0.04 m³/h metering) and nursery_fertigation (45 m³/h
@@ -560,6 +565,16 @@ def _selftest() -> int:
     }}}
     expect(not any(f.kind == "divergence" for f in audit_provenance(pumps).findings),
            "a metering pump and a circulation pump (different devices) must NOT be flagged divergent")
+
+    # DEVICE-TYPE guard (2026-07-29 MGU Calculations): nameplate throughput vs loss/heat
+    # sharing only 'inverter' must NOT false-flag (350 kW vs 2.7 kW).
+    inv = {"orchestratorContract": {"quantities": {
+        "traction_inverter_power_kw": {"value": 350.0, "unit": "kW", "source": "brief"},
+        "inverter_dissipated_kw": {"value": 2.7283, "unit": "kW", "source": "tool:inverter:sic-loss",
+                                   "source_detail": "SiC bridge conduction+switching loss"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(inv).findings),
+           "inverter nameplate vs inverter dissipation must NOT be flagged same-role divergent")
 
     # LOCATION-QUALIFIER guard (Codema ship 2026-07-08): two different devices that only
     # share a location token ('nursery') must NOT be flagged — nursery acid metering vs

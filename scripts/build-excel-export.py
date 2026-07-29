@@ -9727,8 +9727,20 @@ def _brief_metric_is_lower_better(key: str) -> bool:
     never a class table. Shared by Verification spine + Exec cover matrix.
     """
     kl = (key or "").lower()
+    # INTENT (2026-07-29 SOL): regulatory/absolute CEILINGS — under the cap is PASS.
+    # Must stay aligned with scorecard-floor.ts::complianceRowStatus.
+    is_ceiling = (
+        "_ceiling" in kl
+        or "_cap_kg" in kl
+        or "cost_ceiling" in kl
+        or kl == "max_mass_kg"
+        or kl == "max_rotor_speed_rpm"
+        or kl == "max_system_voltage_v"
+        or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl))
+    )
     return (
-        "fcr" in kl
+        is_ceiling
+        or "fcr" in kl
         or "feed_conversion" in kl
         or "conversion_ratio" in kl
         or "_days" in kl or "duration" in kl or "lead_time" in kl

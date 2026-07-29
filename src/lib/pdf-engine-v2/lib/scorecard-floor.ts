@@ -289,7 +289,19 @@ export function briefValueApproximated(briefText: string | undefined, targetValu
 export function complianceRowStatus(row: ComplianceRowInput, briefText?: string): ComplianceStatus {
   if (row.matched == null || row.target == null || row.achieved == null) return 'UNVERIFIED'
   const kl = (row.key || '').toLowerCase()
+  // INTENT (2026-07-29 SOL): regulatory/absolute CEILINGS are lower-is-better —
+  // max_rotor_speed_rpm=100000 with design base 40000 must PASS (under the ceiling),
+  // not FAIL higher-is-better. Exclude capability floors (max_simultaneous_dissipation).
+  const isCeilingMetric =
+    kl.includes('_ceiling') ||
+    kl.includes('_cap_kg') ||
+    kl.includes('cost_ceiling') ||
+    kl === 'max_mass_kg' ||
+    kl === 'max_rotor_speed_rpm' ||
+    kl === 'max_system_voltage_v' ||
+    (kl.startsWith('max_') && (kl.includes('voltage') || kl.includes('rotor_speed')))
   const lowerBetter =
+    isCeilingMetric ||
     kl.includes('fcr') ||
     kl.includes('feed_conversion') ||
     kl.includes('conversion_ratio') ||

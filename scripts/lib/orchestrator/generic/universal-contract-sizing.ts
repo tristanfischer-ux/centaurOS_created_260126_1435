@@ -537,11 +537,21 @@ function boxFromRatingKw(kw: number): string {
  * cold-plate traction pack (signal via hasTractionDrivePackSignal — never a class slug).
  */
 const TRACTION_DRIVE_EDGE_CAP_MM = 650
-function boxFromHighDensityDriveKw(kw: number): string {
+/**
+ * Distinct silhouettes: IPMSM ≈ near-cubic machine; SiC MCU ≈ flatter brick.
+ * INTENT (2026-07-29 SOL): identical 313×291×358 on motor AND inverter was a
+ * skeleton HIGH — one box formula for every traction power phrase.
+ */
+function boxFromHighDensityDriveKw(kw: number, phrase = ''): string {
   const s = Math.cbrt(Math.max(50, kw) / 250)
   const cap = (n: number): number =>
-    Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(140, Math.round(n)))
-  return `${cap(280 * s)}x${cap(260 * s)}x${cap(320 * s)} mm`
+    Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(120, Math.round(n)))
+  const p = phrase.replace(/[_\s]+/g, ' ').toLowerCase()
+  const isInverter =
+    /\b(?:inverter|mcu|converter|rectifier)\b/.test(p)
+    && !/\b(?:motor|ipmsm|mgu|generator)\b/.test(p)
+  const base = isInverter ? [380, 280, 140] : [260, 240, 300]
+  return `${cap(base[0] * s)}x${cap(base[1] * s)}x${cap(base[2] * s)} mm`
 }
 const TRACTION_DRIVE_POWER_PHRASE_RE =
   /\b(?:ipmsm|traction|motor\s*generator|\bmgu\b|\bmcu\b|inverter|converter|drive\s*unit)\b/i
@@ -876,7 +886,7 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
       _tractionDrivePackSizingActive
       && TRACTION_DRIVE_POWER_PHRASE_RE.test(p)
     ) {
-      dim = boxFromHighDensityDriveKw(g.power)
+      dim = boxFromHighDensityDriveKw(g.power, g.phrase)
     } else {
       dim = boxFromRatingKw(g.power)
     }

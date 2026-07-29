@@ -137,6 +137,8 @@ for (const [label, dim] of [['IPMSM', motorDim], ['inverter', invDim]] as const)
 }
 expect(/350/.test(String(motorRating?.value ?? '')),
   `IPMSM nameplate must be peak electrical 350 kW (got ${motorRating?.value})`)
+expect(String(motorDim?.value) !== String(invDim?.value),
+  `motor and inverter must not share an identical envelope (got ${motorDim?.value})`)
 
 // ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
 import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'
