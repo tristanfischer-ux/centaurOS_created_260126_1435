@@ -9433,6 +9433,13 @@ def _brief_scope_qualified_text(brief_text: str, value) -> bool:
     return False
 
 
+# Perimeter-scope tokens on a brief metric that must also appear on the quantity
+# name — else token overlap falsely binds car_level_battery_power_cap_kw → rear_*.
+_METRIC_SCOPE_TOKENS = frozenset({
+    "car", "vehicle", "chassis", "whole", "systemwide", "platform",
+})
+
+
 def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = "") -> Optional[Tuple[str, float, str]]:
     """Find the ACHIEVED contract quantity that fulfils a brief metric, by NAME + UNIT FAMILY.
     (2026-06-25 fix) Match by NAME — NOT by which value is closest to the target. Closeness-to-
@@ -9450,6 +9457,11 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
     b_key = (metric.get("key_metric") or metric.get("metric") or metric.get("name") or "").lower().strip()
     b_norm = _norm_qty_name(b_key)
     b_tokens = set(t for t in re.findall(r"[a-z]+", b_norm) if t not in _QTY_STOP_TOKENS)
+    # INTENT (2026-07-29 SOL): car_level_* / vehicle_* brief context must not bind a
+    # rear-axle product quantity (600 kW car battery ≠ 350 kW rear MGU — false FAIL).
+    b_scope = b_tokens & _METRIC_SCOPE_TOKENS
+    if "car_level" in b_key or "vehicle_level" in b_key:
+        b_scope = b_scope | {"car", "vehicle"}
     # COUNT-TYPED metric whose UNIT is a count-NOUN ('containers' / 'valves' / 'vials' / 'units')
     # rather than the token 'count' lands in the '?'+noun family — so _fam_ok's count branch never
     # fires and it never matches the unitless …_count contract quantity (Tristan 2026-06-29:
@@ -9471,10 +9483,21 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
         token-overlap test below)."""
         if a_fam == b_fam:
             return True
+        # Dimensionless family: brief 'ratio' / '—' / empty ↔ contract unitless.
+        if b_fam in ("ratio", "dimensionless") or (metric.get("unit") or "").strip() in ("—", "-", "ratio", ""):
+            if a_fam in ("ratio", "dimensionless") or a_fam.startswith("?"):
+                return True
         if b_fam == "count":
             return (a_fam in ("count", "ratio") or a_fam.startswith("?")) and \
                    bool(re.search(r"(count|qty|number|_nr|valves?|containers?|units?)$", qname.lower()))
         return False
+
+    def _scope_ok(qname: str) -> bool:
+        """Reject car/vehicle-scoped brief metrics binding product-perimeter quantities."""
+        if not b_scope:
+            return True
+        q_tokens = set(re.findall(r"[a-z]+", _norm_qty_name(qname.lower())))
+        return bool(b_scope & q_tokens)
 
     # (0) SCOPE-QUALIFIED sibling match — only engages when the brief's own prose scopes this
     # metric's cited value (never fires on an ordinary, unscoped metric).
@@ -9513,6 +9536,8 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
         a_fam, _ = _unit_family(qv.get("unit", ""))
         if not _fam_ok(a_fam, qname):
             continue
+        if not _scope_ok(qname):
+            continue
         if _norm_qty_name(qname) == b_norm:
             return qname, a_val, qv.get("unit", "")
 
@@ -9543,6 +9568,8 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
             continue
         a_fam, _ = _unit_family(qv.get("unit", ""))
         if not _fam_ok(a_fam, qname):
+            continue
+        if not _scope_ok(qname):
             continue
         ql = qname.lower()
         q_tokens = set(re.findall(r"[a-z]+", _norm_qty_name(ql)))
@@ -9887,8 +9914,11 @@ def _brief_metric_is_lower_better(key: str) -> bool:
     kl = (key or "").lower()
     # INTENT (2026-07-29 SOL): regulatory/absolute CEILINGS — under the cap is PASS.
     # Must stay aligned with scorecard-floor.ts::complianceRowStatus.
-    # INTENT (2026-07-29 SOL): *_max_rpm = speed ceiling (aligned with scorecard-floor).
-    is_ceiling = (
+    # INTENT (2026-07-29 SOL): band tops + regulatory ceilings (aligned with scorecard-floor).
+    is_capability_floor = (
+        "simultaneous" in kl or "output_capacity" in kl or "dissipation" in kl
+    )
+    is_ceiling = (not is_capability_floor) and (
         "_ceiling" in kl
         or "_cap_kg" in kl
         or "cost_ceiling" in kl
@@ -9898,6 +9928,13 @@ def _brief_metric_is_lower_better(key: str) -> bool:
         or "_temp_limit" in kl
         or kl.endswith("_limit_c")
         or kl.endswith("_max_rpm")
+        or bool(re.search(r"_max_(khz|l_per_min|nm|kw|v|a|c|ratio)\b", kl))
+        or (
+            kl.endswith("_max")
+            and any(t in kl for t in (
+                "ratio", "gear", "flow", "frequency", "speed", "torque", "throughput",
+            ))
+        )
         or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl or "rpm" in kl))
     )
     return (
@@ -31798,6 +31835,15 @@ def _selftest() -> int:
     if not um or um[0] != "cost_per_kwh_gbp" or um[1] != 113.34:
         print(f"  FAIL scope-qualified: an UNSCOPED brief target must match the plain full-system "
               f"quantity, never the _only_ sibling by accident — got {um}"); bad += 1
+    # (1e) proveCatch (2026-07-29 SOL): car_level_* brief context must NOT bind a
+    # rear-axle product quantity (600 kW car battery ≠ 350 kW rear MGU → false FAIL).
+    _car_qs = {
+        "rear_electrical_power_cap_kw": {"value": 350, "unit": "kW"},
+        "rear_axle_electrical_power_kw": {"value": 350, "unit": "kW"},
+    }
+    if _match_quantity({"key_metric": "car_level_battery_power_cap_kw", "value": 600, "unit": "kW"},
+                       _car_qs) is not None:
+        print("  FAIL scope_gate: car_level_battery_power_cap_kw must NOT bind rear_electrical_*"); bad += 1
 
     # ═══ proveCatch COVER COMPLIANCE ARITHMETIC (Tristan 2026-07-06) — the THIRD
     # independent brief-compliance computation (dossier_audit.py + scorecard-floor.ts are

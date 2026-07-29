@@ -90,7 +90,19 @@ export interface BomLine {
 type ContractQuantity = { value?: number; unit?: string } | number | undefined
 type ContractQuantities = Record<string, ContractQuantity>
 
-export interface MacroAssemblyPrice { name?: string; label?: string; price_gbp?: number; gbp?: number }
+// INTENT (2026-07-29 SOL): contract MacroAssemblyPrice uses word_name +
+// unit_price_gbp / total_gbp (engineering-contract.ts). Legacy callers still
+// pass name/label + price_gbp — accept BOTH so grounding cannot silently miss
+// every traction / BESS macro and fall through to £25 Engine-B floors.
+export interface MacroAssemblyPrice {
+  name?: string
+  label?: string
+  word_name?: string
+  price_gbp?: number
+  gbp?: number
+  unit_price_gbp?: number
+  total_gbp?: number
+}
 
 /** Injectable cache lookup — defaults to the real db-only-cascade read. */
 export type CacheLookup = (manufacturer: string | null, mpn: string) => {
@@ -536,16 +548,34 @@ function groundMacroAssembly(line: BomLine, ctx: GroundingContext): GroundedCost
   const macros = ctx.macroAssemblyPrices ?? []
   if (macros.length === 0) return null
   const d = describe(line)
+  // GOTCHA: emitted words use id=`${character_id}_word` and often omit word_id —
+  // strip the suffix so contract macro word_name matches.
+  const idBlob = (
+    line.word_id
+    ?? (line as { id?: string }).id
+    ?? line.content_character?.character_id
+    ?? ''
+  ).toLowerCase().replace(/_word$/, '')
   const nameTokens = (line.name_human ?? line.content_character?.character_id ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length >= 4)
   for (const m of macros) {
-    const macroName = (m.name ?? m.label ?? '').toLowerCase()
+    const macroName = (m.word_name ?? m.name ?? m.label ?? '').toLowerCase()
     if (!macroName) continue
-    const price = Number(m.price_gbp ?? m.gbp)
+    const price = Number(m.total_gbp ?? m.unit_price_gbp ?? m.price_gbp ?? m.gbp)
     if (!Number.isFinite(price) || price <= 0) continue
+    // Exact word_id / character_id ↔ word_name identity (underscore-normalised).
+    const macroId = macroName.replace(/[^a-z0-9]+/g, '_').replace(/_word$/, '')
+    if (idBlob && (idBlob === macroId || idBlob.includes(macroId) || macroId.includes(idBlob))) {
+      return {
+        price_gbp: Math.round(price),
+        provenance: 'macro-assembly',
+        basis: `Engineering-contract macro_assembly_prices entry "${m.word_name ?? m.name ?? m.label}" = £${fmt(price)}`,
+        confidence: 'high',
+      }
+    }
     const macroTokens = macroName.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((t) => t.length >= 4)
     // a confident match needs the macro's key noun(s) present in the line description.
     const overlap = macroTokens.filter((t) => d.includes(t) || nameTokens.includes(t))
@@ -553,7 +583,7 @@ function groundMacroAssembly(line: BomLine, ctx: GroundingContext): GroundedCost
       return {
         price_gbp: Math.round(price),
         provenance: 'macro-assembly',
-        basis: `Engineering-contract macro_assembly_prices entry "${m.name ?? m.label}" = £${fmt(price)}`,
+        basis: `Engineering-contract macro_assembly_prices entry "${m.word_name ?? m.name ?? m.label}" = £${fmt(price)}`,
         confidence: 'medium',
       }
     }

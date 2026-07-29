@@ -443,6 +443,73 @@ export const CLASS_SUPPLIERS: Record<string, ClassSuppliers> = {
       },
     ],
   },
+
+  // INTENT (2026-07-29 SOL): Formula E rear MGU + SiC MCU perimeter — empty
+  // suppliers docked G3 + scorecard. Archetypes are race-powertrain shaped
+  // (not plant EPC); DB profiles fall back to manufacturing / cleantech.
+  formula_e_rear_mgu: {
+    product_class: 'formula_e_rear_mgu',
+    archetypes: [
+      {
+        id: 'traction_mgu_oem',
+        label: 'Principal — high-speed IPMSM / traction MGU manufacturer',
+        function_description:
+          'Designs and builds high-speed IPMSM motor-generators for motorsport / performance EV axles (stator, rotor, housing, resolver). Quote and dyno replace trial macros.',
+        capabilities: [
+          'high-speed IPMSM design',
+          'motorsport traction motor',
+          'oil/glycol jacket cooling',
+          'resolver / temperature sensing integration',
+        ],
+        search_profiles: [...MANUFACTURING_FALLBACK],
+        search_keywords: [
+          'high speed IPMSM manufacturer motorsport',
+          'Formula E MGU supplier',
+          'traction motor generator OEM EV axle',
+          'high-speed electric motor manufacturer UK Europe',
+        ],
+        preferred_regions: ['GB', 'DE', 'IT', 'FR', 'AT', 'CH'],
+      },
+      {
+        id: 'sic_traction_inverter_oem',
+        label: 'Principal — SiC traction inverter / MCU manufacturer',
+        function_description:
+          'Supplies SiC MOSFET traction inverters (motor-control units) for 600–900 V DC buses with high switching frequency and liquid cold-plate cooling — the Formula E “MCU” sense, not a microcontroller.',
+        capabilities: [
+          'SiC traction inverter',
+          '600–900 V DC bus',
+          'field-weakening / MTPA control',
+          'liquid-cooled power module',
+        ],
+        search_profiles: [...MANUFACTURING_FALLBACK],
+        search_keywords: [
+          'SiC traction inverter manufacturer',
+          'motorsport motor control unit MCU inverter',
+          'silicon carbide EV inverter OEM Europe',
+          'Formula E inverter supplier',
+        ],
+        preferred_regions: ['GB', 'DE', 'FR', 'IT', 'US', 'JP'],
+      },
+      {
+        id: 'reduction_gear_stage_supplier',
+        label: 'Subcontractor — compact reduction gear / final-drive stage',
+        function_description:
+          'Supplies the compact reduction gear stage between MGU shaft and half-shaft / differential interface within the manufacturer perimeter.',
+        capabilities: [
+          'high-speed reduction gear',
+          'motorsport final drive',
+          'compact planetary or parallel-axis gearset',
+        ],
+        search_profiles: [...MANUFACTURING_FALLBACK],
+        search_keywords: [
+          'motorsport reduction gear manufacturer',
+          'EV axle gear stage supplier',
+          'high speed gearbox Formula E',
+        ],
+        preferred_regions: ['GB', 'DE', 'IT', 'FR'],
+      },
+    ],
+  },
 }
 
 // 2026-05-19 firestorm iter-1 fix: classifier emits "thermal_system" for heat
@@ -469,6 +536,11 @@ const SUPPLIER_CLASS_ALIASES: Record<string, string> = {
   edge_ai_server: 'edge_ai',
   'auv-subsea': 'auv',
   auv_subsea: 'auv',
+  traction_mgu: 'formula_e_rear_mgu',
+  electric_powertrain: 'formula_e_rear_mgu',
+  ev_drive_unit: 'formula_e_rear_mgu',
+  rear_mgu: 'formula_e_rear_mgu',
+  formula_e_mgu: 'formula_e_rear_mgu',
 }
 
 export function getClassSuppliers(productClass: string): ClassSuppliers | null {

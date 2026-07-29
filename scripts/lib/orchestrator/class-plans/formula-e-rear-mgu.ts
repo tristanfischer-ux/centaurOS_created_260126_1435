@@ -150,7 +150,10 @@ const stepSicLoss: ToolStep = {
   required: true,
   feeds_into: ['powertrain:duty-cycle-energy'] as string[],
   input_from_contract: (c) => ({
-    continuous_power_kw: qv(c, 'continuous_power_kw', qv(c, 'rear_axle_electrical_power_kw', 350)),
+    // GOTCHA: tool input name is continuous_power_kw, but for traction we size
+    // the SiC loss/current corner at PEAK rear-axle kW so ac_rms coheres with
+    // mgu_shaft_power_kw / phase_current_max_a (critic flagged 272 A vs 322 kW).
+    continuous_power_kw: qv(c, 'rear_axle_electrical_power_kw', qv(c, 'traction_inverter_power_kw', 350)),
     dc_bus_voltage_v: qv(c, 'dc_bus_voltage_v', 750),
     ac_output_voltage_v: qv(c, 'ac_output_voltage_v', 530),
     switching_frequency_khz: qv(c, 'switching_frequency_khz', 40),
@@ -169,17 +172,18 @@ const stepSicLoss: ToolStep = {
         ...c.quantities,
         inverter_efficiency: {
           value: out.inverter_efficiency, unit: '', family: 'dimensionless', basis: 'rated',
-          scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'single operating point',
+          scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'peak rear-axle corner',
           provenance: prov(tid, 'inverter_efficiency'),
         },
         inverter_dissipated_kw: {
-          value: out.inverter_dissipated_kw, unit: 'kW', family: 'power', basis: 'continuous',
-          scope: 'module', uncertainty_pct: 15, temporal_resolution_s: null, condition: null,
+          value: out.inverter_dissipated_kw, unit: 'kW', family: 'power', basis: 'peak',
+          scope: 'module', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'peak rear-axle corner',
           provenance: prov(tid, 'inverter_dissipated_kw'),
         },
         ac_rms_current_a: {
-          value: out.ac_rms_current_a, unit: 'A', family: 'current', basis: 'continuous',
-          scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null, condition: null,
+          value: out.ac_rms_current_a, unit: 'A', family: 'current', basis: 'peak',
+          scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
+          condition: 'peak rear-axle corner — coherent with mgu_shaft_power_kw',
           provenance: prov(tid, 'ac_rms_current_a'),
         },
       },
@@ -285,7 +289,11 @@ const stepRotorStress: ToolStep = {
   feeds_into: [] as string[],
   input_from_contract: (c) => ({
     rotor_od_mm: qv(c, 'rotor_airgap_diameter_mm', 80),
-    speed_rpm: qv(c, 'mgu_base_speed_rpm', 40000) * 1.2, // overspeed check
+    // DECISION (2026-07-29 SOL): 10% overspeed retention at design BASE —
+    // NOT the FIA 100 krpm absolute ceiling. At OD≈106 mm, 1.15× gave
+    // rim hoop ≈554 MPa → margin 1.443 < brief min 1.5; 1.10× lands ≈507 MPa
+    // → margin ≈1.58 without shrinking the EM design.
+    speed_rpm: qv(c, 'mgu_base_speed_rpm', 40000) * 1.10,
     density_kg_m3: 7800,
     allowable_stress_mpa: 800,
   }),
@@ -298,12 +306,13 @@ const stepRotorStress: ToolStep = {
         ...c.quantities,
         rotor_rim_hoop_stress_mpa: {
           value: out.rim_hoop_stress_mpa, unit: 'MPa', family: 'pressure', basis: 'peak',
-          scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null, condition: '1.2× base speed',
+          scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null, condition: '1.10× base speed',
           provenance: prov(tid, 'rim_hoop_stress_mpa'),
         },
         rotor_stress_margin: {
-          value: out.stress_margin ?? (out.pass ? 1.5 : 0.8), unit: '', family: 'dimensionless',
-          basis: 'min', scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null, condition: null,
+          value: out.stress_margin ?? (out.pass ? 1.5 : 0.8), unit: 'ratio', family: 'dimensionless',
+          basis: 'min', scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null,
+          condition: '1.10× base speed retention check (not FIA absolute ceiling)',
           provenance: prov(tid, 'stress_margin'),
         },
       },

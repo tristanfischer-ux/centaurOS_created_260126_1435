@@ -292,20 +292,36 @@ export function complianceRowStatus(row: ComplianceRowInput, briefText?: string)
   // INTENT (2026-07-29 SOL): regulatory/absolute CEILINGS are lower-is-better —
   // max_rotor_speed_rpm=100000 with design base 40000 must PASS (under the ceiling),
   // not FAIL higher-is-better. Exclude capability floors (max_simultaneous_dissipation).
-  // INTENT (2026-07-29 SOL): any *_max_rpm key is a speed CEILING (FIA / illustrative
-  // band top). Design base 40k vs illustrative_mgu_base_speed_max_rpm=50k must PASS —
-  // not FAIL higher-is-better. Same for max_rotor_speed_rpm.
+  // INTENT (2026-07-29 SOL): regulatory + brief BAND TOPS are lower-is-better.
+  // Design base 40k vs illustrative_*_max_rpm=50k, gear_ratio=8 vs gear_ratio_max=12,
+  // flow 15 vs coolant_flow_max=20 must PASS — not FAIL higher-is-better.
+  // Exclude capability floors (max_simultaneous_dissipation / max_output_capacity).
+  const isCapabilityFloor =
+    kl.includes('simultaneous') ||
+    kl.includes('output_capacity') ||
+    kl.includes('dissipation')
   const isCeilingMetric =
-    kl.includes('_ceiling') ||
-    kl.includes('_cap_kg') ||
-    kl.includes('cost_ceiling') ||
-    kl === 'max_mass_kg' ||
-    kl === 'max_rotor_speed_rpm' ||
-    kl === 'max_system_voltage_v' ||
-    kl.includes('_temp_limit') ||
-    /_limit_c$/.test(kl) ||
-    /_max_rpm$/.test(kl) ||
-    (kl.startsWith('max_') && (kl.includes('voltage') || kl.includes('rotor_speed') || kl.includes('rpm')))
+    !isCapabilityFloor &&
+    (kl.includes('_ceiling') ||
+      kl.includes('_cap_kg') ||
+      kl.includes('cost_ceiling') ||
+      kl === 'max_mass_kg' ||
+      kl === 'max_rotor_speed_rpm' ||
+      kl === 'max_system_voltage_v' ||
+      kl.includes('_temp_limit') ||
+      /_limit_c$/.test(kl) ||
+      /_max_rpm$/.test(kl) ||
+      /_max_(khz|l_per_min|nm|kw|v|a|c|ratio)\b/.test(kl) ||
+      (kl.endsWith('_max') &&
+        (kl.includes('ratio') ||
+          kl.includes('gear') ||
+          kl.includes('flow') ||
+          kl.includes('frequency') ||
+          kl.includes('speed') ||
+          kl.includes('torque') ||
+          kl.includes('throughput'))) ||
+      (kl.startsWith('max_') &&
+        (kl.includes('voltage') || kl.includes('rotor_speed') || kl.includes('rpm'))))
   const lowerBetter =
     isCeilingMetric ||
     kl.includes('fcr') ||
@@ -442,11 +458,38 @@ export function fallbackMatchQuantity(
   if (briefTokens.length === 0) return null
   const need = Math.max(1, Math.ceil(briefTokens.length / 2))
   const targetUnit = normUnit(metricUnit)
+  // INTENT (2026-07-29 SOL): car_level / vehicle_level brief context must not
+  // bind a rear-axle product quantity (false FAIL on 600→350 kW).
+  const kl = String(metricKey || '').toLowerCase()
+  const scopeTokens = new Set(
+    briefTokens.filter((t) => t === 'car' || t === 'vehicle' || t === 'chassis'),
+  )
+  if (kl.includes('car_level') || kl.includes('vehicle_level')) {
+    scopeTokens.add('car')
+    scopeTokens.add('vehicle')
+  }
   let best: { overlap: number; key: string; value: number } | null = null
   for (const [qname, qv] of Object.entries(quantities || {})) {
     if (!qv || typeof qv !== 'object') continue
     if (ECHO_NAME_TOKEN_RX.test(qname)) continue
-    if (normUnit(qv.unit) !== targetUnit) continue
+    // Dimensionless: ratio / — / empty are interchangeable.
+    const qu = normUnit(qv.unit)
+    const unitOk =
+      qu === targetUnit ||
+      ((targetUnit === 'ratio' || targetUnit === '—' || targetUnit === '-' || targetUnit === '') &&
+        (qu === 'ratio' || qu === '' || qu === '—' || qu === '-'))
+    if (!unitOk) continue
+    if (scopeTokens.size > 0) {
+      const qTok = new Set(nameTokens(qname))
+      let scopeHit = false
+      for (const s of scopeTokens) {
+        if (qTok.has(s)) {
+          scopeHit = true
+          break
+        }
+      }
+      if (!scopeHit) continue
+    }
     const raw = qv.value
     const val = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN
     if (!Number.isFinite(val)) continue
@@ -616,7 +659,9 @@ export function buildUnresolvedCriticHighsSection(
 // ═══════════════════════════════════════════════════════════════════════════════
 export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
   const failed: string[] = []
+  let total = 0
   const check = (id: string, cond: boolean, detail?: string) => {
+    total += 1
     if (!cond) failed.push(detail ? `${id}: ${detail}` : id)
   }
 
@@ -904,6 +949,26 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
       achieved: 60000,
     }) === 'FAIL',
   )
+  check(
+    'ceiling_metric.gear_ratio_max_under_is_pass',
+    complianceRowStatus({
+      key: 'gear_ratio_max',
+      unit: 'ratio',
+      target: 12,
+      matched: 'gear_ratio',
+      achieved: 8,
+    }) === 'PASS',
+  )
+  // car_level must NOT bind rear_electrical — stay UNVERIFIED (honest context).
+  const carLevel = fallbackMatchQuantity('car_level_battery_power_cap_kw', 'kW', {
+    rear_electrical_power_cap_kw: { value: 350, unit: 'kW' },
+    rear_axle_electrical_power_kw: { value: 350, unit: 'kW' },
+  })
+  check(
+    'scope_gate.car_level_does_not_bind_rear_axle',
+    carLevel === null,
+    JSON.stringify(carLevel),
+  )
 
-  return { passed: 20 - failed.length, failed }
+  return { passed: total - failed.length, failed }
 }

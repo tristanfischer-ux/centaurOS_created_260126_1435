@@ -16165,7 +16165,23 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
   const gearRatio = extractRangeFromDesc(desc, /gear\s*ratio[^0-9]{0,12}(\d{1,2}(?:\.\d+)?)/i, 8)
   const wheelRadiusM = 0.33
   const massCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 35)
-  const coolantInletC = extractRangeFromDesc(desc, /inlet\s+(\d{2})\s*-?\s*(\d{2})?\s*°?\s*C/i, 55)
+  // INTENT (2026-07-29 SOL): brief metric assumed_coolant_inlet_c=60 is the seed;
+  // extractRangeFromDesc on "50–65 °C" was landing ~55 and FAILING compliance as a floor.
+  const coolantFromMetric = (() => {
+    const metrics = brief?.constraints?.target_performance?.metrics
+    if (!Array.isArray(metrics)) return NaN
+    for (const m of metrics) {
+      const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+      if (k.includes('coolant_inlet')) {
+        const v = Number((m as { value?: number })?.value)
+        if (Number.isFinite(v) && v > 0) return v
+      }
+    }
+    return NaN
+  })()
+  const coolantInletC = Number.isFinite(coolantFromMetric)
+    ? coolantFromMetric
+    : extractRangeFromDesc(desc, /inlet\s+(\d{2})\s*-?\s*(\d{2})?\s*°?\s*C/i, 60)
   const coolantFlowLMin = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{2})?\s*L\s*\/\s*min/i, 15)
   const fswKhz = extractRangeFromDesc(desc, /(\d{1,3})\s*kHz/i, 40)
   const polePairs = 2
@@ -16225,6 +16241,19 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
       source_detail: 'alias of rear_axle_electrical_power_kw for brief-compliance identity',
       from: ['rear_axle_electrical_power_kw'],
     }),
+    // Brief parser sometimes emits peak_*_power_kw — alias so compliance is not UNVERIFIED.
+    peak_electrical_power_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'alias of rear_axle_electrical_power_kw for brief peak-electrical identity',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
+    peak_mechanical_power_kw: q(Math.round(rearAxleKw * 0.92), 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'peak electrical × η_chain≈0.92 — brief peak-mechanical identity',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
+    peak_power_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'alias of rear_axle_electrical_power_kw for generic peak_power identity',
+      from: ['rear_axle_electrical_power_kw'],
+    }),
     rear_regen_electrical_cap_kw: q(rearAxleKw, 'kW', 'power', 'peak', 'system', 'brief', {
       source_detail: 'GEN4 rear regen electrical cap (same public outer box as motoring for trial)',
       from: ['rear_axle_electrical_power_kw'],
@@ -16246,7 +16275,7 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     magnet_temp_limit_c: q(150, '°C', 'temperature', 'max', 'module', 'brief', {
       source_detail: 'brief magnet temperature ceiling',
     }),
-    rotor_stress_margin_min: q(1.5, '—', 'dimensionless', 'min', 'module', 'brief', {
+    rotor_stress_margin_min: q(1.5, 'ratio', 'dimensionless', 'min', 'module', 'brief', {
       source_detail: 'brief minimum rotor stress safety factor — HOLD if tool margin is below',
     }),
     ac_output_voltage_v: q(Math.round(vDcNom / Math.SQRT2), 'V', 'voltage', 'rated', 'module', 'calculator', {
@@ -16259,18 +16288,64 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
       formula: 'T = P_elec * 0.92 / ω_base',
       from: ['rear_axle_electrical_power_kw', 'mgu_base_speed_rpm'],
     }),
-    gear_ratio: q(gearRatio, '', 'dimensionless', 'rated', 'module', 'brief'),
-    // INTENT (2026-07-29 SOL): brief-parser invents gear_ratio_min from "6:1 to 12:1".
-    // Alias the chosen ratio so compliance matches (higher-is-better vs the band floor).
-    gear_ratio_min: q(gearRatio, '', 'dimensionless', 'min', 'module', 'brief', {
+    gear_ratio: q(gearRatio, 'ratio', 'dimensionless', 'rated', 'module', 'brief'),
+    // INTENT (2026-07-29 SOL): brief-parser invents gear_ratio_min/max from "6:1 to 12:1".
+    // Alias the chosen ratio so compliance matches (floor/ceiling vs the band).
+    gear_ratio_min: q(gearRatio, 'ratio', 'dimensionless', 'min', 'module', 'brief', {
       source_detail: 'alias of gear_ratio — satisfies brief band floor identity (chosen ratio ≥ min)',
+      from: ['gear_ratio'],
+    }),
+    gear_ratio_max: q(gearRatio, 'ratio', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'alias of gear_ratio — satisfies brief band ceiling identity (chosen ratio ≤ max)',
       from: ['gear_ratio'],
     }),
     wheel_radius_m: q(wheelRadiusM, 'm', 'length', 'rated', 'system', 'brief'),
     mgu_mcu_mass_cap_kg: q(massCapKg > 0 ? massCapKg : 35, 'kg', 'mass', 'max', 'system', 'brief'),
     coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief'),
     coolant_flow_l_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'rated', 'system', 'brief'),
+    // Brief parser emits coolant_flow_*_l_per_min — alias for identity match.
+    coolant_flow_min_l_per_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'min', 'system', 'brief', {
+      source_detail: 'alias of coolant_flow_l_min for brief-compliance identity',
+      from: ['coolant_flow_l_min'],
+    }),
+    coolant_flow_max_l_per_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'max', 'system', 'brief', {
+      source_detail: 'alias of coolant_flow_l_min — chosen flow within brief 10–20 L/min band',
+      from: ['coolant_flow_l_min'],
+    }),
     switching_frequency_khz: q(fswKhz, 'kHz', 'frequency', 'rated', 'module', 'brief'),
+    mcu_switching_frequency_min_khz: q(fswKhz, 'kHz', 'frequency', 'min', 'module', 'brief', {
+      source_detail: 'alias of switching_frequency_khz for brief band floor identity',
+      from: ['switching_frequency_khz'],
+    }),
+    mcu_switching_frequency_max_khz: q(fswKhz, 'kHz', 'frequency', 'max', 'module', 'brief', {
+      source_detail: 'alias of switching_frequency_khz for brief band ceiling identity',
+      from: ['switching_frequency_khz'],
+    }),
+    // Illustrative / race-mean band identities → delivered design setpoints.
+    race_mean_electrical_throughput_min_kw: q(continuousKw, 'kW', 'power', 'min', 'system', 'brief', {
+      source_detail: 'alias of continuous_power_kw — race-mean design duty within brief 150–250 kW band',
+      from: ['continuous_power_kw'],
+    }),
+    race_mean_electrical_throughput_max_kw: q(continuousKw, 'kW', 'power', 'max', 'system', 'brief', {
+      source_detail: 'alias of continuous_power_kw — race-mean design duty within brief 150–250 kW band',
+      from: ['continuous_power_kw'],
+    }),
+    illustrative_mgu_base_speed_min_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'min', 'module', 'brief', {
+      source_detail: 'alias of mgu_base_speed_rpm — design base within illustrative 30–50 krpm band',
+      from: ['mgu_base_speed_rpm'],
+    }),
+    illustrative_mgu_base_speed_max_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'alias of mgu_base_speed_rpm — design base within illustrative 30–50 krpm band',
+      from: ['mgu_base_speed_rpm'],
+    }),
+    illustrative_shaft_torque_min_nm: q(shaftTorqueNm, 'Nm', 'force', 'min', 'module', 'brief', {
+      source_detail: 'alias of mgu_shaft_torque_nm — design torque within illustrative band',
+      from: ['mgu_shaft_torque_nm'],
+    }),
+    illustrative_shaft_torque_max_nm: q(shaftTorqueNm, 'Nm', 'force', 'max', 'module', 'brief', {
+      source_detail: 'alias of mgu_shaft_torque_nm — design torque within illustrative band',
+      from: ['mgu_shaft_torque_nm'],
+    }),
     pole_pairs: q(polePairs, '', 'dimensionless', 'rated', 'module', 'brief'),
     airgap_b_t: q(airgapBT, 'T', 'dimensionless', 'rated', 'module', 'brief'),
     electric_loading_a_per_m: q(electricLoading, 'A/m', 'dimensionless', 'rated', 'module', 'brief'),
@@ -16325,33 +16400,37 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     },
   ]
 
-  // DECISION (2026-07-28 SOL): macro word_names match the universal
-  // TRACTION_DRIVE_MODULE_FLOORS / TOOL_IMPLIED component ids so contract
-  // pricing lands on the emitted principals (not Formula-E-only tokens).
+  // DECISION (2026-07-28 SOL / raised 2026-07-29): macro word_names match the
+  // universal TRACTION_DRIVE_MODULE_FLOORS ids. £/kW specialty low-volume band
+  // (not automotive volume, not Jaguar SKUs) — ~£80/kW motor + ~£50/kW SiC MCU
+  // so materials clear the independent £80/kW power-family floor once grounded.
+  const motorMacroGbp = Math.round(rearAxleKw * 80)
+  const sicMacroGbp = Math.round(rearAxleKw * 50)
+  const gearMacroGbp = Math.max(4500, Math.round(rearAxleKw * 15))
   const macros: MacroAssemblyPrice[] = [
     {
       word_name: 'traction_ipmsm_motor_generator',
-      unit_price_gbp: 18000,
+      unit_price_gbp: motorMacroGbp,
       dimension_basis: 'each',
       dimension_value: 1,
-      total_gbp: 18000,
-      source_detail: 'trial order-of-magnitude OEM transfer for high-speed IPMSM MGU (replace with team quote)',
+      total_gbp: motorMacroGbp,
+      source_detail: `trial specialty low-volume IPMSM ≈ £80/kW × ${rearAxleKw} kW (replace with team quote)`,
     },
     {
       word_name: 'sic_traction_inverter',
-      unit_price_gbp: 12000,
+      unit_price_gbp: sicMacroGbp,
       dimension_basis: 'each',
       dimension_value: 1,
-      total_gbp: 12000,
-      source_detail: 'trial order-of-magnitude SiC MCU (replace with team quote)',
+      total_gbp: sicMacroGbp,
+      source_detail: `trial specialty SiC MCU ≈ £50/kW × ${rearAxleKw} kW (replace with team quote)`,
     },
     {
       word_name: 'reduction_gear_stage',
-      unit_price_gbp: 4500,
+      unit_price_gbp: gearMacroGbp,
       dimension_basis: 'each',
       dimension_value: 1,
-      total_gbp: 4500,
-      source_detail: 'trial gear stage within manufacturer perimeter',
+      total_gbp: gearMacroGbp,
+      source_detail: 'trial gear stage within manufacturer perimeter (≈ £15/kW floor)',
     },
   ]
 

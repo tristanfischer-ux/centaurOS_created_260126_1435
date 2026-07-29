@@ -150,6 +150,23 @@ const TRACTION_DRIVE_MODULE_FLOORS: Record<string, string[]> = {
     'resolver_signal_interface',
     'control_harness_set',
   ],
+  // INTENT (2026-07-29 SOL): Tier-C plant floors were still filling
+  // safety_protection / power_distribution (E-stop, fire detector, main breaker)
+  // because those keys were absent here — race-perimeter HV protection only.
+  safety_protection: [
+    'hv_interlock_loop',
+    'phase_overcurrent_trip',
+    'inverter_desat_protection',
+    'coolant_flow_interlock',
+    'isolation_monitor_interface',
+  ],
+  power_distribution: [
+    'hv_dc_fuse',
+    'phase_cable_set',
+    'hv_dc_busbar_link',
+    'shield_drain_bond',
+    'connector_interlock_pin',
+  ],
 }
 const REFRIGERATION_PLANT_COMPONENT_RE =
   /chill(?:er)?|scroll[_\s-]?compressor|refriger|evaporator|condenser|expansion[_\s-]?valve|air[_\s-]?damper|packaged[_\s-]?chiller|tube[_\s-]?bundle|shell[_\s-]?and[_\s-]?tube/i

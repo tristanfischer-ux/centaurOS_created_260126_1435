@@ -14636,6 +14636,8 @@ function checkPcbStageInvariants(): Assertion[] {
         { class: 'energy_conversion_transduction', display: 'MCU', role: 'principal', required: true },
         { class: 'environmental_interface', display: 'Cooling', role: 'subsystem', required: true },
         { class: 'structure_containment', display: 'Structure', role: 'support', required: true },
+        { class: 'safety_protection', display: 'Safety', role: 'safety', required: true },
+        { class: 'power_distribution', display: 'HV Dist', role: 'subsystem', required: true },
       ],
       edges: [],
     }
@@ -14670,9 +14672,14 @@ function checkPcbStageInvariants(): Assertion[] {
     wantTr('traction floor emits Reduction Gear Stage', /Reduction Gear Stage|reduction_gear_stage/i.test(trAll))
     wantTr('traction floor emits Mgu Cold Plate', /Mgu Cold Plate|mgu_cold_plate/i.test(trAll))
     wantTr('traction floor emits Coolant Expansion Bottle (not reservoir)', /Coolant Expansion Bottle|coolant_expansion_bottle/i.test(trAll))
+    wantTr('traction floor emits Hv Interlock Loop', /Hv Interlock Loop|hv_interlock_loop/i.test(trAll))
+    wantTr('traction floor emits Hv Dc Fuse', /Hv Dc Fuse|hv_dc_fuse/i.test(trAll))
     wantTr('traction floor does NOT emit Expansion Degas Reservoir', !/Expansion Degas Reservoir/i.test(trAll))
     wantTr('traction floor does NOT emit Chiller', !/\bChiller\b/i.test(trAll))
     wantTr('traction floor does NOT emit Scroll Compressor', !/Scroll Compressor/i.test(trAll))
+    wantTr('traction floor does NOT emit Emergency Stop Button', !/Emergency Stop/i.test(trAll))
+    wantTr('traction floor does NOT emit Fire Detector', !/Fire Detector/i.test(trAll))
+    wantTr('traction floor does NOT emit Main Breaker', !/Main Breaker/i.test(trAll))
 
     // Tool-implied backstop on a design missing the three principals.
     const {
@@ -14708,7 +14715,7 @@ function checkPcbStageInvariants(): Assertion[] {
 
     out.push(assertEq(
       'UNIVERSAL.traction_drive_pack_floor_and_tool_implied_principals',
-      'SOL overnight proveCatch (2026-07-28): a cold-plate + shaft-torque + phase-current contract with motor:ipmsm / inverter:sic / gear:traction-ratio tools makes derive-skeleton emit traction_ipmsm_motor_generator + sic_traction_inverter + reduction_gear_stage + cold-plate loop (coolant_expansion_bottle, never Expansion Degas Reservoir / Chiller / Scroll Compressor). TOOL_IMPLIED_COMPONENTS backstop reports and adds the same three principals when the generator omitted them.',
+      'SOL proveCatch (2026-07-28/29): cold-plate + shaft-torque + phase-current contract with motor:ipmsm / inverter:sic / gear:traction-ratio tools makes derive-skeleton emit traction principals + cold-plate loop + HV safety/distribution floors (never plant E-stop / fire detector / main breaker / Expansion Degas Reservoir / Chiller / Scroll Compressor). TOOL_IMPLIED_COMPONENTS backstop reports and adds the three principals when omitted.',
       failedTr.length,
       (n) => n === 0,
       () => `traction-drive pack cases failed: ${failedTr.join(' ; ')}. Check derive-skeleton TRACTION_DRIVE_MODULE_FLOORS / hasTractionDrivePackSignal and word-domain-coherence TOOL_IMPLIED motor-ipmsm/inverter-sic/gear-traction-ratio.`,

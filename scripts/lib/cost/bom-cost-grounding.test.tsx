@@ -247,6 +247,37 @@ ok('macro-assembly basis names the entry', /feed compression package/.test(macro
 // macro-assembly takes precedence over the fabricated path (an explicit contract price wins)
 ok('macro-assembly precedence over DOE/NETL', macroG.provenance === 'macro-assembly')
 
+// proveCatch (2026-07-29 SOL): contract schema word_name + total_gbp must ground
+// traction principals (was silently missing → £25 Engine-B motor floor).
+const tractionMacroCtx: GroundingContext = {
+  macroAssemblyPrices: [{
+    word_name: 'traction_ipmsm_motor_generator',
+    unit_price_gbp: 18000,
+    total_gbp: 18000,
+  }],
+}
+const tractionLine = word(
+  'Traction IPMSM Motor Generator · 350 kW',
+  { form: { value: 'high-speed IPMSM' }, list_price_gbp: { value: '25' } },
+  { word_id: 'traction_ipmsm_motor_generator' },
+)
+const tractionG = groundBomLineCost(tractionLine, tractionMacroCtx)
+ok('contract word_name/total_gbp macro grounds traction motor',
+  tractionG.provenance === 'macro-assembly' && tractionG.price_gbp === 18000,
+  `${tractionG.provenance} £${tractionG.price_gbp}`)
+
+// proveCatch: chain words often only have id=`…_word` + content_character.
+const tractionWordSuffix = {
+  id: 'traction_ipmsm_motor_generator_word',
+  name_human: 'Traction Ipmsm Motor Generator',
+  content_character: { character_id: 'traction_ipmsm_motor_generator' },
+  modifier_characters: [],
+} as any
+const tractionSuffixG = groundBomLineCost(tractionWordSuffix, tractionMacroCtx)
+ok('id=_word suffix still grounds via character_id / stripped id',
+  tractionSuffixG.provenance === 'macro-assembly' && tractionSuffixG.price_gbp === 18000,
+  `${tractionSuffixG.provenance} £${tractionSuffixG.price_gbp}`)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4) NO-DATA line → null / no-ground
 // ─────────────────────────────────────────────────────────────────────────────
