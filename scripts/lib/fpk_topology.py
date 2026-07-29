@@ -53,6 +53,11 @@ CRITICAL_EDGE_IDS = frozenset(("HV_DC_NEG", "COOLANT_IN"))
 EXTERNAL_EDGE_IDS = frozenset(
     ("HV_DC_POS", "HV_DC_NEG", "COOLANT_IN", "COOLANT_OUT", "LV_POWER", "CAN_FD")
 )
+# DECISION: these four product-internal paths can close against the bay-boundary
+# concept anchors while their supplier/chassis mating coordinates remain OPEN.
+BAY_RELATIVE_EXTERNAL_ROUTE_IDS = frozenset(
+    ("HV_DC_POS", "HV_DC_NEG", "COOLANT_IN", "COOLANT_OUT")
+)
 
 
 def _now() -> str:
@@ -299,8 +304,12 @@ def _make_edge(
         for node_id in required_nodes
         if not node_id.startswith("chassis_") and node_id not in node_ids
     )
-    is_routed = not is_external and not missing_nodes
-    if is_external:
+    is_routed = not missing_nodes and (
+        not is_external or edge_id in BAY_RELATIVE_EXTERNAL_ROUTE_IDS
+    )
+    if is_external and is_routed:
+        status = "ROUTED_BAY_RELATIVE_INTERFACE_OPEN"
+    elif is_external:
         status = "OPEN_INTERFACE_ICD"
     elif missing_nodes:
         status = "OPEN_SOURCE_NODE"
@@ -315,6 +324,19 @@ def _make_edge(
     else:
         bay_relative["source_endpoint"] = points[0]
         bay_relative["destination_endpoint"] = points[-1]
+    if is_external and is_routed:
+        note = (
+            "Product-internal bay-relative path is complete; external endpoint "
+            "remains OPEN until supplier/chassis ICD. Concept mesh anchor is "
+            "not an FIA port coordinate."
+        )
+    elif is_external:
+        note = (
+            "External endpoint OPEN until supplier/chassis ICD; concept mesh "
+            "anchor is not an FIA port coordinate."
+        )
+    else:
+        note = "Route joins state physics nodes through concentric form anchors."
 
     return {
         "id": edge_id,
@@ -330,12 +352,7 @@ def _make_edge(
             "status": status,
             "bay_relative": bay_relative,
             "missing_source_nodes": missing_nodes,
-            "note": (
-                "External endpoint OPEN until supplier/chassis ICD; concept mesh "
-                "anchor is not an FIA port coordinate."
-                if is_external
-                else "Route joins state physics nodes through concentric form anchors."
-            ),
+            "note": note,
         },
     }
 
@@ -485,7 +502,8 @@ def render_topology_markdown(topology: Mapping[str, Any], catch: Mapping[str, An
             "## Honest residuals",
             "",
             "- Exact FIA/chassis port coordinates are not claimed.",
-            "- External HV, coolant, LV, and CAN endpoints remain open pending the supplier/chassis ICD.",
+            "- HV DC± and coolant in/out product-internal paths are routed bay-relative; their external mating coordinates remain OPEN.",
+            "- LV and CAN routes plus every external connector endpoint remain open pending the supplier/chassis ICD.",
             "- Temperature routes remain open until their sensor nodes exist in the stamped physics tree.",
             "- The race hold remains OPEN until every principal edge is routed.",
             "",
@@ -528,6 +546,11 @@ def _selftest_state() -> dict[str, Any]:
         "phase_coil_u",
         "phase_coil_v",
         "phase_coil_w",
+        "hv_dc_connector",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "coolant_port_in",
+        "coolant_port_out",
         "mcu_cold_plate",
         "motor_cooling_jacket",
         "resolver",
@@ -556,10 +579,15 @@ def _selftest_state() -> dict[str, Any]:
 def _selftest() -> None:
     topology = build_fpk_topology(_selftest_state())
     assert topology["required_count"] == 17
-    assert topology["routed_count"] == 7
+    assert topology["routed_count"] == 11
     assert topology["race_hold"]["status"] == "OPEN"
     assert not topology["claims"]["fia_port_xyz"]
     assert all("xyz_mm" not in json.dumps(edge).lower() for edge in topology["edges"])
+    by_id = {edge["id"]: edge for edge in topology["edges"]}
+    for edge_id in ("HV_DC_POS", "HV_DC_NEG", "COOLANT_IN", "COOLANT_OUT"):
+        assert by_id[edge_id]["routed"] is True
+        assert by_id[edge_id]["route"]["status"] == "ROUTED_BAY_RELATIVE_INTERFACE_OPEN"
+        assert by_id[edge_id]["route"]["bay_relative"]["external_endpoint"] is None
     catch = prove_catch(topology)
     assert catch["ok"], catch
     print(
