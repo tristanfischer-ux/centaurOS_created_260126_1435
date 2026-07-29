@@ -7,7 +7,7 @@
  * brief does NOT fall through to vehicle/plant bootstrap. Perimeter is rear
  * MGU + SiC MCU + gear/cooling interfaces only — not a full race car.
  *
- * Tools (9):
+ * Tools (11):
  *   1. motor:ipmsm-analytical-sizing
  *   2. inverter:current-voltage-envelope
  *   3. inverter:sic-loss
@@ -17,6 +17,8 @@
  *   7. motor:thermal-lumped
  *   8. gear:traction-ratio
  *   9. powertrain:duty-cycle-energy
+ *  10. powertrain:fia-net-usable-energy
+ *  11. powertrain:fia-power-regen-split
  */
 
 import { registerPlan } from '../planner'
@@ -188,20 +190,20 @@ const stepSicLoss: ToolStep = {
           scope: 'module', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'peak rear-axle corner',
           provenance: prov(tid, 'inverter_dissipated_kw'),
         },
-        // GOTCHA: sic-loss derives I from P at nominal Vac (≈381 A for 350 kW).
-        // Critic checks peak power at Vdc,min which needs ≥I_ph,max (~530 A).
-        // Headline ac_rms must be the envelope ceiling, not the loss-tool rms.
+        // DECISION (0846 Verification HARD): contract↔calc matches worked
+        // "AC RMS current" from inverter:sic-loss. Overlaying phase_current_max_a
+        // (530) onto ac_rms (381) made a 28% FAIL. Envelope ceiling stays on
+        // phase_current_max_a; ac_rms_current_a is the tool's own rms identity.
         ac_rms_current_a: {
-          value: Math.max(out.ac_rms_current_a, qv(c, 'phase_current_max_a', out.ac_rms_current_a)),
-          unit: 'A', family: 'current', basis: 'peak',
+          value: out.ac_rms_current_a, unit: 'A', family: 'current', basis: 'rated',
           scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
-          condition: 'peak envelope = max(sic-loss rms, phase_current_max_a) — closes at Vdc,min',
+          condition: 'sic-loss tool rms at peak-kW / nominal Vac (= worked AC RMS current)',
           provenance: prov(tid, 'ac_rms_current_a'),
         },
         sic_loss_ac_rms_current_a: {
           value: out.ac_rms_current_a, unit: 'A', family: 'current', basis: 'rated',
           scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
-          condition: 'sic-loss tool rms at peak-kW / nominal Vac (diagnostic)',
+          condition: 'alias of ac_rms_current_a (diagnostic)',
           provenance: prov(tid, 'ac_rms_current_a'),
         },
       },
@@ -326,25 +328,36 @@ const stepRotorStress: ToolStep = {
     allowable_stress_mpa: 800,
   }),
   contract_update: (c, output) => {
-    const out = output as { rim_hoop_stress_mpa: number; pass?: boolean; stress_margin?: number }
-    const tid = 'motor:rotor-centrifugal-stress'
-    return {
-      ...c,
-      quantities: {
-        ...c.quantities,
-        rotor_rim_hoop_stress_mpa: {
-          value: out.rim_hoop_stress_mpa, unit: 'MPa', family: 'pressure', basis: 'peak',
-          scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null, condition: '1.10× base speed',
-          provenance: prov(tid, 'rim_hoop_stress_mpa'),
-        },
-        rotor_stress_margin: {
-          value: out.stress_margin ?? (out.pass ? 1.5 : 0.8), unit: 'ratio', family: 'dimensionless',
-          basis: 'min', scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null,
-          condition: '1.10× base speed retention check (not FIA absolute ceiling)',
-          provenance: prov(tid, 'stress_margin'),
-        },
-      },
+    const out = output as {
+      rim_hoop_stress_mpa: number
+      pass?: boolean
+      stress_margin?: number
+      tip_speed_m_s?: number
     }
+    const tid = 'motor:rotor-centrifugal-stress'
+    const next = { ...c.quantities }
+    next.rotor_rim_hoop_stress_mpa = {
+      value: out.rim_hoop_stress_mpa, unit: 'MPa', family: 'pressure', basis: 'peak',
+      scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null, condition: '1.10× base speed',
+      provenance: prov(tid, 'rim_hoop_stress_mpa'),
+    }
+    next.rotor_stress_margin = {
+      value: out.stress_margin ?? (out.pass ? 1.5 : 0.8), unit: 'ratio', family: 'dimensionless',
+      basis: 'min', scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null,
+      condition: '1.10× base speed retention check (not FIA absolute ceiling)',
+      provenance: prov(tid, 'stress_margin'),
+    }
+    // Retention tip is a DISTINCT quantity — do NOT overwrite tip_speed_m_s
+    // (base) or Tool-output-used / Verification cross-wire (0846).
+    if (typeof out.tip_speed_m_s === 'number' && Number.isFinite(out.tip_speed_m_s)) {
+      next.tip_speed_at_retention_m_s = {
+        value: out.tip_speed_m_s, unit: 'm/s', family: 'velocity', basis: 'peak',
+        scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
+        condition: 'at 1.10× base speed retention (= worked Rotor tip speed at retention rpm)',
+        provenance: prov(tid, 'tip_speed_m_s'),
+      }
+    }
+    return { ...c, quantities: next }
   },
 }
 
@@ -497,6 +510,64 @@ const stepDutyCycle: ToolStep = {
   },
 }
 
+const stepFiaNetEnergy: ToolStep = {
+  tool_id: 'powertrain:fia-net-usable-energy',
+  required: true,
+  feeds_into: [] as string[],
+  input_from_contract: (c) => ({
+    discharge_energy_kwh: qv(c, 'duty_discharge_energy_kwh', qv(c, 'race_discharge_energy_kwh', 42)),
+    regen_energy_kwh: qv(c, 'duty_regen_energy_kwh', qv(c, 'race_regen_energy_kwh', 18)),
+    regen_credit_factor: qv(c, 'fia_regen_credit_factor', 0.93),
+    race_net_energy_cap_kwh: qv(c, 'race_net_energy_cap_kwh', 41.5),
+  }),
+  contract_update: (c, output) => {
+    const out = output as { net_usable_energy_kwh: number; over_race_cap?: boolean }
+    const tid = 'powertrain:fia-net-usable-energy'
+    return {
+      ...c,
+      quantities: {
+        ...c.quantities,
+        fia_net_usable_energy_kwh: {
+          value: out.net_usable_energy_kwh, unit: 'kWh', family: 'energy', basis: 'typical',
+          scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null,
+          condition: 'E_net = E_dis - 0.93 E_regen (FIA FE public tech regs)',
+          provenance: prov(tid, 'net_usable_energy_kwh'),
+        },
+      },
+    }
+  },
+}
+
+const stepFiaPowerSplit: ToolStep = {
+  tool_id: 'powertrain:fia-power-regen-split',
+  required: true,
+  feeds_into: ['powertrain:fia-net-usable-energy'] as string[],
+  input_from_contract: (c) => ({
+    profile: 'gen3',
+    rear_traction_kw: qv(c, 'rear_axle_electrical_power_kw', qv(c, 'mgu_shaft_power_kw', 300)),
+    front_traction_kw: qv(c, 'front_axle_electrical_power_kw', 0),
+    rear_regen_kw: qv(c, 'rear_regen_power_kw', 300),
+    front_regen_kw: qv(c, 'front_regen_power_kw', 0),
+    attack_mode: false,
+  }),
+  contract_update: (c, output) => {
+    const out = output as { feasible: boolean; requested_kw?: { traction_total_kw?: number } }
+    const tid = 'powertrain:fia-power-regen-split'
+    return {
+      ...c,
+      quantities: {
+        ...c.quantities,
+        fia_power_split_feasible: {
+          value: out.feasible ? 1 : 0, unit: 'bool', family: 'dimensionless', basis: 'rated',
+          scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null,
+          condition: 'GEN3 public axle traction/regen envelope',
+          provenance: prov(tid, 'feasible'),
+        },
+      },
+    }
+  },
+}
+
 const rules = [
   ruleRange('formula_e_rear_mgu.rear_power_cap', 'rear electrical ≤ 350 kW', 'rear_axle_electrical_power_kw', 50, 350, 'warning'),
   ruleRange('formula_e_rear_mgu.vdc_window', 'usable Vdc in [500, 1000]', 'dc_bus_voltage_v', 500, 1000, 'warning'),
@@ -517,11 +588,14 @@ export const FORMULA_E_REAR_MGU_PLAN: ClassToolPlan = {
     stepThermal,
     stepGearRatio,
     stepDutyCycle,
+    stepFiaPowerSplit,
+    stepFiaNetEnergy,
   ],
   coupled_pairs: [
     ['motor:ipmsm-analytical-sizing', 'motor:rotor-centrifugal-stress'],
     ['motor:loss-point', 'motor:thermal-lumped'],
     ['inverter:sic-loss', 'powertrain:duty-cycle-energy'],
+    ['powertrain:fia-power-regen-split', 'powertrain:fia-net-usable-energy'],
   ] as Array<[string, string]>,
   max_iterations: 4,
   convergence_tolerance_pct: 3.0,

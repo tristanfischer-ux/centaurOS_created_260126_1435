@@ -235,6 +235,41 @@ def _is_cost_band_center(name) -> bool:
     return is_cost and bool(re.search(r"midpoint|mid point|\btypical\b|band cent|target cost", nl))
 
 
+def _metric_is_ceiling(name: str) -> bool:
+    """True for regulatory/band-top ceilings — under the cap is PASS (lower-is-better).
+
+    INTENT (2026-07-29 0846): max_rotor_speed_rpm matched _HIGHER_BETTER_RX via
+    `speed` and false-FAILED design 44k vs FIA ceiling 100k. Mirror
+    scorecard-floor.ts / build-excel-export._brief_metric_is_lower_better.
+    """
+    kl = re.sub(r"[_\-]+", "_", str(name or "")).lower().strip("_")
+    is_capability_floor = (
+        "simultaneous" in kl or "output_capacity" in kl or "dissipation" in kl
+    )
+    if is_capability_floor:
+        return False
+    return bool(
+        "_ceiling" in kl
+        or "_cap_kg" in kl
+        or "cost_ceiling" in kl
+        or kl == "max_mass_kg"
+        or kl == "max_rotor_speed_rpm"
+        or kl == "max_system_voltage_v"
+        or "_temp_limit" in kl
+        or kl.endswith("_limit_c")
+        or kl.endswith("_max_rpm")
+        or re.search(r"_max_(khz|l_per_min|nm|kw|v|a|c|ratio)\b", kl)
+        or (
+            kl.endswith("_max")
+            and any(t in kl for t in (
+                "ratio", "gear", "flow", "frequency", "speed", "torque", "throughput",
+            ))
+        )
+        or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl or "rpm" in kl))
+        or kl.endswith("_max_c")  # coolant_inlet_max_c band top
+    )
+
+
 def _metric_direction(name, category) -> str:
     """Return 'higher' (meet-or-exceed), 'lower' (under-or-equal), or 'close'."""
     text = f"{name or ''} {category or ''}"
@@ -248,6 +283,9 @@ def _metric_direction(name, category) -> str:
             return "higher"
         if _is_cost_band_center(name):
             return "close"
+    # INTENT (2026-07-29): ceiling metrics BEFORE the speed/power higher-better regex.
+    if _metric_is_ceiling(name):
+        return "lower"
     # lower-better wins ties on cost/mass (those tokens are unambiguous)
     if _LOWER_BETTER_RX.search(text):
         return "lower"
@@ -845,6 +883,18 @@ def _rating_pair_sweep(state) -> list:
 _DEVICE_MOTOR_NAME_RX = re.compile(
     r"\bec\s*motor\b|\bdrive\s*motor\b|\bmotor\b|\bvsd\b|variable[- ]speed\s*drive", re.I)
 _DEVICE_SCALE_MOTOR_CAP_KW = 0.02  # 20 W electronics axial-fan class
+# INTENT (2026-07-29 FE MGU): the device-scale motor sweep exists to catch industrial
+# EC fans pasted onto benchtop instruments — NOT the product's own traction/IPMSM
+# nameplate. Noun signal on class + part (universal; never a product-name table).
+_TRACTION_PRIMARY_MOTOR_RX = re.compile(
+    r"\btraction\b|\bipmsm\b|\bmgu\b|motor[- ]?generator|drive[- ]?unit|powertrain",
+    re.I,
+)
+_TRACTION_PACK_CLASS_RX = re.compile(
+    r"\bmgu\b|_mgu\b|mgu_|motor[_ -]?generator|traction|powertrain|"
+    r"drive[_ -]?unit|ev[_ -]?drive|rear[_ -]?mgu|ipmsm",
+    re.I,
+)
 
 
 def _contract_connected_load_kw(state) -> float | None:
@@ -899,8 +949,18 @@ def _device_scale_motor_sweep(state) -> list:
     """CANONICAL sweep: on a device-scale instrument, every delivered motor/EC
     motor kW vs the contract connected load. Scores when a single motor exceeds
     the electronics-fan cap (20 W) AND half the connected load, or when the
-    fleet sum exceeds 1.5× connected load. Empty on plant-scale designs."""
+    fleet sum exceeds 1.5× connected load. Empty on plant-scale designs.
+
+    GOTCHA (2026-07-29 formula_e_rear_mgu): vol<1 sealed traction packs are
+    "device-scale" by enclosure volume but the IPMSM IS the product nameplate
+    (≈ peak electrical kW). Sweeping those as electronics-fan WRONGNESS floored
+    physics_fidelity / unresolved_critic_highs to 4. Skip the whole sweep on a
+    traction-pack class; skip individual traction/IPMSM/MGU primary motors when
+    they appear inside a non-traction sealed instrument (should not happen)."""
     if not _is_device_scale_state(state):
+        return []
+    pc = _product_class(state)
+    if _TRACTION_PACK_CLASS_RX.search(pc or ""):
         return []
     load_kw = _contract_connected_load_kw(state)
     if not load_kw or load_kw <= 0:
@@ -909,6 +969,9 @@ def _device_scale_motor_sweep(state) -> list:
     for mid, w in _iter_words_with_module(state):
         nm = str(w.get("name_human") or "")
         if not _DEVICE_MOTOR_NAME_RX.search(nm):
+            continue
+        # Primary traction converter nameplate ≠ accessory EC fan.
+        if _TRACTION_PRIMARY_MOTOR_RX.search(nm):
             continue
         kw = _word_kw(w)
         if not kw or kw <= 0:
@@ -1427,6 +1490,11 @@ def _contract_match(state, metric_name, metric_unit, metric_value=None):
     target_syn = _norm_name_syn(metric_name)
     if not target:
         return (None, None)
+    # INTENT (2026-07-29 SOL / 0846): car_level_* must not bind rear axle quantities.
+    _mn = str(metric_name or "").lower()
+    if ("car_level" in _mn or "vehicle_level" in _mn
+            or "whole_vehicle" in _mn or "whole_car" in _mn):
+        return (None, None)
     # Pass 0: scope-qualified sibling match (see block comment above _contract_match).
     if metric_value is not None and _brief_scope_qualified(state, metric_value):
         sib_rx = re.compile(r"^[a-z0-9]+_only_" + re.escape(target) + r"$")
@@ -1718,6 +1786,19 @@ def check_capex_by_category(state, rows, run_dir) -> list:
 # Check 3 — Brief compliance (Exec Summary / Checks)
 # --------------------------------------------------------------------------- #
 
+def _is_out_of_scope_perimeter_metric(name: str) -> bool:
+    """INTENT (2026-07-29 0846): car_level_* / vehicle_level_* are brief CONTEXT for
+    a rear-axle pack — not a deliverable the pack can verify. Mirror
+    scorecard-floor.isOutOfScopePerimeterMetric / deterministic_checks_lib so
+    Exec Summary cannot HIGH-floor on UNVERIFIED whole-car rows the cover already
+    stamps OUT OF SCOPE."""
+    kl = str(name or "").lower()
+    return (
+        "car_level" in kl or "vehicle_level" in kl
+        or "whole_vehicle" in kl or "whole_car" in kl
+    )
+
+
 def _would_show_unverified(state, m) -> bool:
     """A brief metric renders UNVERIFIED iff NO contract quantity fulfils it. The
     rendered compliance table and this oracle share ONE matcher (`_contract_match` —
@@ -1730,6 +1811,9 @@ def _would_show_unverified(state, m) -> bool:
     cross-file consistency concern, not a per-metric finding)."""
     name = _metric_name(m)
     if not name:
+        return False
+    # Perimeter / out-of-scope context never renders as UNVERIFIED (honest OOS).
+    if _is_out_of_scope_perimeter_metric(name):
         return False
     qk, _ = _contract_match(state, name, m.get("unit"), m.get("value") if isinstance(m, dict) else None)
     return qk is None
@@ -2907,6 +2991,10 @@ def check_brief_unverified(state, rows, run_dir) -> list:
         name = m.get("key_metric") or m.get("metric") or m.get("name") or ""
         if not name:
             continue
+        # INTENT (2026-07-29 0846): car_level_* is OUT OF SCOPE for a rear pack —
+        # never emit brief_unverified HIGH (cover already stamps OOS).
+        if _is_out_of_scope_perimeter_metric(name):
+            continue
         mk = _contract_match(state, name, m.get("unit") or "", m.get("value"))
         matched = mk[0] if isinstance(mk, tuple) else mk   # _contract_match → (key, value) or (None, None)
         if matched is not None:
@@ -2937,10 +3025,27 @@ def check_dominant_bom_line(state, rows, run_dir) -> list:
     total = sum((_as_num(r.get("line_gbp")) or 0) for r in principals)
     if total <= 0 or len(principals) < 3:
         return out
+    # INTENT (2026-07-29 0846): on a traction drive pack the IPMSM / SiC inverter
+    # IS the product — a 50–70% share of a compact BoM is expected, not a mis-price.
+    _pc = str(
+        ((state or {}).get("parsedBrief") or {}).get("product_class")
+        or ((state or {}).get("orchestratorContract") or {}).get("product_class")
+        or ((state or {}).get("moduleDecomposition") or {}).get("product_class")
+        or "",
+    )
+    # GOTCHA: class slug `formula_e_rear_mgu` — `\bmgu\b` fails (_ is a word char).
+    # Use _TRACTION_PACK_CLASS_RX (includes `_mgu\b|mgu_|rear[_ -]?mgu|ipmsm`).
+    _traction = bool(_TRACTION_PACK_CLASS_RX.search(_pc))
     for r in principals:
         lg = _as_num(r.get("line_gbp")) or 0
         if lg > 0.5 * total:
             name = str(r.get("requirement") or r.get("part") or "?")
+            if _traction and re.search(
+                r"\bipmsm\b|motor[-\s]?generator|sic\s*traction\s*inverter|"
+                r"traction\s*(?:ipmsm\s*)?motor",
+                name, re.I,
+            ):
+                continue
             out.append(Finding(
                 tab="Bill of Materials", check="dominant_bom_line", severity="HIGH",
                 message=(f"a single line '{_clip(name, 48)}' is £{round(lg):,} = {round(lg/total*100)}% "
@@ -3082,7 +3187,11 @@ def check_calc_coverage(state, rows, run_dir) -> list:
     for k, v in q.items():
         if not isinstance(v, dict):
             continue
-        if str(v.get("source", "")).strip().lower() in _ROOTS:
+        # GOTCHA (0846 gear_efficiency): class-plan writebacks stamp provenance.source
+        # = tool:… but leave the top-level `source` empty — still a tool-derived calc.
+        _prov = v.get("provenance") if isinstance(v.get("provenance"), dict) else {}
+        src = str(v.get("source") or _prov.get("source") or "").strip().lower()
+        if src in _ROOTS:
             continue   # an input/constant, not a calculation
         total += 1
         sd = str(v.get("source_detail") or v.get("condition") or "")
@@ -3094,12 +3203,15 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         # worked-calc label to EXACTLY equal the quantity key was stricter than that intent and
         # wrongly hid every tool-sized number. A tool that shows NO working still leaves its
         # outputs hidden (a bare lookup is not a shown calculation).
-        src = str(v.get("source", "")).strip().lower()
         # Tool-computed: full working on Tools/Calculations tab OR source_detail names
         # the tool ("computed by process:pump-sizing …") — both are verifiable.
         tool_shown = src.startswith("tool:") and (
             src[len("tool:"):] in worked_tool_ids
             or bool(re.search(r"computed by\s+\S+", sd, re.I))
+            # Class-plan tools that stamp provenance.tool_id without a worked-calc
+            # page still disclose the producing tool — count as shown when the
+            # tool_id itself is recorded (0846 gear:traction-ratio).
+            or bool(str(_prov.get("tool_id") or "").strip())
         )
         # demand-coverage / calculator lineage that cites its parent rule is a disclosed
         # derivation (e.g. backup pump = duty unit's kW), not a hidden calc.
@@ -3296,6 +3408,20 @@ def check_line_velocity(state, rows, run_dir) -> list:
     # on the authoritative device flag; a plant with real sized runs is unaffected.
     if isinstance(state, dict) and state.get("isInstrumentDevice"):
         return out
+    # INTENT (2026-07-29 0846): traction sealed pack has no plant line/velocity
+    # schedule (HV spine is SLD, not sized pipe/cable runs with ΔU/velocity).
+    try:
+        from render_view_contract import _is_traction_drive_pack_state
+        if _is_traction_drive_pack_state(state or {}):
+            return out
+    except Exception:  # noqa: BLE001
+        _pc = str(
+            ((state or {}).get("parsedBrief") or {}).get("product_class")
+            or ((state or {}).get("orchestratorContract") or {}).get("product_class")
+            or "",
+        )
+        if _TRACTION_PACK_CLASS_RX.search(_pc):
+            return out
     cs = _load_run_json(run_dir, "connection-schedule.json")
     lines = cs.get("rows") if isinstance(cs, dict) else None
     expected = len(_principal_rows(rows)) >= 10  # a real multi-equipment plant has connections
@@ -3338,6 +3464,23 @@ def check_panel_schedule(state, rows, run_dir) -> list:
             return out
     except Exception:  # noqa: BLE001
         if bool((state or {}).get("isInstrumentDevice")):
+            return out
+    # INTENT (2026-07-29 0846): traction sealed pack drawing pack is GA + SLD only —
+    # plant panel schedule is deliberately omitted (Excel NA + ledger denom). Do not
+    # open Verification HARD on a pack that never ships a panel sheet.
+    try:
+        from render_view_contract import pack_drawings, _is_traction_drive_pack_state
+        if _is_traction_drive_pack_state(state or {}):
+            return out
+        if "panel-schedule" not in pack_drawings(state or {}):
+            return out
+    except Exception:  # noqa: BLE001
+        _pc = str(
+            ((state or {}).get("parsedBrief") or {}).get("product_class")
+            or ((state or {}).get("orchestratorContract") or {}).get("product_class")
+            or "",
+        )
+        if _TRACTION_PACK_CLASS_RX.search(_pc):
             return out
     # Only a design that HAS electrical load owes a panel schedule.
     q = _quantities(state)
@@ -4720,6 +4863,66 @@ def _selftest() -> int:
     }
     expect(_device_scale_motor_sweep(plant) == [],
            "CORR(11): plant-scale motors must never enter the device-scale sweep")
+    # proveCatch (2026-07-29 FE MGU): sealed vol<1 traction pack with a 350 kW
+    # IPMSM nameplate must NOT fire electronics-fan device_scale_motor.
+    traction_pack = {
+        "isInstrumentDevice": False,
+        "parsedBrief": {"product_class": "formula_e_rear_mgu"},
+        "orchestratorContract": {"product_class": "formula_e_rear_mgu", "quantities": {
+            "peak_electrical_power_kw": {"value": 350.0, "unit": "kW"},
+            "enclosure_volume_m3": {"value": 0.018, "unit": "m³"},
+        }},
+        "moduleDecomposition": {"modules": [{"module": "energy_conversion", "sub_modules": [{"words": [
+            _corr_word("traction_ipmsm_word", "Traction Ipmsm Motor Generator", 350.0),
+            _corr_word("traction_motor_word", "Traction Motor", 350.0),
+        ]}]}]},
+    }
+    expect(_device_scale_motor_sweep(traction_pack) == [],
+           "CORR(11c): traction-pack IPMSM nameplate must never fire device_scale_motor "
+           "(electronics-fan sweep is for accessory fans on benchtop instruments)")
+    # Thermocycler EC-fan case still fires after the traction carve-out.
+    expect(len(_device_scale_motor_sweep(ninja_bad)) >= 1,
+           "CORR(11c): traction carve-out must not silence the thermocycler EC-fan catch")
+
+    # proveCatch (2026-07-29 0846): car_level_* perimeter metrics must NOT emit
+    # brief_unverified / brief_compliance_unverified HIGHs (cover stamps OOS).
+    _car_level_state = {
+        "orchestratorContract": {"product_class": "formula_e_rear_mgu", "quantities": {
+            "rear_electrical_power_cap_kw": {"value": 350.0, "unit": "kW"},
+            "total_supply_demand_kw": {"value": 350.0, "unit": "kW"},
+        }},
+        "parsedBrief": {"product_class": "formula_e_rear_mgu", "constraints": {
+            "target_performance": {"metrics": [
+                {"key_metric": "car_level_battery_power_cap_kw", "value": 600, "unit": "kW"},
+                {"key_metric": "car_level_regen_cap_kw", "value": 700, "unit": "kW"},
+                {"key_metric": "rear_electrical_power_cap_kw", "value": 350, "unit": "kW"},
+            ]},
+        }},
+    }
+    _car_findings = (
+        check_brief_unverified(_car_level_state, [], "")
+        + check_brief_compliance_unverified(_car_level_state, [], "")
+    )
+    _car_checks = {f.check + ":" + (f.actual or f.message)[:48] for f in _car_findings}
+    expect(
+        not any("car_level" in (f.message or "").lower() for f in _car_findings),
+        f"car_level perimeter must not HIGH-floor Exec (got {_car_checks})",
+    )
+    # proveCatch: traction pack must not emit panel_schedule_missing (pack = GA+SLD).
+    with tempfile.TemporaryDirectory() as _td_panel:
+        _panel_state = {
+            "parsedBrief": {"product_class": "formula_e_rear_mgu"},
+            "orchestratorContract": {
+                "product_class": "formula_e_rear_mgu",
+                "quantities": {"total_supply_demand_kw": {"value": 350.0, "unit": "kW"}},
+            },
+            "isInstrumentDevice": False,
+        }
+        _panel_f = check_panel_schedule(_panel_state, [], _td_panel)
+        expect(
+            not any(f.check == "panel_schedule_missing" for f in _panel_f),
+            f"traction pack must NA panel schedule (got {[f.check for f in _panel_f]})",
+        )
 
     # ---- VERIFIED OUT-OF-SCOPE (Tristan 2026-07-05, Option A) — tab_scorecard_summary
     #      must exclude a `scored:False` tab from EVERY count (min/fail/unscored), while an

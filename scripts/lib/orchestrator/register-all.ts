@@ -357,6 +357,8 @@ import './tools/rotor-centrifugal-stress'   // motor:rotor-centrifugal-stress �
 import './tools/mgu-thermal-lumped'         // motor:thermal-lumped — two-node winding/magnet thermal RC
 import './tools/gear-ratio-traction'        // gear:traction-ratio — wheel↔MGU kinematics (not bicycle)
 import './tools/duty-cycle-energy'          // powertrain:duty-cycle-energy — net race/duty electrical energy
+import './tools/fia-net-usable-energy'      // powertrain:fia-net-usable-energy — FIA E_net = E_dis - 0.93 E_regen
+import './tools/fia-power-regen-split'      // powertrain:fia-power-regen-split — axle traction/regen envelope
 import './tools/tdoa-fdoa-geolocation'     // rf:tdoa-fdoa-geolocation — emitter CRLB: sigma_pos~c sigma_t GDOP (+FDOA) (Torrieri 1984)
 import './tools/deployable-boom'           // structures:deployable-boom — cantilever: delta=F L^3/(3 E I); f1=(1.875^2/2pi)sqrt(EI/rho A L^4) (Blevins 1979)
 import './tools/reflector-surface-rms'     // antenna:reflector-surface-rms — Ruze: eta=exp(-(4pi eps/lambda)^2); G=G0-L_ruze (Ruze 1966)
@@ -376,6 +378,7 @@ import './class-plans/dac'
 import './class-plans/co2-mineralisation' // 2026-06-03: on-topic chemical tools; stops the spacecraft/battery auto-plan contamination
 import './class-plans/e-fuel-synthesis'   // 2026-06-05: Power-to-Liquid Fischer-Tropsch SAF plant; on-topic chemical-process tool graph (no marine/irrigation tools — gate 34)
 import './class-plans/formula-e-rear-mgu' // 2026-07-28: Formula E rear MGU+MCU analytical pack (beats vehicle mis-route)
+import './class-plans/formula-e-front-mgu' // 2026-07-29: Gen3/Evo front FPK — bay packaging forces form
 
 // ===========================================================================
 // 2026-05-22 — 6 satellite/ground-segment EMITTERS — BESS-quality

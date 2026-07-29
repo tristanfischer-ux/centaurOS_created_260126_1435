@@ -419,16 +419,51 @@ def is_fluid_less_instrument(state: dict) -> bool:
     return True
 
 
+def _is_traction_drive_pack_state(state: dict) -> bool:
+    """True for sealed traction MGU+MCU packs (drawing-pack noun signal)."""
+    try:
+        from instrument_form_grammar import is_traction_drive_pack_form  # type: ignore
+        pc = str(
+            (state.get("parsedBrief") or {}).get("product_class")
+            or (state.get("orchestratorContract") or {}).get("product_class")
+            or (state.get("moduleDecomposition") or {}).get("product_class")
+            or "",
+        )
+        blob_parts: list[str] = []
+        for m in ((state.get("moduleDecomposition") or {}).get("modules") or [])[:12]:
+            for sm in (m.get("sub_modules") or [])[:8]:
+                for w in (sm.get("words") or [])[:12]:
+                    blob_parts.append(str(w.get("name_human") or ""))
+        return bool(is_traction_drive_pack_form(
+            product_class=pc, part_blob=" ".join(blob_parts),
+        ))
+    except Exception:
+        pc = str(
+            (state.get("parsedBrief") or {}).get("product_class")
+            or (state.get("moduleDecomposition") or {}).get("product_class")
+            or "",
+        )
+        return bool(re.search(r"\bmgu\b|traction|ipmsm|powertrain", pc, re.I))
+
+
 def pack_drawings(state: dict) -> FrozenSet[str]:
     """Drawing keys this form factor may emit.
 
     Fluid-less handhelds exclude plant process sheets entirely (no NA stubs).
     A handheld that somehow carries a fluid edge keeps pid/bfd/process-schedules.
+    Traction packs keep GA + SLD + panel but drop plant process/HVAC sheets
+    (Excel already VERIFIED-NA's those — emitting stubs floors drawing_set_coherence).
     """
     ff = drawing_form_factor(state)
     if ff == "handheld":
         return _PACK_HANDHELD if is_fluid_less_instrument(state) else _PACK_HANDHELD_FLUID
     if ff == "sealed_cabinet":
+        if _is_traction_drive_pack_state(state):
+            # HV spine lives on the single-line; a plant panel-schedule has no
+            # honest home on a sealed MGU+MCU pack (0846: PNL 0/3 floored Electrical).
+            return frozenset({
+                "general-arrangement", "single-line",
+            })
         return _PACK_SEALED
     return _PACK_PLANT
 
@@ -685,6 +720,26 @@ def _selftest() -> None:
     assert drawing_form_factor(_cab) == "sealed_cabinet"
     assert "interconnect" not in pack_drawings(_cab)
     assert "general-arrangement" in pack_drawings(_cab)
+    # proveCatch (2026-07-29): traction sealed pack drops plant process/HVAC sheets.
+    _traction_pack = {
+        "moduleDecomposition": {"product_class": "formula_e_rear_mgu"},
+        "orchestratorContract": {
+            "product_class": "formula_e_rear_mgu",
+            "quantities": {
+                "enclosure_volume_m3": {"value": 0.02},
+                "envelope_length_mm": {"value": 452},
+                "envelope_width_mm": {"value": 225},
+                "envelope_height_mm": {"value": 175},
+            },
+        },
+    }
+    assert drawing_form_factor(_traction_pack) == "sealed_cabinet"
+    assert "single-line" in pack_drawings(_traction_pack)
+    assert "general-arrangement" in pack_drawings(_traction_pack)
+    assert "panel-schedule" not in pack_drawings(_traction_pack)
+    assert "process-schedules" not in pack_drawings(_traction_pack)
+    assert "hvac" not in pack_drawings(_traction_pack)
+    assert "pid" not in pack_drawings(_traction_pack)
     # proveCatch (2026-07-29 SOL): traction MGU+MCU pack envelope must NOT fall
     # to plant form (2340 hero used Mech Plant scaffold / cyan litter).
     _traction = {"orchestratorContract": {"quantities": {

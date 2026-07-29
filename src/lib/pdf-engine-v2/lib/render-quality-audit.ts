@@ -106,7 +106,7 @@ export function computeRenderQuality(
         // Include every instrument form family the universal placer emits.
         if (
           n >= 8
-          && /syringe_pump|thermocycler|optical|photometer|colorimeter|instrument|lab_microscope|microscope|flexure|benchtop_bioreactor|bioreactor|potentiostat|digital_microfluidics|opendrop|pioreactor|rodeostat/.test(form)
+          && /syringe_pump|thermocycler|optical|photometer|colorimeter|instrument|lab_microscope|microscope|flexure|benchtop_bioreactor|bioreactor|potentiostat|digital_microfluidics|opendrop|pioreactor|rodeostat|traction|bay_fill|drive_pack|mgu/.test(form)
         ) {
           return true
         }

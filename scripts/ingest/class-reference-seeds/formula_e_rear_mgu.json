@@ -1,0 +1,243 @@
+{
+  "product_class": "formula_e_rear_mgu",
+  "form_family": "traction_drive_pack",
+  "notes": "Public exemplars only. Gold imagery = TRAINING CHECK for FFF cassette morphology — never mesh paste. Literature grounds constraints + formulas in forge-truth.",
+  "search_hints": [
+    "Formula E rear powertrain MGU MCU",
+    "pulse inverter SiC traction",
+    "transverse motor single-speed reduction",
+    "direct oil cooling stator",
+    "FIA net usable energy regen factor",
+    "RoadPak SiC power module Formula E"
+  ],
+  "visual_invariants": [
+    "Motor, inverter, reduction and differential live as one removable rear cassette, not a lab axial brick train on a skid.",
+    "Default packaging uses a transverse rotor axis into a spur reduction and final drive without a bevel stage when space allows.",
+    "Pulse inverter shares the cassette volume — rigidly on the motor/gearbox face or inside the same structural envelope (above/ahead), not a remote brick on a separate base.",
+    "Modern rear units are single-speed (or minimal-ratio) reduction plus differential; casing length is set by gear mesh and shaft exits, not shift drums.",
+    "HV DC interface faces the battery with a short stiff bus; AC phase paths to the stator are the shortest possible inside the case.",
+    "Cooling jackets, manifolds and dual fluid loops (motor vs inverter) define bosses and outer envelope language — not a clay-smooth motor sculpture.",
+    "Driveshaft exits at axle height fix lateral width and case split planes; the unit must clear suspension rockers.",
+    "Public exterior language is a sealed structural case (ribbed Al or CF) with fastener grids, coolant/oil ports and HV connectors — windings and PCB farms are cutaway-only.",
+    "Mass and CoG push a low compact cassette behind the battery; inverter is forced low when packaging allows.",
+    "Service is whole-cassette removal: mechanical mounts, two thermal loops, HV and LV/control interfaces — not field-open motor service."
+  ],
+  "gold_imagery": [
+    {
+      "id": "fe-audi-mgu05-illust",
+      "url": "https://www.audi-mediacenter.com/en/photos/detail/the-audi-mgu05-in-the-e-tron-fe07-97308",
+      "owner": "Audi MediaCenter",
+      "year": 2021,
+      "view_role": "exterior_shell",
+      "teaches": "Compact MGU+inverter as one structural power unit; integrated drivetrain shell language",
+      "access": "Press / editorial per Audi MediaCenter terms"
+    },
+    {
+      "id": "fe-fia-s3-layouts",
+      "url": "https://www.fiaformulae.com/en/news/2016/october/insight-how-the-cars-have-changed/",
+      "owner": "FIA Formula E",
+      "year": 2016,
+      "view_role": "cutaway_interior",
+      "teaches": "Transverse vs longitudinal; inverter inside carbon case vs remote; spur vs bevel",
+      "access": "Public editorial"
+    },
+    {
+      "id": "fe-car-powertrain-explainer",
+      "url": "https://www.carmagazine.co.uk/electric/formula-e-powertrain/",
+      "owner": "CAR Magazine",
+      "year": 2021,
+      "view_role": "cutaway_interior",
+      "teaches": "Generic FE cassette: transverse motor → reduction → diff; inverter above/ahead",
+      "access": "Public article; notes scarcity of real casing photos"
+    },
+    {
+      "id": "fe-ricardo-ds-case",
+      "url": "https://www.raceenginetechnology.com/Suppliers/ArtMID/415/ArticleID/3413/Ricardo-extends-DS-tie-up",
+      "owner": "Race Engine Technology / Ricardo–DS",
+      "year": 2021,
+      "view_role": "exterior_shell",
+      "teaches": "Slim transmission case; transverse shafts; case may nest in rear structural element",
+      "access": "Trade article"
+    },
+    {
+      "id": "fe-porsche-gen3-scope",
+      "url": "https://newsroom.porsche.com/en/2022/motorsports/porsche-99x-electric-gen3-technical-data-formula-e-30608.html",
+      "owner": "Porsche Newsroom",
+      "year": 2022,
+      "view_role": "packaging_context",
+      "teaches": "Manufacturer perimeter = rear PT + pulse inverter + gearbox/diff + cooling + rear structure",
+      "access": "Editorial press"
+    },
+    {
+      "id": "fe-jaguar-itype7-pkg",
+      "url": "https://media.jaguarracing.com/news/2024/12/jaguar-tcs-racing-launch-all-new-jaguar-i-type-7-sao-paulo-begin-202425-abb-fia",
+      "owner": "Jaguar Racing Media",
+      "year": 2024,
+      "view_role": "packaging_context",
+      "teaches": "Inverter+MGU+transmission repackaged as one balance/thermal unit",
+      "access": "Official media newsroom"
+    },
+    {
+      "id": "fe-machine-design-m9",
+      "url": "https://www.machinedesign.com/markets/automotive/article/21241764/the-evolution-of-the-formula-e-racecar",
+      "owner": "Machine Design / Mahindra Racing",
+      "year": 2023,
+      "view_role": "packaging_context",
+      "teaches": "Transverse MGU + single-ratio box + custom CF casing + parallel motor/inverter cooling",
+      "access": "Public technical feature"
+    },
+    {
+      "id": "fe-bmw-edrive01",
+      "url": "https://www.press.bmwgroup.com/global/article/detail/T0288425EN/the-bmw-ife-18-drivetrain:-unprecedented-teamwork-between-motorsport-and-production-development?language=en",
+      "owner": "BMW Group PressClub",
+      "year": 2018,
+      "view_role": "inverter_module",
+      "teaches": "Motor + 360° cooling jacket + SiC inverter as one stacked drive unit",
+      "access": "Press (hi-res may need registration)"
+    }
+  ],
+  "literature": [
+    {
+      "id": "B1-01",
+      "title": "FIA Formula E Technical Regulations 2023–2024 (Season 10, marked-up)",
+      "org": "FIA",
+      "year": 2023,
+      "url": "https://www.fia.com/sites/default/files/2023-2024_season_10_formula_e_techregs_wmsc_19.10.2023_eng_fr_marked_up.pdf",
+      "document_type": "regulation",
+      "contributes": ["constraints", "layout", "formulas"],
+      "pdf_direct": true,
+      "key_extracts": [
+        "E_net = E_discharge - 0.93 * E_regen",
+        "rear regen <= 350 kW; front <= 250 kW; RESS to battery <= 600 kW",
+        "car max voltage <= 1000 V (except MGU phases)",
+        "rear MGU rotor speed <= 100000 rpm"
+      ]
+    },
+    {
+      "id": "B1-02",
+      "title": "FIA Formula E Technical Regulations 2026–2027 (Season 13 / GEN4) V17",
+      "org": "FIA",
+      "year": 2025,
+      "url": "https://www.fia.com/system/files/documents/2026-2027_season_13_formula_e_techregs_wmsc_10.12.2025_eng_fr_v17.pdf",
+      "document_type": "regulation",
+      "contributes": ["constraints", "layout"],
+      "pdf_direct": true,
+      "key_extracts": [
+        "manufacturer homologation includes rear MGU, MCU, gearbox, differentials, MCU power board, cooling"
+      ]
+    },
+    {
+      "id": "B1-04",
+      "title": "FIA and Formula E unveil GEN4",
+      "org": "FIA",
+      "year": 2025,
+      "url": "https://www.fia.com/news/fia-and-formula-e-unveil-gen4-setting-new-benchmark-speed-sustainability-and-innovation",
+      "document_type": "report",
+      "contributes": ["constraints"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "race peak 450 kW; Attack Mode 600 kW; regen 700 kW; race energy up to 55 kWh"
+      ]
+    },
+    {
+      "id": "B2-01",
+      "title": "Porsche 99X Electric Gen3 technical data",
+      "org": "Porsche Motorsport",
+      "year": 2022,
+      "url": "https://newsroom.porsche.com/en/2022/motorsports/porsche-99x-electric-gen3-technical-data-formula-e-30608.html",
+      "document_type": "whitepaper",
+      "contributes": ["constraints", "layout"],
+      "pdf_direct": false
+    },
+    {
+      "id": "B2-04",
+      "title": "Jaguar TCS Racing I-TYPE 7 launch — integrated rear powertrain",
+      "org": "Jaguar Racing Media",
+      "year": 2024,
+      "url": "https://media.jaguarracing.com/news/2024/12/jaguar-tcs-racing-launch-all-new-jaguar-i-type-7-sao-paulo-begin-202425-abb-fia",
+      "document_type": "report",
+      "contributes": ["layout"],
+      "pdf_direct": false
+    },
+    {
+      "id": "B2-05",
+      "title": "Lucid Motorsports Electric Drive Unit / Formula E Front Powertrain Kit",
+      "org": "Lucid Group",
+      "year": 2023,
+      "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-unveils-state-art-motorsports-electric-drive-unit-taking",
+      "document_type": "whitepaper",
+      "contributes": ["constraints", "layout"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "350 kW class integrated EDU; ~32 kg; ~19500 rpm; ~10.9 kW/kg class density benchmark"
+      ]
+    },
+    {
+      "id": "B3-01",
+      "title": "High-Density SiC Power Modules Meet Formula E Challenges",
+      "org": "Power Electronics News / Hitachi ABB RoadPak summary",
+      "year": 2021,
+      "url": "https://www.powerelectronicsnews.com/high-density-sic-power-modules-meet-formula-e-challenges/",
+      "document_type": "article",
+      "contributes": ["formulas", "constraints"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "P_cond ~ R_DS(on) * I_rms^2",
+        "RoadPak <70x75 mm 1.2 kV; R_th,max < 83 K/kW; Tj,max 175 C"
+      ]
+    },
+    {
+      "id": "B3-03",
+      "title": "Design and Optimization of a High Power Density Silicon Carbide Traction Inverter",
+      "org": "Tyler Adamson / University of Arkansas",
+      "year": 2019,
+      "url": "https://scholarworks.uark.edu/cgi/viewcontent.cgi?article=4556&context=etd",
+      "document_type": "report",
+      "contributes": ["formulas", "layout"],
+      "pdf_direct": true
+    },
+    {
+      "id": "B3-04",
+      "title": "High Performance Cooling of Traction Brushless Machines",
+      "org": "Chalmers University of Technology",
+      "year": 2021,
+      "url": "https://research.chalmers.se/publication/521984/file/521984_Fulltext.pdf",
+      "document_type": "report",
+      "contributes": ["formulas", "layout"],
+      "pdf_direct": true,
+      "key_extracts": [
+        "direct oil / in-slot cooling current-density maps; oil cooling gains vs jacket"
+      ]
+    },
+    {
+      "id": "B3-08",
+      "title": "Energy-optimal Design and Control of Electric Powertrains under Motor Thermal Constraints",
+      "org": "arXiv:2111.07711",
+      "year": 2021,
+      "url": "https://arxiv.org/pdf/2111.07711.pdf",
+      "document_type": "article",
+      "contributes": ["formulas"],
+      "pdf_direct": true
+    },
+    {
+      "id": "B4-01",
+      "title": "MOSFET Power Losses Calculation Using the Data-Sheet Parameters",
+      "org": "Infineon",
+      "year": 2006,
+      "url": "https://community.infineon.com/gfawx74859/attachments/gfawx74859/mosfetsisic/368/1/MOSFET%20Power%20Losses%20Calculation%20Using%20the%20Data-Sheet%20Parameters.pdf",
+      "document_type": "application_note",
+      "contributes": ["formulas"],
+      "pdf_direct": true
+    },
+    {
+      "id": "B4-02",
+      "title": "Automotive High-Power SiC Traction Inverter Reference Design (TIDUF23A)",
+      "org": "Texas Instruments + Wolfspeed",
+      "year": 2024,
+      "url": "https://www.ti.com/lit/ug/tiduf23a/tiduf23a.pdf",
+      "document_type": "datasheet",
+      "contributes": ["layout", "constraints"],
+      "pdf_direct": true
+    }
+  ]
+}

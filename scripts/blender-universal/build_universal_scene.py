@@ -7725,6 +7725,29 @@ def write_parts_manifest(out_dir, parts, state=None):
         if _n_spine:
             print(f"[parts-manifest] seated {_n_spine} gold-spine principal(s) "
                   f"(Compute UI / LED Source Board)")
+        # INTENT (2026-07-29 FE MGU): traction story meshes → BoM principals so
+        # GA/drawing_set_coherence stops flooring at ~11% (shell-only manifest).
+        from traction_spine_manifest import (
+            seat_traction_principals_in_manifest as _seat_td,
+            collect_traction_mesh_bboxes_mm as _td_meshes,
+        )
+        _td_bb = dict(_mesh_bb)
+        _td_bb.update(_td_meshes())
+        # GOTCHA (0846): blender-bg often runs before state.requirementsBom lands —
+        # pass physical `parts` so noun joins still fire (see traction_spine_manifest).
+        # Stamp out_dir so seating can resolve INV-1/X-116 from parts-ledger.json.
+        if isinstance(state, dict) and out_dir:
+            state.setdefault("_out_dir", out_dir)
+        _n_td = _seat_td(
+            rows, state, mesh_bbox_by_prefix=_td_bb, parts=parts,
+        )
+        if _n_td:
+            print(f"[parts-manifest] seated {_n_td} traction-pack principal(s) "
+                  f"(motor / SiC inverter / gear / cold plate)")
+        else:
+            print("[parts-manifest] traction-pack seat returned 0 "
+                  f"(td_meshes={sum(1 for k in _td_bb if str(k).startswith('u_se_td_'))})",
+                  flush=True)
         # VESSEL UNIFICATION (2026-07-25 Tristan "on top, accessible"): seat the real
         # culture-vessel row (X-103) at the ON-TOP signature-mesh pose so the render's
         # on-top vessel and the GA's manifest-drawn vessel are ONE object (was: vessel
@@ -13488,6 +13511,8 @@ _IS_OPTICAL_HANDHELD_FORM = False
 _IS_LAB_ELECTRONICS_FORM = False
 # Traction MGU+MCU+gear pack — motor/shaft/gear/inverter morphology (not lab instrument).
 _IS_TRACTION_DRIVE_FORM = False
+# Front-axle FPK: packaging bay volume IS the exterior form (unitised brick fill).
+_IS_TRACTION_BAY_FILL = False
 # Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
 _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
@@ -13508,6 +13533,7 @@ def _sealed_enclosure_env_mm(state, quantities):
     global _IS_SYRINGE_PUMP_FORM, _SYRINGE_PUMP_CHANNEL_COUNT
     global _IS_LAB_MICROSCOPE_FORM
     global _IS_OPTICAL_HANDHELD_FORM, _IS_LAB_ELECTRONICS_FORM, _IS_TRACTION_DRIVE_FORM
+    global _IS_TRACTION_BAY_FILL
     pc = product_class_of(state) if isinstance(state, dict) else ""
     # Part-name evidence when class slug is thin / missing (needed before plantish).
     part_blob = ""
@@ -13552,6 +13578,15 @@ def _sealed_enclosure_env_mm(state, quantities):
             quantities=quantities if isinstance(quantities, dict) else None,
         )) if callable(_td_detect) else False
     )
+    _bay_detect = getattr(ifg, "is_traction_bay_fill_form", None)
+    _IS_TRACTION_BAY_FILL = (
+        _IS_TRACTION_DRIVE_FORM
+        and (
+            bool(_bay_detect(product_class=pc or ""))
+            if callable(_bay_detect)
+            else bool(re.search(r"front[_ -]?mgu|front[_ -]?powertrain|\bfpk\b", pc or "", re.I))
+        )
+    )
     _plantish = (not _form_instrument) and (not _instrument_allow) and (
         _IS_TRACTION_DRIVE_FORM
         or bool(re.search(
@@ -13577,7 +13612,8 @@ def _sealed_enclosure_env_mm(state, quantities):
               f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
     if _IS_TRACTION_DRIVE_FORM:
         print(f"[univ][sealed] TRACTION drive-pack form "
-              f"(class={pc or '∅'}; instrument path suppressed)")
+              f"(class={pc or '∅'}; instrument path suppressed"
+              f"{'; bay-fill — front-axle packaging volume wins form' if _IS_TRACTION_BAY_FILL else ''})")
     # F1e (2026-07-20): tell the connection sizer this is a device so a no-flow
     # fluid edge defaults to lab micro-tubing, not a plant DN25 process pipe.
     # Traction packs stay device-scale interconnect (coolant ports, not DN25).
@@ -13939,8 +13975,31 @@ def _thermocycler_exterior_keep_visible(name: str) -> bool:
 
 
 def _traction_drive_exterior_keep_visible(name: str) -> bool:
-    """Motor/shaft/gear/SiC/ports stay visible on traction pack product shots."""
-    return (name or "").startswith("u_se_td_")
+    """Sealed cassette language on closed product shots (gold FE training check).
+
+    INTENT (2026-07-29 class-reference corpus): public FE rear units show a
+    sealed structural case + ports/shafts/mounts — windings and PCB farms are
+    cutaway/ghost only. Keep shell + motor jacket bulge + gearbox + inverter
+    cold-plate face + interfaces; hide internal electronics on 04–07.
+    """
+    nm = name or ""
+    if not nm.startswith("u_se_td_"):
+        return False
+    # Cutaway-only internals (still drawn; ghost/hero keep-lists leave them on).
+    _interior = (
+        "u_se_td_pcb",
+        "u_se_td_pcb_edge_pads",
+        "u_se_td_pcb_package_",
+        "u_se_td_dclink_cap_",
+        "u_se_td_phase_cable_",
+        "u_se_td_phase_boot_",
+        "u_se_td_phase_bus_",
+        "u_se_td_signal_ribbon",
+        "u_se_td_hv_bus",
+        "u_se_td_rotor_hint",
+        "u_se_td_stator_hint",
+    )
+    return not any(nm.startswith(p) or p.rstrip("_") == nm for p in _interior)
 
 
 def _selftest_thermocycler_exterior_keep() -> None:
@@ -13968,7 +14027,36 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         assert pfx in _INSTRUMENT_MESH_KEEP_PREFIXES, (
             f"clutter-suppress must keep {pfx}* form meshes")
     assert _traction_drive_exterior_keep_visible("u_se_td_motor_housing")
+    assert _traction_drive_exterior_keep_visible("u_se_td_pack_housing")
+    assert _traction_drive_exterior_keep_visible("u_se_td_hv_connector")
+    assert _traction_drive_exterior_keep_visible("u_se_td_coolant_in")
+    assert _traction_drive_exterior_keep_visible("u_se_td_cast_fin_0")
+    assert _traction_drive_exterior_keep_visible("u_se_td_coldplate_fastener_0")
+    assert _traction_drive_exterior_keep_visible("u_se_td_nameplate")
+    assert _traction_drive_exterior_keep_visible("u_se_td_resolver_bulge")
+    # proveCatch (2026-07-29 corpus): sealed exterior must NOT show PCB/loom —
+    # public FE gold is a closed cassette; electronics live on ghost/cutaway.
+    assert not _traction_drive_exterior_keep_visible("u_se_td_pcb")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_phase_cable_0")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_pcb_edge_pads")
     assert not _traction_drive_exterior_keep_visible("u_se_le_pcb")
+    assert not _traction_drive_exterior_keep_visible("u_se_cad_cell_0"), (
+        "BESS LFP cells must NOT keep on traction exterior")
+    # proveCatch (2026-07-29 JLR demo): bay-fill must NOT reintroduce camera-facing
+    # curtain walls (u_se_td_bay_face_*) — those shipped a featureless appliance brick.
+    import inspect as _insp_td
+    _src_td = _insp_td.getsource(_place_traction_drive_pack_layout)
+    assert "u_se_td_bay_face_" not in _src_td, (
+        "bay-fill must not create u_se_td_bay_face_* curtain walls toward camera")
+    assert "bay_fill" in _src_td and "front-axle" in _src_td.lower(), (
+        "bay-fill front-axle packaging mode must remain in traction placer")
+    assert "u_se_td_cast_fin_" in _src_td and "u_se_td_coldplate_fastener_" in _src_td, (
+        "Lucid-gold race-hardware cues (cast fins + cold-plate fasteners) required")
+    # proveCatch (2026-07-29): crushed FR4 sRGB (0.025,0.14,…) linearises to
+    # ~black and ships an invisible board. Gate the SOURCE sRGB floor.
+    _fr4 = (0.22, 0.52, 0.28)
+    assert _fr4[1] >= 0.40 and _fr4[1] > _fr4[0] and _fr4[1] > _fr4[2], (
+        f"traction FR4 sRGB must read green under softbox, got {_fr4}")
     assert any(
         "u_se_lm_body".startswith(p) for p in _INSTRUMENT_MESH_KEEP_PREFIXES
     ), "lab_microscope body must match a keep prefix"
@@ -14251,27 +14339,30 @@ def _prepare_sealed_product_view(view_name, entering):
                         obj.data.materials.clear()
                         obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
         elif _IS_TRACTION_DRIVE_FORM:
-            # INTENT (2026-07-29 / 0733): opaque closed shell hid the pack → featureless
-            # box. Product shots keep motor/shaft/gear/SiC/ports visible and use the
-            # translucent cutaway shell so the drive unit reads as a real assembly.
+            # INTENT (2026-07-29 / 0811 SIGHT): keeping u_skid_encl_* visible still
+            # shipped a washed-out white brick (mean L≈209) — the opaque crate hid
+            # motor/shaft/gear. Product face IS the traction morphology (syringe-
+            # pump pattern: hide sealed crate, keep u_se_td_*).
+            # GOTCHA (0846 re-SIGHT): the prior branch only hid a few prefixes, so
+            # the sealed shell / zone BoM boxes stayed visible and 04 read as a
+            # featureless brick (vision: "NO motor barrel…"). Mirror lab_electronics
+            # default-hide of the whole product namespace, then keep u_se_td_*.
             if _SEALED_FRONT_COVER is not None:
                 _SEALED_FRONT_COVER.hide_render = True
+            for obj in _SEALED_SHELL_OBJECTS:
+                if obj is not None:
+                    obj.hide_render = True
+            _geo_types = {"MESH", "CURVE", "SURFACE", "META", "FONT"}
             for obj in bpy.data.objects:
-                if getattr(obj, "type", None) not in ("MESH", "CURVE", "SURFACE"):
+                if getattr(obj, "type", None) not in _geo_types:
                     continue
                 nm = obj.name
                 if _traction_drive_exterior_keep_visible(nm):
                     obj.hide_render = False
-                elif nm.startswith("u_skid_encl_") or nm.startswith("u_se_product_"):
-                    obj.hide_render = False
-                elif nm.startswith(("u_se_det_", "u_se_cad_", "u_wire_", "u_pipe_",
-                                    "u_se_instrument_story_", "u_se_cutaway_cue_")):
+                elif nm.startswith((
+                    "u_se_", "u_skid_encl_", "u_wire_", "u_pipe_", "u_exterior_",
+                )):
                     obj.hide_render = True
-            if _SEALED_CUTAWAY_MATERIAL is not None:
-                for obj in _SEALED_SHELL_OBJECTS:
-                    if obj and obj.data:
-                        obj.data.materials.clear()
-                        obj.data.materials.append(_SEALED_CUTAWAY_MATERIAL)
         else:
             _SEALED_FRONT_COVER.hide_render = False
             for obj in bpy.data.objects:
@@ -18157,83 +18248,347 @@ def _selftest_sealed_zone_pack_dominance() -> None:
 
 
 def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
-    """Compound traction pack: IPMSM housing + shaft + gear + SiC brick + ports.
+    """Integrated traction pack — transverse MGU + inverter + gear/diff.
 
-    INTENT (2026-07-29 / 0733 SIGHT): sealed vol<1 without this placer fell into
-    optical-handheld / lab-electronics → clutter-suppress hid BoM → featureless box.
-    Morphology is forced by use-physics (rotating machine + inverter + coolant),
-    never a product silhouette paste. Mesh stems `u_se_td_*` are keep-listed on
-    exterior views so 04–07 show shafts/ports/connector, not a blank shell.
+    INTENT (2026-07-29 class-reference corpus / FE public gold): public Formula E
+    units read as one sealed structural cassette (motor + pulse inverter +
+    single-speed reduction + diff), not a lab axial brick train on a skid.
+    Morphology is forced by use-physics + published packaging grammar
+    (transverse rotor → spur reduction → axle exits; inverter shares envelope;
+    cooling jackets + HV/DC faces). Gold imagery is a TRAINING CHECK only —
+    never an OEM silhouette paste (CORE FIX PRINCIPLE / photoreal-cad rule).
+
+    DECISION — two packaging modes (universal, noun-keyed):
+      • Open cradle (rear manufacturer cassette): integrated volumes readable;
+        no solid occluding cuboid.
+      • Bay-fill (front-axle FPK): the available front-axle bay
+        (`max_dimensions_mm`) IS the exterior form — unitised brick that fills
+        the wishbone/upright/crash corridor. Shape is packaging-forced first.
+
+    DECISION: exterior keep-list shows sealed shell language (case, jacket bulge,
+    gearbox, cold-plate face, ports, shafts, mounts). PCB / phase busbars /
+    DC-link cans are cutaway-only so 04–07 match public FE shell photos while
+    ghost/hero still answer "what is inside?".
+
+    TRIED (0846): axial left→right motor|gear|SiC on a low base — readable as
+    electronics but rejected by FE powertrain engineers (lab exposition, not race
+    cassette). Abandoned for this transverse-in-shell composition.
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
-    mat_alum = fl.make_mat("m_se_td_alum", (0.55, 0.56, 0.58), metallic=0.75, roughness=0.35)
-    mat_steel = fl.make_mat("m_se_td_steel", (0.35, 0.36, 0.38), metallic=0.85, roughness=0.28)
-    mat_sic = fl.make_mat("m_se_td_sic", (0.12, 0.14, 0.16), metallic=0.4, roughness=0.45)
-    mat_port = fl.make_mat("m_se_td_port", (0.75, 0.22, 0.08), metallic=0.3, roughness=0.4)
-    mat_hv = fl.make_mat("m_se_td_hv", (0.55, 0.05, 0.05), metallic=0.2, roughness=0.5)
+    bay_fill = bool(globals().get("_IS_TRACTION_BAY_FILL"))
 
-    cy = 0.0
-    # Motor left, gear mid-left, inverter right — axial pack along +X.
-    motor_od = min(D * 0.72, H * 0.78, 140.0)
-    motor_len = min(W * 0.32, 130.0)
-    gear_w = min(W * 0.18, 90.0)
-    gear_d = min(D * 0.55, 110.0)
-    gear_h = min(H * 0.70, 100.0)
-    inv_w = min(W * 0.28, 120.0)
-    inv_d = min(D * 0.70, 160.0)
-    inv_h = min(H * 0.55, 80.0)
-    z_mid = base_z + H * 0.48
-    x_motor = -W * 0.28
-    ry = (0.0, 1.5707963, 0.0)  # cylinder axis along +X
+    # Charcoal structural case — washed-out white brick (0811 mean L≈209) came
+    # from mid-grey alum under softbox. Keep body dark for render_washed_out.
+    # INTENT (2026-07-29 Lucid-gold bar): slightly more metallic / lower roughness
+    # so softbox reads machined race case, not clay mid-grey.
+    mat_cf = fl.make_mat("m_se_td_cf", (0.055, 0.058, 0.062), metallic=0.22, roughness=0.48)
+    mat_alum = fl.make_mat("m_se_td_alum", (0.08, 0.085, 0.095), metallic=0.62, roughness=0.38)
+    mat_steel = fl.make_mat("m_se_td_steel", (0.18, 0.19, 0.21), metallic=0.88, roughness=0.26)
+    mat_sic = fl.make_mat("m_se_td_sic", (0.045, 0.048, 0.055), metallic=0.40, roughness=0.42)
+    mat_port = fl.make_mat("m_se_td_port", (0.55, 0.18, 0.08), metallic=0.35, roughness=0.38)
+    # DECISION (2026-07-29 JLR SIGHT): HV connector is dark Amphenol-style orange/black
+    # — bright toy-red brick failed the Lucid-gold training check on 04-product-exterior.
+    mat_hv = fl.make_mat("m_se_td_hv", (0.10, 0.07, 0.05), metallic=0.40, roughness=0.40)
+    mat_fast = fl.make_mat("m_se_td_fast", (0.12, 0.12, 0.13), metallic=0.90, roughness=0.28)
+    mat_pcb = fl.make_mat(
+        "m_se_td_pcb",
+        fl._to_linear((0.22, 0.52, 0.28)),
+        metallic=0.05,
+        roughness=0.50,
+    )
+    mat_chip = fl.make_mat("m_se_td_chip", (0.08, 0.08, 0.09), metallic=0.25, roughness=0.45)
+    mat_cap = fl.make_mat("m_se_td_cap", (0.12, 0.13, 0.15), metallic=0.35, roughness=0.40)
+    mat_pad = fl.make_mat(
+        "m_se_td_pad",
+        fl._to_linear((0.78, 0.62, 0.22)),
+        metallic=0.85,
+        roughness=0.35,
+    )
+    mat_ph = [
+        fl.make_mat("m_se_td_ph_u", fl._to_linear((0.90, 0.18, 0.12)),
+                    metallic=0.12, roughness=0.50),
+        fl.make_mat("m_se_td_ph_v", fl._to_linear((0.92, 0.82, 0.12)),
+                    metallic=0.12, roughness=0.50),
+        fl.make_mat("m_se_td_ph_w", fl._to_linear((0.14, 0.42, 0.88)),
+                    metallic=0.12, roughness=0.50),
+    ]
+    mat_bus = fl.make_mat("m_se_td_bus", fl._to_linear((0.85, 0.45, 0.12)),
+                         metallic=0.70, roughness=0.32)
+    mat_copper = fl.make_mat("m_se_td_cu", fl._to_linear((0.72, 0.42, 0.16)),
+                            metallic=0.80, roughness=0.35)
 
+    z0 = base_z + 6.0
+    cx, cy = 0.0, 0.0
+
+    if bay_fill:
+        # INTENT: front-axle bay (brief max_dimensions_mm) is a HARD CEILING that
+        # the unitised FPK must fill densely — wishbones/uprights/crash structure
+        # set the box. Lucid gold is a TRAINING CHECK for a sealed compact drive
+        # unit with readable barrel + shaft ends, NOT a hollow rectangular frame.
+        # GOTCHA (2026-07-29 SIGHT 1333): full fore/aft bay FACE panels occluded
+        # the motor and shipped a featureless appliance brick on 04. Bay bound is
+        # enforced by sizing motor/gear/inverter to the envelope — not by opaque
+        # curtain walls toward the camera.
+        cas_w, cas_d, cas_h = W * 0.98, D * 0.98, H * 0.96
+        wall = max(8.0, min(W, D, H) * 0.035)
+        base_h = max(10.0, wall)
+        # Motor FIRST — dominate the bay (FPK gold: barrel is the product).
+        motor_od = min(cas_d * 0.78, cas_h * 0.68, 200.0)
+        motor_len = min(cas_w * 0.78, cas_w - 2 * wall - 20.0)
+        x_motor = 0.0
+        y_motor = cas_d * 0.02
+        z_motor = z0 + base_h + motor_od * 0.52
+        # Bay floor — footprint = bay, hugs motor (no oversized apron beyond bay).
+        fl.add_box(
+            "u_se_td_pack_base",
+            _mm3((cx, cy, z0 + base_h * 0.5)),
+            _mm3((cas_w, cas_d, base_h)),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+        # Narrow end rings only (shaft faces) — not full-height end slabs.
+        for ei, ex in enumerate((-1.0, 1.0)):
+            fl.add_cyl(
+                f"u_se_td_bay_endwall_{ei}",
+                _mm3((ex * (motor_len * 0.5 + wall * 0.35), y_motor, z_motor)),
+                (motor_od * 0.5 + 5.0) * fl.MM,
+                wall * fl.MM,
+                mat_alum,
+                module=story_mod,
+                module_objects=MO,
+                rotation=(0.0, 1.5707963, 0.0),
+            )
+        # Structural spine under inverter (BoM seat) — NOT a camera-facing wall.
+        fl.add_box(
+            "u_se_td_pack_housing",
+            _mm3((x_motor, y_motor + motor_od * 0.05, z_motor + motor_od * 0.42)),
+            _mm3((motor_len * 0.60, 14.0, 12.0)),
+            mat_cf,
+            module=story_mod,
+            module_objects=MO,
+        )
+        for mi, (mx, my) in enumerate((
+            (-0.45, -0.45), (0.45, -0.45), (-0.45, 0.45), (0.45, 0.45),
+        )):
+            fl.add_box(
+                f"u_se_td_mount_ear_{mi}",
+                _mm3((cas_w * mx * 0.5, cas_d * my * 0.5, z0 + 3.0)),
+                _mm3((18.0, 14.0, 6.0)),
+                mat_steel,
+                module=story_mod,
+                module_objects=MO,
+            )
+    else:
+        # GOTCHA (2026-07-29 SIGHT): a SOLID pack_housing box that fills the envelope
+        # occludes motor/gear/SiC and ships a featureless brick (04/00/08). Public FE
+        # rear gold shows the *integrated volumes* as the silhouette — structural cradle
+        # wraps them; never a closed opaque cuboid.
+        cas_w = min(W * 0.88, max(W * 0.70, 260.0))
+        cas_d = min(D * 0.90, max(D * 0.72, 150.0))
+        cas_h = min(H * 0.88, max(H * 0.65, 110.0))
+        base_h = max(12.0, cas_h * 0.10)
+
+        # Size MOTOR first — OD was ~77 mm when cas_h×0.68 capped it and the apron
+        # read as the product. Barrel must dominate the silhouette (FE gold check).
+        motor_od = min(cas_d * 0.88, cas_h * 0.82, 145.0)
+        motor_len = min(cas_w * 0.78, 280.0)
+        x_motor = 0.0
+        y_motor = 0.0
+        z_motor = z0 + base_h + motor_od * 0.52
+        # Belly cradle hugs the motor footprint (not the brief envelope apron).
+        base_w = motor_len + 36.0
+        base_d = motor_od + 40.0
+        fl.add_box(
+            "u_se_td_pack_base",
+            _mm3((cx, cy, z0 + base_h * 0.5)),
+            _mm3((base_w, base_d, base_h)),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+        # Tiny mount pads only — no tall rails / roof that re-brick the silhouette.
+        for mi, (mx, my) in enumerate((
+            (-0.42, -0.42), (0.42, -0.42), (-0.42, 0.42), (0.42, 0.42),
+        )):
+            fl.add_box(
+                f"u_se_td_mount_ear_{mi}",
+                _mm3((x_motor + base_w * mx * 0.5, y_motor + base_d * my * 0.5, z0 + base_h + 4.0)),
+                _mm3((22.0, 14.0, 8.0)),
+                mat_alum,
+                module=story_mod,
+                module_objects=MO,
+            )
+        # pack_housing = thin longitudinal spine under the inverter (BoM seat name).
+        fl.add_box(
+            "u_se_td_pack_housing",
+            _mm3((x_motor, y_motor, z_motor + motor_od * 0.42)),
+            _mm3((motor_len * 0.55, 12.0, 10.0)),
+            mat_cf,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+    # DECISION (2026-07-29 SIGHT): pack X = car lateral. Transverse rotor axis
+    # must lie along +X so exterior cameras (looking −Y) see the BARREL, not the
+    # end-face (which read as a lone chrome sphere when axis was along Y).
+    rot_along_x = (0.0, 1.5707963, 0.0)  # cylinder default +Z → +X
     fl.add_cyl(
         "u_se_td_motor_housing",
-        _mm3((x_motor, cy, z_mid)),
+        _mm3((x_motor, y_motor, z_motor)),
         motor_od * 0.5 * fl.MM,
         motor_len * fl.MM,
         mat_alum,
         module=story_mod,
         module_objects=MO,
-        rotation=ry,
+        rotation=rot_along_x,
     )
-    shaft_len = motor_len * 0.55 + gear_w * 0.35
     fl.add_cyl(
-        "u_se_td_output_shaft",
-        _mm3((x_motor + motor_len * 0.35, cy, z_mid)),
-        max(6.0, motor_od * 0.08) * fl.MM,
-        shaft_len * fl.MM,
-        mat_steel,
+        "u_se_td_coolant_jacket",
+        _mm3((x_motor, y_motor, z_motor)),
+        (motor_od * 0.5 + 6.0) * fl.MM,
+        motor_len * 0.82 * fl.MM,
+        mat_alum,
         module=story_mod,
         module_objects=MO,
-        rotation=ry,
+        rotation=rot_along_x,
     )
-    x_gear = x_motor + motor_len * 0.55 + gear_w * 0.55
+    # End bells — flange rings so the barrel reads as a cast motor case, not a
+    # smooth infinite cylinder (FE gold training check: end faces + bearing caps).
+    bell_r = motor_od * 0.5 + 4.0
+    bell_len = max(14.0, motor_len * 0.06)
+    for bi, bx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            f"u_se_td_end_bell_{bi}",
+            _mm3((x_motor + bx * (motor_len * 0.5 - bell_len * 0.35), y_motor, z_motor)),
+            bell_r * fl.MM,
+            bell_len * fl.MM,
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+    # Jacket band — circumferential cooling-channel cue mid-barrel.
+    fl.add_cyl(
+        "u_se_td_jacket_band",
+        _mm3((x_motor, y_motor, z_motor)),
+        (motor_od * 0.5 + 8.0) * fl.MM,
+        motor_len * 0.22 * fl.MM,
+        mat_cf,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+    )
+
+    # Driveshaft stubs exit ±X (toward wheels).
+    shaft_r = max(9.0, motor_od * 0.11)
+    shaft_stub = max(36.0, cas_w * 0.10)
+    for si, sx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            "u_se_td_output_shaft" if si == 0 else "u_se_td_output_shaft_b",
+            _mm3((
+                x_motor + sx * (motor_len * 0.5 + shaft_stub * 0.40),
+                y_motor,
+                z_motor,
+            )),
+            shaft_r * fl.MM,
+            shaft_stub * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+        # Bearing cap discs at shaft roots (race-hardware cue).
+        fl.add_cyl(
+            f"u_se_td_bearing_cap_{si}",
+            _mm3((
+                x_motor + sx * (motor_len * 0.5 + 4.0),
+                y_motor,
+                z_motor,
+            )),
+            (shaft_r * 1.85) * fl.MM,
+            8.0 * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+
+    # DECISION (2026-07-29 SIGHT): gearbox MUST sit on −Y (camera face). Prior
+    # +Y nest was occluded behind the barrel on 04/00 — spur/diff volume never
+    # read. Offset slightly −X so halfshaft path is still implied.
+    gear_w = min(motor_len * 0.48, 140.0)
+    gear_d = min(motor_od * 0.55, 78.0)
+    gear_h = min(motor_od * 0.72, cas_h * 0.50)
+    y_gear = y_motor - motor_od * 0.38 - gear_d * 0.35
+    x_gear_box = x_motor - motor_len * 0.12
     fl.add_box(
         "u_se_td_gearbox",
-        _mm3((x_gear, cy, z_mid)),
+        _mm3((x_gear_box, y_gear, z_motor - motor_od * 0.08)),
         _mm3((gear_w, gear_d, gear_h)),
         mat_alum,
         module=story_mod,
         module_objects=MO,
     )
-    x_inv = W * 0.22
+    # Diff bulge — shorter cylinder nest on gearbox face (unitised cassette cue).
+    fl.add_cyl(
+        "u_se_td_diff_bulge",
+        _mm3((x_gear_box, y_gear - gear_d * 0.15, z_motor - motor_od * 0.05)),
+        min(gear_h, gear_d) * 0.38 * fl.MM,
+        gear_w * 0.55 * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+    )
+
+    # Pulse inverter rides on top of motor (shares cassette volume).
+    inv_w = min(motor_len * 0.70, 200.0)
+    inv_d = min(motor_od * 0.70, 95.0)
+    inv_h = min(cas_h * 0.20, 36.0)
+    x_inv = x_motor
+    y_inv = y_motor + motor_od * 0.08
+    inv_z = z_motor + motor_od * 0.48 + inv_h * 0.55
     fl.add_box(
         "u_se_td_sic_inverter",
-        _mm3((x_inv, cy, base_z + H * 0.42)),
+        _mm3((x_inv, y_inv, inv_z)),
         _mm3((inv_w, inv_d, inv_h)),
         mat_sic,
         module=story_mod,
         module_objects=MO,
     )
-    # Coolant ports on +Y face; HV connector on −Y (readable on product shots).
+    # Cold-plate lip on inverter top (machined plate language).
+    fl.add_box(
+        "u_se_td_inverter_coldplate",
+        _mm3((x_inv, y_inv, inv_z + inv_h * 0.5 + 2.0)),
+        _mm3((inv_w * 0.92, inv_d * 0.88, 4.0)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+
+    # Coolant bosses on −Y service face (camera-facing); HV on inverter −Y edge.
+    # Longer nipples + flange rings so ports read as fittings, not orange spheres.
+    y_face = y_motor - motor_od * 0.48
     for i, name in enumerate(("u_se_td_coolant_in", "u_se_td_coolant_out")):
+        px = x_motor + (i - 0.5) * 48.0
+        fl.add_cyl(
+            f"{name}_flange",
+            _mm3((px, y_face - 2.0, z_motor + motor_od * 0.08)),
+            14.0 * fl.MM,
+            6.0 * fl.MM,
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(1.5707963, 0.0, 0.0),
+        )
         fl.add_cyl(
             name,
-            _mm3((x_inv + (i - 0.5) * 28.0, D * 0.48 - t, base_z + H * 0.62)),
-            7.0 * fl.MM,
-            18.0 * fl.MM,
+            _mm3((px, y_face - 16.0, z_motor + motor_od * 0.08)),
+            8.0 * fl.MM,
+            28.0 * fl.MM,
             mat_port,
             module=story_mod,
             module_objects=MO,
@@ -18241,25 +18596,228 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         )
     fl.add_box(
         "u_se_td_hv_connector",
-        _mm3((x_inv, -D * 0.48 + t + 8.0, base_z + H * 0.55)),
-        _mm3((36.0, 22.0, 28.0)),
+        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55, inv_z)),
+        _mm3((40.0, 26.0, 30.0)),
         mat_hv,
         module=story_mod,
         module_objects=MO,
     )
-    ear_w, ear_d, ear_h = 28.0, 18.0, 10.0
-    for xi, yi, tag in (
-        (-1, -1, "fl"), (-1, 1, "fr"), (1, -1, "rl"), (1, 1, "rr"),
-    ):
+    # HV connector keying hood + twin pin towers (Amphenol-style service face).
+    fl.add_box(
+        "u_se_td_hv_hood",
+        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 10.0, inv_z + 2.0)),
+        _mm3((34.0, 10.0, 18.0)),
+        mat_hv,
+        module=story_mod,
+        module_objects=MO,
+    )
+    for pi, px_off in enumerate((-8.0, 8.0)):
+        fl.add_cyl(
+            f"u_se_td_hv_pin_{pi}",
+            _mm3((x_motor - inv_w * 0.32 + px_off, y_inv - inv_d * 0.55 - 16.0, inv_z + 2.0)),
+            3.5 * fl.MM,
+            12.0 * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(1.5707963, 0.0, 0.0),
+        )
+    # Thin HV/EMI shield cover over the inverter service face — seats X-138.
+    fl.add_box(
+        "u_se_td_hv_shield",
+        _mm3((x_inv, y_inv - inv_d * 0.52, inv_z)),
+        _mm3((inv_w * 0.85, 3.5, inv_h * 0.90)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # INTENT (Lucid-gold bar): cast cooling fins + cold-plate fasteners + gearbox
+    # ribs + nameplate pad — race-hardware cues without OEM silhouette paste.
+    fin_n = 5
+    for fi in range(fin_n):
+        fx = x_motor - motor_len * 0.28 + fi * (motor_len * 0.14)
         fl.add_box(
-            f"u_se_td_mount_ear_{tag}",
-            _mm3((xi * (W * 0.42), yi * (D * 0.42), base_z + ear_h * 0.5 + 2.0)),
-            _mm3((ear_w, ear_d, ear_h)),
+            f"u_se_td_cast_fin_{fi}",
+            _mm3((fx, y_motor + motor_od * 0.48, z_motor + motor_od * 0.05)),
+            _mm3((4.0, 10.0, motor_od * 0.55)),
             mat_alum,
             module=story_mod,
             module_objects=MO,
         )
-    print("[univ][sealed] TRACTION interior: motor+shaft+gear+SiC+ports+ears")
+    for fi, (fx, fy) in enumerate((
+        (-0.35, -0.30), (0.0, -0.30), (0.35, -0.30),
+        (-0.35, 0.30), (0.0, 0.30), (0.35, 0.30),
+    )):
+        fl.add_cyl(
+            f"u_se_td_coldplate_fastener_{fi}",
+            _mm3((x_inv + inv_w * fx, y_inv + inv_d * fy, inv_z + inv_h * 0.5 + 4.5)),
+            2.8 * fl.MM,
+            3.5 * fl.MM,
+            mat_fast,
+            module=story_mod,
+            module_objects=MO,
+        )
+    for ri in range(3):
+        fl.add_box(
+            f"u_se_td_gear_rib_{ri}",
+            _mm3((
+                x_gear_box - gear_w * 0.25 + ri * gear_w * 0.25,
+                y_gear - gear_d * 0.52,
+                z_motor - motor_od * 0.08,
+            )),
+            _mm3((3.5, 4.0, gear_h * 0.70)),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+    fl.add_box(
+        "u_se_td_nameplate",
+        _mm3((x_motor + motor_len * 0.18, y_motor - motor_od * 0.52, z_motor + motor_od * 0.22)),
+        _mm3((42.0, 2.0, 18.0)),
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # Resolver / sensor bulge on +X end bell (encoder language, not chrome sphere alone).
+    fl.add_cyl(
+        "u_se_td_resolver_bulge",
+        _mm3((x_motor + motor_len * 0.5 + 6.0, y_motor, z_motor)),
+        (shaft_r * 2.4) * fl.MM,
+        14.0 * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+    )
+    x_port = x_motor - cas_w * 0.45
+    x_gear = x_motor  # for cutaway busbar math below
+
+    # ── Cutaway-only electronics (hidden on sealed exterior keep-list) ────────
+    pcb_w, pcb_d, pcb_t = inv_w * 0.90, inv_d * 0.78, 4.5
+    pcb_z = inv_z + inv_h * 0.5 + pcb_t * 0.5 + 1.0
+    _pcb = _import_family_cad(
+        "instrument_pcb", "u_se_td_pcb",
+        (x_inv, cy, pcb_z), (pcb_w, pcb_d, pcb_t), (0.0, 0.0, 0.0),
+        mat_pcb, story_mod, MO,
+    )
+    if _pcb is None:
+        fl.add_box(
+            "u_se_td_pcb",
+            _mm3((x_inv, cy, pcb_z)),
+            _mm3((pcb_w, pcb_d, pcb_t)),
+            mat_pcb,
+            module=story_mod,
+            module_objects=MO,
+        )
+    fl.add_box(
+        "u_se_td_pcb_edge_pads",
+        _mm3((x_inv - pcb_w * 0.40, y_inv - pcb_d * 0.40, pcb_z + pcb_t * 0.5 + 0.3)),
+        _mm3((pcb_w * 0.12, pcb_d * 0.10, 1.2)),
+        mat_pad,
+        module=story_mod,
+        module_objects=MO,
+    )
+    for hi, (hx, hy, hw, hd) in enumerate((
+        (-0.28, -0.18, 0.20, 0.24),
+        (0.05, -0.18, 0.18, 0.20),
+        (0.28, -0.10, 0.16, 0.18),
+        (-0.20, 0.16, 0.22, 0.16),
+    )):
+        fl.add_box(
+            f"u_se_td_pcb_package_{hi}",
+            _mm3((x_inv + pcb_w * hx, y_inv + pcb_d * hy, pcb_z + pcb_t * 0.5 + 2.5)),
+            _mm3((pcb_w * hw, pcb_d * hd, 5.0)),
+            mat_chip,
+            module=story_mod,
+            module_objects=MO,
+        )
+    for ci in range(3):
+        fl.add_cyl(
+            f"u_se_td_dclink_cap_{ci}",
+            _mm3((x_inv - inv_w * 0.28 + ci * inv_w * 0.22, y_inv - inv_d * 0.40, inv_z)),
+            9.0 * fl.MM,
+            28.0 * fl.MM,
+            mat_cap,
+            module=story_mod,
+            module_objects=MO,
+        )
+    # Short vertical INTERNAL phase busbars motor jacket → inverter underside.
+    for pi in range(3):
+        x_off = (pi - 1) * 22.0
+        fl.add_box(
+            f"u_se_td_phase_bus_{pi}",
+            _mm3((x_motor + x_off, y_motor - motor_od * 0.15, (z_motor + inv_z) * 0.5)),
+            _mm3((8.0, 8.0, max(12.0, abs(inv_z - z_motor) * 0.45))),
+            mat_ph[pi],
+            module=story_mod,
+            module_objects=MO,
+        )
+    fl.add_box(
+        "u_se_td_hv_bus",
+        _mm3((x_motor - inv_w * 0.20, y_face - 2.0, inv_z - inv_h * 0.10)),
+        _mm3((inv_w * 0.35, 8.0, 8.0)),
+        mat_bus,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # Rotor / stator hints for ghost cutaway authenticity (not exterior).
+    fl.add_cyl(
+        "u_se_td_rotor_hint",
+        _mm3((x_motor, y_motor, z_motor)),
+        motor_od * 0.22 * fl.MM,
+        motor_len * 0.55 * fl.MM,
+        mat_copper,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+    )
+    fl.add_cyl(
+        "u_se_td_stator_hint",
+        _mm3((x_motor, y_motor, z_motor)),
+        motor_od * 0.38 * fl.MM,
+        motor_len * 0.50 * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+    )
+    mode = "bay-fill unitised brick (front-axle packaging wins)" if bay_fill else (
+        "open cradle + transverse MGU + gear + SiC"
+    )
+    print(
+        f"[univ][sealed] TRACTION cassette: {mode} "
+        f"(span {cas_w:.0f}×{cas_d:.0f}×{cas_h:.0f} mm)"
+    )
+    # INTENT (2026-07-29 JLR front FPK): syringe/thermocycler/optical dump
+    # form-meshes.json so render-quality-audit does NOT floor Renders as
+    # BLENDER_UNIVERSAL_FALLBACK. Traction bay-fill was the gap — story meshes
+    # existed but never wrote the receipt.
+    try:
+        _out = os.environ.get("BLENDER_OUT_DIR") or ""
+        if _out and hasattr(bpy, "data"):
+            _names = sorted(
+                o.name for o in bpy.data.objects
+                if getattr(o, "type", None) == "MESH"
+                and str(o.name).startswith("u_se_td_")
+            )
+            if len(_names) >= 8:
+                Path(_out).joinpath("form-meshes.json").write_text(
+                    json.dumps(
+                        {
+                            "form": "traction_drive_bay_fill" if bay_fill else "traction_drive_pack",
+                            "form_id": "traction_drive",
+                            "meshes": _names,
+                            "bay_fill": bool(bay_fill),
+                        },
+                        indent=2,
+                    )
+                )
+                print(
+                    f"[univ][sealed] form-meshes.json dumped "
+                    f"({len(_names)} u_se_td_* meshes, bay_fill={bool(bay_fill)})"
+                )
+    except Exception as _dump_exc:
+        print(f"[univ][sealed] traction form-meshes dump skipped: {_dump_exc}")
 
 
 def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
@@ -18498,7 +19056,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         lambda k: ((-W / 2 - _sk_off(k), 0.0), (t, idep * 0.9), "left"),
         lambda k: ((W / 2 + _sk_off(k), 0.0), (t, idep * 0.9), "right"),
     ]
-    if not _IS_INSTRUMENT_DEVICE:
+    # INTENT (0846 traction): skin face plates (shield covers / mounting ears as
+    # tall wall slabs) dominate 04–07 and read as abstract Lego blocks in front of
+    # the motor nose. Traction morphology is u_se_td_* — skip skin plates the same
+    # way instruments do.
+    if not _IS_INSTRUMENT_DEVICE and not _IS_TRACTION_DRIVE_FORM:
         for i, p in enumerate(sorted(skin, key=lambda p: str(p.name))):
             (cx, cy), (pw, pd), _face = faces[i % len(faces)](i // len(faces))
             p.shape = "box"
@@ -18509,7 +19071,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         if skin:
             print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
     elif skin:
-        print(f"[univ][sealed] instrument: {len(skin)} skin part(s) skipped (exterior details on closed views)")
+        _why = "traction u_se_td_* morphology" if _IS_TRACTION_DRIVE_FORM else "exterior details on closed views"
+        print(f"[univ][sealed] {'traction' if _IS_TRACTION_DRIVE_FORM else 'instrument'}: "
+              f"{len(skin)} skin part(s) skipped ({_why})")
 
     if _IS_INSTRUMENT_DEVICE:
         # FLOW: story meshes → coverage proxies → parts-manifest (INSPECT pass)
@@ -19815,7 +20379,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # optical instrument uses the stylized interior story (_place_instrument_zone_story);
         # dropping LFP cell rows + fan ducts here is what made the colorimeter hero read
         # as a Powerwall cabinet (2026-07-13).
-        if not _IS_INSTRUMENT_DEVICE:
+        # GOTCHA (2026-07-29 FE MGU): traction packs also have isInstrumentDevice=False,
+        # so this used to paste a Powerwall cell wall + orphan PCB behind the MGU and
+        # hide the real inverter board / phase harness. Traction electronics live in
+        # `_place_traction_drive_pack_layout` (u_se_td_pcb / phase cables).
+        if not _IS_INSTRUMENT_DEVICE and not _IS_TRACTION_DRIVE_FORM:
             wall_mat = fl.make_mat("m_se_wall", fl._to_linear((0.42, 0.43, 0.45)),
                                    metallic=0.0, roughness=0.9)
             _ww, _wh = W * 6.0, H * 2.2
@@ -20022,6 +20590,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             print(f"[univ][sealed] HERO functional detail: fin bank ×{_n_fins}, 3 capacitors, "
                   f"PCB + 4 chips, HV busbar, 2 bladed fans + duct, 6 pack seams, "
                   f"3 interface terminals/glands")
+        elif _IS_TRACTION_DRIVE_FORM:
+            print("[univ][sealed] traction hero: skip BESS cell-wall/PCB paste — "
+                  "electronics are u_se_td_pcb + phase/HV harness on the axial pack")
         else:
             print("[univ][sealed] instrument hero: optical-bench story only (no BESS functional detail)")
         print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
@@ -25948,14 +26519,46 @@ def main():
         span = max(bbox["x1"] - bbox["x0"], bbox["y1"] - bbox["y0"]) * fl.MM
         # INTENT: instruments get a product-photography softbox rig + soft studio
         # world. Plants keep sun + Nishita (metals need sky reflections).
-        if _IS_INSTRUMENT_DEVICE and _SEALED_ENV_MM:
+        # GOTCHA (0846): traction packs force _IS_INSTRUMENT_DEVICE=False (not a
+        # lab instrument) but still need the softbox — Nishita+sun washed product
+        # exteriors to mean L≈172 and floored render_washed_out.
+        if (_IS_INSTRUMENT_DEVICE or _IS_TRACTION_DRIVE_FORM) and _SEALED_ENV_MM:
             _iw, _id, _ih = _SEALED_ENV_MM
+            # INTENT (2026-07-29): studio ground / softbox scale must track the
+            # DRAWN product, not the brief envelope. Traction hugs a ~0.4 m train
+            # inside a larger sealed env — using max(env) made the contact plane
+            # (and Preview framing) look miles wide under a hand-baggage pack.
             _extent_m = max(_iw, _id, _ih) * fl.MM
+            _half_h_m = (_ih / 2.0) * fl.MM
+            if _IS_TRACTION_DRIVE_FORM:
+                try:
+                    _V = __import__("mathutils").Vector
+                    _xs, _ys, _zs = [], [], []
+                    for _o in bpy.data.objects:
+                        if getattr(_o, "type", None) != "MESH":
+                            continue
+                        if not str(_o.name).startswith("u_se_td_"):
+                            continue
+                        if _o.hide_render:
+                            continue
+                        for _c in _o.bound_box:
+                            _w = _o.matrix_world @ _V(_c)
+                            _xs.append(_w.x); _ys.append(_w.y); _zs.append(_w.z)
+                    if _xs:
+                        _extent_m = max(
+                            max(_xs) - min(_xs),
+                            max(_ys) - min(_ys),
+                            max(_zs) - min(_zs),
+                            0.12,
+                        )
+                        _half_h_m = max((max(_zs) - min(_zs)) * 0.5, 0.04)
+                except Exception as _ee:  # noqa: BLE001
+                    print(f"[univ][render] traction studio extent fallback: {_ee}")
             _cz = (DECK_Z_MM + _ih / 2.0) * fl.MM
             fl.add_instrument_studio_lights(
                 centre_m=(0.0, 0.0, _cz),
                 extent_m=_extent_m,
-                product_half_height_m=(_ih / 2.0) * fl.MM,
+                product_half_height_m=_half_h_m,
                 key_energy=ifg.INSTRUMENT_STUDIO_KEY_ENERGY,
                 fill_energy=ifg.INSTRUMENT_STUDIO_FILL_ENERGY,
                 rim_energy=ifg.INSTRUMENT_STUDIO_RIM_ENERGY,
@@ -25966,7 +26569,10 @@ def main():
                 strength=ifg.INSTRUMENT_STUDIO_WORLD_STRENGTH)
             fl.apply_instrument_color_management(
                 exposure_bias=ifg.INSTRUMENT_EXPOSURE_BIAS)
-            print("[univ][render] instrument product-studio lights + soft world "
+            _studio_kind = (
+                "traction-pack" if _IS_TRACTION_DRIVE_FORM else "instrument"
+            )
+            print(f"[univ][render] {_studio_kind} product-studio lights + soft world "
                   f"(key={ifg.INSTRUMENT_STUDIO_KEY_ENERGY} "
                   f"exposure={ifg.INSTRUMENT_EXPOSURE_BIAS})")
             # Prefer higher Cycles samples for product shots unless the caller
@@ -26019,7 +26625,7 @@ def main():
         #    setup set 2400×1600/64; bump here (nothing resets between) for a crisper final.
         #    Instruments get a slightly higher product-shot resolution.
         try:
-            if _IS_INSTRUMENT_DEVICE:
+            if _IS_INSTRUMENT_DEVICE or _IS_TRACTION_DRIVE_FORM:
                 _rx, _ry = ifg.INSTRUMENT_RENDER_RESOLUTION
                 _scn.render.resolution_x, _scn.render.resolution_y = _rx, _ry
                 # apply_instrument_color_management already set exposure bias;
@@ -26321,11 +26927,12 @@ def main():
                     _ground_hidden = []
                     for _go in bpy.data.objects:
                         # BOTH ground prefixes. The studio floor for an instrument scene is
-                        # `fl_ground_instrument_studio` (a 1.94 x 1.94 m plane sitting at the
-                        # product's own base height), NOT `u_ground_*` — matching only the
-                        # latter left it visible, and the top-down camera stared straight at
-                        # it. Matched by explicit PREFIX, never `"ground" in name`, because
-                        # that would also hide electrical grounding/earth-bonding parts.
+                        # `fl_ground_instrument_studio` (product-hugging plane at the
+                        # product's own base height — see instrument_studio_ground_size_m),
+                        # NOT `u_ground_*` — matching only the latter left it visible, and
+                        # the top-down camera stared straight at it. Matched by explicit
+                        # PREFIX, never `"ground" in name`, because that would also hide
+                        # electrical grounding/earth-bonding parts.
                         if (_go.name.startswith(("u_ground_", "fl_ground_"))
                                 and not _go.hide_render):
                             _go.hide_render = True
@@ -26446,30 +27053,106 @@ def main():
                         _vo.hide_viewport = bool(_vo.hide_render)
 
                     def _export_3d(_stem):
-                        _glb = str(Path(out_dir) / f"{_stem}.glb")
+                        # INTENT (2026-07-29): studio contact plane is for Cycles
+                        # soft-shadows only. Shipping it in GLB/USDZ inflates the
+                        # AABB so Quick Look / 3D Viewer open on a miles-away speck.
+                        # Product already has its own pack/base mesh — hide fl_ground_*.
+                        # GOTCHA: even without that plane, macOS Preview draws its OWN
+                        # infinite stage. If the product floats at Z≈0.3 (Blender deck
+                        # height) the default camera pulls back to show empty air under
+                        # the pack — same "miles away" look. Snap underside to Z=0 and
+                        # centre XY for the export only, then restore.
+                        _V = __import__("mathutils").Vector
+                        _g_snap = []
+                        for _go in bpy.data.objects:
+                            if _go.name.startswith("fl_ground_"):
+                                _g_snap.append(
+                                    (_go, _go.hide_render, _go.hide_viewport))
+                                _go.hide_render = True
+                                _go.hide_viewport = True
+                        _loc_snap = []
+                        _cam_kill = []
                         try:
-                            bpy.ops.export_scene.gltf(
-                                filepath=_glb, export_format='GLB',
-                                use_renderable=True, export_apply=True)
-                            print(f"[univ][ghost3d] {_stem}.glb → {out_dir}")
-                        except Exception as _ge:  # noqa: BLE001
-                            print(f"[univ][ghost3d] {_stem}.glb skipped: {_ge}")
-                        _usd = str(Path(out_dir) / f"{_stem}.usdz")
-                        try:
-                            # This Blender's usd_export has NO `visible_objects_only`
-                            # (verified against the operator's own RNA: it exposes only
-                            # `selected_objects_only`). Because viewport visibility has
-                            # already been synced to render visibility above, a select-all
-                            # can only pick up objects that are actually visible — hidden
-                            # ones are not selectable — so selection IS the visible set.
-                            bpy.ops.object.select_all(action='SELECT')
-                            bpy.ops.wm.usd_export(
-                                filepath=_usd, selected_objects_only=True,
-                                export_materials=True)
-                            bpy.ops.object.select_all(action='DESELECT')
-                            print(f"[univ][ghost3d] {_stem}.usdz → {out_dir}")
-                        except Exception as _ue:  # noqa: BLE001
-                            print(f"[univ][ghost3d] {_stem}.usdz skipped: {_ue}")
+                            _mesh_vis = [
+                                o for o in bpy.data.objects
+                                if getattr(o, "type", None) == "MESH"
+                                and not o.hide_viewport and not o.hide_render
+                                and not o.name.startswith("fl_ground_")
+                            ]
+                            if _mesh_vis:
+                                _xs, _ys, _zs = [], [], []
+                                for _o in _mesh_vis:
+                                    for _c in _o.bound_box:
+                                        _w = _o.matrix_world @ _V(_c)
+                                        _xs.append(_w.x); _ys.append(_w.y); _zs.append(_w.z)
+                                _dx = -((_xs and (min(_xs) + max(_xs)) / 2) or 0.0)
+                                _dy = -((_ys and (min(_ys) + max(_ys)) / 2) or 0.0)
+                                _dz = -(min(_zs) if _zs else 0.0)
+                                for _o in _mesh_vis:
+                                    _loc_snap.append((_o, _o.location.copy()))
+                                    _o.location += _V((_dx, _dy, _dz))
+                                bpy.context.view_layer.update()
+                                _span = max(
+                                    (max(_xs) - min(_xs)) if _xs else 0.1,
+                                    (max(_ys) - min(_ys)) if _ys else 0.1,
+                                    (max(_zs) - min(_zs)) if _zs else 0.1,
+                                    0.08,
+                                )
+                                # Default framing camera — viewers that honour it
+                                # open on the product, not an empty stage.
+                                try:
+                                    _h = (max(_zs) - min(_zs)) if _zs else _span * 0.4
+                                    bpy.ops.object.camera_add(
+                                        location=(_span * 1.15, -_span * 1.35, _h * 0.55 + _span * 0.35))
+                                    _cam = bpy.context.active_object
+                                    _cam.name = "u_product_viewer_cam"
+                                    _cam.data.clip_start = 0.001
+                                    _cam.data.clip_end = max(50.0, _span * 40.0)
+                                    _dir = _V((0.0, 0.0, _h * 0.45)) - _cam.location
+                                    _cam.rotation_euler = _dir.to_track_quat("-Z", "Y").to_euler()
+                                    bpy.context.scene.camera = _cam
+                                    _cam_kill.append(_cam)
+                                except Exception as _ce:  # noqa: BLE001
+                                    print(f"[univ][ghost3d] viewer camera skipped: {_ce}")
+                            _glb = str(Path(out_dir) / f"{_stem}.glb")
+                            try:
+                                bpy.ops.export_scene.gltf(
+                                    filepath=_glb, export_format='GLB',
+                                    use_renderable=True, export_apply=True,
+                                    export_cameras=True)
+                                print(f"[univ][ghost3d] {_stem}.glb → {out_dir} "
+                                      f"(grounded + viewer cam)")
+                            except Exception as _ge:  # noqa: BLE001
+                                print(f"[univ][ghost3d] {_stem}.glb skipped: {_ge}")
+                            _usd = str(Path(out_dir) / f"{_stem}.usdz")
+                            try:
+                                # This Blender's usd_export has NO `visible_objects_only`
+                                # (verified against the operator's own RNA: it exposes only
+                                # `selected_objects_only`). Because viewport visibility has
+                                # already been synced to render visibility above, a select-all
+                                # can only pick up objects that are actually visible — hidden
+                                # ones are not selectable — so selection IS the visible set.
+                                bpy.ops.object.select_all(action='SELECT')
+                                bpy.ops.wm.usd_export(
+                                    filepath=_usd, selected_objects_only=True,
+                                    export_materials=True)
+                                bpy.ops.object.select_all(action='DESELECT')
+                                print(f"[univ][ghost3d] {_stem}.usdz → {out_dir}")
+                            except Exception as _ue:  # noqa: BLE001
+                                print(f"[univ][ghost3d] {_stem}.usdz skipped: {_ue}")
+                        finally:
+                            for _cam in _cam_kill:
+                                try:
+                                    bpy.data.objects.remove(_cam, do_unlink=True)
+                                except Exception:  # noqa: BLE001
+                                    pass
+                            for _o, _loc in _loc_snap:
+                                _o.location = _loc
+                            if _loc_snap:
+                                bpy.context.view_layer.update()
+                            for _go, _hr, _hv in _g_snap:
+                                _go.hide_render = _hr
+                                _go.hide_viewport = _hv
 
                     _export_3d("product-3d-shell-on")
                     # SHELL OFF — hide the shell panels + front cover only. Everything

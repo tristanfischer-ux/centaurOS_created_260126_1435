@@ -578,6 +578,21 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
             from render_view_contract import is_product_scale as _is_product_scale
             meta["is_product_scale"] = bool(_is_product_scale(_st))
+            # INTENT (2026-07-29 FE MGU SIGHT): traction packs are product-scale but
+            # NOT instruments — the Powerwall FFL-fit path crushed the axial train
+            # into the brief envelope (452×225×175) while Blender drew a ~365×151
+            # pack. Detect the same noun signal Blender uses and project faithfully.
+            meta["is_traction_drive_pack"] = False
+            try:
+                import instrument_form_grammar as _ifg_ga
+                _blob_ga = " ".join(
+                    str(r.get("name") or "") for r in (man.get("parts") or [])[:40])
+                meta["is_traction_drive_pack"] = bool(
+                    _ifg_ga.is_traction_drive_pack_form(
+                        product_class=_pc, part_blob=_blob_ga))
+            except Exception:  # noqa: BLE001
+                meta["is_traction_drive_pack"] = bool(
+                    re.search(r"\bmgu\b|traction|ipmsm|powertrain", _pc, re.I))
             if meta["is_instrument_device"] or meta["is_product_scale"]:
                 # Prefer the SAME envelope the Renders captions publish
                 # (design_envelope_* mm) so GA L×W×H cannot disagree with the hero.
@@ -751,6 +766,44 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                     print(f"[ga] projecting the AS-PLACED Blender layout "
                           f"(manifest coordinates, real sizes, no clamp) "
                           f"— datum={'shell floor' if _faithful else 'manifest origin'}")
+                elif meta.get("is_traction_drive_pack") and parts:
+                    # INTENT (2026-07-29): Blender owns the axial train. GA must
+                    # PROJECT those coordinates — never re-fit into brief L×W×H
+                    # (that left motor/gear/SiC floating inside a larger empty box).
+                    _man_bb = man.get("bbox_mm") or {}
+                    try:
+                        _pl = float(_man_bb.get("length_mm") or 0.0)
+                        _pw = float(_man_bb.get("width_mm") or 0.0)
+                        _ph = float(_man_bb.get("height_mm") or 0.0)
+                    except (TypeError, ValueError):
+                        _pl = _pw = _ph = 0.0
+                    if _pl < 1.0 or _pw < 1.0 or _ph < 1.0:
+                        _pad = 8.0
+                        _pl = (max(p.x1 for p in parts) - min(p.x0 for p in parts)
+                               + 2.0 * _pad)
+                        _pw = (max(p.y1 for p in parts) - min(p.y0 for p in parts)
+                               + 2.0 * _pad)
+                        _ph = (max(p.z1 for p in parts) - min(p.z0 for p in parts)
+                               + 2.0 * _pad)
+                    else:
+                        # Small apron so the dashed pack outline clears outermost
+                        # ports without re-inflating to the brief envelope.
+                        _pl += 16.0
+                        _pw += 16.0
+                        _ph += 8.0
+                    ww, dd, hh = _pl, _pw, _ph
+                    bbox = _instrument_envelope_bbox(ww, dd, hh)
+                    meta["envelope_source"] = "traction_placed_pack_bbox"
+                    meta["envelope_ww"] = ww
+                    meta["envelope_dd"] = dd
+                    meta["envelope_hh"] = hh
+                    _faithful = _project_instrument_parts_as_placed(parts)
+                    meta["instrument_faithful_projection"] = _faithful
+                    meta["traction_faithful_projection"] = True
+                    print(f"[ga] traction pack: projecting AS-PLACED Blender train "
+                          f"(envelope {_pl:.0f}×{_pw:.0f}×{_ph:.0f} mm from placed "
+                          f"bbox — not brief design_envelope) "
+                          f"— datum={'shell/base floor' if _faithful else 'manifest origin'}")
                 elif meta["is_product_scale"] and parts:
                     # INTENT (Powerwall 0332): envelope bbox alone is not enough —
                     # floating world-Z parts still paint in the upper half of a
@@ -2041,11 +2094,16 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # INTENT (2026-07-14 Powerwall): sealed product GA must lead with the FRONT
     # cutaway view — the plant-style top plan of a 618×182 mm wall cabinet is a
     # tag pile-up that cannot match the Blender hero a reader compares against.
-    product_mode = bool(meta.get("is_product_scale") or meta.get("is_instrument_device"))
+    product_mode = bool(
+        meta.get("is_product_scale")
+        or meta.get("is_instrument_device")
+        or meta.get("is_traction_drive_pack"))
     # Instruments with seated parts: TOP carries tags (real assembly plan).
     # Thin wall cabinets still defer TOP tags to FRONT.
+    # Traction axial packs keep TOP tags — that plan is the Blender train.
     thin_top = (
         (product_mode and not meta.get("is_instrument_device")
+         and not meta.get("is_traction_drive_pack")
          and (W / max(L, 1.0)) < 0.45)
     )
 
@@ -2054,11 +2112,13 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     if product_mode:
         # Handheld instruments need a close scale (≤1:5) so the L-body reads;
         # wall cabinets still use the wide FRONT budget.
-        if meta.get("is_instrument_device"):
+        if meta.get("is_instrument_device") or meta.get("is_traction_drive_pack"):
             # GOTCHA: choose_scale() bottoms out at 1:20 for sub-metre envelopes
             # (its series is plant-oriented). Handhelds need 1:2 so the L-body
             # + optical cube fill the sheet the way the Blender product shot does.
-            sx = sy = sz = 2.0
+            # Traction packs (~0.4 m) use 1:5 — 1:20 left the train as a stamp
+            # inside an empty brief envelope (2026-07-29 FE MGU SIGHT).
+            sx = sy = sz = (5.0 if meta.get("is_traction_drive_pack") else 2.0)
         else:
             sx, _ = choose_scale(L, 720.0)
             sy, _ = choose_scale(W, 160.0)
@@ -2135,11 +2195,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     if product_mode:
         svg.text(plan_x, plan_y - 30, "TOP", size=13, weight="bold", fill=EQ_INK,
                  spacing="1.5")
-        _top_sub = (
-            "(looking down · internal arrangement)"
-            if meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway")
-            else "(looking down · secondary)"
-        )
+        if meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway"):
+            _top_sub = "(looking down · internal arrangement)"
+        elif meta.get("is_traction_drive_pack"):
+            _top_sub = "(looking down · axial pack · matches Blender)"
+        else:
+            _top_sub = "(looking down · secondary)"
         svg.text(plan_x + 42, plan_y - 30, _top_sub, size=9.5, fill=MUTED)
     else:
         svg.text(plan_x, plan_y - 30, "PLAN", size=13, weight="bold", fill=EQ_INK,
@@ -2197,12 +2258,15 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         for item in _instrument_zone_tag_items(_plan_zone_src):
             _instrument_plan_tag_ids.add(id(item[0]))
 
+    _hull_from_envelope = bool(
+        _form is not None or meta.get("is_traction_drive_pack"))
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.y1 - q.y0, 1))):
-        # Instrument shells = envelope outline (already drawn); clutter = schedule-only.
+        # Instrument / traction shells = envelope outline (already drawn); clutter
+        # = schedule-only on instrument form sheets.
         if _form is not None and _is_instrument_clutter(p):
             continue
-        if _form is not None and _is_instrument_shell(p):
-            continue          # the envelope is drawn once, below, from the canonical dims
+        if _hull_from_envelope and _is_instrument_shell(p):
+            continue          # the envelope is drawn once from the canonical dims
         if _is_face_skin(p):
             continue
         pw = (p.x1 - p.x0) * ppm
@@ -2303,6 +2367,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
             _front_sub = "(cover removed · assembly internals)"
         elif meta.get("is_instrument_device"):
             _front_sub = "(product form · matches Blender exterior)"
+        elif meta.get("is_traction_drive_pack"):
+            _front_sub = "(shell ghosted · axial train on base)"
         else:
             _front_sub = "(door removed · looking in)"
         svg.text(front_x + 68, front_y - 14, _front_sub, size=9.5, fill=MUTED)
@@ -2399,13 +2465,19 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                 f'data-z-shift-mm="{_z_sh:.3f}"/>')
     _env_h = float(meta.get("envelope_hh") or 0.0)
     _env_w = float(meta.get("envelope_ww") or 0.0)
-    if meta.get("is_instrument_device") and _env_h > 0 and _env_w > 0:
+    # INTENT (2026-07-29): traction packs need the same dashed hull so the train
+    # reads as INSIDE a pack, not boxes floating on the FFL line.
+    if ((meta.get("is_instrument_device") or meta.get("is_traction_drive_pack"))
+            and _env_h > 0 and _env_w > 0):
         _e_y = front_y + (z_max - _env_h) * ppm
         svg.rect(front_x + mx(-_env_w / 2.0), _e_y, _env_w * ppm, _env_h * ppm,
                  stroke=EQ_INK, width=1.6, fill="#f7f9fb", dash="6,3")
     front_items = []
+    _skip_shell_box = bool(
+        _form is not None or meta.get("is_traction_drive_pack"))
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.z1 - q.z0, 1))):
-        if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
+        if _skip_shell_box and (_is_instrument_shell(p) or (
+                _form is not None and _is_instrument_clutter(p))):
             continue
         pw = (p.x1 - p.x0) * ppm
         ph = (p.z1 - p.z0) * ppm
@@ -2535,7 +2607,9 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
             svg.text(stx + td * ppm / 2, sty + 10, "OPTICAL",
                      size=7.0, anchor="middle", fill=MUTED)
     for p in sorted(parts, key=lambda q: -(max(q.y1 - q.y0, 1) * max(q.z1 - q.z0, 1))):
-        if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
+        if _hull_from_envelope and _is_instrument_shell(p):
+            continue
+        if _form is not None and _is_instrument_clutter(p):
             continue
         pw = (p.y1 - p.y0) * ppm
         ph = (p.z1 - p.z0) * ppm
@@ -2778,6 +2852,7 @@ def _absurd_schedule_part(p) -> bool:
         r"subcomponent\s*\d+|sensing\s+instrumentation\s+subcomponent|"
         r"enclosure\s+shell|lid\s+shroud|mounting\s+bezel|"
         r"ambient\s+light\s+cap|sensor\s+interconnect\s+cable|"
+        r"traction\s*pack\s*base|pack\s*base|"
         r"qwiic|stemma\s*header|fastener\s*set|cuvette\s*consumable)\b",
         name, re.I,
     ):
@@ -2971,6 +3046,11 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
         _view_note = (
             "Front (product form) + top + side · matches Blender exterior composition · "
             "dimensions in millimetres unless noted."
+        )
+    elif meta.get("is_traction_drive_pack"):
+        _view_note = (
+            "Front (shell ghosted) + top + side · axial motor|gear|inverter train · "
+            "matches Blender pack layout · dimensions in millimetres unless noted."
         )
     elif meta.get("is_product_scale"):
         _view_note = (
@@ -3804,6 +3884,93 @@ def _selftest() -> int:
         bad += 1
     else:
         print(f"  PASS ga-shell-caption-h: caption '{_expect_triple}' == shell dims")
+    # 10 — proveCatch (2026-07-29 FE MGU): traction pack GA must PROJECT the
+    #     Blender axial train (faithful), NOT fit into brief design_envelope.
+    #     Adversarial: brief 452×225×175 while placed pack bbox is ~365×151×126.
+    import tempfile as _tmp_td
+    _td_td = _tmp_td.mkdtemp(prefix="ga-traction-")
+    _td_man = {
+        "schema": "parts-manifest/v1",
+        "count": 3,
+        "placement_fp": "tractiontestfp0001",
+        "bbox_mm": {
+            "x_min_mm": -189.0, "x_max_mm": 175.5,
+            "y_min_mm": -72.0, "y_max_mm": 79.0,
+            "z_min_mm": 319.7, "z_max_mm": 445.7,
+            "length_mm": 364.5, "width_mm": 151.0, "height_mm": 126.0,
+        },
+        "parts": [
+            {"tag": "X-116", "equipment_tag": "X-116",
+             "name": "Traction Ipmsm Motor Generator",
+             "pos_mm": [-119.0, 0.0, 382.7],
+             "dims_mm": {"w": 140.0, "d": 126.0, "h": 126.0},
+             "geometry_source": "traction_drive_story_mesh"},
+            {"tag": "X-117", "equipment_tag": "X-117",
+             "name": "Reduction Gear Stage",
+             "pos_mm": [-25.4, 0.0, 372.1],
+             "dims_mm": {"w": 68.0, "d": 107.1, "h": 96.2},
+             "geometry_source": "traction_drive_story_mesh"},
+            {"tag": "INV-1", "equipment_tag": "INV-1",
+             "name": "SiC Traction Inverter",
+             "pos_mm": [110.5, 0.0, 366.0],
+             "dims_mm": {"w": 130.0, "d": 143.9, "h": 84.0},
+             "geometry_source": "traction_drive_story_mesh"},
+        ],
+    }
+    Path(_td_td, "parts-manifest.json").write_text(json.dumps(_td_man))
+    Path(_td_td, "state.json").write_text(json.dumps({
+        "isInstrumentDevice": False,
+        "parsedBrief": {"product_class": "formula_e_rear_mgu"},
+        "orchestratorContract": {
+            "product_class": "formula_e_rear_mgu",
+            "quantities": {
+                "design_envelope_width_mm": {"value": 452},
+                "design_envelope_depth_mm": {"value": 225},
+                "design_envelope_height_mm": {"value": 175},
+                "enclosure_volume_m3": {"value": 0.018},
+            },
+        },
+    }))
+    _td_parts, _td_bbox, _td_meta = load_manifest(_td_td)
+    if not _td_meta.get("is_traction_drive_pack"):
+        print("  FAIL ga-traction-faithful: must classify formula_e_rear_mgu as "
+              "traction drive pack")
+        bad += 1
+    if not _td_meta.get("traction_faithful_projection"):
+        print("  FAIL ga-traction-faithful: must use faithful Blender projection "
+              f"(got meta keys {[k for k in _td_meta if 'traction' in k or 'fit' in k or 'faithful' in k]})")
+        bad += 1
+    if _td_meta.get("product_fit_projection"):
+        print("  FAIL ga-traction-faithful: must NOT use product FFL-fit "
+              "(that is the floating-boxes-in-brief-envelope defect)")
+        bad += 1
+    if _td_meta.get("envelope_source") != "traction_placed_pack_bbox":
+        print(f"  FAIL ga-traction-faithful: envelope_source must be "
+              f"traction_placed_pack_bbox, got {_td_meta.get('envelope_source')!r}")
+        bad += 1
+    _cap_l = float(_td_bbox.get("length_mm") or 0)
+    if _cap_l > 420:
+        print(f"  FAIL ga-traction-faithful: envelope length {_cap_l:.0f} mm still "
+              f"looks like brief 452 — must hug placed pack (~365+pad)")
+        bad += 1
+    # Motor left of gear left of inverter (axial train order).
+    _by_tag = {p.tag: p for p in _td_parts}
+    if not (_by_tag["X-116"].cx < _by_tag["X-117"].cx < _by_tag["INV-1"].cx):
+        print("  FAIL ga-traction-faithful: axial order must stay "
+              f"motor < gear < inverter "
+              f"(got {[(_by_tag[t].tag, _by_tag[t].cx) for t in ('X-116','X-117','INV-1')]})")
+        bad += 1
+    _td_svg = build_ga_svg(_td_parts, _td_bbox, "formula_e_rear_mgu", _td_meta)
+    if "452" in _td_svg and "product envelope 452" in _td_svg:
+        print("  FAIL ga-traction-faithful: caption must not publish brief "
+              "452 mm envelope when placed pack is smaller")
+        bad += 1
+    if "axial" not in _td_svg.lower() and "shell ghosted" not in _td_svg.lower():
+        print("  FAIL ga-traction-faithful: sheet must label the traction "
+              "assembly view (not 'door removed')")
+        bad += 1
+    else:
+        print("  PASS ga-traction-faithful: placed-pack envelope + axial train")
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0
 

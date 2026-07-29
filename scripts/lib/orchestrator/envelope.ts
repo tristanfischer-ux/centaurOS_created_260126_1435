@@ -291,6 +291,13 @@ const CLASS_ALIASES: Record<string, string> = {
   ev_drive_unit: 'formula_e_rear_mgu',
   rear_mgu: 'formula_e_rear_mgu',
   formula_e_mgu: 'formula_e_rear_mgu',
+  // formula_e_front_mgu — Gen3/Evo SPEC front FPK (2026-07-29). Bay packaging
+  // volume forces form; do NOT alias into rear manufacturer cassette.
+  formula_e_front_mgu: 'formula_e_front_mgu',
+  front_mgu: 'formula_e_front_mgu',
+  front_powertrain_kit: 'formula_e_front_mgu',
+  fpk: 'formula_e_front_mgu',
+  lucid_fpk: 'formula_e_front_mgu',
 }
 
 function normaliseClass(raw: string): string | null {
@@ -1068,6 +1075,31 @@ function formulaERearMguFormFactor(_: string | null, _c: ParsedConstraints): str
 }
 function formulaERearMguApplication(_: string | null, _c: ParsedConstraints): string {
   return 'formula_e_rear_powertrain'
+}
+
+// formula_e_front_mgu — Gen3/Evo SPEC front FPK ----------------------
+// INTENT: Front-axle bay packaging volume forces scale/form. Class stays
+// underscore so FIA tools + bay-fill morphology match.
+function formulaEFrontMguScaleTier(c: ParsedConstraints): string | null {
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'mgu|front|fpk|regen|axle')
+    if (viaDesc !== null) kw = viaDesc
+  }
+  // Public Gen3 front regen cap 250 kW; hardware class often cited 350 kW.
+  if (Number.isNaN(kw)) return 'formula_e_gen3_front_fpk'
+  if (kw <= 250) return 'formula_e_gen3_front_fpk'
+  return 'formula_e_gen3_front_fpk_hw'
+}
+function formulaEFrontMguVoltageTier(_: string | null, c: ParsedConstraints): VoltageTier {
+  if (c.voltage_class_v) return classifyVoltage(c.voltage_class_v)
+  return 'medium'
+}
+function formulaEFrontMguFormFactor(_: string | null, _c: ParsedConstraints): string {
+  return 'front_axle_bay_unitised_fpk'
+}
+function formulaEFrontMguApplication(_: string | null, _c: ParsedConstraints): string {
+  return 'formula_e_front_powertrain'
 }
 
 // satellite_cubesat -------------------------------------------
@@ -1962,6 +1994,12 @@ const DETECTORS: Record<string, ClassDetectors> = {
     voltageTier: formulaERearMguVoltageTier,
     formFactor: formulaERearMguFormFactor,
     application: formulaERearMguApplication,
+  },
+  formula_e_front_mgu: {
+    scaleTier: formulaEFrontMguScaleTier,
+    voltageTier: formulaEFrontMguVoltageTier,
+    formFactor: formulaEFrontMguFormFactor,
+    application: formulaEFrontMguApplication,
   },
   satellite_cubesat: {
     scaleTier: cubesatScaleTier,

@@ -119,6 +119,7 @@ const CLASS_DOMAIN: Record<string, ClassDomain> = {
   cnc_machine: 'terrestrial',
   e_bike: 'terrestrial',
   formula_e_rear_mgu: 'terrestrial',
+  formula_e_front_mgu: 'terrestrial',
   ventilator: 'terrestrial',
   dialysis_machine: 'terrestrial',
   quantum_computer: 'terrestrial',

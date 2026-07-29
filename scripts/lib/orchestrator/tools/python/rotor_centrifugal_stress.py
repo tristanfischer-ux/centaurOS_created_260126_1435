@@ -66,13 +66,27 @@ def solve(inp: dict) -> dict:
     pa_per_mpa = 1e6
 
     worked = []
+    # GOTCHA (0846): label must NOT be bare "Rotor tip speed" — Verification
+    # contract↔calc matched that to tip_speed_m_s (base-speed from IPMSM) and
+    # failed at 10% while Tool-output-used also saw STALE after overwrite.
+    # Retention tip is a distinct condition from base tip.
     worked.append(worked_calc(
-        label="Rotor tip speed",
+        label="Rotor tip speed at retention rpm",
         formula="v_tip = omega x r",
         values={"omega": (omega_r, "rad/s"), "r": (r_r, "m")},
         result=tip_r,
         result_unit="m/s",
-        assumptions=["rim radius = rotor OD / 2"],
+        assumptions=["rim radius = rotor OD / 2", "speed = retention rpm (tool input)"],
+    ))
+    # INTENT (0846): contract max_rotor_speed_rpm must reconcile to THIS tool's
+    # speed_rpm input (retention), not tip speed m/s (unit-family false FAIL).
+    worked.append(worked_calc(
+        label="Design max rotor speed (retention)",
+        formula="n_max = speed_rpm (tool input)",
+        values={"speed_rpm": (n, "rpm")},
+        result=round(n, 1),
+        result_unit="rpm",
+        assumptions=["retention / max-used rotor speed at the stress analysis point"],
     ))
     # DECISION: omega x omega / r x r (not ^2) so harness arithmetic re-evaluates cleanly
     worked.append(worked_calc(

@@ -28,6 +28,7 @@ export const GearRatioTractionTool: Tool<any, any> = {
   applicable_to(envelope) {
     return [
             'formula_e_rear_mgu',
+            'formula_e_front_mgu',
             'traction_mgu',
             'electric_powertrain',
             'ev_drive_unit',

@@ -498,13 +498,72 @@ def _is_instrument_mode(image_path: str) -> bool:
     return bool(st.get("isInstrumentDevice"))
 
 
+def _is_traction_drive_mode(image_path: str) -> bool:
+    """True for sealed traction MGU+SiC+gear packs — NOT wall-battery product rubric.
+
+    INTENT (2026-07-29 0846): enclosure_volume_m3 < 1 routed MGU heroes into
+    _PRODUCT_PROMPT ('dense lower battery pack') and false-broke a correct
+    motor housing + inverter brick + mounting ears render.
+    """
+    st = _load_run_state(image_path)
+    pc = _product_class(image_path)
+    blob = _part_blob_from_state(st)
+    fn = getattr(ifg, "is_traction_drive_pack_form", None)
+    if callable(fn) and fn(product_class=pc, part_blob=blob):
+        return True
+    return bool(re.search(
+        r"\bmgu\b|_mgu\b|mgu_|traction|ipmsm|powertrain|rear[_ -]?mgu",
+        pc, re.I,
+    ))
+
+
+# INTENT (2026-07-29 0846): traction drive pack — IPMSM + SiC inverter + gear +
+# cold plate in a sealed housing. NEVER score as wall-battery / BESS plant.
+_TRACTION_DRIVE_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D render of a "
+    "SEALED TRACTION DRIVE PACK (rear MGU cassette OR front-axle unitised FPK / "
+    "e-axle motor-generator + SiC traction inverter + reduction gear + cold plate — "
+    "NOT a wall battery, NOT a BESS skid, NOT a plant room, NOT a lab instrument).\n\n"
+    "Expect a compact charcoal cast/machined housing with: a cylindrical or barrel "
+    "motor volume, a gearbox/output-shaft end (halfshaft stubs when front FPK), a "
+    "flat SiC inverter / power-electronics brick or lid region, coolant ports / "
+    "cold-plate cues, an HV DC connector, and mounting ears / flanges. Front FPK "
+    "packs fill a tight axle bay envelope (dense unitised brick) — still must show "
+    "barrel + shaft/gear + inverter cues, not a hollow rectangular appliance frame. "
+    "A translucent cutaway showing rotor/stator + inverter brick + gear mesh is "
+    "intentional and desirable.\n\n"
+    "INTENTIONAL / DO NOT FLAG:\n"
+    "  • mounting ears, HV connector, coolant stubs protruding from the housing "
+    "(those are real service interfaces, not floating debris)\n"
+    "  • a translucent / ghosted housing that still reads as one assembled pack\n"
+    "  • absence of a 'lower battery pack' / BMS rack / PV bus — this product has none\n"
+    "  • absence of plant pipes, Mech Plant Rm, or optical-cube / cuvette language\n\n"
+    "Flag broken=true ONLY when any of these are present:\n"
+    "  • blank / empty render (no product visible)\n"
+    "  • parts floating with a clear gap of empty space and NO mounting relationship "
+    "to the housing (not merely ears/connectors on the exterior)\n"
+    "  • exploded / Lego-in-a-box scatter of same-size anonymous blocks\n"
+    "  • a featureless sealed brick with NO motor barrel, shaft/gear end, inverter "
+    "region, or service interfaces\n"
+    "  • a hollow rectangular frame / opaque curtain-wall box that hides the motor "
+    "barrel (packaging bay must constrain size, not become a blank appliance shell)\n"
+    "  • product cropped so small it is unreadable\n\n"
+    "A coherent traction pack with motor + inverter + gear cues and mounted "
+    "interfaces must PASS. Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
+)
+
+
 def _is_product_mode(image_path: str) -> bool:
     """Sealed-product runs (enclosure_volume_m3 < 1 in the contract) are judged by the
     PRODUCT rubric — a ghosted cutaway is intentional there, not 'not a real plant'
     (2026-07-11 run 60: the plant prompt flagged the product hero as 'abstract
     semi-transparent blocks'). Signal-keyed on the run's own contract, never a class.
-    Instruments use _INSTRUMENT_PROMPT instead (not the wall-battery product checklist)."""
+    Instruments use _INSTRUMENT_PROMPT instead (not the wall-battery product checklist).
+    Traction packs use _TRACTION_DRIVE_PROMPT (not wall-battery)."""
     if _is_instrument_mode(image_path):
+        return False
+    if _is_traction_drive_mode(image_path):
         return False
     try:
         st = _load_run_state(image_path)
@@ -528,6 +587,9 @@ def _prompt_for_image(image_path: str) -> str:
     # otherwise "no optical path" falsely breaks a correct channel-bay product.
     if _is_bench_power_instrument_mode(image_path):
         return _BENCH_POWER_INSTRUMENT_PROMPT
+    # INTENT (2026-07-29 0846): traction BEFORE sealed-product wall-battery rubric.
+    if _is_traction_drive_mode(image_path):
+        return _TRACTION_DRIVE_PROMPT
     if _is_instrument_mode(image_path):
         return _INSTRUMENT_PROMPT
     if _is_product_mode(image_path):
@@ -1140,6 +1202,59 @@ def _selftest() -> int:
     finally:
         import shutil as _sh
         _sh.rmtree(_td_bp, ignore_errors=True)
+
+    # proveCatch (2026-07-29 0846): sealed traction MGU must NOT use wall-battery
+    # _PRODUCT_PROMPT ('dense lower battery pack') — that false-broke a correct pack.
+    _td_td = _tf.mkdtemp(prefix="rvc_traction_")
+    try:
+        _td_state = {
+            "isInstrumentDevice": False,
+            "parsedBrief": {"product_class": "formula_e_rear_mgu"},
+            "orchestratorContract": {
+                "product_class": "formula_e_rear_mgu",
+                "quantities": {"enclosure_volume_m3": {"value": 0.018, "unit": "m³"}},
+            },
+            "moduleDecomposition": {
+                "product_class": "formula_e_rear_mgu",
+                "modules": [{"sub_modules": [{"words": [
+                    {"name_human": "Traction Ipmsm Motor Generator"},
+                    {"name_human": "SiC Traction Inverter"},
+                    {"name_human": "Reduction Gear Stage"},
+                ]}]}],
+            },
+        }
+        with open(os.path.join(_td_td, "state.json"), "w", encoding="utf-8") as fh:
+            json.dump(_td_state, fh)
+        _td_img = os.path.join(_td_td, "00-hero.png")
+        with open(_td_img, "wb") as fh:
+            fh.write(b"\x89PNG\r\ntraction-pack-fixture")
+        if not _is_traction_drive_mode(_td_img):
+            fails.append("TRACTION MODE: formula_e_rear_mgu + IPMSM/SiC must select "
+                         "traction-drive mode")
+        if _prompt_for_image(_td_img) is not _TRACTION_DRIVE_PROMPT:
+            fails.append("TRACTION ROUTING: must return _TRACTION_DRIVE_PROMPT "
+                         "(not wall-battery _PRODUCT_PROMPT)")
+        if "battery pack" in _TRACTION_DRIVE_PROMPT.lower() and \
+           "absence of a 'lower battery pack'" not in _TRACTION_DRIVE_PROMPT.lower():
+            fails.append("TRACTION RUBRIC: must not demand a lower battery pack")
+        if _is_product_mode(_td_img):
+            fails.append("TRACTION MODE: must NOT fall through to sealed-product "
+                         "wall-battery mode")
+        # Front FPK class must also select traction mode (bay-fill unitised pack).
+        _td_state["parsedBrief"]["product_class"] = "formula_e_front_mgu"
+        _td_state["orchestratorContract"]["product_class"] = "formula_e_front_mgu"
+        _td_state["moduleDecomposition"]["product_class"] = "formula_e_front_mgu"
+        with open(os.path.join(_td_td, "state.json"), "w", encoding="utf-8") as fh:
+            json.dump(_td_state, fh)
+        if not _is_traction_drive_mode(_td_img):
+            fails.append("TRACTION MODE: formula_e_front_mgu must select traction-drive mode")
+        if _prompt_for_image(_td_img) is not _TRACTION_DRIVE_PROMPT:
+            fails.append("TRACTION ROUTING: front FPK must return _TRACTION_DRIVE_PROMPT")
+        if "curtain-wall" not in _TRACTION_DRIVE_PROMPT and "appliance" not in _TRACTION_DRIVE_PROMPT:
+            fails.append("TRACTION RUBRIC: must flag hollow curtain-wall / appliance shell")
+    finally:
+        import shutil as _sh
+        _sh.rmtree(_td_td, ignore_errors=True)
 
     if fails:
         print("render_vision_critic _selftest: FAIL")

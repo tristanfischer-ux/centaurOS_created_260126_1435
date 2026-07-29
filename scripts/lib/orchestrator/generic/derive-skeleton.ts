@@ -125,6 +125,10 @@ const TRACTION_DRIVE_MODULE_FLOORS: Record<string, string[]> = {
     'output_shaft_coupling',
     'resolver_encoder',
   ],
+  // INTENT (2026-07-29 front FPK): when topology/brief signals a differential
+  // + halfshaft exit (unitised axle kit), append after the reduction stage.
+  // Selected only via hasTractionDifferentialSignal — never a class slug.
+
   energy_conversion_transduction: [
     'sic_traction_inverter',
     'dc_link_capacitor_bank',
@@ -222,14 +226,40 @@ function thermalModeFromContract(contract: ContractInProgress): ThermalMode {
 export function hasColdPlateLoopInterface(contract: ContractInProgress): boolean {
   const quantities = contract?.quantities ?? {}
   const flow = Number((quantities.coolant_flow_l_min as { value?: unknown } | undefined)?.value)
-  const tin = Number((quantities.coolant_inlet_c as { value?: unknown } | undefined)?.value)
+  // GOTCHA: some briefs seed assumed_coolant_inlet_c only — accept either key.
+  const tinRaw =
+    (quantities.coolant_inlet_c as { value?: unknown } | undefined)?.value
+    ?? (quantities.assumed_coolant_inlet_c as { value?: unknown } | undefined)?.value
+  const tin = Number(tinRaw)
   if (!(Number.isFinite(flow) && flow > 0 && Number.isFinite(tin))) return false
   const edges = Array.isArray(contract?.topology) ? contract.topology : []
   return edges.some((e: any) => {
     if (String(e?.mechanism ?? '') !== 'fluid_loop') return false
     const blob = `${e?.from_part ?? ''} ${e?.to_part ?? ''}`
+    // cold_plate / coldplate / cold plates (jacket alone is too broad).
     return /cold[_\s-]?plates?/i.test(blob)
   })
+}
+
+/**
+ * Unitised axle kit with open differential + halfshaft exits (front FPK shape).
+ * PURE: mechanical topology naming differential/halfshaft OR a positive
+ * differential / halfshaft quantity — never a product-class slug.
+ */
+export function hasTractionDifferentialSignal(contract: ContractInProgress): boolean {
+  const edges = Array.isArray(contract?.topology) ? contract.topology : []
+  const topoHit = edges.some((e: any) => {
+    const blob = `${e?.from_part ?? ''} ${e?.to_part ?? ''} ${e?.mechanism ?? ''}`
+    return /differential|half[\s_-]?shaft/i.test(blob)
+  })
+  if (topoHit) return true
+  const quantities = contract?.quantities ?? {}
+  for (const [key, tq] of Object.entries(quantities)) {
+    if (!/differential|half[\s_-]?shaft/i.test(key)) continue
+    const v = (tq as { value?: unknown })?.value
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return true
+  }
+  return false
 }
 
 /**
@@ -250,6 +280,27 @@ export function hasTractionDrivePackSignal(contract: ContractInProgress): boolea
     || (Number.isFinite(iph) && iph >= 100)
     || hasMotorTool
   )
+}
+
+/** Actuation floor for a traction pack — appends open bevel differential when
+ *  the contract's OWN topology/quantities signal a diff + halfshaft exit. */
+function tractionDriveFloorFor(moduleKey: string, contract: ContractInProgress): string[] | null {
+  const base = TRACTION_DRIVE_MODULE_FLOORS[moduleKey]
+  if (!base) return null
+  if (moduleKey !== 'actuation_kinematics' || !hasTractionDifferentialSignal(contract)) {
+    return base
+  }
+  // Insert after reduction_gear_stage so the mechanical story reads motor→gear→diff.
+  const out = [...base]
+  const gearIdx = out.indexOf('reduction_gear_stage')
+  const insertAt = gearIdx >= 0 ? gearIdx + 1 : 2
+  if (!out.includes('open_bevel_differential')) {
+    out.splice(insertAt, 0, 'open_bevel_differential')
+  }
+  if (!out.includes('halfshaft_output_flange_pair')) {
+    out.splice(insertAt + 1, 0, 'halfshaft_output_flange_pair')
+  }
+  return out
 }
 
 /** The environmental_interface floor that matches the contract's thermal duty sign. */
@@ -1141,7 +1192,8 @@ function componentsForModule(
     || (isLowPowerLabElectronics && LAB_ELECTRONICS_MODULE_FLOORS[moduleKey])
     // Traction MGU+MCU pack: authoritative principals (macros) on actuation /
     // energy_conversion / structure — cold-plate thermal stays on thermalFloorFor.
-    || (isTractionDrive && TRACTION_DRIVE_MODULE_FLOORS[moduleKey])
+    // Diff + halfshaft flanges append when hasTractionDifferentialSignal fires.
+    || (isTractionDrive ? tractionDriveFloorFor(moduleKey, contract) : null)
     || null
   if (instrumentFloor) {
     for (const c of instrumentFloor) push(c)

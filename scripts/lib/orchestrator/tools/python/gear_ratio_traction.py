@@ -60,19 +60,43 @@ def solve(inp: dict) -> dict:
         p_shaft = t_mgu_f * (n_mgu * 2.0 * math.pi / 60.0)
         t_wheel_r = round(t_wheel, 3)
         worked.append(worked_calc(
-            label="Wheel torque",
+            label="Wheel torque (at mapped MGU torque)",
             formula="T_wheel = T_mgu x g x eta",
             values={"T_mgu": (t_mgu_f, "Nm"), "g": (g, ""), "eta": (eta, "")},
             result=t_wheel_r,
             result_unit="Nm",
-            assumptions=["gear efficiency applied on torque path"],
+            assumptions=[
+                "gear efficiency applied on torque path",
+                "T_mgu is the mapped operating-point shaft torque — NOT peak unless peak was supplied",
+            ],
         ))
         out.update({
             "wheel_torque_nm": t_wheel_r,
+            # Alias: differential input ≈ post-gear torque at this operating point.
+            "diff_input_torque_nm": t_wheel_r,
             "tractive_force_n": round(f_trac, 2),
             "mgu_shaft_power_w": round(p_shaft, 2),
             "wheel_power_w": round(p_shaft * eta, 2),
+            "mgu_torque_used_nm": t_mgu_f,
         })
+    # INTENT (2026-07-29 FE FPK): when peak shaft torque is supplied separately,
+    # emit peak post-gear torque so prose cannot confuse continuous wheel_torque
+    # (e.g. 908 Nm @ 117 Nm shaft) with peak×ratio (334×7.8×η ≈ 2527 Nm).
+    t_peak = inp.get("mgu_torque_max_nm") or inp.get("mgu_shaft_torque_max_nm")
+    if t_peak is not None:
+        t_peak_f = float(t_peak)
+        t_peak_out = round(t_peak_f * g * eta, 3)
+        worked.append(worked_calc(
+            label="Peak differential-input / wheel torque",
+            formula="T_peak_out = T_mgu_peak x g x eta",
+            values={"T_mgu_peak": (t_peak_f, "Nm"), "g": (g, ""), "eta": (eta, "")},
+            result=t_peak_out,
+            result_unit="Nm",
+            assumptions=["peak shaft torque at constant-power corner; not the mapped continuous point"],
+        ))
+        out["peak_wheel_torque_nm"] = t_peak_out
+        out["peak_diff_input_torque_nm"] = t_peak_out
+        out["mgu_torque_max_nm"] = t_peak_f
 
     # Suggest ratio to hit a target tip speed / vehicle speed
     target_v = inp.get("target_vehicle_speed_kph")

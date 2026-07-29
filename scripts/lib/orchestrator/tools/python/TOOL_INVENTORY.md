@@ -1177,6 +1177,9 @@ Promoted from `prototypes/mgu-mcu-pack/` into the permanent catalogue. Analytica
 | `motor:thermal-lumped` | Two-node winding/magnet thermal RC | PASS | `mgu_thermal_lumped.py` |
 | `gear:traction-ratio` | Wheel ↔ MGU kinematics (not bicycle) | PASS | `gear_ratio_traction.py` |
 | `powertrain:duty-cycle-energy` | Net race/duty electrical energy | PASS | `duty_cycle_energy.py` |
+| `powertrain:fia-net-usable-energy` | FIA E_net = E_dis − 0.93 E_regen (public tech regs) | PASS | `fia_net_usable_energy.py` |
+| `powertrain:fia-power-regen-split` | Axle traction/regen envelope (GEN3/GEN4 profiles) | PASS | `fia_power_regen_split.py` |
 
 Plan / promote recipe: `docs/plans/ANVIL-MGU-MCU-PACK-PREP-2026-07-28.md`.
+Class-reference corpus (literature + gold FFF invariants): `scripts/ingest/class-reference-seeds/formula_e_rear_mgu.json`.
 

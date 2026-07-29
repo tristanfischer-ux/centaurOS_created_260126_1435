@@ -174,6 +174,11 @@ export const INDUSTRIAL_POWER_MARKERS: DomainMarker[] = [
   // "Mains Incomer" from the plant thermal/energy defaults — strip them when
   // the design is device-scale.
   { id: 'chiller unit', re: /\bchiller\s+units?\b|\bscroll\s+compressors?\b|\bpackaged\s+chillers?\b/ },
+  // INTENT (2026-07-29 front FPK / cold-plate packs): SUB_ASSEMBLY explode of a
+  // plant chiller leaves evaporator/condenser/refrigerant/tube-bundle children
+  // even after the parent chiller word is stripped. Flag the vapor-compression
+  // anatomy on device-scale so the strip pass removes the whole kit.
+  { id: 'vapor compression plant', re: /\bevaporators?\b|\bcondensers?\b|\brefrigerant\s+charges?\b|\bexpansion\s+valves?\b|\btube\s+bundles?\b|\bshell[-\s]?and[-\s]?tube\b/ },
   { id: 'mains incomer', re: /\bmains\s+incomers?\b|\bdistribution\s+transformers?\b|\bmain\s+switchboards?\b/ },
   { id: 'lv acb incomer', re: /\b(?:lv\s+)?incomers?\b|\bacb\s+frames?\b|\b400\s*v\s+3[-\s]?phase\b/ },
 ]

@@ -260,6 +260,12 @@ _GENERIC_ROLE = {
     # discriminate ROLE — only genuine domain tokens like supply/demand/electrical do)
     "area", "cost", "price", "mass", "load", "power", "capacity", "rate", "size",
     "volume", "length", "width", "height", "weight", "value", "flow", "duty",
+    # INTENT (2026-07-29 Formula E front FPK Calculations HIGH): race-pack
+    # fia_net_usable_energy_kwh (~25 kWh) and vignette duty_loss_energy_kwh
+    # (~0.17 kWh) shared only the measurement noun 'energy' after generic strip
+    # and false-flagged 150×. Domain tokens (fia/usable vs electrical/loss stem)
+    # discriminate — same pattern as power/mass above.
+    "energy",
     # INTENT (cell-cycler cold-v15 Calculations HIGH): instrument aggregate thermal
     # duty (max_simultaneous_dissipation_w = 200 W) and a per-channel shunt resistor
     # loss (channel_shunt_dissipation_w = 0.5 W) share only the measurement noun
@@ -738,6 +744,24 @@ def _selftest() -> int:
     expect(not any(f.kind == "divergence" for f in audit_provenance(dissip).findings),
            "aggregate instrument dissipation vs channel shunt dissipation must NOT "
            "cluster merely because both carry the measurement noun 'dissipation'")
+
+    # ENERGY measurement-noun guard (Formula E front FPK 2026-07-29):
+    # FIA race-pack usable energy (~25 kWh) vs vignette duty loss (~0.17 kWh)
+    # share only 'energy' — must NOT flag. Two competing FIA usable claims still flag.
+    fe_energy = {"orchestratorContract": {"quantities": {
+        "fia_net_usable_energy_kwh": {"value": 25.26, "unit": "kWh", "source": "tool"},
+        "duty_loss_energy_kwh": {"value": 0.168, "unit": "kWh", "source": "tool"},
+        "duty_net_electrical_energy_kwh": {"value": 1.34, "unit": "kWh", "source": "tool"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(fe_energy).findings),
+           "FIA usable energy vs duty vignette loss/electrical must NOT cluster on "
+           "the measurement noun 'energy' alone")
+    same_fia = {"orchestratorContract": {"quantities": {
+        "fia_net_usable_energy_kwh": {"value": 25.26, "unit": "kWh", "source": "tool"},
+        "fia_pack_usable_energy_kwh": {"value": 0.17, "unit": "kWh", "source": "tool"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_fia).findings),
+           "two competing FIA usable-energy claims that disagree must still flag")
     # GOTCHA: total_* is an aggregate qualifier vs max_* (per-unit/peak) — that
     # pair is skipped by the roll-up guard. Use two non-aggregate keys that share
     # the domain token 'simultaneous' so the catch stays live.

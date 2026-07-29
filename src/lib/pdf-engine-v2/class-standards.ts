@@ -415,6 +415,94 @@ const DIGITAL_MICROFLUIDICS: ClassStandards = {
   ],
 }
 
+// INTENT (2026-07-29 0846): formula_e_rear_mgu had ZERO registry entry →
+// Risk WARN "No class-standards registered" forever (floored Risk at 7).
+// Capability floor = HV traction inverter / rotating electrical machine safety
+// + vehicle EMC — noun-keyed race/EV drive-unit class, not a product paste.
+export const FORMULA_E_REAR_MGU: ClassStandards = {
+  product_class: 'formula_e_rear_mgu',
+  display_name: 'Rear Traction MGU + SiC MCU Drive Unit',
+  compliance_summary:
+    'FIA Formula E / high-performance EV rear drive units are HV rotating machines '
+    + 'with SiC traction inverters: ISO 6469 / ECE R100 electrical safety for the '
+    + 'REESS interface, IEC 61800 functional safety for the power-drive system, '
+    + 'ISO 26262 (ASIL) for the inverter control path, and CISPR 25 / UNECE R10 '
+    + 'vehicle EMC. Full-vehicle homologation (chassis, battery pack) is OUT OF '
+    + 'SCOPE of this rear-axle MGU+MCU dossier — OEM integration stamp required.',
+  standards: [
+    {
+      code: 'ISO 6469-3',
+      title: 'Electrically propelled road vehicles — Safety specifications — Part 3: Electrical safety',
+      jurisdiction: 'ISO',
+      category: 'electrical',
+      mandatory: true,
+      typical_compliance_cost_gbp: 18_000,
+      typical_lead_time_weeks: 14,
+      applies_because: 'HV bus isolation, creepage/clearance, and touch-current limits for the MGU+MCU HV DC interface to the vehicle REESS.',
+    },
+    {
+      code: 'UNECE R100',
+      title: 'Uniform provisions concerning the approval of vehicles with regard to specific requirements for the electric power train',
+      jurisdiction: 'global',
+      category: 'system_safety',
+      mandatory: true,
+      typical_compliance_cost_gbp: 22_000,
+      typical_lead_time_weeks: 16,
+      applies_because: 'Electric power-train approval floor for REESS-connected traction machines and inverters in motorsport / road-vehicle programmes.',
+    },
+    {
+      code: 'IEC 61800-5-1',
+      title: 'Adjustable speed electrical power drive systems — Part 5-1: Safety requirements — Electrical, thermal and energy',
+      jurisdiction: 'IEC',
+      category: 'system_safety',
+      mandatory: true,
+      typical_compliance_cost_gbp: 16_000,
+      typical_lead_time_weeks: 12,
+      applies_because: 'Governing safety standard for the SiC traction inverter as an adjustable-speed power-drive system (thermal, electrical, energy).',
+    },
+    {
+      code: 'IEC 60034-1',
+      title: 'Rotating electrical machines — Part 1: Rating and performance',
+      jurisdiction: 'IEC',
+      category: 'sector_specific',
+      mandatory: true,
+      typical_compliance_cost_gbp: 8_000,
+      typical_lead_time_weeks: 8,
+      applies_because: 'IPMSM traction motor rating, thermal class, and performance declaration baseline.',
+    },
+    {
+      code: 'ISO 26262',
+      title: 'Road vehicles — Functional safety',
+      jurisdiction: 'ISO',
+      category: 'functional_safety',
+      mandatory: true,
+      typical_compliance_cost_gbp: 45_000,
+      typical_lead_time_weeks: 24,
+      applies_because: 'Inverter control / gate-drive / desat protection path is a safety-related E/E system; ASIL allocation is an OEM integration decision.',
+    },
+    {
+      code: 'CISPR 25 / UNECE R10',
+      title: 'Vehicles, boats and internal combustion engines — Radio disturbance characteristics / Electromagnetic compatibility',
+      jurisdiction: 'global',
+      category: 'emc',
+      mandatory: true,
+      typical_compliance_cost_gbp: 14_000,
+      typical_lead_time_weeks: 10,
+      applies_because: 'SiC switching at tens of kHz on a vehicle HV bus must meet automotive radiated/conducted EMC limits.',
+    },
+    {
+      code: 'RoHS 2011/65/EU',
+      title: 'Restriction of Hazardous Substances Directive',
+      jurisdiction: 'EU',
+      category: 'environmental',
+      mandatory: true,
+      typical_compliance_cost_gbp: 2_500,
+      typical_lead_time_weeks: 4,
+      applies_because: 'Applies to the MCU PCB, gate-drive boards, and harness materials placed on the EU/UK market.',
+    },
+  ],
+}
+
 // INTENT (P4 floor-9 / 2026-07-28): unseen multi-channel bench instruments
 // (cell cycler, battery tester, …) classify as consumer_electronics and hit
 // empty CLASS_STANDARDS → Risk WARN "No class-standards registered" forever.
@@ -430,6 +518,22 @@ export const LAB_BENCHTOP_INSTRUMENT_FLOOR: ClassStandards = {
     + 'routes are OUT OF SCOPE unless the brief explicitly requires them. Applied by '
     + 'capability (lab measurement-control signals), not by inventing a per-product class.',
   standards: SYRINGE_PUMP.standards.map((s) => ({ ...s })),
+}
+
+// INTENT (2026-07-29 JLR front FPK): same HV traction machine / SiC inverter
+// safety floor as rear — front axle bay packaging does not change the standards
+// matrix. Without this entry Risk floored at 7 ("No class-standards registered").
+export const FORMULA_E_FRONT_MGU: ClassStandards = {
+  ...FORMULA_E_REAR_MGU,
+  product_class: 'formula_e_front_mgu',
+  display_name: 'Front Traction FPK — MGU + SiC Inverter + Gear + Diff',
+  compliance_summary:
+    'FIA Formula E / high-performance EV front powertrain kits are HV rotating '
+    + 'machines with SiC traction inverters and a unitised reduction/diff: ISO 6469 / '
+    + 'ECE R100 electrical safety for the REESS interface, IEC 61800 for the '
+    + 'power-drive system, ISO 26262 for the inverter control path, and CISPR 25 / '
+    + 'UNECE R10 vehicle EMC. Full-vehicle homologation is OUT OF SCOPE of this '
+    + 'front-axle FPK dossier — OEM integration stamp required.',
 }
 
 export const CLASS_STANDARDS: Record<string, ClassStandards> = {
@@ -452,6 +556,8 @@ export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   potentiostat: POTENTIOSTAT,
   digital_microfluidics: DIGITAL_MICROFLUIDICS,
   lab_benchtop_instrument: LAB_BENCHTOP_INSTRUMENT_FLOOR,
+  formula_e_rear_mgu: FORMULA_E_REAR_MGU,
+  formula_e_front_mgu: FORMULA_E_FRONT_MGU,
 }
 
 // Map common display-name variants and synonyms to canonical class keys. The
@@ -485,6 +591,8 @@ function resolveClassKey(productClass: string): string | null {
     [/\b(benchtop[\s_-]?bioreactor|pioreactor|turbidostat|chemostat)\b/, 'benchtop_bioreactor'],
     [/\b(potentiostat|rodeostat|electrochemical\s+workstation|cell[\s_-]?cycler|battery[\s_-]?cycler|battery[\s_-]?tester)\b/, 'potentiostat'],
     [/\b(digital[\s_-]?microfluidics|opendrop|ewod)\b/, 'digital_microfluidics'],
+    [/\b(formula[\s_-]?e[\s_-]?front[\s_-]?mgu|front[\s_-]?fpk|front[\s_-]?mgu)\b/, 'formula_e_front_mgu'],
+    [/\b(formula[\s_-]?e[\s_-]?rear[\s_-]?mgu|traction[\s_-]?mgu|rear[\s_-]?mgu|ev[\s_-]?drive[\s_-]?unit|electric[\s_-]?powertrain)\b/, 'formula_e_rear_mgu'],
   ]
   for (const [rx, key] of aliases) {
     if (rx.test(lower)) return key

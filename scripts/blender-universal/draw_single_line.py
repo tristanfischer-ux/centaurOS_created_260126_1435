@@ -469,17 +469,148 @@ def _clean_cable(val) -> str:
 
 
 def _device_dc_voltage_label(state: dict) -> str:
-    """Low-voltage DC rail label for an instrument-device SLD.
+    """DC rail label for an instrument-device or traction-pack SLD.
 
     INTENT: a handheld instrument's Electrical drawing is a USB/battery DC rail,
-    not a site switchboard. Prefer explicit contract voltages; otherwise label the
-    rail generically instead of inventing a plant LV value.
+    not a site switchboard. Traction packs use the vehicle HV DC bus (typically
+    400–1000 V) — accept that band when the form gate says traction.
     """
+    traction = False
+    try:
+        traction = _is_traction_drive_pack_state(state)
+    except Exception:
+        traction = False
     for key in ("dc_bus_voltage_v", "logic_rail_voltage_v", "battery_voltage_v"):
         v = _q(state, key)
         if v and 1.0 <= v <= 60.0:
             return f"{v:g} V DC"
-    return "low-voltage DC"
+        if traction and v and 60.0 < v <= 1500.0:
+            return f"{v:g} V DC"
+    return "750 V DC" if traction else "low-voltage DC"
+
+
+def _is_traction_drive_pack_state(state: dict) -> bool:
+    """True for sealed traction MGU+MCU packs (universal noun signal)."""
+    try:
+        _lib = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        import instrument_form_grammar as ifg  # type: ignore
+        pc = str(
+            (state.get("parsedBrief") or {}).get("product_class")
+            or (state.get("orchestratorContract") or {}).get("product_class")
+            or (state.get("moduleDecomposition") or {}).get("product_class")
+            or "",
+        )
+        return bool(ifg.is_traction_drive_pack_form(product_class=pc))
+    except Exception:
+        pc = str((state or {}).get("parsedBrief", {}).get("product_class") or "")
+        return bool(re.search(r"\bmgu\b|traction|ipmsm|powertrain", pc, re.I))
+
+
+def _traction_principal_names(state: dict) -> list[str]:
+    """Collect principal part names for traction SLD synthesis (BoM / words / manifest)."""
+    names: list[str] = []
+    rb = state.get("requirementsBom")
+    if isinstance(rb, list):
+        for r in rb:
+            if not isinstance(r, dict) or r.get("status") == "SUB-COMPONENT":
+                continue
+            nm = str(r.get("requirement") or r.get("name") or "").split("·")[0].strip()
+            if nm:
+                names.append(nm)
+    if not names:
+        for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+            for sm in (m.get("sub_modules") or []):
+                for w in (sm.get("words") or []):
+                    if not isinstance(w, dict) or w.get("_subcomponent"):
+                        continue
+                    nm = str(w.get("name_human")
+                             or (w.get("content_character") or {}).get("name_human")
+                             or "").strip()
+                    if nm:
+                        names.append(nm)
+    return names
+
+
+def _synthesize_traction_device_tree(state: dict, arch: str, schedule: dict,
+                                     devices: list[dict]) -> Optional[Tree]:
+    """Build HV DC→inverter→motor SLD when schedule has no electrical_bus rows.
+
+    INTENT (2026-07-29 0846): sealed traction packs often finish Blender with an
+    empty connection-schedule (no plant ports to route) — without this synthesis
+    reconstruct_tree falls through to MAIN SWITCHBOARD plant LV theatre.
+    """
+    names = _traction_principal_names(state)
+    if not names:
+        return None
+    find = lambda rx: next((n for n in names if re.search(rx, n, re.I)), None)
+    inverter = find(r"sic\s*traction\s*inverter|traction\s*inverter|(?<!desat\s)\binverter\b")
+    motor = find(r"traction\s*ipmsm|ipmsm\s*motor|motor[-\s]?generator|"
+                 r"traction\s*motor(?!\s*generator)")
+    if not inverter or not motor:
+        return None
+    fuse = find(r"hv\s*dc\s*fuse|\bdc\s*fuse\b")
+    connector = find(r"hv\s*(?:dc\s*)?connector")
+    voltage = _device_dc_voltage_label(state)
+    if not voltage or voltage == "low-voltage DC":
+        dc = _q(state, "dc_bus_voltage_v")
+        voltage = f"{dc:g} V DC" if dc else "750 V DC"
+    peak_kw = (_q(state, "rear_axle_electrical_power_kw")
+               or _q(state, "peak_electrical_power_kw")
+               or _q(state, "traction_inverter_power_kw"))
+    bus = Bus(
+        tag="HV DC BUS",
+        voltage=voltage,
+        rating=(f"{peak_kw:g} kW peak" if peak_kw else ""),
+        is_sub=False,
+    )
+    for label, rating in (
+        (inverter, f"{peak_kw:g} kW" if peak_kw else ""),
+        (motor, f"{peak_kw:g} kW" if peak_kw else ""),
+    ):
+        bus.branches.append(Branch(
+            from_node=bus.tag,
+            to_node=label,
+            label=label,
+            rating=rating,
+            cable="HV DC / phase cable set",
+            voltdrop="",
+            count=1,
+            role="device_load",
+        ))
+    incomer: list[Device] = []
+    if fuse:
+        incomer.append(Device(kind="fuse", tag="F", detail=fuse))
+    else:
+        picked = _pick_device(devices, kind="fuse")
+        if picked:
+            incomer.append(_as_device(picked, "fuse", "F"))
+        else:
+            incomer.append(Device(kind="fuse", tag="F", detail="HV DC fuse"))
+    source = Source(
+        sym=SYM_UTILITY,
+        tag="HV BATTERY DC INPUT",
+        detail=connector or "vehicle HV DC bus",
+        voltage=voltage,
+    )
+    tree = Tree(
+        archetype=arch,
+        source=source,
+        incomer_devices=incomer,
+        incomer_transformer=None,
+        main_bus=bus,
+        notes=[
+            "Sealed traction pack: vehicle HV DC feeds the SiC MCU and IPMSM "
+            "through the pack HV bus — not a plant LV switchboard.",
+            "Phase cables, gate-drive and resolver signal paths are on the "
+            "Connection trace / interconnect; this view is the HV power spine.",
+        ],
+        schedule_totals=schedule.get("totals") or {},
+    )
+    tree._device_instrument_tree = True  # type: ignore[attr-defined]
+    tree._traction_drive_tree = True  # type: ignore[attr-defined]
+    return tree
 
 
 def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
@@ -490,12 +621,21 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
     design's own electrical_bus topology. It deliberately bypasses the plant
     distribution-voltage/grouping model, which otherwise turns a USB/battery device
     into a hollow MAIN SWITCHBOARD with one arbitrary feeder.
+
+    INTENT (2026-07-29): sealed traction packs are also device-energy (HV fuse →
+    DC bus → inverter → motor) — not plant switchgear. Gate on traction form when
+    isInstrumentDevice is intentionally false. When the schedule has zero
+    electrical_bus rows (common on sealed-pack Blender passes), synthesise the
+    spine from BoM / module words so Electrical never ships plant LV theatre.
     """
-    if not bool(state.get("isInstrumentDevice")):
+    is_traction = _is_traction_drive_pack_state(state)
+    if not bool(state.get("isInstrumentDevice")) and not is_traction:
         return None
     rows = [r for r in _electrical_rows(schedule)
             if str(r.get("mechanism") or "").lower() == "electrical_bus"]
     if not rows:
+        if is_traction:
+            return _synthesize_traction_device_tree(state, arch, schedule, devices)
         return None
 
     fanout: dict[str, int] = {}
@@ -505,21 +645,38 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
         if src and to and src != to:
             fanout[src] = fanout.get(src, 0) + 1
     if not fanout:
+        if is_traction:
+            return _synthesize_traction_device_tree(state, arch, schedule, devices)
         return None
+    # GOTCHA (0846 Formula-E MGU): a series HV spine (connector→fuse→bus→
+    # inverter→motor) gives every node fanout=1. max(fanout) then picks the
+    # chain HEAD and only the first hop becomes a load → SLD coverage 2/5
+    # (fuse+busbar board footer only). Synthesise the full traction tree.
+    if is_traction and max(fanout.values()) <= 1:
+        synth = _synthesize_traction_device_tree(state, arch, schedule, devices)
+        if synth is not None:
+            return synth
     rail_node = max(fanout, key=fanout.get)
 
     load_rows = [r for r in rows if str(r.get("from") or "").strip() == rail_node
                  and str(r.get("to") or "").strip()
                  and str(r.get("to") or "").strip() != rail_node]
     if not load_rows:
+        if is_traction:
+            return _synthesize_traction_device_tree(state, arch, schedule, devices)
         return None
 
     voltage = _device_dc_voltage_label(state)
-    load_kw = _q(state, "connected_electrical_load_kw")
+    load_kw = (_q(state, "connected_electrical_load_kw")
+               or _q(state, "peak_electrical_power_kw")
+               or _q(state, "rear_axle_electrical_power_kw"))
     bus = Bus(
-        tag="DEVICE DC RAIL",
+        tag="HV DC BUS" if is_traction else "DEVICE DC RAIL",
         voltage=voltage,
-        rating=(f"{load_kw * 1000:g} W connected" if load_kw else ""),
+        rating=(
+            (f"{load_kw:g} kW peak" if is_traction and load_kw
+             else (f"{load_kw * 1000:g} W connected" if load_kw else ""))
+        ),
         is_sub=False,
     )
 
@@ -536,13 +693,18 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
             to_node=label,
             label=label,
             rating=_clean_rating(r.get("rating")),
-            cable=_clean_cable(r.get("size")) or "short device harness / PCB trace",
+            cable=_clean_cable(r.get("size")) or (
+                "HV DC / phase cable set" if is_traction
+                else "short device harness / PCB trace"
+            ),
             voltdrop="",
             count=1,
             role="device_load",
         ))
 
     if not bus.branches:
+        if is_traction:
+            return _synthesize_traction_device_tree(state, arch, schedule, devices)
         return None
 
     inbound = [str(r.get("from") or "").strip() for r in rows
@@ -555,8 +717,11 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
             inbound_clean.append(h)
     source = Source(
         sym=SYM_UTILITY,
-        tag="USB / BATTERY INPUT",
-        detail=", ".join(inbound_clean[:3]) or "device low-voltage input",
+        tag="HV BATTERY DC INPUT" if is_traction else "USB / BATTERY INPUT",
+        detail=(
+            ", ".join(inbound_clean[:3])
+            or ("vehicle HV DC bus" if is_traction else "device low-voltage input")
+        ),
         voltage=voltage,
     )
 
@@ -571,12 +736,17 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
         if fuse:
             incomer_devices.append(_as_device(fuse, "fuse", "F"))
 
-    notes = [
+    notes = ([
+        "Sealed traction pack: vehicle HV DC feeds the SiC MCU and IPMSM "
+        "through the pack HV bus — not a plant LV switchboard.",
+        "Phase cables, gate-drive and resolver signal paths are on the "
+        "Connection trace / interconnect; this view is the HV power spine.",
+    ] if is_traction else [
         "Device-scale instrument: USB/battery input feeds a low-voltage DC rail; "
         "loads are MCU/UI, LED driver and detector electronics, not plant feeders.",
         "Signal and optical paths are documented in the connection trace / PCB tabs; "
         "this Electrical view shows the device DC power tree.",
-    ]
+    ])
     tree = Tree(
         archetype=arch,
         source=source,
@@ -587,6 +757,8 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
         schedule_totals=schedule.get("totals") or {},
     )
     tree._device_instrument_tree = True  # type: ignore[attr-defined]
+    if is_traction:
+        tree._traction_drive_tree = True  # type: ignore[attr-defined]
     return tree
 
 
@@ -3767,6 +3939,49 @@ def _selftest() -> int:
         {"Microcontroller", "Local Display", "LED Driver"}.issubset(inst_labels))
     chk("S5.proveCatch_not_plant_switchboard",
         "MAIN SWITCHBOARD" not in inst_svg and "DEVICE DC RAIL" in inst_svg)
+
+    # S6 — TRACTION SERIES SPINE (0846): BoM-named electrical_bus chain with
+    # all fanout=1 must not collapse to the first hop only.
+    trac_schedule = {"rows": [
+        {"mechanism": "electrical_bus", "from": "Hv DC Connector", "to": "Hv DC Fuse",
+         "rating": "pack", "size": "HV"},
+        {"mechanism": "electrical_bus", "from": "Hv DC Fuse", "to": "Hv DC Busbar Link",
+         "rating": "pack", "size": "HV"},
+        {"mechanism": "electrical_bus", "from": "Hv DC Busbar Link",
+         "to": "SiC Traction Inverter", "rating": "pack", "size": "HV"},
+        {"mechanism": "electrical_bus", "from": "SiC Traction Inverter",
+         "to": "Traction Ipmsm Motor Generator", "rating": "pack", "size": "HV"},
+    ]}
+    trac_state = {
+        "isInstrumentDevice": False,
+        "parsedBrief": {"product_class": "formula_e_rear_mgu"},
+        "orchestratorContract": {
+            "product_class": "formula_e_rear_mgu",
+            "quantities": {
+                "rear_axle_electrical_power_kw": {"value": 350},
+                "dc_bus_voltage_v": {"value": 750},
+            },
+        },
+        "requirementsBom": [
+            {"tag": "X-110", "requirement": "Hv DC Connector", "status": "TBD"},
+            {"tag": "X-122", "requirement": "Hv DC Fuse", "status": "NOT FOUND"},
+            {"tag": "X-124", "requirement": "Hv DC Busbar Link", "status": "IDENTIFIED"},
+            {"tag": "INV-1", "requirement": "SiC Traction Inverter", "status": "NOT FOUND"},
+            {"tag": "X-116", "requirement": "Traction Ipmsm Motor Generator",
+             "status": "NOT FOUND"},
+        ],
+    }
+    trac_tree = reconstruct_tree(trac_schedule, trac_state)
+    trac_svg = build_sld_svg(trac_tree, trac_state)
+    trac_labels = {br.label for br in trac_tree.main_bus.branches}
+    chk("S6.proveCatch_traction_series_not_first_hop_only",
+        "SiC Traction Inverter" in trac_labels
+        and "Traction Ipmsm Motor Generator" in trac_labels
+        and getattr(trac_tree, "_traction_drive_tree", False) is True)
+    chk("S6.proveCatch_traction_connector_on_source",
+        "Hv DC Connector" in (trac_tree.source.detail or ""))
+    chk("S6.proveCatch_not_plant_switchboard",
+        "MAIN SWITCHBOARD" not in trac_svg and "HV DC BUS" in trac_svg)
 
     for f in fails:
         print(f"[sld][selftest] FAIL {f}")

@@ -332,7 +332,48 @@ FIXABLE_CHECKS = set(FIXERS.keys())
 # collapses identical lines — so when an identical £0 line and a priced line both
 # exist, the £0 line is priced first and the surviving merged definition carries
 # the price (not £0).
-STRUCTURAL_FIXERS = [fix_zero_principal_price, fix_duplicate_principal]
+def fix_traction_desat_twins(state: dict, rows: list):
+    """INTENT (2026-07-29 0846): bare 'Traction Motor' / 'Traction Inverter' twins
+    are desaturated when a richer IPMSM / SiC Traction Inverter principal exists —
+    mark them SUB-COMPONENT so they cannot dominate the bill or floor dominance
+    audits. Universal noun-keyed (same desat rule as parts_ledger / GA expected).
+    """
+    heads = [
+        str(r.get("requirement") or r.get("part") or "").split("·", 1)[0].strip()
+        for r in rows if isinstance(r, dict)
+    ]
+    has_ipmsm = any(re.search(r"\bipmsm\b|motor[-\s]?generator", h, re.I) for h in heads)
+    has_sic = any(re.search(r"sic\s*traction\s*inverter", h, re.I) for h in heads)
+    n = 0
+    demoted: list = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        head = str(r.get("requirement") or r.get("part") or "").split("·", 1)[0].strip()
+        if str(r.get("status") or "") == "SUB-COMPONENT":
+            continue
+        demote = False
+        if has_ipmsm and re.fullmatch(r"traction\s*motor", head, re.I):
+            demote = True
+        if has_sic and re.fullmatch(r"traction\s*inverter", head, re.I):
+            demote = True
+        if demote:
+            r["status"] = "SUB-COMPONENT"
+            n += 1
+            demoted.append(head[:32])
+    note = (
+        f"fix_traction_desat_twins: demoted {n} bare twin(s) "
+        f"({', '.join(demoted[:4])})"
+        if n else "fix_traction_desat_twins: no bare twins"
+    )
+    return state, rows, n, note
+
+
+STRUCTURAL_FIXERS = [
+    fix_zero_principal_price,
+    fix_duplicate_principal,
+    fix_traction_desat_twins,
+]
 
 # Everything else is NOT auto-fixable. Documented WHY each can't be patched in
 # data — these are genuine human-input or upstream-source-rule gaps, surfaced

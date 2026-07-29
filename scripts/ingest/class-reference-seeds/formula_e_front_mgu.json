@@ -1,0 +1,159 @@
+{
+  "product_class": "formula_e_front_mgu",
+  "form_family": "traction_drive_pack",
+  "notes": "Gen3/Gen3 Evo SPEC front FPK (Lucid/Atieva). Gold imagery = TRAINING CHECK for bay-constrained unitised morphology — never mesh paste. Shape is forced by front-axle packaging volume first; literature grounds regen/power constraints in forge-truth.",
+  "search_hints": [
+    "Formula E Gen3 front powertrain kit Lucid Atieva",
+    "FPK 32 kg 350 kW 19500 rpm",
+    "front axle packaging Formula E wishbone",
+    "250 kW front regen 600 kW total regen",
+    "Gen3 Evo AWD Attack Mode front traction",
+    "Lucid motorsports electric drive unit"
+  ],
+  "visual_invariants": [
+    "PRIMARY: overall size and silhouette are forced by the available front-axle bay volume (wishbones, uprights, steering, crash structure, halfshaft height, cooling/HV corridors) — not a free-form industrial design.",
+    "The unit must pack into a compact homologated box on the order of ~259 × 343 × 267 mm (press-derived) and ~32 kg dry — fill the bay, do not float a smaller sculpture inside a huge apron.",
+    "Motor + inverter + single-speed reduction + differential are ONE unitised sealed brick (spec kit), denser than a typical open rear manufacturer cradle cassette.",
+    "Halfshaft exits at front axle height fix lateral width and case split planes; shaft stubs are mandatory exterior language.",
+    "Coolant ports and HV DC connector sit on faces that can reach the front-bay service corridors — bosses are packaging-forced, not decorative.",
+    "Public exterior language is a sealed cast/machined housing (often gold-anodised in press photos) — windings and PCB farms are cutaway/ghost only.",
+    "Lucid sealed-unit press photography is the FFF training check: if bay + function are understood, morphology should look very similar — never paste proprietary STEP/STL.",
+    "Lucid Air road Tech Talk / oil-microjet patents are PHYSICS training for cooling/winding only — different duty and envelope from the race FPK.",
+    "Gen3 role is primarily regen; Gen3 Evo adds limited AWD traction windows — morphology still bay-first; do not invent a second remote inverter brick.",
+    "Service is whole-unit removal from the front bay: mounts, thermal loops, HV and LV/control — not field-open motor service."
+  ],
+  "gold_imagery": [
+    {
+      "id": "fe-lucid-fpk-ir-unveil",
+      "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-unveils-state-art-motorsports-electric-drive-unit-taking",
+      "owner": "Lucid Group IR",
+      "year": 2023,
+      "view_role": "sealed_unit_hero",
+      "teaches": "Unitised sealed FPK brick; shaft ends; compact bay-filling envelope; gold-anodised press language",
+      "access": "Public IR / press"
+    },
+    {
+      "id": "fe-lucid-fpk-electrek",
+      "url": "https://electrek.co/2023/01/11/lucid-unveils-formula-e-electric-drive-unit/",
+      "owner": "Electrek / Lucid press",
+      "year": 2023,
+      "view_role": "sealed_unit_hero",
+      "teaches": "32 kg / high power-density sealed unit photography as silhouette training check",
+      "access": "Public editorial"
+    },
+    {
+      "id": "fe-gen3-car-front-pkg",
+      "url": "https://www.fiaformulae.com/en/news/2022/april/gen3-car-unveiled",
+      "owner": "FIA Formula E",
+      "year": 2022,
+      "view_role": "packaging_context",
+      "teaches": "Front axle bay context — FPK lives in constrained space ahead of monocoque, not free volume",
+      "access": "Public editorial"
+    },
+    {
+      "id": "fe-gen3-evo-awd",
+      "url": "https://www.fiaformulae.com/en/news/2024/gen3-evo",
+      "owner": "FIA Formula E",
+      "year": 2024,
+      "view_role": "packaging_context",
+      "teaches": "Same front bay hardware class gains limited AWD traction windows — morphology still bay-constrained",
+      "access": "Public editorial"
+    }
+  ],
+  "literature": [
+    {
+      "id": "F1-01",
+      "title": "Lucid unveils motorsports electric drive unit for Formula E",
+      "org": "Lucid Group",
+      "year": 2023,
+      "url": "https://ir.lucidmotors.com/news-releases/news-release-details/lucid-unveils-state-art-motorsports-electric-drive-unit-taking",
+      "document_type": "whitepaper",
+      "contributes": ["constraints", "layout"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "complete motorsport drive unit ~32 kg",
+        "power density class ~14.7 hp/kg with ~350 kW class claim",
+        "integrated motor inverter transmission differential"
+      ]
+    },
+    {
+      "id": "F1-02",
+      "title": "FIA Formula E Technical Regulations 2023–2024 (Season 10, marked-up)",
+      "org": "FIA",
+      "year": 2023,
+      "url": "https://www.fia.com/sites/default/files/2023-2024_season_10_formula_e_techregs_wmsc_19.10.2023_eng_fr_marked_up.pdf",
+      "document_type": "regulation",
+      "contributes": ["constraints", "formulas"],
+      "pdf_direct": true,
+      "key_extracts": [
+        "front regen <= 250 kW; rear <= 350 kW; RESS path <= 600 kW",
+        "E_net = E_discharge - 0.93 * E_regen",
+        "car max voltage <= 1000 V (except MGU phases)"
+      ]
+    },
+    {
+      "id": "F1-03",
+      "title": "Porsche 99X Electric Gen3 technical data",
+      "org": "Porsche Motorsport",
+      "year": 2022,
+      "url": "https://newsroom.porsche.com/en/2022/motorsports/porsche-99x-electric-gen3-technical-data-formula-e-30608.html",
+      "document_type": "report",
+      "contributes": ["constraints", "layout"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "front powertrain is spec kit; rear is manufacturer perimeter"
+      ]
+    },
+    {
+      "id": "F1-04",
+      "title": "The Drive — Lucid Formula E front drive unit packaging coverage",
+      "org": "The Drive",
+      "year": 2023,
+      "url": "https://www.thedrive.com/news/lucid-built-a-tiny-350-kw-electric-drive-unit-for-formula-e",
+      "document_type": "article",
+      "contributes": ["constraints", "layout"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "envelope ~10.2 x 13.5 x 10.5 in → ~259 x 343 x 267 mm",
+        "~19500 rpm press figure",
+        "compact front-axle packaging emphasis"
+      ]
+    },
+    {
+      "id": "F1-05",
+      "title": "US10128701 — Electric machine with oil cooling (Atieva / Lucid lineage)",
+      "org": "USPTO / Atieva",
+      "year": 2018,
+      "url": "https://patents.google.com/patent/US10128701B2/en",
+      "document_type": "patent",
+      "contributes": ["formulas", "layout"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "oil cooling / jetting concepts for high power-density machines — PHYSICS training only"
+      ]
+    },
+    {
+      "id": "F1-06",
+      "title": "High-Density SiC Power Modules Meet Formula E Challenges",
+      "org": "Power Electronics News",
+      "year": 2021,
+      "url": "https://www.powerelectronicsnews.com/high-density-sic-power-modules-meet-formula-e-challenges/",
+      "document_type": "article",
+      "contributes": ["formulas", "constraints"],
+      "pdf_direct": false
+    },
+    {
+      "id": "F1-07",
+      "title": "FIA Formula E Gen3 Evo — AWD and Attack Mode updates",
+      "org": "FIA Formula E",
+      "year": 2024,
+      "url": "https://www.fiaformulae.com/en/news",
+      "document_type": "report",
+      "contributes": ["constraints"],
+      "pdf_direct": false,
+      "key_extracts": [
+        "Gen3 Evo enables limited front traction windows; same FPK packaging class"
+      ]
+    }
+  ]
+}

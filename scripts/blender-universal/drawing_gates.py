@@ -204,12 +204,16 @@ def _g2_panel_total(panel_md: str, state: dict):
 
 _PRINCIPAL_POWERED_RE = re.compile(
     r"\bpump\b|blower|compressor|\bfan\b|heat\s*pump|\buv\b|ozone|skimmer|degasser|"
-    r"dehumidifier|aerat|oxygenat|centrifuge|mixer|agitator|drive\b", re.I)
+    r"dehumidifier|aerat|oxygenat|centrifuge|mixer|agitator|"
+    # GOTCHA (0846): bare `drive\b` matched "Traction Drive Housing" (a shell) and
+    # demanded an SLD feeder. Require drive-unit / motor-drive / VFD sense only.
+    r"motor\s*drive|\bVFD\b|drive\s*unit|\bdrive\b(?!\s*hous)", re.I)
 # passive / instrument / structural rows that legitimately need NO dedicated power feeder
 _NON_POWERED_RE = re.compile(
     r"\bmedia\b|\bcarrier\b|packing|\bfill\b|\bmesh\b|tank\b|vessel\b|pipe\b|valve\b|"
     r"analy[sz]|sensor|transmitter|\bprobe\b|gauge|\bmeter\b|monitor|slab|frame|panel\b|"
-    r"enclosure|busbar|fuse|surge|cable|connection|\bmedia\b", re.I)
+    r"enclosure|housing|shield|cover|mounting\s*ear|cold\s*plate|gear(?:box|\s*stage)?|"
+    r"busbar|fuse|surge|cable|connection|\bmedia\b", re.I)
 
 
 def _housed_power_re():
@@ -988,6 +992,25 @@ def run_gates(out_dir: str) -> list:
     # exporter already VERIFIED-NA's Process schedules. Scoring a 26:1 empty strip
     # as a legibility HIGH floors the dossier (colorimeter 0819 drawing_gates=6).
     _instrument = bool(state.get("isInstrumentDevice"))
+    # INTENT (2026-07-29 traction packs): same fluid-less plant-sheet skip as
+    # instruments — Excel NA's Process/HVAC; scoring stale process-schedules
+    # floors drawing_gates (0846: missing data-placement-fp on process sheet).
+    _traction = False
+    try:
+        _lib = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        import instrument_form_grammar as _ifg  # type: ignore
+        _pc_g = str(
+            (state.get("parsedBrief") or {}).get("product_class")
+            or (state.get("orchestratorContract") or {}).get("product_class")
+            or (state.get("moduleDecomposition") or {}).get("product_class")
+            or "",
+        )
+        _traction = bool(_ifg.is_traction_drive_pack_form(product_class=_pc_g))
+    except Exception:
+        _pc_g = str((state.get("moduleDecomposition") or {}).get("product_class") or "")
+        _traction = bool(re.search(r"\bmgu\b|traction|ipmsm|powertrain", _pc_g, re.I))
 
     # ── G1 LEGIBILITY — each 2D drawing within a sane aspect ratio ───────────────
     # INTENT (2026-07-14): abstain when the form-factor pack excludes the stem —
@@ -997,7 +1020,7 @@ def run_gates(out_dir: str) -> list:
                "block-flow-diagram", "hvac-layout", "process-schedules", "interconnect"):
         if not _in_drawing_pack(state, nm):
             continue
-        if _instrument and nm in ("process-schedules", "hvac-layout"):
+        if (_instrument or _traction) and nm in ("process-schedules", "hvac-layout"):
             continue
         wh = _png_wh(os.path.join(dd, nm + ".png"))
         if not wh:
@@ -1218,8 +1241,11 @@ def run_gates(out_dir: str) -> list:
     # air path + PCB — BoM proxy bbox fill legitimately sits well below the
     # Powerwall 35% floor. G10 targets sealed energy cabinets whose hero looked
     # like a hollow shell; skip when isInstrumentDevice.
+    # GOTCHA (0846 traction): pack enclosure_volume_m3 ≈0.02 m³ while story meshes
+    # are dense metal — BoM-proxy fill under-reads vs the Powerwall hollow-shell
+    # defect this gate targets. Skip for instruments AND traction packs.
     if (_encl_m3 and 0 < float(_encl_m3) < 1.0 and parts
-            and not state.get("isInstrumentDevice")):
+            and not state.get("isInstrumentDevice") and not _traction):
         fill = interior_fill_fraction(parts, float(_encl_m3))
         if fill is not None:
             gates.append(Gate("interior_fill", ["renders", "general-arrangement"],
@@ -1313,12 +1339,25 @@ def run_gates(out_dir: str) -> list:
             # Route each reason to its own gate by the vocabulary render_image_quality
             # emits. "washed-out/low-contrast" is the exposure rule; edge-density and the
             # width/height/dominant occupancy floors are all framing.
+            # DECISION (2026-07-29 traction 0846): optional Excel views
+            # (product_cutaway_back with required=False) must NOT floor the
+            # dossier. Compact sealed packs also under-fill product_service
+            # height occupancy (close-up of glands on a ≤0.5 m envelope) —
+            # framing/wash HARD-fail only on required non-service views.
             _wash = [r for r in quality.reasons if "washed-out" in r]
             _frame = [r for r in quality.reasons if "washed-out" not in r]
-            if _wash:
+            _frame_counts = bool(view.required) and not (
+                view.view_id == "product_service"
+                and (_traction or ( _encl_m3 and float(_encl_m3) < 0.05))
+            )
+            if _frame_counts:
+                if _wash:
+                    washed_failures.append(f"{view.view_id}: " + "; ".join(_wash))
+                if _frame:
+                    framing_failures.append(f"{view.view_id}: " + "; ".join(_frame))
+            elif view.required and _wash:
+                # Still hard-fail wash on required service views (exposure, not framing).
                 washed_failures.append(f"{view.view_id}: " + "; ".join(_wash))
-            if _frame:
-                framing_failures.append(f"{view.view_id}: " + "; ".join(_frame))
     # (1) PRESENCE — a required Excel-bound view is not on disk. This is pipeline
     #     orchestration, NOT image quality: the archetype sweep re-bakes scene + drawings
     #     but not the shaded Cycles pass, so 8 of 13 archetypes reported "missing
@@ -1750,13 +1789,34 @@ def run_gates(out_dir: str) -> list:
                 str(asset.get("family")) for asset in (cad_assets or [])
                 if isinstance(asset, dict) and asset.get("family")
             }
+            # INTENT (2026-07-29 JLR front FPK): traction packs seat BoM principals
+            # from u_se_td_* story meshes (traction_drive_story_mesh) — that IS the
+            # geometry, not a 4-family plant CAD cache. Requiring ≥4 verified CAD
+            # families floored Renders when only instrument_pcb was imported.
+            n_traction = sum(
+                1 for p in parts
+                if isinstance(p, dict) and (
+                    str(p.get("geometry_source") or "").startswith("traction_")
+                    or str(p.get("tag") or "").startswith("X-")
+                    or str(p.get("tag") or "").startswith("INV-")
+                )
+            )
+            fm = _load("form-meshes.json")
+            fm_form = str((fm or {}).get("form") or "").lower() if isinstance(fm, dict) else ""
+            fm_n = len((fm or {}).get("meshes") or []) if isinstance(fm, dict) else 0
+            traction_form = (
+                "traction" in fm_form or "bay_fill" in fm_form or n_traction >= 6
+            )
+            ok = len(families) >= 4 or (traction_form and (fm_n >= 8 or n_traction >= 6))
             gates.append(Gate(
                 "cad_geometry_coverage",
                 ["renders"],
                 "high",
-                len(families) >= 4,
+                ok,
                 (f"{len(families)} verified CAD families used: {', '.join(sorted(families))}"
-                 if families else
+                 + (f"; traction story {n_traction} principal(s), form-meshes={fm_n}"
+                    if traction_form else "")
+                 if ok else
                  "no verified CAD family geometry recorded — product remains primitive-only"),
             ))
 
@@ -2004,21 +2064,30 @@ def ga_render_manifest_coherent(out_dir: str):
         except OSError:
             ga_txt = ""
         if ga_txt:
-            has_front = bool(re.search(r">\s*FRONT\s*\(", ga_txt, re.I))
+            has_front = bool(re.search(r">\s*FRONT\b", ga_txt, re.I))
             has_cabinet_cutaway = "door removed" in ga_txt.lower()
             has_instrument_form = "product form" in ga_txt.lower()
             has_assembly_cutaway = (
                 "cover removed" in ga_txt.lower()
                 or "assembly internals" in ga_txt.lower()
             )
+            # INTENT (2026-07-29 JLR front FPK): traction packs use
+            # "(shell ghosted · axial train on base)" — not door/cover language.
+            has_traction_form = (
+                "shell ghosted" in ga_txt.lower()
+                or "axial train" in ga_txt.lower()
+                or "traction pack" in ga_txt.lower()
+            )
             if not (has_front and (
-                has_cabinet_cutaway or has_instrument_form or has_assembly_cutaway
+                has_cabinet_cutaway or has_instrument_form
+                or has_assembly_cutaway or has_traction_form
             )):
                 return (False,
                         "general-arrangement.svg is still plant-style PLAN — "
                         "product/instrument GA must lead with FRONT "
                         "(door removed · looking in OR product form · Blender exterior "
-                        "OR cover removed · assembly internals)")
+                        "OR cover removed · assembly internals "
+                        "OR shell ghosted · axial train for traction packs)")
     return (True,
             f"{os.path.basename(render)} + GA fresh vs parts-manifest "
             f"(fp={fp_man}, {kind}) — same placement generation")
@@ -2204,7 +2273,10 @@ def drawing_set_coherent(out_dir: str):
 
 _GA_PART_SET_TAG_RE = re.compile(
     r"""(?<![A-Z0-9-])   # not preceded by alpha-tag char
-        ([A-Z]{1,4}-\d{3,}[A-Za-z]?)  # equipment-tag-shaped token (≥3 digit suffix)
+        # GOTCHA (0846): ≥3-digit suffix dropped INV-1 / EP-1 / I-1 (real ISA
+        # tags). Prefix filter against the manifest set already kills IP-54/G99
+        # false positives — allow 1–4 digit suffixes.
+        ([A-Z]{1,4}-\d{1,4}[A-Za-z]?)
         (?![A-Z0-9-])    # not followed by alpha-tag char
     """,
     re.VERBOSE,

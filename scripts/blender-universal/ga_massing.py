@@ -30,6 +30,15 @@ import re
 # OUTPUT guard that re-flags any regression, and _selftest() below is the
 # proveCatch (verify-engine-guards.sh).
 GA_NON_MASSING_RE = re.compile(
+    # INTENT (2026-07-29 sealed traction packs): harness/hose/bearing/interlock
+    # accessories are NEVER their own GA box — they live ON the motor/inverter
+    # mass. Without this, TYPE_RULES `other` → expected blender+GA while the
+    # story placer never seats them → drawing_set_coherence floors GA ~11%.
+    r"\bphase\s*cable(?:\s*set)?\b|\bcontrol\s*harness(?:\s*set)?\b|"
+    r"\bcoolant\s*hose(?:\s*set)?\b|\bmotor\s*bearings?\b|"
+    r"\bshield\s*drain\s*bond\b|\b(?:hv\s*)?interlock(?:\s*loop|\s*pin)?\b|"
+    r"\bdc\s*link\s*capacitor(?:\s*bank)?\b|\bsignal\s*conditioner\b|"
+    r"\bresolver(?:\s*encoder)?\b|\bcoolant\s*expansion\s*bottle\b|"
     # pipe / mechanical fittings + connectors + supports (accessories)
     r"\b(?:union|glands?|couplings?|adapters?|adaptors?|ferrules?|olives?|"
     r"nipples?|connectors?|flexmount|spacers?|baffles?)\b|"
@@ -403,6 +412,12 @@ def _selftest():
         "agitator shaft mechanical seal", "cable transit frames",
         "access platform + ladders", "structured packing",
         "CO2 sparger ring", "sealer jaw heating element",
+        # INTENT (2026-07-29 sealed traction packs): harness / hose / bearing /
+        # interlock accessories are never their own GA box.
+        "Phase Cable Set", "Control Harness Set", "Coolant Hose Set",
+        "Motor Bearings", "Shield Drain Bond", "Hv Interlock Loop",
+        "DC Link Capacitor Bank", "Signal Conditioner", "Resolver Encoder",
+        "Coolant Expansion Bottle",
     ]
     # pure documentation/signage — expected on NO representation at all.
     must_be_documentation = [
@@ -473,6 +488,9 @@ def _selftest():
         "Weighing Platform", "Loading Platform",  # no 'access' prefix — stays massed
         "Case Packing Machine", "Packing Station",  # 'packing' machine ≠ packing media
         "Immersion Heater",   # no 'heating element' phrase — stays massed
+        # Traction-pack principals MUST stay massed (proveCatch for accessory drop).
+        "Traction Ipmsm Motor Generator", "SiC Traction Inverter",
+        "Reduction Gear Stage", "Traction Drive Housing", "Mgu Cold Plate",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]

@@ -751,6 +751,26 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   instrument_device: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
   photometer: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
   colorimeter: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  // INTENT (2026-07-29 JLR front FPK): unitised motorsport drive units are
+  // OEM-transfer catalogue/specialty assemblies — NOT site-installed plant.
+  // Falling through to DEFAULT applied 20% install + 25% channel and made
+  // installed_asp ≈5.3× a thin class-subtotal BoM (Overview HIGH).
+  formula_e_front_mgu: {
+    assembly_labour_factor: 0.18,
+    factory_overhead_factor: 0.12,
+    manufacturer_margin_factor: 0.28,
+    channel_markup_factor: 0.08,
+    installation_cost_factor: 0,
+    notes: 'Formula E / motorsport front FPK — OEM unit transfer, no site install.',
+  },
+  formula_e_rear_mgu: {
+    assembly_labour_factor: 0.18,
+    factory_overhead_factor: 0.12,
+    manufacturer_margin_factor: 0.28,
+    channel_markup_factor: 0.08,
+    installation_cost_factor: 0,
+    notes: 'Formula E / motorsport rear MGU+MCU — OEM unit transfer, no site install.',
+  },
   // INTENT (2026-07-15 NinjaPCR): benchtop PCR thermocycler — same archetype
   // (no site install). Alias pcr_thermocycler for LLM display-name drift.
   thermocycler: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },

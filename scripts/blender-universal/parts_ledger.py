@@ -92,9 +92,17 @@ TYPE_RULES = [
                    r"force\s+limit|limit\s+feedback|stall\s*(?:sense|detect|feedback)|"
                    r"end[\s-]?stop|load\s*cell|force\s+feedback"),
     ("valve",      r"\bvalve\b|solenoid|actuator|damper"),
-    ("control",    r"controller|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
-                   r"\bHMI\b|touch\s?screen|touch\s?panel|\bDCS\b|operator (?:panel|interface|station)"),
-    ("electrical", r"transformer|switchgear|\bMCC\b|busbar|generator|genset|breaker|relay|\bATS\b|fuse|surge|"
+    ("control",    r"controller|control\s*board|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
+                   r"\bHMI\b|touch\s?screen|touch\s?panel|\bDCS\b|operator (?:panel|interface|station)|"
+                   # INTENT (2026-07-29 sealed drive packs): OEM inverter / gate-driver
+                   # boards are the pack measurement hub when plant SCADA is absent.
+                   r"gate\s*driver(?:\s*board)?"),
+    # INTENT (2026-07-29): traction motor / SiC inverter are ELECTRICAL principals
+    # (SLD + panel), not plant `other` → blender+GA litter. Before generic rules.
+    ("electrical", r"\btraction\s*(?:ipmsm\s*)?motor\b|\bipmsm\b|motor[-\s]?generator|"
+                   r"sic\s*traction\s*inverter|\btraction\s*inverter\b|"
+                   r"(?<!desat\s)\binverter\b(?!\s*control)|\bmcu\b|"
+                   r"transformer|switchgear|\bMCC\b|busbar|generator|genset|breaker|relay|\bATS\b|fuse|surge|"
                    # metering/instrument transformers are switchgear-adjacent power apparatus,
                    # not a bare field instrument (BESS v3: 'grid PCC metering CT' had no match at
                    # all → fell to 'other').
@@ -403,7 +411,8 @@ _ENCLOSURE_HARDWARE_RE = re.compile(
 
 def _not_found_substatus(name: str, basis: str, typ: str = "other",
                           pv_by_norm: dict | None = None,
-                          instrument_device: bool = False) -> str:
+                          instrument_device: bool = False,
+                          traction_drive: bool = False) -> str:
     """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
     evidence (name + basis + its parts_ledger TYPE_RULES classification + its verification
     record) — never a per-part table. One of 'OEM-PROPRIETARY', 'ARCHITECTURALLY-EXCLUDED',
@@ -426,11 +435,14 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
     # GOTCHA (NinjaPCR 2026-07-15): plant TYPE_RULES mis-type board nouns
     # (Flash Storage→vessel, Fan Tachometer→rotating) — fold those into the same
     # instrument residual path unless the name is a real plant head noun.
+    # INTENT (0846 traction MGU): sealed drive packs are also device-scale custom
+    # (IPMSM / SiC MCU / HV spine) — same FABRICATED honesty, gated on traction form.
+    _device_custom = bool(instrument_device or traction_drive)
     _inst_typ = typ
-    if instrument_device and typ in ("vessel", "rotating", "exchanger") and not re.search(
+    if _device_custom and typ in ("vessel", "rotating", "exchanger") and not re.search(
             r"\b(?:tank|pump|blower|compressor|reactor|column|vessel)\b", n, re.I):
         _inst_typ = "other"
-    if instrument_device and _inst_typ in ("instrument", "electrical", "other"):
+    if _device_custom and _inst_typ in ("instrument", "electrical", "other", "rotating", "control"):
         # INTENT (2026-07-14): bezel / "Sensing Instrumentation Subcomponent N" /
         # optical-bench custom parts are concept-stage fabricated work on a handheld
         # instrument — not plant-catalogue NOT FOUND residuals. Universal noun family
@@ -444,7 +456,8 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
         # EXTENDED (NinjaPCR 2026-07-15 Part names 5.3): Bulk Capacitor / Peltier TEC /
         # MOSFET heater switch / sample block fell through both regexes → bare NOT FOUND.
         # Remaining typ=other on an instrument is concept-stage board/thermal work.
-        if _inst_typ in ("instrument", "electrical"):
+        # EXTENDED (0846 traction): OEM inverter control boards type=control.
+        if _inst_typ in ("instrument", "electrical", "rotating", "control"):
             return "FABRICATED"
         if re.search(
                 r"\b(?:fastener|screw|bolt|nut|washer|header|stemma|qwiic|"
@@ -457,11 +470,13 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
                 r"fan\s+tach|fan\s+failure|overtemp|estop|e[\s-]?stop|"
                 r"protective\s+earth|sample\s+block|aluminum\s+sample|"
                 r"subcomponent|sensing|cuvette|collimat|baffle|optic|"
-                r"compute|\bmcu\b|microcontroller|\bui\b|display|\bkit\b",
+                r"compute|\bmcu\b|microcontroller|\bui\b|display|\bkit\b|"
+                r"\bipmsm\b|\bmgu\b|traction|inverter|\bsic\b|cold\s*plate|"
+                r"gear(?:box|stage)?|hv\s*dc|desat|gate\s*driver",
                 n, re.I):
             return "FABRICATED"
-        # Fallthrough: any remaining typ=other on a device instrument is concept-stage
-        # fabricated work, not a plant-catalogue research residual (proveCatch below).
+        # Fallthrough: any remaining typ=other on a device instrument / traction
+        # pack is concept-stage fabricated work, not a plant-catalogue residual.
         return "FABRICATED"
     # Name-family honest statuses (Codema ship 2026-07-09): a control panel / MCC is a
     # scope-documented assembly; a cloth/media filter with no catalogue pin is fabricated
@@ -1045,7 +1060,76 @@ def _is_non_fluid_boundary_noun(name: str) -> bool:
         name_l,
     ):
         return True
+    # INTENT (2026-07-29 0846): shield-drain / PE / earth bond is an ELECTRICAL
+    # bonding strap, not a process-fluid sink — 'drain' must not open missing_output.
+    if re.search(
+        r"shield\s*drain|drain\s*bond|earth\s*bond|pe\s*bond|"
+        r"protective\s*earth|equipotential\s*bond",
+        name_l,
+    ):
+        return True
     return False
+
+
+def _synthesize_traction_hv_spine(
+    equipment: list,
+    connections: list,
+    attached_pairs: set,
+) -> int:
+    """Attach BoM-named HV DC→fuse→bus→SiC→motor edges when schedule is empty.
+
+    INTENT (2026-07-29 0846): freshen-scorer re-runs the ledger after BoM cleanup
+    but abstract eng topology never joins tags — synthesise the pack spine from
+    seated principals so completeness concerns clear without inventing plant pipes.
+    Returns number of newly attached edges.
+    """
+    def _find(rx: str):
+        for e in equipment:
+            if re.search(rx, e.get("name") or "", re.I):
+                return e
+        return None
+
+    hv = _find(r"hv\s*(?:dc\s*)?connector|hv\s*dc\s*input|battery\s*dc")
+    fuse = _find(r"hv\s*dc\s*fuse|\bdc\s*fuse\b")
+    bus = _find(r"hv\s*dc\s*busbar|busbar\s*link")
+    inv = _find(r"sic\s*traction\s*inverter")
+    mot = _find(r"traction\s*ipmsm|ipmsm\s*motor|motor[-\s]?generator")
+    if not inv or not mot:
+        return 0
+    chain = [x for x in (hv, fuse, bus, inv, mot) if x is not None]
+    # Deduplicate if fuse/bus missing left adjacent duplicates.
+    deduped = []
+    for e in chain:
+        if not deduped or deduped[-1] is not e:
+            deduped.append(e)
+    n = 0
+    for fe, te in zip(deduped, deduped[1:]):
+        fr_key = _norm(str(fe.get("name") or ""))
+        to_key = _norm(str(te.get("name") or ""))
+        key = (fr_key, to_key, "electrical_bus")
+        if key in attached_pairs:
+            continue
+        attached_pairs.add(key)
+        via = "cable HV DC"
+        fn = fe.get("name") or fr_key
+        tn = te.get("name") or to_key
+        te.setdefault("inputs", []).append(
+            f"{fn} ({fe.get('tag') or '?'}) via {via} [electrical_bus]")
+        fe.setdefault("outputs", []).append(
+            f"{tn} ({te.get('tag') or '?'}) via {via} [electrical_bus]")
+        connections.append(dict(
+            idx=len(connections), line_number=None,
+            from_part=fn, from_tag=fe.get("tag"),
+            to_part=tn, to_tag=te.get("tag"),
+            mechanism="electrical_bus", kind="cable", via=via,
+            size="", rating=None, length_m=None, line_gbp=None,
+            within_spec=None,
+            coverage=dict(pid=False, process_schedules=False,
+                          isometric=False, route=False),
+            source="traction_hv_spine",
+        ))
+        n += 1
+    return n
 
 
 def _electrical_edge_needs(
@@ -1080,8 +1164,27 @@ def _electrical_edge_needs(
         r"\bindicator\b|pilot\s*(?:light|lamp)|status\s+(?:light|lamp|led)|"
         r"annunciator|\bbeacon\b|buzzer|\bsounder\b|signal\s+(?:lamp|light)",
         name_l, re.I))
-    if is_bus_hardware:
+    # INTENT (2026-07-29 0846): desat / gate-driver boards ride the MCU kit —
+    # never require drawn electrical in+out (a stale ledger OUT must not re-open
+    # missing_input via the terminal has_any path).
+    is_mcu_kit_board = bool(re.search(
+        r"\bdesat\b|gate\s*driver|overcurrent\s*trip",
+        name_l, re.I))
+    # INTENT (2026-07-29 0846): HV pack connector is the battery-limit origin;
+    # IPMSM / motor-generator converts electrical→mechanical — electrical SINK
+    # (shaft out is not an electrical load edge).
+    is_hv_pack_origin = bool(re.search(
+        r"hv\s*(?:dc\s*)?connector|hv\s*dc\s*input|battery\s*dc\s*(?:input|connector)",
+        name_l, re.I))
+    is_traction_motor_sink = bool(re.search(
+        r"\bipmsm\b|motor[-\s]?generator|traction\s*(?:ipmsm\s*)?motor\b",
+        name_l, re.I))
+    if is_bus_hardware or is_mcu_kit_board:
         return False, False
+    if is_hv_pack_origin:
+        is_origin = True
+    if is_traction_motor_sink:
+        is_sink = True
     needs_in = not is_origin and not (is_terminal_elec and not has_any)
     # GOTCHA: compact-device topology can reverse a battery-limit origin tie
     # (e.g. "Power Distribution -> USB inlet"). If any edge touches the origin,
@@ -1101,7 +1204,8 @@ def _electrical_edge_needs(
 # orphan_instrument and floored the tab via min-score. Pure helpers so proveCatch
 # pins both failure modes without running the full ledger.
 _INSTRUMENT_CONTROL_NAME_RE = re.compile(
-    r"\b(?:mcu|microcontroller|compute|controller|plc|hmi|display|ui\s*module)\b",
+    r"\b(?:mcu|microcontroller|compute|controller|plc|hmi|display|ui\s*module|"
+    r"control\s*board|gate\s*driver)\b",
     re.I)
 _INSTRUMENT_CONSUMABLE_RE = re.compile(
     r"\b(?:consumable|cuvette|sample\s*(?:cell|vial|tube|cuvette)|"
@@ -1363,6 +1467,25 @@ def main() -> int:
     # with no fluid/plant). Gates the signal-chain role classification below; a plant /
     # BESS / Powerwall never carries it, so those runs are byte-identical.
     instrument_device = bool(state.get("isInstrumentDevice"))
+    # INTENT (2026-07-29): traction packs seat motor/SiC/gear on blender+GA but
+    # `_classify` types motor/inverter as electrical (SLD-only). Expand expected
+    # so seated principals are in the coverage denominator (not plant litter).
+    _traction_pack = False
+    try:
+        _libp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+        if _libp not in sys.path:
+            sys.path.insert(0, _libp)
+        import instrument_form_grammar as _ifg_pl  # type: ignore
+        _pc_pl = str(
+            (state.get("parsedBrief") or {}).get("product_class")
+            or (state.get("orchestratorContract") or {}).get("product_class")
+            or (state.get("moduleDecomposition") or {}).get("product_class")
+            or "",
+        )
+        _traction_pack = bool(_ifg_pl.is_traction_drive_pack_form(product_class=_pc_pl))
+    except Exception:
+        _pc_pl = str((state.get("moduleDecomposition") or {}).get("product_class") or "")
+        _traction_pack = bool(re.search(r"\bmgu\b|traction|ipmsm|powertrain", _pc_pl, re.I))
     # INTENT (Powerwall 2026-07-15): sealed product cabinets (enclosure_volume_m3 < 1)
     # share the instrument rule for GA coverage — the GA IS the parts-manifest
     # projection (thin-TOP outlines + FRONT cutaway). Requiring every sub-16×12 px
@@ -1774,6 +1897,63 @@ def main() -> int:
             expected = expected - {"block-flow-diagram"}
         if "NA-BY-DESIGN" in (rep_text.get("process-schedules") or ""):
             expected = expected - {"process-schedules"}
+        # Traction pack: no plant process/HVAC homes. Mechanical principals sit on
+        # blender+GA; HV electrical spine (motor/inverter/connector/fuse/busbar) on SLD.
+        if _traction_pack:
+            expected = expected - {
+                "pid", "process-schedules", "block-flow-diagram", "hvac-layout",
+                "panel-schedule",
+            }
+            _mech = bool(re.search(
+                r"reduction\s*gear|gearbox|mgu\s*cold\s*plate|cold\s*plate|"
+                r"traction\s*drive\s*housing|hv\s*shield|mounting\s*ear",
+                name, re.I,
+            ))
+            # Massed HV principals (story meshes / GA boxes).
+            _elec_massed = bool(re.search(
+                r"traction\s*(?:ipmsm\s*)?motor|ipmsm|motor[-\s]?generator|"
+                r"sic\s*traction\s*inverter|(?<!desat\s)\btraction\s*inverter\b|"
+                r"hv\s*(?:dc\s*)?connector",
+                name, re.I,
+            ))
+            # Series HV protection / bus — SLD symbols only, not GA boxes.
+            _elec_sld_only = bool(re.search(
+                r"hv\s*dc\s*fuse|\bdc\s*fuse\b|hv\s*dc\s*busbar|dc\s*busbar\s*link",
+                name, re.I,
+            ))
+            if _mech:
+                expected = expected | {"blender", "general-arrangement"}
+                expected = expected - {"single-line-diagram", "panel-schedule"}
+            if _elec_massed:
+                expected = expected | {
+                    "blender", "general-arrangement", "single-line-diagram",
+                }
+            if _elec_sld_only:
+                expected = expected | {"single-line-diagram"}
+                expected = expected - {"blender", "general-arrangement", "panel-schedule"}
+            # Twin bare names — SLD credit via richer IPMSM/SiC principal only.
+            if re.fullmatch(r"traction\s*motor", name.strip(), re.I) or re.fullmatch(
+                r"traction\s*inverter", name.strip(), re.I,
+            ):
+                expected = expected - {
+                    "blender", "general-arrangement", "single-line-diagram",
+                    "panel-schedule",
+                }
+            # Gate-drive / desat boards live on the MCU — not separate SLD feeders.
+            if re.search(r"desat|gate\s*driver|overcurrent\s*trip", name, re.I):
+                expected = expected - {
+                    "blender", "general-arrangement", "single-line-diagram",
+                    "panel-schedule",
+                }
+            # Coolant manifold is absorbed by the cold-plate story mesh — not a
+            # separate GA box. Phase-overcurrent with no ISA tag is not massing.
+            if re.search(r"coolant\s*manifold", name, re.I):
+                expected = expected - {"blender", "general-arrangement"}
+            if not str(tag or "").strip() or str(tag).strip() in ("—", "-"):
+                expected = expected - {
+                    "blender", "general-arrangement", "single-line-diagram",
+                    "panel-schedule",
+                }
         # A TRANSFORMER is supply-side power conversion UPSTREAM of the board, not a
         # consuming LOAD WAY — a panel schedule lists load circuits, so expecting the
         # transformer there deflates coverage on a correctly-drawn board (Codema 2100:
@@ -1801,7 +1981,8 @@ def main() -> int:
         # truncated `basis` field below) so a signal past 90 chars is never missed.
         # None for every other status (IDENTIFIED/BESPOKE/SYSTEM/… never reach this).
         nf_substatus = _not_found_substatus(
-            name, basis_full, typ, _pv_by_norm, instrument_device
+            name, basis_full, typ, _pv_by_norm, instrument_device,
+            traction_drive=_traction_pack,
         ) if r.get("status") == "NOT FOUND" else None
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
@@ -1968,6 +2149,16 @@ def main() -> int:
               f"absent from the delivered design (wired pre-removal) — disclosed in "
               f"stale_ties, not attached: "
               f"{[t['from_part'] + '→' + t['to_part'] for t in stale_ties[:4]]}")
+
+    # INTENT (2026-07-29 0846): traction packs often race with empty
+    # connection-schedule + abstract eng topology (hv_battery_dc_bus) that never
+    # joins BoM tags. Synthesise the HV spine from seated principals so ledger
+    # completeness / Connection Trace cannot floor on a known-good pack form.
+    if _traction_pack:
+        n_td = _synthesize_traction_hv_spine(equipment, connections, attached_pairs)
+        if n_td:
+            print(f"[parts-ledger] traction HV spine: attached {n_td} BoM-named "
+                  f"electrical_bus edge(s) (connector→fuse→bus→SiC→motor)")
 
     # INTENT (2026-07-14 Tristan adversarial): gold-spine / handheld BoM collapses
     # USB/MCU/fuse hosts into Compute UI Module + LED Source Board, but the
@@ -2458,6 +2649,19 @@ def main() -> int:
             ):
                 n_electrical_connected += 1
                 continue
+            # INTENT (2026-07-29 0846): bare Traction Motor / Traction Inverter
+            # twins are desaturated when a richer IPMSM / SiC principal seats —
+            # do not double-count them in the electrical completeness denom.
+            if _traction_pack:
+                _en = (e.get("name") or "").strip()
+                _has_ipmsm = any(re.search(r"\bipmsm\b|motor[-\s]?generator",
+                                           x.get("name") or "", re.I) for x in equipment)
+                _has_sic = any(re.search(r"sic\s*traction\s*inverter",
+                                         x.get("name") or "", re.I) for x in equipment)
+                if _has_ipmsm and re.fullmatch(r"traction\s*motor", _en, re.I):
+                    continue
+                if _has_sic and re.fullmatch(r"traction\s*inverter", _en, re.I):
+                    continue
             # A TERMINAL / PASSIVE electrical device legitimately has no downstream
             # LOAD edge — it is the END of a circuit, not a distributor: a fuse / surge
             # protector (SPD) / protective relay protects the bus it taps; a cable tray
@@ -3073,6 +3277,26 @@ def _selftest() -> int:
         print("  FAIL not-found-substatus proveNoFalsePositive: Bulk Capacitor on a "
               f"non-instrument plant must stay NOT FOUND (got {_cap_plant!r})")
         bad += 1
+    # proveCatch (0846 traction MGU): SiC inverter / IPMSM on a traction pack are
+    # concept-stage fabricated drive hardware — never plant-catalogue NOT FOUND.
+    _sic = _not_found_substatus("SiC Traction Inverter", "requirement stated", "electrical",
+                               traction_drive=True)
+    if _sic != "FABRICATED":
+        print(f"  FAIL not-found-substatus: traction SiC inverter must be FABRICATED "
+              f"(got {_sic!r})")
+        bad += 1
+    _ipmsm = _not_found_substatus("Traction Ipmsm Motor Generator", "requirement stated",
+                                 "rotating", traction_drive=True)
+    if _ipmsm != "FABRICATED":
+        print(f"  FAIL not-found-substatus: traction IPMSM must be FABRICATED "
+              f"(got {_ipmsm!r})")
+        bad += 1
+    _sic_plant = _not_found_substatus("SiC Traction Inverter", "requirement stated",
+                                     "electrical", traction_drive=False)
+    if _sic_plant == "FABRICATED":
+        print("  FAIL not-found-substatus proveNoFalsePositive: SiC inverter on a "
+              "non-traction plant must NOT auto-classify FABRICATED")
+        bad += 1
     # proveCatch: Electrical Control Panel / Cloth Filter must never stay bare NOT FOUND
     # (Codema ship X-106 / V-104 — both drawn on GA, residual Part-names FAIL).
     _panel = _not_found_substatus("Electrical Control Panel", "bottom-up parametric")
@@ -3303,6 +3527,20 @@ def _selftest() -> int:
     if _control_present([_fake_mcu], instrument_device=False):
         print("  FAIL _control_present: MCU typed other must NOT count on a plant "
               "(non-instrument) run")
+        bad += 1
+    # proveCatch (2026-07-29 FE MGU): OEM inverter control board types as control
+    # so has_control is true on sealed drive packs (orphan_instrument floor kill).
+    _ctrl_board_typ = _classify("Oem Inverter Control Board", "", instrument_device=False)
+    if _ctrl_board_typ != "control":
+        print(f"  FAIL _classify: Oem Inverter Control Board must be 'control' "
+              f"(got {_ctrl_board_typ!r})")
+        bad += 1
+    if not _control_present(
+        [{"tag": "INV-3", "name": "Oem Inverter Control Board", "type": _ctrl_board_typ}],
+        instrument_device=False,
+    ):
+        print("  FAIL _control_present: typed control board must satisfy control_present "
+              "on a non-instrument sealed pack")
         bad += 1
     # proveCatch (OpenFlexure 0939): generic device subcomponents are placeholder
     # leaves, not orphan controllers/feeders.

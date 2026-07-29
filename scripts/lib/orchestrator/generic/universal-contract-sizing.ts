@@ -545,18 +545,82 @@ const TRACTION_DRIVE_EDGE_CAP_MM = 650
  * smaller SiC brick so motor+inverter+gear fit the sealed pack envelope
  * (critic HIGH: 47 L principals vs 18 L enclosure).
  */
+/**
+ * Hard packaging bay (front-axle / unitised FPK box). When present, the sealed
+ * pack envelope is the bay — principals shrink to fit; never grow the shell.
+ * PURE — keyed on bay_envelope_* quantity stems, never a class slug.
+ */
+function bayHardEnvelopeMm(
+  quantities?: Record<string, number>,
+): { w: number; d: number; h: number } | null {
+  if (!quantities) return null
+  const w = Number(
+    quantities.front_bay_envelope_w_mm
+    ?? quantities.bay_envelope_w_mm
+    ?? quantities.bay_envelope_width_mm
+    ?? 0,
+  )
+  const d = Number(
+    quantities.front_bay_envelope_d_mm
+    ?? quantities.bay_envelope_d_mm
+    ?? quantities.bay_envelope_depth_mm
+    ?? 0,
+  )
+  const h = Number(
+    quantities.front_bay_envelope_h_mm
+    ?? quantities.bay_envelope_h_mm
+    ?? quantities.bay_envelope_height_mm
+    ?? 0,
+  )
+  if (!(w > 50 && d > 50 && h > 50)) return null
+  // Bay boxes are compact (tens of litres). Reject plant-room mis-keys.
+  if ((w * d * h) / 1e9 >= 0.25) return null
+  return { w, d, h }
+}
+
 function boxFromHighDensityDriveKw(
   kw: number,
   phrase = '',
   quantities?: Record<string, number>,
 ): string {
   const s = Math.cbrt(Math.max(50, kw) / 250)
+  const bay = bayHardEnvelopeMm(quantities)
+  // When a hard bay exists, every principal edge must fit the bay's MAX edge
+  // (orientation chosen below); soft TRACTION_DRIVE_EDGE_CAP still applies.
+  const edgeCap = bay
+    ? Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(bay.w, bay.d, bay.h))
+    : TRACTION_DRIVE_EDGE_CAP_MM
   const cap = (n: number): number =>
-    Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(90, Math.round(n)))
+    Math.min(edgeCap, Math.max(90, Math.round(n)))
   const p = phrase.replace(/[_\s]+/g, ' ').toLowerCase()
   const isInverter =
     /\b(?:inverter|mcu|converter|rectifier)\b/.test(p)
     && !/\b(?:motor|ipmsm|mgu|generator)\b/.test(p)
+  // DECISION (2026-07-29 bay-fill): HARD bay = UNITISED housing. Prefer bay
+  // fractions over free rotor/stack envelopes so motor+gear+diff are not read
+  // as a coaxial sum that overflows the homologated box (1429 critic HIGH).
+  if (bay) {
+    if (isInverter) {
+      // INTENT (2026-07-29 1431): face-mounted SiC brick on the motor end —
+      // thin package thickness so motor OD + inverter thickness clears bay.d
+      // (critic HIGH: 177 OD + 109 deep inverter "stacked" in 259 mm bay).
+      const span = Math.round(Math.min(bay.w * 0.70, bay.w - 8))
+      const face = Math.round(Math.min(bay.d, bay.h) * 0.72)
+      const thick = 52
+      return `${span}x${face}x${thick} mm`
+    }
+    // Prefer tool rotor OD/stack when present, then clamp into bay fractions.
+    const rotorOd = Number(quantities?.rotor_airgap_diameter_mm ?? 0)
+    const stack = Number(quantities?.stack_length_mm ?? 0)
+    const odMax = Math.round(Math.min(bay.h, bay.d) * 0.82)
+    const lenMax = Math.round(Math.min(bay.w * 0.52, bay.w - 8))
+    if (rotorOd > 20 && stack > 20) {
+      const od = Math.min(odMax, Math.max(90, Math.round(rotorOd * 1.45)))
+      const len = Math.min(lenMax, Math.max(90, Math.round(stack * 1.55)))
+      return `${len}x${od}x${od} mm`
+    }
+    return `${lenMax}x${odMax}x${odMax} mm`
+  }
   if (!isInverter) {
     const rotorOd = Number(quantities?.rotor_airgap_diameter_mm ?? 0)
     const stack = Number(quantities?.stack_length_mm ?? 0)
@@ -566,7 +630,6 @@ function boxFromHighDensityDriveKw(
       return `${len}x${od}x${od} mm`
     }
   }
-  // Compact race-pack references (not plant cube-root; not appliance boxes).
   const base = isInverter ? [240, 180, 90] : [200, 180, 220]
   return `${cap(base[0] * s)}x${cap(base[1] * s)}x${cap(base[2] * s)} mm`
 }
@@ -1335,7 +1398,13 @@ function stampTractionPackAuxiliaryEnvelopes(
   onlyUnsized: boolean,
 ): number {
   if (!_tractionDrivePackSizingActive) return 0
-  const torque = Number(quantities['mgu_shaft_torque_nm'] ?? quantities['mgu_shaft_torque_max_nm'] ?? 0)
+  // Prefer PEAK shaft torque (constant-power corner) for gear/diff; fall back to
+  // rated base-speed torque. Critic 1429: sizing on 117 Nm while brief peak=334.
+  const torque = Number(
+    quantities['mgu_shaft_torque_max_nm']
+    ?? quantities['mgu_shaft_torque_nm']
+    ?? 0,
+  )
   const continuousKw = Number(
     quantities['continuous_power_kw']
     ?? quantities['traction_motor_power_kw']
@@ -1347,7 +1416,11 @@ function stampTractionPackAuxiliaryEnvelopes(
   const gearScale = Math.cbrt(
     Math.max(0.4, (Math.max(40, torque) * Math.max(4, gearRatio)) / (80 * 8)),
   )
-  const gearDim = `${Math.round(160 * gearScale)}x${Math.round(110 * gearScale)}x${Math.round(130 * gearScale)} mm`
+  const bayForGear = bayHardEnvelopeMm(quantities)
+  // Nose-pack fractions (overlap motor stack) — keep coaxial-sum reading ≤ bay.w.
+  const gearDim = bayForGear
+    ? `${Math.round(bayForGear.w * 0.28)}x${Math.round(Math.min(bayForGear.d, bayForGear.h) * 0.58)}x${Math.round(Math.min(bayForGear.d, bayForGear.h) * 0.52)} mm`
+    : `${Math.round(160 * gearScale)}x${Math.round(110 * gearScale)}x${Math.round(130 * gearScale)} mm`
   // Cold-plate footprint tracks continuous loss duty (~7% of continuous electrical).
   const rejectKw = Math.max(5, continuousKw * 0.07)
   const plateSide = Math.min(420, Math.max(140, Math.round(90 * Math.sqrt(rejectKw / 10))))
@@ -1383,6 +1456,33 @@ function stampTractionPackAuxiliaryEnvelopes(
             mod('sizing_basis', 'MCU cold-plate footprint from continuous inverter loss proxy'),
           ])
           n += 1
+        } else if (/open[_\s-]?bevel[_\s-]?differential|bevel[_\s-]?differential|\bdifferential\b/i.test(role)
+          && !/pressure|sensor|gauge/i.test(role)) {
+          // GOTCHA (2026-07-29 1427): rating used torque×ratio (= gear OUTPUT Nm)
+          // while critic compared to motor shaft×ratio — label the OUTPUT clearly
+          // and size the envelope from that output torque.
+          const outTorque = Math.max(40, torque * Math.max(4, gearRatio))
+          const dScale = Math.cbrt(outTorque / (80 * 8))
+          const bay = bayHardEnvelopeMm(quantities)
+          let diffDim = `${Math.round(140 * dScale)}x${Math.round(120 * dScale)}x${Math.round(110 * dScale)} mm`
+          if (bay) {
+            // Nose-pack fraction (overlaps gear; halfshaft exits).
+            diffDim = `${Math.round(bay.w * 0.24)}x${Math.round(Math.min(bay.d, bay.h) * 0.55)}x${Math.round(Math.min(bay.d, bay.h) * 0.50)} mm`
+          }
+          mergeMods(w, [
+            mod('dimension', diffDim),
+            mod('rating_primary', String(Math.round(outTorque)), 'Nm_out'),
+            mod('sizing_basis',
+              `open bevel differential — gear-output torque ≈ shaft×ratio (${Math.round(torque)} Nm × ${gearRatio})`),
+          ])
+          n += 1
+        } else if (/halfshaft[_\s-]?output|half[_\s-]?shaft/i.test(role)) {
+          mergeMods(w, [
+            mod('dimension', '90x55x45 mm'),
+            mod('rating_primary', 'pair', ''),
+            mod('sizing_basis', 'halfshaft output flange pair (interface, not shaft length)'),
+          ])
+          n += 1
         } else if (/desat|gate[_\s-]?driv|phase[_\s-]?overcurrent|isolation[_\s-]?monitor/i.test(role)) {
           // INTENT (2026-07-29 / 0806): desat / protection are PCB functions, not
           // 350 kW power bricks (critic HIGH on copy-pasted inverter dims).
@@ -1400,6 +1500,62 @@ function stampTractionPackAuxiliaryEnvelopes(
 }
 
 /**
+ * INTENT (2026-07-29 front FPK): HARD bay = unitised housing. Principals may
+ * OVERLAP inside the bay (motor + face-mounted inverter + nose gear/diff).
+ * TRIED: uniform scale of Σ lengths to fit — crushed a 350 kW IPMSM to ~0.9 L
+ * (~390 kW/L, critic HIGH). Fix: clamp each principal's OWN edges to the bay;
+ * never shrink by summing sibling boxes.
+ */
+function fitTractionPrincipalsIntoBay(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+): number {
+  if (!_tractionDrivePackSizingActive) return 0
+  const bay = bayHardEnvelopeMm(quantities)
+  if (!bay) return 0
+  const dimRe = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)\s*mm$/i
+  const principalRe =
+    /(?:ipmsm|motor\s*generator|\bmgu\b|traction\s*inverter|sic\s*traction|reduction\s*gear|gear\s*stage|bevel\s*differential|\bdifferential\b)/i
+  const skipRe = /\b(?:bearing|coupling|sensor|cold\s*plate|desat|protection|pressure|halfshaft|flange)\b/i
+  let n = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const word of sm.words ?? []) {
+        const role = wordRoleText(word)
+        if (!principalRe.test(role) || skipRe.test(role)) continue
+        const dimMc = (word.modifier_characters ?? []).find(
+          (mc) => mc.kind === 'dimension' || mc.kind === 'dimensions',
+        )
+        const hit = typeof dimMc?.value === 'string' ? dimRe.exec(dimMc.value.trim()) : null
+        if (!hit) continue
+        const a = parseFloat(hit[1])
+        const b = parseFloat(hit[2])
+        const c = parseFloat(hit[3])
+        // Orient: map the three edges onto bay W/D/H by sorting descending onto
+        // bay's descending axes so the longest principal edge uses bay width.
+        const edges = [a, b, c].sort((x, y) => y - x)
+        const bayAxes = [bay.w, bay.d, bay.h].sort((x, y) => y - x)
+        const clamped = edges.map((e, i) => Math.min(e, bayAxes[i] - 4))
+        // Restore original axis order (L×D×H) with clamped magnitudes by rank.
+        const rank = [a, b, c].map((e, i) => ({ e, i })).sort((x, y) => y.e - x.e)
+        const out = [0, 0, 0]
+        for (let r = 0; r < 3; r++) out[rank[r].i] = Math.max(40, Math.round(clamped[r]))
+        if (out[0] === Math.round(a) && out[1] === Math.round(b) && out[2] === Math.round(c)) {
+          continue
+        }
+        mergeMods(word, [
+          mod('dimension', `${out[0]}x${out[1]}x${out[2]} mm`),
+          mod('sizing_basis',
+            `edge-clamped into HARD bay ${bay.w}×${bay.d}×${bay.h} mm (unitised overlap — not Σ-sibling scale)`),
+        ])
+        n += 1
+      }
+    }
+  }
+  return n
+}
+
+/**
  * INTENT (2026-07-29 / 0806): after principals are stamped, rewrite the sealed
  * pack envelope so enclosure_volume_m3 can contain motor+MCU+gear (with margin).
  * Never leave a 0.018 m³ shell around 47 L of principals (critic HIGH).
@@ -1409,16 +1565,66 @@ function syncTractionPackEnclosureFromPrincipals(
   contract: ContractInProgress,
 ): void {
   if (!_tractionDrivePackSizingActive) return
+  const cq = (contract.quantities ?? {}) as Record<string, Record<string, unknown>>
+  const qtyNums: Record<string, number> = {}
+  for (const [k, v] of Object.entries(cq)) {
+    const n = Number((v as { value?: unknown })?.value)
+    if (Number.isFinite(n)) qtyNums[k] = n
+  }
+  // INTENT (calc-coverage 2026-07-29): HARD bay stamps are brief ROOTs (homologated
+  // box), not calculator derivations — previously overwrote engineering-contract
+  // brief tags with calculator + prose that only accidentally passed via `*` in
+  // `bay_envelope_*` on width while depth/height hid (JLR front 1432, 93% coverage).
+  const stamp = (
+    key: string,
+    value: number,
+    unit: string,
+    family: string,
+    detail: string,
+    source: 'brief' | 'calculator' = 'calculator',
+  ): void => {
+    const prev = cq[key] ?? {}
+    cq[key] = {
+      ...prev,
+      value,
+      unit,
+      family,
+      basis: 'max',
+      scope: 'system',
+      source,
+      source_detail: detail,
+    }
+  }
+  // INTENT (2026-07-29 front FPK): a homologated bay box is HARD packaging.
+  // Principals pack side-by-side INTO the bay — never grow the shell past it
+  // (sync-from-principals previously overwrote 343×259×267 with a larger pack).
+  const bay = bayHardEnvelopeMm(qtyNums)
+  if (bay) {
+    const vol = Math.round((bay.w * bay.d * bay.h) / 1e9 * 1e6) / 1e6
+    stamp('design_envelope_width_mm', bay.w, 'mm', 'length',
+      `design_envelope_width_mm = front_bay_envelope_w_mm = ${bay.w} (HARD homologated bay)`,
+      'brief')
+    stamp('design_envelope_depth_mm', bay.d, 'mm', 'length',
+      `design_envelope_depth_mm = front_bay_envelope_d_mm = ${bay.d} (HARD homologated bay)`,
+      'brief')
+    stamp('design_envelope_height_mm', bay.h, 'mm', 'length',
+      `design_envelope_height_mm = front_bay_envelope_h_mm = ${bay.h} (HARD homologated bay)`,
+      'brief')
+    stamp('enclosure_volume_m3', vol, 'm³', 'volume',
+      `${(bay.w / 1000).toFixed(3)}×${(bay.d / 1000).toFixed(3)}×${(bay.h / 1000).toFixed(3)} m HARD bay — not grown from principals`)
+    contract.quantities = cq as typeof contract.quantities
+    return
+  }
   const dims: Array<{ w: number; d: number; h: number }> = []
   const dimRe = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)\s*mm$/i
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
         const role = wordRoleText(w)
-        if (!/(?:ipmsm|motor\s*generator|\bmgu\b|traction\s*inverter|sic\s*traction|reduction\s*gear|gear\s*stage)/i.test(role)) {
+        if (!/(?:ipmsm|motor\s*generator|\bmgu\b|traction\s*inverter|sic\s*traction|reduction\s*gear|gear\s*stage|bevel\s*differential|differential)/i.test(role)) {
           continue
         }
-        if (/\b(?:bearing|coupling|sensor|cold\s*plate|desat|protection)\b/i.test(role)) continue
+        if (/\b(?:bearing|coupling|sensor|cold\s*plate|desat|protection|pressure)\b/i.test(role)) continue
         const dim = (w.modifier_characters ?? []).find(
           (mc) => mc.kind === 'dimension' || mc.kind === 'dimensions',
         )?.value
@@ -1443,26 +1649,12 @@ function syncTractionPackEnclosureFromPrincipals(
   const envD = Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(200, Math.round(maxD * margin)))
   const envH = Math.min(TRACTION_DRIVE_EDGE_CAP_MM, Math.max(160, Math.round(maxH * margin)))
   const vol = Math.round((envW * envD * envH) / 1e9 * 1e6) / 1e6
-  const cq = (contract.quantities ?? {}) as Record<string, Record<string, unknown>>
-  const stamp = (key: string, value: number, unit: string, family: string, detail: string): void => {
-    const prev = cq[key] ?? {}
-    cq[key] = {
-      ...prev,
-      value,
-      unit,
-      family,
-      basis: 'max',
-      scope: 'system',
-      source: 'calculator',
-      source_detail: detail,
-    }
-  }
   stamp('design_envelope_width_mm', envW, 'mm', 'length',
-    'synced from stamped MGU+MCU+gear principal dims (axial pack)')
+    `design_envelope_width_mm = min(cap, max(320, Σprincipal_w×0.72×${margin})) = ${envW}`)
   stamp('design_envelope_depth_mm', envD, 'mm', 'length',
-    'synced from stamped principal max depth')
+    `design_envelope_depth_mm = min(cap, max(200, max_principal_d×${margin})) = ${envD}`)
   stamp('design_envelope_height_mm', envH, 'mm', 'length',
-    'synced from stamped principal max height')
+    `design_envelope_height_mm = min(cap, max(160, max_principal_h×${margin})) = ${envH}`)
   stamp('enclosure_volume_m3', vol, 'm³', 'volume',
     `${(envW / 1000).toFixed(3)}×${(envD / 1000).toFixed(3)}×${(envH / 1000).toFixed(3)} m traction pack — synced from principals`)
   contract.quantities = cq as typeof contract.quantities
@@ -7499,6 +7691,7 @@ export function applyUniversalContractSizing(
   // area when present; else a watt rating from the dissipation demand. UNIVERSAL.
   sized += stampHeatsinkThermalFromContract(modules, quantities, onlyUnsized)
   sized += stampTractionPackAuxiliaryEnvelopes(modules, quantities, onlyUnsized)
+  fitTractionPrincipalsIntoBay(modules, quantities)
   syncTractionPackEnclosureFromPrincipals(modules, contract)
 
   // ── A2. CLEANING-SERVICE VESSELS: one-charge rule (see sizeCleaningServiceVessels) ──

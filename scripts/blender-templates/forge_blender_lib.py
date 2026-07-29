@@ -27,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 from render_view_contract import presentation_bevel_width_m
+from instrument_form_grammar import instrument_studio_ground_size_m
 
 # Module-level state — populated by add_box / add_cyl / etc.
 _module_objects_ref = None
@@ -306,8 +307,11 @@ def add_instrument_studio_lights(centre_m, extent_m, product_half_height_m=None,
         bounce.data.use_shadow = False
     except AttributeError:
         pass
-    # Seamless soft ground — just under the feet for a real contact shadow.
-    ground_size = e * 8.0
+    # INTENT (2026-07-29): contact-shadow plane must HUG the product footprint.
+    # TRIED: ground_size = e * 8.0 (~3.6 m under a ~0.4 m MGU). Abandoned because
+    # GLB/USDZ viewers frame the full AABB, so the product opened from "miles away".
+    # Beauty grammar: seamless plane under the feet — not a plant-scale slab.
+    ground_size = instrument_studio_ground_size_m(e)
     bpy.ops.mesh.primitive_plane_add(
         size=ground_size,
         location=(cx, cy, ground_z))

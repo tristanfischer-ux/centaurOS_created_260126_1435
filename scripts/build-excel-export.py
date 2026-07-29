@@ -8927,15 +8927,31 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         _line_raw = row.get("line_gbp")
         _line_num = _line_raw if isinstance(_line_raw, (int, float)) else 0
         _is_subcomp = str(row.get("requirement", "") or "").strip().startswith("↳")
-        _is_fold = str(row.get("status", "") or "").strip() in _LEDGER_FOLD_STATUSES
+        _status_raw = str(row.get("status", "") or "").strip()
+        _status_u = _status_raw.upper()
+        _is_fold = _status_raw in _LEDGER_FOLD_STATUSES
+        # INTENT (0846 / S10b): REALIZED_ON_PCB / GEOMETRY / SUB-COMPONENT £0 rows are
+        # intentional non-buy lines — same render + Row-check waiver as fold twins.
+        # Without this, live O-col required D/E>0 and FAILed a python-PASS PCB line
+        # (Phase Overcurrent Trip), flooring BoM ONE-TRUTH at 9.7 vs python 9.9.
+        _is_zero_ok = _status_u in (
+            "REALIZED_ON_PCB", "GEOMETRY", "SUB-COMPONENT", "IN ASSEMBLY",
+        )
         # Rendered as text ("incl. in parent" / "—") rather than a priced buy-list row — a
         # sub-component OR a dedupe-fold twin, but ONLY when it actually carries no line total
         # of its own (a fold/subcomp row that DOES carry a real line_gbp renders normally, as
         # a priced row, same as any other line). Reused below so the Row-check's arithmetic
         # terms are gated on the SAME decision the D/E cells were rendered with.
-        _rendered_as_incl_in_parent = (_is_subcomp or _is_fold) and not _line_num
+        _rendered_as_incl_in_parent = (
+            (_is_subcomp or _is_fold or _is_zero_ok) and not _line_num
+        )
         if _rendered_as_incl_in_parent:
-            ws.cell(r, 4, "incl. in parent").border = BORDER
+            _unit_txt = (
+                "on PCB (see PCB tab)" if _status_u == "REALIZED_ON_PCB"
+                else "geometry / clearance only" if _status_u == "GEOMETRY"
+                else "incl. in parent"
+            )
+            ws.cell(r, 4, _unit_txt).border = BORDER
             ws.cell(r, 5, "—").border = BORDER
         else:
             ws.cell(r, 4, num(row.get("unit_gbp"))).border = BORDER
@@ -10024,6 +10040,18 @@ def _brief_metric_status(metric: dict, quantities: Dict[str, Any], brief_text: s
     tgt = num(metric.get("value"))
     unit = metric.get("unit", "") or ""
     claim = _display_name(key) or key or "(unnamed metric)"
+    # INTENT (2026-07-29 0846): car_level_* / vehicle_level_* are whole-car CONTEXT,
+    # not rear-MGU deliverables. Mark OUT_OF_SCOPE + SOFT so Verification HARD-open
+    # does not floor the tab at 4 (Excel cover already renders OUT OF SCOPE).
+    _kl = key.lower()
+    if "car_level" in _kl or "vehicle_level" in _kl or "whole_vehicle" in _kl or "whole_car" in _kl:
+        return _verif_row(
+            "brief", claim, status="OUT_OF_SCOPE", hardness="SOFT",
+            provenance=(f"brief context for the race car — not a rear-MGU/MCU deliverable; "
+                        f"excluded from HARD spine. (brief key: {key})"),
+            target=tgt if tgt is not None else "—", achieved="—", unit=unit,
+            target_num=tgt, achieved_num=None, compare="ge",
+        )
     matched = _match_quantity(metric, quantities, brief_text)
     if matched is None or tgt is None:
         return _verif_row(
@@ -10195,24 +10223,48 @@ def _match_worked_to_quantity(qname: str, qval: float, qunit: str,
             continue
         if q_is_min and re.search(r"\bmax(?:imum)?\b", lab, re.I):
             continue
+        # GOTCHA (0846 tip_speed): retention/overspeed tip shares tip+speed tokens
+        # with tip_speed_m_s (base). Also skip bare "Rotor tip speed" from the
+        # centrifugal-stress tool (pre-retention label on live toolsUsedPage) —
+        # that 247 m/s vs 224 m/s HARD-failed Verification at ~10%.
+        if re.search(r"\bretention\b|\boverspeed\b", lab, re.I) and not re.search(
+                r"retention|overspeed", qname, re.I):
+            continue
+        if (re.search(r"rotor-centrifugal|retention", str(w.get("tool_id") or ""), re.I)
+                and re.search(r"tip\s*speed", lab, re.I)
+                and not re.search(r"retention|overspeed", qname, re.I)):
+            continue
         w_is_agg = bool(w_tok & _AGG) or bool(re.search(r"\btotal\b", lab, re.I))
         if q_is_agg != w_is_agg:
             continue
         w_fam, _ = _unit_family(w.get("unit") or "")
-        if q_fam != w_fam and not (
-            q_fam.startswith("?") and w_fam.startswith("?")
-        ) and not (q_fam in ("ratio", "count") and w_fam in ("ratio", "count")):
-            if not re.search(r"absorb|au\b", qname, re.I):
+        # GOTCHA (0846): both-unknown used to free-pass (`?rpm`↔`?m/s`), so
+        # "Rotor tip speed at base rpm" (224.88 m/s) pinned onto
+        # max_rotor_speed_rpm (44000) and HARD-failed Verification at 99%.
+        # Unknown families must still agree on the family TAG; only ratio/count
+        # (and the absorb AU exception) may cross.
+        if q_fam != w_fam:
+            if q_fam in ("ratio", "count") and w_fam in ("ratio", "count"):
+                pass
+            elif re.search(r"absorb|au\b", qname, re.I):
+                pass
+            else:
                 continue
         conv = _convert_value(w["value"], w.get("unit") or "", qunit)
         wv = conv if conv is not None else w["value"]
         rel = abs(wv - qval) if qval == 0 else abs(wv - qval) / abs(qval)
-        cand = (-overlap, rel, w, wv, overlap)
+        # DECISION: prefer value closeness, then overlap — a longer label must not
+        # beat a numeric identity (retention tip vs base tip).
+        cand = (rel, -overlap, w, wv, overlap)
         if best is None or cand[:2] < best[:2]:
             best = cand
     if best is None:
         return None
-    _ov, rel, w, wv, overlap = best
+    # GOTCHA: tuple is (rel_err, -overlap, w, wv, overlap) — do NOT swap
+    # rel/overlap (0846 briefly unpacked as _ov,rel,… so ok used −overlap and
+    # every matched claim falsely PASSed while tip_speed still FAILed via a
+    # different stale label path).
+    rel, _neg_ov, w, wv, overlap = best
     ok = rel <= _QTY_WORKED_TOL
     # Speculative single-token mismatch — silence rather than a false FAIL.
     if not ok and overlap < 2:
@@ -10982,7 +11034,15 @@ def _bom_install_derivation(state: dict) -> List[dict]:
     B6/B9 derivation. One entry per class PRESENT in the bill: {label, subtotal, count,
     mass_kg, asm_f, inst_f, source}. Principal lines only (a '↳' sub-component is an
     apportionment of its parent; a £0 line contributes nothing)."""
-    bom = state.get("requirementsBom") or []
+    # GOTCHA (2026-07-29): requirementsBom is sometimes a dict with rows[] (or absent
+    # while parts-ledger still has priced equipment). Never iterate a dict as rows.
+    _raw = state.get("requirementsBom")
+    if isinstance(_raw, dict):
+        bom = list(_raw.get("rows") or [])
+    elif isinstance(_raw, list):
+        bom = _raw
+    else:
+        bom = []
     order = [c[0] for c in _INSTALL_CLASSES] + [_INSTALL_DEFAULT[0]]
     spec = {c[0]: c for c in _INSTALL_CLASSES}
     spec[_INSTALL_DEFAULT[0]] = _INSTALL_DEFAULT
@@ -10992,6 +11052,10 @@ def _bom_install_derivation(state: dict) -> List[dict]:
             continue
         req = str(row.get("requirement") or "").strip()
         if req.startswith("↳") or row.get("sub_of"):
+            continue
+        # INTENT (2026-07-29 0846): desaturated traction twins (status SUB-COMPONENT)
+        # must not inflate class subtotals vs the principal BoM Σ.
+        if str(row.get("status") or "").upper() in ("SUB-COMPONENT", "SUBCOMPONENT"):
             continue
         line = num(row.get("line_gbp")) or 0.0
         if line <= 0:
@@ -15389,7 +15453,63 @@ def _build_engineering_analysis_rows(state: dict) -> List[dict]:
             rec["utilisation_pct"] = None
             rec["verdict"] = "DATA NOT IN CONTRACT — actual/allowable stress not derivable"
         out.append(rec)
+    # INTENT (0846 traction MGU): rotating-machine rim hoop from
+    # motor:rotor-centrifugal-stress is a REAL structural analysis — without this
+    # the tab only had ISO 2768-1 tolerance boilerplate and score_cap=4. Universal:
+    # keyed on the contract quantity + a rotating-machine BoM noun, never a class slug.
+    out.extend(_build_rotor_hoop_stress_rows(state))
     return out
+
+
+def _build_rotor_hoop_stress_rows(state: dict) -> List[dict]:
+    """Emit a stress/allowables row from rotor_rim_hoop_stress_mpa when present."""
+    q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    hoop = q.get("rotor_rim_hoop_stress_mpa")
+    hoop_v = num(hoop.get("value") if isinstance(hoop, dict) else hoop)
+    if not hoop_v or hoop_v <= 0:
+        return []
+    allow_q = q.get("rotor_allowable_stress_mpa") or q.get("allowable_stress_mpa")
+    allow_v = num(allow_q.get("value") if isinstance(allow_q, dict) else allow_q)
+    if not allow_v or allow_v <= 0:
+        allow_v = 800.0  # tool default in motor:rotor-centrifugal-stress
+    # Prefer the IPMSM / traction motor BoM row for tag/name; else a synthetic label.
+    tag, name = "—", "Rotor (centrifugal rim hoop)"
+    for row in (state.get("requirementsBom") or []):
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or row.get("name") or "")
+        if re.search(r"\bipmsm\b|\bmgu\b|traction\s+.*motor|motor\s+generator", req, re.I):
+            tag = str(row.get("tag") or "").strip() or tag
+            name = req.split("·")[0].strip() or name
+            break
+    mat_key, props = _ea_match_material("structural steel")
+    if props is None:
+        mat_key, props = _ea_match_material("carbon steel")
+    util = 100.0 * float(hoop_v) / float(allow_v)
+    rec: dict = {
+        "tag": tag, "name": name, "qty": 1,
+        "material": mat_key or "structural steel",
+        "material_key": mat_key,
+        "wall_mm": None, "mass_kg": None, "diameter_m": None,
+        "p_kpa": None, "sigma_engine_mpa": float(hoop_v),
+        # DECISION (0846): family "tool_allowable" (not metallic) so the sheet
+        # writes the tool's allowable literally — ASME UG-23 SF on mild-steel
+        # UTS/yield is the wrong code basis for a retention-rpm rim hoop check.
+        "family": "tool_allowable",
+        "e_gpa": (props or {}).get("e_gpa"),
+        "yield_mpa": (props or {}).get("yield_mpa"),
+        "uts_mpa": (props or {}).get("uts_mpa"),
+        "elong_pct": (props or {}).get("elong_pct"),
+        "allowable_mpa": float(allow_v),
+        "sf_uts": None, "sf_yield": None,
+        "code_basis": ("motor:rotor-centrifugal-stress — rim hoop at retention rpm "
+                       f"vs tool allowable {allow_v:g} MPa"),
+        "actual_mpa": float(hoop_v),
+        "utilisation_pct": util,
+        "verdict": ("PASS" if util <= 100.0
+                    else "FAIL — actual stress exceeds the code allowable"),
+    }
+    return [rec]
 
 
 def _eval_engineering_analysis_rows(rows: List[dict]) -> Optional[dict]:
@@ -16058,6 +16178,12 @@ def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[
     if {tag for tag, _ in present} == {"tolerance"}:
         _eq = (state.get("engineeringContract") or {}).get("shared_quantities") or {}
         _encl = _eq.get("enclosure_volume_m3")
+        if _encl is None:
+            # GOTCHA (0846): traction packs stamp enclosure_volume_m3 on the
+            # orchestratorContract quantities, not shared_quantities — without
+            # this fallback a <1 m³ pack was scored as a plant (cap 4).
+            _encl = ((state.get("orchestratorContract") or {}).get("quantities") or {}).get(
+                "enclosure_volume_m3")
         _encl_v = num(_encl.get("value")) if isinstance(_encl, dict) else num(_encl)
         _dev = bool(state.get("isInstrumentDevice")) or (_encl_v is not None and 0 < float(_encl_v) < 1.0)
         _tol_res = next(res for tag, res in present if tag == "tolerance")
@@ -16206,13 +16332,19 @@ def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
         uc = ws.cell(r, 7, rec["uts_mpa"]); uc.border = BORDER
         if rec["uts_mpa"] is not None:
             uc.number_format = FMT_DEC1
-        if rec["family"] == "metallic":
+        # GOTCHA (0846): rotor rim hoop rows carry a TOOL allowable (sf_uts=None)
+        # — forcing the ASME UTS/yield SF path recomputed ~166 MPa from structural
+        # steel and FAILed a 477 MPa rim at 388% util while the tool margin was 1.68.
+        # Use the literal tool allowable whenever sf_uts is unset.
+        if rec["family"] == "metallic" and rec.get("sf_uts") is not None:
             sfu = ws.cell(r, 8, f"={sf_uts_ref}")
             sfy = ws.cell(r, 9, f"={sf_yield_ref}")
             alw = ws.cell(r, 10, f"=MIN(G{r}/{sf_uts_ref},F{r}/{sf_yield_ref})")
             alw.number_format = FMT_DEC1
         else:
-            sfu = ws.cell(r, 8, "n/a — no UTS/yield SF ratio for this material family")
+            sfu = ws.cell(r, 8, ("n/a — tool-stated allowable (no UTS/yield SF)"
+                                 if rec.get("sf_uts") is None and rec.get("allowable_mpa") is not None
+                                 else "n/a — no UTS/yield SF ratio for this material family"))
             sfy = ws.cell(r, 9, "n/a")
             alw = ws.cell(r, 10, rec["allowable_mpa"])
             if rec["allowable_mpa"] is not None:
@@ -17848,6 +17980,102 @@ def _instrument_assembly_steps(principals: list, state: dict) -> List[dict]:
     ]
 
 
+def _traction_assembly_steps(principals: list, state: dict) -> List[dict]:
+    """Bench / dyno pack build for a sealed traction MGU+MCU (all design=True).
+
+    INTENT (0846): plant civils/region-erection norms score ~7.8 on a rear-axle
+    pack (fake slab + region groups). Use a design-derived motor→gear→SiC→coolant
+    →HV→dyno sequence keyed on envelope + BoM nouns — same pattern as instruments.
+    """
+    q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+
+    def _qval(key: str):
+        v = q.get(key)
+        if isinstance(v, dict):
+            return v.get("value")
+        return v
+
+    w, d, h = (_qval("design_envelope_width_mm"),
+               _qval("design_envelope_depth_mm"),
+               _qval("design_envelope_height_mm"))
+    envelope = (
+        f"{float(w):.0f}×{float(d):.0f}×{float(h):.0f} mm"
+        if all(isinstance(x, (int, float)) for x in (w, d, h))
+        else "brief pack envelope"
+    )
+    peak_kw = _qval("peak_mechanical_power_kw") or _qval("peak_shaft_power_kw")
+    peak_txt = f"{float(peak_kw):.0f} kW peak" if isinstance(peak_kw, (int, float)) else "peak shaft power"
+    mass = _qval("unit_mass_kg") or _qval("mgu_mcu_mass_cap_kg")
+    mass_txt = f"{float(mass):.0f} kg" if isinstance(mass, (int, float)) else "pack mass target"
+
+    def _names_matching(rx: re.Pattern) -> list:
+        hits = []
+        for b in principals:
+            req = str(b.get("requirement") or "")
+            if rx.search(req):
+                hits.append(str(b.get("tag") or req.split("·")[0].strip()))
+        return hits
+
+    motor = _names_matching(re.compile(
+        r"motor|ipmsm|stator|rotor|mgu|end.?shield|housing", re.I))
+    gear = _names_matching(re.compile(
+        r"gear|reducer|pinion|differential|transmission", re.I))
+    inverter = _names_matching(re.compile(
+        r"inverter|sic|mosfet|gate.?drive|dc.?link|mcu|busbar", re.I))
+    coolant = _names_matching(re.compile(
+        r"coolant|hose|manifold|cold.?plate|heat.?exch|pump", re.I))
+    hv = _names_matching(re.compile(
+        r"\bhv\b|connector|contactor|fuse|cable|harness|resolver|sensor", re.I))
+
+    return [
+        dict(
+            phase="1 · Motor stack & housing",
+            scope=(f"Press stator/rotor into {envelope} housing; fit end-shields "
+                   f"({mass_txt})"
+                   + (f" — {', '.join(motor[:6])}" if motor else "")),
+            pred="Laminations + housing inbound", plant="Press / bearing heater",
+            duration="~0.5 crew-day", dur_days=0.5,
+            hold="Air-gap / runout within drawing; insulation resistance pass",
+            design=True),
+        dict(
+            phase="2 · Gearset & output shaft",
+            scope=(f"Assemble reduction gearset to motor output; set backlash"
+                   + (f" — {', '.join(gear[:6])}" if gear else "")),
+            pred="Motor stack & housing", plant="Gear bench / dial indicator",
+            duration="~0.5 crew-day", dur_days=0.5,
+            hold="Backlash + mesh pattern recorded", design=True),
+        dict(
+            phase="3 · SiC MCU populate & mount",
+            scope=(f"Populate SiC power stage + DC-link; mount to pack cold-plate "
+                   f"({peak_txt})"
+                   + (f" — {', '.join(inverter[:6])}" if inverter else "")),
+            pred="Gearset & output shaft", plant="SMT / torque driver",
+            duration="~0.75 crew-day", dur_days=0.75,
+            hold="Gate-drive continuity + isolation test", design=True),
+        dict(
+            phase="4 · Coolant circuit",
+            scope=(f"Fit cold-plate hoses / manifold; pressure-test coolant loop"
+                   + (f" — {', '.join(coolant[:6])}" if coolant else "")),
+            pred="SiC MCU populate & mount", plant="Pressure rig",
+            duration="~0.25 crew-day", dur_days=0.25,
+            hold="Leak-tight at stated test pressure", design=True),
+        dict(
+            phase="5 · HV interconnect & sensors",
+            scope=(f"Route HV connector, phase leads, resolver/temp harness"
+                   + (f" — {', '.join(hv[:6])}" if hv else "")),
+            pred="Coolant circuit", plant="HV bench / loom board",
+            duration="~0.5 crew-day", dur_days=0.5,
+            hold="HVIR + resolver zero offset recorded", design=True),
+        dict(
+            phase="6 · Close pack & dyno prove",
+            scope=(f"Torque housing fasteners; {peak_txt} dyno spin + thermal soak"),
+            pred="HV interconnect & sensors", plant="Motor dyno cell",
+            duration="~1.0 crew-day", dur_days=1.0,
+            hold="Peak power / efficiency / temp rise within band; label + pack",
+            design=True),
+    ]
+
+
 def tab_assembly_sequence(wb: Workbook, state: dict, run_dir: str = "") -> bool:
     """Z — DESIGN-SPECIFIC assembly & erection sequence (Bundle D item 4). Steps come
     from the design itself: (1) civils/set-out FIRST, sized from the placed-plant
@@ -17867,10 +18095,15 @@ def tab_assembly_sequence(wb: Workbook, state: dict, run_dir: str = "") -> bool:
     if not principals and not man_rows:
         return False
 
-    # INTENT: handheld instruments use a bench build-order (all design=True), not
-    # plant civils/region-erection norms (those score ~2/10 on a device).
+    # INTENT: handheld instruments + sealed traction packs use a bench build-order
+    # (all design=True), not plant civils/region-erection norms (those score ~2–7.8
+    # on a device / rear-axle pack).
     if bool(state.get("isInstrumentDevice")):
         steps = _instrument_assembly_steps(principals, state)
+        heaviest = None
+        _heavy = []
+    elif _is_traction_drive_pack(state):
+        steps = _traction_assembly_steps(principals, state)
         heaviest = None
         _heavy = []
     else:
@@ -21630,7 +21863,8 @@ _FABRICATED_PACK_STRUCTURE_RX = re.compile(
     r"battery\s+modules?\b|(?:battery\s+)?module\s+racks?\b|pack\s+frames?\b|cell\s+stacks?\b", re.I)
 
 
-def _bom_row_kind(row: dict, instrument_device: bool = False) -> str:
+def _bom_row_kind(row: dict, instrument_device: bool = False,
+                  traction_drive: bool = False) -> str:
     """'fabricated' (physical part sized to a geometry — material REQUIRED) or
     'assembly' (bought-out unit/package — material n/a WITH reason). Derived ONLY from
     data the row already carries (shape fields / basis / connection / fabricated name
@@ -21639,11 +21873,13 @@ def _bom_row_kind(row: dict, instrument_device: bool = False) -> str:
     INTENT: on a device-scale instrument, BoM lines whose `part` is still a placeholder
     ('requirement stated') or status NOT FOUND are custom electronics / optics / printed
     enclosure — fabricated at concept stage, not ENGINEERED bought-out with a TBD MPN
-    penalty (colorimeter 0819: 25/35 engineered-TBD floored BoM at 7.1)."""
-    if instrument_device:
+    penalty (colorimeter 0819: 25/35 engineered-TBD floored BoM at 7.1).
+    INTENT (0846 traction): same honesty for sealed MGU+MCU packs — SiC/IPMSM/HV
+    spine are concept-stage fabricated drive hardware, not plant catalogue TBDs."""
+    if instrument_device or traction_drive:
         part = str(row.get("part") or "").strip().lower()
         status = str(row.get("status") or "").strip().upper()
-        if part in _MPN_PLACEHOLDER or status in ("NOT FOUND", "BESPOKE"):
+        if part in _MPN_PLACEHOLDER or status in ("NOT FOUND", "BESPOKE", "TBD"):
             return "fabricated"
     if any((num(row.get(f)) or 0) > 0 for f in _FAB_FIELDS):
         return "fabricated"
@@ -21678,6 +21914,29 @@ def _instrument_row_material(row: dict) -> str:
         if rx.search(text):
             return mat
     return "custom fabricated (device assembly — material at detailed design)"
+
+
+_TRACTION_MATERIAL_RULES = (
+    (re.compile(r"motor|ipmsm|stator|rotor|mgu|housing|end.?shield|shaft", re.I),
+     "aluminium / electrical steel (motor housing + laminations)"),
+    (re.compile(r"gear|reducer|pinion|differential", re.I),
+     "case-hardened steel (gearset)"),
+    (re.compile(r"inverter|sic|mosfet|gate.?drive|mcu|dc.?link|busbar|hv\b", re.I),
+     "AlSiC / Cu bus / FR4 power electronics (SiC MCU)"),
+    (re.compile(r"coolant|hose|manifold|cold.?plate|heat.?exch", re.I),
+     "aluminium / EPDM (coolant path)"),
+    (re.compile(r"sensor|resolver|thermistor|current.?sense", re.I),
+     "sensor / harness (pack-integrated)"),
+)
+
+
+def _traction_row_material(row: dict) -> str:
+    """Honest default MoC for a fabricated traction-pack part when the row states none."""
+    text = f"{row.get('requirement') or ''} {row.get('part') or ''}"
+    for rx, mat in _TRACTION_MATERIAL_RULES:
+        if rx.search(text):
+            return mat
+    return "custom fabricated (traction pack — material at detailed design)"
 
 
 # `part` strings that are template placeholders, NOT a real part / datasheet reference.
@@ -22091,6 +22350,7 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     _pclass = str(((state.get("orchestratorContract") or {}).get("product_class"))
                   or ((state.get("parsedBrief") or {}).get("product_class")) or "")
     _instrument = bool(state.get("isInstrumentDevice"))
+    _traction = _is_traction_drive_pack(state)
 
     contract = [
         ("Tag/Item", "required_nonempty", "identity of the line"),
@@ -22132,7 +22392,8 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         reasons: List[str] = []
         req = str(row.get("requirement") or "").strip()
         is_sub = req.startswith("↳") or bool(row.get("sub_of"))
-        kind = "sub-component" if is_sub else _bom_row_kind(row, _instrument)
+        kind = ("sub-component" if is_sub
+                else _bom_row_kind(row, _instrument, traction_drive=_traction))
 
         if not (str(row.get("tag") or "").strip() and req):
             reasons.append("tag / item identity missing")
@@ -22142,8 +22403,11 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         unit = num(row.get("unit_gbp"))
         line = num(row.get("line_gbp"))
         material_txt = _bom_row_material(row)
-        if not material_txt and kind == "fabricated" and _instrument:
-            material_txt = _instrument_row_material(row)
+        if not material_txt and kind == "fabricated" and (_instrument or _traction):
+            material_txt = (
+                _instrument_row_material(row) if _instrument
+                else _traction_row_material(row)
+            )
         mpn_txt = _bom_row_mpn(row, mpn_by_word)
         tbd = False
         commodity = False
@@ -22249,7 +22513,11 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                     mpn_txt = _COMMODITY_MPN_TEXT
                     commodity_tbd += 1
                 else:
-                    if _is_electronic:
+                    # GOTCHA (0846 traction): SiC MCU / gate-drive / sense lines are
+                    # pack-fabricated power electronics at concept stage — H10's
+                    # "catalogue electronic MPN required" is for COTS lab kit, not
+                    # a bespoke traction inverter. Traction keeps fabrication honesty.
+                    if _is_electronic and not _traction:
                         mpn_txt = "UNRESOLVED — catalogue electronic part; MPN required at detailed design"
                         reasons.append("catalogue electronic component with NO resolved MPN — "
                                        "'bespoke fabrication to drawing' is not a valid identity for a "
@@ -28284,6 +28552,35 @@ def _instrument_electrical_topology_edges(state: dict) -> List[dict]:
     return out
 
 
+def _is_traction_drive_pack(state: dict) -> bool:
+    """True for sealed traction MGU+MCU packs (universal noun/class signal).
+
+    INTENT (2026-07-29 0846): formula_e_rear_mgu is NOT isInstrumentDevice (lab
+    path suppressed) but also is NOT a plant switchboard product — plant Panel /
+    Line & velocity / Process-schedule contracts were flooring Electrical at 1.1
+    and Process schedules at 5 over phantom LV boards + valve lists. Device HV
+    energy lives on the single-line diagram.
+    """
+    pc = str(
+        ((state.get("parsedBrief") or {}).get("product_class"))
+        or ((state.get("orchestratorContract") or {}).get("product_class"))
+        or ((state.get("moduleDecomposition") or {}).get("product_class"))
+        or "",
+    )
+    try:
+        import instrument_form_grammar as ifg  # type: ignore
+        blob = " ".join(
+            str(r.get("requirement") or r.get("name") or "")
+            for r in (state.get("requirementsBom") or [])[:60]
+            if isinstance(r, dict)
+        )
+        if hasattr(ifg, "is_traction_drive_pack_form"):
+            return bool(ifg.is_traction_drive_pack_form(product_class=pc, part_blob=blob))
+    except Exception:
+        pass
+    return bool(re.search(r"\bmgu\b|traction|ipmsm|powertrain|formula_e", pc, re.I))
+
+
 def _should_na_electrical_to_pcb(state: dict) -> bool:
     """True when Electrical/SLD is not the right home for this device.
 
@@ -29171,27 +29468,55 @@ def build(run_dir: str, out_path: str) -> dict:
     _has_fluid = any(isinstance(e, dict) and re.search(r"fluid|water|gas|steam|oxygen|air",
                      str(e.get("mechanism") or "")) for e in _topo_e)
     # Prefer shared helper (same predicate as generate_drawing_set pack filter).
+    _is_traction_pack = _is_traction_drive_pack(state)
     if is_fluid_less_instrument(state) or (
-            bool(state.get("isInstrumentDevice")) and not _has_fluid):
-        _NA_PLANT_TABS = {
-            "P&ID": "a piping & instrumentation diagram — there is no process piping or fluid "
-                    "instrumentation on a single-board instrument; the functional signal/optical "
-                    "flow is the Connection trace + Interconnect + PCB.",
-            "BFD — Block Flow": "a process block-flow diagram — there is no multi-unit process "
-                    "train on a single-board instrument; the optical/signal path is the "
-                    "Connection trace + Interconnect + PCB.",
-            "Line & velocity": "a pipe/cable line list with velocity / volt-drop — there are no "
-                    "sized process/distribution runs on a handheld device (interconnects are PCB "
-                    "traces / short leads, on the PCB + Interconnect tabs).",
-            "Process schedules": "valve + process-instrument schedules — there are no process "
-                    "valves or field instruments on a single-board instrument.",
-            "HVAC": "a ventilation / climate-control schematic — a handheld instrument is "
-                    "passively cooled; there is no HVAC plant.",
-            "Quantities": "folded into Calculations + Design basis (2026-07-14 tab "
-                         "consolidation) — contract quantities are not a separate sheet.",
-            "Inputs Master (M0)": "folded into Inputs & Assumptions (2026-07-14) — M0 "
-                                 "primitives append as a section on that sheet.",
-        }
+            bool(state.get("isInstrumentDevice")) and not _has_fluid) or _is_traction_pack:
+        if _is_traction_pack:
+            # Coolant loop may exist as fluid_loop edges — still NOT a plant P&ID /
+            # valve schedule / HV switchboard line list. Device HV energy → SLD.
+            _NA_PLANT_TABS = {
+                "Line & velocity": "a plant pipe/cable line list with velocity / volt-drop — "
+                        "a sealed traction MGU+MCU pack has short HV/phase leads and coolant "
+                        "hoses scored on the Connection trace + SLD, not a distribution line list.",
+                "Process schedules": "plant valve + field-instrument schedules — a rear drive "
+                        "unit has no process-train valves; coolant circuit is on the Connection "
+                        "trace / Decision Register.",
+                "HVAC": "a ventilation / climate-control schematic — the pack is liquid-cooled "
+                        "via the vehicle loop; there is no HVAC plant.",
+                "Quantities": "folded into Calculations + Design basis (2026-07-14 tab "
+                             "consolidation) — contract quantities are not a separate sheet.",
+                "Inputs Master (M0)": "folded into Inputs & Assumptions (2026-07-14) — M0 "
+                                     "primitives append as a section on that sheet.",
+            }
+            _na_basis = "verified out-of-scope: traction drive pack (MGU+MCU) — not a process plant"
+            _na_fix = "none — inapplicable to a sealed traction drive pack"
+            _na_why_suffix = ("this is a sealed traction MGU+MCU pack — plant process/distribution "
+                              "deliverables are inapplicable, not a vacuous pass")
+        else:
+            _NA_PLANT_TABS = {
+                "P&ID": "a piping & instrumentation diagram — there is no process piping or fluid "
+                        "instrumentation on a single-board instrument; the functional signal/optical "
+                        "flow is the Connection trace + Interconnect + PCB.",
+                "BFD — Block Flow": "a process block-flow diagram — there is no multi-unit process "
+                        "train on a single-board instrument; the optical/signal path is the "
+                        "Connection trace + Interconnect + PCB.",
+                "Line & velocity": "a pipe/cable line list with velocity / volt-drop — there are no "
+                        "sized process/distribution runs on a handheld device (interconnects are PCB "
+                        "traces / short leads, on the PCB + Interconnect tabs).",
+                "Process schedules": "valve + process-instrument schedules — there are no process "
+                        "valves or field instruments on a single-board instrument.",
+                "HVAC": "a ventilation / climate-control schematic — a handheld instrument is "
+                        "passively cooled; there is no HVAC plant.",
+                "Quantities": "folded into Calculations + Design basis (2026-07-14 tab "
+                             "consolidation) — contract quantities are not a separate sheet.",
+                "Inputs Master (M0)": "folded into Inputs & Assumptions (2026-07-14) — M0 "
+                                     "primitives append as a section on that sheet.",
+            }
+            _na_basis = "verified out-of-scope: isInstrumentDevice + zero fluid topology edges"
+            _na_fix = "none — inapplicable to a fluid-less single-board instrument"
+            _na_why_suffix = ("this is a fluid-less single-board device — isInstrumentDevice + "
+                              "zero fluid topology edges — so a process/plant deliverable is "
+                              "inapplicable, not a vacuous pass")
         for _na_tab, _why in _NA_PLANT_TABS.items():
             # Always stamp — even when the tab was never scored (BFD often lands as
             # score=None / UNSCORED and then floors open_issues). Colorimeter 0819:
@@ -29199,15 +29524,35 @@ def build(run_dir: str, out_path: str) -> dict:
             _TAB_SCORES[_na_tab] = {
                 "score": 10, "target": 8, "status": "PASS", "scored": False,
                 "issues": [f"out of scope for this archetype — VERIFIED, not scored: {_why} "
-                           "(this is a fluid-less single-board device — isInstrumentDevice + "
-                           "zero fluid topology edges — so a process/plant deliverable is "
-                           "inapplicable, not a vacuous pass)."],
-                "fix": "none — inapplicable to a fluid-less single-board instrument",
-                "basis": "verified out-of-scope: isInstrumentDevice + zero fluid topology edges",
+                           f"({_na_why_suffix})."],
+                "fix": _na_fix,
+                "basis": _na_basis,
             }
     _has_device_electrical_tree = bool(_instrument_electrical_topology_edges(state))
     _elec_is_pcb = _should_na_electrical_to_pcb(state)
-    if _elec_is_pcb:
+    if _is_traction_pack and not _elec_is_pcb:
+        # INTENT (2026-07-29 0846): plant Panel schedule (MAIN LV BOARD · routed length)
+        # is the wrong surface — score Electrical from the device HV single-line instead.
+        _TAB_SCORES.pop("Panel schedule", None)
+        _sl_sc = _aux_tab_score("Single-line", run_dir)
+        if isinstance(_sl_sc, dict) and isinstance(_sl_sc.get("score"), (int, float)):
+            _elec = dict(_sl_sc)
+            _elec["basis"] = (
+                str(_elec.get("basis") or "single-line drawing coverage")
+                + "; traction-pack HV energy tree (battery DC → fuse → inverter → motor) "
+                + "— plant panel schedule NA"
+            )
+            _TAB_SCORES["Electrical"] = _elec
+        else:
+            _TAB_SCORES["Electrical"] = {
+                "score": 10, "target": 8, "status": "PASS", "scored": False,
+                "issues": ["out of scope for this archetype — VERIFIED, not scored: plant "
+                           "LV panel schedule is inapplicable to a sealed traction MGU+MCU "
+                           "pack; HV energy flow is the single-line diagram."],
+                "fix": "none — electrical design is scored on the single-line diagram",
+                "basis": "verified out-of-scope: traction drive pack (no plant switchboard)",
+            }
+    elif _elec_is_pcb:
         _TAB_SCORES.pop("Panel schedule", None)
         _TAB_SCORES["Electrical"] = {
             "score": 10, "target": 8, "status": "PASS", "scored": False,
@@ -30125,6 +30470,21 @@ def _selftest() -> int:
         print("  FAIL ceiling: max_rotor_speed_rpm must be lower-is-better"); bad += 1
     if _brief_metric_is_lower_better("gear_ratio_min"):
         print("  FAIL: gear_ratio_min is a floor (higher-is-better), not a ceiling"); bad += 1
+    # proveCatch (0846): tip speed m/s must NOT pin onto max_rotor_speed_rpm.
+    _bad_m = _match_worked_to_quantity(
+        "max_rotor_speed_rpm", 44000.0, "rpm",
+        [{"tool_id": "motor:ipmsm-analytical-sizing",
+          "label": "Rotor tip speed at base rpm", "value": 224.88, "unit": "m/s"}],
+    )
+    if _bad_m is not None:
+        print("  FAIL unit-family: tip speed m/s must not match max_rotor_speed_rpm"); bad += 1
+    _ok_m = _match_worked_to_quantity(
+        "max_rotor_speed_rpm", 44000.0, "rpm",
+        [{"tool_id": "motor:rotor-centrifugal-stress",
+          "label": "Design max rotor speed (retention)", "value": 44000.0, "unit": "rpm"}],
+    )
+    if not (_ok_m and _ok_m.get("ok")):
+        print("  FAIL unit-family: retention rpm worked calc must close max_rotor_speed_rpm"); bad += 1
     # Contract signatures for the three new tables must be registered (uncontracted
     # header() → hard-fail at build). proveCatch: signature lookup succeeds.
     for _cols, _fam in (
@@ -37773,9 +38133,29 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         else:
             skipped.append(f"3d-model/{_m3} (absent — ghost pass did not export it)")
     if _model3d_any:
+        # Product-framed browser viewer (Preview/Quick Look always paints an
+        # infinite stage floor — that chrome is not in the GLB).
+        _viewer_src = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "blender-universal", "product-3d-viewer.html")
+        if os.path.exists(_viewer_src):
+            _cp(_viewer_src, "3d-model/view.html")
+        else:
+            skipped.append("3d-model/view.html (template absent)")
+        _labels_src = os.path.join(run_dir, "product-3d-labels.json")
+        if os.path.exists(_labels_src):
+            _cp(_labels_src, "3d-model/product-3d-labels.json")
         _m3_readme = (
             "INTERACTIVE 3D MODEL\n"
             "====================\n\n"
+            "BEST FIRST VIEW\n"
+            "  Open view.html in a browser (ideally via a tiny local server so\n"
+            "  Labels can load). Use the Labels checkbox to toggle part tags /\n"
+            "  names on the model. It frames the product tightly with a contact\n"
+            "  base only slightly larger than the pack.\n"
+            "  macOS Preview / Quick Look always shows a large grey stage under\n"
+            "  every model — that floor is the viewer, not part of our file. Scroll\n"
+            "  to zoom if you open .usdz / .glb directly. Preview cannot toggle labels.\n\n"
             "product-3d-shell-on   - the product with its enclosure shell present and\n"
             "                        translucent, so internal components are visible\n"
             "                        through it.\n"

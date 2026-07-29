@@ -72,7 +72,21 @@ def solve(inp: dict) -> dict:
                 "substitution": f"(2*{t_nm}/(pi*{bg}*{a_rms}*{kw}*{aspect}))^(1/3)",
                 "result": round(rotor_od_mm, 2),
                 "result_unit": "mm",
-            }
+            },
+            # INTENT (0846): Verification contract↔calc needs a BASE-speed tip
+            # worked calc. Retention tip lives on rotor-centrifugal-stress under
+            # a distinct label — without this row tip_speed_m_s pinned to the
+            # retention calc and HARD-failed at ~10%.
+            {
+                "label": "Rotor tip speed at base rpm",
+                "formula": "v_tip = pi * D * n / 60",
+                "substitution": (
+                    f"pi * {rotor_od_mm/1000.0:.6f} * {n_rpm:g} / 60"
+                ),
+                "result": round(tip_speed, 2),
+                "result_unit": "m/s",
+                "assumptions": ["D = air-gap diameter", "n = base speed rpm"],
+            },
         ],
     }
 

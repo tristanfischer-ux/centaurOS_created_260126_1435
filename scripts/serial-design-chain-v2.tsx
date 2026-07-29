@@ -7723,6 +7723,42 @@ async function main() {
     } catch (devErr) {
       console.error(`[chain] device-topology deriver failed (non-fatal): ${(devErr as Error).message}`)
     }
+    // INTENT (2026-07-29 0846): traction packs MUST replace abstract eng topology
+    // (hv_battery_dc_bus / rear_mcu_inverter) with BoM-named HV spine edges. The
+    // prior gate (`!haveOrchTopo`) skipped the deriver whenever the contract
+    // already authored abstract nodes → empty connection-schedule join → plant
+    // SLD / ledger completeness FAIL. Always prefer deriveTractionDriveTopology
+    // when it returns ≥2 edges (noun-gated inside the deriver).
+    {
+      const _pcTraction = String(
+        (state as any)?.parsedBrief?.product_class
+        || orch?.product_class
+        || (state as any)?.moduleDecomposition?.product_class
+        || '',
+      )
+      const _isTractionPack = /\bmgu\b|_mgu\b|traction|powertrain|drive[_ -]?unit|ipmsm/i.test(_pcTraction)
+      if (orch && _isTractionPack) {
+        try {
+          const { deriveTractionDriveTopology } = await import('./lib/orchestrator/generic/derive-topology')
+          const tdEdges = deriveTractionDriveTopology((state.moduleDecomposition?.modules ?? []) as any)
+          if (tdEdges.length >= 2) {
+            const nOldTd = Array.isArray(orch.topology) ? orch.topology.length : 0
+            orch.topology = tdEdges
+            if ((engineeringContract as any)?.topology) (engineeringContract as any).topology = tdEdges
+            haveOrchTopo = true
+            haveEngTopo = true
+            ;(state as any).isInstrumentDevice = false
+            console.error(
+              `[chain] TRACTION drive-pack topology: replaced ${nOldTd} abstract/plant edge(s) `
+              + `with ${tdEdges.length} BoM-named HV edge(s) (HV DC→fuse→bus→SiC inverter→motor)`,
+            )
+            logAction({ step: 'derive_traction_drive_topology', edges: tdEdges.length, replaced: nOldTd })
+          }
+        } catch (tdErr) {
+          console.error(`[chain] traction-topology deriver failed (non-fatal): ${(tdErr as Error).message}`)
+        }
+      }
+    }
     // INSTRUMENT / SIGNAL-CHAIN TOPOLOGY (2026-07-12, colorimeter benchmark): a
     // device-scale electronic/optical INSTRUMENT (colorimeter, pH meter, data logger,
     // sensor node) has neither a fluid process spine nor an energy-storage/PCS plant —
@@ -7739,6 +7775,10 @@ async function main() {
       try {
         const enclV = Number((orch?.quantities?.enclosure_volume_m3 as any)?.value
           ?? orch?.quantities?.enclosure_volume_m3)
+        // GOTCHA (2026-07-29): traction MGU packs are sealed vol<1 but NOT optical
+        // instruments — claiming isInstrumentDevice here would suppress pack signal
+        // topology + re-open the white-brick / electronics-fan false paths. Traction
+        // is handled ABOVE (replaces abstract eng topo even when haveOrchTopo).
         if (Number.isFinite(enclV) && enclV > 0 && enclV < 1) {
           const { deriveInstrumentTopology } = await import('./lib/orchestrator/generic/derive-topology')
           const instEdges = deriveInstrumentTopology((state.moduleDecomposition?.modules ?? []) as any)
@@ -7775,14 +7815,27 @@ async function main() {
     // instruments/controllers, and the Blender signal-wiring only sees 3-D-placed parts (instruments
     // are dropped from the scene by ga_massing) — so without this the connection-ledger has ZERO
     // instrument ties and the deterministic 'instruments associated' invariant FAILS (orphan sensors).
-    // Appended on the GENERIC path only (a registered class wires its own); additive to any fluid edges.
-    if (orch && !haveEngTopo) {
+    // DECISION (2026-07-29 FE MGU): hand-authored eng topo (3 HV/coolant edges) used to
+    // set haveEngTopo=true and SUPPRESS this pass → 6 orphan_instrument → connectivity 0.
+    // Always APPEND (dedupe by from→to+mechanism) unless the instrument signal-chain
+    // deriver already authored the ties (isInstrumentDevice + haveEngTopo from that path).
+    // Additive to fluid/electrical edges; never invents a hub when none exists.
+    if (orch && !(state as any).isInstrumentDevice) {
       const { deriveSignalTopology } = await import('./lib/orchestrator/generic/derive-topology')
       const sigEdges = deriveSignalTopology((state.moduleDecomposition?.modules ?? []) as any)
       if (sigEdges.length > 0) {
-        orch.topology = [...(Array.isArray(orch.topology) ? orch.topology : []), ...sigEdges]
-        console.error(`[chain] derived SIGNAL topology: ${sigEdges.length} instrument→control-hub signal edge(s) (wires the orphan sensors)`)
-        logAction({ step: 'derive_signal_topology', edges: sigEdges.length })
+        const prev = Array.isArray(orch.topology) ? orch.topology : []
+        const seen = new Set(
+          prev.map((e: any) => `${e?.from_part}|${e?.to_part}|${e?.mechanism || ''}`),
+        )
+        const added = sigEdges.filter(
+          (e: any) => !seen.has(`${e?.from_part}|${e?.to_part}|${e?.mechanism || ''}`),
+        )
+        if (added.length > 0) {
+          orch.topology = [...prev, ...added]
+          console.error(`[chain] derived SIGNAL topology: ${added.length} instrument→control-hub signal edge(s) (wires the orphan sensors; additive on eng topo)`)
+          logAction({ step: 'derive_signal_topology', edges: added.length })
+        }
       }
     }
     // FLOW-DEMAND JOIN (2026-07-02, commit 1303f8535's routed defect #1): the contract's

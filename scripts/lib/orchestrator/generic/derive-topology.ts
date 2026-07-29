@@ -607,6 +607,99 @@ export function deriveInstrumentTopology(modules: AnyModule[]): TopologyEdge[] {
 }
 
 
+/**
+ * Derive the HV DC power spine for a sealed traction MGU+MCU pack.
+ *
+ * INTENT (2026-07-29 FE MGU / 0846 SIGHT): traction packs skip
+ * `deriveInstrumentTopology` (not optical) and `deriveDeviceEnergyTopology`
+ * returns [] (no energy-storage plant signal) — so topology stayed empty,
+ * connection-schedule wrote 0 rows, and the SLD fell through to a plant
+ * MAIN SWITCHBOARD. This deriver is the honest pack graph:
+ *   HV DC input → fuse → DC busbar → SiC inverter → traction motor
+ * plus cold-plate thermal ties when present. NOT `_drawing_only` — edges must
+ * reach Connection-trace + the single-line (same discipline as instruments).
+ * UNIVERSAL noun signal — never a product-class table.
+ */
+export function deriveTractionDriveTopology(modules: AnyModule[]): TopologyEdge[] {
+  const names: string[] = []
+  for (const m of modules || []) {
+    for (const sm of m.sub_modules || []) {
+      for (const w of sm.words || []) {
+        if (!w || (w as AnyWord)._subcomponent) continue
+        const nm = w.name_human || w.content_character?.name_human || ''
+        if (nm) names.push(nm)
+      }
+    }
+  }
+  const blob = names.join(' ')
+  // Noun gate — same vocabulary as instrument_form_grammar.TRACTION_DRIVE_PART_RE
+  // (motor/generator + inverter/MCU, or explicit MGU/traction pack tokens).
+  const looksTraction = /\b(?:mgu|traction|ipmsm|motor[-\s]?generator)\b/i.test(blob)
+    && /\b(?:inverter|mcu|sic)\b/i.test(blob)
+  if (!looksTraction) return []
+
+  const find = (rx: RegExp): string | null => {
+    const hit = names.find((n) => rx.test(n))
+    return hit ?? null
+  }
+
+  const hvIn = find(/hv\s*(?:dc\s*)?connector|hv\s*dc\s*input|battery\s*dc/i)
+    ?? 'Vehicle HV DC Input'
+  const fuse = find(/hv\s*dc\s*fuse|\bdc\s*fuse\b|overcurrent/i)
+  const busbar = find(/hv\s*dc\s*busbar|dc\s*busbar|busbar\s*link/i)
+  const inverter = find(/sic\s*traction\s*inverter|traction\s*inverter|(?<!desat\s)\binverter\b/i)
+  const motor = find(/traction\s*ipmsm|ipmsm\s*motor|motor[-\s]?generator|traction\s*motor(?!\s*generator)/i)
+  const coldPlate = find(/mgu\s*cold\s*plate|cold\s*plate/i)
+  const manifold = find(/coolant\s*manifold/i)
+
+  if (!inverter || !motor) return []
+
+  const edges: TopologyEdge[] = []
+  const pushPwr = (from: string | null, to: string | null, ctx: string) => {
+    if (!from || !to || from === to) return
+    edges.push({
+      from_part: from,
+      to_part: to,
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      material_context: ctx,
+    } as unknown as TopologyEdge)
+  }
+  const pushTh = (from: string | null, to: string | null, ctx: string) => {
+    if (!from || !to || from === to) return
+    edges.push({
+      from_part: from,
+      to_part: to,
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      material_context: ctx,
+    } as unknown as TopologyEdge)
+  }
+
+  // Series HV spine — each present stage is in-line (fuse/busbar optional).
+  let prev = hvIn
+  if (fuse) {
+    pushPwr(prev, fuse, 'HV DC pack feed (series protection)')
+    prev = fuse
+  }
+  if (busbar) {
+    pushPwr(prev, busbar, 'HV DC bus distribution')
+    prev = busbar
+  }
+  pushPwr(prev, inverter, 'HV DC to SiC traction inverter')
+  pushPwr(inverter, motor, '3-phase AC to traction motor')
+
+  // Coolant story — cold plate is the thermal sink for inverter + motor losses.
+  if (coldPlate) {
+    pushTh(inverter, coldPlate, 'inverter loss to MGU cold plate')
+    pushTh(motor, coldPlate, 'motor loss to MGU cold plate')
+    if (manifold) pushTh(coldPlate, manifold, 'cold-plate coolant return')
+  }
+
+  return edges
+}
+
+
 export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // Collect distinct principal PROCESS equipment (physics-synthesised, fluid-side).
   const seen = new Set<string>()
@@ -1272,8 +1365,16 @@ function hubTier(name: string): number {
   const n = name || ''
   if (/\b(scada|plant control|control system|dcs)\b/i.test(n)) return 0
   if (/\bplc\b/i.test(n)) return 1
+  // INTENT (2026-07-29 sealed drive packs): OEM inverter / MCU control boards are
+  // the pack's measurement hub — plant SCADA vocabulary is absent. Prefer panel/
+  // cabinet, then control board, then MCU; gate driver is last-resort (not the
+  // measurement aggregator). GOTCHA: "inverter controller" stays NON_HUB; "Oem
+  // Inverter Control Board" matches control board, not NON_HUB_CONTROLLER_RE.
   if (/\bcontrol (?:panel|cabinet)\b/i.test(n)) return 2
-  if (/\bcontroller\b/i.test(n) && !NON_HUB_CONTROLLER_RE.test(n)) return 3
+  if (/\bcontrol\s*board\b/i.test(n)) return 2
+  if (/\b(?:microcontroller|\bmcu\b)\b/i.test(n)) return 3
+  if (/\bgate\s*driver\b/i.test(n)) return 4
+  if (/\bcontroller\b/i.test(n) && !NON_HUB_CONTROLLER_RE.test(n)) return 5
   return -1 // not a control hub (incl. any device-level power/motor/drive controller)
 }
 const CONTROL_HUB_RE = { test: (n: string) => hubTier(n) >= 0 } // same call-shape as a RegExp
@@ -1561,6 +1662,18 @@ function _selftest() {
   }
   if (deriveSignalTopology([{ sub_modules: [{ words: [mk('Level Transmitter'), mk('Dc3 Power Controller')] }] }]).length !== 0) {
     throw new Error('derive-topology SIGNAL: a lone device power controller must not become the signal hub')
+  }
+  // proveCatch (2026-07-29 FE MGU): sealed drive pack — sensors wire to OEM
+  // inverter control board (no plant SCADA/PLC vocabulary present).
+  const sigPack = deriveSignalTopology([{ sub_modules: [{ words: [
+    mk('Phase Current Sensor'), mk('Voltage Sensor'), mk('Temperature Probe'),
+    mk('Oem Inverter Control Board'), mk('Gate Driver Board'),
+  ] }] }])
+  if (sigPack.length !== 3 || sigPack.some(e => e.to_part !== 'Oem Inverter Control Board')) {
+    throw new Error(
+      `derive-topology SIGNAL: pack sensors must wire to Oem Inverter Control Board `
+      + `(got ${JSON.stringify(sigPack.map(e => `${e.from_part}→${e.to_part}`))})`,
+    )
   }
 
   // ── FLOW-DEMAND JOIN (the v52 required_value=null fix) ──────────────────────
@@ -2158,8 +2271,33 @@ function _selftest() {
     throw new Error('stream-role proveNoFalsePositive (BESS-like) FAILED: must stay silent — no recovered role invented')
   }
 
+  // ── TRACTION DRIVE PACK topology proveCatch (2026-07-29 0846 plant-SLD leak) ──
+  const tdTopo = deriveTractionDriveTopology([{
+    sub_modules: [{ words: [
+      mk('Hv DC Connector'), mk('Hv DC Fuse'), mk('Hv DC Busbar Link'),
+      mk('SiC Traction Inverter'), mk('Traction Ipmsm Motor Generator'),
+      mk('Mgu Cold Plate'),
+    ] }],
+  }])
+  if (tdTopo.length < 3) {
+    throw new Error(`traction-drive topology proveCatch FAILED: expected ≥3 HV spine edges, got ${tdTopo.length}`)
+  }
+  if (!tdTopo.some((e) => /inverter/i.test(String(e.from_part)) && /motor|ipmsm/i.test(String(e.to_part))
+    && e.mechanism === 'electrical_bus')) {
+    throw new Error(`traction-drive topology proveCatch FAILED: missing inverter→motor electrical_bus, got ${JSON.stringify(tdTopo)}`)
+  }
+  // proveNoFalsePositive: colorimeter vocabulary must not mint a traction graph.
+  const tdNoFP = deriveTractionDriveTopology([{
+    sub_modules: [{ words: [
+      mk('LED Source Board'), mk('Photodiode Detector'), mk('Compute UI Module'),
+    ] }],
+  }])
+  if (tdNoFP.length !== 0) {
+    throw new Error(`traction-drive topology proveNoFalsePositive FAILED: instrument vocab must yield [], got ${tdNoFP.length}`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold; TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION: catch+no-false-positive hold; T-01 stream_role: catch+no-false-positive hold, roles={${[...fluidRoles].join(',')}})`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold; TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION: catch+no-false-positive hold; T-01 stream_role: catch+no-false-positive hold, roles={${[...fluidRoles].join(',')}}; traction-drive: catch+no-false-positive hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()

@@ -104,6 +104,22 @@ INSTRUMENT_STUDIO_RIM_ENERGY = 32.0
 INSTRUMENT_STUDIO_BOUNCE_ENERGY = 2.5
 INSTRUMENT_STUDIO_WORLD_STRENGTH = 0.30
 INSTRUMENT_STUDIO_GROUND_SRGB = (0.52, 0.53, 0.55)
+# INTENT (2026-07-29): contact-shadow plane hugs the product. e×8 (~3.6 m under a
+# ~0.4 m pack) made GLB/USDZ viewers open from miles away. Thin apron only.
+INSTRUMENT_STUDIO_GROUND_APRON = 1.12
+
+
+def instrument_studio_ground_size_m(extent_m: float,
+                                   apron: float | None = None) -> float:
+    """Edge length (metres) for the instrument studio contact-shadow plane.
+
+    @param extent_m Characteristic product extent in metres (max edge).
+    @param apron Multiplier over extent (≥1). Defaults to INSTRUMENT_STUDIO_GROUND_APRON.
+    @returns Plane edge length in metres for Blender ``primitive_plane_add(size=)``.
+    """
+    e = max(0.08, float(extent_m))
+    a = INSTRUMENT_STUDIO_GROUND_APRON if apron is None else float(apron)
+    return e * max(1.0, a)
 # SIGHT band for a sealed exterior BODY-FACE patch (8-bit mean RGB).
 # Updated 2026-07-23: TRUE mid-grey body (0.47 sRGB ≈ 120/255 unlit; lit face
 # ~130–200 under the softbox key). Band must reject BOTH near-black (charcoal
@@ -434,9 +450,22 @@ def is_bench_power_instrument_form(
 # Noun signal on class + part vocab + contract quantities (phase current / shaft torque).
 TRACTION_DRIVE_CLASS_RE = re.compile(
     r"\bmgu\b|_mgu\b|mgu_|motor[_ -]?generator|traction|powertrain|"
-    r"drive[_ -]?unit|ev[_ -]?drive|rear[_ -]?mgu|ipmsm",
+    r"drive[_ -]?unit|ev[_ -]?drive|rear[_ -]?mgu|front[_ -]?mgu|"
+    r"\bfpk\b|ipmsm",
     re.I,
 )
+
+
+def is_traction_bay_fill_form(*, product_class: str = "") -> bool:
+    """True when packaging bay volume IS the exterior form (front-axle FPK class).
+
+    INTENT: Front MGU shape is forced by the available front-axle bay (wishbones,
+    uprights, steering, crash structure, halfshaft height). That is a different
+    morphology from an open rear cradle cassette in manufacturer volume.
+    Universal — keyed on front/fpk nouns, never a Lucid silhouette paste.
+    """
+    pc = product_class or ""
+    return bool(re.search(r"front[_ -]?mgu|front[_ -]?powertrain|\bfpk\b", pc, re.I))
 TRACTION_DRIVE_PART_RE = re.compile(
     r"traction[_ -]?ipmsm|sic[_ -]?traction|reduction[_ -]?gear|"
     r"mgu[_ -]?cold[_ -]?plate|output[_ -]?shaft|hv[_ -]?dc[_ -]?connector|"
@@ -1161,6 +1190,12 @@ def _selftest() -> None:
     # never optical-handheld — 0733 rendered a featureless instrument box.
     assert is_traction_drive_pack_form(product_class="formula_e_rear_mgu"), (
         "formula_e_rear_mgu class must select traction drive pack form")
+    assert is_traction_drive_pack_form(product_class="formula_e_front_mgu"), (
+        "formula_e_front_mgu class must select traction drive pack form")
+    assert is_traction_bay_fill_form(product_class="formula_e_front_mgu"), (
+        "front FPK class must select bay-fill morphology (axle packaging wins)")
+    assert not is_traction_bay_fill_form(product_class="formula_e_rear_mgu"), (
+        "rear manufacturer cassette is open-cradle, not front bay-fill")
     assert is_traction_drive_pack_form(
         product_class="",
         part_blob="Traction Ipmsm Motor Generator SiC Traction Inverter Reduction Gear Stage",
@@ -1267,6 +1302,11 @@ def _selftest() -> None:
     assert INSTRUMENT_EXPOSURE_LIFT == 0.0, "never lift instrument exposure"
     assert INSTRUMENT_EXPOSURE_BIAS <= 0.0
     assert INSTRUMENT_STUDIO_KEY_ENERGY <= 22.0, "softbox key must not blow out mid-grey body"
+    # proveCatch: studio ground hugs the product — e×8 made GLB open from miles away.
+    _g = instrument_studio_ground_size_m(0.425)
+    assert abs(_g - 0.425 * INSTRUMENT_STUDIO_GROUND_APRON) < 1e-9
+    assert _g < 0.6, "ground must hug ~0.4 m product (not e×8 ≈ 3.4 m)"
+    assert instrument_studio_ground_size_m(0.2, apron=0.5) == 0.2, "apron <1 clamps to 1×"
     assert TARGET_BODY_LUM_MEAN_MIN >= 60.0, "light-grey body min lum floor"
     assert TARGET_BODY_LUM_MEAN_MAX <= 240.0, "body must not blow out to paper white"
     # proveCatch: cuboid-dominated cutaway must fail; CAD-heavy must pass.

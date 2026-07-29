@@ -14681,6 +14681,45 @@ function checkPcbStageInvariants(): Assertion[] {
     wantTr('traction floor does NOT emit Fire Detector', !/Fire Detector/i.test(trAll))
     wantTr('traction floor does NOT emit Main Breaker', !/Main Breaker/i.test(trAll))
 
+    // INTENT (2026-07-29 cold 1356): front FPK bay + fluid_loop cold plates +
+    // mechanical differential/halfshaft topology must emit open bevel differential
+    // and NEVER fall through to plant chiller / tube-bundle floors.
+    const frontFpkContract: any = {
+      product_class: 'formula_e_front_mgu',
+      quantities: {
+        coolant_flow_l_min: { value: 12 },
+        coolant_inlet_c: { value: 60 },
+        mgu_shaft_torque_nm: { value: 118 },
+        phase_current_max_a: { value: 530 },
+        continuous_power_kw: { value: 250 },
+        front_hardware_power_class_kw: { value: 350 },
+        enclosure_volume_m3: { value: 0.024 },
+      },
+      topology: [
+        { from_part: 'coolant_loop', to_part: 'front_mgu_mcu_cold_plates', mechanism: 'fluid_loop' },
+        { from_part: 'reduction_gear_stage', to_part: 'open_bevel_differential', mechanism: 'mechanical' },
+        { from_part: 'open_bevel_differential', to_part: 'front_halfshafts', mechanism: 'mechanical' },
+      ],
+      _tools_run: [
+        'motor:ipmsm-analytical-sizing',
+        'inverter:sic-loss',
+        'gear:traction-ratio',
+      ],
+    }
+    const modsFront = deriveGenericSkeleton(
+      tractionGraph, {} as any, { class: 'formula_e_front_mgu' } as any, frontFpkContract, new Map(),
+    ) as any[]
+    const frontAll = modsFront
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || w.id || ''))))
+      .join(' | ')
+    wantTr('front FPK floor emits Open Bevel Differential', /Open Bevel Differential|open_bevel_differential/i.test(frontAll))
+    wantTr('front FPK floor emits Halfshaft Output Flange Pair', /Halfshaft Output Flange|halfshaft_output_flange/i.test(frontAll))
+    wantTr('front FPK floor emits Mgu Cold Plate (not plant chiller)', /Mgu Cold Plate|mgu_cold_plate/i.test(frontAll))
+    wantTr('front FPK floor does NOT emit Chiller', !/\bChiller\b/i.test(frontAll))
+    wantTr('front FPK floor does NOT emit Tube Bundle', !/Tube Bundle/i.test(frontAll))
+    wantTr('front FPK floor does NOT emit Scroll Compressor', !/Scroll Compressor/i.test(frontAll))
+    wantTr('front FPK floor does NOT emit Evaporator', !/\bEvaporator\b/i.test(frontAll))
+
     // Tool-implied backstop on a design missing the three principals.
     const {
       computeToolImpliedComponents,
@@ -14715,10 +14754,10 @@ function checkPcbStageInvariants(): Assertion[] {
 
     out.push(assertEq(
       'UNIVERSAL.traction_drive_pack_floor_and_tool_implied_principals',
-      'SOL proveCatch (2026-07-28/29): cold-plate + shaft-torque + phase-current contract with motor:ipmsm / inverter:sic / gear:traction-ratio tools makes derive-skeleton emit traction principals + cold-plate loop + HV safety/distribution floors (never plant E-stop / fire detector / main breaker / Expansion Degas Reservoir / Chiller / Scroll Compressor). TOOL_IMPLIED_COMPONENTS backstop reports and adds the three principals when omitted.',
+      'SOL proveCatch (2026-07-28/29): cold-plate + shaft-torque + phase-current contract with motor:ipmsm / inverter:sic / gear:traction-ratio tools makes derive-skeleton emit traction principals + cold-plate loop + HV safety/distribution floors (never plant E-stop / fire detector / main breaker / Expansion Degas Reservoir / Chiller / Scroll Compressor). Front FPK shape (diff+halfshaft topology) additionally floors open_bevel_differential / halfshaft flanges and never plant chiller/tube-bundle/evaporator. TOOL_IMPLIED_COMPONENTS backstop reports and adds the three principals when omitted.',
       failedTr.length,
       (n) => n === 0,
-      () => `traction-drive pack cases failed: ${failedTr.join(' ; ')}. Check derive-skeleton TRACTION_DRIVE_MODULE_FLOORS / hasTractionDrivePackSignal and word-domain-coherence TOOL_IMPLIED motor-ipmsm/inverter-sic/gear-traction-ratio.`,
+      () => `traction-drive pack cases failed: ${failedTr.join(' ; ')}. Check derive-skeleton TRACTION_DRIVE_MODULE_FLOORS / hasTractionDrivePackSignal / hasTractionDifferentialSignal and word-domain-coherence TOOL_IMPLIED motor-ipmsm/inverter-sic/gear-traction-ratio.`,
     ))
   }
 

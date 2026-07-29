@@ -408,6 +408,14 @@ def _checks_rating_equals_quantity(rb: List[dict], quantities: Dict[str, Any]
         # SEPARATE BoM line). Mirrors the panel-schedule connection-row exclusion.
         if re.search(r"\bconnection\b|→|->", name):
             continue
+        # INTENT (2026-07-29 0846): thermal-sink nouns (cold plate / heat sink) carry
+        # a dissipation kW proxy, NOT shaft/electrical power. A lone product-family
+        # token ("mgu") must not bind mgu_shaft_power_kw to a 17.5 kW cold plate.
+        if re.search(
+            r"cold\s*plate|heat\s*sink|heat\s*exchanger|\bradiator\b|coldplate",
+            name,
+        ):
+            continue
         # Prefer the SHAFT/hydraulic figure when the requirement is the dual form
         # "N kW motor (M kW shaft)" — that M is what contract *_power_kw stores.
         # Falling back to the first kW alone mis-compared a wrongly-lifted nameplate
@@ -1673,6 +1681,50 @@ def _is_cost_band_center(name) -> bool:
     return is_cost and bool(re.search(r"midpoint|mid point|\btypical\b|band cent|target cost", nl))
 
 
+def _brief_metric_is_lower_better(key: str) -> bool:
+    """Mirror build-excel-export / scorecard-floor ceiling semantics (ONE-matcher)."""
+    kl = (key or "").lower()
+    is_capability_floor = (
+        "simultaneous" in kl or "output_capacity" in kl or "dissipation" in kl
+    )
+    is_ceiling = (not is_capability_floor) and (
+        "_ceiling" in kl
+        or "_cap_kg" in kl
+        or "cost_ceiling" in kl
+        or kl == "max_mass_kg"
+        or kl == "max_rotor_speed_rpm"
+        or kl == "max_system_voltage_v"
+        or "_temp_limit" in kl
+        or kl.endswith("_limit_c")
+        or kl.endswith("_max_rpm")
+        or bool(re.search(r"_max_(khz|l_per_min|nm|kw|v|a|c|ratio)\b", kl))
+        or (
+            kl.endswith("_max")
+            and any(t in kl for t in (
+                "ratio", "gear", "flow", "frequency", "speed", "torque", "throughput",
+            ))
+        )
+        or (kl.startswith("max_") and ("voltage" in kl or "rotor_speed" in kl or "rpm" in kl))
+        or kl.endswith("_max_c")
+    )
+    return is_ceiling or bool(
+        "fcr" in kl or "feed_conversion" in kl or "conversion_ratio" in kl
+        or "_days" in kl or "duration" in kl or "lead_time" in kl
+        or "lcoe" in kl or "cost_per" in kl
+        or "resolution" in kl or "linewidth" in kl or "detection_limit" in kl
+        or "noise" in kl or "latency" in kl
+        or ("cycle" in kl and bool(re.search(r"\btime\b|hour|minute|second|_s\b", kl)))
+    )
+
+
+def _is_out_of_scope_perimeter_metric(key: str) -> bool:
+    kl = (key or "").lower()
+    return (
+        "car_level" in kl or "vehicle_level" in kl
+        or "whole_vehicle" in kl or "whole_car" in kl
+    )
+
+
 def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
     """UNIVERSAL: deterministically verify each STRUCTURED brief target metric
     (constraints.target_performance.metrics) against the matching DESIGNED contract quantity —
@@ -1702,25 +1754,40 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         mt, mu = _btoks(km), _ufam(unit)
         if not km or not mt or tvf == 0:
             continue
+        # INTENT (2026-07-29 0846): whole-car brief context is not a rear-MGU target.
+        if _is_out_of_scope_perimeter_metric(str(km)):
+            continue
         tol = abs(tvf) * 0.05
         # DECISION (OpenFlexure 2026-07-17): exact key_metric match FIRST.
         # Fuzzy token overlap wrongly bound focus_resolution_um → abbe_resolution_um.
         _band = _is_cost_band_center(km)
         _band_tol = abs(tvf) * 0.20
+        _lower = _brief_metric_is_lower_better(str(km))
         if km in q:
             dvc = qval(q, km)
             if dvc is not None:
-                _ok = (abs(dvc - tvf) <= _band_tol) if _band else (dvc >= tvf - tol)
+                if _band:
+                    _ok = abs(dvc - tvf) <= _band_tol
+                    _rel = "band"
+                elif _lower:
+                    _ok = dvc <= tvf + tol
+                    _rel = "le"
+                else:
+                    _ok = dvc >= tvf - tol
+                    _rel = "ge"
                 out.append(Check(
                     name=f"Brief target met: {km}",
-                    category="BRIEF", relation=("band" if _band else "ge"),
+                    category="BRIEF", relation=_rel,
                     status=PASS if _ok else FAIL,
                     actual=round(dvc, 4), expected=tvf,
                     tol=round(_band_tol if _band else tol, 4), unit=unit,
                     producer=f"brief:{km}",
                     detail=(f"Brief target {km} = {tvf:g} {unit}; design ({km}) = {dvc:g} {unit} — "
                             + ("a cost band-centre: the BoM must land WITHIN the ±20% plausibility band."
-                               if _band else "the design must realise the brief target within ±5%.")),
+                               if _band else
+                               ("a ceiling: design must stay ≤ the brief cap (±5%)."
+                                if _lower else
+                                "the design must realise the brief target within ±5%."))),
                 ))
                 continue
         # candidate designed quantities: unit-family agrees AND a concept-token overlap (>=2,
@@ -1751,24 +1818,35 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         # design that delivers the 90 m³/h TOTAL the plant needs — 90 ≥ 45 is MET, not an equality miss).
         # Prefer the candidate that MEETS the target, closest from above (resolves the per-unit-vs-total
         # clash without falsely failing on over-delivery); if none meets, surface the closest (a real miss).
+        # Ceilings invert: meeting means ≤ target (design under the cap).
         cands.sort(key=lambda t: t[0])
         if _band:
             _, dv, best = min(cands, key=lambda t: abs(t[1] - tvf))
             _ok = abs(dv - tvf) <= _band_tol
+            _rel = "band"
+        elif _lower:
+            meeting = sorted((c for c in cands if c[1] <= tvf + tol), key=lambda t: t[0])
+            _, dv, best = (meeting[0] if meeting else cands[0])
+            _ok = dv <= tvf + tol
+            _rel = "le"
         else:
             meeting = sorted((c for c in cands if c[1] >= tvf - tol), key=lambda t: t[0])
             _, dv, best = (meeting[0] if meeting else cands[0])
             _ok = dv >= tvf - tol
+            _rel = "ge"
         out.append(Check(
             name=f"Brief target met: {km}",
-            category="BRIEF", relation=("band" if _band else "ge"),
+            category="BRIEF", relation=_rel,
             status=PASS if _ok else FAIL,
             actual=round(dv, 4), expected=tvf,
             tol=round(_band_tol if _band else tol, 4), unit=unit,
             producer=f"brief:{km}",
             detail=(f"Brief target {km} = {tvf:g} {unit}; design ({best}) = {dv:g} {unit} — "
                     + ("a cost band-centre: the BoM must land WITHIN the ±20% plausibility band."
-                       if _band else "the design must realise the brief target within ±5%.")),
+                       if _band else
+                       ("a ceiling: design must stay ≤ the brief cap (±5%)."
+                        if _lower else
+                        "the design must realise the brief target within ±5%."))),
         ))
     return out
 

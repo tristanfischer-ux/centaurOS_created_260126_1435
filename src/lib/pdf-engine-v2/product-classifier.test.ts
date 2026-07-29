@@ -188,4 +188,17 @@ describe('classifyProduct — edge cases', () => {
     expect(classifyProduct('Rear MGU + MCU SiC inverter traction drive unit, not a full vehicle.').productClass)
       .toBe('formula_e_rear_mgu')
   })
+
+  // INTENT (2026-07-29 JLR demo): front FPK must NOT fall into rear class.
+  it('classifies Formula E front FPK brief as formula_e_front_mgu (beats rear)', () => {
+    const brief = 'Formula E Gen3 / Gen3 Evo Front Powertrain Kit (FPK) — Demo Brief. '
+      + 'Product class: formula_e_front_mgu. Spec front MGU + inverter + single-speed '
+      + 'reduction + differential. Packaging forced by the front-axle bay. Lucid/Atieva FPK.'
+    expect(classifyProduct(brief).productClass).toBe('formula_e_front_mgu')
+  })
+  it('front MGU / FPK nouns classify as formula_e_front_mgu', () => {
+    expect(classifyProduct(
+      'Formula E Gen3 front powertrain kit FPK: unitised front MGU and SiC inverter for the front-axle bay.',
+    ).productClass).toBe('formula_e_front_mgu')
+  })
 })

@@ -601,6 +601,12 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   ev_drive_unit: 'formula_e_rear_mgu',
   rear_mgu: 'formula_e_rear_mgu',
   formula_e_mgu: 'formula_e_rear_mgu',
+  // Front FPK — spec kit; packaging bay forces envelope (2026-07-29).
+  formula_e_front_mgu: 'formula_e_front_mgu',
+  front_mgu: 'formula_e_front_mgu',
+  front_powertrain_kit: 'formula_e_front_mgu',
+  fpk: 'formula_e_front_mgu',
+  lucid_fpk: 'formula_e_front_mgu',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -16229,8 +16235,71 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
   const coolantInletC = Number.isFinite(coolantFromMetric)
     ? coolantFromMetric
     : extractRangeFromDesc(desc, /inlet\s+(\d{2})\s*-?\s*(\d{2})?\s*°?\s*C/i, 60)
-  const coolantFlowLMin = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{2})?\s*L\s*\/\s*min/i, 15)
-  const fswKhz = extractRangeFromDesc(desc, /(\d{1,3})\s*kHz/i, 40)
+  // INTENT (2026-07-29): coolant flow + MCU switching bands are FLOOR/CEILING
+  // identities (same pattern as gear_ratio_min/max) — aliasing both endpoints to
+  // the chosen setpoint made coolant_flow_max=15 vs brief 20 look like a miss
+  // under higher-is-better paths before ceiling semantics, and still mis-labels
+  // the band on the performance card.
+  const coolantFlowBand = (() => {
+    const metrics = brief?.constraints?.target_performance?.metrics
+    let min = 10
+    let max = 20
+    if (Array.isArray(metrics)) {
+      for (const m of metrics) {
+        const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+        const v = Number((m as { value?: number })?.value)
+        if (!Number.isFinite(v) || v <= 0) continue
+        if (k === 'coolant_flow_min_l_per_min' || k === 'coolant_flow_min_lpm') min = v
+        if (k === 'coolant_flow_max_l_per_min' || k === 'coolant_flow_max_lpm') max = v
+      }
+    }
+    return { min, max }
+  })()
+  const coolantFlowLMin = (() => {
+    const chosen = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{2})?\s*L\s*\/\s*min/i, 15)
+    if (chosen >= coolantFlowBand.min && chosen <= coolantFlowBand.max) return chosen
+    return Math.round((coolantFlowBand.min + coolantFlowBand.max) / 2)
+  })()
+  const fswBand = (() => {
+    const metrics = brief?.constraints?.target_performance?.metrics
+    let min = 10
+    let max = 40
+    if (Array.isArray(metrics)) {
+      for (const m of metrics) {
+        const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+        const v = Number((m as { value?: number })?.value)
+        if (!Number.isFinite(v) || v <= 0) continue
+        if (k === 'mcu_switching_frequency_min_khz') min = v
+        if (k === 'mcu_switching_frequency_max_khz') max = v
+      }
+    }
+    return { min, max }
+  })()
+  const fswKhz = (() => {
+    const chosen = extractRangeFromDesc(desc, /(\d{1,3})\s*kHz/i, 40)
+    if (chosen >= fswBand.min && chosen <= fswBand.max) return chosen
+    return fswBand.max
+  })()
+  // DECISION (2026-07-29): max_rotor_speed_rpm on the contract is the DESIGN
+  // retention / max-used speed (base × 1.10), not the FIA 100 krpm regulatory
+  // ceiling. Echoing 100000 as "achieved" lied on the performance card while
+  // rotor stress is computed at ~44 krpm. Ceiling stays as a separate identity
+  // so brief compliance (lower-is-better) still PASSes design ≤ FIA ceiling.
+  const retentionOverspeed = 1.10
+  const designMaxRotorRpm = Math.round(baseSpeedRpm * retentionOverspeed)
+  const fiaRotorCeilingRpm = (() => {
+    const metrics = brief?.constraints?.target_performance?.metrics
+    if (Array.isArray(metrics)) {
+      for (const m of metrics) {
+        const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+        if (k === 'max_rotor_speed_rpm') {
+          const v = Number((m as { value?: number })?.value)
+          if (Number.isFinite(v) && v > 0) return v
+        }
+      }
+    }
+    return 100000
+  })()
   const polePairs = 2
   const airgapBT = 0.9
   const electricLoading = 60000
@@ -16273,8 +16342,12 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     max_system_voltage_v: q(1000, 'V', 'voltage', 'max', 'system', 'brief', {
       source_detail: 'absolute vehicle / insulation-class ceiling (brief); operating window is assumed_vdc_*',
     }),
-    max_rotor_speed_rpm: q(100000, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
-      source_detail: 'FIA/regulatory rotor-speed ceiling the retention stack is designed against (base speed is separate)',
+    max_rotor_speed_rpm: q(designMaxRotorRpm, 'rpm', 'dimensionless', 'max', 'module', 'calculator', {
+      source_detail: `design retention / max-used rotor speed = mgu_base_speed_rpm × ${retentionOverspeed} (stress tool point); brief FIA ceiling is fia_rotor_speed_ceiling_rpm`,
+      from: ['mgu_base_speed_rpm'],
+    }),
+    fia_rotor_speed_ceiling_rpm: q(fiaRotorCeilingRpm, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'FIA/regulatory rotor-speed ceiling (brief); design max_rotor_speed_rpm must stay ≤ this',
     }),
     mgu_shaft_torque_max_nm: q(
       extractRangeFromDesc(desc, /(\d{2,3})\s*-?\s*(\d{2,3})?\s*Nm/i, 120),
@@ -16364,25 +16437,63 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     }),
     wheel_radius_m: q(wheelRadiusM, 'm', 'length', 'rated', 'system', 'brief'),
     mgu_mcu_mass_cap_kg: q(massCapKg > 0 ? massCapKg : 35, 'kg', 'mass', 'max', 'system', 'brief'),
+    // INTENT (0846 Verification HARD Max mass): the brief cap alone is not an
+    // achieved mass — Verification spine needs unit_mass_kg (or sibling). Seed a
+    // conservative pack estimate under the cap; tool/writeback may refine later.
+    // DECISION: 0.80 × cap (not the cap itself) so the comparison is non-vacuous.
+    unit_mass_kg: q(Math.round((massCapKg > 0 ? massCapKg : 35) * 0.80 * 10) / 10, 'kg', 'mass', 'rated', 'system', 'calculator', {
+      source_detail: `unit_mass_kg = 0.80 × mgu_mcu_mass_cap_kg (${massCapKg > 0 ? massCapKg : 35}) — concept-stage pack mass estimate pending weighed BOM`,
+      formula: 'unit_mass_kg = 0.80 * mgu_mcu_mass_cap_kg',
+      from: ['mgu_mcu_mass_cap_kg'],
+    }),
     coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief'),
-    coolant_flow_l_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'rated', 'system', 'brief'),
-    // Brief parser emits coolant_flow_*_l_per_min — alias for identity match.
-    coolant_flow_min_l_per_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'min', 'system', 'brief', {
-      source_detail: 'alias of coolant_flow_l_min for brief-compliance identity',
-      from: ['coolant_flow_l_min'],
+    // INTENT (2026-07-29 0846): brief coolant_inlet_min/max_c are BAND endpoints
+    // (same pattern as gear_ratio_min/max) — without them Verification HARD stayed
+    // open as UNVERIFIED and floored Exec/Brief/⚠ Checks.
+    coolant_inlet_min_c: q((() => {
+      const metrics = brief?.constraints?.target_performance?.metrics
+      if (Array.isArray(metrics)) {
+        for (const m of metrics) {
+          const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+          const v = Number((m as { value?: number })?.value)
+          if (k === 'coolant_inlet_min_c' && Number.isFinite(v)) return v
+        }
+      }
+      return 50
+    })(), '°C', 'temperature', 'min', 'system', 'brief', {
+      source_detail: 'brief coolant-inlet band floor (chosen coolant_inlet_c must be ≥ this)',
     }),
-    coolant_flow_max_l_per_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'max', 'system', 'brief', {
-      source_detail: 'alias of coolant_flow_l_min — chosen flow within brief 10–20 L/min band',
-      from: ['coolant_flow_l_min'],
+    coolant_inlet_max_c: q((() => {
+      const metrics = brief?.constraints?.target_performance?.metrics
+      if (Array.isArray(metrics)) {
+        for (const m of metrics) {
+          const k = String((m as { key_metric?: string })?.key_metric || '').toLowerCase()
+          const v = Number((m as { value?: number })?.value)
+          if (k === 'coolant_inlet_max_c' && Number.isFinite(v)) return v
+        }
+      }
+      return 65
+    })(), '°C', 'temperature', 'max', 'system', 'brief', {
+      source_detail: 'brief coolant-inlet band ceiling (chosen coolant_inlet_c must be ≤ this)',
     }),
-    switching_frequency_khz: q(fswKhz, 'kHz', 'frequency', 'rated', 'module', 'brief'),
-    mcu_switching_frequency_min_khz: q(fswKhz, 'kHz', 'frequency', 'min', 'module', 'brief', {
-      source_detail: 'alias of switching_frequency_khz for brief band floor identity',
-      from: ['switching_frequency_khz'],
+    coolant_flow_l_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'rated', 'system', 'brief', {
+      source_detail: `chosen coolant flow within brief ${coolantFlowBand.min}–${coolantFlowBand.max} L/min band`,
     }),
-    mcu_switching_frequency_max_khz: q(fswKhz, 'kHz', 'frequency', 'max', 'module', 'brief', {
-      source_detail: 'alias of switching_frequency_khz for brief band ceiling identity',
-      from: ['switching_frequency_khz'],
+    // Brief band endpoints are FLOOR/CEILING — not the chosen flow (gear_ratio pattern).
+    coolant_flow_min_l_per_min: q(coolantFlowBand.min, 'L/min', 'flow_rate', 'min', 'system', 'brief', {
+      source_detail: 'brief coolant-flow band floor (chosen coolant_flow_l_min must be ≥ this)',
+    }),
+    coolant_flow_max_l_per_min: q(coolantFlowBand.max, 'L/min', 'flow_rate', 'max', 'system', 'brief', {
+      source_detail: 'brief coolant-flow band ceiling (chosen coolant_flow_l_min must be ≤ this)',
+    }),
+    switching_frequency_khz: q(fswKhz, 'kHz', 'frequency', 'rated', 'module', 'brief', {
+      source_detail: `chosen MCU switching frequency within brief ${fswBand.min}–${fswBand.max} kHz band`,
+    }),
+    mcu_switching_frequency_min_khz: q(fswBand.min, 'kHz', 'frequency', 'min', 'module', 'brief', {
+      source_detail: 'brief MCU switching-frequency band floor',
+    }),
+    mcu_switching_frequency_max_khz: q(fswBand.max, 'kHz', 'frequency', 'max', 'module', 'brief', {
+      source_detail: 'brief MCU switching-frequency band ceiling',
     }),
     // Illustrative / race-mean band identities → delivered design setpoints.
     race_mean_electrical_throughput_min_kw: q(continuousKw, 'kW', 'power', 'min', 'system', 'brief', {
@@ -16393,21 +16504,18 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
       source_detail: 'alias of continuous_power_kw — race-mean design duty within brief 150–250 kW band',
       from: ['continuous_power_kw'],
     }),
-    illustrative_mgu_base_speed_min_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'min', 'module', 'brief', {
-      source_detail: 'alias of mgu_base_speed_rpm — design base within illustrative 30–50 krpm band',
-      from: ['mgu_base_speed_rpm'],
+    // Illustrative rpm/torque bands are FLOOR/CEILING identities (not the setpoint).
+    illustrative_mgu_base_speed_min_rpm: q(30000, 'rpm', 'dimensionless', 'min', 'module', 'brief', {
+      source_detail: 'brief illustrative MGU base-speed band floor (design mgu_base_speed_rpm within band)',
     }),
-    illustrative_mgu_base_speed_max_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
-      source_detail: 'alias of mgu_base_speed_rpm — design base within illustrative 30–50 krpm band',
-      from: ['mgu_base_speed_rpm'],
+    illustrative_mgu_base_speed_max_rpm: q(50000, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'brief illustrative MGU base-speed band ceiling (design mgu_base_speed_rpm within band)',
     }),
-    illustrative_shaft_torque_min_nm: q(shaftTorqueNm, 'Nm', 'force', 'min', 'module', 'brief', {
-      source_detail: 'alias of mgu_shaft_torque_nm — design torque within illustrative band',
-      from: ['mgu_shaft_torque_nm'],
+    illustrative_shaft_torque_min_nm: q(40, 'Nm', 'force', 'min', 'module', 'brief', {
+      source_detail: 'brief illustrative shaft-torque band floor',
     }),
-    illustrative_shaft_torque_max_nm: q(shaftTorqueNm, 'Nm', 'force', 'max', 'module', 'brief', {
-      source_detail: 'alias of mgu_shaft_torque_nm — design torque within illustrative band',
-      from: ['mgu_shaft_torque_nm'],
+    illustrative_shaft_torque_max_nm: q(120, 'Nm', 'force', 'max', 'module', 'brief', {
+      source_detail: 'brief illustrative shaft-torque band ceiling',
     }),
     pole_pairs: q(polePairs, '', 'dimensionless', 'rated', 'module', 'brief'),
     airgap_b_t: q(airgapBT, 'T', 'dimensionless', 'rated', 'module', 'brief'),
@@ -16502,6 +16610,275 @@ registerArchetype('formula_e_rear_mgu', (brief: any) => {
     brief_summary: `Formula E GEN4-class rear MGU + MCU (SiC inverter) + gear/cooling interfaces — `
       + `${rearAxleKw} kW rear electrical, ~${shaftTorqueNm} Nm @ ${baseSpeedRpm} rpm base, `
       + `Vdc ${vDcMin}–${Math.min(vDcMax, 1000)} V. Front MGU and full vehicle out of scope.`,
+    quantities,
+    topology,
+    macro_assembly_prices: macros,
+    closures: [],
+  }
+})
+
+// formula_e_front_mgu — Gen3/Evo SPEC front FPK (2026-07-29)
+// INTENT: Demo class. Size/shape forced by front-axle bay envelope
+// (max_dimensions_mm ≈ 343×259×267). Lucid gold = FFF training check only.
+// GOTCHA (2026-07-29 cold 1356): a stub topology with {from,to,medium} and
+// assumed_coolant_inlet_c alone never tripped hasColdPlateLoopInterface → plant
+// chiller floor. Macros must match TRACTION_DRIVE_MODULE_FLOORS word ids
+// (never a synthetic front_fpk_unit). Mirror rear cold-plate + fluid_loop shape.
+// ---------------------------------------------------------------------------
+registerArchetype('formula_e_front_mgu', (brief: any) => {
+  const desc = String(brief?.product_description ?? brief?.original_text ?? '')
+  const dims = brief?.constraints?.max_dimensions_mm ?? {}
+  const bayW = Number(dims.width ?? dims.w ?? 343) || 343
+  const bayD = Number(dims.depth ?? dims.d ?? 259) || 259
+  const bayH = Number(dims.height ?? dims.h ?? 267) || 267
+  const frontRegenKw = 250
+  const hwClassKw = 350
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 32) || 32
+  const baseSpeedRpm = extractRangeFromDesc(desc, /(\d{4,5})\s*rpm/i, 19500)
+  const vDcMin = 600
+  const vDcMax = 900
+  const vDcNom = (vDcMin + vDcMax) / 2
+  const etaInv = 0.985
+  const etaMgu = 0.97
+  const etaGear = 0.97
+  // Motoring windows (Gen3 Evo) are limited; size continuous around regen duty.
+  const designKw = frontRegenKw
+  const continuousKw = designKw
+  const omega = baseSpeedRpm * 2 * Math.PI / 60
+  const mguShaftPowerKw = Math.round(designKw * etaInv * etaMgu * 10) / 10
+  const gearOutputPowerKw = Math.round(mguShaftPowerKw * etaGear * 10) / 10
+  const shaftTorqueNm = Math.round((mguShaftPowerKw * 1000) / Math.max(omega, 1) * 10) / 10
+  const phaseCurrentMaxA = Math.ceil(
+    (hwClassKw * 1000) / (Math.sqrt(3) * (vDcMin / Math.SQRT2)),
+  )
+  const coolantInletC = 60
+  const coolantFlowLMin = 12
+  const gearRatio = 8
+  const enclosureVolM3 = Math.round((bayW * bayD * bayH) / 1e9 * 1e6) / 1e6
+
+  const quantities: Record<string, Quantity> = {
+    front_regen_electrical_cap_kw: q(frontRegenKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'Gen3 public front regen electrical cap',
+    }),
+    front_hardware_power_class_kw: q(hwClassKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'press / Lucid density class — clarify electrical vs mechanical in tools',
+    }),
+    // Shared tool pack reads rear_axle_* / continuous_* — front seeds design duty here.
+    rear_axle_electrical_power_kw: q(hwClassKw, 'kW', 'power', 'peak', 'system', 'brief', {
+      source_detail: 'alias of front_hardware_power_class_kw for shared IPMSM/SiC tool pack',
+      from: ['front_hardware_power_class_kw'],
+    }),
+    continuous_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief', {
+      source_detail: 'front continuous design duty ≈ regen cap (Gen3 Evo motoring windows limited)',
+    }),
+    traction_motor_power_kw: q(hwClassKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'alias of front_hardware_power_class_kw for IPMSM nameplate + envelope',
+      from: ['front_hardware_power_class_kw'],
+    }),
+    traction_inverter_power_kw: q(hwClassKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'alias of front_hardware_power_class_kw for SiC MCU nameplate + envelope',
+      from: ['front_hardware_power_class_kw'],
+    }),
+    mgu_shaft_power_kw: q(mguShaftPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: `P_dc×η_inv×η_mgu at front design duty (seeds ${etaInv}×${etaMgu})`,
+      from: ['front_regen_electrical_cap_kw'],
+    }),
+    gear_output_power_kw: q(gearOutputPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
+      source_detail: `post-gear = shaft×η_gear (seed ${etaGear})`,
+      from: ['mgu_shaft_power_kw'],
+    }),
+    mgu_shaft_torque_nm: q(shaftTorqueNm, 'Nm', 'force', 'rated', 'module', 'calculator', {
+      source_detail: `P=Tω at base speed ${baseSpeedRpm} rpm (continuous/regen design duty)`,
+      from: ['mgu_shaft_power_kw', 'mgu_base_speed_rpm'],
+    }),
+    // INTENT (2026-07-29 1429): brief-expansion peak torque at constant-power
+    // corner (~10 krpm for 350 kW HW class) ≈ 334 Nm — gear/diff must size to
+    // this peak, not only the 19.5 krpm continuous point (~117 Nm).
+    mgu_shaft_torque_max_nm: q(
+      Math.round((hwClassKw * 1000) / (10000 * 2 * Math.PI / 60)),
+      'Nm', 'force', 'max', 'module', 'calculator', {
+        source_detail: 'peak shaft torque at assumed constant-power corner ~10,000 rpm for HW class (T=P/ω); dyno replaces',
+        from: ['front_hardware_power_class_kw'],
+      },
+    ),
+    mgu_base_speed_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'press ~19,500 rpm class',
+    }),
+    max_rotor_speed_rpm: q(baseSpeedRpm, 'rpm', 'dimensionless', 'max', 'module', 'brief', {
+      source_detail: 'brief max_rotor_speed_rpm identity (press peak motor speed)',
+    }),
+    // INTENT (calc-coverage): I_ph from 3-ph bridge envelope at Vdc,min must
+    // show arithmetic — bare "HW class" prose hid as uncaptured (JLR front 1432).
+    phase_current_max_a: q(phaseCurrentMaxA, 'A', 'current', 'peak', 'module', 'calculator', {
+      source_detail:
+        `I_ph_max = P_hw×1000 / (√3 × Vdc_min/√2) = ${hwClassKw}×1000 / (√3 × ${vDcMin}/√2) = ${phaseCurrentMaxA} A`,
+      formula: 'I_ph_max = P_hw * 1000 / (sqrt(3) * Vdc_min / sqrt(2))',
+      from: ['front_hardware_power_class_kw', 'assumed_vdc_min_v'],
+    }),
+    dc_bus_voltage_v: q(vDcNom, 'V', 'voltage', 'rated', 'system', 'brief'),
+    assumed_vdc_min_v: q(vDcMin, 'V', 'voltage', 'min', 'system', 'brief'),
+    assumed_vdc_max_v: q(vDcMax, 'V', 'voltage', 'max', 'system', 'brief'),
+    v_dc_min_v: q(vDcMin, 'V', 'voltage', 'min', 'system', 'brief', {
+      from: ['assumed_vdc_min_v'],
+    }),
+    v_dc_max_v: q(vDcMax, 'V', 'voltage', 'max', 'system', 'brief', {
+      from: ['assumed_vdc_max_v'],
+    }),
+    fpk_mass_cap_kg: q(massKg, 'kg', 'mass', 'max', 'system', 'brief', {
+      source_detail: 'press complete-unit dry mass',
+    }),
+    mgu_mcu_mass_cap_kg: q(massKg, 'kg', 'mass', 'max', 'system', 'brief', {
+      source_detail: 'alias of fpk_mass_cap_kg for shared tool pack',
+      from: ['fpk_mass_cap_kg'],
+    }),
+    unit_mass_kg: q(Math.round(massKg * 0.90 * 10) / 10, 'kg', 'mass', 'rated', 'system', 'calculator', {
+      source_detail: `0.90 × fpk_mass_cap_kg — concept-stage pack estimate pending weighed BOM`,
+      from: ['fpk_mass_cap_kg'],
+    }),
+    front_bay_envelope_w_mm: q(bayW, 'mm', 'length', 'max', 'system', 'brief', {
+      source_detail: 'front-axle bay lateral (homologated box)',
+    }),
+    front_bay_envelope_d_mm: q(bayD, 'mm', 'length', 'max', 'system', 'brief', {
+      source_detail: 'front-axle bay fore-aft',
+    }),
+    front_bay_envelope_h_mm: q(bayH, 'mm', 'length', 'max', 'system', 'brief', {
+      source_detail: 'front-axle bay height',
+    }),
+    // Bay box IS the product envelope — morphology + Blender read these.
+    design_envelope_width_mm: q(bayW, 'mm', 'length', 'max', 'system', 'brief', {
+      source_detail: 'alias of front_bay_envelope_w_mm — bay forces form',
+      from: ['front_bay_envelope_w_mm'],
+    }),
+    design_envelope_depth_mm: q(bayD, 'mm', 'length', 'max', 'system', 'brief', {
+      source_detail: 'alias of front_bay_envelope_d_mm — bay forces form',
+      from: ['front_bay_envelope_d_mm'],
+    }),
+    design_envelope_height_mm: q(bayH, 'mm', 'length', 'max', 'system', 'brief', {
+      source_detail: 'alias of front_bay_envelope_h_mm — bay forces form',
+      from: ['front_bay_envelope_h_mm'],
+    }),
+    enclosure_volume_m3: q(enclosureVolM3, 'm³', 'volume', 'max', 'system', 'calculator', {
+      source_detail: `bay box ${bayW}×${bayD}×${bayH} mm = product envelope`,
+    }),
+    gear_ratio: q(gearRatio, 'ratio', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'trial single-speed seed (homologation replaces)',
+    }),
+    // INTENT: hasColdPlateLoopInterface requires coolant_flow_l_min + coolant_inlet_c
+    // (not only assumed_coolant_inlet_c) + a fluid_loop edge naming cold plates.
+    coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief'),
+    assumed_coolant_inlet_c: q(coolantInletC, '°C', 'temperature', 'rated', 'system', 'brief', {
+      source_detail: 'alias of coolant_inlet_c for brief-compliance identity',
+      from: ['coolant_inlet_c'],
+    }),
+    coolant_flow_l_min: q(coolantFlowLMin, 'L/min', 'flow_rate', 'rated', 'system', 'brief', {
+      source_detail: 'trial front FPK coolant flow within manufacturer-perimeter band',
+    }),
+    winding_temp_limit_c: q(180, '°C', 'temperature', 'max', 'module', 'brief'),
+    magnet_temp_limit_c: q(150, '°C', 'temperature', 'max', 'module', 'brief'),
+    inverter_efficiency: q(etaInv, '', 'dimensionless', 'rated', 'module', 'brief'),
+    mgu_efficiency: q(etaMgu, '', 'dimensionless', 'rated', 'module', 'brief'),
+    gear_efficiency: q(etaGear, '', 'dimensionless', 'rated', 'module', 'brief'),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'hv_battery_dc_bus',
+      to_part: 'front_sic_inverter',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: vDcMax,
+      required_unit: 'V',
+    },
+    {
+      from_part: 'front_sic_inverter',
+      to_part: 'front_mgu_stator',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: phaseCurrentMaxA,
+      required_unit: 'A',
+      required_margin_factor: 1.1,
+    },
+    {
+      from_part: 'front_mgu_stator',
+      to_part: 'reduction_gear_stage',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: shaftTorqueNm,
+      required_unit: 'Nm',
+    },
+    {
+      from_part: 'reduction_gear_stage',
+      to_part: 'open_bevel_differential',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: gearOutputPowerKw,
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'open_bevel_differential',
+      to_part: 'front_halfshafts',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: gearOutputPowerKw,
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'coolant_loop',
+      to_part: 'front_mgu_mcu_cold_plates',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: coolantFlowLMin,
+      required_unit: 'L/min',
+    },
+  ]
+
+  // DECISION: macros match TRACTION_DRIVE_MODULE_FLOORS (+ open_bevel_differential
+  // when halfshaft/diff topology is present) — never a synthetic front_fpk_unit.
+  const motorMacroGbp = Math.round(hwClassKw * 80)
+  const sicMacroGbp = Math.round(hwClassKw * 50)
+  const gearMacroGbp = Math.max(3500, Math.round(hwClassKw * 12))
+  const diffMacroGbp = Math.max(2800, Math.round(hwClassKw * 8))
+  const macros: MacroAssemblyPrice[] = [
+    {
+      word_name: 'traction_ipmsm_motor_generator',
+      unit_price_gbp: motorMacroGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: motorMacroGbp,
+      source_detail: `trial specialty front IPMSM ≈ £80/kW × ${hwClassKw} kW (replace with Lucid/team quote)`,
+    },
+    {
+      word_name: 'sic_traction_inverter',
+      unit_price_gbp: sicMacroGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: sicMacroGbp,
+      source_detail: `trial specialty SiC MCU ≈ £50/kW × ${hwClassKw} kW (replace with Lucid/team quote)`,
+    },
+    {
+      word_name: 'reduction_gear_stage',
+      unit_price_gbp: gearMacroGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: gearMacroGbp,
+      source_detail: 'trial single-speed reduction within FPK perimeter',
+    },
+    {
+      word_name: 'open_bevel_differential',
+      unit_price_gbp: diffMacroGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: diffMacroGbp,
+      source_detail: 'trial open bevel differential + halfshaft exits (FPK unitised)',
+    },
+  ]
+
+  return {
+    product_class: 'formula_e_front_mgu',
+    brief_summary: `Formula E Gen3/Evo SPEC front FPK (unitised MGU+inverter+gear+diff) — `
+      + `bay envelope ${bayW}×${bayD}×${bayH} mm forces form; ~${massKg} kg; `
+      + `≤${frontRegenKw} kW front regen (HW class ~${hwClassKw} kW press). `
+      + `Rear manufacturer MGU out of scope.`,
     quantities,
     topology,
     macro_assembly_prices: macros,
