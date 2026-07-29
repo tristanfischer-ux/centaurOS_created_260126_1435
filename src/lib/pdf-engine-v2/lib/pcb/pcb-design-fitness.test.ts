@@ -1,4 +1,7 @@
-import { evaluatePcbDesignFitness } from './pcb-design-fitness'
+import {
+  evaluatePcbDesignFitness,
+  fitnessFailReason,
+} from './pcb-design-fitness'
 import type { PcbArchitecturePlan } from './pcb-architecture'
 
 function plan(): PcbArchitecturePlan {
@@ -35,6 +38,36 @@ describe('evaluatePcbDesignFitness', () => {
     expect(result.findings.map((item) => item.code)).toEqual(expect.arrayContaining([
       'partial_board_scope', 'unresolved_component', 'channel_under_implementation',
     ]))
+  })
+
+  it('proveCatch: required gate channels greater than implemented fail with a reason', () => {
+    const gatePlan: PcbArchitecturePlan = {
+      ...plan(),
+      systemDisposition: 'multi_board',
+      boards: [{
+        ...plan().boards[0],
+        boardId: 'traction_gate_drive',
+        role: 'traction_gate_drive_board',
+        channelRequirements: [{ role: 'gate_drive_channel', count: 6 }],
+      }],
+    }
+    const result = evaluatePcbDesignFitness(gatePlan, {
+      resolvedWordIds: ['driver'],
+      unresolvedWordIds: [],
+      implementedChannels: { gate_drive_channel: 1 },
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        severity: 'high',
+        code: 'channel_under_implementation',
+        message: 'traction_gate_drive requires 6 gate_drive_channel, implements 1',
+      }),
+    ]))
+    expect(fitnessFailReason(result)).toContain(
+      'traction_gate_drive requires 6 gate_drive_channel, implements 1',
+    )
   })
 
   it('proveCatch: deferred stir/pump at 0 are medium and do not fail fitness.ok', () => {

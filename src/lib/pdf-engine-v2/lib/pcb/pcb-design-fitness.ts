@@ -18,6 +18,23 @@ export interface PcbDesignFitnessResult {
   findings: PcbFitnessFinding[]
 }
 
+/**
+ * @description Render the blocking architecture-fitness evidence used by state
+ * honesty fields. A failed fitness result must never be stamped without a reason.
+ * @param result Pure architecture-vs-implementation fitness result.
+ * @returns Empty string on pass; joined HIGH finding messages on failure.
+ */
+export function fitnessFailReason(result: PcbDesignFitnessResult): string {
+  if (result.ok) return ''
+  const blockingReasons = result.findings
+    .filter((finding) => finding.severity === 'high')
+    .map((finding) => finding.message.trim())
+    .filter(Boolean)
+  return blockingReasons.length > 0
+    ? blockingReasons.join('; ')
+    : 'PCB architecture fitness failed without a classified HIGH finding'
+}
+
 /** Pure architecture-vs-implementation fitness; never evaluates DRC/export hygiene. */
 export function evaluatePcbDesignFitness(
   architecture: PcbArchitecturePlan,

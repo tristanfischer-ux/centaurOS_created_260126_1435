@@ -95,6 +95,61 @@ describe('derivePcbArchitecture', () => {
     expect(plan.requiresAnyKiCadDeliverable).toBe(false)
   })
 
+  it('plans traction gate-drive + control boards from inverter nouns + power plane', () => {
+    const state = withElectronicWords(
+      stateWithQuantities({
+        continuous_power_kw: 250,
+        phase_current_max_a: 477,
+      }),
+      [
+        {
+          id: 'gate_driver_board_word',
+          nameHuman: 'Gate Driver Board',
+          characterId: 'gate_driver_board',
+        },
+        {
+          id: 'oem_inverter_control_board_word',
+          nameHuman: 'Oem Inverter Control Board',
+          characterId: 'oem_inverter_control_board',
+        },
+        {
+          id: 'sic_traction_inverter_word',
+          nameHuman: 'SiC Traction Inverter',
+          characterId: 'sic_traction_inverter',
+        },
+        {
+          id: 'phase_current_sensor_word',
+          nameHuman: 'Phase Current Sensor',
+          characterId: 'phase_current_sensor',
+        },
+      ],
+    )
+    const plan = derivePcbArchitecture(state)
+    expect(plan.systemDisposition).toBe('multi_board')
+    expect(plan.boards.map((b) => b.role)).toEqual([
+      'traction_gate_drive_board',
+      'traction_control_board',
+    ])
+    expect(plan.requiresAnyKiCadDeliverable).toBe(true)
+    const byId = Object.fromEntries(plan.assignments.map((a) => [a.wordId, a]))
+    expect(byId.gate_driver_board_word.placement).toBe('on_board')
+    expect(byId.gate_driver_board_word.boardId).toBe('traction_gate_drive')
+    expect(byId.oem_inverter_control_board_word.boardId).toBe('traction_control')
+    expect(byId.sic_traction_inverter_word.placement).toBe('off_board_module')
+    expect(byId.phase_current_sensor_word.boardId).toBe('traction_control')
+    expect(plan.boards[0].channelRequirements).toEqual([
+      { role: 'gate_drive_channel', count: 6 },
+      { role: 'desat_channel', count: 6 },
+    ])
+    expect(plan.boards[1].channelRequirements).toEqual([
+      { role: 'phase_current_sense', count: 3 },
+      { role: 'resolver_channel', count: 1 },
+      { role: 'vehicle_can', count: 1 },
+      { role: 'lv_buck_rail', count: 3 },
+      { role: 'hv_lv_isolation_barrier', count: 1 },
+    ])
+  })
+
   it('assigns multi-board wet-lab roles to the correct boards', () => {
     const state = stateWithQuantities({ working_volume_ml: 20 })
     state.moduleDecomposition = {

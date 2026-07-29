@@ -127,6 +127,26 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     category: 'analog_frontend',
     pattern: /(?:^|[_ -])(?:precision[_ -]?afe|current[_ -]?shunt(?:[_ -]?measurement)?|kelvin[_ -]?(?:voltage[_ -]?)?sense|over[_ -]?under[_ -]?voltage|overcurrent[_ -]?comparator|overtemp[_ -]?trip|comparator[_ -]?latch)(?:$|[_ -])/i,
   },
+  // INTENT (2026-07-29 JLR red-team): traction MCU nouns use underscores —
+  // `\bcurrent_sensor\b` never fires inside `phase_current_sensor_word`.
+  // Collect gate-drive / control / SiC stage / phase-current / CAN-FD roles
+  // from identity alone so pcb-architecture can plan reviewable boards.
+  {
+    category: 'power_electronics',
+    pattern: /(?:^|[_ -])(?:gate[_ -]?driver(?:[_ -]?board)?|sic[_ -]?traction[_ -]?inverter|traction[_ -]?inverter|dc[_ -]?link[_ -]?capacitor(?:[_ -]?bank)?|hv[_ -]?dc[_ -]?fuse)(?:$|[_ -])/i,
+  },
+  {
+    category: 'processor',
+    pattern: /(?:^|[_ -])(?:(?:oem[_ -]?)?inverter[_ -]?control(?:[_ -]?board)?|traction[_ -]?control[_ -]?board)(?:$|[_ -])/i,
+  },
+  {
+    category: 'analog_frontend',
+    pattern: /(?:^|[_ -])(?:phase[_ -]?current[_ -]?(?:sensor|sense)|resolver(?:[_ -]?(?:sensor|interface))?)(?:$|[_ -])/i,
+  },
+  {
+    category: 'connectivity',
+    pattern: /(?:^|[_ -])(?:can[_ -]?fd(?:[_ -]?vehicle[_ -]?interface)?|vehicle[_ -]?can(?:[_ -]?interface)?)(?:$|[_ -])/i,
+  },
 ]
 
 // Independent of the category patterns above: signals about the PRODUCT (not its
@@ -548,6 +568,16 @@ export interface PcbStageResult {
   }
   /** Design-evidence channel counts — firmware contracts must use this, not requiredCount. */
   implementedChannels?: Record<string, number>
+  /** P3 traction-channel honesty aliases consumed by the frozen design twin. */
+  required_gate_channels?: number
+  implemented_gate_channels?: number
+  required_channel_counts?: Record<string, number>
+  implemented_channel_counts?: Record<string, number>
+  /** Architecture-only evidence is explicitly not a supplier fabrication release. */
+  NOT_FABRICATION_READY?: boolean
+  supplier_gerbers?: 'OPEN' | 'SUPPLIED'
+  /** Mandatory when designFitness.ok is false. */
+  fitness_fail_reason?: string
   /** True when architecture needs >1 KiCad deliverable but chain emitted one project (P5). */
   multiBoardMerged?: boolean
   /**

@@ -263,6 +263,27 @@ function board(
     heater_stir_actuation_board: { work: ['drive_heater_stir_pumps', 'sense_wet_actuation_faults'], shape: 'wet_actuation_base', basis: 'wet_connector_edge_and_power_dissipation', holes: 4 },
     high_voltage_controller: { work: ['generate_high_voltage', 'isolate_high_voltage', 'switch_electrode_channels'], shape: 'high_voltage_controller', basis: 'hv_lv_boundary_and_creepage', holes: 4 },
     electrode_cartridge: { work: ['present_electrode_array', 'route_droplet_channels'], shape: 'electrode_cartridge', basis: 'electrode_pitch_and_cartridge_connector', holes: 2 },
+    // INTENT (2026-07-29 JLR red-team): traction MCU control + gate-drive are
+    // reviewable FR4 deliverables even when the SiC power stage is purchased.
+    traction_gate_drive_board: {
+      work: ['isolate_gate_drive', 'desat_protect', 'drive_sic_half_bridges'],
+      shape: 'traction_gate_drive',
+      basis: 'phase_current_and_creepage_to_hv',
+      holes: 6,
+    },
+    traction_control_board: {
+      work: [
+        'sense_phase_current',
+        'demodulate_resolver',
+        'vehicle_can',
+        'regulate_lv_rails',
+        'isolate_hv_lv_domains',
+        'torque_current_limits',
+      ],
+      shape: 'traction_control',
+      basis: 'mcu_sensing_and_vehicle_interface',
+      holes: 4,
+    },
   }
   const p = phenotype[role] ?? { work: ['implement_board_functions'], shape: 'generic_rectangular', basis: 'component_and_connector_envelope', holes: 4 }
   return {
@@ -318,6 +339,12 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
     }
     if (candidate.role === 'wet_lab_hat') {
       return /hat|host|microcontroller|compute|raspberry|interface|usb|firmware|debug|esd|ferrite|polyfuse|reverse[_ -]?polarity|power[_ -]?indicator/i.test(text)
+    }
+    if (candidate.role === 'traction_gate_drive_board') {
+      return /gate[_ -]?driv|desat|half[_ -]?bridge[_ -]?driver|sic[_ -]?driver|isolated[_ -]?driver/i.test(text)
+    }
+    if (candidate.role === 'traction_control_board') {
+      return /(?:oem[_ -]?)?inverter[_ -]?control|control[_ -]?board|phase[_ -]?current|resolver|can[_ -]?fd|vehicle[_ -]?interface|microcontroller|mcu|temperature[_ -]?probe/i.test(text)
     }
     return false
   })
@@ -465,6 +492,17 @@ function nonBoardPlacement(
       reasons: ['purchased_or_host_side_module'],
     }
   }
+  // INTENT (2026-07-29): purchased SiC power stage / HV fuse / DC link bank sit
+  // off the control FR4 — gate-drive + control boards remain on_board.
+  if (
+    /sic[_ -]?traction[_ -]?inverter|traction[_ -]?inverter(?:[_ -]?module)?|power[_ -]?module|hv[_ -]?dc[_ -]?fuse|dc[_ -]?link[_ -]?capacitor/i
+      .test(roleText)
+  ) {
+    return {
+      placement: 'off_board_module',
+      reasons: ['purchased_traction_power_stage_or_hv_passive'],
+    }
+  }
   // INTENT: channel power bus is copper pour / backplane, not a fitted package.
   if (/channel[_ -]?power[_ -]?bus|power[_ -]?bus[_ -]?bar/i.test(roleText)) {
     return {
@@ -608,6 +646,28 @@ function nonBoardPlacement(
     }
   }
   return null
+}
+
+/**
+ * @description True when the design's OWN electronics nouns / quantities imply a
+ * traction inverter control stack (gate-drive + control FR4). Universal — keyed
+ * on word identity and power/current quantities, never a product-class table.
+ */
+export function hasTractionInverterBoardSignal(state: Record<string, unknown>): boolean {
+  const words = collectElectronicWords(state)
+  const blob = words
+    .map((w) => `${w.wordId} ${w.nameHuman} ${w.characterId}`)
+    .join(' ')
+    .toLowerCase()
+  const hasGateOrControl =
+    /gate[_ -]?driv|(?:oem[_ -]?)?inverter[_ -]?control|sic[_ -]?traction|phase[_ -]?current[_ -]?sensor|traction[_ -]?inverter/
+      .test(blob)
+  const hasPowerPlane =
+    (quantity(state, 'continuous_power_kw') ?? 0) >= 50
+    || (quantity(state, 'phase_current_max_a') ?? 0) >= 100
+    || (quantity(state, 'front_hardware_power_class_kw') ?? 0) >= 50
+    || (quantity(state, 'rear_axle_electrical_power_kw') ?? 0) >= 50
+  return hasGateOrControl && hasPowerPlane
 }
 
 /**
@@ -828,6 +888,49 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
       boards = [board('stage_motion', 'motion_driver_board', ['logic', 'motion_actuation'])]
       rationale.push('stage_axes_require_motion_daughterboard')
     }
+  } else if (hasTractionInverterBoardSignal(state)) {
+    // Universal noun/quantity signal — not a product-class table.
+    // Power stage may be purchased; control + gate-drive still need KiCad.
+    const iPh = Math.max(
+      100,
+      Math.floor(quantity(state, 'phase_current_design_a')
+        ?? quantity(state, 'phase_current_max_a')
+        ?? 400),
+    )
+    systemDisposition = 'multi_board'
+    boards = [
+      board(
+        'traction_gate_drive',
+        'traction_gate_drive_board',
+        ['power', 'high_voltage'],
+        [
+          datum('outline_width_mm', 120, `gate-drive creepage envelope for ~${iPh} A phase class`),
+          datum('outline_height_mm', 90, 'three half-bridge driver channels + isolation'),
+        ],
+      ),
+      board(
+        'traction_control',
+        'traction_control_board',
+        ['logic', 'analog'],
+        [
+          datum('outline_width_mm', 100, 'MCU + sensing + CAN interface'),
+          datum('outline_height_mm', 80, 'resolver + current AFE stack'),
+        ],
+      ),
+    ]
+    boards[0].channelRequirements.push(
+      { role: 'gate_drive_channel', count: 6 },
+      { role: 'desat_channel', count: 6 },
+    )
+    boards[1].channelRequirements.push(
+      { role: 'phase_current_sense', count: 3 },
+      { role: 'resolver_channel', count: 1 },
+      { role: 'vehicle_can', count: 1 },
+      // Physics tree `lv_buck_rails` declares 3v3 / 5v / 1v2.
+      { role: 'lv_buck_rail', count: 3 },
+      { role: 'hv_lv_isolation_barrier', count: 1 },
+    )
+    rationale.push('traction_inverter_requires_gate_drive_and_control_boards')
   } else {
     rationale.push('no_functional_board_architecture_signal')
   }
