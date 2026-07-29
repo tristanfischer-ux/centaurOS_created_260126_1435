@@ -89,6 +89,7 @@ const coupMods: any = [{
     mkWord('reduction_gear_stage_word', 'Reduction Gear Stage', [{ kind: 'quantity', value: '×1' }]),
     mkWord('mgu_cold_plate_word', 'Mgu Cold Plate', [{ kind: 'quantity', value: '×1' }]),
     mkWord('mcu_cold_plate_word', 'Mcu Cold Plate', [{ kind: 'quantity', value: '×1' }]),
+    mkWord('oem_inverter_control_board_word', 'Oem Inverter Control Board', [{ kind: 'quantity', value: '×1' }]),
   ] }],
 }]
 const coupContract: any = {
@@ -158,6 +159,11 @@ expect(String(motorDim?.value) !== String(invDim?.value),
   `motor and inverter must not share an identical envelope (got ${motorDim?.value})`)
 expect(String(mguPlateDim?.value) !== String(mcuPlateDim?.value),
   `MGU and MCU cold plates must not share an identical footprint`)
+const ctrlBoard = coupWords.find((w: any) => /control\s*board/i.test(String(w.name_human)))
+const ctrlDim = (ctrlBoard?.modifier_characters ?? []).find((m: any) => m.kind === 'dimension' || m.kind === 'dimensions')
+const ctrlRating = (ctrlBoard?.modifier_characters ?? []).find((m: any) => m.kind === 'rating_primary')
+expect(!ctrlDim, `OEM inverter control board must not inherit SiC MCU envelope (got ${ctrlDim?.value})`)
+expect(!ctrlRating, `OEM inverter control board must not inherit 350 kW rating (got ${ctrlRating?.value})`)
 
 // ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
 import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'

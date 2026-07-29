@@ -1387,6 +1387,12 @@ function wordAcceptsKwDerivedEnvelope(w: WordLike): boolean {
   if (/\b(?:bearings?|bushings?|couplings?|sensors?|fasteners?|seals?|hoses?|bottles?|connectors?|flanges?|keyways?|washers?|bolts?|shims?|gaskets?)\b/i.test(t)) {
     return false
   }
+  // GOTCHA (2026-07-29 0453): "Oem Inverter Control Board" matched `\binverter\b`
+  // and stole the SiC MCU 350 kW / 425×313×157 mm envelope. Control / interface /
+  // harness boards are not power conversion principals.
+  if (/\b(?:control\s*board|interface|harness|interlock|gateway|signal\s*board)\b/i.test(t)) {
+    return false
+  }
   return /\b(?:pump|motor|generator|inverter|compressor|chiller|blower|\bfan\b|transformer|genset|turbine|engine|converter|rectifier|\bups\b|boiler|heater|reactor|skid|heat[\s-]?pump|ipmsm|\bmgu\b|\bmcu\b|traction[\s-]?inverter|drive[\s-]?unit)\b/i.test(t)
 }
 const motorKw = (p: ParentPhysics) => {
