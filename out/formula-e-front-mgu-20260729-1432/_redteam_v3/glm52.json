@@ -1,0 +1,233 @@
+{
+  "verdict": "REJECT",
+  "confidence": 98,
+  "fatal_findings": [
+    {
+      "id": "F1",
+      "area": "PCB / Gate Drive Implementation",
+      "severity": "FATAL",
+      "claim": "The bespoke PCB requires 6 gate-drive channels, 6 desat channels, 3 phase-current sense channels, 1 resolver channel, 1 vehicle CAN, 3 LV buck rails, and 1 HV/LV isolation barrier. ALL implemented counts are zero.",
+      "evidence": "pcb.implemented_channel_counts shows every channel type at 0. pcb.fitness_fail_reason explicitly lists every missing role. design_fitness_ok=false. RACE-HIL and RACE-SUPPLIER-GERBERS are both OPEN with no artefact.",
+      "fix": "Design and lay out actual gate-drive circuitry with desat, phase-current sense, resolver interface, CAN-FD, LV buck, and isolation barrier. Produce Gerbers. Populate board. Run HIL. Hash logs. Until then this is a blank board.",
+      "source_rule_hint": "RACE-HIL artefact_required=hil_report_hash; RACE-SUPPLIER-GERBERS artefact_required=supplier_gerber_package"
+    },
+    {
+      "id": "F2",
+      "area": "Thermal / Cold-Plate CFD",
+      "severity": "FATAL",
+      "claim": "Cold-plate thermal analysis is ANALYTICAL_ONLY from assumed geometry. Source-to-inlet delta of 112.5 K with uncertainty spanning 73.12–174.37 K. No CFD, no flow-bench correlation.",
+      "evidence": "analytical_physics.cold_plate.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY. validation_status=ANALYTICAL_ONLY. measured=false. open_until includes CFD_cold_plate, pressure_drop_bench, supplier_module_Rth, FIA_port_xyz. ship_gate.proveCatch_fired=true, ship_ok=false.",
+      "fix": "Run conjugate heat-transfer CFD on actual cold-plate geometry with supplier module Rth. Correlate on flow bench with instrumented heat source. Reduce uncertainty band below ±10 K before any design freeze.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE artefact_required=cfd_report_hash, closure_authority=cfd_plus_bench"
+    },
+    {
+      "id": "F3",
+      "area": "Topology / Harness Completeness",
+      "severity": "FATAL",
+      "claim": "4 of 17 required topology edges are unrouted: LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER. The powertrain has no LV power distribution, no vehicle communication, and no thermal sensing on either winding or inverter.",
+      "evidence": "topology.routed_count=13, required_count=17, unrouted_count=4. unrouted_edges listed explicitly. race_status=OPEN. RACE-TOPOLOGY-COMPLETE blocks ship_ok.",
+      "fix": "Route all 4 missing edges. Define LV power distribution architecture. Specify CAN-FD transceiver and connector. Place winding and inverter temperature sensors with signal routing. Freeze bay-relative ICD.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE artefact_required=topology_routed_report"
+    },
+    {
+      "id": "F4",
+      "area": "Regulatory / FIA Compliance",
+      "severity": "FATAL",
+      "claim": "No FIA technical regulations PDF exists in the digital twin. The pack claims to be a Formula E front MGU integration study but has zero regulatory grounding.",
+      "evidence": "regulatory.regs_on_disk=false. status=UNVERIFIED. forbid_claims includes FIA_homologated, Gen3_compliant, FIA_approved, SHIPS. FIA_homologation and FIA_port_xyz are in open_until list.",
+      "fix": "Obtain current FIA Formula E technical regulations PDF. Load into twin. Extract and map every applicable rule to a physics node. Obtain team/FIA ICD with sealed chassis interface coordinates in mm.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ artefact_required=interface_icd_xyz, closure_authority=FIA_or_team_ICD"
+    },
+    {
+      "id": "F5",
+      "area": "Electromagnetic / Machine Design",
+      "severity": "FATAL",
+      "claim": "No electromagnetic FEA has been performed. No demag map, no magnet retention validation, no rotor burst FEA, no core loss FEA. The IPMSM is entirely unevaluated electromagnetically.",
+      "evidence": "open_until includes FEA_em, FEA_core_loss, demag_map, DEC-006_magnet_retention, rotor_burst_FEA, supplier_magnet_grade. 101 open_until items total. No dyno data exists.",
+      "fix": "Run 2D/3D electromagnetic FEA across full operating envelope including field weakening. Produce demag safety map. Validate magnet retention at max speed. Run rotor burst analysis. Obtain supplier magnet grade certificate. Run dyno campaign with raw data hash.",
+      "source_rule_hint": "RACE-DYNO artefact_required=dyno_raw_data_hash, blocks DEC-001, DEC-006, DEC-010"
+    },
+    {
+      "id": "F6",
+      "area": "Bus Bar ESL / Power Loop Inductance",
+      "severity": "FATAL",
+      "claim": "DC-link bus bar ESL is analytical-only from assumed geometry at 6.39 nH with a range of 4.15–9.9 nH. No 3D inductance extraction, no double-pulse measurement, no supplier terminal geometry.",
+      "evidence": "analytical_physics.bus_esl.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY. validation_status=ANALYTICAL_ONLY. measured=false. open_until includes bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry.",
+      "fix": "Obtain supplier terminal geometry ICD. Run 3D Q3D inductance extraction on actual bus bar geometry. Perform double-pulse test on populated power stage. Measure actual ESL. Correlate analytical model.",
+      "source_rule_hint": "open_until: bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry"
+    }
+  ],
+  "high_findings": [
+    {
+      "id": "H1",
+      "area": "Mesh Authenticity / Blender Morphology",
+      "severity": "HIGH",
+      "claim": "Mesh authenticity score is 0.7273. Six principal components including the SiC inverter stack, HV bus bar, HV connector, pack base, pack housing, and MCU shelf are plain cuboids — not authentic CAD geometry.",
+      "evidence": "mesh_authenticity.score=0.7273. residual_cuboid array lists 6 components as plain_cuboid. sic_inverter is a plain cuboid — the single most critical power electronic component has no real geometry.",
+      "fix": "Replace all 6 residual cuboids with authentic CAD meshes from supplier or detailed design. Re-run authenticity check. Target score >= 0.95.",
+      "source_rule_hint": "mesh_authenticity.residual_cuboid[].fix_route=build_universal_scene._place_traction_drive_pack_layout"
+    },
+    {
+      "id": "H2",
+      "area": "Lucid/Atieva FPK Training Check",
+      "severity": "HIGH",
+      "claim": "Lucid/Atieva role is defined as FFF_training_check_only_not_CAD_paste, but no evidence of actual sealed FPK training validation is present. The training check is nominal, not demonstrated.",
+      "evidence": "regulatory.lucid_atieva_role=FFF_training_check_only_not_CAD_paste. No artefact, hash, or validation result for the training check exists in the digest.",
+      "fix": "Provide evidence of sealed FPK training check execution — artefact hash, comparison metrics, pass/fail against sealed reference. Document what was checked and what passed.",
+      "source_rule_hint": "regulatory.lucid_atieva_role field — no closure artefact defined"
+    },
+    {
+      "id": "H3",
+      "area": "Excel Traceability — Unvalidated Analytical Inputs",
+      "severity": "HIGH",
+      "claim": "Excel workbook has 2370 formula cells and 1324 verdict formula cells with 11 live formulas and 8 live inputs, but status is LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS. Live formulas fed by unvalidated assumptions produce live garbage.",
+      "evidence": "excel.status=LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS. live_input_count=8. The cold-plate analytical inputs (112.5 K ±50 K) are feeding live formulas downstream.",
+      "fix": "Tag every analytical input cell with provenance and uncertainty. Quarantine downstream formula results until inputs are validated by physical test. Add data validation gates on input cells.",
+      "source_rule_hint": "excel.live_plan_schema=fpk-excel-live-plan/1"
+    },
+    {
+      "id": "H4",
+      "area": "Mass / Weight Budget",
+      "severity": "HIGH",
+      "claim": "No mass, weight, or inertia data appears anywhere in the digest. For a Formula E powertrain where mass is homologation-critical, this is a critical gap.",
+      "evidence": "No mass, weight, inertia, or density field exists in any node of the digest. No mass budget, no CG calculation, no inertia tensor.",
+      "fix": "Produce complete mass budget with every component mass, CG location, and inertia tensor. Correlate against FIA minimum weight rules. Add mass nodes to physics tree.",
+      "source_rule_hint": "No mass-related open_until item exists — the gap is structural, not tracked"
+    },
+    {
+      "id": "H5",
+      "area": "Bearing / Structural / Fatigue",
+      "severity": "HIGH",
+      "claim": "Bearing L10 life, bearing reaction loads, shaft fatigue, structural FEA, thermomechanical FEA, and fatigue testing are all OPEN with no physical artefacts.",
+      "evidence": "open_until includes bearing_supplier_L10, bearing_reaction_loads, bearing_stack_tolerance, shaft_fatigue, structural_FEA, thermomechanical_FEA, fatigue_test, contact_FEA, joint_FEA, carrier_FEA, tooth_bending_FEA, tooth_contact_FEA.",
+      "fix": "Obtain supplier L10 bearing life data. Run structural FEA on all load paths. Run thermomechanical FEA for thermal cycling. Execute fatigue test campaign. Validate bearing reaction loads against dyno data.",
+      "source_rule_hint": "open_until: bearing_supplier_L10, structural_FEA, thermomechanical_FEA, fatigue_test"
+    },
+    {
+      "id": "H6",
+      "area": "Assembly / Manufacturing",
+      "severity": "HIGH",
+      "claim": "No assembly control plan, no assembly trials, no hairpin tooling, no impregnation validation, no surface finish release, no sealant strategy. The powertrain cannot be manufactured.",
+      "evidence": "open_until includes assembly_control_plan, assembly_trials, hairpin_tooling, impregnation_validation, surface_finish_release, sealant_strategy, thermal_fit_analysis, groove_detail, retention_detail.",
+      "fix": "Develop assembly control plan. Run assembly trials. Specify hairpin tooling. Validate impregnation process. Release surface finish specs. Define sealant strategy. Complete thermal fit analysis.",
+      "source_rule_hint": "open_until: assembly_control_plan, assembly_trials, hairpin_tooling"
+    }
+  ],
+  "med_findings": [
+    {
+      "id": "M1",
+      "area": "Gear / Drivetrain Detail",
+      "severity": "MED",
+      "claim": "Bevel tooth geometry, planet kinematics, second stage ratio, spline ICDs, and microgeometry are all OPEN. Gearbox design is incomplete.",
+      "evidence": "open_until includes bevel_tooth_geometry, planet_kinematics, second_stage_ratio, spline_ICD, halfshaft_spline_ICD, microgeometry, diff_detail_design, diff_load_spectrum.",
+      "fix": "Complete gear microgeometry design. Finalize ratios. Obtain spline ICDs from suppliers. Run tooth bending and contact FEA. Define differential architecture.",
+      "source_rule_hint": "open_until: bevel_tooth_geometry, planet_kinematics, second_stage_ratio"
+    },
+    {
+      "id": "M2",
+      "area": "Sensor / Resolver Architecture",
+      "severity": "MED",
+      "claim": "Sensor architecture, sensor MPN, resolver MPN, and calibration are all OPEN. No sensing hardware is selected or validated.",
+      "evidence": "open_until includes sensor_architecture, sensor_mpn, resolver_mpn, calibration, diff_bias_requirement.",
+      "fix": "Select resolver and sensor MPNs. Define sensor architecture. Develop calibration procedure. Validate diff bias requirements.",
+      "source_rule_hint": "open_until: sensor_architecture, resolver_mpn, calibration"
+    },
+    {
+      "id": "M3",
+      "area": "Lubrication / Oil System",
+      "severity": "MED",
+      "claim": "Lubrication architecture, oil flow requirement, oil churn CFD, oil temperature test, and oil supplier spec are all OPEN.",
+      "evidence": "open_until includes lubrication_architecture, lubrication_flow_requirement, oil_churn_CFD, oil_flow_requirement, oil_supplier_spec, oil_temperature_test.",
+      "fix": "Define lubrication architecture. Specify oil flow requirements. Run oil churn CFD. Select oil supplier. Run oil temperature validation test.",
+      "source_rule_hint": "open_until: lubrication_architecture, oil_churn_CFD"
+    },
+    {
+      "id": "M4",
+      "area": "Insulation / Safety",
+      "severity": "MED",
+      "claim": "Insulation system certification, isolation lifetime, safety discharge test, and HVIL ICD are all OPEN.",
+      "evidence": "open_until includes insulation_system_cert, supplier_isolation_lifetime, safety_discharge_test, vehicle_hvil_ICD.",
+      "fix": "Obtain insulation system certification. Validate isolation lifetime. Execute safety discharge test. Define HVIL ICD with vehicle team.",
+      "source_rule_hint": "open_until: insulation_system_cert, safety_discharge_test, vehicle_hvil_ICD"
+    }
+  ],
+  "physics_checks": [
+    {
+      "quantity": "Cold-plate source-to-inlet delta T",
+      "claimed": "112.5 K (range 73.12–174.37 K)",
+      "expected_check": "For a 4318 W heat load with typical EGW flow rates, 112.5 K is plausible only if flow is severely restricted or area is undersized. The ±50 K uncertainty makes this unusable for design decisions.",
+      "likely_wrong": true,
+      "why": "The uncertainty band is 57% of nominal. No engineer can size a cooling system with this. The pressure drop of 28501.9 Pa (~0.285 bar) is high and suggests the assumed geometry is restrictive. Without CFD or bench data, both the heat transfer coefficient and pressure drop are guesses."
+    },
+    {
+      "quantity": "Bus bar ESL",
+      "claimed": "6.39 nH (range 4.15–9.9 nH)",
+      "expected_check": "For a laminated bus bar in a SiC inverter, sub-10 nH is achievable but depends entirely on geometric overlap, dielectric thickness, and terminal geometry. The 2.4x range (4.15 to 9.9) is unacceptable.",
+      "likely_wrong": false,
+      "why": "The nominal value is physically plausible but the range is too wide. Without supplier terminal geometry and 3D extraction, this is a geometry assumption, not a measurement. SiC switches at high di/dt; ESL error of 3.5 nH changes overshoot voltage significantly."
+    },
+    {
+      "quantity": "Cold-plate heat load",
+      "claimed": "4318.0 W",
+      "expected_check": "For a Formula E MGU at peak power (~350 kW), inverter losses at ~2% would be ~7 kW. Motor losses could add 3-5 kW. 4318 W seems low for peak operation or may represent a specific duty point not stated.",
+      "likely_wrong": true,
+      "why": "No duty cycle, operating point, or loss breakdown is provided. 4318 W without context is meaningless. If this is continuous rating, it may be reasonable. If peak, it is dangerously low. The provenance is ANALYTICAL_FROM_ASSUMED_GEOMETRY with no loss map backing it."
+    },
+    {
+      "quantity": "Pressure drop across cold plate",
+      "claimed": "28501.9 Pa",
+      "expected_check": "~0.285 bar is high for a cold plate. Typical automotive cold plates run 0.05–0.15 bar. This suggests either tiny channels or assumed geometry that is not representative.",
+      "likely_wrong": true,
+      "why": "Analytical from assumed geometry. No CFD, no bench measurement. The high pressure drop may force a larger pump, adding mass and parasitic load — neither of which is tracked."
+    }
+  ],
+  "excel_traceability": {
+    "verdict": "LIVE_BUT_UNVALIDATED — formulas are live but inputs are analytical assumptions with no physical validation",
+    "problems": [
+      "8 live inputs are unvalidated analytical assumptions — live formulas fed by unvalidated inputs produce live but wrong results",
+      "No data validation gates on input cells — any value can be entered without provenance check",
+      "Cold-plate analytical inputs with ±50 K uncertainty propagate through 2370 formula cells — error propagation is uncontrolled",
+      "No traceability matrix linking formula cells to physical test artefacts or supplier datasheets",
+      "Status LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS is honest but means the workbook cannot be used for design decisions"
+    ]
+  },
+  "pcb_verdict": {
+    "verdict": "REJECT — blank board with zero implemented channels",
+    "problems": [
+      "6 required gate-drive channels, 0 implemented — the board cannot switch a single phase",
+      "6 required desat channels, 0 implemented — no short-circuit protection",
+      "3 required phase-current sense channels, 0 implemented — no torque control possible",
+      "1 required resolver channel, 0 implemented — no rotor position feedback",
+      "1 required vehicle CAN, 0 implemented — no vehicle communication",
+      "3 required LV buck rails, 0 implemented — no gate-drive power",
+      "1 required HV/LV isolation barrier, 0 implemented — safety violation",
+      "No Gerber package received from supplier — RACE-SUPPLIER-GERBERS OPEN",
+      "No HIL evidence — RACE-HIL OPEN, no populated board exists",
+      "No firmware proof, no pinout, no HIL test plan artefact"
+    ]
+  },
+  "blender_verdict": {
+    "verdict": "REJECT — 6 critical components are plain cuboids, not authentic geometry",
+    "problems": [
+      "SiC inverter stack is a plain cuboid — the most critical power electronic component has no real geometry, no terminal layout, no DC-link capacitor geometry",
+      "HV bus bar is a plain cuboid — bus bar geometry directly determines ESL, yet ESL is analytical-only",
+      "HV connector is a plain cuboid — no connector ICD, no arcing clearance, no creepage path",
+      "Pack base and pack housing are plain cuboids — no structural ribbing, no mounting boss geometry",
+      "MCU shelf is a plain cuboid — no PCB keepout, no connector clearance",
+      "Mesh authenticity 0.7273 is below any acceptable threshold for design freeze",
+      "Lucid/Atieva FPK training check is nominal only — no sealed reference artefact, no comparison metrics, no pass/fail evidence"
+    ]
+  },
+  "top_10_punchlist_for_fix": [
+    "1. Implement all 21 required PCB channels (6 gate-drive, 6 desat, 3 phase-current, 1 resolver, 1 CAN, 3 LV buck, 1 isolation barrier) — currently 0/21",
+    "2. Run conjugate CFD on actual cold-plate geometry and correlate on flow bench — reduce thermal uncertainty from ±50 K to <±10 K",
+    "3. Route 4 missing topology edges: LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER",
+    "4. Obtain FIA Formula E technical regulations PDF and load into digital twin — currently regs_on_disk=false",
+    "5. Run electromagnetic FEA across full operating envelope — produce demag map, field weakening validation, core loss map",
+    "6. Obtain supplier Gerber package and run manufacturing review — no fabrication data exists",
+    "7. Replace 6 residual cuboid meshes with authentic CAD (especially SiC inverter, HV bus bar, HV connector)",
+    "8. Execute double-pulse test on populated power stage to measure actual bus bar ESL — replace 6.39 nH analytical guess",
+    "9. Produce complete mass budget with CG and inertia tensor — no mass data exists anywhere in the digest",
+    "10. Obtain team/FIA ICD with sealed chassis interface port coordinates in mm — RACE-FIA-PORT-XYZ OPEN"
+  ]
+}

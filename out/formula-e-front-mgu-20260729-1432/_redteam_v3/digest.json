@@ -1,0 +1,398 @@
+{
+  "schema": "fpk-redteam-digest/v3",
+  "generated_at": "2026-07-29T19:35:19.598702+00:00",
+  "target": "out/formula-e-front-mgu-20260729-1432",
+  "mode": "CHALLENGE_ONLY",
+  "closure_policy": {
+    "models_are_evidence": false,
+    "race_open_items_may_be_closed_by_council": false,
+    "required_disposition": "Disposition every FATAL individually; preserve OPEN until named physical/supplier/regulatory artefact exists."
+  },
+  "fpkPhysicsTree": {
+    "node_count": 254,
+    "leaf_count": 205,
+    "nodes_with_physics": 254,
+    "physics_coverage_pct": 100.0,
+    "open_until_count": 101,
+    "open_until": [
+      "CFD_cold_plate",
+      "CFD_jacket",
+      "DEC-006_magnet_retention",
+      "EMC_IP_test",
+      "FEA_core_loss",
+      "FEA_em",
+      "FIA_homologation",
+      "FIA_port_xyz",
+      "GD&T_stack",
+      "HIL",
+      "HIL_DEC-008",
+      "IP_test",
+      "assembly_control_plan",
+      "assembly_trials",
+      "axial_load_case",
+      "balance_validation",
+      "bearing_reaction_loads",
+      "bearing_stack_tolerance",
+      "bearing_supplier_L10",
+      "bevel_tooth_geometry",
+      "bus_3D_inductance",
+      "bus_ESL_measurement",
+      "calibration",
+      "cap_ripple_datasheet",
+      "carrier_FEA",
+      "channel_implementation",
+      "component_resolution",
+      "connector_ICD",
+      "contact_FEA",
+      "datum_scheme",
+      "debris_capture_test",
+      "debris_size_requirement",
+      "demag_map",
+      "diff_bias_requirement",
+      "diff_detail_design",
+      "diff_load_spectrum",
+      "double_pulse_bench",
+      "double_pulse_bus_ESL_measurement",
+      "dyno",
+      "dyno_resistance",
+      "fatigue_test",
+      "flow_bench",
+      "gasket_supplier_curve",
+      "groove_detail",
+      "hairpin_tooling",
+      "halfshaft_spline_ICD",
+      "headspace_volume",
+      "impregnation_validation",
+      "insulation_system_cert",
+      "joint_FEA",
+      "joint_stack_release",
+      "lamination_grade_PO",
+      "lubrication_architecture",
+      "lubrication_flow_requirement",
+      "microgeometry",
+      "module_supplier_stack",
+      "mpn_selection",
+      "oil_churn_CFD",
+      "oil_flow_requirement",
+      "oil_supplier_spec",
+      "oil_temperature_test",
+      "pierce_seal_ICD",
+      "pin_diameter_detail",
+      "planet_axial_load",
+      "planet_kinematics",
+      "pressure_drop_bench",
+      "resistor_pulse_datasheet",
+      "resistor_voltage_derating",
+      "resolver_mpn",
+      "retention_detail",
+      "retention_sleeve_FEA",
+      "rotor_balance",
+      "rotor_burst_FEA",
+      "safety_discharge_test",
+      "seal_supplier_curve",
+      "sealant_strategy",
+      "second_stage_ratio",
+      "sensor_architecture",
+      "sensor_mpn",
+      "service_thread_ICD",
+      "shaft_fatigue",
+      "spline_ICD",
+      "strength_check",
+      "structural_FEA",
+      "supplier_ICD",
+      "supplier_L10",
+      "supplier_curve",
+      "supplier_gerbers",
+      "supplier_isolation_lifetime",
+      "supplier_magnet_grade",
+      "supplier_module_Rth",
+      "supplier_module_datasheet",
+      "supplier_terminal_geometry",
+      "surface_finish_release",
+      "thermal_fit_analysis",
+      "thermomechanical_FEA",
+      "tooth_bending_FEA",
+      "tooth_contact_FEA",
+      "torque_friction_validation",
+      "tribology_test",
+      "vehicle_hvil_ICD"
+    ],
+    "ship_ok": false,
+    "honesty": "100% physics-key coverage is analytical coverage, not validation or release."
+  },
+  "checklist_disposition": {
+    "checklist_paths_total": 337,
+    "classified_paths": 337,
+    "coverage_pct": 100.0,
+    "counts": {
+      "mapped": 201,
+      "duplicate": 103,
+      "na": 0,
+      "open": 33
+    },
+    "race_open_items_closed": 0,
+    "ship_ok": false,
+    "honesty": "Disposition coverage means every council path was triaged; it does not mean every part is designed or validated. OPEN remains OPEN."
+  },
+  "topology": {
+    "routed_count": 13,
+    "required_count": 17,
+    "unrouted_count": 4,
+    "unrouted_edges": [
+      "LV_POWER",
+      "CAN_FD",
+      "TEMP_WINDING_W",
+      "TEMP_INVERTER"
+    ],
+    "race_status": "OPEN"
+  },
+  "analytical_physics": {
+    "bus_esl": {
+      "provenance": "ANALYTICAL_FROM_ASSUMED_GEOMETRY",
+      "validation_status": "ANALYTICAL_ONLY",
+      "measured": false,
+      "nominal_nh": 6.39,
+      "range_nh": [
+        4.15,
+        9.9
+      ],
+      "open_until": [
+        "bus_3D_inductance",
+        "double_pulse_bus_ESL_measurement",
+        "supplier_terminal_geometry"
+      ]
+    },
+    "cold_plate": {
+      "provenance": "ANALYTICAL_FROM_ASSUMED_GEOMETRY",
+      "validation_status": "ANALYTICAL_ONLY",
+      "measured": false,
+      "heat_load_w": 4318.0,
+      "pressure_drop_pa": 28501.9,
+      "source_to_inlet_delta_k": 112.5,
+      "uncertainty_range_source_to_inlet_k": [
+        73.12,
+        174.37
+      ],
+      "open_until": [
+        "CFD_cold_plate",
+        "pressure_drop_bench",
+        "supplier_module_Rth",
+        "FIA_port_xyz"
+      ],
+      "ship_gate": {
+        "gate": "cfd_open_propagates_to_ship_ok",
+        "requested_ship_ok": true,
+        "blocking_open": [
+          "CFD_cold_plate"
+        ],
+        "proveCatch_fired": true,
+        "ship_ok": false,
+        "action": "BLOCK_SHIP_AND_ROUTE_TO_CFD",
+        "route": "thermal/CFD_cold_plate"
+      }
+    }
+  },
+  "pcb": {
+    "disposition": "bespoke",
+    "pipeline_ok": true,
+    "design_fitness_ok": false,
+    "required_gate_channels": 6,
+    "implemented_gate_channels": 0,
+    "required_channel_counts": {
+      "gate_drive_channel": 6,
+      "desat_channel": 6,
+      "phase_current_sense": 3,
+      "resolver_channel": 1,
+      "vehicle_can": 1,
+      "lv_buck_rail": 3,
+      "hv_lv_isolation_barrier": 1
+    },
+    "implemented_channel_counts": {
+      "gate_drive_channel": 0,
+      "desat_channel": 0,
+      "phase_current_sense": 0,
+      "resolver_channel": 0,
+      "vehicle_can": 0,
+      "lv_buck_rail": 0,
+      "hv_lv_isolation_barrier": 0
+    },
+    "fitness_fail_reason": "traction_gate_drive is missing required roles: motor_power_terminals; traction_gate_drive requires 6 gate_drive_channel, implements 0; traction_gate_drive requires 6 desat_channel, implements 0; traction_control is missing required roles: mcu_cold_plate, oem_inverter_control_board, oem_inverter_control_board_word, can_fd_vehicle_interface_word, resolver_signal_interface_word, resolver_encoder_word, resolver; traction_control requires 3 phase_current_sense, implements 0; traction_control requires 1 resolver_channel, implements 0; traction_control requires 1 vehicle_can, implements 0; traction_control requires 3 lv_buck_rail, implements 0; traction_control requires 1 hv_lv_isolation_barrier, implements 0; component oem_inverter_control_board_word has no verified implementation; component can_fd_vehicle_interface_word has no verified implementation; component resolver_signal_interface_word has no verified implementation; component resolver_encoder_word has no verified implementation",
+    "honesty": "Pipeline hygiene does not cure channel under-implementation; 6 gate-drive channels are required and 0 are implemented."
+  },
+  "mesh_authenticity": {
+    "score": 0.7273,
+    "principal_count": 22,
+    "principal_present": 22,
+    "authentic_count": 16,
+    "residual_cuboid": [
+      {
+        "role_id": "pack_base",
+        "label": "Traction pack base",
+        "mesh": "u_se_td_pack_base",
+        "kind": "plain_cuboid",
+        "fix_route": "build_universal_scene._place_traction_drive_pack_layout"
+      },
+      {
+        "role_id": "pack_housing",
+        "label": "Pack housing spine",
+        "mesh": "u_se_td_pack_housing",
+        "kind": "plain_cuboid",
+        "fix_route": "build_universal_scene._place_traction_drive_pack_layout"
+      },
+      {
+        "role_id": "mcu_shelf",
+        "label": "MCU upper shelf",
+        "mesh": "u_se_td_mcu_shelf",
+        "kind": "plain_cuboid",
+        "fix_route": "build_universal_scene._place_traction_drive_pack_layout"
+      },
+      {
+        "role_id": "sic_inverter",
+        "label": "SiC inverter stack",
+        "mesh": "u_se_td_sic_inverter",
+        "kind": "plain_cuboid",
+        "fix_route": "build_universal_scene._place_traction_drive_pack_layout"
+      },
+      {
+        "role_id": "hv_bus",
+        "label": "DC-link bus bar",
+        "mesh": "u_se_td_hv_bus",
+        "kind": "plain_cuboid",
+        "fix_route": "build_universal_scene._place_traction_drive_pack_layout"
+      },
+      {
+        "role_id": "hv_connector",
+        "label": "HV DC connector",
+        "mesh": "u_se_td_hv_connector",
+        "kind": "plain_cuboid",
+        "fix_route": "build_universal_scene._place_traction_drive_pack_layout"
+      }
+    ],
+    "honesty": "0.7273 remains below complete principal-mesh authenticity."
+  },
+  "excel": {
+    "release": "V1.12",
+    "live_plan_schema": "fpk-excel-live-plan/1",
+    "live_input_count": 8,
+    "live_formula_count": 11,
+    "workbook_formula_cells": 2370,
+    "verdict_formula_cells": 1324,
+    "sheets_without_formula": [],
+    "status": "LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS"
+  },
+  "evidence_trail": {
+    "race_count": 6,
+    "all_races_open": true,
+    "races": [
+      {
+        "race_id": "RACE-HIL",
+        "title": "HIL proof on populated PCB",
+        "status": "OPEN",
+        "artefact_required": "hil_report_hash",
+        "closure_authority": "physical_HIL",
+        "blocks": [
+          "ship_ok",
+          "SHIPS",
+          "FUNCTIONALLY_VERIFIED"
+        ],
+        "next_real_world_action": "populate board + run firmware proof HIL; hash raw logs"
+      },
+      {
+        "race_id": "RACE-SUPPLIER-GERBERS",
+        "title": "Supplier Gerbers / manufacturing review",
+        "status": "OPEN",
+        "artefact_required": "supplier_gerber_package",
+        "closure_authority": "supplier_document",
+        "blocks": [
+          "ship_ok",
+          "SHIPS",
+          "FABRICATION_READY"
+        ],
+        "next_real_world_action": "receive supplier Gerber package + manufacturing review"
+      },
+      {
+        "race_id": "RACE-DYNO",
+        "title": "Dyno / DEC performance evidence",
+        "status": "OPEN",
+        "artefact_required": "dyno_raw_data_hash",
+        "closure_authority": "physical_dyno",
+        "blocks": [
+          "ship_ok",
+          "SHIPS",
+          "DEC-001",
+          "DEC-006",
+          "DEC-010"
+        ],
+        "next_real_world_action": "dyno campaign with cal certificates + raw hash"
+      },
+      {
+        "race_id": "RACE-CFD-COLD-PLATE",
+        "title": "Cold-plate CFD correlation",
+        "status": "OPEN",
+        "artefact_required": "cfd_report_hash",
+        "closure_authority": "cfd_plus_bench",
+        "blocks": [
+          "ship_ok",
+          "thermal_validated"
+        ],
+        "next_real_world_action": "CFD + flow-bench correlation; keep analytical tagged UNVALIDATED"
+      },
+      {
+        "race_id": "RACE-FIA-PORT-XYZ",
+        "title": "FIA / chassis interface port millimetres",
+        "status": "OPEN",
+        "artefact_required": "interface_icd_xyz",
+        "closure_authority": "FIA_or_team_ICD",
+        "blocks": [
+          "homologation",
+          "ICD_XYZ"
+        ],
+        "next_real_world_action": "team/FIA ICD with sealed coordinates"
+      },
+      {
+        "race_id": "RACE-TOPOLOGY-COMPLETE",
+        "title": "HV/coolant/signal topology fully routed",
+        "status": "OPEN",
+        "artefact_required": "topology_routed_report",
+        "closure_authority": "SOURCE_topology_proveCatch",
+        "blocks": [
+          "ship_ok"
+        ],
+        "next_real_world_action": "route remaining edges + freeze bay-relative ICD"
+      }
+    ],
+    "proveCatch": {
+      "ship_ok_false_while_race_open": true,
+      "cfd_cold_plate_in_open_until": true,
+      "no_raw_data_hash_on_open": true,
+      "pcb_fitness_fail_reason_present": true,
+      "all_pass": true
+    }
+  },
+  "regulatory": {
+    "series": "FIA_Formula_E",
+    "generation_assumption": "Gen3_or_Gen3_Evo_forward_study",
+    "fpk_role": "spec_front_powertrain_kit_integration_study",
+    "lucid_atieva_role": "FFF_training_check_only_not_CAD_paste",
+    "regs_on_disk": false,
+    "status": "UNVERIFIED",
+    "forbid_claims": [
+      "FIA_homologated",
+      "Gen3_compliant",
+      "FIA_approved",
+      "SHIPS"
+    ],
+    "note": "No FIA technical regulations PDF held in twin — forbid compliant language."
+  },
+  "ship_ok": false,
+  "source_hashes": {
+    "state.json": "b424112c2df16be0a0a3bc95aae8df7c5896fa08dc353b6b4ecf4dc84116439c",
+    "_autonomous/checklist_disposition.json": "803766023a6c0447dc0eac22a68fed4005d500baa304c31e753f6c8fca49e1cb",
+    "pcb-stage.json": "59cf4c3cc2824bf4be7761150e90b6e7489cf4aa53579cff60668d0d4f83acb5",
+    "form-meshes.json": "0d52805d20b8fd39f6e5d442d060ef4842b8cf6ce652f127a635f5259bdadfa2",
+    "live-check-stats.json": "3333cf65ff268da67259977f250a25bfc75254b185eb26591f05bfc671681fee",
+    "deliverable-version.json": "40610c4de71e10701403abee45e9e2f3d96eaddcbd1631cbd551afd499761556",
+    "_autonomous/evidence-trail.json": "bb2ef1681fb6613fc0cf5d5a0992c7a68692e9076225cfbdccd8c660a0babd5b",
+    "_autonomous/requirements-matrix.json": "402af9c9eb9035a49a1fc1436c998e25ec6a78457cb915dc494952d36ad9e0af"
+  }
+}

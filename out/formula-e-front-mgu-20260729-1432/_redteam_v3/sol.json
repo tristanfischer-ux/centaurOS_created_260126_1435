@@ -1,0 +1,330 @@
+{
+  "verdict": "REJECT",
+  "confidence": 99,
+  "fatal_findings": [
+    {
+      "id": "F1",
+      "area": "PCB / inverter control",
+      "severity": "FATAL",
+      "claim": "The bespoke PCB is not a traction-inverter control design: every required functional channel is absent.",
+      "evidence": "Implemented counts are 0/6 gate-drive channels, 0/6 desaturation channels, 0/3 phase-current channels, 0/1 resolver channel, 0/1 vehicle-CAN channel, 0/3 LV buck rails and 0/1 HV-LV isolation barrier. design_fitness_ok is false.",
+      "fix": "Produce a complete reviewed schematic, PCB database, BOM and netlist implementing all required channels; demonstrate isolation, creepage, clearance, desaturation, current sensing, resolver, CAN-FD and LV-rail operation on populated hardware.",
+      "source_rule_hint": "Named artefacts: released ECAD schematic/database, PCB design review, ISO 6469-3 isolation evidence, IEC 60664-1 insulation-coordination calculation and inverter electrical DVP&R."
+    },
+    {
+      "id": "F2",
+      "area": "Gerbers / fabrication release",
+      "severity": "FATAL",
+      "claim": "There is no fabrication-ready supplier PCB package.",
+      "evidence": "RACE-SUPPLIER-GERBERS is OPEN, supplier_gerbers is OPEN, the required supplier_gerber_package does not exist and FABRICATION_READY is explicitly blocked.",
+      "fix": "Obtain the supplier-generated Gerber/ODB++ package, NC drills, stack-up, impedance table, fabrication drawing, assembly data, pick-and-place, BOM, IPC netlist and signed DFM/manufacturing review.",
+      "source_rule_hint": "RACE-SUPPLIER-GERBERS; IPC-2581 or ODB++; IPC-2221, IPC-6012 and IPC-A-610 manufacturing artefacts."
+    },
+    {
+      "id": "F3",
+      "area": "Firmware / pinout / HIL",
+      "severity": "FATAL",
+      "claim": "No evidence shows that executable inverter firmware, its pinout or its protection behaviour exists on representative hardware.",
+      "evidence": "RACE-HIL and HIL_DEC-008 remain OPEN. The required hil_report_hash is absent. The digest supplies no firmware binary hash, source revision, linker map, MCU pin map, calibration set, bootloader evidence, timing trace, fault-injection result or populated-PCB test record.",
+      "fix": "Freeze the MCU and connector pinouts, release traceable firmware and calibration hashes, populate the PCB, and run HIL fault injection covering PWM, desaturation, overcurrent, resolver faults, CAN loss, watchdogs, shutdown paths and safe-state timing with raw logs.",
+      "source_rule_hint": "RACE-HIL; named artefacts: firmware release manifest, pinout ICD, HIL report and raw-log hash; ISO 26262-6 and ISO 26262-8 configuration-management and verification work products."
+    },
+    {
+      "id": "F4",
+      "area": "Power and signal topology",
+      "severity": "FATAL",
+      "claim": "The system topology is incomplete and cannot define where all electrical power and critical information enter, are converted or terminate.",
+      "evidence": "Only 13 of 17 required edges are routed. LV_POWER, CAN_FD, TEMP_WINDING_W and TEMP_INVERTER are unrouted, and RACE-TOPOLOGY-COMPLETE remains OPEN. The digest provides no frozen bay-relative ICD.",
+      "fix": "Release a source-to-sink architecture covering HV DC, precharge/discharge, DC link, three phases, LV rails and returns, grounding/shielding, CAN-FD, resolver, all temperatures, coolant and HVIL; route every edge into a connector and pin-level ICD.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE; vehicle_hvil_ICD, connector_ICD, supplier_ICD and interface control drawing."
+    },
+    {
+      "id": "F5",
+      "area": "Thermal / coolant",
+      "severity": "FATAL",
+      "claim": "The inverter thermal concept predicts an unacceptable and unvalidated source-to-coolant temperature rise.",
+      "evidence": "At 4318 W heat load, the analytical model reports 112.5 K source-to-inlet rise with a 73.12–174.37 K uncertainty range. Geometry is assumed, supplier_module_Rth is OPEN, CFD_cold_plate and pressure_drop_bench are OPEN, and the 28.5 kPa pressure drop is uncorrelated.",
+      "fix": "Obtain the actual module transient and steady-state thermal stack, define coolant composition, inlet-temperature envelope, flow, pressure availability and fouling margin, then correlate conjugate CFD against instrumented flow-bench and thermal cycling data.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE; CFD_cold_plate, pressure_drop_bench, supplier_module_Rth and FIA_port_xyz."
+    },
+    {
+      "id": "F6",
+      "area": "Motor electromagnetic design",
+      "severity": "FATAL",
+      "claim": "No validated IPMSM electromagnetic design supports torque, speed, efficiency, field-weakening, demagnetisation or loss claims.",
+      "evidence": "FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO, dyno and calibration are OPEN. No dq maps, back-EMF data, current-angle schedule, voltage ellipse, MTPA/MTPV transition, magnet temperature limit or inverter modulation assumptions are supplied.",
+      "fix": "Release geometry- and material-controlled electromagnetic FEA, dq flux/inductance and loss maps over current, speed and temperature, demagnetisation margins, field-weakening controls and correlated dyno data.",
+      "source_rule_hint": "RACE-DYNO; FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO and calibrated dyno raw data."
+    },
+    {
+      "id": "F7",
+      "area": "Rotor and magnet mechanical integrity",
+      "severity": "FATAL",
+      "claim": "The rotor cannot be accepted at operating or overspeed because magnet retention, burst strength and balance are unresolved.",
+      "evidence": "DEC-006_magnet_retention, retention_detail, retention_sleeve_FEA, rotor_burst_FEA, thermal_fit_analysis, rotor_balance and balance_validation are OPEN. RACE-DYNO explicitly blocks DEC-006.",
+      "fix": "Define rotor speed and overspeed envelopes, material allowables, interference and temperature stacks; complete nonlinear retention and burst analyses, overspeed testing, balance release and post-test inspection.",
+      "source_rule_hint": "DEC-006; RACE-DYNO; retention_sleeve_FEA, rotor_burst_FEA, thermal_fit_analysis and physical overspeed/balance reports."
+    },
+    {
+      "id": "F8",
+      "area": "Mechanical transmission",
+      "severity": "FATAL",
+      "claim": "The gear, differential, bearing and lubrication system is not defined sufficiently to transmit the claimed power.",
+      "evidence": "second_stage_ratio, planet_kinematics, bevel_tooth_geometry, microgeometry, tooth bending/contact FEA, bearing reactions, supplier L10, differential detail/load spectrum and lubrication architecture/flow requirements are OPEN.",
+      "fix": "Freeze the complete ratio and kinematic chain, gear geometry and microgeometry, duty-cycle load spectrum, bearing reactions and life, differential architecture, lubrication circuit and efficiency/loss model; validate on rig and dyno.",
+      "source_rule_hint": "Named artefacts: released transmission drawing set, ISO 6336 gear rating, ISO 281 bearing-life calculation, lubrication schematic and correlated rig report."
+    },
+    {
+      "id": "F9",
+      "area": "FIA and vehicle interfaces",
+      "severity": "FATAL",
+      "claim": "The package cannot be integrated or assessed for Formula E legality because the governing regulations and sealed interface coordinates are absent.",
+      "evidence": "regs_on_disk is false, regulatory status is UNVERIFIED, FIA_homologation and FIA_port_xyz are OPEN, RACE-FIA-PORT-XYZ is OPEN and the generation is only assumed as Gen3_or_Gen3_Evo_forward_study.",
+      "fix": "Load the applicable controlled FIA technical regulations and bulletins, identify every applicable clause, and obtain the team/FIA signed interface ICD with coordinates, envelopes, fluids, connectors, loads and homologation constraints.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ; current controlled FIA Formula E Technical Regulations, FIA bulletins and signed team/FIA interface ICD."
+    },
+    {
+      "id": "F10",
+      "area": "Physics and spreadsheet auditability",
+      "severity": "FATAL",
+      "claim": "Formula counts do not establish that the workbook calculates the powertrain correctly or that outputs are traceable to controlled inputs.",
+      "evidence": "The digest reports 2370 formula cells, 1324 verdict formula cells, 8 live inputs and 11 live-plan formulas, but supplies no cell-level dependency graph, formula inventory, named-range map, external-link report or recalculation comparison. Core equations for phase current, torque, gear conversion and FIA energy are not exposed.",
+      "fix": "Deliver the native workbook and a machine-readable cell audit showing every input, unit, formula, dependency, external link and output; independently recalculate all safety- and performance-critical equations and lock controlled constants to source documents.",
+      "source_rule_hint": "Named artefacts: native XLSX, formula/dependency export, external-link report, unit audit, independent calculation note and signed requirements-to-cell trace matrix."
+    },
+    {
+      "id": "F11",
+      "area": "Mass properties",
+      "severity": "FATAL",
+      "claim": "No defensible mass, centre-of-gravity or inertia model exists for vehicle development.",
+      "evidence": "The digest provides no component mass table, measured masses, material-density provenance, fastener/fluid/harness allowances, centre of gravity, rotor inertia, tolerance or target margin. Several principal geometries remain plain cuboids and component_resolution is OPEN.",
+      "fix": "Release a part-numbered mass roll-up tied to CAD/BOM materials and measured supplier parts, including fluids, harnesses, connectors, fasteners and manufacturing tolerances; provide assembly mass, CG and inertia tensors with margin.",
+      "source_rule_hint": "Named artefacts: controlled BOM mass report, CAD mass-properties export, supplier weigh certificates and physical assembly weigh report."
+    }
+  ],
+  "high_findings": [
+    {
+      "id": "H1",
+      "area": "Blender / morphology authenticity",
+      "severity": "HIGH",
+      "claim": "The Blender representation is unsuitable as a sealed FPK morphology or packaging reference.",
+      "evidence": "Authenticity is 0.7273 and six principal objects remain plain cuboids, including the SiC inverter, DC-link bus bar and HV connector. No sealed Lucid/Atieva reference captures, silhouette comparison, dimensional deviation report or review signature are present.",
+      "fix": "Replace proxies with dimensionally controlled component morphology and run a sealed, camera-matched comparison against the authorized Lucid/Atieva training reference without copying proprietary CAD.",
+      "source_rule_hint": "Named artefact: sealed FPK morphology training-check report with reference hashes, camera parameters and signed deviations."
+    },
+    {
+      "id": "H2",
+      "area": "Harness completeness",
+      "severity": "HIGH",
+      "claim": "No production-relevant harness design supports the electrical topology.",
+      "evidence": "CAN-FD, LV power and two temperature channels remain unrouted. connector_ICD, vehicle_hvil_ICD, sensor_mpn and supplier_ICD are OPEN. No wire gauges, shielding, twisted-pair rules, splice strategy, return paths, strain relief or connector derating are given.",
+      "fix": "Release connector tables, pinouts, wire list, gauges, shielding and grounding rules, HVIL continuity, routing envelopes, bend radii, splice locations and current/temperature derating.",
+      "source_rule_hint": "connector_ICD, vehicle_hvil_ICD and LV/HV harness drawings."
+    },
+    {
+      "id": "H3",
+      "area": "SiC switching and DC-link integrity",
+      "severity": "HIGH",
+      "claim": "The assumed 6.39 nH bus ESL cannot support a SiC voltage-overshoot or switching-loss design decision.",
+      "evidence": "ESL is analytical-only from assumed geometry, spans 4.15–9.9 nH and has no measured result. bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry and module datasheet evidence are OPEN.",
+      "fix": "Freeze terminal and bus geometry, perform 3D parasitic extraction, then correlate double-pulse voltage/current waveforms over DC voltage, current, temperature and gate resistance.",
+      "source_rule_hint": "double_pulse_bus_ESL_measurement, bus_3D_inductance and supplier terminal/module drawings."
+    },
+    {
+      "id": "H4",
+      "area": "Safety discharge and HV isolation",
+      "severity": "HIGH",
+      "claim": "The pack has no demonstrated safe discharge or isolation lifetime.",
+      "evidence": "safety_discharge_test, supplier_isolation_lifetime, resistor_pulse_datasheet and resistor_voltage_derating are OPEN, while the PCB implements zero HV-LV isolation barriers.",
+      "fix": "Define discharge time and touch-voltage requirements, select pulse- and voltage-rated components, calculate lifetime stress and prove discharge and dielectric performance on hardware.",
+      "source_rule_hint": "ISO 6469-3; safety_discharge_test and supplier_isolation_lifetime artefacts."
+    },
+    {
+      "id": "H5",
+      "area": "Cooling-system integration",
+      "severity": "HIGH",
+      "claim": "Coolant availability and circuit integration are unspecified.",
+      "evidence": "FIA_port_xyz, flow_bench and pressure_drop_bench are OPEN. No pump curve, system resistance curve, parallel-branch allocation, coolant specification, degassing strategy or transient inlet-temperature boundary is supplied.",
+      "fix": "Release the vehicle coolant ICD and full system hydraulic model, including pump curve, branch balance, coolant properties, fill/bleed method and worst-case inlet conditions.",
+      "source_rule_hint": "Team/FIA coolant ICD, pump supplier curve and vehicle flow-bench report."
+    },
+    {
+      "id": "H6",
+      "area": "Durability and sealing",
+      "severity": "HIGH",
+      "claim": "Ingress, sealing, fatigue and tribology durability remain unproven.",
+      "evidence": "EMC_IP_test, IP_test, gasket and seal supplier curves, groove detail, sealant strategy, fatigue_test, shaft_fatigue and tribology_test are OPEN.",
+      "fix": "Release seal/groove calculations and conduct pressure cycling, thermal cycling, vibration, ingress, fatigue and lubricant compatibility testing on representative assemblies.",
+      "source_rule_hint": "ISO 20653 ingress testing and component/assembly DVP&R."
+    },
+    {
+      "id": "H7",
+      "area": "Dyno correlation",
+      "severity": "HIGH",
+      "claim": "No physical evidence supports efficiency, torque, loss or thermal performance.",
+      "evidence": "RACE-DYNO remains OPEN and dyno_raw_data_hash is absent. dyno, dyno_resistance and torque_friction_validation are OPEN.",
+      "fix": "Run a calibrated four-quadrant dyno campaign across speed, torque, DC voltage, coolant temperature and field weakening; publish raw channels, uncertainty and calibration certificates.",
+      "source_rule_hint": "RACE-DYNO and DEC-001/DEC-006/DEC-010 evidence requirements."
+    }
+  ],
+  "med_findings": [
+    {
+      "id": "M1",
+      "area": "Evidence governance",
+      "severity": "MED",
+      "claim": "Checklist disposition and proveCatch results are process metadata, not engineering proof.",
+      "evidence": "Coverage is 100%, but 101 physics items and all six evidence races remain OPEN; the digest explicitly states models are not evidence.",
+      "fix": "Attach each requirement to a named supplier, physical-test, regulatory or released-design artefact and preserve every OPEN status until that artefact exists.",
+      "source_rule_hint": "closure_policy and evidence_trail artefact requirements."
+    },
+    {
+      "id": "M2",
+      "area": "Manufacturing readiness",
+      "severity": "MED",
+      "claim": "There is no credible assembly release.",
+      "evidence": "assembly_control_plan, assembly_trials, hairpin_tooling, impregnation_validation, joint_stack_release and surface_finish_release are OPEN.",
+      "fix": "Complete PFMEA, control plan, tooling trials, process capability evidence and released manufacturing specifications.",
+      "source_rule_hint": "IATF 16949/APQP production-part and process-release artefacts."
+    },
+    {
+      "id": "M3",
+      "area": "Dimensional control",
+      "severity": "MED",
+      "claim": "Assembly feasibility is not established by a controlled datum and tolerance system.",
+      "evidence": "GD&T_stack, datum_scheme, bearing_stack_tolerance and joint_stack_release are OPEN.",
+      "fix": "Release datum schemes and worst-case/statistical tolerance stacks for bearings, rotor air gap, gears, seals, connectors and coolant interfaces.",
+      "source_rule_hint": "ASME Y14.5 or ISO GPS drawing set and tolerance-stack report."
+    },
+    {
+      "id": "M4",
+      "area": "Component selection",
+      "severity": "MED",
+      "claim": "Critical parts are placeholders rather than controlled automotive selections.",
+      "evidence": "mpn_selection, resolver_mpn, sensor_mpn, supplier_module_datasheet, cap_ripple_datasheet and oil_supplier_spec are OPEN.",
+      "fix": "Freeze qualified manufacturer part numbers and obtain controlled datasheets, qualification status, derating analyses and approved alternatives.",
+      "source_rule_hint": "Released AVL/BOM and supplier PPAP or qualification dossiers."
+    }
+  ],
+  "physics_checks": [
+    {
+      "quantity": "Phase current I_ph",
+      "claimed": "No auditable formula, waveform convention or value is supplied.",
+      "expected_check": "State whether current is RMS, peak or dq magnitude; derive it from three-phase power using P = 3 V_phase,rms I_phase,rms PF eta or the consistent line-line form, and reconcile it to inverter and machine current limits.",
+      "likely_wrong": false,
+      "why": "There is insufficient evidence to calculate or validate the value; formula-cell counts do not reveal the equation or conventions."
+    },
+    {
+      "quantity": "Torque from power",
+      "claimed": "No auditable torque-speed calculation is supplied.",
+      "expected_check": "Use T = P_mech/omega with omega in rad/s, distinguish electrical input from mechanical output, and apply inverter, motor and gearbox losses only once.",
+      "likely_wrong": false,
+      "why": "No cell formula, units or power-plane definition is exposed, so double-counting and rpm/rad-s errors cannot be excluded."
+    },
+    {
+      "quantity": "Gear ratio and wheel/shaft torque",
+      "claimed": "The second-stage ratio and planet kinematics are OPEN.",
+      "expected_check": "Confirm tooth-count-compatible stage ratios, direction, carrier/ring/sun constraints, overall ratio, mesh efficiency, differential split and reflected inertia.",
+      "likely_wrong": true,
+      "why": "A complete torque and speed path cannot be computed while the second-stage ratio and planetary kinematics are unresolved."
+    },
+    {
+      "quantity": "FIA race energy and power limits",
+      "claimed": "No controlled regulation-derived limit calculation is supplied.",
+      "expected_check": "Apply the exact generation- and event-specific FIA definitions for usable energy, front/rear deployment and regeneration, power limits, measurement point and tolerances.",
+      "likely_wrong": true,
+      "why": "The regulation set is absent and the generation is only assumed, so any FIA energy or power conclusion lacks a valid source baseline."
+    },
+    {
+      "quantity": "Cold-plate source-to-inlet temperature rise",
+      "claimed": "112.5 K nominal, 73.12–174.37 K range at 4318 W.",
+      "expected_check": "Resolve junction-to-case, TIM, baseplate, convection and coolant-bulk resistances separately; verify flow distribution, temperature-dependent coolant properties and transient duty.",
+      "likely_wrong": true,
+      "why": "The result depends on assumed geometry and missing supplier Rth, and its magnitude is incompatible with relying on the concept without redesign and correlation."
+    },
+    {
+      "quantity": "Cold-plate pressure drop",
+      "claimed": "28,501.9 Pa.",
+      "expected_check": "Recalculate from actual channel geometry, roughness, manifolds, bends, fittings, coolant properties and flow, then compare with the vehicle pump/system curve.",
+      "likely_wrong": true,
+      "why": "No actual port geometry, flow-bench correlation, pump curve or vehicle hydraulic allocation exists."
+    },
+    {
+      "quantity": "DC-link bus ESL and SiC overshoot",
+      "claimed": "6.39 nH nominal with 4.15–9.9 nH range.",
+      "expected_check": "Compute V_overshoot = L di/dt using measured commutation-loop ESL and switching di/dt, including module terminals, capacitor ESL and mutual coupling.",
+      "likely_wrong": true,
+      "why": "The geometry and supplier terminal stack are assumed and no double-pulse measurement exists."
+    },
+    {
+      "quantity": "IPMSM field weakening",
+      "claimed": "No voltage-limit, dq-current or MTPV calculation is supplied.",
+      "expected_check": "Use temperature-dependent flux linkage and Ld/Lq maps with DC-bus minimum, modulation limit, current limit and inverter voltage drops to demonstrate the full speed envelope.",
+      "likely_wrong": false,
+      "why": "The necessary electromagnetic maps and calibration are absent, making the speed envelope unauditable rather than numerically falsifiable."
+    },
+    {
+      "quantity": "Magnet demagnetisation margin",
+      "claimed": "No demagnetisation map or controlled magnet grade is supplied.",
+      "expected_check": "Evaluate worst-case negative d-axis current, short-circuit/fault current and rotor temperature against the magnet recoil curve with manufacturing tolerances.",
+      "likely_wrong": false,
+      "why": "Material data and electromagnetic FEA are OPEN, so no defensible margin exists."
+    },
+    {
+      "quantity": "Mass, CG and inertia",
+      "claimed": "No values or calculation basis are supplied.",
+      "expected_check": "Sum controlled part masses and fluids, derive assembly CG and inertia tensors, reconcile CAD values with weighed hardware and include tolerances.",
+      "likely_wrong": false,
+      "why": "The absence of a mass model prevents validation."
+    }
+  ],
+  "excel_traceability": {
+    "verdict": "REJECT — formula-cell presence is not calculation traceability or validation.",
+    "problems": [
+      "Only 8 live inputs and 11 live-plan formulas are identified despite 2370 workbook formula cells; the relationship between these populations is unexplained.",
+      "No cell addresses, formulas, units, named ranges or dependency graph are provided.",
+      "No evidence distinguishes controlled inputs from pasted literals embedded in formula chains.",
+      "No external-link, hidden-sheet, hidden-name, circular-reference, iterative-calculation or macro audit is supplied.",
+      "No independent recalculation proves phase current, torque, gear ratio, losses, thermal results or FIA energy accounting.",
+      "Analytical inputs remain explicitly unvalidated, so live formulas merely propagate unvalidated assumptions.",
+      "The 1324 verdict-formula cells risk circular self-scoring unless separated from engineering calculations and independently reviewed.",
+      "No requirements-to-cell-to-source-document trace matrix is present."
+    ]
+  },
+  "pcb_verdict": {
+    "verdict": "REJECT — not design-fit, not fabrication-ready and not functionally verified.",
+    "problems": [
+      "Zero of six required gate-drive channels are implemented.",
+      "Zero of six desaturation channels are implemented.",
+      "Zero phase-current, resolver, CAN-FD, LV-buck and HV-LV isolation functions are implemented.",
+      "Motor power terminals and verified OEM control-board implementation are absent.",
+      "Supplier Gerbers and manufacturing review remain OPEN.",
+      "No firmware release, MCU pinout, connector pinout or calibration evidence is supplied.",
+      "No populated-board HIL, fault-injection or raw-log hash exists.",
+      "No double-pulse measurement validates SiC switching, bus ESL, gate resistance or voltage overshoot.",
+      "No demonstrated discharge, isolation-lifetime, creepage/clearance or EMC performance exists."
+    ]
+  },
+  "blender_verdict": {
+    "verdict": "REJECT AS ENGINEERING OR SEALED FPK MORPHOLOGY EVIDENCE",
+    "problems": [
+      "Six principal components remain plain cuboids, including the SiC inverter, bus bar and HV connector.",
+      "A 0.7273 authenticity score is an internal model metric, not a dimensional or photorealism acceptance test.",
+      "No sealed Lucid/Atieva FPK training-check output, reference hash or authorized review signature is supplied.",
+      "No matched-camera silhouette, landmark, packaging-clearance or dimensional-deviation analysis exists.",
+      "Photoreal rendering cannot substitute for released CAD, supplier envelopes, connector geometry or interface coordinates.",
+      "The unresolved component geometry prevents reliable clearance, serviceability, harness and coolant routing decisions."
+    ]
+  },
+  "top_10_punchlist_for_fix": [
+    "Replace the zero-channel PCB placeholder with a complete released inverter schematic, layout, BOM, netlist and populated hardware.",
+    "Obtain supplier Gerbers/ODB++, manufacturing drawings and signed DFM review; keep RACE-SUPPLIER-GERBERS OPEN until the supplier package exists.",
+    "Release firmware, calibration and pinout hashes and complete populated-board HIL with raw fault-injection logs; keep RACE-HIL OPEN until physical evidence exists.",
+    "Complete every HV, LV, CAN-FD, resolver, temperature, coolant and HVIL route and freeze connector-level ICDs; keep RACE-TOPOLOGY-COMPLETE OPEN.",
+    "Redesign and validate the cold plate using actual module Rth, controlled CFD and correlated flow/thermal bench data; keep RACE-CFD-COLD-PLATE OPEN.",
+    "Complete IPMSM electromagnetic, core-loss, field-weakening and demagnetisation analyses and correlate them on a calibrated dyno; keep RACE-DYNO OPEN.",
+    "Prove rotor retention, burst, balance and thermal-fit integrity with released FEA and physical overspeed evidence.",
+    "Freeze the transmission ratio, gears, bearings, differential and lubrication architecture and validate the duty-cycle load path.",
+    "Load the controlled FIA regulations and obtain the signed team/FIA interface ICD; keep RACE-FIA-PORT-XYZ and FIA homologation items OPEN.",
+    "Deliver an auditable native workbook plus cell dependency export, controlled input sources, independent physics recalculation and a measured BOM mass/CG/inertia report."
+  ]
+}

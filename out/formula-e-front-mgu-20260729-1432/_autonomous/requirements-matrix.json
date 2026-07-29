@@ -1,0 +1,240 @@
+{
+  "stamped_at": "2026-07-29T19:41:21.080394+00:00",
+  "plan": "docs/plans/JLR-FE-FRONT-FPK-AUTONOMOUS-1-9-2026-07-29.md",
+  "plan_hash": "a9ee59c5d2b5275ee7991b3773364d2987076dfd488f10bb72be114e88adbbaa",
+  "state_hash": "c8a1c734cfe676192f7a2bd3adc00fca2d4d12fa1cbc8845a63bc8c9d6193466",
+  "oa_pdf_harvest": "OPEN_NOT_IMPLEMENTED",
+  "pcb_pipeline_ok_at_start": true,
+  "physics_open_until_at_start": [
+    "CFD_cold_plate",
+    "CFD_jacket",
+    "DEC-006_magnet_retention",
+    "FEA_core_loss",
+    "FEA_em",
+    "FIA_homologation",
+    "FIA_port_xyz",
+    "HIL",
+    "HIL_DEC-008",
+    "bus_3D_inductance",
+    "bus_ESL_measurement",
+    "cap_ripple_datasheet",
+    "channel_implementation",
+    "component_resolution",
+    "connector_ICD",
+    "demag_map",
+    "diff_detail_design",
+    "double_pulse_bench",
+    "dyno",
+    "dyno_resistance",
+    "hairpin_tooling",
+    "insulation_system_cert",
+    "lamination_grade_PO",
+    "microgeometry",
+    "mpn_selection",
+    "pierce_seal_ICD",
+    "pressure_drop_bench",
+    "retention_sleeve_FEA",
+    "rotor_burst_FEA",
+    "shaft_fatigue",
+    "strength_check",
+    "structural_FEA",
+    "supplier_ICD",
+    "supplier_L10",
+    "supplier_gerbers",
+    "supplier_magnet_grade",
+    "supplier_module_datasheet",
+    "tooth_bending_FEA"
+  ],
+  "race_holds": [
+    {
+      "id": "RACE-HIL",
+      "title": "HIL proof on populated PCB",
+      "status": "OPEN",
+      "blocks": [
+        "ship_ok",
+        "SHIPS",
+        "FUNCTIONALLY_VERIFIED"
+      ],
+      "closure_authority": "physical_HIL",
+      "artefact_required": "hil_report_hash"
+    },
+    {
+      "id": "RACE-SUPPLIER-GERBERS",
+      "title": "Supplier Gerbers / manufacturing review",
+      "status": "OPEN",
+      "blocks": [
+        "ship_ok",
+        "SHIPS",
+        "FABRICATION_READY"
+      ],
+      "closure_authority": "supplier_document",
+      "artefact_required": "supplier_gerber_package"
+    },
+    {
+      "id": "RACE-DYNO",
+      "title": "Dyno / DEC performance evidence",
+      "status": "OPEN",
+      "blocks": [
+        "ship_ok",
+        "SHIPS",
+        "DEC-001",
+        "DEC-006",
+        "DEC-010"
+      ],
+      "closure_authority": "physical_dyno",
+      "artefact_required": "dyno_raw_data_hash"
+    },
+    {
+      "id": "RACE-CFD-COLD-PLATE",
+      "title": "Cold-plate CFD correlation",
+      "status": "OPEN",
+      "blocks": [
+        "ship_ok",
+        "thermal_validated"
+      ],
+      "closure_authority": "cfd_plus_bench",
+      "artefact_required": "cfd_report_hash"
+    },
+    {
+      "id": "RACE-FIA-PORT-XYZ",
+      "title": "FIA / chassis interface port millimetres",
+      "status": "OPEN",
+      "blocks": [
+        "homologation",
+        "ICD_XYZ"
+      ],
+      "closure_authority": "FIA_or_team_ICD",
+      "artefact_required": "interface_icd_xyz"
+    },
+    {
+      "id": "RACE-TOPOLOGY-COMPLETE",
+      "title": "HV/coolant/signal topology fully routed",
+      "status": "OPEN",
+      "blocks": [
+        "ship_ok"
+      ],
+      "closure_authority": "SOURCE_topology_proveCatch",
+      "artefact_required": "topology_routed_report"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "item": 1,
+      "title": "Physics tree deepen + 100% checklist disposition",
+      "status": "PROVISIONAL_DONE",
+      "acceptance": "disposition.json covers all checklist paths",
+      "proveCatch": "missing_disposition_path"
+    },
+    {
+      "id": "REQ-2",
+      "item": 2,
+      "title": "Literature claims + corpus hash",
+      "status": "OPEN",
+      "acceptance": "claims > baseline; corpus_hash frozen for P1c",
+      "proveCatch": "literature_quality_floor"
+    },
+    {
+      "id": "REQ-3",
+      "item": 3,
+      "title": "PCB channel-true NOT-FAB-READY",
+      "status": "PROVISIONAL_DONE",
+      "acceptance": "6 gate channels + fitness_fail_reason if fail",
+      "proveCatch": "gate_channels_required"
+    },
+    {
+      "id": "REQ-4",
+      "item": 4,
+      "title": "Bus ESL + cold-plate analytical; CFD OPEN guarded",
+      "status": "PROVISIONAL_DONE",
+      "acceptance": "ESL+uncertainty; CFD_cold_plate in open trail",
+      "proveCatch": "cfd_open_propagates_to_ship_ok"
+    },
+    {
+      "id": "REQ-5",
+      "item": 5,
+      "title": "Topology HV− and coolant-in",
+      "status": "PARTIAL",
+      "acceptance": "edges present or proveCatch fires",
+      "proveCatch": "missing_hv_minus_or_coolant_in"
+    },
+    {
+      "id": "REQ-6",
+      "item": 6,
+      "title": "Mesh authenticity score + residuals",
+      "status": "PROVISIONAL_DONE",
+      "acceptance": "score in state + residual list",
+      "proveCatch": "authenticity_score_absent"
+    },
+    {
+      "id": "REQ-7",
+      "item": 7,
+      "title": "Excel LIVE hashed lineage",
+      "status": "PROVISIONAL_DONE",
+      "acceptance": "LIVE formulas + UNVALIDATED tags",
+      "proveCatch": "excel_all_literal_power_chain"
+    },
+    {
+      "id": "REQ-8",
+      "item": 8,
+      "title": "Evidence trail bidirectional to race IDs",
+      "status": "DONE",
+      "acceptance": "EVIDENCE-TRAIL.md links each OPEN",
+      "proveCatch": "evidence_trail_missing_race_id"
+    },
+    {
+      "id": "REQ-9",
+      "item": 9,
+      "title": "Red-team v3 disposition; no greenwash close",
+      "status": "DONE",
+      "acceptance": "each FATAL dispositioned; OPEN cannot flip without artefact",
+      "proveCatch": "open_closed_without_artefact",
+      "completed_at": "2026-07-29T19:41:21.080394+00:00",
+      "council_artifacts": [
+        "out/formula-e-front-mgu-20260729-1432/_redteam_v3/sol.json",
+        "out/formula-e-front-mgu-20260729-1432/_redteam_v3/glm52.json",
+        "out/formula-e-front-mgu-20260729-1432/_redteam_v3/kimi.json",
+        "out/formula-e-front-mgu-20260729-1432/_redteam_v3/merged.md",
+        "out/formula-e-front-mgu-20260729-1432/_redteam_v3/merged-findings.json"
+      ],
+      "seat_verdicts": {
+        "sol": "REJECT",
+        "glm52": "REJECT",
+        "kimi": "REJECT"
+      },
+      "fatal_disposition_count": 24,
+      "race_open_items_closed": 0,
+      "ship_ok": false,
+      "note": "Council process artefact complete only. Challenge models closed no engineering or evidence race."
+    }
+  ],
+  "regulatory_basis": {
+    "series": "FIA_Formula_E",
+    "generation_assumption": "Gen3_or_Gen3_Evo_forward_study",
+    "fpk_role": "spec_front_powertrain_kit_integration_study",
+    "lucid_atieva_role": "FFF_training_check_only_not_CAD_paste",
+    "regs_on_disk": false,
+    "status": "UNVERIFIED",
+    "forbid_claims": [
+      "FIA_homologated",
+      "Gen3_compliant",
+      "FIA_approved",
+      "SHIPS"
+    ],
+    "note": "No FIA technical regulations PDF held in twin — forbid compliant language."
+  },
+  "ship_ok_policy": {
+    "fail_closed_on": [
+      "RACE-HIL",
+      "RACE-SUPPLIER-GERBERS",
+      "RACE-DYNO",
+      "RACE-CFD-COLD-PLATE",
+      "RACE-FIA-PORT-XYZ",
+      "RACE-TOPOLOGY-COMPLETE",
+      "mandatory_OPEN",
+      "stale_revision",
+      "missing_hash"
+    ],
+    "ship_ok_allowed_while_any_open": false
+  }
+}

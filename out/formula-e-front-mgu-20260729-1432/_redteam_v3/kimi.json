@@ -1,0 +1,123 @@
+{
+  "verdict": "REJECT",
+  "confidence": 97,
+  "fatal_findings": [
+    {
+      "id": "F1",
+      "area": "PCB / inverter control electronics",
+      "severity": "FATAL",
+      "claim": "The traction inverter control board is functionally empty: 0 of 6 gate-drive channels, 0 of 6 desat channels, 0 of 3 phase-current senses, 0 resolver channels, 0 vehicle CAN, 0 of 3 LV buck rails, 0 HV/LV isolation barriers implemented.",
+      "evidence": "pcb.implemented_channel_counts all zero vs required_channel_counts; fitness_fail_reason lists missing roles motor_power_terminals, mcu_cold_plate, oem_inverter_control_board and four '_word' placeholder components with 'no verified implementation'. design_fitness_ok=false while pipeline_ok=true — hygiene passed, engineering absent.",
+      "fix": "Implement all seven required channel roles with named MPNs (isolated gate driver, desat detect, shunt/Hall current sense, resolver interface, CAN FD transceiver, LV rails, creepage/cleared isolation barrier), re-run fitness gate to design_fitness_ok=true, then populate and HIL.",
+      "source_rule_hint": "pcb-stage.json sha256 59cf4c3c...; RACE-HIL; RACE-SUPPLIER-GERBERS; open_until keys mpn_selection, resolver_mpn, sensor_mpn, channel_implementation"
+    },
+    {
+      "id": "F2",
+      "area": "Thermal / SiC cooling viability",
+      "severity": "FATAL",
+      "claim": "As modelled, the cold plate thermally kills the inverter: source-to-inlet delta of 112.5 K nominal with an uncertainty band of 73.1–174.4 K. At any realistic FE coolant inlet (50–65 °C) the nominal case puts SiC junction at ~162–177 °C and the upper bound at ~224–239 °C, beyond any 175 °C-class module. Either the model is wrong or the hardware fails; both possibilities are disqualifying for reliance.",
+      "evidence": "analytical_physics.cold_plate: heat_load_w=4318, pressure_drop_pa=28501.9, source_to_inlet_delta_k=112.5, uncertainty [73.12,174.37], provenance ANALYTICAL_FROM_ASSUMED_GEOMETRY, measured=false; open_until includes CFD_cold_plate, pressure_drop_bench, supplier_module_Rth. No coolant flow rate or inlet temperature is stated anywhere in the digest.",
+      "fix": "Obtain supplier module Rth datasheet, run cold-plate CFD, correlate on flow bench with stated flow rate and inlet temperature, redesign plate until worst-case Tj at max coolant inlet holds margin to module rating; keep analytical tagged UNVALIDATED until correlated.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE (cfd_report_hash, closure_authority cfd_plus_bench); open_until supplier_module_Rth, supplier_module_datasheet, flow_bench, FIA_port_xyz"
+    },
+    {
+      "id": "F3",
+      "area": "Wiring / topology / harness",
+      "severity": "FATAL",
+      "claim": "The electrical topology is incomplete: LV_POWER, CAN_FD, TEMP_WINDING_W and TEMP_INVERTER are unrouted. As delivered there is no low-voltage supply path to the controller, no vehicle comms, and no winding or inverter temperature telemetry — the unit cannot be powered, controlled, or protected.",
+      "evidence": "topology.routed_count=13 of required_count=17; unrouted_edges explicitly [LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER]; race_status OPEN.",
+      "fix": "Route all four remaining edges with connector pinouts and wire sizing, freeze the bay-relative ICD, regenerate topology_routed_report.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE (closure_authority SOURCE_topology_proveCatch); open_until connector_ICD, vehicle_hvil_ICD, pierce_seal_ICD"
+    },
+    {
+      "id": "F4",
+      "area": "Electromagnetics / IPMSM validation",
+      "severity": "FATAL",
+      "claim": "There is no validated electromagnetic design. EM FEA, core-loss FEA, demag map and even the magnet grade are all open. Torque, field-weakening envelope and high-temperature demag margin of the IPMSM are unverifiable; every performance number downstream of the machine is assumption.",
+      "evidence": "open_until includes FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, hairpin_tooling, impregnation_validation, insulation_system_cert. No EM artefact of any kind appears in source_hashes.",
+      "fix": "Place lamination and magnet grade POs, run coupled EM FEA, produce demag map versus temperature at worst-case magnet grade tolerance, validate field-weakening current trajectory, feed core-loss results into the efficiency map.",
+      "source_rule_hint": "open_until FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO; RACE-DYNO blocks DEC-001/DEC-010"
+    },
+    {
+      "id": "F5",
+      "area": "Rotor mechanical integrity / safety",
+      "severity": "FATAL",
+      "claim": "A high-speed IPMSM rotor is offered with no burst FEA, no retention-sleeve FEA, no magnet-retention validation (DEC-006 open) and no balance validation. This is a containment-safety stop: magnet liberation at speed is a lethal failure mode and nothing in the pack addresses it.",
+      "evidence": "open_until includes rotor_burst_FEA, retention_sleeve_FEA, DEC-006_magnet_retention, rotor_balance, balance_validation, shaft_fatigue, strength_check.",
+      "fix": "Run rotor burst and sleeve FEA at max overspeed with temperature-dependent magnet and sleeve properties, spin-pit test to overspeed with containment, balance to grade per ISO 21940, then close DEC-006 with test evidence.",
+      "source_rule_hint": "open_until DEC-006_magnet_retention, rotor_burst_FEA, retention_sleeve_FEA; RACE-DYNO blocks DEC-006"
+    },
+    {
+      "id": "F6",
+      "area": "Regulatory / chassis interface",
+      "severity": "FATAL",
+      "claim": "No FIA technical regulations are held in the twin (regs_on_disk=false, status UNVERIFIED) and no sealed FIA/team interface coordinates exist (RACE-FIA-PORT-XYZ OPEN). Every packaging, mounting and compliance-adjacent statement in the pack is dimensionally unanchored and contractually unusable.",
+      "evidence": "regulatory.regs_on_disk=false; forbid_claims includes Gen3_compliant and FIA_homologated; evidence_trail race RACE-FIA-PORT-XYZ OPEN requiring interface_icd_xyz with closure_authority FIA_or_team_ICD; open_until FIA_homologation, FIA_port_xyz.",
+      "fix": "Obtain the FIA/team ICD with sealed port coordinates in millimetres, place the current FIA Formula E technical regulations PDF in the twin, re-baseline all interfaces to the ICD, and keep compliance language forbidden until homologation evidence exists.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ; regulatory.forbid_claims; open_until FIA_port_xyz, FIA_homologation, halfshaft_spline_ICD, spline_ICD"
+    },
+    {
+      "id": "F7",
+      "area": "Geometry provenance / analytical model validity",
+      "severity": "FATAL",
+      "claim": "The two load-bearing analytical results (bus ESL 6.39 nH, cold-plate thermal) are computed from 'assumed geometry', and the mesh audit shows the corresponding parts — SiC inverter stack, DC-link bus bar, HV connector, pack housing — are plain cuboids. The analytical layer is derived from placeholder boxes; the numbers are not tied to any real shape.",
+      "evidence": "bus_esl.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY and cold_plate.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY; mesh_authenticity.residual_cuboid lists sic_inverter, hv_bus, hv_connector, pack_housing, pack_base, mcu_shelf as plain_cuboid with fix_route build_universal_scene._place_traction_drive_pack_layout; authenticity score 0.7273.",
+      "fix": "Replace all six cuboids with dimensioned CAD from real supplier data (module footprint, laminated bus layout, connector MPN), re-derive ESL and thermal models from the released geometry, and re-run mesh authenticity to 1.0 for principal parts.",
+      "source_rule_hint": "form-meshes.json sha256 0d52805d...; open_until bus_3D_inductance, supplier_terminal_geometry, supplier_module_datasheet"
+    }
+  ],
+  "high_findings": [
+    {
+      "id": "H1",
+      "area": "DC-link / SiC switching",
+      "severity": "HIGH",
+      "claim": "Bus ESL is unmeasured with a ±50% spread (4.15–9.9 nH around 6.39 nH) and no double-pulse evidence. At SiC di/dt of 5–10 A/ns the upper bound implies 50–100 V switching overshoot on the DC bus; margin to a 1200 V module on an ~800–900 V FE bus is unquantified.",
+      "evidence": "analytical_physics.bus_esl: measured=false, range_nh [4.15,9.9], open_until bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry; double_pulse_bench also open.",
+      "fix": "Run double-pulse bench at rated bus voltage and current, extract loop ESL and overshoot, verify module voltage margin with gate-resistor trade, replace analytical ESL with measured value.",
+      "source_rule_hint": "open_until double_pulse_bench, double_pulse_bus_ESL_measurement, bus_ESL_measurement"
+    },
+    {
+      "id": "H2",
+      "area": "Excel traceability",
+      "severity": "HIGH",
+      "claim": "The workbook is live at cell level but starved at input level: 8 live inputs and 11 live-plan formulas against a 254-node physics tree and 2,370 formula cells, with status self-declared LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS. 1,324 verdict cells therefore render judgements on assumptions, not data — GIGO with a live recalculation engine.",
+      "evidence": "excel.live_input_count=8, live_formula_count=11, workbook_formula_cells=2370, verdict_formula_cells=1324, status=LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS; 101 open_until items confirm the input provenance gap.",
+      "fix": "Expand the live-input schema so every physics leaf traces to a named input cell with provenance tag (MEASURED/SUPPLIER/ASSUMED), lock assumed cells with visible flags, and add an independent recalculation check plus sensitivity sweep on the 8 inputs.",
+      "source_rule_hint": "live-check-stats.json sha256 3333cf65...; fpk-excel-live-plan/1; open_until calibration"
+    },
+    {
+      "id": "H3",
+      "area": "Checklist integrity",
+      "severity": "HIGH",
+      "claim": "30.6% of the disposition matrix is duplication: 103 of 337 classified paths are 'duplicate'. The 100% coverage headline is inflated by copies, and 'mapped' (201) is triage, not design completion; 33 paths remain openly unresolved.",
+      "evidence": "checklist_disposition.counts: mapped=201, duplicate=103, open=33; honesty note confirms disposition ≠ designed or validated.",
+      "fix": "De-duplicate the matrix, re-baseline coverage against unique requirement IDs, and publish the 33 open paths as a named gap list with owners and closing artefacts.",
+      "source_rule_hint": "_autonomous/checklist_disposition.json sha256 80376602...; _autonomous/requirements-matrix.json sha256 402af9c9..."
+    },
+    {
+      "id": "H4",
+      "area": "Mass / structural",
+      "severity": "HIGH",
+      "claim": "No mass budget, mass roll-up or CG statement exists anywhere in the digest, and every structural validation (structural_FEA, carrier_FEA, joint_FEA, thermomechanical_FEA, GD&T stack, datum scheme) is open. For a front-axle FE installation, mass and packaging are first-order; the pack is silent.",
+      "evidence": "open_until includes structural_FEA, carrier_FEA, joint_FEA, thermomechanical_FEA, GD&T_stack, datum_scheme, bearing_stack_tolerance; no mass artefact in source_hashes.",
+      "fix": "Produce a component-level mass roll-up with tolerance, CG and inertia statement, structural FEA against race load cases, and a released datum/GD&T scheme.",
+      "source_rule_hint": "open_until structural_FEA, GD&T_stack, datum_scheme, axial_load_case"
+    },
+    {
+      "id": "H5",
+      "area": "Power flow / efficiency",
+      "severity": "HIGH",
+      "claim": "No power-flow artefact exists: source (DC bus), sink (machine phases), regen direction, and loss split between inverter and machine are nowhere evidenced. The single 4,318 W heat load, if taken at a ~250 kW front-axle operating point, implies ~98.3% combined efficiency — an unverified best-case point presented without a loss map.",
+      "evidence": "analytical_physics.cold_plate.heat_load_w=4318 is the only energy-flow number in the digest; FEA_core_loss, double_pulse_bench, dyno and calibration all open; no efficiency map artefact.",
+      "fix": "Publish a full operating-map loss model (inverter + machine, drive and regen) anchored to double-pulse and core-loss FEA, then dyno-correlate; state DC bus voltage, phase current and power factor at each mapped point.",
+      "source_rule_hint": "RACE-DYNO (dyno_raw_data_hash); open_until FEA_core_loss, double_pulse_bench, dyno_resistance"
+    },
+    {
+      "id": "H6",
+      "area": "Transmission / final drive",
+      "severity": "HIGH",
+      "claim": "The gearbox"
+    }
+  ],
+  "_salvaged_from_truncated": true
+}

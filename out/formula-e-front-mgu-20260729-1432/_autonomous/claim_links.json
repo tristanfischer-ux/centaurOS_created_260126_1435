@@ -1,0 +1,595 @@
+{
+  "schema": "fpk-physics-claim-links/v1",
+  "stamped_at": "2026-07-29T19:41:21.080394+00:00",
+  "source_db": "/Users/tristanfischer/.forge-truth/forge-truth.db",
+  "source_table": "fpk_extracted_claims",
+  "product_class": "formula_e_front_mgu",
+  "method": "Exact or normalized component identity; fallback requires >=2 component/topic keyword tokens. No generated claims.",
+  "claim_link_count": 20,
+  "leaf_count_linked": 17,
+  "closure_effect": "NONE — literature links do not close validation, supplier, test, regulatory, or race OPEN items.",
+  "links": [
+    {
+      "leaf_id": "additive_package",
+      "leaf_name": "Gear-oil additive package",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "additive_package"
+      ],
+      "claim_ids": [
+        10
+      ],
+      "claims": [
+        {
+          "claim_id": 10,
+          "document_id": 2579,
+          "claim_kind": "electrical",
+          "component_id": "gear_oil_charge",
+          "topic_id": "ntc_winding_and_oil_temp_sensors",
+          "symbol": "alpha_delay",
+          "expression": "V_DC ~ f(alpha_delay)",
+          "value_text": "The level of the injected DC signal is adjusted by the value of the thyristor delay angle in the soft starter.",
+          "unit": null,
+          "excerpt": "The level of the injected DC signal is adjusted by the value of the delay angle.",
+          "page_hint": null,
+          "confidence": 0.85,
+          "source_detail": "fpk_literature:2579",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "cassette_cover",
+      "leaf_name": "Cassette Cover",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "cassette_cover"
+      ],
+      "claim_ids": [
+        318
+      ],
+      "claims": [
+        {
+          "claim_id": 318,
+          "document_id": 2563,
+          "claim_kind": "material",
+          "component_id": "cassette_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Aluminum Alloy 7050-T7451 used as housing/coupled material",
+          "unit": null,
+          "excerpt": "aluminum alloy (AA) 7050-T7451 coupled to stainless steel (SS) 304",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2563",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        }
+      ]
+    },
+    {
+      "leaf_id": "cover_bolt_set",
+      "leaf_name": "Cover bolt set",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "cover_bolt_set"
+      ],
+      "claim_ids": [
+        280
+      ],
+      "claims": [
+        {
+          "claim_id": 280,
+          "document_id": 2565,
+          "claim_kind": "chemistry",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": "H_uptake",
+          "expression": "H_uptake ∝ i^(1/2)",
+          "value_text": "At low charging currents, hydrogen uptake is proportional to the square root of the charging current density",
+          "unit": "ppm / (A/cm^2)^0.5",
+          "excerpt": "At low charging currents, hydrogen uptake was independent of pH and H2S and proportional to the square root of the charging current density (i1/2).",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2565",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "dowel_set",
+      "leaf_name": "Gearbox housing dowel set",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "dowel_set"
+      ],
+      "claim_ids": [
+        324
+      ],
+      "claims": [
+        {
+          "claim_id": 324,
+          "document_id": 2563,
+          "claim_kind": "material",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "304 Stainless Steel",
+          "unit": null,
+          "excerpt": "coupled to stainless steel (SS) 304 under a droplet of chloride-containing electrolyte",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2563",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "gearbox_cover",
+      "leaf_name": "Gearbox Cover",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "gearbox_cover"
+      ],
+      "claim_ids": [
+        238,
+        457
+      ],
+      "claims": [
+        {
+          "claim_id": 238,
+          "document_id": 2566,
+          "claim_kind": "fea",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Finite element code Marc is used to obtain temperature distribution and effective strain during continuous rolling.",
+          "unit": null,
+          "excerpt": "using finite element code, Marc, the temperature distribution of each rolled bar and effective strain are obtained",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2566",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        },
+        {
+          "claim_id": 457,
+          "document_id": 2556,
+          "claim_kind": "material",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "LM24 aluminum alloy matrix reinforced with 1 wt% aluminum oxide (Al2O3) particles",
+          "unit": "wt%",
+          "excerpt": "The aluminum alloy‐1 wt% aluminum oxide was die cast using LM24 aluminum alloy as the matrix material and aluminum oxide particles of average particle size of 16 μm as a reinforcement material.",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2556",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        }
+      ]
+    },
+    {
+      "leaf_id": "gearbox_housing",
+      "leaf_name": "Gearbox Housing",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "gearbox_housing"
+      ],
+      "claim_ids": [
+        323
+      ],
+      "claims": [
+        {
+          "claim_id": 323,
+          "document_id": 2563,
+          "claim_kind": "material",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Aluminum Alloy 7050-T7451",
+          "unit": null,
+          "excerpt": "aluminum alloy (AA) 7050-T7451 coupled to stainless steel (SS) 304",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2563",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "helicoil_housing_set",
+      "leaf_name": "Housing wire-thread insert set",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "helicoil_housing_set"
+      ],
+      "claim_ids": [
+        346
+      ],
+      "claims": [
+        {
+          "claim_id": 346,
+          "document_id": 2562,
+          "claim_kind": "material",
+          "component_id": "helicoil_insert",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "UNS S13800 (Stainless steel)",
+          "unit": null,
+          "excerpt": "UNS S13800",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2562",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.85
+        }
+      ]
+    },
+    {
+      "leaf_id": "housing_bolt_set",
+      "leaf_name": "Housing bolt set",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "housing_bolt_set"
+      ],
+      "claim_ids": [
+        285
+      ],
+      "claims": [
+        {
+          "claim_id": 285,
+          "document_id": 2564,
+          "claim_kind": "material",
+          "component_id": "helicoil_bolt_preload_al_housing",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "304 Stainless Steel coupled to aluminum alloy",
+          "unit": null,
+          "excerpt": "coupled to 304 stainless steel under a droplet of NaCl",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2564",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "housing_gasket",
+      "leaf_name": "Gearbox housing gasket",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "housing_gasket"
+      ],
+      "claim_ids": [
+        345
+      ],
+      "claims": [
+        {
+          "claim_id": 345,
+          "document_id": 2562,
+          "claim_kind": "material",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "UNS A97075 (Aluminum alloy 7075)",
+          "unit": null,
+          "excerpt": "UNS A97075",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2562",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "inverter_pressure_sensor",
+      "leaf_name": "Cold-plate pressure sensor",
+      "tree_path": [
+        "front_fpk",
+        "mcu_assembly",
+        "inverter_pressure_sensor"
+      ],
+      "claim_ids": [
+        170
+      ],
+      "claims": [
+        {
+          "claim_id": 170,
+          "document_id": 2567,
+          "claim_kind": "material",
+          "component_id": "oem_inverter_control_board",
+          "topic_id": "ntc_winding_and_oil_temp_sensors",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Ternary Mn, Co, Ni oxide along with RuO2",
+          "unit": null,
+          "excerpt": "Negative temperature co‐efficient thermistor powders of ternary Mn, Co, Ni oxide along with RuO2",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2567",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "motor_gearbox_bolt_set",
+      "leaf_name": "Motor-to-gearbox bolt set",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "motor_gearbox_bolt_set"
+      ],
+      "claim_ids": [
+        303
+      ],
+      "claims": [
+        {
+          "claim_id": 303,
+          "document_id": 2564,
+          "claim_kind": "chemistry",
+          "component_id": "gearbox_cover",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Galvanic corrosion occurs between AA7050-T7451 and 304 SS in the presence of NaCl at 97% relative humidity",
+          "unit": null,
+          "excerpt": "galvanic corrosion of aluminum alloy 7050-T7451 and 304 stainless steel under a droplet of NaCl at 97% relative humidity",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2564",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "mounting_ear_set",
+      "leaf_name": "Mounting Ear Set",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "mounting_ear_set"
+      ],
+      "claim_ids": [
+        284,
+        438
+      ],
+      "claims": [
+        {
+          "claim_id": 284,
+          "document_id": 2564,
+          "claim_kind": "material",
+          "component_id": "mounting_ear_set",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Aluminum Alloy 7050-T7451 used in simulated fastener",
+          "unit": null,
+          "excerpt": "aluminum alloy (AA) 7050-T7451 coupled to 304 stainless steel",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2564",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        },
+        {
+          "claim_id": 438,
+          "document_id": 2556,
+          "claim_kind": "geometry",
+          "component_id": "mounting_ear_set",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": "d_particle",
+          "expression": null,
+          "value_text": "16",
+          "unit": "μm",
+          "excerpt": "aluminum oxide particles of average particle size of 16 μm as a reinforcement material",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2556",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        }
+      ]
+    },
+    {
+      "leaf_id": "oil_fluid",
+      "leaf_name": "Gear oil fluid",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "gear_oil_charge",
+        "oil_fluid"
+      ],
+      "claim_ids": [
+        9
+      ],
+      "claims": [
+        {
+          "claim_id": 9,
+          "document_id": 2579,
+          "claim_kind": "thermal",
+          "component_id": "gear_oil_charge",
+          "topic_id": "ntc_winding_and_oil_temp_sensors",
+          "symbol": "T_winding",
+          "expression": "T_winding ~ f(R_winding)",
+          "value_text": "Stator winding temperature can be estimated remotely and sensorlessly from stator winding resistance using DC signal injection.",
+          "unit": null,
+          "excerpt": "The stator winding resistance/temperature is estimated from DC signal injection by changing the gate drive signals of the Thyristor in the soft starter.",
+          "page_hint": null,
+          "confidence": 0.9,
+          "source_detail": "fpk_literature:2579",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "ring_scraper",
+      "leaf_name": "Ring-gear oil scraper",
+      "tree_path": [
+        "front_fpk",
+        "transmission_assembly",
+        "ring_scraper"
+      ],
+      "claim_ids": [
+        11
+      ],
+      "claims": [
+        {
+          "claim_id": 11,
+          "document_id": 2579,
+          "claim_kind": "physics",
+          "component_id": "gear_oil_charge",
+          "topic_id": "ntc_winding_and_oil_temp_sensors",
+          "symbol": null,
+          "expression": "accuracy(T_est) ~ V_DC, torque_pulsation ~ V_DC",
+          "value_text": "Accuracy of stator winding temperature estimation increases with DC signal level, but output torque pulsation also increases.",
+          "unit": null,
+          "excerpt": "The accuracy of stator winding temperature estimation increased with the increase of DC signal level; however the pulsation of the output torque increased also.",
+          "page_hint": null,
+          "confidence": 0.9,
+          "source_detail": "fpk_literature:2579",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "traction_drive_housing",
+      "leaf_name": "Traction Drive Housing",
+      "tree_path": [
+        "front_fpk",
+        "cassette_assembly",
+        "traction_drive_housing"
+      ],
+      "claim_ids": [
+        290,
+        314
+      ],
+      "claims": [
+        {
+          "claim_id": 290,
+          "document_id": 2564,
+          "claim_kind": "material",
+          "component_id": "traction_drive_housing",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Aluminum alloy 7050-T7451 used in simulated fastener",
+          "unit": null,
+          "excerpt": "aluminum alloy (AA) 7050-T7451 coupled to 304 stainless steel",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2564",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        },
+        {
+          "claim_id": 314,
+          "document_id": 2563,
+          "claim_kind": "chemistry",
+          "component_id": "traction_drive_housing",
+          "topic_id": "helicoil_bolt_preload_al_housing",
+          "symbol": null,
+          "expression": null,
+          "value_text": "Galvanic corrosion occurs between AA7050-T7451 and SS304 in chloride environments",
+          "unit": null,
+          "excerpt": "hidden corrosion damage operando on aluminum alloy (AA) 7050-T7451 coupled to stainless steel (SS) 304 under a droplet of chloride-containing electrolyte",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2563",
+          "match_method": "exact_component_id",
+          "match_score": 1.0
+        }
+      ]
+    },
+    {
+      "leaf_id": "winding_ntc_1",
+      "leaf_name": "Winding NTC 1",
+      "tree_path": [
+        "front_fpk",
+        "motor_assembly",
+        "winding_ntc_1"
+      ],
+      "claim_ids": [
+        131
+      ],
+      "claims": [
+        {
+          "claim_id": 131,
+          "document_id": 2570,
+          "claim_kind": "electrical",
+          "component_id": "motor_cooling_jacket",
+          "topic_id": "ntc_winding_and_oil_temp_sensors",
+          "symbol": "UT",
+          "expression": "UT = f(T)",
+          "value_text": "Signal conditioning circuit with NTC thermistor produces temperature-dependent voltage UT",
+          "unit": "V",
+          "excerpt": "a simple signal conditioning circuit with the NTC thermistor is introduced, resulting in a temperature-dependent voltage UT being connected to the MCU’s analog input.",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2570",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    },
+    {
+      "leaf_id": "winding_ntc_2",
+      "leaf_name": "Winding NTC 2",
+      "tree_path": [
+        "front_fpk",
+        "motor_assembly",
+        "winding_ntc_2"
+      ],
+      "claim_ids": [
+        132
+      ],
+      "claims": [
+        {
+          "claim_id": 132,
+          "document_id": 2570,
+          "claim_kind": "formula",
+          "component_id": "motor_cooling_jacket",
+          "topic_id": "ntc_winding_and_oil_temp_sensors",
+          "symbol": "T_calc",
+          "expression": "look-up table | polynomial | B equation | Steinhart-Hart",
+          "value_text": "Four methods for NTC temperature calculation: look-up table, polynomial approximation, B equation, and Steinhart-Hart equation",
+          "unit": null,
+          "excerpt": "resulting in four temperature notations: for a look-up table principle, polynomial approximation, B equation and Steinhart–Hart equation.",
+          "page_hint": null,
+          "confidence": 0.95,
+          "source_detail": "fpk_literature:2570",
+          "match_method": "keyword_component_topic",
+          "match_score": 0.8
+        }
+      ]
+    }
+  ]
+}

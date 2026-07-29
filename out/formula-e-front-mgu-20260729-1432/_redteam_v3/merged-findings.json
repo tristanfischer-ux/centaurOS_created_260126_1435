@@ -1,0 +1,1280 @@
+{
+  "schema": "fpk-redteam-merged/v3",
+  "generated_at": "2026-07-29T19:41:21.080394+00:00",
+  "mode": "CHALLENGE_ONLY",
+  "models": {
+    "glm52": "z-ai/glm-5.2",
+    "sol": "openai/gpt-5.6-sol",
+    "kimi": "moonshotai/kimi-k3"
+  },
+  "seat_verdicts": {
+    "sol": {
+      "verdict": "REJECT",
+      "confidence": 99
+    },
+    "glm52": {
+      "verdict": "REJECT",
+      "confidence": 98
+    },
+    "kimi": {
+      "verdict": "REJECT",
+      "confidence": 97
+    }
+  },
+  "fatal_count": 24,
+  "fatal_dispositions": [
+    {
+      "id": "F1",
+      "area": "PCB / inverter control",
+      "severity": "FATAL",
+      "claim": "The bespoke PCB is not a traction-inverter control design: every required functional channel is absent.",
+      "evidence": "Implemented counts are 0/6 gate-drive channels, 0/6 desaturation channels, 0/3 phase-current channels, 0/1 resolver channel, 0/1 vehicle-CAN channel, 0/3 LV buck rails and 0/1 HV-LV isolation barrier. design_fitness_ok is false.",
+      "fix": "Produce a complete reviewed schematic, PCB database, BOM and netlist implementing all required channels; demonstrate isolation, creepage, clearance, desaturation, current sensing, resolver, CAN-FD and LV-rail operation on populated hardware.",
+      "source_rule_hint": "Named artefacts: released ECAD schematic/database, PCB design review, ISO 6469-3 isolation evidence, IEC 60664-1 insulation-coordination calculation and inverter electrical DVP&R.",
+      "seat": "sol",
+      "uid": "SOL-F1",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL",
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F2",
+      "area": "Gerbers / fabrication release",
+      "severity": "FATAL",
+      "claim": "There is no fabrication-ready supplier PCB package.",
+      "evidence": "RACE-SUPPLIER-GERBERS is OPEN, supplier_gerbers is OPEN, the required supplier_gerber_package does not exist and FABRICATION_READY is explicitly blocked.",
+      "fix": "Obtain the supplier-generated Gerber/ODB++ package, NC drills, stack-up, impedance table, fabrication drawing, assembly data, pick-and-place, BOM, IPC netlist and signed DFM/manufacturing review.",
+      "source_rule_hint": "RACE-SUPPLIER-GERBERS; IPC-2581 or ODB++; IPC-2221, IPC-6012 and IPC-A-610 manufacturing artefacts.",
+      "seat": "sol",
+      "uid": "SOL-F2",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F3",
+      "area": "Firmware / pinout / HIL",
+      "severity": "FATAL",
+      "claim": "No evidence shows that executable inverter firmware, its pinout or its protection behaviour exists on representative hardware.",
+      "evidence": "RACE-HIL and HIL_DEC-008 remain OPEN. The required hil_report_hash is absent. The digest supplies no firmware binary hash, source revision, linker map, MCU pin map, calibration set, bootloader evidence, timing trace, fault-injection result or populated-PCB test record.",
+      "fix": "Freeze the MCU and connector pinouts, release traceable firmware and calibration hashes, populate the PCB, and run HIL fault injection covering PWM, desaturation, overcurrent, resolver faults, CAN loss, watchdogs, shutdown paths and safe-state timing with raw logs.",
+      "source_rule_hint": "RACE-HIL; named artefacts: firmware release manifest, pinout ICD, HIL report and raw-log hash; ISO 26262-6 and ISO 26262-8 configuration-management and verification work products.",
+      "seat": "sol",
+      "uid": "SOL-F3",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F4",
+      "area": "Power and signal topology",
+      "severity": "FATAL",
+      "claim": "The system topology is incomplete and cannot define where all electrical power and critical information enter, are converted or terminate.",
+      "evidence": "Only 13 of 17 required edges are routed. LV_POWER, CAN_FD, TEMP_WINDING_W and TEMP_INVERTER are unrouted, and RACE-TOPOLOGY-COMPLETE remains OPEN. The digest provides no frozen bay-relative ICD.",
+      "fix": "Release a source-to-sink architecture covering HV DC, precharge/discharge, DC link, three phases, LV rails and returns, grounding/shielding, CAN-FD, resolver, all temperatures, coolant and HVIL; route every edge into a connector and pin-level ICD.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE; vehicle_hvil_ICD, connector_ICD, supplier_ICD and interface control drawing.",
+      "seat": "sol",
+      "uid": "SOL-F4",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-TOPOLOGY-COMPLETE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F5",
+      "area": "Thermal / coolant",
+      "severity": "FATAL",
+      "claim": "The inverter thermal concept predicts an unacceptable and unvalidated source-to-coolant temperature rise.",
+      "evidence": "At 4318 W heat load, the analytical model reports 112.5 K source-to-inlet rise with a 73.12–174.37 K uncertainty range. Geometry is assumed, supplier_module_Rth is OPEN, CFD_cold_plate and pressure_drop_bench are OPEN, and the 28.5 kPa pressure drop is uncorrelated.",
+      "fix": "Obtain the actual module transient and steady-state thermal stack, define coolant composition, inlet-temperature envelope, flow, pressure availability and fouling margin, then correlate conjugate CFD against instrumented flow-bench and thermal cycling data.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE; CFD_cold_plate, pressure_drop_bench, supplier_module_Rth and FIA_port_xyz.",
+      "seat": "sol",
+      "uid": "SOL-F5",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-CFD-COLD-PLATE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F6",
+      "area": "Motor electromagnetic design",
+      "severity": "FATAL",
+      "claim": "No validated IPMSM electromagnetic design supports torque, speed, efficiency, field-weakening, demagnetisation or loss claims.",
+      "evidence": "FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO, dyno and calibration are OPEN. No dq maps, back-EMF data, current-angle schedule, voltage ellipse, MTPA/MTPV transition, magnet temperature limit or inverter modulation assumptions are supplied.",
+      "fix": "Release geometry- and material-controlled electromagnetic FEA, dq flux/inductance and loss maps over current, speed and temperature, demagnetisation margins, field-weakening controls and correlated dyno data.",
+      "source_rule_hint": "RACE-DYNO; FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO and calibrated dyno raw data.",
+      "seat": "sol",
+      "uid": "SOL-F6",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F7",
+      "area": "Rotor and magnet mechanical integrity",
+      "severity": "FATAL",
+      "claim": "The rotor cannot be accepted at operating or overspeed because magnet retention, burst strength and balance are unresolved.",
+      "evidence": "DEC-006_magnet_retention, retention_detail, retention_sleeve_FEA, rotor_burst_FEA, thermal_fit_analysis, rotor_balance and balance_validation are OPEN. RACE-DYNO explicitly blocks DEC-006.",
+      "fix": "Define rotor speed and overspeed envelopes, material allowables, interference and temperature stacks; complete nonlinear retention and burst analyses, overspeed testing, balance release and post-test inspection.",
+      "source_rule_hint": "DEC-006; RACE-DYNO; retention_sleeve_FEA, rotor_burst_FEA, thermal_fit_analysis and physical overspeed/balance reports.",
+      "seat": "sol",
+      "uid": "SOL-F7",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F8",
+      "area": "Mechanical transmission",
+      "severity": "FATAL",
+      "claim": "The gear, differential, bearing and lubrication system is not defined sufficiently to transmit the claimed power.",
+      "evidence": "second_stage_ratio, planet_kinematics, bevel_tooth_geometry, microgeometry, tooth bending/contact FEA, bearing reactions, supplier L10, differential detail/load spectrum and lubrication architecture/flow requirements are OPEN.",
+      "fix": "Freeze the complete ratio and kinematic chain, gear geometry and microgeometry, duty-cycle load spectrum, bearing reactions and life, differential architecture, lubrication circuit and efficiency/loss model; validate on rig and dyno.",
+      "source_rule_hint": "Named artefacts: released transmission drawing set, ISO 6336 gear rating, ISO 281 bearing-life calculation, lubrication schematic and correlated rig report.",
+      "seat": "sol",
+      "uid": "SOL-F8",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F9",
+      "area": "FIA and vehicle interfaces",
+      "severity": "FATAL",
+      "claim": "The package cannot be integrated or assessed for Formula E legality because the governing regulations and sealed interface coordinates are absent.",
+      "evidence": "regs_on_disk is false, regulatory status is UNVERIFIED, FIA_homologation and FIA_port_xyz are OPEN, RACE-FIA-PORT-XYZ is OPEN and the generation is only assumed as Gen3_or_Gen3_Evo_forward_study.",
+      "fix": "Load the applicable controlled FIA technical regulations and bulletins, identify every applicable clause, and obtain the team/FIA signed interface ICD with coordinates, envelopes, fluids, connectors, loads and homologation constraints.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ; current controlled FIA Formula E Technical Regulations, FIA bulletins and signed team/FIA interface ICD.",
+      "seat": "sol",
+      "uid": "SOL-F9",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-FIA-PORT-XYZ"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F10",
+      "area": "Physics and spreadsheet auditability",
+      "severity": "FATAL",
+      "claim": "Formula counts do not establish that the workbook calculates the powertrain correctly or that outputs are traceable to controlled inputs.",
+      "evidence": "The digest reports 2370 formula cells, 1324 verdict formula cells, 8 live inputs and 11 live-plan formulas, but supplies no cell-level dependency graph, formula inventory, named-range map, external-link report or recalculation comparison. Core equations for phase current, torque, gear conversion and FIA energy are not exposed.",
+      "fix": "Deliver the native workbook and a machine-readable cell audit showing every input, unit, formula, dependency, external link and output; independently recalculate all safety- and performance-critical equations and lock controlled constants to source documents.",
+      "source_rule_hint": "Named artefacts: native XLSX, formula/dependency export, external-link report, unit audit, independent calculation note and signed requirements-to-cell trace matrix.",
+      "seat": "sol",
+      "uid": "SOL-F10",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F11",
+      "area": "Mass properties",
+      "severity": "FATAL",
+      "claim": "No defensible mass, centre-of-gravity or inertia model exists for vehicle development.",
+      "evidence": "The digest provides no component mass table, measured masses, material-density provenance, fastener/fluid/harness allowances, centre of gravity, rotor inertia, tolerance or target margin. Several principal geometries remain plain cuboids and component_resolution is OPEN.",
+      "fix": "Release a part-numbered mass roll-up tied to CAD/BOM materials and measured supplier parts, including fluids, harnesses, connectors, fasteners and manufacturing tolerances; provide assembly mass, CG and inertia tensors with margin.",
+      "source_rule_hint": "Named artefacts: controlled BOM mass report, CAD mass-properties export, supplier weigh certificates and physical assembly weigh report.",
+      "seat": "sol",
+      "uid": "SOL-F11",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F1",
+      "area": "PCB / Gate Drive Implementation",
+      "severity": "FATAL",
+      "claim": "The bespoke PCB requires 6 gate-drive channels, 6 desat channels, 3 phase-current sense channels, 1 resolver channel, 1 vehicle CAN, 3 LV buck rails, and 1 HV/LV isolation barrier. ALL implemented counts are zero.",
+      "evidence": "pcb.implemented_channel_counts shows every channel type at 0. pcb.fitness_fail_reason explicitly lists every missing role. design_fitness_ok=false. RACE-HIL and RACE-SUPPLIER-GERBERS are both OPEN with no artefact.",
+      "fix": "Design and lay out actual gate-drive circuitry with desat, phase-current sense, resolver interface, CAN-FD, LV buck, and isolation barrier. Produce Gerbers. Populate board. Run HIL. Hash logs. Until then this is a blank board.",
+      "source_rule_hint": "RACE-HIL artefact_required=hil_report_hash; RACE-SUPPLIER-GERBERS artefact_required=supplier_gerber_package",
+      "seat": "glm52",
+      "uid": "GLM52-F1",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL",
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F2",
+      "area": "Thermal / Cold-Plate CFD",
+      "severity": "FATAL",
+      "claim": "Cold-plate thermal analysis is ANALYTICAL_ONLY from assumed geometry. Source-to-inlet delta of 112.5 K with uncertainty spanning 73.12–174.37 K. No CFD, no flow-bench correlation.",
+      "evidence": "analytical_physics.cold_plate.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY. validation_status=ANALYTICAL_ONLY. measured=false. open_until includes CFD_cold_plate, pressure_drop_bench, supplier_module_Rth, FIA_port_xyz. ship_gate.proveCatch_fired=true, ship_ok=false.",
+      "fix": "Run conjugate heat-transfer CFD on actual cold-plate geometry with supplier module Rth. Correlate on flow bench with instrumented heat source. Reduce uncertainty band below ±10 K before any design freeze.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE artefact_required=cfd_report_hash, closure_authority=cfd_plus_bench",
+      "seat": "glm52",
+      "uid": "GLM52-F2",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-CFD-COLD-PLATE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F3",
+      "area": "Topology / Harness Completeness",
+      "severity": "FATAL",
+      "claim": "4 of 17 required topology edges are unrouted: LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER. The powertrain has no LV power distribution, no vehicle communication, and no thermal sensing on either winding or inverter.",
+      "evidence": "topology.routed_count=13, required_count=17, unrouted_count=4. unrouted_edges listed explicitly. race_status=OPEN. RACE-TOPOLOGY-COMPLETE blocks ship_ok.",
+      "fix": "Route all 4 missing edges. Define LV power distribution architecture. Specify CAN-FD transceiver and connector. Place winding and inverter temperature sensors with signal routing. Freeze bay-relative ICD.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE artefact_required=topology_routed_report",
+      "seat": "glm52",
+      "uid": "GLM52-F3",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-TOPOLOGY-COMPLETE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F4",
+      "area": "Regulatory / FIA Compliance",
+      "severity": "FATAL",
+      "claim": "No FIA technical regulations PDF exists in the digital twin. The pack claims to be a Formula E front MGU integration study but has zero regulatory grounding.",
+      "evidence": "regulatory.regs_on_disk=false. status=UNVERIFIED. forbid_claims includes FIA_homologated, Gen3_compliant, FIA_approved, SHIPS. FIA_homologation and FIA_port_xyz are in open_until list.",
+      "fix": "Obtain current FIA Formula E technical regulations PDF. Load into twin. Extract and map every applicable rule to a physics node. Obtain team/FIA ICD with sealed chassis interface coordinates in mm.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ artefact_required=interface_icd_xyz, closure_authority=FIA_or_team_ICD",
+      "seat": "glm52",
+      "uid": "GLM52-F4",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept that no controlled FIA regulations or homologation evidence is held, so compliance reliance is blocked. “Zero regulatory grounding” overstates the record because a declared UNVERIFIED regulatory basis exists; it is not controlled evidence.",
+      "race_ids": [
+        "RACE-FIA-PORT-XYZ"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F5",
+      "area": "Electromagnetic / Machine Design",
+      "severity": "FATAL",
+      "claim": "No electromagnetic FEA has been performed. No demag map, no magnet retention validation, no rotor burst FEA, no core loss FEA. The IPMSM is entirely unevaluated electromagnetically.",
+      "evidence": "open_until includes FEA_em, FEA_core_loss, demag_map, DEC-006_magnet_retention, rotor_burst_FEA, supplier_magnet_grade. 101 open_until items total. No dyno data exists.",
+      "fix": "Run 2D/3D electromagnetic FEA across full operating envelope including field weakening. Produce demag safety map. Validate magnet retention at max speed. Run rotor burst analysis. Obtain supplier magnet grade certificate. Run dyno campaign with raw data hash.",
+      "source_rule_hint": "RACE-DYNO artefact_required=dyno_raw_data_hash, blocks DEC-001, DEC-006, DEC-010",
+      "seat": "glm52",
+      "uid": "GLM52-F5",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept the absence of validated EM FEA, demag, material certification and dyno correlation. “Entirely unevaluated” overstates the record because analytical tree seeds exist; those seeds are not validation.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F6",
+      "area": "Bus Bar ESL / Power Loop Inductance",
+      "severity": "FATAL",
+      "claim": "DC-link bus bar ESL is analytical-only from assumed geometry at 6.39 nH with a range of 4.15–9.9 nH. No 3D inductance extraction, no double-pulse measurement, no supplier terminal geometry.",
+      "evidence": "analytical_physics.bus_esl.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY. validation_status=ANALYTICAL_ONLY. measured=false. open_until includes bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry.",
+      "fix": "Obtain supplier terminal geometry ICD. Run 3D Q3D inductance extraction on actual bus bar geometry. Perform double-pulse test on populated power stage. Measure actual ESL. Correlate analytical model.",
+      "source_rule_hint": "open_until: bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry",
+      "seat": "glm52",
+      "uid": "GLM52-F6",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F1",
+      "area": "PCB / inverter control electronics",
+      "severity": "FATAL",
+      "claim": "The traction inverter control board is functionally empty: 0 of 6 gate-drive channels, 0 of 6 desat channels, 0 of 3 phase-current senses, 0 resolver channels, 0 vehicle CAN, 0 of 3 LV buck rails, 0 HV/LV isolation barriers implemented.",
+      "evidence": "pcb.implemented_channel_counts all zero vs required_channel_counts; fitness_fail_reason lists missing roles motor_power_terminals, mcu_cold_plate, oem_inverter_control_board and four '_word' placeholder components with 'no verified implementation'. design_fitness_ok=false while pipeline_ok=true — hygiene passed, engineering absent.",
+      "fix": "Implement all seven required channel roles with named MPNs (isolated gate driver, desat detect, shunt/Hall current sense, resolver interface, CAN FD transceiver, LV rails, creepage/cleared isolation barrier), re-run fitness gate to design_fitness_ok=true, then populate and HIL.",
+      "source_rule_hint": "pcb-stage.json sha256 59cf4c3c...; RACE-HIL; RACE-SUPPLIER-GERBERS; open_until keys mpn_selection, resolver_mpn, sensor_mpn, channel_implementation",
+      "seat": "kimi",
+      "uid": "KIMI-F1",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL",
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F2",
+      "area": "Thermal / SiC cooling viability",
+      "severity": "FATAL",
+      "claim": "As modelled, the cold plate thermally kills the inverter: source-to-inlet delta of 112.5 K nominal with an uncertainty band of 73.1–174.4 K. At any realistic FE coolant inlet (50–65 °C) the nominal case puts SiC junction at ~162–177 °C and the upper bound at ~224–239 °C, beyond any 175 °C-class module. Either the model is wrong or the hardware fails; both possibilities are disqualifying for reliance.",
+      "evidence": "analytical_physics.cold_plate: heat_load_w=4318, pressure_drop_pa=28501.9, source_to_inlet_delta_k=112.5, uncertainty [73.12,174.37], provenance ANALYTICAL_FROM_ASSUMED_GEOMETRY, measured=false; open_until includes CFD_cold_plate, pressure_drop_bench, supplier_module_Rth. No coolant flow rate or inlet temperature is stated anywhere in the digest.",
+      "fix": "Obtain supplier module Rth datasheet, run cold-plate CFD, correlate on flow bench with stated flow rate and inlet temperature, redesign plate until worst-case Tj at max coolant inlet holds margin to module rating; keep analytical tagged UNVALIDATED until correlated.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE (cfd_report_hash, closure_authority cfd_plus_bench); open_until supplier_module_Rth, supplier_module_datasheet, flow_bench, FIA_port_xyz",
+      "seat": "kimi",
+      "uid": "KIMI-F2",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept the thermal closure blocker and required CFD/bench/supplier-Rth route. Reject the claimed junction temperatures: the source model ends at the module source interface and explicitly excludes junction-to-case Rth; the live state also specifies 12 L/min and 60 °C, which the digest did not expose. This correction does not reduce the OPEN severity.",
+      "race_ids": [
+        "RACE-CFD-COLD-PLATE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F3",
+      "area": "Wiring / topology / harness",
+      "severity": "FATAL",
+      "claim": "The electrical topology is incomplete: LV_POWER, CAN_FD, TEMP_WINDING_W and TEMP_INVERTER are unrouted. As delivered there is no low-voltage supply path to the controller, no vehicle comms, and no winding or inverter temperature telemetry — the unit cannot be powered, controlled, or protected.",
+      "evidence": "topology.routed_count=13 of required_count=17; unrouted_edges explicitly [LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER]; race_status OPEN.",
+      "fix": "Route all four remaining edges with connector pinouts and wire sizing, freeze the bay-relative ICD, regenerate topology_routed_report.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE (closure_authority SOURCE_topology_proveCatch); open_until connector_ICD, vehicle_hvil_ICD, pierce_seal_ICD",
+      "seat": "kimi",
+      "uid": "KIMI-F3",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-TOPOLOGY-COMPLETE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F4",
+      "area": "Electromagnetics / IPMSM validation",
+      "severity": "FATAL",
+      "claim": "There is no validated electromagnetic design. EM FEA, core-loss FEA, demag map and even the magnet grade are all open. Torque, field-weakening envelope and high-temperature demag margin of the IPMSM are unverifiable; every performance number downstream of the machine is assumption.",
+      "evidence": "open_until includes FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, hairpin_tooling, impregnation_validation, insulation_system_cert. No EM artefact of any kind appears in source_hashes.",
+      "fix": "Place lamination and magnet grade POs, run coupled EM FEA, produce demag map versus temperature at worst-case magnet grade tolerance, validate field-weakening current trajectory, feed core-loss results into the efficiency map.",
+      "source_rule_hint": "open_until FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO; RACE-DYNO blocks DEC-001/DEC-010",
+      "seat": "kimi",
+      "uid": "KIMI-F4",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F5",
+      "area": "Rotor mechanical integrity / safety",
+      "severity": "FATAL",
+      "claim": "A high-speed IPMSM rotor is offered with no burst FEA, no retention-sleeve FEA, no magnet-retention validation (DEC-006 open) and no balance validation. This is a containment-safety stop: magnet liberation at speed is a lethal failure mode and nothing in the pack addresses it.",
+      "evidence": "open_until includes rotor_burst_FEA, retention_sleeve_FEA, DEC-006_magnet_retention, rotor_balance, balance_validation, shaft_fatigue, strength_check.",
+      "fix": "Run rotor burst and sleeve FEA at max overspeed with temperature-dependent magnet and sleeve properties, spin-pit test to overspeed with containment, balance to grade per ISO 21940, then close DEC-006 with test evidence.",
+      "source_rule_hint": "open_until DEC-006_magnet_retention, rotor_burst_FEA, retention_sleeve_FEA; RACE-DYNO blocks DEC-006",
+      "seat": "kimi",
+      "uid": "KIMI-F5",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F6",
+      "area": "Regulatory / chassis interface",
+      "severity": "FATAL",
+      "claim": "No FIA technical regulations are held in the twin (regs_on_disk=false, status UNVERIFIED) and no sealed FIA/team interface coordinates exist (RACE-FIA-PORT-XYZ OPEN). Every packaging, mounting and compliance-adjacent statement in the pack is dimensionally unanchored and contractually unusable.",
+      "evidence": "regulatory.regs_on_disk=false; forbid_claims includes Gen3_compliant and FIA_homologated; evidence_trail race RACE-FIA-PORT-XYZ OPEN requiring interface_icd_xyz with closure_authority FIA_or_team_ICD; open_until FIA_homologation, FIA_port_xyz.",
+      "fix": "Obtain the FIA/team ICD with sealed port coordinates in millimetres, place the current FIA Formula E technical regulations PDF in the twin, re-baseline all interfaces to the ICD, and keep compliance language forbidden until homologation evidence exists.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ; regulatory.forbid_claims; open_until FIA_port_xyz, FIA_homologation, halfshaft_spline_ICD, spline_ICD",
+      "seat": "kimi",
+      "uid": "KIMI-F6",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-FIA-PORT-XYZ"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F7",
+      "area": "Geometry provenance / analytical model validity",
+      "severity": "FATAL",
+      "claim": "The two load-bearing analytical results (bus ESL 6.39 nH, cold-plate thermal) are computed from 'assumed geometry', and the mesh audit shows the corresponding parts — SiC inverter stack, DC-link bus bar, HV connector, pack housing — are plain cuboids. The analytical layer is derived from placeholder boxes; the numbers are not tied to any real shape.",
+      "evidence": "bus_esl.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY and cold_plate.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY; mesh_authenticity.residual_cuboid lists sic_inverter, hv_bus, hv_connector, pack_housing, pack_base, mcu_shelf as plain_cuboid with fix_route build_universal_scene._place_traction_drive_pack_layout; authenticity score 0.7273.",
+      "fix": "Replace all six cuboids with dimensioned CAD from real supplier data (module footprint, laminated bus layout, connector MPN), re-derive ESL and thermal models from the released geometry, and re-run mesh authenticity to 1.0 for principal parts.",
+      "source_rule_hint": "form-meshes.json sha256 0d52805d...; open_until bus_3D_inductance, supplier_terminal_geometry, supplier_module_datasheet",
+      "seat": "kimi",
+      "uid": "KIMI-F7",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept that analytical geometry lacks released supplier/CAD authority and that six principal render meshes remain cuboids. The digest does not prove the analytical equations literally consume those Blender cuboids, so that causal statement is not accepted. Supplier geometry, 3D extraction and correlated tests remain mandatory.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    }
+  ],
+  "all_findings": [
+    {
+      "id": "F1",
+      "area": "PCB / inverter control",
+      "severity": "FATAL",
+      "claim": "The bespoke PCB is not a traction-inverter control design: every required functional channel is absent.",
+      "evidence": "Implemented counts are 0/6 gate-drive channels, 0/6 desaturation channels, 0/3 phase-current channels, 0/1 resolver channel, 0/1 vehicle-CAN channel, 0/3 LV buck rails and 0/1 HV-LV isolation barrier. design_fitness_ok is false.",
+      "fix": "Produce a complete reviewed schematic, PCB database, BOM and netlist implementing all required channels; demonstrate isolation, creepage, clearance, desaturation, current sensing, resolver, CAN-FD and LV-rail operation on populated hardware.",
+      "source_rule_hint": "Named artefacts: released ECAD schematic/database, PCB design review, ISO 6469-3 isolation evidence, IEC 60664-1 insulation-coordination calculation and inverter electrical DVP&R.",
+      "seat": "sol",
+      "uid": "SOL-F1",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL",
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F2",
+      "area": "Gerbers / fabrication release",
+      "severity": "FATAL",
+      "claim": "There is no fabrication-ready supplier PCB package.",
+      "evidence": "RACE-SUPPLIER-GERBERS is OPEN, supplier_gerbers is OPEN, the required supplier_gerber_package does not exist and FABRICATION_READY is explicitly blocked.",
+      "fix": "Obtain the supplier-generated Gerber/ODB++ package, NC drills, stack-up, impedance table, fabrication drawing, assembly data, pick-and-place, BOM, IPC netlist and signed DFM/manufacturing review.",
+      "source_rule_hint": "RACE-SUPPLIER-GERBERS; IPC-2581 or ODB++; IPC-2221, IPC-6012 and IPC-A-610 manufacturing artefacts.",
+      "seat": "sol",
+      "uid": "SOL-F2",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F3",
+      "area": "Firmware / pinout / HIL",
+      "severity": "FATAL",
+      "claim": "No evidence shows that executable inverter firmware, its pinout or its protection behaviour exists on representative hardware.",
+      "evidence": "RACE-HIL and HIL_DEC-008 remain OPEN. The required hil_report_hash is absent. The digest supplies no firmware binary hash, source revision, linker map, MCU pin map, calibration set, bootloader evidence, timing trace, fault-injection result or populated-PCB test record.",
+      "fix": "Freeze the MCU and connector pinouts, release traceable firmware and calibration hashes, populate the PCB, and run HIL fault injection covering PWM, desaturation, overcurrent, resolver faults, CAN loss, watchdogs, shutdown paths and safe-state timing with raw logs.",
+      "source_rule_hint": "RACE-HIL; named artefacts: firmware release manifest, pinout ICD, HIL report and raw-log hash; ISO 26262-6 and ISO 26262-8 configuration-management and verification work products.",
+      "seat": "sol",
+      "uid": "SOL-F3",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F4",
+      "area": "Power and signal topology",
+      "severity": "FATAL",
+      "claim": "The system topology is incomplete and cannot define where all electrical power and critical information enter, are converted or terminate.",
+      "evidence": "Only 13 of 17 required edges are routed. LV_POWER, CAN_FD, TEMP_WINDING_W and TEMP_INVERTER are unrouted, and RACE-TOPOLOGY-COMPLETE remains OPEN. The digest provides no frozen bay-relative ICD.",
+      "fix": "Release a source-to-sink architecture covering HV DC, precharge/discharge, DC link, three phases, LV rails and returns, grounding/shielding, CAN-FD, resolver, all temperatures, coolant and HVIL; route every edge into a connector and pin-level ICD.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE; vehicle_hvil_ICD, connector_ICD, supplier_ICD and interface control drawing.",
+      "seat": "sol",
+      "uid": "SOL-F4",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-TOPOLOGY-COMPLETE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F5",
+      "area": "Thermal / coolant",
+      "severity": "FATAL",
+      "claim": "The inverter thermal concept predicts an unacceptable and unvalidated source-to-coolant temperature rise.",
+      "evidence": "At 4318 W heat load, the analytical model reports 112.5 K source-to-inlet rise with a 73.12–174.37 K uncertainty range. Geometry is assumed, supplier_module_Rth is OPEN, CFD_cold_plate and pressure_drop_bench are OPEN, and the 28.5 kPa pressure drop is uncorrelated.",
+      "fix": "Obtain the actual module transient and steady-state thermal stack, define coolant composition, inlet-temperature envelope, flow, pressure availability and fouling margin, then correlate conjugate CFD against instrumented flow-bench and thermal cycling data.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE; CFD_cold_plate, pressure_drop_bench, supplier_module_Rth and FIA_port_xyz.",
+      "seat": "sol",
+      "uid": "SOL-F5",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-CFD-COLD-PLATE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F6",
+      "area": "Motor electromagnetic design",
+      "severity": "FATAL",
+      "claim": "No validated IPMSM electromagnetic design supports torque, speed, efficiency, field-weakening, demagnetisation or loss claims.",
+      "evidence": "FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO, dyno and calibration are OPEN. No dq maps, back-EMF data, current-angle schedule, voltage ellipse, MTPA/MTPV transition, magnet temperature limit or inverter modulation assumptions are supplied.",
+      "fix": "Release geometry- and material-controlled electromagnetic FEA, dq flux/inductance and loss maps over current, speed and temperature, demagnetisation margins, field-weakening controls and correlated dyno data.",
+      "source_rule_hint": "RACE-DYNO; FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO and calibrated dyno raw data.",
+      "seat": "sol",
+      "uid": "SOL-F6",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F7",
+      "area": "Rotor and magnet mechanical integrity",
+      "severity": "FATAL",
+      "claim": "The rotor cannot be accepted at operating or overspeed because magnet retention, burst strength and balance are unresolved.",
+      "evidence": "DEC-006_magnet_retention, retention_detail, retention_sleeve_FEA, rotor_burst_FEA, thermal_fit_analysis, rotor_balance and balance_validation are OPEN. RACE-DYNO explicitly blocks DEC-006.",
+      "fix": "Define rotor speed and overspeed envelopes, material allowables, interference and temperature stacks; complete nonlinear retention and burst analyses, overspeed testing, balance release and post-test inspection.",
+      "source_rule_hint": "DEC-006; RACE-DYNO; retention_sleeve_FEA, rotor_burst_FEA, thermal_fit_analysis and physical overspeed/balance reports.",
+      "seat": "sol",
+      "uid": "SOL-F7",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F8",
+      "area": "Mechanical transmission",
+      "severity": "FATAL",
+      "claim": "The gear, differential, bearing and lubrication system is not defined sufficiently to transmit the claimed power.",
+      "evidence": "second_stage_ratio, planet_kinematics, bevel_tooth_geometry, microgeometry, tooth bending/contact FEA, bearing reactions, supplier L10, differential detail/load spectrum and lubrication architecture/flow requirements are OPEN.",
+      "fix": "Freeze the complete ratio and kinematic chain, gear geometry and microgeometry, duty-cycle load spectrum, bearing reactions and life, differential architecture, lubrication circuit and efficiency/loss model; validate on rig and dyno.",
+      "source_rule_hint": "Named artefacts: released transmission drawing set, ISO 6336 gear rating, ISO 281 bearing-life calculation, lubrication schematic and correlated rig report.",
+      "seat": "sol",
+      "uid": "SOL-F8",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F9",
+      "area": "FIA and vehicle interfaces",
+      "severity": "FATAL",
+      "claim": "The package cannot be integrated or assessed for Formula E legality because the governing regulations and sealed interface coordinates are absent.",
+      "evidence": "regs_on_disk is false, regulatory status is UNVERIFIED, FIA_homologation and FIA_port_xyz are OPEN, RACE-FIA-PORT-XYZ is OPEN and the generation is only assumed as Gen3_or_Gen3_Evo_forward_study.",
+      "fix": "Load the applicable controlled FIA technical regulations and bulletins, identify every applicable clause, and obtain the team/FIA signed interface ICD with coordinates, envelopes, fluids, connectors, loads and homologation constraints.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ; current controlled FIA Formula E Technical Regulations, FIA bulletins and signed team/FIA interface ICD.",
+      "seat": "sol",
+      "uid": "SOL-F9",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-FIA-PORT-XYZ"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F10",
+      "area": "Physics and spreadsheet auditability",
+      "severity": "FATAL",
+      "claim": "Formula counts do not establish that the workbook calculates the powertrain correctly or that outputs are traceable to controlled inputs.",
+      "evidence": "The digest reports 2370 formula cells, 1324 verdict formula cells, 8 live inputs and 11 live-plan formulas, but supplies no cell-level dependency graph, formula inventory, named-range map, external-link report or recalculation comparison. Core equations for phase current, torque, gear conversion and FIA energy are not exposed.",
+      "fix": "Deliver the native workbook and a machine-readable cell audit showing every input, unit, formula, dependency, external link and output; independently recalculate all safety- and performance-critical equations and lock controlled constants to source documents.",
+      "source_rule_hint": "Named artefacts: native XLSX, formula/dependency export, external-link report, unit audit, independent calculation note and signed requirements-to-cell trace matrix.",
+      "seat": "sol",
+      "uid": "SOL-F10",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F11",
+      "area": "Mass properties",
+      "severity": "FATAL",
+      "claim": "No defensible mass, centre-of-gravity or inertia model exists for vehicle development.",
+      "evidence": "The digest provides no component mass table, measured masses, material-density provenance, fastener/fluid/harness allowances, centre of gravity, rotor inertia, tolerance or target margin. Several principal geometries remain plain cuboids and component_resolution is OPEN.",
+      "fix": "Release a part-numbered mass roll-up tied to CAD/BOM materials and measured supplier parts, including fluids, harnesses, connectors, fasteners and manufacturing tolerances; provide assembly mass, CG and inertia tensors with margin.",
+      "source_rule_hint": "Named artefacts: controlled BOM mass report, CAD mass-properties export, supplier weigh certificates and physical assembly weigh report.",
+      "seat": "sol",
+      "uid": "SOL-F11",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "H1",
+      "area": "Blender / morphology authenticity",
+      "severity": "HIGH",
+      "claim": "The Blender representation is unsuitable as a sealed FPK morphology or packaging reference.",
+      "evidence": "Authenticity is 0.7273 and six principal objects remain plain cuboids, including the SiC inverter, DC-link bus bar and HV connector. No sealed Lucid/Atieva reference captures, silhouette comparison, dimensional deviation report or review signature are present.",
+      "fix": "Replace proxies with dimensionally controlled component morphology and run a sealed, camera-matched comparison against the authorized Lucid/Atieva training reference without copying proprietary CAD.",
+      "source_rule_hint": "Named artefact: sealed FPK morphology training-check report with reference hashes, camera parameters and signed deviations.",
+      "seat": "sol",
+      "uid": "SOL-H1",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H2",
+      "area": "Harness completeness",
+      "severity": "HIGH",
+      "claim": "No production-relevant harness design supports the electrical topology.",
+      "evidence": "CAN-FD, LV power and two temperature channels remain unrouted. connector_ICD, vehicle_hvil_ICD, sensor_mpn and supplier_ICD are OPEN. No wire gauges, shielding, twisted-pair rules, splice strategy, return paths, strain relief or connector derating are given.",
+      "fix": "Release connector tables, pinouts, wire list, gauges, shielding and grounding rules, HVIL continuity, routing envelopes, bend radii, splice locations and current/temperature derating.",
+      "source_rule_hint": "connector_ICD, vehicle_hvil_ICD and LV/HV harness drawings.",
+      "seat": "sol",
+      "uid": "SOL-H2",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H3",
+      "area": "SiC switching and DC-link integrity",
+      "severity": "HIGH",
+      "claim": "The assumed 6.39 nH bus ESL cannot support a SiC voltage-overshoot or switching-loss design decision.",
+      "evidence": "ESL is analytical-only from assumed geometry, spans 4.15–9.9 nH and has no measured result. bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry and module datasheet evidence are OPEN.",
+      "fix": "Freeze terminal and bus geometry, perform 3D parasitic extraction, then correlate double-pulse voltage/current waveforms over DC voltage, current, temperature and gate resistance.",
+      "source_rule_hint": "double_pulse_bus_ESL_measurement, bus_3D_inductance and supplier terminal/module drawings.",
+      "seat": "sol",
+      "uid": "SOL-H3",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H4",
+      "area": "Safety discharge and HV isolation",
+      "severity": "HIGH",
+      "claim": "The pack has no demonstrated safe discharge or isolation lifetime.",
+      "evidence": "safety_discharge_test, supplier_isolation_lifetime, resistor_pulse_datasheet and resistor_voltage_derating are OPEN, while the PCB implements zero HV-LV isolation barriers.",
+      "fix": "Define discharge time and touch-voltage requirements, select pulse- and voltage-rated components, calculate lifetime stress and prove discharge and dielectric performance on hardware.",
+      "source_rule_hint": "ISO 6469-3; safety_discharge_test and supplier_isolation_lifetime artefacts.",
+      "seat": "sol",
+      "uid": "SOL-H4",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H5",
+      "area": "Cooling-system integration",
+      "severity": "HIGH",
+      "claim": "Coolant availability and circuit integration are unspecified.",
+      "evidence": "FIA_port_xyz, flow_bench and pressure_drop_bench are OPEN. No pump curve, system resistance curve, parallel-branch allocation, coolant specification, degassing strategy or transient inlet-temperature boundary is supplied.",
+      "fix": "Release the vehicle coolant ICD and full system hydraulic model, including pump curve, branch balance, coolant properties, fill/bleed method and worst-case inlet conditions.",
+      "source_rule_hint": "Team/FIA coolant ICD, pump supplier curve and vehicle flow-bench report.",
+      "seat": "sol",
+      "uid": "SOL-H5",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H6",
+      "area": "Durability and sealing",
+      "severity": "HIGH",
+      "claim": "Ingress, sealing, fatigue and tribology durability remain unproven.",
+      "evidence": "EMC_IP_test, IP_test, gasket and seal supplier curves, groove detail, sealant strategy, fatigue_test, shaft_fatigue and tribology_test are OPEN.",
+      "fix": "Release seal/groove calculations and conduct pressure cycling, thermal cycling, vibration, ingress, fatigue and lubricant compatibility testing on representative assemblies.",
+      "source_rule_hint": "ISO 20653 ingress testing and component/assembly DVP&R.",
+      "seat": "sol",
+      "uid": "SOL-H6",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H7",
+      "area": "Dyno correlation",
+      "severity": "HIGH",
+      "claim": "No physical evidence supports efficiency, torque, loss or thermal performance.",
+      "evidence": "RACE-DYNO remains OPEN and dyno_raw_data_hash is absent. dyno, dyno_resistance and torque_friction_validation are OPEN.",
+      "fix": "Run a calibrated four-quadrant dyno campaign across speed, torque, DC voltage, coolant temperature and field weakening; publish raw channels, uncertainty and calibration certificates.",
+      "source_rule_hint": "RACE-DYNO and DEC-001/DEC-006/DEC-010 evidence requirements.",
+      "seat": "sol",
+      "uid": "SOL-H7",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "M1",
+      "area": "Evidence governance",
+      "severity": "MED",
+      "claim": "Checklist disposition and proveCatch results are process metadata, not engineering proof.",
+      "evidence": "Coverage is 100%, but 101 physics items and all six evidence races remain OPEN; the digest explicitly states models are not evidence.",
+      "fix": "Attach each requirement to a named supplier, physical-test, regulatory or released-design artefact and preserve every OPEN status until that artefact exists.",
+      "source_rule_hint": "closure_policy and evidence_trail artefact requirements.",
+      "seat": "sol",
+      "uid": "SOL-M1",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "M2",
+      "area": "Manufacturing readiness",
+      "severity": "MED",
+      "claim": "There is no credible assembly release.",
+      "evidence": "assembly_control_plan, assembly_trials, hairpin_tooling, impregnation_validation, joint_stack_release and surface_finish_release are OPEN.",
+      "fix": "Complete PFMEA, control plan, tooling trials, process capability evidence and released manufacturing specifications.",
+      "source_rule_hint": "IATF 16949/APQP production-part and process-release artefacts.",
+      "seat": "sol",
+      "uid": "SOL-M2",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "M3",
+      "area": "Dimensional control",
+      "severity": "MED",
+      "claim": "Assembly feasibility is not established by a controlled datum and tolerance system.",
+      "evidence": "GD&T_stack, datum_scheme, bearing_stack_tolerance and joint_stack_release are OPEN.",
+      "fix": "Release datum schemes and worst-case/statistical tolerance stacks for bearings, rotor air gap, gears, seals, connectors and coolant interfaces.",
+      "source_rule_hint": "ASME Y14.5 or ISO GPS drawing set and tolerance-stack report.",
+      "seat": "sol",
+      "uid": "SOL-M3",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "M4",
+      "area": "Component selection",
+      "severity": "MED",
+      "claim": "Critical parts are placeholders rather than controlled automotive selections.",
+      "evidence": "mpn_selection, resolver_mpn, sensor_mpn, supplier_module_datasheet, cap_ripple_datasheet and oil_supplier_spec are OPEN.",
+      "fix": "Freeze qualified manufacturer part numbers and obtain controlled datasheets, qualification status, derating analyses and approved alternatives.",
+      "source_rule_hint": "Released AVL/BOM and supplier PPAP or qualification dossiers.",
+      "seat": "sol",
+      "uid": "SOL-M4",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "F1",
+      "area": "PCB / Gate Drive Implementation",
+      "severity": "FATAL",
+      "claim": "The bespoke PCB requires 6 gate-drive channels, 6 desat channels, 3 phase-current sense channels, 1 resolver channel, 1 vehicle CAN, 3 LV buck rails, and 1 HV/LV isolation barrier. ALL implemented counts are zero.",
+      "evidence": "pcb.implemented_channel_counts shows every channel type at 0. pcb.fitness_fail_reason explicitly lists every missing role. design_fitness_ok=false. RACE-HIL and RACE-SUPPLIER-GERBERS are both OPEN with no artefact.",
+      "fix": "Design and lay out actual gate-drive circuitry with desat, phase-current sense, resolver interface, CAN-FD, LV buck, and isolation barrier. Produce Gerbers. Populate board. Run HIL. Hash logs. Until then this is a blank board.",
+      "source_rule_hint": "RACE-HIL artefact_required=hil_report_hash; RACE-SUPPLIER-GERBERS artefact_required=supplier_gerber_package",
+      "seat": "glm52",
+      "uid": "GLM52-F1",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL",
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F2",
+      "area": "Thermal / Cold-Plate CFD",
+      "severity": "FATAL",
+      "claim": "Cold-plate thermal analysis is ANALYTICAL_ONLY from assumed geometry. Source-to-inlet delta of 112.5 K with uncertainty spanning 73.12–174.37 K. No CFD, no flow-bench correlation.",
+      "evidence": "analytical_physics.cold_plate.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY. validation_status=ANALYTICAL_ONLY. measured=false. open_until includes CFD_cold_plate, pressure_drop_bench, supplier_module_Rth, FIA_port_xyz. ship_gate.proveCatch_fired=true, ship_ok=false.",
+      "fix": "Run conjugate heat-transfer CFD on actual cold-plate geometry with supplier module Rth. Correlate on flow bench with instrumented heat source. Reduce uncertainty band below ±10 K before any design freeze.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE artefact_required=cfd_report_hash, closure_authority=cfd_plus_bench",
+      "seat": "glm52",
+      "uid": "GLM52-F2",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-CFD-COLD-PLATE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F3",
+      "area": "Topology / Harness Completeness",
+      "severity": "FATAL",
+      "claim": "4 of 17 required topology edges are unrouted: LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER. The powertrain has no LV power distribution, no vehicle communication, and no thermal sensing on either winding or inverter.",
+      "evidence": "topology.routed_count=13, required_count=17, unrouted_count=4. unrouted_edges listed explicitly. race_status=OPEN. RACE-TOPOLOGY-COMPLETE blocks ship_ok.",
+      "fix": "Route all 4 missing edges. Define LV power distribution architecture. Specify CAN-FD transceiver and connector. Place winding and inverter temperature sensors with signal routing. Freeze bay-relative ICD.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE artefact_required=topology_routed_report",
+      "seat": "glm52",
+      "uid": "GLM52-F3",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-TOPOLOGY-COMPLETE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F4",
+      "area": "Regulatory / FIA Compliance",
+      "severity": "FATAL",
+      "claim": "No FIA technical regulations PDF exists in the digital twin. The pack claims to be a Formula E front MGU integration study but has zero regulatory grounding.",
+      "evidence": "regulatory.regs_on_disk=false. status=UNVERIFIED. forbid_claims includes FIA_homologated, Gen3_compliant, FIA_approved, SHIPS. FIA_homologation and FIA_port_xyz are in open_until list.",
+      "fix": "Obtain current FIA Formula E technical regulations PDF. Load into twin. Extract and map every applicable rule to a physics node. Obtain team/FIA ICD with sealed chassis interface coordinates in mm.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ artefact_required=interface_icd_xyz, closure_authority=FIA_or_team_ICD",
+      "seat": "glm52",
+      "uid": "GLM52-F4",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept that no controlled FIA regulations or homologation evidence is held, so compliance reliance is blocked. “Zero regulatory grounding” overstates the record because a declared UNVERIFIED regulatory basis exists; it is not controlled evidence.",
+      "race_ids": [
+        "RACE-FIA-PORT-XYZ"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F5",
+      "area": "Electromagnetic / Machine Design",
+      "severity": "FATAL",
+      "claim": "No electromagnetic FEA has been performed. No demag map, no magnet retention validation, no rotor burst FEA, no core loss FEA. The IPMSM is entirely unevaluated electromagnetically.",
+      "evidence": "open_until includes FEA_em, FEA_core_loss, demag_map, DEC-006_magnet_retention, rotor_burst_FEA, supplier_magnet_grade. 101 open_until items total. No dyno data exists.",
+      "fix": "Run 2D/3D electromagnetic FEA across full operating envelope including field weakening. Produce demag safety map. Validate magnet retention at max speed. Run rotor burst analysis. Obtain supplier magnet grade certificate. Run dyno campaign with raw data hash.",
+      "source_rule_hint": "RACE-DYNO artefact_required=dyno_raw_data_hash, blocks DEC-001, DEC-006, DEC-010",
+      "seat": "glm52",
+      "uid": "GLM52-F5",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept the absence of validated EM FEA, demag, material certification and dyno correlation. “Entirely unevaluated” overstates the record because analytical tree seeds exist; those seeds are not validation.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F6",
+      "area": "Bus Bar ESL / Power Loop Inductance",
+      "severity": "FATAL",
+      "claim": "DC-link bus bar ESL is analytical-only from assumed geometry at 6.39 nH with a range of 4.15–9.9 nH. No 3D inductance extraction, no double-pulse measurement, no supplier terminal geometry.",
+      "evidence": "analytical_physics.bus_esl.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY. validation_status=ANALYTICAL_ONLY. measured=false. open_until includes bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry.",
+      "fix": "Obtain supplier terminal geometry ICD. Run 3D Q3D inductance extraction on actual bus bar geometry. Perform double-pulse test on populated power stage. Measure actual ESL. Correlate analytical model.",
+      "source_rule_hint": "open_until: bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry",
+      "seat": "glm52",
+      "uid": "GLM52-F6",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "H1",
+      "area": "Mesh Authenticity / Blender Morphology",
+      "severity": "HIGH",
+      "claim": "Mesh authenticity score is 0.7273. Six principal components including the SiC inverter stack, HV bus bar, HV connector, pack base, pack housing, and MCU shelf are plain cuboids — not authentic CAD geometry.",
+      "evidence": "mesh_authenticity.score=0.7273. residual_cuboid array lists 6 components as plain_cuboid. sic_inverter is a plain cuboid — the single most critical power electronic component has no real geometry.",
+      "fix": "Replace all 6 residual cuboids with authentic CAD meshes from supplier or detailed design. Re-run authenticity check. Target score >= 0.95.",
+      "source_rule_hint": "mesh_authenticity.residual_cuboid[].fix_route=build_universal_scene._place_traction_drive_pack_layout",
+      "seat": "glm52",
+      "uid": "GLM52-H1",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H2",
+      "area": "Lucid/Atieva FPK Training Check",
+      "severity": "HIGH",
+      "claim": "Lucid/Atieva role is defined as FFF_training_check_only_not_CAD_paste, but no evidence of actual sealed FPK training validation is present. The training check is nominal, not demonstrated.",
+      "evidence": "regulatory.lucid_atieva_role=FFF_training_check_only_not_CAD_paste. No artefact, hash, or validation result for the training check exists in the digest.",
+      "fix": "Provide evidence of sealed FPK training check execution — artefact hash, comparison metrics, pass/fail against sealed reference. Document what was checked and what passed.",
+      "source_rule_hint": "regulatory.lucid_atieva_role field — no closure artefact defined",
+      "seat": "glm52",
+      "uid": "GLM52-H2",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H3",
+      "area": "Excel Traceability — Unvalidated Analytical Inputs",
+      "severity": "HIGH",
+      "claim": "Excel workbook has 2370 formula cells and 1324 verdict formula cells with 11 live formulas and 8 live inputs, but status is LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS. Live formulas fed by unvalidated assumptions produce live garbage.",
+      "evidence": "excel.status=LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS. live_input_count=8. The cold-plate analytical inputs (112.5 K ±50 K) are feeding live formulas downstream.",
+      "fix": "Tag every analytical input cell with provenance and uncertainty. Quarantine downstream formula results until inputs are validated by physical test. Add data validation gates on input cells.",
+      "source_rule_hint": "excel.live_plan_schema=fpk-excel-live-plan/1",
+      "seat": "glm52",
+      "uid": "GLM52-H3",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H4",
+      "area": "Mass / Weight Budget",
+      "severity": "HIGH",
+      "claim": "No mass, weight, or inertia data appears anywhere in the digest. For a Formula E powertrain where mass is homologation-critical, this is a critical gap.",
+      "evidence": "No mass, weight, inertia, or density field exists in any node of the digest. No mass budget, no CG calculation, no inertia tensor.",
+      "fix": "Produce complete mass budget with every component mass, CG location, and inertia tensor. Correlate against FIA minimum weight rules. Add mass nodes to physics tree.",
+      "source_rule_hint": "No mass-related open_until item exists — the gap is structural, not tracked",
+      "seat": "glm52",
+      "uid": "GLM52-H4",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H5",
+      "area": "Bearing / Structural / Fatigue",
+      "severity": "HIGH",
+      "claim": "Bearing L10 life, bearing reaction loads, shaft fatigue, structural FEA, thermomechanical FEA, and fatigue testing are all OPEN with no physical artefacts.",
+      "evidence": "open_until includes bearing_supplier_L10, bearing_reaction_loads, bearing_stack_tolerance, shaft_fatigue, structural_FEA, thermomechanical_FEA, fatigue_test, contact_FEA, joint_FEA, carrier_FEA, tooth_bending_FEA, tooth_contact_FEA.",
+      "fix": "Obtain supplier L10 bearing life data. Run structural FEA on all load paths. Run thermomechanical FEA for thermal cycling. Execute fatigue test campaign. Validate bearing reaction loads against dyno data.",
+      "source_rule_hint": "open_until: bearing_supplier_L10, structural_FEA, thermomechanical_FEA, fatigue_test",
+      "seat": "glm52",
+      "uid": "GLM52-H5",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H6",
+      "area": "Assembly / Manufacturing",
+      "severity": "HIGH",
+      "claim": "No assembly control plan, no assembly trials, no hairpin tooling, no impregnation validation, no surface finish release, no sealant strategy. The powertrain cannot be manufactured.",
+      "evidence": "open_until includes assembly_control_plan, assembly_trials, hairpin_tooling, impregnation_validation, surface_finish_release, sealant_strategy, thermal_fit_analysis, groove_detail, retention_detail.",
+      "fix": "Develop assembly control plan. Run assembly trials. Specify hairpin tooling. Validate impregnation process. Release surface finish specs. Define sealant strategy. Complete thermal fit analysis.",
+      "source_rule_hint": "open_until: assembly_control_plan, assembly_trials, hairpin_tooling",
+      "seat": "glm52",
+      "uid": "GLM52-H6",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "M1",
+      "area": "Gear / Drivetrain Detail",
+      "severity": "MED",
+      "claim": "Bevel tooth geometry, planet kinematics, second stage ratio, spline ICDs, and microgeometry are all OPEN. Gearbox design is incomplete.",
+      "evidence": "open_until includes bevel_tooth_geometry, planet_kinematics, second_stage_ratio, spline_ICD, halfshaft_spline_ICD, microgeometry, diff_detail_design, diff_load_spectrum.",
+      "fix": "Complete gear microgeometry design. Finalize ratios. Obtain spline ICDs from suppliers. Run tooth bending and contact FEA. Define differential architecture.",
+      "source_rule_hint": "open_until: bevel_tooth_geometry, planet_kinematics, second_stage_ratio",
+      "seat": "glm52",
+      "uid": "GLM52-M1",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "M2",
+      "area": "Sensor / Resolver Architecture",
+      "severity": "MED",
+      "claim": "Sensor architecture, sensor MPN, resolver MPN, and calibration are all OPEN. No sensing hardware is selected or validated.",
+      "evidence": "open_until includes sensor_architecture, sensor_mpn, resolver_mpn, calibration, diff_bias_requirement.",
+      "fix": "Select resolver and sensor MPNs. Define sensor architecture. Develop calibration procedure. Validate diff bias requirements.",
+      "source_rule_hint": "open_until: sensor_architecture, resolver_mpn, calibration",
+      "seat": "glm52",
+      "uid": "GLM52-M2",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "M3",
+      "area": "Lubrication / Oil System",
+      "severity": "MED",
+      "claim": "Lubrication architecture, oil flow requirement, oil churn CFD, oil temperature test, and oil supplier spec are all OPEN.",
+      "evidence": "open_until includes lubrication_architecture, lubrication_flow_requirement, oil_churn_CFD, oil_flow_requirement, oil_supplier_spec, oil_temperature_test.",
+      "fix": "Define lubrication architecture. Specify oil flow requirements. Run oil churn CFD. Select oil supplier. Run oil temperature validation test.",
+      "source_rule_hint": "open_until: lubrication_architecture, oil_churn_CFD",
+      "seat": "glm52",
+      "uid": "GLM52-M3",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "M4",
+      "area": "Insulation / Safety",
+      "severity": "MED",
+      "claim": "Insulation system certification, isolation lifetime, safety discharge test, and HVIL ICD are all OPEN.",
+      "evidence": "open_until includes insulation_system_cert, supplier_isolation_lifetime, safety_discharge_test, vehicle_hvil_ICD.",
+      "fix": "Obtain insulation system certification. Validate isolation lifetime. Execute safety discharge test. Define HVIL ICD with vehicle team.",
+      "source_rule_hint": "open_until: insulation_system_cert, safety_discharge_test, vehicle_hvil_ICD",
+      "seat": "glm52",
+      "uid": "GLM52-M4",
+      "bucket": "med_findings"
+    },
+    {
+      "id": "F1",
+      "area": "PCB / inverter control electronics",
+      "severity": "FATAL",
+      "claim": "The traction inverter control board is functionally empty: 0 of 6 gate-drive channels, 0 of 6 desat channels, 0 of 3 phase-current senses, 0 resolver channels, 0 vehicle CAN, 0 of 3 LV buck rails, 0 HV/LV isolation barriers implemented.",
+      "evidence": "pcb.implemented_channel_counts all zero vs required_channel_counts; fitness_fail_reason lists missing roles motor_power_terminals, mcu_cold_plate, oem_inverter_control_board and four '_word' placeholder components with 'no verified implementation'. design_fitness_ok=false while pipeline_ok=true — hygiene passed, engineering absent.",
+      "fix": "Implement all seven required channel roles with named MPNs (isolated gate driver, desat detect, shunt/Hall current sense, resolver interface, CAN FD transceiver, LV rails, creepage/cleared isolation barrier), re-run fitness gate to design_fitness_ok=true, then populate and HIL.",
+      "source_rule_hint": "pcb-stage.json sha256 59cf4c3c...; RACE-HIL; RACE-SUPPLIER-GERBERS; open_until keys mpn_selection, resolver_mpn, sensor_mpn, channel_implementation",
+      "seat": "kimi",
+      "uid": "KIMI-F1",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-HIL",
+        "RACE-SUPPLIER-GERBERS"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F2",
+      "area": "Thermal / SiC cooling viability",
+      "severity": "FATAL",
+      "claim": "As modelled, the cold plate thermally kills the inverter: source-to-inlet delta of 112.5 K nominal with an uncertainty band of 73.1–174.4 K. At any realistic FE coolant inlet (50–65 °C) the nominal case puts SiC junction at ~162–177 °C and the upper bound at ~224–239 °C, beyond any 175 °C-class module. Either the model is wrong or the hardware fails; both possibilities are disqualifying for reliance.",
+      "evidence": "analytical_physics.cold_plate: heat_load_w=4318, pressure_drop_pa=28501.9, source_to_inlet_delta_k=112.5, uncertainty [73.12,174.37], provenance ANALYTICAL_FROM_ASSUMED_GEOMETRY, measured=false; open_until includes CFD_cold_plate, pressure_drop_bench, supplier_module_Rth. No coolant flow rate or inlet temperature is stated anywhere in the digest.",
+      "fix": "Obtain supplier module Rth datasheet, run cold-plate CFD, correlate on flow bench with stated flow rate and inlet temperature, redesign plate until worst-case Tj at max coolant inlet holds margin to module rating; keep analytical tagged UNVALIDATED until correlated.",
+      "source_rule_hint": "RACE-CFD-COLD-PLATE (cfd_report_hash, closure_authority cfd_plus_bench); open_until supplier_module_Rth, supplier_module_datasheet, flow_bench, FIA_port_xyz",
+      "seat": "kimi",
+      "uid": "KIMI-F2",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept the thermal closure blocker and required CFD/bench/supplier-Rth route. Reject the claimed junction temperatures: the source model ends at the module source interface and explicitly excludes junction-to-case Rth; the live state also specifies 12 L/min and 60 °C, which the digest did not expose. This correction does not reduce the OPEN severity.",
+      "race_ids": [
+        "RACE-CFD-COLD-PLATE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F3",
+      "area": "Wiring / topology / harness",
+      "severity": "FATAL",
+      "claim": "The electrical topology is incomplete: LV_POWER, CAN_FD, TEMP_WINDING_W and TEMP_INVERTER are unrouted. As delivered there is no low-voltage supply path to the controller, no vehicle comms, and no winding or inverter temperature telemetry — the unit cannot be powered, controlled, or protected.",
+      "evidence": "topology.routed_count=13 of required_count=17; unrouted_edges explicitly [LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER]; race_status OPEN.",
+      "fix": "Route all four remaining edges with connector pinouts and wire sizing, freeze the bay-relative ICD, regenerate topology_routed_report.",
+      "source_rule_hint": "RACE-TOPOLOGY-COMPLETE (closure_authority SOURCE_topology_proveCatch); open_until connector_ICD, vehicle_hvil_ICD, pierce_seal_ICD",
+      "seat": "kimi",
+      "uid": "KIMI-F3",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-TOPOLOGY-COMPLETE"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F4",
+      "area": "Electromagnetics / IPMSM validation",
+      "severity": "FATAL",
+      "claim": "There is no validated electromagnetic design. EM FEA, core-loss FEA, demag map and even the magnet grade are all open. Torque, field-weakening envelope and high-temperature demag margin of the IPMSM are unverifiable; every performance number downstream of the machine is assumption.",
+      "evidence": "open_until includes FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, hairpin_tooling, impregnation_validation, insulation_system_cert. No EM artefact of any kind appears in source_hashes.",
+      "fix": "Place lamination and magnet grade POs, run coupled EM FEA, produce demag map versus temperature at worst-case magnet grade tolerance, validate field-weakening current trajectory, feed core-loss results into the efficiency map.",
+      "source_rule_hint": "open_until FEA_em, FEA_core_loss, demag_map, supplier_magnet_grade, lamination_grade_PO; RACE-DYNO blocks DEC-001/DEC-010",
+      "seat": "kimi",
+      "uid": "KIMI-F4",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F5",
+      "area": "Rotor mechanical integrity / safety",
+      "severity": "FATAL",
+      "claim": "A high-speed IPMSM rotor is offered with no burst FEA, no retention-sleeve FEA, no magnet-retention validation (DEC-006 open) and no balance validation. This is a containment-safety stop: magnet liberation at speed is a lethal failure mode and nothing in the pack addresses it.",
+      "evidence": "open_until includes rotor_burst_FEA, retention_sleeve_FEA, DEC-006_magnet_retention, rotor_balance, balance_validation, shaft_fatigue, strength_check.",
+      "fix": "Run rotor burst and sleeve FEA at max overspeed with temperature-dependent magnet and sleeve properties, spin-pit test to overspeed with containment, balance to grade per ISO 21940, then close DEC-006 with test evidence.",
+      "source_rule_hint": "open_until DEC-006_magnet_retention, rotor_burst_FEA, retention_sleeve_FEA; RACE-DYNO blocks DEC-006",
+      "seat": "kimi",
+      "uid": "KIMI-F5",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-DYNO"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F6",
+      "area": "Regulatory / chassis interface",
+      "severity": "FATAL",
+      "claim": "No FIA technical regulations are held in the twin (regs_on_disk=false, status UNVERIFIED) and no sealed FIA/team interface coordinates exist (RACE-FIA-PORT-XYZ OPEN). Every packaging, mounting and compliance-adjacent statement in the pack is dimensionally unanchored and contractually unusable.",
+      "evidence": "regulatory.regs_on_disk=false; forbid_claims includes Gen3_compliant and FIA_homologated; evidence_trail race RACE-FIA-PORT-XYZ OPEN requiring interface_icd_xyz with closure_authority FIA_or_team_ICD; open_until FIA_homologation, FIA_port_xyz.",
+      "fix": "Obtain the FIA/team ICD with sealed port coordinates in millimetres, place the current FIA Formula E technical regulations PDF in the twin, re-baseline all interfaces to the ICD, and keep compliance language forbidden until homologation evidence exists.",
+      "source_rule_hint": "RACE-FIA-PORT-XYZ; regulatory.forbid_claims; open_until FIA_port_xyz, FIA_homologation, halfshaft_spline_ICD, spline_ICD",
+      "seat": "kimi",
+      "uid": "KIMI-F6",
+      "bucket": "fatal_findings",
+      "disposition": "ACCEPTED_OPEN",
+      "disposition_rationale": "Accepted as an evidence-backed reliance blocker. It is routed to the named source/physical artefact and cannot be closed by this council.",
+      "race_ids": [
+        "RACE-FIA-PORT-XYZ"
+      ],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "F7",
+      "area": "Geometry provenance / analytical model validity",
+      "severity": "FATAL",
+      "claim": "The two load-bearing analytical results (bus ESL 6.39 nH, cold-plate thermal) are computed from 'assumed geometry', and the mesh audit shows the corresponding parts — SiC inverter stack, DC-link bus bar, HV connector, pack housing — are plain cuboids. The analytical layer is derived from placeholder boxes; the numbers are not tied to any real shape.",
+      "evidence": "bus_esl.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY and cold_plate.provenance=ANALYTICAL_FROM_ASSUMED_GEOMETRY; mesh_authenticity.residual_cuboid lists sic_inverter, hv_bus, hv_connector, pack_housing, pack_base, mcu_shelf as plain_cuboid with fix_route build_universal_scene._place_traction_drive_pack_layout; authenticity score 0.7273.",
+      "fix": "Replace all six cuboids with dimensioned CAD from real supplier data (module footprint, laminated bus layout, connector MPN), re-derive ESL and thermal models from the released geometry, and re-run mesh authenticity to 1.0 for principal parts.",
+      "source_rule_hint": "form-meshes.json sha256 0d52805d...; open_until bus_3D_inductance, supplier_terminal_geometry, supplier_module_datasheet",
+      "seat": "kimi",
+      "uid": "KIMI-F7",
+      "bucket": "fatal_findings",
+      "disposition": "PARTIALLY_ACCEPTED_OPEN",
+      "disposition_rationale": "Accept that analytical geometry lacks released supplier/CAD authority and that six principal render meshes remain cuboids. The digest does not prove the analytical equations literally consume those Blender cuboids, so that causal statement is not accepted. Supplier geometry, 3D extraction and correlated tests remain mandatory.",
+      "race_ids": [],
+      "closure_effect": "NONE — challenge-only; no OPEN item changed"
+    },
+    {
+      "id": "H1",
+      "area": "DC-link / SiC switching",
+      "severity": "HIGH",
+      "claim": "Bus ESL is unmeasured with a ±50% spread (4.15–9.9 nH around 6.39 nH) and no double-pulse evidence. At SiC di/dt of 5–10 A/ns the upper bound implies 50–100 V switching overshoot on the DC bus; margin to a 1200 V module on an ~800–900 V FE bus is unquantified.",
+      "evidence": "analytical_physics.bus_esl: measured=false, range_nh [4.15,9.9], open_until bus_3D_inductance, double_pulse_bus_ESL_measurement, supplier_terminal_geometry; double_pulse_bench also open.",
+      "fix": "Run double-pulse bench at rated bus voltage and current, extract loop ESL and overshoot, verify module voltage margin with gate-resistor trade, replace analytical ESL with measured value.",
+      "source_rule_hint": "open_until double_pulse_bench, double_pulse_bus_ESL_measurement, bus_ESL_measurement",
+      "seat": "kimi",
+      "uid": "KIMI-H1",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H2",
+      "area": "Excel traceability",
+      "severity": "HIGH",
+      "claim": "The workbook is live at cell level but starved at input level: 8 live inputs and 11 live-plan formulas against a 254-node physics tree and 2,370 formula cells, with status self-declared LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS. 1,324 verdict cells therefore render judgements on assumptions, not data — GIGO with a live recalculation engine.",
+      "evidence": "excel.live_input_count=8, live_formula_count=11, workbook_formula_cells=2370, verdict_formula_cells=1324, status=LIVE_WITH_UNVALIDATED_ANALYTICAL_INPUTS; 101 open_until items confirm the input provenance gap.",
+      "fix": "Expand the live-input schema so every physics leaf traces to a named input cell with provenance tag (MEASURED/SUPPLIER/ASSUMED), lock assumed cells with visible flags, and add an independent recalculation check plus sensitivity sweep on the 8 inputs.",
+      "source_rule_hint": "live-check-stats.json sha256 3333cf65...; fpk-excel-live-plan/1; open_until calibration",
+      "seat": "kimi",
+      "uid": "KIMI-H2",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H3",
+      "area": "Checklist integrity",
+      "severity": "HIGH",
+      "claim": "30.6% of the disposition matrix is duplication: 103 of 337 classified paths are 'duplicate'. The 100% coverage headline is inflated by copies, and 'mapped' (201) is triage, not design completion; 33 paths remain openly unresolved.",
+      "evidence": "checklist_disposition.counts: mapped=201, duplicate=103, open=33; honesty note confirms disposition ≠ designed or validated.",
+      "fix": "De-duplicate the matrix, re-baseline coverage against unique requirement IDs, and publish the 33 open paths as a named gap list with owners and closing artefacts.",
+      "source_rule_hint": "_autonomous/checklist_disposition.json sha256 80376602...; _autonomous/requirements-matrix.json sha256 402af9c9...",
+      "seat": "kimi",
+      "uid": "KIMI-H3",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H4",
+      "area": "Mass / structural",
+      "severity": "HIGH",
+      "claim": "No mass budget, mass roll-up or CG statement exists anywhere in the digest, and every structural validation (structural_FEA, carrier_FEA, joint_FEA, thermomechanical_FEA, GD&T stack, datum scheme) is open. For a front-axle FE installation, mass and packaging are first-order; the pack is silent.",
+      "evidence": "open_until includes structural_FEA, carrier_FEA, joint_FEA, thermomechanical_FEA, GD&T_stack, datum_scheme, bearing_stack_tolerance; no mass artefact in source_hashes.",
+      "fix": "Produce a component-level mass roll-up with tolerance, CG and inertia statement, structural FEA against race load cases, and a released datum/GD&T scheme.",
+      "source_rule_hint": "open_until structural_FEA, GD&T_stack, datum_scheme, axial_load_case",
+      "seat": "kimi",
+      "uid": "KIMI-H4",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H5",
+      "area": "Power flow / efficiency",
+      "severity": "HIGH",
+      "claim": "No power-flow artefact exists: source (DC bus), sink (machine phases), regen direction, and loss split between inverter and machine are nowhere evidenced. The single 4,318 W heat load, if taken at a ~250 kW front-axle operating point, implies ~98.3% combined efficiency — an unverified best-case point presented without a loss map.",
+      "evidence": "analytical_physics.cold_plate.heat_load_w=4318 is the only energy-flow number in the digest; FEA_core_loss, double_pulse_bench, dyno and calibration all open; no efficiency map artefact.",
+      "fix": "Publish a full operating-map loss model (inverter + machine, drive and regen) anchored to double-pulse and core-loss FEA, then dyno-correlate; state DC bus voltage, phase current and power factor at each mapped point.",
+      "source_rule_hint": "RACE-DYNO (dyno_raw_data_hash); open_until FEA_core_loss, double_pulse_bench, dyno_resistance",
+      "seat": "kimi",
+      "uid": "KIMI-H5",
+      "bucket": "high_findings"
+    },
+    {
+      "id": "H6",
+      "area": "Transmission / final drive",
+      "severity": "HIGH",
+      "claim": "The gearbox",
+      "seat": "kimi",
+      "uid": "KIMI-H6",
+      "bucket": "high_findings"
+    }
+  ],
+  "top_fatals": [
+    {
+      "rank": 1,
+      "fatal": "PCB functional implementation absent",
+      "evidence": "6/6 gate-drive required, 0/6 implemented; all other required control channels also 0",
+      "route": "atopile-generator + component resolution, then populated-board RACE-HIL",
+      "status": "OPEN"
+    },
+    {
+      "rank": 2,
+      "fatal": "Thermal concept is unvalidated and analytically unacceptable",
+      "evidence": "112.5 K source-interface-to-inlet rise, 73.12–174.37 K range; CFD/bench/module Rth absent",
+      "route": "RACE-CFD-COLD-PLATE",
+      "status": "OPEN"
+    },
+    {
+      "rank": 3,
+      "fatal": "Critical electrical/sensing topology is incomplete",
+      "evidence": "13/17; LV_POWER, CAN_FD, TEMP_WINDING_W, TEMP_INVERTER unrouted",
+      "route": "RACE-TOPOLOGY-COMPLETE",
+      "status": "OPEN"
+    },
+    {
+      "rank": 4,
+      "fatal": "No controlled FIA basis or sealed vehicle interface",
+      "evidence": "regulations absent, status UNVERIFIED, FIA/team XYZ ICD absent",
+      "route": "RACE-FIA-PORT-XYZ",
+      "status": "OPEN"
+    },
+    {
+      "rank": 5,
+      "fatal": "IPMSM electromagnetic and rotor safety closure absent",
+      "evidence": "EM/core-loss/demag/retention/burst/balance and dyno evidence OPEN",
+      "route": "FEA/material certificates + RACE-DYNO",
+      "status": "OPEN"
+    },
+    {
+      "rank": 6,
+      "fatal": "No supplier Gerber/manufacturing release or representative-hardware HIL",
+      "evidence": "both supplier-Gerber and HIL races OPEN",
+      "route": "RACE-SUPPLIER-GERBERS + RACE-HIL",
+      "status": "OPEN"
+    },
+    {
+      "rank": 7,
+      "fatal": "Analytical ESL and geometry authority are not release-grade",
+      "evidence": "6.39 nH analytical, 4.15–9.9 nH range; 3D extraction and double-pulse absent; mesh score 0.7273",
+      "route": "supplier terminal CAD + 3D extraction + double-pulse + mesh source rule",
+      "status": "OPEN"
+    },
+    {
+      "rank": 8,
+      "fatal": "Workbook liveness is not full calculation validation",
+      "evidence": "V1.12 is live, but inputs are analytically unvalidated and no independent dependency/unit audit was supplied to council",
+      "route": "cell lineage + independent recalculation + source evidence",
+      "status": "OPEN"
+    },
+    {
+      "rank": 9,
+      "fatal": "Transmission, mass properties and manufacturing release remain insufficient",
+      "evidence": "gear/bearing/lubrication/structural/mass/CG/inertia closure artefacts absent",
+      "route": "released calculations/CAD/BOM + rig/measurement evidence",
+      "status": "OPEN"
+    }
+  ],
+  "race_policy": {
+    "all_remain_open": true,
+    "race_open_items_closed": 0,
+    "ship_ok": false,
+    "regulatory": "UNVERIFIED"
+  },
+  "factual_corrections": [
+    "KIMI-F2 junction-temperature extrapolation rejected; source-interface model is not Tj.",
+    "GLM52-F4/F5 absolute “zero/entirely” language narrowed to absence of controlled validation.",
+    "KIMI-F7 direct Blender-cuboid-to-analysis causation is unproven; geometry authority gap remains."
+  ]
+}
