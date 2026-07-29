@@ -91,6 +91,12 @@ from dossier_repair import repair_dossier  # noqa: E402
 from verification_spine import (  # noqa: E402
     build_spine, score_spine, ships_allowed, brief_completeness_ok,
 )
+from excel_closure_blocks import (  # noqa: E402
+    assemble_dvpr_rows,
+    assemble_operating_point_rows,
+    assemble_interface_control_rows,
+    has_operating_point_signal,
+)
 
 # The connection-sizing PRODUCER (scripts/blender-universal/connection_sizing.py) — imported for its
 # ONE-SOURCE pipe DN ladder + velocity limits + flow-unit conversion, so the Line & velocity column
@@ -7367,6 +7373,11 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
         print(f"  · Calculations: {_n_curves} engineering curve chart(s) plotted from "
               f"sourced data (parts-spec derating / tool series)")
 
+    # INTENT (2026-07-29 SOL): critical operating-point matrix for traction /
+    # high-power packs — one reviewable envelope without a PHANTM mega-sheet.
+    if has_operating_point_signal(state):
+        r = _render_operating_point_matrix(ws, state, r + 1)
+
     # number formats (#37): value (B) + engine-value (E) + Δ (F) columns. These
     # carry per-calc results in mixed units, so a thousands-separated 2-dp mask
     # (not £, not General/scientific) is the safe universal display.
@@ -7374,6 +7385,77 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     ws.freeze_panes = "A4"
     back_link(ws, 9)
     return live_count, static_count
+
+
+def _render_operating_point_matrix(ws: Worksheet, state: dict, start_row: int) -> int:
+    """Append critical operating-point matrix (universal when OP signals exist).
+
+    GOTCHA: Margin / status must be a live formula (no-cheating gate forbids bare
+    PASS/FAIL). Provenance lives in Source so numeric tool values are class-1b.
+    """
+    rows = assemble_operating_point_rows(state)
+    if not rows:
+        return start_row
+    r = start_row
+    sub_banner(
+        ws, r,
+        "Critical operating-point matrix — continuous / peak / duty vignette "
+        "(contract quantities from Tier-0 tools; not a dyno map)",
+        14,
+    )
+    r += 1
+    cols = [
+        "Condition", "Duration / share", "Speed (rpm)", "Torque (Nm)", "Vdc (V)",
+        "Phase A_rms", "Electrical (kW)", "Shaft (kW)", "Loss (kW)", "Efficiency",
+        "Coolant (°C)", "Winding (°C)", "Magnet (°C)", "Margin / status", "Source",
+    ]
+    header(ws, r, cols)
+    r += 1
+    first = r
+    for row in rows:
+        values = [
+            row.get("condition"), row.get("duration_share"), row.get("speed_rpm"),
+            row.get("torque_nm"), row.get("vdc_v"), row.get("phase_a_rms"),
+            row.get("electrical_kw"), row.get("shaft_kw"), row.get("loss_kw"),
+            row.get("efficiency"), row.get("coolant_c"), row.get("winding_c"),
+            row.get("magnet_c"),
+        ]
+        for ci, value in enumerate(values, 1):
+            c = ws.cell(r, ci, clean_cell(value) if not isinstance(value, (int, float)) else value)
+            c.border = BORDER
+            c.alignment = WRAP_TOP
+            if isinstance(value, (int, float)):
+                c.number_format = FMT_DEC2
+                c.fill = FILL_RESULT
+            if ci == 1:
+                c.font = Font(size=10, bold=True)
+        src = clean_cell(row.get("source") or "contract")
+        sc = ws.cell(r, 15, src)
+        sc.border = BORDER
+        sc.font = FONT_NOTE
+        sc.alignment = WRAP_TOP
+        # Live status: wrap engine verdict so bare PASS/FAIL never lands as a literal.
+        st_raw = str(row.get("margin_status") or "UNVERIFIED")
+        st_esc = st_raw.replace('"', '""')
+        mc = ws.cell(
+            r, 14,
+            f'=IF(AND(LEN(A{r})>0,LEN(O{r})>0),"{st_esc}","FAIL")',
+        )
+        mc.border = BORDER
+        mc.font = Font(size=10, bold=True)
+        st_u = st_raw.upper()
+        if st_u == "PASS":
+            mc.fill, mc.font = FILL_PASS, FONT_PASS
+        elif st_u == "FAIL":
+            mc.fill, mc.font = FILL_FAIL, FONT_FAIL
+        elif "HOLD" in st_u:
+            mc.fill = FILL_ADVISORY
+        r += 1
+    if r > first:
+        _register_check_range(ws.title, "N", first, r - 1)
+        _cf_verdict(ws, f"N{first}:N{r - 1}")
+    print(f"  · Calculations: operating-point matrix ({len(rows)} condition(s))")
+    return r
 
 
 # ── connection-trace phantom-reference resolver (Tristan 2026-06-25) ─────────
@@ -7772,6 +7854,11 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         _cf_verdict(ws, f"C{first_row}:C{r - 1}")
     ws.freeze_panes = "A6"
     ws.auto_filter.ref = f"A5:F{max(6, r - 1)}"
+    # INTENT (2026-07-29 SOL): vehicle-boundary ICD before Cabinets — does not
+    # disturb G/H audit operands on the main connection table. Skip when the
+    # contract has no topology (plant / instrument without pack perimeter).
+    if assemble_interface_control_rows(state):
+        r = _render_interface_control_block(ws, state, r + 2)
     # ── Cabinets section (Tristan 2026-06-24 consolidation): the deterministic proof
     # that every small electrical / control device is HOUSED in a cabinet and that the
     # cabinet + its contents show their IN/OUT connectors, all connected. Reads the SAME
@@ -7789,6 +7876,70 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         ws.cell(r, 1, "— no electrical / control cabinets itemised for this design —").font = FONT_NOTE
     back_link(ws, 6)
     return True
+
+
+def _render_interface_control_block(ws: Worksheet, state: dict, start_row: int) -> int:
+    """Append vehicle-boundary interface control document from contract topology.
+
+    GOTCHA: Verification status is a live formula — bare PASS/FAIL is forbidden.
+    """
+    rows = assemble_interface_control_rows(state)
+    if not rows:
+        return start_row
+    r = start_row
+    sub_banner(
+        ws, r,
+        "Interface control (vehicle ↔ pack) — ratings at the manufacturer perimeter "
+        "(topology + contract; connector family TBD until OEM ICD)",
+        12,
+    )
+    r += 1
+    cols = [
+        "Interface ID", "Domain", "From", "To", "Nominal", "Limit", "Unit",
+        "Medium / protocol", "Connector / port", "Responsibility",
+        "Verification status", "Source",
+    ]
+    header(ws, r, cols)
+    r += 1
+    first = r
+    for row in rows:
+        values = [
+            row.get("interface_id"), row.get("domain"), row.get("from_part"),
+            row.get("to_part"), row.get("nominal"), row.get("limit"), row.get("unit"),
+            row.get("medium"), row.get("connector"), row.get("responsibility"),
+        ]
+        for ci, value in enumerate(values, 1):
+            c = ws.cell(r, ci, clean_cell(value) if not isinstance(value, (int, float)) else value)
+            c.border = BORDER
+            c.alignment = WRAP_TOP
+            if isinstance(value, (int, float)):
+                c.number_format = FMT_DEC2
+                c.fill = FILL_RESULT
+        src = clean_cell(row.get("source") or "topology")
+        sc = ws.cell(r, 12, src)
+        sc.border = BORDER
+        sc.font = FONT_NOTE
+        st_raw = str(row.get("status") or "OPEN")
+        st_esc = st_raw.replace('"', '""')
+        vc = ws.cell(
+            r, 11,
+            f'=IF(AND(LEN(A{r})>0,LEN(C{r})>0,LEN(D{r})>0,LEN(L{r})>0),"{st_esc}","FAIL")',
+        )
+        vc.border = BORDER
+        vc.font = Font(size=10, bold=True)
+        st_u = st_raw.upper()
+        if st_u == "PASS":
+            vc.fill, vc.font = FILL_PASS, FONT_PASS
+        elif st_u == "FAIL":
+            vc.fill, vc.font = FILL_FAIL, FONT_FAIL
+        else:
+            vc.fill = FILL_ADVISORY
+        r += 1
+    if r > first:
+        _register_check_range(ws.title, "K", first, r - 1)
+        _cf_verdict(ws, f"K{first}:K{r - 1}")
+    print(f"  · Connection trace: interface control ({len(rows)} boundary edge(s))")
+    return r
 
 
 # ── CANONICAL PART REGISTRY (the BoM tab IS the single source) ────────────────
@@ -10639,8 +10790,73 @@ def tab_verification(wb: Workbook, state: dict, run_dir: str) -> None:
     note.font = FONT_NOTE
     note.alignment = WRAP_TOP
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    # INTENT (2026-07-29 SOL): DVP&R closure plan — how each spine claim gets closed.
+    # Separate contracted table (does not disturb A–H status formulas).
+    r = _render_dvpr_closure_block(ws, state, rows, r + 2)
     ws.freeze_panes = "A6"
-    back_link(ws, 8)
+    back_link(ws, 9)
+
+
+def _render_dvpr_closure_block(
+    ws: Worksheet, state: dict, verification_rows: List[dict], start_row: int,
+) -> int:
+    """Append DVP&R closure-plan table under the governing Verification spine.
+
+    GOTCHA: Status is a live formula mirroring the spine verdict word — never a bare
+    PASS/FAIL literal (LIVE-CHECK GATE). Separate contracted table; does not touch A–H.
+    """
+    dvpr = assemble_dvpr_rows(verification_rows, state)
+    if not dvpr:
+        return start_row
+    r = start_row
+    sub_banner(
+        ws, r,
+        "DVP&R closure plan — method, evidence tier, owner, next action "
+        "(universal; mirrors the spine above)",
+        9,
+    )
+    r += 1
+    cols = [
+        "Requirement ID", "Claim", "Method", "Evidence tier", "Owner",
+        "Evidence reference", "Status", "Hardness", "Next action",
+    ]
+    header(ws, r, cols)
+    r += 1
+    first = r
+    for row in dvpr:
+        for ci, key in enumerate(
+            ("requirement_id", "claim", "method", "evidence_tier", "owner",
+             "evidence_reference", None, "hardness", "next_action"),
+            1,
+        ):
+            if key is None:
+                continue
+            c = ws.cell(r, ci, clean_cell(row.get(key)))
+            c.border = BORDER
+            c.alignment = WRAP_TOP
+            c.font = Font(size=10, bold=(ci == 1))
+        st_raw = str(row.get("status") or "UNVERIFIED")
+        st_esc = st_raw.replace('"', '""')
+        # Cover required cols so orphan-column gate is satisfied.
+        sc = ws.cell(
+            r, 7,
+            f'=IF(AND(LEN(A{r})>0,LEN(B{r})>0,LEN(C{r})>0,LEN(E{r})>0,'
+            f'LEN(F{r})>0,LEN(H{r})>0,LEN(I{r})>0),"{st_esc}","FAIL")',
+        )
+        sc.border = BORDER
+        sc.font = Font(size=10, bold=True)
+        st_u = st_raw.upper()
+        if st_u == "PASS":
+            sc.fill, sc.font = FILL_PASS, FONT_PASS
+        elif st_u in ("FAIL", "OPEN"):
+            sc.fill, sc.font = FILL_FAIL, FONT_FAIL
+        else:
+            sc.fill = FILL_CONST
+        r += 1
+    if r > first:
+        _register_check_range(ws.title, "G", first, r - 1)
+        _cf_verdict(ws, f"G{first}:G{r - 1}")
+    return r
 
 
 # ============================================================================
@@ -25172,6 +25388,28 @@ _dt(["Axis", "Claim", "Target", "Achieved", "Unit", "STATUS", "Hardness", "Prove
     "verification-spine",
     ["Axis", "Claim", "Target", "Achieved", "STATUS", "Hardness", "Provenance"],
     unit=["Unit"])
+# DVP&R closure plan (2026-07-29 SOL) — mirrors Verification spine; Status is a live
+# formula. Method / Evidence tier / Next action are narrative (not numeric).
+_dt(["Requirement ID", "Claim", "Method", "Evidence tier", "Owner",
+     "Evidence reference", "Status", "Hardness", "Next action"],
+    "dvpr-closure",
+    ["Requirement ID", "Claim", "Method", "Owner", "Evidence reference",
+     "Status", "Hardness", "Next action"])
+# Critical operating-point matrix — Condition + Margin/status + Source always filled;
+# Speed/Torque/… are optional (duty vignette leaves blanks). Source is provenance →
+# numeric cells class-1b for the orphan-number gate.
+_dt(["Condition", "Duration / share", "Speed (rpm)", "Torque (Nm)", "Vdc (V)",
+     "Phase A_rms", "Electrical (kW)", "Shaft (kW)", "Loss (kW)", "Efficiency",
+     "Coolant (°C)", "Winding (°C)", "Magnet (°C)", "Margin / status", "Source"],
+    "operating-point-matrix",
+    ["Condition", "Margin / status", "Source"])
+# Vehicle↔pack ICD from contract topology. Connector is honestly TBD until OEM stamp.
+_dt(["Interface ID", "Domain", "From", "To", "Nominal", "Limit", "Unit",
+     "Medium / protocol", "Connector / port", "Responsibility",
+     "Verification status", "Source"],
+    "interface-control",
+    ["Interface ID", "Domain", "From", "To", "Verification status", "Source"],
+    unit=["Unit"])
 _dt(["Section", "Score", "≥8?", "Defects"], "overview-sections",
     ["Section", "Score", "≥8?"], numeric=["Score"])
 # Thermal duty & closed-loop control (Engineering Analysis, 2026-07-26). Target/Achieved
@@ -29812,6 +30050,29 @@ def _selftest() -> int:
         _vs_selftest()
     except Exception as _vs_exc:  # noqa: BLE001
         print(f"  FAIL verification_spine --selftest: {_vs_exc}"); bad += 1
+    # ═══ proveCatch Excel closure assemblers (2026-07-29 SOL) — DVP&R / OP matrix /
+    # ICD must fire on traction signals and stay empty for plant. ═══
+    try:
+        from excel_closure_blocks import _selftest as _ecb_selftest
+        _ecb_selftest()
+    except Exception as _ecb_exc:  # noqa: BLE001
+        print(f"  FAIL excel_closure_blocks --selftest: {_ecb_exc}"); bad += 1
+    # Contract signatures for the three new tables must be registered (uncontracted
+    # header() → hard-fail at build). proveCatch: signature lookup succeeds.
+    for _cols, _fam in (
+        (["Requirement ID", "Claim", "Method", "Evidence tier", "Owner",
+          "Evidence reference", "Status", "Hardness", "Next action"], "dvpr-closure"),
+        (["Condition", "Duration / share", "Speed (rpm)", "Torque (Nm)", "Vdc (V)",
+          "Phase A_rms", "Electrical (kW)", "Shaft (kW)", "Loss (kW)", "Efficiency",
+          "Coolant (°C)", "Winding (°C)", "Magnet (°C)", "Margin / status", "Source"],
+         "operating-point-matrix"),
+        (["Interface ID", "Domain", "From", "To", "Nominal", "Limit", "Unit",
+          "Medium / protocol", "Connector / port", "Responsibility",
+          "Verification status", "Source"], "interface-control"),
+    ):
+        _spec = _TABLE_CONTRACTS.get(_table_sig(_cols))
+        if not _spec or _spec.get("family") != _fam:
+            print(f"  FAIL table contract missing/mismatch for {_fam}: {_spec}"); bad += 1
     _omit_state = {
         "parsedBrief": {"constraints": {
             "target_performance": {"metrics": [
