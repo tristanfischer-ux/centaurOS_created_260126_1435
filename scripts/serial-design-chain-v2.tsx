@@ -9020,6 +9020,47 @@ async function main() {
           }
         }
         console.log(`[chain] bom-cost-grounding: ${overwritten} lines re-priced from DOE/NETL + cache (real), ${recordedOnly} recorded-only (low-confidence kept at prior price)`)
+        // INTENT (2026-07-29 SOL): costStack / cost_reality were persisted BEFORE
+        // grounding, so macro £28k/£17.5k lines never reached gate-32 £/kW or the
+        // cover — refresh totals whenever grounding overwrote ≥1 line.
+        if (overwritten > 0) {
+          try {
+            const qtyByWid = new Map<string, number>()
+            for (const m of (liveState.moduleDecomposition?.modules ?? []))
+              for (const sm of (m.sub_modules ?? []))
+                for (const w of (sm.words ?? [])) {
+                  let qy = 1
+                  const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
+                  if (qmod) {
+                    const n = parseInt(String(qmod.value).replace(/[×x,\s]/g, ''), 10)
+                    if (Number.isFinite(n) && n > 0) qy = n
+                  }
+                  if (w.id) qtyByWid.set(String(w.id), qy)
+                }
+            let groundedBomTotal = 0
+            for (const v of (Array.isArray(liveState.partVerifications) ? liveState.partVerifications : [])) {
+              const unit = Number(v.distributor_price_gbp) > 0
+                ? Number(v.distributor_price_gbp)
+                : (Number(v.price_estimate_gbp) > 0 ? Number(v.price_estimate_gbp) : 0)
+              if (unit <= 0 || v.cost_repair_excluded_from_subtotal === true) continue
+              groundedBomTotal += unit * (qtyByWid.get(String(v.word_id ?? '')) ?? 1)
+            }
+            if (groundedBomTotal > 0) {
+              if (liveState.cost_reality && typeof liveState.cost_reality === 'object') {
+                liveState.cost_reality.bom_total_gbp = Math.round(groundedBomTotal)
+                liveState.cost_reality.order_of_magnitude =
+                  Math.round(Math.log10(groundedBomTotal) * 10) / 10
+              }
+              const { ratios: gRatios, class_key: gClassKey } = resolveCostStack(liveState)
+              liveState.costStack = computeCostStack(groundedBomTotal, gRatios, gClassKey)
+              console.error(
+                `[chain] bom-cost-grounding: cost_reality + costStack refreshed to post-ground BoM £${Math.round(groundedBomTotal).toLocaleString('en-GB')} (ex-works £${Math.round(liveState.costStack.oem_transfer_price_gbp).toLocaleString('en-GB')})`,
+              )
+            }
+          } catch (refreshErr) {
+            console.error(`[chain] bom-cost-grounding: totals refresh threw: ${(refreshErr as Error).message}; continuing`)
+          }
+        }
         logAction({ step: 'bom_cost_grounding', overwritten, recordedOnly, latency_ms: Date.now() - tCost, ok: true })
       } catch (err) {
         console.error(`[chain] bom-cost-grounding failed (non-fatal): ${(err as Error).message}`)

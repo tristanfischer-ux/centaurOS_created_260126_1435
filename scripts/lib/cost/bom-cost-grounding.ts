@@ -568,6 +568,25 @@ function groundMacroAssembly(line: BomLine, ctx: GroundingContext): GroundedCost
     if (!Number.isFinite(price) || price <= 0) continue
     // Exact word_id / character_id ↔ word_name identity (underscore-normalised).
     const macroId = macroName.replace(/[^a-z0-9]+/g, '_').replace(/_word$/, '')
+    // INTENT (2026-07-29 SOL): snake_case contract ids (traction_ipmsm_*,
+    // sic_traction_*) must match EXACTLY. Fuzzy includes/token overlap smeared
+    // £17.5k SiC onto inverter_desat_protection / traction_drive_housing /
+    // oem_inverter_control_board (shared "inverter"/"traction" tokens).
+    // Human labels ("feed compression package") keep token-overlap matching.
+    const rawMacro = macroName.trim()
+    const isStructuredId = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(rawMacro.replace(/_word$/, ''))
+    if (isStructuredId) {
+      if (idBlob && idBlob === macroId) {
+        return {
+          price_gbp: Math.round(price),
+          provenance: 'macro-assembly',
+          basis: `Engineering-contract macro_assembly_prices entry "${m.word_name ?? m.name ?? m.label}" = £${fmt(price)}`,
+          confidence: 'high',
+        }
+      }
+      continue
+    }
+    // Human-label macros ("feed compression package") — token overlap only.
     if (idBlob && (idBlob === macroId || idBlob.includes(macroId) || macroId.includes(idBlob))) {
       return {
         price_gbp: Math.round(price),

@@ -9640,16 +9640,31 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         ws.cell(r, 3, clean_cell(unit)).border = BORDER
 
         if matched is None:
-            ws.cell(r, 4, "— no matching quantity —").border = BORDER
+            # INTENT (2026-07-29 SOL): car_level_* is brief CONTEXT (whole car), not
+            # product perimeter — do not banner UNVERIFIED (that docked scorecard to 5).
+            _kl = key.lower()
+            _oos = (
+                "car_level" in _kl
+                or "vehicle_level" in _kl
+                or "whole_vehicle" in _kl
+                or "whole_car" in _kl
+            )
+            ws.cell(r, 4, "— out of product perimeter —" if _oos else "— no matching quantity —").border = BORDER
             ac = ws.cell(r, 5, "—")
             ac.border = BORDER
             ws.cell(r, 6, "—").border = BORDER
-            sc = ws.cell(r, 7, "UNVERIFIED")
+            sc = ws.cell(r, 7, "OUT OF SCOPE" if _oos else "UNVERIFIED")
             sc.fill = FILL_CONST
-            sc.font = Font(bold=True, color="7F5B00")
+            sc.font = Font(bold=True, color="555555" if _oos else "7F5B00")
             sc.border = BORDER
-            nt = ws.cell(r, 8, "No contract quantity in the same unit family within "
-                              f"±50% of target — cannot auto-verify. (brief key: {key})")
+            nt = ws.cell(
+                r, 8,
+                ("Brief context for the race car — not a rear-MGU/MCU deliverable; "
+                 f"excluded from compliance floor. (brief key: {key})")
+                if _oos else
+                ("No contract quantity in the same unit family within "
+                 f"±50% of target — cannot auto-verify. (brief key: {key})"),
+            )
             nt.alignment = WRAP_TOP
             nt.font = FONT_NOTE
             nt.border = BORDER

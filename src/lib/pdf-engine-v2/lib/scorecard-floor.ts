@@ -562,6 +562,22 @@ export function buildClosureHonestySection(input: {
  * engage the feedstock-approximation relief and the fallback matcher above — both are
  * no-ops when omitted, so every existing call site is unaffected byte-for-byte.
  */
+/**
+ * INTENT (2026-07-29 SOL): car_level_* / vehicle_level_* are brief CONTEXT for
+ * the race car, not product-perimeter deliverables. Matching them was blocked
+ * (false FAIL on 600→350 kW); counting them as hard UNVERIFIED capped
+ * brief_compliance at 5 forever. Skip — out of MGU/MCU scope.
+ */
+export function isOutOfScopePerimeterMetric(key: string): boolean {
+  const kl = String(key || '').toLowerCase()
+  return (
+    kl.includes('car_level') ||
+    kl.includes('vehicle_level') ||
+    kl.includes('whole_vehicle') ||
+    kl.includes('whole_car')
+  )
+}
+
 export function buildBriefComplianceSection(rows: ComplianceRowInput[], ctx?: ComplianceContext): ScorecardSection {
   const defects: string[] = []
   let hardFail = false
@@ -569,6 +585,7 @@ export function buildBriefComplianceSection(rows: ComplianceRowInput[], ctx?: Co
   let softGap = false
   for (const row0 of rows) {
     const row = resolveComplianceRow(row0, ctx)
+    if (isOutOfScopePerimeterMetric(row.key)) continue
     const status = complianceRowStatus(row, ctx?.briefText)
     if (status === 'PASS') continue
     const hard = complianceMetricIsHard(row.key, row.category)
@@ -959,7 +976,7 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
       achieved: 8,
     }) === 'PASS',
   )
-  // car_level must NOT bind rear_electrical — stay UNVERIFIED (honest context).
+  // car_level must NOT bind rear_electrical — stay unmatched (honest context).
   const carLevel = fallbackMatchQuantity('car_level_battery_power_cap_kw', 'kW', {
     rear_electrical_power_cap_kw: { value: 350, unit: 'kW' },
     rear_axle_electrical_power_kw: { value: 350, unit: 'kW' },
@@ -968,6 +985,33 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
     'scope_gate.car_level_does_not_bind_rear_axle',
     carLevel === null,
     JSON.stringify(carLevel),
+  )
+  // Out-of-perimeter car_level rows must not dock brief_compliance to 5.
+  check('scope_gate.car_level_is_out_of_perimeter', isOutOfScopePerimeterMetric('car_level_battery_power_cap_kw'))
+  const carLevelSection = buildBriefComplianceSection(
+    [
+      {
+        key: 'rear_electrical_power_cap_kw',
+        unit: 'kW',
+        target: 350,
+        matched: 'rear_electrical_power_cap_kw',
+        achieved: 350,
+        category: 'scale',
+      },
+      {
+        key: 'car_level_battery_power_cap_kw',
+        unit: 'kW',
+        target: 600,
+        matched: null,
+        achieved: null,
+        category: 'scale',
+      },
+    ],
+  )
+  check(
+    'scope_gate.car_level_skipped_scores_10',
+    carLevelSection.score === 10 && carLevelSection.defects.length === 0,
+    JSON.stringify(carLevelSection),
   )
 
   return { passed: total - failed.length, failed }

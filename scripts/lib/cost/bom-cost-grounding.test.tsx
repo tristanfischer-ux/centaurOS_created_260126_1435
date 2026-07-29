@@ -278,6 +278,39 @@ ok('id=_word suffix still grounds via character_id / stripped id',
   tractionSuffixG.provenance === 'macro-assembly' && tractionSuffixG.price_gbp === 18000,
   `${tractionSuffixG.provenance} £${tractionSuffixG.price_gbp}`)
 
+// proveCatch: structured sic_traction_inverter must NOT smear onto sibling inverter words.
+const sicMacroCtx: GroundingContext = {
+  macroAssemblyPrices: [{
+    word_name: 'sic_traction_inverter',
+    unit_price_gbp: 17500,
+    total_gbp: 17500,
+  }],
+}
+const desatLine = {
+  id: 'inverter_desat_protection_word',
+  name_human: 'Inverter Desat Protection',
+  content_character: { character_id: 'inverter_desat_protection' },
+  modifier_characters: [],
+} as any
+const housingLine = {
+  id: 'traction_drive_housing_word',
+  name_human: 'Traction Drive Housing',
+  content_character: { character_id: 'traction_drive_housing' },
+  modifier_characters: [],
+} as any
+const sicExact = groundBomLineCost({
+  id: 'sic_traction_inverter_word',
+  name_human: 'SiC Traction Inverter',
+  content_character: { character_id: 'sic_traction_inverter' },
+  modifier_characters: [],
+} as any, sicMacroCtx)
+ok('sic macro grounds exact inverter principal',
+  sicExact.provenance === 'macro-assembly' && sicExact.price_gbp === 17500)
+ok('sic macro does NOT smear onto desat protection',
+  groundBomLineCost(desatLine, sicMacroCtx).provenance !== 'macro-assembly')
+ok('sic/traction macro does NOT smear onto drive housing',
+  groundBomLineCost(housingLine, sicMacroCtx).provenance !== 'macro-assembly')
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4) NO-DATA line → null / no-ground
 // ─────────────────────────────────────────────────────────────────────────────

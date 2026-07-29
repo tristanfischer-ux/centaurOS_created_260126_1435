@@ -180,10 +180,20 @@ const stepSicLoss: ToolStep = {
           scope: 'module', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'peak rear-axle corner',
           provenance: prov(tid, 'inverter_dissipated_kw'),
         },
+        // GOTCHA: sic-loss derives I from P at nominal Vac (≈381 A for 350 kW).
+        // Critic checks peak power at Vdc,min which needs ≥I_ph,max (~530 A).
+        // Headline ac_rms must be the envelope ceiling, not the loss-tool rms.
         ac_rms_current_a: {
-          value: out.ac_rms_current_a, unit: 'A', family: 'current', basis: 'peak',
+          value: Math.max(out.ac_rms_current_a, qv(c, 'phase_current_max_a', out.ac_rms_current_a)),
+          unit: 'A', family: 'current', basis: 'peak',
           scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
-          condition: 'peak rear-axle corner — coherent with mgu_shaft_power_kw',
+          condition: 'peak envelope = max(sic-loss rms, phase_current_max_a) — closes at Vdc,min',
+          provenance: prov(tid, 'ac_rms_current_a'),
+        },
+        sic_loss_ac_rms_current_a: {
+          value: out.ac_rms_current_a, unit: 'A', family: 'current', basis: 'rated',
+          scope: 'module', uncertainty_pct: 10, temporal_resolution_s: null,
+          condition: 'sic-loss tool rms at peak-kW / nominal Vac (diagnostic)',
           provenance: prov(tid, 'ac_rms_current_a'),
         },
       },
