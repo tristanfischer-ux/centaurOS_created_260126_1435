@@ -2657,6 +2657,19 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                     print(f"  ! ship-gate axis/axes unmet → blocked SHIPS (S7 unify): {_unmet}")
         except Exception as _axv_exc:  # noqa: BLE001 — never let the axis gate crash the verdict
             print(f"  ! ship-axes unification skipped (non-fatal): {_axv_exc}")
+        # INTENT (2026-07-29 JLR): each race-critical OPEN hold counts as an open issue
+        # so DRAFT banners cannot claim open_issues=0 while DEC-008/009/010 are OPEN.
+        _race_open_n = sum(
+            1 for h in (state.get("decisionHolds") or [])
+            if isinstance(h, dict)
+            and str(h.get("status") or "").upper() == "OPEN"
+            and (h.get("blocks_homologation") or h.get("open_by_design"))
+        )
+        if _race_open_n:
+            ships = False
+            open_n = max(open_n, _race_open_n)
+            print(f"  ! race-critical OPEN-by-design holds → blocked SHIPS "
+                  f"({_race_open_n} hold(s); HIL / supplier Gerbers / dyno)")
     return {"floor": floor, "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
@@ -2741,8 +2754,12 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     #    FAB-READY string) passes, ENGINEERING DRAFT / FAIL does not.
     # INTENT (2026-07-29 SOL): cots-modules / none dispositions are purchased-parent
     # boards — fab-ready is N/A (never demand a bespoke KiCad pack for OEM MCU boards).
+    # GOTCHA (2026-07-29 JLR): Forge draft Gerbers with supplierGerbers=false /
+    # hilPresent=false must NOT pass as fab-ready — that greenwashed homologation.
     _pcb = st.get("pcb") or {}
     _pcb_disp = str(_pcb.get("disposition") or "").lower()
+    _supplier_gbr = _pcb.get("supplierGerbers") is True
+    _hil_ok = _pcb.get("hilPresent") is True
     if _pcb.get("isPcbBearing") and _pcb_disp in ("cots-modules", "cots_modules", "none"):
         axes.append({"axis": "PCB readiness — fab-ready", "applicable": False,
                      "passed": True,
@@ -2750,19 +2767,46 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     elif _pcb.get("isPcbBearing"):
         try:
             _rd = str(_pcb_two_axis_assessment(_pcb, run_dir or "").get("readiness") or "")
-            # DETAIL must be descriptive, never a BARE verdict word: a failing board's readiness
-            # string is literally "FAIL", which the no-cheating LIVE-CHECK gate flags as a bare
-            # verdict literal (Quality & Audit!D11) → build-excel-export refuses to save the whole
-            # workbook. Prefix it so the detail reads "readiness: FAIL" (the axis Verdict cell col C
-            # is the real live formula; this is just its human note). 2026-07-21.
+            _forge_only = bool(_pcb.get("forgeDraftOnly")) or not _supplier_gbr
+            _pass = (
+                _rd.startswith("FAB-READY")
+                and _supplier_gbr
+                and _hil_ok
+                and not _forge_only
+            )
+            _detail = (
+                f"readiness: {_rd or '—'}; supplierGerbers={_supplier_gbr}; "
+                f"hilPresent={_hil_ok}; forgeDraftOnly={_forge_only}"
+            )
             axes.append({"axis": "PCB readiness — fab-ready", "applicable": True,
-                         "passed": _rd.startswith("FAB-READY"), "detail": f"readiness: {_rd or '—'}"})
+                         "passed": _pass, "detail": _detail})
         except Exception:  # noqa: BLE001 — never let the axis crash the verdict
             axes.append({"axis": "PCB readiness — fab-ready", "applicable": True,
                          "passed": False, "detail": "readiness not computed"})
     else:
         axes.append({"axis": "PCB readiness — fab-ready", "applicable": False,
                      "passed": True, "detail": "no PCB in this design"})
+    # 4b. RACE-CRITICAL OPEN-BY-DESIGN HOLDS — HIL / supplier Gerbers / dyno holes.
+    # INTENT (2026-07-29 JLR HoT): these must stay OPEN and must block SHIPS until
+    # real evidence lands. Universal: any decisionHold with blocks_homologation + OPEN.
+    _race_open = [
+        h for h in (st.get("decisionHolds") or [])
+        if isinstance(h, dict)
+        and str(h.get("status") or "").upper() == "OPEN"
+        and (h.get("blocks_homologation") or h.get("open_by_design"))
+    ]
+    if _race_open or isinstance(st.get("homologationHonesty"), dict):
+        _ids = [str(h.get("id") or "?") for h in _race_open]
+        axes.append({
+            "axis": "Race homologation holds — no open dyno/HIL/supplier gaps",
+            "applicable": True,
+            "passed": len(_race_open) == 0,
+            "detail": (
+                "clean — no OPEN blocks_homologation holds"
+                if not _race_open
+                else f"OPEN by design: {', '.join(_ids)} — NOT FIA race homologated"
+            ),
+        })
     # 5. RENDER VISION — a DELIVERED vision critique that flags the render broken blocks
     #    ships. INSTRUMENT + NO CRITIQUE ≠ green (Cursor afternoon audit): a benchtop
     #    instrument HAS a hero render that a 5-second glance would judge — an absent critique
@@ -7385,6 +7429,11 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     if has_operating_point_signal(state):
         r = _render_operating_point_matrix(ws, state, r + 1)
 
+    # INTENT (2026-07-29 JLR red-team): live DC→wheel power + thermal ΔT block.
+    # Yellow inputs drive green formulas so C16-class literals are not the SoT.
+    if _has_fpk_power_trace_signal(state):
+        r = _render_fpk_power_thermal_trace(ws, state, r + 1)
+
     # number formats (#37): value (B) + engine-value (E) + Δ (F) columns. These
     # carry per-calc results in mixed units, so a thousands-separated 2-dp mask
     # (not £, not General/scientific) is the safe universal display.
@@ -7392,6 +7441,163 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     ws.freeze_panes = "A4"
     back_link(ws, 9)
     return live_count, static_count
+
+
+def _has_fpk_power_trace_signal(state: dict) -> bool:
+    """True when contract carries front/rear FPK continuous DC + efficiency planes."""
+    q = ((state or {}).get("orchestratorContract") or {}).get("quantities") or {}
+    pc = str(((state or {}).get("orchestratorContract") or {}).get("product_class")
+             or ((state or {}).get("parsedBrief") or {}).get("product_class") or "")
+    if re.search(r"formula_e|front_mgu|rear_mgu|fpk", pc, re.I):
+        return True
+    return "continuous_power_kw" in q and "inverter_efficiency" in q and (
+        "mgu_efficiency" in q or "mgu_shaft_power_kw" in q
+    )
+
+
+def _qval(state: dict, key: str, default: float) -> float:
+    raw = (((state or {}).get("orchestratorContract") or {}).get("quantities") or {}).get(key)
+    if isinstance(raw, dict):
+        try:
+            return float(raw.get("value"))
+        except (TypeError, ValueError):
+            return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) -> int:
+    """Live DC→AC→shaft→wheel + coolant ΔT — editable yellow drivers, green formulas.
+
+    INTENT (2026-07-29 red-team F1/F5/F6): a HoT must edit Vdc / η / flow and see
+    the chain recompute. Pasted data-flow literals above are not the SoT.
+    """
+    r = start_row
+    sub_banner(
+        ws, r,
+        "FPK power & thermal trace — LIVE formulas (yellow = edit; green = recomputes)",
+        14,
+    )
+    r += 1
+    ws.cell(
+        r, 1,
+        "Power ENTERS at HV DC (RESS → inverter). Leaves as mechanical shaft then "
+        "wheel after gear. Heat to coolant = P_dc − P_shaft (lump). HW class / "
+        "envelope currents are PEAK sizing — not continuous duty.",
+    ).font = FONT_NOTE
+    r += 2
+    header(ws, r, ["Quantity", "Live value", "Unit", "Role / formula", "Engine seed", "Delta"])
+    r += 1
+
+    # Yellow inputs
+    inputs = [
+        ("P_dc_cont", _qval(state, "continuous_power_kw", 250), "kW",
+         "DC electrical continuous at inverter input (from RESS)"),
+        ("eta_inv", _qval(state, "inverter_efficiency", 0.985), "—",
+         "Inverter efficiency (tool:inverter:sic-loss or seed)"),
+        ("eta_mgu", _qval(state, "mgu_efficiency", 0.97), "—",
+         "MGU efficiency (tool:motor:loss-point or seed)"),
+        ("eta_gear", _qval(state, "gear_efficiency", 0.97), "—",
+         "Gearbox efficiency (trial seed until mesh loss model)"),
+        ("rpm", _qval(state, "mgu_base_speed_rpm", 19500), "rpm",
+         "Mechanical base speed for T=P/ω"),
+        ("flow_l_min", _qval(state, "coolant_flow_l_min", 12), "L/min",
+         "Coolant volumetric flow (EGW class)"),
+        ("rho_egw", 1030.0, "kg/m³", "Coolant density assumption (EGW ~50/50)"),
+        ("cp_egw", 3500.0, "J/(kg·K)", "Coolant specific heat assumption"),
+        ("P_hw", _qval(state, "front_hardware_power_class_kw",
+                       _qval(state, "rear_axle_electrical_power_kw", 350)), "kW",
+         "Hardware PEAK class (nameplate) — not continuous"),
+        ("Vdc_min", _qval(state, "assumed_vdc_min_v",
+                          _qval(state, "v_dc_min_v", 600)), "V",
+         "Minimum DC bus for phase-current ceiling"),
+        ("I_ph_margin", 1.12, "—",
+         "Design margin on ideal SVPWM I_ph (dead-time / modulation / Vdrop)"),
+    ]
+    input_rows: Dict[str, int] = {}
+    for label, val, unit, note in inputs:
+        ws.cell(r, 1, label).border = BORDER
+        vc = ws.cell(r, 2, float(val))
+        vc.fill = FILL_INPUT
+        vc.border = BORDER
+        vc.number_format = FMT_DEC2 if abs(float(val)) >= 1 else "0.0000"
+        ws.cell(r, 3, unit).border = BORDER
+        ws.cell(r, 4, note).font = FONT_NOTE
+        input_rows[label] = r
+        r += 1
+
+    b = {k: f"$B${row}" for k, row in input_rows.items()}
+    # Green derived chain
+    derived = [
+        ("P_ac", f"={b['P_dc_cont']}*{b['eta_inv']}", "kW",
+         "P_dc × η_inv — AC into MGU", _qval(state, "mgu_ac_electrical_input_kw", 0)),
+        ("P_shaft", f"={b['P_dc_cont']}*{b['eta_inv']}*{b['eta_mgu']}", "kW",
+         "P_dc × η_inv × η_mgu — MECHANICAL shaft",
+         _qval(state, "mgu_shaft_power_kw", 0)),
+        ("P_wheel", f"={b['P_dc_cont']}*{b['eta_inv']}*{b['eta_mgu']}*{b['eta_gear']}", "kW",
+         "P_shaft × η_gear — exits to halfshafts",
+         _qval(state, "gear_output_power_kw", 0)),
+        ("omega", f"={b['rpm']}*2*PI()/60", "rad/s",
+         "ω = rpm × 2π/60", _qval(state, "mgu_base_speed_rpm", 19500) * 2 * 3.14159265358979 / 60),
+        ("T_shaft", f"=P_shaft_REF*1000/omega_REF", "Nm",
+         "T = P_shaft/ω (mechanical)", _qval(state, "mgu_shaft_torque_nm", 0)),
+        ("Q_loss", f"={b['P_dc_cont']}-P_shaft_REF", "kW",
+         "Heat to coolant (lump) = P_dc − P_shaft",
+         _qval(state, "total_dissipated_kw_continuous", 0)),
+        ("mdot", f"=({b['flow_l_min']}/60)*({b['rho_egw']}/1000)", "kg/s",
+         "ṁ from volumetric flow", 0),
+        ("dT_coolant", f"=IF(mdot_REF<=0,\"—\",Q_loss_REF*1000/(mdot_REF*{b['cp_egw']}))", "K",
+         "ΔT = Q/(ṁ·cp)", _qval(state, "coolant_delta_t_k", 0)),
+        ("I_ph_ideal", f"=CEILING({b['P_hw']}*1000/(SQRT(3)*({b['Vdc_min']}/SQRT(2))),1)", "A",
+         "Ideal SVPWM I_ph at Vdc,min for P_hw",
+         _qval(state, "phase_current_max_a", 0)),
+        ("I_ph_design", f"=CEILING(I_ph_ideal_REF*{b['I_ph_margin']},1)", "A",
+         "I_ph × design margin",
+         _qval(state, "phase_current_design_a", 0)),
+        ("mass_unit", f"={_qval(state,'mass_motor_kg',11.5)}+{_qval(state,'mass_inverter_kg',8.2)}"
+         f"+{_qval(state,'mass_gear_diff_kg',6.4)}+{_qval(state,'mass_housing_misc_kg',2.7)}", "kg",
+         "Σ concept mass seeds (CAD weigh replaces)",
+         _qval(state, "unit_mass_kg", 28.8)),
+    ]
+    # First pass: write formulas; resolve self-refs to cell addresses
+    drows: Dict[str, int] = {}
+    pending = list(derived)
+    # Write with temporary placeholders then patch cross-refs
+    for label, formula, unit, note, engine in pending:
+        ws.cell(r, 1, label).border = BORDER
+        # defer formula write until we know row numbers for cross-refs
+        drows[label] = r
+        ws.cell(r, 3, unit).border = BORDER
+        ws.cell(r, 4, note).font = FONT_NOTE
+        ec = ws.cell(r, 5, float(engine) if isinstance(engine, (int, float)) else engine)
+        ec.border = BORDER
+        ec.number_format = FMT_DEC2
+        r += 1
+
+    # Now write live formulas with resolved refs
+    for label, formula, unit, note, engine in pending:
+        row = drows[label]
+        f = formula
+        f = f.replace("P_shaft_REF", f"$B${drows['P_shaft']}")
+        f = f.replace("omega_REF", f"$B${drows['omega']}")
+        f = f.replace("Q_loss_REF", f"$B${drows['Q_loss']}")
+        f = f.replace("mdot_REF", f"$B${drows['mdot']}")
+        f = f.replace("I_ph_ideal_REF", f"$B${drows['I_ph_ideal']}")
+        vc = ws.cell(row, 2, f)
+        vc.fill = FILL_RESULT
+        vc.border = BORDER
+        vc.number_format = FMT_DEC2
+        # Δ vs engine seed
+        if isinstance(engine, (int, float)) and engine != 0:
+            ws.cell(row, 6, f"=IF(ISNUMBER(E{row}),B{row}-E{row},\"—\")").border = BORDER
+        else:
+            ws.cell(row, 6, "—").border = BORDER
+
+    print(f"  · Calculations: FPK power/thermal LIVE trace "
+          f"({len(inputs)} inputs + {len(derived)} formulas)")
+    return r + 1
 
 
 def _render_operating_point_matrix(ws: Worksheet, state: dict, start_row: int) -> int:
@@ -20051,6 +20257,7 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     _bm = audit_operand("PCB", "bespoke board required but pipeline not clean", bool(_bespoke_missing), "isPcbBearing & disposition=bespoke & !pipeline_ok")
     _fs = audit_operand("PCB", "design-fitness score (/10)", round(float(a.get("fitness_score") or 0.0), 2), "BoM MPN/package resolution weighted vs function_class guesses")
     _gp = audit_operand("PCB", "unresolved ELECTRONIC gap count", int(a.get("n_electronic_gap") or 0), "electronic parts with no resolved MPN/package")
+    _ag = audit_operand("PCB", "architecture/channel gap count", int(a.get("architecture_gaps") or 0), "state.pcb.architecture channelRequirements vs state.pcb.implementedChannels")
     # HONESTY (2026-07-23, Tristan spot-check): the FAB-READY banner hard-coded "DRC-clean",
     # but a board can carry real DRC residuals (a false "clean" is as bad as a false FAIL).
     # Read the REAL per-board drc-report.json error count and disclose it in the banner.
@@ -25354,6 +25561,9 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             "pretraining_extracted_standards": "Standards (scope + citations)",
             "distributor_cascade_cache": "Distributor price cache",
             "material_prices": "Material prices (£/kg)",
+            "fpk_extracted_claims": "FPK claims (formulas/materials/geometry)",
+            "fpk_component_literature": "FPK component↔literature links",
+            "pretraining_spec_documents": "Spec/literature documents",
         }
         for _tbl, _lbl in _GDB_LABELS.items():
             _e = _fresh.get("tables", {}).get(_tbl) or {}
@@ -25363,6 +25573,8 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             _extra = ""
             if _tbl == "distributor_cascade_cache":
                 _extra = f" · {_e.get('hits', 0)} hits / {_e.get('expired', 0)} expired"
+            if _tbl == "material_prices" and _e.get("stale_n") is not None:
+                _extra += f" · {_e.get('stale_n')} stale rows"
             _val = (f"{_e.get('n', 0):,} rows · last {str(_e.get('max_ts') or '—')[:10]} "
                     f"({_age if _age is not None else '?'} d){_extra}")
             ws.cell(r, 1, _lbl).font = FONT_SUB
@@ -25371,6 +25583,31 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             if _e.get("stale"):
                 ws.cell(r, 4, "STALE — refresh the seed (A5)").font = FONT_NOTE
             r += 1
+        # Surface twin FPK DB usage proof when present (not orphan JSON-only).
+        _fpk_db = (state or {}).get("fpkDbUsage") or {}
+        if _fpk_db:
+            r += 1
+            sub_banner(ws, r, "FPK DB knowledge — presence / use / growth proof", 4)
+            r += 1
+            _useful = bool(_fpk_db.get("useful"))
+            ws.cell(r, 1, "fpkDbUsage.useful").font = FONT_SUB
+            _vc = ws.cell(r, 2, "USEFUL" if _useful else "NOT USEFUL")
+            _vc.fill = FILL_PASS if _useful else FILL_FAIL
+            r += 1
+            _bars = _fpk_db.get("bars") or {}
+            _pass_n = sum(1 for v in _bars.values() if v)
+            ws.cell(r, 1, "Deterministic bars").font = FONT_SUB
+            ws.cell(r, 2, f"{_pass_n}/{len(_bars)} PASS · proved {_fpk_db.get('proved_at', '—')}")
+            r += 1
+            if _fpk_db.get("typescript_consumer_ok") is not None:
+                ws.cell(r, 1, "TS consumer (lookupFpkClaims)").font = FONT_SUB
+                _tok = bool(_fpk_db.get("typescript_consumer_ok"))
+                ws.cell(r, 3, 1 if _tok else 0).font = _FONT_AUDIT
+                # LIVE-CHECK GATE: even proof/status rows must be formulas, not
+                # bare OK/FAIL literals. Col C is the row-local audit operand.
+                _vc = ws.cell(r, 2, f'=IF($C{r}>=1,"OK","FAIL — TS consumer proof failed")')
+                _vc.fill = FILL_PASS if _tok else FILL_FAIL
+                r += 1
 
     # ---- PER-TAB deterministic scorecard (Tristan 2026-06-26): every tab vs the ≥8 floor.
     # LIVE SCORES (2026-07-03): every Score cell (B) is a FORMULA — =ROUND(MIN(...),1)
@@ -25462,10 +25699,23 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         _QA_FLOOR_CELL.clear()
         _QA_FLOOR_CELL.append(f"'{ws.title}'!$B${r}")
         r += 1
-        ws.cell(r, 1, "LIVE OPEN ISSUES — sections/tabs below 8 or unscored "
-                      "(computed in-cell over the same score cells)").font = FONT_SUB
+        # INTENT (2026-07-29 JLR): LIVE OPEN ISSUES must also floor on race-critical
+        # OPEN-by-design holds (HIL / supplier Gerbers / dyno). Tab-floor alone can
+        # under-count (python 6 vs workbook 5) and greenwash homologation gaps.
+        _race_open_n_qa = sum(
+            1 for h in (state.get("decisionHolds") or [])
+            if isinstance(h, dict)
+            and str(h.get("status") or "").upper() == "OPEN"
+            and (h.get("blocks_homologation") or h.get("open_by_design"))
+        )
+        ws.cell(r, 1, "LIVE OPEN ISSUES — max(tabs below 8/unscored, race OPEN-by-design "
+                      "holds: HIL / supplier Gerbers / dyno)").font = FONT_SUB
         _opn_terms = [f'COUNTIF({_rg},"<8")+(COUNTA({_rg})-COUNT({_rg}))' for _rg in _rngs]
-        _opc = ws.cell(r, 2, "=" + "+".join(_opn_terms) if _opn_terms else 0)
+        _tab_open_expr = "+".join(_opn_terms) if _opn_terms else "0"
+        if _race_open_n_qa:
+            _opc = ws.cell(r, 2, f"=MAX({_tab_open_expr},{int(_race_open_n_qa)})")
+        else:
+            _opc = ws.cell(r, 2, f"={_tab_open_expr}")
         _opc.fill = FILL_RESULT
         _QA_OPEN_CELL.clear()
         _QA_OPEN_CELL.append(f"'{ws.title}'!$B${r}")
@@ -25835,6 +26085,12 @@ _dt(["Condition", "Duration / share", "Speed (rpm)", "Torque (Nm)", "Vdc (V)",
      "Coolant (°C)", "Winding (°C)", "Magnet (°C)", "Margin / status", "Source"],
     "operating-point-matrix",
     ["Condition", "Margin / status", "Source"])
+# FPK DC→wheel LIVE power/thermal trace (2026-07-29 red-team): yellow inputs +
+# green formulas. Quantity/Live value/Unit/Role always filled; Engine seed + Delta optional.
+_dt(["Quantity", "Live value", "Unit", "Role / formula", "Engine seed", "Delta"],
+    "fpk-power-thermal-trace",
+    ["Quantity", "Live value", "Unit", "Role / formula"],
+    numeric=["Live value", "Engine seed", "Delta"], unit=["Unit"])
 # Vehicle↔pack ICD from contract topology. Connector is honestly TBD until OEM stamp.
 _dt(["Interface ID", "Domain", "From", "To", "Nominal", "Limit", "Unit",
      "Medium / protocol", "Connector / port", "Responsibility",
@@ -29412,6 +29668,35 @@ def build(run_dir: str, out_path: str) -> dict:
         _reconcile_watt_scale_feeder_cable(state)
     except Exception as exc:  # noqa: BLE001
         print(f"  · watt-scale feeder cable reconcile skipped: {exc}")
+    # FPK front power-chain reconcile: state quantities can be refreshed after
+    # the tool ledger was written. Sync BOTH the quantity formula provenance and
+    # the 4-orchestrator-tools-used sidecar before deterministic checks read it.
+    try:
+        from fpk_excel_live_plan import (  # noqa: WPS433 - local to keep exporter optional
+            stamp_fpk_formula_provenance,
+            sync_front_fpk_power_reconcile_tools_page,
+        )
+        _fpk_mut = False
+        if stamp_fpk_formula_provenance(state):
+            _fpk_mut = True
+            print("  · FPK formula provenance stamped for power/thermal live coverage")
+        _side_path = os.path.join(run_dir, "4-orchestrator-tools-used.json")
+        _side = load_json(_side_path) if os.path.isfile(_side_path) else None
+        if isinstance(_side, dict) and sync_front_fpk_power_reconcile_tools_page(_side, state):
+            with open(_side_path, "w", encoding="utf-8") as _fh:
+                json.dump(_side, _fh, indent=2, default=str)
+            _fpk_mut = True
+            print("  · FPK power reconcile tool claims synced to sidecar")
+        _page = state.get("toolsUsedPage")
+        if isinstance(_page, dict) and sync_front_fpk_power_reconcile_tools_page(_page, state):
+            _fpk_mut = True
+            print("  · FPK power reconcile tool claims synced to state.toolsUsedPage")
+        if _fpk_mut:
+            _sp = os.path.join(run_dir, "state.json")
+            with open(_sp, "w", encoding="utf-8") as _fh:
+                json.dump(state, _fh, indent=2, default=str)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  · FPK formula/claim sync skipped: {exc}")
     # TEC bay-self-heat: sync stale peltier claims → clear PROVENANCE STALE FAILs.
     # GOTCHA: CHECKS read 4-orchestrator-tools-used.json, not toolsUsedPage alone.
     try:
@@ -34702,7 +34987,10 @@ def _selftest() -> int:
                        {"name": "drawings", "score": 9, "defects": []}]},
                    "tabScorecard": {"Brief": {"score": 9, "status": "PASS", "issues": []}},
                    "tabScorecardSummary": {"min_tab": "Brief", "min_score": 9,
-                                           "fail_tabs": [], "unscored_tabs": []}}
+                                           "fail_tabs": [], "unscored_tabs": []},
+                   "fpkDbUsage": {"useful": True, "bars": {"db_present": True},
+                                  "proved_at": "selftest",
+                                  "typescript_consumer_ok": True}}
         _VERDICT_CELLS.clear(); _VERDICT.clear()
         _VERDICT.update(compute_verdict(_qstate, _qstate["tabScorecard"]))
         _wbq = Workbook(); _wbq.remove(_wbq.active)
@@ -34727,6 +35015,16 @@ def _selftest() -> int:
                     print(f"  FAIL quality-merge: merged tab must carry {_need!r}"); bad += 1
             if sum(1 for (_t, _r, _c, _s, _sf) in _VERDICT_CELLS if _t == "Quality & Audit") != 1:
                 print("  FAIL quality-merge: exactly ONE verdict cell registered for re-stamping"); bad += 1
+            _ts_status = None
+            for row_ in _wsq.iter_rows():
+                if row_[0].value == "TS consumer (lookupFpkClaims)":
+                    _ts_status = row_[1].value
+                    break
+            if _ts_status is not None and not (
+                isinstance(_ts_status, str) and _ts_status.startswith("=")
+            ):
+                print(f"  FAIL quality-merge: FPK TS consumer status must be a live "
+                      f"formula, not a bare literal (got {_ts_status!r})"); bad += 1
     finally:
         _VERDICT_CELLS.clear(); _VERDICT_CELLS.extend(_save_vc)
         _VERDICT.clear(); _VERDICT.update(_save_v)
