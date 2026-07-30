@@ -42,12 +42,21 @@ You asked whether “DONE software” and “PASS release” are Part A and Part
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~21:20:** **Part A still building — not finished. Part B deliberately OPEN.**  
-Just landed: rotor bore enlarged so planetary nest fits (`nest_fits_rotor=true`, rotor ID **130.5** mm); hardware **bench-prep recipes** (`READY_FOR_BENCH`, still OPEN); post-diff CadQuery family; Excel revision gate; MTPA + voltage/FW screens.  
-Next Part A push: Blender re-render must log rotorID **130.5** (not stale 92.7); post-diff ×4 into Blender interfaces.  
-`ship_ok` **false**. Release CAD **0%**. Hardware holds OPEN (recipes ready; no measured PASS).
+**Overall mood as of 2026-07-30 ~22:05:** **Part A software-screening bar largely met. Part B deliberately OPEN.**  
+Live stamp: **0 OPEN architecture blockers**; all 7 solver checks **PARTIAL** with `works_in_kit_context=true` (formal PASS forbidden without benches); parametric CAD families **9**; release CAD **0%**; hardware holds **6/6 OPEN** + `READY_FOR_BENCH`.  
+`ship_ok` **false** (correct).
 
-**Last scoreboard update:** 2026-07-30 ~21:20 (Part A/B clarified).
+**Last scoreboard update:** 2026-07-30 ~22:05 (Part A screening burst).
+
+### What “all stages pass” means here
+
+| Finish line | Can go green from this repo? | Live status |
+|---|---|---|
+| Part A — architecture blockers cleared (software screening) | **Yes** | **0 OPEN** (diff nest, planetary bore, post-diff all CLEARED screening) |
+| Part A — every required check has twin-bound screen + works in kit | **Yes as PARTIAL** | **7/7 PARTIAL**, `still_open_checks=[]` |
+| Part A — Blender matches physics geometry | **Yes** | Re-render in flight for rotor OD **197.1** / post-diff resize |
+| Formal solver check **PASS** + `ship_ok=true` | **No — needs Part B benches** | Intentionally **false** / not PASS |
+| Hardware correlation holds closed | **No — needs labs** | **6/6 OPEN**, recipes ready |
 
 ### Simple finish checklist (what “finished” means)
 
@@ -55,21 +64,23 @@ Next Part A push: Blender re-render must log rotorID **130.5** (not stale 92.7);
 |---|---|---|
 | Shared revision enforced | **DONE** (Excel hard-exits on mismatch) | Keep using it |
 | Results visible (step 7) | **DONE** | Re-stamp after each change |
-| Hardware holds visible (step 8 register) | **DONE as register + recipes** | Closing holds = real dyno/HIL/flow — **Part B, not software** |
-| Diff nest strength | **Screen cleared** via cut-torque | Post-diff stage still packaging OPEN |
-| Post-diff ×4 stage | **CAD + Blender meshes PARTIAL** | Interfaces/strength still OPEN; blocker not cleared |
-| Planetary fits rotor bore | **CLEARED (software)** — enlarge bore path | Re-render Blender from 130.5 mm bore; keep `nest_fits_rotor` guard |
-| EM evidence | PARTIAL screens (MTPA + voltage/FW) | Denser closed map in software; dyno = Part B |
-| Cooling | PARTIAL (duct + lumped temp) | Fuller CHT/oil screens in software; flow bench = Part B |
-| `ship_ok = true` | **Forbidden until Part A + Part B** | Do not celebrate early |
+| Hardware holds visible (step 8 register) | **DONE as register + recipes** | Closing holds = real dyno/HIL/flow — **Part B** |
+| Diff nest strength | **CLEARED (screening)** | Release bevel / KISSsoft = later |
+| Post-diff ×4 stage | **CLEARED (software screening)** FoS≈1.20, bay_fit, interfaces 0 gap | KISSsoft / release CAD / bench |
+| Planetary fits rotor bore | **CLEARED** ID **130.5** mm | Keep `nest_fits_rotor` guard |
+| EM evidence | **PARTIAL + duty screen ok** (~207 N·m FEMM after OD recover); denser hybrid map 164 pts | Dyno = Part B; keep maps OPEN |
+| Cooling | **PARTIAL + coupled network ok** (T_mod≈71 °C, Δp≈43 kPa) | Full CHT + flow bench = Part B |
+| CAD parametric spine | **9 families** | More principals + supplier STEP (release still 0) |
+| `ship_ok = true` | **Forbidden until Part B** | Do not celebrate early |
 
 ### Architecture blockers (track + permanently unblock — not chat-only)
 
 | Blocker id | Status | Why blocked | Permanent unblock | Guard |
 |---|---|---|---|---|
 | `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` | **CLEARED (screening)** | Was: nest OD≤120 could not carry ~1000 N·m | Applied `cut_torque_at_diff`: `ratio_into_diff=2.0`, `ratio_after_diff=4.0` → carrier ≈250 N·m, FoS≈1.22 | Decision JSON `_motor_stack/diff_architecture_decision.json` |
-| `PLANETARY_STRENGTH_VS_ROTOR_BORE` | **CLEARED (software)** | Was: tip~128 mm vs bore 92.7 mm | Enlarge rotor bore (ID **130.5** / OD **159.8**); strength writeback + `nest_fits_rotor` | ISO case + `fpk_concentric_geometry` selftest |
-| `POST_DIFF_FINAL_DRIVE_PACKAGING` | **OPEN** | Remaining ×4 ratio after the open bevel is not yet a packaged CAD/Blender stage | Package outboard/final-drive stage in bay; sync CAD + Blender; re-screen interfaces | Stamp `architectureBlockers[]`; proveCatch ⇒ `ship_ok` false |
+| `PLANETARY_STRENGTH_VS_ROTOR_BORE` | **CLEARED (software)** | Was: tip~128 mm vs bore 92.7 mm | Enlarge rotor bore (ID **130.5**); grow EM ring OD to **197.1** so duty torque recovers | ISO case + `fpk_concentric_geometry` selftest |
+| `POST_DIFF_FINAL_DRIVE_PACKAGING` | **CLEARED (software screening)** | Was: residual ×4 stage unpackaged / weak | Strength-resize 24:96 m_n=1.4 face=46 helix=25; FoS≈1.20; interfaces + Blender meshes | Packaging screen `blocker_may_clear` + stamp |
+| `EM_TORQUE_VS_ROTOR_BORE` | **Armed, not firing** | Would fire if nest fits but FEMM duty &lt;75% | Bore+OD recover + pole-pitch magnets | Stamp proveCatch |
 
 Surfaces: `motorMultiphysics.architectureBlockers` · `hardwareCorrelation` · sidecar · markdown · Quality & Audit.
 
