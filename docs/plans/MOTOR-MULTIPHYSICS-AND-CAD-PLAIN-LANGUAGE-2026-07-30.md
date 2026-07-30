@@ -24,12 +24,20 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~18:20:** **Software screens advancing — still not race-ready.**  
-Happy about: **7/7** required checks PARTIAL; planetary gear + demag + pocket + case/mount kit screens; EM position sweep; Excel Q&A.  
-Honest architecture hold: **bevel differential** seed FoS≈0.002; best-in-kit OD=120 mm still FoS≈0.60 — clearing needs OD≳220 mm → `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE`.  
-Not done: full MTPA/FW map, dyno/HIL, free-surface oil CFD, KISSsoft, full cast-case FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
+**Overall mood as of 2026-07-30 ~18:40:** **Software screens advancing — still not race-ready.**  
+Happy about: **7/7** required checks PARTIAL; planetary gear + demag + pocket + case/mount kit screens; EM position sweep; Excel Q&A; **architecture blockers register** in stamp/Excel.  
+Honest architecture hold (tracked): **bevel differential** → `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` (OPEN; permanent unblock options named in code).  
+Not done: human architecture decision on diff nest; full MTPA/FW map; dyno/HIL; free-surface oil CFD; KISSsoft; full cast-case FEA; supplier STEP; **release CAD = 0%**; `ship_ok` **false**.
 
-**Last scoreboard update:** 2026-07-30 (bevel architecture hold + demag + case/mount).
+**Last scoreboard update:** 2026-07-30 (architecture blockers registry + permanent unblock paths).
+
+### Architecture blockers (track + permanently unblock — not chat-only)
+
+| Blocker id | Status | Why blocked | Permanent unblock options (pick one + implement in code) | Guard |
+|---|---|---|---|---|
+| `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` | **OPEN** | Straight-bevel nest OD≤120 mm cannot clear FoS≥1.2 at ~1000 N·m carrier (best≈0.60; clearing hint OD≳220 mm) | (1) `enlarge_diff_nest` — raise nest/ring tip + CadQuery/Blender writeback; (2) `cut_torque_at_diff` — Decision Register freeze on torque budget / ratio split; (3) `change_diff_topology` — new topology family | Stamp `architectureBlockers[]` + proveCatch: OPEN blocker ⇒ `ship_ok` false; Excel Q&A table |
+
+Surfaces: `motorMultiphysics.architectureBlockers` · sidecar · markdown · Quality & Audit.
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
@@ -73,11 +81,12 @@ Expected early. **Not fab-ready.** Building the library ≠ closed manufacturing
 
 **Still open (next campaigns — not claimed done):**
 
-1. Magnetic position/MTPA map + 24-vs-48 slot reconciliation.  
-2. Gear redesign so ISO FoS ≥ 1.2, then re-screen.  
-3. Full CHT / free-surface oil / case FEA / KISSsoft.  
-4. Hardware: dyno, HIL, flow bench, FIA port XYZ.  
-5. Keep `ship_ok = false` until those close.
+1. **Architecture decision on `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE`** — pick enlarge nest / cut torque / change topology; implement writeback + re-screen (tracked in `architectureBlockers`).  
+2. Magnetic denser MTPA/FW map + 24-vs-48 slot reconciliation.  
+3. Sync Blender/edu_form to strength-resized planetary (gear FoS screen already works=yes).  
+4. Full CHT / free-surface oil / case FEA / KISSsoft.  
+5. Hardware: dyno, HIL, flow bench, FIA port XYZ.  
+6. Keep `ship_ok = false` until those close.
 
 ---
 

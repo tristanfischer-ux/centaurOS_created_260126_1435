@@ -25,6 +25,52 @@ SCHEMA_MOTOR = "motor-multiphysics/v1"
 SCHEMA_CAD = "cad-authority/v1"
 ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 
+# INTENT (2026-07-30): Architecture / packaging blockers must be machine-readable
+# with permanent unblock paths — never chat-only, never greenwashed to ship_ok.
+BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
+_DIFF_NEST_PERMANENT_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "enlarge_diff_nest",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Raise kit-allowed bevel nest OD (and planetary ring tip) so a "
+            "strength-driven nest clears FoS ≥ 1.2, then sync CadQuery + Blender."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py"
+            "#MAX_DIFF_OD_IN_KIT_MM;"
+            "Tier 1 and 2 parts for cad /tier2_motor_drivetrain.py#planetary_gearset;"
+            "scripts/lib/edu_form_grammar.py"
+        ),
+    },
+    {
+        "option_id": "cut_torque_at_diff",
+        "kind": "architecture_decision",
+        "summary": (
+            "Reduce carrier torque into the open bevel (ratio split, dual-path, "
+            "or limited-slip torque budget) so the current nest envelope clears."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py#derive_motor_shaft_torque_nm;"
+            "Decision Register freeze: DIFF_TORQUE_BUDGET"
+        ),
+    },
+    {
+        "option_id": "change_diff_topology",
+        "kind": "architecture_decision",
+        "summary": (
+            "Replace open straight-bevel nest (spur/helical face, compact "
+            "torque-vectoring module, or locked axle strategy) with a topology "
+            "that fits the bay and clears strength."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py;"
+            "docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md"
+            "#architecture-blockers"
+        ),
+    },
+]
+
 # Last-known-green toolchain smoke notes (README / 2026-07-30 proofs).
 # These prove the *tools* run — never that the FIA twin geometry was solved.
 _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
@@ -1146,6 +1192,16 @@ def _bevel_differential_cite_from_case(
     min_fos = margins.get("minimum_strength_factor")
     if min_fos is None:
         min_fos = strength.get("minimum_strength_factor")
+    recommended = (
+        bevel_case.get("recommended_geometry")
+        if isinstance(bevel_case.get("recommended_geometry"), dict)
+        else {}
+    )
+    architecture_hold = (
+        bevel_case.get("architecture_hold")
+        or recommended.get("architecture_hold")
+        or None
+    )
     return {
         "status": bevel_case.get("status") or "PARTIAL",
         "ship_ok": False,
@@ -1163,14 +1219,76 @@ def _bevel_differential_cite_from_case(
         "spider_pinion_teeth": geometry.get("spider_pinion_teeth"),
         "side_gear_teeth": geometry.get("side_gear_teeth"),
         "tooth_count_basis": geometry.get("tooth_count_basis"),
+        "architecture_hold": architecture_hold,
         "iso23509_independent_check": "OPEN",
         "kisssoft_independent_check": "OPEN",
         "note": (
             "Twin-bound straight-bevel handbook SCREEN on "
             "compact_bevel_differential packaging nest — NOT full ISO 23509 / "
             "KISSsoft / contact pattern; ship_ok false."
+            + (
+                f" Architecture hold: {architecture_hold}."
+                if architecture_hold
+                else ""
+            )
         ),
     }
+
+
+def collect_architecture_blockers(
+    motor: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Harvest OPEN architecture / packaging blockers from twin-bound cites.
+
+    INTENT: A blocker that only lives in chat or a plan paragraph regresses.
+    Every hold that prevents honest PASS must appear here with permanent
+    unblock options (geometry writeback, architecture decision, or freeze).
+
+    @description Reads gear_strength bevel cite (extend as new holds land).
+    @param motor motorMultiphysics object
+    @returns List of blocker dicts (may be empty)
+    """
+    blockers: list[dict[str, Any]] = []
+    checks = motor.get("required_checks") if isinstance(motor, Mapping) else None
+    if not isinstance(checks, Mapping):
+        return blockers
+    gear = checks.get("gear_strength")
+    if not isinstance(gear, Mapping):
+        return blockers
+    twin_case = gear.get("twin_bound_case")
+    if not isinstance(twin_case, Mapping):
+        return blockers
+    bevel = twin_case.get("bevel_differential_screen")
+    if not isinstance(bevel, Mapping):
+        return blockers
+    hold = str(bevel.get("architecture_hold") or "")
+    if BLOCKER_ID_DIFF_NEST in hold or (
+        bevel.get("works_in_kit_context") is False
+        and bevel.get("minimum_strength_factor") is not None
+        and float(bevel.get("minimum_strength_factor") or 0.0) < 1.2
+        and "DIFF_NEST" in hold
+    ):
+        blockers.append(
+            {
+                "blocker_id": BLOCKER_ID_DIFF_NEST,
+                "domain": "gear_strength.differential",
+                "status": "OPEN",
+                "severity": "architecture_hold",
+                "ship_ok": False,
+                "cannot_greenwash": True,
+                "evidence_path": bevel.get("path")
+                or "_motor_stack/iso_bevel_fia_front_kit_case.json",
+                "minimum_strength_factor": bevel.get("minimum_strength_factor"),
+                "summary": hold
+                or (
+                    "Straight-bevel nest inside kit envelope cannot clear "
+                    "carrier-torque FoS ≥ 1.2 — architecture hold."
+                ),
+                "permanent_unblock_options": list(_DIFF_NEST_PERMANENT_UNBLOCK),
+                "human_decision_required": True,
+            }
+        )
+    return blockers
 
 
 def _gear_strength_check_from_fia_case(
@@ -1559,6 +1677,14 @@ def build_motor_multiphysics(
                 "(_motor_stack/iso_bevel_fia_front_kit_case.json; "
                 "ISO 23509 still OPEN)."
             )
+            hold = None
+            twin_case = gear_strength.get("twin_bound_case")
+            if isinstance(twin_case, Mapping):
+                bevel_cite = twin_case.get("bevel_differential_screen")
+                if isinstance(bevel_cite, Mapping):
+                    hold = bevel_cite.get("architecture_hold")
+            if hold:
+                notes += f" Architecture blocker OPEN: {hold}"
     else:
         gear_strength = _open_check(
             "gear_strength",
@@ -1596,7 +1722,7 @@ def build_motor_multiphysics(
         "gear_strength": gear_strength,
     }
 
-    return {
+    motor_body: dict[str, Any] = {
         "schema_version": SCHEMA_MOTOR,
         "stamped_at": stamped,
         "source": "scripts/lib/motor_multiphysics_stamp.py",
@@ -1610,9 +1736,16 @@ def build_motor_multiphysics(
         "honesty": (
             "Blender explains packaging. Analytical tools screen. "
             "PASS needs twin-bound result_ref + geometry_revision + input_hash. "
-            "Toolchain smoke ≠ PASS. ship_ok stays false."
+            "Toolchain smoke ≠ PASS. ship_ok stays false. "
+            "OPEN architectureBlockers block release until permanently unblocked."
         ),
     }
+    blockers = collect_architecture_blockers(motor_body)
+    motor_body["architectureBlockers"] = blockers
+    motor_body["architecture_blockers_open_count"] = sum(
+        1 for b in blockers if b.get("status") == "OPEN"
+    )
+    return motor_body
 
 
 def build_cad_authority(
@@ -1708,6 +1841,9 @@ def build_stamp_payload(
     }
     if packaging is not None:
         payload["inverterPackaging"] = packaging
+    blockers = motor.get("architectureBlockers")
+    if isinstance(blockers, list):
+        payload["architectureBlockers"] = blockers
     return payload
 
 
@@ -1827,6 +1963,50 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
                 "",
             ]
         )
+    blockers = (
+        payload.get("architectureBlockers")
+        or motor.get("architectureBlockers")
+        or []
+    )
+    if isinstance(blockers, list) and blockers:
+        lines.extend(
+            [
+                "",
+                "## Architecture blockers (must permanently unblock — not chat-only)",
+                "",
+                "Each OPEN blocker has named permanent unblock options in code /",
+                "Decision Register. `ship_ok` stays false while any remain OPEN.",
+                "",
+                "| Blocker | Status | Severity | Evidence | Permanent unblock |",
+                "|---|---|---|---|---|",
+            ]
+        )
+        for b in blockers:
+            if not isinstance(b, Mapping):
+                continue
+            opts = b.get("permanent_unblock_options") or []
+            opt_ids = ", ".join(
+                f"`{o.get('option_id')}`"
+                for o in opts
+                if isinstance(o, Mapping)
+            ) or "—"
+            lines.append(
+                f"| `{b.get('blocker_id')}` | **{b.get('status')}** | "
+                f"{b.get('severity')} | `{b.get('evidence_path')}` | {opt_ids} |"
+            )
+        for b in blockers:
+            if not isinstance(b, Mapping):
+                continue
+            lines.extend(["", f"### `{b.get('blocker_id')}`", ""])
+            lines.append(str(b.get("summary") or ""))
+            lines.append("")
+            for o in b.get("permanent_unblock_options") or []:
+                if not isinstance(o, Mapping):
+                    continue
+                lines.append(
+                    f"- **{o.get('option_id')}** ({o.get('kind')}): "
+                    f"{o.get('summary')} — hooks: `{o.get('code_hooks')}`"
+                )
     lines.extend(
         [
             "",
@@ -1838,7 +2018,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             "",
             "Artefacts: `motor-multiphysics.json` (sidecar) · state keys",
             "`motorMultiphysics` / `cadAuthority` / optional `inverterPackaging` "
-            "when state write succeeds.",
+            "/ `architectureBlockers` when state write succeeds.",
             "",
         ]
     )
@@ -1948,6 +2128,27 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
             and bool(packaging.get("result_ref"))
         )
     results["inverter_packaging_honest_or_absent"] = packaging_ok
+    # OPEN architecture blockers must never coexist with ship_ok true.
+    blockers = payload.get("architectureBlockers") or motor.get("architectureBlockers")
+    open_blockers = [
+        b
+        for b in (blockers if isinstance(blockers, list) else [])
+        if isinstance(b, Mapping) and b.get("status") == "OPEN"
+    ]
+    blockers_ok = True
+    if open_blockers:
+        blockers_ok = (
+            motor.get("ship_ok") is False
+            and payload.get("ship_ok") is False
+            and all(b.get("cannot_greenwash") is True for b in open_blockers)
+            and all(
+                isinstance(b.get("permanent_unblock_options"), list)
+                and len(b.get("permanent_unblock_options") or []) >= 1
+                for b in open_blockers
+            )
+        )
+    results["open_architecture_blockers_honest"] = blockers_ok
+    results["open_architecture_blocker_count"] = len(open_blockers)
     results["ok"] = (
         statuses_honest
         and remaining_open
@@ -1957,6 +2158,7 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         and stator_ok
         and smoke_tagged
         and packaging_ok
+        and blockers_ok
         and not illicit_pass
     )
     return results
@@ -2002,9 +2204,24 @@ def apply_to_state(
     state["cadAuthority"] = payload["cadAuthority"]
     if isinstance(payload.get("inverterPackaging"), Mapping):
         state["inverterPackaging"] = payload["inverterPackaging"]
+    blockers = payload.get("architectureBlockers")
+    if isinstance(blockers, list):
+        state["architectureBlockers"] = blockers
+    elif isinstance(payload.get("motorMultiphysics"), Mapping):
+        nested = payload["motorMultiphysics"].get("architectureBlockers")
+        if isinstance(nested, list):
+            state["architectureBlockers"] = nested
     state["ship_ok"] = False
     # Small pointer so digests / Overview can find the sidecar without re-reading
     # the whole multiphysics block if a later wipe occurs.
+    open_n = 0
+    listed = state.get("architectureBlockers")
+    if isinstance(listed, list):
+        open_n = sum(
+            1
+            for b in listed
+            if isinstance(b, Mapping) and b.get("status") == "OPEN"
+        )
     state["motorMultiphysicsPointer"] = {
         "sidecar": "motor-multiphysics.json",
         "markdown": "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
@@ -2013,6 +2230,7 @@ def apply_to_state(
         "all_required_solver_checks_pass": False,
         "stamped_at": payload.get("stamped_at"),
         "has_inverter_packaging": isinstance(payload.get("inverterPackaging"), Mapping),
+        "architecture_blockers_open_count": open_n,
     }
 
 
@@ -2389,6 +2607,50 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "iso_bevel_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.iso_bevel_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "architecture_hold": (
+                        "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE — enlarge nest, "
+                        "reduce ratio/torque at diff, or change topology; "
+                        "do not claim PASS"
+                    ),
+                    "bevel_geometry": {
+                        "diff_od_mm": 19.2,
+                        "spider_pinion_teeth": 10,
+                        "side_gear_teeth": 14,
+                        "tooth_count_basis": "documented packaging seed",
+                    },
+                    "duty_torques": {"carrier_input_torque_nm": 1001.6},
+                    "strength_screen": {
+                        "minimum_bending_fos": 0.01,
+                        "minimum_contact_fos": 0.002,
+                        "minimum_strength_factor": 0.002,
+                    },
+                    "margins": {
+                        "minimum_bending_fos": 0.01,
+                        "minimum_contact_fos": 0.002,
+                        "minimum_strength_factor": 0.002,
+                    },
+                    "works_in_kit_context": {"duty_strength_screen_ok": False},
+                    "recommended_geometry": {
+                        "diff_od_mm": 120.0,
+                        "minimum_strength_factor": 0.60,
+                        "clears_duty_screen": False,
+                        "architecture_hold": (
+                            "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE — enlarge nest, "
+                            "reduce ratio/torque at diff, or change topology; "
+                            "do not claim PASS"
+                        ),
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "inverter_packaging_fia_front_kit_case.json").write_text(
             json.dumps(
                 {
@@ -2578,6 +2840,32 @@ def selftest() -> int:
                 "duty_strength_screen_ok is false"
             )
             bad += 1
+        bevel_cite = (
+            (gear_strength_chk.get("twin_bound_case") or {}).get(
+                "bevel_differential_screen"
+            )
+            if isinstance(gear_strength_chk.get("twin_bound_case"), dict)
+            else None
+        )
+        if not isinstance(bevel_cite, dict):
+            print("FAIL: bevel_differential_screen cite must be present in fixture")
+            bad += 1
+        elif BLOCKER_ID_DIFF_NEST not in str(bevel_cite.get("architecture_hold") or ""):
+            print("FAIL: bevel cite must surface DIFF_NEST architecture_hold")
+            bad += 1
+        blockers = partial_payload["motorMultiphysics"].get("architectureBlockers")
+        if not isinstance(blockers, list) or not blockers:
+            print("FAIL: architectureBlockers must list OPEN holds from bevel case")
+            bad += 1
+        elif blockers[0].get("blocker_id") != BLOCKER_ID_DIFF_NEST:
+            print("FAIL: expected DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE blocker")
+            bad += 1
+        elif not blockers[0].get("permanent_unblock_options"):
+            print("FAIL: blocker must name permanent_unblock_options")
+            bad += 1
+        elif blockers[0].get("cannot_greenwash") is not True:
+            print("FAIL: blocker must set cannot_greenwash")
+            bad += 1
         packaging = partial_payload.get("inverterPackaging")
         if not isinstance(packaging, dict) or packaging.get("status") != "PARTIAL":
             print("FAIL: inverterPackaging section must be PARTIAL when artefact exists")
@@ -2592,17 +2880,35 @@ def selftest() -> int:
         if "Inverter packaging" not in md_partial:
             print("FAIL: markdown must include inverter packaging section")
             bad += 1
+        if "Architecture blockers" not in md_partial:
+            print("FAIL: markdown must include architecture blockers section")
+            bad += 1
+        if BLOCKER_ID_DIFF_NEST not in md_partial:
+            print("FAIL: markdown must name DIFF_NEST blocker id")
+            bad += 1
         if partial_payload["motorMultiphysics"].get("ship_ok") is True:
             print(
                 "FAIL: PARTIAL magnetic/ross/calculix/OF/gear_oil/iso6336 "
                 "must not set ship_ok"
             )
             bad += 1
-        if not prove_catch(partial_payload).get("ok"):
+        catch_partial = prove_catch(partial_payload)
+        if not catch_partial.get("ok"):
             print(
                 "FAIL: proveCatch must accept magnetic+ross+calculix+OF+gear_oil+"
-                "gear_strength PARTIAL with result_ref (+ inverterPackaging)"
+                "gear_strength PARTIAL with result_ref (+ inverterPackaging + "
+                "architecture blockers)"
             )
+            bad += 1
+        if int(catch_partial.get("open_architecture_blocker_count") or 0) < 1:
+            print("FAIL: proveCatch must count OPEN architecture blockers")
+            bad += 1
+        # Adversarial: OPEN blocker + ship_ok true must fail proveCatch.
+        evil = json.loads(json.dumps(partial_payload))
+        evil["ship_ok"] = True
+        evil["motorMultiphysics"]["ship_ok"] = True
+        if prove_catch(evil).get("ok"):
+            print("FAIL: proveCatch must fire when OPEN blockers coexist with ship_ok")
             bad += 1
         if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 5:
             print(

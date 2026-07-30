@@ -1033,6 +1033,27 @@ def run_selftest() -> int:
         "never_ship_ok_true": artifact["ship_ok"] is False,
         "never_status_pass": artifact["status"] != "PASS",
     }
+    # Permanent hold: when kit-envelope search cannot clear FoS, record named blocker.
+    recommended = propose_strength_feasible_bevel(
+        inputs, motor_shaft_torque_nm=torque
+    )
+    checks["architecture_hold_when_envelope_fails"] = (
+        recommended.get("clears_duty_screen") is False
+        and "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
+        in str(recommended.get("architecture_hold") or "")
+    )
+    held_artifact = build_artifact(
+        inputs=inputs,
+        geometry=geometry,
+        screen=screen,
+        source_state_sha256="synthetic-selftest-hold",
+        source_twin="synthetic-selftest-hold",
+        recommended_geometry=recommended,
+    )
+    checks["architecture_hold_copied_to_case"] = (
+        "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
+        in str(held_artifact.get("architecture_hold") or "")
+    )
     passed = all(checks.values())
     print(
         json.dumps(

@@ -26426,6 +26426,10 @@ _dt(["Metric", "Value", "Meaning", "", ""],
 _dt(["Field", "Value", "Note", "", ""],
     "motor-inverter-packaging",
     ["Field", "Value", "Note"])
+# Architecture / packaging holds with permanent unblock options (2026-07-30).
+_dt(["Blocker", "Severity", "Status", "Evidence / permanent unblock", ""],
+    "motor-architecture-blockers",
+    ["Blocker", "Severity", "Status", "Evidence / permanent unblock"])
 _dt(["Metric", "Value", "Unit", "Notes / source"], "overview-metrics",
     ["Metric", "Value", "Notes / source"])
 _dt(["Category", "Cost (£)", "% of capex", "Share"], "overview-cost",
@@ -28496,7 +28500,21 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
     pkg = restored.get("inverterPackaging")
     if isinstance(pkg, dict):
         state["inverterPackaging"] = pkg
+    blockers = restored.get("architectureBlockers")
+    if not isinstance(blockers, list):
+        blockers = motor.get("architectureBlockers")
+    if isinstance(blockers, list):
+        state["architectureBlockers"] = blockers
+        motor = dict(motor)
+        motor["architectureBlockers"] = blockers
+        state["motorMultiphysics"] = motor
     state["ship_ok"] = False
+    open_n = 0
+    if isinstance(blockers, list):
+        open_n = sum(
+            1 for b in blockers
+            if isinstance(b, dict) and b.get("status") == "OPEN"
+        )
     state["motorMultiphysicsPointer"] = {
         "sidecar": "motor-multiphysics.json",
         "markdown": "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
@@ -28504,6 +28522,7 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
         or motor.get("assembly_revision"),
         "ship_ok": False,
         "stamped_at": restored.get("stamped_at") or motor.get("stamped_at"),
+        "architecture_blockers_open_count": open_n,
     }
     return True
 
@@ -28711,6 +28730,47 @@ def _render_motor_multiphysics_qa(ws, state: dict, run_dir: str, r: int) -> int:
             else:
                 vc.fill = FILL_ADVISORY
             ws.cell(r, 3, note).font = FONT_NOTE
+            r += 1
+    blockers = None
+    if isinstance(motor, dict) and isinstance(motor.get("architectureBlockers"), list):
+        blockers = motor["architectureBlockers"]
+    elif isinstance(state.get("architectureBlockers"), list):
+        blockers = state["architectureBlockers"]
+    if blockers:
+        r += 1
+        sub_banner(
+            ws, r,
+            "Architecture blockers (permanent unblock required — ship_ok false)",
+            5,
+        )
+        r += 1
+        header(
+            ws, r,
+            ["Blocker", "Severity", "Status", "Evidence / permanent unblock", ""],
+        )
+        r += 1
+        for b in blockers:
+            if not isinstance(b, dict):
+                continue
+            opts = b.get("permanent_unblock_options") or []
+            opt_ids = ", ".join(
+                str(o.get("option_id"))
+                for o in opts
+                if isinstance(o, dict) and o.get("option_id")
+            )
+            evidence = (
+                f"{b.get('evidence_path') or '—'} · "
+                f"unblock: {opt_ids or 'named options missing'}"
+            )
+            ws.cell(r, 1, str(b.get("blocker_id") or "—")).font = FONT_SUB
+            sev = ws.cell(r, 2, str(b.get("severity") or "—"))
+            st = ws.cell(r, 3, str(b.get("status") or "OPEN"))
+            if str(b.get("status") or "").upper() == "OPEN":
+                st.fill = FILL_FAIL
+                sev.fill = FILL_FAIL
+            else:
+                st.fill = FILL_ADVISORY
+            ws.cell(r, 4, evidence).font = FONT_NOTE
             r += 1
     r += 1
     return r
