@@ -101,6 +101,22 @@ def main() -> int:
         ],
     }
 
+    # INTENT (FFF): morphology features are forced by use-physics requirements,
+    # not a later visual densification pass. Stamp EduFormRule beside the tree
+    # so Blender + SIGHT share the same causal contract.
+    try:
+        from scripts.lib.edu_form_grammar import derive_edu_form_rule_from_state
+
+        edu_rule = derive_edu_form_rule_from_state(state)
+        state["eduFormRule"] = {
+            "stamped_at": stamped_at,
+            "source": "scripts/lib/edu_form_grammar.py",
+            "intent": "use-physics→forced morphology; orphan decoration is a defect",
+            **edu_rule.to_dict(),
+        }
+    except Exception as edu_exc:
+        print(f"eduFormRule stamp skipped: {edu_exc}", file=sys.stderr)
+
     state_path.write_text(json.dumps(state, indent=2) + "\n")
     md_path = args.twin / "JLR-FE-FRONT-FPK-PHYSICS-TREE.md"
     md_path.write_text(render_checklist_md(root))

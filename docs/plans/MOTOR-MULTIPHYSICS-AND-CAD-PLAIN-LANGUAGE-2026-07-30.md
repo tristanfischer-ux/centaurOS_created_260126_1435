@@ -5,6 +5,8 @@
 **Scope:** The integrated electric drive unit: motor, inverter, reduction gearbox and differential in one package.
 **Current release verdict:** `ship_ok = false`
 
+**Binding mission (do not forget):** Every solver, CAD family and Blender view must serve the Formula E **front powertrain kit** duties — especially **≤ 250 kW front regenerative electrical power** as continuous design duty, the **343 × 259 × 267 mm / ~32 kg** bay, **~19,500 rpm**, voltage window, and open vehicle interfaces. Full checklist: [`FIA-FRONT-POWERTRAIN-KIT-BINDING-REQUIREMENTS-2026-07-30.md`](./FIA-FRONT-POWERTRAIN-KIT-BINDING-REQUIREMENTS-2026-07-30.md). Generic motor science that ignores those rows is out of scope.
+
 ## Plain-language verdict
 
 The Blender model is now useful for explaining how the package is arranged. It shows a motor barrel, inverter shelf, reduction gears, differential, cooling interfaces and a physical cutaway. The physics tree is also a strong checklist: 256 nodes, 207 leaves and explicit analytical values for items such as winding resistance, capacitor size and cold-plate channels.

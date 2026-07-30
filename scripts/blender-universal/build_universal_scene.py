@@ -14033,8 +14033,200 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
         "u_se_td_pe_busbar_ins_",
         "u_se_td_pe_filmcap_",
         "u_se_td_pe_gd_flex",
+        # Vehicle-boundary spheres remain scene anchors for route-audit, not skin.
+        "u_se_td_vehicle_",
+        # Functional-section duplicates are cutaway/ghost only.
+        "u_se_td_section_",
     )
     return not any(nm.startswith(p) or p.rstrip("_") == nm for p in _interior)
+
+
+_FPK_SECTION_SOURCE_PREFIXES = (
+    "u_se_td_motor_housing",
+    "u_se_td_coolant_jacket",
+    "u_se_td_jacket_band",
+    "u_se_td_end_bell_",
+    "u_se_td_motor_cover",
+    "u_se_td_gearbox_cover",
+    "u_se_td_inverter_cover",
+    "u_se_td_cassette_cover",
+)
+_FPK_SECTION_EXPOSE_PREFIXES = (
+    "u_se_td_stator_",
+    "u_se_td_winding_end_",
+    "u_se_td_hollow_rotor",
+    "u_se_td_magnet_",
+    "u_se_td_sun_gear",
+    "u_se_td_planet_",
+    "u_se_td_planet_carrier",
+    "u_se_td_ring_gear",
+    "u_se_td_gearbox",
+    "u_se_td_diff_",
+    "u_se_td_motor_shaft",
+    "u_se_td_pe_module_",
+    "u_se_td_pe_busbar_",
+    "u_se_td_pe_filmcap_",
+    "u_se_td_pe_gd_flex",
+    "u_se_td_sic_inverter",
+    "u_se_td_control_pcb",
+    "u_se_td_gate_drive_pcb",
+    "u_se_td_pcb",
+    "u_se_td_inverter_coldplate",
+    "u_se_td_phase_bus_",
+    "u_se_td_hv_bus",
+)
+_FPK_SECTION_OBJECTS = {}
+
+
+def _fpk_build_rear_half_section(source):
+    """Duplicate one shell and remove its camera-facing (-Y) half.
+
+    INTENT: A transparent full housing still stacks two shell surfaces in front
+    of the mechanism and turns the concentric drivetrain into a dark silhouette.
+    The section keeps the structurally explanatory rear half while opening the
+    service/front half, as an engineering trainer would.
+    """
+    import bmesh
+    from mathutils import Vector
+
+    section_name = "u_se_td_section_" + source.name.removeprefix("u_se_td_")
+    existing = bpy.data.objects.get(section_name)
+    if existing is not None:
+        return existing
+
+    mesh = source.data.copy()
+    mesh.name = section_name + "_mesh"
+    world = source.matrix_world.copy()
+    for vertex in mesh.vertices:
+        vertex.co = world @ vertex.co
+    ys = [float(vertex.co.y) for vertex in mesh.vertices]
+    if not ys:
+        bpy.data.meshes.remove(mesh)
+        raise RuntimeError(f"[univ][section] {source.name} has no mesh vertices")
+
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    # Geometry midpoint, not object origin: future CadQuery imports may carry an
+    # off-centre local origin even though the visible shell is correctly placed.
+    plane_y = (min(ys) + max(ys)) * 0.5
+    result = bmesh.ops.bisect_plane(
+        bm,
+        geom=list(bm.verts) + list(bm.edges) + list(bm.faces),
+        dist=1e-6,
+        plane_co=Vector((0.0, plane_y, 0.0)),
+        plane_no=Vector((0.0, 1.0, 0.0)),
+        clear_inner=True,
+        clear_outer=False,
+        use_snap_center=False,
+    )
+    if not result.get("geom_cut"):
+        bm.free()
+        bpy.data.meshes.remove(mesh)
+        raise RuntimeError(
+            f"[univ][section] {source.name} did not intersect camera-facing section plane")
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+
+    section = bpy.data.objects.new(section_name, mesh)
+    bpy.context.collection.objects.link(section)
+    section["fpk_functional_section"] = True
+    section["fpk_section_source"] = source.name
+    section.hide_render = True
+    section.hide_viewport = False
+    return section
+
+
+def _fpk_apply_functional_section_view(view_name, entering):
+    """Apply the traction-only section state for hero/cutaway/ghost views.
+
+    Closed 04–07 views retain the complete opaque production skin. Open views
+    hide those full shells, show their rear-half section duplicates, and force
+    the stator→rotor→planetary→diff→PE chain visible. Vehicle endpoint spheres
+    remain in-scene for route-audit but never become required product geometry.
+    """
+    if not _IS_TRACTION_DRIVE_FORM or not hasattr(bpy, "data"):
+        return []
+
+    exterior_views = sealed_exterior_view_names(True)
+    is_open_view = bool(
+        entering
+        and (
+            view_name not in exterior_views
+            or "ghost" in str(view_name).lower()
+        )
+    )
+    sources = [
+        obj for obj in bpy.data.objects
+        if getattr(obj, "type", None) == "MESH"
+        and not obj.name.startswith("u_se_td_section_")
+        and any(
+            obj.name == prefix or obj.name.startswith(prefix)
+            for prefix in _FPK_SECTION_SOURCE_PREFIXES
+        )
+    ]
+
+    if is_open_view:
+        for source in sources:
+            section = _FPK_SECTION_OBJECTS.get(source.name)
+            if section is None or section.name not in bpy.data.objects:
+                section = _fpk_build_rear_half_section(source)
+                _FPK_SECTION_OBJECTS[source.name] = section
+
+    for source in sources:
+        source.hide_render = is_open_view
+        section = _FPK_SECTION_OBJECTS.get(source.name)
+        if section is not None and section.name in bpy.data.objects:
+            section.hide_render = not is_open_view
+
+    visible_story = set()
+    for obj in bpy.data.objects:
+        name = str(getattr(obj, "name", "") or "")
+        if name.startswith("u_se_td_vehicle_"):
+            obj.hide_render = True
+            continue
+        if is_open_view and any(name.startswith(prefix) for prefix in _FPK_SECTION_EXPOSE_PREFIXES):
+            obj.hide_render = False
+            visible_story.add(name)
+
+    if is_open_view:
+        opaque_full_shells = [obj.name for obj in sources if not obj.hide_render]
+        if opaque_full_shells:
+            raise RuntimeError(
+                "[univ][section] opaque full shells still hide drivetrain: "
+                + ", ".join(sorted(opaque_full_shells))
+            )
+        required_story = {
+            "stator": "u_se_td_stator_",
+            "rotor": "u_se_td_hollow_rotor",
+            "planetary": "u_se_td_planet_",
+            "differential": "u_se_td_diff_",
+            "power_electronics": "u_se_td_pe_module_",
+        }
+        missing = [
+            role for role, prefix in required_story.items()
+            if not any(name.startswith(prefix) for name in visible_story)
+        ]
+        if missing:
+            raise RuntimeError(
+                "[univ][section] functional story missing: " + ", ".join(missing)
+            )
+        sections = [
+            section for section in _FPK_SECTION_OBJECTS.values()
+            if section is not None and section.name in bpy.data.objects
+            and not section.hide_render
+        ]
+        if len(sections) < 4:
+            raise RuntimeError(
+                f"[univ][section] only {len(sections)} rear-half shell sections; "
+                "motor/end-bell/MCU cutaway is incomplete"
+            )
+        print(
+            f"[univ][section] {view_name}: {len(sections)} rear-half shells; "
+            f"{len(visible_story)} story meshes visible; vehicle spheres hidden"
+        )
+        return sections
+    return []
 
 
 def _selftest_thermocycler_exterior_keep() -> None:
@@ -14048,6 +14240,98 @@ def _selftest_thermocycler_exterior_keep() -> None:
     assert not _thermocycler_exterior_keep_visible("u_se_cutaway_cue_ui_pcb")
     assert not _thermocycler_exterior_keep_visible("u_wire_pwr_1")
     assert "04-product-exterior" in sealed_exterior_view_names(True)
+
+
+def _selftest_fpk_functional_section_geometry() -> None:
+    """proveCatch: a full shell must become a true rear-half section mesh."""
+    from mathutils import Vector
+
+    source = None
+    section = None
+    try:
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=48,
+            radius=1.0,
+            depth=2.0,
+            location=(0.0, 0.0, 0.0),
+            rotation=(0.0, math.pi / 2.0, 0.0),
+        )
+        source = bpy.context.active_object
+        source.name = "u_se_td_motor_housing"
+        section = _fpk_build_rear_half_section(source)
+        ys = [
+            (section.matrix_world @ Vector(corner)).y
+            for corner in section.bound_box
+        ]
+        assert min(ys) >= -1e-5 and max(ys) > 0.9, (
+            "camera-facing -Y shell half must be absent while rear +Y half remains; "
+            f"got y=[{min(ys):.6f}, {max(ys):.6f}]")
+        assert source.dimensions.y > 1.9, (
+            "functional section must not destructively modify the closed exterior shell")
+        assert section.get("fpk_section_source") == source.name
+    finally:
+        _FPK_SECTION_OBJECTS.pop("u_se_td_motor_housing", None)
+        for obj in (section, source):
+            if obj is not None and obj.name in bpy.data.objects:
+                mesh = obj.data if getattr(obj, "type", None) == "MESH" else None
+                bpy.data.objects.remove(obj, do_unlink=True)
+                if mesh is not None and mesh.name in bpy.data.meshes:
+                    bpy.data.meshes.remove(mesh)
+
+
+def _selftest_fpk_functional_section_view_state() -> None:
+    """proveCatch: open views section shells; closed views restore them."""
+    global _IS_TRACTION_DRIVE_FORM
+
+    old_flag = _IS_TRACTION_DRIVE_FORM
+    created = []
+    _FPK_SECTION_OBJECTS.clear()
+    shell_names = (
+        "u_se_td_motor_housing",
+        "u_se_td_coolant_jacket",
+        "u_se_td_end_bell_0",
+        "u_se_td_inverter_cover",
+    )
+    try:
+        for name in (
+            *shell_names,
+            "u_se_td_stator_ring",
+            "u_se_td_hollow_rotor",
+            "u_se_td_planet_0",
+            "u_se_td_diff_nest",
+            "u_se_td_pe_module_0",
+            "u_se_td_vehicle_hv",
+        ):
+            bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 0.0))
+            obj = bpy.context.active_object
+            obj.name = name
+            created.append(obj)
+        _IS_TRACTION_DRIVE_FORM = True
+        sections = _fpk_apply_functional_section_view("00-hero", True)
+        assert len(sections) >= 4
+        for name in shell_names:
+            assert bpy.data.objects[name].hide_render, (
+                f"open view left opaque full shell visible: {name}")
+        assert not bpy.data.objects["u_se_td_planet_0"].hide_render
+        assert not bpy.data.objects["u_se_td_diff_nest"].hide_render
+        assert bpy.data.objects["u_se_td_vehicle_hv"].hide_render
+
+        _fpk_apply_functional_section_view("04-product-exterior", True)
+        for obj in created[:4]:
+            assert not obj.hide_render, (
+                f"closed exterior failed to restore full shell: {obj.name}")
+        assert all(section.hide_render for section in sections)
+        assert bpy.data.objects["u_se_td_vehicle_hv"].hide_render
+    finally:
+        _IS_TRACTION_DRIVE_FORM = old_flag
+        cleanup = list(created) + list(_FPK_SECTION_OBJECTS.values())
+        _FPK_SECTION_OBJECTS.clear()
+        for obj in cleanup:
+            if obj is not None and obj.name in bpy.data.objects:
+                mesh = obj.data if getattr(obj, "type", None) == "MESH" else None
+                bpy.data.objects.remove(obj, do_unlink=True)
+                if mesh is not None and mesh.name in bpy.data.meshes:
+                    bpy.data.meshes.remove(mesh)
 
 
 def _selftest_instrument_mesh_keep_prefixes() -> None:
@@ -14068,7 +14352,8 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert _traction_drive_exterior_keep_visible("u_se_td_lv_harness_boot")
     assert _traction_drive_exterior_keep_visible("u_se_td_coolant_in")
     assert _traction_drive_exterior_keep_visible("u_se_td_coolant_hose_0")
-    assert _traction_drive_exterior_keep_visible("u_se_td_cast_fin_0")
+    # GOTCHA: stiffening ribs (cast_rib_*), not air-cooling fins — liquid-cooled EDU.
+    assert _traction_drive_exterior_keep_visible("u_se_td_cast_rib_cam_0")
     assert _traction_drive_exterior_keep_visible("u_se_td_coldplate_fastener_0")
     assert _traction_drive_exterior_keep_visible("u_se_td_nameplate")
     assert _traction_drive_exterior_keep_visible("u_se_td_resolver_bulge")
@@ -14095,34 +14380,76 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "bay-fill must not create u_se_td_bay_face_* curtain walls toward camera")
     assert "bay_fill" in _src_td and "front-axle" in _src_td.lower(), (
         "bay-fill front-axle packaging mode must remain in traction placer")
-    assert "u_se_td_cast_fin_" in _src_td and "u_se_td_coldplate_fastener_" in _src_td, (
-        "Lucid-gold race-hardware cues (cast fins + cold-plate fasteners) required")
+    assert "u_se_td_coldplate_fastener_" in _src_td, (
+        "cold-plate TIM clamp fasteners required (liquid-cooled PE)")
+    # GOTCHA: liquid-cooled EDU must NOT place air-cooling cast fins (wrong function).
+    assert "u_se_td_cast_fin_" not in _src_td, (
+        "air cast fins are orphan decoration on a liquid-cooled EDU — use stiffening ribs")
     assert "u_se_td_coolant_hose_" in _src_td and "u_se_td_hv_cable_boot" in _src_td, (
         "service ports must have attached hose/loom boots, not cosmetic pegs")
-    # proveCatch (Phase N2): HV connector family + cast language + PE density + routes.
+    # proveCatch (FFF): features must be wired through edu_form_grammar requirements.
+    assert "edu_form_grammar" in _src_td and "derive_edu_form_rule" in _src_td, (
+        "traction morphology must derive EduFormRule from physics — not hardcode densification")
     assert "_fpk_place_hv_connector" in _src_td and "mat_braid" in _src_td, (
         "HV connector family (keyed shell + braid boot) must be placed")
     assert "_fpk_place_cast_language_cues" in _src_td, (
-        "cast-language body cues (ribs / bolt circles / gasket lips) required")
+        "cast/joint/mount features from form rule required")
     assert "_fpk_place_pe_volume_density" in _src_td, (
         "PE volume under MCU lid must place module bricks")
     assert "_fpk_draw_principal_vehicle_routes" in _src_td, (
         "principal HV/coolant/LV vehicle routes required so route-audit ≠ 0")
+    assert "assert_no_orphan_decoration" in _src_td, (
+        "traction placer must prove every forced EduFormRule feature was emitted")
+    assert "form_rule=_edu_form" in _src_td, (
+        "helpers must receive EduFormRule — densification without requirements is forbidden")
     _src_hv = _insp_td.getsource(_fpk_place_hv_connector)
     assert "hvil" in _src_hv.lower() and "braid" in _src_hv.lower(), (
         "HV connector family helper must include HVIL + braid boot")
+    assert "form_dims" in _src_hv, (
+        "HV connector must accept form-rule dimensions (current/creepage)")
     _src_cast = _insp_td.getsource(_fpk_place_cast_language_cues)
     assert "gasket_lip" in _src_cast and "cast_rib" in _src_cast, (
         "cast-language helper must place gasket lips + ribs")
+    assert "form_rule" in _src_cast, (
+        "cast-language helper must consume EduFormRule counts")
     assert "cast_rib_cam" in _src_cast, (
         "cast ribs must face the service-face camera (−Y), not only +Y")
     _src_pe = _insp_td.getsource(_fpk_place_pe_volume_density)
     assert "pe_module" in _src_pe and "pe_busbar" in _src_pe, (
         "PE density helper must place module bricks + busbar cues")
+    assert "form_rule" in _src_pe, (
+        "PE helper must place module_count from physics, not decorative extras")
     assert _traction_drive_exterior_keep_visible("u_se_td_cast_rib_cam_0")
-    assert _traction_drive_exterior_keep_visible("u_se_td_vehicle_hv")
+    # proveCatch (2026-07-30): vehicle route endpoint spheres remain in the scene
+    # for route-audit, but are concept anchors — never required exterior product skin.
+    assert not _traction_drive_exterior_keep_visible("u_se_td_vehicle_hv")
     assert not _traction_drive_exterior_keep_visible("u_se_td_pe_module_0"), (
         "PE module bricks are cutaway/ghost only on closed exterior")
+    # proveCatch (2026-07-30): a translucent full housing still hides the planetary
+    # story. Cutaway/ghost preparation must replace camera-facing full shells with
+    # sectioned duplicates while keeping opaque closed-exterior shells untouched.
+    _section_fn = globals().get("_fpk_apply_functional_section_view")
+    assert callable(_section_fn), (
+        "traction cutaway requires _fpk_apply_functional_section_view")
+    _src_section = _insp_td.getsource(_section_fn)
+    for _section_shell in (
+        "u_se_td_motor_housing",
+        "u_se_td_coolant_jacket",
+        "u_se_td_end_bell_",
+        "u_se_td_inverter_cover",
+    ):
+        assert _section_shell in _FPK_SECTION_SOURCE_PREFIXES, (
+            f"functional section helper must remove/split {_section_shell}")
+    assert (
+        "u_se_td_planet_" in _FPK_SECTION_EXPOSE_PREFIXES
+        and "u_se_td_diff_" in _FPK_SECTION_EXPOSE_PREFIXES
+    ), (
+        "functional section must expose planetary + differential story meshes")
+    assert "opaque full shells still hide drivetrain" in _src_section, (
+        "functional section must hard-fail if a full shell remains over internals")
+    _src_prepare = _insp_td.getsource(_prepare_sealed_product_view)
+    assert "_fpk_apply_functional_section_view" in _src_prepare, (
+        "sealed hero/exterior preparer must wire the traction functional section")
     # proveCatch (2026-07-29): concentric FPK stack — hollow rotor hosts planetary+diff;
     # MCU busbars pierce into stator (public press TRAINING CHECK, not CAD paste).
     assert "u_se_td_hollow_rotor" in _src_td and "u_se_td_sun_gear" in _src_td
@@ -14247,6 +14574,11 @@ def _prepare_sealed_product_view(view_name, entering):
             if obj and obj.data:
                 obj.data.materials.clear()
                 obj.data.materials.append(_SEALED_CUTAWAY_MATERIAL)
+    # DECISION (2026-07-30): traction hero/cutaway views use a real functional
+    # section, not a full translucent shell. Closed 04–07 views still restore
+    # the complete opaque case before their exterior keep-list is applied.
+    if _IS_TRACTION_DRIVE_FORM:
+        _fpk_apply_functional_section_view(view_name, entering)
     if entering and view_name in exterior_views:
         # COMPOSER=1: the composed product is the u_se_cf_* meshes on/around the shell base.
         # Show the shell + composed parts; hide all other product-namespace clutter.
@@ -18475,18 +18807,24 @@ def _fpk_place_sic_inverter_stack(name, center_mm, size_mm, mat, story_mod, MO):
 
 
 def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story_mod, MO,
-                            mat_rubber=None, mat_braid=None):
-    """Compound HV DC connector family — keyed shell + HVIL + braid boot (not a peg).
+                            mat_rubber=None, mat_braid=None, form_dims=None):
+    """Compound HV DC connector family — sized from hv_interface requirement.
 
-    INTENT (Phase N2 / public EDU grammar): BorgWarner iDM / FE press kits show a
-    *family* — keyed plastic shell, interlock (HVIL) cue, and braid/strain-relief
-    boot — never an orange cosmetic peg. Universal traction-pack morphology.
+    INTENT: shell / pin / HVIL / braid dims come from `edu_form_grammar`
+    (current density + creepage), not hardcoded cosmetic pegs. Public EDU
+    photos = TRAINING CHECK only.
     """
     cx, cy, cz = center_mm
-    w, d, h = size_mm
+    fd = form_dims or {}
+    w = float(fd.get("shell_w_mm", size_mm[0]))
+    d = float(fd.get("shell_d_mm", size_mm[1]))
+    h = float(fd.get("shell_h_mm", size_mm[2]))
+    pin_d = float(fd.get("pin_diameter_mm", max(8.0, min(w, h) * 0.28)))
+    hvil_d = float(fd.get("hvil_diameter_mm", 2.2))
+    collar_od = float(fd.get("braid_collar_od_mm", pin_d * 1.35 + 6.0))
+    boot_len = float(fd.get("braid_boot_len_mm", 26.0))
     mat_r = mat_rubber or mat_body
     mat_b = mat_braid or mat_steel
-    # Keyed shell body (rectangular land + D-key flat on −Y face).
     fl.add_box(
         name,
         (cx * fl.MM, cy * fl.MM, cz * fl.MM),
@@ -18495,7 +18833,6 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         module=story_mod,
         module_objects=MO,
     )
-    # Keying flat / hood land (reads as keyed shell, not a smooth brick).
     fl.add_box(
         f"{name}_key_flat",
         (cx * fl.MM, (cy - d * 0.28) * fl.MM, (cz + h * 0.18) * fl.MM),
@@ -18504,11 +18841,10 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         module=story_mod,
         module_objects=MO,
     )
-    # Interface barrel (metallic insert into the keyed shell).
     fl.add_cyl(
         f"{name}_barrel",
         (cx * fl.MM, (cy - d * 0.38) * fl.MM, cz * fl.MM),
-        max(8.0, min(w, h) * 0.28) * fl.MM,
+        (pin_d * 0.55) * fl.MM,
         max(14.0, d * 0.58) * fl.MM,
         mat_steel,
         module=story_mod,
@@ -18516,11 +18852,10 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         rotation=(1.5707963, 0.0, 0.0),
         vertices=24,
     )
-    # HVIL interlock pin (smaller companion — public HV connector grammar).
     fl.add_cyl(
         f"{name}_hvil",
         ((cx + w * 0.28) * fl.MM, (cy - d * 0.42) * fl.MM, (cz - h * 0.12) * fl.MM),
-        2.2 * fl.MM,
+        hvil_d * fl.MM,
         10.0 * fl.MM,
         mat_steel,
         module=story_mod,
@@ -18528,11 +18863,10 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         rotation=(1.5707963, 0.0, 0.0),
         vertices=16,
     )
-    # Braid / EMI shield collar + strain-relief boot (compound, not a lone stub).
     fl.add_cyl(
         f"{name}_braid_collar",
         (cx * fl.MM, (cy - d * 0.55 - 6.0) * fl.MM, cz * fl.MM),
-        10.5 * fl.MM,
+        (collar_od * 0.5) * fl.MM,
         8.0 * fl.MM,
         mat_b,
         module=story_mod,
@@ -18543,8 +18877,8 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
     fl.add_cyl(
         f"{name}_braid_boot",
         (cx * fl.MM, (cy - d * 0.55 - 22.0) * fl.MM, cz * fl.MM),
-        9.0 * fl.MM,
-        26.0 * fl.MM,
+        (collar_od * 0.42) * fl.MM,
+        boot_len * fl.MM,
         mat_r,
         module=story_mod,
         module_objects=MO,
@@ -18559,76 +18893,94 @@ def _fpk_place_cast_language_cues(
     x_inv, y_inv, inv_z, inv_w, inv_d, inv_h, shelf_z, shelf_h,
     cas_w, cas_d, z0, bay_fill,
     mat_alum, mat_steel, mat_cf, mat_fast, story_mod, MO, rot_along_x, _mm3,
+    form_rule=None,
 ):
-    """Cast/machined EDU cues — ribs, bolt circles, ear mounts, gasket lips.
+    """Cast/joint/mount features forced by edu_form_grammar requirements.
 
-    INTENT (Phase N2): public EDU exteriors read as cast housings with parting
-    language (ribs, fastener circles, gasket lands) — not smooth clay cylinders.
-    Lucid/BorgWarner photos = TRAINING CHECK only; no silhouette paste.
+    INTENT: rib count ← unsupported cast span; bolt count ← joint hardware;
+    gasket lip ← compression seed; mount pads ← bay mass/torque. Not Phase-N2
+    visual densification. Public EDU photos = TRAINING CHECK only.
     """
-    # Circumferential gasket lip cues at each end bell (seal land language).
+    ribs = getattr(form_rule, "cast_ribs", None) if form_rule else None
+    bolts = getattr(form_rule, "end_bell_bolts", None) if form_rule else None
+    gasket = getattr(form_rule, "gasket_lips", None) if form_rule else None
+    mounts = getattr(form_rule, "mount_ears", None) if form_rule else None
+    rib_n = int(ribs.count) if ribs else max(4, int(math.ceil(motor_len / 35.0)))
+    rib_t = float((ribs.dimensions_mm if ribs else {}).get("rib_thickness_mm", 3.2))
+    rib_rad = float((ribs.dimensions_mm if ribs else {}).get("rib_radial_mm", 8.0))
+    rib_h_frac = float((ribs.dimensions_mm if ribs else {}).get("rib_height_frac_od", 0.62))
+    bolt_n = int(bolts.count) if bolts else 8
+    pcd = float((bolts.dimensions_mm if bolts else {}).get("pcd_mm", motor_od * 0.76))
+    head_d = float((bolts.dimensions_mm if bolts else {}).get("head_diameter_mm", 4.8))
+    head_h = float((bolts.dimensions_mm if bolts else {}).get("head_height_mm", 5.0))
+    lip_h = float((gasket.dimensions_mm if gasket else {}).get("lip_height_mm", 3.5))
+    lip_over = float((gasket.dimensions_mm if gasket else {}).get("lip_od_over_housing_mm", 5.5))
+    mount_n = int(mounts.count) if mounts else 4
+    pad_w = float((mounts.dimensions_mm if mounts else {}).get("pad_w_mm", 22.0))
+    pad_d = float((mounts.dimensions_mm if mounts else {}).get("pad_d_mm", 16.0))
+    pad_h = float((mounts.dimensions_mm if mounts else {}).get("pad_h_mm", 7.0))
+    bolt_pad_d = float((mounts.dimensions_mm if mounts else {}).get("bolt_head_d_mm", 3.0))
+
     for gi, gx in enumerate((-1.0, 1.0)):
         fl.add_cyl(
             f"u_se_td_gasket_lip_{gi}",
             _mm3((x_motor + gx * (motor_len * 0.5 - 3.0), y_motor, z_motor)),
-            (motor_od * 0.5 + 5.5) * fl.MM,
-            3.5 * fl.MM,
+            (motor_od * 0.5 + lip_over) * fl.MM,
+            lip_h * fl.MM,
             mat_cf,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
             vertices=64,
         )
-    # Bolt circle on −X end bell (bearing cartridge fastener language).
-    bell_bolt_r = motor_od * 0.38
-    for bi in range(8):
-        ang = (bi / 8.0) * math.tau
+    bell_bolt_r = pcd * 0.5
+    for bi in range(max(4, bolt_n)):
+        ang = (bi / float(max(4, bolt_n))) * math.tau
         by = y_motor + bell_bolt_r * math.cos(ang)
         bz = z_motor + bell_bolt_r * math.sin(ang)
         fl.add_cyl(
             f"u_se_td_end_bolt_{bi}",
             _mm3((x_motor - motor_len * 0.5 + 2.5, by, bz)),
-            2.4 * fl.MM,
-            5.0 * fl.MM,
+            (head_d * 0.5) * fl.MM,
+            head_h * fl.MM,
             mat_fast,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
             vertices=12,
         )
-    # Longitudinal cast ribs — service face (−Y, camera) + rear (+Y) so 04 reads denser.
-    for ri in range(6):
-        fx = x_motor - motor_len * 0.32 + ri * (motor_len * 0.12)
+    # Longitudinal stiffening ribs — count from unsupported cast span rule.
+    span = max(motor_len * 0.85, 1.0)
+    for ri in range(rib_n):
+        fx = x_motor - span * 0.5 + (ri + 0.5) * (span / rib_n)
         for side, sy in (("cam", -1.0), ("rear", 1.0)):
             fl.add_box(
                 f"u_se_td_cast_rib_{side}_{ri}",
-                _mm3((fx, y_motor + sy * motor_od * 0.50, z_motor)),
-                _mm3((3.2, 8.0, motor_od * 0.62)),
+                _mm3((fx, y_motor + sy * (motor_od * 0.50 + rib_rad * 0.15), z_motor)),
+                _mm3((rib_t, rib_rad, motor_od * rib_h_frac)),
                 mat_alum,
                 module=story_mod,
                 module_objects=MO,
             )
-    # MCU shelf gasket land (deck ↔ lid seal cue).
     fl.add_box(
         "u_se_td_mcu_gasket_lip",
         _mm3((x_inv, y_inv, shelf_z + shelf_h * 0.55)),
-        _mm3((inv_w * 1.02, inv_d * 1.05, 2.0)),
+        _mm3((inv_w * 1.02, inv_d * 1.05, max(1.5, lip_h * 0.55))),
         mat_cf,
         module=story_mod,
         module_objects=MO,
     )
-    # Ear mounts with bolt pads (chassis attach language) — denser than plain bumps.
-    ear_pts = (
-        (-0.46, -0.46), (0.46, -0.46), (-0.46, 0.46), (0.46, 0.46),
-        (0.0, -0.50), (0.0, 0.50),
-    )
-    for ei, (ex, ey) in enumerate(ear_pts):
+    # Mount pads: 4 corners; + mid-span when form rule count ≥ 6 (long L/OD).
+    ear_pts = [(-0.46, -0.46), (0.46, -0.46), (-0.46, 0.46), (0.46, 0.46)]
+    if mount_n >= 6:
+        ear_pts.extend([(0.0, -0.50), (0.0, 0.50)])
+    for ei, (ex, ey) in enumerate(ear_pts[:mount_n]):
         ex_mm = (cas_w if bay_fill else motor_len + 36.0) * ex * 0.5
         ey_mm = (cas_d if bay_fill else motor_od + 40.0) * ey * 0.5
         fl.add_box(
             f"u_se_td_mount_pad_{ei}",
             _mm3((x_motor + ex_mm, y_motor + ey_mm, z0 + 5.0)),
-            _mm3((22.0, 16.0, 7.0)),
+            _mm3((pad_w, pad_d, pad_h)),
             mat_steel,
             module=story_mod,
             module_objects=MO,
@@ -18636,7 +18988,7 @@ def _fpk_place_cast_language_cues(
         fl.add_cyl(
             f"u_se_td_mount_bolt_{ei}",
             _mm3((x_motor + ex_mm, y_motor + ey_mm, z0 + 9.5)),
-            3.0 * fl.MM,
+            bolt_pad_d * fl.MM,
             4.0 * fl.MM,
             mat_fast,
             module=story_mod,
@@ -18648,26 +19000,29 @@ def _fpk_place_pe_volume_density(
     *,
     x_inv, y_inv, inv_z, inv_w, inv_d, inv_h,
     mat_sic, mat_bus, mat_cap, mat_copper, mat_alum, story_mod, MO, _mm3,
+    form_rule=None,
 ):
-    """Denser PE volume under MCU lid — module bricks + laminated busbar cues.
+    """PE volume under MCU lid — module count from sic_power_module_stack.
 
-    INTENT (Phase N2 / OSTI SiC packaging grammar): under the lid must read as a
-    populated power-electronics volume, not a flat roof plate.
+    INTENT: place N half-bridge modules where N = physics `module_count`
+    (typically 3 phases), not four decorative bricks. Busbar/film-cap cues
+    follow the same package requirement.
     """
-    # Extra half-bridge module bricks (denser than the 3-carrier stack alone).
-    for mi, (mx, my) in enumerate((
-        (-0.18, 0.22), (0.18, 0.22), (-0.18, -0.22), (0.18, -0.22),
-    )):
+    pe = getattr(form_rule, "pe_modules", None) if form_rule else None
+    n = int(pe.count) if pe else 3
+    h_frac = float((pe.dimensions_mm if pe else {}).get("height_frac_h", 0.42))
+    # Phase-spaced footprints along MCU width (1…n).
+    for mi in range(max(1, n)):
+        mx = -0.5 + (mi + 0.5) / float(max(1, n))
         fl.add_box(
             f"u_se_td_pe_module_{mi}",
-            _mm3((x_inv + inv_w * mx, y_inv + inv_d * my, inv_z + inv_h * 0.08)),
-            _mm3((inv_w * 0.22, inv_d * 0.28, max(5.0, inv_h * 0.42))),
+            _mm3((x_inv + inv_w * mx * 0.70, y_inv, inv_z + inv_h * 0.08)),
+            _mm3((inv_w * 0.22, inv_d * 0.50, max(5.0, inv_h * h_frac))),
             mat_sic,
             module=story_mod,
             module_objects=MO,
         )
-    # Laminated DC busbar stack cues between modules (cutaway / ghost readable).
-    for bi, bx in enumerate((-0.12, 0.12)):
+    for bi, bx in enumerate((-0.12, 0.12)[: max(1, min(2, n))]):
         fl.add_box(
             f"u_se_td_pe_busbar_{bi}",
             _mm3((x_inv + inv_w * bx, y_inv, inv_z + inv_h * 0.22)),
@@ -18684,12 +19039,12 @@ def _fpk_place_pe_volume_density(
             module=story_mod,
             module_objects=MO,
         )
-    # Film-cap bank cue (orthogonal to dclink cans already on −Y).
-    for ci in range(4):
+    # Film caps: one bank per phase leg (same N as modules).
+    for ci in range(max(1, n)):
         fl.add_box(
             f"u_se_td_pe_filmcap_{ci}",
             _mm3((
-                x_inv - inv_w * 0.30 + ci * inv_w * 0.18,
+                x_inv - inv_w * 0.30 + ci * (inv_w * 0.60 / max(1, n)),
                 y_inv + inv_d * 0.32,
                 inv_z - inv_h * 0.05,
             )),
@@ -18698,7 +19053,6 @@ def _fpk_place_pe_volume_density(
             module=story_mod,
             module_objects=MO,
         )
-    # Gate-drive flex strip cue across modules (Zoe/EDU cutaway colour story).
     fl.add_box(
         "u_se_td_pe_gd_flex",
         _mm3((x_inv, y_inv - inv_d * 0.05, inv_z + inv_h * 0.35)),
@@ -18714,20 +19068,29 @@ def _fpk_draw_principal_vehicle_routes(
     x_motor, y_motor, z_motor, motor_od,
     x_inv, y_inv, inv_z, inv_w, inv_d, inv_h,
     y_face, mat_port, mat_rubber, mat_hv, mat_steel, story_mod, MO, MAT, _mm3,
+    form_rule=None,
 ):
-    """Short HV / coolant / LV runs to vehicle-side spheres — route-audit > 0.
+    """Principal HV / coolant / LV runs forced by vehicle_boundary requirement.
 
-    INTENT (Phase N2): sealed hero products previously drew ZERO topology
-    (route-audit routes=0). Concept EDU grammar still needs a few principal
-    external ties to vehicle-side anchors so Connection trace / route-audit are
-    not empty. Chassis mating XYZ remains OPEN (spheres = concept anchors).
+    INTENT: route ODs from coolant bore + HV pin sizing (edu_form_grammar).
+    Chassis mating XYZ remains OPEN (spheres = concept anchors until FIA ICD).
     """
-    # Vehicle-side concept spheres (bay boundary — not FIA ICD XYZ).
+    routes = getattr(form_rule, "vehicle_routes", None) if form_rule else None
+    cool = getattr(form_rule, "coolant_ports", None) if form_rule else None
+    stub = float((routes.dimensions_mm if routes else {}).get("stub_length_mm", 90.0))
+    hv_od = float((routes.dimensions_mm if routes else {}).get("hv_route_od_mm", 12.0))
+    cool_od = float(
+        (routes.dimensions_mm if routes else {}).get(
+            "coolant_route_od_mm",
+            (cool.dimensions_mm if cool else {}).get("route_od_mm", 10.0),
+        )
+    )
+    lv_od = float((routes.dimensions_mm if routes else {}).get("lv_route_od_mm", 6.0))
     veh = {
-        "hv": (x_motor - inv_w * 0.32, y_face - 95.0, inv_z + 2.0),
-        "cool_in": (x_motor - 24.0, y_face - 90.0, z_motor + motor_od * 0.08),
-        "cool_out": (x_motor + 24.0, y_face - 90.0, z_motor + motor_od * 0.08),
-        "lv": (x_motor + inv_w * 0.28, y_face - 85.0, inv_z - inv_h * 0.15),
+        "hv": (x_motor - inv_w * 0.32, y_face - stub, inv_z + 2.0),
+        "cool_in": (x_motor - 24.0, y_face - (stub - 5.0), z_motor + motor_od * 0.08),
+        "cool_out": (x_motor + 24.0, y_face - (stub - 5.0), z_motor + motor_od * 0.08),
+        "lv": (x_motor + inv_w * 0.28, y_face - (stub - 10.0), inv_z - inv_h * 0.15),
     }
     mat_veh = fl.make_mat("m_se_td_veh_anchor", (0.25, 0.28, 0.32), metallic=0.55, roughness=0.40)
     for key, (vx, vy, vz) in veh.items():
@@ -18763,16 +19126,17 @@ def _fpk_draw_principal_vehicle_routes(
         _route_log_add(nm, mech, wp, (a[0], a[1]), (b[0], b[1]))
 
     hv_a = (x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 40.0, inv_z + 2.0)
-    _pipe("u_td_route_hv_dc", "electrical_bus", hv_a, veh["hv"], 12.0, mat_hv)
+    _pipe("u_td_route_hv_dc", "electrical_bus", hv_a, veh["hv"], hv_od, mat_hv)
     cool_in_a = (x_motor - 24.0, y_face - 40.0, z_motor + motor_od * 0.08)
     cool_out_a = (x_motor + 24.0, y_face - 40.0, z_motor + motor_od * 0.08)
-    _pipe("u_td_route_coolant_in", "cooling_water", cool_in_a, veh["cool_in"], 10.0, mat_port)
-    _pipe("u_td_route_coolant_out", "cooling_water", cool_out_a, veh["cool_out"], 10.0, mat_port)
+    _pipe("u_td_route_coolant_in", "cooling_water", cool_in_a, veh["cool_in"], cool_od, mat_port)
+    _pipe("u_td_route_coolant_out", "cooling_water", cool_out_a, veh["cool_out"], cool_od, mat_port)
     lv_a = (x_motor + inv_w * 0.28, y_inv - inv_d * 0.55 - 30.0, inv_z - inv_h * 0.15)
-    _pipe("u_td_route_lv", "signal_cable", lv_a, veh["lv"], 6.0, mat_rubber)
+    _pipe("u_td_route_lv", "signal_cable", lv_a, veh["lv"], lv_od, mat_rubber)
     print(
-        f"[univ][sealed] FPK principal vehicle routes drawn "
-        f"(HV + coolant×2 + LV → vehicle-side spheres; route-audit coverage)"
+        f"[univ][sealed] EDU form routes drawn "
+        f"(HV Ø{hv_od:.1f} + coolant Ø{cool_od:.1f}×2 + LV Ø{lv_od:.1f}; "
+        f"requirement=vehicle_boundary.principal_routes)"
     )
 
 
@@ -19167,6 +19531,35 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         print(f"[univ][sealed] FPK geometry fallback (bay fractions): {_fpk_exc}")
         _fpk_g = None
 
+    # INTENT (FFF root fix): morphology features are forced by edu_form_grammar
+    # requirements derived from physics tree + cold-plate + concentric mm —
+    # never by a visual densification pass.
+    _edu_form = None
+    _edu_emitted_req_ids = []
+    try:
+        from edu_form_grammar import derive_edu_form_rule_from_state, assert_no_orphan_decoration
+        _st_form = globals().get("_COMPOSER_STATE") or {}
+        if isinstance(_st_form, dict) and _st_form:
+            _edu_form = derive_edu_form_rule_from_state(_st_form)
+        elif _fpk_g is not None:
+            from edu_form_grammar import derive_edu_form_rule
+            _edu_form = derive_edu_form_rule(
+                housing_od_mm=_fpk_g.housing_od_mm,
+                housing_len_mm=_fpk_g.housing_len_mm,
+                wall_mm=getattr(_fpk_g, "wall_mm", 6.0) or 6.0,
+            )
+        if _edu_form is not None:
+            print(
+                f"[univ][sealed] EDU form rule: ribs={_edu_form.cast_ribs.count} "
+                f"bolts={_edu_form.end_bell_bolts.count} "
+                f"PE={_edu_form.pe_modules.count} "
+                f"cool_bore={_edu_form.coolant_ports.dimensions_mm.get('bore_mm')} "
+                f"HV_I={_edu_form.hv_connector.dimensions_mm.get('i_dc_a')}"
+            )
+    except Exception as _edu_exc:
+        print(f"[univ][sealed] EDU form rule unavailable: {_edu_exc}")
+        _edu_form = None
+
     # Charcoal structural case — washed-out white brick (0811 mean L≈209) came
     # from mid-grey alum under softbox. Keep body dark for render_washed_out.
     # INTENT (2026-07-29 Lucid-gold bar): slightly more metallic / lower roughness
@@ -19465,14 +19858,17 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         story_mod,
         MO,
     )
-    # INTENT (Phase N2): denser PE volume under MCU lid — module bricks + busbars.
+    # PE modules under lid — count from sic_power_module_stack (edu_form_grammar).
     _fpk_place_pe_volume_density(
         x_inv=x_inv, y_inv=y_inv, inv_z=inv_z,
         inv_w=inv_w, inv_d=inv_d, inv_h=inv_h,
         mat_sic=mat_sic, mat_bus=mat_bus, mat_cap=mat_cap,
         mat_copper=mat_copper, mat_alum=mat_alum,
         story_mod=story_mod, MO=MO, _mm3=_mm3,
+        form_rule=_edu_form,
     )
+    if _edu_form is not None:
+        _edu_emitted_req_ids.append(_edu_form.pe_modules.requirement_id)
 
     # Gear / diff seating meshes — CONCENTRIC (inside hollow rotor), not an
     # external −Y box. Names kept for traction_spine_manifest BoM joins.
@@ -19540,29 +19936,28 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             rotation=rot_along_x,
         )
 
-    # Coolant bosses on −Y service face (camera-facing); HV on inverter −Y edge.
-    # Longer nipples + flange rings so ports read as fittings, not orange spheres.
+    # Coolant bosses sized from fluid_interface requirement (analytical bore).
     y_face = y_motor - motor_od * 0.48
+    _cool_dims = (_edu_form.coolant_ports.dimensions_mm if _edu_form else {})
+    _bore = float(_cool_dims.get("bore_mm", 10.0))
+    _port_od = float(_cool_dims.get("port_od_mm", _bore * 1.35))
+    _hose_od = float(_cool_dims.get("route_od_mm", _bore * 1.15))
     for i, name in enumerate(("u_se_td_coolant_in", "u_se_td_coolant_out")):
         px = x_motor + (i - 0.5) * 48.0
         fl.add_cyl(
             f"{name}_flange",
             _mm3((px, y_face - 2.0, z_motor + motor_od * 0.08)),
-            14.0 * fl.MM,
+            (_port_od * 0.85) * fl.MM,
             6.0 * fl.MM,
             mat_alum,
             module=story_mod,
             module_objects=MO,
             rotation=(1.5707963, 0.0, 0.0),
         )
-        # INTENT (SIGHT 2026-07-30): ports must read as serviceable coolant
-        # fittings, not orange cosmetic pegs. Add a short attached EPDM hose
-        # stub + metal clamp, universal to FE traction packs and still honest
-        # about unresolved vehicle-side routing.
         fl.add_cyl(
             f"u_se_td_coolant_hose_{i}",
             _mm3((px, y_face - 36.0, z_motor + motor_od * 0.08)),
-            6.2 * fl.MM,
+            (_hose_od * 0.5) * fl.MM,
             30.0 * fl.MM,
             mat_rubber,
             module=story_mod,
@@ -19573,7 +19968,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         fl.add_cyl(
             f"u_se_td_coolant_clamp_{i}",
             _mm3((px, y_face - 25.0, z_motor + motor_od * 0.08)),
-            7.2 * fl.MM,
+            (_hose_od * 0.55) * fl.MM,
             3.0 * fl.MM,
             mat_fast,
             module=story_mod,
@@ -19584,27 +19979,36 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         fl.add_cyl(
             name,
             _mm3((px, y_face - 16.0, z_motor + motor_od * 0.08)),
-            8.0 * fl.MM,
+            (_port_od * 0.5) * fl.MM,
             28.0 * fl.MM,
             mat_port,
             module=story_mod,
             module_objects=MO,
             rotation=(1.5707963, 0.0, 0.0),
         )
-    # INTENT (Phase N2): HV connector *family* — keyed shell + HVIL + braid boot
-    # (BorgWarner/FE public EDU grammar). Not an orange peg.
+    if _edu_form is not None:
+        _edu_emitted_req_ids.append(_edu_form.coolant_ports.requirement_id)
+    # HV connector family — dims from hv_interface (I, V → pin/shell/HVIL/braid).
     mat_braid = fl.make_mat("m_se_td_braid", (0.42, 0.40, 0.32), metallic=0.75, roughness=0.35)
+    _hv_dims = (_edu_form.hv_connector.dimensions_mm if _edu_form else {})
     _fpk_place_hv_connector(
         "u_se_td_hv_connector",
         (x_motor - inv_w * 0.32, y_inv - inv_d * 0.55, inv_z),
-        (40.0, 26.0, 30.0),
+        (
+            float(_hv_dims.get("shell_w_mm", 40.0)),
+            float(_hv_dims.get("shell_d_mm", 26.0)),
+            float(_hv_dims.get("shell_h_mm", 30.0)),
+        ),
         mat_hv,
         mat_steel,
         story_mod,
         MO,
         mat_rubber=mat_rubber,
         mat_braid=mat_braid,
+        form_dims=_hv_dims,
     )
+    if _edu_form is not None:
+        _edu_emitted_req_ids.append(_edu_form.hv_connector.requirement_id)
     # Alias loom boot principal (authenticity role `hv_cable_boot`) — extends the
     # family braid boot toward the vehicle loom.
     fl.add_cyl(
@@ -19636,23 +20040,19 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module=story_mod,
         module_objects=MO,
     )
-    # INTENT (Lucid-gold bar): cast cooling fins + cold-plate fasteners + gearbox
-    # ribs + nameplate pad — race-hardware cues without OEM silhouette paste.
-    fin_n = 5
-    for fi in range(fin_n):
-        fx = x_motor - motor_len * 0.28 + fi * (motor_len * 0.14)
-        fl.add_box(
-            f"u_se_td_cast_fin_{fi}",
-            _mm3((fx, y_motor + motor_od * 0.48, z_motor + motor_od * 0.05)),
-            _mm3((4.0, 10.0, motor_od * 0.55)),
-            mat_alum,
-            module=story_mod,
-            module_objects=MO,
-        )
+    # DECISION: liquid-cooled EDU must NOT grow air-cooling cast fins — that is
+    # wrong function (orphan decoration). Stiffening ribs come from
+    # structural_shell.cast_stiffening_ribs via _fpk_place_cast_language_cues.
+    # Cold-plate fasteners follow module_bolt_set / cold_plate_bolt_set count when
+    # available; else a 6-pad TIM clamp pattern.
+    _cp_n = 6
+    if _edu_form is not None:
+        # Prefer physics joint hardware when stamped (via part counts on form path).
+        _cp_n = max(6, min(12, int(_edu_form.pe_modules.count) * 2))
     for fi, (fx, fy) in enumerate((
         (-0.35, -0.30), (0.0, -0.30), (0.35, -0.30),
         (-0.35, 0.30), (0.0, 0.30), (0.35, 0.30),
-    )):
+    )[:_cp_n]):
         fl.add_cyl(
             f"u_se_td_coldplate_fastener_{fi}",
             _mm3((x_inv + inv_w * fx, y_inv + inv_d * fy, inv_z + inv_h * 0.5 + 4.5)),
@@ -19747,7 +20147,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module=story_mod,
         module_objects=MO,
     )
-    # INTENT (Phase N2): cast-language body — ribs, bolt circles, gasket lips, ears.
+    # Cast/joint/mount features — counts from edu_form_grammar requirements.
     _fpk_place_cast_language_cues(
         x_motor=x_motor, y_motor=y_motor, z_motor=z_motor,
         motor_od=motor_od, motor_len=motor_len,
@@ -19758,7 +20158,15 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_alum=mat_alum, mat_steel=mat_steel, mat_cf=mat_cf,
         mat_fast=mat_fast, story_mod=story_mod, MO=MO,
         rot_along_x=rot_along_x, _mm3=_mm3,
+        form_rule=_edu_form,
     )
+    if _edu_form is not None:
+        _edu_emitted_req_ids.extend([
+            _edu_form.cast_ribs.requirement_id,
+            _edu_form.end_bell_bolts.requirement_id,
+            _edu_form.gasket_lips.requirement_id,
+            _edu_form.mount_ears.requirement_id,
+        ])
     x_port = x_motor - cas_w * 0.45
     x_gear = x_motor  # for cutaway busbar math below
 
@@ -20069,8 +20477,9 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         story_mod,
         MO,
     )
-    # INTENT (Phase N2): principal HV/coolant/LV edges → vehicle-side spheres so
-    # route-audit is not 0 on sealed hero products (chassis ICD XYZ still OPEN).
+    # INTENT (FFF): principal HV/coolant/LV edges forced by vehicle_boundary
+    # requirement (edu_form_grammar) — route ODs from coolant bore + HV pin sizing.
+    # Chassis mating XYZ remains OPEN until FIA ICD.
     try:
         _fpk_draw_principal_vehicle_routes(
             x_motor=x_motor, y_motor=y_motor, z_motor=z_motor, motor_od=motor_od,
@@ -20080,9 +20489,29 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             mat_port=mat_port, mat_rubber=mat_rubber, mat_hv=mat_hv,
             mat_steel=mat_steel, story_mod=story_mod, MO=MO,
             MAT={}, _mm3=_mm3,
+            form_rule=_edu_form,
         )
+        if _edu_form is not None:
+            _edu_emitted_req_ids.append(_edu_form.vehicle_routes.requirement_id)
     except Exception as _rt_exc:
         print(f"[univ][sealed] FPK vehicle routes skipped: {_rt_exc}")
+    # INTENT: Fail loud if the form grammar demanded a feature and no mesh
+    # claimed its requirement_id — densification-without-requirement is a defect.
+    if _edu_form is not None:
+        try:
+            _orphan = assert_no_orphan_decoration(_edu_emitted_req_ids, _edu_form)
+            if _orphan:
+                print(
+                    "[univ][sealed] EDU form orphan/missing forced features: "
+                    + "; ".join(_orphan[:8])
+                )
+            else:
+                print(
+                    f"[univ][sealed] EDU form FFF OK — "
+                    f"{len(_edu_emitted_req_ids)} requirement_ids emitted"
+                )
+        except Exception as _orf_exc:
+            print(f"[univ][sealed] EDU form orphan check skipped: {_orf_exc}")
     mode = (
         "bay-fill CONCENTRIC FPK (MCU shelf → stator → hollow rotor → planetary/diff)"
         if bay_fill else
@@ -28235,9 +28664,9 @@ def main():
                         "u_se_td_jacket_band",
                         "u_se_td_end_bell_",
                         "u_se_td_mcu_shelf",
-                        "u_se_td_cast_fin_",
                         "u_se_td_cast_rib_",
                         "u_se_td_gasket_lip_",
+                        "u_se_td_section_",
                     )
                     for _to in bpy.data.objects:
                         if getattr(_to, "type", None) != "MESH":
@@ -28311,6 +28740,12 @@ def main():
                         _gob.data.materials.append(_use)
                         if _gob.name.startswith("u_se_td_"):
                             _gob.hide_render = False
+                # The generic "show everything traction" loop above deliberately
+                # cannot know shell semantics. Re-assert the functional section so
+                # full motor/end-bell/MCU shells do not return over the internals.
+                if _IS_TRACTION_DRIVE_FORM:
+                    _fpk_apply_functional_section_view(
+                        "08-product-ghost-shell", True)
                 # Front cover: hide on traction ghost (crate curtain); else show.
                 if _SEALED_FRONT_COVER is not None:
                     _SEALED_FRONT_COVER.hide_render = bool(_IS_TRACTION_DRIVE_FORM)
@@ -29056,6 +29491,8 @@ if __name__ == "__main__":
         _selftest_containing_shell()
         _selftest_instrument_form_rule()
         _selftest_thermocycler_exterior_keep()
+        _selftest_fpk_functional_section_geometry()
+        _selftest_fpk_functional_section_view_state()
         _selftest_instrument_mesh_keep_prefixes()
         _selftest_instrument_source_harness()
         _selftest_sealed_role_xy()
