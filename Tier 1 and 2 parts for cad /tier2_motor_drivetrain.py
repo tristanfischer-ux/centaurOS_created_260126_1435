@@ -883,6 +883,408 @@ def motor_water_jacket_helical(params: dict[str, object]) -> cq.Workplane:
     return jacket
 
 
+def _resolve_integrated_drive_case_shell_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate cassette shell envelope for an integrated traction EDU.
+
+    Defaults track a compact front-bay slice (W×D×H ≈ 336×254×256 mm) with a
+    motor bore pocket and a gear-nest cavity — universal packaging seeds, not
+    release castings.
+    """
+    outer_width = _number(params, "outer_width", 336.0)
+    outer_depth = _number(params, "outer_depth", 254.0)
+    outer_height = _number(params, "outer_height", 256.0)
+    wall = _number(params, "wall_thickness", 8.0)
+    motor_bore_diameter = _number(params, "motor_bore_diameter", 180.0)
+    motor_bore_depth = _number(params, "motor_bore_depth", 150.0)
+    gear_cavity_diameter = _number(params, "gear_cavity_diameter", 128.0)
+    gear_cavity_depth = _number(params, "gear_cavity_depth", 72.0)
+    flange_thickness = _number(params, "flange_thickness", 12.0)
+    mounting_ear_count = int(params.get("mounting_ear_count", 4))
+    ear_width = _number(params, "ear_width", 28.0)
+    ear_thickness = _number(params, "ear_thickness", 14.0)
+    ear_extension = _number(params, "ear_extension", 18.0)
+
+    if wall * 2.0 >= min(outer_width, outer_depth, outer_height):
+        raise ValueError("wall_thickness leaves no internal volume")
+    if motor_bore_diameter >= min(outer_depth, outer_height) - 2.0 * wall:
+        raise ValueError("motor_bore_diameter exceeds shell cross-section")
+    if gear_cavity_diameter >= min(outer_depth, outer_height) - 2.0 * wall:
+        raise ValueError("gear_cavity_diameter exceeds shell cross-section")
+    if motor_bore_depth + gear_cavity_depth + flange_thickness >= outer_width - 2.0 * wall:
+        raise ValueError(
+            "motor_bore_depth + gear_cavity_depth + flange_thickness "
+            "exceed shell length"
+        )
+    if mounting_ear_count < 2:
+        raise ValueError("mounting_ear_count must be at least 2")
+    if ear_extension + ear_thickness >= outer_depth / 2.0:
+        raise ValueError("ear_extension would collide with opposite shell face")
+
+    return {
+        "outer_width": outer_width,
+        "outer_depth": outer_depth,
+        "outer_height": outer_height,
+        "wall_thickness": wall,
+        "motor_bore_diameter": motor_bore_diameter,
+        "motor_bore_depth": motor_bore_depth,
+        "gear_cavity_diameter": gear_cavity_diameter,
+        "gear_cavity_depth": gear_cavity_depth,
+        "flange_thickness": flange_thickness,
+        "mounting_ear_count": mounting_ear_count,
+        "ear_width": ear_width,
+        "ear_thickness": ear_thickness,
+        "ear_extension": ear_extension,
+    }
+
+
+def integrated_drive_case_shell_metrics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit packaging scalars for the integrated drive case shell family."""
+    p = _resolve_integrated_drive_case_shell_params(params)
+    inner_width = float(p["outer_width"]) - 2.0 * float(p["wall_thickness"])
+    return {
+        "outer_width_mm": float(p["outer_width"]),
+        "outer_depth_mm": float(p["outer_depth"]),
+        "outer_height_mm": float(p["outer_height"]),
+        "inner_length_mm": inner_width,
+        "motor_bore_diameter_mm": float(p["motor_bore_diameter"]),
+        "gear_cavity_diameter_mm": float(p["gear_cavity_diameter"]),
+        "mounting_ear_count": int(p["mounting_ear_count"]),
+    }
+
+
+def integrated_drive_case_shell(params: dict[str, object]) -> cq.Workplane:
+    """Build a cast/machined integrated drive unit case shell (training geometry).
+
+    INTENT: give forge-truth a parametric cassette shell with motor bore,
+    gear-nest pocket, end flanges and mounting ears for packaging cutaways.
+    ForgeOS source-owned — not team-release casting CAD.
+    """
+    p = _resolve_integrated_drive_case_shell_params(params)
+    outer_width = float(p["outer_width"])
+    outer_depth = float(p["outer_depth"])
+    outer_height = float(p["outer_height"])
+    wall = float(p["wall_thickness"])
+    motor_bore_diameter = float(p["motor_bore_diameter"])
+    motor_bore_depth = float(p["motor_bore_depth"])
+    gear_cavity_diameter = float(p["gear_cavity_diameter"])
+    gear_cavity_depth = float(p["gear_cavity_depth"])
+    flange_thickness = float(p["flange_thickness"])
+    mounting_ear_count = int(p["mounting_ear_count"])
+    ear_width = float(p["ear_width"])
+    ear_thickness = float(p["ear_thickness"])
+    ear_extension = float(p["ear_extension"])
+
+    shell = cq.Workplane("XY").box(outer_width, outer_depth, outer_height)
+
+    # Motor bore pocket from the -X face (motor stack axis along +X).
+    motor_cavity = (
+        cq.Workplane("YZ")
+        .workplane(offset=-outer_width / 2.0 + wall + 0.05)
+        .circle(motor_bore_diameter / 2.0)
+        .extrude(motor_bore_depth)
+    )
+    shell = shell.cut(motor_cavity)
+
+    # Gear nest pocket from the +X face.
+    gear_cavity = (
+        cq.Workplane("YZ")
+        .workplane(offset=outer_width / 2.0 - wall - gear_cavity_depth - 0.05)
+        .circle(gear_cavity_diameter / 2.0)
+        .extrude(gear_cavity_depth + 0.1)
+    )
+    shell = shell.cut(gear_cavity)
+
+    # Inverter / service shelf recess on the crown (+Z).
+    shelf_depth = min(outer_height * 0.22, outer_height - 2.0 * wall - 6.0)
+    shelf = (
+        cq.Workplane("XY")
+        .workplane(offset=outer_height / 2.0 - wall - shelf_depth)
+        .rect(outer_width - 2.0 * wall - 24.0, outer_depth - 2.0 * wall - 24.0)
+        .extrude(shelf_depth + 0.1)
+    )
+    shell = shell.cut(shelf)
+
+    # End-bell flange rings (material retention at both short faces).
+    for x_offset in (
+        -outer_width / 2.0 + flange_thickness / 2.0,
+        outer_width / 2.0 - flange_thickness / 2.0,
+    ):
+        ring_od = min(outer_depth, outer_height) - 2.0 * wall + 4.0
+        ring = (
+            cq.Workplane("YZ")
+            .workplane(offset=x_offset)
+            .circle(ring_od / 2.0)
+            .circle((motor_bore_diameter / 2.0) + wall)
+            .extrude(flange_thickness)
+        )
+        shell = shell.union(ring)
+
+    # Mounting ears on the -Y face.
+    ear_spacing = (outer_width - ear_width) / max(mounting_ear_count - 1, 1)
+    x_start = -outer_width / 2.0 + ear_width / 2.0
+    for index in range(mounting_ear_count):
+        x_centre = x_start + index * ear_spacing
+        ear = (
+            cq.Workplane("XZ")
+            .workplane(offset=-outer_depth / 2.0 - ear_extension / 2.0 + 0.05)
+            .center(x_centre, 0.0)
+            .rect(ear_width, ear_thickness)
+            .extrude(ear_extension + 0.1)
+        )
+        shell = shell.union(ear)
+
+    return shell
+
+
+def _resolve_laminated_dc_bus_stack_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate laminated bus-bar stack rules for inverter commutation loop."""
+    plate_length = _number(params, "plate_length", 160.0)
+    plate_width = _number(params, "plate_width", 90.0)
+    layer_count = int(params.get("layer_count", 4))
+    copper_thickness = _number(params, "copper_thickness", 0.8)
+    dielectric_gap = _number(params, "dielectric_gap", 0.15)
+    terminal_tab_length = _number(params, "terminal_tab_length", 22.0)
+    terminal_tab_width = _number(params, "terminal_tab_width", 14.0)
+    phase_bar_count = int(params.get("phase_bar_count", 3))
+    bar_spacing = _number(params, "bar_spacing", 18.0)
+    edge_margin = _number(params, "edge_margin", 8.0)
+
+    if layer_count < 2:
+        raise ValueError("layer_count must be at least 2")
+    if phase_bar_count < 1:
+        raise ValueError("phase_bar_count must be at least 1")
+    if copper_thickness <= 0.0:
+        raise ValueError("copper_thickness must be positive")
+    if dielectric_gap < 0.05:
+        raise ValueError("dielectric_gap must leave insulation clearance")
+    span = (phase_bar_count - 1) * bar_spacing + terminal_tab_width
+    if span + 2.0 * edge_margin > plate_width:
+        raise ValueError("phase bars and tabs exceed plate_width")
+    if terminal_tab_length + edge_margin > plate_length:
+        raise ValueError("terminal_tab_length exceeds plate_length")
+
+    stack_height = layer_count * copper_thickness + (layer_count - 1) * dielectric_gap
+    return {
+        "plate_length": plate_length,
+        "plate_width": plate_width,
+        "layer_count": layer_count,
+        "copper_thickness": copper_thickness,
+        "dielectric_gap": dielectric_gap,
+        "terminal_tab_length": terminal_tab_length,
+        "terminal_tab_width": terminal_tab_width,
+        "phase_bar_count": phase_bar_count,
+        "bar_spacing": bar_spacing,
+        "edge_margin": edge_margin,
+        "stack_height": stack_height,
+    }
+
+
+def laminated_dc_bus_stack_metrics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit stack height and layer count for bus screening exports."""
+    p = _resolve_laminated_dc_bus_stack_params(params)
+    return {
+        "layer_count": int(p["layer_count"]),
+        "stack_height_mm": float(p["stack_height"]),
+        "phase_bar_count": int(p["phase_bar_count"]),
+        "plate_length_mm": float(p["plate_length"]),
+        "plate_width_mm": float(p["plate_width"]),
+    }
+
+
+def laminated_dc_bus_stack(params: dict[str, object]) -> cq.Workplane:
+    """Build a laminated direct-current bus stack with offset phase tabs.
+
+    INTENT: recognisable overlapping copper laminates for inverter commutation
+    loop packaging and FastHenry-style screening — not release bus artwork.
+    """
+    p = _resolve_laminated_dc_bus_stack_params(params)
+    plate_length = float(p["plate_length"])
+    plate_width = float(p["plate_width"])
+    layer_count = int(p["layer_count"])
+    copper_thickness = float(p["copper_thickness"])
+    dielectric_gap = float(p["dielectric_gap"])
+    terminal_tab_length = float(p["terminal_tab_length"])
+    terminal_tab_width = float(p["terminal_tab_width"])
+    phase_bar_count = int(p["phase_bar_count"])
+    bar_spacing = float(p["bar_spacing"])
+    edge_margin = float(p["edge_margin"])
+
+    stack: cq.Workplane | None = None
+    z_base = -float(p["stack_height"]) / 2.0
+    bar_length = plate_length - terminal_tab_length - edge_margin
+
+    for layer_index in range(layer_count):
+        z_layer = z_base + layer_index * (copper_thickness + dielectric_gap)
+        polarity_offset = (layer_index % 2) * (bar_spacing / 2.0)
+        y_start = -((phase_bar_count - 1) * bar_spacing) / 2.0 + polarity_offset
+
+        for bar_index in range(phase_bar_count):
+            y_centre = y_start + bar_index * bar_spacing
+            bar = (
+                cq.Workplane("XY")
+                .workplane(offset=z_layer)
+                .center(
+                    -terminal_tab_length / 2.0,
+                    y_centre,
+                )
+                .rect(bar_length, terminal_tab_width * 0.85)
+                .extrude(copper_thickness)
+            )
+            tab = (
+                cq.Workplane("XY")
+                .workplane(offset=z_layer)
+                .center(
+                    plate_length / 2.0 - edge_margin - terminal_tab_length / 2.0,
+                    y_centre + (layer_index % 3 - 1) * 2.5,
+                )
+                .rect(terminal_tab_length, terminal_tab_width)
+                .extrude(copper_thickness)
+            )
+            layer_solid = bar.union(tab)
+            stack = layer_solid if stack is None else stack.union(layer_solid)
+
+    assert stack is not None
+
+    # Insulation frame (dielectric spacer outline — visual cue only).
+    frame = (
+        cq.Workplane("XY")
+        .box(plate_length, plate_width, float(p["stack_height"]) + 0.4)
+        .faces(">Z")
+        .shell(-0.25)
+    )
+    return stack.union(frame)
+
+
+def _resolve_vehicle_interface_port_cluster_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate HV/LV/coolant port cluster on a mounting plate."""
+    plate_width = _number(params, "plate_width", 180.0)
+    plate_height = _number(params, "plate_height", 120.0)
+    plate_thickness = _number(params, "plate_thickness", 8.0)
+    hv_port_diameter = _number(params, "hv_port_diameter", 42.0)
+    hv_boss_height = _number(params, "hv_boss_height", 28.0)
+    lv_port_width = _number(params, "lv_port_width", 32.0)
+    lv_port_depth = _number(params, "lv_port_depth", 18.0)
+    lv_boss_height = _number(params, "lv_boss_height", 16.0)
+    coolant_port_diameter = _number(params, "coolant_port_diameter", 16.0)
+    coolant_boss_height = _number(params, "coolant_boss_height", 14.0)
+    coolant_spacing = _number(params, "coolant_spacing", 36.0)
+    edge_margin = _number(params, "edge_margin", 14.0)
+
+    if hv_port_diameter + 2.0 * edge_margin > plate_width:
+        raise ValueError("hv_port_diameter exceeds plate_width with margins")
+    if lv_port_width + 2.0 * edge_margin > plate_width:
+        raise ValueError("lv_port_width exceeds plate_width with margins")
+    if coolant_spacing + coolant_port_diameter + 2.0 * edge_margin > plate_height:
+        raise ValueError("coolant ports exceed plate_height with margins")
+    if hv_boss_height + lv_boss_height > plate_height - 2.0 * edge_margin:
+        raise ValueError("boss heights collide on plate_height")
+
+    return {
+        "plate_width": plate_width,
+        "plate_height": plate_height,
+        "plate_thickness": plate_thickness,
+        "hv_port_diameter": hv_port_diameter,
+        "hv_boss_height": hv_boss_height,
+        "lv_port_width": lv_port_width,
+        "lv_port_depth": lv_port_depth,
+        "lv_boss_height": lv_boss_height,
+        "coolant_port_diameter": coolant_port_diameter,
+        "coolant_boss_height": coolant_boss_height,
+        "coolant_spacing": coolant_spacing,
+        "edge_margin": edge_margin,
+    }
+
+
+def vehicle_interface_port_cluster_metrics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit port count and plate envelope for interface screening."""
+    p = _resolve_vehicle_interface_port_cluster_params(params)
+    return {
+        "plate_width_mm": float(p["plate_width"]),
+        "plate_height_mm": float(p["plate_height"]),
+        "hv_port_diameter_mm": float(p["hv_port_diameter"]),
+        "coolant_port_count": 2,
+        "lv_port_count": 1,
+    }
+
+
+def vehicle_interface_port_cluster(params: dict[str, object]) -> cq.Workplane:
+    """Build HV/LV/coolant port bosses on a vehicle-interface mounting plate.
+
+    INTENT: parametric keep-out and mounting geometry for traction EDU
+    interfaces — not supplier connector release CAD.
+    """
+    p = _resolve_vehicle_interface_port_cluster_params(params)
+    plate_width = float(p["plate_width"])
+    plate_height = float(p["plate_height"])
+    plate_thickness = float(p["plate_thickness"])
+    hv_port_diameter = float(p["hv_port_diameter"])
+    hv_boss_height = float(p["hv_boss_height"])
+    lv_port_width = float(p["lv_port_width"])
+    lv_port_depth = float(p["lv_port_depth"])
+    lv_boss_height = float(p["lv_boss_height"])
+    coolant_port_diameter = float(p["coolant_port_diameter"])
+    coolant_boss_height = float(p["coolant_boss_height"])
+    coolant_spacing = float(p["coolant_spacing"])
+    edge_margin = float(p["edge_margin"])
+
+    plate = cq.Workplane("XY").box(plate_width, plate_height, plate_thickness)
+
+    # HV main port boss (+Y side).
+    hv_x = -plate_width / 2.0 + edge_margin + hv_port_diameter / 2.0
+    hv_y = plate_height / 2.0 - edge_margin - hv_boss_height / 2.0
+    hv_boss = (
+        cq.Workplane("XY")
+        .workplane(offset=plate_thickness / 2.0)
+        .center(hv_x, hv_y)
+        .circle(hv_port_diameter / 2.0)
+        .extrude(hv_boss_height)
+    )
+    plate = plate.union(hv_boss)
+
+    # LV signal connector pocket (-Y side).
+    lv_x = plate_width / 2.0 - edge_margin - lv_port_width / 2.0
+    lv_y = -plate_height / 2.0 + edge_margin + lv_boss_height / 2.0
+    lv_boss = (
+        cq.Workplane("XY")
+        .workplane(offset=plate_thickness / 2.0)
+        .center(lv_x, lv_y)
+        .rect(lv_port_width, lv_port_depth)
+        .extrude(lv_boss_height)
+    )
+    plate = plate.union(lv_boss)
+
+    # Coolant quick-connect bosses (centre column).
+    for sign in (-1.0, 1.0):
+        cool_y = sign * coolant_spacing / 2.0
+        cool_boss = (
+            cq.Workplane("XY")
+            .workplane(offset=plate_thickness / 2.0)
+            .center(0.0, cool_y)
+            .circle(coolant_port_diameter / 2.0)
+            .extrude(coolant_boss_height)
+        )
+        plate = plate.union(cool_boss)
+
+    # Through-bores for visual authenticity in cutaways.
+    plate = plate.faces(">Z").workplane().pushPoints(
+        [(hv_x, hv_y), (lv_x, lv_y), (0.0, coolant_spacing / 2.0), (0.0, -coolant_spacing / 2.0)]
+    ).hole(hv_port_diameter * 0.55)
+
+    return plate
+
+
 TIER2_MOTOR_DRIVETRAIN = {
     "ipmsm_stator_lamination": {
         "function": ipmsm_stator_lamination,
@@ -1273,6 +1675,229 @@ TIER2_MOTOR_DRIVETRAIN = {
             ),
         },
     },
+    "integrated_drive_case_shell": {
+        "function": integrated_drive_case_shell,
+        "name": "Integrated Drive Case Shell",
+        "category": "enclosure",
+        "default_colour": "#707880",
+        "visual_tags": [
+            "aluminium",
+            "cast_case",
+            "traction_drive",
+            "enclosure",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "outer_width": {
+                "type": "number", "default": 336.0, "min": 80.0, "unit": "mm"
+            },
+            "outer_depth": {
+                "type": "number", "default": 254.0, "min": 60.0, "unit": "mm"
+            },
+            "outer_height": {
+                "type": "number", "default": 256.0, "min": 60.0, "unit": "mm"
+            },
+            "wall_thickness": {
+                "type": "number", "default": 8.0, "min": 3.0, "unit": "mm"
+            },
+            "motor_bore_diameter": {
+                "type": "number", "default": 180.0, "min": 40.0, "unit": "mm"
+            },
+            "motor_bore_depth": {
+                "type": "number", "default": 150.0, "min": 20.0, "unit": "mm"
+            },
+            "gear_cavity_diameter": {
+                "type": "number", "default": 128.0, "min": 30.0, "unit": "mm"
+            },
+            "gear_cavity_depth": {
+                "type": "number", "default": 72.0, "min": 10.0, "unit": "mm"
+            },
+            "flange_thickness": {
+                "type": "number", "default": 12.0, "min": 4.0, "unit": "mm"
+            },
+            "mounting_ear_count": {
+                "type": "integer", "default": 4, "min": 2
+            },
+            "ear_width": {
+                "type": "number", "default": 28.0, "min": 8.0, "unit": "mm"
+            },
+            "ear_thickness": {
+                "type": "number", "default": 14.0, "min": 4.0, "unit": "mm"
+            },
+            "ear_extension": {
+                "type": "number", "default": 18.0, "min": 4.0, "unit": "mm"
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "chassis_mount_ears",
+                "type": "planar_face_array",
+                "position": "minus_y_face",
+            },
+            {
+                "name": "motor_bore_axis",
+                "type": "concentric_bore",
+                "position": "minus_x_face",
+            },
+            {
+                "name": "gear_nest_axis",
+                "type": "concentric_bore",
+                "position": "plus_x_face",
+            },
+        ],
+        "training_provenance": {
+            "source_url": None,
+            "source_revision": None,
+            "licence": "ForgeOS-source-owned",
+            "use": (
+                "ForgeOS source-owned EDU cassette shell for packaging / "
+                "structural screening — not team-release casting CAD"
+            ),
+        },
+    },
+    "laminated_dc_bus_stack": {
+        "function": laminated_dc_bus_stack,
+        "name": "Laminated DC Bus Stack",
+        "category": "power_electronics",
+        "default_colour": "#C87830",
+        "visual_tags": [
+            "copper",
+            "busbar",
+            "laminated",
+            "inverter",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "plate_length": {
+                "type": "number", "default": 160.0, "min": 40.0, "unit": "mm"
+            },
+            "plate_width": {
+                "type": "number", "default": 90.0, "min": 30.0, "unit": "mm"
+            },
+            "layer_count": {
+                "type": "integer", "default": 4, "min": 2
+            },
+            "copper_thickness": {
+                "type": "number", "default": 0.8, "min": 0.2, "unit": "mm"
+            },
+            "dielectric_gap": {
+                "type": "number", "default": 0.15, "min": 0.05, "unit": "mm"
+            },
+            "terminal_tab_length": {
+                "type": "number", "default": 22.0, "min": 5.0, "unit": "mm"
+            },
+            "terminal_tab_width": {
+                "type": "number", "default": 14.0, "min": 4.0, "unit": "mm"
+            },
+            "phase_bar_count": {
+                "type": "integer", "default": 3, "min": 1
+            },
+            "bar_spacing": {
+                "type": "number", "default": 18.0, "min": 4.0, "unit": "mm"
+            },
+            "edge_margin": {
+                "type": "number", "default": 8.0, "min": 2.0, "unit": "mm"
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "module_terminal_face",
+                "type": "planar_face",
+                "position": "plus_x_tabs",
+            },
+            {
+                "name": "capacitor_terminal_face",
+                "type": "planar_face",
+                "position": "minus_x_bars",
+            },
+        ],
+        "training_provenance": {
+            "source_url": None,
+            "source_revision": None,
+            "licence": "ForgeOS-source-owned",
+            "use": (
+                "ForgeOS source-owned laminated bus concept for commutation-loop "
+                "packaging — not release bus artwork or measured ESL"
+            ),
+        },
+    },
+    "vehicle_interface_port_cluster": {
+        "function": vehicle_interface_port_cluster,
+        "name": "Vehicle Interface Port Cluster",
+        "category": "interface",
+        "default_colour": "#606870",
+        "visual_tags": [
+            "connector",
+            "hv_port",
+            "coolant_port",
+            "vehicle_interface",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "plate_width": {
+                "type": "number", "default": 180.0, "min": 60.0, "unit": "mm"
+            },
+            "plate_height": {
+                "type": "number", "default": 120.0, "min": 40.0, "unit": "mm"
+            },
+            "plate_thickness": {
+                "type": "number", "default": 8.0, "min": 3.0, "unit": "mm"
+            },
+            "hv_port_diameter": {
+                "type": "number", "default": 42.0, "min": 10.0, "unit": "mm"
+            },
+            "hv_boss_height": {
+                "type": "number", "default": 28.0, "min": 6.0, "unit": "mm"
+            },
+            "lv_port_width": {
+                "type": "number", "default": 32.0, "min": 8.0, "unit": "mm"
+            },
+            "lv_port_depth": {
+                "type": "number", "default": 18.0, "min": 6.0, "unit": "mm"
+            },
+            "lv_boss_height": {
+                "type": "number", "default": 16.0, "min": 4.0, "unit": "mm"
+            },
+            "coolant_port_diameter": {
+                "type": "number", "default": 16.0, "min": 4.0, "unit": "mm"
+            },
+            "coolant_boss_height": {
+                "type": "number", "default": 14.0, "min": 4.0, "unit": "mm"
+            },
+            "coolant_spacing": {
+                "type": "number", "default": 36.0, "min": 8.0, "unit": "mm"
+            },
+            "edge_margin": {
+                "type": "number", "default": 14.0, "min": 4.0, "unit": "mm"
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "hv_traction_port",
+                "type": "port",
+                "position": "plus_y_boss",
+            },
+            {
+                "name": "lv_signal_port",
+                "type": "port",
+                "position": "minus_y_boss",
+            },
+            {
+                "name": "coolant_in_out",
+                "type": "dual_port",
+                "position": "centre_column",
+            },
+        ],
+        "training_provenance": {
+            "source_url": None,
+            "source_revision": None,
+            "licence": "ForgeOS-source-owned",
+            "use": (
+                "ForgeOS source-owned interface keep-out geometry — not supplier "
+                "connector release CAD or FIA port coordinates"
+            ),
+        },
+    },
 }
 
 
@@ -1449,6 +2074,100 @@ def _selftest_cold_plate(temp_root: Path) -> None:
     )
 
 
+def _selftest_integrated_drive_case_shell(temp_root: Path) -> None:
+    """Prove EDU shell envelope, cavities, ears and STEP/STL export."""
+    metrics = integrated_drive_case_shell_metrics({})
+    assert metrics["mounting_ear_count"] == 4
+    assert float(metrics["outer_width_mm"]) == 336.0
+
+    model = integrated_drive_case_shell({})
+    bbox = model.val().BoundingBox()
+    assert model.solids().size() >= 1
+    assert bbox.xlen >= 336.0
+    assert bbox.xlen <= 350.0
+    assert bbox.ylen >= 254.0
+    assert abs(bbox.zlen - 256.0) < 2.0
+
+    envelope = 336.0 * 254.0 * 256.0
+    volume = model.val().Volume()
+    assert volume < envelope * 0.98
+    assert volume > envelope * 0.35
+
+    try:
+        integrated_drive_case_shell({"wall_thickness": 200.0})
+        raise AssertionError("expected wall_thickness rejection")
+    except ValueError as exc:
+        assert "wall" in str(exc).lower()
+
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "integrated_drive_case_shell", temp_root
+    )
+    print(
+        "[integrated-drive-case-shell] selftest PASS: "
+        f"ears={metrics['mounting_ear_count']}, "
+        f"STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
+def _selftest_laminated_dc_bus_stack(temp_root: Path) -> None:
+    """Prove laminated layers, stack height and STEP/STL export."""
+    metrics = laminated_dc_bus_stack_metrics({})
+    assert metrics["layer_count"] == 4
+    assert metrics["phase_bar_count"] == 3
+    expected_height = 4 * 0.8 + 3 * 0.15
+    assert abs(float(metrics["stack_height_mm"]) - expected_height) < 1e-6
+
+    model = laminated_dc_bus_stack({})
+    bbox = model.val().BoundingBox()
+    assert model.solids().size() >= 4
+    assert abs(bbox.xlen - 160.0) < 2.0
+    assert abs(bbox.ylen - 90.0) < 2.0
+    assert bbox.zlen > expected_height
+
+    try:
+        laminated_dc_bus_stack({"layer_count": 1})
+        raise AssertionError("expected layer_count rejection")
+    except ValueError as exc:
+        assert "layer_count" in str(exc).lower()
+
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "laminated_dc_bus_stack", temp_root
+    )
+    print(
+        "[laminated-dc-bus-stack] selftest PASS: "
+        f"layers={metrics['layer_count']}, "
+        f"STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
+def _selftest_vehicle_interface_port_cluster(temp_root: Path) -> None:
+    """Prove HV/LV/coolant bosses, plate envelope and STEP/STL export."""
+    metrics = vehicle_interface_port_cluster_metrics({})
+    assert metrics["coolant_port_count"] == 2
+    assert float(metrics["hv_port_diameter_mm"]) == 42.0
+
+    model = vehicle_interface_port_cluster({})
+    bbox = model.val().BoundingBox()
+    assert model.solids().size() >= 1
+    assert abs(bbox.xlen - 180.0) < 2.0
+    assert bbox.ylen >= 120.0
+    assert bbox.zlen > 8.0
+
+    try:
+        vehicle_interface_port_cluster({"hv_port_diameter": 200.0})
+        raise AssertionError("expected hv_port_diameter rejection")
+    except ValueError as exc:
+        assert "hv_port" in str(exc).lower() or "plate_width" in str(exc).lower()
+
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "vehicle_interface_port_cluster", temp_root
+    )
+    print(
+        "[vehicle-interface-port-cluster] selftest PASS: "
+        f"STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
 def _selftest_water_jacket(temp_root: Path) -> None:
     """Prove annular helix, positive bridges, Dh / developed length, STEP/STL."""
     hyd = motor_water_jacket_helical_hydraulics({})
@@ -1505,6 +2224,9 @@ def _selftest() -> int:
         _selftest_post_diff_final_drive(temp_root)
         _selftest_cold_plate(temp_root)
         _selftest_water_jacket(temp_root)
+        _selftest_integrated_drive_case_shell(temp_root)
+        _selftest_laminated_dc_bus_stack(temp_root)
+        _selftest_vehicle_interface_port_cluster(temp_root)
     return 0
 
 

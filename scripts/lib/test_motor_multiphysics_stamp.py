@@ -157,5 +157,34 @@ class PostDiffFinalDriveBlockerTests(unittest.TestCase):
         self.assertIn("Blender placer syncs", blocker["summary"])
 
 
+class CadAuthorityParametricFamilyTests(unittest.TestCase):
+    """Prove new front-drive principals list parametric families without release authority."""
+
+    def test_cad_authority_lists_nine_parametric_families_with_zero_release_coverage(
+        self,
+    ) -> None:
+        cad = build_cad_authority(stamped_at="2026-07-30T00:00:00Z")
+
+        self.assertEqual(cad["parametric_family_count"], 9)
+        self.assertEqual(cad["release_authority_coverage"], 0.0)
+        self.assertFalse(cad["ship_ok"])
+
+    def test_new_principal_families_register_without_release_authority(self) -> None:
+        cad = build_cad_authority(stamped_at="2026-07-30T00:00:00Z")
+        by_id = {row["component_id"]: row for row in cad["components"]}
+
+        expected = {
+            "traction_drive_housing": "integrated_drive_case_shell",
+            "laminated_dc_bus": "laminated_dc_bus_stack",
+            "vehicle_interface_connectors": "vehicle_interface_port_cluster",
+        }
+        for component_id, cad_family in expected.items():
+            component = by_id[component_id]
+            self.assertEqual(component["authority_level"], "parametric_family")
+            self.assertEqual(component["source_type"], "cadquery_family")
+            self.assertEqual(component["cad_family"], cad_family)
+            self.assertFalse(component["release_authority"])
+
+
 if __name__ == "__main__":
     unittest.main()

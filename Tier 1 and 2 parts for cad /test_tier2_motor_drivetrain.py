@@ -250,5 +250,60 @@ class MotorWaterJacketHelicalTests(unittest.TestCase):
             )
 
 
+class IntegratedDriveCaseShellTests(unittest.TestCase):
+    """Prove EDU cassette shell envelope and cavity rules."""
+
+    def test_default_shell_matches_bay_slice_envelope(self) -> None:
+        model = MODULE.integrated_drive_case_shell({})
+        bbox = model.val().BoundingBox()
+        metrics = MODULE.integrated_drive_case_shell_metrics({})
+
+        self.assertEqual(metrics["mounting_ear_count"], 4)
+        self.assertGreaterEqual(bbox.xlen, 336.0)
+        self.assertLessEqual(bbox.xlen, 350.0)
+        self.assertGreaterEqual(bbox.ylen, 254.0)
+        self.assertAlmostEqual(bbox.zlen, 256.0, delta=2.0)
+
+    def test_excessive_wall_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "wall_thickness"):
+            MODULE.integrated_drive_case_shell({"wall_thickness": 200.0})
+
+
+class LaminatedDcBusStackTests(unittest.TestCase):
+    """Prove laminated bus stack layers and stack height."""
+
+    def test_default_stack_height_and_layer_count(self) -> None:
+        metrics = MODULE.laminated_dc_bus_stack_metrics({})
+        model = MODULE.laminated_dc_bus_stack({})
+        bbox = model.val().BoundingBox()
+
+        self.assertEqual(metrics["layer_count"], 4)
+        self.assertEqual(metrics["phase_bar_count"], 3)
+        expected_height = 4 * 0.8 + 3 * 0.15
+        self.assertAlmostEqual(metrics["stack_height_mm"], expected_height, places=6)
+        self.assertGreater(bbox.zlen, expected_height)
+
+    def test_single_layer_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "layer_count"):
+            MODULE.laminated_dc_bus_stack({"layer_count": 1})
+
+
+class VehicleInterfacePortClusterTests(unittest.TestCase):
+    """Prove HV/LV/coolant port cluster plate rules."""
+
+    def test_default_cluster_has_two_coolant_ports(self) -> None:
+        metrics = MODULE.vehicle_interface_port_cluster_metrics({})
+        model = MODULE.vehicle_interface_port_cluster({})
+        bbox = model.val().BoundingBox()
+
+        self.assertEqual(metrics["coolant_port_count"], 2)
+        self.assertAlmostEqual(bbox.xlen, 180.0, delta=2.0)
+        self.assertGreater(bbox.zlen, 8.0)
+
+    def test_oversize_hv_port_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "hv_port|plate_width"):
+            MODULE.vehicle_interface_port_cluster({"hv_port_diameter": 200.0})
+
+
 if __name__ == "__main__":
     unittest.main()

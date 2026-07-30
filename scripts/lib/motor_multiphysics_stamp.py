@@ -94,6 +94,7 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
             "_motor_stack/em_fia_front_kit_case.json",
             "_motor_stack/em_fia_mtpa_screen.json",
             "_motor_stack/em_fia_voltage_fw_screen.json",
+            "_motor_stack/em_fia_torque_map_screen.json",
         ],
         "measurement_recipe": (
             "Mount the revision-matched MGU and inverter on a calibrated dyno; hold "
@@ -295,6 +296,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "scripts/motor-stack/em_fia_mtpa_screen.py",
             "scripts/motor-stack/em_fia_demag_screen.py",
             "scripts/motor-stack/em_fia_voltage_fw_screen.py",
+            "scripts/motor-stack/em_fia_torque_map_screen.py",
             "scripts/phantm/bin/femmcli",
         ],
         "versions": {
@@ -674,6 +676,12 @@ def _load_fia_voltage_fw_case(
     return _load_fia_case_json(twin_dir, "em_fia_voltage_fw_screen.json")
 
 
+def _load_fia_torque_map_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA hybrid torque-map screen if present."""
+
+    return _load_fia_case_json(twin_dir, "em_fia_torque_map_screen.json")
+
+
 def _load_fia_ross_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA ROSS rotor-dynamics case artefact if present."""
     return _load_fia_case_json(twin_dir, "ross_fia_front_kit_case.json")
@@ -927,6 +935,64 @@ def _voltage_fw_screen_cite(
     }
 
 
+def _torque_map_screen_cite(
+    torque_map_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Cite the hybrid torque-map SCREEN while leaving maps OPEN.
+
+    INTENT: Surface denser FEMM+analytical evidence (current scaling, loss
+    corners, FW capability curve) without upgrading to closed torque/FW maps.
+    """
+
+    if not isinstance(torque_map_case, Mapping):
+        return "OPEN"
+    summary = (
+        torque_map_case.get("summary")
+        if isinstance(torque_map_case.get("summary"), dict)
+        else {}
+    )
+    coverage = (
+        torque_map_case.get("coverage")
+        if isinstance(torque_map_case.get("coverage"), dict)
+        else {}
+    )
+    geometry_binding = (
+        torque_map_case.get("geometry_binding")
+        if isinstance(torque_map_case.get("geometry_binding"), dict)
+        else {}
+    )
+    rel_ref = "_motor_stack/em_fia_torque_map_screen.json"
+    return {
+        "status": torque_map_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "femm_anchor_points": coverage.get("femm_anchor_points"),
+        "current_scaled_points": coverage.get("current_scaled_points"),
+        "fw_capability_points": coverage.get("fw_capability_points"),
+        "loss_corner_points": coverage.get("loss_corner_points"),
+        "total_screen_points": coverage.get("total_screen_points"),
+        "peak_torque_magnitude_nm": summary.get("peak_torque_magnitude_nm"),
+        "peak_torque_vs_required_ratio": summary.get(
+            "peak_torque_vs_required_ratio"
+        ),
+        "rotor_inner_diameter_mm": geometry_binding.get("rotor_inner_diameter_mm"),
+        "rotor_outer_diameter_mm": geometry_binding.get("rotor_outer_diameter_mm"),
+        "geometry_matches_twin": geometry_binding.get("matches_twin_concentric"),
+        "losses_evaluated": coverage.get("losses_evaluated"),
+        "fw_capability_evaluated": coverage.get("fw_capability_evaluated"),
+        "torque_map": "OPEN",
+        "field_weakening_map": "OPEN",
+        "note": (
+            "Twin-bound hybrid FEMM+analytical torque-map SCREEN with current "
+            "scaling, loss corners and FW capability curve. Not a closed "
+            "torque/loss/FW map; not ship_ok."
+        ),
+    }
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
@@ -935,6 +1001,7 @@ def _magnetic_check_from_fia_case(
     demag_case: Optional[Mapping[str, Any]] = None,
     mtpa_case: Optional[Mapping[str, Any]] = None,
     voltage_fw_case: Optional[Mapping[str, Any]] = None,
+    torque_map_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote magnetic check to PARTIAL when a twin-bound open-circuit point exists.
 
@@ -971,6 +1038,10 @@ def _magnetic_check_from_fia_case(
     mtpa_cite = _mtpa_screen_cite(mtpa_case, twin_dir=twin_dir)
     voltage_fw_cite = _voltage_fw_screen_cite(
         voltage_fw_case,
+        twin_dir=twin_dir,
+    )
+    torque_map_cite = _torque_map_screen_cite(
+        torque_map_case,
         twin_dir=twin_dir,
     )
     demag_margin: Any = None
@@ -1056,6 +1127,7 @@ def _magnetic_check_from_fia_case(
                 "demag_screen": demag_cite,
                 "mtpa_screen": mtpa_cite,
                 "voltage_fw_screen": voltage_fw_cite,
+                "torque_map_screen": torque_map_cite,
                 "demagnetisation_margin": demag_margin,
                 "torque_map": "OPEN",
                 "field_weakening_map": "OPEN",
@@ -1065,8 +1137,9 @@ def _magnetic_check_from_fia_case(
                     "Twin-bound OC + loaded magnetic screen on kit geometry, "
                     "optionally with a coarse rotor-position sweep at the "
                     "screened current angle, an analytical hot demag SCREEN, "
-                    "and an analytical voltage / field-weakening SCREEN. "
-                    "works_in_kit_context / duty_torque_screen_ok = |FE torque| "
+                    "an analytical voltage / field-weakening SCREEN, and a hybrid "
+                    "torque-map SCREEN (current scaling, loss corners, FW "
+                    "capability). works_in_kit_context / duty_torque_screen_ok = |FE torque| "
                     "≥ ~75% of analytical shaft torque at the reference "
                     "position — NOT smoke-only, NOT full MTPA, NOT demag map "
                     "PASS, NOT FW calibration, NOT ship_ok. Torque map / FW "
@@ -2374,6 +2447,7 @@ def build_motor_multiphysics(
     fia_demag = _load_fia_demag_case(twin_dir)
     fia_mtpa = _load_fia_mtpa_case(twin_dir)
     fia_voltage_fw = _load_fia_voltage_fw_case(twin_dir)
+    fia_torque_map = _load_fia_torque_map_case(twin_dir)
     if fia_mag is not None and twin_dir is not None:
         magnetic = _magnetic_check_from_fia_case(
             duty,
@@ -2382,6 +2456,7 @@ def build_motor_multiphysics(
             demag_case=fia_demag,
             mtpa_case=fia_mtpa,
             voltage_fw_case=fia_voltage_fw,
+            torque_map_case=fia_torque_map,
         )
         notes += (
             " Magnetic check PARTIAL: twin-bound open-circuit / loaded point in "
@@ -2399,6 +2474,11 @@ def build_motor_multiphysics(
             notes += (
                 " + voltage/FW SCREEN in "
                 "_motor_stack/em_fia_voltage_fw_screen.json"
+            )
+        if fia_torque_map is not None:
+            notes += (
+                " + hybrid torque-map SCREEN in "
+                "_motor_stack/em_fia_torque_map_screen.json"
             )
         notes += " (torque map / FW map / full demag map / dyno still OPEN)."
     else:
@@ -3592,6 +3672,50 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "em_fia_torque_map_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.em_fia_torque_map_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "torquemap321",
+                    "geometry_binding": {
+                        "rotor_inner_diameter_mm": 130.5,
+                        "rotor_outer_diameter_mm": 159.8,
+                        "matches_twin_concentric": True,
+                    },
+                    "summary": {
+                        "femm_anchor_points": 35,
+                        "current_scaled_points": 105,
+                        "fw_capability_points": 21,
+                        "loss_corner_points": 3,
+                        "total_screen_points": 164,
+                        "peak_torque_magnitude_nm": 118.4,
+                        "peak_torque_vs_required_ratio": 0.909,
+                        "rotor_inner_diameter_mm": 130.5,
+                        "rotor_outer_diameter_mm": 159.8,
+                        "geometry_matches_twin": True,
+                    },
+                    "coverage": {
+                        "femm_anchor_points": 35,
+                        "current_scaled_points": 105,
+                        "fw_capability_points": 21,
+                        "loss_corner_points": 3,
+                        "total_screen_points": 164,
+                        "denser_than_mtpa_alone": True,
+                        "losses_evaluated": True,
+                        "fw_capability_evaluated": True,
+                        "closed_torque_map": False,
+                        "closed_field_weakening_map": False,
+                    },
+                    "torque_map_screen": {"status": "PARTIAL"},
+                    "torque_map": {"status": "OPEN"},
+                    "field_weakening_map": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "ross_fia_front_kit_case.json").write_text(
             json.dumps(
                 {
@@ -4060,6 +4184,37 @@ def selftest() -> int:
             bad += 1
         elif voltage_fw_cite.get("field_weakening_map") != "OPEN":
             print("FAIL: voltage/FW cite must leave FW map OPEN")
+            bad += 1
+        torque_map_cite = mag_twin.get("torque_map_screen")
+        if (
+            not isinstance(torque_map_cite, dict)
+            or torque_map_cite.get("status") != "PARTIAL"
+        ):
+            print(
+                "FAIL: magnetic twin_bound_case must cite hybrid torque-map "
+                "screen as PARTIAL when artefact present"
+            )
+            bad += 1
+        elif torque_map_cite.get("total_screen_points") != 164:
+            print("FAIL: torque-map cite must surface total screen point count")
+            bad += 1
+        elif torque_map_cite.get("peak_torque_magnitude_nm") != 118.4:
+            print("FAIL: torque-map cite must surface peak torque magnitude")
+            bad += 1
+        elif torque_map_cite.get("rotor_inner_diameter_mm") != 130.5:
+            print("FAIL: torque-map cite must bind enlarged rotor ID")
+            bad += 1
+        elif torque_map_cite.get("rotor_outer_diameter_mm") != 159.8:
+            print("FAIL: torque-map cite must bind enlarged rotor OD")
+            bad += 1
+        elif torque_map_cite.get("ship_ok") is not False:
+            print("FAIL: torque-map cite must keep ship_ok false")
+            bad += 1
+        elif torque_map_cite.get("torque_map") != "OPEN":
+            print("FAIL: torque-map cite must leave torque map OPEN")
+            bad += 1
+        elif torque_map_cite.get("field_weakening_map") != "OPEN":
+            print("FAIL: torque-map cite must leave FW map OPEN")
             bad += 1
         if mag.get("status") == "PASS" or mag_twin.get("ship_ok") is True:
             print("FAIL: magnetic must remain PARTIAL with ship_ok false")
