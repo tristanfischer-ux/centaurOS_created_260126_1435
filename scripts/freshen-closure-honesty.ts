@@ -23,12 +23,14 @@ function main(): void {
   const state = JSON.parse(readFileSync(statePath, 'utf8'))
   const r = computeDesignClosure(state)
   writeFileSync(resolve(runDir, '4-design-closure.json'), JSON.stringify(r, null, 2))
+  const chIn = buildClosureHonestyFromState(state)
+  state.designClosureHonesty = chIn
+  writeFileSync(statePath, JSON.stringify(state))
 
   if (!existsSync(qPath)) {
     console.error(`[freshen-closure] no quality-scorecard.json — wrote 4-design-closure only (honesty=${r.honesty_score})`)
     return
   }
-  const chIn = buildClosureHonestyFromState(state)
   const qsc = JSON.parse(readFileSync(qPath, 'utf8')) as {
     sections?: Array<{ name?: string; score?: number; defects?: string[]; advisory?: boolean }>
     floor?: number
@@ -48,22 +50,28 @@ function main(): void {
   }
   if (idx >= 0) sections[idx] = { ...sections[idx], ...ch }
   else sections.push(ch)
-  const det = sections.filter((s) => !s.advisory)
-  const floor = det.length ? Math.min(...det.map((s) => Number(s.score ?? 10))) : 10
+  const scored = sections.map((s) => Number(s.score ?? 10))
+  const det = sections.filter((s) => !s.advisory).map((s) => Number(s.score ?? 10))
+  const floor = scored.length ? Math.min(...scored) : 10
   const mean =
+    scored.length > 0
+      ? Math.round((scored.reduce((a, score) => a + score, 0) / scored.length) * 10) / 10
+      : 10
+  const deterministicFloor = det.length ? Math.min(...det) : floor
+  const deterministicMean =
     det.length > 0
-      ? Math.round((det.reduce((a, s) => a + Number(s.score ?? 0), 0) / det.length) * 10) / 10
+      ? Math.round((det.reduce((a, score) => a + score, 0) / det.length) * 10) / 10
       : 10
   qsc.sections = sections
   qsc.floor = floor
   qsc.mean = mean
-  qsc.deterministicFloor = floor
-  qsc.deterministicMean = mean
+  qsc.deterministicFloor = deterministicFloor
+  qsc.deterministicMean = deterministicMean
   qsc.allPass = floor >= 8
-  qsc.deterministicAllPass = floor >= 8
+  qsc.deterministicAllPass = deterministicFloor >= 8
   writeFileSync(qPath, JSON.stringify(qsc, null, 2))
   console.error(
-    `[freshen-closure] honesty=${chIn.score} fillable=${chIn.fillable_tbd} scorecard_floor=${floor}`,
+    `[freshen-closure] honesty=${chIn.score} fillable=${chIn.fillable_tbd} scorecard_floor=${floor} deterministic_floor=${deterministicFloor}`,
   )
 }
 

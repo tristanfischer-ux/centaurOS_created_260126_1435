@@ -75,6 +75,28 @@ function modulesOf(state: unknown): any[] {
   return (s?.moduleDecomposition?.modules ?? s?.design?.modules ?? []) as any[]
 }
 
+// INTENT: FPK race packs can be honestly non-shipping while OEM quote, HIL,
+// supplier Gerbers, dyno correlation, and FIA holds remain open. A complete
+// NOT_HOMOLOGATED ledger is disclosure, not a hidden all-TBD skeleton.
+function hasCompleteOpenRaceHoldsLedger(state: unknown): boolean {
+  const s = state as Record<string, any> | null | undefined
+  const hh = s?.homologationHonesty
+  if (!hh || typeof hh !== 'object') return false
+  const verdict = String(hh.verdict ?? '').trim().toUpperCase()
+  const ids = Array.isArray(hh.open_by_design_ids) ? hh.open_by_design_ids : []
+  const openCount = Number(hh.open_by_design_count ?? ids.length)
+  const note = String(hh.note ?? '').trim()
+  const shipOk = s?.ship_ok === true || s?.fpkClaimWiring?.ship_ok === true
+  return (
+    verdict === 'NOT_HOMOLOGATED' &&
+    Number.isFinite(openCount) &&
+    openCount > 0 &&
+    ids.length >= openCount &&
+    note.length > 0 &&
+    shipOk === false
+  )
+}
+
 function walkWords(state: unknown): Array<{ where: string; word: any; name: string; id: string }> {
   const out: Array<{ where: string; word: any; name: string; id: string }> = []
   const modules = modulesOf(state)
@@ -368,12 +390,14 @@ export function computeDesignClosure(state: unknown): DesignClosureResult {
     }
   }
 
-  // Honesty: all-critical-TBD → ≤2; each fillable TBD docks; closed → 10
+  // Honesty: all-critical-TBD → ≤2 unless a non-shipping open-holds ledger
+  // discloses why those race/OEM/proof slots remain open; each fillable TBD docks.
   const critical = words.filter((w) => isCriticalRole(w.name, w.id)
     && !/fastener|foot[_\s-]?pad|legend|bezel|wire_harness|status_led|decoupling|cell[_\s-]?holder|holder[_\s-]?fixture/i.test(`${w.name} ${w.id}`))
   const criticalTbd = critical.filter((w) => isTbdPart(w.word)).length
+  const hasOpenRaceHoldsLedger = hasCompleteOpenRaceHoldsLedger(state)
   let honesty = 10
-  if (critical.length > 0 && criticalTbd === critical.length) honesty = 2
+  if (critical.length > 0 && criticalTbd === critical.length && !hasOpenRaceHoldsLedger) honesty = 2
   else if (fillableTbd > 0) honesty = Math.max(2, 10 - Math.min(8, fillableTbd))
 
   const highs = findings.filter((f) => f.severity === 'high')
@@ -438,13 +462,25 @@ export function buildClosureHonestyFromState(state: unknown): {
   advisory: false
 } {
   const r = computeDesignClosure(state)
+  const s = state as Record<string, any> | null | undefined
+  const hh = s?.homologationHonesty
+  const disclosedHoldIds =
+    hasCompleteOpenRaceHoldsLedger(state) && Array.isArray(hh?.open_by_design_ids)
+      ? hh.open_by_design_ids.map((id: unknown) => String(id)).filter(Boolean)
+      : []
+  const defects = r.findings
+    .filter((f) => f.kind === 'fillable_tbd_critical_role' || f.kind === 'unbound_multiplicity' || f.kind === 'zero_dim_on_demand')
+    .slice(0, 12)
+    .map((f) => f.issue)
+  if (disclosedHoldIds.length > 0) {
+    defects.push(
+      `OPEN race holds disclosed: homologation=${String(hh?.verdict ?? 'NOT_HOMOLOGATED')}; ship_ok=false; holds=${disclosedHoldIds.join(', ')}`,
+    )
+  }
   return {
     score: r.honesty_score,
     fillable_tbd: r.fillable_tbd,
-    defects: r.findings
-      .filter((f) => f.kind === 'fillable_tbd_critical_role' || f.kind === 'unbound_multiplicity' || f.kind === 'zero_dim_on_demand')
-      .slice(0, 12)
-      .map((f) => f.issue),
+    defects,
     advisory: false,
   }
 }
@@ -741,6 +777,82 @@ export function selftestDesignClosure(): number {
       `FAIL: traction OEM-quote TBD pack honesty must be ≥9 (got ${trR.honesty_score}) — mcu_cold_plate must not trip all-critical-TBD`,
       trR,
     )
+    bad++
+  }
+
+  // proveCatch (2026-07-30 FPK Bar A): non-shipping race packs must disclose
+  // OPEN homologation/proof holds without pretending ship_ok=true. The same
+  // critical TBD skeleton WITHOUT that ledger still floors to 2.
+  const fpkCriticalTbd = {
+    ship_ok: false,
+    orchestratorContract: {
+      quantities: {
+        rear_axle_electrical_power_kw: { value: 350 },
+      },
+    },
+    moduleDecomposition: {
+      modules: [{
+        module: 'energy_conversion_transduction',
+        sub_modules: [{
+          words: [
+            {
+              name_human: 'SiC Power Module Stack',
+              content_character: { character_id: 'sic_power_module_stack' },
+              modifier_characters: [
+                { kind: 'quantity', value: '×1' },
+                { kind: 'part_number', value: 'TBD (detailed design)' },
+              ],
+            },
+            {
+              name_human: 'Real-time MCU',
+              content_character: { character_id: 'control_mcu' },
+              modifier_characters: [
+                { kind: 'quantity', value: '×1' },
+                { kind: 'part_number', value: 'TBD (detailed design)' },
+              ],
+            },
+          ],
+        }],
+      }],
+    },
+  }
+  const hiddenFpk = computeDesignClosure(fpkCriticalTbd)
+  if (hiddenFpk.honesty_score > 3) {
+    console.error(`FAIL: undisclosed all-critical FPK TBD must floor honesty (got ${hiddenFpk.honesty_score})`)
+    bad++
+  }
+  const disclosedFpk = {
+    ...fpkCriticalTbd,
+    homologationHonesty: {
+      verdict: 'NOT_HOMOLOGATED',
+      fia_race_ready: false,
+      open_by_design_count: 3,
+      open_by_design_ids: ['DEC-001', 'DEC-006', 'DEC-010'],
+      hil_present: false,
+      supplier_gerbers_present: false,
+      dyno_correlation_present: false,
+      note: 'HIL, supplier Gerbers, and dyno holes remain OPEN by design.',
+    },
+  }
+  const disclosedFpkR = computeDesignClosure(disclosedFpk)
+  if (disclosedFpkR.honesty_score < 9) {
+    console.error(
+      `FAIL: disclosed NOT_HOMOLOGATED race holds must lift closure honesty (got ${disclosedFpkR.honesty_score})`,
+      disclosedFpkR,
+    )
+    bad++
+  }
+  const disclosedFpkSection = buildClosureHonestyFromState(disclosedFpk)
+  if (!disclosedFpkSection.defects.some((d) => /OPEN race holds disclosed/.test(d) && /DEC-006/.test(d))) {
+    console.error('FAIL: closure_honesty section must list disclosed OPEN race holds', disclosedFpkSection)
+    bad++
+  }
+  const falseShipFpkR = computeDesignClosure({
+    ...disclosedFpk,
+    ship_ok: true,
+  })
+  if (falseShipFpkR.honesty_score > 3) {
+    console.error('FAIL: open-holds relief must not apply when ship_ok=true', falseShipFpkR)
     bad++
   }
 

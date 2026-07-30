@@ -2294,6 +2294,42 @@ def _performance_card_fact(state: dict) -> dict:
     return {"score": max(2, 8 - 2 * len(findings)), "defects": [f.message for f in findings]}
 
 
+def _closure_honesty_fact(state: dict, run_dir: str = "") -> dict:
+    """Live closure_honesty fact from Gate-40's delivered closure artifact.
+
+    INTENT: quality-scorecard.json can be stale while a freshener has already
+    rebuilt 4-design-closure.json from live state. Excel mirrors must ingest the
+    delivered closure ledger so Executive Summary / Quality & Audit cannot stay
+    capped by an obsolete closure_honesty=2.
+    """
+    if not run_dir:
+        return {"score": None, "defects": []}
+    dc = load_json(os.path.join(run_dir, "4-design-closure.json")) or {}
+    score = num(dc.get("honesty_score")) if isinstance(dc, dict) else None
+    if score is None:
+        return {"score": None, "defects": []}
+    defects = []
+    for f in (dc.get("findings") or []):
+        if not isinstance(f, dict):
+            continue
+        if str(f.get("kind") or "") in {
+            "fillable_tbd_critical_role",
+            "unbound_multiplicity",
+            "zero_dim_on_demand",
+        }:
+            defects.append(str(f.get("issue") or "")[:200])
+    hh = (state or {}).get("homologationHonesty") if isinstance(state, dict) else {}
+    hold_ids = hh.get("open_by_design_ids") if isinstance(hh, dict) else []
+    if isinstance(hold_ids, list) and str((hh or {}).get("verdict") or "").upper() == "NOT_HOMOLOGATED":
+        clean_ids = [str(x) for x in hold_ids if str(x).strip()]
+        if clean_ids:
+            defects.append(
+                "OPEN race holds disclosed: "
+                f"homologation={hh.get('verdict')}; ship_ok=false; holds={', '.join(clean_ids)}"
+            )
+    return {"score": score, "defects": defects}
+
+
 def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], Dict[str, dict]]:
     """Split the quality sections into FACT vs OPINION (the B3 doctrine,
     scorecard-floor.ts — "a number is trustworthy only when you can WATCH it be
@@ -2341,6 +2377,9 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
                 facts[nm] = ent
         else:
             facts[nm] = ent
+    _ch = _closure_honesty_fact(state, run_dir)
+    if _ch.get("score") is not None:
+        facts["closure_honesty"] = _ch
     for s in (((state or {}).get("selfAudit") or {}).get("sections") or []):
         if not isinstance(s, dict) or not s.get("name"):
             continue
