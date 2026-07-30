@@ -31,6 +31,7 @@ except ModuleNotFoundError:
 
 TARGET_MIN_LINES = 120
 TARGET_MAX_LINES = 200
+DB_PATH_DEFAULT = Path.home() / ".forge-truth/forge-truth.db"
 
 FASTENER_SKIP = re.compile(
     r"(bolt_set|bolt$|washer|nut_set|screw_set|fastener|dowel|clip_set|clamp_bolt|"
@@ -256,6 +257,119 @@ def load_literature_materials(db_path: Path) -> dict[str, str]:
     return material_by_token
 
 
+def load_material_prices(db_path: Path) -> dict[str, dict[str, Any]]:
+    """Load forge-truth material prices for honest concept pricing.
+
+    INTENT: FPK densify rows are make-to-print concepts, so the workbook needs
+    non-zero cost evidence without pretending an MPN exists. Material prices give
+    the best available floor; missing DB rows fall back to explicit RFQ language.
+    """
+    prices: dict[str, dict[str, Any]] = {}
+    if not db_path.exists():
+        return prices
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        rows = conn.execute(
+            """
+            SELECT material, raw_gbp_per_kg, mfg_mult_low, mfg_mult_high, source, updated, origin
+            FROM material_prices
+            """
+        ).fetchall()
+        conn.close()
+    except Exception:
+        return prices
+    for material, raw, low, high, source, updated, origin in rows:
+        key = norm(str(material or ""))
+        if not key:
+            continue
+        prices[key] = {
+            "raw_gbp_per_kg": float(raw),
+            "mfg_mult_low": float(low),
+            "mfg_mult_high": float(high),
+            "source": str(source or ""),
+            "updated": str(updated or ""),
+            "origin": str(origin or ""),
+        }
+    return prices
+
+
+def material_price_key(leaf: dict[str, Any], material: str) -> str:
+    text = f"{leaf.get('material_id') or ''} {material or ''} {leaf.get('name') or ''}".lower()
+    if "egw" in text or "coolant" in text:
+        return "egw_coolant_50"
+    if "gear_oil" in text or "oil" in text:
+        return "polymer_thermoplastic"
+    if "ndfeb" in text or "magnet" in text:
+        return "ndfeb_magnet"
+    if "copper" in text or "cu_" in text or "ofhc" in text or "etp" in text:
+        return "copper"
+    if "electrical steel" in text or "lamination" in text:
+        return "electrical_steel"
+    if "steel" in text or "4340" in text or "100cr6" in text or "51crv4" in text:
+        return "gear_steel"
+    if "stainless" in text or "a2" in text:
+        return "stainless_steel"
+    if "aluminium" in text or "aluminum" in text or "6061" in text or "adc12" in text:
+        return "aluminium"
+    if "fkm" in text or "epdm" in text or "rubber" in text or "seal" in text:
+        return "rubber_elastomer"
+    if "pa66" in text or "fr4" in text or "polymer" in text or "laminate" in text or "eptfe" in text:
+        return "polymer_thermoplastic"
+    return ""
+
+
+def pricing_role(leaf: dict[str, Any]) -> tuple[float, float, str]:
+    """Return (concept_mass_proxy_kg, labour_floor_gbp, role_label)."""
+    lid = norm(str(leaf.get("id") or ""))
+    name = norm(str(leaf.get("name") or leaf.get("name_human") or ""))
+    text = f"{lid} {name}"
+    if re.search(r"mcu|transceiver|isolation|buck|sense|ntc|resistor|divider|frontend", text, re.I):
+        return 0.08, 18.0, "low-volume traction electronics / sensor allowance"
+    if re.search(r"coil|winding", text, re.I):
+        return 0.75, 120.0, "formed copper winding subassembly allowance"
+    if re.search(r"cold_plate|baseplate|channels?|cover|baffle|gallery", text, re.I):
+        return 0.9, 180.0, "CNC-machined thermal plate/gallery allowance"
+    if re.search(r"gear|pinion|spline|differential|pin_set|cross_pin|tone_wheel|sleeve|ring", text, re.I):
+        return 0.55, 220.0, "case-hardened precision geartrain make-to-print allowance"
+    if re.search(r"bearing", text, re.I):
+        return 0.18, 65.0, "bearing/seating hardware allowance"
+    if re.search(r"seal|breather|plug|shim|spacer|screen|retainer", text, re.I):
+        return 0.08, 28.0, "small drivetrain hardware allowance"
+    if re.search(r"oil|coolant|fluid|additive", text, re.I):
+        return 1.0, 0.0, "fluid charge allowance"
+    if re.search(r"magnet|retention", text, re.I):
+        return 0.35, 95.0, "magnet retention / high-speed rotor hardware allowance"
+    return 0.25, 75.0, "concept make-to-print allowance"
+
+
+def price_for_leaf(
+    leaf: dict[str, Any],
+    material: str,
+    material_prices: dict[str, dict[str, Any]],
+) -> tuple[float, str, int, str]:
+    """Return a low-confidence unit estimate plus an auditable basis string."""
+    material_key = material_price_key(leaf, material)
+    mass_proxy_kg, labour_floor_gbp, role_label = pricing_role(leaf)
+    price_row = material_prices.get(material_key) if material_key else None
+    if price_row:
+        raw = float(price_row["raw_gbp_per_kg"])
+        mult = (float(price_row["mfg_mult_low"]) + float(price_row["mfg_mult_high"])) / 2.0
+        material_allowance = raw * mult * mass_proxy_kg
+        unit = round(max(material_allowance + labour_floor_gbp, labour_floor_gbp or material_allowance), 2)
+        basis = (
+            f"forge-truth material_prices[{material_key}] raw £{raw:g}/kg × mfg mult {mult:.2g} "
+            f"× concept mass proxy {mass_proxy_kg:g} kg + £{labour_floor_gbp:g} role floor "
+            f"({role_label}); source={price_row.get('source')}; updated={price_row.get('updated')}"
+        )
+        return unit, basis, 5, "low — concept make-to-print estimate; replace with CAD mass + supplier RFQ"
+    unit = round(max(labour_floor_gbp, 1.0), 2)
+    basis = (
+        f"concept role floor only ({role_label}); material='{material or 'OPEN TBD'}' has no "
+        "forge-truth material_prices key — keep MPN TBD and refresh from supplier/RFQ"
+    )
+    return unit, basis, 5, "low — no material-price key; procurement/RFQ required"
+
+
 def concentric_dim_hints(cg: dict[str, Any]) -> dict[str, str]:
     return {
         "motor_outer_casing": f"Ø{cg.get('housing_od_mm')} × L{cg.get('housing_len_mm')} mm",
@@ -394,7 +508,12 @@ def build_concept_word(
     }
 
 
-def build_requirements_bom_row(leaf: dict[str, Any], word: dict[str, Any], tag: str) -> dict[str, Any]:
+def build_requirements_bom_row(
+    leaf: dict[str, Any],
+    word: dict[str, Any],
+    tag: str,
+    material_prices: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     lname = str(word.get("name_human") or "")
     dim = ""
     mat = ""
@@ -406,6 +525,7 @@ def build_requirements_bom_row(leaf: dict[str, Any], word: dict[str, Any], tag: 
             dim = str(m.get("value") or "")
         if "material" in kind:
             mat = str(m.get("value") or "")
+    unit_gbp, price_basis, estimate_class, confidence = price_for_leaf(leaf, mat, material_prices)
     return {
         "tag": tag,
         "equipment_tag": tag,
@@ -416,13 +536,16 @@ def build_requirements_bom_row(leaf: dict[str, Any], word: dict[str, Any], tag: 
         "part": "TBD (detailed design)",
         "status": "NOT FOUND",
         "qty": 1,
-        "unit_gbp": 0,
-        "line_gbp": 0,
+        "unit_gbp": unit_gbp,
+        "line_gbp": unit_gbp,
         "mass_kg": None,
+        "material": mat,
         "module": route_module(leaf),
+        "estimate_class": estimate_class,
+        "confidence": confidence,
         "basis": (
             "fpk physics-tree densify · concept line · no fake MPN · "
-            f"material={mat or 'OPEN TBD'}"
+            f"material={mat or 'OPEN TBD'} · price={price_basis}"
         ),
         "dims_mm": dim or None,
         "provenance": "fpk_bom_densify/v1",
@@ -464,6 +587,47 @@ def append_word_to_module(state: dict[str, Any], module_id: str, word: dict[str,
     bucket = sub_modules[0]
     words = bucket.setdefault("words", [])
     words.append(word)
+
+
+def repair_existing_densify_rows(
+    rb_rows: list[dict[str, Any]],
+    leaves: list[dict[str, Any]],
+    material_prices: dict[str, dict[str, Any]],
+    literature: dict[str, str],
+    roles: dict[str, tuple[str, str]],
+) -> int:
+    """Reprice already-emitted FPK-D rows so old twins meet the same contract."""
+    leaves_by_id = {str(leaf.get("id") or leaf.get("component_id") or ""): leaf for leaf in leaves}
+    repaired = 0
+    for row in rb_rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("provenance") != "fpk_bom_densify/v1" and not str(row.get("tag") or "").startswith("FPK-D-"):
+            continue
+        leaf = leaves_by_id.get(str(row.get("character_id") or ""))
+        if not leaf:
+            continue
+        material, mat_basis = material_for_leaf(leaf, literature, roles)
+        unit_gbp, price_basis, estimate_class, confidence = price_for_leaf(leaf, material, material_prices)
+        qty = float(row.get("qty") or 1) or 1.0
+        before = (row.get("unit_gbp"), row.get("line_gbp"), row.get("material"))
+        row["part"] = "TBD (detailed design)"
+        row["status"] = "NOT FOUND"
+        row["qty"] = qty
+        row["unit_gbp"] = unit_gbp
+        row["line_gbp"] = round(unit_gbp * qty, 2)
+        row["material"] = material
+        row["estimate_class"] = estimate_class
+        row["confidence"] = confidence
+        row["basis"] = (
+            "fpk physics-tree densify · concept line · no fake MPN · "
+            f"material={material or 'OPEN TBD'} ({mat_basis}) · price={price_basis}"
+        )
+        row["provenance"] = "fpk_bom_densify/v1"
+        after = (row.get("unit_gbp"), row.get("line_gbp"), row.get("material"))
+        if before != after:
+            repaired += 1
+    return repaired
 
 
 def attach_modifiers_to_existing(
@@ -511,6 +675,7 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
     cg = state.get("fpkConcentricGeometry") or {}
     dim_hints = concentric_dim_hints(cg)
     literature = load_literature_materials(db_path)
+    material_prices = load_material_prices(db_path)
     roles = role_materials()
     dims_added, mats_added = attach_modifiers_to_existing(words, dim_hints, literature, roles)
 
@@ -544,7 +709,7 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
         module_id = route_module(leaf)
         append_word_to_module(state, module_id, word)
         tag = next_densify_tag(rb_rows)
-        rb_rows.append(build_requirements_bom_row(leaf, word, tag))
+        rb_rows.append(build_requirements_bom_row(leaf, word, tag, material_prices))
         lid = str(leaf.get("id") or "")
         covered.add(norm(lid))
         covered.add(norm(str(word.get("name_human") or "")))
@@ -556,6 +721,14 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
                 "tag": tag,
             }
         )
+
+    priced_repaired = repair_existing_densify_rows(
+        rb_rows,
+        leaves,
+        material_prices,
+        literature,
+        roles,
+    )
 
     words.clear()
     walk_words(state.get("moduleDecomposition") or {}, words)
@@ -575,6 +748,7 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
         "bill_lines_before": bill_before,
         "bill_lines_after": bill_after,
         "concept_lines_added": len(added_schedule),
+        "priced_rows_repaired": priced_repaired,
         "requirements_bom_before": rb_before,
         "requirements_bom_after": len(rb_rows),
         "dimension_modifiers_added": dims_added,
@@ -599,7 +773,7 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--twin", type=Path, default=ROOT / "out/formula-e-front-mgu-20260729-1432")
-    ap.add_argument("--db", type=Path, default=Path.home() / ".forge-truth/forge-truth.db")
+    ap.add_argument("--db", type=Path, default=DB_PATH_DEFAULT)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -680,6 +854,12 @@ def run_selftest() -> int:
     for row in state["requirementsBom"]:
         part = str(row.get("part") or "")
         assert "Mouser" not in part and "fake" not in part.lower()
+        if str(row.get("tag") or "").startswith("FPK-D-"):
+            assert float(row.get("unit_gbp") or 0) > 0, row
+            assert float(row.get("line_gbp") or 0) > 0, row
+            assert row.get("material"), row
+            assert row.get("estimate_class") == 5, row
+            assert str(row.get("confidence") or "").lower().startswith("low"), row
     added_ids = {x["id"] for x in stamp["concept_schedule"]}
     assert "housing_bolt_set" not in added_ids
     assert "input_seal" in added_ids
