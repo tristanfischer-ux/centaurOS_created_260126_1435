@@ -15,6 +15,7 @@ export interface ChannelEvidenceComponent {
   characterId?: string | null
   nameHuman?: string | null
   functionClass?: string | null
+  quantityInDesign?: number | null
 }
 
 /** Pioreactor heater_20ml gold constituents (ca40a91e) — full set mints heater_channel. */
@@ -162,6 +163,28 @@ export function deriveImplementedChannelCounts(args: {
     counts.safety_channel = minPositive(trip, polarity)
   }
 
+  // INTENT (2026-07-30 FE traction): traction-control evidence is counted from
+  // fitted topology nouns/footprints, never from the channel requirement itself.
+  // Supplier/HIL release stays separate; these counts only lift draft fidelity.
+  if ((counts.phase_current_sense ?? 0) === 0) {
+    counts.phase_current_sense = Math.max(
+      countRoleInstances(components, /phase[_ -]?current[_ -]?sensor/i),
+      countRoleInstances(components, /current[_ -]?sense[_ -]?front[_ -]?end/i),
+    )
+  }
+  if ((counts.resolver_channel ?? 0) === 0) {
+    counts.resolver_channel = countRoleInstances(components, /resolver[_ -]?signal[_ -]?interface/i)
+  }
+  if ((counts.vehicle_can ?? 0) === 0) {
+    counts.vehicle_can = countRoleInstances(components, /can[_ -]?fd[_ -]?transceiver|vehicle[_ -]?can/i)
+  }
+  if ((counts.lv_buck_rail ?? 0) === 0) {
+    counts.lv_buck_rail = countRoleInstances(components, /lv[_ -]?buck[_ -]?rails?|buck[_ -]?(?:regulator|rail)|dc[_ -]?dc/i)
+  }
+  if ((counts.hv_lv_isolation_barrier ?? 0) === 0) {
+    counts.hv_lv_isolation_barrier = countRoleInstances(components, /hv[_ -]?lv[_ -]?isolation|galvanic[_ -]?isolator|isolator[_ -]?ic/i)
+  }
+
   return counts
 }
 
@@ -177,17 +200,34 @@ export function countRoleInstances(
     const blob = `${c.characterId ?? ''} ${c.nameHuman ?? ''}`
     // GOTCHA (cold-v12): decoupling companions reuse the parent role name and
     // would double-count power/sense/safety channels (8 MOSFET → 16).
-    if (/decouple[_ -]/i.test(blob)) return false
+    if (/decoupl(?:e|ing)[_ -]/i.test(blob)) return false
     return rolePattern.test(blob)
   })
   if (matched.length === 0) return 0
-  return matched.length
+  return matched.reduce((sum, component) => sum + componentInstanceCount(component), 0)
 }
 
 /** @description Min of positive counts; 0 if any constituent is missing. */
 function minPositive(...counts: number[]): number {
   if (counts.length === 0 || counts.some((n) => n <= 0)) return 0
   return Math.min(...counts)
+}
+
+/** @description Physical instance count from explicit quantity or a grep-able "xN" role name. */
+function componentInstanceCount(component: ChannelEvidenceComponent): number {
+  if (
+    typeof component.quantityInDesign === 'number'
+    && Number.isFinite(component.quantityInDesign)
+    && component.quantityInDesign > 0
+  ) {
+    return Math.max(1, Math.floor(component.quantityInDesign))
+  }
+  const blob = `${component.characterId ?? ''} ${component.nameHuman ?? ''}`
+  const explicit = blob.match(/(?:×|x)\s*(\d{1,3})\b/i)
+  if (!explicit) return 1
+  const parsed = Number(explicit[1])
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1
+  return Math.max(1, Math.floor(parsed))
 }
 
 /**

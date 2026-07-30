@@ -80,6 +80,13 @@ describe('atopile-generator', () => {
       ageHours: null,
     }))
   })
+
+  it('classifies FE traction fitted control nouns to package-family draft footprints', () => {
+    expect(classifyFunction('resolver_signal_interface')).toBe('op_amp')
+    expect(classifyFunction('current_sense_frontend')).toBe('op_amp')
+    expect(classifyFunction('lv_buck_rails')).toBe('regulator')
+    expect(classifyFunction('dc_link_voltage_sense')).toBe('passive_r')
+  })
   afterAll(() => {
     for (const dir of tmpDirs) {
       try { rmSync(dir, { recursive: true, force: true }) } catch { /* no-op */ }

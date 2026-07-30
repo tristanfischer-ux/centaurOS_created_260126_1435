@@ -134,7 +134,7 @@ describe('derivePcbArchitecture', () => {
     const byId = Object.fromEntries(plan.assignments.map((a) => [a.wordId, a]))
     expect(byId.gate_driver_board_word.placement).toBe('on_board')
     expect(byId.gate_driver_board_word.boardId).toBe('traction_gate_drive')
-    expect(byId.oem_inverter_control_board_word.boardId).toBe('traction_control')
+    expect(byId.oem_inverter_control_board_word.placement).toBe('off_board_module')
     expect(byId.sic_traction_inverter_word.placement).toBe('off_board_module')
     expect(byId.phase_current_sensor_word.boardId).toBe('traction_control')
     expect(plan.boards[0].channelRequirements).toEqual([
@@ -148,6 +148,37 @@ describe('derivePcbArchitecture', () => {
       { role: 'lv_buck_rail', count: 3 },
       { role: 'hv_lv_isolation_barrier', count: 1 },
     ])
+  })
+
+  it('parks traction parent/mechanical assemblies outside fitted board scope', () => {
+    const state = withElectronicWords(
+      stateWithQuantities({
+        continuous_power_kw: 250,
+        phase_current_max_a: 477,
+      }),
+      [
+        { id: 'gate_driver_board_word', nameHuman: 'Gate Driver Board', characterId: 'gate_driver_board' },
+        { id: 'mcu_cold_plate', nameHuman: 'MCU Cold Plate', characterId: 'mcu_cold_plate' },
+        { id: 'oem_inverter_control_board_word', nameHuman: 'OEM Inverter Control Board', characterId: 'oem_inverter_control_board' },
+        { id: 'can_fd_vehicle_interface_word', nameHuman: 'CAN-FD Vehicle Interface', characterId: 'can_fd_vehicle_interface' },
+        { id: 'can_fd_transceiver_word', nameHuman: 'CAN-FD Transceiver', characterId: 'can_fd_transceiver' },
+        { id: 'resolver_signal_interface_word', nameHuman: 'Resolver Signal Interface', characterId: 'resolver_signal_interface' },
+        { id: 'resolver_encoder_word', nameHuman: 'Resolver Encoder', characterId: 'resolver_encoder' },
+        { id: 'resolver', nameHuman: 'Resolver', characterId: 'resolver' },
+      ],
+    )
+    const plan = derivePcbArchitecture(state)
+    const byId = Object.fromEntries(plan.assignments.map((a) => [a.wordId, a]))
+
+    expect(byId.mcu_cold_plate.placement).toBe('off_board_module')
+    expect(byId.oem_inverter_control_board_word.placement).toBe('off_board_module')
+    expect(byId.can_fd_vehicle_interface_word.placement).toBe('interconnect_only')
+    expect(byId.can_fd_transceiver_word.boardId).toBe('traction_control')
+    expect(byId.resolver_signal_interface_word.boardId).toBe('traction_control')
+    expect(byId.resolver_encoder_word.placement).toBe('off_board_module')
+    expect(byId.resolver.placement).toBe('off_board_module')
+    expect(plan.boards.find((b) => b.boardId === 'traction_control')?.requiredWordIds)
+      .toEqual(expect.arrayContaining(['can_fd_transceiver_word', 'resolver_signal_interface_word']))
   })
 
   it('assigns multi-board wet-lab roles to the correct boards', () => {

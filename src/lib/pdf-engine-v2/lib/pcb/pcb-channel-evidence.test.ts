@@ -172,4 +172,34 @@ describe('pcb-channel-evidence', () => {
     expect(counts.sense_channel).toBe(0)
     expect(counts.safety_channel).toBe(0)
   })
+
+  it('proveCatch: FE traction topology mints only evidenced draft channels', () => {
+    const counts = deriveImplementedChannelCounts({
+      components: [
+        { characterId: 'current_sense_frontend', nameHuman: 'Phase current sense front-end x3' },
+        { characterId: 'resolver_signal_interface', nameHuman: 'Resolver signal interface' },
+        { characterId: 'decoupling_capacitor', nameHuman: 'Decoupling capacitor (Resolver signal interface)' },
+        { characterId: 'can_fd_transceiver', nameHuman: 'CAN-FD transceiver' },
+        { characterId: 'lv_buck_rails', nameHuman: 'LV buck power rails' },
+      ],
+      functionRequirements: [],
+      requiredRoles: [
+        'gate_drive_channel',
+        'desat_channel',
+        'phase_current_sense',
+        'resolver_channel',
+        'vehicle_can',
+        'lv_buck_rail',
+        'hv_lv_isolation_barrier',
+      ],
+    })
+    expect(counts.phase_current_sense).toBe(3)
+    expect(counts.resolver_channel).toBe(1)
+    expect(counts.vehicle_can).toBe(1)
+    expect(counts.lv_buck_rail).toBe(1)
+    // GOTCHA: channel requirements alone must not mint safety-critical power-stage proof.
+    expect(counts.gate_drive_channel).toBe(0)
+    expect(counts.desat_channel).toBe(0)
+    expect(counts.hv_lv_isolation_barrier).toBe(0)
+  })
 })

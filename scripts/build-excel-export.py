@@ -20030,6 +20030,26 @@ def _pcb_is_honest_engineering_draft(pcb: dict, assessment: dict) -> bool:
     )
 
 
+def _pcb_honest_draft_score_cap(pcb: dict, assessment: dict) -> float:
+    """Evidence-sensitive ceiling for NOT_FAB PCB drafts.
+
+    INTENT (2026-07-30 FE traction): the PCB tab score is the quality of the
+    delivered evidence surface, not supplier release. A content-zero draft stays
+    capped at 8; a DRC-clean draft with real implemented-channel evidence can
+    score 9 while readiness, ship_ok, supplier Gerbers and HIL remain blocked.
+    """
+    impl = pcb.get("implemented_channel_counts") or pcb.get("implementedChannels")
+    has_channel_evidence = (
+        isinstance(impl, dict)
+        and any(int(v or 0) > 0 for v in impl.values())
+    )
+    has_clean_hygiene = all(
+        bool(assessment.get(k))
+        for k in ("pipeline_ok", "drc_ok", "routed_ok", "gerbers_ok")
+    )
+    return 9.0 if has_channel_evidence and has_clean_hygiene else 8.0
+
+
 def _pcb_honest_draft_components(pcb: dict, assessment: dict) -> List[Tuple[str, float, float]]:
     """Concept-quality checks for an explicitly draft-only PCB evidence surface.
 
@@ -20045,6 +20065,7 @@ def _pcb_honest_draft_components(pcb: dict, assessment: dict) -> List[Tuple[str,
         if isinstance(f, dict) and str(f.get("severity") or "").lower() == "high"
     ]
     residuals = assessment.get("placement_residuals") or []
+    draft_cap = _pcb_honest_draft_score_cap(pcb, assessment)
     checks: List[Tuple[str, float, float]] = [
         ("draft stamp: NOT_FABRICATION_READY / forgeDraftOnly", 1 if (
             pcb.get("NOT_FABRICATION_READY") is True or pcb.get("forgeDraftOnly") is True
@@ -20058,8 +20079,8 @@ def _pcb_honest_draft_components(pcb: dict, assessment: dict) -> List[Tuple[str,
             bool(str(pcb.get("fitness_fail_reason") or "").strip()) or bool(high_findings)
         ) else 0, 1),
         ("PCB-local ship flag is false", 1 if pcb.get("ship_ok") is not True else 0, 1),
-        # Cap the tab at concept quality: excellent honesty, explicitly not fab-ready.
-        ("engineering draft concept-quality ceiling (not fabrication-ready)", 8, 10),
+        # Cap the tab at draft quality: excellent honesty, explicitly not fab-ready.
+        ("engineering draft evidence-quality ceiling (not fabrication-ready)", draft_cap, 10),
     ]
     if assessment.get("channel_gaps"):
         checks.append(
@@ -28357,14 +28378,15 @@ def _sc_pcb(wb, ws, state, run_dir):
     # check didn't pass) caps the score regardless of any individual fraction above —
     # mirrors evaluatePcbGate()'s bespoke_required_* verdicts, never a green tab over a
     # missing/unverified board. ENGINEERING DRAFT is split:
-    #   • explicitly NOT_FABRICATION_READY / forgeDraftOnly → concept-quality cap 8
-    #     because the tab is scoring honest disclosure, not a supplier fab release;
+    #   • explicitly NOT_FABRICATION_READY / forgeDraftOnly → draft-quality cap 8/9
+    #     based on real channel evidence, because the tab is scoring honest disclosure,
+    #     not a supplier fab release;
     #   • any other draft → cap 6 (legacy anti-Goodhart on partial boards).
     honest_draft = _pcb_is_honest_engineering_draft(pcb, a)
     if a["readiness"] == "FAIL":
         score_cap = 2.0
     elif honest_draft:
-        score_cap = 8.0
+        score_cap = _pcb_honest_draft_score_cap(pcb, a)
         comps = _pcb_honest_draft_hygiene_components(a) + _pcb_honest_draft_components(pcb, a)
         iss.append("[MED] PCB tab is scored as an honest ENGINEERING DRAFT: "
                    "required/implemented channels, fitness failure, placement residuals "
@@ -37565,11 +37587,28 @@ def _selftest() -> int:
         _draft_comps = _pcb_honest_draft_hygiene_components(_draft_a) + _pcb_honest_draft_components(_draft_pcb, _draft_a)
         _draft_score = min(10.0 * p / c for (_label, p, c) in _draft_comps if c)
         if abs(_draft_score - 8.0) > 0.01:
-            print(f"  FAIL PCB draft honesty: honest draft concept score must cap at 8.0, "
+            print(f"  FAIL PCB draft honesty: empty-channel honest draft score must cap at 8.0, "
                   f"got {_draft_score!r} from {_draft_comps!r}"); bad += 1
         if "NOT_FABRICATION_READY" not in str(_draft_a.get("readiness_why") or ""):
             print(f"  FAIL PCB draft honesty: readiness why must disclose NOT_FABRICATION_READY, "
                   f"got {_draft_a.get('readiness_why')!r}"); bad += 1
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _evidenced_draft = dict(_draft_pcb)
+        _evidenced_draft["implemented_channel_counts"] = {
+            "gate_drive_channel": 0,
+            "desat_channel": 0,
+            "phase_current_sense": 3,
+        }
+        _evidenced_draft["implementedChannels"] = dict(_evidenced_draft["implemented_channel_counts"])
+        _ev_a = _pcb_two_axis_assessment(_evidenced_draft, _p5_td)
+        _ev_comps = _pcb_honest_draft_hygiene_components(_ev_a) + _pcb_honest_draft_components(_evidenced_draft, _ev_a)
+        _ev_score = min(10.0 * p / c for (_label, p, c) in _ev_comps if c)
+        if abs(_ev_score - 9.0) > 0.01:
+            print(f"  FAIL PCB draft honesty: evidenced NOT_FAB draft score must cap at 9.0, "
+                  f"got {_ev_score!r} from {_ev_comps!r}"); bad += 1
+        if _ev_a.get("readiness") != "ENGINEERING DRAFT" or _evidenced_draft.get("ship_ok") is not False:
+            print(f"  FAIL PCB draft honesty: evidenced draft must stay ENGINEERING DRAFT/ship_ok false, "
+                  f"readiness={_ev_a.get('readiness')!r} ship_ok={_evidenced_draft.get('ship_ok')!r}"); bad += 1
         # proveCatch (fixpack16): Tier-1 hygiene row surfaces when firmwareProof.tier1
         # is recorded — ok → scored 1/1; hard-fail (ok=false,skipped=false) → 0/1;
         # skipped alone must NOT floor (1/1 with skipped label).

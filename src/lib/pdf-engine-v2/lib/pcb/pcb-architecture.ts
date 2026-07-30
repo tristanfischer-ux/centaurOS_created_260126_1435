@@ -474,7 +474,7 @@ function nonBoardPlacement(
   // GOTCHA (Sol+Fable 2026-07-27): `per_channel_power_cooling_fan` never matched
   // heatsink_fan — it was assigned on_board and bloated Gate 38's denominator.
   if (
-    /peltier|\btec\b|thermoelectric|heatsink(?:[_ -]?fan)?|heat[_ -]?sink|cooling[_ -]?fan|heatsink[_ -]?fan|finned[_ -]?heatsink|thermal[_ -]?insulation|thermal[_ -]?interface|thermal[_ -]?pad|tim[_ -]?pad/i
+    /peltier|\btec\b|thermoelectric|cold[_ -]?plate|heatsink(?:[_ -]?fan)?|heat[_ -]?sink|cooling[_ -]?fan|heatsink[_ -]?fan|finned[_ -]?heatsink|thermal[_ -]?insulation|thermal[_ -]?interface|thermal[_ -]?pad|tim[_ -]?pad/i
       .test(roleText)
   ) {
     return {
@@ -501,6 +501,31 @@ function nonBoardPlacement(
     return {
       placement: 'off_board_module',
       reasons: ['purchased_traction_power_stage_or_hv_passive'],
+    }
+  }
+  // INTENT (2026-07-30 FE traction): parent inverter-control assemblies and
+  // motor-mounted resolver hardware are supplier/mechanical artefacts. Keep the
+  // reviewable bespoke board scope on fitted electronics: MCU, CAN transceiver,
+  // resolver signal interface, current/voltage sense and rails.
+  if (
+    /(?:^|[_ -])oem[_ -]?inverter[_ -]?control[_ -]?board(?:$|[_ -])|resolver[_ -]?encoder|(?:^|[_ -])resolver(?:$|[_ -])/i
+      .test(roleText)
+    && !/resolver[_ -]?signal[_ -]?interface/i.test(roleText)
+  ) {
+    return {
+      placement: 'off_board_module',
+      reasons: ['purchased_traction_control_parent_or_motor_sensor'],
+    }
+  }
+  if (
+    !hasExplicitPartIdentity
+    && /can[_ -]?fd[_ -]?vehicle[_ -]?interface/i.test(roleText)
+    && allWords.some((candidate) => /can[_ -]?fd[_ -]?transceiver/i.test(candidate.characterId))
+  ) {
+    return {
+      placement: 'interconnect_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['can_fd_transceiver_owns_vehicle_interface'],
     }
   }
   // INTENT: channel power bus is copper pour / backplane, not a fitted package.

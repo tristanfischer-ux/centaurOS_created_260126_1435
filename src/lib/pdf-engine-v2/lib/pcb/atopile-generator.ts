@@ -149,14 +149,14 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // before generic `detector`/`sensor` smear (reverse_polarity_detector was SOIC).
   { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient|input[_-]?protection(?:[_-]?network)?/i },
   { id: 'passive_r', test: /current[_-]?shunt|sense[_-]?shunt|shunt[_-]?measurement|shunt[_-]?resistor|pass[_-]?bank|discharge[_-]?pass[_-]?bank|cell[_-]?thermistor|thermistor[_-]?input|(?:power|finned)?[_-]?heatsink/i },
-  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance|precision[_-]?afe|(^|[_-])afe($|[_-])|current[_-]?control[_-]?loop|kelvin[_-]?(?:voltage[_-]?)?sense/i },
+  { id: 'op_amp', test: /signal[_-]?conditioner|resolver[_-]?signal[_-]?interface|current[_-]?sense[_-]?front[_-]?end|amplifier|(^|[_-])tia($|[_-])|[_-]tia$|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog|transimpedance|precision[_-]?afe|(^|[_-])afe($|[_-])|current[_-]?control[_-]?loop|kelvin[_-]?(?:voltage[_-]?)?sense/i },
   // INTENT (Sol+Fable 2026-07-28): a discharge/load MOSFET is a discrete FET
   // (power_mosfet), not a gate-driver IC. Drivers stay on gate_driver_ic.
   // GOTCHA: hardware_cutout must classify as power_mosfet (series FET pair), not
   // sensor_ic — otherwise verified IRLB3813 never selects (functionClass mismatch).
   { id: 'power_mosfet', test: /discharge[_-]?load[_-]?mosfet|hardware[_-]?cutout|(^|[_-])mosfet($|[_-])|power[_-]?mosfet|load[_-]?switch[_-]?mosfet|tec[_-]?power[_-]?mosfet/i },
   { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
-  { id: 'regulator', test: /charge[_-]?current[_-]?source|source[_-]?sink[_-]?stage|linear[_-]?source[_-]?sink|isolated[_-]?ac[_-]?dc|ac[_-]?dc[_-]?power[_-]?module|controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
+  { id: 'regulator', test: /lv[_-]?buck[_-]?rails?|charge[_-]?current[_-]?source|source[_-]?sink[_-]?stage|linear[_-]?source[_-]?sink|isolated[_-]?ac[_-]?dc|ac[_-]?dc[_-]?power[_-]?module|controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
   { id: 'sensor_ic', test: /over[_-]?under[_-]?voltage|overvoltage|undervoltage|overcurrent[_-]?comparator|overtemp[_-]?trip|comparator[_-]?latch|photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless|wi[_-]?fi|host[_-]?protocol[_-]?bridge|protocol[_-]?bridge|level[_-]?shifter/i },
@@ -189,7 +189,7 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // INTENT (Pioreactor heater_20ml): cartridge/resistive heater loads are SMD
   // resistor packages on the actuation daughterboard — not gate-driver ICs.
   // (series/feedback resistor densify is matched earlier, before op_amp.)
-  { id: 'passive_r', test: /resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor|cartridge[_-]?heater|resistive[_-]?heater|heater[_-]?element/i },
+  { id: 'passive_r', test: /dc[_-]?link[_-]?voltage[_-]?sense|resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor|cartridge[_-]?heater|resistive[_-]?heater|heater[_-]?element/i },
   { id: 'passive_l', test: /ferrite|inductor|choke/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
   { id: 'display_module', test: /display[_-]?panel|\block?d\b|\boled\b|\btft\b|screen/i },
