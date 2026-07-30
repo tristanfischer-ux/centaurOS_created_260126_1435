@@ -28434,6 +28434,65 @@ def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
     return True
 
 
+def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
+    """INTENT (2026-07-30): restore motorMultiphysics + cadAuthority from the
+    twin sidecar written by fe-front-stamp-motor-multiphysics.py. Quality & Audit /
+    Engineering Analysis can later surface OPEN solver rows from these keys.
+
+    HOOK: Prefer `motor-multiphysics.json` over a wiped/missing state block.
+    Never invents PASS / ship_ok — sidecar honesty fields are copied as-is.
+    Markdown twin artefact: JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md
+
+    @description Rehydrate solver/CAD evidence stubs from sidecar when absent.
+    @param state Mutable run state
+    @param run_dir Chain out directory
+    @returns Whether state was updated from the sidecar
+    """
+    has_motor = isinstance(state.get("motorMultiphysics"), dict) and isinstance(
+        (state.get("motorMultiphysics") or {}).get("required_checks"), dict
+    )
+    has_cad = isinstance(state.get("cadAuthority"), dict) and isinstance(
+        (state.get("cadAuthority") or {}).get("components"), list
+    )
+    if has_motor and has_cad:
+        return False
+    side = os.path.join(run_dir or "", "motor-multiphysics.json")
+    if not os.path.isfile(side):
+        return False
+    try:
+        with open(side, encoding="utf-8") as fh:
+            restored = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"  ! motor-multiphysics sidecar read failed ({exc})")
+        return False
+    if not isinstance(restored, dict):
+        return False
+    motor = restored.get("motorMultiphysics")
+    cad = restored.get("cadAuthority")
+    if not isinstance(motor, dict) or not isinstance(cad, dict):
+        return False
+    # Fail-closed: never promote ship_ok from a smoke-only sidecar.
+    if motor.get("ship_ok") is True or restored.get("ship_ok") is True:
+        motor = dict(motor)
+        motor["ship_ok"] = False
+        motor["all_required_solver_checks_pass"] = False
+    if not has_motor:
+        state["motorMultiphysics"] = motor
+    if not has_cad:
+        state["cadAuthority"] = cad
+    state["ship_ok"] = False
+    if not isinstance(state.get("motorMultiphysicsPointer"), dict):
+        state["motorMultiphysicsPointer"] = {
+            "sidecar": "motor-multiphysics.json",
+            "markdown": "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
+            "assembly_revision": restored.get("assembly_revision")
+            or motor.get("assembly_revision"),
+            "ship_ok": False,
+            "stamped_at": restored.get("stamped_at") or motor.get("stamped_at"),
+        }
+    return True
+
+
 def _sc_pcb(wb, ws, state, run_dir):
     """PCB-TAB-UX (2026-07-12): scores the tab on TWO INDEPENDENT axes — HYGIENE (does the
     pipeline's own real signals say DRC-clean/routed/Gerbers-present, PLUS the new
@@ -30029,6 +30088,10 @@ def build(run_dir: str, out_path: str) -> dict:
     # race wiped it — before Verification / PCB tab / Gate-38 mirrors read state.
     if _ensure_pcb_from_sidecar(state, run_dir):
         print("  · restored state.pcb from pcb-stage-result.json (race/wipe guard)")
+    # INTENT (2026-07-30): restore motorMultiphysics + cadAuthority from twin
+    # sidecar (OPEN solver/CAD stubs). See JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md.
+    if _ensure_motor_multiphysics_from_sidecar(state, run_dir):
+        print("  · restored motorMultiphysics/cadAuthority from motor-multiphysics.json")
     # Watt-scale feeder CSA reconcile BEFORE checks/scoring read quantities.
     try:
         _reconcile_watt_scale_feeder_cable(state)
