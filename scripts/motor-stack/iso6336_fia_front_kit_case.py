@@ -19,7 +19,7 @@ import hashlib
 import json
 import math
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -29,6 +29,12 @@ import ijson
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
 SCHEMA = "forgeos.motor_stack.iso6336_fia_front_kit_case/v1"
+# Packaging envelope for strength-driven resize (bay 343×259×267 — ring tip
+# must leave room for case wall / oil / differential; face capped vs stack).
+MAX_RING_TIP_DIAMETER_MM = 140.0
+MAX_FACE_WIDTH_MM = 60.0
+MIN_MODULE_MM = 0.70
+MAX_MODULE_MM = 2.20
 
 # Screening allowables for case-hardened low-alloy gear steel (16MnCr5 / 20MnCr5
 # class). Numbers are ISO 6336-5 MQ-order handbook seeds — not a certified
@@ -498,6 +504,94 @@ def _screen_mesh(
     )
 
 
+def _ring_tip_diameter_mm(module_mm: float, ring_teeth: int) -> float:
+    """Approx tip diameter for packaging screen (addendum ≈ 1.25·m)."""
+
+    return module_mm * (float(ring_teeth) + 2.5)
+
+
+def propose_strength_feasible_geometry(
+    inputs: TwinInputs,
+    *,
+    motor_shaft_torque_nm: float,
+) -> dict[str, Any] | None:
+    """Search module / face / planet-count that clears SCREEN_FOS_MIN in bay.
+
+    INTENT: Twin packaging seeds (m≈0.7 mm, face≈14 mm) fail the 250 kW
+    screen by ~6× on bending. Fix the *rule* by proposing a strength-feasible
+    packaging revision inside the bay — never greenwash the failed seed.
+
+    DECISION: Keep tooth counts (ratio 8) and search module, face width, and
+    planet count ∈ {3,4,5}. Prefer the compact volume proxy m·b·ring_tip.
+
+    @description Returns None when no candidate fits envelope + FoS.
+    @param inputs Twin packaging / duty seeds
+    @param motor_shaft_torque_nm Screen shaft torque (~125 N·m)
+    @returns Candidate dict or None
+    """
+
+    max_face = min(MAX_FACE_WIDTH_MM, max(inputs.active_length_mm * 0.65, 20.0))
+    best: dict[str, Any] | None = None
+    m = MIN_MODULE_MM
+    while m <= MAX_MODULE_MM + 1.0e-9:
+        b = 14.0
+        while b <= max_face + 1.0e-9:
+            for planet_count in (3, 4, 5):
+                if (inputs.sun_teeth + inputs.planet_teeth) % planet_count != 0:
+                    continue
+                tip = _ring_tip_diameter_mm(m, inputs.ring_teeth)
+                if tip > MAX_RING_TIP_DIAMETER_MM:
+                    continue
+                trial_inputs = replace(
+                    inputs,
+                    gear_module_mm=round(m, 3),
+                    face_width_mm=round(b, 3),
+                    planet_count=planet_count,
+                )
+                geometry = derive_gear_geometry(trial_inputs)
+                if not geometry.assembly_ok or not geometry.ratio_matches_twin:
+                    continue
+                screen = run_strength_screen(
+                    trial_inputs,
+                    geometry,
+                    motor_shaft_torque_nm=motor_shaft_torque_nm,
+                )
+                if not screen.works_in_kit_context:
+                    continue
+                volume_proxy = m * b * tip
+                candidate = {
+                    "gear_module_mm": round(m, 3),
+                    "face_width_mm": round(b, 3),
+                    "planet_count": planet_count,
+                    "sun_teeth": inputs.sun_teeth,
+                    "planet_teeth": inputs.planet_teeth,
+                    "ring_teeth": inputs.ring_teeth,
+                    "ring_tip_diameter_mm": round(tip, 3),
+                    "sun_pitch_diameter_mm": geometry.sun_pitch_diameter_mm,
+                    "planet_pitch_diameter_mm": geometry.planet_pitch_diameter_mm,
+                    "ring_pitch_diameter_mm": geometry.ring_pitch_diameter_mm,
+                    "minimum_bending_fos": screen.minimum_bending_fos,
+                    "minimum_contact_fos": screen.minimum_contact_fos,
+                    "minimum_strength_factor": screen.minimum_strength_factor,
+                    "volume_proxy_mm3": round(volume_proxy, 1),
+                    "envelope": {
+                        "max_ring_tip_diameter_mm": MAX_RING_TIP_DIAMETER_MM,
+                        "max_face_width_mm": max_face,
+                    },
+                    "statement": (
+                        "Strength-driven packaging resize — clears screening "
+                        f"FoS ≥ {SCREEN_FOS_MIN} inside ring-tip ≤ "
+                        f"{MAX_RING_TIP_DIAMETER_MM:.0f} mm. Not KISSsoft / "
+                        "spectrum / FEA; ship_ok stays false."
+                    ),
+                }
+                if best is None or candidate["volume_proxy_mm3"] < best["volume_proxy_mm3"]:
+                    best = candidate
+            b += 2.0
+        m += 0.05
+    return best
+
+
 def run_strength_screen(
     inputs: TwinInputs,
     geometry: GearGeometry,
@@ -581,10 +675,32 @@ def build_artifact(
     screen: StrengthScreen,
     source_state_sha256: str,
     source_twin: str,
+    packaging_seed_screen: StrengthScreen | None = None,
+    packaging_seed_geometry: GearGeometry | None = None,
+    recommended_geometry: Mapping[str, Any] | None = None,
+    controlling_geometry_source: str = "packaging_seed",
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release gear-strength artefact."""
 
-    return {
+    controlling = controlling_geometry_source
+    if controlling == "strength_driven_resize":
+        provenance_statement = (
+            "Controlling geometry is a strength-driven packaging resize that "
+            "clears the screening FoS inside the bay tip/face envelope. The "
+            "failed twin packaging seed is retained under packaging_seed_screen. "
+            "Not a licensed KISSsoft run."
+        )
+        face_note = (
+            "Face width / module from strength-driven resize (seed was undersized)."
+        )
+    else:
+        provenance_statement = (
+            "Twin-bound analytical ISO 6336-style screen on packaging-seed "
+            "planetary geometry; not a licensed KISSsoft run."
+        )
+        face_note = "Face width from twin fpk_gear_face_mm / 14 mm packaging seed."
+
+    artifact: dict[str, Any] = {
         "schema": SCHEMA,
         "status": "PARTIAL",
         "ship_ok": False,
@@ -593,6 +709,7 @@ def build_artifact(
         "input_quantities_sha256": input_quantities_sha256(inputs),
         "input_quantities": asdict(inputs),
         "gear_geometry": asdict(geometry),
+        "controlling_geometry_source": controlling,
         "duty_torques": {
             "motor_shaft_torque_nm": screen.motor_shaft_torque_nm,
             "carrier_output_torque_nm": screen.carrier_output_torque_nm,
@@ -625,6 +742,7 @@ def build_artifact(
             "threshold_fos": SCREEN_FOS_MIN,
             "ratio_matches_twin": geometry.ratio_matches_twin,
             "assembly_ok": geometry.assembly_ok,
+            "controlling_geometry_source": controlling,
             "note": (
                 f"duty_strength_screen_ok means min(bending, contact) FoS ≥ "
                 f"{SCREEN_FOS_MIN} on sun–planet and planet–ring meshes with "
@@ -650,21 +768,21 @@ def build_artifact(
             f"σF_allow={SIGMA_F_ALLOW_MPA} MPa, σH_allow={SIGMA_H_ALLOW_MPA} MPa "
             "(case-hardened MQ handbook seeds).",
             "No helix angle, profile shift, tip relief, or crowning.",
-            "Face width from twin fpk_gear_face_mm / 14 mm packaging seed.",
+            face_note,
             "Differential bevel set not screened here.",
         ],
         "geometry_provenance": {
             "controlling_dimensions": (
                 "orchestratorContract teeth/module/ratio + "
                 "fpkConcentricGeometry sun/planet/ring diameters"
+                if controlling == "packaging_seed"
+                else "strength-driven resize of module/face/planet_count "
+                "(teeth/ratio frozen from twin)"
             ),
             "cad_family": "planetary_gearset",
             "kisssoft_used": False,
             "calculix_tooth_contact_used": False,
-            "statement": (
-                "Twin-bound analytical ISO 6336-style screen on packaging-seed "
-                "planetary geometry; not a licensed KISSsoft run."
-            ),
+            "statement": provenance_statement,
         },
         "fia_question": (
             f"Does reduction transmit reconciled torque for "
@@ -692,6 +810,21 @@ def build_artifact(
             "KISSsoft/spectrum/FEA closure on the current revision."
         ),
     }
+    if packaging_seed_screen is not None and packaging_seed_geometry is not None:
+        artifact["packaging_seed_screen"] = {
+            "gear_geometry": asdict(packaging_seed_geometry),
+            "minimum_bending_fos": packaging_seed_screen.minimum_bending_fos,
+            "minimum_contact_fos": packaging_seed_screen.minimum_contact_fos,
+            "minimum_strength_factor": packaging_seed_screen.minimum_strength_factor,
+            "works_in_kit_context": packaging_seed_screen.works_in_kit_context,
+            "statement": (
+                "As-read twin packaging seed — retained when the controlling "
+                "screen uses a strength-driven resize."
+            ),
+        }
+    if recommended_geometry is not None:
+        artifact["recommended_geometry"] = dict(recommended_geometry)
+    return artifact
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -780,6 +913,13 @@ def run_selftest() -> int:
         "torque_scaling_proves_catch": (
             hot.minimum_strength_factor < 0.15 * screen.minimum_strength_factor
         ),
+        "packaging_seed_fails_duty_screen": screen.works_in_kit_context is False,
+        "strength_resize_clears_duty_screen": (
+            propose_strength_feasible_geometry(
+                inputs, motor_shaft_torque_nm=torque
+            )
+            is not None
+        ),
         "allowables_documented": (
             artifact["strength_screen"]["allowables"]["sigma_f_allow_mpa"]
             == SIGMA_F_ALLOW_MPA
@@ -819,22 +959,68 @@ def run_selftest() -> int:
 
 
 def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
-    """Run and persist one ISO 6336-style screen against a live twin."""
+    """Run and persist one ISO 6336-style screen against a live twin.
+
+    When the twin packaging seed fails the FoS screen, propose a strength-
+    driven resize inside the bay envelope and make that the controlling
+    geometry (seed retained under packaging_seed_screen).
+    """
 
     state_path = twin_dir / "state.json"
-    inputs, state_hash = load_twin_inputs(state_path)
-    geometry = derive_gear_geometry(inputs)
-    if not geometry.assembly_ok:
+    seed_inputs, state_hash = load_twin_inputs(state_path)
+    seed_geometry = derive_gear_geometry(seed_inputs)
+    if not seed_geometry.assembly_ok:
         raise FiaFrontKitGearError(
             "Twin tooth counts fail planetary assembly / planet-size check"
         )
-    torque = derive_motor_shaft_torque_nm(inputs)
-    screen = run_strength_screen(inputs, geometry, motor_shaft_torque_nm=torque)
+    torque = derive_motor_shaft_torque_nm(seed_inputs)
+    seed_screen = run_strength_screen(
+        seed_inputs, seed_geometry, motor_shaft_torque_nm=torque
+    )
     if not (
-        math.isfinite(screen.minimum_strength_factor)
-        and screen.minimum_strength_factor > 0.0
+        math.isfinite(seed_screen.minimum_strength_factor)
+        and seed_screen.minimum_strength_factor > 0.0
     ):
         raise FiaFrontKitGearError("Strength screen returned non-finite FoS")
+
+    recommended = propose_strength_feasible_geometry(
+        seed_inputs, motor_shaft_torque_nm=torque
+    )
+    controlling = "packaging_seed"
+    inputs = seed_inputs
+    geometry = seed_geometry
+    screen = seed_screen
+    packaging_seed_screen: StrengthScreen | None = None
+    packaging_seed_geometry: GearGeometry | None = None
+    if not seed_screen.works_in_kit_context:
+        packaging_seed_screen = seed_screen
+        packaging_seed_geometry = seed_geometry
+        if recommended is None:
+            raise FiaFrontKitGearError(
+                "Packaging seed fails FoS screen and no strength-feasible "
+                f"resize fits ring tip ≤ {MAX_RING_TIP_DIAMETER_MM:.0f} mm / "
+                f"face ≤ {MAX_FACE_WIDTH_MM:.0f} mm"
+            )
+        inputs = replace(
+            seed_inputs,
+            gear_module_mm=float(recommended["gear_module_mm"]),
+            face_width_mm=float(recommended["face_width_mm"]),
+            planet_count=int(recommended["planet_count"]),
+            # Keep OD seeds consistent with resized pitch diameters (tip≈od).
+            sun_od_mm=float(recommended["sun_pitch_diameter_mm"]),
+            planet_od_mm=float(recommended["planet_pitch_diameter_mm"]),
+            ring_id_mm=float(recommended["ring_pitch_diameter_mm"]),
+        )
+        geometry = derive_gear_geometry(inputs)
+        screen = run_strength_screen(
+            inputs, geometry, motor_shaft_torque_nm=torque
+        )
+        controlling = "strength_driven_resize"
+        if not screen.works_in_kit_context:
+            raise FiaFrontKitGearError(
+                "Strength-driven resize failed to clear FoS after apply"
+            )
+
     try:
         twin_label = str(twin_dir.resolve().relative_to(REPO_ROOT))
     except ValueError:
@@ -845,6 +1031,10 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         screen=screen,
         source_state_sha256=state_hash,
         source_twin=twin_label,
+        packaging_seed_screen=packaging_seed_screen,
+        packaging_seed_geometry=packaging_seed_geometry,
+        recommended_geometry=recommended,
+        controlling_geometry_source=controlling,
     )
     destination = (
         output_path
@@ -852,7 +1042,31 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         else twin_dir / "_motor_stack" / "iso6336_fia_front_kit_case.json"
     )
     _atomic_write_json(destination, artifact)
+    # Sidecar for CAD / twin quantity writeback consumers.
+    if recommended is not None:
+        _atomic_write_json(
+            twin_dir / "_motor_stack" / "iso6336_recommended_geometry.json",
+            {
+                "schema": "forgeos.motor_stack.iso6336_recommended_geometry/v1",
+                "ship_ok": False,
+                "controlling_geometry_source": controlling,
+                "recommended": recommended,
+                "packaging_seed": {
+                    "gear_module_mm": seed_inputs.gear_module_mm,
+                    "face_width_mm": seed_inputs.face_width_mm,
+                    "planet_count": seed_inputs.planet_count,
+                    "minimum_strength_factor": seed_screen.minimum_strength_factor,
+                },
+            },
+        )
     works_word = "clears" if screen.works_in_kit_context else "does NOT clear"
+    seed_note = ""
+    if packaging_seed_screen is not None:
+        seed_note = (
+            f" Packaging seed FoS ≈ {packaging_seed_screen.minimum_strength_factor:.3f} "
+            f"(FAILED) → resized to m={geometry.module_mm:.3f} mm / "
+            f"face={geometry.face_width_mm:.1f} mm / n={geometry.planet_count}."
+        )
     print(
         "FIA front-kit ISO 6336-style gear screen: "
         f"T_motor ≈ {screen.motor_shaft_torque_nm:.1f} N·m → "
@@ -865,7 +1079,8 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         f"min contact FoS ≈ {screen.minimum_contact_fos:.3f} "
         f"(need ≥ {SCREEN_FOS_MIN:.2f} vs "
         f"σF_allow={SIGMA_F_ALLOW_MPA:.0f} / σH_allow={SIGMA_H_ALLOW_MPA:.0f} MPa). "
-        f"Duty screen {works_word} kit context. "
+        f"Duty screen {works_word} kit context "
+        f"(controlling={controlling}).{seed_note} "
         "KISSsoft / load spectrum / tooth-contact FEA remain OPEN; ship_ok is false."
     )
     print(f"Artefact: {destination}")

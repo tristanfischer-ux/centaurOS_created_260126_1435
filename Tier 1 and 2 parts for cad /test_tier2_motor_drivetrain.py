@@ -111,10 +111,11 @@ class PlanetaryGearsetTests(unittest.TestCase):
             raise unittest.SkipTest(str(exc)) from exc
 
         bbox = model.val().BoundingBox()
-        self.assertGreaterEqual(model.solids().size(), 4)
-        self.assertGreater(bbox.xlen, 40.0)
-        self.assertGreater(bbox.ylen, 40.0)
-        self.assertAlmostEqual(bbox.zlen, 10.0, places=0)
+        # Defaults track FIA front-kit strength resize: m=1, face=58, S/P=18/54, n=4
+        self.assertGreaterEqual(model.solids().size(), 5)
+        self.assertGreater(bbox.xlen, 100.0)
+        self.assertGreater(bbox.ylen, 100.0)
+        self.assertAlmostEqual(bbox.zlen, 58.0, places=0)
 
     def test_incompatible_tooth_counts_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "divisible by planet_count"):

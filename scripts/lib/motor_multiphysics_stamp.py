@@ -951,6 +951,9 @@ def _gear_strength_check_from_fia_case(
                 "ship_ok": False,
                 "works_in_kit_context": duty_ok,
                 "duty_strength_screen_ok": duty_ok,
+                "controlling_geometry_source": case.get(
+                    "controlling_geometry_source", "packaging_seed"
+                ),
                 "path": rel_ref,
                 "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
                 "minimum_bending_fos": margins.get("minimum_bending_fos")
@@ -963,12 +966,22 @@ def _gear_strength_check_from_fia_case(
                     "carrier_output_torque_nm"
                 ),
                 "gear_ratio": inputs.get("gear_ratio"),
+                "packaging_seed_minimum_strength_factor": (
+                    (case.get("packaging_seed_screen") or {}).get(
+                        "minimum_strength_factor"
+                    )
+                    if isinstance(case.get("packaging_seed_screen"), dict)
+                    else None
+                ),
+                "recommended_geometry": case.get("recommended_geometry"),
                 "kisssoft_independent_check": "OPEN",
                 "load_spectrum_fatigue": "OPEN",
                 "calculix_tooth_contact": "OPEN",
                 "note": (
-                    "Twin-bound ISO 6336-style analytical screen on kit planetary "
-                    "seeds. works_in_kit_context / duty_strength_screen_ok = "
+                    "Twin-bound ISO 6336-style analytical screen. Controlling "
+                    "geometry may be a strength-driven resize when the packaging "
+                    "seed fails FoS (seed retained under packaging_seed_screen). "
+                    "works_in_kit_context / duty_strength_screen_ok = "
                     "min(bending, contact) FoS ≥ 1.2 vs assumed case-hardened "
                     "allowables — NOT KISSsoft, NOT spectrum, NOT ship_ok."
                 ),

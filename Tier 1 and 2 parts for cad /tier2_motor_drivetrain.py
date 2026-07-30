@@ -332,12 +332,16 @@ def planetary_gearset(params: dict[str, object]) -> cq.Workplane:
             "requirements.txt)"
         ) from exc
 
+    # DECISION (2026-07-30): defaults match the FIA front-kit strength-driven
+    # packaging resize (ISO 6336 screen FoS ≥ 1.2): m=1.0, face=58, S/P=18/54,
+    # 4 planets, ratio 8. Older 12/18/10/3 training seeds remain valid when passed
+    # explicitly as params.
     module = _number(params, "module", 1.0)
-    sun_teeth = int(params.get("sun_teeth", 12))
-    planet_teeth = int(params.get("planet_teeth", 18))
-    width = _number(params, "width", 10.0)
+    sun_teeth = int(params.get("sun_teeth", 18))
+    planet_teeth = int(params.get("planet_teeth", 54))
+    width = _number(params, "width", 58.0)
     rim_width = _number(params, "rim_width", 3.0)
-    planet_count = int(params.get("planet_count", 3))
+    planet_count = int(params.get("planet_count", 4))
     bore_diameter = _number(params, "bore_diameter", 6.0)
     backlash = _optional_non_negative(params, "backlash", 0.0)
     pressure_angle = _number(params, "pressure_angle_deg", 20.0)
@@ -350,16 +354,18 @@ def planetary_gearset(params: dict[str, object]) -> cq.Workplane:
         raise ValueError("planet_count must be at least 2")
 
     ring_teeth = sun_teeth + planet_teeth * 2
-    # GOTCHA: even planet spacing needs (sun + planet) divisible by planet count
-    # for clean meshing; reject rather than emit a silently broken set.
+    # GOTCHA: even planet spacing needs (sun + planet) and (sun + ring)
+    # divisible by planet count. Do NOT require sun%n and ring%n individually
+    # (FIA kit S/P/R=18/54/126 with n=4: 18%4≠0 but (18+126)%4==0 — valid).
     if (sun_teeth + planet_teeth) % planet_count != 0:
         raise ValueError(
             "sun_teeth + planet_teeth must be divisible by planet_count "
             "for evenly spaced planets"
         )
-    if ring_teeth % planet_count != 0 and sun_teeth % planet_count != 0:
+    if (sun_teeth + ring_teeth) % planet_count != 0:
         raise ValueError(
-            "tooth counts are incompatible with equal planet spacing"
+            "sun_teeth + ring_teeth must be divisible by planet_count "
+            "for evenly spaced planets"
         )
 
     gearset = PlanetaryGearset(
@@ -855,19 +861,19 @@ TIER2_MOTOR_DRIVETRAIN = {
                 "type": "number", "default": 1.0, "min": 0.2, "unit": "mm"
             },
             "sun_teeth": {
-                "type": "integer", "default": 12, "min": 6
-            },
-            "planet_teeth": {
                 "type": "integer", "default": 18, "min": 6
             },
+            "planet_teeth": {
+                "type": "integer", "default": 54, "min": 6
+            },
             "width": {
-                "type": "number", "default": 10.0, "min": 1.0, "unit": "mm"
+                "type": "number", "default": 58.0, "min": 1.0, "unit": "mm"
             },
             "rim_width": {
                 "type": "number", "default": 3.0, "min": 0.5, "unit": "mm"
             },
             "planet_count": {
-                "type": "integer", "default": 3, "min": 2
+                "type": "integer", "default": 4, "min": 2
             },
             "bore_diameter": {
                 "type": "number", "default": 6.0, "min": 0.5, "unit": "mm"
@@ -1119,11 +1125,12 @@ def _selftest_planetary(temp_root: Path) -> None:
     bbox = model.val().BoundingBox()
     solid_count = model.solids().size()
     # Sun + ring + N planets (compound may report N+2 solids).
-    assert solid_count >= 4
-    assert bbox.zlen >= 9.5
-    # Pitch geometry: ring teeth = sun + 2*planet = 48; OD roughly module*(ring+2).
-    assert bbox.xlen > 40.0
-    assert bbox.ylen > 40.0
+    # Defaults: FIA kit strength resize — S/P/R=18/54/126, n=4, face=58.
+    assert solid_count >= 5
+    assert bbox.zlen >= 57.0
+    # Ring tip ≈ module*(ring+2.5) ≈ 128.5 mm → bbox > 100 mm.
+    assert bbox.xlen > 100.0
+    assert bbox.ylen > 100.0
 
     step_size, stl_size = _export_and_assert_substantial(
         model, "planetary_gearset", temp_root

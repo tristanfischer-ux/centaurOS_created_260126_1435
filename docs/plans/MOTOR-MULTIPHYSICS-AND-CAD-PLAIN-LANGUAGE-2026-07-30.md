@@ -24,12 +24,11 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~17:45:** **Software twin-bound *screens* for the plan are landed — still not race-ready.**  
-Happy about: all **7** `required_checks` are **PARTIAL** with twin artefacts; **6/7** pass their kit-context duty screen; magnetics ~**96 N·m (~77% of ~125)**; water-jacket helical CAD + OpenFOAM duct; gear oil analytical screen; inverter packaging analytical screen; **Quality & Audit** now mirrors the stamp table.  
-Honest fail: **gear_strength** twin-bound but **works_in_kit_context = no** (FoS ≪ 1.2 — design signal, not greenwash).  
-Not done / cannot close in software: MTPA map, demag, dyno, HIL, flow bench, free-surface oil CFD, KISSsoft, case/mount FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
+**Overall mood as of 2026-07-30 ~17:30:** **Software screens advancing — still not race-ready.**  
+Happy about: all **7** checks PARTIAL; magnetics position sweep (0/15/30/45° mech) at −45° elec; **gear_strength** now **works=yes** after strength-driven resize (**m=1.0 mm, face=58 mm, 4 planets**, FoS≈1.21) while packaging seed FoS≈0.18 retained as FAIL; Excel Q&A mirrors stamp.  
+Not done: full MTPA/FW map, demag, dyno, HIL, free-surface oil CFD, KISSsoft, case FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
 
-**Last scoreboard update:** 2026-07-30 (Excel Q&A card + plan closure for software screens).
+**Last scoreboard update:** 2026-07-30 (gear FoS resize + EM rotor-position sweep).
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
@@ -37,8 +36,8 @@ Not done / cannot close in software: MTPA map, demag, dyno, HIL, flow bench, fre
 |---|---|---|---|---|---|
 | 1 | Freeze one shared assembly revision for CAD + solvers + Blender + Excel | **PARTIAL** | Label `front-drive-concept-stub-2026-07-30` on stamp + Excel card | Not a hard gate yet — bump discipline when geometry changes | Reject mismatched revisions in Excel when revision field diverges |
 | 2 | Build CAD authority spine (case, stator, rotor, gears, cooling, …) | **PARTIAL** | **5** parametric families: stator, rotor carrier, planetary, cold plate, **motor water jacket helical** | Case, bearings, differential, oil, bus, connectors still Blender-only; **release CAD = 0 / 13** | Cast case + supplier STEP when known |
-| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (duty screen yes)** | ~**96 N·m (~77%)** after −90° null fix; ROSS clear of band; CalculiX rotor ring screen | MTPA/position map, demag, dyno, 24-vs-48 slots, magnet-pocket burst OPEN | Position sweep + voltage/thermal; keep `ship_ok` false |
-| 4 | Close gears, differential, structure | **PARTIAL (honest FoS fail)** | ISO 6336-style twin screen **landed**; FoS bending ~0.18 / contact ~0.38 vs ≥1.2 → **works=no** | Differential contact, case/mount FEA, KISSsoft, load spectrum OPEN | Thicker face / coarser module / material — then re-screen |
+| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (duty screen yes)** | ~**96 N·m (~77%)** at best angle/position; coarse **rotor-position sweep** (0–45° mech) shows strong position dependence (ratio min/mean/max ≈ 0.03/0.41/0.77) | Full MTPA/FW map, demag, dyno, 24-vs-48 slots, magnet-pocket burst OPEN | Voltage/thermal + denser map; keep `ship_ok` false |
+| 4 | Close gears, differential, structure | **PARTIAL (duty screen yes after resize)** | Packaging seed FoS≈0.18 **FAILED**; strength-driven resize **m=1.0 / face=58 / 4 planets** → FoS≈**1.21** (**works=yes**); seed retained in artefact | Differential contact, case/mount FEA, KISSsoft, load spectrum OPEN; Blender still on old seed until CAD writeback | Sync CadQuery/Blender to recommended geometry |
 | 5 | Close cooling and lubrication | **PARTIAL (duct + oil screen)** | OpenFOAM cold-plate + **water-jacket** ducts @ 12 L/min / 60 °C; gear-oil analytical jet/churning/pickup | Full serpentine/helical CHT, free-surface oil CFD, module/winding temps OPEN | CHT when solid mesh exists; oil CFD after galleries |
 | 6 | Close inverter packaging | **PARTIAL (analytical)** | Density / DC current / ESL seed / cold-plate land / bay-fit screen; stamp + Excel rows | Module MPN, supplier STEP, double-pulse ESL OPEN | Freeze MPNs + measured ESL |
 | 7 | Make every result visible in the dossier | **DONE (software surface)** | Markdown stamp + `motor-multiphysics.json` + **Quality & Audit** multiphysics / CAD / inverter tables | Deeper Engineering Analysis plots still thin | Keep re-export after each stamp |
@@ -48,13 +47,13 @@ Not done / cannot close in software: MTPA map, demag, dyno, HIL, flow bench, fre
 
 | Check | Said we need | Status now | Works in kit context? | Next fix |
 |---|---|---|---|---|
-| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **yes** — ~96 N·m / 125 (~77%) | MTPA map; 24-vs-48 slots; demag; dyno |
+| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **yes** — peak ~96 N·m / 125 (~77%); position sweep recorded | Full MTPA/FW; demag; dyno |
 | Rotor dynamics | Critical speeds vs 19,500 rpm | **PARTIAL** | **yes** — clear of band (assumed bearings) | Catalogue k/c; modal correlation |
 | Structural / burst | Case, rotor, mounts survive | **PARTIAL** | **yes** — steel-ring centrifugal screen | Pocket burst + case/mount FEA |
 | Motor water jacket | Flow + heat at 12 L/min, 60 °C | **PARTIAL** | **yes** — OpenFOAM duct Δp screen | Helical CHT + winding temps |
 | Inverter cold plate | Module temperatures / pressure drop | **PARTIAL** | **yes** — duct Δp screen | Full serpentine CHT + heater plate |
 | Gear oil delivery | Jets, pickup, churning | **PARTIAL** | **yes** — analytical handbook screen | Free-surface CFD + bench |
-| Gear strength | Tooth life for kit torque | **PARTIAL** | **no** — FoS ≪ 1.2 (honest fail) | Resize teeth / material; KISSsoft |
+| Gear strength | Tooth life for kit torque | **PARTIAL** | **yes** — after resize FoS≈1.21 (seed still FAIL) | CAD/Blender sync; KISSsoft; spectrum |
 
 ### C. CAD authority (why “release coverage 0” sounds alarming)
 
