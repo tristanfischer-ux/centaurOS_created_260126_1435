@@ -45,7 +45,10 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
     },
     "rotor_dynamics": {
         "software": "ROSS",
-        "paths": ["scripts/motor-stack/ross_rotor_selftest.py"],
+        "paths": [
+            "scripts/motor-stack/ross_rotor_selftest.py",
+            "scripts/motor-stack/ross_fia_front_kit_case.py",
+        ],
         "versions": {"ross": "2.3.0"},
         "last_known_green": "2026-07-30 — 1 m steel shaft beam model critical speed (generic)",
         "evidence_class": "toolchain_smoke_pass",
@@ -284,11 +287,11 @@ def _open_check(
     return body
 
 
-def _load_fia_magnetic_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
-    """Load twin-bound FIA magnetic case artefact if present."""
+def _load_fia_case_json(twin_dir: Optional[Path], filename: str) -> Optional[dict[str, Any]]:
+    """Load a twin-bound FIA motor-stack case artefact if present."""
     if twin_dir is None:
         return None
-    path = Path(twin_dir) / "_motor_stack" / "em_fia_front_kit_case.json"
+    path = Path(twin_dir) / "_motor_stack" / filename
     if not path.is_file():
         return None
     try:
@@ -296,6 +299,16 @@ def _load_fia_magnetic_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]
     except (OSError, json.JSONDecodeError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def _load_fia_magnetic_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA magnetic case artefact if present."""
+    return _load_fia_case_json(twin_dir, "em_fia_front_kit_case.json")
+
+
+def _load_fia_ross_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA ROSS rotor-dynamics case artefact if present."""
+    return _load_fia_case_json(twin_dir, "ross_fia_front_kit_case.json")
 
 
 def _magnetic_check_from_fia_case(
@@ -370,6 +383,70 @@ def _magnetic_check_from_fia_case(
     return body
 
 
+def _rotor_dynamics_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote rotor_dynamics to PARTIAL when a twin-bound ROSS screen exists.
+
+    INTENT: Make the FIA front-kit critical-speed screen visible without claiming
+    bearing identity, Campbell diagrams, or modal/dyno correlation (those stay OPEN).
+    """
+    speeds = case.get("critical_speeds") if isinstance(case.get("critical_speeds"), dict) else {}
+    margins = case.get("margins") if isinstance(case.get("margins"), dict) else {}
+    inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
+    model = case.get("rotor_model") if isinstance(case.get("rotor_model"), dict) else {}
+    rel_ref = "_motor_stack/ross_fia_front_kit_case.json"
+    body = _open_check(
+        "rotor_dynamics",
+        extra={
+            "status": "PARTIAL",
+            "critical_speed_margin": margins.get("first_critical_over_operating"),
+            "bearing_reaction_ref": None,
+            "model_revision": str(
+                case.get("schema") or "forgeos.motor_stack.ross_fia_front_kit_case/v1"
+            ),
+            "geometry_revision": (
+                f"span={model.get('shaft_length_m')}m "
+                f"shaft_od={model.get('shaft_outer_diameter_m')}m "
+                f"disk_od={model.get('disk_outer_diameter_m')}m"
+                if model
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                f"Are critical speeds clear of the {duty['max_rotor_speed_rpm']} rpm "
+                "operating band with margin?"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "first_critical_speed_rpm": speeds.get("first_critical_speed_rpm"),
+                "operating_speed_rpm": speeds.get("operating_speed_rpm"),
+                "margin_ratio_first_over_operating": margins.get(
+                    "first_critical_over_operating"
+                ),
+                "clear_of_operating_band": margins.get("clear_of_operating_band"),
+                "max_rotor_speed_rpm": inputs.get("max_rotor_speed_rpm"),
+                "bearing_supplier_identity": "OPEN",
+                "modal_or_dynamometer_correlation": "OPEN",
+                "note": (
+                    "Twin-bound ROSS beam critical-speed screen on kit-sized shaft + "
+                    "rotor disk. Assumed bearing stiffness; not modal/dyno-correlated; "
+                    "does not close release."
+                ),
+            },
+        },
+    )
+    body["status"] = "PARTIAL"
+    return body
+
+
 def build_motor_multiphysics(
     *,
     state: Optional[Mapping[str, Any]] = None,
@@ -379,8 +456,9 @@ def build_motor_multiphysics(
 ) -> dict[str, Any]:
     """Build motorMultiphysics dict per plan schema.
 
-    @description Records FIA duty + toolchain smoke pointers. Magnetic may be
-    PARTIAL when a twin-bound FIA case artefact exists; all_required still false.
+    @description Records FIA duty + toolchain smoke pointers. Magnetic and
+    rotor_dynamics may be PARTIAL when twin-bound FIA case artefacts exist;
+    all_required still false.
     @param state Optional twin state for quantity readback
     @param assembly_revision Shared CAD/solver/Blender revision label
     @param stamped_at ISO timestamp override
@@ -420,9 +498,18 @@ def build_motor_multiphysics(
             },
         )
 
-    required_checks = {
-        "magnetic": magnetic,
-        "rotor_dynamics": _open_check(
+    fia_ross = _load_fia_ross_case(twin_dir)
+    if fia_ross is not None and twin_dir is not None:
+        rotor_dynamics = _rotor_dynamics_check_from_fia_case(
+            duty, fia_ross, twin_dir=Path(twin_dir)
+        )
+        notes += (
+            " Rotor-dynamics check PARTIAL: twin-bound ROSS screen in "
+            "_motor_stack/ross_fia_front_kit_case.json "
+            "(bearing identity / modal-dyno still OPEN)."
+        )
+    else:
+        rotor_dynamics = _open_check(
             "rotor_dynamics",
             extra={
                 "critical_speed_margin": None,
@@ -432,7 +519,11 @@ def build_motor_multiphysics(
                     "operating band with margin?"
                 ),
             },
-        ),
+        )
+
+    required_checks = {
+        "magnetic": magnetic,
+        "rotor_dynamics": rotor_dynamics,
         "structural": _open_check(
             "structural",
             extra={
@@ -624,9 +715,10 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
         "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
-        "when a twin-bound artefact exists (e.g. one magnetic open-circuit point) while",
-        "torque map, demagnetisation, dynamometer correlation and the other domains",
-        "remain **OPEN**. `ship_ok` stays false.",
+        "when a twin-bound artefact exists (magnetic open-circuit point and/or ROSS",
+        "critical-speed screen) while torque map, demagnetisation, bearing identity,",
+        "modal/dynamometer correlation and the other domains remain **OPEN**. `ship_ok`",
+        "stays false.",
         "",
         "## FIA binding duties (why the solvers exist)",
         "",
@@ -692,7 +784,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
 
 
 def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """proveCatch: stamp must stay fail-closed; magnetic may be PARTIAL with a result_ref.
+    """proveCatch: stamp must stay fail-closed; magnetic/ross may be PARTIAL with result_ref.
 
     @description Adversarial guards for the stub / twin-bound-partial stamp.
     @param payload Combined stamp payload
@@ -701,23 +793,24 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
     motor = payload.get("motorMultiphysics") or {}
     cad = payload.get("cadAuthority") or {}
     checks = motor.get("required_checks") or {}
+    _partial_allowed = frozenset({"magnetic", "rotor_dynamics"})
 
     def _status_ok(name: str, chk: Mapping[str, Any]) -> bool:
         status = chk.get("status")
         if status == "OPEN":
             return True
-        # PARTIAL only for magnetic when a twin-bound artefact is cited.
-        if name == "magnetic" and status == "PARTIAL" and chk.get("result_ref"):
+        # PARTIAL only for twin-bound artefacts that cite a result_ref.
+        if name in _partial_allowed and status == "PARTIAL" and chk.get("result_ref"):
             return True
         return False
 
     statuses_honest = bool(checks) and all(
         isinstance(c, Mapping) and _status_ok(name, c) for name, c in checks.items()
     )
-    non_magnetic_open = all(
+    remaining_open = all(
         isinstance(c, Mapping) and c.get("status") == "OPEN"
         for name, c in checks.items()
-        if name != "magnetic" and isinstance(c, Mapping)
+        if name not in _partial_allowed and isinstance(c, Mapping)
     )
     duty = motor.get("fia_duty") or {}
     duty_ok = all(
@@ -745,8 +838,8 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(c, Mapping)
     )
     results = {
-        "statuses_honest_open_or_magnetic_partial": statuses_honest,
-        "non_magnetic_checks_open": non_magnetic_open,
+        "statuses_honest_open_or_allowed_partial": statuses_honest,
+        "non_partial_checks_open": remaining_open,
         "ship_ok_false": motor.get("ship_ok") is False and payload.get("ship_ok") is False,
         "all_required_solver_checks_pass_false": (
             motor.get("all_required_solver_checks_pass") is False
@@ -771,7 +864,7 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
     }
     results["ok"] = (
         statuses_honest
-        and non_magnetic_open
+        and remaining_open
         and results["ship_ok_false"]
         and results["all_required_solver_checks_pass_false"]
         and duty_ok
@@ -899,7 +992,7 @@ def selftest() -> int:
         print("FAIL: proveCatch must fail on illicit PASS")
         bad += 1
 
-    # Twin-bound FIA magnetic case → magnetic PARTIAL; other checks stay OPEN.
+    # Twin-bound FIA magnetic + ROSS cases → PARTIAL; other checks stay OPEN.
     import tempfile
 
     with tempfile.TemporaryDirectory(prefix="fpk-motor-stack-") as tmp:
@@ -937,16 +1030,53 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "ross_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.ross_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "def456",
+                    "critical_speeds": {
+                        "first_critical_speed_rpm": 42000.0,
+                        "operating_speed_rpm": 19500.0,
+                    },
+                    "margins": {
+                        "first_critical_over_operating": 2.15,
+                        "clear_of_operating_band": True,
+                    },
+                    "input_quantities": {"max_rotor_speed_rpm": 19500.0},
+                    "rotor_model": {
+                        "shaft_length_m": 0.141,
+                        "shaft_outer_diameter_m": 0.0927,
+                        "disk_outer_diameter_m": 0.122,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         partial_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
         mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
         if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
             print("FAIL: twin-bound FIA case must mark magnetic PARTIAL with result_ref")
             bad += 1
+        ross = partial_payload["motorMultiphysics"]["required_checks"]["rotor_dynamics"]
+        if ross.get("status") != "PARTIAL" or not ross.get("result_ref"):
+            print(
+                "FAIL: twin-bound ROSS case must mark rotor_dynamics PARTIAL with result_ref"
+            )
+            bad += 1
+        if ross.get("critical_speed_margin") != 2.15:
+            print("FAIL: rotor_dynamics must surface critical_speed_margin from artefact")
+            bad += 1
         if partial_payload["motorMultiphysics"].get("ship_ok") is True:
-            print("FAIL: PARTIAL magnetic must not set ship_ok")
+            print("FAIL: PARTIAL magnetic/ross must not set ship_ok")
             bad += 1
         if not prove_catch(partial_payload).get("ok"):
-            print("FAIL: proveCatch must accept magnetic PARTIAL with result_ref")
+            print(
+                "FAIL: proveCatch must accept magnetic+ross PARTIAL with result_ref"
+            )
             bad += 1
         if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 4:
             print(

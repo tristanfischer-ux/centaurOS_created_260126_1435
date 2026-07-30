@@ -182,6 +182,53 @@ exits non-zero. To recreate the isolated environment:
 .venv-motor/bin/python -m pip install ross-rotordynamics
 ```
 
+### FIA-bound Formula E front-kit case
+
+The smoke command above proves that ROSS works; it deliberately does **not**
+represent the Formula E front kit. Run the twin-bound case instead when
+producing front-powertrain rotor-dynamics evidence:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/ross_fia_front_kit_case.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+The FIA case selectively reads `orchestratorContract.quantities` and
+`fpkConcentricGeometry` with `ijson`, so it does not load the large `state.json`
+into memory. It builds a simplified kit-sized beam model:
+
+- solid steel shaft OD ≈ rotor bore (~92.7 mm);
+- bearing span ≈ housing length (~141 mm);
+- one midspan disk for laminated rotor + magnets (Ø~122 mm × stack length);
+- two identical isotropic bearings with **assumed** stiffness/damping
+  (5×10⁷ N/m, 5×10³ N·s/m) until a supplier catalogue replaces them.
+
+It asks ROSS for the first damped critical speeds and compares them to the
+~19,500 rpm operating band (subcritical screen wants first critical ≥
+1.20 × operating). The artefact always keeps bearing identity and
+modal/dynamometer correlation `OPEN`, status `PARTIAL`, and `ship_ok: false`.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/ross_fia_front_kit_case.json
+```
+
+When that file exists, `scripts/fe-front-stamp-motor-multiphysics.py` promotes
+the multiphysics `rotor_dynamics` check to **PARTIAL** (same honesty pattern as
+the magnetic twin-bound case). Never treat PARTIAL as PASS; never set
+`ship_ok` true without race / dyno evidence.
+
+Run the synthetic proveCatch separately:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/ross_fia_front_kit_case.py --selftest
+```
+
+The self-test solves the synthetic FIA geometry twice. Stretching the bearing
+span by 4× must drop the first critical by more than 40 %, proving the
+headline rpm is solver-derived. It also proves that the synthetic twin
+dimensions replace the generic 1 m smoke shaft and that no code path can set
+`ship_ok`.
+
 ## CalculiX structural finite-element analysis
 
 Homebrew does not currently provide a CalculiX formula. ForgeOS therefore uses
