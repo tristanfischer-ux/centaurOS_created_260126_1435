@@ -24,7 +24,7 @@ import json
 import math
 import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -34,6 +34,10 @@ import ijson
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
 SCHEMA = "forgeos.motor_stack.iso_bevel_fia_front_kit_case/v1"
+# Diff nest must fit inside the strength-resized planetary ring tip (~128 mm)
+# and the 259 mm bay short edge — envelope search cap for honest resize.
+MAX_DIFF_OD_IN_KIT_MM = 120.0
+MIN_CLEARING_DIFF_OD_HINT_MM = 220.0
 
 # Screening allowables — same MQ case-hardened band as planetary ISO screen.
 SIGMA_F_ALLOW_MPA = 450.0
@@ -563,6 +567,114 @@ def _dynamic_factor_kv(pitch_line_velocity_m_s: float) -> float:
     return 1.0 + v / 80.0
 
 
+def propose_strength_feasible_bevel(
+    inputs: TwinInputs,
+    *,
+    motor_shaft_torque_nm: float,
+) -> dict[str, Any]:
+    """Search diff OD / face / teeth inside the kit nest envelope.
+
+    INTENT: The 19 mm Blender nest fails FoS by ~500×. Search a larger nest
+    capped at MAX_DIFF_OD_IN_KIT_MM (planetary/bay fit). If nothing clears
+    SCREEN_FOS_MIN, return the best-in-envelope candidate with
+    ``clears_duty_screen=false`` and an architecture note — never greenwash.
+
+    @description Always returns a dict (best effort); may not clear FoS.
+    @param inputs Twin packaging / duty seeds
+    @param motor_shaft_torque_nm Screen shaft torque (~125 N·m)
+    @returns Candidate dict with clears_duty_screen flag
+    """
+
+    best: dict[str, Any] | None = None
+    best_clearing: dict[str, Any] | None = None
+    tooth_pairs = ((10, 14), (12, 18), (14, 21), (16, 24), (18, 27), (20, 30))
+    od = 40.0
+    while od <= MAX_DIFF_OD_IN_KIT_MM + 1.0e-9:
+        face = 10.0
+        while face <= 60.0 + 1.0e-9:
+            for spider_z, side_z in tooth_pairs:
+                for spider_n in (2, 4):
+                    length = max(face / 0.50, od * 0.90)
+                    trial = replace(
+                        inputs,
+                        diff_od_mm=round(od, 3),
+                        diff_len_mm=round(length, 3),
+                        bevel_face_width_mm=round(face, 3),
+                        spider_pinion_teeth=spider_z,
+                        side_gear_teeth=side_z,
+                        spider_count=spider_n,
+                        tooth_counts_from_twin=False,
+                        tooth_count_basis=(
+                            "strength-driven bevel packaging search "
+                            "(not twin-released tooth counts)"
+                        ),
+                    )
+                    try:
+                        geometry = derive_bevel_geometry(trial)
+                        screen = run_strength_screen(
+                            trial,
+                            geometry,
+                            motor_shaft_torque_nm=motor_shaft_torque_nm,
+                        )
+                    except FiaFrontKitBevelError:
+                        continue
+                    volume_proxy = od * od * geometry.face_width_mm
+                    candidate = {
+                        "diff_od_mm": round(od, 3),
+                        "diff_len_mm": round(length, 3),
+                        "bevel_face_width_mm": geometry.face_width_mm,
+                        "spider_pinion_teeth": spider_z,
+                        "side_gear_teeth": side_z,
+                        "spider_count": spider_n,
+                        "mean_module_mm": geometry.mean_module_mm,
+                        "cone_distance_mm": geometry.cone_distance_mm,
+                        "minimum_bending_fos": screen.minimum_bending_fos,
+                        "minimum_contact_fos": screen.minimum_contact_fos,
+                        "minimum_strength_factor": screen.minimum_strength_factor,
+                        "clears_duty_screen": screen.works_in_kit_context,
+                        "volume_proxy_mm3": round(volume_proxy, 1),
+                        "envelope_max_diff_od_mm": MAX_DIFF_OD_IN_KIT_MM,
+                    }
+                    if (
+                        best is None
+                        or candidate["minimum_strength_factor"]
+                        > best["minimum_strength_factor"]
+                    ):
+                        best = candidate
+                    if screen.works_in_kit_context and (
+                        best_clearing is None
+                        or candidate["volume_proxy_mm3"]
+                        < best_clearing["volume_proxy_mm3"]
+                    ):
+                        best_clearing = candidate
+            face += 5.0
+        od += 5.0
+
+    chosen = best_clearing or best
+    if chosen is None:
+        raise FiaFrontKitBevelError("Bevel strength search found no candidates")
+    if chosen.get("clears_duty_screen"):
+        chosen["statement"] = (
+            "Strength-driven bevel nest resize clears screening FoS ≥ "
+            f"{SCREEN_FOS_MIN} inside OD ≤ {MAX_DIFF_OD_IN_KIT_MM:.0f} mm. "
+            "Not ISO 23509 / KISSsoft; ship_ok false."
+        )
+    else:
+        chosen["statement"] = (
+            "No straight-bevel nest inside the kit envelope "
+            f"(OD ≤ {MAX_DIFF_OD_IN_KIT_MM:.0f} mm) clears FoS ≥ {SCREEN_FOS_MIN} "
+            f"at ~1000 N·m carrier. Best-in-envelope FoS ≈ "
+            f"{chosen['minimum_strength_factor']:.3f}. Clearing typically needs "
+            f"OD ≳ {MIN_CLEARING_DIFF_OD_HINT_MM:.0f} mm (outside planetary/bay "
+            "nest) — architecture / packaging hold stays OPEN. Not greenwashed."
+        )
+        chosen["architecture_hold"] = (
+            "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE — enlarge nest, reduce "
+            "ratio/torque at diff, or change topology; do not claim PASS"
+        )
+    return chosen
+
+
 def run_strength_screen(
     inputs: TwinInputs,
     geometry: BevelGeometry,
@@ -651,10 +763,14 @@ def build_artifact(
     screen: StrengthScreen,
     source_state_sha256: str,
     source_twin: str,
+    packaging_seed_screen: StrengthScreen | None = None,
+    packaging_seed_geometry: BevelGeometry | None = None,
+    recommended_geometry: Mapping[str, Any] | None = None,
+    controlling_geometry_source: str = "packaging_seed",
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release bevel-strength artefact."""
 
-    return {
+    artifact: dict[str, Any] = {
         "schema": SCHEMA,
         "status": "PARTIAL",
         "ship_ok": False,
@@ -663,6 +779,7 @@ def build_artifact(
         "input_quantities_sha256": input_quantities_sha256(inputs),
         "input_quantities": asdict(inputs),
         "bevel_geometry": asdict(geometry),
+        "controlling_geometry_source": controlling_geometry_source,
         "duty_torques": {
             "motor_shaft_torque_nm": screen.motor_shaft_torque_nm,
             "carrier_input_torque_nm": screen.carrier_input_torque_nm,
@@ -778,6 +895,26 @@ def build_artifact(
             "ISO 23509 / KISSsoft / spectrum / FEA closure on the current revision."
         ),
     }
+    if packaging_seed_screen is not None and packaging_seed_geometry is not None:
+        artifact["packaging_seed_screen"] = {
+            "bevel_geometry": asdict(packaging_seed_geometry),
+            "minimum_bending_fos": packaging_seed_screen.minimum_bending_fos,
+            "minimum_contact_fos": packaging_seed_screen.minimum_contact_fos,
+            "minimum_strength_factor": packaging_seed_screen.minimum_strength_factor,
+            "works_in_kit_context": packaging_seed_screen.works_in_kit_context,
+            "statement": (
+                "As-read twin / Blender packaging nest — retained when a "
+                "strength search records recommended_geometry."
+            ),
+        }
+    if recommended_geometry is not None:
+        artifact["recommended_geometry"] = dict(recommended_geometry)
+        artifact["works_in_kit_context"]["controlling_geometry_source"] = (
+            controlling_geometry_source
+        )
+        if recommended_geometry.get("architecture_hold"):
+            artifact["architecture_hold"] = recommended_geometry["architecture_hold"]
+    return artifact
 
 
 def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -921,20 +1058,64 @@ def run_selftest() -> int:
 
 
 def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
-    """Run and persist one straight-bevel handbook screen against a live twin."""
+    """Run and persist one straight-bevel handbook screen against a live twin.
+
+    When the packaging nest fails FoS, search a larger nest inside the kit
+    envelope. If nothing clears, keep works=false and record the best-in-
+    envelope candidate plus an architecture hold (do not greenwash).
+    """
 
     state_path = twin_dir / "state.json"
-    inputs, state_hash = load_twin_inputs(state_path)
-    geometry = derive_bevel_geometry(inputs)
-    torque = derive_motor_shaft_torque_nm(inputs)
-    screen = run_strength_screen(
-        inputs, geometry, motor_shaft_torque_nm=torque
+    seed_inputs, state_hash = load_twin_inputs(state_path)
+    seed_geometry = derive_bevel_geometry(seed_inputs)
+    torque = derive_motor_shaft_torque_nm(seed_inputs)
+    seed_screen = run_strength_screen(
+        seed_inputs, seed_geometry, motor_shaft_torque_nm=torque
     )
     if not (
-        math.isfinite(screen.minimum_strength_factor)
-        and screen.minimum_strength_factor > 0.0
+        math.isfinite(seed_screen.minimum_strength_factor)
+        and seed_screen.minimum_strength_factor > 0.0
     ):
         raise FiaFrontKitBevelError("Strength screen returned non-finite FoS")
+
+    recommended = None
+    controlling = "packaging_seed"
+    inputs = seed_inputs
+    geometry = seed_geometry
+    screen = seed_screen
+    packaging_seed_screen: StrengthScreen | None = None
+    packaging_seed_geometry: BevelGeometry | None = None
+    if not seed_screen.works_in_kit_context:
+        packaging_seed_screen = seed_screen
+        packaging_seed_geometry = seed_geometry
+        recommended = propose_strength_feasible_bevel(
+            seed_inputs, motor_shaft_torque_nm=torque
+        )
+        # Apply best-in-envelope as controlling geometry for the artefact body
+        # even when it still fails — so Excel shows the honest ceiling.
+        inputs = replace(
+            seed_inputs,
+            diff_od_mm=float(recommended["diff_od_mm"]),
+            diff_len_mm=float(recommended["diff_len_mm"]),
+            bevel_face_width_mm=float(recommended["bevel_face_width_mm"]),
+            spider_pinion_teeth=int(recommended["spider_pinion_teeth"]),
+            side_gear_teeth=int(recommended["side_gear_teeth"]),
+            spider_count=int(recommended["spider_count"]),
+            tooth_counts_from_twin=False,
+            tooth_count_basis=str(
+                recommended.get("statement")
+                or "strength-driven bevel packaging search"
+            ),
+        )
+        geometry = derive_bevel_geometry(inputs)
+        screen = run_strength_screen(
+            inputs, geometry, motor_shaft_torque_nm=torque
+        )
+        controlling = (
+            "strength_driven_resize"
+            if recommended.get("clears_duty_screen")
+            else "best_in_kit_envelope_still_failing"
+        )
 
     try:
         twin_label = str(twin_dir.resolve().relative_to(REPO_ROOT))
@@ -946,6 +1127,10 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         screen=screen,
         source_state_sha256=state_hash,
         source_twin=twin_label,
+        packaging_seed_screen=packaging_seed_screen,
+        packaging_seed_geometry=packaging_seed_geometry,
+        recommended_geometry=recommended,
+        controlling_geometry_source=controlling,
     )
     destination = (
         output_path
@@ -953,7 +1138,29 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         else twin_dir / "_motor_stack" / "iso_bevel_fia_front_kit_case.json"
     )
     _atomic_write_json(destination, artifact)
+    if recommended is not None:
+        _atomic_write_json(
+            twin_dir / "_motor_stack" / "iso_bevel_recommended_geometry.json",
+            {
+                "schema": "forgeos.motor_stack.iso_bevel_recommended_geometry/v1",
+                "ship_ok": False,
+                "controlling_geometry_source": controlling,
+                "recommended": recommended,
+                "packaging_seed": {
+                    "diff_od_mm": seed_inputs.diff_od_mm,
+                    "bevel_face_width_mm": seed_inputs.bevel_face_width_mm,
+                    "minimum_strength_factor": seed_screen.minimum_strength_factor,
+                },
+            },
+        )
     works_word = "clears" if screen.works_in_kit_context else "does NOT clear"
+    seed_note = ""
+    if packaging_seed_screen is not None:
+        seed_note = (
+            f" Packaging seed FoS ≈ {packaging_seed_screen.minimum_strength_factor:.4f} "
+            f"(FAILED) → best-in-envelope OD={geometry.diff_od_mm:.1f} mm / "
+            f"face={geometry.face_width_mm:.1f} mm (controlling={controlling})."
+        )
     print(
         "FIA front-kit straight-bevel differential screen: "
         f"T_motor ≈ {screen.motor_shaft_torque_nm:.1f} N·m → "
@@ -965,8 +1172,7 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         f"Min bending FoS ≈ {screen.minimum_bending_fos:.4f}, "
         f"min contact FoS ≈ {screen.minimum_contact_fos:.4f} "
         f"(need ≥ {SCREEN_FOS_MIN:.2f}). "
-        f"Duty screen {works_word} kit context. "
-        f"Tooth basis: {geometry.tooth_count_basis}. "
+        f"Duty screen {works_word} kit context.{seed_note} "
         "ISO 23509 / KISSsoft / spectrum / tooth-contact FEA remain OPEN; "
         "ship_ok is false."
     )
