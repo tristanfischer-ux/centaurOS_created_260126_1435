@@ -193,6 +193,24 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
             motor_drivetrain.CQ_GEARS_PLANETARY_SOURCE,
             "Apache-2.0",
         ),
+        (
+            "cold_plate_serpentine",
+            motor_drivetrain.cold_plate_serpentine,
+            {
+                "plate_length": 180.0,
+                "plate_width": 100.0,
+                "plate_thickness": 10.0,
+                "wall": 3.0,
+                "channel_width": 5.345,
+                "channel_depth": 1.336,
+                "channel_pitch": 8.0,
+                "pass_count": 8,
+                "port_diameter": 6.0,
+                "port_spacing": 56.0,
+            },
+            motor_drivetrain.PINNEAPPLE_COLD_PLATE_TRAINING_CHECK,
+            "Apache-2.0",
+        ),
     ]
     # DECISION: the OpenMotor STEP is registered only against its exact educational
     # identity. It must never become a generic traction-motor family fallback.

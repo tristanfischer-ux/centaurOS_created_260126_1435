@@ -167,10 +167,13 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "inverter_cold_plate",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "Analytical channel seed — CFD OPEN",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "cold_plate_serpentine",
+        "notes": (
+            "Parametric serpentine cold-plate family seeded (ForgeOS / Apache-2.0 "
+            "training check). CFD / conjugate heat transfer still OPEN."
+        ),
     },
     {
         "component_id": "sic_power_modules",
@@ -511,9 +514,9 @@ def build_cad_authority(
     assembly_revision: str = ASSEMBLY_REVISION,
     stamped_at: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Build cadAuthority register — communication_only except seeded stator family.
+    """Build cadAuthority register — communication_only except seeded parametric families.
 
-    @description Lists principal components with authority levels from the plan.
+    @description Stator, rotor, planetary, and serpentine cold plate are parametric.
     @param assembly_revision Shared revision label
     @param stamped_at ISO timestamp override
     @returns cadAuthority object
@@ -945,8 +948,26 @@ def selftest() -> int:
         if not prove_catch(partial_payload).get("ok"):
             print("FAIL: proveCatch must accept magnetic PARTIAL with result_ref")
             bad += 1
-        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 3:
-            print("FAIL: expected ≥3 parametric families (stator, rotor, planetary)")
+        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 4:
+            print(
+                "FAIL: expected ≥4 parametric families "
+                "(stator, rotor, planetary, cold_plate)"
+            )
+            bad += 1
+        cold = next(
+            (
+                c
+                for c in partial_payload["cadAuthority"]["components"]
+                if c.get("component_id") == "inverter_cold_plate"
+            ),
+            None,
+        )
+        if (
+            not cold
+            or cold.get("authority_level") != "parametric_family"
+            or cold.get("cad_family") != "cold_plate_serpentine"
+        ):
+            print("FAIL: inverter_cold_plate must list cold_plate_serpentine family")
             bad += 1
 
     if bad:

@@ -16,7 +16,7 @@ electromagnetic, thermal, structural, durability, or manufacturing performance.
 | 3 | `ipmsm_lamination_stack` | Composition of families 1 and 2, Apache-2.0 benchmark provenance | Assembly family | stack length, lamination thickness, inter-lamination gap, skew steps | axial envelope and lamination count reconcile; no fused stator/rotor |
 | 4 | `planetary_gearset` | `cq_gears`, revision `e73874…`, Apache-2.0 | Family fallback; implemented (optional `cq_gears` import) | module, sun/planet teeth, width, rim width, planet count, backlash, bore | tooth-count compatibility, equal planet spacing, STEP/STL rebuild, non-intersecting solids |
 | 5 | `open_propulsion_motor_reference` | OpenMotor CIAG 2 28 125 25, revision `1e1e56…`, CERN-OHL-W-2.0 | **Exact identity only**: OpenMotor / `CIAG-2-28-125-25` | none; source STEP is unchanged | import succeeds; 616 solids; 138.393 × 138.393 × 53.500 mm; never used as traction-family fallback |
-| 6 | `cold_plate_serpentine` | ForgeOS source-owned builder; PINNeAPPle revision `78c635…` is an Apache-2.0 training check | Family fallback after fluid checks | plate envelope, wall, channel width/depth/pitch, pass count, port diameter/spacing | continuous channel, positive wall, no channel breakout, hydraulic diameter emitted |
+| 6 | `cold_plate_serpentine` | ForgeOS source-owned builder; PINNeAPPle revision `78c635…` is an Apache-2.0 training check | Family fallback; implemented | plate envelope, wall, channel width/depth/pitch, pass count, port diameter/spacing | continuous channel, positive wall, no channel breakout, hydraulic diameter emitted |
 | 7 | `inverter_half_bridge_power_stage` | Paltatech half-bridge, CERN-OHL-1.2, as architecture training only | Exact reference first; universal builder later | substrate, switch count/package, bus spacing, cold-plate interface | package identities and mounting interfaces explicit; no power-rating claim without calculation |
 
 ## Seeding sequence
@@ -50,9 +50,13 @@ electromagnetic, thermal, structural, durability, or manufacturing performance.
 3. `planetary_gearset` — parametric promotion of the cq_gears three-planet
    example (module 1, sun 12, planet 18, width 10 mm, 3 planets). `cq_gears`
    remains an optional import so stator/rotor stay always-on.
+4. `cold_plate_serpentine` — ForgeOS source-owned milled serpentine blank
+   (envelope, wall, channel width/depth/pitch, pass count, ports). Emits
+   rectangular hydraulic diameter. PINNeAPPle revision `78c635…` is the
+   Apache-2.0 training check only — not copied geometry.
 
 The forge-truth seeder publishes these families under Apache-2.0 provenance and
 registers the OpenMotor STEP only against its exact CERN-OHL-W-2.0 identity.
 
 The next implementation should be `ipmsm_lamination_stack` (axial composition
-of families 1 and 2), then `cold_plate_serpentine`.
+of families 1 and 2), then `inverter_half_bridge_power_stage`.

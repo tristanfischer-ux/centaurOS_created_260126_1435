@@ -127,5 +127,46 @@ class PlanetaryGearsetTests(unittest.TestCase):
             )
 
 
+class ColdPlateSerpentineTests(unittest.TestCase):
+    """Prove serpentine fluid path rules and hydraulic-diameter emission."""
+
+    def test_default_plate_envelope_and_material_removal(self) -> None:
+        model = MODULE.cold_plate_serpentine({})
+        bbox = model.val().BoundingBox()
+
+        self.assertAlmostEqual(bbox.xlen, 180.0, places=1)
+        self.assertAlmostEqual(bbox.ylen, 100.0, places=1)
+        self.assertAlmostEqual(bbox.zlen, 10.0, places=1)
+        self.assertEqual(model.solids().size(), 1)
+
+        envelope = 180.0 * 100.0 * 10.0
+        volume = model.val().Volume()
+        self.assertLess(volume, envelope * 0.98)
+        self.assertGreater(volume, envelope * 0.70)
+
+    def test_hydraulics_emit_rectangular_dh(self) -> None:
+        hyd = MODULE.cold_plate_serpentine_hydraulics({})
+        expected = 2.0 * 5.345 * 1.336 / (5.345 + 1.336)
+        self.assertAlmostEqual(hyd["hydraulic_diameter_mm"], expected, places=6)
+        self.assertGreater(hyd["fin_wall_mm"], 0.0)
+        self.assertEqual(hyd["pass_count"], 8)
+
+    def test_floor_breakout_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "plate_thickness|floor"):
+            MODULE.cold_plate_serpentine(
+                {
+                    "channel_depth": 9.0,
+                    "wall": 3.0,
+                    "plate_thickness": 10.0,
+                }
+            )
+
+    def test_zero_fin_wall_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "channel_pitch|channel_width"):
+            MODULE.cold_plate_serpentine(
+                {"channel_width": 8.0, "channel_pitch": 8.0}
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

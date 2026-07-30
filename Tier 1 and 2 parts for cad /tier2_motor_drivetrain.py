@@ -4,8 +4,10 @@ Default stator and rotor dimensions are training benchmarks derived from
 Pyleecan's Apache-2.0 IPMSM_B definition at revision
 7937d675fb77701ac8f2c65816b583cb29270e12. The planetary defaults follow the
 cq_gears Apache-2.0 three-planet example at revision
-e73874cf17a25447a99b1e7c22a4d5af38560e9c. These are universal parametric
-geometries, not original-equipment-manufacturer or race-vehicle parts.
+e73874cf17a25447a99b1e7c22a4d5af38560e9c. The serpentine cold plate is
+ForgeOS source-owned geometry; PINNeAPPle revision 78c635… is an Apache-2.0
+training check only. These are universal parametric geometries, not
+original-equipment-manufacturer or race-vehicle parts.
 """
 
 from __future__ import annotations
@@ -28,6 +30,13 @@ CQ_GEARS_PLANETARY_SOURCE = (
     "https://github.com/meadiode/cq_gears/blob/"
     "e73874cf17a25447a99b1e7c22a4d5af38560e9c/"
     "examples/ring_gears_and_planetary_gearsets.ipynb"
+)
+# PINNeAPPle is an Apache-2.0 training check (simple through-channel), not the
+# geometry we emit — ForgeOS owns the serpentine builder below.
+PINNEAPPLE_COLD_PLATE_TRAINING_CHECK = (
+    "https://github.com/barrosyan/PINNeAPPle/blob/"
+    "78c6357e5aa38802c99f8c3329dea6c13606ca5e/"
+    "pinneapple_design/geometry/gen/cadquery_gen.py"
 )
 
 # IPMSM_B HoleM53 W4 (radians) — V-pocket opening angle.
@@ -365,6 +374,163 @@ def planetary_gearset(params: dict[str, object]) -> cq.Workplane:
     return cq.Workplane("XY").gear(gearset)
 
 
+def cold_plate_serpentine_hydraulics(params: dict[str, object]) -> dict[str, float | int]:
+    """Emit rectangular-channel hydraulic scalars for the serpentine family.
+
+    INTENT: packaging and early thermal seeds need Dh without claiming a CFD
+    result — Dh = 2·w·d/(w+d) for a rectangular milled channel.
+    """
+    channel_width = _number(params, "channel_width", 5.345)
+    channel_depth = _number(params, "channel_depth", 1.336)
+    pitch = _number(params, "channel_pitch", 8.0)
+    pass_count = int(params.get("pass_count", 8))
+    if pass_count < 2:
+        raise ValueError("pass_count must be at least 2")
+    hydraulic_diameter = (
+        2.0 * channel_width * channel_depth / (channel_width + channel_depth)
+    )
+    return {
+        "pass_count": pass_count,
+        "channel_width_mm": channel_width,
+        "channel_depth_mm": channel_depth,
+        "channel_pitch_mm": pitch,
+        "hydraulic_diameter_mm": hydraulic_diameter,
+        "fin_wall_mm": pitch - channel_width,
+    }
+
+
+def _resolve_cold_plate_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate envelope / channel / port rules for the serpentine plate."""
+    length = _number(params, "plate_length", 180.0)
+    width = _number(params, "plate_width", 100.0)
+    thickness = _number(params, "plate_thickness", 10.0)
+    wall = _number(params, "wall", 3.0)
+    channel_width = _number(params, "channel_width", 5.345)
+    channel_depth = _number(params, "channel_depth", 1.336)
+    pitch = _number(params, "channel_pitch", 8.0)
+    pass_count = int(params.get("pass_count", 8))
+    port_diameter = _number(params, "port_diameter", 6.0)
+    default_port_spacing = (pass_count - 1) * pitch if pass_count >= 2 else pitch
+    port_spacing = float(params.get("port_spacing", default_port_spacing))
+
+    if pass_count < 2:
+        raise ValueError("pass_count must be at least 2")
+    if pitch <= channel_width:
+        raise ValueError("channel_pitch must exceed channel_width (positive fin wall)")
+    if channel_depth + wall > thickness:
+        raise ValueError(
+            "channel_depth + wall must not exceed plate_thickness "
+            "(no floor breakout)"
+        )
+    channel_span = (pass_count - 1) * pitch + channel_width
+    if channel_span + 2.0 * wall > width:
+        raise ValueError(
+            "pass_count/pitch/channel_width do not fit plate_width with wall margin"
+        )
+    if length < 2.0 * wall + 2.0 * channel_width:
+        raise ValueError("plate_length too short for wall margins and end turns")
+    if port_diameter >= thickness:
+        raise ValueError("port_diameter must be less than plate_thickness")
+    if abs(port_spacing - (pass_count - 1) * pitch) > 0.05:
+        raise ValueError(
+            "port_spacing must match (pass_count - 1) * channel_pitch "
+            "so ports land on the serpentine ends"
+        )
+    # Side-port cylinder must keep a positive floor under the lowest point.
+    z_mid = thickness / 2.0 - channel_depth / 2.0
+    port_floor = z_mid - port_diameter / 2.0
+    if port_floor < -thickness / 2.0 + wall * 0.25:
+        raise ValueError(
+            "port_diameter would break through the plate floor at the side ports"
+        )
+
+    return {
+        "plate_length": length,
+        "plate_width": width,
+        "plate_thickness": thickness,
+        "wall": wall,
+        "channel_width": channel_width,
+        "channel_depth": channel_depth,
+        "channel_pitch": pitch,
+        "pass_count": pass_count,
+        "port_diameter": port_diameter,
+        "port_spacing": port_spacing,
+    }
+
+
+def cold_plate_serpentine(params: dict[str, object]) -> cq.Workplane:
+    """Build a milled serpentine inverter cold-plate blank (training geometry).
+
+    INTENT: give forge-truth a parametric liquid cold-plate family for packaging
+    and render authenticity. PINNeAPPle's through-channel is the training check
+    only — this builder is ForgeOS source-owned serpentine geometry, not Lucid
+    or race-team CAD, and not a CFD-proven release part.
+
+    Channel is open from the top face (cover not modelled). Inlet/outlet ports
+    exit one short edge at the first and last pass centre-lines.
+    """
+    p = _resolve_cold_plate_params(params)
+    length = float(p["plate_length"])
+    width = float(p["plate_width"])
+    thickness = float(p["plate_thickness"])
+    wall = float(p["wall"])
+    channel_width = float(p["channel_width"])
+    channel_depth = float(p["channel_depth"])
+    pitch = float(p["channel_pitch"])
+    pass_count = int(p["pass_count"])
+    port_diameter = float(p["port_diameter"])
+
+    plate = cq.Workplane("XY").box(length, width, thickness)
+    y0 = -((pass_count - 1) * pitch) / 2.0
+    pass_length = length - 2.0 * wall
+    # Mill floor sits channel_depth below the top face.
+    mill_z = thickness / 2.0 - channel_depth
+
+    def mill_rect(cx: float, cy: float, sx: float, sy: float) -> cq.Workplane:
+        return (
+            cq.Workplane("XY")
+            .workplane(offset=mill_z)
+            .center(cx, cy)
+            .rect(sx, sy)
+            .extrude(channel_depth + 0.15)
+        )
+
+    cutter: cq.Workplane | None = None
+    for index in range(pass_count):
+        y = y0 + index * pitch
+        segment = mill_rect(0.0, y, pass_length, channel_width)
+        cutter = segment if cutter is None else cutter.union(segment)
+        if index >= pass_count - 1:
+            continue
+        # End turn: even passes turn at +X, odd at -X.
+        x_turn = (length / 2.0 - wall - channel_width / 2.0) * (
+            1.0 if index % 2 == 0 else -1.0
+        )
+        y_turn = y + pitch / 2.0
+        turn = mill_rect(x_turn, y_turn, channel_width, pitch + channel_width)
+        cutter = cutter.union(turn)
+
+    assert cutter is not None
+    plate = plate.cut(cutter)
+
+    # Side ports on the -X face into the first and last pass ends (even pass_count
+    # puts both serpentine termini on the same short edge).
+    z_mid = thickness / 2.0 - channel_depth / 2.0
+    for y_port in (y0, y0 + (pass_count - 1) * pitch):
+        port = (
+            cq.Workplane("YZ")
+            .workplane(offset=-length / 2.0 - 0.05)
+            .center(y_port, z_mid)
+            .circle(port_diameter / 2.0)
+            .extrude(wall + channel_width + 0.2)
+        )
+        plate = plate.cut(port)
+
+    return plate
+
+
 TIER2_MOTOR_DRIVETRAIN = {
     "ipmsm_stator_lamination": {
         "function": ipmsm_stator_lamination,
@@ -537,6 +703,77 @@ TIER2_MOTOR_DRIVETRAIN = {
             "use": "parametric planetary training geometry; not customer geometry",
         },
     },
+    "cold_plate_serpentine": {
+        "function": cold_plate_serpentine,
+        "name": "Serpentine Cold Plate",
+        "category": "thermal",
+        "default_colour": "#B0B0B0",
+        "visual_tags": [
+            "aluminium",
+            "cold_plate",
+            "serpentine",
+            "inverter",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "plate_length": {
+                "type": "number", "default": 180.0, "min": 20.0, "unit": "mm"
+            },
+            "plate_width": {
+                "type": "number", "default": 100.0, "min": 20.0, "unit": "mm"
+            },
+            "plate_thickness": {
+                "type": "number", "default": 10.0, "min": 3.0, "unit": "mm"
+            },
+            "wall": {
+                "type": "number", "default": 3.0, "min": 0.5, "unit": "mm"
+            },
+            "channel_width": {
+                "type": "number", "default": 5.345, "min": 0.5, "unit": "mm"
+            },
+            "channel_depth": {
+                "type": "number", "default": 1.336, "min": 0.3, "unit": "mm"
+            },
+            "channel_pitch": {
+                "type": "number", "default": 8.0, "min": 1.0, "unit": "mm"
+            },
+            "pass_count": {
+                "type": "integer", "default": 8, "min": 2
+            },
+            "port_diameter": {
+                "type": "number", "default": 6.0, "min": 1.0, "unit": "mm"
+            },
+            "port_spacing": {
+                "type": "number", "default": 56.0, "min": 1.0, "unit": "mm"
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "coolant_inlet",
+                "type": "port",
+                "position": "short_edge_minus_x",
+            },
+            {
+                "name": "coolant_outlet",
+                "type": "port",
+                "position": "short_edge_minus_x",
+            },
+            {
+                "name": "module_mount_face",
+                "type": "planar_face",
+                "position": "top",
+            },
+        ],
+        "training_provenance": {
+            "source_url": PINNEAPPLE_COLD_PLATE_TRAINING_CHECK,
+            "source_revision": "78c6357e5aa38802c99f8c3329dea6c13606ca5e",
+            "licence": "Apache-2.0",
+            "use": (
+                "PINNeAPPle through-channel is a training check only; "
+                "serpentine solid is ForgeOS source-owned — not release CAD"
+            ),
+        },
+    },
 }
 
 
@@ -636,6 +873,49 @@ def _selftest_planetary(temp_root: Path) -> None:
     )
 
 
+def _selftest_cold_plate(temp_root: Path) -> None:
+    """Prove continuous serpentine, positive walls, Dh emission, STEP/STL >1 KB."""
+    hyd = cold_plate_serpentine_hydraulics({})
+    assert hyd["pass_count"] == 8
+    assert hyd["fin_wall_mm"] > 0.0
+    expected_dh = 2.0 * 5.345 * 1.336 / (5.345 + 1.336)
+    assert abs(float(hyd["hydraulic_diameter_mm"]) - expected_dh) < 1e-6
+
+    model = cold_plate_serpentine({})
+    bbox = model.val().BoundingBox()
+    assert model.solids().size() == 1
+    assert abs(bbox.xlen - 180.0) < 0.1
+    assert abs(bbox.ylen - 100.0) < 0.1
+    assert abs(bbox.zlen - 10.0) < 0.1
+
+    solid_volume = model.val().Volume()
+    envelope_volume = 180.0 * 100.0 * 10.0
+    assert solid_volume < envelope_volume * 0.98
+    assert solid_volume > envelope_volume * 0.70
+
+    # Reject channel floor breakout and zero fin wall.
+    try:
+        cold_plate_serpentine({"channel_depth": 9.0, "wall": 3.0, "plate_thickness": 10.0})
+        raise AssertionError("expected floor-breakout rejection")
+    except ValueError as exc:
+        assert "floor" in str(exc).lower() or "plate_thickness" in str(exc)
+
+    try:
+        cold_plate_serpentine({"channel_width": 8.0, "channel_pitch": 8.0})
+        raise AssertionError("expected pitch/width rejection")
+    except ValueError as exc:
+        assert "pitch" in str(exc).lower() or "channel_width" in str(exc)
+
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "cold_plate_serpentine", temp_root
+    )
+    print(
+        "[cold-plate-serpentine] selftest PASS: "
+        f"Dh={hyd['hydraulic_diameter_mm']:.3f} mm, "
+        f"STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
 def _selftest() -> int:
     """Run all educational motor/drivetrain family self-tests."""
     with tempfile.TemporaryDirectory(prefix="forge-motor-drivetrain-") as temp_dir:
@@ -643,6 +923,7 @@ def _selftest() -> int:
         _selftest_stator(temp_root)
         _selftest_rotor(temp_root)
         _selftest_planetary(temp_root)
+        _selftest_cold_plate(temp_root)
     return 0
 
 
