@@ -97,8 +97,8 @@ licensed Pyleecan definition contributes only its nonlinear electrical-steel
 B-H curve and neodymium-magnet material record; no Prius dimensions or
 proprietary Lucid geometry enter the mesh.
 
-The command performs one nonlinear open-circuit finite-element solve and
-writes:
+The command performs one nonlinear open-circuit solve and one loaded
+magnetostatic solve, then writes:
 
 ```text
 out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json
@@ -106,10 +106,22 @@ out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json
 
 That artefact binds its input hash to 250 kW front-regeneration duty, 750 V
 direct-current bus within the assumed 600–900 V window, 19,500 rpm, the
-343×259×267 mm bay and the 32 kg soft whole-kit aspiration. It reports solved
-air-gap flux plus an analytical power/torque/current reconciliation. It always
-keeps the torque map and dynamometer correlation `OPEN`, status `PARTIAL`, and
-`ship_ok: false`.
+343×259×267 mm bay and the 32 kg soft whole-kit aspiration. The analytical
+duty check estimates about 335 A rms phase current and 125 N·m required shaft
+torque. The loaded solve applies that current at one assumed regenerative
+q-axis angle (`Id = 0`, −90 electrical degrees) and one rotor position
+(0 mechanical degrees).
+
+The exact winding has not been frozen, so the model uses one effective
+conductor per slot rather than inventing a production turn count. On the
+30 July live twin this raised peak air-gap flux from about 0.283 T open-circuit
+to 0.678 T loaded and returned −7.75 N·m from FEMM's weighted-stress integral.
+The sign denotes the chosen regenerative direction. The magnitude is only a
+solver-derived estimate: it does **not** demonstrate the required 125 N·m.
+Series turns, winding factor, angle and rotor-position sweeps, voltage closure,
+losses and demagnetisation still need to be solved. The artefact therefore
+always keeps the torque map and dynamometer correlation `OPEN`, status
+`PARTIAL`, and `ship_ok: false`.
 
 Run the synthetic proveCatch separately:
 
@@ -117,11 +129,12 @@ Run the synthetic proveCatch separately:
 .venv-motor/bin/python scripts/motor-stack/em_fia_front_kit_case.py --selftest
 ```
 
-The self-test solves the synthetic FIA geometry twice. Reducing magnet
-remanence by one million must collapse the solved field by at least five orders
-of magnitude, proving the headline flux is solver-derived. It also proves that
-the synthetic twin dimensions replace the educational machine dimensions and
-that no code path can set `ship_ok`.
+The self-test solves the synthetic FIA geometry open-circuit, loaded, and again
+with magnet remanence reduced by one million. The reduced-remanence field must
+collapse by at least five orders of magnitude, and the loaded case must return
+finite flux and torque. These checks prove the headline values are
+solver-derived. The test also proves that synthetic twin dimensions replace
+the educational machine dimensions and that no code path can set `ship_ok`.
 
 ### Fresh Python setup
 

@@ -49,6 +49,7 @@ class FiaFrontKitCaseContractTest(unittest.TestCase):
         inputs = CASE.inputs_from_sections(self.quantities, self.concentric)
         geometry = CASE.derive_fia_geometry(inputs)
         duty = CASE.analytical_duty_check(inputs)
+        loaded = CASE.loaded_point_assumptions(duty)
 
         self.assertEqual(inputs.continuous_electrical_power_kw, 250.0)
         self.assertEqual(inputs.dc_bus_voltage_v, 750.0)
@@ -61,6 +62,23 @@ class FiaFrontKitCaseContractTest(unittest.TestCase):
         self.assertAlmostEqual(duty.electrical_power_check_kw, 250.0, places=9)
         self.assertGreater(duty.required_shaft_torque_nm, 125.0)
         self.assertLess(duty.required_shaft_torque_nm, 140.0)
+        self.assertEqual(
+            loaded.phase_current_rms_a,
+            duty.estimated_phase_rms_current_a,
+        )
+        self.assertAlmostEqual(
+            loaded.phase_current_peak_a,
+            duty.estimated_phase_rms_current_a * 2.0**0.5,
+        )
+        self.assertAlmostEqual(
+            loaded.phase_a_current_a
+            + loaded.phase_b_current_a
+            + loaded.phase_c_current_a,
+            0.0,
+            places=9,
+        )
+        self.assertEqual(loaded.current_angle_electrical_deg, -90.0)
+        self.assertEqual(loaded.rotor_position_mechanical_deg, 0.0)
 
     def test_artifact_can_never_claim_release_or_a_closed_map(self) -> None:
         inputs = CASE.inputs_from_sections(self.quantities, self.concentric)
@@ -72,11 +90,21 @@ class FiaFrontKitCaseContractTest(unittest.TestCase):
             mean_airgap_flux_density_t=0.55,
             minimum_airgap_flux_density_t=0.08,
         )
+        loaded_assumptions = CASE.loaded_point_assumptions(duty)
+        loaded_magnetic = CASE.LoadedMagneticResult(
+            peak_airgap_flux_density_t=1.04,
+            rms_airgap_flux_density_t=0.71,
+            mean_airgap_flux_density_t=0.59,
+            minimum_airgap_flux_density_t=0.09,
+            torque_nm=-118.4,
+        )
         artifact = CASE.build_artifact(
             inputs=inputs,
             geometry=geometry,
             duty=duty,
             magnetic=magnetic,
+            loaded_assumptions=loaded_assumptions,
+            loaded_magnetic=loaded_magnetic,
             solver_identity={"name": "xfemm femmcli", "version": "test"},
             source_state_sha256="a" * 64,
         )
@@ -86,6 +114,16 @@ class FiaFrontKitCaseContractTest(unittest.TestCase):
         self.assertEqual(artifact["torque_map"]["status"], "OPEN")
         self.assertEqual(artifact["dynamometer_correlation"]["status"], "OPEN")
         self.assertIsNone(artifact["finite_element_point"]["torque_nm"])
+        self.assertEqual(artifact["loaded_point"]["torque_nm"], -118.4)
+        self.assertFalse(artifact["loaded_point"]["torque_reliable"])
+        self.assertEqual(
+            artifact["loaded_point"]["phase_current_rms_a"],
+            duty.estimated_phase_rms_current_a,
+        )
+        self.assertIn(
+            "one rotor position",
+            artifact["loaded_point"]["honesty_note"],
+        )
 
     def test_input_hash_changes_when_binding_quantity_changes(self) -> None:
         first = CASE.inputs_from_sections(self.quantities, self.concentric)

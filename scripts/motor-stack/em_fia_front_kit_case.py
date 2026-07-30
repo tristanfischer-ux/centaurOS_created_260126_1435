@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""FIA-bound electromagnetic point case for the Formula E front kit twin.
+"""FIA-bound electromagnetic point cases for the Formula E front kit twin.
 
 This is deliberately separate from ``em_magnetic_selftest.py``.  The smoke
 test proves the Pyleecan/xfemm toolchain on an educational Prius-derived
 machine.  This case reads the Formula E twin, builds a fresh 48-slot/eight-pole
 interior-PM cross-section at the twin's rotor, stator, bore, air-gap and stack
-dimensions, and solves an open-circuit magnetic point with native xfemm.
+dimensions, and solves open-circuit and loaded magnetic points with native
+xfemm.
 
-The point solve does not close a torque/efficiency/demagnetisation map.  The
-250 kW duty is reconciled analytically at the twin speed and remains OPEN for
+The loaded point uses the analytical 250 kW phase-current estimate at one
+documented current angle and rotor position.  It does not close a
+torque/efficiency/demagnetisation map and remains OPEN for winding-detail and
 dynamometer correlation.
 """
 
@@ -129,6 +131,28 @@ class MagneticResult:
     rms_airgap_flux_density_t: float
     mean_airgap_flux_density_t: float
     minimum_airgap_flux_density_t: float
+
+
+@dataclass(frozen=True)
+class LoadedPointAssumptions:
+    """Explicit assumptions for the single loaded magnetic operating point."""
+
+    phase_current_rms_a: float
+    phase_current_peak_a: float
+    current_angle_electrical_deg: float
+    rotor_position_mechanical_deg: float
+    phase_a_current_a: float
+    phase_b_current_a: float
+    phase_c_current_a: float
+    effective_turns_per_slot: int
+    winding_model: str
+
+
+@dataclass(frozen=True)
+class LoadedMagneticResult(MagneticResult):
+    """Flux and weighted-stress torque from one loaded xfemm solution."""
+
+    torque_nm: float
 
 
 def _number(
@@ -508,6 +532,41 @@ def analytical_duty_check(inputs: TwinInputs) -> DutyCheck:
     )
 
 
+def loaded_point_assumptions(duty: DutyCheck) -> LoadedPointAssumptions:
+    """Create the one-position loaded-point excitation from the duty estimate.
+
+    The twin does not yet freeze conductor count, series turns, winding factor,
+    d/q inductance or a maximum-torque-per-ampere schedule.  One effective
+    conductor per slot therefore makes this a current-linked solver estimate,
+    not a design torque prediction.
+    """
+
+    phase_peak_a = duty.estimated_phase_rms_current_a * math.sqrt(2.0)
+    current_angle_deg = -90.0
+    current_angle_rad = math.radians(current_angle_deg)
+    phase_a_a = phase_peak_a * math.cos(current_angle_rad)
+    phase_b_a = phase_peak_a * math.cos(
+        current_angle_rad - 2.0 * math.pi / 3.0
+    )
+    phase_c_a = phase_peak_a * math.cos(
+        current_angle_rad + 2.0 * math.pi / 3.0
+    )
+    return LoadedPointAssumptions(
+        phase_current_rms_a=duty.estimated_phase_rms_current_a,
+        phase_current_peak_a=phase_peak_a,
+        current_angle_electrical_deg=current_angle_deg,
+        rotor_position_mechanical_deg=0.0,
+        phase_a_current_a=phase_a_a,
+        phase_b_current_a=phase_b_a,
+        phase_c_current_a=phase_c_a,
+        effective_turns_per_slot=1,
+        winding_model=(
+            "48-slot/eight-pole integral-slot phase belts "
+            "A+, C-, B+, A-, C+, B-; one effective series conductor per slot"
+        ),
+    )
+
+
 def _solver_path() -> Path:
     """Resolve the native xfemm command-line solver."""
 
@@ -636,6 +695,8 @@ def _block_label_lua(
     mesh_mm: float,
     group: int,
     magnet_angle_deg: float = 0.0,
+    circuit: str = "<None>",
+    turns: int = 0,
 ) -> list[str]:
     """Assign one FEMM material block label."""
 
@@ -643,11 +704,25 @@ def _block_label_lua(
         f"mi_addblocklabel({point.real:.12g},{point.imag:.12g})",
         f"mi_selectlabel({point.real:.12g},{point.imag:.12g})",
         (
-            f'mi_setblockprop("{material}",0,{mesh_mm:.12g},"<None>",'
-            f"{magnet_angle_deg:.12g},{group},0)"
+            f'mi_setblockprop("{material}",0,{mesh_mm:.12g},"{circuit}",'
+            f"{magnet_angle_deg:.12g},{group},{turns})"
         ),
         "mi_clearselected()",
     ]
+
+
+def _slot_winding_assignment(slot_index: int) -> tuple[str, int]:
+    """Return the phase circuit and signed turn for one 48-slot winding side."""
+
+    phase_belts = (
+        ("phase_a", 1),
+        ("phase_c", -1),
+        ("phase_b", 1),
+        ("phase_a", -1),
+        ("phase_c", 1),
+        ("phase_b", -1),
+    )
+    return phase_belts[(slot_index % 12) // 2]
 
 
 def _build_fia_lua(
@@ -655,8 +730,9 @@ def _build_fia_lua(
     *,
     remanence_t: float,
     fem_name: str,
+    loaded: LoadedPointAssumptions | None = None,
 ) -> str:
-    """Build the full FIA-sized open-circuit interior-PM xfemm model."""
+    """Build the FIA-sized interior-PM xfemm model for one magnetic point."""
 
     material_machine = load(str(MATERIAL_MACHINE_PATH))
     magnet_material = material_machine.rotor.hole[0].magnet_0.mat_type.mag
@@ -688,6 +764,14 @@ def _build_fia_lua(
             f"{coercive_field_a_m:.12g},0,0,0,0,1,0,0,0)"
         ),
     ]
+    if loaded is not None:
+        lua.extend(
+            [
+                f'mi_addcircprop("phase_a",{loaded.phase_a_current_a:.12g},1)',
+                f'mi_addcircprop("phase_b",{loaded.phase_b_current_a:.12g},1)',
+                f'mi_addcircprop("phase_c",{loaded.phase_c_current_a:.12g},1)',
+            ]
+        )
     for h_a_m, b_t in material_machine.stator.mat_type.mag.BH_curve.get_data():
         lua.append(f'mi_addbhpoint("m400",{float(b_t):.12g},{float(h_a_m):.12g})')
     for radius_mm in (r_ri, r_ro, r_si, r_so):
@@ -695,7 +779,7 @@ def _build_fia_lua(
 
     slot_pitch_rad = 2.0 * math.pi / STATOR_SLOTS
     slot_half_width_rad = slot_pitch_rad * 0.23
-    slot_labels: list[complex] = []
+    slot_labels: list[tuple[complex, str, int]] = []
     for slot_index in range(STATOR_SLOTS):
         center_angle = slot_index * slot_pitch_rad
         points = (
@@ -718,10 +802,20 @@ def _build_fia_lua(
         )
         lua.extend(_polygon_lua(points))
         label_radius = (r_slot_inner + r_slot_outer) / 2.0
+        slot_point = complex(
+            label_radius * math.cos(center_angle),
+            label_radius * math.sin(center_angle),
+        )
+        circuit, signed_turn = _slot_winding_assignment(slot_index)
         slot_labels.append(
-            complex(
-                label_radius * math.cos(center_angle),
-                label_radius * math.sin(center_angle),
+            (
+                slot_point,
+                circuit if loaded is not None else "<None>",
+                (
+                    signed_turn * loaded.effective_turns_per_slot
+                    if loaded is not None
+                    else 0
+                ),
             )
         )
 
@@ -810,9 +904,16 @@ def _build_fia_lua(
     lua.extend(
         _block_label_lua(stator_label, material="m400", mesh_mm=0.9, group=3)
     )
-    for point in slot_labels:
+    for point, circuit, turns in slot_labels:
         lua.extend(
-            _block_label_lua(point, material="copper", mesh_mm=0.7, group=4)
+            _block_label_lua(
+                point,
+                material="copper",
+                mesh_mm=0.7,
+                group=4,
+                circuit=circuit,
+                turns=turns,
+            )
         )
     for point, magnet_angle_deg in magnet_labels:
         lua.extend(
@@ -860,19 +961,33 @@ def _build_fia_lua(
             f'print("{RESULT_PREFIX} rms_t="..(b_sq_sum/{probe_count})^0.5)',
             f'print("{RESULT_PREFIX} mean_t="..b_sum/{probe_count})',
             f'print("{RESULT_PREFIX} minimum_t="..b_min)',
-            "quit()",
         ]
     )
+    if loaded is not None:
+        # DECISION: FEMM's steady-state weighted-stress block integral provides
+        # a useful one-position torque estimate without pretending that this
+        # provisional winding definition is a converged torque map.
+        lua.extend(
+            [
+                "mo_clearblock()",
+                "mo_groupselectblock(1)",
+                "mo_groupselectblock(5)",
+                f'print("{RESULT_PREFIX} torque_nm="..mo_blockintegral(22))',
+                "mo_clearblock()",
+            ]
+        )
+    lua.append("quit()")
     return "\n".join(lua) + "\n"
 
 
-def run_magnetic_point(
+def _execute_magnetic_point(
     geometry: FiaMachineGeometry,
     solver: Path,
     *,
     remanence_t: float,
-) -> MagneticResult:
-    """Run one native xfemm magnetic point and parse air-gap evidence."""
+    loaded: LoadedPointAssumptions | None,
+) -> dict[str, float]:
+    """Run one native xfemm magnetic point and return its numeric evidence."""
 
     with tempfile.TemporaryDirectory(prefix="forge-fia-front-em-") as temp_dir:
         work_dir = Path(temp_dir)
@@ -882,6 +997,7 @@ def run_magnetic_point(
                 geometry,
                 remanence_t=remanence_t,
                 fem_name="fia_front_kit.fem",
+                loaded=loaded,
             ),
             encoding="utf-8",
         )
@@ -901,6 +1017,8 @@ def run_magnetic_point(
         if separator:
             values[key.strip()] = float(raw_value.strip())
     expected = {"peak_t", "rms_t", "mean_t", "minimum_t"}
+    if loaded is not None:
+        expected.add("torque_nm")
     if process.returncode != 0 or values.keys() != expected:
         raise FiaFrontKitCaseError(
             "xfemm FIA magnetic point failed or returned incomplete evidence: "
@@ -908,11 +1026,56 @@ def run_magnetic_point(
             f"stdout_tail={process.stdout[-1600:]!r}, "
             f"stderr_tail={process.stderr[-800:]!r}"
         )
+    if not all(math.isfinite(value) for value in values.values()):
+        raise FiaFrontKitCaseError(
+            "xfemm FIA magnetic point returned a non-finite value"
+        )
+    return values
+
+
+def run_magnetic_point(
+    geometry: FiaMachineGeometry,
+    solver: Path,
+    *,
+    remanence_t: float,
+) -> MagneticResult:
+    """Run the open-circuit native xfemm point and parse air-gap evidence."""
+
+    values = _execute_magnetic_point(
+        geometry,
+        solver,
+        remanence_t=remanence_t,
+        loaded=None,
+    )
     return MagneticResult(
         peak_airgap_flux_density_t=values["peak_t"],
         rms_airgap_flux_density_t=values["rms_t"],
         mean_airgap_flux_density_t=values["mean_t"],
         minimum_airgap_flux_density_t=values["minimum_t"],
+    )
+
+
+def run_loaded_magnetic_point(
+    geometry: FiaMachineGeometry,
+    solver: Path,
+    *,
+    remanence_t: float,
+    assumptions: LoadedPointAssumptions,
+) -> LoadedMagneticResult:
+    """Run one loaded native xfemm point at the documented excitation."""
+
+    values = _execute_magnetic_point(
+        geometry,
+        solver,
+        remanence_t=remanence_t,
+        loaded=assumptions,
+    )
+    return LoadedMagneticResult(
+        peak_airgap_flux_density_t=values["peak_t"],
+        rms_airgap_flux_density_t=values["rms_t"],
+        mean_airgap_flux_density_t=values["mean_t"],
+        minimum_airgap_flux_density_t=values["minimum_t"],
+        torque_nm=values["torque_nm"],
     )
 
 
@@ -922,13 +1085,15 @@ def build_artifact(
     geometry: FiaMachineGeometry,
     duty: DutyCheck,
     magnetic: MagneticResult,
+    loaded_assumptions: LoadedPointAssumptions,
+    loaded_magnetic: LoadedMagneticResult,
     solver_identity: Mapping[str, str],
     source_state_sha256: str,
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release electromagnetic artefact."""
 
     return {
-        "schema": "forgeos.motor_stack.em_fia_front_kit_case/v1",
+        "schema": "forgeos.motor_stack.em_fia_front_kit_case/v2",
         "status": "PARTIAL",
         "ship_ok": False,
         "source_twin": "out/formula-e-front-mgu-20260729-1432",
@@ -944,6 +1109,53 @@ def build_artifact(
             "minimum_airgap_flux_density_t": magnetic.minimum_airgap_flux_density_t,
             "torque_nm": None,
             "torque_status": "OPEN — open-circuit point has no current excitation",
+        },
+        "loaded_point": {
+            "kind": "2D nonlinear loaded magnetostatic at one rotor position",
+            "duty_basis": "analytical 250 kW continuous electrical duty check",
+            "phase_current_rms_a": loaded_assumptions.phase_current_rms_a,
+            "phase_current_peak_a": loaded_assumptions.phase_current_peak_a,
+            "phase_instantaneous_current_a": {
+                "a": loaded_assumptions.phase_a_current_a,
+                "b": loaded_assumptions.phase_b_current_a,
+                "c": loaded_assumptions.phase_c_current_a,
+            },
+            "current_angle_electrical_deg": (
+                loaded_assumptions.current_angle_electrical_deg
+            ),
+            "current_angle_assumption": (
+                "Id = 0 nominal q-axis regenerative excitation; no MTPA or "
+                "field-weakening schedule has been solved"
+            ),
+            "rotor_position_mechanical_deg": (
+                loaded_assumptions.rotor_position_mechanical_deg
+            ),
+            "winding_model": loaded_assumptions.winding_model,
+            "effective_turns_per_slot": loaded_assumptions.effective_turns_per_slot,
+            "peak_airgap_flux_density_t": (
+                loaded_magnetic.peak_airgap_flux_density_t
+            ),
+            "rms_airgap_flux_density_t": loaded_magnetic.rms_airgap_flux_density_t,
+            "mean_airgap_flux_density_t": (
+                loaded_magnetic.mean_airgap_flux_density_t
+            ),
+            "minimum_airgap_flux_density_t": (
+                loaded_magnetic.minimum_airgap_flux_density_t
+            ),
+            "torque_nm": loaded_magnetic.torque_nm,
+            "torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
+            "torque_method": "FEMM steady-state weighted-stress block integral (22)",
+            "torque_reliable": False,
+            "torque_status": (
+                "ESTIMATE — solver-derived at provisional winding turns, one "
+                "current angle and one rotor position"
+            ),
+            "honesty_note": (
+                "This is one rotor position with one assumed current angle and "
+                "one effective conductor per slot. Exact series turns, winding "
+                "factor, MTPA/field-weakening control, position sweep, voltage "
+                "closure, losses, demagnetisation and dyno correlation remain OPEN."
+            ),
         },
         "analytical_duty_check": asdict(duty),
         "solver": dict(solver_identity),
@@ -970,9 +1182,9 @@ def build_artifact(
         "torque_map": {
             "status": "OPEN",
             "reason": (
-                "One open-circuit field point plus analytical 250 kW/speed "
-                "reconciliation is not a current-angle, voltage, loss, thermal "
-                "or demagnetisation map."
+                "One open-circuit point and one provisional loaded point plus "
+                "analytical 250 kW/speed reconciliation are not a rotor-position, "
+                "current-angle, voltage, loss, thermal or demagnetisation map."
             ),
         },
         "dynamometer_correlation": {
@@ -1057,6 +1269,13 @@ def run_selftest() -> int:
         material_machine.rotor.hole[0].magnet_0.mat_type.mag.Brm20
     )
     solved = run_magnetic_point(geometry, solver, remanence_t=remanence_t)
+    loaded_assumptions = loaded_point_assumptions(duty)
+    loaded_solved = run_loaded_magnetic_point(
+        geometry,
+        solver,
+        remanence_t=remanence_t,
+        assumptions=loaded_assumptions,
+    )
     near_zero = run_magnetic_point(
         geometry,
         solver,
@@ -1067,6 +1286,8 @@ def run_selftest() -> int:
         geometry=geometry,
         duty=duty,
         magnetic=solved,
+        loaded_assumptions=loaded_assumptions,
+        loaded_magnetic=loaded_solved,
         solver_identity=_solver_identity(solver),
         source_state_sha256="synthetic-selftest",
     )
@@ -1095,11 +1316,28 @@ def run_selftest() -> int:
             and duty.front_regen_cap_respected
             and duty.bus_inside_assumed_window
         ),
+        "loaded_point_uses_duty_current": (
+            loaded_assumptions.phase_current_rms_a
+            == duty.estimated_phase_rms_current_a
+            and abs(
+                loaded_assumptions.phase_a_current_a
+                + loaded_assumptions.phase_b_current_a
+                + loaded_assumptions.phase_c_current_a
+            )
+            < 1.0e-9
+        ),
+        "loaded_solver_returns_flux_and_torque": (
+            0.01 < loaded_solved.rms_airgap_flux_density_t
+            <= loaded_solved.peak_airgap_flux_density_t
+            and math.isfinite(loaded_solved.torque_nm)
+            and abs(loaded_solved.torque_nm) > 1.0e-3
+        ),
         "release_honesty": (
             artifact["status"] in {"OPEN", "PARTIAL"}
             and artifact["ship_ok"] is False
             and artifact["torque_map"]["status"] == "OPEN"
             and artifact["dynamometer_correlation"]["status"] == "OPEN"
+            and artifact["loaded_point"]["torque_reliable"] is False
         ),
     }
     passed = all(checks.values())
@@ -1111,6 +1349,8 @@ def run_selftest() -> int:
                 "geometry": asdict(geometry),
                 "open_circuit_result": asdict(solved),
                 "near_zero_remanence_result": asdict(near_zero),
+                "loaded_point_assumptions": asdict(loaded_assumptions),
+                "loaded_point_result": asdict(loaded_solved),
                 "analytical_duty_check": asdict(duty),
                 "ship_ok": artifact["ship_ok"],
             },
@@ -1122,7 +1362,7 @@ def run_selftest() -> int:
 
 
 def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
-    """Run and persist one open-circuit point against a live twin."""
+    """Run and persist open-circuit and loaded points against a live twin."""
 
     state_path = twin_dir / "state.json"
     inputs, state_hash = load_twin_inputs(state_path)
@@ -1150,6 +1390,13 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         solver,
         remanence_t=remanence_t,
     )
+    loaded_assumptions = loaded_point_assumptions(duty)
+    loaded_magnetic = run_loaded_magnetic_point(
+        geometry,
+        solver,
+        remanence_t=remanence_t,
+        assumptions=loaded_assumptions,
+    )
     if not (
         0.05 < magnetic.peak_airgap_flux_density_t < 2.5
         and 0.01 < magnetic.rms_airgap_flux_density_t
@@ -1163,6 +1410,8 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         geometry=geometry,
         duty=duty,
         magnetic=magnetic,
+        loaded_assumptions=loaded_assumptions,
+        loaded_magnetic=loaded_magnetic,
         solver_identity=_solver_identity(solver),
         source_state_sha256=state_hash,
     )
@@ -1184,6 +1433,10 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         f"The twin-sized Ø{geometry.rotor_outer_diameter_mm:.1f} × "
         f"{geometry.active_length_mm:.1f} mm IPM point solved at "
         f"{magnetic.peak_airgap_flux_density_t:.3f} T peak air-gap flux. "
+        f"One loaded point at {loaded_assumptions.phase_current_rms_a:.1f} A rms "
+        f"and {loaded_assumptions.current_angle_electrical_deg:.0f} electrical "
+        f"degrees yielded {loaded_magnetic.torque_nm:.2f} N·m weighted-stress "
+        "torque as an explicitly provisional estimate. "
         "Torque map, demagnetisation, thermal limits and dyno correlation remain OPEN; "
         "ship_ok is false."
     )
