@@ -478,6 +478,31 @@ OPEN; `ship_ok` stays false.
 .venv-motor/bin/python scripts/motor-stack/gear_oil_fia_front_kit_case.py --selftest
 ```
 
+## Coupled cooling network screen (FIA front kit)
+
+Advances beyond isolated duct Δp screens and the lumped three-node thermal model
+by coupling OpenFOAM jacket/cold-plate `headline_delta_p_pa`, kit coolant duty
+(12 L/min / 60 °C), winding + module losses, and convection resistances from
+branch Re/Nu into one revision-bound screen with explicit temperature and
+pressure margins. Still **PARTIAL** — not CHT, not flow-bench correlated.
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/analytical_fia_cooling_network_screen.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+Requires twin `_motor_stack/openfoam_fia_water_jacket_case.json` and
+`openfoam_fia_cold_plate_case.json`. Series coolant topology: jacket → cold
+plate. `coupled_screen_ok` is a screening margin only; `ship_ok` stays false.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/analytical_fia_cooling_network_screen.json
+```
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/analytical_fia_cooling_network_screen.py --selftest
+```
+
 ## Inverter packaging analytical screen (FIA front kit)
 
 Not a solver row. Packaging evidence (power density, DC current, ESL seed band,

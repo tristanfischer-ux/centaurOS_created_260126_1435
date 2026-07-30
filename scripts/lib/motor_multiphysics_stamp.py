@@ -139,6 +139,7 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
         "predicted_model_refs": [
             "_motor_stack/openfoam_fia_cold_plate_case.json",
             "_motor_stack/openfoam_fia_water_jacket_case.json",
+            "_motor_stack/analytical_fia_cooling_network_screen.json",
         ],
         "measurement_recipe": (
             "Bench each revision-matched coolant article with the specified coolant "
@@ -160,6 +161,7 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
         ),
         "predicted_model_refs": [
             "_motor_stack/analytical_fia_cooling_thermal_screen.json",
+            "_motor_stack/analytical_fia_cooling_network_screen.json",
             "_motor_stack/inverter_packaging_fia_front_kit_case.json",
         ],
         "measurement_recipe": (
@@ -334,6 +336,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "scripts/motor-stack/openfoam_fia_water_jacket_case.py",
             "scripts/motor-stack/openfoam_fia_water_jacket_case.sh",
             "scripts/motor-stack/analytical_fia_cooling_thermal_screen.py",
+            "scripts/motor-stack/analytical_fia_cooling_network_screen.py",
         ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
@@ -352,6 +355,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "scripts/motor-stack/openfoam_fia_cold_plate_case.py",
             "scripts/motor-stack/openfoam_fia_cold_plate_case.sh",
             "scripts/motor-stack/analytical_fia_cooling_thermal_screen.py",
+            "scripts/motor-stack/analytical_fia_cooling_network_screen.py",
         ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
@@ -408,10 +412,13 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
 _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     {
         "component_id": "traction_drive_housing",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "Cast case / end bells / inverter cover — screening Blender geometry",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "integrated_drive_case_shell",
+        "notes": (
+            "Parametric integrated EDU cassette shell seeded (ForgeOS source-owned). "
+            "Structural FEA, casting release and interface datums still OPEN."
+        ),
     },
     {
         "component_id": "stator_lamination_and_winding",
@@ -509,10 +516,13 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "laminated_dc_bus",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "Cross-section seed — FastHenry2 / measured ESL OPEN",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "laminated_dc_bus_stack",
+        "notes": (
+            "Parametric laminated bus stack seeded (ForgeOS source-owned). "
+            "FastHenry2 / measured ESL / terminal fit still OPEN."
+        ),
     },
     {
         "component_id": "dc_link_capacitors",
@@ -523,10 +533,13 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "vehicle_interface_connectors",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "HV/LV/coolant shells — FIA port XYZ OPEN",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "vehicle_interface_port_cluster",
+        "notes": (
+            "Parametric HV/LV/coolant port cluster seeded (ForgeOS source-owned). "
+            "Supplier connector identity and FIA port XYZ still OPEN."
+        ),
     },
 ]
 
@@ -689,6 +702,15 @@ def _load_fia_cold_plate_case(twin_dir: Optional[Path]) -> Optional[dict[str, An
 def _load_fia_water_jacket_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA OpenFOAM water-jacket duct artefact if present."""
     return _load_fia_case_json(twin_dir, "openfoam_fia_water_jacket_case.json")
+
+
+def _load_fia_cooling_network_screen(
+    twin_dir: Optional[Path],
+) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA coupled cooling network screen if present."""
+    return _load_fia_case_json(
+        twin_dir, "analytical_fia_cooling_network_screen.json"
+    )
 
 
 def _load_fia_cooling_thermal_screen(
@@ -1382,12 +1404,77 @@ def _thermal_screen_cite(
     }
 
 
+def _cooling_network_cite(
+    network_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Cite the coupled hydraulic + thermal network screen when present.
+
+    INTENT: Surface Δp coupling and convection-limited temperatures without
+    upgrading an analytical network into CHT or hardware PASS.
+    """
+    if not isinstance(network_case, Mapping):
+        return "OPEN"
+    screening = (
+        network_case.get("screening_results")
+        if isinstance(network_case.get("screening_results"), Mapping)
+        else {}
+    )
+    hydraulic = (
+        network_case.get("hydraulic_network")
+        if isinstance(network_case.get("hydraulic_network"), Mapping)
+        else {}
+    )
+    margins = (
+        network_case.get("margins")
+        if isinstance(network_case.get("margins"), Mapping)
+        else {}
+    )
+    rel_ref = "_motor_stack/analytical_fia_cooling_network_screen.json"
+    return {
+        "status": network_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "input_hash": network_case.get("input_binding_sha256"),
+        "total_delta_p_kpa": hydraulic.get("total_delta_p_kpa"),
+        "pressure_margin_kpa": margins.get("pressure_margin_kpa"),
+        "pressure_screen_ok": screening.get("pressure_screen_ok"),
+        "maximum_winding_temperature_c": screening.get(
+            "maximum_winding_temperature_c"
+        ),
+        "maximum_module_temperature_c": screening.get(
+            "maximum_module_temperature_c"
+        ),
+        "coupled_screen_ok": screening.get("coupled_screen_ok"),
+        "winding_margin_pct": margins.get("winding_margin_pct"),
+        "module_margin_pct": margins.get("module_margin_pct"),
+        "conjugate_heat_transfer": (
+            (network_case.get("conjugate_heat_transfer") or {}).get("status")
+            if isinstance(network_case.get("conjugate_heat_transfer"), Mapping)
+            else "OPEN"
+        ),
+        "flow_bench": (
+            (network_case.get("flow_bench") or {}).get("status")
+            if isinstance(network_case.get("flow_bench"), Mapping)
+            else "OPEN"
+        ),
+        "note": (
+            "Twin-bound series hydraulic + convection thermal NETWORK screen "
+            "coupling OpenFOAM duct Δp to winding/module temperatures at "
+            "12 L/min / 60 °C kit duty. Not CHT; not flow-bench correlated."
+        ),
+    }
+
+
 def _cold_plate_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
     thermal_case: Optional[Mapping[str, Any]] = None,
+    network_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote inverter_cold_plate to PARTIAL when a twin-bound OF duct exists.
 
@@ -1407,11 +1494,14 @@ def _cold_plate_check_from_fia_case(
     headline_pa = pressure.get("headline_delta_p_pa")
     has_delta_p = isinstance(headline_pa, (int, float)) and float(headline_pa) > 0.0
     thermal_cite = _thermal_screen_cite(thermal_case, twin_dir=twin_dir)
+    network_cite = _cooling_network_cite(network_case, twin_dir=twin_dir)
     module_temp = (
-        thermal_cite.get("maximum_module_temperature_c")
-        if isinstance(thermal_cite, Mapping)
+        network_cite.get("maximum_module_temperature_c")
+        if isinstance(network_cite, Mapping)
         else None
     )
+    if module_temp is None and isinstance(thermal_cite, Mapping):
+        module_temp = thermal_cite.get("maximum_module_temperature_c")
     body = _open_check(
         "inverter_cold_plate",
         extra={
@@ -1452,12 +1542,12 @@ def _cold_plate_check_from_fia_case(
                 "module_temperatures": "OPEN",
                 "conjugate_heat_transfer": "OPEN",
                 "thermal_screen": thermal_cite,
+                "cooling_network_screen": network_cite,
                 "note": (
                     "Twin-bound OpenFOAM rectangular-duct screen on family channel "
                     "section at kit coolant point. works_in_kit_context = finite Δp. "
-                    "A lumped module temperature may be cited from the separate "
-                    "PARTIAL thermal screen, but full serpentine STEP CHT and "
-                    "hardware correlation remain OPEN. "
+                    "Lumped and coupled network screens may cite module temperatures; "
+                    "full serpentine STEP CHT and hardware correlation remain OPEN. "
                     "See also inverterPackaging for MCU land / ESL screen."
                 ),
             },
@@ -1473,6 +1563,7 @@ def _water_jacket_check_from_fia_case(
     *,
     twin_dir: Path,
     thermal_case: Optional[Mapping[str, Any]] = None,
+    network_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote water_jacket to PARTIAL when a twin-bound OF duct exists.
 
@@ -1496,11 +1587,14 @@ def _water_jacket_check_from_fia_case(
     headline_pa = pressure.get("headline_delta_p_pa")
     has_delta_p = isinstance(headline_pa, (int, float)) and float(headline_pa) > 0.0
     thermal_cite = _thermal_screen_cite(thermal_case, twin_dir=twin_dir)
+    network_cite = _cooling_network_cite(network_case, twin_dir=twin_dir)
     winding_temp = (
-        thermal_cite.get("maximum_winding_temperature_c")
-        if isinstance(thermal_cite, Mapping)
+        network_cite.get("maximum_winding_temperature_c")
+        if isinstance(network_cite, Mapping)
         else None
     )
+    if winding_temp is None and isinstance(thermal_cite, Mapping):
+        winding_temp = thermal_cite.get("maximum_winding_temperature_c")
     body = _open_check(
         "water_jacket",
         extra={
@@ -1541,11 +1635,12 @@ def _water_jacket_check_from_fia_case(
                 "winding_temperatures": "OPEN",
                 "conjugate_heat_transfer": "OPEN",
                 "thermal_screen": thermal_cite,
+                "cooling_network_screen": network_cite,
                 "note": (
                     "Twin-bound OpenFOAM rectangular-duct screen on helical family "
-                    "channel section at kit coolant point. A lumped winding temperature "
-                    "may be cited from the separate PARTIAL thermal screen, but full "
-                    "jacket STEP CHT and hardware correlation remain OPEN."
+                    "channel section at kit coolant point. Lumped and coupled network "
+                    "screens may cite winding temperatures, but full jacket STEP CHT "
+                    "and hardware correlation remain OPEN."
                 ),
             },
         },
@@ -2384,6 +2479,7 @@ def build_motor_multiphysics(
         )
 
     fia_thermal = _load_fia_cooling_thermal_screen(twin_dir)
+    fia_network = _load_fia_cooling_network_screen(twin_dir)
     fia_cold = _load_fia_cold_plate_case(twin_dir)
     if fia_cold is not None and twin_dir is not None:
         inverter_cold_plate = _cold_plate_check_from_fia_case(
@@ -2391,6 +2487,7 @@ def build_motor_multiphysics(
             fia_cold,
             twin_dir=Path(twin_dir),
             thermal_case=fia_thermal,
+            network_case=fia_network,
         )
         notes += (
             " Inverter cold-plate check PARTIAL: twin-bound OpenFOAM duct screen in "
@@ -2402,6 +2499,12 @@ def build_motor_multiphysics(
                 " Lumped motor/inverter thermal SCREEN cited from "
                 "_motor_stack/analytical_fia_cooling_thermal_screen.json; "
                 "heater-plate and flow-bench correlation remain OPEN."
+            )
+        if fia_network is not None:
+            notes += (
+                " Coupled cooling NETWORK screen in "
+                "_motor_stack/analytical_fia_cooling_network_screen.json "
+                "binds duct Δp to convection-limited temperatures."
             )
     else:
         inverter_cold_plate = _open_check(
@@ -2424,6 +2527,7 @@ def build_motor_multiphysics(
             fia_jacket,
             twin_dir=Path(twin_dir),
             thermal_case=fia_thermal,
+            network_case=fia_network,
         )
         notes += (
             " Water-jacket check PARTIAL: twin-bound OpenFOAM duct screen in "
@@ -3674,6 +3778,39 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "analytical_fia_cooling_network_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": (
+                        "forgeos.motor_stack."
+                        "analytical_fia_cooling_network_screen/v1"
+                    ),
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_binding_sha256": "network789",
+                    "hydraulic_network": {
+                        "total_delta_p_kpa": 43.421,
+                        "pressure_margin_kpa": 106.579,
+                        "pressure_screen_ok": True,
+                    },
+                    "screening_results": {
+                        "maximum_winding_temperature_c": 88.5,
+                        "maximum_module_temperature_c": 108.2,
+                        "coupled_screen_ok": True,
+                        "pressure_screen_ok": True,
+                    },
+                    "margins": {
+                        "winding_margin_pct": 50.8,
+                        "module_margin_pct": 38.2,
+                        "pressure_margin_kpa": 106.579,
+                    },
+                    "conjugate_heat_transfer": {"status": "OPEN"},
+                    "flow_bench": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "gear_oil_fia_front_kit_case.json").write_text(
             json.dumps(
                 {
@@ -4002,8 +4139,10 @@ def selftest() -> int:
         if cold_chk.get("works_in_kit_context") is not True:
             print("FAIL: inverter_cold_plate works_in_kit_context must be true when Δp set")
             bad += 1
-        if cold_chk.get("maximum_module_temperature_c") != 112.4:
-            print("FAIL: inverter_cold_plate must cite thermal-screen module temperature")
+        if cold_chk.get("maximum_module_temperature_c") != 108.2:
+            print(
+                "FAIL: inverter_cold_plate must cite coupled network module temperature"
+            )
             bad += 1
         cold_thermal = (cold_chk.get("twin_bound_case") or {}).get("thermal_screen")
         if not isinstance(cold_thermal, Mapping) or cold_thermal.get("status") != "PARTIAL":
@@ -4011,6 +4150,15 @@ def selftest() -> int:
             bad += 1
         elif cold_thermal.get("conjugate_heat_transfer") != "OPEN":
             print("FAIL: thermal cite must leave conjugate heat transfer OPEN")
+            bad += 1
+        cold_network = (cold_chk.get("twin_bound_case") or {}).get(
+            "cooling_network_screen"
+        )
+        if not isinstance(cold_network, Mapping) or cold_network.get("status") != "PARTIAL":
+            print("FAIL: inverter_cold_plate must cite PARTIAL cooling network screen")
+            bad += 1
+        elif cold_network.get("total_delta_p_kpa") != 43.421:
+            print("FAIL: cooling network cite must surface coupled total Δp")
             bad += 1
         jacket_chk = partial_payload["motorMultiphysics"]["required_checks"][
             "water_jacket"
@@ -4027,12 +4175,20 @@ def selftest() -> int:
         if jacket_chk.get("works_in_kit_context") is not True:
             print("FAIL: water_jacket works_in_kit_context must be true when Δp set")
             bad += 1
-        if jacket_chk.get("maximum_winding_temperature_c") != 91.2:
-            print("FAIL: water_jacket must cite thermal-screen winding temperature")
+        if jacket_chk.get("maximum_winding_temperature_c") != 88.5:
+            print(
+                "FAIL: water_jacket must cite coupled network winding temperature"
+            )
             bad += 1
         jacket_thermal = (jacket_chk.get("twin_bound_case") or {}).get("thermal_screen")
         if not isinstance(jacket_thermal, Mapping) or jacket_thermal.get("flow_bench") != "OPEN":
             print("FAIL: water_jacket thermal cite must leave flow bench OPEN")
+            bad += 1
+        jacket_network = (jacket_chk.get("twin_bound_case") or {}).get(
+            "cooling_network_screen"
+        )
+        if not isinstance(jacket_network, Mapping) or jacket_network.get("ship_ok") is not False:
+            print("FAIL: water_jacket must cite cooling network screen with ship_ok false")
             bad += 1
         gear_oil = partial_payload["motorMultiphysics"]["required_checks"]["gear_oil"]
         if gear_oil.get("status") != "PARTIAL" or not gear_oil.get("result_ref"):
@@ -4139,10 +4295,11 @@ def selftest() -> int:
         if prove_catch(evil).get("ok"):
             print("FAIL: proveCatch must fire when OPEN blockers coexist with ship_ok")
             bad += 1
-        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 5:
+        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 8:
             print(
-                "FAIL: expected ≥5 parametric families "
-                "(stator, rotor, planetary, cold_plate, water_jacket)"
+                "FAIL: expected ≥8 parametric families "
+                "(stator, rotor, planetary, post_diff, cold_plate, water_jacket, "
+                "case_shell, bus_stack, port_cluster)"
             )
             bad += 1
         cold = next(
