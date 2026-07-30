@@ -635,6 +635,7 @@ def run_work_package(wp_id: str) -> dict[str, Any]:
     elif wp == "WP7":
         for name in (
             "fe-front-freshen-closure-honesty.py",
+            "fe-front-quality-advisory-stamp.py",
             "freshen-closure-honesty.ts",
             "build-excel-export.py",
         ):
