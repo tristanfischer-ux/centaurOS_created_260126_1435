@@ -2256,15 +2256,9 @@ _VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
 # mirrors; a REAL 0 tab still pins the floor at 0. ──
 _MIRROR_TABS = ("Executive Summary", "Quality & Audit")
 
-# Bar A / concept floor policy (2026-07-30 FE FPK): disclosed race-verification
-# holds (dyno/HIL/supplier Gerbers/homologation evidence) block SHIPS, but they
-# are not a concept-quality defect. The Verification tab itself remains FAIL.
-_RACE_VERIFICATION_TOKEN_RX = re.compile(
-    r"\b(?:race|homologation|fia|hil|hardware|dyno|gerber|gerbers|"
-    r"pinout|icd|populated|overspeed|burst|torque\s+map|efficiency\s+map|"
-    r"thermal\s+map|correlation|release\s+pack)\b",
-    re.I,
-)
+# ANTI-INFLATION POLICY (2026-07-30): disclosure changes the wording, never the
+# grade. A HARD-open Verification claim remains in the reported dossier floor
+# whether it is a race/hardware hold, a brief miss, or another proof gap.
 
 
 def _row_get(row: Any, key: str) -> Any:
@@ -2273,72 +2267,18 @@ def _row_get(row: Any, key: str) -> Any:
     return getattr(row, key, None)
 
 
-def _row_text_blob(row: Any) -> str:
-    fields = (
-        "axis", "claim", "target", "achieved", "method", "evidence_tier",
-        "evidence", "evidence_reference", "provenance", "owner", "next_action",
-        "id", "title", "summary", "why",
-    )
-    return " | ".join(str(_row_get(row, f) or "") for f in fields)
-
-
 def _is_hard_open_verification_row(row: Any) -> bool:
     status = str(_row_get(row, "status") or "").strip().upper()
     hardness = str(_row_get(row, "hardness") or "HARD").strip().upper()
     return hardness == "HARD" and status in ("FAIL", "UNVERIFIED", "OPEN")
 
 
-def _is_disclosed_race_verification_hold(row: Any) -> bool:
-    """Universal race-hold classifier for Bar A concept-floor exclusion.
-
-    INTENT: hardware/race evidence gaps (HIL, supplier Gerbers, dyno correlation,
-    homologation evidence) are Bar B verification holds. They still FAIL the
-    Verification tab and ship gate, but do not define concept quality.
-    """
-    if not _is_hard_open_verification_row(row):
-        return False
-    blob = _row_text_blob(row)
-    axis = str(_row_get(row, "axis") or "").strip().lower()
-    has_hold_context = (
-        axis == "hold"
-        or bool(re.search(r"\b(?:hold|homologation|race|blocks_homologation|open_by_design)\b",
-                          blob, re.I))
-        or bool(_row_get(row, "blocks_homologation"))
-        or bool(_row_get(row, "open_by_design"))
-    )
-    return has_hold_context and bool(_RACE_VERIFICATION_TOKEN_RX.search(blob))
-
-
-def _decision_hold_rows(state: dict) -> List[dict]:
-    rows: List[dict] = []
-    for h in (state or {}).get("decisionHolds") or []:
-        if not isinstance(h, dict):
-            continue
-        if str(h.get("status") or "").upper() != "OPEN":
-            continue
-        if not (h.get("blocks_homologation") or h.get("open_by_design")):
-            continue
-        rows.append({
-            "axis": "hold",
-            "claim": "Race homologation hold — "
-                     + str(h.get("id") or "").strip() + ": "
-                     + str(h.get("title") or h.get("summary") or "").strip(),
-            "status": "OPEN",
-            "hardness": "HARD",
-            "provenance": str(h.get("evidence") or h.get("why") or ""),
-            "blocks_homologation": bool(h.get("blocks_homologation")),
-            "open_by_design": bool(h.get("open_by_design")),
-        })
-    return rows
-
-
 def _verification_concept_floor_policy(state: dict, tab_scores: dict) -> dict:
-    """Whether Verification's low score should be excluded from the Bar A floor.
+    """Return the anti-inflation Verification floor policy.
 
-    The exclusion is deliberately narrow: the Verification surface must be failing,
-    and every HARD-open verification row we can see must classify as a disclosed
-    race/hardware hold. A non-hold HARD failure (brief miss, physics fail, cost
-    failure, silent omission) stays in the concept floor.
+    INTENT: an earlier policy excluded disclosed race/hardware holds and produced
+    "quality 9 / allPass" beside a Verification 4 and NOT_HOMOLOGATED. Disclosure
+    is still required, but no HARD-open proof claim is removed from the grade.
     """
     entry = (tab_scores or {}).get("Verification")
     score = entry.get("score") if isinstance(entry, dict) else None
@@ -2347,21 +2287,15 @@ def _verification_concept_floor_policy(state: dict, tab_scores: dict) -> dict:
     spine_d = (state or {}).get("_verificationSpine") if isinstance(state, dict) else None
     rows = spine_d.get("rows") if isinstance(spine_d, dict) else None
     hard_open = [r for r in (rows or []) if _is_hard_open_verification_row(r)]
-    source = "verification spine"
     if not hard_open:
-        hard_open = _decision_hold_rows(state or {})
-        source = "decision holds"
-    if not hard_open:
-        return {"exclude": False, "hard_open_count": 0, "reason": ""}
-    bad = [r for r in hard_open if not _is_disclosed_race_verification_hold(r)]
-    if bad:
-        return {"exclude": False, "hard_open_count": len(hard_open),
-                "reason": f"{len(bad)} HARD-open verification row(s) are not disclosed race holds"}
-    return {
-        "exclude": True,
-        "hard_open_count": len(hard_open),
-        "reason": f"{len(hard_open)} disclosed HARD-open race verification hold(s) from {source}",
-    }
+        hard_open = [
+            h for h in (state or {}).get("decisionHolds") or []
+            if isinstance(h, dict)
+            and str(h.get("status") or "").upper() == "OPEN"
+            and (h.get("blocks_homologation") or h.get("open_by_design"))
+        ]
+    return {"exclude": False, "hard_open_count": len(hard_open),
+            "reason": "HARD-open Verification claims remain in the reported dossier floor"}
 
 
 def _performance_card_fact(state: dict) -> dict:
@@ -31296,9 +31230,9 @@ def _selftest() -> int:
         _vs_selftest()
     except Exception as _vs_exc:  # noqa: BLE001
         print(f"  FAIL verification_spine --selftest: {_vs_exc}"); bad += 1
-    # ═══ proveCatch Bar A concept floor (2026-07-30 FE FPK) — disclosed race
-    # hardware holds must not collapse the concept mirror floor, while any
-    # non-race HARD verification failure still floors normally. ═══
+    # ═══ proveCatch anti-inflation floor (2026-07-30) — disclosure changes the
+    # wording, never the grade. Any HARD-open Verification claim must remain in the
+    # reported dossier floor, including race/hardware/homologation evidence holds. ═══
     _race_spine_state = {"_verificationSpine": {"rows": [
         {"axis": "brief", "claim": "brief power", "target": "closed", "achieved": "closed",
          "status": "PASS", "hardness": "HARD", "provenance": "quantities.power_kw"},
@@ -31314,11 +31248,11 @@ def _selftest() -> int:
         "BoM": {"score": 9.2, "basis": "line arithmetic"},
     }
     _race_v = compute_verdict(_race_spine_state, _race_scores)
-    if abs((_race_v.get("floor") or 0) - 8.6) > 0.01 \
-            or _race_v.get("verification_race_hold_exclusion") is None \
+    if abs((_race_v.get("floor") or 0) - 4.0) > 0.01 \
+            or _race_v.get("verification_race_hold_exclusion") is not None \
             or _race_v.get("ships") is not False:
-        print(f"  FAIL bar-a-floor: race HARD-open Verification hold must be excluded "
-              f"from concept floor but still block ships (got {_race_v})"); bad += 1
+        print(f"  FAIL anti-inflation-floor: disclosed race HARD-open Verification hold "
+              f"must floor the dossier and block ships (got {_race_v})"); bad += 1
     _fallback_state = {"decisionHolds": [{
         "id": "DEC-HIL", "status": "OPEN",
         "title": "HIL on populated inverter revision — MISSING",
@@ -31326,10 +31260,10 @@ def _selftest() -> int:
         "blocks_homologation": True, "open_by_design": True,
     }]}
     _fallback_v = compute_verdict(_fallback_state, _race_scores)
-    if abs((_fallback_v.get("floor") or 0) - 8.6) > 0.01 \
-            or _fallback_v.get("verification_race_hold_exclusion") is None:
-        print(f"  FAIL bar-a-floor: decisionHold fallback must exclude disclosed "
-              f"race/hardware holds from concept floor (got {_fallback_v})"); bad += 1
+    if abs((_fallback_v.get("floor") or 0) - 4.0) > 0.01 \
+            or _fallback_v.get("verification_race_hold_exclusion") is not None:
+        print(f"  FAIL anti-inflation-floor: decisionHold fallback must not hide a "
+              f"race/hardware Verification failure (got {_fallback_v})"); bad += 1
     _non_race_state = {"_verificationSpine": {"rows": [
         {"axis": "brief", "claim": "brief power", "target": "closed", "achieved": "closed",
          "status": "PASS", "hardness": "HARD", "provenance": "quantities.power_kw"},

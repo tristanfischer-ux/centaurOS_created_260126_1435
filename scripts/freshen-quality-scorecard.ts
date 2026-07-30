@@ -13,6 +13,7 @@ import { resolve } from 'node:path'
 import {
   buildDesignNarrativeSection,
   buildDrawingGatesSection,
+  buildReleaseReadinessSection,
   computeHonestShipFloor,
   computeScorecardFloor,
   dedupeScorecardSections,
@@ -65,6 +66,7 @@ function freshenSections(
   }
   byName.set('drawing_gates', drawingGates)
   byName.set('design_narrative', designNarrative)
+  byName.set('release_readiness', buildReleaseReadinessSection(state))
 
   return dedupeScorecardSections(Array.from(byName.values()))
 }

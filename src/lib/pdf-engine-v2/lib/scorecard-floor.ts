@@ -25,6 +25,8 @@ export interface ScorecardSection {
   defects?: string[]
   /** true = LLM self-audit section: visible but NON-GATING (advisory only). */
   advisory?: boolean
+  /** false = deterministic external evidence hold; report it, but do not rerun design stages. */
+  qualityLoopActionable?: boolean
 }
 
 /**
@@ -41,6 +43,125 @@ export function computeScorecardFloor(
   const floor = scores.length ? Math.min(...scores) : 0
   const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
   return { floor, mean: Math.round(mean * 10) / 10 }
+}
+
+type UnknownRecord = Record<string, unknown>
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+}
+
+function stringIds(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : []
+}
+
+/**
+ * @description Builds the deterministic release-evidence axis that prevents a
+ * concept-quality score from masquerading as homologation or fabrication readiness.
+ * @param state Delivered chain state containing homologation, PCB, verification,
+ * render-quality, and render-gate evidence.
+ * @returns A non-advisory scorecard section. External evidence holds are intentionally
+ * non-actionable by the design quality loop.
+ */
+export function buildReleaseReadinessSection(state: unknown): ScorecardSection {
+  // INTENT: Local arithmetic, disclosure, and visual hygiene can all score 10 while
+  // the product remains physically unverified. This independent axis makes that
+  // boundary machine-readable instead of relying on a reader noticing caveat prose.
+  const root = asRecord(state)
+  const defects: string[] = []
+  let score = 10
+
+  const homologation = asRecord(root.homologationHonesty)
+  const holdIds = stringIds(homologation.open_by_design_ids)
+  const homologationVerdict = String(homologation.verdict ?? '').trim().toUpperCase()
+  const isNotHomologated =
+    homologationVerdict === 'NOT_HOMOLOGATED'
+    || homologation.fia_race_ready === false
+    || holdIds.length > 0
+  if (isNotHomologated) {
+    score = Math.min(score, 4)
+    defects.push(
+      `NOT_HOMOLOGATED: ${holdIds.length || 'one or more'} open release hold(s)`
+      + (holdIds.length ? ` (${holdIds.join(', ')})` : ''),
+    )
+  }
+
+  const verification = asRecord(root._verificationSpine)
+  const verificationRows = Array.isArray(verification.rows) ? verification.rows : []
+  const hardOpenFromRows = verificationRows.filter((row) => {
+    const item = asRecord(row)
+    const hardness = String(item.hardness ?? 'HARD').toUpperCase()
+    const status = String(item.status ?? '').toUpperCase()
+    return hardness === 'HARD' && ['FAIL', 'UNVERIFIED', 'OPEN'].includes(status)
+  }).length
+  // GOTCHA: Number(null) is 0, which would suppress open rows in older/corrupt
+  // cached spines. Only parse an explicitly populated count; otherwise use SIGHT.
+  const hardOpenRaw = verification.hard_open
+  const hardOpen = (
+    typeof hardOpenRaw === 'number'
+    || (typeof hardOpenRaw === 'string' && hardOpenRaw.trim() !== '')
+  )
+    ? Number(hardOpenRaw)
+    : Number.NaN
+  const hardOpenCount = Number.isFinite(hardOpen) ? hardOpen : hardOpenFromRows
+  if (hardOpenCount > 0) {
+    score = Math.min(score, 4)
+    defects.push(`${hardOpenCount} HARD verification claim(s) remain open`)
+  }
+
+  const pcb = asRecord(root.pcb)
+  const pcbDisposition = String(pcb.disposition ?? '').trim().toLowerCase()
+  const bespokePcb = pcb.isPcbBearing === true && ['bespoke', 'bespoke_required'].includes(pcbDisposition)
+  const pcbReleaseOpen = bespokePcb && (
+    pcb.NOT_FABRICATION_READY === true
+    || pcb.forgeDraftOnly === true
+    || pcb.supplierGerbers !== true
+    || pcb.hilPresent !== true
+    || pcb.ship_ok === false
+  )
+  if (pcbReleaseOpen) {
+    score = Math.min(score, 4)
+    defects.push(
+      'NOT_FABRICATION_READY: bespoke PCB lacks supplier-Gerber and/or populated-board HIL release evidence',
+    )
+  }
+
+  const renderGate = asRecord(root.renderDeliverableGate)
+  if (Object.keys(renderGate).length > 0 && renderGate.passed === false) {
+    score = Math.min(score, 4)
+    defects.push('Release render deliverable gate failed')
+  }
+
+  const renderQuality = asRecord(root.renderQuality)
+  const renderReadiness = String(
+    renderQuality.readiness ?? renderQuality.evidence_tier ?? renderQuality.evidenceTier ?? '',
+  ).trim().toLowerCase()
+  const hasRenderEvidence = Object.keys(renderQuality).length > 0
+  // DECISION: Release evidence fails closed. A visually clean Blender result proves
+  // presentation quality, not release CAD, unless the producer explicitly attests it.
+  const isReleaseRender =
+    renderQuality.release_ready === true
+    || (
+      renderQuality.release_ready !== false
+      && /\b(?:release|production|homologated)\b/.test(renderReadiness)
+    )
+  const conceptOnlyRender = hasRenderEvidence && !isReleaseRender
+  if (conceptOnlyRender) {
+    score = Math.min(score, 7)
+    defects.push('Render evidence is concept-only; it does not prove release CAD or homologated geometry')
+  }
+
+  return {
+    name: 'release_readiness',
+    score,
+    defects,
+    advisory: false,
+    qualityLoopActionable: false,
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

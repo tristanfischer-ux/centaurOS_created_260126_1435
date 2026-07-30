@@ -58,6 +58,7 @@ import {
   dedupeScorecardSections,
   buildBriefComplianceSection,
   buildClosureHonestySection,
+  buildReleaseReadinessSection,
   buildUnresolvedCriticHighsSection,
   buildPhysicsFidelitySection,
   type ComplianceRowInput,
@@ -2465,7 +2466,13 @@ interface QualityScorecard {
   // advisory section scoring below the deterministic floor is NEVER hidden behind it.
   floor: number
   mean: number
-  sections: Array<{ name: string; score: number; defects?: string[]; advisory?: boolean }>
+  sections: Array<{
+    name: string
+    score: number
+    defects?: string[]
+    advisory?: boolean
+    qualityLoopActionable?: boolean
+  }>
   allPass: boolean
   // DETERMINISTIC (gating) fields — B3: the arithmetic/ledger-derived sections only,
   // never dragged by LLM self-audit noise. Used SOLELY to drive the automated
@@ -2693,7 +2700,13 @@ async function runPhysicsCriticCached(
 }
 
 function computeQualityScorecard(state: any): QualityScorecard {
-  const sections: Array<{ name: string; score: number; defects: string[]; advisory?: boolean }> = []
+  const sections: Array<{
+    name: string
+    score: number
+    defects: string[]
+    advisory?: boolean
+    qualityLoopActionable?: boolean
+  }> = []
 
   // Self-audit sections (gate 31) — the LLM-judged sections. CAGED (B3, Tristan
   // 2026-06-19): these are ADVISORY ONLY. The LLM critic demonstrably misreads
@@ -2937,6 +2950,18 @@ function computeQualityScorecard(state: any): QualityScorecard {
     console.error(`[chain] ⚠ closure_honesty section UNAVAILABLE: ${(err as Error).message}`)
   }
 
+  // INTENT: concept arithmetic can be excellent while external release evidence is
+  // still open. Keep closure_honesty about truthful disclosure; score homologation,
+  // fabrication, HIL, and explicit concept-render limits on their own deterministic axis.
+  const releaseReadiness = buildReleaseReadinessSection(state)
+  sections.push({
+    name: releaseReadiness.name,
+    score: releaseReadiness.score,
+    defects: releaseReadiness.defects ?? [],
+    advisory: releaseReadiness.advisory,
+    qualityLoopActionable: releaseReadiness.qualityLoopActionable,
+  })
+
   // ── SCORECARD HONESTY (Tristan 2026-07-08) ──────────────────────────────────────
   // Several sources above can push a section under the SAME conceptual name (e.g. the
   // LLM self-audit's own 'brief_compliance'/'physics_fidelity' opinion at the top of
@@ -3003,7 +3028,7 @@ function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirec
     // the loop chasing the critic's misreads is exactly the churn B3 removes. Only a
     // failing DETERMINISTIC section routes to a fix stage.
     const shipFloor = Math.max(1, Math.min(10, parseInt(process.env.QUALITY_LOOP_SHIP_FLOOR || '9', 10) || 9))
-    if (s.score < shipFloor && !s.advisory) {
+    if (s.score < shipFloor && !s.advisory && s.qualityLoopActionable !== false) {
       const canonical = canonicalSectionName(s.name)
       directives.push({
         section: canonical,
