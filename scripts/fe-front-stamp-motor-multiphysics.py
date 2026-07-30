@@ -115,7 +115,19 @@ def main() -> int:
         "pointer_only": pointer_only or args.state_only_pointer,
         "ship_ok": False,
         "all_required_solver_checks_pass": False,
-        "open_checks": list(payload["motorMultiphysics"]["required_checks"].keys()),
+        "check_statuses": {
+            name: (chk or {}).get("status")
+            for name, chk in (
+                payload["motorMultiphysics"]["required_checks"] or {}
+            ).items()
+        },
+        "still_open_checks": [
+            name
+            for name, chk in (
+                payload["motorMultiphysics"]["required_checks"] or {}
+            ).items()
+            if (chk or {}).get("status") == "OPEN"
+        ],
         "principal_components": payload["cadAuthority"]["principal_components_total"],
         "release_authority_coverage": payload["cadAuthority"]["release_authority_coverage"],
         "proveCatch": catch,

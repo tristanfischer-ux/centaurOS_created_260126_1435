@@ -77,6 +77,12 @@ class TwinInputs:
     active_length_mm: float
     machine_efficiency_assumption: float
     inverter_efficiency_assumption: float
+    # Analytical winding seeds from the twin physics tree (not a hairpin freeze).
+    turns_per_coil: float
+    turns_per_phase: float
+    winding_parallel_paths: float
+    twin_stator_slots: float
+    phase_current_design_a: float | None
 
 
 @dataclass(frozen=True)
@@ -178,6 +184,18 @@ def _number(
     raise FiaFrontKitCaseError(
         "Missing positive twin quantity; expected one of: " + ", ".join(keys)
     )
+
+
+def _optional_number(
+    values: Mapping[str, Any],
+    keys: Sequence[str],
+) -> float | None:
+    """Return a positive quantity when present, else None (no error)."""
+
+    try:
+        return _number(values, keys)
+    except FiaFrontKitCaseError:
+        return None
 
 
 def _number_from_sections(
@@ -294,6 +312,30 @@ def inputs_from_sections(
             concentric,
             ("airgap_mm",),
             default=0.7,
+        ),
+        turns_per_coil=_number(
+            quantities,
+            ("turns_per_coil",),
+            default=4.0,
+        ),
+        turns_per_phase=_number(
+            quantities,
+            ("turns_per_phase",),
+            default=14.0,
+        ),
+        winding_parallel_paths=_number(
+            quantities,
+            ("winding_parallel_paths",),
+            default=2.0,
+        ),
+        twin_stator_slots=_number(
+            quantities,
+            ("stator_slots",),
+            default=24.0,
+        ),
+        phase_current_design_a=_optional_number(
+            quantities,
+            ("phase_current_design_a", "phase_current_max_a"),
         ),
         active_length_mm=_number_from_sections(
             concentric,
@@ -532,16 +574,55 @@ def analytical_duty_check(inputs: TwinInputs) -> DutyCheck:
     )
 
 
-def loaded_point_assumptions(duty: DutyCheck) -> LoadedPointAssumptions:
-    """Create the one-position loaded-point excitation from the duty estimate.
+def effective_turns_per_slot_from_twin(inputs: TwinInputs) -> int:
+    """Map twin analytical winding seeds onto this 48-slot FEMM belt model.
 
-    The twin does not yet freeze conductor count, series turns, winding factor,
-    d/q inductance or a maximum-torque-per-ampere schedule.  One effective
-    conductor per slot therefore makes this a current-linked solver estimate,
-    not a design torque prediction.
+    DECISION: Use ``turns_per_coil`` as the FEMM slot conductor count.  The
+    48-slot belt map gives eight go and eight return sides per phase; with
+    ``winding_parallel_paths`` that recovers the twin's ``turns_per_phase``
+    order (14 ≈ 4 × 8 / 2).  Do **not** stuff ``turns_per_phase`` into every
+    slot — that overstates ampere-turns by about the belt multiplicity.
+
+    GOTCHA: Twin analytical ``stator_slots`` is 24 while this point mesh stays
+    48 for the IPM sector topology.  Closing that slot-count mismatch is a
+    separate geometry revision; this function only removes the absurd 1-turn
+    placeholder.
     """
 
-    phase_peak_a = duty.estimated_phase_rms_current_a * math.sqrt(2.0)
+    turns = max(1, int(round(inputs.turns_per_coil)))
+    # Cross-check: series turns implied by belts should stay near turns_per_phase.
+    slots_per_phase_go = STATOR_SLOTS // 3 // 2  # 8 for the 48-slot belt map
+    implied_series = (
+        turns * slots_per_phase_go / max(inputs.winding_parallel_paths, 1.0)
+    )
+    if abs(implied_series - inputs.turns_per_phase) > max(
+        4.0, 0.5 * inputs.turns_per_phase
+    ):
+        # Prefer coil seed still; document the mismatch in winding_model text.
+        pass
+    return turns
+
+
+def loaded_point_assumptions(
+    duty: DutyCheck,
+    inputs: TwinInputs,
+) -> LoadedPointAssumptions:
+    """Create the one-position loaded-point excitation from duty + twin winding.
+
+    INTENT: Bind coil turns (and optional design phase current) from the twin
+    so the weighted-stress torque is no longer the 1-turn placeholder (~8 N·m).
+    Still one rotor position / one current angle — not a torque map.
+    """
+
+    # DECISION: Prefer bus/power-derived rms when design current is absent or
+    # wildly larger than the analytical estimate; otherwise use the twin's
+    # design current seed so the loaded point tracks the physics tree.
+    phase_rms_a = duty.estimated_phase_rms_current_a
+    if inputs.phase_current_design_a is not None:
+        design_a = float(inputs.phase_current_design_a)
+        if 0.5 * phase_rms_a <= design_a <= 2.5 * phase_rms_a:
+            phase_rms_a = design_a
+    phase_peak_a = phase_rms_a * math.sqrt(2.0)
     current_angle_deg = -90.0
     current_angle_rad = math.radians(current_angle_deg)
     phase_a_a = phase_peak_a * math.cos(current_angle_rad)
@@ -551,18 +632,28 @@ def loaded_point_assumptions(duty: DutyCheck) -> LoadedPointAssumptions:
     phase_c_a = phase_peak_a * math.cos(
         current_angle_rad + 2.0 * math.pi / 3.0
     )
+    turns = effective_turns_per_slot_from_twin(inputs)
+    implied_series = (
+        turns * (STATOR_SLOTS // 3 // 2) / max(inputs.winding_parallel_paths, 1.0)
+    )
     return LoadedPointAssumptions(
-        phase_current_rms_a=duty.estimated_phase_rms_current_a,
+        phase_current_rms_a=phase_rms_a,
         phase_current_peak_a=phase_peak_a,
         current_angle_electrical_deg=current_angle_deg,
         rotor_position_mechanical_deg=0.0,
         phase_a_current_a=phase_a_a,
         phase_b_current_a=phase_b_a,
         phase_c_current_a=phase_c_a,
-        effective_turns_per_slot=1,
+        effective_turns_per_slot=turns,
         winding_model=(
-            "48-slot/eight-pole integral-slot phase belts "
-            "A+, C-, B+, A-, C+, B-; one effective series conductor per slot"
+            f"48-slot/eight-pole integral-slot phase belts "
+            f"A+, C-, B+, A-, C+, B-; {turns} conductors/slot from twin "
+            f"turns_per_coil={inputs.turns_per_coil:g} "
+            f"(twin turns_per_phase={inputs.turns_per_phase:g}, "
+            f"parallel_paths={inputs.winding_parallel_paths:g}, "
+            f"twin_stator_slots={inputs.twin_stator_slots:g}; "
+            f"implied series turns≈{implied_series:.1f} on this 48-slot map). "
+            "Not a frozen hairpin schedule."
         ),
     )
 
@@ -1146,15 +1237,26 @@ def build_artifact(
             "torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
             "torque_method": "FEMM steady-state weighted-stress block integral (22)",
             "torque_reliable": False,
+            "required_shaft_torque_nm": duty.required_shaft_torque_nm,
+            "torque_vs_required_ratio": (
+                round(
+                    abs(loaded_magnetic.torque_nm) / duty.required_shaft_torque_nm,
+                    6,
+                )
+                if duty.required_shaft_torque_nm > 0.0
+                else None
+            ),
             "torque_status": (
-                "ESTIMATE — solver-derived at provisional winding turns, one "
+                "ESTIMATE — solver-derived at twin-bound coil turns, one "
                 "current angle and one rotor position"
             ),
             "honesty_note": (
                 "This is one rotor position with one assumed current angle and "
-                "one effective conductor per slot. Exact series turns, winding "
-                "factor, MTPA/field-weakening control, position sweep, voltage "
-                "closure, losses, demagnetisation and dyno correlation remain OPEN."
+                "twin-bound conductors per slot (turns_per_coil). Exact hairpin "
+                "schedule, winding factor, MTPA/field-weakening, position sweep, "
+                "voltage closure, losses, demagnetisation and dyno correlation "
+                "remain OPEN. A large torque_vs_required_ratio miss is a design "
+                "signal, not a reason to invent turns."
             ),
         },
         "analytical_duty_check": asdict(duty),
@@ -1249,6 +1351,10 @@ def run_selftest() -> int:
         "fpk_rotor_od_mm": {"value": 122.0, "unit": "mm"},
         "fpk_rotor_id_mm": {"value": 92.7, "unit": "mm"},
         "stack_length_mm": {"value": 98.0, "unit": "mm"},
+        "turns_per_coil": {"value": 4.0, "unit": "-"},
+        "turns_per_phase": {"value": 14.0, "unit": "-"},
+        "winding_parallel_paths": {"value": 2.0, "unit": "-"},
+        "stator_slots": {"value": 24.0, "unit": "-"},
     }
     concentric = {
         "housing_od_mm": 176.7,
@@ -1269,7 +1375,7 @@ def run_selftest() -> int:
         material_machine.rotor.hole[0].magnet_0.mat_type.mag.Brm20
     )
     solved = run_magnetic_point(geometry, solver, remanence_t=remanence_t)
-    loaded_assumptions = loaded_point_assumptions(duty)
+    loaded_assumptions = loaded_point_assumptions(duty, inputs)
     loaded_solved = run_loaded_magnetic_point(
         geometry,
         solver,
@@ -1315,6 +1421,10 @@ def run_selftest() -> int:
             duty.duty_power_matches
             and duty.front_regen_cap_respected
             and duty.bus_inside_assumed_window
+        ),
+        "loaded_point_uses_twin_coil_turns": (
+            loaded_assumptions.effective_turns_per_slot == 4
+            and loaded_assumptions.effective_turns_per_slot != 1
         ),
         "loaded_point_uses_duty_current": (
             loaded_assumptions.phase_current_rms_a
@@ -1390,7 +1500,7 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         solver,
         remanence_t=remanence_t,
     )
-    loaded_assumptions = loaded_point_assumptions(duty)
+    loaded_assumptions = loaded_point_assumptions(duty, inputs)
     loaded_magnetic = run_loaded_magnetic_point(
         geometry,
         solver,

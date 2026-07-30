@@ -76,11 +76,18 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
     },
     "inverter_cold_plate": {
         "software": "OpenFOAM",
-        "paths": ["scripts/motor-stack/openfoam_smoke_selftest.sh"],
+        "paths": [
+            "scripts/motor-stack/openfoam_smoke_selftest.sh",
+            "scripts/motor-stack/openfoam_fia_cold_plate_case.py",
+            "scripts/motor-stack/openfoam_fia_cold_plate_case.sh",
+        ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
         },
-        "last_known_green": "2026-07-30 — same cavity smoke as water_jacket (generic)",
+        "last_known_green": (
+            "2026-07-30 — cavity smoke + twin-bound rectangular duct screen "
+            "(not full serpentine CHT)"
+        ),
         "evidence_class": "toolchain_smoke_pass",
     },
     "gear_oil": {
@@ -317,6 +324,11 @@ def _load_fia_calculix_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]
     return _load_fia_case_json(twin_dir, "calculix_fia_rotor_screen.json")
 
 
+def _load_fia_cold_plate_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA OpenFOAM cold-plate duct artefact if present."""
+    return _load_fia_case_json(twin_dir, "openfoam_fia_cold_plate_case.json")
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
@@ -519,6 +531,79 @@ def _structural_check_from_fia_case(
     return body
 
 
+def _cold_plate_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote inverter_cold_plate to PARTIAL when a twin-bound OF duct exists.
+
+    INTENT: Make the 12 L/min / 60 °C cold-plate duct screen visible without
+    claiming module temperatures or full serpentine conjugate heat transfer.
+    """
+    pressure = (
+        case.get("pressure_drop") if isinstance(case.get("pressure_drop"), dict) else {}
+    )
+    channel = (
+        case.get("channel_geometry")
+        if isinstance(case.get("channel_geometry"), dict)
+        else {}
+    )
+    inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
+    rel_ref = "_motor_stack/openfoam_fia_cold_plate_case.json"
+    headline_pa = pressure.get("headline_delta_p_pa")
+    body = _open_check(
+        "inverter_cold_plate",
+        extra={
+            "status": "PARTIAL",
+            "pressure_drop_kpa": (
+                round(float(headline_pa) / 1000.0, 4)
+                if isinstance(headline_pa, (int, float))
+                else None
+            ),
+            "maximum_module_temperature_c": None,
+            "module_temperature_spread_c": None,
+            "model_revision": str(
+                case.get("schema") or "forgeos.motor_stack.openfoam_fia_cold_plate_case/v1"
+            ),
+            "geometry_revision": (
+                f"{channel.get('channel_width_m')}m × {channel.get('channel_depth_m')}m "
+                f"× {channel.get('pass_count')} passes"
+                if channel
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                f"Cold-plate channels at {duty['coolant_flow_l_min']} L/min / "
+                f"{duty['coolant_inlet_c']} °C — module temp spread OPEN"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "headline_delta_p_pa": headline_pa,
+                "inlet_velocity_m_s": channel.get("inlet_velocity_m_s"),
+                "reynolds_number": channel.get("reynolds_number"),
+                "coolant_flow_l_min": inputs.get("coolant_flow_l_min"),
+                "coolant_inlet_c": inputs.get("coolant_inlet_c"),
+                "cad_family": case.get("cad_family") or "cold_plate_serpentine",
+                "module_temperatures": "OPEN",
+                "conjugate_heat_transfer": "OPEN",
+                "note": (
+                    "Twin-bound OpenFOAM rectangular-duct screen on family channel "
+                    "section at kit coolant point. Not full serpentine STEP CHT; "
+                    "module ΔT not closed."
+                ),
+            },
+        },
+    )
+    body["status"] = "PARTIAL"
+    return body
+
+
 def build_motor_multiphysics(
     *,
     state: Optional[Mapping[str, Any]] = None,
@@ -529,8 +614,8 @@ def build_motor_multiphysics(
     """Build motorMultiphysics dict per plan schema.
 
     @description Records FIA duty + toolchain smoke pointers. Magnetic,
-    rotor_dynamics, and structural may be PARTIAL when twin-bound FIA case
-    artefacts exist; all_required still false.
+    rotor_dynamics, structural, and inverter_cold_plate may be PARTIAL when
+    twin-bound FIA case artefacts exist; all_required still false.
     @param state Optional twin state for quantity readback
     @param assembly_revision Shared CAD/solver/Blender revision label
     @param stamped_at ISO timestamp override
@@ -617,6 +702,30 @@ def build_motor_multiphysics(
             },
         )
 
+    fia_cold = _load_fia_cold_plate_case(twin_dir)
+    if fia_cold is not None and twin_dir is not None:
+        inverter_cold_plate = _cold_plate_check_from_fia_case(
+            duty, fia_cold, twin_dir=Path(twin_dir)
+        )
+        notes += (
+            " Inverter cold-plate check PARTIAL: twin-bound OpenFOAM duct screen in "
+            "_motor_stack/openfoam_fia_cold_plate_case.json "
+            "(module temperatures / full serpentine CHT still OPEN)."
+        )
+    else:
+        inverter_cold_plate = _open_check(
+            "inverter_cold_plate",
+            extra={
+                "pressure_drop_kpa": None,
+                "maximum_module_temperature_c": None,
+                "module_temperature_spread_c": None,
+                "fia_question": (
+                    f"Cold-plate channels at {duty['coolant_flow_l_min']} L/min / "
+                    f"{duty['coolant_inlet_c']} °C — module temp spread OPEN"
+                ),
+            },
+        )
+
     required_checks = {
         "magnetic": magnetic,
         "rotor_dynamics": rotor_dynamics,
@@ -632,18 +741,7 @@ def build_motor_multiphysics(
                 ),
             },
         ),
-        "inverter_cold_plate": _open_check(
-            "inverter_cold_plate",
-            extra={
-                "pressure_drop_kpa": None,
-                "maximum_module_temperature_c": None,
-                "module_temperature_spread_c": None,
-                "fia_question": (
-                    f"Cold-plate channels at {duty['coolant_flow_l_min']} L/min / "
-                    f"{duty['coolant_inlet_c']} °C — module temp spread OPEN"
-                ),
-            },
-        ),
+        "inverter_cold_plate": inverter_cold_plate,
         "gear_oil": _open_check(
             "gear_oil",
             extra={
@@ -800,10 +898,11 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
         "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
-        "when a twin-bound artefact exists (magnetic open-circuit point and/or ROSS",
-        "critical-speed screen) while torque map, demagnetisation, bearing identity,",
-        "modal/dynamometer correlation and the other domains remain **OPEN**. `ship_ok`",
-        "stays false.",
+        "when a twin-bound artefact exists (magnetic point, ROSS critical-speed screen,",
+        "CalculiX rotor centrifugal screen, and/or OpenFOAM cold-plate duct) while",
+        "torque map, demagnetisation, magnet-pocket burst, module temperatures,",
+        "bearing identity, modal/dynamometer correlation and other domains remain",
+        "**OPEN**. `ship_ok` stays false.",
         "",
         "## FIA binding duties (why the solvers exist)",
         "",
@@ -872,15 +971,17 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
     """proveCatch: stamp must stay fail-closed; twin-bound checks may be PARTIAL with result_ref.
 
     @description Adversarial guards for the stub / twin-bound-partial stamp.
-    Magnetic, rotor_dynamics, and structural may be PARTIAL when they cite a
-    twin-bound artefact result_ref; everything else stays OPEN.
+    Magnetic, rotor_dynamics, structural, and inverter_cold_plate may be PARTIAL
+    when they cite a twin-bound artefact result_ref; everything else stays OPEN.
     @param payload Combined stamp payload
     @returns Catch dict with ok bool
     """
     motor = payload.get("motorMultiphysics") or {}
     cad = payload.get("cadAuthority") or {}
     checks = motor.get("required_checks") or {}
-    _partial_allowed = frozenset({"magnetic", "rotor_dynamics", "structural"})
+    _partial_allowed = frozenset(
+        {"magnetic", "rotor_dynamics", "structural", "inverter_cold_plate"}
+    )
 
     def _status_ok(name: str, chk: Mapping[str, Any]) -> bool:
         status = chk.get("status")
@@ -1171,6 +1272,31 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "openfoam_fia_cold_plate_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.openfoam_fia_cold_plate_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "cad_family": "cold_plate_serpentine",
+                    "input_quantities_sha256": "jkl012",
+                    "pressure_drop": {"headline_delta_p_pa": 24921.0},
+                    "channel_geometry": {
+                        "channel_width_m": 0.005345,
+                        "channel_depth_m": 0.001336,
+                        "pass_count": 8,
+                        "inlet_velocity_m_s": 3.5,
+                        "reynolds_number": 15657.0,
+                    },
+                    "input_quantities": {
+                        "coolant_flow_l_min": 12.0,
+                        "coolant_inlet_c": 60.0,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         partial_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
         mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
         if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
@@ -1194,12 +1320,25 @@ def selftest() -> int:
         if structural.get("minimum_factor_of_safety") != 3.01:
             print("FAIL: structural must surface screening FoS from artefact")
             bad += 1
+        cold_chk = partial_payload["motorMultiphysics"]["required_checks"][
+            "inverter_cold_plate"
+        ]
+        if cold_chk.get("status") != "PARTIAL" or not cold_chk.get("result_ref"):
+            print(
+                "FAIL: twin-bound OpenFOAM case must mark inverter_cold_plate "
+                "PARTIAL with result_ref"
+            )
+            bad += 1
+        if cold_chk.get("pressure_drop_kpa") != 24.921:
+            print("FAIL: inverter_cold_plate must surface Δp_kPa from artefact")
+            bad += 1
         if partial_payload["motorMultiphysics"].get("ship_ok") is True:
-            print("FAIL: PARTIAL magnetic/ross/calculix must not set ship_ok")
+            print("FAIL: PARTIAL magnetic/ross/calculix/OF must not set ship_ok")
             bad += 1
         if not prove_catch(partial_payload).get("ok"):
             print(
-                "FAIL: proveCatch must accept magnetic+ross+calculix PARTIAL with result_ref"
+                "FAIL: proveCatch must accept magnetic+ross+calculix+OF PARTIAL "
+                "with result_ref"
             )
             bad += 1
         if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 4:

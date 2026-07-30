@@ -112,16 +112,17 @@ torque. The loaded solve applies that current at one assumed regenerative
 q-axis angle (`Id = 0`, −90 electrical degrees) and one rotor position
 (0 mechanical degrees).
 
-The exact winding has not been frozen, so the model uses one effective
-conductor per slot rather than inventing a production turn count. On the
-30 July live twin this raised peak air-gap flux from about 0.283 T open-circuit
-to 0.678 T loaded and returned −7.75 N·m from FEMM's weighted-stress integral.
-The sign denotes the chosen regenerative direction. The magnitude is only a
-solver-derived estimate: it does **not** demonstrate the required 125 N·m.
-Series turns, winding factor, angle and rotor-position sweeps, voltage closure,
-losses and demagnetisation still need to be solved. The artefact therefore
-always keeps the torque map and dynamometer correlation `OPEN`, status
-`PARTIAL`, and `ship_ok: false`.
+The hairpin schedule is not frozen. The loaded point binds twin analytical
+`turns_per_coil` (4 on the live twin) as FEMM conductors per slot and prefers
+the twin design phase current when it sits near the bus/power estimate
+(~535 A rms). On the 30 July reload this raised peak air-gap flux from about
+0.283 T open-circuit to about 1.34 T loaded and returned about −9.3 N·m from
+FEMM's weighted-stress integral — still only ~7% of the required ~125 N·m.
+That miss is treated as a design / current-angle / topology signal, not a
+reason to invent more turns. Angle and rotor-position sweeps, 24-vs-48 slot
+reconciliation, voltage closure, losses and demagnetisation still need to be
+solved. The artefact therefore always keeps the torque map and dynamometer
+correlation `OPEN`, status `PARTIAL`, and `ship_ok: false`.
 
 Run the synthetic proveCatch separately:
 
