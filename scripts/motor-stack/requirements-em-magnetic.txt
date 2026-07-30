@@ -1,0 +1,8 @@
+# Headless Pyleecan geometry dependencies for em_magnetic_selftest.py.
+# Install with --no-deps: Pyleecan's full metadata also pulls GUI/VTK and the
+# Windows-oriented pyFEMM bridge, neither of which drives the native xfemm proof.
+numpy==2.4.6
+matplotlib==3.11.1
+h5py==3.16.0
+cloudpickle==3.1.2
+pyleecan @ git+https://github.com/Eomys/pyleecan.git@7937d675fb77701ac8f2c65816b583cb29270e12

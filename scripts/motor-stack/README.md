@@ -42,6 +42,70 @@ scripts/motor-stack/openfoam_smoke_selftest.sh
 OpenFOAM Foundation also documents a Canonical Multipass installation for
 macOS, but the container route is smaller and now proven in this workspace.
 
+## Electromagnetic status on Apple silicon
+
+The headless electromagnetic path is also proven natively:
+
+- Python: 3.12.12 in the isolated `.venv-motor`
+- Pyleecan: 1.5.2, pinned to source revision
+  `7937d675fb77701ac8f2c65816b583cb29270e12`
+- xfemm `femmcli`: `0.0.0-dev`, native Mach-O ARM64
+- xfemm mesher: built-in Triangle 1.6.0
+- training machine: licensed Pyleecan `IPMSM_B` with 48 stator slots, eight
+  rotor poles, 16 buried V-magnet regions and 0.75 mm mechanical air gap
+
+Run the repeatable proof from the repository root:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/em_magnetic_selftest.py --selftest
+```
+
+The 30 July 2026 proof loaded the Pyleecan machine, generated its exact
+one-pole anti-periodic finite-element sector, applied the source M400-50A
+nonlinear B-H curve and 1.24 T magnet remanence, and solved it with native
+xfemm. Sample open-circuit air-gap results were:
+
+- peak flux density: `0.796173 T`
+- root-mean-square flux density: `0.593026 T`
+- mean flux-density magnitude: `0.504830 T`
+
+The self-test also reruns the identical model with magnet remanence reduced by
+one million. Its peak falls to `6.12e-08 T`, proving the headline result is
+field-solver output rather than a stored constant. All five checks must pass.
+
+This is a toolchain smoke proof, not a torque map, demagnetisation study,
+thermal correlation or dynamometer correlation. It changes no release state.
+
+### Fresh Python setup
+
+Pyleecan's full package metadata includes graphical-interface, visualization
+and Windows-oriented pyFEMM dependencies. The native macOS solve instead uses
+Pyleecan headlessly for controlled geometry and materials, then sends generated
+Lua directly to xfemm. Install only that proven subset:
+
+```bash
+python3.12 -m venv .venv-motor
+.venv-motor/bin/python -m pip install --upgrade pip setuptools
+.venv-motor/bin/python -m pip install --no-deps \
+  -r scripts/motor-stack/requirements-em-magnetic.txt
+.venv-motor/bin/python scripts/motor-stack/em_magnetic_selftest.py --selftest
+```
+
+### Native xfemm solver
+
+The tracked ARM64 binary is at `scripts/phantm/bin/femmcli`; it does not need
+to be on `PATH`. Set `FEMMCLI=/absolute/path/to/femmcli` to test another build.
+Verify the tracked binary with:
+
+```bash
+file scripts/phantm/bin/femmcli
+scripts/phantm/bin/femmcli --version
+```
+
+If it must be rebuilt, use the source and portability notes already recorded
+in `scripts/phantm/femm/runner.py`. There is no Homebrew `xfemm` formula on
+Apple silicon as of this proof.
+
 ## ROSS rotor dynamics
 
 ROSS (Rotordynamic Open-Source Software) 2.3.0 is installed in the isolated
