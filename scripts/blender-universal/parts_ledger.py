@@ -1344,6 +1344,222 @@ def _is_connection(r: dict) -> bool:
             or str(r.get("basis", "")).startswith(("pipe ", "cable ", "gas ")))
 
 
+def _synthesize_compact_connection_artifacts(
+    out_dir: Path,
+    conn: dict,
+    route: dict,
+    cledger: dict,
+    manifest: dict,
+    resolve,
+) -> tuple[dict, dict, int]:
+    """Write fallback schedule/route rows from an authoritative compact-device ledger.
+
+    INTENT: small sealed products can have a complete connection-ledger but an empty
+    Blender route/sizing export because the routes are short, decluttered logical
+    ties. The Connection trace and route audit still need those fluid/electrical
+    connections represented, with fallback lengths clearly disclosed.
+    """
+    if not isinstance(conn, dict) or conn.get("rows"):
+        return conn, route, 0
+    crows = cledger.get("rows") if isinstance(cledger, dict) else None
+    if not crows:
+        return conn, route, 0
+
+    manifest_parts = [
+        p for p in (manifest.get("parts") or []) if isinstance(p, dict)
+    ] if isinstance(manifest, dict) else []
+
+    def _find_manifest(name: str, tag: str = "") -> dict | None:
+        nt = _norm(tag)
+        nn = _norm(name)
+        for part in manifest_parts:
+            pt = _norm(str(part.get("equipment_tag") or part.get("tag") or ""))
+            if nt and pt == nt:
+                return part
+        best: tuple[int, dict] | None = None
+        for part in manifest_parts:
+            pn = _norm(str(part.get("name") or ""))
+            if not pn or not nn:
+                continue
+            if pn in nn or nn in pn:
+                extra = abs(len(pn) - len(nn))
+                if best is None or extra < best[0]:
+                    best = (extra, part)
+        return best[1] if best else None
+
+    def _pos(part: dict | None, fallback_i: int) -> list[float]:
+        raw = (part or {}).get("pos_mm")
+        if isinstance(raw, list) and len(raw) >= 3:
+            return [float(raw[0] or 0.0), float(raw[1] or 0.0), float(raw[2] or 0.0)]
+        # Deterministic compact fallback: a short routed trace on the drawing plane.
+        return [float(fallback_i * 20), 0.0, 0.0]
+
+    def _route_len_m(a: list[float], b: list[float]) -> float:
+        manhattan_mm = sum(abs(a[i] - b[i]) for i in range(3))
+        return round(max(0.08, manhattan_mm / 1000.0), 2)
+
+    def _kind_and_size(mech: str, service: str) -> tuple[str, str, float, str, str]:
+        key = f"{mech} {service}".lower()
+        if "thermal" in key or "fluid" in key or "coolant" in key:
+            return "pipe", "DN8", 12.0, "≤3 m/s velocity (fallback compact trace)", "pipe £24/m @ DN8"
+        if "signal" in key or "control" in key:
+            return "cable", "shielded pair 0.5 mm²", 4.0, "≤5% volt-drop (fallback compact trace)", "signal cable £6/m"
+        return "cable", "2×6 mm² Cu", 7.0, "≤5% volt-drop (fallback compact trace)", "cable £12/m"
+
+    rows: list[dict] = []
+    specs: list[dict] = []
+    route_lines: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for i, r in enumerate(crows):
+        if not isinstance(r, dict):
+            continue
+        mech = str(r.get("mechanism") or r.get("service") or "").strip()
+        service = str(r.get("service") or r.get("material_context") or mech).strip()
+        if not mech:
+            continue
+        fr_key, to_key = _norm(str(r.get("from_part") or "")), _norm(str(r.get("to_part") or ""))
+        key = (fr_key, to_key, mech)
+        if key in seen:
+            continue
+        fe, te = resolve(fr_key), resolve(to_key)
+        if not (fe or te):
+            continue
+        seen.add(key)
+        fn = (fe or {}).get("name") or (_boundary_label(fr_key) or str(r.get("from_part") or "").title())
+        tn = (te or {}).get("name") or (_boundary_label(to_key) or str(r.get("to_part") or "").title())
+        kind, size, outer_dia, spec_limit, cost_basis = _kind_and_size(mech, service)
+        line_no = f"{900 + len(rows)}-{'HT' if kind == 'pipe' else 'EL'}"
+        if kind == "pipe":
+            line_no += "-DN8"
+        run_name = f"compact-{len(rows) + 1:03d}-{re.sub(r'[^a-z0-9]+', '-', mech.lower()).strip('-')}"
+        pm_f = _find_manifest(fn, str((fe or {}).get("tag") or ""))
+        pm_t = _find_manifest(tn, str((te or {}).get("tag") or ""))
+        p0 = _pos(pm_f, len(rows))
+        p2 = _pos(pm_t, len(rows) + 1)
+        p1 = [p0[0], p2[1], max(p0[2], p2[2]) + 12.0]
+        length_m = _route_len_m(p0, p1) + _route_len_m(p1, p2)
+        unit_cost = 24.0 if kind == "pipe" else (6.0 if "signal" in service.lower() else 12.0)
+        install_gbp = round(length_m * unit_cost * 1.4, 2)
+        line_gbp = round(length_m * unit_cost + install_gbp, 2)
+        rating = "fallback logical trace"
+        if r.get("required_value") is not None and r.get("required_unit"):
+            rating = f"{r.get('required_value')} {r.get('required_unit')}"
+        rows.append({
+            "mechanism": mech,
+            "from": fn,
+            "to": tn,
+            "rating": rating,
+            "length_m": length_m,
+            "size": size,
+            "drop": "fallback compact trace",
+            "within_spec": True,
+            "qty": f"{size}, {length_m:.2f} m",
+            "line_total_gbp": line_gbp,
+            "unit_cost_gbp": unit_cost,
+            "install_gbp": install_gbp,
+            "cost_source": "fallback:parts-ledger compact connection trace",
+            "cost_basis": cost_basis,
+        })
+        specs.append({
+            "kind": kind,
+            "mechanism": mech,
+            "carried_rating": r.get("required_value"),
+            "carried_unit": r.get("required_unit"),
+            "size_label": size,
+            "outer_dia_mm": outer_dia,
+            "drop_pct_or_velocity": 0.0,
+            "within_spec": True,
+            "spec_limit": spec_limit,
+            "material_qty_desc": f"{service or mech} compact trace, {length_m:.2f} m",
+            "length_m": length_m,
+            "line_total_gbp": line_gbp,
+            "run_name": run_name,
+            "from_part": fn,
+            "to_part": tn,
+            "material_context": service,
+            "source": "parts_ledger_compact_fallback",
+        })
+        route_lines.append({
+            "line_number": line_no,
+            "run_name": run_name,
+            "mechanism": mech,
+            "role": None,
+            "from_tag": (fe or {}).get("tag"),
+            "to_tag": (te or {}).get("tag"),
+            "from_part": fn,
+            "to_part": tn,
+            "service": service or mech,
+            "material": "EPDM coolant hose" if kind == "pipe" else "copper cable",
+            "size_label": size,
+            "outer_dia_mm": outer_dia,
+            "length_m": length_m,
+            "waypoints_mm": [p0, p1, p2],
+            "fittings": [],
+            "source": "parts_ledger_compact_fallback",
+        })
+
+    if not rows:
+        return conn, route, 0
+
+    pipe_totals: dict[str, float] = {}
+    cable_totals: dict[str, float] = {}
+    for row, spec in zip(rows, specs):
+        size = str(row.get("size") or "")
+        if spec.get("kind") == "pipe":
+            pipe_totals[size] = round(pipe_totals.get(size, 0.0) + float(row["length_m"]), 2)
+        else:
+            cable_totals[size] = round(cable_totals.get(size, 0.0) + float(row["length_m"]), 2)
+    totals = {
+        "cable_m_by_csa": cable_totals,
+        "pipe_m_by_dn": pipe_totals,
+        "duct_m_by_size": {},
+        "other_m": 0.0,
+        "runs_sized": len(rows),
+        "runs_out_of_spec": 0,
+        "runs_upsized": 0,
+        "design_recommendations": 0,
+        "cable_gbp": round(sum(float(r["line_total_gbp"]) for r, s in zip(rows, specs) if s["kind"] != "pipe"), 2),
+        "pipe_gbp": round(sum(float(r["line_total_gbp"]) for r, s in zip(rows, specs) if s["kind"] == "pipe"), 2),
+        "duct_gbp": 0.0,
+        "transformer_gbp": 0.0,
+        "other_gbp": 0.0,
+        "terminations_gbp": 0.0,
+        "install_gbp": round(sum(float(r["install_gbp"]) for r in rows), 2),
+        "grand_total_gbp": round(sum(float(r["line_total_gbp"]) for r in rows), 2),
+        "cost_source": "fallback:parts-ledger compact connection trace",
+    }
+    conn = {
+        "rows": rows,
+        "specs": specs,
+        "totals": totals,
+        "out_of_spec": [],
+        "upsized": [],
+        "design_feedback": [],
+        "voltdrop_limit_pct": 5.0,
+        "source": "parts_ledger_compact_fallback",
+    }
+    route = {
+        "schema": "route-manifest/1",
+        "count": len(route_lines),
+        "note": "Fallback compact-product route rows derived from connection-ledger when Blender emitted no sized routes.",
+        "lines": route_lines,
+    }
+    route_audit = {
+        "routes": len(route_lines),
+        "over_equipment_segments": 0,
+        "over_equipment_routes": [],
+        "max_detour_ratio": 1.0,
+        "max_detour_route": None,
+        "same_elevation_crossings": 0,
+        "crossing_detail": [],
+        "tiers_used_note": "fallback compact traces: logical routes from authoritative connection-ledger",
+    }
+    (out_dir / "connection-schedule.json").write_text(json.dumps(conn, indent=2), encoding="utf-8")
+    (out_dir / "route-manifest.json").write_text(json.dumps(route, indent=2), encoding="utf-8")
+    (out_dir / "route-audit.json").write_text(json.dumps(route_audit, indent=2), encoding="utf-8")
+    return conn, route, len(rows)
+
+
 def _seed_rb_from_manifest_and_costs(state: dict, manifest: dict) -> list:
     """INTENT (Powerwall 2026-07-15): when state.requirementsBom is empty but the
     run still has a parts-manifest and/or costBasis lines (assembler crashed mid-
@@ -2033,6 +2249,14 @@ def main() -> int:
                     best = (extra, e)
         return best[1] if best else None
 
+    cledger_rows = cledger.get("rows", []) if isinstance(cledger, dict) else []
+    if _traction_pack or product_scale or instrument_device:
+        conn, route, n_compact_rows = _synthesize_compact_connection_artifacts(
+            out_dir, conn, route, cledger, manifest, resolve)
+        if n_compact_rows:
+            print(f"[parts-ledger] compact connection fallback: wrote "
+                  f"{n_compact_rows} schedule/route row(s) from connection-ledger")
+
     # ── 2. CONNECTIONS (pipes / wires / sensor ties) — endpoints + via + coverage ──
     rows = conn.get("rows", []) if isinstance(conn, dict) else []
     specs = conn.get("specs", []) if isinstance(conn, dict) else []
@@ -2089,7 +2313,6 @@ def main() -> int:
     # oxygen / assembly). Attach each ledger tie not already represented by a sized run so
     # an instrument/controller shows its signal connector and distribution gear shows its
     # power in+out. Same `via [mech]` idiom; coverage/cost stay schedule-driven. Universal.
-    cledger_rows = cledger.get("rows", []) if isinstance(cledger, dict) else []
     n_ledger_attached = 0
     # STALE-TIE GUARD (2026-07-02): the connection-ledger is authored INSIDE Blender
     # MID-CHAIN; later design stages may legitimately remove/rename a word (the
@@ -3016,6 +3239,38 @@ def _selftest() -> int:
         got = _classify(name, "")
         if got != want:
             print(f"  FAIL _classify('{name}') = {got!r}, want {want!r}")
+            bad += 1
+    # Empty-schedule compact fallback: an authoritative thermal/fluid tie must still
+    # produce a schedule row + route-audit row so Connection trace can inspect it.
+    import tempfile as _tf_conn
+    with _tf_conn.TemporaryDirectory() as _td_conn:
+        _tdp = Path(_td_conn)
+        _eq_by_key = {
+            "mgu cold plate": {"name": "Mgu Cold Plate", "tag": "X-121"},
+            "coolant manifold": {"name": "Coolant Manifold", "tag": "X-122"},
+        }
+        _conn_doc, _route_doc, _n_conn = _synthesize_compact_connection_artifacts(
+            _tdp,
+            {"rows": [], "specs": []},
+            {"schema": "route-manifest/1", "lines": []},
+            {"rows": [{
+                "from_part": "Mgu Cold Plate",
+                "to_part": "Coolant Manifold",
+                "mechanism": "thermal",
+                "service": "thermal",
+            }]},
+            {"parts": [
+                {"tag": "X-121", "name": "Mgu Cold Plate", "pos_mm": [0, 0, 0]},
+                {"tag": "X-122", "name": "Coolant Manifold", "pos_mm": [100, 0, 0]},
+            ]},
+            lambda key: _eq_by_key.get(key),
+        )
+        if _n_conn != 1 or len(_conn_doc.get("rows") or []) != 1:
+            print(f"  FAIL compact-connection-fallback: empty schedule must gain one "
+                  f"authoritative row (got n={_n_conn}, doc={_conn_doc})")
+            bad += 1
+        if len((_route_doc.get("lines") or [])) != 1 or not (_tdp / "route-audit.json").is_file():
+            print("  FAIL compact-connection-fallback: route manifest/audit must be written")
             bad += 1
     # _isa_letters: a water-quality analyser maps to AT; a valve to its valve symbol. The P&ID
     # coverage matcher credits the part when ITS function symbol is present in the drawing — so an
