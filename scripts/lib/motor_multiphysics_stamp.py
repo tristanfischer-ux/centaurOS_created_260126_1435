@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 SCHEMA_MOTOR = "motor-multiphysics/v1"
 SCHEMA_CAD = "cad-authority/v1"
+SCHEMA_HARDWARE_CORRELATION = "motor-hardware-correlation/v1"
 ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 
 # INTENT (2026-07-30): Architecture / packaging blockers must be machine-readable
@@ -71,6 +72,65 @@ _DIFF_NEST_PERMANENT_UNBLOCK: list[dict[str, str]] = [
         ),
     },
 ]
+
+# INTENT: Physical correlation gaps are release holds, not footnotes. Link each
+# to the existing Decision Register where that authority already exists.
+_HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
+    {
+        "hold_id": "DYNO_TORQUE_EFFICIENCY_MAP",
+        "domain": "motor_inverter_performance",
+        "decision_register_ids": ["DEC-010"],
+        "required_evidence": (
+            "Calibrated dyno raw data + torque/efficiency map over speed, current, "
+            "voltage, and coolant conditions, revision-hashed to the assembly."
+        ),
+    },
+    {
+        "hold_id": "HIL_POPULATED_INVERTER",
+        "domain": "controls_and_power_electronics",
+        "decision_register_ids": ["DEC-008"],
+        "required_evidence": (
+            "Hardware-in-the-loop pass on the populated inverter revision, including "
+            "safe-off, sensing, resolver, CAN, desaturation, and fault handling."
+        ),
+    },
+    {
+        "hold_id": "FLOW_BENCH_JACKET_AND_COLD_PLATE",
+        "domain": "cooling_hydraulics",
+        "decision_register_ids": [],
+        "required_evidence": (
+            "Measured pressure-flow curves for the motor jacket and inverter cold "
+            "plate at controlled coolant temperature and concentration."
+        ),
+    },
+    {
+        "hold_id": "HEATER_PLATE_MODULE_TEMPS",
+        "domain": "inverter_thermal",
+        "decision_register_ids": ["DEC-001"],
+        "required_evidence": (
+            "Heater-plate test with calibrated module/case/coolant temperatures and "
+            "TIM/contact stack matching the populated SiC module revision."
+        ),
+    },
+    {
+        "hold_id": "OVERSPEED_ROTOR_RETENTION",
+        "domain": "rotor_structural",
+        "decision_register_ids": ["DEC-006"],
+        "required_evidence": (
+            "Instrumented overspeed/retention test and correlated rotor stress model "
+            "at the controlled maximum-speed release condition."
+        ),
+    },
+    {
+        "hold_id": "DOUBLE_PULSE_ESL_SIC",
+        "domain": "inverter_switching",
+        "decision_register_ids": ["DEC-001", "DEC-008"],
+        "required_evidence": (
+            "Double-pulse switching waveforms on populated SiC hardware with measured "
+            "commutation-loop ESL, overshoot, switching loss, and gate settings."
+        ),
+    },
+)
 _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK: list[dict[str, str]] = [
     {
         "option_id": "package_post_diff_final_drive",
@@ -149,6 +209,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "scripts/motor-stack/openfoam_smoke_selftest.sh",
             "scripts/motor-stack/openfoam_fia_water_jacket_case.py",
             "scripts/motor-stack/openfoam_fia_water_jacket_case.sh",
+            "scripts/motor-stack/analytical_fia_cooling_thermal_screen.py",
         ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
@@ -166,6 +227,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "scripts/motor-stack/openfoam_smoke_selftest.sh",
             "scripts/motor-stack/openfoam_fia_cold_plate_case.py",
             "scripts/motor-stack/openfoam_fia_cold_plate_case.sh",
+            "scripts/motor-stack/analytical_fia_cooling_thermal_screen.py",
         ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
@@ -464,6 +526,15 @@ def _load_fia_cold_plate_case(twin_dir: Optional[Path]) -> Optional[dict[str, An
 def _load_fia_water_jacket_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA OpenFOAM water-jacket duct artefact if present."""
     return _load_fia_case_json(twin_dir, "openfoam_fia_water_jacket_case.json")
+
+
+def _load_fia_cooling_thermal_screen(
+    twin_dir: Optional[Path],
+) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA lumped cooling/thermal screen if present."""
+    return _load_fia_case_json(
+        twin_dir, "analytical_fia_cooling_thermal_screen.json"
+    )
 
 
 def _load_fia_iso6336_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
@@ -955,11 +1026,68 @@ def _structural_check_from_fia_case(
     return body
 
 
+def _thermal_screen_cite(
+    thermal_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Build a fail-closed cite for the lumped cooling/thermal screen.
+
+    INTENT: Surface useful twin-bound temperatures in hydraulic check rows
+    without converting a PARTIAL lumped model into CHT or hardware PASS.
+    """
+
+    if not isinstance(thermal_case, Mapping):
+        return "OPEN"
+    results = (
+        thermal_case.get("screening_results")
+        if isinstance(thermal_case.get("screening_results"), Mapping)
+        else {}
+    )
+    cht = (
+        thermal_case.get("conjugate_heat_transfer")
+        if isinstance(thermal_case.get("conjugate_heat_transfer"), Mapping)
+        else {}
+    )
+    flow = (
+        thermal_case.get("flow_bench")
+        if isinstance(thermal_case.get("flow_bench"), Mapping)
+        else {}
+    )
+    rel_ref = "_motor_stack/analytical_fia_cooling_thermal_screen.json"
+    return {
+        "status": thermal_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "input_hash": thermal_case.get("input_quantities_sha256"),
+        "maximum_winding_temperature_c": results.get(
+            "maximum_winding_temperature_c"
+        ),
+        "maximum_magnet_temperature_c": results.get(
+            "maximum_magnet_temperature_c"
+        ),
+        "maximum_module_temperature_c": results.get(
+            "maximum_module_temperature_c"
+        ),
+        "coolant_outlet_temperature_c": results.get(
+            "coolant_outlet_temperature_c"
+        ),
+        "conjugate_heat_transfer": cht.get("status") or "OPEN",
+        "flow_bench": flow.get("status") or "OPEN",
+        "note": (
+            "Twin-bound steady lumped thermal SCREEN. Temperatures are analytical "
+            "screening values; CHT and physical flow/heater-plate correlation stay OPEN."
+        ),
+    }
+
+
 def _cold_plate_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
+    thermal_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote inverter_cold_plate to PARTIAL when a twin-bound OF duct exists.
 
@@ -978,6 +1106,12 @@ def _cold_plate_check_from_fia_case(
     rel_ref = "_motor_stack/openfoam_fia_cold_plate_case.json"
     headline_pa = pressure.get("headline_delta_p_pa")
     has_delta_p = isinstance(headline_pa, (int, float)) and float(headline_pa) > 0.0
+    thermal_cite = _thermal_screen_cite(thermal_case, twin_dir=twin_dir)
+    module_temp = (
+        thermal_cite.get("maximum_module_temperature_c")
+        if isinstance(thermal_cite, Mapping)
+        else None
+    )
     body = _open_check(
         "inverter_cold_plate",
         extra={
@@ -985,7 +1119,7 @@ def _cold_plate_check_from_fia_case(
             "pressure_drop_kpa": (
                 round(float(headline_pa) / 1000.0, 4) if has_delta_p else None
             ),
-            "maximum_module_temperature_c": None,
+            "maximum_module_temperature_c": module_temp,
             "module_temperature_spread_c": None,
             "works_in_kit_context": has_delta_p,
             "model_revision": str(
@@ -1017,10 +1151,13 @@ def _cold_plate_check_from_fia_case(
                 "cad_family": case.get("cad_family") or "cold_plate_serpentine",
                 "module_temperatures": "OPEN",
                 "conjugate_heat_transfer": "OPEN",
+                "thermal_screen": thermal_cite,
                 "note": (
                     "Twin-bound OpenFOAM rectangular-duct screen on family channel "
                     "section at kit coolant point. works_in_kit_context = finite Δp. "
-                    "Not full serpentine STEP CHT; module ΔT not closed. "
+                    "A lumped module temperature may be cited from the separate "
+                    "PARTIAL thermal screen, but full serpentine STEP CHT and "
+                    "hardware correlation remain OPEN. "
                     "See also inverterPackaging for MCU land / ESL screen."
                 ),
             },
@@ -1035,6 +1172,7 @@ def _water_jacket_check_from_fia_case(
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
+    thermal_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote water_jacket to PARTIAL when a twin-bound OF duct exists.
 
@@ -1057,6 +1195,12 @@ def _water_jacket_check_from_fia_case(
     rel_ref = "_motor_stack/openfoam_fia_water_jacket_case.json"
     headline_pa = pressure.get("headline_delta_p_pa")
     has_delta_p = isinstance(headline_pa, (int, float)) and float(headline_pa) > 0.0
+    thermal_cite = _thermal_screen_cite(thermal_case, twin_dir=twin_dir)
+    winding_temp = (
+        thermal_cite.get("maximum_winding_temperature_c")
+        if isinstance(thermal_cite, Mapping)
+        else None
+    )
     body = _open_check(
         "water_jacket",
         extra={
@@ -1064,7 +1208,7 @@ def _water_jacket_check_from_fia_case(
             "pressure_drop_kpa": (
                 round(float(headline_pa) / 1000.0, 4) if has_delta_p else None
             ),
-            "maximum_winding_temperature_c": None,
+            "maximum_winding_temperature_c": winding_temp,
             "works_in_kit_context": has_delta_p,
             "model_revision": str(
                 case.get("schema")
@@ -1096,10 +1240,12 @@ def _water_jacket_check_from_fia_case(
                 "cad_family": case.get("cad_family") or "motor_water_jacket_helical",
                 "winding_temperatures": "OPEN",
                 "conjugate_heat_transfer": "OPEN",
+                "thermal_screen": thermal_cite,
                 "note": (
                     "Twin-bound OpenFOAM rectangular-duct screen on helical family "
-                    "channel section at kit coolant point. Not full jacket STEP CHT; "
-                    "winding ΔT not closed."
+                    "channel section at kit coolant point. A lumped winding temperature "
+                    "may be cited from the separate PARTIAL thermal screen, but full "
+                    "jacket STEP CHT and hardware correlation remain OPEN."
                 ),
             },
         },
@@ -1681,16 +1827,26 @@ def build_motor_multiphysics(
             },
         )
 
+    fia_thermal = _load_fia_cooling_thermal_screen(twin_dir)
     fia_cold = _load_fia_cold_plate_case(twin_dir)
     if fia_cold is not None and twin_dir is not None:
         inverter_cold_plate = _cold_plate_check_from_fia_case(
-            duty, fia_cold, twin_dir=Path(twin_dir)
+            duty,
+            fia_cold,
+            twin_dir=Path(twin_dir),
+            thermal_case=fia_thermal,
         )
         notes += (
             " Inverter cold-plate check PARTIAL: twin-bound OpenFOAM duct screen in "
             "_motor_stack/openfoam_fia_cold_plate_case.json "
-            "(module temperatures / full serpentine CHT still OPEN)."
+            "(full serpentine CHT still OPEN)."
         )
+        if fia_thermal is not None:
+            notes += (
+                " Lumped motor/inverter thermal SCREEN cited from "
+                "_motor_stack/analytical_fia_cooling_thermal_screen.json; "
+                "heater-plate and flow-bench correlation remain OPEN."
+            )
     else:
         inverter_cold_plate = _open_check(
             "inverter_cold_plate",
@@ -1708,12 +1864,15 @@ def build_motor_multiphysics(
     fia_jacket = _load_fia_water_jacket_case(twin_dir)
     if fia_jacket is not None and twin_dir is not None:
         water_jacket = _water_jacket_check_from_fia_case(
-            duty, fia_jacket, twin_dir=Path(twin_dir)
+            duty,
+            fia_jacket,
+            twin_dir=Path(twin_dir),
+            thermal_case=fia_thermal,
         )
         notes += (
             " Water-jacket check PARTIAL: twin-bound OpenFOAM duct screen in "
             "_motor_stack/openfoam_fia_water_jacket_case.json "
-            "(winding temperatures / full helical CHT still OPEN)."
+            "(full helical CHT still OPEN)."
         )
     else:
         water_jacket = _open_check(
@@ -1887,6 +2046,51 @@ def build_cad_authority(
     }
 
 
+def build_hardware_correlation(
+    *,
+    assembly_revision: str = ASSEMBLY_REVISION,
+    stamped_at: Optional[str] = None,
+) -> dict[str, Any]:
+    """Build the physical hardware-correlation release-hold register.
+
+    @description Registers the six mandatory physical evidence campaigns and
+    links existing Decision Register authority. Every initial hold is OPEN, so
+    the register and parent stamp remain unshippable.
+    @param assembly_revision Shared CAD/solver/hardware revision label
+    @param stamped_at ISO timestamp override
+    @returns Fail-closed hardwareCorrelation object
+    """
+
+    stamped = stamped_at or _iso_now()
+    holds = [
+        {
+            **row,
+            "status": "OPEN",
+            "ship_ok": False,
+            "blocks_ship": True,
+            "evidence_ref": None,
+            "correlated_revision": None,
+        }
+        for row in _HARDWARE_CORRELATION_HOLDS
+    ]
+    open_count = sum(1 for row in holds if row["status"] == "OPEN")
+    return {
+        "schema_version": SCHEMA_HARDWARE_CORRELATION,
+        "stamped_at": stamped,
+        "assembly_revision": assembly_revision,
+        "status": "OPEN" if open_count else "CLOSED",
+        "holds": holds,
+        "hold_count": len(holds),
+        "open_count": open_count,
+        "all_holds_closed": open_count == 0,
+        "ship_ok": open_count == 0,
+        "honesty": (
+            "Analytical and numerical screens do not replace physical correlation. "
+            "Any OPEN hold forces ship_ok false."
+        ),
+    }
+
+
 def build_stamp_payload(
     *,
     state: Optional[Mapping[str, Any]] = None,
@@ -1909,6 +2113,10 @@ def build_stamp_payload(
         twin_dir=twin_dir,
     )
     cad = build_cad_authority(assembly_revision=assembly_revision, stamped_at=stamped)
+    hardware = build_hardware_correlation(
+        assembly_revision=assembly_revision,
+        stamped_at=stamped,
+    )
     packaging = build_inverter_packaging(twin_dir=twin_dir, stamped_at=stamped)
     payload: dict[str, Any] = {
         "schema_version": "motor-multiphysics-sidecar/v1",
@@ -1916,6 +2124,7 @@ def build_stamp_payload(
         "assembly_revision": assembly_revision,
         "motorMultiphysics": motor,
         "cadAuthority": cad,
+        "hardwareCorrelation": hardware,
         "ship_ok": False,
         "all_required_solver_checks_pass": False,
     }
@@ -2043,6 +2252,34 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
                 "",
             ]
         )
+    hardware = payload.get("hardwareCorrelation")
+    if isinstance(hardware, Mapping):
+        lines.extend(
+            [
+                "",
+                "## Hardware correlation (release holds)",
+                "",
+                "Numerical and analytical screens stay **PARTIAL** until the physical",
+                "campaigns below close on the same controlled assembly revision.",
+                f"**Status:** **{hardware.get('status')}** · "
+                f"**OPEN:** **{hardware.get('open_count')} / "
+                f"{hardware.get('hold_count')}** · **ship_ok:** **false**",
+                "",
+                "| Hardware hold | Status | Decision Register | Required evidence |",
+                "|---|---|---|---|",
+            ]
+        )
+        for row in hardware.get("holds") or []:
+            if not isinstance(row, Mapping):
+                continue
+            decisions = ", ".join(
+                f"`{decision_id}`"
+                for decision_id in row.get("decision_register_ids") or []
+            ) or "—"
+            lines.append(
+                f"| `{row.get('hold_id')}` | **{row.get('status')}** | "
+                f"{decisions} | {row.get('required_evidence')} |"
+            )
     blockers = (
         payload.get("architectureBlockers")
         or motor.get("architectureBlockers")
@@ -2098,7 +2335,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             "",
             "Artefacts: `motor-multiphysics.json` (sidecar) · state keys",
             "`motorMultiphysics` / `cadAuthority` / optional `inverterPackaging` "
-            "/ `architectureBlockers` when state write succeeds.",
+            "/ `hardwareCorrelation` / `architectureBlockers` when state write succeeds.",
             "",
         ]
     )
@@ -2208,6 +2445,38 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
             and bool(packaging.get("result_ref"))
         )
     results["inverter_packaging_honest_or_absent"] = packaging_ok
+    hardware = payload.get("hardwareCorrelation")
+    hardware_holds = (
+        hardware.get("holds")
+        if isinstance(hardware, Mapping)
+        and isinstance(hardware.get("holds"), list)
+        else []
+    )
+    open_hardware_holds = [
+        row
+        for row in hardware_holds
+        if isinstance(row, Mapping) and row.get("status") == "OPEN"
+    ]
+    hardware_ok = (
+        isinstance(hardware, Mapping)
+        and len(hardware_holds) == len(_HARDWARE_CORRELATION_HOLDS)
+        and all(
+            isinstance(row, Mapping)
+            and row.get("blocks_ship") is True
+            and row.get("ship_ok") is False
+            for row in hardware_holds
+        )
+        and (
+            not open_hardware_holds
+            or (
+                hardware.get("ship_ok") is False
+                and motor.get("ship_ok") is False
+                and payload.get("ship_ok") is False
+            )
+        )
+    )
+    results["open_hardware_correlation_holds_honest"] = hardware_ok
+    results["open_hardware_correlation_hold_count"] = len(open_hardware_holds)
     # OPEN architecture blockers must never coexist with ship_ok true.
     blockers = payload.get("architectureBlockers") or motor.get("architectureBlockers")
     open_blockers = [
@@ -2238,6 +2507,7 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         and stator_ok
         and smoke_tagged
         and packaging_ok
+        and hardware_ok
         and blockers_ok
         and not illicit_pass
     )
@@ -2275,13 +2545,15 @@ def apply_to_state(
     state: MutableMapping[str, Any],
     payload: Mapping[str, Any],
 ) -> None:
-    """Mutate state with motorMultiphysics, cadAuthority, and fail-closed ship_ok.
+    """Mutate state with solver, CAD, hardware-correlation, and ship truth.
 
     @param state Mutable state dict
     @param payload Combined stamp payload
     """
     state["motorMultiphysics"] = payload["motorMultiphysics"]
     state["cadAuthority"] = payload["cadAuthority"]
+    if isinstance(payload.get("hardwareCorrelation"), Mapping):
+        state["hardwareCorrelation"] = payload["hardwareCorrelation"]
     if isinstance(payload.get("inverterPackaging"), Mapping):
         state["inverterPackaging"] = payload["inverterPackaging"]
     blockers = payload.get("architectureBlockers")
@@ -2310,6 +2582,11 @@ def apply_to_state(
         "all_required_solver_checks_pass": False,
         "stamped_at": payload.get("stamped_at"),
         "has_inverter_packaging": isinstance(payload.get("inverterPackaging"), Mapping),
+        "hardware_correlation_open_count": (
+            payload.get("hardwareCorrelation", {}).get("open_count")
+            if isinstance(payload.get("hardwareCorrelation"), Mapping)
+            else None
+        ),
         "architecture_blockers_open_count": open_n,
     }
 
@@ -2369,6 +2646,42 @@ def selftest() -> int:
             "FAIL: markdown must distinguish kit-context duty screens from smoke-only"
         )
         bad += 1
+    hardware = payload.get("hardwareCorrelation")
+    expected_hardware_holds = {
+        "DYNO_TORQUE_EFFICIENCY_MAP",
+        "HIL_POPULATED_INVERTER",
+        "FLOW_BENCH_JACKET_AND_COLD_PLATE",
+        "HEATER_PLATE_MODULE_TEMPS",
+        "OVERSPEED_ROTOR_RETENTION",
+        "DOUBLE_PULSE_ESL_SIC",
+    }
+    actual_hardware_holds = {
+        str(row.get("hold_id"))
+        for row in ((hardware or {}).get("holds") or [])
+        if isinstance(row, Mapping)
+    }
+    if not isinstance(hardware, Mapping) or actual_hardware_holds != expected_hardware_holds:
+        print(
+            "FAIL: hardwareCorrelation must register the six required OPEN hardware holds"
+        )
+        bad += 1
+    elif hardware.get("ship_ok") is not False or hardware.get("open_count") != 6:
+        print("FAIL: six OPEN hardware holds must force hardwareCorrelation.ship_ok false")
+        bad += 1
+    if "Hardware correlation" not in md:
+        print("FAIL: markdown must render the hardware correlation register")
+        bad += 1
+    if not catch.get("open_hardware_correlation_holds_honest"):
+        print("FAIL: proveCatch must enforce OPEN hardware correlation holds")
+        bad += 1
+    applied_state: dict[str, Any] = {}
+    apply_to_state(applied_state, payload)
+    if applied_state.get("hardwareCorrelation") != hardware:
+        print("FAIL: apply_to_state must attach hardwareCorrelation")
+        bad += 1
+    if applied_state.get("ship_ok") is not False:
+        print("FAIL: apply_to_state must remain fail-closed with hardware holds OPEN")
+        bad += 1
 
     # Adversarial: illicit PASS without result_ref must fire
     evil = json.loads(json.dumps(payload))
@@ -2380,6 +2693,17 @@ def selftest() -> int:
         bad += 1
     if evil_catch.get("ok"):
         print("FAIL: proveCatch must fail on illicit PASS")
+        bad += 1
+    # Adversarial: any OPEN physical-correlation hold forbids ship_ok=true even
+    # when all analytical status fields remain untouched.
+    evil_hardware = json.loads(json.dumps(payload))
+    evil_hardware["hardwareCorrelation"]["ship_ok"] = True
+    evil_hardware_catch = prove_catch(evil_hardware)
+    if evil_hardware_catch.get("open_hardware_correlation_holds_honest"):
+        print("FAIL: OPEN hardware correlation hold must reject hardware ship_ok=true")
+        bad += 1
+    if evil_hardware_catch.get("ok"):
+        print("FAIL: proveCatch must fire on OPEN hardware hold + ship_ok=true")
         bad += 1
 
     # Twin-bound FIA magnetic + ROSS cases → PARTIAL; other checks stay OPEN.
@@ -2619,6 +2943,26 @@ def selftest() -> int:
                         "coolant_flow_l_min": 12.0,
                         "coolant_inlet_c": 60.0,
                     },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (case_dir / "analytical_fia_cooling_thermal_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.analytical_fia_cooling_thermal_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "thermal456",
+                    "screening_results": {
+                        "maximum_winding_temperature_c": 91.2,
+                        "maximum_magnet_temperature_c": 96.4,
+                        "maximum_module_temperature_c": 112.4,
+                        "coolant_outlet_temperature_c": 69.1,
+                    },
+                    "conjugate_heat_transfer": {"status": "OPEN"},
+                    "flow_bench": {"status": "OPEN"},
                 }
             )
             + "\n",
@@ -2870,6 +3214,16 @@ def selftest() -> int:
         if cold_chk.get("works_in_kit_context") is not True:
             print("FAIL: inverter_cold_plate works_in_kit_context must be true when Δp set")
             bad += 1
+        if cold_chk.get("maximum_module_temperature_c") != 112.4:
+            print("FAIL: inverter_cold_plate must cite thermal-screen module temperature")
+            bad += 1
+        cold_thermal = (cold_chk.get("twin_bound_case") or {}).get("thermal_screen")
+        if not isinstance(cold_thermal, Mapping) or cold_thermal.get("status") != "PARTIAL":
+            print("FAIL: inverter_cold_plate must cite PARTIAL thermal screen")
+            bad += 1
+        elif cold_thermal.get("conjugate_heat_transfer") != "OPEN":
+            print("FAIL: thermal cite must leave conjugate heat transfer OPEN")
+            bad += 1
         jacket_chk = partial_payload["motorMultiphysics"]["required_checks"][
             "water_jacket"
         ]
@@ -2884,6 +3238,13 @@ def selftest() -> int:
             bad += 1
         if jacket_chk.get("works_in_kit_context") is not True:
             print("FAIL: water_jacket works_in_kit_context must be true when Δp set")
+            bad += 1
+        if jacket_chk.get("maximum_winding_temperature_c") != 91.2:
+            print("FAIL: water_jacket must cite thermal-screen winding temperature")
+            bad += 1
+        jacket_thermal = (jacket_chk.get("twin_bound_case") or {}).get("thermal_screen")
+        if not isinstance(jacket_thermal, Mapping) or jacket_thermal.get("flow_bench") != "OPEN":
+            print("FAIL: water_jacket thermal cite must leave flow bench OPEN")
             bad += 1
         gear_oil = partial_payload["motorMultiphysics"]["required_checks"]["gear_oil"]
         if gear_oil.get("status") != "PARTIAL" or not gear_oil.get("result_ref"):

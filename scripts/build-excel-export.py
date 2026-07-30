@@ -26430,6 +26430,11 @@ _dt(["Field", "Value", "Note", "", ""],
 _dt(["Blocker", "Severity", "Status", "Evidence / permanent unblock", ""],
     "motor-architecture-blockers",
     ["Blocker", "Severity", "Status", "Evidence / permanent unblock"])
+_dt(["Hardware hold", "Status", "Decision Register", "Required evidence",
+     "Ship gate"],
+    "motor-hardware-correlation",
+    ["Hardware hold", "Status", "Decision Register", "Required evidence",
+     "Ship gate"])
 _dt(["Metric", "Value", "Unit", "Notes / source"], "overview-metrics",
     ["Metric", "Value", "Notes / source"])
 _dt(["Category", "Cost (£)", "% of capex", "Share"], "overview-cost",
@@ -28500,6 +28505,19 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
     pkg = restored.get("inverterPackaging")
     if isinstance(pkg, dict):
         state["inverterPackaging"] = pkg
+    hardware = restored.get("hardwareCorrelation")
+    if isinstance(hardware, dict):
+        # Fail closed even if a malformed sidecar claims ship_ok while a hold is OPEN.
+        open_hardware = [
+            row for row in (hardware.get("holds") or [])
+            if isinstance(row, dict) and str(row.get("status") or "").upper() == "OPEN"
+        ]
+        if open_hardware:
+            hardware = dict(hardware)
+            hardware["ship_ok"] = False
+            hardware["status"] = "OPEN"
+            hardware["open_count"] = len(open_hardware)
+        state["hardwareCorrelation"] = hardware
     blockers = restored.get("architectureBlockers")
     if not isinstance(blockers, list):
         blockers = motor.get("architectureBlockers")
@@ -28522,6 +28540,11 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
         or motor.get("assembly_revision"),
         "ship_ok": False,
         "stamped_at": restored.get("stamped_at") or motor.get("stamped_at"),
+        "hardware_correlation_open_count": (
+            state.get("hardwareCorrelation", {}).get("open_count")
+            if isinstance(state.get("hardwareCorrelation"), dict)
+            else None
+        ),
         "architecture_blockers_open_count": open_n,
     }
     return True
@@ -28771,6 +28794,61 @@ def _render_motor_multiphysics_qa(ws, state: dict, run_dir: str, r: int) -> int:
             else:
                 st.fill = FILL_ADVISORY
             ws.cell(r, 4, evidence).font = FONT_NOTE
+            r += 1
+    hardware = (
+        state.get("hardwareCorrelation")
+        if isinstance(state.get("hardwareCorrelation"), dict)
+        else {}
+    )
+    hardware_holds = (
+        hardware.get("holds")
+        if isinstance(hardware.get("holds"), list)
+        else []
+    )
+    if hardware_holds:
+        r += 1
+        sub_banner(
+            ws, r,
+            "Hardware correlation (physical release holds — ship_ok false while OPEN)",
+            5,
+        )
+        r += 1
+        header(
+            ws, r,
+            [
+                "Hardware hold",
+                "Status",
+                "Decision Register",
+                "Required evidence",
+                "Ship gate",
+            ],
+        )
+        r += 1
+        for hold in hardware_holds:
+            if not isinstance(hold, dict):
+                continue
+            status = str(hold.get("status") or "OPEN").upper()
+            decision_ids = hold.get("decision_register_ids")
+            decision_ref = (
+                ", ".join(str(value) for value in decision_ids if value)
+                if isinstance(decision_ids, list)
+                else str(decision_ids or "—")
+            )
+            blocks_ship = status == "OPEN" or bool(hold.get("blocks_ship"))
+            ws.cell(r, 1, str(hold.get("hold_id") or "—")).font = FONT_SUB
+            status_cell = ws.cell(r, 2, status)
+            ws.cell(r, 3, decision_ref or "—").font = FONT_NOTE
+            ws.cell(r, 4, str(hold.get("required_evidence") or "—")).font = FONT_NOTE
+            ship_cell = ws.cell(r, 5, "BLOCKED" if blocks_ship else "CLOSED")
+            if blocks_ship:
+                status_cell.fill = FILL_FAIL
+                ship_cell.fill = FILL_FAIL
+                ship_cell.font = FONT_FAIL
+            else:
+                status_cell.fill = FILL_PASS
+                ship_cell.fill = FILL_PASS
+                ship_cell.font = FONT_PASS
+            ws.cell(r, 4).alignment = WRAP_TOP
             r += 1
     r += 1
     return r
@@ -31680,6 +31758,8 @@ def _selftest() -> int:
         (["Interface ID", "Domain", "From", "To", "Nominal", "Limit", "Unit",
           "Medium / protocol", "Connector / port", "Responsibility",
           "Verification status", "Source"], "interface-control"),
+        (["Hardware hold", "Status", "Decision Register", "Required evidence",
+          "Ship gate"], "motor-hardware-correlation"),
     ):
         _spec = _TABLE_CONTRACTS.get(_table_sig(_cols))
         if not _spec or _spec.get("family") != _fam:
