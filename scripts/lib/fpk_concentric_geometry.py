@@ -29,6 +29,12 @@ class FpkConcentricParams:
     gear_ratio: float
     shaft_torque_nm: float
     phase_current_design_a: float = 0.0
+    gear_module_mm: float = 0.0
+    sun_od_mm: float = 0.0
+    planet_od_mm: float = 0.0
+    planet_count: int = 0
+    ring_id_mm: float = 0.0
+    gear_face_mm: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -63,6 +69,7 @@ class FpkConcentricGeometry:
     diff_od_mm: float
     diff_len_mm: float
     gear_face_mm: float
+    gear_module_mm: float
 
     # MCU shelf (L1)
     mcu_w_mm: float
@@ -131,6 +138,14 @@ def params_from_quantities(quantities: Mapping[str, Any]) -> FpkConcentricParams
         phase_current_design_a=_num(
             quantities, "phase_current_design_a", "phase_current_max_a", default=0.0,
         ),
+        gear_module_mm=_num(quantities, "gear_module_mm", default=0.0),
+        sun_od_mm=_num(quantities, "fpk_sun_od_mm", default=0.0),
+        planet_od_mm=_num(quantities, "fpk_planet_od_mm", default=0.0),
+        planet_count=int(_num(quantities, "fpk_planet_count", default=0.0)),
+        ring_id_mm=_num(quantities, "fpk_ring_id_mm", default=0.0),
+        gear_face_mm=_num(
+            quantities, "fpk_gear_face_mm", "gear_face_mm", default=0.0,
+        ),
     )
 
 
@@ -184,20 +199,31 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
     i = max(2.5, float(p.gear_ratio))
     rs = i - 1.0
     # Pitch diameters inside rotor bore with 2 mm radial clearance.
-    ring_id = max(28.0, rotor_id - 4.0)
+    derived_ring_id = max(28.0, rotor_id - 4.0)
     # R = ring pitch ≈ ring_id; S = R / (i−1); planet ≈ (R−S)/2
-    sun_od = max(12.0, ring_id / (rs + 1.0))
-    planet_od = max(8.0, (ring_id - sun_od) / 2.0)
-    planet_count = 3 if planet_od >= 10.0 else 4
+    # DECISION: ISO 6336 strength-resize/writeback values are authoritative.
+    # Re-derive only fields that were not stamped into contract quantities.
+    ring_id = float(p.ring_id_mm) or derived_ring_id
+    sun_od = float(p.sun_od_mm) or max(12.0, ring_id / (rs + 1.0))
+    planet_od = float(p.planet_od_mm) or max(8.0, (ring_id - sun_od) / 2.0)
+    planet_count = int(p.planet_count) or (3 if planet_od >= 10.0 else 4)
     planet_pcd = sun_od + planet_od
     # Face width scales gently with shaft torque (concept tooth load proxy).
     t = max(40.0, float(p.shaft_torque_nm))
-    gear_face = min(nest_len * 0.42, max(14.0, 0.12 * math.sqrt(t) * 10.0))
+    derived_gear_face = min(
+        nest_len * 0.42,
+        max(14.0, 0.12 * math.sqrt(t) * 10.0),
+    )
+    gear_face = float(p.gear_face_mm) or derived_gear_face
+    gear_module = float(p.gear_module_mm)
     carrier_od = min(ring_id * 0.92, planet_pcd + planet_od * 0.35)
     diff_od = min(carrier_od * 0.85, sun_od * 1.6)
     diff_len = min(nest_len * 0.28, gear_face * 1.35)
 
-    nest_fits = (planet_pcd / 2.0 + planet_od / 2.0) <= (ring_id / 2.0 + 0.5)
+    planets_fit_ring = (
+        planet_pcd / 2.0 + planet_od / 2.0
+    ) <= (ring_id / 2.0 + 0.5)
+    nest_fits = planets_fit_ring and ring_id <= rotor_id + 0.5
 
     # MCU shelf — thin package on crown; span along motor length.
     mcu_h = 28.0
@@ -218,7 +244,10 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
     stack_fits = housing_od <= min(case_d, case_h) and housing_len <= case_w
 
     if not nest_fits:
-        notes.append("planetary PCD exceeds ring ID — check gear_ratio vs rotor bore")
+        notes.append(
+            "planetary exceeds hollow rotor bore — reconcile strength-resized "
+            "gear geometry with electromagnetic rotor packaging"
+        )
     if not mcu_fits:
         notes.append("MCU shelf + motor OD exceeds bay height — thin MCU further")
     if not stack_fits:
@@ -248,6 +277,7 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
         diff_od_mm=round(diff_od, 1),
         diff_len_mm=round(diff_len, 1),
         gear_face_mm=round(gear_face, 1),
+        gear_module_mm=round(gear_module, 3),
         mcu_w_mm=round(mcu_w, 1),
         mcu_d_mm=round(mcu_d, 1),
         mcu_h_mm=round(mcu_h, 1),
@@ -262,8 +292,32 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
     )
 
 
-def geometry_from_quantities(quantities: Mapping[str, Any]) -> FpkConcentricGeometry:
-    return derive_geometry(params_from_quantities(quantities))
+def geometry_from_quantities(
+    quantities: Mapping[str, Any],
+    concentric_geometry: Optional[Mapping[str, Any]] = None,
+) -> FpkConcentricGeometry:
+    """Derive geometry with optional state/writeback concentric stamp fallback.
+
+    INTENT: strength solvers can stamp either contract ``fpk_*`` quantities or
+    the ``fpkConcentricGeometry`` section used by the writeback sidecar.
+    Explicit contract quantities win when both sources contain the same field.
+    """
+    stamp_to_quantity = {
+        "sun_od_mm": "fpk_sun_od_mm",
+        "planet_od_mm": "fpk_planet_od_mm",
+        "planet_count": "fpk_planet_count",
+        "ring_id_mm": "fpk_ring_id_mm",
+        "gear_face_mm": "fpk_gear_face_mm",
+        "gear_module_mm": "gear_module_mm",
+    }
+    merged: dict[str, Any] = {}
+    if isinstance(concentric_geometry, Mapping):
+        for stamp_key, quantity_key in stamp_to_quantity.items():
+            value = concentric_geometry.get(stamp_key)
+            if value is not None:
+                merged[quantity_key] = value
+    merged.update(quantities)
+    return derive_geometry(params_from_quantities(merged))
 
 
 def principal_box_dims(g: FpkConcentricGeometry) -> dict[str, str]:
@@ -302,7 +356,7 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
             "source_detail": detail,
         }
 
-    return {
+    result: dict[str, dict[str, Any]] = {
         "fpk_housing_od_mm": q(g.housing_od_mm, "mm", "derived housing OD from IPMSM airgap + jacket"),
         "fpk_housing_len_mm": q(g.housing_len_mm, "mm", "derived stack + end-winding clamp into bay W"),
         "fpk_stator_od_mm": q(g.stator_od_mm, "mm", "derived stator OD"),
@@ -323,9 +377,17 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
             "basis": "rated",
             "scope": "module",
             "source": "calculator",
-            "source_detail": "3–4 planets from planet OD class",
+            "source_detail": (
+                "strength-resize stamp retained when present; "
+                "else 3–4 planets from planet OD class"
+            ),
         },
         "fpk_ring_id_mm": q(g.ring_id_mm, "mm", "ring gear ID inside hollow rotor"),
+        "fpk_gear_face_mm": q(
+            g.gear_face_mm,
+            "mm",
+            "planetary face width; strength-resize stamp retained when present",
+        ),
         "fpk_diff_od_mm": q(g.diff_od_mm, "mm", "mini-diff nest OD inside carrier"),
         "fpk_mcu_w_mm": q(g.mcu_w_mm, "mm", "MCU shelf span"),
         "fpk_mcu_d_mm": q(g.mcu_d_mm, "mm", "MCU shelf depth"),
@@ -350,6 +412,13 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
             ),
         },
     }
+    if g.gear_module_mm > 0:
+        result["gear_module_mm"] = q(
+            g.gear_module_mm,
+            "mm",
+            "gear tooth module from strength-resize stamp",
+        )
+    return result
 
 
 def _selftest() -> None:
@@ -386,11 +455,56 @@ def _selftest() -> None:
         FpkConcentricParams(343, 259, 267, 122, 98, 14.0, 120, 500),
     )
     assert g2.nest_fits_rotor or g2.planet_od_mm >= 8.0
+    # proveCatch: strength-resize writeback must control Blender-facing geometry.
+    resized = geometry_from_quantities({
+        **q,
+        "fpk_sun_od_mm": {"value": 18.0, "unit": "mm"},
+        "fpk_planet_od_mm": {"value": 54.0, "unit": "mm"},
+        "fpk_planet_count": {"value": 4, "unit": "count"},
+        "fpk_ring_id_mm": {"value": 126.0, "unit": "mm"},
+        "fpk_gear_face_mm": {"value": 58.0, "unit": "mm"},
+        "gear_module_mm": {"value": 1.0, "unit": "mm"},
+    })
+    assert resized.planet_count == 4
+    assert resized.gear_face_mm == 58.0
+    assert resized.gear_module_mm == 1.0
+    assert resized.sun_od_mm == 18.0
+    assert resized.planet_od_mm == 54.0
+    assert resized.ring_id_mm == 126.0
+    resized_wb = quantity_writeback(resized)
+    assert resized_wb["fpk_planet_count"]["value"] == 4
+    assert resized_wb["fpk_gear_face_mm"]["value"] == 58.0
+    assert resized_wb["gear_module_mm"]["value"] == 1.0
+    resized_from_section = geometry_from_quantities(
+        q,
+        {
+            "sun_od_mm": 18.0,
+            "planet_od_mm": 54.0,
+            "planet_count": 4,
+            "ring_id_mm": 126.0,
+            "gear_face_mm": 58.0,
+            "gear_module_mm": 1.0,
+        },
+    )
+    assert resized_from_section.planet_count == 4
+    assert resized_from_section.gear_face_mm == 58.0
+    assert resized_from_section.gear_module_mm == 1.0
+    stamped_wins = geometry_from_quantities(
+        {**q, "fpk_planet_count": {"value": 4}},
+        {"planet_count": 3},
+    )
+    assert stamped_wins.planet_count == 4
     print("fpk_concentric_geometry --selftest OK")
     print(
         f"  housing Ø{g.housing_od_mm}×L{g.housing_len_mm}  "
         f"rotor ID {g.rotor_id_mm}  sun {g.sun_od_mm}  "
         f"planet×{g.planet_count} Ø{g.planet_od_mm}  MCU {g.mcu_w_mm}×{g.mcu_d_mm}×{g.mcu_h_mm}"
+    )
+    print(
+        f"  strength stamp: planet×{resized.planet_count} "
+        f"face={resized.gear_face_mm} mm module={resized.gear_module_mm} mm "
+        f"S/P/R={resized.sun_od_mm}/{resized.planet_od_mm}/{resized.ring_id_mm} mm "
+        f"nest_fits_rotor={resized.nest_fits_rotor}"
     )
 
 

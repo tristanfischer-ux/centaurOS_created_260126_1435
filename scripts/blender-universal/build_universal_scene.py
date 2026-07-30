@@ -13429,6 +13429,7 @@ _SEALED_FRONT_COVER = None
 _SEALED_SHELL_OBJECTS = []
 _LE_SIGNATURE = "generic"   # lab_electronics sub-type by contract signal (set in _sealed_enclosure_env_mm)
 _COMPOSER_STATE = None      # the run state, set in main(), read by the COMPOSER=1 universal placer
+_COMPOSER_STATE_PATH = None  # state path, used to consume adjacent solver writebacks
 _SEALED_CUTAWAY_MATERIAL = None
 _SEALED_EXTERIOR_MATERIAL = None
 _CAD_RESOLVER = None
@@ -14458,6 +14459,10 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     # proveCatch (2026-07-29 P1): Hooley/PHANTM-class — contract-driven geometry module
     assert "fpk_concentric_geometry" in _src_td
     assert "geometry_from_quantities" in _src_td
+    # proveCatch (2026-07-30): Blender consumes strength-resized planetary stamps.
+    assert "gear_geometry_writeback.json" in _src_td
+    assert "fpkConcentricGeometry" in _src_td
+    assert "gear_module_mm" in _src_td
     # proveCatch (2026-07-29): crushed FR4 sRGB (0.025,0.14,…) linearises to
     # ~black and ships an invisible board. Gate the SOURCE sRGB floor.
     _fr4 = (0.22, 0.52, 0.28)
@@ -19517,14 +19522,39 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     try:
         from fpk_concentric_geometry import geometry_from_quantities
         _st = globals().get("_COMPOSER_STATE") or {}
-        _cq = ((_st.get("orchestratorContract") or {}).get("quantities")) or {}
-        if isinstance(_cq, dict) and _cq:
-            _fpk_g = geometry_from_quantities(_cq)
+        _cq = dict(((_st.get("engineeringContract") or {}).get("quantities")) or {})
+        _cq.update(((_st.get("orchestratorContract") or {}).get("quantities")) or {})
+        _fpk_stamp = dict(_st.get("fpkConcentricGeometry") or {})
+        # FLOW: ISO 6336 strength screen → adjacent writeback sidecar → Blender.
+        # The sidecar is newest and therefore overrides stale state stamps.
+        _state_path = globals().get("_COMPOSER_STATE_PATH")
+        if _state_path:
+            _gear_writeback_path = (
+                Path(_state_path).parent
+                / "_motor_stack"
+                / "gear_geometry_writeback.json"
+            )
+            if _gear_writeback_path.is_file():
+                _gear_writeback = json.loads(
+                    _gear_writeback_path.read_text(encoding="utf-8")
+                )
+                _cq.update(_gear_writeback.get("quantities") or {})
+                _fpk_stamp.update(
+                    _gear_writeback.get("fpkConcentricGeometry") or {}
+                )
+                print(
+                    "[univ][sealed] FPK strength writeback loaded: "
+                    f"{_gear_writeback_path}"
+                )
+        if _cq or _fpk_stamp:
+            _fpk_g = geometry_from_quantities(_cq, _fpk_stamp)
             print(
                 f"[univ][sealed] FPK geometry: housing Ø{_fpk_g.housing_od_mm}×"
                 f"L{_fpk_g.housing_len_mm} rotorID {_fpk_g.rotor_id_mm} "
                 f"sun {_fpk_g.sun_od_mm} planet×{_fpk_g.planet_count} "
-                f"Ø{_fpk_g.planet_od_mm} MCU {_fpk_g.mcu_w_mm}×{_fpk_g.mcu_d_mm}×"
+                f"Ø{_fpk_g.planet_od_mm} face {_fpk_g.gear_face_mm} "
+                f"module {_fpk_g.gear_module_mm} "
+                f"MCU {_fpk_g.mcu_w_mm}×{_fpk_g.mcu_d_mm}×"
                 f"{_fpk_g.mcu_h_mm} ok={_fpk_g.nest_fits_rotor and _fpk_g.stack_fits_bay}"
             )
     except Exception as _fpk_exc:
@@ -27775,8 +27805,9 @@ def main():
     print(f"[univ] state={state_path}")
     print(f"[univ] out  ={out_dir}")
     state = load_state(state_path)
-    global _COMPOSER_STATE
+    global _COMPOSER_STATE, _COMPOSER_STATE_PATH
     _COMPOSER_STATE = state   # for the COMPOSER=1 universal placer
+    _COMPOSER_STATE_PATH = state_path
 
     # Tell connection_sizing the plant SALINITY (for the marine→duplex pipe-material rule). Read
     # from the contract; absent / fresh-water leaves it None so a non-marine plant is unchanged.
