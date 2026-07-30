@@ -9,6 +9,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     // Python virtual environment (contains third-party JS like matplotlib)
     ".venv/**",
+    ".venv-motor/**",
     ".vercel/**",
     "out/**",
     "build/**",
