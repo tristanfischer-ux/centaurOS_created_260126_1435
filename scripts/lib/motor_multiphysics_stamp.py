@@ -125,8 +125,10 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "kisssoft": "licence_not_proven_in_repo",
         },
         "last_known_green": (
-            "2026-07-30 — twin-bound ISO 6336-style analytical screen "
-            "(KISSsoft / spectrum / tooth-contact FEA still OPEN)"
+            "2026-07-30 — twin-bound ISO 6336-style analytical screen on "
+            "formula-e-front-mgu-20260729-1432 (min FoS ≈ 0.18 bend / 0.38 "
+            "contact vs 1.20 screen; duty_strength_screen_ok false; "
+            "KISSsoft / spectrum / tooth-contact FEA still OPEN)"
         ),
         "evidence_class": "toolchain_smoke_pass",
     },
