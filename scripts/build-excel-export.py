@@ -7534,11 +7534,11 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
     inputs = [
         ("P_dc_cont", _qval(state, "continuous_power_kw", 250), "kW",
          "DC electrical continuous at inverter input (from RESS)"),
-        ("eta_inv", _qval(state, "inverter_efficiency", 0.985), "—",
+        ("eta_inv", _qval(state, "inverter_efficiency", 0.985), "ratio",
          "Inverter efficiency (tool:inverter:sic-loss or seed)"),
-        ("eta_mgu", _qval(state, "mgu_efficiency", 0.97), "—",
+        ("eta_mgu", _qval(state, "mgu_efficiency", 0.97), "ratio",
          "MGU efficiency (tool:motor:loss-point or seed)"),
-        ("eta_gear", _qval(state, "gear_efficiency", 0.97), "—",
+        ("eta_gear", _qval(state, "gear_efficiency", 0.97), "ratio",
          "Gearbox efficiency (trial seed until mesh loss model)"),
         ("rpm", _qval(state, "mgu_base_speed_rpm", 19500), "rpm",
          "Mechanical base speed for T=P/ω"),
@@ -7552,7 +7552,7 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
         ("Vdc_min", _qval(state, "assumed_vdc_min_v",
                           _qval(state, "v_dc_min_v", 600)), "V",
          "Minimum DC bus for phase-current ceiling"),
-        ("I_ph_margin", 1.12, "—",
+        ("I_ph_margin", 1.12, "ratio",
          "Design margin on ideal SVPWM I_ph (dead-time / modulation / Vdrop)"),
     ]
     input_rows: Dict[str, int] = {}

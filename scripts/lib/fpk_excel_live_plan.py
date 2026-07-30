@@ -182,6 +182,16 @@ FPK_ROOT_SOURCES: dict[str, tuple[str, str]] = {
 }
 
 
+def _formula_rhs_symbols(formula: str) -> set[str]:
+    """Return non-function identifier tokens from a worked-calc formula RHS."""
+    rhs = formula.split("=", 1)[1] if "=" in formula else formula
+    rhs = re.sub(r"(?<![A-Za-z0-9_])x(?![A-Za-z0-9_])", "*", rhs)
+    tokens = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rhs))
+    functions = {fn.lower() for fn in re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", rhs)}
+    constants = {"pi", "e"}
+    return {tok for tok in tokens if tok.lower() not in functions and tok.lower() not in constants}
+
+
 def _q_raw(state: Mapping[str, Any], key: str) -> Any:
     q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
     if key in q:
@@ -354,42 +364,42 @@ def build_front_fpk_power_reconcile_tool(state: Mapping[str, Any]) -> dict[str, 
     worked = [
         {
             "label": "Front FPK AC input power",
-            "formula": "P_ac = P_dc_cont x eta_inv",
-            "substitution": f"P_ac = {val('continuous_power_kw')} x {val('inverter_efficiency')} = {val('mgu_ac_electrical_input_kw')} kW",
+            "formula": "mgu_ac_electrical_input_kw = continuous_power_kw x inverter_efficiency",
+            "substitution": f"mgu_ac_electrical_input_kw = {val('continuous_power_kw')} x {val('inverter_efficiency')} = {val('mgu_ac_electrical_input_kw')} kW",
             "inputs": [
                 {"symbol": "continuous_power_kw", "value": val("continuous_power_kw"), "unit": "kW"},
-                {"symbol": "inverter_efficiency", "value": val("inverter_efficiency"), "unit": ""},
+                {"symbol": "inverter_efficiency", "value": val("inverter_efficiency"), "unit": "ratio"},
             ],
             "result": {"value": val("mgu_ac_electrical_input_kw"), "unit": "kW"},
             "assumptions": ["post-tool reconcile; inverter efficiency from the current tool/seed state"],
         },
         {
             "label": "Front FPK shaft power",
-            "formula": "P_shaft = P_dc_cont x eta_inv x eta_mgu",
-            "substitution": f"P_shaft = {val('continuous_power_kw')} x {val('inverter_efficiency')} x {val('mgu_efficiency')} = {val('mgu_shaft_power_kw')} kW",
+            "formula": "mgu_shaft_power_kw = continuous_power_kw x inverter_efficiency x mgu_efficiency",
+            "substitution": f"mgu_shaft_power_kw = {val('continuous_power_kw')} x {val('inverter_efficiency')} x {val('mgu_efficiency')} = {val('mgu_shaft_power_kw')} kW",
             "inputs": [
                 {"symbol": "continuous_power_kw", "value": val("continuous_power_kw"), "unit": "kW"},
-                {"symbol": "inverter_efficiency", "value": val("inverter_efficiency"), "unit": ""},
-                {"symbol": "mgu_efficiency", "value": val("mgu_efficiency"), "unit": ""},
+                {"symbol": "inverter_efficiency", "value": val("inverter_efficiency"), "unit": "ratio"},
+                {"symbol": "mgu_efficiency", "value": val("mgu_efficiency"), "unit": "ratio"},
             ],
             "result": {"value": val("mgu_shaft_power_kw"), "unit": "kW"},
             "assumptions": ["mechanical shaft power is the reconciled power-flow plane"],
         },
         {
             "label": "Front FPK wheel power",
-            "formula": "P_wheel = P_shaft x eta_gear",
-            "substitution": f"P_wheel = {val('mgu_shaft_power_kw')} x {val('gear_efficiency')} = {val('gear_output_power_kw')} kW",
+            "formula": "gear_output_power_kw = mgu_shaft_power_kw x gear_efficiency",
+            "substitution": f"gear_output_power_kw = {val('mgu_shaft_power_kw')} x {val('gear_efficiency')} = {val('gear_output_power_kw')} kW",
             "inputs": [
                 {"symbol": "mgu_shaft_power_kw", "value": val("mgu_shaft_power_kw"), "unit": "kW"},
-                {"symbol": "gear_efficiency", "value": val("gear_efficiency"), "unit": ""},
+                {"symbol": "gear_efficiency", "value": val("gear_efficiency"), "unit": "ratio"},
             ],
             "result": {"value": val("gear_output_power_kw"), "unit": "kW"},
             "assumptions": ["single-speed reduction efficiency applies after MGU shaft"],
         },
         {
             "label": "Front FPK shaft torque",
-            "formula": "T = P_shaft*1000 / (rpm*2*pi/60)",
-            "substitution": f"T = {val('mgu_shaft_power_kw')}*1000 / ({val('mgu_base_speed_rpm')}*2*pi/60) = {val('mgu_shaft_torque_nm')} Nm",
+            "formula": "mgu_shaft_torque_nm = mgu_shaft_power_kw*1000 / (mgu_base_speed_rpm*2*pi/60)",
+            "substitution": f"mgu_shaft_torque_nm = {val('mgu_shaft_power_kw')}*1000 / ({val('mgu_base_speed_rpm')}*2*pi/60) = {val('mgu_shaft_torque_nm')} Nm",
             "inputs": [
                 {"symbol": "mgu_shaft_power_kw", "value": val("mgu_shaft_power_kw"), "unit": "kW"},
                 {"symbol": "mgu_base_speed_rpm", "value": val("mgu_base_speed_rpm"), "unit": "rpm"},
@@ -399,9 +409,9 @@ def build_front_fpk_power_reconcile_tool(state: Mapping[str, Any]) -> dict[str, 
         },
         {
             "label": "Front FPK coolant temperature rise",
-            "formula": "dT = Q_loss*1000 / (m_dot*cp)",
+            "formula": "coolant_delta_t_k = total_dissipated_kw_continuous*1000 / ((coolant_flow_l_min/60)*(coolant_density_kg_m3/1000)*coolant_cp_j_kgk)",
             "substitution": (
-                f"dT = {val('total_dissipated_kw_continuous')}*1000 / "
+                f"coolant_delta_t_k = {val('total_dissipated_kw_continuous')}*1000 / "
                 f"(({val('coolant_flow_l_min')}/60)*({val('coolant_density_kg_m3')}/1000)*"
                 f"{val('coolant_cp_j_kgk')}) = {val('coolant_delta_t_k')} K"
             ),
@@ -619,6 +629,35 @@ def _selftest() -> int:
         print("  FAIL: forced literal chain must fire proveCatch")
         bad += 1
 
+    if bad:
+        print(f"fpk_excel_live_plan selftest: {bad} FAIL")
+        return 1
+    tool = build_front_fpk_power_reconcile_tool({
+        "orchestratorContract": {
+            "product_class": "formula_e_front_mgu",
+            "quantities": {
+                "continuous_power_kw": {"value": 250},
+                "inverter_efficiency": {"value": 0.98},
+                "mgu_efficiency": {"value": 0.97},
+                "gear_efficiency": {"value": 0.97},
+                "mgu_shaft_power_kw": {"value": 237.65},
+                "gear_output_power_kw": {"value": 230.52},
+                "mgu_base_speed_rpm": {"value": 19500},
+                "mgu_shaft_torque_nm": {"value": 116.45},
+                "total_dissipated_kw_continuous": {"value": 6.0},
+                "coolant_flow_l_min": {"value": 12.0},
+                "coolant_density_kg_m3": {"value": 1040.0},
+                "coolant_cp_j_kgk": {"value": 3500.0},
+                "coolant_delta_t_k": {"value": 8.24},
+            },
+        }
+    })
+    for worked in (tool or {}).get("worked", []):
+        input_symbols = {str(i.get("symbol")) for i in worked.get("inputs", [])}
+        missing = _formula_rhs_symbols(str(worked.get("formula") or "")) - input_symbols
+        if missing:
+            print(f"  FAIL: worked formula {worked.get('label')} has unbound symbols {sorted(missing)}")
+            bad += 1
     if bad:
         print(f"fpk_excel_live_plan selftest: {bad} FAIL")
         return 1
