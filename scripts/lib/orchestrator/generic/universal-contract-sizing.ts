@@ -1630,7 +1630,7 @@ function syncTractionPackEnclosureFromPrincipals(
   contract: ContractInProgress,
 ): void {
   if (!_tractionDrivePackSizingActive) return
-  const cq = (contract.quantities ?? {}) as Record<string, Record<string, unknown>>
+  const cq = (contract.quantities ?? {}) as unknown as Record<string, Record<string, unknown>>
   const qtyNums: Record<string, number> = {}
   for (const [k, v] of Object.entries(cq)) {
     const n = Number((v as { value?: unknown })?.value)
@@ -1677,7 +1677,7 @@ function syncTractionPackEnclosureFromPrincipals(
       'brief')
     stamp('enclosure_volume_m3', vol, 'm³', 'volume',
       `${(bay.w / 1000).toFixed(3)}×${(bay.d / 1000).toFixed(3)}×${(bay.h / 1000).toFixed(3)} m HARD bay — not grown from principals`)
-    contract.quantities = cq as typeof contract.quantities
+    contract.quantities = cq as unknown as typeof contract.quantities
     return
   }
   const dims: Array<{ w: number; d: number; h: number }> = []
@@ -1722,7 +1722,7 @@ function syncTractionPackEnclosureFromPrincipals(
     `design_envelope_height_mm = min(cap, max(160, max_principal_h×${margin})) = ${envH}`)
   stamp('enclosure_volume_m3', vol, 'm³', 'volume',
     `${(envW / 1000).toFixed(3)}×${(envD / 1000).toFixed(3)}×${(envH / 1000).toFixed(3)} m traction pack — synced from principals`)
-  contract.quantities = cq as typeof contract.quantities
+  contract.quantities = cq as unknown as typeof contract.quantities
 }
 
 /** True when a power group's phrase is thermal rejection / dissipation, not shaft/electrical. */

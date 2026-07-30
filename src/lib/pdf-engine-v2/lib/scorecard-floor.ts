@@ -1010,7 +1010,7 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
   )
   check(
     'scope_gate.car_level_skipped_scores_10',
-    carLevelSection.score === 10 && carLevelSection.defects.length === 0,
+    carLevelSection.score === 10 && (carLevelSection.defects ?? []).length === 0,
     JSON.stringify(carLevelSection),
   )
 
