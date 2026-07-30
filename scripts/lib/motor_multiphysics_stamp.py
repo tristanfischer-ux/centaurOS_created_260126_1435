@@ -29,9 +29,11 @@ ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 # These prove the *tools* run — never that the FIA twin geometry was solved.
 _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
     "magnetic": {
-        "software": "Pyleecan + xfemm",
+        "software": "Pyleecan + xfemm + analytical demag screen",
         "paths": [
             "scripts/motor-stack/em_magnetic_selftest.py",
+            "scripts/motor-stack/em_fia_front_kit_case.py",
+            "scripts/motor-stack/em_fia_demag_screen.py",
             "scripts/phantm/bin/femmcli",
         ],
         "versions": {
@@ -346,6 +348,11 @@ def _load_fia_magnetic_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]
     return _load_fia_case_json(twin_dir, "em_fia_front_kit_case.json")
 
 
+def _load_fia_demag_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA hot demagnetisation screen artefact if present."""
+    return _load_fia_case_json(twin_dir, "em_fia_demag_screen.json")
+
+
 def _load_fia_ross_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA ROSS rotor-dynamics case artefact if present."""
     return _load_fia_case_json(twin_dir, "ross_fia_front_kit_case.json")
@@ -393,16 +400,75 @@ def _load_fia_inverter_packaging_case(
     return _load_fia_case_json(twin_dir, "inverter_packaging_fia_front_kit_case.json")
 
 
+def _demag_screen_cite(
+    demag_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Cite twin-bound hot demag SCREEN when present; else leave OPEN.
+
+    INTENT: Surface analytical knee/Hci margin without claiming a full demag
+    map PASS.  Always keeps ship_ok false and demag_map OPEN.
+    """
+    if not isinstance(demag_case, Mapping):
+        return "OPEN"
+    screen = (
+        demag_case.get("screening_results")
+        if isinstance(demag_case.get("screening_results"), dict)
+        else {}
+    )
+    margins = (
+        demag_case.get("margins") if isinstance(demag_case.get("margins"), dict) else {}
+    )
+    works = (
+        demag_case.get("works_in_kit_context")
+        if isinstance(demag_case.get("works_in_kit_context"), dict)
+        else {}
+    )
+    demag_rel = "_motor_stack/em_fia_demag_screen.json"
+    return {
+        "status": demag_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": demag_rel,
+        "absolute_path": str((Path(twin_dir) / demag_rel).resolve()),
+        "magnet_grade": screen.get("magnet_grade") or works.get("magnet_grade"),
+        "magnet_temp_c": screen.get("magnet_temp_c") or works.get("magnet_temp_c"),
+        "phase_current_rms_a": screen.get("phase_current_rms_a"),
+        "current_angle_electrical_deg": screen.get("current_angle_electrical_deg"),
+        "h_knee_a_per_m": screen.get("h_knee_a_per_m") or margins.get("h_knee_a_per_m"),
+        "h_operating_a_per_m": (
+            screen.get("h_operating_a_per_m") or margins.get("h_operating_a_per_m")
+        ),
+        "demagnetisation_margin_ratio": (
+            screen.get("demagnetisation_margin_ratio")
+            or margins.get("demagnetisation_margin_ratio")
+            or works.get("demagnetisation_margin_ratio")
+        ),
+        "demagnetisation_margin_headroom": (
+            screen.get("demagnetisation_margin_headroom")
+            or margins.get("demagnetisation_margin_headroom")
+        ),
+        "demag_screen_ok": works.get("demag_screen_ok", margins.get("screen_ok")),
+        "demag_map": "OPEN",
+        "note": (
+            "Twin-bound analytical hot knee / Hci SCREEN (N42UH-class seed). "
+            "Not a full FE demag map; not supplier BH; not ship_ok."
+        ),
+    }
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
+    demag_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote magnetic check to PARTIAL when a twin-bound open-circuit point exists.
 
     INTENT: Make the FIA front-kit magnetic case visible without claiming a torque
-    map, demagnetisation margin, or dynamometer correlation (those stay OPEN).
+    map, full demagnetisation map PASS, or dynamometer correlation (those stay
+    OPEN).  When present, cite the analytical hot demag SCREEN margin.
     """
     fem = case.get("finite_element_point") if isinstance(case.get("finite_element_point"), dict) else {}
     loaded = case.get("loaded_point") if isinstance(case.get("loaded_point"), dict) else {}
@@ -429,13 +495,17 @@ def _magnetic_check_from_fia_case(
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     rel_ref = "_motor_stack/em_fia_front_kit_case.json"
     duty_ok = bool(works.get("duty_torque_screen_ok"))
+    demag_cite = _demag_screen_cite(demag_case, twin_dir=twin_dir)
+    demag_margin: Any = None
+    if isinstance(demag_cite, dict):
+        demag_margin = demag_cite.get("demagnetisation_margin_ratio")
     body = _open_check(
         "magnetic",
         extra={
             "status": "PARTIAL",
             "torque_map_ref": None,
             "loss_map_ref": None,
-            "demagnetisation_margin": None,
+            "demagnetisation_margin": demag_margin,
             "works_in_kit_context": duty_ok,
             "duty_torque_screen_ok": duty_ok,
             "torque_vs_required_ratio": works.get("torque_vs_required_ratio")
@@ -506,15 +576,20 @@ def _magnetic_check_from_fia_case(
                     if position_summary.get("n_positions")
                     else None
                 ),
+                "demag_screen": demag_cite,
+                "demagnetisation_margin": demag_margin,
                 "torque_map": "OPEN",
+                "demagnetisation_map": "OPEN",
                 "dynamometer_correlation": "OPEN",
                 "note": (
                     "Twin-bound OC + loaded magnetic screen on kit geometry, "
                     "optionally with a coarse rotor-position sweep at the "
-                    "screened current angle. works_in_kit_context / "
-                    "duty_torque_screen_ok = |FE torque| ≥ ~75% of analytical "
-                    "shaft torque at the reference position — NOT smoke-only, "
-                    "NOT full MTPA, NOT ship_ok. Torque map / dyno still OPEN."
+                    "screened current angle and an analytical hot demag SCREEN. "
+                    "works_in_kit_context / duty_torque_screen_ok = |FE torque| "
+                    "≥ ~75% of analytical shaft torque at the reference "
+                    "position — NOT smoke-only, NOT full MTPA, NOT demag map "
+                    "PASS, NOT ship_ok. Torque map / full demag map / dyno "
+                    "still OPEN."
                 ),
             },
         },
@@ -1228,12 +1303,23 @@ def build_motor_multiphysics(
     )
 
     fia_mag = _load_fia_magnetic_case(twin_dir)
+    fia_demag = _load_fia_demag_case(twin_dir)
     if fia_mag is not None and twin_dir is not None:
-        magnetic = _magnetic_check_from_fia_case(duty, fia_mag, twin_dir=Path(twin_dir))
-        notes += (
-            " Magnetic check PARTIAL: twin-bound open-circuit point in "
-            "_motor_stack/em_fia_front_kit_case.json (torque map / dyno still OPEN)."
+        magnetic = _magnetic_check_from_fia_case(
+            duty,
+            fia_mag,
+            twin_dir=Path(twin_dir),
+            demag_case=fia_demag,
         )
+        notes += (
+            " Magnetic check PARTIAL: twin-bound open-circuit / loaded point in "
+            "_motor_stack/em_fia_front_kit_case.json"
+        )
+        if fia_demag is not None:
+            notes += (
+                " + hot demag SCREEN in _motor_stack/em_fia_demag_screen.json"
+            )
+        notes += " (torque map / full demag map / dyno still OPEN)."
     else:
         magnetic = _open_check(
             "magnetic",
@@ -1551,12 +1637,13 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
         "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
-        "when a twin-bound artefact exists (magnetic point, ROSS critical-speed screen,",
-        "CalculiX rotor centrifugal screen, OpenFOAM cold-plate duct, gear-oil screen,",
-        "and/or ISO 6336-style gear-strength screen) while torque map, demagnetisation,",
-        "magnet-pocket burst, free-surface oil CFD, KISSsoft, load spectrum, module",
-        "temperatures, bearing identity, modal/dynamometer correlation and other",
-        "domains remain **OPEN**. `ship_ok` stays false.",
+        "when a twin-bound artefact exists (magnetic point, analytical hot demag",
+        "screen, ROSS critical-speed screen, CalculiX rotor centrifugal screen,",
+        "OpenFOAM cold-plate duct, gear-oil screen, and/or ISO 6336-style",
+        "gear-strength screen) while torque map, **full** demagnetisation map,",
+        "magnet-pocket burst release FoS, free-surface oil CFD, KISSsoft, load",
+        "spectrum, module temperatures, bearing identity, modal/dynamometer",
+        "correlation and other domains remain **OPEN**. `ship_ok` stays false.",
         "",
         "## FIA binding duties (why the solvers exist)",
         "",
@@ -1938,6 +2025,44 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "em_fia_demag_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.em_fia_demag_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "demag123",
+                    "screening_results": {
+                        "magnet_grade": "N42UH",
+                        "magnet_temp_c": 160.0,
+                        "phase_current_rms_a": 535.0,
+                        "current_angle_electrical_deg": -45.0,
+                        "h_knee_a_per_m": 507450.0,
+                        "h_operating_a_per_m": 242000.0,
+                        "demagnetisation_margin_ratio": 2.0969,
+                        "demagnetisation_margin_headroom": 0.5231,
+                        "screen_ok": True,
+                    },
+                    "margins": {
+                        "demagnetisation_margin_ratio": 2.0969,
+                        "demagnetisation_margin_headroom": 0.5231,
+                        "h_knee_a_per_m": 507450.0,
+                        "h_operating_a_per_m": 242000.0,
+                        "screen_ok": True,
+                        "demag_map_closed": False,
+                    },
+                    "works_in_kit_context": {
+                        "demag_screen_ok": True,
+                        "demagnetisation_margin_ratio": 2.0969,
+                        "magnet_temp_c": 160.0,
+                        "magnet_grade": "N42UH",
+                    },
+                    "demagnetisation_map": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "ross_fia_front_kit_case.json").write_text(
             json.dumps(
                 {
@@ -2199,6 +2324,37 @@ def selftest() -> int:
         mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
         if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
             print("FAIL: twin-bound FIA case must mark magnetic PARTIAL with result_ref")
+            bad += 1
+        if mag.get("demagnetisation_margin") != 2.0969:
+            print(
+                "FAIL: magnetic demagnetisation_margin must surface demag screen ratio"
+            )
+            bad += 1
+        mag_twin = mag.get("twin_bound_case") or {}
+        demag_cite = mag_twin.get("demag_screen")
+        if not isinstance(demag_cite, dict) or demag_cite.get("status") != "PARTIAL":
+            print(
+                "FAIL: magnetic twin_bound_case must cite demag screen as PARTIAL "
+                "when artefact present"
+            )
+            bad += 1
+        elif demag_cite.get("magnet_grade") != "N42UH":
+            print("FAIL: demag cite must surface magnet grade")
+            bad += 1
+        elif demag_cite.get("magnet_temp_c") != 160.0:
+            print("FAIL: demag cite must surface magnet temperature")
+            bad += 1
+        elif demag_cite.get("h_knee_a_per_m") != 507450.0:
+            print("FAIL: demag cite must surface knee field")
+            bad += 1
+        elif demag_cite.get("ship_ok") is not False:
+            print("FAIL: demag cite must keep ship_ok false")
+            bad += 1
+        elif demag_cite.get("demag_map") != "OPEN":
+            print("FAIL: demag cite must leave full demag map OPEN")
+            bad += 1
+        if mag.get("status") == "PASS" or mag_twin.get("ship_ok") is True:
+            print("FAIL: magnetic must remain PARTIAL with ship_ok false")
             bad += 1
         ross = partial_payload["motorMultiphysics"]["required_checks"]["rotor_dynamics"]
         if ross.get("status") != "PARTIAL" or not ross.get("result_ref"):

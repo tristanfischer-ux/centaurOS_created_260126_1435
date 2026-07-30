@@ -121,10 +121,20 @@ and a best angle near −45°, the live twin returns about **−96 N·m** (~77% 
 the required ~125 N·m) and sets `works_in_kit_context.duty_torque_screen_ok`
 when that ratio clears 75%. That is a kit-context screen, not a torque map.
 Position sweeps, 24-vs-48 slot reconciliation, voltage closure, losses and
-demagnetisation remain OPEN. The artefact keeps the torque map and
+**full** demagnetisation maps remain OPEN. The artefact keeps the torque map and
 dynamometer correlation `OPEN`, status `PARTIAL`, and `ship_ok: false`.
 
-Run the synthetic proveCatch separately:
+A companion analytical hot demagnetisation SCREEN (N42UH-class knee / Hci vs
+Id-projected armature H at ~160 °C) is available without claiming map PASS:
+
+```bash
+python3 scripts/motor-stack/em_fia_demag_screen.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+# → _motor_stack/em_fia_demag_screen.json  (PARTIAL, ship_ok false)
+python3 scripts/motor-stack/em_fia_demag_screen.py --selftest
+```
+
+Run the EM synthetic proveCatch separately:
 
 ```bash
 .venv-motor/bin/python scripts/motor-stack/em_fia_front_kit_case.py --selftest
