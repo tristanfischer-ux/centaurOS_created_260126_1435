@@ -10130,7 +10130,7 @@ _VERIF_STOP_TOKENS = frozenset({
     "mm", "cm", "um", "nm", "m", "km", "au", "ma", "ua", "na", "a", "ka",
     "mv", "uv", "v", "kv", "mw", "uw", "nw", "w", "kw", "db", "hz", "khz",
     "mhz", "ghz", "kg", "g", "mg", "ug", "l", "ml", "ul", "pa", "kpa", "mpa",
-    "bar", "ohm", "deg", "degc", "c", "k", "s", "ms", "us", "h", "yr",
+    "bar", "ohm", "deg", "degc", "c", "k", "rpm", "s", "ms", "us", "h", "yr",
 })
 # Signal → BoM requirement noun family (realisation: maths demand must appear as a part).
 _REALISATION_BOM_SIGNALS = (
@@ -10482,8 +10482,10 @@ def _match_worked_to_quantity(qname: str, qval: float, qunit: str,
         # with tip_speed_m_s (base). Also skip bare "Rotor tip speed" from the
         # centrifugal-stress tool (pre-retention label on live toolsUsedPage) —
         # that 247 m/s vs 224 m/s HARD-failed Verification at ~10%.
-        if re.search(r"\bretention\b|\boverspeed\b", lab, re.I) and not re.search(
-                r"retention|overspeed", qname, re.I):
+        if (
+                re.search(r"\bretention\b|\boverspeed\b", lab, re.I)
+                and re.search(r"tip\s*speed", lab, re.I)
+                and not re.search(r"retention|overspeed", qname, re.I)):
             continue
         if (re.search(r"rotor-centrifugal|retention", str(w.get("tool_id") or ""), re.I)
                 and re.search(r"tip\s*speed", lab, re.I)
