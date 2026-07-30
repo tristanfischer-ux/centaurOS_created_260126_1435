@@ -39,7 +39,7 @@ Just landed: post-diff CadQuery family seeded; Excel revision mismatch gate; Ble
 | Hardware holds visible (step 8 register) | **DONE as register** | Closing holds = real dyno/HIL/flow — **not software** |
 | Diff nest strength | **Screen cleared** via cut-torque | Post-diff stage still packaging OPEN |
 | Post-diff ×4 stage | **CAD family seeded** | Blender interface still OPEN |
-| Planetary fits rotor bore | **FAILING** (ring 126 vs bore ~93) | Must reconcile — in progress |
+| Planetary fits rotor bore | **BLOCKED** `PLANETARY_STRENGTH_VS_ROTOR_BORE` | FoS≥1.2 needs tip~128 mm; bore is 92.7 mm; best-in-bore FoS≈0.89. Pick: enlarge bore / change teeth / external planetary |
 | EM evidence | PARTIAL screens (MTPA + voltage/FW) | Closed map + dyno still open |
 | Cooling | PARTIAL (duct + lumped temp) | Full CHT + bench still open |
 | `ship_ok = true` | **Forbidden until above + hardware** | Do not celebrate early |
