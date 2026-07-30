@@ -590,6 +590,35 @@ def append_word_to_module(state: dict[str, Any], module_id: str, word: dict[str,
     words.append(word)
 
 
+def sync_cost_stack_from_requirements_bom(state: dict[str, Any], rb_rows: list[dict[str, Any]]) -> bool:
+    """Align material-cost anchors to the authoritative requirementsBom sum.
+
+    @description FPK densify appends make-to-print concept rows after the original
+    costStack was calculated. Raw-materials cost must therefore follow the bill, not
+    remain at the pre-densify value.
+    @param state Runtime chain state mutated in place.
+    @param rb_rows Current requirementsBom rows.
+    @returns True when a cost anchor changed.
+    @throws This helper does not intentionally raise.
+    """
+    total = round(
+        sum(float(row.get("line_gbp") or 0.0) for row in rb_rows if isinstance(row, dict)),
+        2,
+    )
+    changed = False
+    cost_stack = state.get("costStack")
+    if isinstance(cost_stack, dict):
+        for key in ("raw_materials_bom_gbp", "bom_total_gbp"):
+            if key in cost_stack and cost_stack.get(key) != total:
+                cost_stack[key] = total
+                changed = True
+    cost_reality = state.get("cost_reality")
+    if isinstance(cost_reality, dict) and cost_reality.get("bom_total_gbp") != total:
+        cost_reality["bom_total_gbp"] = total
+        changed = True
+    return changed
+
+
 def repair_existing_densify_rows(
     rb_rows: list[dict[str, Any]],
     leaves: list[dict[str, Any]],
@@ -731,6 +760,7 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
         literature,
         roles,
     )
+    cost_stack_synced = sync_cost_stack_from_requirements_bom(state, rb_rows)
 
     words.clear()
     walk_words(state.get("moduleDecomposition") or {}, words)
@@ -753,6 +783,7 @@ def densify_state(state: dict[str, Any], db_path: Path) -> dict[str, Any]:
         "priced_rows_repaired": priced_repaired,
         "requirements_bom_before": rb_before,
         "requirements_bom_after": len(rb_rows),
+        "cost_stack_synced": cost_stack_synced,
         "dimension_modifiers_added": dims_added,
         "material_modifiers_added": mats_added,
         "physics_leaves_seen": len(leaves),
@@ -826,6 +857,8 @@ def run_selftest() -> int:
                 "line_gbp": 1,
             }
         ],
+        "costStack": {"raw_materials_bom_gbp": 1},
+        "cost_reality": {"bom_total_gbp": 1},
         "fpkConcentricGeometry": {"housing_od_mm": 200, "housing_len_mm": 300},
         "fpkPhysicsTree": {
             "part_index": [
@@ -853,6 +886,10 @@ def run_selftest() -> int:
     assert stamp["bill_lines_after"] >= 3, stamp
     assert stamp["concept_lines_added"] >= 2, stamp
     assert stamp["concept_lines_added"] < 20, stamp
+    rb_sum = round(sum(float(row.get("line_gbp") or 0) for row in state["requirementsBom"]), 2)
+    assert stamp["cost_stack_synced"] is True, stamp
+    assert state["costStack"]["raw_materials_bom_gbp"] == rb_sum, state["costStack"]
+    assert state["cost_reality"]["bom_total_gbp"] == rb_sum, state["cost_reality"]
     for row in state["requirementsBom"]:
         part = str(row.get("part") or "")
         assert "Mouser" not in part and "fake" not in part.lower()

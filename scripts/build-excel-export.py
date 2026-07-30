@@ -33140,6 +33140,17 @@ def _selftest() -> int:
                           if str(_cws.cell(rr, 1).value or "").startswith("Raw materials")), None)
         if not (isinstance(_raw_cell, str) and _raw_cell.startswith("=") and _LEDGER_SHEET in _raw_cell):
             print(f"  FAIL waterfall-raw-source: Raw materials must LINK to the BoM Ledger Σ, got {_raw_cell!r}"); bad += 1
+        _stale_cost = {
+            "requirementsBom": [{"line_gbp": 100.25}, {"line_gbp": 200.25}],
+            "cost_reality": {"bom_total_gbp": 1.0},
+            "costStack": {"raw_materials_bom_gbp": 1.0},
+        }
+        if not _sync_cost_anchors_to_bom_sum(_stale_cost, 300.5):
+            print("  FAIL waterfall-cost-sync: stale costStack anchor must report a mutation"); bad += 1
+        if _stale_cost["costStack"]["raw_materials_bom_gbp"] != 300.5 \
+                or _stale_cost["cost_reality"]["bom_total_gbp"] != 300.5:
+            print(f"  FAIL waterfall-cost-sync: cost anchors must equal Σ requirementsBom "
+                  f"(got {_stale_cost})"); bad += 1
         # (7b) WATERFALL BAR DERIVATION (issue 8): the assembly + installation bars must be
         # LIVE =SUM() formulas over the class-factor derivation table, with a basis string
         # naming the derivation — NEVER a bare scalar with a bare costStack key.
