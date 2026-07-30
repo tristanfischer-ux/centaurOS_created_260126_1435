@@ -24,11 +24,11 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~17:30:** **Software screens advancing — still not race-ready.**  
-Happy about: all **7** checks PARTIAL; magnetics position sweep (0/15/30/45° mech) at −45° elec; **gear_strength** now **works=yes** after strength-driven resize (**m=1.0 mm, face=58 mm, 4 planets**, FoS≈1.21) while packaging seed FoS≈0.18 retained as FAIL; Excel Q&A mirrors stamp.  
-Not done: full MTPA/FW map, demag, dyno, HIL, free-surface oil CFD, KISSsoft, case FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
+**Overall mood as of 2026-07-30 ~18:00:** **Software screens advancing — still not race-ready.**  
+Happy about: all **7** checks PARTIAL + kit-context **yes**; gear resize writeback (**m=1.0 / face=58 / n=4**, FoS≈1.21); EM position sweep; magnet-pocket bridge FEA (~147 MPa vs 355); case/mount analytical screen (governing FoS≈3.86); Excel Q&A mirrors stamp.  
+Not done: full MTPA/FW/demag, dyno/HIL, free-surface oil CFD, KISSsoft, full cast-case FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
 
-**Last scoreboard update:** 2026-07-30 (gear FoS resize + EM rotor-position sweep).
+**Last scoreboard update:** 2026-07-30 (gear writeback + magnet pocket + case/mount screens).
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
