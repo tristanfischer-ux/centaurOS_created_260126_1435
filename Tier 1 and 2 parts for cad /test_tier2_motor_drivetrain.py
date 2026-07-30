@@ -128,6 +128,43 @@ class PlanetaryGearsetTests(unittest.TestCase):
             )
 
 
+class PostDiffFinalDriveHelicalTests(unittest.TestCase):
+    """Prove the dual post-differential stage is real ratio-four gear geometry."""
+
+    def test_default_stage_builds_four_helical_gears_inside_screened_envelope(
+        self,
+    ) -> None:
+        model = MODULE.post_diff_final_drive_helical({})
+        bbox = model.val().BoundingBox()
+        metrics = MODULE.post_diff_final_drive_helical_metrics({})
+
+        self.assertEqual(model.solids().size(), 4)
+        self.assertAlmostEqual(metrics["ratio"], 4.0, places=6)
+        self.assertEqual(metrics["pair_count"], 2)
+        self.assertLessEqual(bbox.xlen, 172.2782)
+        self.assertLessEqual(bbox.ylen, 132.0)
+        self.assertLessEqual(bbox.zlen, 192.0)
+
+    def test_ratio_mismatch_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "ratio"):
+            MODULE.post_diff_final_drive_helical(
+                {
+                    "pinion_teeth": 19,
+                    "wheel_teeth": 72,
+                    "ratio_target": 4.0,
+                }
+            )
+
+    def test_family_registry_preserves_ratio_four_defaults(self) -> None:
+        family = MODULE.TIER2_MOTOR_DRIVETRAIN["post_diff_final_drive_helical"]
+        schema = family["param_schema"]
+
+        self.assertEqual(schema["pinion_teeth"]["default"], 18)
+        self.assertEqual(schema["wheel_teeth"]["default"], 72)
+        self.assertEqual(schema["pair_count"]["default"], 2)
+        self.assertEqual(family["category"], "drivetrain")
+
+
 class ColdPlateSerpentineTests(unittest.TestCase):
     """Prove serpentine fluid path rules and hydraulic-diameter emission."""
 

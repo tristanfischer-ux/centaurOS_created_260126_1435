@@ -30,6 +30,8 @@ ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 # with permanent unblock paths — never chat-only, never greenwashed to ship_ok.
 BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
 BLOCKER_ID_POST_DIFF_FINAL_DRIVE = "POST_DIFF_FINAL_DRIVE_PACKAGING"
+POST_DIFF_FINAL_DRIVE_COMPONENT_ID = "post_diff_final_drive"
+POST_DIFF_FINAL_DRIVE_CAD_FAMILY = "post_diff_final_drive_helical"
 POST_DIFF_PACKAGING_SCREEN_FILENAME = (
     "post_diff_final_drive_packaging_screen.json"
 )
@@ -340,9 +342,18 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
         "notes": (
             "Architecture communication — twin-bound straight-bevel handbook "
             "SCREEN may be cited under gear_strength.twin_bound_case; "
-            "post-diff final-drive packaging screen may be PARTIAL but its "
-            "parametric CAD family remains OPEN; ISO 23509 / KISSsoft / "
-            "contact pattern still OPEN"
+            "ISO 23509 / KISSsoft / contact pattern still OPEN"
+        ),
+    },
+    {
+        "component_id": POST_DIFF_FINAL_DRIVE_COMPONENT_ID,
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": POST_DIFF_FINAL_DRIVE_CAD_FAMILY,
+        "notes": (
+            "Dual 18:72 ratio-four helical pairs are seeded as rebuildable "
+            "CadQuery/cq_gears concept geometry. Blender/interface integration, "
+            "ISO 6336/AGMA strength, bearings, shafts, and lubrication remain OPEN."
         ),
     },
     {
@@ -401,6 +412,21 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
         "notes": "HV/LV/coolant shells — FIA port XYZ OPEN",
     },
 ]
+
+
+def _post_diff_parametric_family_registration() -> Optional[dict[str, Any]]:
+    """Return the source-owned post-differential CAD registration, if valid."""
+    return next(
+        (
+            row
+            for row in _PRINCIPAL_COMPONENTS
+            if row.get("component_id") == POST_DIFF_FINAL_DRIVE_COMPONENT_ID
+            and row.get("authority_level") == "parametric_family"
+            and row.get("source_type") == "cadquery_family"
+            and row.get("cad_family") == POST_DIFF_FINAL_DRIVE_CAD_FAMILY
+        ),
+        None,
+    )
 
 
 def _iso_now() -> str:
@@ -1514,6 +1540,8 @@ def _post_diff_packaging_cite_from_case(
         if isinstance(packaging_case.get("architecture_blocker"), Mapping)
         else {}
     )
+    family_registration = _post_diff_parametric_family_registration()
+    family_registered = family_registration is not None
     return {
         "status": packaging_case.get("status") or "PARTIAL",
         "ship_ok": False,
@@ -1521,15 +1549,23 @@ def _post_diff_packaging_cite_from_case(
         "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
         "bay_fit": packaging_case.get("bay_fit"),
         "envelope_mm": dict(envelope),
-        "parametric_family_exists": cad.get("parametric_family_exists") is True,
-        "cad_family": cad.get("cad_family"),
-        "cad_status": cad.get("status") or "OPEN",
+        "screen_recorded_parametric_family_exists": (
+            cad.get("parametric_family_exists") is True
+        ),
+        "parametric_family_exists": family_registered,
+        "cad_family": (
+            family_registration.get("cad_family")
+            if family_registration
+            else cad.get("cad_family")
+        ),
+        "cad_status": "SOFTWARE_SEEDED" if family_registered else "OPEN",
         "blocker_may_clear": closure.get("blocker_may_clear") is True,
         "blocker_status": blocker.get("status") or "OPEN",
         "summary": blocker.get("summary"),
         "note": (
-            "Twin-bound analytical envelope screen only; no tooth-strength, "
-            "bearing/shaft/lubrication close or parametric/release CAD claim."
+            "Twin-bound analytical envelope screen plus rebuildable concept CAD; "
+            "no Blender/interface, tooth-strength, bearing/shaft/lubrication, "
+            "or release-CAD close."
         ),
     }
 
@@ -1655,18 +1691,31 @@ def _post_diff_unblock_options(
         return options
     package_option = options[0]
     if isinstance(packaging, Mapping):
+        family_registration = _post_diff_parametric_family_registration()
+        family_registered = family_registration is not None
+        software_screen_ok = (
+            packaging.get("bay_fit") is True and family_registered
+        )
         package_option.update(
             {
-                "progress_status": "PARTIAL_PACKAGING_SCREEN",
+                "progress_status": (
+                    "SOFTWARE_SEEDED"
+                    if software_screen_ok
+                    else "PARTIAL_PACKAGING_SCREEN"
+                ),
                 "progress_evidence_path": packaging.get("path")
                 or f"_motor_stack/{POST_DIFF_PACKAGING_SCREEN_FILENAME}",
                 "bay_fit_screen": packaging.get("bay_fit"),
-                "parametric_family_exists": (
-                    packaging.get("parametric_family_exists") is True
+                "parametric_family_exists": family_registered,
+                "cad_family": (
+                    family_registration.get("cad_family")
+                    if family_registration
+                    else None
                 ),
+                "software_packaging_screen_ok": software_screen_ok,
                 "remaining_work": (
-                    "Create a revision-bound parametric gear/bearing/shaft/case "
-                    "family, sync Blender, then close strength and lubrication."
+                    "Sync the seeded stage into Blender, bind differential and "
+                    "halfshaft interfaces, then close strength and lubrication."
                 ),
             }
         )
@@ -1756,13 +1805,32 @@ def collect_architecture_blockers(
             else None
         )
         bay_fit = packaging.get("bay_fit") if packaging else None
-        parametric_family_exists = (
-            packaging.get("parametric_family_exists") is True
-            if packaging
-            else False
+        family_registration = _post_diff_parametric_family_registration()
+        parametric_family_exists = family_registration is not None
+        cad_family = (
+            family_registration.get("cad_family")
+            if family_registration
+            else None
         )
-        closure_eligible = bool(bay_fit and parametric_family_exists)
+        software_packaging_screen_ok = bool(
+            bay_fit is True and parametric_family_exists
+        )
+        # GOTCHA: software geometry progress is not release closure. The blocker
+        # remains OPEN until Blender proves interfaces and engineering checks close.
+        closure_eligible = False
         packaging_summary = packaging.get("summary") if packaging else None
+        summary = (
+            "CAD family seeded — Blender/interface still OPEN; the bay envelope "
+            "screen passes, but gear strength, bearings, shafts, lubrication, "
+            "tolerances, and release authority remain OPEN."
+            if software_packaging_screen_ok
+            else packaging_summary
+            or residual.get("summary")
+            or (
+                "Differential torque budget clears the bevel nest, but the "
+                "remaining post-differential final-drive stage is not packaged."
+            )
+        )
         blockers.append(
             {
                 "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
@@ -1789,14 +1857,16 @@ def collect_architecture_blockers(
                     packaging.get("envelope_mm") if packaging else None
                 ),
                 "parametric_family_exists": parametric_family_exists,
-                "cad_family": packaging.get("cad_family") if packaging else None,
-                "closure_eligible": closure_eligible,
-                "summary": packaging_summary
-                or residual.get("summary")
-                or (
-                    "Differential torque budget clears the bevel nest, but the "
-                    "remaining post-differential final-drive stage is not packaged."
+                "cad_family": cad_family,
+                "software_packaging_screen_ok": software_packaging_screen_ok,
+                "software_progress_status": (
+                    "SOFTWARE_SEEDED"
+                    if software_packaging_screen_ok
+                    else "PACKAGING_OR_CAD_OPEN"
                 ),
+                "blender_interface_status": "OPEN",
+                "closure_eligible": closure_eligible,
+                "summary": summary,
                 "permanent_unblock_options": _post_diff_unblock_options(packaging),
                 "human_decision_required": True,
             }
@@ -2326,6 +2396,8 @@ def build_cad_authority(
                 "authority_level": level,
                 "source_type": row["source_type"],
                 "cad_family": row.get("cad_family"),
+                "release_authority": level
+                in ("supplier_authoritative", "team_release_cad"),
                 "source_revision": None,
                 "source_hash": None,
                 "interface_revision": None,
@@ -2524,7 +2596,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             "",
             f"- Principal components: **{cad.get('principal_components_total')}**",
             f"- Parametric family: **{cad.get('parametric_family_count')}** "
-            f"(stator + rotor carrier + planetary; not release CAD)",
+            f"(rebuildable concept families; not release CAD)",
             f"- Communication only: **{cad.get('communication_only_count')}**",
             f"- Release authority (supplier/team): **{cad.get('release_authority_count')}** "
             f"/ coverage **{cad.get('release_authority_coverage')}**",
@@ -3952,19 +4024,34 @@ def selftest() -> int:
         elif residual_blockers[0].get("bay_fit") is not True:
             print("FAIL: post-diff blocker must surface packaging-screen bay_fit")
             bad += 1
-        elif residual_blockers[0].get("parametric_family_exists") is not False:
-            print("FAIL: post-diff blocker must keep parametric CAD family OPEN")
+        elif residual_blockers[0].get("parametric_family_exists") is not True:
+            print("FAIL: post-diff blocker must surface seeded parametric CAD family")
+            bad += 1
+        elif (
+            residual_blockers[0].get("cad_family")
+            != POST_DIFF_FINAL_DRIVE_CAD_FAMILY
+        ):
+            print("FAIL: post-diff blocker must name the seeded CadQuery family")
+            bad += 1
+        elif residual_blockers[0].get("software_packaging_screen_ok") is not True:
+            print("FAIL: bay fit plus seeded CAD must record software screen progress")
+            bad += 1
+        elif residual_blockers[0].get("software_progress_status") != "SOFTWARE_SEEDED":
+            print("FAIL: post-diff blocker must distinguish SOFTWARE_SEEDED progress")
             bad += 1
         elif residual_blockers[0].get("closure_eligible") is not False:
-            print("FAIL: fit without parametric CAD must not clear post-diff blocker")
+            print("FAIL: software-seeded CAD must not clear the release blocker")
+            bad += 1
+        elif residual_blockers[0].get("blender_interface_status") != "OPEN":
+            print("FAIL: Blender/interface must remain OPEN after software CAD seed")
             bad += 1
         elif not any(
             isinstance(option, Mapping)
             and option.get("option_id") == "package_post_diff_final_drive"
-            and option.get("progress_status") == "PARTIAL_PACKAGING_SCREEN"
+            and option.get("progress_status") == "SOFTWARE_SEEDED"
             for option in residual_blockers[0].get("permanent_unblock_options") or []
         ):
-            print("FAIL: permanent unblock must record PARTIAL packaging progress")
+            print("FAIL: permanent unblock must record SOFTWARE_SEEDED progress")
             bad += 1
         if BLOCKER_ID_DIFF_NEST in json.dumps(residual_blockers):
             print("FAIL: DIFF_NEST blocker must stop once budgeted FoS clears")
@@ -3986,7 +4073,7 @@ def selftest() -> int:
             bad += 1
         residual_markdown = render_markdown(residual_payload)
         if (
-            "PARTIAL_PACKAGING_SCREEN" not in residual_markdown
+            "SOFTWARE_SEEDED" not in residual_markdown
             or "_motor_stack/post_diff_final_drive_packaging_screen.json"
             not in residual_markdown
         ):

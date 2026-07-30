@@ -33,6 +33,11 @@ DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
 OUTPUT_FILENAME = "post_diff_final_drive_packaging_screen.json"
 SCHEMA = "forgeos.motor_stack.post_diff_final_drive_packaging_screen/v1"
 BLOCKER_ID = "POST_DIFF_FINAL_DRIVE_PACKAGING"
+CAD_FAMILY = "post_diff_final_drive_helical"
+CAD_FAMILY_SOURCE = (
+    "Tier 1 and 2 parts for cad /tier2_motor_drivetrain.py"
+    "#post_diff_final_drive_helical"
+)
 
 # Compact helical screening seed. These are not released tooth proportions.
 PINION_TEETH = 18
@@ -327,8 +332,9 @@ def build_artifact(
     if screen.bay_fit:
         blocker_summary = (
             "The compact dual post-diff 4:1 helical-pair seed fits the bay envelope "
-            "as a first packaging screen, but no parametric family or released "
-            "gear/bearing/shaft/lubrication design exists; blocker remains OPEN."
+            "and its parametric CadQuery family is seeded, but Blender/interface "
+            "integration and the released gear/bearing/shaft/lubrication design "
+            "remain OPEN."
         )
     else:
         blocker_summary = (
@@ -398,13 +404,14 @@ def build_artifact(
             "margin": screen.short_edge_margin_mm,
         },
         "cad_authority": {
-            "status": "OPEN",
-            "parametric_family_exists": False,
-            "cad_family": None,
+            "status": "SOFTWARE_SEEDED",
+            "parametric_family_exists": True,
+            "cad_family": CAD_FAMILY,
+            "source": CAD_FAMILY_SOURCE,
             "release_cad": False,
             "note": (
-                "No CadQuery family is claimed. The dimensions are an analytical "
-                "rectangular envelope only."
+                "Rebuildable 18:72 dual-helical concept geometry exists. It is not "
+                "revision-bound release CAD and has not been placed in Blender."
             ),
         },
         "architecture_blocker": {
@@ -418,16 +425,19 @@ def build_artifact(
             "bay_fit_required": True,
             "bay_fit": screen.bay_fit,
             "parametric_family_required": True,
-            "parametric_family_exists": False,
+            "parametric_family_exists": True,
+            "software_packaging_screen_ok": screen.bay_fit,
+            "blender_interface_status": "OPEN",
             "blocker_may_clear": False,
             "reason": (
-                "POST_DIFF blocker may clear only after bay_fit=true and a "
-                "revision-bound parametric family exists; this artefact supplies "
-                "only the first condition."
+                "Bay fit plus concept CAD records SOFTWARE_SEEDED progress only. "
+                "POST_DIFF remains OPEN until Blender proves differential/halfshaft "
+                "interfaces and release engineering checks close."
             ),
         },
         "honesty_notes": [
             "PARTIAL packaging screen only; never a CAD release or ship permission.",
+            "CadQuery family seeded; Blender/interface integration remains OPEN.",
             "No ISO 6336/AGMA tooth-strength, micropitting, scuffing, or spectrum life close.",
             "No bearing life, shaft deflection, spline, seal, tolerance, NVH, or lubrication close.",
             "Dual output stages preserve differential action only if both mirrored gear paths and halfshaft interfaces are packaged as assumed.",
@@ -476,8 +486,12 @@ def selftest() -> int:
         "blocker_stays_open": (
             nominal_artifact["architecture_blocker"]["status"] == "OPEN"
         ),
-        "cad_family_stays_open": (
-            nominal_artifact["cad_authority"]["parametric_family_exists"] is False
+        "cad_family_seeded_but_release_stays_open": (
+            nominal_artifact["cad_authority"]["parametric_family_exists"] is True
+            and nominal_artifact["cad_authority"]["cad_family"]
+            == "post_diff_final_drive_helical"
+            and nominal_artifact["closure_gate"]["software_packaging_screen_ok"]
+            is True
             and nominal_artifact["closure_gate"]["blocker_may_clear"] is False
         ),
     }

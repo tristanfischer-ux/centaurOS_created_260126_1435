@@ -382,6 +382,162 @@ def planetary_gearset(params: dict[str, object]) -> cq.Workplane:
     return cq.Workplane("XY").gear(gearset)
 
 
+def _resolve_post_diff_final_drive_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate the dual post-differential helical-stage geometry."""
+    normal_module = _number(params, "normal_module", 1.15)
+    pinion_teeth = int(params.get("pinion_teeth", 18))
+    wheel_teeth = int(params.get("wheel_teeth", 72))
+    width = _number(params, "width", 22.0)
+    helix_angle = _number(params, "helix_angle_deg", 20.0)
+    pressure_angle = _number(params, "pressure_angle_deg", 20.0)
+    input_bore = _number(params, "input_bore_diameter", 12.0)
+    output_bore = _number(params, "output_bore_diameter", 20.0)
+    diff_clear_span = _number(params, "diff_clear_span", 108.0)
+    backlash = _optional_non_negative(params, "backlash", 0.05)
+    ratio_target = _number(params, "ratio_target", 4.0)
+    ratio_tolerance = _number(params, "ratio_tolerance", 0.10)
+    pair_count = int(params.get("pair_count", 2))
+
+    if pinion_teeth < 12 or wheel_teeth < 12:
+        raise ValueError("pinion_teeth and wheel_teeth must each be at least 12")
+    if pair_count != 2:
+        raise ValueError(
+            "pair_count must be 2 so both differential outputs retain reduction"
+        )
+    if helix_angle >= 45.0:
+        raise ValueError("helix_angle_deg must stay below 45 degrees")
+    ratio = wheel_teeth / pinion_teeth
+    if abs(ratio - ratio_target) > ratio_tolerance:
+        raise ValueError(
+            f"tooth-count ratio {ratio:.4f} does not match ratio_target "
+            f"{ratio_target:.4f} within ratio_tolerance {ratio_tolerance:.4f}"
+        )
+
+    transverse_module = normal_module / math.cos(math.radians(helix_angle))
+    pinion_root_diameter = transverse_module * max(pinion_teeth - 2.5, 1.0)
+    wheel_root_diameter = transverse_module * max(wheel_teeth - 2.5, 1.0)
+    if input_bore >= pinion_root_diameter:
+        raise ValueError("input_bore_diameter must stay inside the pinion root")
+    if output_bore >= wheel_root_diameter:
+        raise ValueError("output_bore_diameter must stay inside the wheel root")
+
+    return {
+        "normal_module": normal_module,
+        "transverse_module": transverse_module,
+        "pinion_teeth": pinion_teeth,
+        "wheel_teeth": wheel_teeth,
+        "width": width,
+        "helix_angle_deg": helix_angle,
+        "pressure_angle_deg": pressure_angle,
+        "input_bore_diameter": input_bore,
+        "output_bore_diameter": output_bore,
+        "diff_clear_span": diff_clear_span,
+        "backlash": backlash,
+        "ratio": ratio,
+        "ratio_target": ratio_target,
+        "ratio_tolerance": ratio_tolerance,
+        "pair_count": pair_count,
+        "center_distance": transverse_module * (pinion_teeth + wheel_teeth) / 2.0,
+    }
+
+
+def post_diff_final_drive_helical_metrics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit ratio and pitch geometry for the dual post-differential stage.
+
+    INTENT: Keep the analytical packaging screen and rebuildable tooth geometry
+    tied to the same ratio-four, 18:72 dimensional contract.
+    """
+    p = _resolve_post_diff_final_drive_params(params)
+    transverse_module = float(p["transverse_module"])
+    return {
+        "pair_count": int(p["pair_count"]),
+        "ratio": float(p["ratio"]),
+        "normal_module_mm": float(p["normal_module"]),
+        "transverse_module_mm": transverse_module,
+        "pinion_teeth": int(p["pinion_teeth"]),
+        "wheel_teeth": int(p["wheel_teeth"]),
+        "pinion_pitch_diameter_mm": transverse_module * int(p["pinion_teeth"]),
+        "wheel_pitch_diameter_mm": transverse_module * int(p["wheel_teeth"]),
+        "center_distance_mm": float(p["center_distance"]),
+        "face_width_mm": float(p["width"]),
+        "diff_clear_span_mm": float(p["diff_clear_span"]),
+    }
+
+
+def post_diff_final_drive_helical(params: dict[str, object]) -> cq.Workplane:
+    """Build two mirrored 4:1 parallel-axis helical gear pairs.
+
+    INTENT: Provide real tooth geometry for the reduction after an open
+    differential, so each side output retains differential action while gaining
+    the selected ratio. This is concept CAD for packaging and interfaces, not
+    ISO 6336/AGMA strength, bearing-life, lubrication, or release authority.
+
+    DECISION: cq_gears ``SpurGear`` generates both spur and helical solids; signed
+    helix angles provide opposite hands within each external mesh. The two pairs
+    sit on opposite sides of the differential clear span.
+    """
+    try:
+        from cq_gears import SpurGear
+    except ImportError as exc:  # pragma: no cover - environment-dependent
+        raise ImportError(
+            "post_diff_final_drive_helical requires cq_gears "
+            "(pip install -r assets/edu-training-cad/cq-gears-planetary/"
+            "requirements.txt)"
+        ) from exc
+
+    p = _resolve_post_diff_final_drive_params(params)
+    transverse_module = float(p["transverse_module"])
+    width = float(p["width"])
+    center_distance = float(p["center_distance"])
+    diff_clear_span = float(p["diff_clear_span"])
+    pressure_angle = float(p["pressure_angle_deg"])
+    helix_angle = float(p["helix_angle_deg"])
+    backlash = float(p["backlash"])
+
+    solids: list[cq.Shape] = []
+    for side_index, z_offset in enumerate(
+        (-diff_clear_span / 2.0 - width, diff_clear_span / 2.0)
+    ):
+        hand = 1.0 if side_index == 0 else -1.0
+        pinion = (
+            cq.Workplane("XY")
+            .gear(
+                SpurGear(
+                    module=transverse_module,
+                    teeth_number=int(p["pinion_teeth"]),
+                    width=width,
+                    pressure_angle=pressure_angle,
+                    helix_angle=hand * helix_angle,
+                    backlash=backlash,
+                    bore_d=float(p["input_bore_diameter"]),
+                )
+            )
+            .translate((0.0, 0.0, z_offset))
+        )
+        wheel = (
+            cq.Workplane("XY")
+            .gear(
+                SpurGear(
+                    module=transverse_module,
+                    teeth_number=int(p["wheel_teeth"]),
+                    width=width,
+                    pressure_angle=pressure_angle,
+                    helix_angle=-hand * helix_angle,
+                    backlash=backlash,
+                    bore_d=float(p["output_bore_diameter"]),
+                )
+            )
+            .translate((0.0, center_distance, z_offset))
+        )
+        solids.extend((pinion.val(), wheel.val()))
+
+    return cq.Workplane(obj=cq.Compound.makeCompound(solids))
+
+
 def cold_plate_serpentine_hydraulics(params: dict[str, object]) -> dict[str, float | int]:
     """Emit rectangular-channel hydraulic scalars for the serpentine family.
 
@@ -899,6 +1055,82 @@ TIER2_MOTOR_DRIVETRAIN = {
             "use": "parametric planetary training geometry; not customer geometry",
         },
     },
+    "post_diff_final_drive_helical": {
+        "function": post_diff_final_drive_helical,
+        "name": "Post-Differential Final Drive — Dual Helical",
+        "category": "drivetrain",
+        "default_colour": "#989898",
+        "visual_tags": [
+            "gear",
+            "helical",
+            "final_drive",
+            "post_differential",
+            "drivetrain",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "normal_module": {
+                "type": "number", "default": 1.15, "min": 0.2, "unit": "mm"
+            },
+            "pinion_teeth": {
+                "type": "integer", "default": 18, "min": 12
+            },
+            "wheel_teeth": {
+                "type": "integer", "default": 72, "min": 12
+            },
+            "width": {
+                "type": "number", "default": 22.0, "min": 2.0, "unit": "mm"
+            },
+            "helix_angle_deg": {
+                "type": "number", "default": 20.0, "min": 1.0, "unit": "deg"
+            },
+            "pressure_angle_deg": {
+                "type": "number", "default": 20.0, "min": 14.5, "unit": "deg"
+            },
+            "input_bore_diameter": {
+                "type": "number", "default": 12.0, "min": 1.0, "unit": "mm"
+            },
+            "output_bore_diameter": {
+                "type": "number", "default": 20.0, "min": 1.0, "unit": "mm"
+            },
+            "diff_clear_span": {
+                "type": "number", "default": 108.0, "min": 20.0, "unit": "mm"
+            },
+            "backlash": {
+                "type": "number", "default": 0.05, "min": 0.0, "unit": "mm"
+            },
+            "ratio_target": {
+                "type": "number", "default": 4.0, "min": 1.0
+            },
+            "ratio_tolerance": {
+                "type": "number", "default": 0.10, "min": 0.001
+            },
+            "pair_count": {
+                "type": "integer", "default": 2, "min": 2, "max": 2
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "differential_side_output_bores",
+                "type": "dual_concentric_bore",
+                "position": "pinion_axes_opposite_sides",
+            },
+            {
+                "name": "halfshaft_output_bores",
+                "type": "dual_concentric_bore",
+                "position": "wheel_axes_opposite_sides",
+            },
+        ],
+        "training_provenance": {
+            "source_url": CQ_GEARS_PLANETARY_SOURCE,
+            "source_revision": "e73874cf17a25447a99b1e7c22a4d5af38560e9c",
+            "licence": "Apache-2.0",
+            "use": (
+                "cq_gears tooth generator with ForgeOS-owned dual-stage layout; "
+                "ratio-four concept CAD, not customer or release geometry"
+            ),
+        },
+    },
     "cold_plate_serpentine": {
         "function": cold_plate_serpentine,
         "name": "Serpentine Cold Plate",
@@ -1141,6 +1373,39 @@ def _selftest_planetary(temp_root: Path) -> None:
     )
 
 
+def _selftest_post_diff_final_drive(temp_root: Path) -> None:
+    """Prove ratio-four dual meshes fit the screened envelope and export."""
+    metrics = post_diff_final_drive_helical_metrics({})
+    assert metrics["pair_count"] == 2
+    assert abs(float(metrics["ratio"]) - 4.0) < 1e-9
+
+    model = post_diff_final_drive_helical({})
+    bbox = model.val().BoundingBox()
+    assert model.solids().size() == 4
+    # Packaging-screen axes: lateral width=Z, short edge=X, height=Y.
+    assert bbox.zlen <= 192.0
+    assert bbox.xlen <= 172.2782
+    assert bbox.ylen <= 132.0
+
+    try:
+        post_diff_final_drive_helical(
+            {"pinion_teeth": 19, "wheel_teeth": 72, "ratio_target": 4.0}
+        )
+        raise AssertionError("expected ratio mismatch rejection")
+    except ValueError as exc:
+        assert "ratio" in str(exc).lower()
+
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "post_diff_final_drive_helical", temp_root
+    )
+    print(
+        "[post-diff-final-drive-helical] selftest PASS: "
+        f"ratio={metrics['ratio']:.3f}, solids=4, "
+        f"envelope={bbox.zlen:.1f}×{bbox.xlen:.1f}×{bbox.ylen:.1f} mm, "
+        f"STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
 def _selftest_cold_plate(temp_root: Path) -> None:
     """Prove continuous serpentine, positive walls, Dh emission, STEP/STL >1 KB."""
     hyd = cold_plate_serpentine_hydraulics({})
@@ -1237,6 +1502,7 @@ def _selftest() -> int:
         _selftest_stator(temp_root)
         _selftest_rotor(temp_root)
         _selftest_planetary(temp_root)
+        _selftest_post_diff_final_drive(temp_root)
         _selftest_cold_plate(temp_root)
         _selftest_water_jacket(temp_root)
     return 0
