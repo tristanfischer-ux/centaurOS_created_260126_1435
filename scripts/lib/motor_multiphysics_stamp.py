@@ -121,18 +121,21 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
         "software": "ISO 6336 + KISSsoft + CalculiX",
         "paths": [
             "scripts/motor-stack/iso6336_fia_front_kit_case.py",
+            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py",
             "scripts/motor-stack/calculix_smoke_selftest.sh",
         ],
         "versions": {
             "iso6336_screen": "analytical_simplified_v1",
+            "iso_bevel_screen": "straight_bevel_handbook_not_iso23509_v1",
             "calculix_ccx": "2.21",
             "kisssoft": "licence_not_proven_in_repo",
         },
         "last_known_green": (
-            "2026-07-30 — twin-bound ISO 6336-style analytical screen on "
-            "formula-e-front-mgu-20260729-1432 (min FoS ≈ 0.18 bend / 0.38 "
-            "contact vs 1.20 screen; duty_strength_screen_ok false; "
-            "KISSsoft / spectrum / tooth-contact FEA still OPEN)"
+            "2026-07-30 — twin-bound ISO 6336-style planetary screen + "
+            "straight-bevel differential handbook SCREEN on "
+            "formula-e-front-mgu-20260729-1432 (bevel nest FoS << 1.20; "
+            "duty_strength_screen_ok / bevel works flags honest; "
+            "ISO 23509 / KISSsoft / spectrum / tooth-contact FEA still OPEN)"
         ),
         "evidence_class": "toolchain_smoke_pass",
     },
@@ -191,7 +194,11 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
         "authority_level": "communication_only",
         "source_type": "blender_compound",
         "cad_family": None,
-        "notes": "Architecture communication — bevel contact OPEN",
+        "notes": (
+            "Architecture communication — twin-bound straight-bevel handbook "
+            "SCREEN may be cited under gear_strength.twin_bound_case; "
+            "ISO 23509 / KISSsoft / contact pattern still OPEN"
+        ),
     },
     {
         "component_id": "integrated_drive_oil_circuit",
@@ -386,6 +393,11 @@ def _load_fia_water_jacket_case(twin_dir: Optional[Path]) -> Optional[dict[str, 
 def _load_fia_iso6336_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA ISO 6336-style gear-strength artefact if present."""
     return _load_fia_case_json(twin_dir, "iso6336_fia_front_kit_case.json")
+
+
+def _load_fia_iso_bevel_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA straight-bevel differential screen artefact if present."""
+    return _load_fia_case_json(twin_dir, "iso_bevel_fia_front_kit_case.json")
 
 
 def _load_fia_gear_oil_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
@@ -1093,16 +1105,86 @@ def _gear_oil_check_from_fia_case(
     return body
 
 
+def _bevel_differential_cite_from_case(
+    bevel_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Build optional bevel-differential SCREEN cite for gear_strength twin_bound.
+
+    GOTCHA: Absence stays the string ``OPEN`` so proveCatch on planetary-only
+    fixtures is unchanged. When present, cite is PARTIAL with ship_ok false.
+    """
+
+    if not isinstance(bevel_case, Mapping):
+        return "OPEN"
+    strength = (
+        bevel_case.get("strength_screen")
+        if isinstance(bevel_case.get("strength_screen"), dict)
+        else {}
+    )
+    margins = (
+        bevel_case.get("margins") if isinstance(bevel_case.get("margins"), dict) else {}
+    )
+    works = (
+        bevel_case.get("works_in_kit_context")
+        if isinstance(bevel_case.get("works_in_kit_context"), dict)
+        else {}
+    )
+    duty_torques = (
+        bevel_case.get("duty_torques")
+        if isinstance(bevel_case.get("duty_torques"), dict)
+        else {}
+    )
+    geometry = (
+        bevel_case.get("bevel_geometry")
+        if isinstance(bevel_case.get("bevel_geometry"), dict)
+        else {}
+    )
+    rel_ref = "_motor_stack/iso_bevel_fia_front_kit_case.json"
+    duty_ok = bool(works.get("duty_strength_screen_ok"))
+    min_fos = margins.get("minimum_strength_factor")
+    if min_fos is None:
+        min_fos = strength.get("minimum_strength_factor")
+    return {
+        "status": bevel_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "works_in_kit_context": duty_ok,
+        "duty_strength_screen_ok": duty_ok,
+        "minimum_strength_factor": min_fos,
+        "minimum_bending_fos": margins.get("minimum_bending_fos")
+        or strength.get("minimum_bending_fos"),
+        "minimum_contact_fos": margins.get("minimum_contact_fos")
+        or strength.get("minimum_contact_fos"),
+        "carrier_input_torque_nm": duty_torques.get("carrier_input_torque_nm"),
+        "diff_od_mm": geometry.get("diff_od_mm"),
+        "spider_pinion_teeth": geometry.get("spider_pinion_teeth"),
+        "side_gear_teeth": geometry.get("side_gear_teeth"),
+        "tooth_count_basis": geometry.get("tooth_count_basis"),
+        "iso23509_independent_check": "OPEN",
+        "kisssoft_independent_check": "OPEN",
+        "note": (
+            "Twin-bound straight-bevel handbook SCREEN on "
+            "compact_bevel_differential packaging nest — NOT full ISO 23509 / "
+            "KISSsoft / contact pattern; ship_ok false."
+        ),
+    }
+
+
 def _gear_strength_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
+    bevel_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote gear_strength to PARTIAL when a twin-bound ISO 6336 screen exists.
 
     INTENT: Make the FIA front-kit planetary tooth screen visible without claiming
     KISSsoft closure, race load-spectrum fatigue, or CalculiX tooth contact.
+    Optional bevel differential SCREEN is cited under twin_bound_case when present.
     """
     strength = (
         case.get("strength_screen")
@@ -1131,6 +1213,7 @@ def _gear_strength_check_from_fia_case(
     min_fos = margins.get("minimum_strength_factor")
     if min_fos is None:
         min_fos = strength.get("minimum_strength_factor")
+    bevel_cite = _bevel_differential_cite_from_case(bevel_case, twin_dir=twin_dir)
     body = _open_check(
         "gear_strength",
         extra={
@@ -1191,6 +1274,7 @@ def _gear_strength_check_from_fia_case(
                     else None
                 ),
                 "recommended_geometry": case.get("recommended_geometry"),
+                "bevel_differential_screen": bevel_cite,
                 "kisssoft_independent_check": "OPEN",
                 "load_spectrum_fatigue": "OPEN",
                 "calculix_tooth_contact": "OPEN",
@@ -1198,6 +1282,8 @@ def _gear_strength_check_from_fia_case(
                     "Twin-bound ISO 6336-style analytical screen. Controlling "
                     "geometry may be a strength-driven resize when the packaging "
                     "seed fails FoS (seed retained under packaging_seed_screen). "
+                    "Optional bevel_differential_screen cites the straight-bevel "
+                    "handbook SCREEN when present (else OPEN). "
                     "works_in_kit_context / duty_strength_screen_ok = "
                     "min(bending, contact) FoS ≥ 1.2 vs assumed case-hardened "
                     "allowables — NOT KISSsoft, NOT spectrum, NOT ship_ok."
@@ -1453,15 +1539,26 @@ def build_motor_multiphysics(
         )
 
     fia_iso6336 = _load_fia_iso6336_case(twin_dir)
+    fia_iso_bevel = _load_fia_iso_bevel_case(twin_dir)
     if fia_iso6336 is not None and twin_dir is not None:
         gear_strength = _gear_strength_check_from_fia_case(
-            duty, fia_iso6336, twin_dir=Path(twin_dir)
+            duty,
+            fia_iso6336,
+            twin_dir=Path(twin_dir),
+            bevel_case=fia_iso_bevel,
         )
         notes += (
             " Gear-strength check PARTIAL: twin-bound ISO 6336-style screen in "
             "_motor_stack/iso6336_fia_front_kit_case.json "
             "(KISSsoft / load spectrum / tooth-contact FEA still OPEN)."
         )
+        if fia_iso_bevel is not None:
+            notes += (
+                " Bevel differential handbook SCREEN cited under "
+                "gear_strength.twin_bound_case.bevel_differential_screen "
+                "(_motor_stack/iso_bevel_fia_front_kit_case.json; "
+                "ISO 23509 still OPEN)."
+            )
     else:
         gear_strength = _open_check(
             "gear_strength",

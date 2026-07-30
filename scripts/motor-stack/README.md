@@ -421,6 +421,35 @@ The self-test proves synthetic teeth/module/face control the geometry, torque
 is near 125 N·m, stresses are finite, and a 10× torque collapse proves the FoS
 is calculated rather than canned.
 
+## Straight-bevel differential strength (handbook screen — not ISO 23509)
+
+The planetary ISO screen does **not** cover the mini open bevel differential.
+There is no ISO 23509 / KISSsoft bevel close in this checkout. The twin-bound
+bevel screen is a simplified straight-bevel bending + contact handbook check
+on the Formula E front-kit `compact_bevel_differential` packaging nest:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/iso_bevel_fia_front_kit_case.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+It selectively reads `orchestratorContract.quantities` and
+`fpkConcentricGeometry` (plus physics-tree tooth seeds when present) with
+`ijson`. Carrier torque ≈ `gear_ratio × ~125 N·m` (~1001 N·m at ratio 8).
+When twin tooth counts are absent, documented packaging seeds
+(Z_pinion=10 / Z_side=14 / 2 spiders; pitch fractions of `diff_od`) are used
+and labelled. `works_in_kit_context` requires min FoS ≥ **1.20**. Status stays
+`PARTIAL`, `ship_ok` false. When the artefact exists, the multiphysics stamp
+cites it under `gear_strength.twin_bound_case.bevel_differential_screen`.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/iso_bevel_fia_front_kit_case.json
+```
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/iso_bevel_fia_front_kit_case.py --selftest
+```
+
 ## Gear-oil analytical screen (FIA front kit)
 
 Full free-surface OpenFOAM of jets / pickup / cornering oil migration is still
