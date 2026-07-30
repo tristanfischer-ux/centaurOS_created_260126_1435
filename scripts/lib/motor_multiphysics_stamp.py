@@ -30,6 +30,7 @@ ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 # with permanent unblock paths — never chat-only, never greenwashed to ship_ok.
 BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
 BLOCKER_ID_POST_DIFF_FINAL_DRIVE = "POST_DIFF_FINAL_DRIVE_PACKAGING"
+BLOCKER_ID_PLANETARY_VS_ROTOR_BORE = "PLANETARY_STRENGTH_VS_ROTOR_BORE"
 POST_DIFF_FINAL_DRIVE_COMPONENT_ID = "post_diff_final_drive"
 POST_DIFF_FINAL_DRIVE_CAD_FAMILY = "post_diff_final_drive_helical"
 POST_DIFF_PACKAGING_SCREEN_FILENAME = (
@@ -136,6 +137,42 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
         ),
     },
 )
+_PLANETARY_VS_ROTOR_PERMANENT_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "enlarge_rotor_bore",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Grow hollow rotor ID so a FoS≥1.2 planetary tip fits, then re-run "
+            "EM + structural screens on the new bore."
+        ),
+        "code_hooks": (
+            "scripts/lib/fpk_concentric_geometry.py;"
+            "scripts/motor-stack/iso6336_fia_front_kit_case.py;"
+            "scripts/motor-stack/em_fia_front_kit_case.py"
+        ),
+    },
+    {
+        "option_id": "change_planetary_tooth_counts",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Retarget sun/planet/ring teeth (and possibly ratio split) so a "
+            "smaller tip clears FoS≥1.2 inside the current rotor bore."
+        ),
+        "code_hooks": "scripts/motor-stack/iso6336_fia_front_kit_case.py#propose_strength_feasible_geometry",
+    },
+    {
+        "option_id": "external_planetary_topology",
+        "kind": "architecture_decision",
+        "summary": (
+            "Move the planetary outside the rotor bore (side-by-side / offset "
+            "layout) so strength and EM envelopes stop fighting."
+        ),
+        "code_hooks": (
+            "docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md"
+            "#architecture-blockers"
+        ),
+    },
+]
 _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK: list[dict[str, str]] = [
     {
         "option_id": "package_post_diff_final_drive",
@@ -1756,6 +1793,36 @@ def collect_architecture_blockers(
     twin_case = gear.get("twin_bound_case")
     if not isinstance(twin_case, Mapping):
         return blockers
+    planetary_hold = str(twin_case.get("architecture_hold") or "")
+    if BLOCKER_ID_PLANETARY_VS_ROTOR_BORE in planetary_hold or (
+        twin_case.get("nest_fits_rotor") is False
+        and twin_case.get("works_in_kit_context") is False
+        and twin_case.get("minimum_strength_factor") is not None
+        and float(twin_case.get("minimum_strength_factor") or 0.0) < 1.2
+    ):
+        blockers.append(
+            {
+                "blocker_id": BLOCKER_ID_PLANETARY_VS_ROTOR_BORE,
+                "domain": "gear_strength.planetary_rotor_nest",
+                "status": "OPEN",
+                "severity": "architecture_hold",
+                "ship_ok": False,
+                "cannot_greenwash": True,
+                "evidence_path": twin_case.get("path")
+                or "_motor_stack/iso6336_fia_front_kit_case.json",
+                "minimum_strength_factor": twin_case.get("minimum_strength_factor"),
+                "nest_fits_rotor": twin_case.get("nest_fits_rotor"),
+                "summary": planetary_hold
+                or (
+                    "Planetary strength resize that clears FoS does not fit the "
+                    "hollow rotor bore; bore-limited nests do not clear FoS ≥ 1.2."
+                ),
+                "permanent_unblock_options": list(
+                    _PLANETARY_VS_ROTOR_PERMANENT_UNBLOCK
+                ),
+                "human_decision_required": True,
+            }
+        )
     bevel = twin_case.get("bevel_differential_screen")
     if not isinstance(bevel, Mapping):
         return blockers
@@ -1980,6 +2047,8 @@ def _gear_strength_check_from_fia_case(
                     else None
                 ),
                 "recommended_geometry": case.get("recommended_geometry"),
+                "architecture_hold": case.get("architecture_hold"),
+                "nest_fits_rotor": case.get("nest_fits_rotor"),
                 "bevel_differential_screen": bevel_cite,
                 "kisssoft_independent_check": "OPEN",
                 "load_spectrum_fatigue": "OPEN",
@@ -1987,7 +2056,7 @@ def _gear_strength_check_from_fia_case(
                 "note": (
                     "Twin-bound ISO 6336-style analytical screen. Controlling "
                     "geometry may be a strength-driven resize when the packaging "
-                    "seed fails FoS (seed retained under packaging_seed_screen). "
+                    "seed fails FoS AND the nest fits the rotor bore. "
                     "Optional bevel_differential_screen cites the straight-bevel "
                     "handbook SCREEN when present (else OPEN). "
                     "works_in_kit_context / duty_strength_screen_ok = "

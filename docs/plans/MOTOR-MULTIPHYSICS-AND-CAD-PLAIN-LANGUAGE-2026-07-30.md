@@ -24,12 +24,25 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~19:45:** **Closure campaign running — still not race-ready.**  
-Landed in parallel: `cut_torque_at_diff` (bevel FoS≈**1.22**); denser MTPA screen (**35** FEMM points, peak ~**112 N·m**); Blender honors planetary m=1 / face=58 / ×4; lumped thermal screen; **6** hardware correlation holds registered OPEN.  
-Residual architecture blocker: `POST_DIFF_FINAL_DRIVE_PACKAGING` (ratio after diff still needs packaging).  
-`ship_ok` **false**; release CAD **0%**; hardware cannot close in software alone.
+**Overall mood as of 2026-07-30 ~21:00:** **Still building — not finished.**  
+Just landed: post-diff CadQuery family seeded; Excel revision mismatch gate; Blender re-render with planet×4 face=58; voltage/FW screen; thermal + hardware registers earlier.  
+`ship_ok` **false**. Release CAD **0%**. Hardware holds all OPEN (needs real benches).
 
-**Last scoreboard update:** 2026-07-30 (Plan A closure campaign — diff budget + MTPA + Blender sync + thermal + hardware register).
+**Last scoreboard update:** 2026-07-30 evening finish burst.
+
+### Simple finish checklist (what “finished” means)
+
+| To call Plan A done enough for software | Status now | What still has to happen |
+|---|---|---|
+| Shared revision enforced | **DONE** (Excel hard-exits on mismatch) | Keep using it |
+| Results visible (step 7) | **DONE** | Re-stamp after each change |
+| Hardware holds visible (step 8 register) | **DONE as register** | Closing holds = real dyno/HIL/flow — **not software** |
+| Diff nest strength | **Screen cleared** via cut-torque | Post-diff stage still packaging OPEN |
+| Post-diff ×4 stage | **CAD family seeded** | Blender interface still OPEN |
+| Planetary fits rotor bore | **FAILING** (ring 126 vs bore ~93) | Must reconcile — in progress |
+| EM evidence | PARTIAL screens (MTPA + voltage/FW) | Closed map + dyno still open |
+| Cooling | PARTIAL (duct + lumped temp) | Full CHT + bench still open |
+| `ship_ok = true` | **Forbidden until above + hardware** | Do not celebrate early |
 
 ### Architecture blockers (track + permanently unblock — not chat-only)
 

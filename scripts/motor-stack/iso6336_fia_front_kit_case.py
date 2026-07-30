@@ -35,6 +35,9 @@ MAX_RING_TIP_DIAMETER_MM = 140.0
 MAX_FACE_WIDTH_MM = 60.0
 MIN_MODULE_MM = 0.70
 MAX_MODULE_MM = 2.20
+# Hollow-rotor planetary nest: ring tip must stay inside rotor bore.
+ROTOR_RING_RADIAL_CLEARANCE_MM = 2.0
+BLOCKER_ID_PLANETARY_VS_ROTOR_BORE = "PLANETARY_STRENGTH_VS_ROTOR_BORE"
 
 # Screening allowables for case-hardened low-alloy gear steel (16MnCr5 / 20MnCr5
 # class). Numbers are ISO 6336-5 MQ-order handbook seeds — not a certified
@@ -92,6 +95,7 @@ class TwinInputs:
     face_width_mm: float
     active_length_mm: float
     motor_shaft_torque_nm: float | None
+    rotor_id_mm: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -277,6 +281,11 @@ def inputs_from_sections(
         quantities,
         ("mgu_shaft_torque_nm", "envelope_mgu_torque_nm"),
     )
+    rotor_id_mm = _number(
+        concentric,
+        ("rotor_id_mm",),
+        default=_number(quantities, ("fpk_rotor_id_mm", "rotor_id_mm"), default=0.0),
+    )
 
     return TwinInputs(
         max_rotor_speed_rpm=max_rpm,
@@ -302,6 +311,7 @@ def inputs_from_sections(
         face_width_mm=face_width_mm,
         active_length_mm=active_length_mm,
         motor_shaft_torque_nm=motor_shaft_torque_nm,
+        rotor_id_mm=rotor_id_mm,
     )
 
 
@@ -323,6 +333,17 @@ def _stream_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _max_ring_tip_for_rotor_mm(rotor_id_mm: float) -> float:
+    """Ring tip diameter that still nests inside the hollow rotor bore."""
+
+    if rotor_id_mm <= 0.0:
+        return MAX_RING_TIP_DIAMETER_MM
+    return min(
+        MAX_RING_TIP_DIAMETER_MM,
+        max(0.0, rotor_id_mm - ROTOR_RING_RADIAL_CLEARANCE_MM),
+    )
+
+
 def _apply_gear_geometry_writeback(
     twin_dir: Path,
     quantities: dict[str, Any],
@@ -333,6 +354,9 @@ def _apply_gear_geometry_writeback(
     INTENT: After the packaging seed failed FoS, the writeback sidecar (and
     patched state quantities) is the controlling packaging seed for re-runs so
     we do not keep rediscovering the same undersized m/face every time.
+
+    GOTCHA: Ignore writebacks whose ring tip cannot fit the rotor bore — the
+    2026-07-30 m=1 / ring=126 resize cleared FoS but violated nest_fits_rotor.
     """
 
     side = twin_dir / "_motor_stack" / "gear_geometry_writeback.json"
@@ -342,10 +366,33 @@ def _apply_gear_geometry_writeback(
         payload = json.loads(side.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return
-    for key, entry in (payload.get("quantities") or {}).items():
+    rotor_id = _number(
+        concentric,
+        ("rotor_id_mm",),
+        default=_number(quantities, ("fpk_rotor_id_mm", "rotor_id_mm"), default=0.0),
+    )
+    fpk = payload.get("fpkConcentricGeometry") or {}
+    ring_id = float(fpk.get("ring_id_mm") or 0.0)
+    module = None
+    qty = payload.get("quantities") or {}
+    if isinstance(qty.get("gear_module_mm"), Mapping):
+        module = qty["gear_module_mm"].get("value")
+    ring_teeth = 126
+    if isinstance(qty.get("ring_teeth"), Mapping) and qty["ring_teeth"].get("value"):
+        ring_teeth = int(qty["ring_teeth"]["value"])
+    tip = (
+        _ring_tip_diameter_mm(float(module), ring_teeth)
+        if module is not None
+        else ring_id
+    )
+    max_tip = _max_ring_tip_for_rotor_mm(rotor_id)
+    if rotor_id > 0.0 and tip > max_tip + 1.0e-6:
+        # Invalid strength resize — do not re-apply over the packaging seed.
+        return
+    for key, entry in qty.items():
         if isinstance(entry, Mapping) and entry.get("value") is not None:
             quantities[key] = dict(entry)
-    for key, value in (payload.get("fpkConcentricGeometry") or {}).items():
+    for key, value in fpk.items():
         concentric[key] = value
 
 
@@ -561,7 +608,9 @@ def propose_strength_feasible_geometry(
     """
 
     max_face = min(MAX_FACE_WIDTH_MM, max(inputs.active_length_mm * 0.65, 20.0))
+    max_tip = _max_ring_tip_for_rotor_mm(inputs.rotor_id_mm)
     best: dict[str, Any] | None = None
+    best_failing: dict[str, Any] | None = None
     m = MIN_MODULE_MM
     while m <= MAX_MODULE_MM + 1.0e-9:
         b = 14.0
@@ -570,7 +619,7 @@ def propose_strength_feasible_geometry(
                 if (inputs.sun_teeth + inputs.planet_teeth) % planet_count != 0:
                     continue
                 tip = _ring_tip_diameter_mm(m, inputs.ring_teeth)
-                if tip > MAX_RING_TIP_DIAMETER_MM:
+                if tip > max_tip + 1.0e-9:
                     continue
                 trial_inputs = replace(
                     inputs,
@@ -586,8 +635,6 @@ def propose_strength_feasible_geometry(
                     geometry,
                     motor_shaft_torque_nm=motor_shaft_torque_nm,
                 )
-                if not screen.works_in_kit_context:
-                    continue
                 volume_proxy = m * b * tip
                 candidate = {
                     "gear_module_mm": round(m, 3),
@@ -603,23 +650,51 @@ def propose_strength_feasible_geometry(
                     "minimum_bending_fos": screen.minimum_bending_fos,
                     "minimum_contact_fos": screen.minimum_contact_fos,
                     "minimum_strength_factor": screen.minimum_strength_factor,
+                    "clears_duty_screen": screen.works_in_kit_context,
                     "volume_proxy_mm3": round(volume_proxy, 1),
+                    "rotor_id_mm": inputs.rotor_id_mm,
                     "envelope": {
-                        "max_ring_tip_diameter_mm": MAX_RING_TIP_DIAMETER_MM,
+                        "max_ring_tip_diameter_mm": max_tip,
+                        "bay_max_ring_tip_diameter_mm": MAX_RING_TIP_DIAMETER_MM,
                         "max_face_width_mm": max_face,
+                        "rotor_bore_limited": inputs.rotor_id_mm > 0.0,
                     },
-                    "statement": (
+                }
+                if screen.works_in_kit_context:
+                    candidate["statement"] = (
                         "Strength-driven packaging resize — clears screening "
                         f"FoS ≥ {SCREEN_FOS_MIN} inside ring-tip ≤ "
-                        f"{MAX_RING_TIP_DIAMETER_MM:.0f} mm. Not KISSsoft / "
+                        f"{max_tip:.1f} mm (rotor bore constrained). Not KISSsoft / "
                         "spectrum / FEA; ship_ok stays false."
-                    ),
-                }
-                if best is None or candidate["volume_proxy_mm3"] < best["volume_proxy_mm3"]:
-                    best = candidate
+                    )
+                    if (
+                        best is None
+                        or candidate["volume_proxy_mm3"] < best["volume_proxy_mm3"]
+                    ):
+                        best = candidate
+                else:
+                    if (
+                        best_failing is None
+                        or candidate["minimum_strength_factor"]
+                        > best_failing["minimum_strength_factor"]
+                    ):
+                        best_failing = candidate
             b += 2.0
         m += 0.05
-    return best
+    if best is not None:
+        return best
+    # Honest residual: strongest nest that fits the rotor still fails FoS.
+    if best_failing is not None and inputs.rotor_id_mm > 0.0:
+        best_failing["architecture_hold"] = (
+            f"{BLOCKER_ID_PLANETARY_VS_ROTOR_BORE} — best nest inside rotor "
+            f"ID {inputs.rotor_id_mm:.1f} mm reaches FoS ≈ "
+            f"{best_failing['minimum_strength_factor']:.3f} (< {SCREEN_FOS_MIN}); "
+            "enlarge rotor bore, change tooth counts/topology, or accept "
+            "external planetary; do not claim PASS"
+        )
+        best_failing["statement"] = best_failing["architecture_hold"]
+        best_failing["clears_duty_screen"] = False
+    return None if best_failing is None else best_failing
 
 
 def run_strength_screen(
@@ -709,6 +784,7 @@ def build_artifact(
     packaging_seed_geometry: GearGeometry | None = None,
     recommended_geometry: Mapping[str, Any] | None = None,
     controlling_geometry_source: str = "packaging_seed",
+    architecture_hold: str | None = None,
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release gear-strength artefact."""
 
@@ -716,19 +792,37 @@ def build_artifact(
     if controlling == "strength_driven_resize":
         provenance_statement = (
             "Controlling geometry is a strength-driven packaging resize that "
-            "clears the screening FoS inside the bay tip/face envelope. The "
-            "failed twin packaging seed is retained under packaging_seed_screen. "
+            "clears the screening FoS inside the rotor-bore / bay tip envelope. "
+            "The failed twin packaging seed is retained under packaging_seed_screen. "
             "Not a licensed KISSsoft run."
         )
         face_note = (
             "Face width / module from strength-driven resize (seed was undersized)."
         )
+    elif controlling == "packaging_seed_rotor_bore_hold":
+        provenance_statement = (
+            "Packaging seed retained: strength-driven nests that clear FoS do not "
+            "fit the hollow rotor bore, and bore-limited nests do not clear FoS. "
+            "Architecture hold recorded; ship_ok false."
+        )
+        face_note = "Face width from twin packaging seed (rotor-bore hold active)."
     else:
         provenance_statement = (
             "Twin-bound analytical ISO 6336-style screen on packaging-seed "
             "planetary geometry; not a licensed KISSsoft run."
         )
         face_note = "Face width from twin fpk_gear_face_mm / 14 mm packaging seed."
+
+    hold = architecture_hold or (
+        str((recommended_geometry or {}).get("architecture_hold") or "") or None
+    )
+    tip_mm = _ring_tip_diameter_mm(geometry.module_mm, geometry.ring_teeth)
+    nest_fits = (
+        inputs.rotor_id_mm <= 0.0
+        or tip_mm <= _max_ring_tip_for_rotor_mm(inputs.rotor_id_mm) + 1.0e-6
+    )
+    # INTENT: Kit-context duty requires FoS AND physical nest fit in the rotor.
+    duty_ok = bool(screen.works_in_kit_context) and nest_fits and not hold
 
     artifact: dict[str, Any] = {
         "schema": SCHEMA,
@@ -767,7 +861,9 @@ def build_artifact(
             },
         },
         "works_in_kit_context": {
-            "duty_strength_screen_ok": screen.works_in_kit_context,
+            "duty_strength_screen_ok": duty_ok,
+            "fos_screen_ok": screen.works_in_kit_context,
+            "nest_fits_rotor": nest_fits,
             "minimum_strength_factor": screen.minimum_strength_factor,
             "threshold_fos": SCREEN_FOS_MIN,
             "ratio_matches_twin": geometry.ratio_matches_twin,
@@ -775,8 +871,8 @@ def build_artifact(
             "controlling_geometry_source": controlling,
             "note": (
                 f"duty_strength_screen_ok means min(bending, contact) FoS ≥ "
-                f"{SCREEN_FOS_MIN} on sun–planet and planet–ring meshes with "
-                "assumed case-hardened allowables — NOT KISSsoft, NOT spectrum, "
+                f"{SCREEN_FOS_MIN} AND nest_fits_rotor, with assumed "
+                "case-hardened allowables — NOT KISSsoft, NOT spectrum, "
                 "NOT ship_ok."
             ),
         },
@@ -854,6 +950,9 @@ def build_artifact(
         }
     if recommended_geometry is not None:
         artifact["recommended_geometry"] = dict(recommended_geometry)
+    artifact["nest_fits_rotor"] = nest_fits
+    if hold:
+        artifact["architecture_hold"] = hold
     return artifact
 
 
@@ -945,10 +1044,34 @@ def run_selftest() -> int:
         ),
         "packaging_seed_fails_duty_screen": screen.works_in_kit_context is False,
         "strength_resize_clears_duty_screen": (
-            propose_strength_feasible_geometry(
-                inputs, motor_shaft_torque_nm=torque
+            (
+                propose_strength_feasible_geometry(
+                    inputs, motor_shaft_torque_nm=torque
+                )
+                or {}
+            ).get("clears_duty_screen")
+            is True
+        ),
+        "rotor_bore_blocks_invalid_resize": (
+            (
+                propose_strength_feasible_geometry(
+                    replace(inputs, rotor_id_mm=92.7),
+                    motor_shaft_torque_nm=torque,
+                )
+                or {}
+            ).get("clears_duty_screen")
+            is False
+            and BLOCKER_ID_PLANETARY_VS_ROTOR_BORE
+            in str(
+                (
+                    propose_strength_feasible_geometry(
+                        replace(inputs, rotor_id_mm=92.7),
+                        motor_shaft_torque_nm=torque,
+                    )
+                    or {}
+                ).get("architecture_hold")
+                or ""
             )
-            is not None
         ),
         "allowables_documented": (
             artifact["strength_screen"]["allowables"]["sigma_f_allow_mpa"]
@@ -1022,33 +1145,85 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
     screen = seed_screen
     packaging_seed_screen: StrengthScreen | None = None
     packaging_seed_geometry: GearGeometry | None = None
-    if not seed_screen.works_in_kit_context:
+    architecture_hold: str | None = None
+    seed_tip = _ring_tip_diameter_mm(
+        seed_geometry.module_mm, seed_geometry.ring_teeth
+    )
+    seed_fits_rotor = (
+        seed_inputs.rotor_id_mm <= 0.0
+        or seed_tip
+        <= _max_ring_tip_for_rotor_mm(seed_inputs.rotor_id_mm) + 1.0e-6
+    )
+    # GOTCHA: FoS can clear on an oversized nest that cannot physically sit in
+    # the hollow rotor. That is NOT works_in_kit_context.
+    if seed_screen.works_in_kit_context and not seed_fits_rotor:
+        architecture_hold = (
+            f"{BLOCKER_ID_PLANETARY_VS_ROTOR_BORE} — controlling nest tip "
+            f"{seed_tip:.1f} mm exceeds rotor ID {seed_inputs.rotor_id_mm:.1f} mm "
+            f"(max tip {_max_ring_tip_for_rotor_mm(seed_inputs.rotor_id_mm):.1f} mm); "
+            "FoS alone must not greenwash nest_fits_rotor"
+        )
+        packaging_seed_screen = seed_screen
+        packaging_seed_geometry = seed_geometry
+        if recommended and recommended.get("clears_duty_screen"):
+            inputs = replace(
+                seed_inputs,
+                gear_module_mm=float(recommended["gear_module_mm"]),
+                face_width_mm=float(recommended["face_width_mm"]),
+                planet_count=int(recommended["planet_count"]),
+                sun_od_mm=float(recommended["sun_pitch_diameter_mm"]),
+                planet_od_mm=float(recommended["planet_pitch_diameter_mm"]),
+                ring_id_mm=float(recommended["ring_pitch_diameter_mm"]),
+            )
+            geometry = derive_gear_geometry(inputs)
+            screen = run_strength_screen(
+                inputs, geometry, motor_shaft_torque_nm=torque
+            )
+            controlling = "strength_driven_resize"
+            architecture_hold = None
+        else:
+            controlling = "packaging_seed_rotor_bore_hold"
+            if recommended and recommended.get("architecture_hold"):
+                architecture_hold = str(recommended["architecture_hold"])
+    elif not seed_screen.works_in_kit_context:
         packaging_seed_screen = seed_screen
         packaging_seed_geometry = seed_geometry
         if recommended is None:
             raise FiaFrontKitGearError(
                 "Packaging seed fails FoS screen and no strength-feasible "
-                f"resize fits ring tip ≤ {MAX_RING_TIP_DIAMETER_MM:.0f} mm / "
+                f"resize fits ring tip ≤ {_max_ring_tip_for_rotor_mm(seed_inputs.rotor_id_mm):.1f} mm / "
                 f"face ≤ {MAX_FACE_WIDTH_MM:.0f} mm"
             )
-        inputs = replace(
-            seed_inputs,
-            gear_module_mm=float(recommended["gear_module_mm"]),
-            face_width_mm=float(recommended["face_width_mm"]),
-            planet_count=int(recommended["planet_count"]),
-            # Keep OD seeds consistent with resized pitch diameters (tip≈od).
-            sun_od_mm=float(recommended["sun_pitch_diameter_mm"]),
-            planet_od_mm=float(recommended["planet_pitch_diameter_mm"]),
-            ring_id_mm=float(recommended["ring_pitch_diameter_mm"]),
+        architecture_hold = (
+            str(recommended.get("architecture_hold") or "") or None
         )
-        geometry = derive_gear_geometry(inputs)
-        screen = run_strength_screen(
-            inputs, geometry, motor_shaft_torque_nm=torque
-        )
-        controlling = "strength_driven_resize"
-        if not screen.works_in_kit_context:
-            raise FiaFrontKitGearError(
-                "Strength-driven resize failed to clear FoS after apply"
+        clears = bool(recommended.get("clears_duty_screen"))
+        if clears:
+            inputs = replace(
+                seed_inputs,
+                gear_module_mm=float(recommended["gear_module_mm"]),
+                face_width_mm=float(recommended["face_width_mm"]),
+                planet_count=int(recommended["planet_count"]),
+                # Keep OD seeds consistent with resized pitch diameters (tip≈od).
+                sun_od_mm=float(recommended["sun_pitch_diameter_mm"]),
+                planet_od_mm=float(recommended["planet_pitch_diameter_mm"]),
+                ring_id_mm=float(recommended["ring_pitch_diameter_mm"]),
+            )
+            geometry = derive_gear_geometry(inputs)
+            screen = run_strength_screen(
+                inputs, geometry, motor_shaft_torque_nm=torque
+            )
+            controlling = "strength_driven_resize"
+            if not screen.works_in_kit_context:
+                raise FiaFrontKitGearError(
+                    "Strength-driven resize failed to clear FoS after apply"
+                )
+        else:
+            # Rotor-bore-limited search cannot clear FoS — keep seed, record hold.
+            controlling = "packaging_seed_rotor_bore_hold"
+            architecture_hold = architecture_hold or (
+                f"{BLOCKER_ID_PLANETARY_VS_ROTOR_BORE} — no nest inside rotor "
+                f"clears FoS ≥ {SCREEN_FOS_MIN}"
             )
 
     try:
@@ -1065,6 +1240,7 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         packaging_seed_geometry=packaging_seed_geometry,
         recommended_geometry=recommended,
         controlling_geometry_source=controlling,
+        architecture_hold=architecture_hold,
     )
     destination = (
         output_path
@@ -1089,14 +1265,107 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
                 },
             },
         )
-    works_word = "clears" if screen.works_in_kit_context else "does NOT clear"
+        # Only write nest-fitting clearing geometry into the Blender/CAD writeback.
+        if recommended.get("clears_duty_screen"):
+            _atomic_write_json(
+                twin_dir / "_motor_stack" / "gear_geometry_writeback.json",
+                {
+                    "schema": "forgeos.motor_stack.gear_geometry_writeback/v1",
+                    "ship_ok": False,
+                    "source": "iso6336_fia_front_kit_case strength_driven_resize",
+                    "controlling_geometry_source": controlling,
+                    "note": (
+                        "Strength-driven gear packaging writeback that fits the "
+                        "hollow rotor bore. ship_ok false."
+                    ),
+                    "fpkConcentricGeometry": {
+                        "gear_face_mm": float(recommended["face_width_mm"]),
+                        "gear_module_mm": float(recommended["gear_module_mm"]),
+                        "planet_count": int(recommended["planet_count"]),
+                        "planet_od_mm": float(recommended["planet_pitch_diameter_mm"]),
+                        "ring_id_mm": float(recommended["ring_pitch_diameter_mm"]),
+                        "sun_od_mm": float(recommended["sun_pitch_diameter_mm"]),
+                    },
+                    "quantities": {
+                        "fpk_gear_face_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["face_width_mm"]),
+                        },
+                        "fpk_planet_count": {
+                            "unit": "count",
+                            "value": int(recommended["planet_count"]),
+                        },
+                        "fpk_planet_od_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["planet_pitch_diameter_mm"]),
+                        },
+                        "fpk_ring_id_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["ring_pitch_diameter_mm"]),
+                        },
+                        "fpk_sun_od_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["sun_pitch_diameter_mm"]),
+                        },
+                        "gear_face_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["face_width_mm"]),
+                        },
+                        "gear_module_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["gear_module_mm"]),
+                        },
+                        "planet_count": {
+                            "unit": "count",
+                            "value": int(recommended["planet_count"]),
+                        },
+                    },
+                },
+            )
+        else:
+            # Invalidate the previous oversized writeback so Blender stops
+            # showing a nest that cannot fit the rotor.
+            wb_path = twin_dir / "_motor_stack" / "gear_geometry_writeback.json"
+            if wb_path.is_file():
+                _atomic_write_json(
+                    wb_path,
+                    {
+                        "schema": "forgeos.motor_stack.gear_geometry_writeback/v1",
+                        "ship_ok": False,
+                        "invalidated": True,
+                        "architecture_hold": architecture_hold
+                        or recommended.get("architecture_hold"),
+                        "note": (
+                            "Previous strength resize exceeded rotor bore and was "
+                            "invalidated. Controllers must use packaging seed until "
+                            "PLANETARY_STRENGTH_VS_ROTOR_BORE is unblocked."
+                        ),
+                        "fpkConcentricGeometry": {},
+                        "quantities": {},
+                    },
+                )
+    works_word = (
+        "clears"
+        if (
+            screen.works_in_kit_context
+            and not architecture_hold
+            and (
+                seed_inputs.rotor_id_mm <= 0.0
+                or _ring_tip_diameter_mm(geometry.module_mm, geometry.ring_teeth)
+                <= _max_ring_tip_for_rotor_mm(seed_inputs.rotor_id_mm) + 1.0e-6
+            )
+        )
+        else "does NOT clear"
+    )
     seed_note = ""
-    if packaging_seed_screen is not None:
+    if packaging_seed_screen is not None and controlling == "strength_driven_resize":
         seed_note = (
             f" Packaging seed FoS ≈ {packaging_seed_screen.minimum_strength_factor:.3f} "
             f"(FAILED) → resized to m={geometry.module_mm:.3f} mm / "
             f"face={geometry.face_width_mm:.1f} mm / n={geometry.planet_count}."
         )
+    elif architecture_hold:
+        seed_note = f" Architecture hold: {architecture_hold}"
     print(
         "FIA front-kit ISO 6336-style gear screen: "
         f"T_motor ≈ {screen.motor_shaft_torque_nm:.1f} N·m → "
