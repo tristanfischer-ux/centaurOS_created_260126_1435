@@ -173,6 +173,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "scripts/motor-stack/em_fia_front_kit_case.py",
             "scripts/motor-stack/em_fia_mtpa_screen.py",
             "scripts/motor-stack/em_fia_demag_screen.py",
+            "scripts/motor-stack/em_fia_voltage_fw_screen.py",
             "scripts/phantm/bin/femmcli",
         ],
         "versions": {
@@ -509,6 +510,14 @@ def _load_fia_mtpa_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     return _load_fia_case_json(twin_dir, "em_fia_mtpa_screen.json")
 
 
+def _load_fia_voltage_fw_case(
+    twin_dir: Optional[Path],
+) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA voltage / field-weakening screen if present."""
+
+    return _load_fia_case_json(twin_dir, "em_fia_voltage_fw_screen.json")
+
+
 def _load_fia_ross_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA ROSS rotor-dynamics case artefact if present."""
     return _load_fia_case_json(twin_dir, "ross_fia_front_kit_case.json")
@@ -694,6 +703,65 @@ def _mtpa_screen_cite(
     }
 
 
+def _voltage_fw_screen_cite(
+    voltage_fw_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Cite the voltage/FW SCREEN while leaving torque and FW maps OPEN.
+
+    INTENT: Surface peak-speed back-EMF and FIA bus utilisation without
+    upgrading an analytical screen into controller calibration or release.
+    """
+
+    if not isinstance(voltage_fw_case, Mapping):
+        return "OPEN"
+    screen = (
+        voltage_fw_case.get("voltage_fw_screen")
+        if isinstance(voltage_fw_case.get("voltage_fw_screen"), dict)
+        else {}
+    )
+    coverage = (
+        voltage_fw_case.get("coverage")
+        if isinstance(voltage_fw_case.get("coverage"), dict)
+        else {}
+    )
+    rel_ref = "_motor_stack/em_fia_voltage_fw_screen.json"
+    return {
+        "status": voltage_fw_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "verdict": screen.get("verdict"),
+        "field_weakening_indicated_at_max_speed": screen.get(
+            "field_weakening_indicated_at_max_speed"
+        ),
+        "max_speed_rpm": screen.get("max_speed_rpm"),
+        "estimated_back_emf_line_line_rms_v_at_max_speed": screen.get(
+            "estimated_back_emf_line_line_rms_v_at_max_speed"
+        ),
+        "estimated_loaded_terminal_line_line_rms_v": screen.get(
+            "estimated_loaded_terminal_line_line_rms_v"
+        ),
+        "worst_case_voltage_utilisation": screen.get(
+            "worst_case_voltage_utilisation"
+        ),
+        "worst_case_voltage_headroom": screen.get("worst_case_voltage_headroom"),
+        "back_emf_no_fw_speed_rpm_at_min_bus": screen.get(
+            "back_emf_no_fw_speed_rpm_at_min_bus"
+        ),
+        "speed_points": coverage.get("speed_points"),
+        "dc_bus_cases": coverage.get("dc_bus_cases"),
+        "torque_map": "OPEN",
+        "field_weakening_map": "OPEN",
+        "note": (
+            "Twin-bound analytical back-EMF + loaded terminal-voltage SCREEN "
+            "against FIA min/nominal/max DC bus. No identified Rs/Ld/Lq or "
+            "controller FW schedule; not ship_ok."
+        ),
+    }
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
@@ -701,6 +769,7 @@ def _magnetic_check_from_fia_case(
     twin_dir: Path,
     demag_case: Optional[Mapping[str, Any]] = None,
     mtpa_case: Optional[Mapping[str, Any]] = None,
+    voltage_fw_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote magnetic check to PARTIAL when a twin-bound open-circuit point exists.
 
@@ -735,6 +804,10 @@ def _magnetic_check_from_fia_case(
     duty_ok = bool(works.get("duty_torque_screen_ok"))
     demag_cite = _demag_screen_cite(demag_case, twin_dir=twin_dir)
     mtpa_cite = _mtpa_screen_cite(mtpa_case, twin_dir=twin_dir)
+    voltage_fw_cite = _voltage_fw_screen_cite(
+        voltage_fw_case,
+        twin_dir=twin_dir,
+    )
     demag_margin: Any = None
     if isinstance(demag_cite, dict):
         demag_margin = demag_cite.get("demagnetisation_margin_ratio")
@@ -817,19 +890,22 @@ def _magnetic_check_from_fia_case(
                 ),
                 "demag_screen": demag_cite,
                 "mtpa_screen": mtpa_cite,
+                "voltage_fw_screen": voltage_fw_cite,
                 "demagnetisation_margin": demag_margin,
                 "torque_map": "OPEN",
+                "field_weakening_map": "OPEN",
                 "demagnetisation_map": "OPEN",
                 "dynamometer_correlation": "OPEN",
                 "note": (
                     "Twin-bound OC + loaded magnetic screen on kit geometry, "
                     "optionally with a coarse rotor-position sweep at the "
-                    "screened current angle and an analytical hot demag SCREEN. "
+                    "screened current angle, an analytical hot demag SCREEN, "
+                    "and an analytical voltage / field-weakening SCREEN. "
                     "works_in_kit_context / duty_torque_screen_ok = |FE torque| "
                     "≥ ~75% of analytical shaft torque at the reference "
                     "position — NOT smoke-only, NOT full MTPA, NOT demag map "
-                    "PASS, NOT ship_ok. Torque map / full demag map / dyno "
-                    "still OPEN."
+                    "PASS, NOT FW calibration, NOT ship_ok. Torque map / FW "
+                    "map / full demag map / dyno still OPEN."
                 ),
             },
         },
@@ -1951,6 +2027,7 @@ def build_motor_multiphysics(
     fia_mag = _load_fia_magnetic_case(twin_dir)
     fia_demag = _load_fia_demag_case(twin_dir)
     fia_mtpa = _load_fia_mtpa_case(twin_dir)
+    fia_voltage_fw = _load_fia_voltage_fw_case(twin_dir)
     if fia_mag is not None and twin_dir is not None:
         magnetic = _magnetic_check_from_fia_case(
             duty,
@@ -1958,6 +2035,7 @@ def build_motor_multiphysics(
             twin_dir=Path(twin_dir),
             demag_case=fia_demag,
             mtpa_case=fia_mtpa,
+            voltage_fw_case=fia_voltage_fw,
         )
         notes += (
             " Magnetic check PARTIAL: twin-bound open-circuit / loaded point in "
@@ -1971,7 +2049,12 @@ def build_motor_multiphysics(
             notes += (
                 " + denser MTPA SCREEN in _motor_stack/em_fia_mtpa_screen.json"
             )
-        notes += " (torque map / full demag map / dyno still OPEN)."
+        if fia_voltage_fw is not None:
+            notes += (
+                " + voltage/FW SCREEN in "
+                "_motor_stack/em_fia_voltage_fw_screen.json"
+            )
+        notes += " (torque map / FW map / full demag map / dyno still OPEN)."
     else:
         magnetic = _open_check(
             "magnetic",
@@ -3054,6 +3137,40 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "em_fia_voltage_fw_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.em_fia_voltage_fw_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "voltage789",
+                    "voltage_fw_screen": {
+                        "status": "PARTIAL",
+                        "verdict": (
+                            "NOT_INDICATED_BY_COARSE_BACK_EMF_AND_LOADED_"
+                            "VOLTAGE_SCREEN"
+                        ),
+                        "field_weakening_indicated_at_max_speed": False,
+                        "max_speed_rpm": 19500.0,
+                        "estimated_back_emf_line_line_rms_v_at_max_speed": 116.2,
+                        "estimated_loaded_terminal_line_line_rms_v": 289.8,
+                        "worst_case_voltage_utilisation": 0.8302,
+                        "worst_case_voltage_headroom": 0.1698,
+                        "back_emf_no_fw_speed_rpm_at_min_bus": 58567.0,
+                    },
+                    "coverage": {
+                        "speed_points": 4,
+                        "dc_bus_cases": 3,
+                        "closed_torque_map": False,
+                        "closed_field_weakening_map": False,
+                    },
+                    "torque_map": {"status": "OPEN"},
+                    "field_weakening_map": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "ross_fia_front_kit_case.json").write_text(
             json.dumps(
                 {
@@ -3426,6 +3543,39 @@ def selftest() -> int:
             bad += 1
         elif mtpa_cite.get("torque_map") != "OPEN":
             print("FAIL: MTPA cite must leave torque map OPEN")
+            bad += 1
+        voltage_fw_cite = mag_twin.get("voltage_fw_screen")
+        if (
+            not isinstance(voltage_fw_cite, dict)
+            or voltage_fw_cite.get("status") != "PARTIAL"
+        ):
+            print(
+                "FAIL: magnetic twin_bound_case must cite voltage/FW screen as "
+                "PARTIAL when artefact present"
+            )
+            bad += 1
+        elif voltage_fw_cite.get("max_speed_rpm") != 19500.0:
+            print("FAIL: voltage/FW cite must surface maximum screened speed")
+            bad += 1
+        elif (
+            voltage_fw_cite.get(
+                "estimated_back_emf_line_line_rms_v_at_max_speed"
+            )
+            != 116.2
+        ):
+            print("FAIL: voltage/FW cite must surface estimated peak-speed back-EMF")
+            bad += 1
+        elif voltage_fw_cite.get("worst_case_voltage_utilisation") != 0.8302:
+            print("FAIL: voltage/FW cite must surface worst voltage utilisation")
+            bad += 1
+        elif voltage_fw_cite.get("ship_ok") is not False:
+            print("FAIL: voltage/FW cite must keep ship_ok false")
+            bad += 1
+        elif voltage_fw_cite.get("torque_map") != "OPEN":
+            print("FAIL: voltage/FW cite must leave torque map OPEN")
+            bad += 1
+        elif voltage_fw_cite.get("field_weakening_map") != "OPEN":
+            print("FAIL: voltage/FW cite must leave FW map OPEN")
             bad += 1
         if mag.get("status") == "PASS" or mag_twin.get("ship_ok") is True:
             print("FAIL: magnetic must remain PARTIAL with ship_ok false")
