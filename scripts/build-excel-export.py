@@ -70,6 +70,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 import deterministic_checks_lib as dcl  # noqa: E402
 import pcb_firmware_honesty as pcb_fw_honesty  # noqa: E402
+from motor_multiphysics_stamp import ASSEMBLY_REVISION as MOTOR_ASSEMBLY_REVISION  # noqa: E402
 from render_view_contract import (  # noqa: E402
     drawing_form_factor,
     form_factor_honesty_ok,
@@ -28464,6 +28465,102 @@ def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
     return True
 
 
+def _motor_assembly_revision_mismatch(
+    state: dict,
+    sidecar: Optional[dict] = None,
+    *,
+    expected_revision: str = MOTOR_ASSEMBLY_REVISION,
+) -> Optional[dict]:
+    """Return a HARD finding when motor/CAD evidence is not revision-coherent.
+
+    INTENT: Solver evidence, CAD authority, and their state pointer describe one
+    physical front-drive assembly. Mixing revisions invalidates the exported proof.
+
+    @description Compare every present assembly authority before sidecar rehydration.
+    @param state Run state containing motorMultiphysics/cadAuthority/pointer.
+    @param sidecar Optional motor-multiphysics.json payload.
+    @param expected_revision Canonical revision from motor_multiphysics_stamp.
+    @returns A revision_mismatch finding, or None when all authorities agree.
+    """
+    sources = [
+        ("state.motorMultiphysics", state.get("motorMultiphysics")),
+        ("state.cadAuthority", state.get("cadAuthority")),
+        ("state.motorMultiphysicsPointer", state.get("motorMultiphysicsPointer")),
+    ]
+    has_evidence = any(
+        isinstance(state.get(key), dict)
+        for key in ("motorMultiphysics", "cadAuthority")
+    ) or isinstance(sidecar, dict)
+    if not has_evidence:
+        return None
+    if isinstance(sidecar, dict):
+        sources.extend([
+            ("sidecar", sidecar),
+            ("sidecar.motorMultiphysics", sidecar.get("motorMultiphysics")),
+            ("sidecar.cadAuthority", sidecar.get("cadAuthority")),
+        ])
+
+    revisions = {
+        label: (
+            str(authority.get("assembly_revision") or "").strip() or None
+        )
+        for label, authority in sources
+        if isinstance(authority, dict)
+    }
+    if not revisions:
+        return None
+
+    missing = sorted(label for label, revision in revisions.items() if revision is None)
+    distinct = sorted({revision for revision in revisions.values() if revision is not None})
+    is_mismatch = bool(missing) or len(distinct) != 1 or distinct[0] != expected_revision
+    if not is_mismatch:
+        return None
+
+    return {
+        "code": "revision_mismatch",
+        "severity": "HARD",
+        "status": "FAIL",
+        "expected_revision": expected_revision,
+        "revisions": revisions,
+        "missing_sources": missing,
+        "distinct_revisions": distinct,
+        "message": (
+            "motorMultiphysics, cadAuthority, sidecar, and "
+            "motorMultiphysicsPointer must share the canonical assembly revision"
+        ),
+    }
+
+
+def _enforce_motor_assembly_revision(
+    state: dict,
+    sidecar: Optional[dict] = None,
+) -> None:
+    """Fail the export before stale solver/CAD evidence can be combined.
+
+    @description Enforce the shared assembly revision as a hard export gate.
+    @param state Run state containing motor/CAD evidence.
+    @param sidecar Optional motor-multiphysics.json payload.
+    @returns None when revision authorities are coherent.
+    @throws SystemExit when any present authority is missing or mismatched.
+    """
+    finding = _motor_assembly_revision_mismatch(state, sidecar)
+    if finding is None:
+        return
+    state["ship_ok"] = False
+    motor = state.get("motorMultiphysics")
+    if isinstance(motor, dict):
+        motor["ship_ok"] = False
+        motor["all_required_solver_checks_pass"] = False
+    revisions = ", ".join(
+        f"{source}={revision or 'MISSING'}"
+        for source, revision in finding["revisions"].items()
+    )
+    raise SystemExit(
+        f"revision_mismatch: assembly evidence is not revision-coherent; "
+        f"expected {finding['expected_revision']}; {revisions}"
+    )
+
+
 def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
     """INTENT (2026-07-30): restore motorMultiphysics + cadAuthority from the
     twin sidecar written by fe-front-stamp-motor-multiphysics.py. Quality & Audit
@@ -28481,6 +28578,7 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
     @returns Whether state was updated from the sidecar
     """
     side = os.path.join(run_dir or "", "motor-multiphysics.json")
+    _enforce_motor_assembly_revision(state)
     if not os.path.isfile(side):
         return False
     try:
@@ -28491,6 +28589,9 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
         return False
     if not isinstance(restored, dict):
         return False
+    # DECISION: validate state and sidecar BEFORE the authoritative sidecar copy.
+    # Otherwise rehydration would erase a stale-state mismatch and greenwash the export.
+    _enforce_motor_assembly_revision(state, restored)
     motor = restored.get("motorMultiphysics")
     cad = restored.get("cadAuthority")
     if not isinstance(motor, dict) or not isinstance(cad, dict):
@@ -31612,6 +31713,56 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch shared motor/CAD assembly revision (Plan A step 1, 2026-07-30) ═══
+    _assembly_rev = MOTOR_ASSEMBLY_REVISION
+    _matched_revision_state = {
+        "motorMultiphysics": {"assembly_revision": _assembly_rev},
+        "cadAuthority": {"assembly_revision": _assembly_rev},
+        "motorMultiphysicsPointer": {"assembly_revision": _assembly_rev},
+    }
+    _matched_revision_sidecar = {
+        "assembly_revision": _assembly_rev,
+        "motorMultiphysics": {"assembly_revision": _assembly_rev},
+        "cadAuthority": {"assembly_revision": _assembly_rev},
+    }
+    if _motor_assembly_revision_mismatch(
+        _matched_revision_state,
+        _matched_revision_sidecar,
+        expected_revision=_assembly_rev,
+    ) is not None:
+        print("  FAIL assembly-revision: matched state/sidecar revisions must pass"); bad += 1
+    _mismatched_revision_state = dict(_matched_revision_state)
+    _mismatched_revision_state["cadAuthority"] = {
+        "assembly_revision": "stale-cad-revision",
+    }
+    _revision_finding = _motor_assembly_revision_mismatch(
+        _mismatched_revision_state,
+        _matched_revision_sidecar,
+        expected_revision=_assembly_rev,
+    )
+    if not (_revision_finding
+            and _revision_finding.get("code") == "revision_mismatch"
+            and "state.cadAuthority" in (_revision_finding.get("revisions") or {})):
+        print(f"  FAIL assembly-revision: mismatched CAD revision must catch "
+              f"(got {_revision_finding})"); bad += 1
+    try:
+        _enforce_motor_assembly_revision(
+            _matched_revision_state,
+            _matched_revision_sidecar,
+        )
+    except SystemExit as _matched_revision_exc:
+        print(f"  FAIL assembly-revision: matched revisions must not block export "
+              f"({_matched_revision_exc})"); bad += 1
+    try:
+        _enforce_motor_assembly_revision(
+            _mismatched_revision_state,
+            _matched_revision_sidecar,
+        )
+        print("  FAIL assembly-revision: mismatch must hard-stop the export"); bad += 1
+    except SystemExit as _mismatch_revision_exc:
+        if "revision_mismatch" not in str(_mismatch_revision_exc):
+            print(f"  FAIL assembly-revision: hard stop must name revision_mismatch "
+                  f"(got {_mismatch_revision_exc})"); bad += 1
     # ═══ proveCatch compute_ship_axes self-audit axis (2026-07-27) — ONE TRUTH ═══
     # The axis must agree with the verdict's compiled-check partition, and must still be
     # able to FAIL. Three cases: a defect the compiled checks RETIRED reads clean (it was
