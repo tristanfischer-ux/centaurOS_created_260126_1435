@@ -282,3 +282,50 @@ Otherwise it verifies Docker and the local image, then prints the exact build
 command when either is missing. Gmsh remains available for production meshes;
 the smoke test deliberately uses a tiny hand-written mesh so it proves the
 structural solver independently.
+
+### FIA-bound Formula E front-kit rotor centrifugal screen
+
+The smoke command above proves that CalculiX works; it deliberately does **not**
+represent the Formula E front kit. Run the twin-bound case instead when producing
+front-powertrain rotor-retention screening evidence:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/calculix_fia_rotor_screen.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+The FIA case selectively reads `orchestratorContract.quantities` and
+`fpkConcentricGeometry` with `ijson`. It builds a coarse C3D8 quarter-ring solid
+from twin rotor ID→OD (≈92.7–122 mm) at 25 % of active length, applies
+`*DLOAD CENTRIF` at ~19,500 rpm about the kit axis, and records max von Mises /
+principal stress plus displacement. Material cards are **assumed isotropic
+steel** (E = 210 GPa, ν = 0.30, ρ ≈ 7810 kg/m³, screening yield 355 MPa) —
+not laminate stack, magnet pocket, or sleeve detail.
+
+Work directories stay under `scripts/motor-stack/` so Colima can see them (macOS
+`TMPDIR` under `/var/folders` is not mounted). Native `ccx` is preferred when
+present; otherwise `forgeos/calculix:2.21-arm64`.
+
+The artefact always keeps magnet-pocket burst FEA and release FoS `OPEN`,
+status `PARTIAL`, and `ship_ok: false`. Screening FoS vs assumed yield is
+informational only — never a closed release factor of safety.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/calculix_fia_rotor_screen.json
+```
+
+When that file exists, `scripts/fe-front-stamp-motor-multiphysics.py` promotes
+the multiphysics `structural` check to **PARTIAL** (same honesty pattern as the
+magnetic and ROSS twin-bound cases).
+
+Run the synthetic proveCatch separately:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/calculix_fia_rotor_screen.py --selftest
+```
+
+The self-test solves the synthetic FIA ring at 19,500 rpm and again at half
+speed. Halving rpm must drop von Mises by more than 55 %, proving the headline
+stress is solver-derived (ω² scaling). It also proves twin dimensions replace
+the smoke cantilever and that no code path can set `ship_ok` or close release
+FoS.

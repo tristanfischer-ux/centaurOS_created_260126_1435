@@ -57,6 +57,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
         "software": "Gmsh + CalculiX",
         "paths": [
             "scripts/motor-stack/calculix_smoke_selftest.sh",
+            "scripts/motor-stack/calculix_fia_rotor_screen.py",
             "scripts/motor-stack/calculix.Dockerfile",
         ],
         "versions": {"calculix_ccx": "2.21", "image": "forgeos/calculix:2.21-arm64"},
@@ -311,6 +312,11 @@ def _load_fia_ross_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     return _load_fia_case_json(twin_dir, "ross_fia_front_kit_case.json")
 
 
+def _load_fia_calculix_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA CalculiX rotor centrifugal screen artefact if present."""
+    return _load_fia_case_json(twin_dir, "calculix_fia_rotor_screen.json")
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
@@ -405,9 +411,7 @@ def _rotor_dynamics_check_from_fia_case(
             "status": "PARTIAL",
             "critical_speed_margin": margins.get("first_critical_over_operating"),
             "bearing_reaction_ref": None,
-            "model_revision": str(
-                case.get("schema") or "forgeos.motor_stack.ross_fia_front_kit_case/v1"
-            ),
+            "model_revision": str(case.get("schema") or "forgeos.motor_stack.ross_fia_front_kit_case/v1"),
             "geometry_revision": (
                 f"span={model.get('shaft_length_m')}m "
                 f"shaft_od={model.get('shaft_outer_diameter_m')}m "
@@ -447,6 +451,74 @@ def _rotor_dynamics_check_from_fia_case(
     return body
 
 
+def _structural_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote structural to PARTIAL when a twin-bound CalculiX screen exists.
+
+    INTENT: Make the FIA front-kit centrifugal ring screen visible without
+    claiming magnet-pocket burst FEA or closed release FoS (those stay OPEN).
+    """
+    screening = (
+        case.get("screening_results")
+        if isinstance(case.get("screening_results"), dict)
+        else {}
+    )
+    margins = case.get("margins") if isinstance(case.get("margins"), dict) else {}
+    inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
+    mesh = case.get("ring_mesh") if isinstance(case.get("ring_mesh"), dict) else {}
+    rel_ref = "_motor_stack/calculix_fia_rotor_screen.json"
+    body = _open_check(
+        "structural",
+        extra={
+            "status": "PARTIAL",
+            "load_case_set": "centrifugal_overspeed_ring_screen",
+            "minimum_factor_of_safety": margins.get("screening_fos_vs_assumed_yield"),
+            "model_revision": str(
+                case.get("schema") or "forgeos.motor_stack.calculix_fia_rotor_screen/v1"
+            ),
+            "geometry_revision": (
+                f"ri={mesh.get('rotor_inner_radius_mm')}mm "
+                f"ro={mesh.get('rotor_outer_radius_mm')}mm "
+                f"L={mesh.get('axial_length_mm')}mm"
+                if mesh
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                f"Do rotor retention, case, mounts and joints survive "
+                f"{duty['max_rotor_speed_rpm']} rpm and torque reaction inside the "
+                f"{duty['mass_cap_kg']} kg / bay box?"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "max_von_mises_mpa": screening.get("max_von_mises_mpa"),
+                "max_principal_stress_mpa": screening.get("max_principal_stress_mpa"),
+                "max_abs_displacement_mm": screening.get("max_abs_displacement_mm"),
+                "screening_fos_vs_yield": margins.get("screening_fos_vs_assumed_yield"),
+                "below_assumed_yield": margins.get("below_assumed_yield"),
+                "release_fos_closed": False,
+                "max_rotor_speed_rpm": inputs.get("max_rotor_speed_rpm"),
+                "magnet_pocket_burst_fea": "OPEN",
+                "note": (
+                    "Twin-bound CalculiX steel-ring centrifugal screen at kit rpm. "
+                    "Assumed isotropic steel; not magnet-pocket burst; release FoS "
+                    "not closed."
+                ),
+            },
+        },
+    )
+    body["status"] = "PARTIAL"
+    return body
+
+
 def build_motor_multiphysics(
     *,
     state: Optional[Mapping[str, Any]] = None,
@@ -456,9 +528,9 @@ def build_motor_multiphysics(
 ) -> dict[str, Any]:
     """Build motorMultiphysics dict per plan schema.
 
-    @description Records FIA duty + toolchain smoke pointers. Magnetic and
-    rotor_dynamics may be PARTIAL when twin-bound FIA case artefacts exist;
-    all_required still false.
+    @description Records FIA duty + toolchain smoke pointers. Magnetic,
+    rotor_dynamics, and structural may be PARTIAL when twin-bound FIA case
+    artefacts exist; all_required still false.
     @param state Optional twin state for quantity readback
     @param assembly_revision Shared CAD/solver/Blender revision label
     @param stamped_at ISO timestamp override
@@ -521,10 +593,18 @@ def build_motor_multiphysics(
             },
         )
 
-    required_checks = {
-        "magnetic": magnetic,
-        "rotor_dynamics": rotor_dynamics,
-        "structural": _open_check(
+    fia_calculix = _load_fia_calculix_case(twin_dir)
+    if fia_calculix is not None and twin_dir is not None:
+        structural = _structural_check_from_fia_case(
+            duty, fia_calculix, twin_dir=Path(twin_dir)
+        )
+        notes += (
+            " Structural check PARTIAL: twin-bound CalculiX rotor centrifugal "
+            "screen in _motor_stack/calculix_fia_rotor_screen.json "
+            "(magnet-pocket burst / release FoS still OPEN)."
+        )
+    else:
+        structural = _open_check(
             "structural",
             extra={
                 "load_case_set": None,
@@ -535,7 +615,12 @@ def build_motor_multiphysics(
                     f"{duty['mass_cap_kg']} kg / bay box?"
                 ),
             },
-        ),
+        )
+
+    required_checks = {
+        "magnetic": magnetic,
+        "rotor_dynamics": rotor_dynamics,
+        "structural": structural,
         "water_jacket": _open_check(
             "water_jacket",
             extra={
@@ -605,9 +690,9 @@ def build_cad_authority(
     assembly_revision: str = ASSEMBLY_REVISION,
     stamped_at: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Build cadAuthority register — communication_only except seeded parametric families.
+    """Build cadAuthority register — communication_only except seeded stator family.
 
-    @description Stator, rotor, planetary, and serpentine cold plate are parametric.
+    @description Lists principal components with authority levels from the plan.
     @param assembly_revision Shared revision label
     @param stamped_at ISO timestamp override
     @returns cadAuthority object
@@ -784,16 +869,18 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
 
 
 def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """proveCatch: stamp must stay fail-closed; magnetic/ross may be PARTIAL with result_ref.
+    """proveCatch: stamp must stay fail-closed; twin-bound checks may be PARTIAL with result_ref.
 
     @description Adversarial guards for the stub / twin-bound-partial stamp.
+    Magnetic, rotor_dynamics, and structural may be PARTIAL when they cite a
+    twin-bound artefact result_ref; everything else stays OPEN.
     @param payload Combined stamp payload
     @returns Catch dict with ok bool
     """
     motor = payload.get("motorMultiphysics") or {}
     cad = payload.get("cadAuthority") or {}
     checks = motor.get("required_checks") or {}
-    _partial_allowed = frozenset({"magnetic", "rotor_dynamics"})
+    _partial_allowed = frozenset({"magnetic", "rotor_dynamics", "structural"})
 
     def _status_ok(name: str, chk: Mapping[str, Any]) -> bool:
         status = chk.get("status")
@@ -1056,6 +1143,34 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "calculix_fia_rotor_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.calculix_fia_rotor_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "ghi789",
+                    "screening_results": {
+                        "max_von_mises_mpa": 118.0,
+                        "max_principal_stress_mpa": 130.0,
+                        "max_abs_displacement_mm": 0.012,
+                    },
+                    "margins": {
+                        "screening_fos_vs_assumed_yield": 3.01,
+                        "below_assumed_yield": True,
+                        "release_fos_closed": False,
+                    },
+                    "input_quantities": {"max_rotor_speed_rpm": 19500.0},
+                    "ring_mesh": {
+                        "rotor_inner_radius_mm": 46.35,
+                        "rotor_outer_radius_mm": 61.0,
+                        "axial_length_mm": 24.395,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         partial_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
         mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
         if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
@@ -1070,12 +1185,21 @@ def selftest() -> int:
         if ross.get("critical_speed_margin") != 2.15:
             print("FAIL: rotor_dynamics must surface critical_speed_margin from artefact")
             bad += 1
+        structural = partial_payload["motorMultiphysics"]["required_checks"]["structural"]
+        if structural.get("status") != "PARTIAL" or not structural.get("result_ref"):
+            print(
+                "FAIL: twin-bound CalculiX case must mark structural PARTIAL with result_ref"
+            )
+            bad += 1
+        if structural.get("minimum_factor_of_safety") != 3.01:
+            print("FAIL: structural must surface screening FoS from artefact")
+            bad += 1
         if partial_payload["motorMultiphysics"].get("ship_ok") is True:
-            print("FAIL: PARTIAL magnetic/ross must not set ship_ok")
+            print("FAIL: PARTIAL magnetic/ross/calculix must not set ship_ok")
             bad += 1
         if not prove_catch(partial_payload).get("ok"):
             print(
-                "FAIL: proveCatch must accept magnetic+ross PARTIAL with result_ref"
+                "FAIL: proveCatch must accept magnetic+ross+calculix PARTIAL with result_ref"
             )
             bad += 1
         if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 4:
