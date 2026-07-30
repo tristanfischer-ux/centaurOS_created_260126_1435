@@ -55,8 +55,17 @@ EXTERNAL_EDGE_IDS = frozenset(
 )
 # DECISION: these four product-internal paths can close against the bay-boundary
 # concept anchors while their supplier/chassis mating coordinates remain OPEN.
+# DECISION: LV + CAN use the same bay-boundary honesty as HV/coolant —
+# route product-internal path; keep chassis mating XYZ OPEN (not FIA invent).
 BAY_RELATIVE_EXTERNAL_ROUTE_IDS = frozenset(
-    ("HV_DC_POS", "HV_DC_NEG", "COOLANT_IN", "COOLANT_OUT")
+    (
+        "HV_DC_POS",
+        "HV_DC_NEG",
+        "COOLANT_IN",
+        "COOLANT_OUT",
+        "LV_POWER",
+        "CAN_FD",
+    )
 )
 
 

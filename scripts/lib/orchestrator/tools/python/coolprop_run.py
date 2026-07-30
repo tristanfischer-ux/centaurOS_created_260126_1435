@@ -37,7 +37,11 @@ FLUID_MAP = {
     "r410a": "R410A",
     "r513a": "R513A",
     "water": "Water",
-    "water_glycol_50": "INCOMP::APG[0.50]",  # Aqueous propylene glycol 50% via INCOMP
+    # FPK / traction coolant: ethylene glycol 50% (MEG). APG kept as alias for propylene.
+    "water_glycol_50": "INCOMP::MEG[0.50]",
+    "egw_50": "INCOMP::MEG[0.50]",
+    "meg_50": "INCOMP::MEG[0.50]",
+    "apg_50": "INCOMP::APG[0.50]",
     "co2": "CO2",
     "ammonia": "Ammonia",
 }
@@ -46,10 +50,18 @@ FLUID_MAP = {
 def compute(payload: dict) -> dict:
     import CoolProp.CoolProp as CP
 
-    fluid_in = safe_choice(str(payload.get("fluid", "")).strip().lower(), FLUID_MAP, default="r290", label="fluid")
-    fluid = FLUID_MAP.get(fluid_in)
+    raw_fluid = str(payload.get("fluid", "")).strip()
+    # GOTCHA: FPK stamps sometimes pass CoolProp native "INCOMP::MEG[0.50]".
+    # Do NOT run that through safe_choice — it would silently become R290.
+    if raw_fluid.upper().startswith("INCOMP::") or raw_fluid in FLUID_MAP.values():
+        fluid = raw_fluid if raw_fluid.upper().startswith("INCOMP::") else raw_fluid
+    else:
+        fluid_in = safe_choice(
+            raw_fluid.lower(), FLUID_MAP, default="r290", label="fluid"
+        )
+        fluid = FLUID_MAP.get(fluid_in)
     if not fluid:
-        raise ValueError(f"unknown fluid code: {fluid_in!r} (supported: {list(FLUID_MAP.keys())})")
+        raise ValueError(f"unknown fluid code: {raw_fluid!r} (supported: {list(FLUID_MAP.keys())})")
 
     t_c = float(payload.get("temperature_c", 25.0))
     t_k = t_c + 273.15
@@ -96,11 +108,37 @@ def compute(payload: dict) -> dict:
     else:
         out["latent_heat_kj_kg"] = None
 
-    # Liquid specific heat
+    # Liquid specific heat — prefer saturation Q=0; for INCOMP mixtures use P=1 atm
     try:
         out["cp_liquid_kj_kgk"] = round(CP.PropsSI("C", "T", t_k, "Q", 0, fluid) / 1000.0, 3)
     except Exception:
-        out["cp_liquid_kj_kgk"] = None
+        try:
+            out["cp_liquid_kj_kgk"] = round(
+                CP.PropsSI("C", "T", t_k, "P", 101325.0, fluid) / 1000.0, 3
+            )
+        except Exception:
+            out["cp_liquid_kj_kgk"] = None
+
+    # Incompressible coolants: also emit single-phase ρ / μ / k at (T,P)
+    if fluid.startswith("INCOMP::") or fluid == "Water":
+        try:
+            out["liquid_density_kg_m3"] = round(
+                CP.PropsSI("D", "T", t_k, "P", 101325.0, fluid), 2
+            )
+        except Exception:
+            pass
+        try:
+            out["viscosity_pa_s"] = float(CP.PropsSI("V", "T", t_k, "P", 101325.0, fluid))
+        except Exception:
+            out["viscosity_pa_s"] = None
+        try:
+            out["conductivity_w_mk"] = round(
+                CP.PropsSI("L", "T", t_k, "P", 101325.0, fluid), 4
+            )
+        except Exception:
+            out["conductivity_w_mk"] = None
+        if out.get("cp_liquid_kj_kgk") is not None:
+            out["cp_liquid_j_kgk"] = round(float(out["cp_liquid_kj_kgk"]) * 1000.0, 1)
 
     # Flammability class (ASHRAE)
     flammability_classes = {

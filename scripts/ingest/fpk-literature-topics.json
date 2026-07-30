@@ -1,0 +1,1493 @@
+{
+  "product_class": "formula_e_front_mgu",
+  "intent": "Anvil world-expert FPK literature corpus \u2014 \u226510 peer-reviewed / high-quality papers per research topic, mapped to physics-tree component_ids. Harvest via OpenAlex/Crossref; extract formulas/materials/physics into forge-truth.",
+  "min_papers_per_topic": 10,
+  "topics": [
+    {
+      "id": "sic_traction_inverter",
+      "name": "SiC MOSFET traction inverter design",
+      "assembly": "mcu",
+      "components": [
+        "sic_power_module_stack",
+        "sic_half_bridge_1",
+        "sic_die_1_high_side",
+        "sic_die_1_low_side",
+        "aln_substrate_1",
+        "module_baseplate_1"
+      ],
+      "queries": [
+        "silicon carbide MOSFET traction inverter EV",
+        "SiC power module half-bridge automotive",
+        "SiC MOSFET switching loss conduction loss traction",
+        "AMB AlN substrate power module thermal"
+      ]
+    },
+    {
+      "id": "dc_link_capacitor_bank",
+      "name": "DC-link capacitors for PWM traction inverters",
+      "assembly": "mcu",
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_cap_1",
+        "dc_link_dielectric"
+      ],
+      "queries": [
+        "DC-link capacitor PWM inverter ripple current",
+        "metallized polypropylene film capacitor traction",
+        "DC bus capacitor sizing electric vehicle inverter",
+        "ESR ESL DC-link capacitor bank design"
+      ]
+    },
+    {
+      "id": "laminated_hv_busbar",
+      "name": "Laminated DC busbars and commutation inductance",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "dc_bus_dielectric",
+        "ac_phase_busbar_pierce"
+      ],
+      "queries": [
+        "laminated busbar DC-link inductance inverter",
+        "commutation loop inductance power electronics",
+        "copper busbar skin effect PWM inverter",
+        "low inductance busbar design SiC inverter"
+      ]
+    },
+    {
+      "id": "gate_driver_sic",
+      "name": "Isolated SiC gate drivers and desaturation",
+      "assembly": "mcu",
+      "components": [
+        "gate_driver_board",
+        "gate_channel_1",
+        "gate_ic_1",
+        "desat_1",
+        "isolated_dcdc_1"
+      ],
+      "queries": [
+        "isolated gate driver SiC MOSFET automotive",
+        "desaturation detection short circuit SiC",
+        "gate driver DC-DC isolation traction inverter",
+        "SiC gate drive +15V -3V design"
+      ]
+    },
+    {
+      "id": "inverter_control_pcb",
+      "name": "Traction inverter control electronics",
+      "assembly": "mcu",
+      "components": [
+        "oem_inverter_control_board",
+        "control_mcu",
+        "current_sense_frontend",
+        "resolver_excitation_demod",
+        "can_fd_transceiver",
+        "hv_lv_isolation_barrier"
+      ],
+      "queries": [
+        "electric vehicle inverter control board architecture",
+        "field oriented control IPMSM automotive ECU",
+        "resolver to digital converter traction motor",
+        "phase current sensing inverter Hall LEM"
+      ]
+    },
+    {
+      "id": "cold_plate_power_electronics",
+      "name": "Liquid cold plates for power modules",
+      "assembly": "mcu",
+      "components": [
+        "mcu_cold_plate",
+        "cold_plate_channels",
+        "cold_plate_cover",
+        "tim_layer",
+        "coolant_port_in",
+        "coolant_port_out",
+        "coolant_fluid"
+      ],
+      "queries": [
+        "liquid cold plate power electronics channel design",
+        "thermal interface material power module cold plate",
+        "ethylene glycol water cooling inverter EV",
+        "microchannel cold plate SiC module CFD",
+        "impingement cooling power electronics"
+      ]
+    },
+    {
+      "id": "ipmsm_electromagnetics",
+      "name": "IPMSM electromagnetic design and sizing",
+      "assembly": "motor",
+      "components": [
+        "stator_windings",
+        "stator_laminations",
+        "permanent_magnet_set",
+        "hollow_rotor_barrel",
+        "motor_shaft"
+      ],
+      "queries": [
+        "interior permanent magnet synchronous motor design",
+        "IPMSM electric loading current density traction",
+        "IPMSM torque equation airgap flux density",
+        "high speed IPMSM field weakening EV"
+      ]
+    },
+    {
+      "id": "stator_windings_hairpin",
+      "name": "Stator windings, hairpin and copper fill",
+      "assembly": "motor",
+      "components": [
+        "stator_windings",
+        "phase_coil_u",
+        "conductor_strand_u",
+        "copper_core_u",
+        "enamel_u",
+        "slot_liner_wedge_set",
+        "phase_terminal_lugs"
+      ],
+      "queries": [
+        "hairpin winding stator electric vehicle motor",
+        "slot fill factor copper winding traction motor",
+        "magnet wire enamel class H polyimide motor",
+        "AC copper loss proximity effect hairpin winding",
+        "vacuum pressure impregnation VPI stator"
+      ]
+    },
+    {
+      "id": "ndfeb_magnets_retention",
+      "name": "NdFeB magnets, demagnetization and retention",
+      "assembly": "motor",
+      "components": [
+        "permanent_magnet_set",
+        "magnet_segment_body",
+        "magnet_retention",
+        "magnet_coating"
+      ],
+      "queries": [
+        "NdFeB permanent magnet demagnetization IPMSM",
+        "high speed rotor magnet retention sleeve",
+        "NdFeB N42UH automotive traction magnet",
+        "IPM magnet bridge stress centrifugal force"
+      ]
+    },
+    {
+      "id": "electrical_steel_laminations",
+      "name": "Electrical steel laminations and core loss",
+      "assembly": "motor",
+      "components": [
+        "stator_laminations",
+        "lamination_sheet",
+        "interlaminar_varnish"
+      ],
+      "queries": [
+        "non-oriented electrical steel core loss motor",
+        "lamination thickness eddy current traction motor",
+        "M250-35A electrical steel magnetic properties",
+        "interlaminar insulation varnish electrical steel"
+      ]
+    },
+    {
+      "id": "motor_jacket_cooling",
+      "name": "Motor housing jacket liquid cooling",
+      "assembly": "motor",
+      "components": [
+        "motor_cooling_jacket",
+        "jacket_channels",
+        "jacket_coolant",
+        "motor_outer_casing"
+      ],
+      "queries": [
+        "traction motor water jacket cooling design",
+        "stator cooling channel EV motor thermal",
+        "LPTN thermal network IPMSM cooling",
+        "oil spray cooling electric motor windings"
+      ]
+    },
+    {
+      "id": "motor_bearings_shaft",
+      "name": "High-speed motor bearings and shafts",
+      "assembly": "motor",
+      "components": [
+        "front_bearing",
+        "rear_bearing",
+        "motor_shaft",
+        "front_end_bell",
+        "rear_end_bell"
+      ],
+      "queries": [
+        "high speed electric motor bearing DN life",
+        "angular contact bearing traction motor",
+        "hollow shaft electric motor design fatigue",
+        "bearing currents inverter-fed motor"
+      ]
+    },
+    {
+      "id": "resolver_position_sensing",
+      "name": "Resolvers and rotor position sensing",
+      "assembly": "motor",
+      "components": [
+        "resolver",
+        "encoder",
+        "resolver_excitation_demod"
+      ],
+      "queries": [
+        "variable reluctance resolver traction motor",
+        "resolver to digital converter accuracy EV",
+        "rotor position sensor IPMSM automotive"
+      ]
+    },
+    {
+      "id": "planetary_reduction_ev",
+      "name": "Planetary reduction gears for EV drives",
+      "assembly": "transmission",
+      "components": [
+        "sun_gear",
+        "planet_gears",
+        "ring_gear",
+        "planet_carrier",
+        "gearbox_housing",
+        "gearbox_cover"
+      ],
+      "queries": [
+        "planetary gear EV reduction drive unit",
+        "helical planetary gearbox tooth bending AGMA",
+        "high speed planetary gear noise EV",
+        "planet bearing needle carrier pin design"
+      ]
+    },
+    {
+      "id": "open_differential_ev",
+      "name": "Compact open differentials in EDU",
+      "assembly": "transmission",
+      "components": [
+        "differential_carrier",
+        "side_gears",
+        "pinion_gear",
+        "output_shaft_left",
+        "output_shaft_right",
+        "intermediate_shaft"
+      ],
+      "queries": [
+        "bevel differential electric drive unit",
+        "open differential side gear design EV",
+        "compact differential planetary EDU packaging"
+      ]
+    },
+    {
+      "id": "gear_lubrication_seals",
+      "name": "Gear oil, seals and lubrication",
+      "assembly": "transmission",
+      "components": [
+        "gear_oil_charge",
+        "oil_seals",
+        "oil_fluid",
+        "gearbox_bearings"
+      ],
+      "queries": [
+        "EV gearbox oil splash lubrication efficiency",
+        "fluoroelastomer FKM shaft seal high speed",
+        "synthetic gear oil 75W-90 electric drive",
+        "windage and churning losses planetary gearbox"
+      ]
+    },
+    {
+      "id": "edu_housing_manufacturing",
+      "name": "EDU / FPK housing manufacturing and materials",
+      "assembly": "cassette",
+      "components": [
+        "traction_drive_housing",
+        "cassette_cover",
+        "inverter_housing",
+        "inverter_cover",
+        "mounting_ear_set"
+      ],
+      "queries": [
+        "aluminum HPDC electric drive unit housing",
+        "EV EDU casting machining dimensional tolerance",
+        "integrated electric drive unit packaging design",
+        "ADC12 aluminum housing thermal conductivity"
+      ]
+    },
+    {
+      "id": "hv_connectors_coolant_ports",
+      "name": "HV connectors and coolant interface ports",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_connector",
+        "lv_signal_connector",
+        "coolant_port_in",
+        "coolant_port_out",
+        "motor_power_terminals"
+      ],
+      "queries": [
+        "high voltage connector electric vehicle inverter",
+        "HVIL interlock connector automotive",
+        "coolant quick connect EV power electronics",
+        "shielded LV signal connector traction inverter"
+      ]
+    },
+    {
+      "id": "tim_and_thermal_stack",
+      "name": "Thermal interface materials and stack-up",
+      "assembly": "mcu",
+      "components": [
+        "tim_layer",
+        "mcu_cold_plate",
+        "module_baseplate_1"
+      ],
+      "queries": [
+        "thermal interface material power electronics grease",
+        "TIM thermal resistance power module cold plate",
+        "sintered silver die attach SiC module"
+      ]
+    },
+    {
+      "id": "pwm_loss_thermal_fea",
+      "name": "PWM loss models and FEA/CFD methods",
+      "assembly": "mcu",
+      "components": [
+        "sic_power_module_stack",
+        "mcu_cold_plate",
+        "stator_windings",
+        "stator_laminations"
+      ],
+      "queries": [
+        "finite element electromagnetic IPMSM loss",
+        "CFD cold plate power electronics validation",
+        "coupled electro-thermal simulation traction inverter",
+        "iron loss model PWM supply electrical steel"
+      ]
+    },
+    {
+      "id": "formula_e_edu_systems",
+      "name": "Formula E / motorsport EDU systems",
+      "assembly": "cassette",
+      "components": [
+        "traction_drive_housing",
+        "halfshaft_output_flange_pair",
+        "front_fpk"
+      ],
+      "queries": [
+        "Formula E Gen3 powertrain electric drive",
+        "motorsport electric drive unit power density",
+        "formula e front powertrain kit packaging",
+        "high power density EDU racing electric"
+      ]
+    },
+    {
+      "id": "copper_bus_materials",
+      "name": "Copper conductivity and bus materials",
+      "assembly": "mcu",
+      "components": [
+        "copper_core_u",
+        "hv_dc_busbar_link",
+        "ac_phase_busbar_pierce",
+        "phase_terminal_lugs"
+      ],
+      "queries": [
+        "OFHC copper electrical conductivity temperature",
+        "copper busbar current density design guide",
+        "electrodeposited copper PCB power plane"
+      ]
+    },
+    {
+      "id": "pcb_hv_creepage_isolation",
+      "name": "HV PCB creepage and galvanic isolation",
+      "assembly": "mcu",
+      "components": [
+        "gate_driver_board",
+        "oem_inverter_control_board",
+        "hv_lv_isolation_barrier",
+        "gdb_fr4",
+        "ctrl_fr4"
+      ],
+      "queries": [
+        "PCB creepage clearance 800V automotive inverter",
+        "IEC 60664 insulation coordination power electronics",
+        "reinforced isolation gate driver PCB layout",
+        "FR4 high voltage PCB design EV inverter"
+      ]
+    },
+    {
+      "id": "fasteners_al_housings",
+      "name": "Fasteners and inserts in aluminum housings",
+      "assembly": "fasteners",
+      "components": [
+        "mounting_ear_set",
+        "traction_drive_housing",
+        "cassette_cover"
+      ],
+      "queries": [
+        "helicoil thread insert aluminum casting automotive",
+        "bolt preload aluminum housing EV",
+        "vibration fasteners electric drive unit"
+      ]
+    },
+    {
+      "id": "egw_coolant_properties",
+      "name": "EGW coolant thermophysical properties",
+      "assembly": "cooling",
+      "components": [
+        "coolant_fluid",
+        "jacket_coolant",
+        "coolant_port_in"
+      ],
+      "queries": [
+        "ethylene glycol water mixture thermal properties",
+        "50/50 EGW coolant viscosity heat capacity",
+        "automotive coolant corrosion inhibitor EV"
+      ]
+    },
+    {
+      "id": "sic_mosfet_die_rds_switching",
+      "name": "SiC MOSFET die: Rds(on), switching energy, short-circuit SOA",
+      "assembly": "mcu",
+      "components": [
+        "sic_power_module_stack",
+        "sic_half_bridge_1",
+        "sic_die_1_high_side",
+        "sic_die_1_low_side",
+        "sic_crystal_1_high_side",
+        "sic_crystal_1_low_side"
+      ],
+      "queries": [
+        "silicon carbide MOSFET Rds(on) temperature dependence traction inverter",
+        "SiC MOSFET Eon Eoff switching energy double pulse test IEEE",
+        "4H-SiC MOSFET short-circuit withstand time SOA automotive",
+        "SiC MOSFET body diode reverse recovery traction drive",
+        "planar trench SiC MOSFET specific on-resistance 1200 V",
+        "SiC power MOSFET parallel die current sharing imbalance"
+      ],
+      "must_extract": [
+        "formulas",
+        "materials",
+        "geometry",
+        "fea"
+      ]
+    },
+    {
+      "id": "aln_amb_dbc_substrate_thermal",
+      "name": "AlN AMB/DBC ceramic substrates for power modules",
+      "assembly": "mcu",
+      "components": [
+        "aln_substrate_1",
+        "aln_substrate_2",
+        "aln_substrate_3",
+        "sic_half_bridge_1",
+        "sic_power_module_stack"
+      ],
+      "queries": [
+        "aluminum nitride AMB substrate thermal conductivity power module",
+        "active metal brazed AlN DBC copper ceramic power electronics",
+        "AlN substrate CTE mismatch SiC die thermomechanical stress",
+        "DBC AMB substrate thermal resistance junction case measurement",
+        "ceramic substrate copper thickness current carrying power module",
+        "AlN vs Si3N4 substrate reliability power cycling IEEE"
+      ],
+      "must_extract": [
+        "materials",
+        "manufacturing",
+        "geometry",
+        "fea",
+        "formulas"
+      ]
+    },
+    {
+      "id": "sic_module_baseplate_spreading",
+      "name": "Power-module baseplate spreading resistance and CTE",
+      "assembly": "mcu",
+      "components": [
+        "module_baseplate_1",
+        "module_baseplate_2",
+        "module_baseplate_3",
+        "tim_layer",
+        "mcu_cold_plate"
+      ],
+      "queries": [
+        "power module copper baseplate thermal spreading resistance",
+        "AlSiC baseplate CTE matching SiC power module",
+        "pin-fin baseplate liquid cooling power semiconductor module",
+        "baseplate warpage solder joint reliability power cycling",
+        "junction to case thermal impedance structure function module",
+        "direct cooled baseplate SiC traction inverter thermal"
+      ],
+      "must_extract": [
+        "formulas",
+        "materials",
+        "geometry",
+        "fea",
+        "manufacturing"
+      ]
+    },
+    {
+      "id": "silver_sinter_die_attach_sic",
+      "name": "Silver sinter die-attach for SiC power dies",
+      "assembly": "mcu",
+      "components": [
+        "sic_die_1_high_side",
+        "sic_die_1_low_side",
+        "aln_substrate_1",
+        "sic_power_module_stack"
+      ],
+      "queries": [
+        "silver sintering die attach SiC MOSFET power module",
+        "nanosilver paste pressureless sinter die bonding reliability",
+        "sintered silver thermal conductivity void fraction power electronics",
+        "Ag sinter vs solder die attach power cycling lifetime",
+        "transient liquid phase bonding copper sinter SiC packaging",
+        "die attach shear strength silver sinter high temperature"
+      ],
+      "must_extract": [
+        "materials",
+        "manufacturing",
+        "formulas",
+        "fea",
+        "geometry"
+      ]
+    },
+    {
+      "id": "pp_film_cap_ripple_lifetime",
+      "name": "Metallized PP film DC-link capacitors: ripple, hotspot, lifetime",
+      "assembly": "mcu",
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_cap_1",
+        "dc_link_dielectric"
+      ],
+      "queries": [
+        "metallized polypropylene film capacitor ripple current heating",
+        "DC-link film capacitor lifetime Arrhenius voltage stress model",
+        "self-healing metallized film capacitor hotspot temperature inverter",
+        "polypropylene dielectric loss tan delta DC bus capacitor EV",
+        "film capacitor ESR temperature dependence PWM inverter",
+        "DC-link capacitor bank current sharing parallel film cans"
+      ],
+      "must_extract": [
+        "formulas",
+        "materials",
+        "geometry",
+        "manufacturing",
+        "fea"
+      ]
+    },
+    {
+      "id": "dc_link_esl_resonance_commutation",
+      "name": "DC-link ESL, stray inductance and bus resonance",
+      "assembly": "mcu",
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_cap_1",
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "dc_bus_dielectric"
+      ],
+      "queries": [
+        "DC-link capacitor ESL measurement impedance spectroscopy inverter",
+        "commutation loop inductance SiC inverter overvoltage snubber",
+        "DC bus resonance film capacitor laminated busbar PWM",
+        "parasitic inductance capacitor bank switching voltage overshoot",
+        "equivalent series inductance reduction DC-link packaging",
+        "high frequency impedance DC-link network traction inverter"
+      ],
+      "must_extract": [
+        "formulas",
+        "geometry",
+        "fea",
+        "materials"
+      ]
+    },
+    {
+      "id": "laminated_busbar_dielectric_pd",
+      "name": "Laminated busbars: dielectric stack, PD and geometry",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "dc_bus_dielectric",
+        "ac_phase_busbar_pierce"
+      ],
+      "queries": [
+        "laminated busbar dielectric insulation partial discharge HV",
+        "multilayer copper busbar polypropylene dielectric EV inverter",
+        "laminated busbar geometry optimization loop inductance FEA",
+        "edge field intensification laminated DC busbar creepage",
+        "busbar insulation aging thermal cycling power electronics",
+        "planar laminated busbar design guidelines IEEE power electronics"
+      ],
+      "must_extract": [
+        "geometry",
+        "materials",
+        "manufacturing",
+        "fea",
+        "formulas"
+      ]
+    },
+    {
+      "id": "busbar_skin_proximity_pwm_loss",
+      "name": "Busbar AC losses: skin, proximity and PWM harmonics",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "ac_phase_busbar_pierce",
+        "copper_core_u"
+      ],
+      "queries": [
+        "copper busbar skin effect proximity effect PWM frequency",
+        "AC resistance laminated busbar high frequency harmonics",
+        "eddy current loss busbar finite element power electronics",
+        "current density distribution laminated DC bus SiC inverter",
+        "phase busbar AC loss traction inverter switching frequency",
+        "busbar temperature rise I2R skin proximity automotive"
+      ],
+      "must_extract": [
+        "formulas",
+        "fea",
+        "geometry",
+        "materials"
+      ]
+    },
+    {
+      "id": "gate_drive_six_channel_layout",
+      "name": "Six-channel SiC gate-drive board architecture and layout",
+      "assembly": "mcu",
+      "components": [
+        "gate_driver_board",
+        "gate_channel_1",
+        "gate_channel_2",
+        "gate_channel_3",
+        "gate_channel_4",
+        "gate_channel_5",
+        "gate_channel_6",
+        "gate_ic_1",
+        "gdb_fr4"
+      ],
+      "queries": [
+        "three-phase SiC inverter six channel gate driver PCB layout",
+        "gate loop inductance minimization Kelvin source SiC MOSFET",
+        "Miller clamp active gate driver SiC half-bridge crosstalk",
+        "negative gate bias turn-off SiC MOSFET +15 V \u22125 V design",
+        "common mode transient immunity CMTI gate driver PCB",
+        "bootstrap vs isolated supply six-pack gate drive automotive"
+      ],
+      "must_extract": [
+        "formulas",
+        "geometry",
+        "manufacturing",
+        "materials",
+        "fea"
+      ]
+    },
+    {
+      "id": "desat_short_circuit_protection_channels",
+      "name": "Per-channel desaturation / short-circuit protection for SiC",
+      "assembly": "mcu",
+      "components": [
+        "desat_1",
+        "desat_2",
+        "desat_3",
+        "desat_4",
+        "desat_5",
+        "desat_6",
+        "gate_channel_1",
+        "gate_driver_board",
+        "sic_die_1_high_side"
+      ],
+      "queries": [
+        "desaturation detection blanking time SiC MOSFET short circuit",
+        "soft turn-off two-level gate drive short circuit protection",
+        "Vds monitoring DESAT threshold SiC traction inverter",
+        "short-circuit protection response time SiC power module",
+        "false trip DESAT noise immunity gate driver automotive",
+        "overcurrent protection comparison DESAT Rogowski SiC inverter"
+      ],
+      "must_extract": [
+        "formulas",
+        "geometry",
+        "materials",
+        "fea"
+      ]
+    },
+    {
+      "id": "isolated_gate_dcdc_bias_supplies",
+      "name": "Isolated DC-DC bias supplies for gate rails (+15/\u22123 V class)",
+      "assembly": "mcu",
+      "components": [
+        "isolated_dcdc_1",
+        "isolated_dcdc_2",
+        "isolated_dcdc_3",
+        "isolated_dcdc_4",
+        "isolated_dcdc_5",
+        "isolated_dcdc_6",
+        "gate_channel_1",
+        "gate_driver_board"
+      ],
+      "queries": [
+        "isolated DC-DC converter gate driver bias supply SiC",
+        "reinforced isolation power supply gate drive automotive AEC",
+        "flyback push-pull isolated gate supply +15 V \u22123 V design",
+        "common-mode capacitance isolated DC-DC gate driver CMTI",
+        "gate driver auxiliary power transformer isolation barrier",
+        "multi-channel isolated bias supply traction inverter PCB"
+      ],
+      "must_extract": [
+        "formulas",
+        "materials",
+        "geometry",
+        "manufacturing",
+        "fea"
+      ]
+    },
+    {
+      "id": "control_mcu_adc_pwm_sampling",
+      "name": "Traction control MCU, ADC sampling and PWM timing",
+      "assembly": "mcu",
+      "components": [
+        "oem_inverter_control_board",
+        "control_mcu",
+        "ctrl_fr4",
+        "lv_buck_rails"
+      ],
+      "queries": [
+        "automotive traction inverter MCU ADC sampling FOC PWM",
+        "synchronous current sampling center PWM dead-time compensation",
+        "lockstep multicore MCU electric vehicle inverter control",
+        "ADC resolution SNR phase current measurement traction drive",
+        "PWM carrier synchronization resolver FOC IPMSM ECU",
+        "real-time interrupt latency inverter control board automotive"
+      ],
+      "must_extract": [
+        "formulas",
+        "geometry",
+        "manufacturing",
+        "materials"
+      ]
+    },
+    {
+      "id": "phase_current_sense_frontend",
+      "name": "Phase current sensing front-ends (shunt, Hall, fluxgate)",
+      "assembly": "mcu",
+      "components": [
+        "current_sense_frontend",
+        "oem_inverter_control_board",
+        "control_mcu",
+        "ac_phase_busbar_pierce"
+      ],
+      "queries": [
+        "phase current sensing shunt amplifier traction inverter",
+        "closed-loop Hall current transducer EV inverter accuracy",
+        "fluxgate current sensor automotive inverter bandwidth",
+        "current sense CMRR isolation barrier PWM inverter PCB",
+        "Rogowski coil current measurement SiC switching inverter",
+        "offset drift temperature compensation phase current sensor FOC"
+      ],
+      "must_extract": [
+        "formulas",
+        "materials",
+        "geometry",
+        "fea"
+      ]
+    },
+    {
+      "id": "resolver_demod_can_fd_hvil",
+      "name": "Resolver demod, CAN-FD and HVIL interlock on control PCB",
+      "assembly": "mcu",
+      "components": [
+        "resolver_excitation_demod",
+        "can_fd_transceiver",
+        "hv_lv_isolation_barrier",
+        "oem_inverter_control_board",
+        "lv_signal_connector",
+        "hv_dc_connector"
+      ],
+      "queries": [
+        "resolver to digital converter excitation demodulation accuracy",
+        "CAN FD transceiver EMC automotive traction inverter ECU",
+        "high voltage interlock loop HVIL connector detection circuit",
+        "galvanic isolation digital signal HV LV inverter control board",
+        "ISO 11898 CAN FD physical layer electromagnetic compatibility",
+        "safety interlock HVIL loss of connection detection EV inverter"
+      ],
+      "must_extract": [
+        "formulas",
+        "geometry",
+        "materials",
+        "manufacturing"
+      ]
+    },
+    {
+      "id": "cold_plate_microchannel_pressure_drop",
+      "name": "Cold-plate channels: Nu, \u0394P, manufacturing and CFD",
+      "assembly": "mcu",
+      "components": [
+        "mcu_cold_plate",
+        "cold_plate_channels",
+        "cold_plate_cover",
+        "coolant_fluid"
+      ],
+      "queries": [
+        "rectangular microchannel cold plate Nusselt number pressure drop",
+        "liquid cooled cold plate pin-fin vs parallel channel CFD",
+        "friction stir welded cold plate cover leak test power electronics",
+        "maldistribution parallel coolant channels power module cold plate",
+        "impingement jet cold plate SiC module thermal resistance",
+        "Dittus-Boelter Gnielinski correlation cold plate EGW coolant"
+      ],
+      "must_extract": [
+        "formulas",
+        "geometry",
+        "fea",
+        "manufacturing",
+        "materials"
+      ]
+    },
+    {
+      "id": "tim_grease_gap_filler_module_plate",
+      "name": "TIM grease / gap fillers between module baseplate and cold plate",
+      "assembly": "mcu",
+      "components": [
+        "tim_layer",
+        "module_baseplate_1",
+        "mcu_cold_plate"
+      ],
+      "queries": [
+        "thermal grease bond line thickness power module cold plate",
+        "thermal interface material pump-out aging power electronics",
+        "phase change TIM vs silicone grease Rth power semiconductor",
+        "gap filler compressibility thermal resistance cold plate",
+        "TIM effective thermal conductivity contact pressure measurement",
+        "dry-out thermal grease high temperature cycling inverter module"
+      ],
+      "must_extract": [
+        "materials",
+        "formulas",
+        "manufacturing",
+        "geometry",
+        "fea"
+      ]
+    },
+    {
+      "id": "coolant_ports_oring_quick_connect",
+      "name": "Coolant ports, O-rings and quick-connect couplings",
+      "assembly": "mcu",
+      "components": [
+        "coolant_port_in",
+        "coolant_port_out",
+        "mcu_cold_plate",
+        "coolant_fluid"
+      ],
+      "queries": [
+        "automotive coolant quick disconnect coupling leak rate EGW",
+        "O-ring face seal boss aluminum cold plate design",
+        "ethylene glycol water seal elastomer swell EPDM FKM",
+        "coolant fitting pressure drop EV power electronics manifold",
+        "SAE J2044 quick connect fluid coupling automotive cooling",
+        "cold plate inlet outlet port geometry flow uniformity"
+      ],
+      "must_extract": [
+        "geometry",
+        "materials",
+        "manufacturing",
+        "formulas"
+      ]
+    },
+    {
+      "id": "hv_connector_contact_hvil_shield",
+      "name": "HV DC connectors: contact resistance, shielding and HVIL",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_connector",
+        "lv_signal_connector",
+        "hv_dc_busbar_link",
+        "motor_power_terminals"
+      ],
+      "queries": [
+        "high voltage automotive connector contact resistance current rating",
+        "HVIL interlock pin design high voltage connector EV",
+        "shielded HV connector EMC traction inverter cable assembly",
+        "connector creepage clearance 800 V DC IEC 60664 automotive",
+        "silver plated copper contact fretting corrosion EV connector",
+        "high voltage connector partial discharge humidity automotive"
+      ],
+      "must_extract": [
+        "materials",
+        "geometry",
+        "manufacturing",
+        "formulas",
+        "fea"
+      ]
+    },
+    {
+      "id": "lv_signal_connector_emc_shielding",
+      "name": "LV signal connectors: EMC, shielding and pinout integrity",
+      "assembly": "mcu",
+      "components": [
+        "lv_signal_connector",
+        "can_fd_transceiver",
+        "oem_inverter_control_board",
+        "resolver_excitation_demod"
+      ],
+      "queries": [
+        "shielded automotive connector EMC CAN resolver inverter",
+        "LV signal connector crosstalk PWM cable harness EV",
+        "connector pin retention vibration automotive ECU reliability",
+        "twisted pair shield termination connector transfer impedance",
+        "IP67 sealed connector automotive power electronics signal",
+        "resolver signal integrity connector cable length noise EV"
+      ],
+      "must_extract": [
+        "geometry",
+        "materials",
+        "manufacturing",
+        "formulas"
+      ]
+    },
+    {
+      "id": "hairpin_ac_copper_loss_proximity",
+      "name": "Hairpin AC copper loss, skin and proximity effect",
+      "assembly": "motor",
+      "components": [
+        "stator_windings",
+        "conductor_strand_u",
+        "copper_core_u",
+        "phase_coil_u"
+      ],
+      "queries": [
+        "AC copper loss hairpin winding traction motor",
+        "proximity effect rectangular conductor stator slot",
+        "skin effect PWM frequency hairpin winding loss",
+        "frequency-dependent resistance hairpin EV motor",
+        "eddy current loss bar winding interior permanent magnet",
+        "slot leakage inductance hairpin winding analytical model"
+      ],
+      "must_extract": [
+        "formula",
+        "electrical",
+        "physics",
+        "geometry"
+      ]
+    },
+    {
+      "id": "magnet_wire_enamel_dielectric",
+      "name": "Magnet-wire enamel dielectric class and PD ageing",
+      "assembly": "motor",
+      "components": [
+        "enamel_u",
+        "conductor_strand_u",
+        "stator_windings"
+      ],
+      "queries": [
+        "magnet wire enamel polyimide class H traction motor",
+        "partial discharge inverter-fed motor winding insulation",
+        "enamel dielectric strength PWM voltage stress EV",
+        "IEC 60317 magnet wire temperature class properties",
+        "corona-resistant magnet wire SiC inverter motor",
+        "turn-to-turn insulation lifetime traction machine"
+      ],
+      "must_extract": [
+        "material",
+        "electrical",
+        "chemistry",
+        "physics"
+      ]
+    },
+    {
+      "id": "stator_vpi_resin_impregnation",
+      "name": "Vacuum pressure impregnation resin and fill",
+      "assembly": "motor",
+      "components": [
+        "stator_windings",
+        "slot_liner_wedge_set",
+        "enamel_u"
+      ],
+      "queries": [
+        "vacuum pressure impregnation VPI stator resin motor",
+        "epoxy impregnating resin thermal conductivity winding",
+        "slot fill factor after VPI traction motor",
+        "trickle impregnation versus VPI electric machine",
+        "resin glass transition temperature stator insulation",
+        "void content impregnation high voltage motor winding"
+      ],
+      "must_extract": [
+        "manufacturing",
+        "material",
+        "thermal",
+        "chemistry"
+      ]
+    },
+    {
+      "id": "slot_liner_wedge_insulation_system",
+      "name": "Slot liners, wedges and groundwall insulation",
+      "assembly": "motor",
+      "components": [
+        "slot_liner_wedge_set",
+        "stator_windings",
+        "stator_laminations"
+      ],
+      "queries": [
+        "slot liner Nomex insulation traction motor",
+        "slot wedge design electric machine vibration",
+        "groundwall insulation thickness stator slot EV",
+        "phase insulation separator hairpin winding",
+        "thermal conductivity slot insulation system motor",
+        "slot fill geometry rectangular conductor winding"
+      ],
+      "must_extract": [
+        "material",
+        "geometry",
+        "thermal",
+        "manufacturing"
+      ]
+    },
+    {
+      "id": "no_steel_pwm_core_loss_models",
+      "name": "NO electrical steel PWM harmonic core loss",
+      "assembly": "motor",
+      "components": [
+        "stator_laminations",
+        "lamination_sheet",
+        "interlaminar_varnish"
+      ],
+      "queries": [
+        "non-oriented electrical steel iron loss PWM harmonics",
+        "Bertotti core loss model traction motor laminations",
+        "lamination thickness eddy current high frequency motor",
+        "M235-35A M250-35A magnetic properties electric vehicle",
+        "interlaminar insulation varnish eddy current loss",
+        "rotational iron loss IPMSM finite element validation"
+      ],
+      "must_extract": [
+        "formula",
+        "material",
+        "electrical",
+        "fea"
+      ]
+    },
+    {
+      "id": "ndfeb_irreversible_demagnetization",
+      "name": "NdFeB irreversible demagnetization under fault and heat",
+      "assembly": "motor",
+      "components": [
+        "permanent_magnet_set",
+        "magnet_segment_body",
+        "magnet_coating"
+      ],
+      "queries": [
+        "NdFeB irreversible demagnetization IPMSM short circuit",
+        "knee point temperature demagnetization rare earth magnet",
+        "N42UH N48UH automotive traction magnet BH curve",
+        "three-phase short circuit demagnetization permanent magnet motor",
+        "magnet eddy current loss IPMSM temperature rise",
+        "heavy rare earth dysprosium NdFeB coercivity traction"
+      ],
+      "must_extract": [
+        "material",
+        "physics",
+        "thermal",
+        "electrical"
+      ]
+    },
+    {
+      "id": "rotor_magnet_retention_sleeve_bridge",
+      "name": "High-speed magnet retention sleeve and iron bridges",
+      "assembly": "motor",
+      "components": [
+        "magnet_retention",
+        "permanent_magnet_set",
+        "hollow_rotor_barrel"
+      ],
+      "queries": [
+        "carbon fibre magnet retention sleeve high speed motor",
+        "IPM rotor bridge stress centrifugal force analysis",
+        "metallic sleeve prestress permanent magnet rotor",
+        "rotor bandage carbon fiber composite electric machine",
+        "burst speed magnet retention IPMSM mechanical design",
+        "interference fit sleeve magnet retention FEA"
+      ],
+      "must_extract": [
+        "geometry",
+        "fea",
+        "material",
+        "physics"
+      ]
+    },
+    {
+      "id": "stator_jacket_channel_heat_transfer",
+      "name": "Stator water-jacket channel heat transfer",
+      "assembly": "motor",
+      "components": [
+        "motor_cooling_jacket",
+        "jacket_channels",
+        "jacket_coolant",
+        "motor_outer_casing"
+      ],
+      "queries": [
+        "stator water jacket cooling channel Nusselt number EV",
+        "spiral jacket cooling traction motor thermal network",
+        "conjugate heat transfer CFD motor housing jacket",
+        "pressure drop coolant jacket electric drive unit",
+        "housing to coolant thermal resistance IPMSM",
+        "axial helical cooling channel EV motor design"
+      ],
+      "must_extract": [
+        "thermal",
+        "formula",
+        "fea",
+        "geometry"
+      ]
+    },
+    {
+      "id": "oil_spray_direct_winding_cooling",
+      "name": "Oil spray and direct winding oil cooling",
+      "assembly": "motor",
+      "components": [
+        "stator_windings",
+        "motor_cooling_jacket",
+        "gear_oil_charge",
+        "hollow_rotor_barrel"
+      ],
+      "queries": [
+        "oil spray cooling electric motor windings EV",
+        "direct oil cooling hairpin stator traction machine",
+        "rotor oil cooling hollow shaft electric drive",
+        "two-phase oil cooling high power density motor",
+        "ATF dielectric oil cooling electric machine thermal",
+        "impingement oil jet winding heat transfer coefficient"
+      ],
+      "must_extract": [
+        "thermal",
+        "chemistry",
+        "formula",
+        "physics"
+      ]
+    },
+    {
+      "id": "hs_bearing_edm_and_dn_life",
+      "name": "High-speed bearing DN life and EDM currents",
+      "assembly": "motor",
+      "components": [
+        "front_bearing",
+        "rear_bearing",
+        "motor_shaft"
+      ],
+      "queries": [
+        "bearing current EDM damage inverter-fed motor",
+        "hybrid ceramic ball bearing high speed traction motor",
+        "DN value angular contact bearing electric machine life",
+        "common mode voltage shaft voltage bearing failure EV",
+        "grease lubrication high speed electric motor bearing",
+        "insulated bearing traction motor PWM inverter"
+      ],
+      "must_extract": [
+        "physics",
+        "manufacturing",
+        "electrical",
+        "formula"
+      ]
+    },
+    {
+      "id": "hollow_shaft_fatigue_rotor_dynamics",
+      "name": "Hollow motor shafts, fatigue and rotor dynamics",
+      "assembly": "motor",
+      "components": [
+        "motor_shaft",
+        "hollow_rotor_barrel",
+        "front_bearing",
+        "rear_bearing"
+      ],
+      "queries": [
+        "hollow shaft electric motor torsional fatigue design",
+        "rotor dynamics critical speed IPMSM traction",
+        "press-fit rotor shaft interference stress motor",
+        "4340 steel shaft fatigue electric drive unit",
+        "spline shaft torque transmission EV motor",
+        "whirl and imbalance high speed traction rotor"
+      ],
+      "must_extract": [
+        "material",
+        "fea",
+        "geometry",
+        "physics"
+      ]
+    },
+    {
+      "id": "vr_resolver_accuracy_harsh_env",
+      "name": "Variable-reluctance resolver accuracy in harsh EV duty",
+      "assembly": "motor",
+      "components": [
+        "resolver",
+        "encoder",
+        "resolver_excitation_demod",
+        "motor_shaft"
+      ],
+      "queries": [
+        "variable reluctance resolver accuracy temperature EV",
+        "resolver transformation ratio error traction motor",
+        "electromagnetic interference resolver SiC inverter",
+        "rotor position sensorless versus resolver IPMSM",
+        "resolver mounting concentricity electric machine",
+        "RDC resolver-to-digital converter latency FOC"
+      ],
+      "must_extract": [
+        "electrical",
+        "formula",
+        "geometry",
+        "physics"
+      ]
+    },
+    {
+      "id": "planetary_sun_planet_ring_tooth_stress",
+      "name": "Planetary sun, planet and ring tooth bending/contact",
+      "assembly": "transmission",
+      "components": [
+        "sun_gear",
+        "planet_gears",
+        "ring_gear",
+        "planet_carrier"
+      ],
+      "queries": [
+        "planetary gear tooth bending stress ISO 6336 EV",
+        "helical planetary sun planet ring contact stress",
+        "load sharing planet gears electric drive unit",
+        "AGMA bending strength high speed reduction gearbox",
+        "internal ring gear tooth root stress FEA",
+        "face width module selection planetary EV gearbox"
+      ],
+      "must_extract": [
+        "formula",
+        "fea",
+        "geometry",
+        "material"
+      ]
+    },
+    {
+      "id": "planet_needle_bearing_pin_design",
+      "name": "Planet needle bearings and carrier pins",
+      "assembly": "transmission",
+      "components": [
+        "planet_gears",
+        "planet_carrier",
+        "gearbox_bearings"
+      ],
+      "queries": [
+        "needle roller bearing planet gear carrier pin",
+        "planet pin bending stress high speed planetary gearbox",
+        "full complement needle bearing EV reduction drive",
+        "cage guided needle bearing lubrication planetary",
+        "planet bearing DN life electric drive unit",
+        "carrier pin press fit planetary gearbox fatigue"
+      ],
+      "must_extract": [
+        "geometry",
+        "formula",
+        "manufacturing",
+        "physics"
+      ]
+    },
+    {
+      "id": "planetary_thrust_washer_axial_load",
+      "name": "Planetary thrust washers and axial load path",
+      "assembly": "transmission",
+      "components": [
+        "planet_gears",
+        "planet_carrier",
+        "sun_gear",
+        "gear_oil_charge"
+      ],
+      "queries": [
+        "thrust washer planetary gearbox helical axial force",
+        "bronze thrust washer wear planetary reduction EV",
+        "axial load helical planetary electric drive unit",
+        "polymer coated thrust washer automotive transmission",
+        "endplay control planetary carrier thrust bearing",
+        "friction torque thrust washer splash lubricated gear"
+      ],
+      "must_extract": [
+        "material",
+        "physics",
+        "geometry",
+        "manufacturing"
+      ]
+    },
+    {
+      "id": "compact_bevel_mini_differential",
+      "name": "Compact bevel mini-differential packaging in EDU",
+      "assembly": "transmission",
+      "components": [
+        "differential_carrier",
+        "side_gears",
+        "pinion_gear",
+        "output_shaft_left",
+        "output_shaft_right"
+      ],
+      "queries": [
+        "compact bevel differential electric drive unit packaging",
+        "open differential pinion mate gear EV gearbox",
+        "mini differential side gear design automotive EDU",
+        "bevel gear hypoid versus straight differential EV",
+        "differential carrier stiffness electric axle",
+        "torque bias ratio open differential electric vehicle"
+      ],
+      "must_extract": [
+        "geometry",
+        "formula",
+        "fea",
+        "manufacturing"
+      ]
+    },
+    {
+      "id": "side_gear_spline_seal_interface",
+      "name": "Side gears, output splines and seal interfaces",
+      "assembly": "transmission",
+      "components": [
+        "side_gears",
+        "output_shaft_left",
+        "output_shaft_right",
+        "oil_seals"
+      ],
+      "queries": [
+        "side gear spline durability automotive differential",
+        "involute spline wear electric drive output shaft",
+        "shaft seal journal finish Ra differential EV",
+        "side gear thrust face lubrication differential",
+        "output flange halfshaft interface EDU torque",
+        "fretting corrosion spline electric vehicle gearbox"
+      ],
+      "must_extract": [
+        "geometry",
+        "material",
+        "manufacturing",
+        "physics"
+      ]
+    },
+    {
+      "id": "rotary_lip_seal_high_speed_edu",
+      "name": "High-speed rotary lip seals for EDU shafts",
+      "assembly": "transmission",
+      "components": [
+        "oil_seals",
+        "output_shaft_left",
+        "output_shaft_right",
+        "gear_oil_charge"
+      ],
+      "queries": [
+        "fluoroelastomer FKM rotary lip seal high speed shaft",
+        "PTFE lip seal electric drive unit oil leakage",
+        "seal friction torque high speed EV gearbox",
+        "shaft surface roughness seal life automotive",
+        "dual lip seal dust exclusion electric axle",
+        "thermal ageing FKM seal gear oil compatibility"
+      ],
+      "must_extract": [
+        "material",
+        "chemistry",
+        "physics",
+        "manufacturing"
+      ]
+    },
+    {
+      "id": "ev_gear_oil_film_efficiency",
+      "name": "EV gear oil film thickness and churning efficiency",
+      "assembly": "transmission",
+      "components": [
+        "gear_oil_charge",
+        "oil_fluid",
+        "sun_gear",
+        "planet_gears",
+        "ring_gear"
+      ],
+      "queries": [
+        "electric vehicle gearbox oil film thickness EHL",
+        "churning and windage loss planetary EV lubricant",
+        "low viscosity synthetic gear oil electric drive efficiency",
+        "PAO ester gear lubricant copper corrosion EV motor",
+        "splash lubrication oil level planetary reduction",
+        "elastohydrodynamic lubrication helical planetary gear"
+      ],
+      "must_extract": [
+        "chemistry",
+        "formula",
+        "physics",
+        "thermal"
+      ]
+    },
+    {
+      "id": "hpdc_aluminum_edu_housing_process",
+      "name": "HPDC aluminum EDU housing process and integrity",
+      "assembly": "cassette",
+      "components": [
+        "traction_drive_housing",
+        "cassette_cover",
+        "gearbox_housing",
+        "motor_outer_casing"
+      ],
+      "queries": [
+        "high pressure die casting aluminum electric drive housing",
+        "ADC12 AlSi9Cu3 porosity HPDC automotive casting",
+        "vacuum HPDC leak tightness EDU housing coolant",
+        "heat treatment T6 aluminum die cast housing distortion",
+        "machining stock HPDC electric drive unit casting",
+        "thermal conductivity AlSi die cast motor housing"
+      ],
+      "must_extract": [
+        "manufacturing",
+        "material",
+        "geometry",
+        "thermal"
+      ]
+    },
+    {
+      "id": "helicoil_bolt_preload_al_housing",
+      "name": "Helicoils, bolt preload and vibration in Al housings",
+      "assembly": "fasteners",
+      "components": [
+        "mounting_ear_set",
+        "traction_drive_housing",
+        "cassette_cover",
+        "gearbox_cover"
+      ],
+      "queries": [
+        "wire thread insert helicoil aluminum casting torque",
+        "bolt preload relaxation aluminum housing automotive",
+        "vibration loosening fasteners electric drive unit",
+        "thread engagement length aluminum die cast housing",
+        "flange joint gasket EDU housing sealing torque",
+        "stainless steel insert galvanic corrosion aluminum housing"
+      ],
+      "must_extract": [
+        "manufacturing",
+        "material",
+        "physics",
+        "geometry"
+      ]
+    },
+    {
+      "id": "ntc_winding_and_oil_temp_sensors",
+      "name": "NTC and temperature sensors for windings and oil",
+      "assembly": "motor",
+      "components": [
+        "stator_windings",
+        "oem_inverter_control_board",
+        "gear_oil_charge",
+        "motor_cooling_jacket"
+      ],
+      "queries": [
+        "NTC thermistor stator winding temperature sensor motor",
+        "PT100 RTD electric machine thermal protection",
+        "embedded thermistor hairpin winding insulation",
+        "gear oil temperature sensor electric drive unit",
+        "thermal time constant NTC motor overload protection",
+        "sensor placement stator hotspot IPMSM estimation"
+      ],
+      "must_extract": [
+        "electrical",
+        "thermal",
+        "material",
+        "formula"
+      ]
+    }
+  ]
+}

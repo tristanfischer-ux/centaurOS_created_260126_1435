@@ -1,0 +1,58 @@
+---
+description: FPK sub-sub-components — form follows function, all quantities deterministically calculated
+alwaysApply: true
+---
+
+# FPK Deterministic Form-Follows-Function
+
+**STANDING DIRECTIVE (Tristan 2026-07-29):** Every sub-component and sub-sub-component of the front powertrain kit has a **form-follows-function** set of characteristics. **Nothing is random. Nothing is decorative. Everything is deterministically calculated** from physics, packaging, duty, materials, and manufacturing constraints — then validated (FEA/dyno/supplier) — not invented for looks.
+
+## The bar
+
+Ask of every leaf (wire enamel, channel cross-section, bus thickness, planet tooth, TIM gap, gate-drive channel, seal lip…):
+
+> What function forces this geometry / material / count / size — and which equation or constraint set produces the number?
+
+| Must be TRUE | Must be FALSE |
+|---|---|
+| Size, shape, count, material grade derived from load / loss / voltage / speed / flow / strength / creepage / bay | “Looks about right” / silhouette paste |
+| Provenance: contract quantity, tool, or named formula seed with OPEN until FEA/supplier | Magic constants with no basis string |
+| Universal FFF (function + hand/eye/package) | Product-named random features |
+| Covers/housings exist because they close a volume / seal / EMI / service | Orphan blobs in Blender |
+
+## Calculation stack (order)
+
+```
+duty + bay + interfaces
+  → electrical / magnetic / thermal / fluid / mechanical budgets
+  → part geometry + material + manufacturing process
+  → mesh / BoM / Excel LIVE from those quantities
+  → FEA / dyno / supplier replace seeds (never skip the seed step)
+```
+
+Optimisation is **after** the deterministic skeleton — never instead of it.
+
+## Code hooks
+
+| Concern | Where |
+|---|---|
+| Recursive part → physics | `scripts/lib/fpk_physics_tree.py` |
+| Flat seeds | `scripts/lib/fpk_first_principles.py` |
+| Concentric bay geometry | `scripts/lib/fpk_concentric_geometry.py` |
+| Literature grounding | `scripts/ingest/harvest-fpk-literature.py` + `fpk-literature-search.ts` |
+| Challenge gaps | Sol + Kimi K3 + GLM council (`.cursor/rules/multi-model-challenge-council.mdc`) |
+
+## Forbidden
+
+- Random dimensions on windings, busbars, cold-plate channels, gears, fasteners
+- Blender morphology not driven by derived mm
+- BoM lines without engineering basis
+- Claiming “designed” when only decorative labels exist
+
+## Checklist before accepting a part as “in the FPK”
+
+- [ ] Function named (why this part exists)
+- [ ] Driving quantities named (V, I, T, ω, Q̇, ΔP, σ, …)
+- [ ] Formula or tool path recorded in `basis` / physics node
+- [ ] Geometry/material follow from that — not the reverse
+- [ ] OPEN listed where only FEA/supplier can close

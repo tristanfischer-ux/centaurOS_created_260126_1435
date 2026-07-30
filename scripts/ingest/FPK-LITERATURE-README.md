@@ -11,17 +11,26 @@ fpk-literature-topics.json          ← research topics ↔ component_ids
 migrate-fpk-literature-schema.py    ← fpk_* tables in forge-truth.db
         │
         ▼
-harvest-fpk-literature.py           ← OpenAlex + Crossref → documents + links
-        │ --oa-pdf (is_oa only, bounded batch)
-        ▼
-~/.forge-truth/fpk-pdfs/            ← validated %PDF files + document.file_path
+harvest-fpk-literature.py           ← OpenAlex + Crossref → abstracts + links
         │
         ▼
-extract-fpk-literature-claims.py    ← LLM claims + OpenAI embeddings
+download-fpk-oa-fulltext.py         ← Unpaywall/OpenAlex → PDF + pdftotext scrape
+        │
+        ▼
+~/.forge-truth/fpk-pdfs/            ← validated %PDF files + document.file_path
+        │                             extracted_full_text = FULL scrape (≥5k)
+        ▼
+extract-fpk-literature-claims.py    ← LLM claims on FULLTEXT first + embeddings
+        │
+        ▼
+fe-front-wire-fpk-claims.py         ← attach claims to physics-tree leaves
         │
         ▼
 fpk-literature-search.ts            ← chain READ: lookup by component_id
 ```
+
+**Hard rule:** abstracts-only is not literature work. Prove with:
+`python3 scripts/ingest/download-fpk-oa-fulltext.py --prove`
 
 ## Commands
 
@@ -29,8 +38,10 @@ fpk-literature-search.ts            ← chain READ: lookup by component_id
 python3 scripts/ingest/migrate-fpk-literature-schema.py
 python3 scripts/ingest/harvest-fpk-literature.py --min 10
 python3 scripts/ingest/harvest-fpk-literature.py --status
-python3 scripts/ingest/harvest-fpk-literature.py --oa-pdf --oa-limit 10
+python3 scripts/ingest/download-fpk-oa-fulltext.py --limit 40
+python3 scripts/ingest/download-fpk-oa-fulltext.py --prove
 python3 scripts/ingest/extract-fpk-literature-claims.py --limit 80
+python3 scripts/fe-front-wire-fpk-claims.py --twin out/formula-e-front-mgu-20260729-1432
 ```
 
 ## Tables
@@ -59,9 +70,9 @@ lookupFpkClaims({ componentId: 'dc_link_capacitor_bank', claimKind: 'formula' })
 
 ## Honesty
 
-- Abstracts/metadata first; OA PDFs when available (Unpaywall later).
-- `--oa-pdf` considers only OpenAlex rows marked `is_oa=1`, requires a direct
-  `pdf_url`, validates the `%PDF-` header, caps each file at 50 MiB, and writes
-  `pretraining_spec_documents.file_path`; it never probes closed works.
+- Harvest still stores abstracts first for coverage; **fulltext download is mandatory**
+  via `download-fpk-oa-fulltext.py` (Unpaywall → PDF → pdftotext → FTS).
+- Harvest `--oa-pdf` is legacy (needs `is_oa=1` in harvest_log — usually 0). Prefer
+  the Unpaywall fulltext script.
 - Peer-reviewed **hint** from OpenAlex/Crossref type+DOI — not a substitute for curator QA.
-- Chain never calls OpenAlex — only reads DB.
+- Chain never calls Unpaywall/OpenAlex — only reads DB after ingest.

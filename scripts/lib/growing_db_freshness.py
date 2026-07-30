@@ -32,6 +32,10 @@ _TABLE_TS = [
     ("pretraining_extracted_standards", "updated_at"),
     ("distributor_cascade_cache", "fetched_at"),
     ("material_prices", "updated"),
+    # FPK literature / executable canon — self-building with every harvest + writeback.
+    ("fpk_extracted_claims", "created_at"),
+    ("fpk_component_literature", "created_at"),
+    ("pretraining_spec_documents", "extracted_at"),
 ]
 
 
@@ -99,8 +103,39 @@ def compute_freshness(db_path: str = DEFAULT_DB,
                         (_iso(now),)).fetchone()[0]
                 # materials go stale — flag > 28 d so the operator refreshes (A5)
                 if table == "material_prices":
-                    entry["stale"] = bool(entry["age_days"] is not None
-                                          and entry["age_days"] > MATERIALS_STALE_DAYS)
+                    # GOTCHA: MAX(updated) alone launders a stale seed majority when a
+                    # few FPK rows were freshly written. Count per-row staleness.
+                    cols = _cols(cur, table)
+                    if "origin" in cols:
+                        rows = cur.execute(
+                            "SELECT material, updated, origin FROM material_prices"
+                        ).fetchall()
+                    else:
+                        rows = [
+                            (m, u, None)
+                            for m, u in cur.execute(
+                                "SELECT material, updated FROM material_prices"
+                            ).fetchall()
+                        ]
+                    stale_rows = []
+                    for material, updated, origin in rows:
+                        dt = _parse_ts(updated)
+                        age = ((now - dt).total_seconds() / 86400.0) if dt else None
+                        if age is not None and age > MATERIALS_STALE_DAYS:
+                            stale_rows.append(
+                                {"material": material, "updated": updated,
+                                 "origin": origin, "age_days": round(age, 1)}
+                            )
+                    entry["stale_n"] = len(stale_rows)
+                    entry["stale_fraction"] = (
+                        round(len(stale_rows) / len(rows), 3) if rows else None
+                    )
+                    entry["stale_materials"] = stale_rows[:12]
+                    # Stale if ANY row is old — MAX freshness must not hide seed rot.
+                    entry["stale"] = bool(stale_rows) or bool(
+                        entry["age_days"] is not None
+                        and entry["age_days"] > MATERIALS_STALE_DAYS
+                    )
             out["tables"][table] = entry
     finally:
         con.close()
@@ -128,9 +163,9 @@ def _selftest() -> int:
     c.execute("CREATE TABLE pretraining_extracted_parts (id INT, discovered_at TEXT)")
     c.executemany("INSERT INTO pretraining_extracted_parts VALUES (?,?)",
                   [(1, "2026-05-18T00:00:00Z"), (2, "2026-07-19T05:00:20Z"), (3, None)])
-    c.execute("CREATE TABLE material_prices (material TEXT, updated TEXT)")
-    c.executemany("INSERT INTO material_prices VALUES (?,?)",
-                  [("steel", "2026-05-30"), ("copper", "2026-05-30")])
+    c.execute("CREATE TABLE material_prices (material TEXT, updated TEXT, origin TEXT)")
+    c.executemany("INSERT INTO material_prices VALUES (?,?,?)",
+                  [("steel", "2026-05-30", "seed"), ("copper", "2026-05-30", "seed")])
     c.execute("CREATE TABLE distributor_cascade_cache "
               "(id INT, fetched_at TEXT, expires_at TEXT, miss INT)")
     c.executemany("INSERT INTO distributor_cascade_cache VALUES (?,?,?,?)",
@@ -148,6 +183,19 @@ def _selftest() -> int:
     chk(p["age_days"] == 0.8, f"parts age should be ~0.8 d, got {p.get('age_days')}")
     m = f["tables"]["material_prices"]
     chk(m["stale"] is True, "materials updated 2026-05-30 vs now 2026-07-20 (>28d) must be stale")
+    chk(m.get("stale_n") == 2, f"both seed materials should be stale_n=2, got {m.get('stale_n')}")
+    # MAX-ts launder trap: one fresh row must NOT clear stale when others are old
+    con = sqlite3.connect(db)
+    con.execute(
+        "INSERT INTO material_prices VALUES (?,?,?)",
+        ("ndfeb_magnet", "2026-07-19", "fpk_writeback"),
+    )
+    con.commit(); con.close()
+    f_mix = compute_freshness(db, now=now)
+    m_mix = f_mix["tables"]["material_prices"]
+    chk(m_mix["stale"] is True,
+        "MAX(updated) fresh must not launder other stale material rows")
+    chk(m_mix.get("stale_n") == 2, f"mixed stale_n should stay 2, got {m_mix.get('stale_n')}")
     d = f["tables"]["distributor_cascade_cache"]
     chk(d["hits"] == 1 and d["expired"] == 1,
         f"cache hits/expired wrong: {d.get('hits')}/{d.get('expired')}")

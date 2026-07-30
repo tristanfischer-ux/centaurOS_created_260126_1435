@@ -19,10 +19,16 @@ try:
 except ModuleNotFoundError:
     from fpk_concentric_geometry import geometry_from_quantities
 
+try:
+    from scripts.lib.fpk_physics_engines import derive_coolant_and_channel
+except ModuleNotFoundError:
+    from fpk_physics_engines import derive_coolant_and_channel
+
 
 MU_0_H_PER_M = 4.0e-7 * math.pi
 CU_ETP_CONDUCTIVITY_S_M = 5.6e7
 CU_ETP_RESISTIVITY_OHM_M = 1.78e-8
+# Handbook seeds retained only as CoolProp/fluids/ht FALLBACK (see fpk_physics_engines).
 EGW_DENSITY_KG_M3 = 1060.0
 EGW_CP_J_KGK = 3500.0
 EGW_CONDUCTIVITY_W_MK = 0.4
@@ -312,8 +318,6 @@ def derive_cold_plate_thermal(
         default=60.0,
     )
     volume_flow_m3_s = flow_l_min / 60_000.0
-    mass_flow_kg_s = volume_flow_m3_s * EGW_DENSITY_KG_M3
-    fluid_delta_k = heat_load_w / (mass_flow_kg_s * EGW_CP_J_KGK)
 
     channel_count = 8
     target_velocity_m_s = 3.5
@@ -328,45 +332,61 @@ def derive_cold_plate_thermal(
         * channel_height_m
         / (channel_width_m + channel_height_m)
     )
-    reynolds = (
-        EGW_DENSITY_KG_M3
-        * target_velocity_m_s
-        * hydraulic_diameter_m
-        / EGW_VISCOSITY_PA_S
-    )
-    prandtl = (
-        EGW_CP_J_KGK
-        * EGW_VISCOSITY_PA_S
-        / EGW_CONDUCTIVITY_W_MK
-    )
-    nusselt, correlation = _nusselt_number(reynolds, prandtl)
-    h_conv_w_m2k = (
-        nusselt
-        * EGW_CONDUCTIVITY_W_MK
-        / hydraulic_diameter_m
-    )
-
     channel_length_m = max(
         0.07,
         min(geometry.mcu_w_mm * 0.82 / 1000.0, 0.16),
     )
+    # DECISION: CoolProp + fluids + ht are installed Anvil engines — use them
+    # for ρ/cp/μ/k, friction factor, and Nu instead of dead handbook constants.
+    lib = derive_coolant_and_channel(
+        quantities,
+        channel_hydraulic_diameter_m=hydraulic_diameter_m,
+        channel_length_m=channel_length_m,
+        channel_count=channel_count,
+        flow_l_min=flow_l_min,
+        inlet_c=inlet_c,
+    )
+    coolant = lib["coolant"]
+    rho = float(coolant["density_kg_m3"])
+    cp = float(coolant["cp_j_kgk"])
+    mu = float(coolant["viscosity_pa_s"])
+    k_f = float(coolant["conductivity_w_mk"])
+    mass_flow_kg_s = volume_flow_m3_s * rho
+    fluid_delta_k = heat_load_w / (mass_flow_kg_s * cp)
+
+    hyd_lib = lib["channel_hydraulics_library"]
+    conv_lib = lib["convection_library"]
+    # Prefer library velocity/Re when fluids engine ran; else geometric target.
+    if hyd_lib.get("engine_used"):
+        reynolds = float(hyd_lib["reynolds"])
+        friction = float(hyd_lib["friction_factor"])
+        target_velocity_m_s = float(hyd_lib["velocity_m_s"])
+        channel_pressure_drop_pa = float(hyd_lib["pressure_drop_friction_pa"])
+        total_pressure_drop_pa = float(hyd_lib["pressure_drop_pa"])
+    else:
+        reynolds = rho * target_velocity_m_s * hydraulic_diameter_m / mu
+        friction = _friction_factor(reynolds)
+        dynamic_pressure_pa = 0.5 * rho * target_velocity_m_s**2
+        channel_pressure_drop_pa = (
+            friction * channel_length_m / hydraulic_diameter_m * dynamic_pressure_pa
+        )
+        total_pressure_drop_pa = channel_pressure_drop_pa + 3.0 * dynamic_pressure_pa
+    prandtl = float(coolant.get("prandtl") or (cp * mu / k_f))
+    if conv_lib.get("engine_used"):
+        nusselt = float(conv_lib["nusselt"])
+        h_conv_w_m2k = float(conv_lib["h_conv_w_m2k"])
+        correlation = str(conv_lib["correlation"])
+    else:
+        nusselt, correlation = _nusselt_number(reynolds, prandtl)
+        h_conv_w_m2k = nusselt * k_f / hydraulic_diameter_m
+    port_minor_loss_k = 3.0
     wetted_area_m2 = (
         channel_count
         * 2.0
         * (channel_width_m + channel_height_m)
         * channel_length_m
     )
-    friction = _friction_factor(reynolds)
-    port_minor_loss_k = 3.0
-    dynamic_pressure_pa = (
-        0.5 * EGW_DENSITY_KG_M3 * target_velocity_m_s**2
-    )
-    channel_pressure_drop_pa = (
-        friction * channel_length_m / hydraulic_diameter_m * dynamic_pressure_pa
-    )
-    total_pressure_drop_pa = (
-        channel_pressure_drop_pa + port_minor_loss_k * dynamic_pressure_pa
-    )
+    engines_used = lib.get("engines_used") or {}
 
     plate_contact_area_m2 = (
         max(70.0, geometry.mcu_w_mm * 0.75)
@@ -410,12 +430,24 @@ def derive_cold_plate_thermal(
             "loss or thermal-resistance curve invented"
         ),
         "operating_point": {
-            "coolant": "50/50 ethylene-glycol/water handbook seed",
+            "coolant": coolant.get("coolprop_fluid")
+            or coolant.get("fluid_code")
+            or "50/50 EGW",
             "flow_l_min": round(flow_l_min, 2),
             "inlet_c": round(inlet_c, 2),
-            "density_kg_m3": EGW_DENSITY_KG_M3,
-            "specific_heat_j_kgk": EGW_CP_J_KGK,
-            "dynamic_viscosity_pa_s": EGW_VISCOSITY_PA_S,
+            "density_kg_m3": round(rho, 2),
+            "specific_heat_j_kgk": round(cp, 2),
+            "dynamic_viscosity_pa_s": mu,
+            "conductivity_w_mk": round(k_f, 4),
+            "property_provenance": coolant.get("provenance"),
+            "coolprop_engine_used": bool(engines_used.get("coolprop")),
+        },
+        "physics_engines_used": {
+            "coolprop": bool(engines_used.get("coolprop")),
+            "fluids": bool(engines_used.get("fluids")),
+            "ht": bool(engines_used.get("ht")),
+            "all_libraries_used": bool(lib.get("all_libraries_used")),
+            "source": "scripts/lib/fpk_physics_engines.py",
         },
         "plate_geometry_mm": {
             "footprint_width": round(geometry.mcu_w_mm, 2),

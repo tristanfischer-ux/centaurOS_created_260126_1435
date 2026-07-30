@@ -10079,10 +10079,20 @@ def augment_topology_connect_orphans(state, topology, parts):
             elif svc == 'signal' and ctrl_hub and p.name != ctrl_hub \
                     and (p.name, ctrl_hub) not in existing and (p.name, ctrl_hub) not in seen:
                 seen.add((p.name, ctrl_hub)); n_sig += 1
+                # INTENT (2026-07-29 red-team): 4-20 mA is plant instrumentation —
+                # traction / FPK sensing is differential analogue, SPI/SENT, or resolver
+                # excitation — never industrial loop current.
+                _sig_ctx = 'instrument signal cable 4-20mA'
+                _pc = product_class_of(state) if isinstance(state, dict) else ""
+                if re.search(r'formula_e|traction|mgu|inverter|fpk|ev_drive', str(_pc), re.I) \
+                        or any(re.search(r'phase.?current|resolver|gate.?driv|sic|mgu',
+                                         str(getattr(pp, 'name', '') or ''), re.I)
+                               for pp in parts):
+                    _sig_ctx = 'shielded twisted-pair differential analogue / digital (not 4-20mA)'
                 extra.append({'from_part': p.name, 'to_part': ctrl_hub, 'mechanism': 'signal',
                               'constraint_kind': 'current_rating', 'required_value': 0.5,
                               'required_unit': 'A', 'required_margin_factor': 1.0,
-                              'material_context': 'instrument signal cable 4-20mA', '_augmented': True})
+                              'material_context': _sig_ctx, '_augmented': True})
             elif svc == 'water':
                 # ORIGINAL behaviour (byte-stable): tie the part to its MODULE's fluid
                 # repr, giving it an OUTPUT. The direction-closer below ADDS the missing
@@ -13977,10 +13987,10 @@ def _thermocycler_exterior_keep_visible(name: str) -> bool:
 def _traction_drive_exterior_keep_visible(name: str) -> bool:
     """Sealed cassette language on closed product shots (gold FE training check).
 
-    INTENT (2026-07-29 class-reference corpus): public FE rear units show a
-    sealed structural case + ports/shafts/mounts — windings and PCB farms are
-    cutaway/ghost only. Keep shell + motor jacket bulge + gearbox + inverter
-    cold-plate face + interfaces; hide internal electronics on 04–07.
+    INTENT (2026-07-29 class-reference corpus): public FE front FPK units show a
+    sealed structural case + MCU shelf + ports/shafts/mounts — concentric
+    stator/rotor/planetary guts and PCB farms are cutaway/ghost only. Keep shell
+    + motor jacket + inverter cold-plate face + interfaces; hide internals on 04–07.
     """
     nm = name or ""
     if not nm.startswith("u_se_td_"):
@@ -13988,9 +13998,15 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
     # Cutaway-only internals (still drawn; ghost/hero keep-lists leave them on).
     _interior = (
         "u_se_td_pcb",
+        "u_se_td_control_pcb",
+        "u_se_td_gate_drive_pcb",
         "u_se_td_pcb_edge_pads",
         "u_se_td_pcb_package_",
         "u_se_td_dclink_cap_",
+        "u_se_td_magnet_",
+        "u_se_td_ring_gear",
+        "u_se_td_motor_shaft",
+        "u_se_td_halfshaft_flange_",
         "u_se_td_phase_cable_",
         "u_se_td_phase_boot_",
         "u_se_td_phase_bus_",
@@ -13998,6 +14014,18 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
         "u_se_td_hv_bus",
         "u_se_td_rotor_hint",
         "u_se_td_stator_hint",
+        # Concentric stack (public FE FPK packaging grammar) — ghost/cutaway only.
+        "u_se_td_stator_ring",
+        "u_se_td_winding_end_",
+        "u_se_td_hollow_rotor",
+        "u_se_td_sun_gear",
+        "u_se_td_planet_",
+        "u_se_td_planet_carrier",
+        "u_se_td_diff_nest",
+        "u_se_td_microjet_",
+        "u_se_td_gearbox",       # seated BoM mesh = internal planetary nest
+        "u_se_td_diff_bulge",    # seated BoM mesh = internal mini-diff
+        "u_se_td_gear_rib_",
     )
     return not any(nm.startswith(p) or p.rstrip("_") == nm for p in _interior)
 
@@ -14039,6 +14067,11 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert not _traction_drive_exterior_keep_visible("u_se_td_pcb")
     assert not _traction_drive_exterior_keep_visible("u_se_td_phase_cable_0")
     assert not _traction_drive_exterior_keep_visible("u_se_td_pcb_edge_pads")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_hollow_rotor")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_planet_0")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_stator_ring")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_gearbox"), (
+        "concentric planetary nest must not show as exterior gear box")
     assert not _traction_drive_exterior_keep_visible("u_se_le_pcb")
     assert not _traction_drive_exterior_keep_visible("u_se_cad_cell_0"), (
         "BESS LFP cells must NOT keep on traction exterior")
@@ -14052,6 +14085,14 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "bay-fill front-axle packaging mode must remain in traction placer")
     assert "u_se_td_cast_fin_" in _src_td and "u_se_td_coldplate_fastener_" in _src_td, (
         "Lucid-gold race-hardware cues (cast fins + cold-plate fasteners) required")
+    # proveCatch (2026-07-29): concentric FPK stack — hollow rotor hosts planetary+diff;
+    # MCU busbars pierce into stator (public press TRAINING CHECK, not CAD paste).
+    assert "u_se_td_hollow_rotor" in _src_td and "u_se_td_sun_gear" in _src_td
+    assert "u_se_td_planet_" in _src_td and "u_se_td_microjet_" in _src_td
+    assert "concentric" in _src_td.lower() and "pierce" in _src_td.lower()
+    # proveCatch (2026-07-29 P1): Hooley/PHANTM-class — contract-driven geometry module
+    assert "fpk_concentric_geometry" in _src_td
+    assert "geometry_from_quantities" in _src_td
     # proveCatch (2026-07-29): crushed FR4 sRGB (0.025,0.14,…) linearises to
     # ~black and ships an invisible board. Gate the SOURCE sRGB floor.
     _fr4 = (0.22, 0.52, 0.28)
@@ -18247,37 +18288,569 @@ def _selftest_sealed_zone_pack_dominance() -> None:
     print("[univ][sealed] _selftest_sealed_zone_pack_dominance OK")
 
 
+def _fpk_place_ribbed_coldplate(name, center_mm, size_mm, mat, story_mod, MO):
+    """Compound cold plate — base slab + parallel micro-channel ribs (not one cuboid)."""
+    cx, cy, cz = center_mm
+    w, d, t = size_mm
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+        (w * fl.MM, d * fl.MM, max(1.2, t * 0.35) * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+    rib_h = max(1.0, t * 0.55)
+    rib_w = max(3.0, w * 0.06)
+    for ri, rx in enumerate((-0.28, 0.0, 0.28)):
+        fl.add_box(
+            f"{name}_rib_{ri}",
+            (
+                (cx + w * rx) * fl.MM,
+                cy * fl.MM,
+                (cz + t * 0.22) * fl.MM,
+            ),
+            (rib_w * fl.MM, d * 0.82 * fl.MM, rib_h * fl.MM),
+            mat,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+
+def _fpk_place_l_busbar(name, center_mm, section_mm, pierce_h_mm, mat, story_mod, MO):
+    """Compound L-busbar — vertical pierce leg + horizontal shelf tie (not one cuboid)."""
+    cx, cy, cz = center_mm
+    sx, sy, sz = section_mm
+    fl.add_box(
+        f"{name}_leg_v",
+        (cx * fl.MM, cy * fl.MM, (cz + pierce_h_mm * 0.42) * fl.MM),
+        (sx * fl.MM, sy * fl.MM, pierce_h_mm * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_box(
+        f"{name}_leg_h",
+        (cx * fl.MM, cy * fl.MM, (cz + pierce_h_mm * 0.88) * fl.MM),
+        (sx * 2.6 * fl.MM, sy * 1.4 * fl.MM, sz * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+
+
+def _fpk_place_ribbed_baseplate(name, center_mm, size_mm, mat, story_mod, MO):
+    """Compound bay floor — plate + longitudinal rails (not one plain cuboid)."""
+    cx, cy, cz = center_mm
+    w, d, h = size_mm
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+        (w * fl.MM, d * fl.MM, max(2.0, h * 0.55) * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+    rail_h = max(3.0, h * 0.85)
+    rail_w = max(6.0, w * 0.04)
+    for ri, ry in enumerate((-0.38, 0.38)):
+        fl.add_box(
+            f"{name}_rail_{ri}",
+            (cx * fl.MM, (cy + d * ry) * fl.MM, (cz + h * 0.15) * fl.MM),
+            (w * 0.92 * fl.MM, rail_w * fl.MM, rail_h * fl.MM),
+            mat,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+
+def _fpk_place_housing_spine(name, center_mm, size_mm, mat, story_mod, MO):
+    """Compound pack housing spine — web + two flange pads."""
+    cx, cy, cz = center_mm
+    w, d, h = size_mm
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+        (w * fl.MM, max(4.0, d * 0.45) * fl.MM, h * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+    for fi, fx in enumerate((-0.35, 0.35)):
+        fl.add_box(
+            f"{name}_flange_{fi}",
+            ((cx + w * fx) * fl.MM, cy * fl.MM, cz * fl.MM),
+            (max(10.0, w * 0.12) * fl.MM, max(8.0, d) * fl.MM, max(4.0, h * 0.55) * fl.MM),
+            mat,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+
+def _fpk_place_mcu_shelf(name, center_mm, size_mm, mat, story_mod, MO):
+    """Compound MCU shelf — deck + side lips (cassette land, not floating brick)."""
+    cx, cy, cz = center_mm
+    w, d, h = size_mm
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+        (w * fl.MM, d * fl.MM, max(2.0, h * 0.55) * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+    lip_h = max(2.5, h * 0.9)
+    for li, ly in enumerate((-0.48, 0.48)):
+        fl.add_box(
+            f"{name}_lip_{li}",
+            (cx * fl.MM, (cy + d * ly) * fl.MM, (cz + h * 0.2) * fl.MM),
+            (w * 0.96 * fl.MM, max(3.0, d * 0.06) * fl.MM, lip_h * fl.MM),
+            mat,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+
+def _fpk_place_sic_inverter_stack(name, center_mm, size_mm, mat, story_mod, MO):
+    """Compound SiC inverter — carrier + three power-module bricks (not one slab)."""
+    cx, cy, cz = center_mm
+    w, d, h = size_mm
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, (cz - h * 0.18) * fl.MM),
+        (w * fl.MM, d * fl.MM, max(3.0, h * 0.28) * fl.MM),
+        mat,
+        module=story_mod,
+        module_objects=MO,
+    )
+    mod_w = w * 0.28
+    mod_h = max(4.0, h * 0.55)
+    for mi, mx in enumerate((-0.32, 0.0, 0.32)):
+        fl.add_box(
+            f"{name}_mod_{mi}",
+            ((cx + w * mx) * fl.MM, cy * fl.MM, (cz + h * 0.12) * fl.MM),
+            (mod_w * fl.MM, d * 0.78 * fl.MM, mod_h * fl.MM),
+            mat,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+
+def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story_mod, MO):
+    """Compound HV DC connector — keyed body + cylindrical interface barrel."""
+    cx, cy, cz = center_mm
+    w, d, h = size_mm
+    fl.add_box(
+        name,
+        (cx * fl.MM, cy * fl.MM, cz * fl.MM),
+        (w * fl.MM, d * 0.55 * fl.MM, h * fl.MM),
+        mat_body,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_cyl(
+        f"{name}_barrel",
+        (cx * fl.MM, (cy - d * 0.35) * fl.MM, cz * fl.MM),
+        max(8.0, min(w, h) * 0.28) * fl.MM,
+        max(12.0, d * 0.55) * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=24,
+    )
+
+
+def _fpk_place_tooth_cues(name_prefix, center_mm, od_mm, face_mm, n_teeth_cue,
+                          mat, story_mod, MO, rot_along_x):
+    """Readable tooth stubs around a gear pitch circle — FFF cue, not FEA microgeometry.
+
+    INTENT: drawings must show gears are toothed mechanisms forced by ratio/torque,
+    not smooth decorative cylinders. Cue count is capped for mesh budget.
+    """
+    n = max(8, min(int(n_teeth_cue), 18))
+    cx, cy, cz = center_mm
+    tip = max(1.2, od_mm * 0.045)
+    tw = max(1.0, (math.pi * od_mm) / (n * 2.2))
+    for i in range(n):
+        ang = (i / float(n)) * math.tau
+        ty = cy + (od_mm * 0.5 + tip * 0.35) * math.cos(ang)
+        tz = cz + (od_mm * 0.5 + tip * 0.35) * math.sin(ang)
+        fl.add_box(
+            f"{name_prefix}_tooth_{i}",
+            (cx * fl.MM, ty * fl.MM, tz * fl.MM),
+            (face_mm * 0.85 * fl.MM, tip * fl.MM, tw * fl.MM),
+            mat,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+
+
+def _fpk_place_ontology_fff_parts(
+    *,
+    x_motor, y_motor, z_motor, motor_od, motor_len,
+    rotor_od, rotor_id, nest_len, sun_od, planet_od, planet_n, planet_pcd,
+    ring_id, carrier_od, diff_od, diff_len, gear_face,
+    shaft_r, shaft_stub, inv_w, inv_d, inv_h, inv_z, x_inv, y_inv, cas_w, cas_d,
+    mat_steel, mat_alum, mat_magnet, mat_oil, mat_pcb, mat_copper,
+    story_mod, MO, rot_along_x, _mm3, _cyl_v, quantities,
+):
+    """Place every missing first-principles ontology sub-component (FFF).
+
+    INTENT (2026-07-29): Blender drawings / cutaways must show ALL
+    ``fpk_first_principles`` parts — covers, magnets, ring gear, flanges,
+    seals — sized from concentric geometry + physics seeds. Universal
+    (noun/quantity keyed); Lucid = training check only.
+    FLOW: geometry mm + derive_physics → named u_se_td_* meshes
+      → fpk_blender_coverage proveCatch.
+    """
+    # Physics seeds (pole pairs / magnet count / teeth) when contract present.
+    pole_pairs = 4
+    magnet_n = 8
+    sun_teeth_cue = 12
+    ring_teeth_cue = 16
+    try:
+        from fpk_first_principles import derive_physics
+        if isinstance(quantities, dict) and quantities:
+            seeds = derive_physics(quantities)
+            pole_pairs = max(2, int(seeds.pole_pairs))
+            magnet_n = max(4, int(seeds.magnet_segments))
+            sun_teeth_cue = max(8, min(18, int(seeds.sun_teeth) // 2 or 12))
+            ring_teeth_cue = max(10, min(18, int(seeds.ring_teeth) // 4 or 16))
+    except Exception as _seed_exc:
+        print(f"[univ][sealed] FPK physics seeds fallback: {_seed_exc}")
+
+    # ── Ring gear (fixed annulus inside rotor bore) ──────────────────────────
+    ring_od = min(rotor_id - 1.0, ring_id + 6.0)
+    ring_id_inner = max(ring_id - 4.0, sun_od + planet_od + 2.0)
+    fl.add_cyl(
+        "u_se_td_ring_gear",
+        _mm3((x_motor, y_motor, z_motor)),
+        (ring_od * 0.5) * fl.MM,
+        (gear_face * 0.95) * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=_cyl_v,
+    )
+    _fpk_place_tooth_cues(
+        "u_se_td_ring_gear", (x_motor, y_motor, z_motor),
+        ring_id_inner, gear_face * 0.9, ring_teeth_cue,
+        mat_steel, story_mod, MO, rot_along_x,
+    )
+
+    # ── Permanent magnet segments on rotor OD (IPMSM seed) ──────────────────
+    mag_thick = max(2.5, (rotor_od - rotor_id) * 0.22)
+    mag_r = (rotor_od * 0.5) - mag_thick * 0.55
+    mag_arc_w = max(4.0, (math.pi * rotor_od) / (magnet_n * 1.8))
+    for mi in range(int(magnet_n)):
+        ang = (mi / float(magnet_n)) * math.tau
+        my = y_motor + mag_r * math.cos(ang)
+        mz = z_motor + mag_r * math.sin(ang)
+        fl.add_box(
+            f"u_se_td_magnet_{mi}",
+            _mm3((x_motor, my, mz)),
+            _mm3((nest_len * 0.75, mag_thick, mag_arc_w)),
+            mat_magnet,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+
+    # ── Motor shaft through sun / carrier ────────────────────────────────────
+    fl.add_cyl(
+        "u_se_td_motor_shaft",
+        _mm3((x_motor, y_motor, z_motor)),
+        max(shaft_r * 0.85, 6.0) * fl.MM,
+        (nest_len * 0.95) * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=24,
+    )
+
+    # ── Sun tooth cues (ratio-forced teeth language) ─────────────────────────
+    _fpk_place_tooth_cues(
+        "u_se_td_sun_gear", (x_motor, y_motor, z_motor),
+        sun_od, gear_face * 0.9, sun_teeth_cue,
+        mat_steel, story_mod, MO, rot_along_x,
+    )
+
+    # ── Diff internals: pinion + side gears + intermediate shaft ─────────────
+    fl.add_cyl(
+        "u_se_td_pinion_gear",
+        _mm3((x_motor, y_motor + diff_od * 0.18, z_motor)),
+        max(4.0, diff_od * 0.18) * fl.MM,
+        max(8.0, diff_len * 0.55) * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(0.0, 1.5707963, 0.0),
+        vertices=20,
+    )
+    fl.add_cyl(
+        "u_se_td_intermediate_shaft",
+        _mm3((x_motor, y_motor, z_motor)),
+        max(5.0, shaft_r * 0.7) * fl.MM,
+        max(12.0, diff_len * 1.1) * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=20,
+    )
+    for sgi, sx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            f"u_se_td_side_gear_{sgi}",
+            _mm3((x_motor + sx * diff_len * 0.28, y_motor, z_motor)),
+            max(6.0, diff_od * 0.28) * fl.MM,
+            max(6.0, gear_face * 0.35) * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=20,
+        )
+        fl.add_cyl(
+            f"u_se_td_output_gear_{sgi}",
+            _mm3((
+                x_motor + sx * (motor_len * 0.42),
+                y_motor,
+                z_motor,
+            )),
+            max(8.0, shaft_r * 1.6) * fl.MM,
+            max(8.0, gear_face * 0.4) * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=20,
+        )
+
+    # ── Gearbox bearings + oil seals + oil charge ────────────────────────────
+    for bi, bx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            f"u_se_td_gearbox_bearing_{bi}",
+            _mm3((x_motor + bx * nest_len * 0.32, y_motor, z_motor)),
+            max(10.0, carrier_od * 0.22) * fl.MM,
+            6.0 * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=24,
+        )
+    seal_n = 4
+    for si in range(seal_n):
+        sx = -1.0 if si < 2 else 1.0
+        fl.add_cyl(
+            f"u_se_td_oil_seal_{si}",
+            _mm3((
+                x_motor + sx * (motor_len * 0.5 + 2.0 + (si % 2) * 3.0),
+                y_motor,
+                z_motor,
+            )),
+            (shaft_r * 1.55) * fl.MM,
+            3.0 * fl.MM,
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=20,
+        )
+    fl.add_cyl(
+        "u_se_td_gear_oil",
+        _mm3((x_motor, y_motor, z_motor - ring_id * 0.12)),
+        (ring_id * 0.35) * fl.MM,
+        (gear_face * 0.7) * fl.MM,
+        mat_oil,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=24,
+    )
+
+    # ── Covers (cover on everything) ────────────────────────────────────────
+    fl.add_cyl(
+        "u_se_td_motor_cover",
+        _mm3((x_motor - motor_len * 0.5 - 2.0, y_motor, z_motor)),
+        (motor_od * 0.48) * fl.MM,
+        4.0 * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=_cyl_v,
+    )
+    fl.add_cyl(
+        "u_se_td_gearbox_cover",
+        _mm3((x_motor + nest_len * 0.38, y_motor, z_motor)),
+        (ring_id * 0.48) * fl.MM,
+        3.5 * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=32,
+    )
+    # Inverter housing walls + cover lid (MCU volume)
+    for wi, (wx, wy) in enumerate((
+        (-0.5, 0.0), (0.5, 0.0), (0.0, -0.5), (0.0, 0.5),
+    )):
+        fl.add_box(
+            f"u_se_td_inverter_housing_wall_{wi}",
+            _mm3((
+                x_inv + wx * inv_w * 0.98,
+                y_inv + wy * inv_d * 0.98,
+                inv_z,
+            )),
+            _mm3((
+                (3.0 if abs(wx) > 0.1 else inv_w * 0.96),
+                (3.0 if abs(wy) > 0.1 else inv_d * 0.96),
+                inv_h * 0.95,
+            )),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+    fl.add_box(
+        "u_se_td_inverter_housing",
+        _mm3((x_inv, y_inv, inv_z)),
+        _mm3((inv_w * 0.98, inv_d * 0.98, inv_h * 0.08)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_box(
+        "u_se_td_inverter_cover",
+        _mm3((x_inv, y_inv, inv_z + inv_h * 0.55 + 3.0)),
+        _mm3((inv_w * 1.02, inv_d * 1.02, 3.0)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_box(
+        "u_se_td_cassette_cover",
+        _mm3((x_motor, y_motor, z_motor + motor_od * 0.55 + inv_h * 0.9)),
+        _mm3((min(cas_w * 0.85, motor_len * 1.15), min(cas_d * 0.75, motor_od * 0.95), 4.0)),
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+    )
+
+    # ── Halfshaft flanges + encoder + UVW terminals ─────────────────────────
+    for fi, fx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            f"u_se_td_halfshaft_flange_{fi}",
+            _mm3((
+                x_motor + fx * (motor_len * 0.5 + shaft_stub * 0.85),
+                y_motor,
+                z_motor,
+            )),
+            (shaft_r * 2.8) * fl.MM,
+            8.0 * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=32,
+        )
+    fl.add_cyl(
+        "u_se_td_encoder",
+        _mm3((x_motor - motor_len * 0.5 - 6.0, y_motor, z_motor)),
+        (shaft_r * 2.1) * fl.MM,
+        12.0 * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=32,
+    )
+    for ti in range(3):
+        fl.add_cyl(
+            f"u_se_td_motor_terminal_{ti}",
+            _mm3((
+                x_motor + (ti - 1) * max(18.0, sun_od * 0.35),
+                y_motor,
+                z_motor + motor_od * 0.38,
+            )),
+            4.5 * fl.MM,
+            14.0 * fl.MM,
+            mat_copper,
+            module=story_mod,
+            module_objects=MO,
+            vertices=16,
+        )
+    print(
+        f"[univ][sealed] FPK ontology FFF parts: ring+magnets×{magnet_n}+covers+"
+        f"flanges+diff_internals (pole_pairs={pole_pairs})"
+    )
+
+
 def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
-    """Integrated traction pack — transverse MGU + inverter + gear/diff.
+    """Integrated traction pack — concentric FPK stack (bay-fill) or open cradle.
 
     INTENT (2026-07-29 class-reference corpus / FE public gold): public Formula E
-    units read as one sealed structural cassette (motor + pulse inverter +
-    single-speed reduction + diff), not a lab axial brick train on a skid.
-    Morphology is forced by use-physics + published packaging grammar
-    (transverse rotor → spur reduction → axle exits; inverter shares envelope;
-    cooling jackets + HV/DC faces). Gold imagery is a TRAINING CHECK only —
-    never an OEM silhouette paste (CORE FIX PRINCIPLE / photoreal-cad rule).
+    **front FPK** packaging is a **concentric, integrated stack** — not separate
+    boxes connected by long HV AC cables. Use-physics layers (public press
+    grammar; Lucid/Atieva = TRAINING CHECK only, never STEP/mesh paste):
+
+      L1 MCU / SiC inverter — bolts to flat upper shelf of the casing; solid
+          phase busbars pierce straight into the stator terminations beneath.
+      L2 Stator — outer cylindrical ring; continuous wave-wound copper class;
+          end-winding microjet oil cooling for extreme regen thermal load.
+      L3 Hollow rotor — PM barrel nested inside the stator ID; cavity hosts the
+          transmission (not a solid shaft cylinder filling the bore).
+      L4 Planetary + mini-diff — packed inside the rotor cavity; axle sockets
+          exit ±X through the casing sides.
+
+    Bay envelope (~343×259×267 mm) + ~32 kg dry unit force the exterior; the
+    concentric nest is why that footprint is possible.
+
+    GOTCHA — Lucid / Atieva / public FPK photos + press anatomy are a **FFF
+    TRAINING CHECK** only. NEVER silhouette paste, NEVER OEM CAD import
+    (CORE FIX / photoreal-cad / JLR HoT honesty).
 
     DECISION — two packaging modes (universal, noun-keyed):
-      • Open cradle (rear manufacturer cassette): integrated volumes readable;
-        no solid occluding cuboid.
-      • Bay-fill (front-axle FPK): the available front-axle bay
-        (`max_dimensions_mm`) IS the exterior form — unitised brick that fills
-        the wishbone/upright/crash corridor. Shape is packaging-forced first.
+      • Bay-fill (front-axle FPK): concentric stack above; exterior = sealed
+        barrel + MCU shelf + shafts/ports (no external gear box).
+      • Open cradle (rear manufacturer cassette): volumes more readable; may
+        still show a compact gear nest for process twins.
 
-    DECISION: exterior keep-list shows sealed shell language (case, jacket bulge,
-    gearbox, cold-plate face, ports, shafts, mounts). PCB / phase busbars /
-    DC-link cans are cutaway-only so 04–07 match public FE shell photos while
-    ghost/hero still answer "what is inside?".
+    DECISION: exterior keep-list shows sealed shell + MCU shelf + interfaces;
+    concentric guts + PCB/busbars are cutaway/ghost only on 04–07.
 
-    TRIED (0846): axial left→right motor|gear|SiC on a low base — readable as
-    electronics but rejected by FE powertrain engineers (lab exposition, not race
-    cassette). Abandoned for this transverse-in-shell composition.
+    TRIED (0846): axial motor|gear|SiC brick train — rejected (lab exposition).
+    TRIED (1432): external gearbox box on −Y of motor — rejected vs concentric
+    hollow-rotor grammar (separate box fights the footprint story).
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
     bay_fill = bool(globals().get("_IS_TRACTION_BAY_FILL"))
+
+    # INTENT (2026-07-29 Hooley/PHANTM bar): derive stator/rotor/planetary/MCU mm
+    # from contract quantities — never bay-fraction blobs for the mechanism.
+    _fpk_g = None
+    try:
+        from fpk_concentric_geometry import geometry_from_quantities
+        _st = globals().get("_COMPOSER_STATE") or {}
+        _cq = ((_st.get("orchestratorContract") or {}).get("quantities")) or {}
+        if isinstance(_cq, dict) and _cq:
+            _fpk_g = geometry_from_quantities(_cq)
+            print(
+                f"[univ][sealed] FPK geometry: housing Ø{_fpk_g.housing_od_mm}×"
+                f"L{_fpk_g.housing_len_mm} rotorID {_fpk_g.rotor_id_mm} "
+                f"sun {_fpk_g.sun_od_mm} planet×{_fpk_g.planet_count} "
+                f"Ø{_fpk_g.planet_od_mm} MCU {_fpk_g.mcu_w_mm}×{_fpk_g.mcu_d_mm}×"
+                f"{_fpk_g.mcu_h_mm} ok={_fpk_g.nest_fits_rotor and _fpk_g.stack_fits_bay}"
+            )
+    except Exception as _fpk_exc:
+        print(f"[univ][sealed] FPK geometry fallback (bay fractions): {_fpk_exc}")
+        _fpk_g = None
 
     # Charcoal structural case — washed-out white brick (0811 mean L≈209) came
     # from mid-grey alum under softbox. Keep body dark for render_washed_out.
@@ -18318,6 +18891,11 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                          metallic=0.70, roughness=0.32)
     mat_copper = fl.make_mat("m_se_td_cu", fl._to_linear((0.72, 0.42, 0.16)),
                             metallic=0.80, roughness=0.35)
+    # INTENT: magnet / oil materials for ontology FFF sub-components (cutaway).
+    mat_magnet = fl.make_mat("m_se_td_magnet", fl._to_linear((0.35, 0.12, 0.10)),
+                             metallic=0.55, roughness=0.40)
+    mat_oil = fl.make_mat("m_se_td_oil", fl._to_linear((0.45, 0.38, 0.12)),
+                          metallic=0.05, roughness=0.35)
 
     z0 = base_z + 6.0
     cx, cy = 0.0, 0.0
@@ -18331,23 +18909,29 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         # the motor and shipped a featureless appliance brick on 04. Bay bound is
         # enforced by sizing motor/gear/inverter to the envelope — not by opaque
         # curtain walls toward the camera.
-        cas_w, cas_d, cas_h = W * 0.98, D * 0.98, H * 0.96
-        wall = max(8.0, min(W, D, H) * 0.035)
+        if _fpk_g is not None:
+            cas_w, cas_d, cas_h = _fpk_g.case_w_mm, _fpk_g.case_d_mm, _fpk_g.case_h_mm
+            wall = _fpk_g.wall_mm
+            motor_od = _fpk_g.housing_od_mm
+            motor_len = _fpk_g.housing_len_mm
+        else:
+            cas_w, cas_d, cas_h = W * 0.98, D * 0.98, H * 0.96
+            wall = max(8.0, min(W, D, H) * 0.035)
+            motor_od = min(cas_d * 0.78, cas_h * 0.68, 200.0)
+            motor_len = min(cas_w * 0.78, cas_w - 2 * wall - 20.0)
         base_h = max(10.0, wall)
         # Motor FIRST — dominate the bay (FPK gold: barrel is the product).
-        motor_od = min(cas_d * 0.78, cas_h * 0.68, 200.0)
-        motor_len = min(cas_w * 0.78, cas_w - 2 * wall - 20.0)
         x_motor = 0.0
         y_motor = cas_d * 0.02
         z_motor = z0 + base_h + motor_od * 0.52
-        # Bay floor — footprint = bay, hugs motor (no oversized apron beyond bay).
-        fl.add_box(
+        # Bay floor — footprint = bay, hugs motor (ribbed compound, not plain cuboid).
+        _fpk_place_ribbed_baseplate(
             "u_se_td_pack_base",
-            _mm3((cx, cy, z0 + base_h * 0.5)),
-            _mm3((cas_w, cas_d, base_h)),
+            (cx, cy, z0 + base_h * 0.5),
+            (cas_w, cas_d, base_h),
             mat_alum,
-            module=story_mod,
-            module_objects=MO,
+            story_mod,
+            MO,
         )
         # Narrow end rings only (shaft faces) — not full-height end slabs.
         for ei, ex in enumerate((-1.0, 1.0)):
@@ -18362,13 +18946,13 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 rotation=(0.0, 1.5707963, 0.0),
             )
         # Structural spine under inverter (BoM seat) — NOT a camera-facing wall.
-        fl.add_box(
+        _fpk_place_housing_spine(
             "u_se_td_pack_housing",
-            _mm3((x_motor, y_motor + motor_od * 0.05, z_motor + motor_od * 0.42)),
-            _mm3((motor_len * 0.60, 14.0, 12.0)),
+            (x_motor, y_motor + motor_od * 0.05, z_motor + motor_od * 0.42),
+            (motor_len * 0.60, 14.0, 12.0),
             mat_cf,
-            module=story_mod,
-            module_objects=MO,
+            story_mod,
+            MO,
         )
         for mi, (mx, my) in enumerate((
             (-0.45, -0.45), (0.45, -0.45), (-0.45, 0.45), (0.45, 0.45),
@@ -18398,16 +18982,16 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         x_motor = 0.0
         y_motor = 0.0
         z_motor = z0 + base_h + motor_od * 0.52
-        # Belly cradle hugs the motor footprint (not the brief envelope apron).
+        # Belly cradle hugs the motor footprint (ribbed compound, not plain cuboid).
         base_w = motor_len + 36.0
         base_d = motor_od + 40.0
-        fl.add_box(
+        _fpk_place_ribbed_baseplate(
             "u_se_td_pack_base",
-            _mm3((cx, cy, z0 + base_h * 0.5)),
-            _mm3((base_w, base_d, base_h)),
+            (cx, cy, z0 + base_h * 0.5),
+            (base_w, base_d, base_h),
             mat_alum,
-            module=story_mod,
-            module_objects=MO,
+            story_mod,
+            MO,
         )
         # Tiny mount pads only — no tall rails / roof that re-brick the silhouette.
         for mi, (mx, my) in enumerate((
@@ -18422,19 +19006,22 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 module_objects=MO,
             )
         # pack_housing = thin longitudinal spine under the inverter (BoM seat name).
-        fl.add_box(
+        _fpk_place_housing_spine(
             "u_se_td_pack_housing",
-            _mm3((x_motor, y_motor, z_motor + motor_od * 0.42)),
-            _mm3((motor_len * 0.55, 12.0, 10.0)),
+            (x_motor, y_motor, z_motor + motor_od * 0.42),
+            (motor_len * 0.55, 12.0, 10.0),
             mat_cf,
-            module=story_mod,
-            module_objects=MO,
+            story_mod,
+            MO,
         )
 
     # DECISION (2026-07-29 SIGHT): pack X = car lateral. Transverse rotor axis
     # must lie along +X so exterior cameras (looking −Y) see the BARREL, not the
     # end-face (which read as a lone chrome sphere when axis was along Y).
+    # INTENT (race-hardened morphology): raise cylinder segments so softbox does
+    # not read low-poly clay (Lucid-gold TRAINING CHECK — not a mesh paste).
     rot_along_x = (0.0, 1.5707963, 0.0)  # cylinder default +Z → +X
+    _cyl_v = 96
     fl.add_cyl(
         "u_se_td_motor_housing",
         _mm3((x_motor, y_motor, z_motor)),
@@ -18444,6 +19031,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
+        vertices=_cyl_v,
     )
     fl.add_cyl(
         "u_se_td_coolant_jacket",
@@ -18454,6 +19042,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
+        vertices=_cyl_v,
     )
     # End bells — flange rings so the barrel reads as a cast motor case, not a
     # smooth infinite cylinder (FE gold training check: end faces + bearing caps).
@@ -18483,8 +19072,12 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     )
 
     # Driveshaft stubs exit ±X (toward wheels).
-    shaft_r = max(9.0, motor_od * 0.11)
-    shaft_stub = max(36.0, cas_w * 0.10)
+    if _fpk_g is not None:
+        shaft_r = _fpk_g.shaft_od_mm * 0.5
+        shaft_stub = _fpk_g.shaft_stub_mm
+    else:
+        shaft_r = max(9.0, motor_od * 0.11)
+        shaft_stub = max(36.0, cas_w * 0.10)
     for si, sx in enumerate((-1.0, 1.0)):
         fl.add_cyl(
             "u_se_td_output_shaft" if si == 0 else "u_se_td_output_shaft_b",
@@ -18516,58 +19109,112 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             rotation=rot_along_x,
         )
 
-    # DECISION (2026-07-29 SIGHT): gearbox MUST sit on −Y (camera face). Prior
-    # +Y nest was occluded behind the barrel on 04/00 — spur/diff volume never
-    # read. Offset slightly −X so halfshaft path is still implied.
-    gear_w = min(motor_len * 0.48, 140.0)
-    gear_d = min(motor_od * 0.55, 78.0)
-    gear_h = min(motor_od * 0.72, cas_h * 0.50)
-    y_gear = y_motor - motor_od * 0.38 - gear_d * 0.35
-    x_gear_box = x_motor - motor_len * 0.12
-    fl.add_box(
-        "u_se_td_gearbox",
-        _mm3((x_gear_box, y_gear, z_motor - motor_od * 0.08)),
-        _mm3((gear_w, gear_d, gear_h)),
+    # ── Layer 1: MCU / SiC inverter on flat upper shelf (concentric stack) ───
+    # INTENT: bolts to casing shelf; busbars pierce into stator (cutaway below).
+    if _fpk_g is not None:
+        inv_w, inv_d, inv_h = _fpk_g.mcu_w_mm, _fpk_g.mcu_d_mm, _fpk_g.mcu_h_mm
+        shelf_h = _fpk_g.shelf_h_mm
+    else:
+        inv_w = min(motor_len * 0.78, 220.0)
+        inv_d = min(motor_od * 0.78, 110.0)
+        inv_h = min(cas_h * 0.18, 32.0)
+        shelf_h = max(6.0, inv_h * 0.22)
+    x_inv = x_motor
+    y_inv = y_motor
+    # Flat shelf land under MCU (race cassette cue — lipped compound, not a brick).
+    shelf_z = z_motor + motor_od * 0.48 + shelf_h * 0.5
+    _fpk_place_mcu_shelf(
+        "u_se_td_mcu_shelf",
+        (x_inv, y_inv, shelf_z),
+        (inv_w * 1.05, inv_d * 1.08, shelf_h),
         mat_alum,
-        module=story_mod,
-        module_objects=MO,
+        story_mod,
+        MO,
     )
-    # Diff bulge — shorter cylinder nest on gearbox face (unitised cassette cue).
-    fl.add_cyl(
-        "u_se_td_diff_bulge",
-        _mm3((x_gear_box, y_gear - gear_d * 0.15, z_motor - motor_od * 0.05)),
-        min(gear_h, gear_d) * 0.38 * fl.MM,
-        gear_w * 0.55 * fl.MM,
+    inv_z = shelf_z + shelf_h * 0.5 + inv_h * 0.55
+    _fpk_place_sic_inverter_stack(
+        "u_se_td_sic_inverter",
+        (x_inv, y_inv, inv_z),
+        (inv_w, inv_d, inv_h),
+        mat_sic,
+        story_mod,
+        MO,
+    )
+    # Cold-plate lip on inverter top — ribbed compound (P6 mesh authenticity).
+    _fpk_place_ribbed_coldplate(
+        "u_se_td_inverter_coldplate",
+        (x_inv, y_inv, inv_z + inv_h * 0.5 + 2.0),
+        (inv_w * 0.92, inv_d * 0.88, 4.0),
         mat_alum,
-        module=story_mod,
-        module_objects=MO,
-        rotation=rot_along_x,
+        story_mod,
+        MO,
     )
 
-    # Pulse inverter rides on top of motor (shares cassette volume).
-    inv_w = min(motor_len * 0.70, 200.0)
-    inv_d = min(motor_od * 0.70, 95.0)
-    inv_h = min(cas_h * 0.20, 36.0)
-    x_inv = x_motor
-    y_inv = y_motor + motor_od * 0.08
-    inv_z = z_motor + motor_od * 0.48 + inv_h * 0.55
-    fl.add_box(
-        "u_se_td_sic_inverter",
-        _mm3((x_inv, y_inv, inv_z)),
-        _mm3((inv_w, inv_d, inv_h)),
-        mat_sic,
-        module=story_mod,
-        module_objects=MO,
-    )
-    # Cold-plate lip on inverter top (machined plate language).
-    fl.add_box(
-        "u_se_td_inverter_coldplate",
-        _mm3((x_inv, y_inv, inv_z + inv_h * 0.5 + 2.0)),
-        _mm3((inv_w * 0.92, inv_d * 0.88, 4.0)),
-        mat_alum,
-        module=story_mod,
-        module_objects=MO,
-    )
+    # Gear / diff seating meshes — CONCENTRIC (inside hollow rotor), not an
+    # external −Y box. Names kept for traction_spine_manifest BoM joins.
+    if _fpk_g is not None:
+        gear_w = _fpk_g.gear_face_mm
+        gear_r = _fpk_g.ring_id_mm * 0.5
+        diff_r = _fpk_g.diff_od_mm * 0.5
+        diff_len_seat = _fpk_g.diff_len_mm
+    else:
+        gear_w = motor_len * 0.42
+        gear_r = motor_od * 0.18
+        diff_r = motor_od * 0.12
+        diff_len_seat = gear_w * 0.55
+    gear_d = gear_r * 2.0
+    gear_h = gear_r * 2.0
+    x_gear_box = x_motor
+    y_gear = y_motor
+    if bay_fill:
+        # Invisible-on-exterior planetary nest volume (ghost shows the stack).
+        fl.add_cyl(
+            "u_se_td_gearbox",
+            _mm3((x_motor, y_motor, z_motor)),
+            gear_r * fl.MM,
+            gear_w * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=48,
+        )
+        fl.add_cyl(
+            "u_se_td_diff_bulge",
+            _mm3((x_motor, y_motor, z_motor)),
+            diff_r * fl.MM,
+            diff_len_seat * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=48,
+        )
+    else:
+        # Open cradle: compact gear nest still readable on camera face.
+        gear_w = min(motor_len * 0.48, 140.0)
+        gear_d = min(motor_od * 0.55, 78.0)
+        gear_h = min(motor_od * 0.72, cas_h * 0.50)
+        y_gear = y_motor - motor_od * 0.38 - gear_d * 0.35
+        x_gear_box = x_motor - motor_len * 0.12
+        fl.add_box(
+            "u_se_td_gearbox",
+            _mm3((x_gear_box, y_gear, z_motor - motor_od * 0.08)),
+            _mm3((gear_w, gear_d, gear_h)),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+        fl.add_cyl(
+            "u_se_td_diff_bulge",
+            _mm3((x_gear_box, y_gear - gear_d * 0.15, z_motor - motor_od * 0.05)),
+            min(gear_h, gear_d) * 0.38 * fl.MM,
+            gear_w * 0.55 * fl.MM,
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
 
     # Coolant bosses on −Y service face (camera-facing); HV on inverter −Y edge.
     # Longer nipples + flange rings so ports read as fittings, not orange spheres.
@@ -18594,13 +19241,14 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module_objects=MO,
             rotation=(1.5707963, 0.0, 0.0),
         )
-    fl.add_box(
+    _fpk_place_hv_connector(
         "u_se_td_hv_connector",
-        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55, inv_z)),
-        _mm3((40.0, 26.0, 30.0)),
+        (x_motor - inv_w * 0.32, y_inv - inv_d * 0.55, inv_z),
+        (40.0, 26.0, 30.0),
         mat_hv,
-        module=story_mod,
-        module_objects=MO,
+        mat_steel,
+        story_mod,
+        MO,
     )
     # HV connector keying hood + twin pin towers (Amphenol-style service face).
     fl.add_box(
@@ -18657,19 +19305,20 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module=story_mod,
             module_objects=MO,
         )
-    for ri in range(3):
-        fl.add_box(
-            f"u_se_td_gear_rib_{ri}",
-            _mm3((
-                x_gear_box - gear_w * 0.25 + ri * gear_w * 0.25,
-                y_gear - gear_d * 0.52,
-                z_motor - motor_od * 0.08,
-            )),
-            _mm3((3.5, 4.0, gear_h * 0.70)),
-            mat_alum,
-            module=story_mod,
-            module_objects=MO,
-        )
+    if not bay_fill:
+        for ri in range(3):
+            fl.add_box(
+                f"u_se_td_gear_rib_{ri}",
+                _mm3((
+                    x_gear_box - gear_w * 0.25 + ri * gear_w * 0.25,
+                    y_gear - gear_d * 0.52,
+                    z_motor - motor_od * 0.08,
+                )),
+                _mm3((3.5, 4.0, gear_h * 0.70)),
+                mat_alum,
+                module=story_mod,
+                module_objects=MO,
+            )
     fl.add_box(
         "u_se_td_nameplate",
         _mm3((x_motor + motor_len * 0.18, y_motor - motor_od * 0.52, z_motor + motor_od * 0.22)),
@@ -18688,23 +19337,91 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
+        vertices=64,
+    )
+    # INTENT (race-hardened service face): LV signal connector + chassis ground
+    # stud + oil breather on casing — bay-forced / use-physics, not OEM CAD paste.
+    fl.add_box(
+        "u_se_td_lv_connector",
+        _mm3((x_motor + inv_w * 0.28, y_inv - inv_d * 0.55, inv_z - inv_h * 0.15)),
+        _mm3((28.0, 18.0, 16.0)),
+        mat_hv,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_cyl(
+        "u_se_td_ground_stud",
+        _mm3((x_motor + motor_len * 0.35, y_motor - motor_od * 0.52, z_motor - motor_od * 0.25)),
+        4.0 * fl.MM,
+        10.0 * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=24,
+    )
+    fl.add_cyl(
+        "u_se_td_gear_breather",
+        _mm3((x_motor - motor_len * 0.10, y_motor - motor_od * 0.50, z_motor + motor_od * 0.28)),
+        5.5 * fl.MM,
+        12.0 * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        vertices=24,
+    )
+    # Machine-face pad on inverter cold-plate (milled land — race hardware cue).
+    fl.add_box(
+        "u_se_td_coldplate_machine_face",
+        _mm3((x_inv, y_inv, inv_z + inv_h * 0.5 + 4.2)),
+        _mm3((inv_w * 0.55, inv_d * 0.40, 1.2)),
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
     )
     x_port = x_motor - cas_w * 0.45
     x_gear = x_motor  # for cutaway busbar math below
 
     # ── Cutaway-only electronics (hidden on sealed exterior keep-list) ────────
+    # DECISION (2026-07-29 FFF): split gate-drive vs OEM control boards — two
+    # ontology parts, two meshes (not one collapsed PCB blob).
     pcb_w, pcb_d, pcb_t = inv_w * 0.90, inv_d * 0.78, 4.5
     pcb_z = inv_z + inv_h * 0.5 + pcb_t * 0.5 + 1.0
+    gd_w, gd_d, gd_t = inv_w * 0.72, inv_d * 0.55, 3.5
+    gd_z = inv_z - inv_h * 0.15
     _pcb = _import_family_cad(
-        "instrument_pcb", "u_se_td_pcb",
+        "instrument_pcb", "u_se_td_control_pcb",
         (x_inv, cy, pcb_z), (pcb_w, pcb_d, pcb_t), (0.0, 0.0, 0.0),
         mat_pcb, story_mod, MO,
     )
     if _pcb is None:
         fl.add_box(
-            "u_se_td_pcb",
+            "u_se_td_control_pcb",
             _mm3((x_inv, cy, pcb_z)),
             _mm3((pcb_w, pcb_d, pcb_t)),
+            mat_pcb,
+            module=story_mod,
+            module_objects=MO,
+        )
+    # Legacy alias name kept so older keep-lists / seats still resolve.
+    fl.add_box(
+        "u_se_td_pcb",
+        _mm3((x_inv, cy, pcb_z - 0.2)),
+        _mm3((pcb_w * 0.98, pcb_d * 0.98, 0.8)),
+        mat_pcb,
+        module=story_mod,
+        module_objects=MO,
+    )
+    _gd = _import_family_cad(
+        "instrument_pcb", "u_se_td_gate_drive_pcb",
+        (x_inv, y_inv - inv_d * 0.08, gd_z), (gd_w, gd_d, gd_t), (0.0, 0.0, 0.0),
+        mat_pcb, story_mod, MO,
+    )
+    if _gd is None:
+        fl.add_box(
+            "u_se_td_gate_drive_pcb",
+            _mm3((x_inv, y_inv - inv_d * 0.08, gd_z)),
+            _mm3((gd_w, gd_d, gd_t)),
             mat_pcb,
             module=story_mod,
             module_objects=MO,
@@ -18741,57 +19458,232 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module=story_mod,
             module_objects=MO,
         )
-    # Short vertical INTERNAL phase busbars motor jacket → inverter underside.
-    for pi in range(3):
-        x_off = (pi - 1) * 22.0
-        fl.add_box(
-            f"u_se_td_phase_bus_{pi}",
-            _mm3((x_motor + x_off, y_motor - motor_od * 0.15, (z_motor + inv_z) * 0.5)),
-            _mm3((8.0, 8.0, max(12.0, abs(inv_z - z_motor) * 0.45))),
-            mat_ph[pi],
-            module=story_mod,
-            module_objects=MO,
-        )
-    fl.add_box(
-        "u_se_td_hv_bus",
-        _mm3((x_motor - inv_w * 0.20, y_face - 2.0, inv_z - inv_h * 0.10)),
-        _mm3((inv_w * 0.35, 8.0, 8.0)),
-        mat_bus,
-        module=story_mod,
-        module_objects=MO,
-    )
-    # Rotor / stator hints for ghost cutaway authenticity (not exterior).
+    # ── Concentric cutaway stack (ghost/hero) — L2 stator → L3 hollow rotor → L4 ─
+    # INTENT: public FE FPK anatomy (press TRAINING CHECK). No long phase cables —
+    # solid busbars pierce MCU shelf into stator terminations.
+    # DECISION: when fpk_concentric_geometry is present, sun/planet/ring sizes come
+    # from gear_ratio + rotor bore (Hooley-class), not decorative motor_od fractions.
+    if _fpk_g is not None:
+        stator_od = _fpk_g.stator_od_mm
+        stator_id = _fpk_g.stator_id_mm
+        rotor_od = _fpk_g.rotor_od_mm
+        rotor_id = _fpk_g.rotor_id_mm
+        nest_len = _fpk_g.nest_len_mm
+        sun_od = _fpk_g.sun_od_mm
+        planet_od = _fpk_g.planet_od_mm
+        planet_n = _fpk_g.planet_count
+        planet_pcd = _fpk_g.planet_pcd_mm
+        carrier_od = _fpk_g.carrier_od_mm
+        diff_od = _fpk_g.diff_od_mm
+        diff_len = _fpk_g.diff_len_mm
+        gear_face = _fpk_g.gear_face_mm
+        bus_s = _fpk_g.busbar_section_mm
+    else:
+        stator_od = motor_od * 0.92
+        stator_id = motor_od * 0.62
+        rotor_od = motor_od * 0.58
+        rotor_id = motor_od * 0.34
+        nest_len = motor_len * 0.62
+        sun_od = motor_od * 0.16
+        planet_od = motor_od * 0.11
+        planet_n = 3
+        planet_pcd = motor_od * 0.32
+        carrier_od = motor_od * 0.28
+        diff_od = motor_od * 0.22
+        diff_len = nest_len * 0.22
+        gear_face = nest_len * 0.35
+        bus_s = 10.0
+
+    # L2 — stator ring + wave-wound end-winding bands.
     fl.add_cyl(
-        "u_se_td_rotor_hint",
+        "u_se_td_stator_ring",
         _mm3((x_motor, y_motor, z_motor)),
-        motor_od * 0.22 * fl.MM,
-        motor_len * 0.55 * fl.MM,
-        mat_copper,
-        module=story_mod,
-        module_objects=MO,
-        rotation=rot_along_x,
-    )
-    fl.add_cyl(
-        "u_se_td_stator_hint",
-        _mm3((x_motor, y_motor, z_motor)),
-        motor_od * 0.38 * fl.MM,
-        motor_len * 0.50 * fl.MM,
+        (stator_od * 0.5) * fl.MM,
+        nest_len * fl.MM,
         mat_steel,
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
+        vertices=_cyl_v,
     )
-    mode = "bay-fill unitised brick (front-axle packaging wins)" if bay_fill else (
-        "open cradle + transverse MGU + gear + SiC"
+    fl.add_cyl(
+        "u_se_td_stator_hint",
+        _mm3((x_motor, y_motor, z_motor)),
+        (stator_id * 0.5) * fl.MM,
+        (nest_len * 0.92) * fl.MM,
+        mat_copper,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=_cyl_v,
+    )
+    for wi, wx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            f"u_se_td_winding_end_{wi}",
+            _mm3((x_motor + wx * nest_len * 0.42, y_motor, z_motor)),
+            (stator_od * 0.48) * fl.MM,
+            (motor_len * 0.08) * fl.MM,
+            mat_copper,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=64,
+        )
+        # Microjet oil spray cues at end-winding (tiny ports — cooling grammar).
+        for ji in range(4):
+            ang = (ji / 4.0) * math.tau
+            jy = y_motor + (stator_od * 0.42) * math.cos(ang)
+            jz = z_motor + (stator_od * 0.42) * math.sin(ang)
+            fl.add_cyl(
+                f"u_se_td_microjet_{wi}_{ji}",
+                _mm3((x_motor + wx * nest_len * 0.40, jy, jz)),
+                2.2 * fl.MM,
+                8.0 * fl.MM,
+                mat_port,
+                module=story_mod,
+                module_objects=MO,
+                vertices=12,
+            )
+
+    # L3 — hollow PM rotor barrel (structural home for transmission).
+    fl.add_cyl(
+        "u_se_td_hollow_rotor",
+        _mm3((x_motor, y_motor, z_motor)),
+        (rotor_od * 0.5) * fl.MM,
+        (nest_len * 0.88) * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=_cyl_v,
+    )
+    fl.add_cyl(
+        "u_se_td_rotor_hint",
+        _mm3((x_motor, y_motor, z_motor)),
+        (rotor_id * 0.5) * fl.MM,
+        (nest_len * 0.80) * fl.MM,
+        mat_cf,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=48,
+    )
+
+    # L4 — planetary sun + planets + mini-diff nest inside hollow rotor.
+    fl.add_cyl(
+        "u_se_td_sun_gear",
+        _mm3((x_motor, y_motor, z_motor)),
+        (sun_od * 0.5) * fl.MM,
+        gear_face * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=32,
+    )
+    fl.add_cyl(
+        "u_se_td_planet_carrier",
+        _mm3((x_motor, y_motor, z_motor)),
+        (carrier_od * 0.5) * fl.MM,
+        max(8.0, gear_face * 0.35) * fl.MM,
+        mat_alum,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=32,
+    )
+    for pi in range(int(planet_n)):
+        ang = (pi / float(planet_n)) * math.tau
+        py = y_motor + (planet_pcd * 0.5) * math.cos(ang)
+        pz = z_motor + (planet_pcd * 0.5) * math.sin(ang)
+        fl.add_cyl(
+            f"u_se_td_planet_{pi}",
+            _mm3((x_motor, py, pz)),
+            (planet_od * 0.5) * fl.MM,
+            (gear_face * 0.92) * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=24,
+        )
+    fl.add_cyl(
+        "u_se_td_diff_nest",
+        _mm3((x_motor, y_motor, z_motor)),
+        (diff_od * 0.5) * fl.MM,
+        diff_len * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=rot_along_x,
+        vertices=32,
+    )
+
+    # ── Ontology FFF sub-components (covers, magnets, ring, flanges, seals…) ──
+    # INTENT: every fpk_first_principles part gets a physics-sized mesh so
+    # drawings/cutaways show the full mechanism — not assembly blobs.
+    _ring_id_mm = (
+        float(_fpk_g.ring_id_mm) if _fpk_g is not None else float(rotor_id - 4.0)
+    )
+    _cq_fff = (
+        (((globals().get("_COMPOSER_STATE") or {}).get("orchestratorContract") or {})
+         .get("quantities"))
+        or {}
+    )
+    _fpk_place_ontology_fff_parts(
+        x_motor=x_motor, y_motor=y_motor, z_motor=z_motor,
+        motor_od=motor_od, motor_len=motor_len,
+        rotor_od=rotor_od, rotor_id=rotor_id, nest_len=nest_len,
+        sun_od=sun_od, planet_od=planet_od, planet_n=planet_n,
+        planet_pcd=planet_pcd, ring_id=_ring_id_mm, carrier_od=carrier_od,
+        diff_od=diff_od, diff_len=diff_len, gear_face=gear_face,
+        shaft_r=shaft_r, shaft_stub=shaft_stub,
+        inv_w=inv_w, inv_d=inv_d, inv_h=inv_h, inv_z=inv_z,
+        x_inv=x_inv, y_inv=y_inv, cas_w=cas_w, cas_d=cas_d,
+        mat_steel=mat_steel, mat_alum=mat_alum, mat_magnet=mat_magnet,
+        mat_oil=mat_oil, mat_pcb=mat_pcb, mat_copper=mat_copper,
+        story_mod=story_mod, MO=MO, rot_along_x=rot_along_x,
+        _mm3=_mm3, _cyl_v=_cyl_v, quantities=_cq_fff,
+    )
+
+    # Solid phase busbars pierce MCU underside → stator — L-busbar compounds (P6).
+    pierce_h = max(18.0, abs(inv_z - z_motor) * 0.55)
+    for pi in range(3):
+        x_off = (pi - 1) * max(22.0, bus_s * 2.4)
+        _fpk_place_l_busbar(
+            f"u_se_td_phase_bus_{pi}",
+            (
+                x_motor + x_off,
+                y_motor,
+                z_motor + motor_od * 0.35,
+            ),
+            (bus_s, bus_s, bus_s * 0.6),
+            pierce_h,
+            mat_ph[pi],
+            story_mod,
+            MO,
+        )
+    # DC-link HV bus — L-compound (tabs + run), not a lone cuboid bar.
+    _fpk_place_l_busbar(
+        "u_se_td_hv_bus",
+        (x_motor - inv_w * 0.20, y_face - 2.0, inv_z - inv_h * 0.25),
+        (8.0, 6.0, 5.0),
+        max(14.0, inv_h * 0.55),
+        mat_bus,
+        story_mod,
+        MO,
+    )
+    mode = (
+        "bay-fill CONCENTRIC FPK (MCU shelf → stator → hollow rotor → planetary/diff)"
+        if bay_fill else
+        "open cradle + transverse MGU + gear nest + SiC"
     )
     print(
         f"[univ][sealed] TRACTION cassette: {mode} "
         f"(span {cas_w:.0f}×{cas_d:.0f}×{cas_h:.0f} mm)"
     )
-    # INTENT (2026-07-29 JLR front FPK): syringe/thermocycler/optical dump
-    # form-meshes.json so render-quality-audit does NOT floor Renders as
-    # BLENDER_UNIVERSAL_FALLBACK. Traction bay-fill was the gap — story meshes
-    # existed but never wrote the receipt.
+    # INTENT (2026-07-29 JLR front FPK): dump form-meshes.json so render-quality
+    # audit does NOT floor Renders as BLENDER_UNIVERSAL_FALLBACK.
     try:
         _out = os.environ.get("BLENDER_OUT_DIR") or ""
         if _out and hasattr(bpy, "data"):
@@ -18801,20 +19693,104 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 and str(o.name).startswith("u_se_td_")
             )
             if len(_names) >= 8:
+                _prov: dict[str, dict[str, str]] = {}
+                for _nm in _names:
+                    if re.search(
+                        r"^u_se_td_(pcb|control_pcb|gate_drive_pcb)$", _nm
+                    ):
+                        _prov[_nm] = {"kind": "cad_family", "family": "instrument_pcb"}
+                    elif re.search(r"^u_se_td_(phase_bus_\d+|hv_bus)_(leg_v|leg_h)$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "l_busbar_leg"}
+                    elif re.search(r"^u_se_td_(phase_bus_\d+|hv_bus)$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "l_busbar"}
+                    elif re.search(r"^u_se_td_inverter_coldplate(_rib_\d+)?$", _nm):
+                        _prov[_nm] = {
+                            "kind": "compound",
+                            "primitive": "ribbed_coldplate",
+                        }
+                    elif re.search(r"^u_se_td_pack_base(_rail_\d+)?$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "ribbed_baseplate"}
+                    elif re.search(r"^u_se_td_pack_housing(_flange_\d+)?$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "housing_spine"}
+                    elif re.search(r"^u_se_td_mcu_shelf(_lip_\d+)?$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "lipped_shelf"}
+                    elif re.search(r"^u_se_td_sic_inverter(_mod_\d+)?$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "sic_module_stack"}
+                    elif re.search(r"^u_se_td_hv_connector(_barrel)?$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "hv_connector"}
+                    elif re.search(r"^u_se_td_magnet_\d+$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "magnet_segment"}
+                    elif re.search(
+                        r"^u_se_td_(sun_gear|ring_gear|planet_\d+)_tooth_\d+$", _nm
+                    ):
+                        _prov[_nm] = {"kind": "compound", "primitive": "gear_tooth_cue"}
+                    elif re.search(
+                        r"^u_se_td_(motor_housing|stator_ring|stator_hint|hollow_rotor|"
+                        r"rotor_hint|winding_end_\d+|sun_gear|planet_\d+|planet_carrier|"
+                        r"ring_gear|gearbox|diff_nest|diff_bulge|coolant_jacket|coolant_in|"
+                        r"coolant_out|output_shaft(_b)?|end_bell_\d+|bearing_cap_\d+|"
+                        r"jacket_band|microjet_\d+_\d+|motor_shaft|motor_cover|"
+                        r"gearbox_cover|pinion_gear|intermediate_shaft|side_gear_\d+|"
+                        r"output_gear_\d+|gearbox_bearing_\d+|oil_seal_\d+|gear_oil|"
+                        r"encoder|motor_terminal_\d+|halfshaft_flange_\d+|"
+                        r"inverter_housing(_wall_\d+)?|inverter_cover|cassette_cover)$",
+                        _nm,
+                    ):
+                        _prov[_nm] = {"kind": "compound", "primitive": "fff_ontology"}
+                # Ontology coverage stamp (proveCatch consumer)
+                _ont_cov = None
+                try:
+                    from fpk_blender_coverage import evaluate_blender_coverage
+                    _ont_cov = evaluate_blender_coverage(
+                        {"meshes": _names, "form": (
+                            "traction_drive_concentric_bay_fill"
+                            if bay_fill else "traction_drive_pack"
+                        )}
+                    )
+                except Exception as _cov_exc:
+                    print(f"[univ][sealed] ontology coverage eval skipped: {_cov_exc}")
                 Path(_out).joinpath("form-meshes.json").write_text(
                     json.dumps(
                         {
-                            "form": "traction_drive_bay_fill" if bay_fill else "traction_drive_pack",
+                            "form": (
+                                "traction_drive_concentric_bay_fill"
+                                if bay_fill else "traction_drive_pack"
+                            ),
                             "form_id": "traction_drive",
+                            "architecture": "concentric_fpk_stack",
+                            "layers": [
+                                "mcu_shelf_inverter",
+                                "stator_wave_wound",
+                                "hollow_rotor_magnets",
+                                "planetary_diff_in_rotor",
+                                "ontology_fff_covers_seals_flanges",
+                            ],
                             "meshes": _names,
+                            "mesh_provenance": _prov,
+                            "ontology_coverage": (
+                                {
+                                    "score": _ont_cov.get("score"),
+                                    "ok": _ont_cov.get("ok"),
+                                    "covered": _ont_cov.get("covered"),
+                                    "ontology_count": _ont_cov.get("ontology_count"),
+                                    "missing_ids": [
+                                        m["part_id"]
+                                        for m in (_ont_cov.get("missing") or [])
+                                    ],
+                                }
+                                if isinstance(_ont_cov, dict) else None
+                            ),
                             "bay_fill": bool(bay_fill),
+                            "lucid_role": "FFF_TRAINING_CHECK_ONLY",
+                            "fff_rule": "fpk-deterministic-fff — every ontology part from physics",
                         },
                         indent=2,
                     )
                 )
                 print(
                     f"[univ][sealed] form-meshes.json dumped "
-                    f"({len(_names)} u_se_td_* meshes, bay_fill={bool(bay_fill)})"
+                    f"({len(_names)} u_se_td_* meshes, bay_fill={bool(bay_fill)}, "
+                    f"concentric=1)"
                 )
     except Exception as _dump_exc:
         print(f"[univ][sealed] traction form-meshes dump skipped: {_dump_exc}")

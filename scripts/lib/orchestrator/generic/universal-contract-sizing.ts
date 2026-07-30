@@ -600,23 +600,34 @@ function boxFromHighDensityDriveKw(
   // fractions over free rotor/stack envelopes so motor+gear+diff are not read
   // as a coaxial sum that overflows the homologated box (1429 critic HIGH).
   if (bay) {
+    // INTENT (2026-07-29 Hooley/PHANTM bar): prefer contract-derived concentric
+    // geometry (fpk_* writeback / IPMSM tool) over bay-fraction blobs.
+    const fpkOd = Number(quantities?.fpk_housing_od_mm ?? 0)
+    const fpkLen = Number(quantities?.fpk_housing_len_mm ?? 0)
+    const fpkMcuW = Number(quantities?.fpk_mcu_w_mm ?? 0)
+    const fpkMcuD = Number(quantities?.fpk_mcu_d_mm ?? 0)
+    const fpkMcuH = Number(quantities?.fpk_mcu_h_mm ?? 0)
     if (isInverter) {
-      // INTENT (2026-07-29 1431): face-mounted SiC brick on the motor end —
-      // thin package thickness so motor OD + inverter thickness clears bay.d
-      // (critic HIGH: 177 OD + 109 deep inverter "stacked" in 259 mm bay).
+      if (fpkMcuW > 40 && fpkMcuD > 40 && fpkMcuH > 10) {
+        return `${Math.round(fpkMcuW)}x${Math.round(fpkMcuD)}x${Math.round(fpkMcuH)} mm`
+      }
+      // MCU shelf brick on casing crown — thin height, not a bay-depth stack.
       const span = Math.round(Math.min(bay.w * 0.70, bay.w - 8))
-      const face = Math.round(Math.min(bay.d, bay.h) * 0.72)
-      const thick = 52
+      const face = Math.round(Math.min(bay.d, bay.h) * 0.55)
+      const thick = 28
       return `${span}x${face}x${thick} mm`
     }
-    // Prefer tool rotor OD/stack when present, then clamp into bay fractions.
+    if (fpkOd > 40 && fpkLen > 40) {
+      return `${Math.round(fpkLen)}x${Math.round(fpkOd)}x${Math.round(fpkOd)} mm`
+    }
+    // Prefer tool rotor OD/stack when present, then clamp into bay (concentric).
     const rotorOd = Number(quantities?.rotor_airgap_diameter_mm ?? 0)
     const stack = Number(quantities?.stack_length_mm ?? 0)
-    const odMax = Math.round(Math.min(bay.h, bay.d) * 0.82)
-    const lenMax = Math.round(Math.min(bay.w * 0.52, bay.w - 8))
+    const odMax = Math.round(Math.min(bay.h, bay.d) * 0.78)
+    const lenMax = Math.round(Math.min(bay.w * 0.78, bay.w - 16))
     if (rotorOd > 20 && stack > 20) {
-      const od = Math.min(odMax, Math.max(90, Math.round(rotorOd * 1.45)))
-      const len = Math.min(lenMax, Math.max(90, Math.round(stack * 1.55)))
+      const od = Math.min(odMax, Math.max(90, Math.round(rotorOd * 1.42)))
+      const len = Math.min(lenMax, Math.max(90, Math.round(stack + 2 * Math.max(18, stack * 0.22))))
       return `${len}x${od}x${od} mm`
     }
     return `${lenMax}x${odMax}x${odMax} mm`
@@ -1049,6 +1060,39 @@ function isPhantomPlantTotalPumpCoveredByUnits(
   }
   if (!(matchedDemand > 0)) return false
   return parallelUnitCapacityCoverage(quantities, matchedDemand) !== null
+}
+
+/**
+ * INTENT (2026-07-29 JLR front FPK P0): quantity aliases `traction_motor_power_kw`
+ * / `traction_inverter_power_kw` mint groups that fuzzy-miss the floor words
+ * `traction_ipmsm_motor_generator` / `sic_traction_inverter` → dual synth twins.
+ * When a traction floor already names the principal, never mint a second identity.
+ */
+function tractionFloorCoversGroup(modules: ModuleLike[] | undefined, phrase: string): boolean {
+  if (!_tractionDrivePackSizingActive || !modules?.length) return false
+  const p = phrase.replace(/_/g, ' ').toLowerCase()
+  const isMotorGroup =
+    /\b(?:traction\s*motor|motor\s*generator|\bipmsm\b|\bmgu\b)\b/.test(p)
+    && !/\b(?:inverter|mcu|converter)\b/.test(p)
+  const isInverterGroup =
+    /\b(?:traction\s*inverter|sic\s*traction|\binverter\b|\bmcu\b)\b/.test(p)
+    && !/\b(?:motor\s*generator|\bipmsm\b)\b/.test(p)
+  if (!isMotorGroup && !isInverterGroup) return false
+  for (const m of modules) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const role = wordRoleText(w).replace(/_/g, ' ').toLowerCase()
+        if (/\b(?:synth)\b/.test(role)) continue
+        if (isMotorGroup && /traction\s*ipmsm|ipmsm\s*motor|motor\s*generator/.test(role)) {
+          return true
+        }
+        if (isInverterGroup && /sic\s*traction\s*inverter|sic\s*traction/.test(role)) {
+          return true
+        }
+      }
+    }
+  }
+  return false
 }
 
 function isSynthesisable(g: EquipGroup, quantities?: Record<string, number>): boolean {
@@ -1515,8 +1559,12 @@ function fitTractionPrincipalsIntoBay(
   if (!bay) return 0
   const dimRe = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)\s*mm$/i
   const principalRe =
-    /(?:ipmsm|motor\s*generator|\bmgu\b|traction\s*inverter|sic\s*traction|reduction\s*gear|gear\s*stage|bevel\s*differential|\bdifferential\b)/i
+    /(?:ipmsm|motor\s*generator|\bmgu\b|traction\s*inverter|sic\s*traction|reduction\s*gear|gear\s*stage|planetary|bevel\s*differential|mini[_\s-]?diff|\bdifferential\b)/i
   const skipRe = /\b(?:bearing|coupling|sensor|cold\s*plate|desat|protection|pressure|halfshaft|flange)\b/i
+  // Nested transmission must fit INSIDE hollow rotor — not as bay side-boxes.
+  const rotorId = Number(quantities.fpk_rotor_id_mm ?? 0)
+  const ringId = Number(quantities.fpk_ring_id_mm ?? 0)
+  const nestCap = Math.max(40, rotorId > 20 ? rotorId : ringId > 20 ? ringId : Math.min(bay.d, bay.h) * 0.34)
   let n = 0
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
@@ -1531,6 +1579,23 @@ function fitTractionPrincipalsIntoBay(
         const a = parseFloat(hit[1])
         const b = parseFloat(hit[2])
         const c = parseFloat(hit[3])
+        const isNestedTx =
+          /planetary|reduction\s*gear|gear\s*stage|mini[_\s-]?diff|bevel\s*differential|\bdifferential\b/i.test(role)
+          && !/ipmsm|motor\s*generator|\bmgu\b|inverter|sic/i.test(role)
+        if (isNestedTx) {
+          const edges = [a, b, c].map((e) => Math.min(e, nestCap))
+          const out = edges.map((e) => Math.max(20, Math.round(e)))
+          if (out[0] === Math.round(a) && out[1] === Math.round(b) && out[2] === Math.round(c)) {
+            continue
+          }
+          mergeMods(word, [
+            mod('dimension', `${out[0]}x${out[1]}x${out[2]} mm`),
+            mod('sizing_basis',
+              `nested inside hollow-rotor bore (cap Ø${Math.round(nestCap)} mm) — concentric FPK, not external bay box`),
+          ])
+          n += 1
+          continue
+        }
         // Orient: map the three edges onto bay W/D/H by sorting descending onto
         // bay's descending axes so the longest principal edge uses bay width.
         const edges = [a, b, c].sort((x, y) => y - x)
@@ -7710,6 +7775,7 @@ export function applyUniversalContractSizing(
     for (const g of groups) {
       if (matched.has(g.phrase)) continue
       if (!isSynthesisable(g, quantities)) continue
+      if (tractionFloorCoversGroup(modules, g.phrase)) continue
       if (isDisinfectionPhrase(g.phrase) && disinfectionWordExists) continue
       // A `total_*` / overall / combined volume is a REPORTING SUM of the real vessels, not a
       // physical tank. Synthesising it mints a phantom mega-vessel that double-counts the

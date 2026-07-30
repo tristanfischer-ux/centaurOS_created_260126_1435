@@ -117,27 +117,63 @@ const COLD_PLATE_LOOP_FLOOR = [
 // emit plant HVAC / empty actuation. Floor the three principal macros the
 // analytical tool pack sizes — universal for any future traction MGU+MCU kit,
 // never a product-name branch.
+// INTENT (2026-07-29 Tristan HoT): FPK floors are an ASSEMBLY EXPLOSION — MCU /
+// motor / transmission covers, boards, windings, magnets, gears, bearings, seals
+// — each a BoM identity. First-principles seeds live in fpk_first_principles.py;
+// never a shelf+blob. Universal traction-pack signal (not a product-name branch).
 const TRACTION_DRIVE_MODULE_FLOORS: Record<string, string[]> = {
   actuation_kinematics: [
     'traction_ipmsm_motor_generator',
-    'reduction_gear_stage',
-    'motor_bearings',
+    'motor_outer_casing',
+    'motor_cover',
+    'motor_cooling_jacket',
+    'stator_laminations',
+    'stator_windings',
+    'permanent_magnet_set',
+    'hollow_rotor_barrel',
+    'motor_shaft',
+    'front_bearing',
+    'rear_bearing',
+    'front_end_bell',
+    'rear_end_bell',
+    'resolver',
+    'encoder',
+    'motor_power_terminals',
+    // Concentric TX nest inside hollow rotor — not an external open-bevel box.
+    'planetary_reduction_in_rotor',
+    'gearbox_housing',
+    'gearbox_cover',
+    'sun_gear',
+    'planet_gears',
+    'ring_gear',
+    'planet_carrier',
+    'pinion_gear',
+    'intermediate_shaft',
+    'gearbox_bearings',
+    'oil_seals',
+    'gear_oil_charge',
     'output_shaft_coupling',
-    'resolver_encoder',
   ],
   // INTENT (2026-07-29 front FPK): when topology/brief signals a differential
-  // + halfshaft exit (unitised axle kit), append after the reduction stage.
+  // + halfshaft exit (unitised axle kit), append mini_diff after planetary.
   // Selected only via hasTractionDifferentialSignal — never a class slug.
 
   energy_conversion_transduction: [
     'sic_traction_inverter',
+    'inverter_housing',
+    'inverter_cover',
+    'sic_power_module_stack',
     'dc_link_capacitor_bank',
     'gate_driver_board',
     'phase_current_sensor',
     'hv_dc_connector',
+    'lv_signal_connector',
+    'coolant_port_in',
+    'coolant_port_out',
   ],
   structure_containment: [
     'traction_drive_housing',
+    'cassette_cover',
     'hv_shield_cover',
     'mounting_ear_set',
     'fastener_set',
@@ -166,7 +202,9 @@ const TRACTION_DRIVE_MODULE_FLOORS: Record<string, string[]> = {
   ],
   power_distribution: [
     'hv_dc_fuse',
-    'phase_cable_set',
+    // DECISION (2026-07-29 concentric FPK): MCU→stator is solid AC busbar pierce,
+    // not a long phase-cable harness (press grammar / HoT morphology).
+    'ac_phase_busbar_pierce',
     'hv_dc_busbar_link',
     'shield_drain_bond',
     'connector_interlock_pin',
@@ -282,23 +320,34 @@ export function hasTractionDrivePackSignal(contract: ContractInProgress): boolea
   )
 }
 
-/** Actuation floor for a traction pack — appends open bevel differential when
- *  the contract's OWN topology/quantities signal a diff + halfshaft exit. */
+/** Actuation floor for a traction pack — appends mini-diff + halfshaft flanges
+ *  when the contract's OWN topology/quantities signal a diff + halfshaft exit. */
 function tractionDriveFloorFor(moduleKey: string, contract: ContractInProgress): string[] | null {
   const base = TRACTION_DRIVE_MODULE_FLOORS[moduleKey]
   if (!base) return null
   if (moduleKey !== 'actuation_kinematics' || !hasTractionDifferentialSignal(contract)) {
     return base
   }
-  // Insert after reduction_gear_stage so the mechanical story reads motor→gear→diff.
+  // Insert after planetary nest so the mechanical story reads motor→planetary→mini-diff.
   const out = [...base]
-  const gearIdx = out.indexOf('reduction_gear_stage')
-  const insertAt = gearIdx >= 0 ? gearIdx + 1 : 2
-  if (!out.includes('open_bevel_differential')) {
-    out.splice(insertAt, 0, 'open_bevel_differential')
-  }
-  if (!out.includes('halfshaft_output_flange_pair')) {
-    out.splice(insertAt + 1, 0, 'halfshaft_output_flange_pair')
+  const gearIdx = out.indexOf('planetary_reduction_in_rotor')
+  const legacyGearIdx = out.indexOf('reduction_gear_stage')
+  const insertAt = (gearIdx >= 0 ? gearIdx : legacyGearIdx >= 0 ? legacyGearIdx : 1) + 1
+  const diffParts = [
+    'mini_diff_in_rotor',
+    'differential_carrier',
+    'side_gears',
+    'output_gears',
+    'output_shaft_left',
+    'output_shaft_right',
+    'halfshaft_output_flange_pair',
+  ]
+  let at = insertAt
+  for (const part of diffParts) {
+    if (!out.includes(part)) {
+      out.splice(at, 0, part)
+      at += 1
+    }
   }
   return out
 }

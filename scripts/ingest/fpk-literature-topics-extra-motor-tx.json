@@ -1,0 +1,338 @@
+{
+  "product_class": "formula_e_front_mgu",
+  "intent": "ADDITIONAL Anvil FPK literature topics — deep motor / transmission / cassette subcomponents beyond fpk-literature-topics.json. Same harvest schema; unique topic ids; OpenAlex-ready scholarly queries only.",
+  "min_papers_per_topic": 10,
+  "extends": "scripts/ingest/fpk-literature-topics.json",
+  "topics": [
+    {
+      "id": "hairpin_ac_copper_loss_proximity",
+      "name": "Hairpin AC copper loss, skin and proximity effect",
+      "assembly": "motor",
+      "components": ["stator_windings", "conductor_strand_u", "copper_core_u", "phase_coil_u"],
+      "queries": [
+        "AC copper loss hairpin winding traction motor",
+        "proximity effect rectangular conductor stator slot",
+        "skin effect PWM frequency hairpin winding loss",
+        "frequency-dependent resistance hairpin EV motor",
+        "eddy current loss bar winding interior permanent magnet",
+        "slot leakage inductance hairpin winding analytical model"
+      ],
+      "must_extract": ["formula", "electrical", "physics", "geometry"]
+    },
+    {
+      "id": "magnet_wire_enamel_dielectric",
+      "name": "Magnet-wire enamel dielectric class and PD ageing",
+      "assembly": "motor",
+      "components": ["enamel_u", "conductor_strand_u", "stator_windings"],
+      "queries": [
+        "magnet wire enamel polyimide class H traction motor",
+        "partial discharge inverter-fed motor winding insulation",
+        "enamel dielectric strength PWM voltage stress EV",
+        "IEC 60317 magnet wire temperature class properties",
+        "corona-resistant magnet wire SiC inverter motor",
+        "turn-to-turn insulation lifetime traction machine"
+      ],
+      "must_extract": ["material", "electrical", "chemistry", "physics"]
+    },
+    {
+      "id": "stator_vpi_resin_impregnation",
+      "name": "Vacuum pressure impregnation resin and fill",
+      "assembly": "motor",
+      "components": ["stator_windings", "slot_liner_wedge_set", "enamel_u"],
+      "queries": [
+        "vacuum pressure impregnation VPI stator resin motor",
+        "epoxy impregnating resin thermal conductivity winding",
+        "slot fill factor after VPI traction motor",
+        "trickle impregnation versus VPI electric machine",
+        "resin glass transition temperature stator insulation",
+        "void content impregnation high voltage motor winding"
+      ],
+      "must_extract": ["manufacturing", "material", "thermal", "chemistry"]
+    },
+    {
+      "id": "slot_liner_wedge_insulation_system",
+      "name": "Slot liners, wedges and groundwall insulation",
+      "assembly": "motor",
+      "components": ["slot_liner_wedge_set", "stator_windings", "stator_laminations"],
+      "queries": [
+        "slot liner Nomex insulation traction motor",
+        "slot wedge design electric machine vibration",
+        "groundwall insulation thickness stator slot EV",
+        "phase insulation separator hairpin winding",
+        "thermal conductivity slot insulation system motor",
+        "slot fill geometry rectangular conductor winding"
+      ],
+      "must_extract": ["material", "geometry", "thermal", "manufacturing"]
+    },
+    {
+      "id": "no_steel_pwm_core_loss_models",
+      "name": "NO electrical steel PWM harmonic core loss",
+      "assembly": "motor",
+      "components": ["stator_laminations", "lamination_sheet", "interlaminar_varnish"],
+      "queries": [
+        "non-oriented electrical steel iron loss PWM harmonics",
+        "Bertotti core loss model traction motor laminations",
+        "lamination thickness eddy current high frequency motor",
+        "M235-35A M250-35A magnetic properties electric vehicle",
+        "interlaminar insulation varnish eddy current loss",
+        "rotational iron loss IPMSM finite element validation"
+      ],
+      "must_extract": ["formula", "material", "electrical", "fea"]
+    },
+    {
+      "id": "ndfeb_irreversible_demagnetization",
+      "name": "NdFeB irreversible demagnetization under fault and heat",
+      "assembly": "motor",
+      "components": ["permanent_magnet_set", "magnet_segment_body", "magnet_coating"],
+      "queries": [
+        "NdFeB irreversible demagnetization IPMSM short circuit",
+        "knee point temperature demagnetization rare earth magnet",
+        "N42UH N48UH automotive traction magnet BH curve",
+        "three-phase short circuit demagnetization permanent magnet motor",
+        "magnet eddy current loss IPMSM temperature rise",
+        "heavy rare earth dysprosium NdFeB coercivity traction"
+      ],
+      "must_extract": ["material", "physics", "thermal", "electrical"]
+    },
+    {
+      "id": "rotor_magnet_retention_sleeve_bridge",
+      "name": "High-speed magnet retention sleeve and iron bridges",
+      "assembly": "motor",
+      "components": ["magnet_retention", "permanent_magnet_set", "hollow_rotor_barrel"],
+      "queries": [
+        "carbon fibre magnet retention sleeve high speed motor",
+        "IPM rotor bridge stress centrifugal force analysis",
+        "metallic sleeve prestress permanent magnet rotor",
+        "rotor bandage carbon fiber composite electric machine",
+        "burst speed magnet retention IPMSM mechanical design",
+        "interference fit sleeve magnet retention FEA"
+      ],
+      "must_extract": ["geometry", "fea", "material", "physics"]
+    },
+    {
+      "id": "stator_jacket_channel_heat_transfer",
+      "name": "Stator water-jacket channel heat transfer",
+      "assembly": "motor",
+      "components": ["motor_cooling_jacket", "jacket_channels", "jacket_coolant", "motor_outer_casing"],
+      "queries": [
+        "stator water jacket cooling channel Nusselt number EV",
+        "spiral jacket cooling traction motor thermal network",
+        "conjugate heat transfer CFD motor housing jacket",
+        "pressure drop coolant jacket electric drive unit",
+        "housing to coolant thermal resistance IPMSM",
+        "axial helical cooling channel EV motor design"
+      ],
+      "must_extract": ["thermal", "formula", "fea", "geometry"]
+    },
+    {
+      "id": "oil_spray_direct_winding_cooling",
+      "name": "Oil spray and direct winding oil cooling",
+      "assembly": "motor",
+      "components": ["stator_windings", "motor_cooling_jacket", "gear_oil_charge", "hollow_rotor_barrel"],
+      "queries": [
+        "oil spray cooling electric motor windings EV",
+        "direct oil cooling hairpin stator traction machine",
+        "rotor oil cooling hollow shaft electric drive",
+        "two-phase oil cooling high power density motor",
+        "ATF dielectric oil cooling electric machine thermal",
+        "impingement oil jet winding heat transfer coefficient"
+      ],
+      "must_extract": ["thermal", "chemistry", "formula", "physics"]
+    },
+    {
+      "id": "hs_bearing_edm_and_dn_life",
+      "name": "High-speed bearing DN life and EDM currents",
+      "assembly": "motor",
+      "components": ["front_bearing", "rear_bearing", "motor_shaft"],
+      "queries": [
+        "bearing current EDM damage inverter-fed motor",
+        "hybrid ceramic ball bearing high speed traction motor",
+        "DN value angular contact bearing electric machine life",
+        "common mode voltage shaft voltage bearing failure EV",
+        "grease lubrication high speed electric motor bearing",
+        "insulated bearing traction motor PWM inverter"
+      ],
+      "must_extract": ["physics", "manufacturing", "electrical", "formula"]
+    },
+    {
+      "id": "hollow_shaft_fatigue_rotor_dynamics",
+      "name": "Hollow motor shafts, fatigue and rotor dynamics",
+      "assembly": "motor",
+      "components": ["motor_shaft", "hollow_rotor_barrel", "front_bearing", "rear_bearing"],
+      "queries": [
+        "hollow shaft electric motor torsional fatigue design",
+        "rotor dynamics critical speed IPMSM traction",
+        "press-fit rotor shaft interference stress motor",
+        "4340 steel shaft fatigue electric drive unit",
+        "spline shaft torque transmission EV motor",
+        "whirl and imbalance high speed traction rotor"
+      ],
+      "must_extract": ["material", "fea", "geometry", "physics"]
+    },
+    {
+      "id": "vr_resolver_accuracy_harsh_env",
+      "name": "Variable-reluctance resolver accuracy in harsh EV duty",
+      "assembly": "motor",
+      "components": ["resolver", "encoder", "resolver_excitation_demod", "motor_shaft"],
+      "queries": [
+        "variable reluctance resolver accuracy temperature EV",
+        "resolver transformation ratio error traction motor",
+        "electromagnetic interference resolver SiC inverter",
+        "rotor position sensorless versus resolver IPMSM",
+        "resolver mounting concentricity electric machine",
+        "RDC resolver-to-digital converter latency FOC"
+      ],
+      "must_extract": ["electrical", "formula", "geometry", "physics"]
+    },
+    {
+      "id": "planetary_sun_planet_ring_tooth_stress",
+      "name": "Planetary sun, planet and ring tooth bending/contact",
+      "assembly": "transmission",
+      "components": ["sun_gear", "planet_gears", "ring_gear", "planet_carrier"],
+      "queries": [
+        "planetary gear tooth bending stress ISO 6336 EV",
+        "helical planetary sun planet ring contact stress",
+        "load sharing planet gears electric drive unit",
+        "AGMA bending strength high speed reduction gearbox",
+        "internal ring gear tooth root stress FEA",
+        "face width module selection planetary EV gearbox"
+      ],
+      "must_extract": ["formula", "fea", "geometry", "material"]
+    },
+    {
+      "id": "planet_needle_bearing_pin_design",
+      "name": "Planet needle bearings and carrier pins",
+      "assembly": "transmission",
+      "components": ["planet_gears", "planet_carrier", "gearbox_bearings"],
+      "queries": [
+        "needle roller bearing planet gear carrier pin",
+        "planet pin bending stress high speed planetary gearbox",
+        "full complement needle bearing EV reduction drive",
+        "cage guided needle bearing lubrication planetary",
+        "planet bearing DN life electric drive unit",
+        "carrier pin press fit planetary gearbox fatigue"
+      ],
+      "must_extract": ["geometry", "formula", "manufacturing", "physics"]
+    },
+    {
+      "id": "planetary_thrust_washer_axial_load",
+      "name": "Planetary thrust washers and axial load path",
+      "assembly": "transmission",
+      "components": ["planet_gears", "planet_carrier", "sun_gear", "gear_oil_charge"],
+      "queries": [
+        "thrust washer planetary gearbox helical axial force",
+        "bronze thrust washer wear planetary reduction EV",
+        "axial load helical planetary electric drive unit",
+        "polymer coated thrust washer automotive transmission",
+        "endplay control planetary carrier thrust bearing",
+        "friction torque thrust washer splash lubricated gear"
+      ],
+      "must_extract": ["material", "physics", "geometry", "manufacturing"]
+    },
+    {
+      "id": "compact_bevel_mini_differential",
+      "name": "Compact bevel mini-differential packaging in EDU",
+      "assembly": "transmission",
+      "components": ["differential_carrier", "side_gears", "pinion_gear", "output_shaft_left", "output_shaft_right"],
+      "queries": [
+        "compact bevel differential electric drive unit packaging",
+        "open differential pinion mate gear EV gearbox",
+        "mini differential side gear design automotive EDU",
+        "bevel gear hypoid versus straight differential EV",
+        "differential carrier stiffness electric axle",
+        "torque bias ratio open differential electric vehicle"
+      ],
+      "must_extract": ["geometry", "formula", "fea", "manufacturing"]
+    },
+    {
+      "id": "side_gear_spline_seal_interface",
+      "name": "Side gears, output splines and seal interfaces",
+      "assembly": "transmission",
+      "components": ["side_gears", "output_shaft_left", "output_shaft_right", "oil_seals"],
+      "queries": [
+        "side gear spline durability automotive differential",
+        "involute spline wear electric drive output shaft",
+        "shaft seal journal finish Ra differential EV",
+        "side gear thrust face lubrication differential",
+        "output flange halfshaft interface EDU torque",
+        "fretting corrosion spline electric vehicle gearbox"
+      ],
+      "must_extract": ["geometry", "material", "manufacturing", "physics"]
+    },
+    {
+      "id": "rotary_lip_seal_high_speed_edu",
+      "name": "High-speed rotary lip seals for EDU shafts",
+      "assembly": "transmission",
+      "components": ["oil_seals", "output_shaft_left", "output_shaft_right", "gear_oil_charge"],
+      "queries": [
+        "fluoroelastomer FKM rotary lip seal high speed shaft",
+        "PTFE lip seal electric drive unit oil leakage",
+        "seal friction torque high speed EV gearbox",
+        "shaft surface roughness seal life automotive",
+        "dual lip seal dust exclusion electric axle",
+        "thermal ageing FKM seal gear oil compatibility"
+      ],
+      "must_extract": ["material", "chemistry", "physics", "manufacturing"]
+    },
+    {
+      "id": "ev_gear_oil_film_efficiency",
+      "name": "EV gear oil film thickness and churning efficiency",
+      "assembly": "transmission",
+      "components": ["gear_oil_charge", "oil_fluid", "sun_gear", "planet_gears", "ring_gear"],
+      "queries": [
+        "electric vehicle gearbox oil film thickness EHL",
+        "churning and windage loss planetary EV lubricant",
+        "low viscosity synthetic gear oil electric drive efficiency",
+        "PAO ester gear lubricant copper corrosion EV motor",
+        "splash lubrication oil level planetary reduction",
+        "elastohydrodynamic lubrication helical planetary gear"
+      ],
+      "must_extract": ["chemistry", "formula", "physics", "thermal"]
+    },
+    {
+      "id": "hpdc_aluminum_edu_housing_process",
+      "name": "HPDC aluminum EDU housing process and integrity",
+      "assembly": "cassette",
+      "components": ["traction_drive_housing", "cassette_cover", "gearbox_housing", "motor_outer_casing"],
+      "queries": [
+        "high pressure die casting aluminum electric drive housing",
+        "ADC12 AlSi9Cu3 porosity HPDC automotive casting",
+        "vacuum HPDC leak tightness EDU housing coolant",
+        "heat treatment T6 aluminum die cast housing distortion",
+        "machining stock HPDC electric drive unit casting",
+        "thermal conductivity AlSi die cast motor housing"
+      ],
+      "must_extract": ["manufacturing", "material", "geometry", "thermal"]
+    },
+    {
+      "id": "helicoil_bolt_preload_al_housing",
+      "name": "Helicoils, bolt preload and vibration in Al housings",
+      "assembly": "fasteners",
+      "components": ["mounting_ear_set", "traction_drive_housing", "cassette_cover", "gearbox_cover"],
+      "queries": [
+        "wire thread insert helicoil aluminum casting torque",
+        "bolt preload relaxation aluminum housing automotive",
+        "vibration loosening fasteners electric drive unit",
+        "thread engagement length aluminum die cast housing",
+        "flange joint gasket EDU housing sealing torque",
+        "stainless steel insert galvanic corrosion aluminum housing"
+      ],
+      "must_extract": ["manufacturing", "material", "physics", "geometry"]
+    },
+    {
+      "id": "ntc_winding_and_oil_temp_sensors",
+      "name": "NTC and temperature sensors for windings and oil",
+      "assembly": "motor",
+      "components": ["stator_windings", "oem_inverter_control_board", "gear_oil_charge", "motor_cooling_jacket"],
+      "queries": [
+        "NTC thermistor stator winding temperature sensor motor",
+        "PT100 RTD electric machine thermal protection",
+        "embedded thermistor hairpin winding insulation",
+        "gear oil temperature sensor electric drive unit",
+        "thermal time constant NTC motor overload protection",
+        "sensor placement stator hotspot IPMSM estimation"
+      ],
+      "must_extract": ["electrical", "thermal", "material", "formula"]
+    }
+  ]
+}

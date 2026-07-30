@@ -91,11 +91,16 @@ Orientation note for twin: treat **width as car-lateral** (shaft exits ±X) so e
 ## Morphology / FFF (universal, bay-first)
 
 1. **Bay box wins** — every exterior volume must fit inside `max_dimensions_mm`; no apron larger than the bay.
-2. **Unitised brick** — motor + inverter + reduction + diff share one sealed envelope (denser than a typical open rear cradle).
-3. **Shaft ends** — halfshaft exits define lateral width and case splits.
-4. **Service faces** — coolant bosses + HV connector on the faces that can reach front-bay corridors (not decorative).
-5. **Gold check** — Lucid sealed-unit press photos: if function + bay are right, morphology should look *very similar*; never STEP paste.
-6. **PCB / windings** — cutaway / ghost only on sealed exterior views.
+2. **Concentric integrated stack** (public FE FPK packaging grammar — Lucid/Atieva press = TRAINING CHECK, never CAD paste):
+   - **L1 MCU/SiC** — bolts to flat upper shelf; solid phase busbars pierce into stator (no long HV AC cables).
+   - **L2 Stator** — outer cylindrical ring; wave-wound copper class; end-winding microjet oil cooling for extreme regen.
+   - **L3 Hollow rotor** — PM barrel nested in stator ID; bore hosts the transmission.
+   - **L4 Planetary + mini-diff** — inside the rotor cavity; torque out to ±X axle sockets.
+3. **Unitised sealed exterior** — one cassette silhouette; reduction/diff are *inside* the rotor, not a separate side box.
+4. **Shaft ends** — halfshaft exits define lateral width and case splits.
+5. **Service faces** — coolant bosses + HV/LV on faces that reach front-bay corridors.
+6. **Gold check** — Lucid sealed-unit press photos / anatomy write-ups: if function + bay + concentric stack are right, morphology should look *very similar*; never STEP/mesh paste.
+7. **PCB / windings / planetary guts** — cutaway / ghost only on sealed exterior views.
 
 ---
 

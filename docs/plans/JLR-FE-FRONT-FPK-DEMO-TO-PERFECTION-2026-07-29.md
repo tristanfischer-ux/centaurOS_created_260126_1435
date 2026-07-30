@@ -345,3 +345,16 @@ Send: `out/formula-e-front-mgu-20260729-1432/20260729-1522-V1.5-formula-e-front-
 Pack: `…/20260729-1522-V1.5-formula-e-front-mgu-design-pack.zip`
 
 SOURCE fix for the last ship blocker: `phase_current_max_a` formula in `engineering-contract.ts`; HARD bay `design_envelope_{depth,height,width}_mm` stamped as `brief` roots in `universal-contract-sizing.ts` (was calculator prose that hid depth/height).
+
+## Close-out of six residuals (2026-07-29 ~16:30)
+
+| # | Residual | Done |
+|---|---|---|
+| 1 | Morphology → Lucid-gold cues | Cast fins, cold-plate fasteners, HV hood/pins, nameplate, resolver bulge; materials darkened; full product+ghost view set re-rendered (`INSPECT=0`) |
+| 2 | PCB / firmware | `state.pcb` disposition **cots-modules**; `pcb/` + `firmware/` bring-up contract in pack (`FAB-READY — UNPROVEN IN HARDWARE`; no false HIL) |
+| 3 | Disclosed holds | DEC-002..005 **FROZEN** (250 vs 350, gear 8, coolant, mass); DEC-001/006/007 remain OPEN (dyno) |
+| 4 | Rear MGU | **DEFERRED by operator (2026-07-29 16:26)** — do not continue; front-only demo |
+| 5 | Homologation | `JLR-FE-FRONT-FPK-HOMOLOGATION-READINESS.md` — explicit **NOT HOMOLOGATED** matrix |
+| 6 | SOURCE commit | `8cfb369de` on `oxccu-efuel` (class-reference-search.ts left unstaged — drift gate; follow-up bridge) |
+
+**Send:** latest `out/formula-e-front-mgu-20260729-1432/*-formula-e-front-mgu-engineering-workbook.xlsx` + matching design-pack.zip (V1.6+).

@@ -16645,31 +16645,51 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
   const designKw = frontRegenKw
   const continuousKw = designKw
   const omega = baseSpeedRpm * 2 * Math.PI / 60
-  const mguShaftPowerKw = Math.round(designKw * etaInv * etaMgu * 10) / 10
-  const gearOutputPowerKw = Math.round(mguShaftPowerKw * etaGear * 10) / 10
+  const mguAcKw = Math.round(designKw * etaInv * 1000) / 1000
+  const mguShaftPowerKw = Math.round(designKw * etaInv * etaMgu * 1000) / 1000
+  const gearOutputPowerKw = Math.round(mguShaftPowerKw * etaGear * 1000) / 1000
   const shaftTorqueNm = Math.round((mguShaftPowerKw * 1000) / Math.max(omega, 1) * 10) / 10
   const phaseCurrentMaxA = Math.ceil(
     (hwClassKw * 1000) / (Math.sqrt(3) * (vDcMin / Math.SQRT2)),
   )
+  const phaseCurrentDesignA = Math.ceil(phaseCurrentMaxA * 1.12)
   const coolantInletC = 60
   const coolantFlowLMin = 12
+  const lossSeedKw = Math.round((continuousKw - mguShaftPowerKw) * 1000) / 1000
+  const rhoEgw = 1030
+  const cpEgw = 3500
+  const mDot = (coolantFlowLMin / 60) * (rhoEgw / 1000)
+  const coolantDeltaTK = mDot > 0
+    ? Math.round((lossSeedKw * 1000) / (mDot * cpEgw) * 1000) / 1000
+    : 0
   const gearRatio = 8
   const enclosureVolM3 = Math.round((bayW * bayD * bayH) / 1e9 * 1e6) / 1e6
+  // INTENT (red-team H5): never a bare 0.90×cap — expose component mass seeds
+  // that sum to the concept pack (weighed CAD/BoM replaces).
+  const massMotorKg = 11.5
+  const massInverterKg = 8.2
+  const massGearDiffKg = 6.4
+  const massHousingKg = 2.7
+  const unitMassKg = Math.round((massMotorKg + massInverterKg + massGearDiffKg + massHousingKg) * 10) / 10
 
   const quantities: Record<string, Quantity> = {
     front_regen_electrical_cap_kw: q(frontRegenKw, 'kW', 'power', 'peak', 'system', 'brief', {
-      source_detail: 'Gen3 public front regen electrical cap',
+      source_detail: 'Gen3 public front regen electrical cap — DC electrical at RESS/inverter',
     }),
     front_hardware_power_class_kw: q(hwClassKw, 'kW', 'power', 'peak', 'system', 'brief', {
-      source_detail: 'press / Lucid density class — clarify electrical vs mechanical in tools',
+      source_detail: 'HW nameplate class (press) — NOT continuous duty; SiC/EM envelope sizing',
     }),
     // Shared tool pack reads rear_axle_* / continuous_* — front seeds design duty here.
     rear_axle_electrical_power_kw: q(hwClassKw, 'kW', 'power', 'peak', 'system', 'brief', {
-      source_detail: 'alias of front_hardware_power_class_kw for shared IPMSM/SiC tool pack',
+      source_detail: 'alias of front_hardware_power_class_kw for shared IPMSM/SiC tool pack (PEAK sizing)',
       from: ['front_hardware_power_class_kw'],
     }),
     continuous_power_kw: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief', {
-      source_detail: 'front continuous design duty ≈ regen cap (Gen3 Evo motoring windows limited)',
+      source_detail: 'DC electrical continuous/regen design duty at inverter input',
+    }),
+    dc_input_electrical_kw_continuous: q(continuousKw, 'kW', 'power', 'continuous', 'system', 'brief', {
+      source_detail: 'Power ENTERS here: HV DC from RESS / front axle bus',
+      from: ['continuous_power_kw'],
     }),
     traction_motor_power_kw: q(hwClassKw, 'kW', 'power', 'peak', 'module', 'calculator', {
       source_detail: 'alias of front_hardware_power_class_kw for IPMSM nameplate + envelope',
@@ -16679,16 +16699,24 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
       source_detail: 'alias of front_hardware_power_class_kw for SiC MCU nameplate + envelope',
       from: ['front_hardware_power_class_kw'],
     }),
-    mgu_shaft_power_kw: q(mguShaftPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
-      source_detail: `P_dc×η_inv×η_mgu at front design duty (seeds ${etaInv}×${etaMgu})`,
-      from: ['front_regen_electrical_cap_kw'],
+    mgu_ac_electrical_input_kw: q(mguAcKw, 'kW', 'power', 'continuous', 'module', 'calculator', {
+      source_detail: `P_dc×η_inv (${etaInv}) — AC after inverter, into MGU`,
+      formula: 'P_ac = P_dc_cont * eta_inv',
+      from: ['continuous_power_kw', 'inverter_efficiency'],
     }),
-    gear_output_power_kw: q(gearOutputPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', {
-      source_detail: `post-gear = shaft×η_gear (seed ${etaGear})`,
-      from: ['mgu_shaft_power_kw'],
+    mgu_shaft_power_kw: q(mguShaftPowerKw, 'kW', 'power', 'continuous', 'module', 'calculator', {
+      source_detail: `P_dc×η_inv×η_mgu (${etaInv}×${etaMgu}) — MECHANICAL shaft (not 250 kW electrical)`,
+      formula: 'P_shaft = P_dc_cont * eta_inv * eta_mgu',
+      from: ['continuous_power_kw', 'inverter_efficiency', 'mgu_efficiency'],
     }),
-    mgu_shaft_torque_nm: q(shaftTorqueNm, 'Nm', 'force', 'rated', 'module', 'calculator', {
-      source_detail: `P=Tω at base speed ${baseSpeedRpm} rpm (continuous/regen design duty)`,
+    gear_output_power_kw: q(gearOutputPowerKw, 'kW', 'power', 'continuous', 'module', 'calculator', {
+      source_detail: `post-gear = shaft×η_gear (${etaGear}) — power EXITS to halfshafts/wheels`,
+      formula: 'P_wheel = P_shaft * eta_gear',
+      from: ['mgu_shaft_power_kw', 'gear_efficiency'],
+    }),
+    mgu_shaft_torque_nm: q(shaftTorqueNm, 'Nm', 'force', 'continuous', 'module', 'calculator', {
+      source_detail: `T=P_shaft/ω at ${baseSpeedRpm} rpm — mechanical shaft after η_inv×η_mgu (NOT raw 250 kW electrical)`,
+      formula: 'T_shaft = P_shaft_kW * 1000 / omega_mech',
       from: ['mgu_shaft_power_kw', 'mgu_base_speed_rpm'],
     }),
     // INTENT (2026-07-29 1429): brief-expansion peak torque at constant-power
@@ -16711,10 +16739,32 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
     // show arithmetic — bare "HW class" prose hid as uncaptured (JLR front 1432).
     phase_current_max_a: q(phaseCurrentMaxA, 'A', 'current', 'peak', 'module', 'calculator', {
       source_detail:
-        `I_ph_max = P_hw×1000 / (√3 × Vdc_min/√2) = ${hwClassKw}×1000 / (√3 × ${vDcMin}/√2) = ${phaseCurrentMaxA} A`,
+        `Ideal SVPWM I_ph at Vdc,min for P_hw (no dead-time): ${hwClassKw} kW / (√3×${vDcMin}/√2) = ${phaseCurrentMaxA} A`,
       formula: 'I_ph_max = P_hw * 1000 / (sqrt(3) * Vdc_min / sqrt(2))',
       from: ['front_hardware_power_class_kw', 'assumed_vdc_min_v'],
     }),
+    phase_current_design_a: q(phaseCurrentDesignA, 'A', 'current', 'peak', 'module', 'calculator', {
+      source_detail: `I_ph_max×1.12 design margin for modulation/dead-time/device drop = ${phaseCurrentDesignA} A`,
+      formula: 'I_ph_design = I_ph_max * 1.12',
+      from: ['phase_current_max_a'],
+    }),
+    total_dissipated_kw_continuous: q(lossSeedKw, 'kW', 'power', 'continuous', 'system', 'calculator', {
+      source_detail: 'P_dc − P_shaft at continuous (heat to coolant; tools refine)',
+      formula: 'Q_loss = P_dc_cont - P_shaft',
+      from: ['continuous_power_kw', 'mgu_shaft_power_kw'],
+    }),
+    coolant_delta_t_k: q(coolantDeltaTK, 'K', 'temperature', 'continuous', 'system', 'calculator', {
+      source_detail: `ΔT=Q/(ṁ·cp) at ${coolantFlowLMin} L/min EGW (ρ=${rhoEgw}, cp=${cpEgw})`,
+      formula: 'dT = Q_loss_W / (mdot_kg_s * cp)',
+      from: ['total_dissipated_kw_continuous', 'coolant_flow_l_min'],
+    }),
+    coolant_outlet_c: q(
+      Math.round((coolantInletC + coolantDeltaTK) * 10) / 10,
+      '°C', 'temperature', 'continuous', 'system', 'calculator', {
+        source_detail: 'inlet + ΔT (lump; radiator boundary OOS until vehicle loop ICD)',
+        from: ['coolant_inlet_c', 'coolant_delta_t_k'],
+      },
+    ),
     dc_bus_voltage_v: q(vDcNom, 'V', 'voltage', 'rated', 'system', 'brief'),
     assumed_vdc_min_v: q(vDcMin, 'V', 'voltage', 'min', 'system', 'brief'),
     assumed_vdc_max_v: q(vDcMax, 'V', 'voltage', 'max', 'system', 'brief'),
@@ -16731,9 +16781,23 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
       source_detail: 'alias of fpk_mass_cap_kg for shared tool pack',
       from: ['fpk_mass_cap_kg'],
     }),
-    unit_mass_kg: q(Math.round(massKg * 0.90 * 10) / 10, 'kg', 'mass', 'rated', 'system', 'calculator', {
-      source_detail: `0.90 × fpk_mass_cap_kg — concept-stage pack estimate pending weighed BOM`,
-      from: ['fpk_mass_cap_kg'],
+    mass_motor_kg: q(massMotorKg, 'kg', 'mass', 'rated', 'module', 'calculator', {
+      source_detail: 'concept IPMSM active+housing share (CAD weigh replaces)',
+    }),
+    mass_inverter_kg: q(massInverterKg, 'kg', 'mass', 'rated', 'module', 'calculator', {
+      source_detail: 'concept SiC MCU + cold-plate share (CAD weigh replaces)',
+    }),
+    mass_gear_diff_kg: q(massGearDiffKg, 'kg', 'mass', 'rated', 'module', 'calculator', {
+      source_detail: 'concept planetary-in-rotor + mini-diff share (CAD weigh replaces)',
+    }),
+    mass_housing_misc_kg: q(massHousingKg, 'kg', 'mass', 'rated', 'module', 'calculator', {
+      source_detail: 'concept cassette/fasteners/connectors share (CAD weigh replaces)',
+    }),
+    unit_mass_kg: q(unitMassKg, 'kg', 'mass', 'rated', 'system', 'calculator', {
+      source_detail:
+        `Σ concept mass seeds (${massMotorKg}+${massInverterKg}+${massGearDiffKg}+${massHousingKg}) — NOT 0.9×cap; CAD/BoM weigh replaces`,
+      formula: 'unit_mass = mass_motor + mass_inverter + mass_gear_diff + mass_housing_misc',
+      from: ['mass_motor_kg', 'mass_inverter_kg', 'mass_gear_diff_kg', 'mass_housing_misc_kg'],
     }),
     front_bay_envelope_w_mm: q(bayW, 'mm', 'length', 'max', 'system', 'brief', {
       source_detail: 'front-axle bay lateral (homologated box)',
@@ -16800,22 +16864,22 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
     },
     {
       from_part: 'front_mgu_stator',
-      to_part: 'reduction_gear_stage',
+      to_part: 'planetary_reduction_in_rotor',
       mechanism: 'mechanical',
       constraint_kind: 'mass_carry',
       required_value: shaftTorqueNm,
       required_unit: 'Nm',
     },
     {
-      from_part: 'reduction_gear_stage',
-      to_part: 'open_bevel_differential',
+      from_part: 'planetary_reduction_in_rotor',
+      to_part: 'mini_diff_in_rotor',
       mechanism: 'mechanical',
       constraint_kind: 'mass_carry',
       required_value: gearOutputPowerKw,
       required_unit: 'kW',
     },
     {
-      from_part: 'open_bevel_differential',
+      from_part: 'mini_diff_in_rotor',
       to_part: 'front_halfshafts',
       mechanism: 'mechanical',
       constraint_kind: 'mass_carry',
@@ -16832,7 +16896,7 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
     },
   ]
 
-  // DECISION: macros match TRACTION_DRIVE_MODULE_FLOORS (+ open_bevel_differential
+  // DECISION: macros match TRACTION_DRIVE_MODULE_FLOORS (+ mini_diff_in_rotor
   // when halfshaft/diff topology is present) — never a synthetic front_fpk_unit.
   const motorMacroGbp = Math.round(hwClassKw * 80)
   const sicMacroGbp = Math.round(hwClassKw * 50)
@@ -16845,7 +16909,7 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
       dimension_basis: 'each',
       dimension_value: 1,
       total_gbp: motorMacroGbp,
-      source_detail: `trial specialty front IPMSM ≈ £80/kW × ${hwClassKw} kW (replace with Lucid/team quote)`,
+      source_detail: `trial specialty front IPMSM ≈ £80/kW × ${hwClassKw} kW (replace with team quote)`,
     },
     {
       word_name: 'sic_traction_inverter',
@@ -16853,23 +16917,23 @@ registerArchetype('formula_e_front_mgu', (brief: any) => {
       dimension_basis: 'each',
       dimension_value: 1,
       total_gbp: sicMacroGbp,
-      source_detail: `trial specialty SiC MCU ≈ £50/kW × ${hwClassKw} kW (replace with Lucid/team quote)`,
+      source_detail: `trial specialty SiC MCU ≈ £50/kW × ${hwClassKw} kW (replace with team quote)`,
     },
     {
-      word_name: 'reduction_gear_stage',
+      word_name: 'planetary_reduction_in_rotor',
       unit_price_gbp: gearMacroGbp,
       dimension_basis: 'each',
       dimension_value: 1,
       total_gbp: gearMacroGbp,
-      source_detail: 'trial single-speed reduction within FPK perimeter',
+      source_detail: 'trial single-speed planetary nest inside hollow rotor (concentric FPK)',
     },
     {
-      word_name: 'open_bevel_differential',
+      word_name: 'mini_diff_in_rotor',
       unit_price_gbp: diffMacroGbp,
       dimension_basis: 'each',
       dimension_value: 1,
       total_gbp: diffMacroGbp,
-      source_detail: 'trial open bevel differential + halfshaft exits (FPK unitised)',
+      source_detail: 'trial mini-diff inside rotor cavity + halfshaft exits (FPK unitised)',
     },
   ]
 

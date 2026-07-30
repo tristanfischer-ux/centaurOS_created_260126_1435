@@ -1,0 +1,887 @@
+{
+  "papers": [
+    {
+      "doi": "10.1109/tia.1986.4504786",
+      "title": "Interior Permanent-Magnet Synchronous Motors for Adjustable-Speed Drives",
+      "year": 1986,
+      "venue": "IEEE Transactions on Industry Applications",
+      "topic_ids": [
+        "ipmsm_electromagnetics",
+        "inverter_control_pcb"
+      ],
+      "components": [
+        "stator_windings",
+        "permanent_magnet_set",
+        "control_mcu"
+      ],
+      "why": "Foundational Jahns IPMSM adjustable-speed drive paper",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/20.43994",
+      "title": "General properties of power losses in soft ferromagnetic materials",
+      "year": 1988,
+      "venue": "IEEE Transactions on Magnetics",
+      "topic_ids": [
+        "electrical_steel_laminations",
+        "pwm_loss_thermal_fea"
+      ],
+      "components": [
+        "stator_laminations",
+        "lamination_sheet"
+      ],
+      "why": "Bertotti iron-loss separation model foundation for electrical steel",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/iecon.1989.69681",
+      "title": "Resolver signal requirements for high accuracy resolver-to-digital conversion",
+      "year": 1989,
+      "venue": "15th Annual Conference of IEEE Industrial Electronics Society",
+      "topic_ids": [
+        "resolver_position_sensing"
+      ],
+      "components": [
+        "resolver",
+        "resolver_excitation_demod"
+      ],
+      "why": "Resolver signal requirements for high-accuracy RDC",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ias.1989.96630",
+      "title": "Expansion of operating limits for permanent magnet motor by optimum flux-weakening",
+      "year": 1990,
+      "venue": "Conference Record of the IEEE Industry Applications Society Annual Meeting",
+      "topic_ids": [
+        "ipmsm_electromagnetics",
+        "inverter_control_pcb"
+      ],
+      "components": [
+        "permanent_magnet_set",
+        "control_mcu"
+      ],
+      "why": "Classic Morimoto flux-weakening operating-limit expansion for PM motors",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1049/ip-b.1991.0025",
+      "title": "Lumped parameter thermal model for electrical machines of TEFC design",
+      "year": 1991,
+      "venue": "IEE Proceedings B Electric Power Applications",
+      "topic_ids": [
+        "motor_jacket_cooling",
+        "pwm_loss_thermal_fea"
+      ],
+      "components": [
+        "motor_cooling_jacket",
+        "stator_windings",
+        "stator_laminations"
+      ],
+      "why": "Classic Mellor lumped-parameter thermal model for electrical machines",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1115/1.2919415",
+      "title": "Conceptual Design of Gear Differentials for Automotive Vehicles",
+      "year": 1994,
+      "venue": "Journal of Mechanical Design",
+      "topic_ids": [
+        "open_differential_ev"
+      ],
+      "components": [
+        "differential_carrier",
+        "side_gears",
+        "pinion_gear"
+      ],
+      "why": "Conceptual design framework for automotive gear differentials",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/28.491472",
+      "title": "Effect of PWM inverters on AC motor bearing currents and shaft voltages",
+      "year": 1996,
+      "venue": "IEEE Transactions on Industry Applications",
+      "topic_ids": [
+        "motor_bearings_shaft"
+      ],
+      "components": [
+        "front_bearing",
+        "motor_shaft"
+      ],
+      "why": "Foundational Erdman paper on PWM-inverter bearing currents and shaft voltages",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1115/1.2831298",
+      "title": "Elastohydrodynamic Model of the Rotary Lip Seal",
+      "year": 1996,
+      "venue": "Journal of Tribology",
+      "topic_ids": [
+        "gear_lubrication_seals"
+      ],
+      "components": [
+        "oil_seals"
+      ],
+      "why": "Elastohydrodynamic model of rotary lip seals for high-speed shafts",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/63.575680",
+      "title": "Analysis of direct torque control in permanent magnet synchronous motor drives",
+      "year": 1997,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "inverter_control_pcb"
+      ],
+      "components": [
+        "control_mcu"
+      ],
+      "why": "DTC applied to PMSM traction drives",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tia.2002.803013",
+      "title": "Field-weakening performance of interior permanent-magnet motors",
+      "year": 2002,
+      "venue": "IEEE Transactions on Industry Applications",
+      "topic_ids": [
+        "ipmsm_electromagnetics"
+      ],
+      "components": [
+        "permanent_magnet_set",
+        "stator_windings",
+        "hollow_rotor_barrel"
+      ],
+      "why": "Soong & Miller field-weakening performance of interior PM motors",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1016/s0094-114x(01)00077-5",
+      "title": "The analytical expression of the efficiency of planetary gear trains",
+      "year": 2002,
+      "venue": "Mechanism and Machine Theory",
+      "topic_ids": [
+        "planetary_reduction_ev"
+      ],
+      "components": [
+        "sun_gear",
+        "planet_gears",
+        "ring_gear"
+      ],
+      "why": "Analytical efficiency expression for planetary gear trains",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/iecon.2003.1280627",
+      "title": "A new high accuracy software based resolver-to-digital converter",
+      "year": 2003,
+      "venue": "IECON'03. 29th Annual Conference of the IEEE Industrial Electronics Society (IEEE Cat. No.03CH37468)",
+      "topic_ids": [
+        "resolver_position_sensing",
+        "inverter_control_pcb"
+      ],
+      "components": [
+        "resolver",
+        "resolver_excitation_demod",
+        "control_mcu"
+      ],
+      "why": "High-accuracy software-based resolver-to-digital conversion",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1115/imece2003-41034",
+      "title": "Thermal Resistance of Particle Laden Polymeric Thermal Interface Materials",
+      "year": 2003,
+      "venue": "Electronic and Photonic Packaging, Electrical Systems and Photonic Design, and Nanotechnology",
+      "topic_ids": [
+        "tim_and_thermal_stack"
+      ],
+      "components": [
+        "tim_layer"
+      ],
+      "why": "Thermal resistance of particle-laden polymeric TIMs",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tencon.2004.1414855",
+      "title": "New variable-reluctance resolver for rotor-position sensing",
+      "year": 2004,
+      "venue": "2004 IEEE Region 10 Conference TENCON 2004.",
+      "topic_ids": [
+        "resolver_position_sensing"
+      ],
+      "components": [
+        "resolver"
+      ],
+      "why": "Variable-reluctance resolver for rotor-position sensing",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tia.2005.847312",
+      "title": "Optimal Flux Weakening in Surface PM Machines Using Fractional-Slot Concentrated Windings",
+      "year": 2005,
+      "venue": "IEEE Transactions on Industry Applications",
+      "topic_ids": [
+        "ipmsm_electromagnetics",
+        "stator_windings_hairpin"
+      ],
+      "components": [
+        "stator_windings",
+        "permanent_magnet_set"
+      ],
+      "why": "EL-Refaie flux-weakening with fractional-slot concentrated windings",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1049/ip-epa:20050458",
+      "title": "Analytical calculation of the RMS current stress on the DC-link capacitor of voltage-PWM converter systems",
+      "year": 2006,
+      "venue": "IEE Proceedings - Electric Power Applications",
+      "topic_ids": [
+        "dc_link_capacitor_bank"
+      ],
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_cap_1"
+      ],
+      "why": "Analytical RMS current stress on DC-link capacitors of PWM converters",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/jproc.2006.879796",
+      "title": "Thermal Interface Materials: Historical Perspective, Status, and Future Directions",
+      "year": 2006,
+      "venue": "Proceedings of the IEEE",
+      "topic_ids": [
+        "tim_and_thermal_stack"
+      ],
+      "components": [
+        "tim_layer",
+        "module_baseplate_1",
+        "mcu_cold_plate"
+      ],
+      "why": "Canonical Prasher TIM review for power-electronics thermal stacks",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tie.2007.892001",
+      "title": "Calculation of Circulating Bearing Currents in Machines of Inverter-Based Drive Systems",
+      "year": 2007,
+      "venue": "IEEE Transactions on Industrial Electronics",
+      "topic_ids": [
+        "motor_bearings_shaft"
+      ],
+      "components": [
+        "front_bearing",
+        "rear_bearing"
+      ],
+      "why": "Circulating bearing-current calculation for inverter-fed machines",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/demped.2007.4393120",
+      "title": "Lifetime of Film Capacitors in Single-Phase Regenerative Induction Motor Drives",
+      "year": 2007,
+      "venue": "2007 IEEE International Symposium on Diagnostics for Electric Machines, Power Electronics and Drives",
+      "topic_ids": [
+        "dc_link_capacitor_bank"
+      ],
+      "components": [
+        "dc_link_dielectric",
+        "dc_link_capacitor_bank"
+      ],
+      "why": "Film-capacitor lifetime under regenerative inverter stress",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/jproc.2006.890118",
+      "title": "Power Semiconductor Devices for Hybrid, Electric, and Fuel Cell Vehicles",
+      "year": 2007,
+      "venue": "Proceedings of the IEEE",
+      "topic_ids": [
+        "sic_traction_inverter"
+      ],
+      "components": [
+        "sic_power_module_stack"
+      ],
+      "why": "Classic survey of power semiconductor devices for HEV/EV traction",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tie.2007.894698",
+      "title": "Practical Rules for Assessment of Inverter-Induced Bearing Currents in Inverter-Fed AC Motors up to 500 kW",
+      "year": 2007,
+      "venue": "IEEE Transactions on Industrial Electronics",
+      "topic_ids": [
+        "motor_bearings_shaft"
+      ],
+      "components": [
+        "front_bearing",
+        "rear_bearing",
+        "motor_shaft"
+      ],
+      "why": "Muetze practical rules for inverter-induced bearing currents",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1080/10402000903452848",
+      "title": "A Windage Power Loss Model for Spur Gear Pairs",
+      "year": 2010,
+      "venue": "Tribology Transactions",
+      "topic_ids": [
+        "gear_lubrication_seals"
+      ],
+      "components": [
+        "gear_oil_charge",
+        "sun_gear"
+      ],
+      "why": "Windage power-loss model for spur gear pairs at high speed",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1115/1.4006827",
+      "title": "A New Method to Measure Planet Load Sharing and Sun Gear Radial Orbit of Planetary Gear Sets",
+      "year": 2012,
+      "venue": "Journal of Mechanical Design",
+      "topic_ids": [
+        "planetary_reduction_ev"
+      ],
+      "components": [
+        "planet_gears",
+        "sun_gear",
+        "planet_carrier"
+      ],
+      "why": "Experimental method for planet load sharing and sun-gear orbit",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ievc.2012.6183226",
+      "title": "Impacts of interior permanent magnet machine technology for electric vehicles",
+      "year": 2012,
+      "venue": "2012 IEEE International Electric Vehicle Conference",
+      "topic_ids": [
+        "ipmsm_electromagnetics",
+        "formula_e_edu_systems"
+      ],
+      "components": [
+        "permanent_magnet_set",
+        "stator_windings",
+        "stator_laminations"
+      ],
+      "why": "IPM machine technology impacts for EV traction applications",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/vetecs.2012.6240320",
+      "title": "Optimum Design of the Electric Vehicle Traction Motor Using the Hairpin Winding",
+      "year": 2012,
+      "venue": "2012 IEEE 75th Vehicular Technology Conference (VTC Spring)",
+      "topic_ids": [
+        "stator_windings_hairpin",
+        "ipmsm_electromagnetics"
+      ],
+      "components": [
+        "stator_windings",
+        "phase_coil_u"
+      ],
+      "why": "Optimum EV traction-motor design using hairpin winding technology",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ecce.2012.6342376",
+      "title": "Theoretical analysis of DC link capacitor current ripple reduction in the HEV DC-DC converter and inverter system using a carrier modulation method",
+      "year": 2012,
+      "venue": "2012 IEEE Energy Conversion Congress and Exposition (ECCE)",
+      "topic_ids": [
+        "dc_link_capacitor_bank"
+      ],
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_dielectric"
+      ],
+      "why": "DC-link capacitor current-ripple reduction analysis for traction inverters",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tmag.2013.2247382",
+      "title": "Proximity Losses in the Windings of High Speed Brushless Permanent Magnet AC Motors With Single Tooth Windings and Parallel Paths",
+      "year": 2013,
+      "venue": "IEEE Transactions on Magnetics",
+      "topic_ids": [
+        "stator_windings_hairpin",
+        "pwm_loss_thermal_fea"
+      ],
+      "components": [
+        "stator_windings",
+        "conductor_strand_u",
+        "copper_core_u"
+      ],
+      "why": "Proximity-loss model for high-speed PM machine windings",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2013.2268900",
+      "title": "A Survey of Wide Bandgap Power Semiconductor Devices",
+      "year": 2014,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "sic_traction_inverter"
+      ],
+      "components": [
+        "sic_power_module_stack",
+        "sic_die_1_high_side",
+        "sic_die_1_low_side"
+      ],
+      "why": "Canonical WBG device survey for SiC traction switch selection",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1016/j.mechmachtheory.2013.11.001",
+      "title": "Analysis of the transmission ratio and efficiency ranges of the four-, five-, and six-link planetary gear trains",
+      "year": 2014,
+      "venue": "Mechanism and Machine Theory",
+      "topic_ids": [
+        "planetary_reduction_ev"
+      ],
+      "components": [
+        "sun_gear",
+        "planet_gears",
+        "ring_gear"
+      ],
+      "why": "Planetary ratio/efficiency envelopes for reduction-stage selection",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1007/s11664-013-2967-3",
+      "title": "Are Sintered Silver Joints Ready for Use as Interconnect Material in Microelectronic Packaging?",
+      "year": 2014,
+      "venue": "Journal of Electronic Materials",
+      "topic_ids": [
+        "tim_and_thermal_stack"
+      ],
+      "components": [
+        "tim_layer",
+        "module_baseplate_1"
+      ],
+      "why": "Siow review of sintered-silver joints as power-module interconnects",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2013.2282621",
+      "title": "Investigation, Evaluation, and Optimization of Stray Inductance in Laminated Busbar",
+      "year": 2014,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "laminated_hv_busbar",
+        "sic_traction_inverter"
+      ],
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_dielectric",
+        "sic_half_bridge_1"
+      ],
+      "why": "Stray-inductance investigation and optimization in laminated busbars",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/itec.2014.6861841",
+      "title": "Laminated busbar design criteria in power converters for electrified powertrain applications",
+      "year": 2014,
+      "venue": "2014 IEEE Transportation Electrification Conference and Expo (ITEC)",
+      "topic_ids": [
+        "laminated_hv_busbar"
+      ],
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "dc_bus_dielectric"
+      ],
+      "why": "Laminated-busbar design criteria for electrified powertrain converters",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2014.2353417",
+      "title": "Gate Oxide Reliability Issues of SiC MOSFETs Under Short-Circuit Operation",
+      "year": 2015,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "sic_traction_inverter",
+        "gate_driver_sic"
+      ],
+      "components": [
+        "sic_die_1_high_side",
+        "gate_ic_1",
+        "desat_1"
+      ],
+      "why": "SiC gate-oxide short-circuit reliability limits gate-drive and protection design",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/vppc.2015.7352971",
+      "title": "Irreversible Demagnetization Fault Diagnosis of Permanent Magnet Synchronous Motor for Electric Vehicle",
+      "year": 2015,
+      "venue": "2015 IEEE Vehicle Power and Propulsion Conference (VPPC)",
+      "topic_ids": [
+        "ndfeb_magnets_retention"
+      ],
+      "components": [
+        "permanent_magnet_set"
+      ],
+      "why": "Irreversible demagnetization fault diagnosis methods for PM motors",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2014.2331562",
+      "title": "Liquid Jet Impingement Cooling of a Silicon Carbide Power Conversion Module for Vehicle Applications",
+      "year": 2015,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "cold_plate_power_electronics"
+      ],
+      "components": [
+        "mcu_cold_plate",
+        "cold_plate_channels",
+        "coolant_fluid"
+      ],
+      "why": "Liquid jet-impingement cooling of a SiC power conversion module",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tmag.2015.2446437",
+      "title": "On-Load Voltage Distortion in Fractional-Slot Interior Permanent Magnet Machines",
+      "year": 2015,
+      "venue": "IEEE Transactions on Magnetics",
+      "topic_ids": [
+        "ipmsm_electromagnetics",
+        "stator_windings_hairpin"
+      ],
+      "components": [
+        "stator_windings",
+        "permanent_magnet_set"
+      ],
+      "why": "On-load voltage distortion in fractional-slot IPMs \u2014 winding/EM design constraint",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ecce.2015.7309911",
+      "title": "Post-demagnetization characteristics of permanent magnet synchronous machines",
+      "year": 2015,
+      "venue": "2015 IEEE Energy Conversion Congress and Exposition (ECCE)",
+      "topic_ids": [
+        "ndfeb_magnets_retention"
+      ],
+      "components": [
+        "permanent_magnet_set",
+        "magnet_segment_body"
+      ],
+      "why": "Post-demagnetization characteristics of PMSMs after magnet damage",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ted.2014.2359240",
+      "title": "SiC\u2014Emerging Power Device Technology for Next-Generation Electrically Powered Environmentally Friendly Vehicles",
+      "year": 2015,
+      "venue": "IEEE Transactions on Electron Devices",
+      "topic_ids": [
+        "sic_traction_inverter"
+      ],
+      "components": [
+        "sic_power_module_stack",
+        "sic_die_1_high_side"
+      ],
+      "why": "SiC device-technology roadmap paper for next-generation electrified powertrains",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2014.2312335",
+      "title": "Thermal Loading and Lifetime Estimation for Power Device Considering Mission Profiles in Wind Power Converter",
+      "year": 2015,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "sic_traction_inverter",
+        "pwm_loss_thermal_fea"
+      ],
+      "components": [
+        "sic_power_module_stack",
+        "module_baseplate_1",
+        "mcu_cold_plate"
+      ],
+      "why": "Mission-profile thermal loading and lifetime estimation for power devices",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2015.2408054",
+      "title": "Influences of Device and Circuit Mismatches on Paralleling Silicon Carbide MOSFETs",
+      "year": 2016,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "sic_traction_inverter"
+      ],
+      "components": [
+        "sic_power_module_stack",
+        "sic_half_bridge_1",
+        "sic_die_1_high_side"
+      ],
+      "why": "Mismatch physics when paralleling SiC MOSFETs inside traction modules",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1115/1.4035554",
+      "title": "A Three-Dimensional Load Sharing Model of Planetary Gear Sets Having Manufacturing Errors",
+      "year": 2017,
+      "venue": "Journal of Mechanical Design",
+      "topic_ids": [
+        "planetary_reduction_ev"
+      ],
+      "components": [
+        "planet_gears",
+        "planet_carrier",
+        "sun_gear"
+      ],
+      "why": "3-D load-sharing model for planetary gear sets with manufacturing errors",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1007/s10973-017-6276-6",
+      "title": "Thermal conductivity and specific heat capacity of water\u2013ethylene glycol mixture-based nanofluids with graphene nanoplatelets",
+      "year": 2017,
+      "venue": "Journal of Thermal Analysis and Calorimetry",
+      "topic_ids": [
+        "egw_coolant_properties"
+      ],
+      "components": [
+        "coolant_fluid",
+        "jacket_coolant"
+      ],
+      "why": "Thermal conductivity and specific heat of water\u2013ethylene glycol mixtures",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/apec.2018.8341530",
+      "title": "Closed loop analog active gate driver for fast switching and active damping of SiC MOSFET",
+      "year": 2018,
+      "venue": "2018 IEEE Applied Power Electronics Conference and Exposition (APEC)",
+      "topic_ids": [
+        "gate_driver_sic"
+      ],
+      "components": [
+        "gate_channel_1",
+        "gate_ic_1"
+      ],
+      "why": "Closed-loop analog active gate driver for fast SiC switching and damping",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tasc.2017.2786690",
+      "title": "Rotor Design of High-Speed Permanent Magnet Synchronous Motors Considering Rotor Magnet and Sleeve Materials",
+      "year": 2018,
+      "venue": "IEEE Transactions on Applied Superconductivity",
+      "topic_ids": [
+        "ndfeb_magnets_retention",
+        "ipmsm_electromagnetics"
+      ],
+      "components": [
+        "magnet_retention",
+        "permanent_magnet_set",
+        "hollow_rotor_barrel"
+      ],
+      "why": "High-speed PM rotor design including magnet retention constraints",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tvt.2019.2897899",
+      "title": "Automotive Traction Inverters: Current Status and Future Trends",
+      "year": 2019,
+      "venue": "IEEE Transactions on Vehicular Technology",
+      "topic_ids": [
+        "sic_traction_inverter",
+        "formula_e_edu_systems"
+      ],
+      "components": [
+        "sic_power_module_stack",
+        "oem_inverter_control_board",
+        "dc_link_capacitor_bank"
+      ],
+      "why": "Authoritative review of automotive traction-inverter topologies, devices, and packaging trends",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/access.2019.2907800",
+      "title": "Design of High Power Density and High Efficiency Wound-Field Synchronous Motor for Electric Vehicle Traction",
+      "year": 2019,
+      "venue": "IEEE Access",
+      "topic_ids": [
+        "ipmsm_electromagnetics",
+        "formula_e_edu_systems"
+      ],
+      "components": [
+        "stator_windings",
+        "stator_laminations"
+      ],
+      "why": "High power-density / high-efficiency wound-field traction design methods transferable to dense EDUs",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1016/j.mechmachtheory.2019.04.007",
+      "title": "Dynamic modelling of differential bevel gear system in the presence of a defect",
+      "year": 2019,
+      "venue": "Mechanism and Machine Theory",
+      "topic_ids": [
+        "open_differential_ev"
+      ],
+      "components": [
+        "differential_carrier",
+        "side_gears",
+        "pinion_gear"
+      ],
+      "why": "Dynamic modelling of differential bevel-gear systems under faults/loads",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ev.2019.8892937",
+      "title": "Lumped Parameter Thermal Modeling of Permanent Magnet Synchronous Motor",
+      "year": 2019,
+      "venue": "2019 Electric Vehicles International Conference (EV)",
+      "topic_ids": [
+        "motor_jacket_cooling",
+        "pwm_loss_thermal_fea"
+      ],
+      "components": [
+        "motor_cooling_jacket",
+        "stator_windings"
+      ],
+      "why": "Lumped-parameter thermal modelling of PMSMs for EV cooling design",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1016/j.triboint.2020.106496",
+      "title": "Oil distribution and churning losses of gearboxes: Experimental and numerical analysis",
+      "year": 2020,
+      "venue": "Tribology International",
+      "topic_ids": [
+        "gear_lubrication_seals",
+        "planetary_reduction_ev"
+      ],
+      "components": [
+        "gear_oil_charge",
+        "oil_fluid",
+        "planet_gears"
+      ],
+      "why": "Oil distribution and churning-loss quantification for gearboxes",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/wow47795.2020.9291267",
+      "title": "Overcurrent and Short-Circuit Protection Method using Desaturation Detection of SiC MOSFET",
+      "year": 2020,
+      "venue": "2020 IEEE PELS Workshop on Emerging Technologies: Wireless Power Transfer (WoW)",
+      "topic_ids": [
+        "gate_driver_sic"
+      ],
+      "components": [
+        "desat_1",
+        "gate_ic_1",
+        "gate_driver_board"
+      ],
+      "why": "Desaturation-based overcurrent/short-circuit protection for WBG devices",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tmag.2020.2966572",
+      "title": "Time-Dependent Demagnetization of NdFeB Magnets Under DC and Pulsed Magnetic Fields",
+      "year": 2020,
+      "venue": "IEEE Transactions on Magnetics",
+      "topic_ids": [
+        "ndfeb_magnets_retention"
+      ],
+      "components": [
+        "permanent_magnet_set",
+        "magnet_segment_body"
+      ],
+      "why": "Time-dependent NdFeB demagnetization under pulsed fields",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1115/1.4047949",
+      "title": "Experimental Investigations About the Power Loss Transition Between Churning and Windage for Spur Gears",
+      "year": 2021,
+      "venue": "Journal of Tribology",
+      "topic_ids": [
+        "gear_lubrication_seals",
+        "planetary_reduction_ev"
+      ],
+      "components": [
+        "gear_oil_charge",
+        "oil_fluid"
+      ],
+      "why": "Power-loss transition between churning and windage regimes in gears",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/ojpel.2021.3065813",
+      "title": "Review of Standards on Insulation Coordination for Medium Voltage Power Converters",
+      "year": 2021,
+      "venue": "IEEE Open Journal of Power Electronics",
+      "topic_ids": [
+        "pcb_hv_creepage_isolation"
+      ],
+      "components": [
+        "hv_lv_isolation_barrier",
+        "gate_driver_board",
+        "gdb_fr4"
+      ],
+      "why": "Review of insulation-coordination standards relevant to power-electronics PCBs",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/icem51905.2022.9910905",
+      "title": "Hairpin Windings for Traction Machines: Analysis and Comparison",
+      "year": 2022,
+      "venue": "2022 International Conference on Electrical Machines (ICEM)",
+      "topic_ids": [
+        "stator_windings_hairpin"
+      ],
+      "components": [
+        "stator_windings",
+        "phase_coil_u",
+        "conductor_strand_u"
+      ],
+      "why": "Hairpin winding analysis and comparison for traction machines",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1109/tpel.2022.3171744",
+      "title": "Single-Phase Dielectric Fluid Thermal Management for Power-Dense Automotive Power Electronics",
+      "year": 2022,
+      "venue": "IEEE Transactions on Power Electronics",
+      "topic_ids": [
+        "cold_plate_power_electronics",
+        "egw_coolant_properties"
+      ],
+      "components": [
+        "mcu_cold_plate",
+        "coolant_fluid"
+      ],
+      "why": "Single-phase dielectric-fluid thermal management for power-dense converters",
+      "peer_reviewed": true
+    },
+    {
+      "doi": "10.1016/j.applthermaleng.2024.123234",
+      "title": "Thermal management characteristics of electric vehicle driving motor with oil spray cooling based on spray locations and oil types",
+      "year": 2024,
+      "venue": "Applied Thermal Engineering",
+      "topic_ids": [
+        "motor_jacket_cooling"
+      ],
+      "components": [
+        "motor_cooling_jacket",
+        "jacket_coolant",
+        "stator_windings"
+      ],
+      "why": "Thermal-management characteristics of EV driving motors (jacket/oil paths)",
+      "peer_reviewed": true
+    }
+  ]
+}

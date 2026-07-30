@@ -7,18 +7,20 @@
  * brief does NOT fall through to vehicle/plant bootstrap. Perimeter is rear
  * MGU + SiC MCU + gear/cooling interfaces only — not a full race car.
  *
- * Tools (11):
+ * Tools (13):
  *   1. motor:ipmsm-analytical-sizing
  *   2. inverter:current-voltage-envelope
  *   3. inverter:sic-loss
  *   4. inverter:field-weakening-mtpa
  *   5. motor:loss-point
  *   6. motor:rotor-centrifugal-stress
- *   7. motor:thermal-lumped
- *   8. gear:traction-ratio
- *   9. powertrain:duty-cycle-energy
- *  10. powertrain:fia-net-usable-energy
- *  11. powertrain:fia-power-regen-split
+ *   7. coolprop:refrigerant-properties  (MEG 50/50 — REQUIRED)
+ *   8. fluids:pipe-sizing               (cold-plate channel ΔP)
+ *   9. motor:thermal-lumped
+ *  10. gear:traction-ratio
+ *  11. powertrain:duty-cycle-energy
+ *  12. powertrain:fia-net-usable-energy
+ *  13. powertrain:fia-power-regen-split
  */
 
 import { registerPlan } from '../planner'
@@ -568,6 +570,118 @@ const stepFiaPowerSplit: ToolStep = {
   },
 }
 
+/** CoolProp MEG 50/50 — installed Anvil engine; feeds thermal ΔT + cold-plate. */
+const stepCoolPropEgw: ToolStep = {
+  tool_id: 'coolprop:refrigerant-properties',
+  required: true,
+  feeds_into: ['motor:thermal-lumped', 'fluids:pipe-sizing'] as string[],
+  input_from_contract: (c) => ({
+    fluid: 'water_glycol_50',
+    temperature_c: qv(c, 'coolant_inlet_c', 60),
+  }),
+  contract_update: (c, output) => {
+    const out = output as {
+      liquid_density_kg_m3?: number | null
+      cp_liquid_kj_kgk?: number | null
+      cp_liquid_j_kgk?: number | null
+      viscosity_pa_s?: number | null
+      conductivity_w_mk?: number | null
+    }
+    const tid = 'coolprop:refrigerant-properties'
+    const rho = typeof out.liquid_density_kg_m3 === 'number' ? out.liquid_density_kg_m3 : null
+    const cpJ =
+      typeof out.cp_liquid_j_kgk === 'number'
+        ? out.cp_liquid_j_kgk
+        : typeof out.cp_liquid_kj_kgk === 'number'
+          ? out.cp_liquid_kj_kgk * 1000
+          : null
+    if (rho == null || cpJ == null) return c
+    return {
+      ...c,
+      quantities: {
+        ...c.quantities,
+        coolant_density_kg_m3: {
+          value: rho, unit: 'kg/m3', family: 'density', basis: 'rated',
+          scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null,
+          condition: 'CoolProp INCOMP::MEG[0.50] at coolant_inlet_c',
+          provenance: prov(tid, 'liquid_density_kg_m3'),
+        },
+        coolant_cp_j_kgk: {
+          value: cpJ, unit: 'J/(kg·K)', family: 'specific_heat', basis: 'rated',
+          scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null,
+          condition: 'CoolProp MEG 50/50',
+          provenance: prov(tid, 'cp_liquid_j_kgk'),
+        },
+        ...(typeof out.viscosity_pa_s === 'number'
+          ? {
+              coolant_viscosity_pa_s: {
+                value: out.viscosity_pa_s, unit: 'Pa·s', family: 'viscosity', basis: 'rated',
+                scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null,
+                condition: 'CoolProp MEG 50/50',
+                provenance: prov(tid, 'viscosity_pa_s'),
+              },
+            }
+          : {}),
+        ...(typeof out.conductivity_w_mk === 'number'
+          ? {
+              coolant_conductivity_w_mk: {
+                value: out.conductivity_w_mk, unit: 'W/(m·K)', family: 'thermal_conductivity', basis: 'rated',
+                scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null,
+                condition: 'CoolProp MEG 50/50',
+                provenance: prov(tid, 'conductivity_w_mk'),
+              },
+            }
+          : {}),
+      },
+    }
+  },
+}
+
+/** fluids Darcy–Weisbach on cold-plate hydraulic equivalent diameter. */
+const stepFluidsColdPlate: ToolStep = {
+  tool_id: 'fluids:pipe-sizing',
+  required: false,
+  feeds_into: ['motor:thermal-lumped'] as string[],
+  input_from_contract: (c) => {
+    const flowLMin = qv(c, 'coolant_flow_l_min', 12)
+    return {
+      flow_rate_m3_s: flowLMin / 60_000,
+      fluid: 'water' as const, // ρ/μ overridden conceptually; fluids uses water if no custom — channel ΔP still library friction
+      fluid_temperature_c: qv(c, 'coolant_inlet_c', 60),
+      pipe_diameter_mm: 4.0, // hydraulic-diameter class for cold-plate channels
+      length_m: 0.12,
+      roughness_mm: 0.0015,
+    }
+  },
+  contract_update: (c, output) => {
+    const out = output as { pressure_drop_kpa?: number; velocity_m_s?: number; reynolds_number?: number }
+    const tid = 'fluids:pipe-sizing'
+    if (typeof out.pressure_drop_kpa !== 'number') return c
+    return {
+      ...c,
+      quantities: {
+        ...c.quantities,
+        cold_plate_channel_dp_kpa: {
+          value: out.pressure_drop_kpa, unit: 'kPa', family: 'pressure', basis: 'rated',
+          scope: 'module', uncertainty_pct: 25, temporal_resolution_s: null,
+          condition: 'fluids Darcy–Weisbach on Dh≈4 mm × 0.12 m screening path',
+          provenance: prov(tid, 'pressure_drop_kpa'),
+        },
+        ...(typeof out.velocity_m_s === 'number'
+          ? {
+              cold_plate_channel_velocity_m_s: {
+                value: out.velocity_m_s, unit: 'm/s', family: 'velocity', basis: 'rated',
+                scope: 'module', uncertainty_pct: 20, temporal_resolution_s: null,
+                condition: 'fluids pipe-sizing screening',
+                provenance: prov(tid, 'velocity_m_s'),
+              },
+            }
+          : {}),
+      },
+    }
+  },
+}
+
 const rules = [
   ruleRange('formula_e_rear_mgu.rear_power_cap', 'rear electrical ≤ 350 kW', 'rear_axle_electrical_power_kw', 50, 350, 'warning'),
   ruleRange('formula_e_rear_mgu.vdc_window', 'usable Vdc in [500, 1000]', 'dc_bus_voltage_v', 500, 1000, 'warning'),
@@ -585,6 +699,8 @@ export const FORMULA_E_REAR_MGU_PLAN: ClassToolPlan = {
     stepFieldWeakening,
     stepMotorLoss,
     stepRotorStress,
+    stepCoolPropEgw,
+    stepFluidsColdPlate,
     stepThermal,
     stepGearRatio,
     stepDutyCycle,
@@ -594,6 +710,8 @@ export const FORMULA_E_REAR_MGU_PLAN: ClassToolPlan = {
   coupled_pairs: [
     ['motor:ipmsm-analytical-sizing', 'motor:rotor-centrifugal-stress'],
     ['motor:loss-point', 'motor:thermal-lumped'],
+    ['coolprop:refrigerant-properties', 'motor:thermal-lumped'],
+    ['fluids:pipe-sizing', 'motor:thermal-lumped'],
     ['inverter:sic-loss', 'powertrain:duty-cycle-energy'],
     ['powertrain:fia-power-regen-split', 'powertrain:fia-net-usable-energy'],
   ] as Array<[string, string]>,

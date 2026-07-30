@@ -1,0 +1,411 @@
+{
+  "product_class": "formula_e_front_mgu",
+  "intent": "Extra MCU/inverter subcomponent literature topics — deep coverage where fpk-literature-topics.json is thin (SiC package stack, film-cap lifetime/ESL, laminated bus, 6-channel gate drive, control PCB sensing/comms, cold-plate fluidics, HV/LV connectors). OpenAlex/Crossref harvest only; no invented DOIs.",
+  "assembly_focus": "mcu",
+  "extends": "scripts/ingest/fpk-literature-topics.json",
+  "min_papers_per_topic": 10,
+  "topics": [
+    {
+      "id": "sic_mosfet_die_rds_switching",
+      "name": "SiC MOSFET die: Rds(on), switching energy, short-circuit SOA",
+      "assembly": "mcu",
+      "components": [
+        "sic_power_module_stack",
+        "sic_half_bridge_1",
+        "sic_die_1_high_side",
+        "sic_die_1_low_side",
+        "sic_crystal_1_high_side",
+        "sic_crystal_1_low_side"
+      ],
+      "queries": [
+        "silicon carbide MOSFET Rds(on) temperature dependence traction inverter",
+        "SiC MOSFET Eon Eoff switching energy double pulse test IEEE",
+        "4H-SiC MOSFET short-circuit withstand time SOA automotive",
+        "SiC MOSFET body diode reverse recovery traction drive",
+        "planar trench SiC MOSFET specific on-resistance 1200 V",
+        "SiC power MOSFET parallel die current sharing imbalance"
+      ],
+      "must_extract": ["formulas", "materials", "geometry", "fea"]
+    },
+    {
+      "id": "aln_amb_dbc_substrate_thermal",
+      "name": "AlN AMB/DBC ceramic substrates for power modules",
+      "assembly": "mcu",
+      "components": [
+        "aln_substrate_1",
+        "aln_substrate_2",
+        "aln_substrate_3",
+        "sic_half_bridge_1",
+        "sic_power_module_stack"
+      ],
+      "queries": [
+        "aluminum nitride AMB substrate thermal conductivity power module",
+        "active metal brazed AlN DBC copper ceramic power electronics",
+        "AlN substrate CTE mismatch SiC die thermomechanical stress",
+        "DBC AMB substrate thermal resistance junction case measurement",
+        "ceramic substrate copper thickness current carrying power module",
+        "AlN vs Si3N4 substrate reliability power cycling IEEE"
+      ],
+      "must_extract": ["materials", "manufacturing", "geometry", "fea", "formulas"]
+    },
+    {
+      "id": "sic_module_baseplate_spreading",
+      "name": "Power-module baseplate spreading resistance and CTE",
+      "assembly": "mcu",
+      "components": [
+        "module_baseplate_1",
+        "module_baseplate_2",
+        "module_baseplate_3",
+        "tim_layer",
+        "mcu_cold_plate"
+      ],
+      "queries": [
+        "power module copper baseplate thermal spreading resistance",
+        "AlSiC baseplate CTE matching SiC power module",
+        "pin-fin baseplate liquid cooling power semiconductor module",
+        "baseplate warpage solder joint reliability power cycling",
+        "junction to case thermal impedance structure function module",
+        "direct cooled baseplate SiC traction inverter thermal"
+      ],
+      "must_extract": ["formulas", "materials", "geometry", "fea", "manufacturing"]
+    },
+    {
+      "id": "silver_sinter_die_attach_sic",
+      "name": "Silver sinter die-attach for SiC power dies",
+      "assembly": "mcu",
+      "components": [
+        "sic_die_1_high_side",
+        "sic_die_1_low_side",
+        "aln_substrate_1",
+        "sic_power_module_stack"
+      ],
+      "queries": [
+        "silver sintering die attach SiC MOSFET power module",
+        "nanosilver paste pressureless sinter die bonding reliability",
+        "sintered silver thermal conductivity void fraction power electronics",
+        "Ag sinter vs solder die attach power cycling lifetime",
+        "transient liquid phase bonding copper sinter SiC packaging",
+        "die attach shear strength silver sinter high temperature"
+      ],
+      "must_extract": ["materials", "manufacturing", "formulas", "fea", "geometry"]
+    },
+    {
+      "id": "pp_film_cap_ripple_lifetime",
+      "name": "Metallized PP film DC-link capacitors: ripple, hotspot, lifetime",
+      "assembly": "mcu",
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_cap_1",
+        "dc_link_dielectric"
+      ],
+      "queries": [
+        "metallized polypropylene film capacitor ripple current heating",
+        "DC-link film capacitor lifetime Arrhenius voltage stress model",
+        "self-healing metallized film capacitor hotspot temperature inverter",
+        "polypropylene dielectric loss tan delta DC bus capacitor EV",
+        "film capacitor ESR temperature dependence PWM inverter",
+        "DC-link capacitor bank current sharing parallel film cans"
+      ],
+      "must_extract": ["formulas", "materials", "geometry", "manufacturing", "fea"]
+    },
+    {
+      "id": "dc_link_esl_resonance_commutation",
+      "name": "DC-link ESL, stray inductance and bus resonance",
+      "assembly": "mcu",
+      "components": [
+        "dc_link_capacitor_bank",
+        "dc_link_cap_1",
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "dc_bus_dielectric"
+      ],
+      "queries": [
+        "DC-link capacitor ESL measurement impedance spectroscopy inverter",
+        "commutation loop inductance SiC inverter overvoltage snubber",
+        "DC bus resonance film capacitor laminated busbar PWM",
+        "parasitic inductance capacitor bank switching voltage overshoot",
+        "equivalent series inductance reduction DC-link packaging",
+        "high frequency impedance DC-link network traction inverter"
+      ],
+      "must_extract": ["formulas", "geometry", "fea", "materials"]
+    },
+    {
+      "id": "laminated_busbar_dielectric_pd",
+      "name": "Laminated busbars: dielectric stack, PD and geometry",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "dc_bus_dielectric",
+        "ac_phase_busbar_pierce"
+      ],
+      "queries": [
+        "laminated busbar dielectric insulation partial discharge HV",
+        "multilayer copper busbar polypropylene dielectric EV inverter",
+        "laminated busbar geometry optimization loop inductance FEA",
+        "edge field intensification laminated DC busbar creepage",
+        "busbar insulation aging thermal cycling power electronics",
+        "planar laminated busbar design guidelines IEEE power electronics"
+      ],
+      "must_extract": ["geometry", "materials", "manufacturing", "fea", "formulas"]
+    },
+    {
+      "id": "busbar_skin_proximity_pwm_loss",
+      "name": "Busbar AC losses: skin, proximity and PWM harmonics",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_busbar_link",
+        "dc_bus_plus",
+        "dc_bus_minus",
+        "ac_phase_busbar_pierce",
+        "copper_core_u"
+      ],
+      "queries": [
+        "copper busbar skin effect proximity effect PWM frequency",
+        "AC resistance laminated busbar high frequency harmonics",
+        "eddy current loss busbar finite element power electronics",
+        "current density distribution laminated DC bus SiC inverter",
+        "phase busbar AC loss traction inverter switching frequency",
+        "busbar temperature rise I2R skin proximity automotive"
+      ],
+      "must_extract": ["formulas", "fea", "geometry", "materials"]
+    },
+    {
+      "id": "gate_drive_six_channel_layout",
+      "name": "Six-channel SiC gate-drive board architecture and layout",
+      "assembly": "mcu",
+      "components": [
+        "gate_driver_board",
+        "gate_channel_1",
+        "gate_channel_2",
+        "gate_channel_3",
+        "gate_channel_4",
+        "gate_channel_5",
+        "gate_channel_6",
+        "gate_ic_1",
+        "gdb_fr4"
+      ],
+      "queries": [
+        "three-phase SiC inverter six channel gate driver PCB layout",
+        "gate loop inductance minimization Kelvin source SiC MOSFET",
+        "Miller clamp active gate driver SiC half-bridge crosstalk",
+        "negative gate bias turn-off SiC MOSFET +15 V −5 V design",
+        "common mode transient immunity CMTI gate driver PCB",
+        "bootstrap vs isolated supply six-pack gate drive automotive"
+      ],
+      "must_extract": ["formulas", "geometry", "manufacturing", "materials", "fea"]
+    },
+    {
+      "id": "desat_short_circuit_protection_channels",
+      "name": "Per-channel desaturation / short-circuit protection for SiC",
+      "assembly": "mcu",
+      "components": [
+        "desat_1",
+        "desat_2",
+        "desat_3",
+        "desat_4",
+        "desat_5",
+        "desat_6",
+        "gate_channel_1",
+        "gate_driver_board",
+        "sic_die_1_high_side"
+      ],
+      "queries": [
+        "desaturation detection blanking time SiC MOSFET short circuit",
+        "soft turn-off two-level gate drive short circuit protection",
+        "Vds monitoring DESAT threshold SiC traction inverter",
+        "short-circuit protection response time SiC power module",
+        "false trip DESAT noise immunity gate driver automotive",
+        "overcurrent protection comparison DESAT Rogowski SiC inverter"
+      ],
+      "must_extract": ["formulas", "geometry", "materials", "fea"]
+    },
+    {
+      "id": "isolated_gate_dcdc_bias_supplies",
+      "name": "Isolated DC-DC bias supplies for gate rails (+15/−3 V class)",
+      "assembly": "mcu",
+      "components": [
+        "isolated_dcdc_1",
+        "isolated_dcdc_2",
+        "isolated_dcdc_3",
+        "isolated_dcdc_4",
+        "isolated_dcdc_5",
+        "isolated_dcdc_6",
+        "gate_channel_1",
+        "gate_driver_board"
+      ],
+      "queries": [
+        "isolated DC-DC converter gate driver bias supply SiC",
+        "reinforced isolation power supply gate drive automotive AEC",
+        "flyback push-pull isolated gate supply +15 V −3 V design",
+        "common-mode capacitance isolated DC-DC gate driver CMTI",
+        "gate driver auxiliary power transformer isolation barrier",
+        "multi-channel isolated bias supply traction inverter PCB"
+      ],
+      "must_extract": ["formulas", "materials", "geometry", "manufacturing", "fea"]
+    },
+    {
+      "id": "control_mcu_adc_pwm_sampling",
+      "name": "Traction control MCU, ADC sampling and PWM timing",
+      "assembly": "mcu",
+      "components": [
+        "oem_inverter_control_board",
+        "control_mcu",
+        "ctrl_fr4",
+        "lv_buck_rails"
+      ],
+      "queries": [
+        "automotive traction inverter MCU ADC sampling FOC PWM",
+        "synchronous current sampling center PWM dead-time compensation",
+        "lockstep multicore MCU electric vehicle inverter control",
+        "ADC resolution SNR phase current measurement traction drive",
+        "PWM carrier synchronization resolver FOC IPMSM ECU",
+        "real-time interrupt latency inverter control board automotive"
+      ],
+      "must_extract": ["formulas", "geometry", "manufacturing", "materials"]
+    },
+    {
+      "id": "phase_current_sense_frontend",
+      "name": "Phase current sensing front-ends (shunt, Hall, fluxgate)",
+      "assembly": "mcu",
+      "components": [
+        "current_sense_frontend",
+        "oem_inverter_control_board",
+        "control_mcu",
+        "ac_phase_busbar_pierce"
+      ],
+      "queries": [
+        "phase current sensing shunt amplifier traction inverter",
+        "closed-loop Hall current transducer EV inverter accuracy",
+        "fluxgate current sensor automotive inverter bandwidth",
+        "current sense CMRR isolation barrier PWM inverter PCB",
+        "Rogowski coil current measurement SiC switching inverter",
+        "offset drift temperature compensation phase current sensor FOC"
+      ],
+      "must_extract": ["formulas", "materials", "geometry", "fea"]
+    },
+    {
+      "id": "resolver_demod_can_fd_hvil",
+      "name": "Resolver demod, CAN-FD and HVIL interlock on control PCB",
+      "assembly": "mcu",
+      "components": [
+        "resolver_excitation_demod",
+        "can_fd_transceiver",
+        "hv_lv_isolation_barrier",
+        "oem_inverter_control_board",
+        "lv_signal_connector",
+        "hv_dc_connector"
+      ],
+      "queries": [
+        "resolver to digital converter excitation demodulation accuracy",
+        "CAN FD transceiver EMC automotive traction inverter ECU",
+        "high voltage interlock loop HVIL connector detection circuit",
+        "galvanic isolation digital signal HV LV inverter control board",
+        "ISO 11898 CAN FD physical layer electromagnetic compatibility",
+        "safety interlock HVIL loss of connection detection EV inverter"
+      ],
+      "must_extract": ["formulas", "geometry", "materials", "manufacturing"]
+    },
+    {
+      "id": "cold_plate_microchannel_pressure_drop",
+      "name": "Cold-plate channels: Nu, ΔP, manufacturing and CFD",
+      "assembly": "mcu",
+      "components": [
+        "mcu_cold_plate",
+        "cold_plate_channels",
+        "cold_plate_cover",
+        "coolant_fluid"
+      ],
+      "queries": [
+        "rectangular microchannel cold plate Nusselt number pressure drop",
+        "liquid cooled cold plate pin-fin vs parallel channel CFD",
+        "friction stir welded cold plate cover leak test power electronics",
+        "maldistribution parallel coolant channels power module cold plate",
+        "impingement jet cold plate SiC module thermal resistance",
+        "Dittus-Boelter Gnielinski correlation cold plate EGW coolant"
+      ],
+      "must_extract": ["formulas", "geometry", "fea", "manufacturing", "materials"]
+    },
+    {
+      "id": "tim_grease_gap_filler_module_plate",
+      "name": "TIM grease / gap fillers between module baseplate and cold plate",
+      "assembly": "mcu",
+      "components": [
+        "tim_layer",
+        "module_baseplate_1",
+        "mcu_cold_plate"
+      ],
+      "queries": [
+        "thermal grease bond line thickness power module cold plate",
+        "thermal interface material pump-out aging power electronics",
+        "phase change TIM vs silicone grease Rth power semiconductor",
+        "gap filler compressibility thermal resistance cold plate",
+        "TIM effective thermal conductivity contact pressure measurement",
+        "dry-out thermal grease high temperature cycling inverter module"
+      ],
+      "must_extract": ["materials", "formulas", "manufacturing", "geometry", "fea"]
+    },
+    {
+      "id": "coolant_ports_oring_quick_connect",
+      "name": "Coolant ports, O-rings and quick-connect couplings",
+      "assembly": "mcu",
+      "components": [
+        "coolant_port_in",
+        "coolant_port_out",
+        "mcu_cold_plate",
+        "coolant_fluid"
+      ],
+      "queries": [
+        "automotive coolant quick disconnect coupling leak rate EGW",
+        "O-ring face seal boss aluminum cold plate design",
+        "ethylene glycol water seal elastomer swell EPDM FKM",
+        "coolant fitting pressure drop EV power electronics manifold",
+        "SAE J2044 quick connect fluid coupling automotive cooling",
+        "cold plate inlet outlet port geometry flow uniformity"
+      ],
+      "must_extract": ["geometry", "materials", "manufacturing", "formulas"]
+    },
+    {
+      "id": "hv_connector_contact_hvil_shield",
+      "name": "HV DC connectors: contact resistance, shielding and HVIL",
+      "assembly": "mcu",
+      "components": [
+        "hv_dc_connector",
+        "lv_signal_connector",
+        "hv_dc_busbar_link",
+        "motor_power_terminals"
+      ],
+      "queries": [
+        "high voltage automotive connector contact resistance current rating",
+        "HVIL interlock pin design high voltage connector EV",
+        "shielded HV connector EMC traction inverter cable assembly",
+        "connector creepage clearance 800 V DC IEC 60664 automotive",
+        "silver plated copper contact fretting corrosion EV connector",
+        "high voltage connector partial discharge humidity automotive"
+      ],
+      "must_extract": ["materials", "geometry", "manufacturing", "formulas", "fea"]
+    },
+    {
+      "id": "lv_signal_connector_emc_shielding",
+      "name": "LV signal connectors: EMC, shielding and pinout integrity",
+      "assembly": "mcu",
+      "components": [
+        "lv_signal_connector",
+        "can_fd_transceiver",
+        "oem_inverter_control_board",
+        "resolver_excitation_demod"
+      ],
+      "queries": [
+        "shielded automotive connector EMC CAN resolver inverter",
+        "LV signal connector crosstalk PWM cable harness EV",
+        "connector pin retention vibration automotive ECU reliability",
+        "twisted pair shield termination connector transfer impedance",
+        "IP67 sealed connector automotive power electronics signal",
+        "resolver signal integrity connector cable length noise EV"
+      ],
+      "must_extract": ["geometry", "materials", "manufacturing", "formulas"]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+---
+description: Regularly challenge work with Sol + Kimi K3 + GLM (not self-grade alone)
+alwaysApply: true
+---
+
+# Multi-Model Challenge Council (Sol · Kimi K3 · GLM)
+
+**STANDING DIRECTIVE (Tristan 2026-07-29):** Do not rely on a single model’s self-assessment. On a **regular basis**, use **Sol**, **Kimi K3**, and **GLM** to challenge and improve the work — especially FPK / dossier / physics / literature depth.
+
+## Models (OpenRouter)
+
+| Seat | Model id | Fallback |
+|---|---|---|
+| Sol | `openai/gpt-5.6-sol` | — |
+| Kimi K3 | `moonshotai/kimi-k3` | **`anthropic/claude-opus-5`** if Kimi fails |
+| GLM | `z-ai/glm-5.2` | — |
+
+**Kimi → Opus 5 (Tristan 2026-07-29):** If Kimi returns parse error, reasoning-without-JSON, timeout, empty rows, or HTTP failure — **immediately retry that seat with Opus 5**. Do not drop the third seat. Label outputs `kimi` vs `opus5` in artefacts so provenance is clear.
+
+## When to convene (minimum cadence)
+
+Run a challenge pass after any of:
+
+1. A substantive physics / parts / PCB / morphology milestone
+2. A new literature or checklist corpus merge
+3. Claiming “ready for HoT / DRAFT pack review”
+4. Getting stuck in self-confirmation (green gates, pretty renders)
+
+Do **not** wait only for end-of-programme red-team.
+
+## How
+
+1. Feed a **digest of delivered artefacts** (not just `state.json` intent) — SIGHT.
+2. Ask all three **in parallel** to REJECT / find gaps / deepen first-principles.
+3. Merge into a punchlist; fix at **SOURCE** (CORE FIX PRINCIPLE); re-challenge.
+4. Harden parsers: truncated JSON, `content=null`, Kimi reasoning-without-JSON — salvage or re-prompt “JSON only, first char `{`”. If Kimi still fails → **Opus 5** for that seat.
+
+## Existing scripts (extend, don’t reinvent)
+
+- `scripts/fe-front-redteam-council.py` — HoT adversarial reject
+- `scripts/fe-front-physics-checklist-council.py` (+ pass2) — component/physics explosion
+- Pattern for new councils: same three models, flat JSON schema, merge + gap vs engine
+
+## Anti-patterns
+
+| Bad | Good |
+|---|---|
+| “I think this is solid” without council | Sol+Kimi+GLM punchlist |
+| One model only | All three seats |
+| Praise-seeking prompts | Adversarial / completeness prompts |
+| Ignoring truncated replies | Salvage + retry with flat schema |

@@ -2012,6 +2012,31 @@ def _build_motor_sensor_detail(ctx: FpkContext, parent: str) -> list[PhysicsNode
             ("sensor_mpn", "impregnation_validation"),
         ),
         (
+            "winding_ntc_3",
+            "Winding NTC 3",
+            None,
+            "1/T = 1/T0 + ln(R/R0)/B",
+            {
+                "nominal_resistance_ohm": 10000.0,
+                "temp_class_c": 180.0,
+                "phase": "W",
+                "provenance": "ANALYTICAL_FROM_ASSUMED_GEOMETRY",
+            },
+            ("sensor_mpn", "impregnation_validation"),
+        ),
+        (
+            "inverter_module_ntc",
+            "Inverter power-module NTC",
+            None,
+            "T_j ≈ T_ntc + P_loss * R_th_jc_to_ntc",
+            {
+                "nominal_resistance_ohm": 5000.0,
+                "role": "SiC_module_baseplate_sense",
+                "provenance": "ANALYTICAL_FROM_ASSUMED_GEOMETRY",
+            },
+            ("supplier_module_datasheet", "thermal_derating"),
+        ),
+        (
             "bearing_seat_set",
             "Bearing seat set",
             "Al_ADC12",

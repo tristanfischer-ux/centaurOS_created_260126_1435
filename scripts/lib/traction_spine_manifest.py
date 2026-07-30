@@ -52,9 +52,19 @@ _TRACTION_SEATS: list[tuple[str, str, str]] = [
         "SiC Traction Inverter",
     ),
     (
+        "u_se_td_mcu_shelf",
+        r"mcu\s*shelf|inverter\s*shelf|upper\s*shelf",
+        "Mcu Shelf",
+    ),
+    (
         "u_se_td_gearbox",
-        r"reduction\s*gear|gearbox|gear\s*stage",
-        "Reduction Gear Stage",
+        r"planetary\s*reduction|reduction\s*gear|gearbox|gear\s*stage|planetary",
+        "Planetary Reduction In Rotor",
+    ),
+    (
+        "u_se_td_hollow_rotor",
+        r"hollow\s*rotor|rotor\s*barrel|pm\s*rotor",
+        "Hollow Rotor",
     ),
     (
         "u_se_td_hv_connector",
@@ -70,8 +80,18 @@ _TRACTION_SEATS: list[tuple[str, str, str]] = [
     # the ledger but never seated — GA/Renders coverage floored at 6/9.
     (
         "u_se_td_diff_bulge",
-        r"open\s*bevel\s*differential|bevel\s*differential|\bdifferential\b",
-        "Open Bevel Differential",
+        r"mini[_\s-]?diff|open\s*bevel\s*differential|bevel\s*differential|\bdifferential\b",
+        "Mini Diff In Rotor",
+    ),
+    (
+        "u_se_td_diff_nest",
+        r"mini[_\s-]?diff|diff\s*nest|\bdifferential\b",
+        "Mini Diff In Rotor",
+    ),
+    (
+        "u_se_td_phase_bus",
+        r"ac\s*phase\s*busbar|phase\s*busbar|busbar\s*pierce|phase\s*cable",
+        "Ac Phase Busbar Pierce",
     ),
     (
         "u_se_td_mount_ear",
@@ -82,6 +102,48 @@ _TRACTION_SEATS: list[tuple[str, str, str]] = [
         "u_se_td_hv_shield",
         r"hv\s*shield\s*cover|shield\s*cover|emi\s*shield",
         "Hv Shield Cover",
+    ),
+    # INTENT (2026-07-29 FFF ontology): seat physics-forced sub-components so
+    # GA/drawings credit ring/magnets/covers/flanges — not only assembly blobs.
+    (
+        "u_se_td_ring_gear",
+        r"ring\s*gear|annulus\s*gear|fixed\s*ring",
+        "Ring Gear",
+    ),
+    (
+        "u_se_td_magnet",
+        r"permanent\s*magnet|magnet\s*set|pm\s*segment",
+        "Permanent Magnet Set",
+    ),
+    (
+        "u_se_td_halfshaft_flange",
+        r"halfshaft|output\s*flange|flange\s*pair",
+        "Halfshaft Output Flange Pair",
+    ),
+    (
+        "u_se_td_cassette_cover",
+        r"cassette\s*cover|pack\s*cover|drive\s*cover",
+        "Cassette Cover",
+    ),
+    (
+        "u_se_td_gate_drive_pcb",
+        r"gate\s*driv|gate.?drive\s*board",
+        "Gate Driver Board",
+    ),
+    (
+        "u_se_td_control_pcb",
+        r"oem\s*inverter\s*control|control\s*board|inverter\s*control",
+        "Oem Inverter Control Board",
+    ),
+    (
+        "u_se_td_sun_gear",
+        r"\bsun\s*gear\b",
+        "Sun Gear",
+    ),
+    (
+        "u_se_td_planet_",
+        r"planet\s*gear|pinion\s*set",
+        "Planet Gears",
     ),
 ]
 
@@ -209,13 +271,16 @@ _PREFERRED_ISA_TAGS: dict[str, str] = {
     _norm("Traction Ipmsm Motor Generator"): "X-116",
     _norm("SiC Traction Inverter"): "INV-1",
     _norm("Reduction Gear Stage"): "X-117",
+    _norm("Planetary Reduction In Rotor"): "X-117",
     _norm("Mgu Cold Plate"): "X-121",
     _norm("Hv DC Connector"): "X-110",
     _norm("Traction Drive Housing"): "X-103",
     _norm("Traction Pack Base"): "X-104",
     _norm("Open Bevel Differential"): "X-133",
+    _norm("Mini Diff In Rotor"): "X-133",
     _norm("Hv Shield Cover"): "X-138",
     _norm("Mounting Ear Set"): "X-139",
+    _norm("Ac Phase Busbar Pierce"): "X-105",
 }
 
 
@@ -480,10 +545,13 @@ def _selftest() -> None:
         bad += 1
     for need in ("Traction Pack Base", "Traction Drive Housing",
                  "Traction Ipmsm Motor Generator", "SiC Traction Inverter",
-                 "Reduction Gear Stage", "Mgu Cold Plate"):
+                 "Mgu Cold Plate"):
         if need not in names:
             print(f"  FAIL missing seated principal {need!r}")
             bad += 1
+    if "Planetary Reduction In Rotor" not in names and "Reduction Gear Stage" not in names:
+        print(f"  FAIL missing seated planetary/reduction gear (got {sorted(names)})")
+        bad += 1
     tags = {str(r.get("tag")) for r in rows}
     if "X-103" not in tags:
         print(f"  FAIL Traction Drive Housing must seat as X-103 (got {sorted(tags)})")
