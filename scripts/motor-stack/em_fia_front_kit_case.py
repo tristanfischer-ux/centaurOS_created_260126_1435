@@ -482,8 +482,24 @@ def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
     # twin-bound — not a pasted supplier magnet schedule.
     bridge_keepout_mm = 2.0  # 1 mm OD + 1 mm ID
     usable_radial_mm = max(4.0, rotor_ring_mm - bridge_keepout_mm)
-    magnet_thickness_mm = max(3.5, min(7.0, usable_radial_mm * 0.55))
-    magnet_length_mm = max(12.0, min(18.0, usable_radial_mm * 1.35))
+    magnet_tilt_rad = math.radians(20.0)
+    # DECISION: magnet_length is circumferential (long axis ≈ pole pitch).
+    # Absolute 18 mm caps starved flux when planetary bore enlarge grows rotor
+    # diameter but not pole arc — size from pole pitch at the magnet centre.
+    magnet_thickness_mm = max(4.0, min(12.0, usable_radial_mm * 0.75))
+    r_mag_est = max(
+        r_ri + bridge_keepout_mm + 2.0,
+        r_ro - bridge_keepout_mm - usable_radial_mm * 0.45,
+    )
+    pole_pitch_mm = (2.0 * math.pi * r_mag_est) / ROTOR_POLES
+    magnet_length_mm = max(14.0, min(pole_pitch_mm * 0.38, 44.0))
+    radial_half_extent_mm = (
+        magnet_length_mm / 2.0 * math.sin(magnet_tilt_rad)
+        + magnet_thickness_mm / 2.0 * math.cos(magnet_tilt_rad)
+    )
+    if r_ro - bridge_keepout_mm - radial_half_extent_mm <= r_ri + bridge_keepout_mm:
+        magnet_thickness_mm = max(3.5, usable_radial_mm * 0.55)
+        magnet_length_mm = max(12.0, min(pole_pitch_mm * 0.32, 28.0))
     stator_build_mm = r_so - r_si
     slot_depth_mm = max(8.0, min(15.0, stator_build_mm * 0.66))
     estimated_mass = _estimate_active_mass_kg(

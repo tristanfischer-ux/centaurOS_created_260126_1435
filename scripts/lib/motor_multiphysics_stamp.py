@@ -31,6 +31,7 @@ ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
 BLOCKER_ID_POST_DIFF_FINAL_DRIVE = "POST_DIFF_FINAL_DRIVE_PACKAGING"
 BLOCKER_ID_PLANETARY_VS_ROTOR_BORE = "PLANETARY_STRENGTH_VS_ROTOR_BORE"
+BLOCKER_ID_EM_TORQUE_VS_ROTOR_BORE = "EM_TORQUE_VS_ROTOR_BORE"
 POST_DIFF_FINAL_DRIVE_COMPONENT_ID = "post_diff_final_drive"
 POST_DIFF_FINAL_DRIVE_CAD_FAMILY = "post_diff_final_drive_helical"
 POST_DIFF_PACKAGING_SCREEN_FILENAME = (
@@ -251,6 +252,48 @@ _PLANETARY_VS_ROTOR_PERMANENT_UNBLOCK: list[dict[str, str]] = [
             "layout) so strength and EM envelopes stop fighting."
         ),
         "code_hooks": (
+            "docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md"
+            "#architecture-blockers"
+        ),
+    },
+]
+_EM_TORQUE_VS_ROTOR_BORE_PERMANENT_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "grow_em_annulus_in_bore",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Keep nest_fits_rotor but recover magnet volume: grow rotor OD ring "
+            "within the bay, pole-pitch-aware V-magnet arc, and thicker radial "
+            "magnet build — then re-run FEMM duty torque screen."
+        ),
+        "code_hooks": (
+            "scripts/lib/fpk_concentric_geometry.py#EM_MIN_ROTOR_RADIAL_MM;"
+            "scripts/motor-stack/em_fia_front_kit_case.py#derive_fia_geometry"
+        ),
+    },
+    {
+        "option_id": "longer_stack_or_more_poles",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Increase active stack length and/or pole count so torque rises "
+            "without shrinking the planetary-clearing bore."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/em_fia_front_kit_case.py;"
+            "scripts/lib/fpk_concentric_geometry.py"
+        ),
+    },
+    {
+        "option_id": "external_planetary_or_smaller_tip",
+        "kind": "architecture_decision",
+        "summary": (
+            "Move planetary partially external, retarget tooth counts/module, "
+            "or split ratio so ring tip shrinks and rotor bore can return "
+            "magnet annulus to the pre-enlarge build."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/iso6336_fia_front_kit_case.py"
+            "#propose_strength_feasible_geometry;"
             "docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md"
             "#architecture-blockers"
         ),
@@ -2124,170 +2167,216 @@ def collect_architecture_blockers(
             }
         )
     bevel = twin_case.get("bevel_differential_screen")
-    if not isinstance(bevel, Mapping):
-        return blockers
-    hold = str(bevel.get("architecture_hold") or "")
-    if BLOCKER_ID_DIFF_NEST in hold or (
-        bevel.get("works_in_kit_context") is False
-        and bevel.get("minimum_strength_factor") is not None
-        and float(bevel.get("minimum_strength_factor") or 0.0) < 1.2
-        and "DIFF_NEST" in hold
-    ):
-        blockers.append(
-            {
-                "blocker_id": BLOCKER_ID_DIFF_NEST,
-                "domain": "gear_strength.differential",
-                "status": "OPEN",
-                "severity": "architecture_hold",
-                "ship_ok": False,
-                "cannot_greenwash": True,
-                "evidence_path": bevel.get("path")
-                or "_motor_stack/iso_bevel_fia_front_kit_case.json",
-                "minimum_strength_factor": bevel.get("minimum_strength_factor"),
-                "summary": hold
-                or (
-                    "Straight-bevel nest inside kit envelope cannot clear "
-                    "carrier-torque FoS ≥ 1.2 — architecture hold."
-                ),
-                "permanent_unblock_options": list(_DIFF_NEST_PERMANENT_UNBLOCK),
-                "human_decision_required": True,
-            }
-        )
-    residual = (
-        bevel.get("residual_blocker")
-        if isinstance(bevel.get("residual_blocker"), Mapping)
-        else None
-    )
-    if (
-        residual
-        and residual.get("blocker_id") == BLOCKER_ID_POST_DIFF_FINAL_DRIVE
-        and residual.get("status") == "OPEN"
-    ):
-        packaging = (
-            bevel.get("post_diff_final_drive_packaging_screen")
-            if isinstance(
-                bevel.get("post_diff_final_drive_packaging_screen"),
-                Mapping,
+    if isinstance(bevel, Mapping):
+        hold = str(bevel.get("architecture_hold") or "")
+        if BLOCKER_ID_DIFF_NEST in hold or (
+            bevel.get("works_in_kit_context") is False
+            and bevel.get("minimum_strength_factor") is not None
+            and float(bevel.get("minimum_strength_factor") or 0.0) < 1.2
+            and "DIFF_NEST" in hold
+        ):
+            blockers.append(
+                {
+                    "blocker_id": BLOCKER_ID_DIFF_NEST,
+                    "domain": "gear_strength.differential",
+                    "status": "OPEN",
+                    "severity": "architecture_hold",
+                    "ship_ok": False,
+                    "cannot_greenwash": True,
+                    "evidence_path": bevel.get("path")
+                    or "_motor_stack/iso_bevel_fia_front_kit_case.json",
+                    "minimum_strength_factor": bevel.get("minimum_strength_factor"),
+                    "summary": hold
+                    or (
+                        "Straight-bevel nest inside kit envelope cannot clear "
+                        "carrier-torque FoS ≥ 1.2 — architecture hold."
+                    ),
+                    "permanent_unblock_options": list(_DIFF_NEST_PERMANENT_UNBLOCK),
+                    "human_decision_required": True,
+                }
             )
+        residual = (
+            bevel.get("residual_blocker")
+            if isinstance(bevel.get("residual_blocker"), Mapping)
             else None
-        )
-        bay_fit = packaging.get("bay_fit") if packaging else None
-        family_registration = _post_diff_parametric_family_registration()
-        parametric_family_exists = family_registration is not None
-        cad_family = (
-            family_registration.get("cad_family")
-            if family_registration
-            else None
-        )
-        software_packaging_screen_ok = bool(
-            bay_fit is True and parametric_family_exists
-        )
-        closure_gate = (
-            packaging.get("closure_gate")
-            if isinstance(packaging, Mapping)
-            and isinstance(packaging.get("closure_gate"), Mapping)
-            else packaging or {}
-        )
-        packaging_blocker = (
-            packaging.get("architecture_blocker")
-            if isinstance(packaging, Mapping)
-            and isinstance(packaging.get("architecture_blocker"), Mapping)
-            else {}
         )
         if (
-            closure_gate.get("blocker_may_clear") is True
-            and (
-                packaging_blocker.get("status") == "CLEARED"
-                or packaging.get("blocker_status") == "CLEARED"
-            )
+            residual
+            and residual.get("blocker_id") == BLOCKER_ID_POST_DIFF_FINAL_DRIVE
+            and residual.get("status") == "OPEN"
         ):
-            return blockers
-        blender_interface_status = str(
-            closure_gate.get("blender_interface_status") or "OPEN"
-        )
-        strength_screen_ok = closure_gate.get("strength_screen_ok") is True
-        interface_register_ok = closure_gate.get("interface_register_ok") is True
-        # GOTCHA: software screening closure is still not release closure. Only
-        # omit this blocker when the packaging artefact itself proves every
-        # screening predicate and marks the architecture blocker CLEARED.
-        closure_eligible = False
-        packaging_summary = packaging.get("summary") if packaging else None
-        summary = (
-            "CAD family, Blender datums, and differential/halfshaft interface "
-            "register are software-closed, but the post-diff helical strength "
-            "screen is below FoS >= 1.2; release engineering remains OPEN."
-            if software_packaging_screen_ok
-            and interface_register_ok
-            and not strength_screen_ok
-            else (
-            "CAD family seeded and Blender placer syncs post-diff meshes — "
-            "differential/halfshaft interfaces and release engineering remain OPEN."
-            if software_packaging_screen_ok
-            and blender_interface_status == "PARTIAL"
-            else (
-                "CAD family seeded — Blender/interface still OPEN; the bay envelope "
-                "screen passes, but gear strength, bearings, shafts, lubrication, "
-                "tolerances, and release authority remain OPEN."
-                if software_packaging_screen_ok
-                else packaging_summary
-                or residual.get("summary")
-                or (
-                    "Differential torque budget clears the bevel nest, but the "
-                    "remaining post-differential final-drive stage is not packaged."
+            packaging = (
+                bevel.get("post_diff_final_drive_packaging_screen")
+                if isinstance(
+                    bevel.get("post_diff_final_drive_packaging_screen"),
+                    Mapping,
                 )
+                else None
             )
+            bay_fit = packaging.get("bay_fit") if packaging else None
+            family_registration = _post_diff_parametric_family_registration()
+            parametric_family_exists = family_registration is not None
+            cad_family = (
+                family_registration.get("cad_family")
+                if family_registration
+                else None
             )
-        )
-        blockers.append(
-            {
-                "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
-                "domain": "gear_strength.final_drive_packaging",
-                "status": "OPEN",
-                "severity": "architecture_hold",
-                "ship_ok": False,
-                "cannot_greenwash": True,
-                "evidence_path": (
-                    packaging.get("path")
-                    if packaging
-                    else bevel.get("path")
-                    or "_motor_stack/iso_bevel_fia_front_kit_case.json"
-                ),
-                "source_bevel_evidence_path": bevel.get("path")
-                or "_motor_stack/iso_bevel_fia_front_kit_case.json",
-                "minimum_strength_factor": closure_gate.get("minimum_strength_factor")
-                or bevel.get("minimum_strength_factor"),
-                "bevel_minimum_strength_factor": bevel.get("minimum_strength_factor"),
-                "ratio_after_diff": residual.get("ratio_after_diff"),
-                "packaging_screen_status": (
-                    packaging.get("status") if packaging else "NOT_STARTED"
-                ),
-                "bay_fit": bay_fit,
-                "packaging_envelope_mm": (
-                    packaging.get("envelope_mm") if packaging else None
-                ),
-                "parametric_family_exists": parametric_family_exists,
-                "cad_family": cad_family,
-                "software_packaging_screen_ok": software_packaging_screen_ok,
-                "software_progress_status": (
-                    "SOFTWARE_SEEDED"
+            software_packaging_screen_ok = bool(
+                bay_fit is True and parametric_family_exists
+            )
+            closure_gate = (
+                packaging.get("closure_gate")
+                if isinstance(packaging, Mapping)
+                and isinstance(packaging.get("closure_gate"), Mapping)
+                else packaging or {}
+            )
+            packaging_blocker = (
+                packaging.get("architecture_blocker")
+                if isinstance(packaging, Mapping)
+                and isinstance(packaging.get("architecture_blocker"), Mapping)
+                else {}
+            )
+            if (
+                closure_gate.get("blocker_may_clear") is True
+                and (
+                    packaging_blocker.get("status") == "CLEARED"
+                    or packaging.get("blocker_status") == "CLEARED"
+                )
+            ):
+                pass
+            else:
+                blender_interface_status = str(
+                    closure_gate.get("blender_interface_status") or "OPEN"
+                )
+                strength_screen_ok = closure_gate.get("strength_screen_ok") is True
+                interface_register_ok = closure_gate.get("interface_register_ok") is True
+                # GOTCHA: software screening closure is still not release closure. Only
+                # omit this blocker when the packaging artefact itself proves every
+                # screening predicate and marks the architecture blocker CLEARED.
+                closure_eligible = False
+                packaging_summary = packaging.get("summary") if packaging else None
+                summary = (
+                    "CAD family, Blender datums, and differential/halfshaft interface "
+                    "register are software-closed, but the post-diff helical strength "
+                    "screen is below FoS >= 1.2; release engineering remains OPEN."
                     if software_packaging_screen_ok
-                    else "PACKAGING_OR_CAD_OPEN"
-                ),
-                "blender_interface_status": blender_interface_status,
-                "blender_meshes_defined": (
-                    closure_gate.get("blender_meshes_defined") is True
-                ),
-                "strength_screen_ok": strength_screen_ok,
-                "interface_register_ok": interface_register_ok,
-                "post_diff_minimum_strength_factor": closure_gate.get(
-                    "minimum_strength_factor"
-                ),
-                "closure_eligible": closure_eligible,
-                "summary": summary,
-                "permanent_unblock_options": _post_diff_unblock_options(packaging),
-                "human_decision_required": True,
-            }
-        )
+                    and interface_register_ok
+                    and not strength_screen_ok
+                    else (
+                    "CAD family seeded and Blender placer syncs post-diff meshes — "
+                    "differential/halfshaft interfaces and release engineering remain OPEN."
+                    if software_packaging_screen_ok
+                    and blender_interface_status == "PARTIAL"
+                    else (
+                        "CAD family seeded — Blender/interface still OPEN; the bay envelope "
+                        "screen passes, but gear strength, bearings, shafts, lubrication, "
+                        "tolerances, and release authority remain OPEN."
+                        if software_packaging_screen_ok
+                        else packaging_summary
+                        or residual.get("summary")
+                        or (
+                            "Differential torque budget clears the bevel nest, but the "
+                            "remaining post-differential final-drive stage is not packaged."
+                        )
+                    )
+                    )
+                )
+                blockers.append(
+                    {
+                        "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
+                        "domain": "gear_strength.final_drive_packaging",
+                        "status": "OPEN",
+                        "severity": "architecture_hold",
+                        "ship_ok": False,
+                        "cannot_greenwash": True,
+                        "evidence_path": (
+                            packaging.get("path")
+                            if packaging
+                            else bevel.get("path")
+                            or "_motor_stack/iso_bevel_fia_front_kit_case.json"
+                        ),
+                        "source_bevel_evidence_path": bevel.get("path")
+                        or "_motor_stack/iso_bevel_fia_front_kit_case.json",
+                        "minimum_strength_factor": closure_gate.get("minimum_strength_factor")
+                        or bevel.get("minimum_strength_factor"),
+                        "bevel_minimum_strength_factor": bevel.get("minimum_strength_factor"),
+                        "ratio_after_diff": residual.get("ratio_after_diff"),
+                        "packaging_screen_status": (
+                            packaging.get("status") if packaging else "NOT_STARTED"
+                        ),
+                        "bay_fit": bay_fit,
+                        "packaging_envelope_mm": (
+                            packaging.get("envelope_mm") if packaging else None
+                        ),
+                        "parametric_family_exists": parametric_family_exists,
+                        "cad_family": cad_family,
+                        "software_packaging_screen_ok": software_packaging_screen_ok,
+                        "software_progress_status": (
+                            "SOFTWARE_SEEDED"
+                            if software_packaging_screen_ok
+                            else "PACKAGING_OR_CAD_OPEN"
+                        ),
+                        "blender_interface_status": blender_interface_status,
+                        "blender_meshes_defined": (
+                            closure_gate.get("blender_meshes_defined") is True
+                        ),
+                        "strength_screen_ok": strength_screen_ok,
+                        "interface_register_ok": interface_register_ok,
+                        "post_diff_minimum_strength_factor": closure_gate.get(
+                            "minimum_strength_factor"
+                        ),
+                        "closure_eligible": closure_eligible,
+                        "summary": summary,
+                        "permanent_unblock_options": _post_diff_unblock_options(packaging),
+                        "human_decision_required": True,
+                    }
+                )
+    magnetic = checks.get("magnetic")
+    if isinstance(magnetic, Mapping):
+        mag_twin = magnetic.get("twin_bound_case")
+        if isinstance(mag_twin, Mapping):
+            nest_fits = twin_case.get("nest_fits_rotor")
+            duty_torque_ok = magnetic.get("duty_torque_screen_ok")
+            if duty_torque_ok is None:
+                duty_torque_ok = mag_twin.get("duty_torque_screen_ok")
+            duty_torque_ok = bool(duty_torque_ok)
+            torque_ratio = (
+                magnetic.get("torque_vs_required_ratio")
+                or mag_twin.get("torque_vs_required_ratio")
+            )
+            if nest_fits is True and not duty_torque_ok:
+                blockers.append(
+                    {
+                        "blocker_id": BLOCKER_ID_EM_TORQUE_VS_ROTOR_BORE,
+                        "domain": "magnetic.planetary_bore_torque",
+                        "status": "OPEN",
+                        "severity": "architecture_hold",
+                        "ship_ok": False,
+                        "cannot_greenwash": True,
+                        "evidence_path": mag_twin.get("path")
+                        or "_motor_stack/em_fia_front_kit_case.json",
+                        "nest_fits_rotor": True,
+                        "duty_torque_screen_ok": False,
+                        "torque_vs_required_ratio": torque_ratio,
+                        "required_shaft_torque_nm": mag_twin.get(
+                            "required_shaft_torque_nm"
+                        ),
+                        "loaded_torque_magnitude_nm": mag_twin.get(
+                            "loaded_torque_magnitude_nm"
+                        ),
+                        "summary": (
+                            "Planetary strength clears inside the enlarged rotor "
+                            "bore (nest_fits_rotor) but twin-bound FEMM duty "
+                            "torque screen is below the required shaft torque — "
+                            "EM magnet volume vs bore conflict; do not set "
+                            "duty_torque_screen_ok."
+                        ),
+                        "permanent_unblock_options": list(
+                            _EM_TORQUE_VS_ROTOR_BORE_PERMANENT_UNBLOCK
+                        ),
+                        "human_decision_required": True,
+                    }
+                )
     return blockers
 
 
@@ -2739,7 +2828,7 @@ def build_motor_multiphysics(
             if post_diff_packaging is not None:
                 notes += (
                     " Post-diff final-drive packaging PARTIAL: twin-bound envelope "
-                    f"screen reports bay_fit={post_diff_packaging.get('bay_fit')} "
+                    f"bay_fit={post_diff_packaging.get('bay_fit')} "
                     f"(_motor_stack/{POST_DIFF_PACKAGING_SCREEN_FILENAME}); "
                     "parametric CAD and release closure remain OPEN."
                 )
@@ -4751,6 +4840,52 @@ def selftest() -> int:
         ):
             print("FAIL: proveCatch must enforce the post-diff residual blocker")
             bad += 1
+
+    em_torque_blockers = collect_architecture_blockers(
+        {
+            "required_checks": {
+                "gear_strength": {
+                    "twin_bound_case": {
+                        "nest_fits_rotor": True,
+                        "minimum_strength_factor": 1.25,
+                    }
+                },
+                "magnetic": {
+                    "duty_torque_screen_ok": False,
+                    "torque_vs_required_ratio": 0.43,
+                    "twin_bound_case": {
+                        "duty_torque_screen_ok": False,
+                        "required_shaft_torque_nm": 125.2,
+                        "loaded_torque_magnitude_nm": 54.3,
+                        "path": "_motor_stack/em_fia_front_kit_case.json",
+                    },
+                },
+            }
+        }
+    )
+    em_blocker = next(
+        (
+            b
+            for b in em_torque_blockers
+            if b.get("blocker_id") == BLOCKER_ID_EM_TORQUE_VS_ROTOR_BORE
+        ),
+        None,
+    )
+    if em_blocker is None:
+        print(
+            "FAIL: proveCatch must fire EM_TORQUE_VS_ROTOR_BORE when "
+            "nest_fits_rotor and duty_torque_screen_ok disagree"
+        )
+        bad += 1
+    elif em_blocker.get("cannot_greenwash") is not True:
+        print("FAIL: EM_TORQUE blocker must set cannot_greenwash")
+        bad += 1
+    elif not em_blocker.get("permanent_unblock_options"):
+        print("FAIL: EM_TORQUE blocker must name permanent_unblock_options")
+        bad += 1
+    elif em_blocker.get("duty_torque_screen_ok") is not False:
+        print("FAIL: EM_TORQUE blocker must record duty_torque_screen_ok false")
+        bad += 1
 
     if bad:
         print(f"selftest FAIL ({bad})")

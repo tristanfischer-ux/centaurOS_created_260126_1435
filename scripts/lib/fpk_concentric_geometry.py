@@ -18,6 +18,11 @@ from typing import Any, Mapping, Optional
 
 
 PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM = 2.0
+# INTENT: When planetary strength enlarges the hollow rotor bore, the magnet
+# annulus must not shrink to the pre-enlarge radial build — that starves FEMM
+# torque while nest_fits_rotor goes green. Grow OD within the bay cap instead.
+EM_MIN_ROTOR_RADIAL_MM = 20.0
+BORE_ENLARGE_OD_RECOVERY_FRAC = 0.55
 
 
 @dataclass(frozen=True)
@@ -245,17 +250,56 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
         stator_radial_build = (stator_od - stator_id) / 2.0
         housing_radial_build = (housing_od - stator_od) / 2.0
         previous_rotor_id = rotor_id
+        bore_delta = max(0.0, required_rotor_id - rotor_id)
         rotor_id = required_rotor_id
-        rotor_od = rotor_id + 2.0 * rotor_radial_build
+        if bore_delta > 1.0e-6:
+            em_radial_floor = max(
+                rotor_radial_build + BORE_ENLARGE_OD_RECOVERY_FRAC * bore_delta,
+                EM_MIN_ROTOR_RADIAL_MM,
+            )
+            notes.append(
+                f"rotor bore {previous_rotor_id:.1f}→{rotor_id:.1f} mm for "
+                f"planetary ring tip {ring_tip:.1f} mm + "
+                f"{PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM:.1f} mm clearance; "
+                f"OD ring grown to {em_radial_floor:.1f} mm radial to preserve "
+                "EM magnet annulus"
+            )
+        else:
+            em_radial_floor = rotor_radial_build
+            notes.append(
+                f"rotor bore {previous_rotor_id:.1f}→{rotor_id:.1f} mm for "
+                f"planetary ring tip {ring_tip:.1f} mm + "
+                f"{PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM:.1f} mm clearance; "
+                "rotor/stator/jacket radial builds preserved"
+            )
+        rotor_od = rotor_id + 2.0 * em_radial_floor
         stator_id = rotor_od + 2.0 * airgap
         stator_od = stator_id + 2.0 * stator_radial_build
         housing_od = stator_od + 2.0 * housing_radial_build
-        notes.append(
-            f"rotor bore {previous_rotor_id:.1f}→{rotor_id:.1f} mm for "
-            f"planetary ring tip {ring_tip:.1f} mm + "
-            f"{PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM:.1f} mm clearance; "
-            "rotor/stator/jacket radial builds preserved"
-        )
+        # GOTCHA: od_cap is the rotor-OD seed clamp, not the bay OD limit.
+        # After bore enlarge, only shrink the EM ring when the full stack
+        # exceeds the bay cross-section (stack_fits_bay), never below the
+        # pre-enlarge radial build.
+        bay_od_cap = min(case_d, case_h) - 2.0
+        if housing_od > bay_od_cap:
+            stator_od_max = bay_od_cap - 2.0 * housing_radial_build
+            em_radial_cap = (
+                stator_od_max
+                - rotor_id
+                - 2.0 * airgap
+                - 2.0 * stator_radial_build
+            ) / 2.0
+            if em_radial_cap < em_radial_floor:
+                previous_em = em_radial_floor
+                em_radial_floor = max(rotor_radial_build, em_radial_cap)
+                notes.append(
+                    f"EM rotor ring capped {previous_em:.1f}→{em_radial_floor:.1f} mm "
+                    f"radial to keep housing OD ≤ bay ({bay_od_cap:.1f} mm)"
+                )
+                rotor_od = rotor_id + 2.0 * em_radial_floor
+                stator_id = rotor_od + 2.0 * airgap
+                stator_od = stator_id + 2.0 * stator_radial_build
+                housing_od = stator_od + 2.0 * housing_radial_build
 
     mean_airgap_diameter = (rotor_od + stator_id) / 2.0
     carrier_od = min(ring_id * 0.92, planet_pcd + planet_od * 0.35)
@@ -540,7 +584,8 @@ def _selftest() -> None:
     assert resized.planet_od_mm == 54.0
     assert resized.ring_id_mm == 126.0
     assert resized.rotor_id_mm >= 130.5
-    assert resized.rotor_od_mm > 121.98
+    assert resized.rotor_od_mm > 159.8
+    assert (resized.rotor_od_mm - resized.rotor_id_mm) / 2.0 >= EM_MIN_ROTOR_RADIAL_MM - 0.1
     assert resized.stator_id_mm > resized.rotor_od_mm
     assert resized.nest_fits_rotor
     assert resized.stack_fits_bay
