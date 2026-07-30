@@ -137,9 +137,26 @@ FPK_FORMULA_LINEAGE: dict[str, tuple[str, tuple[str, ...]]] = {
     "mass_inverter_kg": ("mass_inverter_kg = fpk_mass_cap_kg*0.25625", ("fpk_mass_cap_kg",)),
     "mass_gear_diff_kg": ("mass_gear_diff_kg = fpk_mass_cap_kg*0.2", ("fpk_mass_cap_kg",)),
     "mass_housing_misc_kg": ("mass_housing_misc_kg = fpk_mass_cap_kg*0.084375", ("fpk_mass_cap_kg",)),
-    "fpk_stator_od_mm": ("fpk_stator_od_mm = rotor_airgap_diameter_mm*1.35", ("rotor_airgap_diameter_mm",)),
-    "fpk_rotor_id_mm": ("fpk_rotor_id_mm = rotor_airgap_diameter_mm*0.76", ("rotor_airgap_diameter_mm",)),
-    "fpk_ring_id_mm": ("fpk_ring_id_mm = fpk_rotor_id_mm-4", ("fpk_rotor_id_mm",)),
+    "fpk_rotor_id_mm": (
+        "fpk_rotor_id_mm = max(rotor_airgap_diameter_mm*0.76,fpk_ring_tip_diameter_mm+2)",
+        ("rotor_airgap_diameter_mm", "fpk_ring_tip_diameter_mm"),
+    ),
+    "fpk_rotor_od_mm": (
+        "fpk_rotor_od_mm = fpk_rotor_id_mm+rotor_airgap_diameter_mm*0.24",
+        ("fpk_rotor_id_mm", "rotor_airgap_diameter_mm"),
+    ),
+    "fpk_stator_od_mm": (
+        "fpk_stator_od_mm = fpk_rotor_od_mm+rotor_airgap_diameter_mm*0.35",
+        ("fpk_rotor_od_mm", "rotor_airgap_diameter_mm"),
+    ),
+    "fpk_ring_id_mm": (
+        "fpk_ring_id_mm = gear_module_mm*ring_teeth",
+        ("gear_module_mm", "ring_teeth"),
+    ),
+    "fpk_ring_tip_diameter_mm": (
+        "fpk_ring_tip_diameter_mm = gear_module_mm*(ring_teeth+2.5)",
+        ("gear_module_mm", "ring_teeth"),
+    ),
     "fpk_diff_od_mm": ("fpk_diff_od_mm = fpk_ring_id_mm*0.2165", ("fpk_ring_id_mm",)),
     "fpk_mcu_w_mm": ("fpk_mcu_w_mm = front_bay_envelope_w_mm*0.336", ("front_bay_envelope_w_mm",)),
     "fpk_mcu_d_mm": ("fpk_mcu_d_mm = front_bay_envelope_d_mm*0.491", ("front_bay_envelope_d_mm",)),

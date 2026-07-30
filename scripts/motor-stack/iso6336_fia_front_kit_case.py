@@ -1020,6 +1020,30 @@ def run_selftest() -> int:
         geometry,
         motor_shaft_torque_nm=torque * 10.0,
     )
+    strength_stamp_inputs = replace(
+        inputs,
+        gear_module_mm=1.0,
+        face_width_mm=58.0,
+        planet_count=4,
+        sun_od_mm=18.0,
+        planet_od_mm=54.0,
+        ring_id_mm=126.0,
+        rotor_id_mm=130.5,
+    )
+    strength_stamp_geometry = derive_gear_geometry(strength_stamp_inputs)
+    strength_stamp_screen = run_strength_screen(
+        strength_stamp_inputs,
+        strength_stamp_geometry,
+        motor_shaft_torque_nm=torque,
+    )
+    strength_stamp_artifact = build_artifact(
+        inputs=strength_stamp_inputs,
+        geometry=strength_stamp_geometry,
+        screen=strength_stamp_screen,
+        source_state_sha256="synthetic-strength-stamp",
+        source_twin="synthetic-strength-stamp",
+        controlling_geometry_source="strength_driven_resize",
+    )
 
     checks = {
         "synthetic_teeth_control_geometry": (
@@ -1072,6 +1096,15 @@ def run_selftest() -> int:
                 ).get("architecture_hold")
                 or ""
             )
+        ),
+        "strength_stamp_clears_and_nests_in_enlarged_rotor": (
+            strength_stamp_screen.works_in_kit_context
+            and strength_stamp_artifact["nest_fits_rotor"] is True
+            and strength_stamp_artifact["works_in_kit_context"][
+                "duty_strength_screen_ok"
+            ]
+            is True
+            and strength_stamp_artifact["ship_ok"] is False
         ),
         "allowables_documented": (
             artifact["strength_screen"]["allowables"]["sigma_f_allow_mpa"]
@@ -1284,6 +1317,9 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
                         "planet_count": int(recommended["planet_count"]),
                         "planet_od_mm": float(recommended["planet_pitch_diameter_mm"]),
                         "ring_id_mm": float(recommended["ring_pitch_diameter_mm"]),
+                        "ring_tip_diameter_mm": float(
+                            recommended["ring_tip_diameter_mm"]
+                        ),
                         "sun_od_mm": float(recommended["sun_pitch_diameter_mm"]),
                     },
                     "quantities": {
@@ -1302,6 +1338,10 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
                         "fpk_ring_id_mm": {
                             "unit": "mm",
                             "value": float(recommended["ring_pitch_diameter_mm"]),
+                        },
+                        "fpk_ring_tip_diameter_mm": {
+                            "unit": "mm",
+                            "value": float(recommended["ring_tip_diameter_mm"]),
                         },
                         "fpk_sun_od_mm": {
                             "unit": "mm",

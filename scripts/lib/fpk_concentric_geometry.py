@@ -17,6 +17,9 @@ from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Optional
 
 
+PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM = 2.0
+
+
 @dataclass(frozen=True)
 class FpkConcentricParams:
     """Inputs from orchestratorContract.quantities (numeric values)."""
@@ -35,6 +38,7 @@ class FpkConcentricParams:
     planet_count: int = 0
     ring_id_mm: float = 0.0
     gear_face_mm: float = 0.0
+    ring_tip_diameter_mm: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -65,6 +69,7 @@ class FpkConcentricGeometry:
     planet_count: int
     planet_pcd_mm: float
     ring_id_mm: float
+    ring_tip_diameter_mm: float
     carrier_od_mm: float
     diff_od_mm: float
     diff_len_mm: float
@@ -146,6 +151,9 @@ def params_from_quantities(quantities: Mapping[str, Any]) -> FpkConcentricParams
         gear_face_mm=_num(
             quantities, "fpk_gear_face_mm", "gear_face_mm", default=0.0,
         ),
+        ring_tip_diameter_mm=_num(
+            quantities, "fpk_ring_tip_diameter_mm", default=0.0,
+        ),
     )
 
 
@@ -177,7 +185,6 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
         )
         rotor_od = od_cap / 1.42
     stator_id = rotor_od + 2.0 * airgap
-    mean_airgap_diameter = (rotor_od + stator_id) / 2.0
     stator_od = min(od_cap * 0.96, rotor_od * 1.35)
     housing_od = min(od_cap, stator_od + 12.0)
 
@@ -216,6 +223,41 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
     )
     gear_face = float(p.gear_face_mm) or derived_gear_face
     gear_module = float(p.gear_module_mm)
+    ring_tip = (
+        float(p.ring_tip_diameter_mm)
+        or (
+            ring_id + 2.5 * gear_module
+            if gear_module > 0.0
+            else ring_id
+        )
+    )
+
+    # INTENT: A strength-clearing planetary is only useful when the hollow
+    # rotor grows with it. Preserve the seed's rotor/stator radial builds while
+    # moving every concentric diameter outward; never squeeze magnet, back-iron,
+    # winding, or jacket thickness merely to make the packaging boolean green.
+    required_rotor_id = ring_tip + PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM
+    if (
+        (p.ring_id_mm > 0.0 or p.ring_tip_diameter_mm > 0.0)
+        and required_rotor_id > rotor_id
+    ):
+        rotor_radial_build = (rotor_od - rotor_id) / 2.0
+        stator_radial_build = (stator_od - stator_id) / 2.0
+        housing_radial_build = (housing_od - stator_od) / 2.0
+        previous_rotor_id = rotor_id
+        rotor_id = required_rotor_id
+        rotor_od = rotor_id + 2.0 * rotor_radial_build
+        stator_id = rotor_od + 2.0 * airgap
+        stator_od = stator_id + 2.0 * stator_radial_build
+        housing_od = stator_od + 2.0 * housing_radial_build
+        notes.append(
+            f"rotor bore {previous_rotor_id:.1f}→{rotor_id:.1f} mm for "
+            f"planetary ring tip {ring_tip:.1f} mm + "
+            f"{PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM:.1f} mm clearance; "
+            "rotor/stator/jacket radial builds preserved"
+        )
+
+    mean_airgap_diameter = (rotor_od + stator_id) / 2.0
     carrier_od = min(ring_id * 0.92, planet_pcd + planet_od * 0.35)
     diff_od = min(carrier_od * 0.85, sun_od * 1.6)
     diff_len = min(nest_len * 0.28, gear_face * 1.35)
@@ -223,7 +265,10 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
     planets_fit_ring = (
         planet_pcd / 2.0 + planet_od / 2.0
     ) <= (ring_id / 2.0 + 0.5)
-    nest_fits = planets_fit_ring and ring_id <= rotor_id + 0.5
+    nest_fits = (
+        planets_fit_ring
+        and ring_tip + PLANETARY_TIP_DIAMETRAL_CLEARANCE_MM <= rotor_id + 1.0e-6
+    )
 
     # MCU shelf — thin package on crown; span along motor length.
     mcu_h = 28.0
@@ -273,6 +318,7 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
         planet_count=planet_count,
         planet_pcd_mm=round(planet_pcd, 1),
         ring_id_mm=round(ring_id, 1),
+        ring_tip_diameter_mm=round(ring_tip, 1),
         carrier_od_mm=round(carrier_od, 1),
         diff_od_mm=round(diff_od, 1),
         diff_len_mm=round(diff_len, 1),
@@ -307,6 +353,7 @@ def geometry_from_quantities(
         "planet_od_mm": "fpk_planet_od_mm",
         "planet_count": "fpk_planet_count",
         "ring_id_mm": "fpk_ring_id_mm",
+        "ring_tip_diameter_mm": "fpk_ring_tip_diameter_mm",
         "gear_face_mm": "fpk_gear_face_mm",
         "gear_module_mm": "gear_module_mm",
     }
@@ -327,7 +374,7 @@ def principal_box_dims(g: FpkConcentricGeometry) -> dict[str, str]:
     # MCU: shelf brick
     mcu = f"{int(round(g.mcu_w_mm))}x{int(round(g.mcu_d_mm))}x{int(round(g.mcu_h_mm))} mm"
     # Planetary nest — diameter×face×diameter INSIDE rotor (not bay side box)
-    gear_od = int(round(g.ring_id_mm))
+    gear_od = int(round(g.ring_tip_diameter_mm))
     gear_face = int(round(g.gear_face_mm))
     gear = f"{gear_face}x{gear_od}x{gear_od} mm"
     diff_od = int(round(g.diff_od_mm))
@@ -357,17 +404,33 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
         }
 
     result: dict[str, dict[str, Any]] = {
-        "fpk_housing_od_mm": q(g.housing_od_mm, "mm", "derived housing OD from IPMSM airgap + jacket"),
+        "fpk_housing_od_mm": q(
+            g.housing_od_mm,
+            "mm",
+            "concentric stator OD plus preserved radial jacket build",
+        ),
         "fpk_housing_len_mm": q(g.housing_len_mm, "mm", "derived stack + end-winding clamp into bay W"),
-        "fpk_stator_od_mm": q(g.stator_od_mm, "mm", "derived stator OD"),
+        "fpk_stator_od_mm": q(
+            g.stator_od_mm,
+            "mm",
+            "rotor-driven stator ID plus preserved magnetic radial build",
+        ),
         "fpk_stator_id_mm": q(g.stator_id_mm, "mm", "rotor OD + 2×airgap"),
-        "fpk_rotor_od_mm": q(g.rotor_od_mm, "mm", "from rotor_airgap_diameter_mm (clamped)"),
+        "fpk_rotor_od_mm": q(
+            g.rotor_od_mm,
+            "mm",
+            "planetary-clearing rotor ID plus preserved magnet/retention radial build",
+        ),
         "fpk_mean_airgap_diameter_mm": q(
             g.mean_airgap_diameter_mm,
             "mm",
             "mean diameter between rotor OD and stator ID",
         ),
-        "fpk_rotor_id_mm": q(g.rotor_id_mm, "mm", "hollow bore for planetary nest"),
+        "fpk_rotor_id_mm": q(
+            g.rotor_id_mm,
+            "mm",
+            "max(seed hollow bore, planetary ring tip + 2 mm diametral clearance)",
+        ),
         "fpk_sun_od_mm": q(g.sun_od_mm, "mm", "planetary sun from gear_ratio + ring ID"),
         "fpk_planet_od_mm": q(g.planet_od_mm, "mm", "planet pitch diameter from R/S split"),
         "fpk_planet_count": {
@@ -383,6 +446,11 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
             ),
         },
         "fpk_ring_id_mm": q(g.ring_id_mm, "mm", "ring gear ID inside hollow rotor"),
+        "fpk_ring_tip_diameter_mm": q(
+            g.ring_tip_diameter_mm,
+            "mm",
+            "planetary ring tip diameter; rotor bore adds 2 mm diametral clearance",
+        ),
         "fpk_gear_face_mm": q(
             g.gear_face_mm,
             "mm",
@@ -471,6 +539,11 @@ def _selftest() -> None:
     assert resized.sun_od_mm == 18.0
     assert resized.planet_od_mm == 54.0
     assert resized.ring_id_mm == 126.0
+    assert resized.rotor_id_mm >= 130.5
+    assert resized.rotor_od_mm > 121.98
+    assert resized.stator_id_mm > resized.rotor_od_mm
+    assert resized.nest_fits_rotor
+    assert resized.stack_fits_bay
     resized_wb = quantity_writeback(resized)
     assert resized_wb["fpk_planet_count"]["value"] == 4
     assert resized_wb["fpk_gear_face_mm"]["value"] == 58.0
