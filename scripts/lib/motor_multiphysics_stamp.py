@@ -30,6 +30,9 @@ ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 # with permanent unblock paths — never chat-only, never greenwashed to ship_ok.
 BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
 BLOCKER_ID_POST_DIFF_FINAL_DRIVE = "POST_DIFF_FINAL_DRIVE_PACKAGING"
+POST_DIFF_PACKAGING_SCREEN_FILENAME = (
+    "post_diff_final_drive_packaging_screen.json"
+)
 _DIFF_NEST_PERMANENT_UNBLOCK: list[dict[str, str]] = [
     {
         "option_id": "enlarge_diff_nest",
@@ -141,7 +144,7 @@ _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK: list[dict[str, str]] = [
             "fit it inside the FIA front-kit bay."
         ),
         "code_hooks": (
-            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py;"
+            "scripts/motor-stack/post_diff_final_drive_packaging_screen.py;"
             "Tier 1 and 2 parts for cad /tier2_motor_drivetrain.py;"
             "scripts/lib/fpk_concentric_geometry.py"
         ),
@@ -336,7 +339,9 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
         "notes": (
             "Architecture communication — twin-bound straight-bevel handbook "
             "SCREEN may be cited under gear_strength.twin_bound_case; "
-            "ISO 23509 / KISSsoft / contact pattern still OPEN"
+            "post-diff final-drive packaging screen may be PARTIAL but its "
+            "parametric CAD family remains OPEN; ISO 23509 / KISSsoft / "
+            "contact pattern still OPEN"
         ),
     },
     {
@@ -551,6 +556,14 @@ def _load_fia_iso6336_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]
 def _load_fia_iso_bevel_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA straight-bevel differential screen artefact if present."""
     return _load_fia_case_json(twin_dir, "iso_bevel_fia_front_kit_case.json")
+
+
+def _load_post_diff_packaging_screen(
+    twin_dir: Optional[Path],
+) -> Optional[dict[str, Any]]:
+    """Load the twin-bound post-differential packaging screen if present."""
+
+    return _load_fia_case_json(twin_dir, POST_DIFF_PACKAGING_SCREEN_FILENAME)
 
 
 def _load_fia_gear_oil_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
@@ -1395,10 +1408,61 @@ def _gear_oil_check_from_fia_case(
     return body
 
 
+def _post_diff_packaging_cite_from_case(
+    packaging_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Optional[dict[str, Any]]:
+    """Build a compact, non-shipping cite from the packaging screen artefact."""
+
+    if not isinstance(packaging_case, Mapping):
+        return None
+    rel_ref = f"_motor_stack/{POST_DIFF_PACKAGING_SCREEN_FILENAME}"
+    envelope = (
+        packaging_case.get("envelope_mm")
+        if isinstance(packaging_case.get("envelope_mm"), Mapping)
+        else {}
+    )
+    cad = (
+        packaging_case.get("cad_authority")
+        if isinstance(packaging_case.get("cad_authority"), Mapping)
+        else {}
+    )
+    closure = (
+        packaging_case.get("closure_gate")
+        if isinstance(packaging_case.get("closure_gate"), Mapping)
+        else {}
+    )
+    blocker = (
+        packaging_case.get("architecture_blocker")
+        if isinstance(packaging_case.get("architecture_blocker"), Mapping)
+        else {}
+    )
+    return {
+        "status": packaging_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "bay_fit": packaging_case.get("bay_fit"),
+        "envelope_mm": dict(envelope),
+        "parametric_family_exists": cad.get("parametric_family_exists") is True,
+        "cad_family": cad.get("cad_family"),
+        "cad_status": cad.get("status") or "OPEN",
+        "blocker_may_clear": closure.get("blocker_may_clear") is True,
+        "blocker_status": blocker.get("status") or "OPEN",
+        "summary": blocker.get("summary"),
+        "note": (
+            "Twin-bound analytical envelope screen only; no tooth-strength, "
+            "bearing/shaft/lubrication close or parametric/release CAD claim."
+        ),
+    }
+
+
 def _bevel_differential_cite_from_case(
     bevel_case: Optional[Mapping[str, Any]],
     *,
     twin_dir: Path,
+    post_diff_packaging_case: Optional[Mapping[str, Any]] = None,
 ) -> Any:
     """Build optional bevel-differential SCREEN cite for gear_strength twin_bound.
 
@@ -1456,7 +1520,7 @@ def _bevel_differential_cite_from_case(
         if isinstance(bevel_case.get("architecture_decision"), Mapping)
         else None
     )
-    return {
+    body = {
         "status": bevel_case.get("status") or "PARTIAL",
         "ship_ok": False,
         "path": rel_ref,
@@ -1494,6 +1558,54 @@ def _bevel_differential_cite_from_case(
             )
         ),
     }
+    packaging_cite = _post_diff_packaging_cite_from_case(
+        post_diff_packaging_case,
+        twin_dir=twin_dir,
+    )
+    if packaging_cite is not None:
+        body["post_diff_final_drive_packaging_screen"] = packaging_cite
+    return body
+
+
+def _post_diff_unblock_options(
+    packaging: Optional[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Annotate permanent unblock options with durable packaging progress."""
+
+    options: list[dict[str, Any]] = [
+        dict(option) for option in _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK
+    ]
+    if not options:
+        return options
+    package_option = options[0]
+    if isinstance(packaging, Mapping):
+        package_option.update(
+            {
+                "progress_status": "PARTIAL_PACKAGING_SCREEN",
+                "progress_evidence_path": packaging.get("path")
+                or f"_motor_stack/{POST_DIFF_PACKAGING_SCREEN_FILENAME}",
+                "bay_fit_screen": packaging.get("bay_fit"),
+                "parametric_family_exists": (
+                    packaging.get("parametric_family_exists") is True
+                ),
+                "remaining_work": (
+                    "Create a revision-bound parametric gear/bearing/shaft/case "
+                    "family, sync Blender, then close strength and lubrication."
+                ),
+            }
+        )
+    else:
+        package_option.update(
+            {
+                "progress_status": "NOT_STARTED",
+                "progress_evidence_path": None,
+                "remaining_work": (
+                    "Run the twin-bound packaging screen, then create the "
+                    "revision-bound parametric family."
+                ),
+            }
+        )
+    return options
 
 
 def collect_architecture_blockers(
@@ -1559,6 +1671,22 @@ def collect_architecture_blockers(
         and residual.get("blocker_id") == BLOCKER_ID_POST_DIFF_FINAL_DRIVE
         and residual.get("status") == "OPEN"
     ):
+        packaging = (
+            bevel.get("post_diff_final_drive_packaging_screen")
+            if isinstance(
+                bevel.get("post_diff_final_drive_packaging_screen"),
+                Mapping,
+            )
+            else None
+        )
+        bay_fit = packaging.get("bay_fit") if packaging else None
+        parametric_family_exists = (
+            packaging.get("parametric_family_exists") is True
+            if packaging
+            else False
+        )
+        closure_eligible = bool(bay_fit and parametric_family_exists)
+        packaging_summary = packaging.get("summary") if packaging else None
         blockers.append(
             {
                 "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
@@ -1567,18 +1695,33 @@ def collect_architecture_blockers(
                 "severity": "architecture_hold",
                 "ship_ok": False,
                 "cannot_greenwash": True,
-                "evidence_path": bevel.get("path")
+                "evidence_path": (
+                    packaging.get("path")
+                    if packaging
+                    else bevel.get("path")
+                    or "_motor_stack/iso_bevel_fia_front_kit_case.json"
+                ),
+                "source_bevel_evidence_path": bevel.get("path")
                 or "_motor_stack/iso_bevel_fia_front_kit_case.json",
                 "minimum_strength_factor": bevel.get("minimum_strength_factor"),
                 "ratio_after_diff": residual.get("ratio_after_diff"),
-                "summary": residual.get("summary")
+                "packaging_screen_status": (
+                    packaging.get("status") if packaging else "NOT_STARTED"
+                ),
+                "bay_fit": bay_fit,
+                "packaging_envelope_mm": (
+                    packaging.get("envelope_mm") if packaging else None
+                ),
+                "parametric_family_exists": parametric_family_exists,
+                "cad_family": packaging.get("cad_family") if packaging else None,
+                "closure_eligible": closure_eligible,
+                "summary": packaging_summary
+                or residual.get("summary")
                 or (
                     "Differential torque budget clears the bevel nest, but the "
                     "remaining post-differential final-drive stage is not packaged."
                 ),
-                "permanent_unblock_options": list(
-                    _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK
-                ),
+                "permanent_unblock_options": _post_diff_unblock_options(packaging),
                 "human_decision_required": True,
             }
         )
@@ -1591,6 +1734,7 @@ def _gear_strength_check_from_fia_case(
     *,
     twin_dir: Path,
     bevel_case: Optional[Mapping[str, Any]] = None,
+    post_diff_packaging_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote gear_strength to PARTIAL when a twin-bound ISO 6336 screen exists.
 
@@ -1625,7 +1769,11 @@ def _gear_strength_check_from_fia_case(
     min_fos = margins.get("minimum_strength_factor")
     if min_fos is None:
         min_fos = strength.get("minimum_strength_factor")
-    bevel_cite = _bevel_differential_cite_from_case(bevel_case, twin_dir=twin_dir)
+    bevel_cite = _bevel_differential_cite_from_case(
+        bevel_case,
+        twin_dir=twin_dir,
+        post_diff_packaging_case=post_diff_packaging_case,
+    )
     body = _open_check(
         "gear_strength",
         extra={
@@ -1971,12 +2119,14 @@ def build_motor_multiphysics(
 
     fia_iso6336 = _load_fia_iso6336_case(twin_dir)
     fia_iso_bevel = _load_fia_iso_bevel_case(twin_dir)
+    post_diff_packaging = _load_post_diff_packaging_screen(twin_dir)
     if fia_iso6336 is not None and twin_dir is not None:
         gear_strength = _gear_strength_check_from_fia_case(
             duty,
             fia_iso6336,
             twin_dir=Path(twin_dir),
             bevel_case=fia_iso_bevel,
+            post_diff_packaging_case=post_diff_packaging,
         )
         notes += (
             " Gear-strength check PARTIAL: twin-bound ISO 6336-style screen in "
@@ -1998,6 +2148,13 @@ def build_motor_multiphysics(
                     hold = bevel_cite.get("architecture_hold")
             if hold:
                 notes += f" Architecture blocker OPEN: {hold}"
+            if post_diff_packaging is not None:
+                notes += (
+                    " Post-diff final-drive packaging PARTIAL: twin-bound envelope "
+                    f"screen reports bay_fit={post_diff_packaging.get('bay_fit')} "
+                    f"(_motor_stack/{POST_DIFF_PACKAGING_SCREEN_FILENAME}); "
+                    "parametric CAD and release closure remain OPEN."
+                )
     else:
         gear_strength = _open_check(
             "gear_strength",
@@ -2394,9 +2551,18 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             for o in b.get("permanent_unblock_options") or []:
                 if not isinstance(o, Mapping):
                     continue
+                progress = o.get("progress_status")
+                progress_note = ""
+                if progress:
+                    evidence = o.get("progress_evidence_path") or "—"
+                    progress_note = (
+                        f" Progress: **{progress}**; evidence: `{evidence}`;"
+                        f" remaining: {o.get('remaining_work') or '—'}."
+                    )
                 lines.append(
                     f"- **{o.get('option_id')}** ({o.get('kind')}): "
-                    f"{o.get('summary')} — hooks: `{o.get('code_hooks')}`"
+                    f"{o.get('summary')} — hooks: `{o.get('code_hooks')}`."
+                    f"{progress_note}"
                 )
     lines.extend(
         [
@@ -3565,6 +3731,47 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "post_diff_final_drive_packaging_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": (
+                        "forgeos.motor_stack."
+                        "post_diff_final_drive_packaging_screen/v1"
+                    ),
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "bay_fit": True,
+                    "input_quantities": {
+                        "bay_depth_mm": 259.0,
+                        "diff_od_mm": 120.0,
+                        "ratio_after_diff": 4.0,
+                    },
+                    "envelope_mm": {
+                        "width_lateral": 192.0,
+                        "depth_short_edge": 172.2782,
+                        "height": 132.0,
+                        "short_edge_margin": 86.7218,
+                    },
+                    "cad_authority": {
+                        "status": "OPEN",
+                        "parametric_family_exists": False,
+                        "cad_family": None,
+                    },
+                    "closure_gate": {
+                        "bay_fit": True,
+                        "parametric_family_exists": False,
+                        "blocker_may_clear": False,
+                    },
+                    "architecture_blocker": {
+                        "blocker_id": "POST_DIFF_FINAL_DRIVE_PACKAGING",
+                        "status": "OPEN",
+                        "ship_ok": False,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         residual_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
         residual_blockers = residual_payload["motorMultiphysics"].get(
             "architectureBlockers"
@@ -3586,8 +3793,54 @@ def selftest() -> int:
         elif residual_blockers[0].get("cannot_greenwash") is not True:
             print("FAIL: post-diff blocker must set cannot_greenwash")
             bad += 1
+        elif (
+            residual_blockers[0].get("evidence_path")
+            != "_motor_stack/post_diff_final_drive_packaging_screen.json"
+        ):
+            print("FAIL: post-diff blocker must cite packaging-screen evidence")
+            bad += 1
+        elif residual_blockers[0].get("bay_fit") is not True:
+            print("FAIL: post-diff blocker must surface packaging-screen bay_fit")
+            bad += 1
+        elif residual_blockers[0].get("parametric_family_exists") is not False:
+            print("FAIL: post-diff blocker must keep parametric CAD family OPEN")
+            bad += 1
+        elif residual_blockers[0].get("closure_eligible") is not False:
+            print("FAIL: fit without parametric CAD must not clear post-diff blocker")
+            bad += 1
+        elif not any(
+            isinstance(option, Mapping)
+            and option.get("option_id") == "package_post_diff_final_drive"
+            and option.get("progress_status") == "PARTIAL_PACKAGING_SCREEN"
+            for option in residual_blockers[0].get("permanent_unblock_options") or []
+        ):
+            print("FAIL: permanent unblock must record PARTIAL packaging progress")
+            bad += 1
         if BLOCKER_ID_DIFF_NEST in json.dumps(residual_blockers):
             print("FAIL: DIFF_NEST blocker must stop once budgeted FoS clears")
+            bad += 1
+        residual_bevel_cite = (
+            (
+                residual_payload["motorMultiphysics"]["required_checks"][
+                    "gear_strength"
+                ].get("twin_bound_case")
+                or {}
+            ).get("bevel_differential_screen")
+            or {}
+        )
+        if not isinstance(
+            residual_bevel_cite.get("post_diff_final_drive_packaging_screen"),
+            Mapping,
+        ):
+            print("FAIL: bevel residual cite must include post-diff packaging screen")
+            bad += 1
+        residual_markdown = render_markdown(residual_payload)
+        if (
+            "PARTIAL_PACKAGING_SCREEN" not in residual_markdown
+            or "_motor_stack/post_diff_final_drive_packaging_screen.json"
+            not in residual_markdown
+        ):
+            print("FAIL: markdown must surface post-diff permanent-unblock progress")
             bad += 1
         if residual_payload["motorMultiphysics"].get("ship_ok") is not False:
             print("FAIL: residual packaging blocker must keep ship_ok false")
