@@ -669,6 +669,88 @@ export function buildUnresolvedCriticHighsSection(
   return { name: 'unresolved_critic_highs', score, defects }
 }
 
+/** Minimum mission prose length — below this is genuinely empty for ship purposes. */
+const DESIGN_NARRATIVE_MISSION_MIN_CHARS = 40
+
+/** Minimum module overview length to count as engineering-grounded prose. */
+const DESIGN_NARRATIVE_MODULE_MIN_CHARS = 60
+
+const GENERIC_WHY_NOW_OPENER_RE =
+  /^(?:growing demand|premium,?\s*certified|rapidly deployable)/i
+
+/**
+ * Deterministic `design_narrative` section (advisory:true — visible, ship via
+ * shipGatingScore). Replaces stale LLM self-audit scores that ran before
+ * briefOverviewProse was filled (e.g. "Mission prose empty/absent" when
+ * mission_statement is present on disk).
+ *
+ * SCORING: mission + module overviews present → 9–10; missing mission → ≤4;
+ * thin modules → ≤6. Why-now genericity is annotated only (non-ship-gating).
+ */
+export function buildDesignNarrativeSection(input: {
+  missionStatement?: string
+  whyNow?: string
+  moduleOverviews?: string[]
+}): ScorecardSection {
+  const mission = String(input.missionStatement ?? '').trim()
+  const whyNow = String(input.whyNow ?? '').trim()
+  const modules = (input.moduleOverviews ?? [])
+    .map((s) => String(s).trim())
+    .filter((s) => s.length > 0)
+
+  const defects: string[] = []
+  let score = 10
+
+  const missionOk = mission.length >= DESIGN_NARRATIVE_MISSION_MIN_CHARS
+  const substantiveModules = modules.filter((m) => m.length >= DESIGN_NARRATIVE_MODULE_MIN_CHARS)
+  const modulesOk =
+    modules.length > 0
+    && substantiveModules.length >= Math.min(3, Math.max(1, modules.length))
+
+  if (!missionOk) {
+    defects.push('Mission prose empty/absent')
+    score = Math.min(score, 4)
+  }
+  if (!modulesOk) {
+    defects.push('Module overviews thin or absent')
+    score = Math.min(score, 6)
+  }
+  if (whyNow && GENERIC_WHY_NOW_OPENER_RE.test(whyNow)) {
+    defects.push('Why now paragraph is generic boilerplate')
+  }
+
+  if (missionOk && modulesOk && score >= 8) {
+    score = 9
+  }
+
+  return { name: 'design_narrative', score, defects, advisory: true }
+}
+
+/**
+ * Deterministic `drawing_gates` section from the delivered gate verdict
+ * (state.drawingGates or drawing-gates.json). Prevents a mid-loop FAIL from
+ * freezing quality-scorecard.json after a heal/restamp.
+ */
+export function buildDrawingGatesSection(input: {
+  allPass?: boolean
+  nFailing?: number
+  gateDefects?: string[]
+}): ScorecardSection {
+  const nFail = Number(input.nFailing ?? 0)
+  const allPass = input.allPass === true || nFail === 0
+  if (allPass) {
+    return { name: 'drawing_gates', score: 10, defects: [] }
+  }
+  const defects = input.gateDefects?.length
+    ? input.gateDefects.map((d) => String(d).slice(0, 200))
+    : [`${Math.max(1, nFail)} drawing gate(s) failing (live drawing-gates.json)`]
+  return {
+    name: 'drawing_gates',
+    score: Math.max(0, 10 - 2 * Math.max(1, nFail)),
+    defects,
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SELF-TEST (Tristan 2026-07-06) — proveCatch for both fixes above, both directions.
 // Pure + dependency-free (module-local); run with `npx tsx -e` or import + call
@@ -1012,6 +1094,47 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
     'scope_gate.car_level_skipped_scores_10',
     carLevelSection.score === 10 && (carLevelSection.defects ?? []).length === 0,
     JSON.stringify(carLevelSection),
+  )
+
+  // (16) proveCatch — filled mission + modules score ≥9; stale empty-mission must not.
+  const filledNarrative = buildDesignNarrativeSection({
+    missionStatement:
+      'Deliver a Gen3/Gen3 Evo–spec front powertrain kit — unitised IPMSM MGU, SiC traction inverter.',
+    whyNow: 'Gen3 Evo expands front-axle regen/traction windows.',
+    moduleOverviews: [
+      'The power electronics module integrates the SiC traction inverter with liquid cooling.',
+      'The mechanical assembly houses the IPMSM rotor and single-speed reduction gearbox.',
+      'Thermal management routes coolant through the inverter cold plate and MGU jacket.',
+    ],
+  })
+  check(
+    'design_narrative.filled_mission_and_modules_score_at_least_9',
+    filledNarrative.score >= 9 && !filledNarrative.defects?.some((d) => d.includes('empty/absent')),
+    JSON.stringify(filledNarrative),
+  )
+  const emptyNarrative = buildDesignNarrativeSection({
+    missionStatement: '',
+    moduleOverviews: [],
+  })
+  check(
+    'design_narrative.empty_mission_docks_floor',
+    emptyNarrative.score <= 4
+      && (emptyNarrative.defects ?? []).some((d) => d.includes('Mission prose empty')),
+    JSON.stringify(emptyNarrative),
+  )
+
+  // (17) proveCatch — stale drawing_gates=6 must yield to live ALL-PASS verdict.
+  const healedGates = buildDrawingGatesSection({ allPass: true, nFailing: 0 })
+  check(
+    'drawing_gates.all_pass_scores_10',
+    healedGates.score === 10 && (healedGates.defects ?? []).length === 0,
+    JSON.stringify(healedGates),
+  )
+  const failingGates = buildDrawingGatesSection({ allPass: false, nFailing: 2 })
+  check(
+    'drawing_gates.n_failing_deducts_2_per_gate',
+    failingGates.score === 6,
+    JSON.stringify(failingGates),
   )
 
   return { passed: total - failed.length, failed }

@@ -29709,6 +29709,40 @@ def _sync_peltier_cooling_tool_claims(state: dict, run_dir: Optional[str] = None
     return mutated
 
 
+def _freshen_quality_scorecard(run_dir: str) -> bool:
+    """Recompute drawing_gates + design_narrative in quality-scorecard.json.
+
+    INTENT: mid-loop drawing FAIL and pre-prose self-audit can freeze floor=6
+    while drawing-gates.json is ALL-PASS and briefOverviewProse is filled.
+    Universal: any run_dir with state.json + quality-scorecard.json.
+    """
+    script = os.path.join(os.path.dirname(__file__), "freshen-quality-scorecard.ts")
+    if not os.path.isfile(script):
+        return False
+    try:
+        r = subprocess.run(
+            ["npx", "tsx", script, run_dir],
+            check=False,
+            timeout=60,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"  · quality-scorecard freshen failed: {exc}")
+        return False
+    if r.returncode != 0:
+        err = (r.stderr or r.stdout or "").strip().splitlines()[-1:] or ["unknown"]
+        print(f"  · quality-scorecard freshen exit {r.returncode}: {err[0][:160]}")
+        return False
+    for line in (r.stderr or "").splitlines():
+        if "freshen-scorecard" in line or "drawing_gates" in line:
+            print(f"  · {line.strip()}")
+            break
+    else:
+        print("  · quality-scorecard freshened from live artefacts")
+    return True
+
+
 def _freshen_closure_honesty_scorecard(run_dir: str) -> bool:
     """Recompute Gate-40 honesty into quality-scorecard.json from live state.
 
@@ -29922,6 +29956,10 @@ def build(run_dir: str, out_path: str) -> dict:
     # INTENT (2026-07-28): closure_honesty in quality-scorecard.json can lag a
     # post-chain fillBlank / PCB identity writeback — Exec Summary mirrors that
     # stale floor. Recompute from live state before Overview/Quality read it.
+    try:
+        _freshen_quality_scorecard(run_dir)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  · quality-scorecard freshen skipped: {exc}")
     try:
         _freshen_closure_honesty_scorecard(run_dir)
     except Exception as exc:  # noqa: BLE001
