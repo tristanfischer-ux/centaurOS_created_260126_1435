@@ -535,6 +535,7 @@ def build_requirements_bom_row(
         "character_id": str(leaf.get("id") or ""),
         "part": "TBD (detailed design)",
         "status": "NOT FOUND",
+        "not_found_status": "FABRICATED",
         "qty": 1,
         "unit_gbp": unit_gbp,
         "line_gbp": unit_gbp,
@@ -613,6 +614,7 @@ def repair_existing_densify_rows(
         before = (row.get("unit_gbp"), row.get("line_gbp"), row.get("material"))
         row["part"] = "TBD (detailed design)"
         row["status"] = "NOT FOUND"
+        row["not_found_status"] = "FABRICATED"
         row["qty"] = qty
         row["unit_gbp"] = unit_gbp
         row["line_gbp"] = round(unit_gbp * qty, 2)
@@ -860,6 +862,7 @@ def run_selftest() -> int:
             assert row.get("material"), row
             assert row.get("estimate_class") == 5, row
             assert str(row.get("confidence") or "").lower().startswith("low"), row
+            assert row.get("not_found_status") == "FABRICATED", row
     added_ids = {x["id"] for x in stamp["concept_schedule"]}
     assert "housing_bolt_set" not in added_ids
     assert "input_seal" in added_ids

@@ -80,7 +80,7 @@ TYPE_RULES = [
                    r"data\s*logger|\bIoT\b|edge\s*gateway|\bgateway\b"),
     ("instrument", r"transmitter|analy[sz]er|\bprobe\b|sensor|\bgauge\b|level switch|"
                    r"flow meter|flowmeter|\bmeter\b|densit|turbidit|viscosit|coriolis|"
-                   r"mass flow|detector|monitor|"
+                   r"mass flow|detector|monitor|thermistor|\bntc\b|"
                    # a position/door/limit switch is a field SENSOR (open/closed state), not a
                    # power-distribution device — checked here (not the electrical rule) so it is
                    # P&ID/schedule-expected, not a phantom single-line feeder (BESS v3 dissection
@@ -92,11 +92,14 @@ TYPE_RULES = [
                    r"force\s+limit|limit\s+feedback|stall\s*(?:sense|detect|feedback)|"
                    r"end[\s-]?stop|load\s*cell|force\s+feedback"),
     ("valve",      r"\bvalve\b|solenoid|actuator|damper"),
-    ("control",    r"controller|control\s*board|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
+    ("control",    r"controller|control\s*board|microcontroller|\bmcu\b|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
                    r"\bHMI\b|touch\s?screen|touch\s?panel|\bDCS\b|operator (?:panel|interface|station)|"
                    # INTENT (2026-07-29 sealed drive packs): OEM inverter / gate-driver
                    # boards are the pack measurement hub when plant SCADA is absent.
                    r"gate\s*driver(?:\s*board)?"),
+    # INTENT (2026-07-30 Formula-E FPK): a mesh screen is a mechanical pickup/filter
+    # insert, not a discrete separator vessel with its own fluid in/out nozzles.
+    ("other",      r"\b(?:pickup\s+)?mesh\s+screen\b"),
     # INTENT (2026-07-29): traction motor / SiC inverter are ELECTRICAL principals
     # (SLD + panel), not plant `other` → blender+GA litter. Before generic rules.
     ("electrical", r"\btraction\s*(?:ipmsm\s*)?motor\b|\bipmsm\b|motor[-\s]?generator|"
@@ -227,7 +230,10 @@ _FABRICATED_BASIS_RX = re.compile(
     # throughput, not a catalogue MPN (Codema ship V-104 Nursery Cloth Filter).
     r"(?:cloth|paperbelt|drum|sand|media)\s+filter\s+parametric|"
     r"distribution-manifold\s+parametric|"
-    r"\d+(?:\.\d+)?\s*m[³3]/h\s*[×x]\s*£",
+    r"\d+(?:\.\d+)?\s*m[³3]/h\s*[×x]\s*£|"
+    # FPK physics-tree densify concept lines (0846 traction MGU): make-to-print cassette
+    # take-offs with honest TBD MPNs — no catalogue identity by nature.
+    r"fpk\s+physics-tree\s+densify|concept\s+line\s+·\s+no\s+fake\s+mpn",
     re.I)
 # INTENT: electrical control / MCC / distribution panels are SCOPE-DOCUMENTED assemblies
 # (built-to-schedule from the panel schedule), not catalogue-research residuals. Without
@@ -1975,7 +1981,16 @@ def main() -> int:
         # expected {pid, process-schedules} and deflates P&ID coverage (Codema ship).
         if str(r.get("status") or "").upper() == "PARAMETRIC":
             expected = set()
-        basis_full = str(r.get("basis", ""))
+        # FPK physics-tree densify concept lines (0846 traction MGU): internal cassette
+        # take-offs mirrored from fpkPhysicsTree — not individually tagged GA objects.
+        _basis_early = str(r.get("basis") or "")
+        if (
+            str(r.get("provenance") or "") == "fpk_bom_densify/v1"
+            or re.match(r"^FPK-D-\d{3}$", tag)
+            or re.search(r"fpk\s+physics-tree\s+densify", _basis_early, re.I)
+        ):
+            expected = set()
+        basis_full = _basis_early
         eq_tools = _find_tools_for_equipment(tag, name, basis_full)
         # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
         # truncated `basis` field below) so a signal past 90 chars is never missed.
@@ -2962,6 +2977,9 @@ def _selftest() -> int:
         ("Microscreen Filter", "separator"),
         ("UF Membrane Bank", "separator"),
         ("Pressure Transmitter", "instrument"),
+        ("Inverter power-module NTC", "instrument"),
+        ("Real-time MCU", "control"),
+        ("Oil pickup mesh screen", "other"),
         ("Butterfly Valve", "valve"),
         ("Fresh Water Tank", "vessel"),
     ]
@@ -3233,6 +3251,16 @@ def _selftest() -> int:
     if _fab_hit != "FABRICATED":
         print(f"  FAIL not-found-substatus: a fabricated manifold must classify FABRICATED "
               f"(got {_fab_hit!r}) — a fabricated manifold must never count not-found")
+        bad += 1
+    _fpk_densify = _not_found_substatus(
+        "Oil pickup mesh screen",
+        "fpk physics-tree densify · concept line · no fake MPN · material=steel",
+        "separator",
+        traction_drive=True,
+    )
+    if _fpk_densify != "FABRICATED":
+        print(f"  FAIL not-found-substatus: FPK densify concept line must classify "
+              f"FABRICATED (got {_fpk_densify!r})")
         bad += 1
     # proveCatch (2026-07-14): instrument-device custom bezel / sensing subcomponents
     # must classify FABRICATED — never inflate Part names with plant-catalogue NOT FOUND.

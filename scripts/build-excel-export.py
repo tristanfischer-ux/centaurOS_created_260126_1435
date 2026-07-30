@@ -8502,6 +8502,12 @@ def _collect_principals(bom: list, run_dir: str) -> Tuple[List[dict], int]:
         # kit) — the arrow is the universal, class-independent discriminator.
         if "→" in req:
             continue
+        # INTENT (0846 traction MGU / cell-cycler SIGHT): circuit functions realized on
+        # the bespoke PCB (Phase Overcurrent Trip, …) are disclosed on the PCB tab —
+        # not discrete purchasable principals on the Part names master. An em-dash tag
+        # on that row fails the Tag cell contract and inflates cross-link gaps.
+        if str(row.get("status") or "").strip().upper() == "REALIZED_ON_PCB":
+            continue
         nm = _clean_name(req)
         key = _norm_name(req)
         if not nm or not key or key in seen:
@@ -29626,6 +29632,32 @@ def _freshen_closure_honesty_scorecard(run_dir: str) -> bool:
     return True
 
 
+def _sync_cost_anchors_to_bom_sum(state: dict, bom_sum: float) -> bool:
+    """Keep cost anchors aligned to the bill when requirementsBom is the authority.
+
+    @description FPK densify can add honest requirementsBom rows after costStack was
+    computed. The Excel scorer compares against costStack, so the cost anchors must
+    follow the live bill even when parts-ledger is already fresh.
+    @param state Runtime chain state mutated in place.
+    @param bom_sum Authoritative Σ requirementsBom line_gbp value.
+    @returns True when any cost anchor changed.
+    @throws This helper is pure in-memory and does not raise intentionally.
+    """
+    changed = False
+    target = round(float(bom_sum), 2)
+    cr = state.get("cost_reality")
+    if isinstance(cr, dict) and _num_of(cr.get("bom_total_gbp")) != target:
+        cr["bom_total_gbp"] = target
+        changed = True
+    cs = state.get("costStack")
+    if isinstance(cs, dict):
+        for key in ("raw_materials_bom_gbp", "bom_total_gbp"):
+            if key in cs and _num_of(cs.get(key)) != target:
+                cs[key] = target
+                changed = True
+    return changed
+
+
 def _freshen_parts_ledger_if_stale(run_dir: str, state: dict) -> bool:
     """Re-run parts_ledger.py when grand_total diverges from Σ requirementsBom.
 
@@ -29650,8 +29682,17 @@ def _freshen_parts_ledger_if_stale(run_dir: str, state: dict) -> bool:
         grand = float(pl.get("grand_total_gbp")) if pl.get("grand_total_gbp") is not None else None
     except (TypeError, ValueError):
         grand = None
+    cost_synced = _sync_cost_anchors_to_bom_sum(state, bom_sum)
     if grand is not None and abs(bom_sum - grand) <= max(1.0, 0.01 * max(abs(grand), 1.0)):
-        return False
+        if cost_synced:
+            state_path = os.path.join(run_dir, "state.json")
+            try:
+                with open(state_path, "w", encoding="utf-8") as fh:
+                    json.dump(state, fh, indent=2, default=str)
+            except OSError as exc:
+                print(f"  · costStack/BOM sync not persisted (state write failed: {exc})")
+            print(f"  · costStack/BOM sync: raw materials → Σ requirementsBom £{bom_sum:,.0f}")
+        return cost_synced
     py = sys.executable
     ledger_py = os.path.join(os.path.dirname(__file__), "blender-universal", "parts_ledger.py")
     state_path = os.path.join(run_dir, "state.json")
@@ -29681,12 +29722,7 @@ def _freshen_parts_ledger_if_stale(run_dir: str, state: dict) -> bool:
     if grand2 is None:
         return False
     # Keep cover / cost_reality aligned with the refreshed BoM sum.
-    cr = state.get("cost_reality")
-    if isinstance(cr, dict):
-        cr["bom_total_gbp"] = round(bom_sum)
-    cs = state.get("costStack")
-    if isinstance(cs, dict) and cs.get("raw_materials_bom_gbp") is not None:
-        cs["raw_materials_bom_gbp"] = round(bom_sum)
+    _sync_cost_anchors_to_bom_sum(state, bom_sum)
     print(
         f"  · parts-ledger freshened: grand {grand} → {grand2} "
         f"(Σ requirementsBom={bom_sum:.0f})"
@@ -31362,6 +31398,19 @@ def _selftest() -> int:
     if any("Gac Softener" in n for n in _pc_names):
         print(f"  FAIL x140-collect: a routed pipe run (arrow present) must NOT become "
               f"a master principal (got {sorted(_pc_names)})"); bad += 1
+    _pcb_bom = [
+        {"tag": "—", "requirement": "Phase Overcurrent Trip · gate-drive", "qty": 1,
+         "status": "REALIZED_ON_PCB"},
+        {"tag": "X-201", "requirement": "Traction Ipmsm Motor", "qty": 1},
+    ]
+    _pcb_principals, _ = _collect_principals(_pcb_bom, "")
+    _pcb_names = {p["name"] for p in _pcb_principals}
+    if any("Overcurrent" in n for n in _pcb_names):
+        print("  FAIL pcb-collect: REALIZED_ON_PCB circuit functions must NOT appear on "
+              f"the Part names master (got {sorted(_pcb_names)})"); bad += 1
+    if not any("Traction" in n for n in _pcb_names):
+        print("  FAIL pcb-collect: a real principal must still be collected when a "
+              f"REALIZED_ON_PCB row is present (got {sorted(_pcb_names)})"); bad += 1
     # ═══ proveCatch the EQUIPMENT REGISTER name-divergence checks — both directions
     # independent (a name present in the BoM but never drawn fails ONLY the drawings
     # check; the reverse fails ONLY the BoM check), plus the base cases. ═══
