@@ -41,10 +41,14 @@ SCHEMA = "forgeos.motor_stack.analytical_fia_cooling_network_screen/v1"
 # Screening pump head when twin does not pin a kit manifold budget.
 DEFAULT_PUMP_PRESSURE_BUDGET_KPA = 150.0
 
-# Solid-path seeds (K·m²/W area-normalised unless noted). Documented, not measured.
+# Solid-path area-normalised resistances (K·m²/W). Documented screening seeds.
+# DECISION: ~0.1 mm grease/solder TIM at k≈1 W/mK → 1e-4 K·m²/W — not the
+# lumped 0.05 K/W magnet-path constant (that unit was wrongly copied here).
 DEFAULT_JACKET_WALL_R_M2K_PER_W = 0.00012
-DEFAULT_TIM_R_M2K_PER_W = 0.05
+DEFAULT_TIM_R_M2K_PER_W = 0.0001
 DEFAULT_MAGNET_TO_WINDING_K_PER_W = 0.05
+# Lumped-screen-compatible junction→coolant ceiling (motor:thermal-lumped seed).
+DEFAULT_MODULE_TO_COOLANT_K_PER_W = 0.01
 
 DEFAULT_WINDING_LIMIT_C = 180.0
 DEFAULT_MAGNET_LIMIT_C = 150.0
@@ -78,6 +82,7 @@ class LossInputs:
     jacket_wall_r_m2k_per_w: float
     tim_r_m2k_per_w: float
     magnet_to_winding_k_per_w: float
+    module_to_coolant_k_per_w: float
 
 
 @dataclass(frozen=True)
@@ -93,6 +98,7 @@ class BranchHydraulics:
     channel_depth_m: float
     inlet_velocity_m_s: float | None
     artefact_ref: str
+    pass_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -282,6 +288,14 @@ def loss_inputs_from_quantities(quantities: Mapping[str, Any]) -> LossInputs:
             ("thermal_resistance_magnet_to_winding_k_per_w",),
             DEFAULT_MAGNET_TO_WINDING_K_PER_W,
         ),
+        module_to_coolant_k_per_w=_positive_or_default(
+            quantities,
+            (
+                "thermal_resistance_module_to_coolant_k_per_w",
+                "inverter_module_to_coolant_k_per_w",
+            ),
+            DEFAULT_MODULE_TO_COOLANT_K_PER_W,
+        ),
     )
 
 
@@ -293,6 +307,28 @@ def _rect_hydraulic_diameter(width_m: float, depth_m: float) -> float:
 
 def _wetted_area_rect(width_m: float, depth_m: float, length_m: float) -> float:
     return 2.0 * (width_m + depth_m) * length_m
+
+
+def _area_normalized_k_per_w(r_m2k_per_w: float, area_m2: float) -> float:
+    """Convert K·m²/W interface resistance to K/W for contact area."""
+
+    if area_m2 <= 0.0:
+        raise FiaCoolingNetworkScreenError("Contact area must be positive")
+    return r_m2k_per_w / area_m2
+
+
+def _series_cold_plate_reynolds(branch: BranchHydraulics) -> float:
+    """Scale OF per-pass Re to series serpentine full-flow Re.
+
+    GOTCHA: openfoam_fia_cold_plate_case divides kit flow by pass_count for the
+    rectangular-duct velocity screen. The kit cold plate is a series serpentine,
+    so convection must use the full 12 L/min through each channel segment.
+    """
+
+    if branch.branch_id != "inverter_cold_plate":
+        return branch.reynolds_number
+    pass_count = branch.pass_count if branch.pass_count and branch.pass_count > 0 else 1
+    return branch.reynolds_number * float(pass_count)
 
 
 def branch_from_openfoam_artefact(
@@ -343,6 +379,12 @@ def branch_from_openfoam_artefact(
         )
     velocity = channel.get("inlet_velocity_m_s")
     inlet_velocity = float(velocity) if isinstance(velocity, (int, float)) else None
+    pass_raw = channel.get("pass_count")
+    pass_count = (
+        int(pass_raw)
+        if isinstance(pass_raw, (int, float)) and int(pass_raw) > 0
+        else None
+    )
     return BranchHydraulics(
         branch_id=branch_id,
         headline_delta_p_pa=float(headline),
@@ -353,6 +395,7 @@ def branch_from_openfoam_artefact(
         channel_depth_m=depth_m,
         inlet_velocity_m_s=inlet_velocity,
         artefact_ref=artefact_ref,
+        pass_count=pass_count,
     )
 
 
@@ -387,6 +430,7 @@ def _convection_branch(
     *,
     inlet_c: float,
     wetted_area_m2: float,
+    reynolds_number: float | None = None,
 ) -> ConvectionBranch:
     """Derive h and R_conv from branch Re and CoolProp/ht correlations."""
 
@@ -398,8 +442,9 @@ def _convection_branch(
             * float(props["viscosity_pa_s"])
             / float(props["conductivity_w_mk"])
         )
+    re = float(reynolds_number if reynolds_number is not None else branch.reynolds_number)
     conv = ht_nusselt_tube(
-        reynolds=branch.reynolds_number,
+        reynolds=re,
         prandtl=float(pr),
         diameter_m=branch.hydraulic_diameter_m,
         length_m=branch.developed_length_m,
@@ -455,9 +500,8 @@ def solve_thermal_network(
     module_area_m2 = (
         losses.sic_module_count * losses.module_footprint_mm2 / 1_000_000.0
     )
-    # DECISION: Convection area is the lesser of channel wetted area and module
-    # footprint — conservative when the channel is longer than the heated land.
-    cold_wetted = min(cold_area_channel, module_area_m2)
+    if module_area_m2 <= 0.0:
+        raise FiaCoolingNetworkScreenError("Module contact area must be positive")
 
     jacket_conv = _convection_branch(
         jacket,
@@ -469,25 +513,26 @@ def solve_thermal_network(
     jacket_out = cold_in + jacket_rise
     bulk_jacket = cold_in + 0.5 * jacket_rise
 
+    cold_re = _series_cold_plate_reynolds(cold_plate)
     cold_conv = _convection_branch(
         cold_plate,
         inlet_c=jacket_out,
-        wetted_area_m2=cold_wetted,
+        wetted_area_m2=cold_area_channel,
+        reynolds_number=cold_re,
     )
     cold_rise = losses.inverter_loss_w / (mdot * cp)
     cold_out = jacket_out + cold_rise
     bulk_cold = jacket_out + 0.5 * cold_rise
 
-    winding_t = (
-        bulk_jacket
-        + winding_loss * (jacket_conv.r_conv_k_per_w + losses.jacket_wall_r_m2k_per_w)
+    r_jacket_wall = _area_normalized_k_per_w(
+        losses.jacket_wall_r_m2k_per_w, jacket_area
     )
+    r_tim = _area_normalized_k_per_w(losses.tim_r_m2k_per_w, module_area_m2)
+    r_module_junction = cold_conv.r_conv_k_per_w + r_tim
+
+    winding_t = bulk_jacket + winding_loss * (jacket_conv.r_conv_k_per_w + r_jacket_wall)
     magnet_t = winding_t + losses.magnet_loss_w * losses.magnet_to_winding_k_per_w
-    module_t = (
-        bulk_cold
-        + losses.inverter_loss_w
-        * (cold_conv.r_conv_k_per_w + losses.tim_r_m2k_per_w)
-    )
+    module_t = bulk_cold + losses.inverter_loss_w * r_module_junction
 
     winding_margin = losses.winding_limit_c - winding_t
     magnet_margin = losses.magnet_limit_c - magnet_t
@@ -716,8 +761,8 @@ def build_artifact(
                 "from OpenFOAM duct screens"
             ),
             "solid_resistance_basis": (
-                "documented jacket wall + TIM + magnet-to-winding seeds; "
-                "not measured contact resistances"
+                "area-normalised TIM + jacket wall (K·m²/W ÷ contact area); "
+                "module_to_coolant_k_per_w seed kept for lumped-screen parity"
             ),
         },
         "conjugate_heat_transfer": {
@@ -884,6 +929,13 @@ def run_selftest() -> int:
         ),
         "coupled_screen_ok_not_release_authority": (
             artifact["margins"]["limits_are_release_authority"] is False
+        ),
+        "kit_duty_temperature_screen_passes": (
+            results.thermal.all_temperatures_below_limits
+            and results.hydraulic.pressure_screen_ok
+        ),
+        "coupled_screen_ok_at_kit_duty": (
+            artifact["screening_results"]["coupled_screen_ok"] is True
         ),
     }
     passed = all(checks.values())
