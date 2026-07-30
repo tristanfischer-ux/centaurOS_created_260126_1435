@@ -473,8 +473,9 @@ def connection_sanity_findings(ledger_rows, schedule_rows, quantities):
 # vertical pile of ~6 colliding tags over the tank nest, tags overprinted the view titles,
 # and the B–B right edge clipped tags mid-word. Deterministic: parse the SVG's own <text>
 # elements, keep only equipment-tag-shaped labels ('TK-104', ranges 'TK-106…TK-113'),
-# rebuild each bbox with the SAME char-width model the generator's _TagPlacer used, and
-# score (i) pairwise overlap and (ii) containment in the view's `data-viewbox` border box.
+# rebuild each bbox with the SAME char-width + clearance model the generator's
+# _TagPlacer used, and score (i) pairwise overlap and (ii) containment in the
+# view's `data-viewbox` border box.
 
 TAG_OVERLAP_MAX = 0.20          # >20% bbox intersection (over the smaller bbox) = a pile-up
 _TAG_LABEL_RE = re.compile(
@@ -501,6 +502,25 @@ def _tag_char_w():
             return 0.62   # MIRROR of draw_ga._TagPlacer.CHAR_W (keep in sync)
 
 
+def _tag_clearance_px():
+    """The generator's visual moat around equipment labels.
+
+    INTENT: G9 must score the delivered drawing the same way draw_ga places tags.
+    A raw SVG text bbox can merely touch and still read as a collision once bold
+    glyphs and leader strokes rasterise; this clearance is the shared invariant.
+    """
+    try:
+        import draw_ga
+        return float(draw_ga._TagPlacer.CLEARANCE_PX)
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        try:
+            import draw_ga
+            return float(draw_ga._TagPlacer.CLEARANCE_PX)
+        except ImportError:
+            return 2.75   # MIRROR of draw_ga._TagPlacer.CLEARANCE_PX
+
+
 def tag_legibility_findings(svg_text: str) -> list:
     """PURE G9 check — list of finding strings (empty = every tag legible).
     (i) two tag bboxes in the SAME view overlapping >TAG_OVERLAP_MAX of the smaller;
@@ -513,12 +533,16 @@ def tag_legibility_findings(svg_text: str) -> list:
     msvg = re.search(r'<svg[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"', svg_text)
     sheet = (0.0, 0.0, float(msvg.group(1)), float(msvg.group(2))) if msvg else None
     cw = _tag_char_w()
+    clearance = _tag_clearance_px()
 
     tags = []   # (view_name_or_None, label, bbox)
     for m in _TEXT_EL_RE.finditer(svg_text):
         attrs = dict(_ATTR_RE.findall(m.group(1)))
         label = m.group(2).strip()
-        if not _TAG_LABEL_RE.match(label):
+        marked_equipment = attrs.get("data-ga-tag") == "equipment"
+        # New GA bakes mark labels explicitly. Legacy bakes still get the old
+        # tag-shape path so v59-style sheets remain catchable.
+        if not marked_equipment and not _TAG_LABEL_RE.match(label):
             continue                       # titles, dims, notes — never scored
         if "transform" in attrs:
             continue                       # rotated dimension text is not a tag
@@ -530,7 +554,8 @@ def tag_legibility_findings(svg_text: str) -> list:
             continue
         w = cw * size * len(label)
         x0 = x - w / 2.0 if attrs.get("text-anchor") == "middle" else x
-        bb = (x0, y - 0.78 * size, x0 + w, y + 0.22 * size)
+        bb = (x0 - clearance, y - 0.78 * size - clearance,
+              x0 + w + clearance, y + 0.22 * size + clearance)
         cx, cy = (bb[0] + bb[2]) / 2.0, (bb[1] + bb[3]) / 2.0
         view = None
         for nm in sorted(boxes):
@@ -538,6 +563,8 @@ def tag_legibility_findings(svg_text: str) -> list:
             if b[0] <= cx <= b[2] and b[1] <= cy <= b[3]:
                 view = nm
                 break
+        if boxes and view is None and not marked_equipment:
+            continue                       # schedule/title legacy tags outside GA views
         tags.append((view, label, bb))
 
     findings = []
@@ -3649,14 +3676,38 @@ def _selftest() -> int:
                'TK-101</text>'
                '<text x="700" y="590" font-size="9.5">FF-GA-001</text></svg>')
     chk("g9_ignores_titles_and_dims", tag_legibility_findings(_titles) == [])
-    # (f) two tags merely CLOSE (rows a full ladder step apart) do not fire — the
-    #     threshold is >20% of the smaller bbox, not any touch
+    # (f) NEAR-TOUCHING rows now fire. This is the FE-front vision gap: raw
+    #     font bboxes did not intersect, but the delivered bold labels read as a
+    #     single stacked block. The gate uses draw_ga's clearance moat, not the
+    #     optimistic bare glyph box.
     _close = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
               '<text x="200" y="150" font-size="9.5" text-anchor="middle" '
               'font-weight="bold">TK-114</text>'
-              '<text x="200" y="162" font-size="9.5" text-anchor="middle" '
+              '<text x="200" y="161.5" font-size="9.5" text-anchor="middle" '
               'font-weight="bold">TK-115</text></svg>')
-    chk("g9_no_false_positive_on_ladder_rows", tag_legibility_findings(_close) == [])
+    chk("g9_fires_on_near_touching_ladder_rows",
+        any("pile-up" in x for x in tag_legibility_findings(_close)))
+    # (g) properly moat-spaced rows remain a pass.
+    _spaced = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
+               '<text x="200" y="150" font-size="9.5" text-anchor="middle" '
+               'font-weight="bold">TK-114</text>'
+               '<text x="200" y="166" font-size="9.5" text-anchor="middle" '
+               'font-weight="bold">TK-115</text></svg>')
+    chk("g9_no_false_positive_on_moat_spaced_rows",
+        tag_legibility_findings(_spaced) == [])
+    # (h) New GA bakes mark manifest-derived component tags explicitly, including
+    #     lower-case/object tags (`u_hollow_rotor`) and multi-segment tags
+    #     (`FPK-D-014`) that the original A-123-only regex intentionally ignored.
+    _marked = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
+               '<rect x="100" y="100" width="500" height="300" fill="none" stroke="none" '
+               'data-viewbox="plan"/>'
+               '<text x="250" y="180" font-size="7.5" text-anchor="middle" '
+               'font-weight="bold" data-ga-tag="equipment">u_hollow_rotor</text>'
+               '<text x="250" y="188" font-size="7.5" text-anchor="middle" '
+               'font-weight="bold" data-ga-tag="equipment">FPK-D-014</text></svg>')
+    chk("g9_scores_marked_component_tags",
+        any("u_hollow_rotor" in x and "FPK-D-014" in x
+            for x in tag_legibility_findings(_marked)))
 
     # scorecard aggregation
     gs = [Gate("legibility", ["single-line-diagram"], "high", False, "x"),

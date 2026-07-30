@@ -1254,6 +1254,7 @@ class _TagPlacer:
     bands are registered as obstacles via block()."""
 
     CHAR_W = 0.62          # ≈ em-fraction per character of the sheet's bold Helvetica
+    CLEARANCE_PX = 2.75    # visual moat around bold tags; shared with drawing_gates G9
 
     def __init__(self, svg, bounds=None):
         self.svg = svg
@@ -1264,7 +1265,12 @@ class _TagPlacer:
     def _bbox(self, x, y, text, size):
         w = self.CHAR_W * size * max(len(str(text)), 1)
         # y is the text BASELINE (svg.text convention): ascender ≈ 0.78·size above.
-        return (x - w / 2.0, y - size * 0.78, x + w / 2.0, y + size * 0.22)
+        # INTENT: geometric non-intersection is not enough for legibility; bold
+        # SVG text and leader strokes need a small clear moat or vision/humans see
+        # a stacked label block even when raw bboxes merely touch.
+        c = self.CLEARANCE_PX
+        return (x - w / 2.0 - c, y - size * 0.78 - c,
+                x + w / 2.0 + c, y + size * 0.22 + c)
 
     @staticmethod
     def _hits(a, b):
@@ -1303,22 +1309,25 @@ class _TagPlacer:
         spiral and only accepts a clear slot — never an overlapping one."""
         for x, y, text, size, anchor_pt in self._pending:
             w = self.CHAR_W * size * max(len(str(text)), 1)
+            w_padded = w + 2.0 * self.CLEARANCE_PX
             # hard clip-guard: pull the anchor x inside the view bounds up front,
             # so even the fallback position can never run past the view border.
             x_in, clamped = x, False
             if self.bounds is not None:
-                lo = self.bounds[0] + w / 2.0 + 1.0
-                hi = self.bounds[2] - w / 2.0 - 1.0
+                lo = self.bounds[0] + w_padded / 2.0 + 1.0
+                hi = self.bounds[2] - w_padded / 2.0 - 1.0
                 if lo <= hi:
                     nx = min(max(x, lo), hi)
                     if nx != x:
                         x_in, clamped = nx, True
-            step = size + 2.5
+            step = size + 2.0 * self.CLEARANCE_PX + 0.5
             chosen = None
             # Primary ladder, then a wider spiral (same deterministic order) so a
             # dense nest never falls through to an unchecked stamp.
-            dx_steps = (0.0, -0.75 * w, 0.75 * w, -1.5 * w, 1.5 * w,
-                        -2.25 * w, 2.25 * w, -3.0 * w, 3.0 * w)
+            dx_steps = (0.0, -0.75 * w_padded, 0.75 * w_padded,
+                        -1.5 * w_padded, 1.5 * w_padded,
+                        -2.25 * w_padded, 2.25 * w_padded,
+                        -3.0 * w_padded, 3.0 * w_padded)
             k_order = [0]
             for kk in range(1, 17):
                 k_order.extend((-kk, kk))
@@ -1343,9 +1352,9 @@ class _TagPlacer:
                 if self.bounds is not None:
                     bx0, by0, bx1, by1 = self.bounds
                     # pad so the full text bbox fits
-                    pad_x = w / 2.0 + 1.0
-                    pad_y_lo = size * 0.78 + 1.0
-                    pad_y_hi = size * 0.22 + 1.0
+                    pad_x = w_padded / 2.0 + 1.0
+                    pad_y_lo = size * 0.78 + self.CLEARANCE_PX + 1.0
+                    pad_y_hi = size * 0.22 + self.CLEARANCE_PX + 1.0
                     grid_x0 = bx0 + pad_x
                     grid_x1 = bx1 - pad_x
                     grid_y0 = by0 + pad_y_lo
@@ -1354,7 +1363,7 @@ class _TagPlacer:
                         gx = grid_x0
                         while gx <= grid_x1 + 0.01:
                             search_xs.append(gx)
-                            gx += max(step, w * 0.5)
+                            gx += max(step, w_padded * 0.5)
                         gy = grid_y0
                         while gy <= grid_y1 + 0.01:
                             search_ys.append(gy)
@@ -1407,7 +1416,7 @@ class _TagPlacer:
                 ey = bb[3] if cy < ay else bb[1]
                 self.svg.line(cx, ey, ax, ay, stroke=DATUM_INK, width=0.7)
             self.svg.text(cx, cy, text, size=size, anchor="middle", weight="bold",
-                          fill=EQ_INK)
+                          fill=EQ_INK, extra='data-ga-tag="equipment"')
         self._pending = []
 
 
@@ -3385,6 +3394,32 @@ def _selftest() -> int:
         else:
             continue
         break
+    # 1c — FE-front FPK long component labels (2026-07-30): the vision critic
+    #     rejected FRONT / B-B / TOP because long manifest object tags cleared the
+    #     old bare bboxes by only 1-2 px. The placer must reserve a visual moat and
+    #     mark the SVG text so G9 scores these non-A-123 labels too.
+    fpk_stack = [
+        (220.0, 100.0, "FPK-D-014"),
+        (220.0, 100.0, "u_hollow_rotor"),
+        (220.0, 100.0, "u_permanent_magnet_set"),
+        (220.0, 100.0, "u_ring_gear"),
+    ]
+    txt_fpk, pl_fpk = _render(fpk_stack)
+    for i in range(len(pl_fpk._placed)):
+        for j in range(i + 1, len(pl_fpk._placed)):
+            if _TagPlacer._hits(pl_fpk._placed[i], pl_fpk._placed[j]):
+                print("  FAIL ga-tags-fpk-long: long component labels still overlap "
+                      f"({pl_fpk._placed[i]} vs {pl_fpk._placed[j]})")
+                bad += 1
+                break
+        else:
+            continue
+        break
+    fpk_marker_count = txt_fpk.count('data-ga-tag="equipment"')
+    if fpk_marker_count != len(fpk_stack):
+        print("  FAIL ga-tags-fpk-markers: every resolved equipment tag must carry "
+              f"data-ga-tag for G9 (got {fpk_marker_count})")
+        bad += 1
     # 2 — the OTHER direction: a lone tag must stay exactly in place, no leader.
     txt2, pl2 = _render([(100.0, 60.0, "TK-101")])
     if '<line' in txt2:
