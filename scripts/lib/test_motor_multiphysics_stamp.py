@@ -122,6 +122,11 @@ class PostDiffFinalDriveBlockerTests(unittest.TestCase):
                                     "depth_short_edge": 172.2782,
                                     "height": 132.0,
                                 },
+                                "closure_gate": {
+                                    "blender_interface_status": "PARTIAL",
+                                    "blender_meshes_defined": True,
+                                    "blocker_may_clear": False,
+                                },
                                 # The older screen predates this source registration.
                                 "parametric_family_exists": False,
                                 "cad_family": None,
@@ -146,8 +151,10 @@ class PostDiffFinalDriveBlockerTests(unittest.TestCase):
         self.assertTrue(blocker["parametric_family_exists"])
         self.assertEqual(blocker["cad_family"], "post_diff_final_drive_helical")
         self.assertEqual(blocker["software_progress_status"], "SOFTWARE_SEEDED")
+        self.assertEqual(blocker["blender_interface_status"], "PARTIAL")
+        self.assertTrue(blocker["blender_meshes_defined"])
         self.assertFalse(blocker["closure_eligible"])
-        self.assertIn("Blender/interface still OPEN", blocker["summary"])
+        self.assertIn("Blender placer syncs", blocker["summary"])
 
 
 if __name__ == "__main__":

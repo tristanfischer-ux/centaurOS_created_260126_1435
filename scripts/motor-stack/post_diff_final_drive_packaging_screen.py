@@ -332,9 +332,9 @@ def build_artifact(
     if screen.bay_fit:
         blocker_summary = (
             "The compact dual post-diff 4:1 helical-pair seed fits the bay envelope "
-            "and its parametric CadQuery family is seeded, but Blender/interface "
-            "integration and the released gear/bearing/shaft/lubrication design "
-            "remain OPEN."
+            "and its parametric CadQuery family is seeded; Blender placer syncs "
+            "physics-linked meshes, but gear/bearing/shaft/lubrication release "
+            "engineering remains OPEN."
         )
     else:
         blocker_summary = (
@@ -409,9 +409,11 @@ def build_artifact(
             "cad_family": CAD_FAMILY,
             "source": CAD_FAMILY_SOURCE,
             "release_cad": False,
+            "blender_mesh_prefix": "u_se_td_post_diff_",
             "note": (
-                "Rebuildable 18:72 dual-helical concept geometry exists. It is not "
-                "revision-bound release CAD and has not been placed in Blender."
+                "Rebuildable 18:72 dual-helical concept geometry exists. Blender "
+                "traction placer emits physics-linked u_se_td_post_diff_* meshes "
+                "when this screen is present — not revision-bound release CAD."
             ),
         },
         "architecture_blocker": {
@@ -427,17 +429,23 @@ def build_artifact(
             "parametric_family_required": True,
             "parametric_family_exists": True,
             "software_packaging_screen_ok": screen.bay_fit,
-            "blender_interface_status": "OPEN",
+            "blender_interface_status": "PARTIAL",
+            "blender_meshes_defined": True,
+            "blender_mesh_prefix": "u_se_td_post_diff_",
+            "blender_geometry_module": (
+                "scripts/lib/post_diff_final_drive_geometry.py"
+            ),
             "blocker_may_clear": False,
             "reason": (
-                "Bay fit plus concept CAD records SOFTWARE_SEEDED progress only. "
-                "POST_DIFF remains OPEN until Blender proves differential/halfshaft "
-                "interfaces and release engineering checks close."
+                "Bay fit plus concept CAD and Blender placer sync record "
+                "SOFTWARE_SEEDED progress only. POST_DIFF remains OPEN until "
+                "differential/halfshaft interfaces are proven and release "
+                "engineering checks close."
             ),
         },
         "honesty_notes": [
             "PARTIAL packaging screen only; never a CAD release or ship permission.",
-            "CadQuery family seeded; Blender/interface integration remains OPEN.",
+            "CadQuery family seeded; Blender placer syncs u_se_td_post_diff_* meshes.",
             "No ISO 6336/AGMA tooth-strength, micropitting, scuffing, or spectrum life close.",
             "No bearing life, shaft deflection, spline, seal, tolerance, NVH, or lubrication close.",
             "Dual output stages preserve differential action only if both mirrored gear paths and halfshaft interfaces are packaged as assumed.",
@@ -492,6 +500,8 @@ def selftest() -> int:
             == "post_diff_final_drive_helical"
             and nominal_artifact["closure_gate"]["software_packaging_screen_ok"]
             is True
+            and nominal_artifact["closure_gate"]["blender_interface_status"]
+            == "PARTIAL"
             and nominal_artifact["closure_gate"]["blocker_may_clear"] is False
         ),
     }

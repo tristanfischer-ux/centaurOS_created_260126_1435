@@ -84,6 +84,12 @@ _TRACTION_SEATS: list[tuple[str, str, str]] = [
         "Mini Diff In Rotor",
     ),
     (
+        "u_se_td_post_diff_",
+        r"post[_\s-]?diff|final[_\s-]?drive|helical\s*(?:pair|stage|reduction)|"
+        r"ratio[_\s-]?after[_\s-]?diff",
+        "Post Diff Final Drive Helical",
+    ),
+    (
         "u_se_td_diff_nest",
         r"mini[_\s-]?diff|diff\s*nest|\bdifferential\b",
         "Mini Diff In Rotor",

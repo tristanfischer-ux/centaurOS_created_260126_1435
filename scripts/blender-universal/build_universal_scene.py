@@ -14027,6 +14027,7 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
         "u_se_td_microjet_",
         "u_se_td_gearbox",       # seated BoM mesh = internal planetary nest
         "u_se_td_diff_bulge",    # seated BoM mesh = internal mini-diff
+        "u_se_td_post_diff_",    # post-bevel ×4 helical pairs (cutaway only)
         "u_se_td_gear_rib_",
         # Phase N2 PE volume under MCU lid — cutaway/ghost only on closed 04–07.
         "u_se_td_pe_module_",
@@ -14063,6 +14064,7 @@ _FPK_SECTION_EXPOSE_PREFIXES = (
     "u_se_td_ring_gear",
     "u_se_td_gearbox",
     "u_se_td_diff_",
+    "u_se_td_post_diff_",
     "u_se_td_motor_shaft",
     "u_se_td_pe_module_",
     "u_se_td_pe_busbar_",
@@ -14210,6 +14212,7 @@ def _fpk_apply_functional_section_view(view_name, entering):
             "rotor": "u_se_td_hollow_rotor",
             "planetary": "u_se_td_planet_",
             "differential": "u_se_td_diff_",
+            "post_diff_final_drive": "u_se_td_post_diff_",
             "power_electronics": "u_se_td_pe_module_",
         }
         missing = [
@@ -14454,8 +14457,13 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert (
         "u_se_td_planet_" in _FPK_SECTION_EXPOSE_PREFIXES
         and "u_se_td_diff_" in _FPK_SECTION_EXPOSE_PREFIXES
+        and "u_se_td_post_diff_" in _FPK_SECTION_EXPOSE_PREFIXES
     ), (
-        "functional section must expose planetary + differential story meshes")
+        "functional section must expose planetary, differential, and post-diff story meshes")
+    assert "_fpk_place_post_diff_final_drive" in _src_td, (
+        "traction placer must wire post-diff final-drive meshes")
+    assert "post_diff_final_drive_geometry" in _src_td, (
+        "post-diff placement must consume packaging-screen geometry module")
     assert "opaque full shells still hide drivetrain" in _src_section, (
         "functional section must hard-fail if a full shell remains over internals")
     _src_prepare = _insp_td.getsource(_prepare_sealed_product_view)
@@ -19489,6 +19497,105 @@ def _fpk_place_ontology_fff_parts(
     )
 
 
+def _fpk_place_post_diff_final_drive(
+    *,
+    x_motor: float,
+    y_motor: float,
+    z_motor: float,
+    diff_od: float,
+    diff_len: float,
+    mat_steel,
+    story_mod,
+    MO,
+    rot_along_x,
+    _mm3,
+    _cyl_v: int,
+) -> bool:
+    """Place physics-linked post-differential ×4 helical-pair story meshes.
+
+    INTENT: ``cut_torque_at_diff`` leaves ``ratio_after_diff≈4`` after the open
+    bevel nest. Without these meshes the drivetrain chain stops at the diff —
+  a silent gap on cutaway views and in the parts manifest.
+
+    FLOW: ``_motor_stack/post_diff_final_drive_packaging_screen.json`` (preferred)
+      → ``post_diff_final_drive_geometry`` → ``u_se_td_post_diff_*`` meshes.
+    """
+    placement = None
+    try:
+        from post_diff_final_drive_geometry import load_placement_from_twin_motor_stack
+
+        _state_path = globals().get("_COMPOSER_STATE_PATH")
+        if _state_path:
+            placement = load_placement_from_twin_motor_stack(
+                Path(_state_path).parent / "_motor_stack",
+                diff_od_mm=float(diff_od),
+                diff_len_mm=float(diff_len),
+            )
+    except Exception as exc:
+        print(f"[univ][sealed] post-diff geometry skipped: {exc}")
+        return False
+    if placement is None:
+        return False
+
+    pinion_r = placement.pinion_tip_diameter_mm * 0.5
+    wheel_r = placement.wheel_tip_diameter_mm * 0.5
+    face = placement.face_width_mm
+    wheel_offset = placement.wheel_radial_offset_mm
+    axial_offset = placement.pair_axial_offset_mm
+
+    for side_index, x_sign in enumerate((-1.0, 1.0)):
+        x_pair = x_motor + x_sign * axial_offset
+        fl.add_cyl(
+            f"u_se_td_post_diff_pinion_{side_index}",
+            _mm3((x_pair, y_motor, z_motor)),
+            pinion_r * fl.MM,
+            face * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=_cyl_v,
+        )
+        fl.add_cyl(
+            f"u_se_td_post_diff_wheel_{side_index}",
+            _mm3((x_pair, y_motor + wheel_offset, z_motor)),
+            wheel_r * fl.MM,
+            face * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=max(24, _cyl_v // 2),
+        )
+
+    fl.add_box(
+        "u_se_td_post_diff_envelope",
+        _mm3((
+            x_motor,
+            y_motor + wheel_offset * 0.5,
+            z_motor,
+        )),
+        _mm3((
+            placement.overall_width_mm,
+            placement.overall_depth_mm,
+            placement.overall_height_mm,
+        )),
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+    )
+    print(
+        "[univ][sealed] post-diff final-drive meshes: "
+        f"ratio={placement.ratio_from_teeth} "
+        f"center={placement.center_distance_mm:.1f} mm "
+        f"face={face:.1f} mm envelope "
+        f"{placement.overall_width_mm:.0f}×"
+        f"{placement.overall_depth_mm:.0f}×"
+        f"{placement.overall_height_mm:.0f} mm"
+    )
+    return True
+
+
 def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     """Integrated traction pack — concentric FPK stack (bay-fill) or open cradle.
 
@@ -20469,6 +20576,19 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         module_objects=MO,
         rotation=rot_along_x,
         vertices=32,
+    )
+    _fpk_place_post_diff_final_drive(
+        x_motor=x_motor,
+        y_motor=y_motor,
+        z_motor=z_motor,
+        diff_od=diff_od,
+        diff_len=diff_len,
+        mat_steel=mat_steel,
+        story_mod=story_mod,
+        MO=MO,
+        rot_along_x=rot_along_x,
+        _mm3=_mm3,
+        _cyl_v=_cyl_v,
     )
 
     # ── Ontology FFF sub-components (covers, magnets, ring, flanges, seals…) ──

@@ -1676,6 +1676,10 @@ def _post_diff_packaging_cite_from_case(
             else cad.get("cad_family")
         ),
         "cad_status": "SOFTWARE_SEEDED" if family_registered else "OPEN",
+        "blender_interface_status": (
+            closure.get("blender_interface_status") or "OPEN"
+        ),
+        "blender_meshes_defined": closure.get("blender_meshes_defined") is True,
         "blocker_may_clear": closure.get("blocker_may_clear") is True,
         "blocker_status": blocker.get("status") or "OPEN",
         "summary": blocker.get("summary"),
@@ -1813,6 +1817,11 @@ def _post_diff_unblock_options(
         software_screen_ok = (
             packaging.get("bay_fit") is True and family_registered
         )
+        closure_gate = (
+            packaging.get("closure_gate")
+            if isinstance(packaging.get("closure_gate"), Mapping)
+            else {}
+        )
         package_option.update(
             {
                 "progress_status": (
@@ -1831,8 +1840,13 @@ def _post_diff_unblock_options(
                 ),
                 "software_packaging_screen_ok": software_screen_ok,
                 "remaining_work": (
-                    "Sync the seeded stage into Blender, bind differential and "
-                    "halfshaft interfaces, then close strength and lubrication."
+                    "Prove differential and halfshaft interfaces on the synced "
+                    "Blender meshes, then close strength and lubrication."
+                    if closure_gate.get("blender_interface_status") == "PARTIAL"
+                    else (
+                        "Sync the seeded stage into Blender, bind differential and "
+                        "halfshaft interfaces, then close strength and lubrication."
+                    )
                 ),
             }
         )
@@ -1962,20 +1976,35 @@ def collect_architecture_blockers(
         software_packaging_screen_ok = bool(
             bay_fit is True and parametric_family_exists
         )
+        closure_gate = (
+            packaging.get("closure_gate")
+            if isinstance(packaging, Mapping)
+            and isinstance(packaging.get("closure_gate"), Mapping)
+            else {}
+        )
+        blender_interface_status = str(
+            closure_gate.get("blender_interface_status") or "OPEN"
+        )
         # GOTCHA: software geometry progress is not release closure. The blocker
         # remains OPEN until Blender proves interfaces and engineering checks close.
         closure_eligible = False
         packaging_summary = packaging.get("summary") if packaging else None
         summary = (
-            "CAD family seeded — Blender/interface still OPEN; the bay envelope "
-            "screen passes, but gear strength, bearings, shafts, lubrication, "
-            "tolerances, and release authority remain OPEN."
+            "CAD family seeded and Blender placer syncs post-diff meshes — "
+            "differential/halfshaft interfaces and release engineering remain OPEN."
             if software_packaging_screen_ok
-            else packaging_summary
-            or residual.get("summary")
-            or (
-                "Differential torque budget clears the bevel nest, but the "
-                "remaining post-differential final-drive stage is not packaged."
+            and blender_interface_status == "PARTIAL"
+            else (
+                "CAD family seeded — Blender/interface still OPEN; the bay envelope "
+                "screen passes, but gear strength, bearings, shafts, lubrication, "
+                "tolerances, and release authority remain OPEN."
+                if software_packaging_screen_ok
+                else packaging_summary
+                or residual.get("summary")
+                or (
+                    "Differential torque budget clears the bevel nest, but the "
+                    "remaining post-differential final-drive stage is not packaged."
+                )
             )
         )
         blockers.append(
@@ -2011,7 +2040,10 @@ def collect_architecture_blockers(
                     if software_packaging_screen_ok
                     else "PACKAGING_OR_CAD_OPEN"
                 ),
-                "blender_interface_status": "OPEN",
+                "blender_interface_status": blender_interface_status,
+                "blender_meshes_defined": (
+                    closure_gate.get("blender_meshes_defined") is True
+                ),
                 "closure_eligible": closure_eligible,
                 "summary": summary,
                 "permanent_unblock_options": _post_diff_unblock_options(packaging),
@@ -4285,8 +4317,13 @@ def selftest() -> int:
         elif residual_blockers[0].get("closure_eligible") is not False:
             print("FAIL: software-seeded CAD must not clear the release blocker")
             bad += 1
-        elif residual_blockers[0].get("blender_interface_status") != "OPEN":
-            print("FAIL: Blender/interface must remain OPEN after software CAD seed")
+        elif residual_blockers[0].get("blender_interface_status") not in (
+            "OPEN",
+            "PARTIAL",
+        ):
+            print(
+                "FAIL: Blender/interface must stay OPEN or PARTIAL after software CAD seed"
+            )
             bad += 1
         elif not any(
             isinstance(option, Mapping)
