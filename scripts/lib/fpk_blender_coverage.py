@@ -21,6 +21,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -366,6 +367,97 @@ def evaluate_blender_coverage(
     }
 
 
+def cad_resolution_assets_from_coverage(result: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Convert covered FPK ontology meshes into honest CAD-resolution evidence.
+
+    @description FPK geometry is deterministic, physics-backed story mesh, not an
+    imported catalogue CAD family. The resolution tier says that explicitly so the
+    CAD sheet can count the verified geometry without pretending it came from a
+    vendor STEP file or an image paste.
+    @param result Output from ``evaluate_blender_coverage``.
+    @returns cad-geometry-resolution/v1 asset rows for covered ontology parts.
+    """
+    if not isinstance(result, Mapping):
+        return []
+    assets: list[dict[str, Any]] = []
+    for row in result.get("present") or []:
+        if not isinstance(row, Mapping) or not row.get("part_id"):
+            continue
+        payload = {
+            "part_id": row.get("part_id"),
+            "meshes": sorted(str(m) for m in (row.get("meshes") or [])),
+            "function": row.get("function"),
+            "physics": row.get("physics"),
+        }
+        digest = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        part_id = str(row.get("part_id"))
+        assets.append(
+            {
+                "object": part_id,
+                "family": f"fpk_ontology_{part_id}",
+                "resolution_tier": "parametric_story_mesh",
+                "asset_sha256": digest,
+                "source_url": f"internal://fpk_blender_coverage/{part_id}",
+                "licence": "INTERNAL-PARAMETRIC",
+                "assembly": row.get("assembly"),
+                "function": row.get("function"),
+                "physics": row.get("physics"),
+                "evidence_meshes": payload["meshes"],
+            }
+        )
+    return assets
+
+
+def stamp_cad_resolution(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
+    """Merge FPK ontology mesh assets into ``cad-geometry-resolution.json``.
+
+    @description Preserves existing exact/family CAD imports and appends verified
+    FPK story-mesh assets keyed by object/family/tier. This is source evidence for
+    small product CAD coverage, not a substitute for future supplier STEP files.
+    @param run_dir Twin output directory.
+    @param result Output from ``evaluate_blender_coverage``.
+    @returns The merged cad-geometry-resolution document.
+    """
+    path = Path(run_dir) / "cad-geometry-resolution.json"
+    existing: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            existing = {}
+    assets = [
+        asset for asset in (existing.get("assets") or [])
+        if isinstance(asset, dict)
+    ]
+    seen = {
+        (
+            str(asset.get("object") or ""),
+            str(asset.get("family") or ""),
+            str(asset.get("resolution_tier") or ""),
+        )
+        for asset in assets
+    }
+    for asset in cad_resolution_assets_from_coverage(result):
+        key = (
+            str(asset.get("object") or ""),
+            str(asset.get("family") or ""),
+            str(asset.get("resolution_tier") or ""),
+        )
+        if key in seen:
+            continue
+        assets.append(asset)
+        seen.add(key)
+    merged = {
+        "schema": "cad-geometry-resolution/v1",
+        "count": len(assets),
+        "assets": assets,
+    }
+    path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+    return merged
+
+
 def prove_catch_incomplete_coverage() -> dict[str, Any]:
     """Adversarial: form-meshes with only pack_base must FIRE incomplete coverage.
 
@@ -420,6 +512,7 @@ def stamp_coverage(run_dir: Path, state: dict[str, Any] | None = None) -> dict[s
     (run_dir / "JLR-FE-FRONT-FPK-BLENDER-COVERAGE.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )
+    cad_doc = stamp_cad_resolution(run_dir, result)
     if isinstance(state, dict):
         state["fpkBlenderCoverage"] = {
             "schema": SCHEMA,
@@ -429,6 +522,7 @@ def stamp_coverage(run_dir: Path, state: dict[str, Any] | None = None) -> dict[s
             "ontology_count": result["ontology_count"],
             "missing_count": result["missing_count"],
             "missing_ids": [m["part_id"] for m in result["missing"]],
+            "cad_resolution_assets": cad_doc["count"],
             "ship_ok": False,
         }
         state["ship_ok"] = False
@@ -514,6 +608,17 @@ def _selftest() -> int:
     good = evaluate_blender_coverage({"meshes": synth_meshes})
     if not good["ok"]:
         print("  FAIL synthetic full set must cover:", good["missing"])
+        return 1
+    cad_assets = cad_resolution_assets_from_coverage(good)
+    if len(cad_assets) != good["covered"]:
+        print(
+            "  FAIL cad-resolution evidence: every covered ontology part must "
+            f"emit one asset row (got {len(cad_assets)} vs {good['covered']})"
+        )
+        return 1
+    if not all(a.get("resolution_tier") == "parametric_story_mesh" for a in cad_assets):
+        print("  FAIL cad-resolution evidence: FPK assets must use honest "
+              "parametric_story_mesh tier")
         return 1
     print(
         f"fpk_blender_coverage --selftest OK — ontology={good['ontology_count']} "

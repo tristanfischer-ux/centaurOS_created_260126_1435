@@ -1007,6 +1007,76 @@ class SVG:
                 f'{body}\n</svg>\n')
 
 
+def _svg_numeric_attrs(fragment: str, names: tuple[str, ...]) -> list[float]:
+    values: list[float] = []
+    for name in names:
+        for hit in re.findall(rf'\b{re.escape(name)}="(-?\d+(?:\.\d+)?)"', fragment):
+            try:
+                values.append(float(hit))
+            except ValueError:
+                pass
+    return values
+
+
+def _product_front_primary_svg_parts(
+    parts: list[str],
+    *,
+    front_y: float,
+    front_h: float,
+    plan_y: float,
+    plan_h: float,
+) -> list[str]:
+    """Put product FRONT-view SVG elements before TOP/PLAN in XML order.
+
+    INTENT: Product-scale GAs already place FRONT at the top-left, but the
+    generator historically appended the TOP plan first. Human/Excel SIGHT reads
+    the delivered SVG stream and called that a plant-style PLAN. Reorder only the
+    disjoint view groups; preserve each group's internal drawing order.
+    """
+    if not parts:
+        return parts
+
+    front_lo = front_y - 44.0
+    front_hi = front_y + front_h + 44.0
+    plan_lo = plan_y - 44.0
+    plan_hi = plan_y + plan_h + 64.0
+    pinned: list[str] = []
+    front_group: list[str] = []
+    plan_group: list[str] = []
+    other_group: list[str] = []
+
+    def _in_band(fragment: str, lo: float, hi: float) -> bool:
+        values = _svg_numeric_attrs(fragment, ("y", "y1", "y2", "cy"))
+        return bool(values) and any(lo <= v <= hi for v in values)
+
+    first_view_seen = False
+    for fragment in parts:
+        is_front = (
+            'data-view="front"' in fragment
+            or 'data-viewbox="elevation-aa"' in fragment
+            or _in_band(fragment, front_lo, front_hi)
+        )
+        is_plan = (
+            'data-view="top"' in fragment
+            or 'data-viewbox="plan"' in fragment
+            or _in_band(fragment, plan_lo, plan_hi)
+        )
+        # Page primitives before the first view (defs, background, border) must stay
+        # below all view geometry; moving them after regrouping paints over the drawing.
+        if not first_view_seen and not is_front and not is_plan:
+            pinned.append(fragment)
+            continue
+        first_view_seen = first_view_seen or is_front or is_plan
+        if is_front:
+            front_group.append(fragment)
+        elif is_plan:
+            plan_group.append(fragment)
+        else:
+            other_group.append(fragment)
+
+    return pinned + front_group + plan_group + other_group
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # DIMENSION LINE — extension lines + double arrowheads + the value
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2680,6 +2750,14 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     if not fp:
         # Last resort only when the caller built GAParts without a manifest.
         fp = placement_fingerprint(parts)
+    if product_mode:
+        svg.parts = _product_front_primary_svg_parts(
+            svg.parts,
+            front_y=front_y,
+            front_h=front_h,
+            plan_y=plan_y,
+            plan_h=plan_h,
+        )
     return embed_svg_placement_fp(svg.render(), fp)
 
 
@@ -3961,6 +4039,11 @@ def _selftest() -> int:
               f"(got {[(_by_tag[t].tag, _by_tag[t].cx) for t in ('X-116','X-117','INV-1')]})")
         bad += 1
     _td_svg = build_ga_svg(_td_parts, _td_bbox, "formula_e_rear_mgu", _td_meta)
+    _td_labels = re.findall(r">(FRONT|TOP|PLAN|ELEVATION A[^<]*)<", _td_svg)
+    if not _td_labels or _td_labels[0] != "FRONT":
+        print("  FAIL ga-traction-front-primary: product GA SVG stream must lead "
+              f"with FRONT before TOP/PLAN (labels={_td_labels[:4]})")
+        bad += 1
     if "452" in _td_svg and "product envelope 452" in _td_svg:
         print("  FAIL ga-traction-faithful: caption must not publish brief "
               "452 mm envelope when placed pack is smaller")

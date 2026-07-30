@@ -19740,13 +19740,14 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 # Ontology coverage stamp (proveCatch consumer)
                 _ont_cov = None
                 try:
-                    from fpk_blender_coverage import evaluate_blender_coverage
+                    from fpk_blender_coverage import evaluate_blender_coverage, stamp_cad_resolution
                     _ont_cov = evaluate_blender_coverage(
                         {"meshes": _names, "form": (
                             "traction_drive_concentric_bay_fill"
                             if bay_fill else "traction_drive_pack"
                         )}
                     )
+                    stamp_cad_resolution(Path(_out), _ont_cov)
                 except Exception as _cov_exc:
                     print(f"[univ][sealed] ontology coverage eval skipped: {_cov_exc}")
                 Path(_out).joinpath("form-meshes.json").write_text(
