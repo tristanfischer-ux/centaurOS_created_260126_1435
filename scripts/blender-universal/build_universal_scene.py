@@ -14174,6 +14174,7 @@ def _fpk_apply_functional_section_view(view_name, entering):
                 section = _fpk_build_rear_half_section(source)
                 _FPK_SECTION_OBJECTS[source.name] = section
 
+    source_names = {source.name for source in sources}
     for source in sources:
         source.hide_render = is_open_view
         section = _FPK_SECTION_OBJECTS.get(source.name)
@@ -14186,7 +14187,14 @@ def _fpk_apply_functional_section_view(view_name, entering):
         if name.startswith("u_se_td_vehicle_"):
             obj.hide_render = True
             continue
-        if is_open_view and any(name.startswith(prefix) for prefix in _FPK_SECTION_EXPOSE_PREFIXES):
+        # GOTCHA: broad story prefixes can also match a shell source
+        # (`u_se_td_gearbox` matches `u_se_td_gearbox_cover`). Never restore a
+        # full shell after replacing it with its rear-half section duplicate.
+        if (
+            is_open_view
+            and name not in source_names
+            and any(name.startswith(prefix) for prefix in _FPK_SECTION_EXPOSE_PREFIXES)
+        ):
             obj.hide_render = False
             visible_story.add(name)
 
@@ -14292,12 +14300,14 @@ def _selftest_fpk_functional_section_view_state() -> None:
         "u_se_td_coolant_jacket",
         "u_se_td_end_bell_0",
         "u_se_td_inverter_cover",
+        "u_se_td_gearbox_cover",
     )
     try:
         for name in (
             *shell_names,
             "u_se_td_stator_ring",
             "u_se_td_hollow_rotor",
+            "u_se_td_gearbox",
             "u_se_td_planet_0",
             "u_se_td_diff_nest",
             "u_se_td_pe_module_0",
@@ -14318,7 +14328,7 @@ def _selftest_fpk_functional_section_view_state() -> None:
         assert bpy.data.objects["u_se_td_vehicle_hv"].hide_render
 
         _fpk_apply_functional_section_view("04-product-exterior", True)
-        for obj in created[:4]:
+        for obj in created[:len(shell_names)]:
             assert not obj.hide_render, (
                 f"closed exterior failed to restore full shell: {obj.name}")
         assert all(section.hide_render for section in sections)
@@ -14463,6 +14473,11 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert "gear_geometry_writeback.json" in _src_td
     assert "fpkConcentricGeometry" in _src_td
     assert "gear_module_mm" in _src_td
+    _src_ontology = _insp_td.getsource(_fpk_place_ontology_fff_parts)
+    assert "(gear_face * 0.92)" not in _src_td, (
+        "planet meshes must bake the strength-solved face width without visual shrink")
+    assert "gear_face * 0.9" not in _src_ontology, (
+        "sun/ring tooth meshes must share the exact strength-solved face width")
     # proveCatch (2026-07-29): crushed FR4 sRGB (0.025,0.14,…) linearises to
     # ~black and ships an invisible board. Gate the SOURCE sRGB floor.
     _fr4 = (0.22, 0.52, 0.28)
@@ -19212,7 +19227,7 @@ def _fpk_place_ontology_fff_parts(
         "u_se_td_ring_gear",
         _mm3((x_motor, y_motor, z_motor)),
         (ring_od * 0.5) * fl.MM,
-        (gear_face * 0.95) * fl.MM,
+        gear_face * fl.MM,
         mat_steel,
         module=story_mod,
         module_objects=MO,
@@ -19221,7 +19236,7 @@ def _fpk_place_ontology_fff_parts(
     )
     _fpk_place_tooth_cues(
         "u_se_td_ring_gear", (x_motor, y_motor, z_motor),
-        ring_id_inner, gear_face * 0.9, ring_teeth_cue,
+        ring_id_inner, gear_face, ring_teeth_cue,
         mat_steel, story_mod, MO, rot_along_x,
     )
 
@@ -19259,7 +19274,7 @@ def _fpk_place_ontology_fff_parts(
     # ── Sun tooth cues (ratio-forced teeth language) ─────────────────────────
     _fpk_place_tooth_cues(
         "u_se_td_sun_gear", (x_motor, y_motor, z_motor),
-        sun_od, gear_face * 0.9, sun_teeth_cue,
+        sun_od, gear_face, sun_teeth_cue,
         mat_steel, story_mod, MO, rot_along_x,
     )
 
@@ -20430,11 +20445,14 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         ang = (pi / float(planet_n)) * math.tau
         py = y_motor + (planet_pcd * 0.5) * math.cos(ang)
         pz = z_motor + (planet_pcd * 0.5) * math.sin(ang)
+        # INTENT: The strength writeback owns the nominal tooth face. Meshing
+        # members must share that exact axial width; presentation shrink factors
+        # made a 58 mm solved face bake as only 53.36 mm in the exported GLB.
         fl.add_cyl(
             f"u_se_td_planet_{pi}",
             _mm3((x_motor, py, pz)),
             (planet_od * 0.5) * fl.MM,
-            (gear_face * 0.92) * fl.MM,
+            gear_face * fl.MM,
             mat_steel,
             module=story_mod,
             module_objects=MO,
