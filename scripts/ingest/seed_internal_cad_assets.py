@@ -33,11 +33,13 @@ def _bbox_mm(shape) -> tuple[float, float, float]:
 
 
 def seed_assets(resolver: CadAssetResolver) -> list[str]:
-    """Publish the initial Powerwall-visible family assets."""
+    """Publish internal families and licensed educational CAD references."""
     electromechanical = _load_module(
         "tier2_electromechanical.py", "forge_tier2_electromechanical")
     expansion = _load_module("tier2_expansion.py", "forge_tier2_expansion")
     universal = _load_module("tier1_expansion.py", "forge_tier1_expansion")
+    motor_drivetrain = _load_module(
+        "tier2_motor_drivetrain.py", "forge_tier2_motor_drivetrain")
 
     definitions = [
         (
@@ -142,6 +144,42 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
             {"can_d": 8.0, "can_h": 5.5, "flange_od": 10.8, "flange_h": 0.8},
         ),
     ]
+    licensed_family_definitions = [
+        (
+            "ipmsm_stator_lamination",
+            motor_drivetrain.ipmsm_stator_lamination,
+            {
+                "outer_diameter": 269.24,
+                "bore_diameter": 161.90,
+                "lamination_thickness": 0.50,
+                "slot_count": 48,
+                "slot_opening": 1.93,
+                "slot_width": 8.00,
+                "slot_neck_depth": 1.00,
+                "slot_depth": 34.30,
+            },
+            motor_drivetrain.PYLEECAN_IPMSM_B_SOURCE,
+            "Apache-2.0",
+        ),
+    ]
+    # DECISION: the OpenMotor STEP is registered only against its exact educational
+    # identity. It must never become a generic traction-motor family fallback.
+    exact_reference_definitions = [
+        (
+            "open_propulsion_motor_reference",
+            "OpenMotor",
+            "CIAG-2-28-125-25",
+            REPO_ROOT / "assets" / "edu-training-cad" / "openmotor-ciag-125"
+            / "CIAG_2_28_125_25.step",
+            (
+                "https://github.com/eMotres/OpenMotor-Hardware/blob/"
+                "1e1e56d7cf64ea393793ca5c06189251f87b6e98/"
+                "CAD/CIAG_2_28%20125_25.step"
+            ),
+            "CERN-OHL-W-2.0",
+            (138.393, 138.393, 53.500),
+        ),
+    ]
 
     published = []
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -160,6 +198,43 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
                 is_family_asset=True,
             )
             published.append(family)
+        for family, builder, params, source_url, licence in licensed_family_definitions:
+            shape = builder(params)
+            output = Path(temp_dir) / f"{family}.stl"
+            cq.exporters.export(shape, str(output), tolerance=0.05, angularTolerance=0.1)
+            resolver.register_verified_asset(
+                manufacturer="ForgeOS Training Geometry",
+                mpn=f"FAMILY-{family.upper().replace('_', '-')}",
+                family=family,
+                source_file=output,
+                source_url=source_url,
+                licence=licence,
+                bbox_mm=_bbox_mm(shape),
+                is_family_asset=True,
+            )
+            published.append(family)
+        for (
+            family,
+            manufacturer,
+            mpn,
+            source_file,
+            source_url,
+            licence,
+            bbox_mm,
+        ) in exact_reference_definitions:
+            if not source_file.is_file() or source_file.stat().st_size <= 1024:
+                raise RuntimeError(f"Educational CAD reference is missing: {source_file}")
+            resolver.register_verified_asset(
+                manufacturer=manufacturer,
+                mpn=mpn,
+                family=family,
+                source_file=source_file,
+                source_url=source_url,
+                licence=licence,
+                bbox_mm=bbox_mm,
+                is_family_asset=False,
+            )
+            published.append(f"{family}:{mpn}")
     return published
 
 
@@ -170,7 +245,7 @@ def main() -> int:
         "FORGE_CAD_ASSET_ROOT", "~/.forge-truth/cad-assets")).expanduser()
     resolver = CadAssetResolver(db_path=db_path, asset_root=asset_root)
     published = seed_assets(resolver)
-    print(f"[cad-assets] published {len(published)} family assets: {', '.join(published)}")
+    print(f"[cad-assets] published {len(published)} CAD assets: {', '.join(published)}")
     return 0
 
 
