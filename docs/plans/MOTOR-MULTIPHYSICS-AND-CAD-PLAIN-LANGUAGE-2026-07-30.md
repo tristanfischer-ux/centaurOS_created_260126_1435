@@ -12,6 +12,24 @@
 
 ---
 
+## Two finish lines (read this first)
+
+You asked whether “DONE software” and “PASS release” are Part A and Part B. **Yes.**
+
+| Part | What it means | What “green” looks like | Who can finish it from this repo |
+|---|---|---|---|
+| **Part A — software-only** | One coherent digital twin: physics screens, CadQuery families, Blender, Excel, blockers — all driven by the **same** geometry and duty numbers | Every software check that *can* close without a lab is closed; Blender matches strength/EM packaging; `ship_ok` still **false** | **Us — keep going here** |
+| **Part B — PASS release / step 8 benches** | Real hardware correlation: dyno torque map, inverter HIL, coolant flow, heater, overspeed, double-pulse ESL, supplier STEP, homologation | Holds flip OPEN → closed with measured `correlation_ref`; only then can `ship_ok` become true | **Needs a physical kit + benches** (or team/supplier data). Software can only prepare recipes |
+
+**Why step 8 cannot go green from coding alone:**  
+“Get the benches” is not a missing script. Closing a dyno hold means someone ran a real motor on a dyno and filed revision-matched numbers. We do not own that lab in this checkout. What software *did* do: every hold is now `READY_FOR_BENCH` with a measurement recipe and acceptance band (`_motor_stack/hardware_correlation_bench_prep.json`). That is Part A prep for Part B — not a fake PASS.
+
+**Why we still “progress” on Part B visibility without faking PASS:** register + recipes + Excel surface advance Part A honesty; they do **not** claim release.
+
+**Standing aim (your words):** push Part A as close to perfect as software allows — Blender from fundamental physics, solvers and pictures agreeing — and never invent Part B green.
+
+---
+
 ## Progress scoreboard — update this whenever work lands
 
 **How to read this (mood guide):**
@@ -24,31 +42,33 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~21:00:** **Still building — not finished.**  
-Just landed: post-diff CadQuery family seeded; Excel revision mismatch gate; Blender re-render with planet×4 face=58; voltage/FW screen; thermal + hardware registers earlier.  
-`ship_ok` **false**. Release CAD **0%**. Hardware holds all OPEN (needs real benches).
+**Overall mood as of 2026-07-30 ~21:20:** **Part A still building — not finished. Part B deliberately OPEN.**  
+Just landed: rotor bore enlarged so planetary nest fits (`nest_fits_rotor=true`, rotor ID **130.5** mm); hardware **bench-prep recipes** (`READY_FOR_BENCH`, still OPEN); post-diff CadQuery family; Excel revision gate; MTPA + voltage/FW screens.  
+Next Part A push: Blender re-render must log rotorID **130.5** (not stale 92.7); post-diff ×4 into Blender interfaces.  
+`ship_ok` **false**. Release CAD **0%**. Hardware holds OPEN (recipes ready; no measured PASS).
 
-**Last scoreboard update:** 2026-07-30 evening finish burst.
+**Last scoreboard update:** 2026-07-30 ~21:20 (Part A/B clarified).
 
 ### Simple finish checklist (what “finished” means)
 
-| To call Plan A done enough for software | Status now | What still has to happen |
+| To call Part A done enough for software | Status now | What still has to happen |
 |---|---|---|
 | Shared revision enforced | **DONE** (Excel hard-exits on mismatch) | Keep using it |
 | Results visible (step 7) | **DONE** | Re-stamp after each change |
-| Hardware holds visible (step 8 register) | **DONE as register** | Closing holds = real dyno/HIL/flow — **not software** |
+| Hardware holds visible (step 8 register) | **DONE as register + recipes** | Closing holds = real dyno/HIL/flow — **Part B, not software** |
 | Diff nest strength | **Screen cleared** via cut-torque | Post-diff stage still packaging OPEN |
-| Post-diff ×4 stage | **CAD family seeded** | Blender interface still OPEN |
-| Planetary fits rotor bore | **BLOCKED** `PLANETARY_STRENGTH_VS_ROTOR_BORE` | FoS≥1.2 needs tip~128 mm; bore is 92.7 mm; best-in-bore FoS≈0.89. Pick: enlarge bore / change teeth / external planetary |
-| EM evidence | PARTIAL screens (MTPA + voltage/FW) | Closed map + dyno still open |
-| Cooling | PARTIAL (duct + lumped temp) | Full CHT + bench still open |
-| `ship_ok = true` | **Forbidden until above + hardware** | Do not celebrate early |
+| Post-diff ×4 stage | **CAD + Blender meshes PARTIAL** | Interfaces/strength still OPEN; blocker not cleared |
+| Planetary fits rotor bore | **CLEARED (software)** — enlarge bore path | Re-render Blender from 130.5 mm bore; keep `nest_fits_rotor` guard |
+| EM evidence | PARTIAL screens (MTPA + voltage/FW) | Denser closed map in software; dyno = Part B |
+| Cooling | PARTIAL (duct + lumped temp) | Fuller CHT/oil screens in software; flow bench = Part B |
+| `ship_ok = true` | **Forbidden until Part A + Part B** | Do not celebrate early |
 
 ### Architecture blockers (track + permanently unblock — not chat-only)
 
 | Blocker id | Status | Why blocked | Permanent unblock | Guard |
 |---|---|---|---|---|
 | `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` | **CLEARED (screening)** | Was: nest OD≤120 could not carry ~1000 N·m | Applied `cut_torque_at_diff`: `ratio_into_diff=2.0`, `ratio_after_diff=4.0` → carrier ≈250 N·m, FoS≈1.22 | Decision JSON `_motor_stack/diff_architecture_decision.json` |
+| `PLANETARY_STRENGTH_VS_ROTOR_BORE` | **CLEARED (software)** | Was: tip~128 mm vs bore 92.7 mm | Enlarge rotor bore (ID **130.5** / OD **159.8**); strength writeback + `nest_fits_rotor` | ISO case + `fpk_concentric_geometry` selftest |
 | `POST_DIFF_FINAL_DRIVE_PACKAGING` | **OPEN** | Remaining ×4 ratio after the open bevel is not yet a packaged CAD/Blender stage | Package outboard/final-drive stage in bay; sync CAD + Blender; re-screen interfaces | Stamp `architectureBlockers[]`; proveCatch ⇒ `ship_ok` false |
 
 Surfaces: `motorMultiphysics.architectureBlockers` · `hardwareCorrelation` · sidecar · markdown · Quality & Audit.
