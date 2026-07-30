@@ -54,11 +54,12 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
         "evidence_class": "toolchain_smoke_pass",
     },
     "structural": {
-        "software": "Gmsh + CalculiX",
+        "software": "Gmsh + CalculiX + analytical case/mount screen",
         "paths": [
             "scripts/motor-stack/calculix_smoke_selftest.sh",
             "scripts/motor-stack/calculix_fia_rotor_screen.py",
             "scripts/motor-stack/calculix_fia_magnet_pocket_screen.py",
+            "scripts/motor-stack/analytical_fia_case_mount_screen.py",
             "scripts/motor-stack/calculix.Dockerfile",
         ],
         "versions": {"calculix_ccx": "2.21", "image": "forgeos/calculix:2.21-arm64"},
@@ -360,6 +361,11 @@ def _load_fia_magnet_pocket_case(twin_dir: Optional[Path]) -> Optional[dict[str,
     return _load_fia_case_json(twin_dir, "calculix_fia_magnet_pocket_screen.json")
 
 
+def _load_fia_case_mount_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA cast-case / bay-mount analytical screen if present."""
+    return _load_fia_case_json(twin_dir, "analytical_fia_case_mount_screen.json")
+
+
 def _load_fia_cold_plate_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA OpenFOAM cold-plate duct artefact if present."""
     return _load_fia_case_json(twin_dir, "openfoam_fia_cold_plate_case.json")
@@ -590,12 +596,13 @@ def _structural_check_from_fia_case(
     *,
     twin_dir: Path,
     magnet_pocket_case: Optional[Mapping[str, Any]] = None,
+    case_mount_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote structural to PARTIAL when a twin-bound CalculiX screen exists.
 
     INTENT: Make the FIA front-kit centrifugal ring screen visible, and cite the
-    magnet-pocket / iron-bridge screen when present, without claiming closed
-    release FoS (always OPEN) or flipping ship_ok.
+    magnet-pocket / iron-bridge and case/mount screens when present, without
+    claiming closed release FoS (always OPEN) or flipping ship_ok.
     """
     screening = (
         case.get("screening_results")
@@ -608,7 +615,8 @@ def _structural_check_from_fia_case(
     rel_ref = "_motor_stack/calculix_fia_rotor_screen.json"
     below_yield = bool(margins.get("below_assumed_yield"))
     # GOTCHA: works_in_kit_context stays ring-screen below_yield so proveCatch
-    # on the ring artefact alone does not break when the pocket screen is absent.
+    # on the ring artefact alone does not break when pocket / case-mount cites
+    # are absent.
     magnet_pocket_evidence: Any = "OPEN"
     if isinstance(magnet_pocket_case, Mapping):
         pocket_screening = (
@@ -654,15 +662,89 @@ def _structural_check_from_fia_case(
                 "centrifugal SCREEN. Not release FoS; not fillet burst mesh."
             ),
         }
+    case_mount_evidence: Any = "OPEN"
+    if isinstance(case_mount_case, Mapping):
+        mount_screening = (
+            case_mount_case.get("screening_results")
+            if isinstance(case_mount_case.get("screening_results"), dict)
+            else {}
+        )
+        mount_margins = (
+            case_mount_case.get("margins")
+            if isinstance(case_mount_case.get("margins"), dict)
+            else {}
+        )
+        mount_works = (
+            case_mount_case.get("works_in_kit_context")
+            if isinstance(case_mount_case.get("works_in_kit_context"), dict)
+            else {}
+        )
+        mount_rel = "_motor_stack/analytical_fia_case_mount_screen.json"
+        case_mount_evidence = {
+            "status": case_mount_case.get("status") or "PARTIAL",
+            "ship_ok": False,
+            "path": mount_rel,
+            "absolute_path": str((Path(twin_dir) / mount_rel).resolve()),
+            "motor_reaction_torque_nm": mount_screening.get(
+                "motor_reaction_torque_nm"
+            ),
+            "carrier_output_torque_nm": mount_screening.get(
+                "carrier_output_torque_nm"
+            ),
+            "flange_bolt_shear_fos": mount_margins.get("flange_bolt_shear_fos"),
+            "bay_mount_shear_fos": mount_margins.get("bay_mount_shear_fos"),
+            "bay_mount_tension_fos": mount_margins.get("bay_mount_tension_fos"),
+            "housing_wall_torsion_fos": mount_margins.get(
+                "housing_wall_torsion_fos"
+            ),
+            "minimum_screening_fos": mount_margins.get("minimum_screening_fos"),
+            "below_assumed_allowables": mount_margins.get(
+                "below_assumed_allowables"
+            ),
+            "works_in_kit_context": bool(
+                mount_works.get("case_mount_screen_ok")
+                if "case_mount_screen_ok" in mount_works
+                else mount_margins.get("below_assumed_allowables")
+            ),
+            "calculix_full_case": "OPEN",
+            "release_fos_closed": False,
+            "note": (
+                "Twin-bound analytical cast-case / bay-mount SCREEN under motor "
+                "reaction + carrier output + bump tension. Full-case CalculiX "
+                "OPEN; not release FoS."
+            ),
+        }
+    load_parts = ["centrifugal_overspeed_ring_screen"]
+    if isinstance(magnet_pocket_evidence, dict):
+        load_parts.append("magnet_pocket_bridge_screen")
+    if isinstance(case_mount_evidence, dict):
+        load_parts.append("case_mount_torque_screen")
+    note_extra = ""
+    if isinstance(magnet_pocket_evidence, dict):
+        note_extra += (
+            " Magnet-pocket / iron-bridge screen cited when present "
+            "(still SCREENING, not release)."
+        )
+    else:
+        note_extra += (
+            " Magnet-pocket burst FEA remains OPEN until "
+            "calculix_fia_magnet_pocket_screen.json is present."
+        )
+    if isinstance(case_mount_evidence, dict):
+        note_extra += (
+            " Cast-case / bay-mount analytical screen cited when present "
+            "(still SCREENING; full-case CalculiX OPEN)."
+        )
+    else:
+        note_extra += (
+            " Case / mount torque screen remains OPEN until "
+            "analytical_fia_case_mount_screen.json is present."
+        )
     body = _open_check(
         "structural",
         extra={
             "status": "PARTIAL",
-            "load_case_set": (
-                "centrifugal_overspeed_ring_screen+magnet_pocket_bridge_screen"
-                if isinstance(magnet_pocket_evidence, dict)
-                else "centrifugal_overspeed_ring_screen"
-            ),
+            "load_case_set": "+".join(load_parts),
             "minimum_factor_of_safety": margins.get("screening_fos_vs_assumed_yield"),
             "works_in_kit_context": below_yield,
             "model_revision": str(
@@ -696,17 +778,12 @@ def _structural_check_from_fia_case(
                 "release_fos_closed": False,
                 "max_rotor_speed_rpm": inputs.get("max_rotor_speed_rpm"),
                 "magnet_pocket_burst_fea": magnet_pocket_evidence,
+                "case_mount_screen": case_mount_evidence,
                 "note": (
                     "Twin-bound CalculiX steel-ring centrifugal screen at kit rpm. "
                     "works_in_kit_context = ring below_assumed_yield (screening only). "
                     "Assumed isotropic steel; release FoS not closed."
-                    + (
-                        " Magnet-pocket / iron-bridge screen cited when present "
-                        "(still SCREENING, not release)."
-                        if isinstance(magnet_pocket_evidence, dict)
-                        else " Magnet-pocket burst FEA remains OPEN until "
-                        "calculix_fia_magnet_pocket_screen.json is present."
-                    )
+                    + note_extra
                 ),
             },
         },
@@ -1196,12 +1273,14 @@ def build_motor_multiphysics(
 
     fia_calculix = _load_fia_calculix_case(twin_dir)
     fia_magnet_pocket = _load_fia_magnet_pocket_case(twin_dir)
+    fia_case_mount = _load_fia_case_mount_case(twin_dir)
     if fia_calculix is not None and twin_dir is not None:
         structural = _structural_check_from_fia_case(
             duty,
             fia_calculix,
             twin_dir=Path(twin_dir),
             magnet_pocket_case=fia_magnet_pocket,
+            case_mount_case=fia_case_mount,
         )
         notes += (
             " Structural check PARTIAL: twin-bound CalculiX rotor centrifugal "
@@ -1211,6 +1290,11 @@ def build_motor_multiphysics(
             notes += (
                 " + magnet-pocket / iron-bridge screen in "
                 "_motor_stack/calculix_fia_magnet_pocket_screen.json"
+            )
+        if fia_case_mount is not None:
+            notes += (
+                " + cast-case / bay-mount analytical screen in "
+                "_motor_stack/analytical_fia_case_mount_screen.json"
             )
         notes += " (release FoS still OPEN)."
     else:
@@ -1934,6 +2018,42 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "analytical_fia_case_mount_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.analytical_fia_case_mount_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "mount456",
+                    "screening_results": {
+                        "motor_reaction_torque_nm": 125.2,
+                        "carrier_output_torque_nm": 1001.6,
+                        "flange_bolt_shear_fos": 42.0,
+                        "bay_mount_shear_fos": 12.5,
+                        "bay_mount_tension_fos": 80.0,
+                        "housing_wall_torsion_fos": 55.0,
+                        "minimum_screening_fos": 12.5,
+                        "below_assumed_allowables": True,
+                    },
+                    "margins": {
+                        "flange_bolt_shear_fos": 42.0,
+                        "bay_mount_shear_fos": 12.5,
+                        "bay_mount_tension_fos": 80.0,
+                        "housing_wall_torsion_fos": 55.0,
+                        "minimum_screening_fos": 12.5,
+                        "below_assumed_allowables": True,
+                        "release_fos_closed": False,
+                    },
+                    "works_in_kit_context": {"case_mount_screen_ok": True},
+                    "input_quantities": {
+                        "max_rotor_speed_rpm": 19500.0,
+                        "housing_outer_diameter_mm": 176.7,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "openfoam_fia_cold_plate_case.json").write_text(
             json.dumps(
                 {
@@ -2117,6 +2237,25 @@ def selftest() -> int:
             bad += 1
         elif pocket_cite.get("ship_ok") is not False:
             print("FAIL: magnet-pocket cite must keep ship_ok false")
+            bad += 1
+        mount_cite = structural_twin.get("case_mount_screen")
+        if not isinstance(mount_cite, dict) or mount_cite.get("status") != "PARTIAL":
+            print(
+                "FAIL: structural twin_bound_case must cite case/mount screen "
+                "as PARTIAL evidence when artefact present"
+            )
+            bad += 1
+        elif mount_cite.get("minimum_screening_fos") != 12.5:
+            print("FAIL: case/mount cite must surface minimum_screening_fos")
+            bad += 1
+        elif mount_cite.get("carrier_output_torque_nm") != 1001.6:
+            print("FAIL: case/mount cite must surface carrier output torque")
+            bad += 1
+        elif mount_cite.get("ship_ok") is not False:
+            print("FAIL: case/mount cite must keep ship_ok false")
+            bad += 1
+        elif mount_cite.get("calculix_full_case") != "OPEN":
+            print("FAIL: case/mount cite must leave full-case CalculiX OPEN")
             bad += 1
         if structural.get("status") == "PASS" or structural_twin.get("ship_ok") is True:
             print("FAIL: structural must remain PARTIAL with ship_ok false")
