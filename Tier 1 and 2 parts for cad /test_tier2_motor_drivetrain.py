@@ -168,5 +168,49 @@ class ColdPlateSerpentineTests(unittest.TestCase):
             )
 
 
+class MotorWaterJacketHelicalTests(unittest.TestCase):
+    """Prove helical jacket annular path, Dh emission, and wall rules."""
+
+    def test_default_annulus_envelope_and_material_removal(self) -> None:
+        model = MODULE.motor_water_jacket_helical({})
+        bbox = model.val().BoundingBox()
+
+        self.assertAlmostEqual(bbox.xlen, 176.7, places=1)
+        self.assertAlmostEqual(bbox.ylen, 176.7, places=1)
+        self.assertAlmostEqual(bbox.zlen, 140.5, places=1)
+        self.assertEqual(model.solids().size(), 1)
+
+        envelope = math.pi * ((176.7 / 2.0) ** 2 - (164.7 / 2.0) ** 2) * 140.5
+        volume = model.val().Volume()
+        self.assertLess(volume, envelope * 0.95)
+        self.assertGreater(volume, envelope * 0.55)
+
+    def test_hydraulics_emit_rectangular_dh_and_developed_length(self) -> None:
+        hyd = MODULE.motor_water_jacket_helical_hydraulics({})
+        expected = 2.0 * 8.0 * 3.5 / (8.0 + 3.5)
+        self.assertAlmostEqual(hyd["hydraulic_diameter_mm"], expected, places=6)
+        self.assertEqual(hyd["helix_turns"], 5)
+        self.assertGreater(
+            hyd["developed_length_mm"], hyd["one_turn_developed_length_mm"]
+        )
+
+    def test_inner_bridge_breakout_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "bridge|outer_shell"):
+            MODULE.motor_water_jacket_helical(
+                {
+                    "channel_depth": 5.5,
+                    "outer_shell": 1.0,
+                    "housing_outer_diameter": 176.7,
+                    "jacket_inner_diameter": 164.7,
+                }
+            )
+
+    def test_pitch_land_collision_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "pitch|channel_width"):
+            MODULE.motor_water_jacket_helical(
+                {"helix_turns": 20, "channel_width": 8.0}
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

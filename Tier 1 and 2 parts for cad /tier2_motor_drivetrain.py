@@ -6,7 +6,9 @@ Pyleecan's Apache-2.0 IPMSM_B definition at revision
 cq_gears Apache-2.0 three-planet example at revision
 e73874cf17a25447a99b1e7c22a4d5af38560e9c. The serpentine cold plate is
 ForgeOS source-owned geometry; PINNeAPPle revision 78c635… is an Apache-2.0
-training check only. These are universal parametric geometries, not
+training check only. The motor water-jacket helical family is ForgeOS
+source-owned annular-channel geometry for packaging / hydraulic screening —
+not cast-case release CAD. These are universal parametric geometries, not
 original-equipment-manufacturer or race-vehicle parts.
 """
 
@@ -531,6 +533,194 @@ def cold_plate_serpentine(params: dict[str, object]) -> cq.Workplane:
     return plate
 
 
+def motor_water_jacket_helical_hydraulics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit rectangular-channel hydraulic scalars for the helical jacket family.
+
+    INTENT: packaging and OpenFOAM duct screens need Dh and developed length
+    without claiming conjugate heat transfer or winding temperatures.
+    """
+    p = _resolve_motor_water_jacket_params(params)
+    channel_width = float(p["channel_width"])
+    channel_depth = float(p["channel_depth"])
+    hydraulic_diameter = (
+        2.0 * channel_width * channel_depth / (channel_width + channel_depth)
+    )
+    r_mid = float(p["channel_mean_radius"])
+    pitch = float(p["helix_pitch"])
+    turns = float(p["helix_turns"])
+    one_turn_length = math.hypot(2.0 * math.pi * r_mid, pitch)
+    developed_length = one_turn_length * turns
+    return {
+        "helix_turns": int(p["helix_turns"]),
+        "channel_width_mm": channel_width,
+        "channel_depth_mm": channel_depth,
+        "hydraulic_diameter_mm": hydraulic_diameter,
+        "channel_mean_diameter_mm": 2.0 * r_mid,
+        "helix_pitch_mm": pitch,
+        "one_turn_developed_length_mm": one_turn_length,
+        "developed_length_mm": developed_length,
+        "flow_topology": 1,  # series single helical channel (int flag for exporters)
+    }
+
+
+def _resolve_motor_water_jacket_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate annular envelope / helical channel rules for the jacket family.
+
+    Defaults track a compact traction housing envelope (OD≈176.7 mm,
+    L≈140.5 mm, stator OD≈164.7 mm) — universal sizing seeds, not a named
+    product family.
+    """
+    housing_od = _number(params, "housing_outer_diameter", 176.7)
+    jacket_id = _number(params, "jacket_inner_diameter", 164.7)
+    axial_length = _number(params, "axial_length", 140.5)
+    channel_width = _number(params, "channel_width", 8.0)
+    channel_depth = _number(params, "channel_depth", 3.5)
+    outer_shell = _number(params, "outer_shell", 1.25)
+    helix_turns = float(params.get("helix_turns", 5))
+    end_margin = _number(params, "end_margin", 8.0)
+    port_diameter = _number(params, "port_diameter", 8.0)
+    segment_count = int(params.get("segment_count", 56))
+
+    if helix_turns < 2.0:
+        raise ValueError("helix_turns must be at least 2")
+    if segment_count < 24:
+        raise ValueError("segment_count must be at least 24 for a continuous channel")
+    if jacket_id >= housing_od:
+        raise ValueError("jacket_inner_diameter must be less than housing_outer_diameter")
+    radial_wall = (housing_od - jacket_id) / 2.0
+    if channel_depth + outer_shell >= radial_wall:
+        raise ValueError(
+            "channel_depth + outer_shell must leave a positive inner bridge "
+            "inside the annular wall"
+        )
+    inner_bridge = radial_wall - channel_depth - outer_shell
+    if inner_bridge < 0.4:
+        raise ValueError("inner bridge under channel is too thin (<0.4 mm)")
+    if 2.0 * end_margin >= axial_length:
+        raise ValueError("end_margin leaves no active helical length")
+    active_length = axial_length - 2.0 * end_margin
+    pitch = active_length / helix_turns
+    if pitch <= channel_width + 1.0:
+        raise ValueError(
+            "helix pitch must exceed channel_width with land clearance "
+            "(reduce helix_turns or channel_width)"
+        )
+    if port_diameter >= axial_length / 2.0:
+        raise ValueError("port_diameter too large for axial_length")
+    if port_diameter > radial_wall * 1.8:
+        raise ValueError("port_diameter would oversize relative to annular wall")
+
+    channel_mean_radius = jacket_id / 2.0 + inner_bridge + channel_depth / 2.0
+    return {
+        "housing_outer_diameter": housing_od,
+        "jacket_inner_diameter": jacket_id,
+        "axial_length": axial_length,
+        "channel_width": channel_width,
+        "channel_depth": channel_depth,
+        "outer_shell": outer_shell,
+        "inner_bridge": inner_bridge,
+        "radial_wall": radial_wall,
+        "helix_turns": helix_turns,
+        "end_margin": end_margin,
+        "helix_pitch": pitch,
+        "active_length": active_length,
+        "port_diameter": port_diameter,
+        "segment_count": segment_count,
+        "channel_mean_radius": channel_mean_radius,
+    }
+
+
+def motor_water_jacket_helical(params: dict[str, object]) -> cq.Workplane:
+    """Build an annular motor water-jacket with a helical coolant channel.
+
+    INTENT: give forge-truth a parametric liquid jacket family for packaging,
+    cooling cutaways, and hydraulic screening. ForgeOS source-owned — not a
+    cast-case release solid and not OEM / race-team CAD.
+
+    The channel is approximated as overlapping pitched boxes along a helix so
+    CadQuery stays robust without a fragile Frenet sweep. Inlet/outlet ports
+    are radial holes at the helix termini.
+    """
+    p = _resolve_motor_water_jacket_params(params)
+    housing_od = float(p["housing_outer_diameter"])
+    jacket_id = float(p["jacket_inner_diameter"])
+    axial_length = float(p["axial_length"])
+    channel_width = float(p["channel_width"])
+    channel_depth = float(p["channel_depth"])
+    helix_turns = float(p["helix_turns"])
+    end_margin = float(p["end_margin"])
+    active_length = float(p["active_length"])
+    pitch = float(p["helix_pitch"])
+    port_diameter = float(p["port_diameter"])
+    segment_count = int(p["segment_count"])
+    r_mid = float(p["channel_mean_radius"])
+
+    shell = (
+        cq.Workplane("XY")
+        .circle(housing_od / 2.0)
+        .circle(jacket_id / 2.0)
+        .extrude(axial_length)
+    )
+
+    total_angle = 2.0 * math.pi * helix_turns
+    pitch_angle = math.atan2(pitch, 2.0 * math.pi * r_mid)
+    seg_len = (
+        math.hypot(r_mid * total_angle / segment_count, active_length / segment_count)
+        * 1.25
+    )
+
+    cutter: cq.Workplane | None = None
+    for index in range(segment_count):
+        t = (index + 0.5) / segment_count
+        angle = total_angle * t
+        z = end_margin + active_length * t
+        segment = (
+            cq.Workplane("XY")
+            .transformed(
+                rotate=(math.degrees(pitch_angle), 0.0, math.degrees(angle)),
+                offset=(r_mid * math.cos(angle), r_mid * math.sin(angle), z),
+            )
+            .box(
+                channel_depth + 0.35,
+                seg_len,
+                channel_width,
+                centered=(True, True, True),
+            )
+        )
+        cutter = segment if cutter is None else cutter.union(segment)
+
+    assert cutter is not None
+    jacket = shell.cut(cutter)
+
+    # Radial ports at helix start / end (into the channel band).
+    for angle, z_port in (
+        (0.0, end_margin),
+        (total_angle, end_margin + active_length),
+    ):
+        ux = math.cos(angle)
+        uy = math.sin(angle)
+        port = (
+            cq.Workplane("XY")
+            .transformed(
+                rotate=(0.0, 90.0, math.degrees(angle)),
+                offset=(
+                    (housing_od / 2.0) * ux,
+                    (housing_od / 2.0) * uy,
+                    z_port,
+                ),
+            )
+            .circle(port_diameter / 2.0)
+            .extrude(-(float(p["radial_wall"]) + 0.4))
+        )
+        jacket = jacket.cut(port)
+
+    return jacket
+
+
 TIER2_MOTOR_DRIVETRAIN = {
     "ipmsm_stator_lamination": {
         "function": ipmsm_stator_lamination,
@@ -774,6 +964,77 @@ TIER2_MOTOR_DRIVETRAIN = {
             ),
         },
     },
+    "motor_water_jacket_helical": {
+        "function": motor_water_jacket_helical,
+        "name": "Motor Water Jacket Helical",
+        "category": "thermal",
+        "default_colour": "#8FA8B8",
+        "visual_tags": [
+            "aluminium",
+            "water_jacket",
+            "helical",
+            "motor",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "housing_outer_diameter": {
+                "type": "number", "default": 176.7, "min": 40.0, "unit": "mm"
+            },
+            "jacket_inner_diameter": {
+                "type": "number", "default": 164.7, "min": 20.0, "unit": "mm"
+            },
+            "axial_length": {
+                "type": "number", "default": 140.5, "min": 30.0, "unit": "mm"
+            },
+            "channel_width": {
+                "type": "number", "default": 8.0, "min": 1.0, "unit": "mm"
+            },
+            "channel_depth": {
+                "type": "number", "default": 3.5, "min": 0.5, "unit": "mm"
+            },
+            "outer_shell": {
+                "type": "number", "default": 1.25, "min": 0.4, "unit": "mm"
+            },
+            "helix_turns": {
+                "type": "number", "default": 5.0, "min": 2.0
+            },
+            "end_margin": {
+                "type": "number", "default": 8.0, "min": 2.0, "unit": "mm"
+            },
+            "port_diameter": {
+                "type": "number", "default": 8.0, "min": 2.0, "unit": "mm"
+            },
+            "segment_count": {
+                "type": "integer", "default": 56, "min": 24
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "coolant_inlet",
+                "type": "port",
+                "position": "radial_helix_start",
+            },
+            {
+                "name": "coolant_outlet",
+                "type": "port",
+                "position": "radial_helix_end",
+            },
+            {
+                "name": "stator_bore",
+                "type": "concentric_bore",
+                "position": "inner_diameter",
+            },
+        ],
+        "training_provenance": {
+            "source_url": None,
+            "source_revision": None,
+            "licence": "ForgeOS-source-owned",
+            "use": (
+                "ForgeOS source-owned helical jacket blank for packaging / "
+                "hydraulic screening — not cast-case release CAD"
+            ),
+        },
+    },
 }
 
 
@@ -916,6 +1177,52 @@ def _selftest_cold_plate(temp_root: Path) -> None:
     )
 
 
+def _selftest_water_jacket(temp_root: Path) -> None:
+    """Prove annular helix, positive bridges, Dh / developed length, STEP/STL."""
+    hyd = motor_water_jacket_helical_hydraulics({})
+    assert int(hyd["helix_turns"]) == 5
+    expected_dh = 2.0 * 8.0 * 3.5 / (8.0 + 3.5)
+    assert abs(float(hyd["hydraulic_diameter_mm"]) - expected_dh) < 1e-6
+    assert float(hyd["developed_length_mm"]) > float(hyd["one_turn_developed_length_mm"])
+
+    model = motor_water_jacket_helical({})
+    bbox = model.val().BoundingBox()
+    assert model.solids().size() == 1
+    assert abs(bbox.xlen - 176.7) < 0.3
+    assert abs(bbox.ylen - 176.7) < 0.3
+    assert abs(bbox.zlen - 140.5) < 0.3
+
+    solid_volume = model.val().Volume()
+    envelope_volume = math.pi * ((176.7 / 2.0) ** 2 - (164.7 / 2.0) ** 2) * 140.5
+    assert solid_volume < envelope_volume * 0.95
+    assert solid_volume > envelope_volume * 0.55
+
+    try:
+        motor_water_jacket_helical(
+            {"channel_depth": 5.5, "outer_shell": 1.0, "housing_outer_diameter": 176.7,
+             "jacket_inner_diameter": 164.7}
+        )
+        raise AssertionError("expected inner-bridge rejection")
+    except ValueError as exc:
+        assert "bridge" in str(exc).lower() or "outer_shell" in str(exc)
+
+    try:
+        motor_water_jacket_helical({"helix_turns": 20, "channel_width": 8.0})
+        raise AssertionError("expected pitch/width rejection")
+    except ValueError as exc:
+        assert "pitch" in str(exc).lower() or "channel_width" in str(exc)
+
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "motor_water_jacket_helical", temp_root
+    )
+    print(
+        "[motor-water-jacket-helical] selftest PASS: "
+        f"Dh={hyd['hydraulic_diameter_mm']:.3f} mm, "
+        f"L_dev={hyd['developed_length_mm']:.1f} mm, "
+        f"STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
 def _selftest() -> int:
     """Run all educational motor/drivetrain family self-tests."""
     with tempfile.TemporaryDirectory(prefix="forge-motor-drivetrain-") as temp_dir:
@@ -924,6 +1231,7 @@ def _selftest() -> int:
         _selftest_rotor(temp_root)
         _selftest_planetary(temp_root)
         _selftest_cold_plate(temp_root)
+        _selftest_water_jacket(temp_root)
     return 0
 
 

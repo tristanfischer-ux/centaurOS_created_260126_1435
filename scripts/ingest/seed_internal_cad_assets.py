@@ -211,6 +211,24 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
             motor_drivetrain.PINNEAPPLE_COLD_PLATE_TRAINING_CHECK,
             "Apache-2.0",
         ),
+        (
+            "motor_water_jacket_helical",
+            motor_drivetrain.motor_water_jacket_helical,
+            {
+                "housing_outer_diameter": 176.7,
+                "jacket_inner_diameter": 164.7,
+                "axial_length": 140.5,
+                "channel_width": 8.0,
+                "channel_depth": 3.5,
+                "outer_shell": 1.25,
+                "helix_turns": 5.0,
+                "end_margin": 8.0,
+                "port_diameter": 8.0,
+                "segment_count": 56,
+            },
+            "internal://component_geometry_types/motor_water_jacket_helical",
+            "ForgeOS-source-owned",
+        ),
     ]
     # DECISION: the OpenMotor STEP is registered only against its exact educational
     # identity. It must never become a generic traction-motor family fallback.
