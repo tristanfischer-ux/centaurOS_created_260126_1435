@@ -23,6 +23,10 @@ export interface PcbStateHonesty {
   required_channel_counts: Record<string, number>
   implemented_channel_counts: Record<string, number>
   NOT_FABRICATION_READY: boolean
+  forgeDraftOnly: boolean
+  supplierGerbers: boolean
+  hilPresent: boolean
+  ship_ok: false
   supplier_gerbers: 'OPEN' | 'SUPPLIED'
   fitness_fail_reason: string
 }
@@ -69,6 +73,10 @@ export function buildPcbStateHonesty(args: {
     required_channel_counts: requiredChannelCounts,
     implemented_channel_counts: implementedChannelCounts,
     NOT_FABRICATION_READY: !args.fabricationReady,
+    forgeDraftOnly: !args.fabricationReady,
+    supplierGerbers: args.supplierGerbers === 'SUPPLIED',
+    hilPresent: false,
+    ship_ok: false,
     supplier_gerbers: args.supplierGerbers,
     fitness_fail_reason: fitnessFailReason(designFitness),
   }

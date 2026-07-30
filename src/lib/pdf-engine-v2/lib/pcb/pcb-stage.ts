@@ -575,6 +575,14 @@ export interface PcbStageResult {
   implemented_channel_counts?: Record<string, number>
   /** Architecture-only evidence is explicitly not a supplier fabrication release. */
   NOT_FABRICATION_READY?: boolean
+  /** True for Forge-generated engineering drafts without supplier fab-release evidence. */
+  forgeDraftOnly?: boolean
+  /** Supplier-provided fabrication release evidence, distinct from Forge draft Gerbers. */
+  supplierGerbers?: boolean
+  /** Hardware-in-the-loop evidence; required before any functional verification claim. */
+  hilPresent?: boolean
+  /** PCB-local ship flag. A draft PCB must never set this true. */
+  ship_ok?: boolean
   supplier_gerbers?: 'OPEN' | 'SUPPLIED'
   /** Mandatory when designFitness.ok is false. */
   fitness_fail_reason?: string

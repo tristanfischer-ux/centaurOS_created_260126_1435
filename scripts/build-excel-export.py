@@ -19635,6 +19635,98 @@ def _pcb_channel_coverage_gaps(pcb: dict) -> Tuple[int, List[str]]:
     return gaps, detail
 
 
+def _pcb_placement_residuals(pipeline: dict) -> List[str]:
+    """Placement residuals that were repaired or carried as draft-only caveats.
+
+    INTENT (2026-07-30 Formula E front MGU): `pipeline.ok=true` means the toolchain
+    produced routed artefacts; a recorded placement overlap still belongs on the
+    PCB evidence surface so a DRC-clean draft cannot masquerade as supplier release.
+    """
+    if not isinstance(pipeline, dict):
+        return []
+    out: List[str] = []
+    for err in (pipeline.get("errors") or []):
+        msg = str(err or "").strip()
+        if re.search(r"\b(?:body\s+overlap|placement\s+iteration|aabb\s+gap|overlap)\b", msg, re.I):
+            out.append(msg)
+    return out
+
+
+def _pcb_is_honest_engineering_draft(pcb: dict, assessment: dict) -> bool:
+    """True when a clean toolchain result is deliberately stamped as draft-only.
+
+    This is a workbook-quality judgement, not a fabrication-readiness pass: the
+    ship axis still requires supplier Gerbers + HIL and fails for this condition.
+    """
+    if assessment.get("readiness") != "ENGINEERING DRAFT":
+        return False
+    return (
+        pcb.get("NOT_FABRICATION_READY") is True
+        or pcb.get("forgeDraftOnly") is True
+        or str(pcb.get("supplier_gerbers") or "").upper() == "OPEN"
+        or pcb.get("supplierGerbers") is False
+    )
+
+
+def _pcb_honest_draft_components(pcb: dict, assessment: dict) -> List[Tuple[str, float, float]]:
+    """Concept-quality checks for an explicitly draft-only PCB evidence surface.
+
+    These score the honesty of the disclosed draft, not completion of a PCBA. Open
+    channels, unresolved roles and placement residuals still render as issues and
+    continue to block shipping/fab-ready claims.
+    """
+    req_counts = pcb.get("required_channel_counts")
+    impl_counts = pcb.get("implemented_channel_counts") or pcb.get("implementedChannels")
+    fitness = pcb.get("designFitness") if isinstance(pcb.get("designFitness"), dict) else {}
+    high_findings = [
+        f for f in (fitness.get("findings") or [])
+        if isinstance(f, dict) and str(f.get("severity") or "").lower() == "high"
+    ]
+    residuals = assessment.get("placement_residuals") or []
+    checks: List[Tuple[str, float, float]] = [
+        ("draft stamp: NOT_FABRICATION_READY / forgeDraftOnly", 1 if (
+            pcb.get("NOT_FABRICATION_READY") is True or pcb.get("forgeDraftOnly") is True
+        ) else 0, 1),
+        ("supplier/HIL release evidence withheld", 1 if (
+            pcb.get("supplierGerbers") is not True and pcb.get("hilPresent") is not True
+        ) else 0, 1),
+        ("required channel counts disclosed", 1 if isinstance(req_counts, dict) and bool(req_counts) else 0, 1),
+        ("implemented channel counts disclosed", 1 if isinstance(impl_counts, dict) and bool(impl_counts) else 0, 1),
+        ("fitness failure reason disclosed", 1 if (
+            bool(str(pcb.get("fitness_fail_reason") or "").strip()) or bool(high_findings)
+        ) else 0, 1),
+        ("PCB-local ship flag is false", 1 if pcb.get("ship_ok") is not True else 0, 1),
+        # Cap the tab at concept quality: excellent honesty, explicitly not fab-ready.
+        ("engineering draft concept-quality ceiling (not fabrication-ready)", 8, 10),
+    ]
+    if assessment.get("channel_gaps"):
+        checks.append(
+            ("channel gap detail disclosed", 1 if assessment.get("channel_gap_detail") else 0, 1),
+        )
+    if residuals:
+        checks.append(("placement residual recorded", 1, 1))
+    return checks
+
+
+def _pcb_honest_draft_hygiene_components(assessment: dict) -> List[Tuple[str, float, float]]:
+    """Hygiene subset that concept-quality drafts must still satisfy.
+
+    Manufacturing-layer inventory and pick-and-place completeness are fab-pack polish;
+    they should not drag an explicitly not-fabrication-ready concept draft below the
+    honesty floor. Pipeline/DRC/routing/Gerber presence still matter.
+    """
+    keep = (
+        "DRC clean",
+        "board fully routed",
+        "Gerber set present",
+        "pipeline's own ok verdict",
+    )
+    return [
+        c for c in (assessment.get("hygiene_components") or [])
+        if any(str(c[0]).startswith(prefix) for prefix in keep)
+    ]
+
+
 def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     """ONE computation shared by tab_pcb() (render) and _sc_pcb() (score) so the tab's
     banner/tables and its score can never diverge (mirrors the file-wide 'two never
@@ -19766,6 +19858,7 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     # per-peripheral structural gap — same severity as an empty required board → not FAB-READY.
     _n_channel_gaps, _channel_gap_detail = _pcb_channel_coverage_gaps(pcb)
     _n_arch_gaps += _n_channel_gaps
+    _placement_residuals = _pcb_placement_residuals(pipeline)
     _fw = pcb.get("firmwareProof") if isinstance(pcb.get("firmwareProof"), dict) else None
     # P9b: chain writes both `ok` and `allOk` (alias); accept either. None = never run.
     _fw_ok = None
@@ -19790,6 +19883,13 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         n_non_fab_tier=_n_non_fab_tier, all_on_board_fab_tier=_all_on_board_fab,
         n_architecture_gaps=_n_arch_gaps, firmware_proof_ok=_fw_ok,
         firmware_proof_tier=_fw_tier, firmware_honesty_why=_fw_honesty_why)
+    if readiness == "ENGINEERING DRAFT":
+        if _channel_gap_detail:
+            readiness_why += "; channel gaps: " + ", ".join(_channel_gap_detail[:8])
+        if _placement_residuals:
+            readiness_why += "; placement residual recorded: " + _placement_residuals[0][:180]
+        if _pcb_is_honest_engineering_draft(pcb, {"readiness": readiness}):
+            readiness_why += "; NOT_FABRICATION_READY=TRUE / supplier release remains OPEN"
     # HONESTY (2026-07-23, Tristan spot-check): _pcb_readiness_verdict hard-codes "DRC-clean"
     # in the FAB-READY prose, but a board can carry non-critical DRC residuals (e.g. a
     # connector shield-pad annular width under the board min). Read the REAL per-board
@@ -19862,6 +19962,8 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         "drc_ok": drc_ok, "routed_ok": routed_ok, "gerbers_ok": gerbers_ok,
         "pipeline_ok": pipeline_ok,
         "channel_gaps": _n_channel_gaps, "channel_gap_detail": _channel_gap_detail,
+        "architecture_gaps": _n_arch_gaps,
+        "placement_residuals": _placement_residuals,
         "readiness": readiness, "readiness_why": readiness_why,
         "drc_violation_rows": drc_rows, "drc_unconnected_n": unconnected_n,
         "drc_report": drc_report, "drc_ignored_rows": drc_ignored_rows,
@@ -19970,10 +20072,11 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         f'"FAIL — "&IF({_bm},"this design needs a bespoke PCB but no DRC-clean, fully-routed '
         f'board with Gerbers landed","the pipeline hygiene checks (DRC / routed / Gerbers / '
         f'pipeline.ok) did not all pass"),'
-        f'IF(OR({_fs}<7.5,{_gp}>0),'
-        f'"ENGINEERING DRAFT — hygiene is clean, but the BoM is not fab-grade (design-fitness "'
-        f'&TEXT({_fs},"0.0")&"/10"&IF({_gp}>0,"; "&TEXT({_gp},"0")&" unresolved electronic '
-        f'gap(s)","")&")",'
+        f'IF(OR({_fs}<7.5,{_gp}>0,{_ag}>0),'
+        f'"ENGINEERING DRAFT — NOT FABRICATION READY — hygiene is clean, but fab readiness is open '
+        f'(design-fitness "&TEXT({_fs},"0.0")&"/10"&IF({_gp}>0,"; "&TEXT({_gp},"0")&'
+        f'" unresolved electronic gap(s)","")&IF({_ag}>0,"; "&TEXT({_ag},"0")&'
+        f'" architecture/channel gap(s)","")&")",'
         f'"FAB-READY — UNPROVEN IN HARDWARE — {_drc_phrase}, fully routed, Gerbers complete, and the '
         f'BoM is verified-tier, but there is no hardware-in-the-loop firmware proof, so it is NOT '
         f'FUNCTIONALLY VERIFIED"))'
@@ -27831,14 +27934,29 @@ def _sc_pcb(wb, ws, state, run_dir):
     if a["n_electronic_gap"]:
         iss.append(f"[HIGH] {a['n_electronic_gap']} unresolved ELECTRONIC gap(s) — part(s) "
                    "with no footprint/MPN that are NOT mechanical/off-board")
+    if a.get("channel_gaps"):
+        iss.append("[HIGH] required PCB channels are not physically implemented — "
+                   + ", ".join(a.get("channel_gap_detail") or []))
+    if a.get("placement_residuals"):
+        iss.append("[HIGH] placement residual recorded in pipeline errors — "
+                   + "; ".join(str(x) for x in (a.get("placement_residuals") or [])[:2]))
 
     # Honest-failure hard cap: FAIL readiness (needs-bespoke-but-no-board, OR a hygiene
     # check didn't pass) caps the score regardless of any individual fraction above —
     # mirrors evaluatePcbGate()'s bespoke_required_* verdicts, never a green tab over a
-    # missing/unverified board. ENGINEERING DRAFT (partial board / weak BoM) caps at 6
-    # — never a 9.3 FAB-READY Goodhart on a 3-part daughterboard (Tristan 2026-07-14).
+    # missing/unverified board. ENGINEERING DRAFT is split:
+    #   • explicitly NOT_FABRICATION_READY / forgeDraftOnly → concept-quality cap 8
+    #     because the tab is scoring honest disclosure, not a supplier fab release;
+    #   • any other draft → cap 6 (legacy anti-Goodhart on partial boards).
+    honest_draft = _pcb_is_honest_engineering_draft(pcb, a)
     if a["readiness"] == "FAIL":
         score_cap = 2.0
+    elif honest_draft:
+        score_cap = 8.0
+        comps = _pcb_honest_draft_hygiene_components(a) + _pcb_honest_draft_components(pcb, a)
+        iss.append("[MED] PCB tab is scored as an honest ENGINEERING DRAFT: "
+                   "required/implemented channels, fitness failure, placement residuals "
+                   "and NOT_FABRICATION_READY are disclosed; ship/fab-ready remains blocked")
     elif a["readiness"] == "ENGINEERING DRAFT":
         score_cap = 6.0
     else:
@@ -36766,6 +36884,98 @@ def _selftest() -> int:
         elif "architecture gap" not in str(_p5_a.get("readiness_why") or "").lower():
             print(f"  FAIL P5 multiBoardMerged: why must mention architecture gap, got "
                   f"{_p5_a.get('readiness_why')!r}"); bad += 1
+        # proveCatch (2026-07-30, Formula E front MGU): a DRC-clean toolchain result
+        # with EMPTY required channel implementation is an honest ENGINEERING DRAFT,
+        # not fab-ready and not a content-zero PCB tab, when the state explicitly
+        # stamps NOT_FABRICATION_READY / supplier release OPEN.
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _draft_pcb = {
+            "isPcbBearing": True,
+            "disposition": "bespoke",
+            "electronicPartCount": 8,
+            "NOT_FABRICATION_READY": True,
+            "forgeDraftOnly": True,
+            "supplierGerbers": False,
+            "hilPresent": False,
+            "ship_ok": False,
+            "supplier_gerbers": "OPEN",
+            "required_channel_counts": {
+                "gate_drive_channel": 6,
+                "desat_channel": 6,
+            },
+            "implemented_channel_counts": {
+                "gate_drive_channel": 0,
+                "desat_channel": 0,
+            },
+            "implementedChannels": {
+                "gate_drive_channel": 0,
+                "desat_channel": 0,
+            },
+            "fitness_fail_reason": "traction_gate_drive requires 6 gate_drive_channel, implements 0",
+            "designFitness": {
+                "ok": False,
+                "findings": [{
+                    "severity": "high",
+                    "code": "channel_under_implementation",
+                    "message": "traction_gate_drive requires 6 gate_drive_channel, implements 0",
+                    "fixStage": "atopile-generator",
+                }],
+            },
+            "architecture": {
+                "boards": [{
+                    "boardId": "traction_gate_drive",
+                    "channelRequirements": [
+                        {"role": "gate_drive_channel", "count": 6},
+                        {"role": "desat_channel", "count": 6},
+                    ],
+                    "requiredWordIds": ["gate_driver_word"],
+                }],
+            },
+            "pipeline": {
+                "ok": True,
+                "routed": True,
+                "unroutedAfterFreerouting": 0,
+                "drc": {"ran": True, "violations": 0},
+                "errors": ["[traction_control] placement iteration 1 invalid: body overlap: U1 vs U2 (aabb gap < 0.5 mm)"],
+                "gerbers": {"dir": _p5_td, "files": [_p5_gbr]},
+                "drill": {"files": []},
+                "pos": {},
+                "generator": {
+                    "components": [
+                        {
+                            "instanceName": f"u{i}",
+                            "resolutionTier": "mpn_symbol_footprint",
+                            "partNumber": f"PN{i}",
+                            "manufacturer": "M",
+                        }
+                        for i in range(8)
+                    ],
+                    "offBoard": [],
+                    "unresolved": [],
+                    "offBoardCount": 0,
+                },
+            },
+        }
+        _draft_a = _pcb_two_axis_assessment(_draft_pcb, _p5_td)
+        if _draft_a.get("readiness") != "ENGINEERING DRAFT":
+            print(f"  FAIL PCB draft honesty: empty implemented channels must read "
+                  f"ENGINEERING DRAFT, got {_draft_a.get('readiness')!r}"); bad += 1
+        if not _pcb_is_honest_engineering_draft(_draft_pcb, _draft_a):
+            print("  FAIL PCB draft honesty: NOT_FABRICATION_READY draft was not recognised "
+                  "as an honest engineering draft"); bad += 1
+        if _draft_a.get("channel_gaps") != 2:
+            print(f"  FAIL PCB draft honesty: expected 2 channel gaps, got "
+                  f"{_draft_a.get('channel_gaps')!r}"); bad += 1
+        if not _draft_a.get("placement_residuals"):
+            print("  FAIL PCB draft honesty: U1/U2 placement overlap residual must be recorded"); bad += 1
+        _draft_comps = _pcb_honest_draft_hygiene_components(_draft_a) + _pcb_honest_draft_components(_draft_pcb, _draft_a)
+        _draft_score = min(10.0 * p / c for (_label, p, c) in _draft_comps if c)
+        if abs(_draft_score - 8.0) > 0.01:
+            print(f"  FAIL PCB draft honesty: honest draft concept score must cap at 8.0, "
+                  f"got {_draft_score!r} from {_draft_comps!r}"); bad += 1
+        if "NOT_FABRICATION_READY" not in str(_draft_a.get("readiness_why") or ""):
+            print(f"  FAIL PCB draft honesty: readiness why must disclose NOT_FABRICATION_READY, "
+                  f"got {_draft_a.get('readiness_why')!r}"); bad += 1
         # proveCatch (fixpack16): Tier-1 hygiene row surfaces when firmwareProof.tier1
         # is recorded — ok → scored 1/1; hard-fail (ok=false,skipped=false) → 0/1;
         # skipped alone must NOT floor (1/1 with skipped label).

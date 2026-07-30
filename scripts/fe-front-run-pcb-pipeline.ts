@@ -44,6 +44,10 @@ function stampChannelHonesty(
   pcb.required_channel_counts = honesty.required_channel_counts
   pcb.implemented_channel_counts = honesty.implemented_channel_counts
   pcb.NOT_FABRICATION_READY = honesty.NOT_FABRICATION_READY
+  pcb.forgeDraftOnly = honesty.forgeDraftOnly
+  pcb.supplierGerbers = honesty.supplierGerbers
+  pcb.hilPresent = honesty.hilPresent
+  pcb.ship_ok = honesty.ship_ok
   pcb.supplier_gerbers = honesty.supplier_gerbers
   pcb.fitness_fail_reason = honesty.fitness_fail_reason
 }

@@ -62,4 +62,55 @@ describe('buildPcbStateHonesty', () => {
     expect(honesty.designFitness.ok).toBe(false)
     expect(honesty.fitness_fail_reason).toContain('requires 6 gate_drive_channel, implements 1')
   })
+
+  it('proveCatch: all-empty traction channels fail fitness but stamp draft-only honesty', () => {
+    const tractionArchitecture: PcbArchitecturePlan = {
+      ...ARCHITECTURE,
+      boards: [
+        ARCHITECTURE.boards[0],
+        {
+          ...ARCHITECTURE.boards[0],
+          boardId: 'traction_control',
+          role: 'traction_control_board',
+          domains: ['logic', 'analog'],
+          channelRequirements: [
+            { role: 'phase_current_sense', count: 3 },
+            { role: 'resolver_channel', count: 1 },
+            { role: 'vehicle_can', count: 1 },
+            { role: 'lv_buck_rail', count: 3 },
+            { role: 'hv_lv_isolation_barrier', count: 1 },
+          ],
+        },
+      ],
+    }
+
+    const honesty = buildPcbStateHonesty({
+      architecture: tractionArchitecture,
+      evidence: {
+        resolvedWordIds: [],
+        unresolvedWordIds: [],
+        implementedChannels: {},
+      },
+      fabricationReady: false,
+      supplierGerbers: 'OPEN',
+    })
+
+    expect(honesty.designFitness.ok).toBe(false)
+    expect(honesty.NOT_FABRICATION_READY).toBe(true)
+    expect(honesty.forgeDraftOnly).toBe(true)
+    expect(honesty.supplierGerbers).toBe(false)
+    expect(honesty.hilPresent).toBe(false)
+    expect(honesty.ship_ok).toBe(false)
+    expect(honesty.implemented_channel_counts).toEqual({
+      gate_drive_channel: 0,
+      desat_channel: 0,
+      phase_current_sense: 0,
+      resolver_channel: 0,
+      vehicle_can: 0,
+      lv_buck_rail: 0,
+      hv_lv_isolation_barrier: 0,
+    })
+    expect(honesty.fitness_fail_reason).toContain('requires 6 gate_drive_channel, implements 0')
+    expect(honesty.fitness_fail_reason).toContain('requires 3 phase_current_sense, implements 0')
+  })
 })
