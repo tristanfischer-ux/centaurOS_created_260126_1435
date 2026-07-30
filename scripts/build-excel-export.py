@@ -10102,6 +10102,10 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
 _SOFT_BRIEF_CATEGORIES = frozenset({
     "soft", "preference", "nice_to_have", "aspirational", "nice-to-have",
 })
+_VERIFICATION_SOFT_HOME_TAB_HOLD_RE = re.compile(
+    r"\b(overview_invariant_fail|invariant_fail_on_tab|coverage_partial|tag_validity)\b",
+    re.I,
+)
 _INSTRUMENT_PCB_MAX_MM = 40.0
 # Actuation-drive control boards (MCU + stepper) need the [50,120] plant floor —
 # the 40 mm optical-daughterboard cap must not HARD-fail them (Poseidon 2026-07-16).
@@ -11019,10 +11023,42 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             item, re.I,
         ):
             soft = True
+        # INTENT (2026-07-30 FPK): home-tab audit residues stay visible here, but
+        # their own tab already carries the score impact. Treating them as HARD
+        # double-counts the same known defect and hides the real homologation holds.
+        if (
+            "self-repair loop" in src.lower()
+            and _VERIFICATION_SOFT_HOME_TAB_HOLD_RE.search(item)
+        ):
+            soft = True
         rows.append(_verif_row(
             "hold", item,
             status="OPEN", hardness="SOFT" if soft else "HARD",
             provenance=src,
+            target="closed", achieved="open", compare="literal",
+        ))
+
+    # Race homologation holds are governing disclosures, not proof-spine defects.
+    # They must stay OPEN and visible while compute_verdict blocks SHIPS from
+    # state.decisionHolds / homologationHonesty (ship_ok=false; NOT_HOMOLOGATED).
+    for h in (state.get("decisionHolds") or []):
+        if not isinstance(h, dict):
+            continue
+        if str(h.get("status") or "").upper() != "OPEN":
+            continue
+        if not (h.get("blocks_homologation") or h.get("open_by_design")):
+            continue
+        hid = str(h.get("id") or "DEC-OPEN").strip()
+        title = str(h.get("title") or "race homologation evidence hold").strip()
+        owner = str(h.get("owner") or "race engineering").strip()
+        evidence = str(h.get("evidence") or h.get("residual_risk") or "").strip()
+        rows.append(_verif_row(
+            "hold", f"Race homologation hold — {hid}: {title}",
+            status="OPEN", hardness="SOFT",
+            provenance=(
+                f"decisionHolds.{hid}; owner={owner}; "
+                f"blocks_homologation=true; {evidence}"
+            ),
             target="closed", achieved="open", compare="literal",
         ))
 
@@ -11074,15 +11110,26 @@ def tab_verification(wb: Workbook, state: dict, run_dir: str) -> None:
         "Achieved. SHIPS requires every HARD row PASS.",
     )
     r = 4
+    race_open = [
+        h for h in (state.get("decisionHolds") or [])
+        if isinstance(h, dict)
+        and str(h.get("status") or "").upper() == "OPEN"
+        and (h.get("blocks_homologation") or h.get("open_by_design"))
+    ]
+    hard_spine_closed = ships_allowed(spine)
+    ship_phrase = (
+        "HARD spine closed; dossier SHIPS blocked by disclosed race holds"
+        if hard_spine_closed and race_open
+        else ("SHIPS allowed" if hard_spine_closed else "SHIPS blocked — close HARD open rows")
+    )
     banner = (
         f"Spine score {score_spine(spine):g}/10 · HARD {spine.as_dict()['hard_total']} · "
-        f"HARD open {spine.as_dict()['hard_open']} · "
-        f"{'SHIPS allowed' if ships_allowed(spine) else 'SHIPS blocked — close HARD open rows'}"
+        f"HARD open {spine.as_dict()['hard_open']} · {ship_phrase}"
     )
     bc = ws.cell(r, 1, banner)
     bc.font = Font(name="Calibri", size=11, bold=True,
-                   color="006100" if ships_allowed(spine) else "9C0006")
-    bc.fill = FILL_PASS if ships_allowed(spine) else FILL_FAIL
+                   color="006100" if hard_spine_closed and not race_open else "9C0006")
+    bc.fill = FILL_PASS if hard_spine_closed and not race_open else FILL_FAIL
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
     r += 2
 
@@ -11148,8 +11195,9 @@ def tab_verification(wb: Workbook, state: dict, run_dir: str) -> None:
     note = ws.cell(
         r, 1,
         "Proof spine → this tab floors the dossier. Edit a yellow Target and STATUS "
-        "recomputes. Soft OPEN holds (TBD MPNs) flag but do not block SHIPS; HARD "
-        "FAIL / not-yet-proven / OPEN do.",
+        "recomputes. Soft OPEN holds (TBD MPNs, home-tab residues, race "
+        "homologation holds) flag but do not cap the proof score; HARD FAIL / "
+        "not-yet-proven / OPEN do. Race holds still block the dossier verdict.",
     )
     note.font = FONT_NOTE
     note.alignment = WRAP_TOP
@@ -31175,6 +31223,37 @@ def _selftest() -> int:
     if score_spine(_hold_spine) > 4.0:
         print(f"  FAIL verification proveCatch: HARD open must cap score ≤4, "
               f"got {score_spine(_hold_spine)}"); bad += 1
+    _home_tab_hold_state = dict(_omit_state)
+    _home_tab_hold_state["costStack"] = {"raw_materials_bom_gbp": 105.0}
+    _home_tab_hold_state["_dossierRepair"] = {
+        "needs_input": [{"check": "overview_invariant_fail",
+                         "message": "Overview invariant already scores its home tab",
+                         "severity": "HIGH", "tab": "Overview",
+                         "why": "fix Overview invariant at source"}],
+    }
+    _home_rows = _assemble_verification_rows(_home_tab_hold_state, "")
+    _home_hold = next((r for r in _home_rows
+                       if "overview_invariant_fail" in str(r.get("claim") or "")), None)
+    if not _home_hold or _home_hold.get("hardness") != "SOFT":
+        print(f"  FAIL verification home-tab residue: overview_invariant_fail must "
+              f"render as SOFT disclosed hold, got {_home_hold}"); bad += 1
+    _race_hold_state = dict(_omit_state)
+    _race_hold_state["costStack"] = {"raw_materials_bom_gbp": 105.0}
+    _race_hold_state["decisionHolds"] = [{
+        "id": "DEC-008",
+        "status": "OPEN",
+        "title": "HIL on populated inverter revision missing",
+        "evidence": "hil_present=false",
+        "owner": "Controls / HIL lead",
+        "open_by_design": True,
+        "blocks_homologation": True,
+    }]
+    _race_rows = _assemble_verification_rows(_race_hold_state, "")
+    _race_hold = next((r for r in _race_rows
+                       if "Race homologation hold" in str(r.get("claim") or "")), None)
+    if not _race_hold or _race_hold.get("status") != "OPEN" or _race_hold.get("hardness") != "SOFT":
+        print(f"  FAIL verification race hold: OPEN blocks_homologation hold must "
+              f"render as SOFT disclosed row, got {_race_hold}"); bad += 1
     _v = compute_verdict(_hold_state, {"Verification": {
         "score": score_spine(_hold_spine),
         "basis": "verification spine proveCatch",

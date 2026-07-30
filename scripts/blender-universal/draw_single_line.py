@@ -603,8 +603,8 @@ def _synthesize_traction_device_tree(state: dict, arch: str, schedule: dict,
         notes=[
             "Sealed traction pack: vehicle HV DC feeds the SiC MCU and IPMSM "
             "through the pack HV bus — not a plant LV switchboard.",
-            "Phase cables, gate-drive and resolver signal paths are on the "
-            "Connection trace / interconnect; this view is the HV power spine.",
+            "LV control, gate-drive, resolver and NTC signal paths are named "
+            "below; detailed harness routing stays on the Connection trace.",
         ],
         schedule_totals=schedule.get("totals") or {},
     )
@@ -739,8 +739,8 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
     notes = ([
         "Sealed traction pack: vehicle HV DC feeds the SiC MCU and IPMSM "
         "through the pack HV bus — not a plant LV switchboard.",
-        "Phase cables, gate-drive and resolver signal paths are on the "
-        "Connection trace / interconnect; this view is the HV power spine.",
+        "LV control, gate-drive, resolver and NTC signal paths are named "
+        "below; detailed harness routing stays on the Connection trace.",
     ] if is_traction else [
         "Device-scale instrument: USB/battery input feeds a low-voltage DC rail; "
         "loads are MCU/UI, LED driver and detector electronics, not plant feeders.",
@@ -3162,7 +3162,7 @@ _SLD_BOARD_RE = re.compile(
     r"\b(control panel|digital control|circuit breaker|breaker|surge|\bspd\b|\bups\b|"
     r"switchboard|switchgear|\bmcc\b|distribution board|isolator|disconnect|contactor|relay|"
     r"power supply|\bpsu\b|vfd|soft[- ]start|standby (?:diesel )?generator|genset|"
-    r"transfer switch|\bats\b|plc|scada|hmi|gateway|controller|"
+    r"transfer switch|\bats\b|plc|scada|hmi|gateway|controller|microcontroller|\bmcu\b|"
     r"fuse(?!\s*(?:holder|label|mount|install))|busbar|\blcl\b)\b", re.I)
 _SLD_BOARD_EXCLUDE_RE = re.compile(
     r"\b(pump|tank|valve|membrane|vessel|skid|motor|sensor|transmitter|analy[sz]er|"
@@ -3206,7 +3206,8 @@ def _collect_board_components(state: dict):
 _SLD_PROTECTION_RE = re.compile(
     r"\b(insulation monitor|current transducer|voltage transducer|"
     r"current sensor|voltage sensor|voltage transformer|current transformer|"
-    r"grid pcc metering|metering\s+ct|metering\s+vt)\b", re.I)
+    r"grid pcc metering|metering\s+ct|metering\s+vt|"
+    r"thermistor|\bntc\b|resolver)\b", re.I)
 
 
 def _collect_protection_instrumentation(state: dict):
@@ -3969,6 +3970,9 @@ def _selftest() -> int:
             {"tag": "INV-1", "requirement": "SiC Traction Inverter", "status": "NOT FOUND"},
             {"tag": "X-116", "requirement": "Traction Ipmsm Motor Generator",
              "status": "NOT FOUND"},
+            {"tag": "FPK-D-004", "requirement": "Real-time MCU", "status": "NOT FOUND"},
+            {"tag": "FPK-D-017", "requirement": "Inverter power-module NTC",
+             "status": "NOT FOUND"},
         ],
     }
     trac_tree = reconstruct_tree(trac_schedule, trac_state)
@@ -3982,6 +3986,9 @@ def _selftest() -> int:
         "Hv DC Connector" in (trac_tree.source.detail or ""))
     chk("S6.proveCatch_not_plant_switchboard",
         "MAIN SWITCHBOARD" not in trac_svg and "HV DC BUS" in trac_svg)
+    chk("S6.proveCatch_traction_lv_control_signal_callouts",
+        "Real-time MCU (FPK-D-004)" in trac_svg
+        and "Inverter power-module NTC (FPK-D-017)" in trac_svg)
 
     for f in fails:
         print(f"[sld][selftest] FAIL {f}")
