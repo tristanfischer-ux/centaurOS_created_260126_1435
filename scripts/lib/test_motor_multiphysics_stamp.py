@@ -156,6 +156,61 @@ class PostDiffFinalDriveBlockerTests(unittest.TestCase):
         self.assertFalse(blocker["closure_eligible"])
         self.assertIn("Blender placer syncs", blocker["summary"])
 
+    def test_screening_closed_post_diff_blocker_is_omitted_but_ship_stays_false(self) -> None:
+        motor = {
+            "required_checks": {
+                "gear_strength": {
+                    "twin_bound_case": {
+                        "bevel_differential_screen": {
+                            "path": "_motor_stack/iso_bevel_fia_front_kit_case.json",
+                            "minimum_strength_factor": 1.2172,
+                            "residual_blocker": {
+                                "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
+                                "status": "OPEN",
+                                "ratio_after_diff": 4.0,
+                            },
+                            "post_diff_final_drive_packaging_screen": {
+                                "status": "SOFTWARE_CLOSED",
+                                "path": (
+                                    "_motor_stack/"
+                                    "post_diff_final_drive_packaging_screen.json"
+                                ),
+                                "bay_fit": True,
+                                "envelope_mm": {
+                                    "width_lateral": 192.0,
+                                    "depth_short_edge": 172.2782,
+                                    "height": 132.0,
+                                },
+                                "closure_gate": {
+                                    "blender_interface_status": "SOFTWARE_CLOSED",
+                                    "blender_meshes_defined": True,
+                                    "blocker_may_clear": True,
+                                    "strength_screen_ok": True,
+                                    "interface_register_ok": True,
+                                    "minimum_strength_factor": 1.35,
+                                },
+                                "architecture_blocker": {
+                                    "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
+                                    "status": "CLEARED",
+                                    "clearance_scope": "software_screening_only",
+                                    "ship_ok": False,
+                                    "cannot_greenwash": (
+                                        "release CAD, KISSsoft and bench remain OPEN"
+                                    ),
+                                },
+                            },
+                        }
+                    }
+                }
+            },
+            "ship_ok": False,
+        }
+
+        blockers = collect_architecture_blockers(motor)
+
+        self.assertEqual(blockers, [])
+        self.assertFalse(motor["ship_ok"])
+
 
 class CadAuthorityParametricFamilyTests(unittest.TestCase):
     """Prove new front-drive principals list parametric families without release authority."""

@@ -1849,12 +1849,19 @@ def _post_diff_packaging_cite_from_case(
         ),
         "blender_meshes_defined": closure.get("blender_meshes_defined") is True,
         "blocker_may_clear": closure.get("blocker_may_clear") is True,
+        "strength_screen_ok": closure.get("strength_screen_ok") is True,
+        "interface_register_ok": closure.get("interface_register_ok") is True,
+        "minimum_strength_factor": closure.get("minimum_strength_factor"),
+        "strength_screen_path": closure.get("strength_screen_path"),
+        "interface_register_path": closure.get("interface_register_path"),
         "blocker_status": blocker.get("status") or "OPEN",
+        "clearance_scope": blocker.get("clearance_scope"),
+        "cannot_greenwash": blocker.get("cannot_greenwash"),
         "summary": blocker.get("summary"),
         "note": (
             "Twin-bound analytical envelope screen plus rebuildable concept CAD; "
-            "no Blender/interface, tooth-strength, bearing/shaft/lubrication, "
-            "or release-CAD close."
+            "screening closure still leaves KISSsoft, bearing/shaft/lubrication, "
+            "bench validation, and release-CAD close OPEN."
         ),
     }
 
@@ -1988,14 +1995,29 @@ def _post_diff_unblock_options(
         closure_gate = (
             packaging.get("closure_gate")
             if isinstance(packaging.get("closure_gate"), Mapping)
-            else {}
+            else packaging
+        )
+        closure_may_clear = closure_gate.get("blocker_may_clear") is True
+        software_closed = (
+            closure_may_clear
+            and (
+                (
+                    isinstance(packaging.get("architecture_blocker"), Mapping)
+                    and packaging["architecture_blocker"].get("status") == "CLEARED"
+                )
+                or packaging.get("blocker_status") == "CLEARED"
+            )
         )
         package_option.update(
             {
                 "progress_status": (
-                    "SOFTWARE_SEEDED"
-                    if software_screen_ok
-                    else "PARTIAL_PACKAGING_SCREEN"
+                    "SOFTWARE_CLOSED"
+                    if software_closed
+                    else (
+                        "SOFTWARE_SEEDED"
+                        if software_screen_ok
+                        else "PARTIAL_PACKAGING_SCREEN"
+                    )
                 ),
                 "progress_evidence_path": packaging.get("path")
                 or f"_motor_stack/{POST_DIFF_PACKAGING_SCREEN_FILENAME}",
@@ -2007,13 +2029,29 @@ def _post_diff_unblock_options(
                     else None
                 ),
                 "software_packaging_screen_ok": software_screen_ok,
+                "blocker_may_clear": closure_may_clear,
                 "remaining_work": (
-                    "Prove differential and halfshaft interfaces on the synced "
-                    "Blender meshes, then close strength and lubrication."
-                    if closure_gate.get("blender_interface_status") == "PARTIAL"
+                    "Software screening cleared; release CAD, KISSsoft, race "
+                    "spectrum, shafts/bearings/splines/lubrication and bench "
+                    "validation remain OPEN."
+                    if software_closed
                     else (
-                        "Sync the seeded stage into Blender, bind differential and "
-                        "halfshaft interfaces, then close strength and lubrication."
+                        "Increase/revise the post-diff helical stage until its "
+                        "screening FoS >= 1.2; interface register already closes."
+                        if closure_gate.get("interface_register_ok") is True
+                        and closure_gate.get("strength_screen_ok") is not True
+                        else (
+                            "Prove differential and halfshaft interfaces on the "
+                            "synced Blender meshes, then close strength and "
+                            "lubrication."
+                            if closure_gate.get("blender_interface_status")
+                            == "PARTIAL"
+                            else (
+                                "Sync the seeded stage into Blender, bind "
+                                "differential and halfshaft interfaces, then close "
+                                "strength and lubrication."
+                            )
+                        )
                     )
                 ),
             }
@@ -2148,16 +2186,40 @@ def collect_architecture_blockers(
             packaging.get("closure_gate")
             if isinstance(packaging, Mapping)
             and isinstance(packaging.get("closure_gate"), Mapping)
+            else packaging or {}
+        )
+        packaging_blocker = (
+            packaging.get("architecture_blocker")
+            if isinstance(packaging, Mapping)
+            and isinstance(packaging.get("architecture_blocker"), Mapping)
             else {}
         )
+        if (
+            closure_gate.get("blocker_may_clear") is True
+            and (
+                packaging_blocker.get("status") == "CLEARED"
+                or packaging.get("blocker_status") == "CLEARED"
+            )
+        ):
+            return blockers
         blender_interface_status = str(
             closure_gate.get("blender_interface_status") or "OPEN"
         )
-        # GOTCHA: software geometry progress is not release closure. The blocker
-        # remains OPEN until Blender proves interfaces and engineering checks close.
+        strength_screen_ok = closure_gate.get("strength_screen_ok") is True
+        interface_register_ok = closure_gate.get("interface_register_ok") is True
+        # GOTCHA: software screening closure is still not release closure. Only
+        # omit this blocker when the packaging artefact itself proves every
+        # screening predicate and marks the architecture blocker CLEARED.
         closure_eligible = False
         packaging_summary = packaging.get("summary") if packaging else None
         summary = (
+            "CAD family, Blender datums, and differential/halfshaft interface "
+            "register are software-closed, but the post-diff helical strength "
+            "screen is below FoS >= 1.2; release engineering remains OPEN."
+            if software_packaging_screen_ok
+            and interface_register_ok
+            and not strength_screen_ok
+            else (
             "CAD family seeded and Blender placer syncs post-diff meshes — "
             "differential/halfshaft interfaces and release engineering remain OPEN."
             if software_packaging_screen_ok
@@ -2173,6 +2235,7 @@ def collect_architecture_blockers(
                     "Differential torque budget clears the bevel nest, but the "
                     "remaining post-differential final-drive stage is not packaged."
                 )
+            )
             )
         )
         blockers.append(
@@ -2191,7 +2254,9 @@ def collect_architecture_blockers(
                 ),
                 "source_bevel_evidence_path": bevel.get("path")
                 or "_motor_stack/iso_bevel_fia_front_kit_case.json",
-                "minimum_strength_factor": bevel.get("minimum_strength_factor"),
+                "minimum_strength_factor": closure_gate.get("minimum_strength_factor")
+                or bevel.get("minimum_strength_factor"),
+                "bevel_minimum_strength_factor": bevel.get("minimum_strength_factor"),
                 "ratio_after_diff": residual.get("ratio_after_diff"),
                 "packaging_screen_status": (
                     packaging.get("status") if packaging else "NOT_STARTED"
@@ -2211,6 +2276,11 @@ def collect_architecture_blockers(
                 "blender_interface_status": blender_interface_status,
                 "blender_meshes_defined": (
                     closure_gate.get("blender_meshes_defined") is True
+                ),
+                "strength_screen_ok": strength_screen_ok,
+                "interface_register_ok": interface_register_ok,
+                "post_diff_minimum_strength_factor": closure_gate.get(
+                    "minimum_strength_factor"
                 ),
                 "closure_eligible": closure_eligible,
                 "summary": summary,

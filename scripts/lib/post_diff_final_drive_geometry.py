@@ -58,6 +58,9 @@ class PostDiffFinalDrivePlacement:
     face_width_mm: float
     pair_axial_offset_mm: float
     wheel_radial_offset_mm: float
+    diff_output_face_abs_x_mm: float
+    pinion_inner_face_abs_x_mm: float
+    halfshaft_stub_axis_radial_offset_mm: float
     overall_width_mm: float
     overall_depth_mm: float
     overall_height_mm: float
@@ -174,6 +177,8 @@ def derive_placement(p: PostDiffFinalDriveParams) -> PostDiffFinalDrivePlacement
         p.face_width_mm + BEARING_AXIAL_ALLOWANCE_MM + CASE_WALL_AXIAL_MM
     )
     pair_axial_offset = p.diff_len_mm / 2.0 + p.face_width_mm / 2.0
+    diff_output_face = p.diff_len_mm / 2.0
+    pinion_inner_face = pair_axial_offset - p.face_width_mm / 2.0
     return PostDiffFinalDrivePlacement(
         ratio_from_teeth=round(ratio, 6),
         transverse_module_mm=round(transverse_module, 4),
@@ -185,6 +190,9 @@ def derive_placement(p: PostDiffFinalDriveParams) -> PostDiffFinalDrivePlacement
         face_width_mm=p.face_width_mm,
         pair_axial_offset_mm=round(pair_axial_offset, 4),
         wheel_radial_offset_mm=round(center_distance, 4),
+        diff_output_face_abs_x_mm=round(diff_output_face, 4),
+        pinion_inner_face_abs_x_mm=round(pinion_inner_face, 4),
+        halfshaft_stub_axis_radial_offset_mm=round(center_distance, 4),
         overall_width_mm=round(overall_width, 4),
         overall_depth_mm=round(overall_depth, 4),
         overall_height_mm=round(overall_height, 4),
@@ -285,6 +293,21 @@ def quantity_writeback(
                 "Blender traction placer story meshes for the post-diff stage"
             ),
         },
+        "post_diff_diff_output_face_abs_x_mm": q(
+            placement.diff_output_face_abs_x_mm,
+            "mm",
+            "differential side-output face datum used by interface register",
+        ),
+        "post_diff_pinion_inner_face_abs_x_mm": q(
+            placement.pinion_inner_face_abs_x_mm,
+            "mm",
+            "post-diff pinion inner face datum; should meet diff output face",
+        ),
+        "post_diff_halfshaft_stub_axis_radial_offset_mm": q(
+            placement.halfshaft_stub_axis_radial_offset_mm,
+            "mm",
+            "wheel and halfshaft stub axis offset from differential output axis",
+        ),
     }
 
 
@@ -308,6 +331,15 @@ def _selftest() -> int:
     )
     checks["wheel_offset_matches_center_distance"] = (
         placement.wheel_radial_offset_mm == placement.center_distance_mm
+    )
+    checks["interface_datums_no_float_gap"] = (
+        abs(
+            placement.diff_output_face_abs_x_mm
+            - placement.pinion_inner_face_abs_x_mm
+        )
+        <= 0.05
+        and placement.halfshaft_stub_axis_radial_offset_mm
+        == placement.wheel_radial_offset_mm
     )
 
     screen = {
@@ -342,6 +374,10 @@ def _selftest() -> int:
     wb = quantity_writeback(placement)
     checks["writeback_has_mesh_prefix"] = (
         wb["post_diff_blender_mesh_prefix"]["value"] == "u_se_td_post_diff_"
+    )
+    checks["writeback_has_interface_datums"] = (
+        "post_diff_pinion_inner_face_abs_x_mm" in wb
+        and "post_diff_halfshaft_stub_axis_radial_offset_mm" in wb
     )
 
     try:
