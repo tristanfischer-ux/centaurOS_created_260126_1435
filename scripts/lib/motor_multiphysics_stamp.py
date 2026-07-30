@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 SCHEMA_MOTOR = "motor-multiphysics/v1"
 SCHEMA_CAD = "cad-authority/v1"
-SCHEMA_HARDWARE_CORRELATION = "motor-hardware-correlation/v1"
+SCHEMA_HARDWARE_CORRELATION = "motor-hardware-correlation/v2"
 ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 
 # INTENT (2026-07-30): Architecture / packaging blockers must be machine-readable
@@ -90,6 +90,20 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
             "Calibrated dyno raw data + torque/efficiency map over speed, current, "
             "voltage, and coolant conditions, revision-hashed to the assembly."
         ),
+        "predicted_model_refs": [
+            "_motor_stack/em_fia_front_kit_case.json",
+            "_motor_stack/em_fia_mtpa_screen.json",
+            "_motor_stack/em_fia_voltage_fw_screen.json",
+        ],
+        "measurement_recipe": (
+            "Mount the revision-matched MGU and inverter on a calibrated dyno; hold "
+            "coolant inlet conditions, sweep the modelled speed/current grid, and "
+            "record shaft torque, DC/AC power, temperatures, and efficiency."
+        ),
+        "acceptance_band": (
+            "At revision-matched points, measured torque is within ±10% of the model "
+            "and efficiency within ±3 percentage points, with no limit exceedance."
+        ),
     },
     {
         "hold_id": "HIL_POPULATED_INVERTER",
@@ -98,6 +112,20 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
         "required_evidence": (
             "Hardware-in-the-loop pass on the populated inverter revision, including "
             "safe-off, sensing, resolver, CAN, desaturation, and fault handling."
+        ),
+        "predicted_model_refs": [
+            "_motor_stack/inverter_packaging_fia_front_kit_case.json",
+            "_motor_stack/em_fia_voltage_fw_screen.json",
+        ],
+        "measurement_recipe": (
+            "Connect the populated inverter to a real-time plant simulator; replay "
+            "normal, sensor-fault, resolver, CAN-loss, desaturation, and safe-off "
+            "cases while logging commands, sensed values, and protection timing."
+        ),
+        "acceptance_band": (
+            "Every commanded state and protection transition matches the approved "
+            "sequence; scaled analogue channels are within ±5% and no unsafe output "
+            "persists after a trip."
         ),
     },
     {
@@ -108,6 +136,19 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
             "Measured pressure-flow curves for the motor jacket and inverter cold "
             "plate at controlled coolant temperature and concentration."
         ),
+        "predicted_model_refs": [
+            "_motor_stack/openfoam_fia_cold_plate_case.json",
+            "_motor_stack/openfoam_fia_water_jacket_case.json",
+        ],
+        "measurement_recipe": (
+            "Bench each revision-matched coolant article with the specified coolant "
+            "mix and inlet temperature; step flow across the operating range and "
+            "record stabilised inlet/outlet pressure, flow, and fluid temperature."
+        ),
+        "acceptance_band": (
+            "Measured pressure drop is within ±15% of each modelled point for both "
+            "articles and preserves the predicted monotonic pressure-flow trend."
+        ),
     },
     {
         "hold_id": "HEATER_PLATE_MODULE_TEMPS",
@@ -116,6 +157,19 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
         "required_evidence": (
             "Heater-plate test with calibrated module/case/coolant temperatures and "
             "TIM/contact stack matching the populated SiC module revision."
+        ),
+        "predicted_model_refs": [
+            "_motor_stack/analytical_fia_cooling_thermal_screen.json",
+            "_motor_stack/inverter_packaging_fia_front_kit_case.json",
+        ],
+        "measurement_recipe": (
+            "Build the revision-matched module/TIM/cold-plate stack, apply calibrated "
+            "heater power at controlled coolant conditions, and log steady module, "
+            "case, plate, inlet, and outlet temperatures."
+        ),
+        "acceptance_band": (
+            "Steady module temperature is within ±5 °C of prediction and measured "
+            "junction-to-coolant thermal resistance is within ±15% of the model."
         ),
     },
     {
@@ -126,6 +180,20 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
             "Instrumented overspeed/retention test and correlated rotor stress model "
             "at the controlled maximum-speed release condition."
         ),
+        "predicted_model_refs": [
+            "_motor_stack/calculix_fia_rotor_screen.json",
+            "_motor_stack/calculix_fia_magnet_pocket_screen.json",
+            "_motor_stack/ross_fia_front_kit_case.json",
+        ],
+        "measurement_recipe": (
+            "Spin the revision-matched rotor in a guarded rig through the approved "
+            "speed steps; record speed, vibration, strain or growth, and post-test "
+            "magnet/sleeve/bridge inspection evidence."
+        ),
+        "acceptance_band": (
+            "Measured strain or radial growth is within ±15% of the structural model, "
+            "critical-speed trend agrees within ±10%, and retention remains intact."
+        ),
     },
     {
         "hold_id": "DOUBLE_PULSE_ESL_SIC",
@@ -134,6 +202,18 @@ _HARDWARE_CORRELATION_HOLDS: tuple[dict[str, Any], ...] = (
         "required_evidence": (
             "Double-pulse switching waveforms on populated SiC hardware with measured "
             "commutation-loop ESL, overshoot, switching loss, and gate settings."
+        ),
+        "predicted_model_refs": [
+            "_motor_stack/inverter_packaging_fia_front_kit_case.json",
+        ],
+        "measurement_recipe": (
+            "Run a guarded double-pulse test on the populated revision at the modelled "
+            "DC bus/current points; capture gate voltage, VDS, current, timing, "
+            "temperature, and commutation-loop geometry."
+        ),
+        "acceptance_band": (
+            "Measured loop ESL is within ±20% of prediction, voltage overshoot within "
+            "±10%, and Eon/Eoff within ±15%, with no protection or device-limit breach."
         ),
     },
 )
@@ -2505,43 +2585,64 @@ def build_hardware_correlation(
     *,
     assembly_revision: str = ASSEMBLY_REVISION,
     stamped_at: Optional[str] = None,
+    twin_dir: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Build the physical hardware-correlation release-hold register.
 
     @description Registers the six mandatory physical evidence campaigns and
-    links existing Decision Register authority. Every initial hold is OPEN, so
-    the register and parent stamp remain unshippable.
+    links existing Decision Register authority. Software may prepare a runnable
+    recipe, but every hold stays OPEN until revision-matched physical data exists.
     @param assembly_revision Shared CAD/solver/hardware revision label
     @param stamped_at ISO timestamp override
+    @param twin_dir Optional twin directory used to verify predicted model refs
     @returns Fail-closed hardwareCorrelation object
     """
 
     stamped = stamped_at or _iso_now()
-    holds = [
-        {
-            **row,
-            "status": "OPEN",
-            "ship_ok": False,
-            "blocks_ship": True,
-            "evidence_ref": None,
-            "correlated_revision": None,
+    holds: list[dict[str, Any]] = []
+    for row in _HARDWARE_CORRELATION_HOLDS:
+        model_refs = list(row["predicted_model_refs"])
+        model_refs_present = {
+            ref: bool(twin_dir is not None and (twin_dir / ref).is_file())
+            for ref in model_refs
         }
-        for row in _HARDWARE_CORRELATION_HOLDS
-    ]
-    open_count = sum(1 for row in holds if row["status"] == "OPEN")
+        holds.append(
+            {
+                **row,
+                "predicted_model_refs": model_refs,
+                "predicted_model_refs_present": model_refs_present,
+                "software_prep_status": (
+                    "READY_FOR_BENCH"
+                    if model_refs and all(model_refs_present.values())
+                    else "NOT_READY"
+                ),
+                "status": "OPEN",
+                "ship_ok": False,
+                "blocks_ship": True,
+                "evidence_ref": None,
+                "correlated_revision": None,
+            }
+        )
+    open_count = len(holds)
+    ready_count = sum(
+        1 for row in holds if row["software_prep_status"] == "READY_FOR_BENCH"
+    )
     return {
         "schema_version": SCHEMA_HARDWARE_CORRELATION,
         "stamped_at": stamped,
         "assembly_revision": assembly_revision,
-        "status": "OPEN" if open_count else "CLOSED",
+        "status": "OPEN",
+        "bench_prep_ref": "_motor_stack/hardware_correlation_bench_prep.json",
         "holds": holds,
         "hold_count": len(holds),
         "open_count": open_count,
-        "all_holds_closed": open_count == 0,
-        "ship_ok": open_count == 0,
+        "ready_for_bench_count": ready_count,
+        "all_holds_closed": False,
+        "ship_ok": False,
         "honesty": (
-            "Analytical and numerical screens do not replace physical correlation. "
-            "Any OPEN hold forces ship_ok false."
+            "Software-only work can prepare model-linked bench recipes. It cannot "
+            "close correlation: PASS needs revision-matched physical data. Every hold "
+            "remains OPEN and ship_ok remains false."
         ),
     }
 
@@ -2571,6 +2672,7 @@ def build_stamp_payload(
     hardware = build_hardware_correlation(
         assembly_revision=assembly_revision,
         stamped_at=stamped,
+        twin_dir=twin_dir,
     )
     packaging = build_inverter_packaging(twin_dir=twin_dir, stamped_at=stamped)
     payload: dict[str, Any] = {
@@ -2714,16 +2816,21 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
                 "",
                 "## Hardware correlation (release holds)",
                 "",
-                "Numerical and analytical screens stay **PARTIAL** until the physical",
-                "campaigns below close on the same controlled assembly revision.",
+                "### Software-only bench preparation",
+                "",
+                "Software-only work can prepare exact measurement recipes, predicted",
+                "model references, and acceptance bands. It cannot correlate hardware:",
+                "**PASS needs physical data** from the same controlled assembly revision.",
+                "Every hold below therefore stays **OPEN** and `ship_ok` stays **false**.",
                 f"**Status:** **{hardware.get('status')}** · "
                 f"**OPEN:** **{hardware.get('open_count')} / "
                 f"{hardware.get('hold_count')}** · **ship_ok:** **false**",
                 "",
-                "| Hardware hold | Status | Decision Register | Required evidence |",
-                "|---|---|---|---|",
+                "| Hardware hold | Status | Software prep | Decision Register | Required evidence |",
+                "|---|---|---|---|---|",
             ]
         )
+        prep_details: list[str] = []
         for row in hardware.get("holds") or []:
             if not isinstance(row, Mapping):
                 continue
@@ -2733,8 +2840,20 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             ) or "—"
             lines.append(
                 f"| `{row.get('hold_id')}` | **{row.get('status')}** | "
-                f"{decisions} | {row.get('required_evidence')} |"
+                f"**{row.get('software_prep_status')}** | {decisions} | "
+                f"{row.get('required_evidence')} |"
             )
+            model_refs = ", ".join(
+                f"`{ref}`" for ref in row.get("predicted_model_refs") or []
+            ) or "—"
+            prep_details.extend(
+                [
+                    f"- **{row.get('hold_id')} predicted models:** {model_refs}",
+                    f"  - **Measurement recipe:** {row.get('measurement_recipe')}",
+                    f"  - **Acceptance band:** {row.get('acceptance_band')}",
+                ]
+            )
+        lines.extend(["", "### Bench recipes", "", *prep_details])
     blockers = (
         payload.get("architectureBlockers")
         or motor.get("architectureBlockers")
@@ -2924,10 +3043,26 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
     hardware_ok = (
         isinstance(hardware, Mapping)
         and len(hardware_holds) == len(_HARDWARE_CORRELATION_HOLDS)
+        and len(open_hardware_holds) == len(hardware_holds)
+        and hardware.get("status") == "OPEN"
+        and hardware.get("ship_ok") is False
         and all(
             isinstance(row, Mapping)
+            and row.get("status") == "OPEN"
             and row.get("blocks_ship") is True
             and row.get("ship_ok") is False
+            and row.get("software_prep_status") in {
+                "READY_FOR_BENCH",
+                "NOT_READY",
+            }
+            and isinstance(row.get("predicted_model_refs"), list)
+            and bool(row.get("predicted_model_refs"))
+            and all(
+                isinstance(ref, str) and ref.startswith("_motor_stack/")
+                for ref in row.get("predicted_model_refs") or []
+            )
+            and bool(row.get("measurement_recipe"))
+            and bool(row.get("acceptance_band"))
             for row in hardware_holds
         )
         and (
@@ -2981,7 +3116,8 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
 def write_sidecar(twin: Path, payload: Mapping[str, Any]) -> Path:
     """Write motor-multiphysics.json into the twin directory.
 
-    @description Canonical small artefact for Excel / overview (avoids 100MB+ state).
+    @description Writes the canonical Excel/overview sidecar and the focused
+    machine-readable hardware-correlation bench-prep register when present.
     @param twin Twin out directory
     @param payload Combined stamp
     @returns Path written
@@ -2990,6 +3126,14 @@ def write_sidecar(twin: Path, payload: Mapping[str, Any]) -> Path:
     tmp = twin / f".motor-multiphysics.{os.getpid()}.tmp"
     tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)
+    hardware = payload.get("hardwareCorrelation")
+    if isinstance(hardware, Mapping):
+        stack_dir = twin / "_motor_stack"
+        stack_dir.mkdir(parents=True, exist_ok=True)
+        prep_path = stack_dir / "hardware_correlation_bench_prep.json"
+        prep_tmp = stack_dir / f".hardware_correlation_bench_prep.{os.getpid()}.tmp"
+        prep_tmp.write_text(json.dumps(hardware, indent=2) + "\n", encoding="utf-8")
+        os.replace(prep_tmp, prep_path)
     return path
 
 
@@ -3634,6 +3778,36 @@ def selftest() -> int:
             encoding="utf-8",
         )
         partial_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
+        partial_hardware = partial_payload["hardwareCorrelation"]
+        partial_holds = {
+            row["hold_id"]: row for row in partial_hardware.get("holds") or []
+        }
+        if not all(
+            row.get("status") == "OPEN" and row.get("ship_ok") is False
+            for row in partial_holds.values()
+        ):
+            print("FAIL: bench preparation must leave every hardware hold OPEN")
+            bad += 1
+        if partial_hardware.get("ship_ok") is not False:
+            print("FAIL: bench preparation must leave hardware ship_ok false")
+            bad += 1
+        for hold_id in (
+            "DYNO_TORQUE_EFFICIENCY_MAP",
+            "FLOW_BENCH_JACKET_AND_COLD_PLATE",
+        ):
+            if (
+                partial_holds.get(hold_id, {}).get("software_prep_status")
+                != "READY_FOR_BENCH"
+            ):
+                print(
+                    f"FAIL: {hold_id} must be READY_FOR_BENCH when model refs exist"
+                )
+                bad += 1
+        write_sidecar(twin_tmp, partial_payload)
+        prep_sidecar = case_dir / "hardware_correlation_bench_prep.json"
+        if not prep_sidecar.is_file():
+            print("FAIL: stamp must write hardware_correlation_bench_prep.json")
+            bad += 1
         mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
         if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
             print("FAIL: twin-bound FIA case must mark magnetic PARTIAL with result_ref")

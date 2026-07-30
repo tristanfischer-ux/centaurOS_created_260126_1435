@@ -28936,10 +28936,28 @@ def _render_motor_multiphysics_qa(ws, state: dict, run_dir: str, r: int) -> int:
                 else str(decision_ids or "—")
             )
             blocks_ship = status == "OPEN" or bool(hold.get("blocks_ship"))
+            model_refs = hold.get("predicted_model_refs")
+            model_ref_text = (
+                ", ".join(str(value) for value in model_refs if value)
+                if isinstance(model_refs, list)
+                else "—"
+            )
+            evidence_and_prep = "\n".join(
+                [
+                    str(hold.get("required_evidence") or "—"),
+                    (
+                        "Software prep: "
+                        f"{hold.get('software_prep_status') or 'NOT_READY'}"
+                    ),
+                    f"Predicted models: {model_ref_text or '—'}",
+                    f"Recipe: {hold.get('measurement_recipe') or '—'}",
+                    f"Correlation acceptance: {hold.get('acceptance_band') or '—'}",
+                ]
+            )
             ws.cell(r, 1, str(hold.get("hold_id") or "—")).font = FONT_SUB
             status_cell = ws.cell(r, 2, status)
             ws.cell(r, 3, decision_ref or "—").font = FONT_NOTE
-            ws.cell(r, 4, str(hold.get("required_evidence") or "—")).font = FONT_NOTE
+            ws.cell(r, 4, evidence_and_prep).font = FONT_NOTE
             ship_cell = ws.cell(r, 5, "BLOCKED" if blocks_ship else "CLOSED")
             if blocks_ship:
                 status_cell.fill = FILL_FAIL

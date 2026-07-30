@@ -2,13 +2,83 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.lib.motor_multiphysics_stamp import (
     BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
     build_cad_authority,
+    build_stamp_payload,
     collect_architecture_blockers,
+    render_markdown,
+    write_sidecar,
 )
+
+
+class HardwareCorrelationBenchPrepTests(unittest.TestCase):
+    """Prove software preparation stays distinct from physical correlation."""
+
+    def test_existing_dyno_and_flow_models_make_bench_prep_ready_not_passed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="fpk-bench-prep-") as tmp:
+            twin = Path(tmp)
+            stack = twin / "_motor_stack"
+            stack.mkdir()
+            for name in (
+                "em_fia_front_kit_case.json",
+                "em_fia_mtpa_screen.json",
+                "em_fia_voltage_fw_screen.json",
+                "openfoam_fia_cold_plate_case.json",
+                "openfoam_fia_water_jacket_case.json",
+            ):
+                (stack / name).write_text("{}\n", encoding="utf-8")
+
+            payload = build_stamp_payload(twin_dir=twin)
+            hardware = payload["hardwareCorrelation"]
+            holds = {row["hold_id"]: row for row in hardware["holds"]}
+
+            self.assertTrue(all(row["status"] == "OPEN" for row in holds.values()))
+            self.assertTrue(all(row["ship_ok"] is False for row in holds.values()))
+            self.assertFalse(hardware["ship_ok"])
+            self.assertFalse(payload["ship_ok"])
+            self.assertEqual(
+                holds["DYNO_TORQUE_EFFICIENCY_MAP"]["software_prep_status"],
+                "READY_FOR_BENCH",
+            )
+            self.assertEqual(
+                holds["FLOW_BENCH_JACKET_AND_COLD_PLATE"]["software_prep_status"],
+                "READY_FOR_BENCH",
+            )
+            self.assertEqual(
+                holds["HIL_POPULATED_INVERTER"]["software_prep_status"],
+                "NOT_READY",
+            )
+            for hold in holds.values():
+                self.assertTrue(hold["predicted_model_refs"])
+                self.assertTrue(
+                    all(
+                        ref.startswith("_motor_stack/")
+                        for ref in hold["predicted_model_refs"]
+                    )
+                )
+                self.assertTrue(hold["measurement_recipe"])
+                self.assertTrue(hold["acceptance_band"])
+
+            markdown = render_markdown(payload)
+            self.assertIn("Software-only bench preparation", markdown)
+            self.assertIn("PASS needs physical data", markdown)
+            self.assertIn("READY_FOR_BENCH", markdown)
+
+            write_sidecar(twin, payload)
+            prep_path = stack / "hardware_correlation_bench_prep.json"
+            self.assertTrue(prep_path.is_file())
+            prep = json.loads(prep_path.read_text(encoding="utf-8"))
+            self.assertEqual(prep["status"], "OPEN")
+            self.assertFalse(prep["ship_ok"])
+            self.assertTrue(
+                all(row["status"] == "OPEN" for row in prep["holds"])
+            )
 
 
 class PostDiffFinalDriveBlockerTests(unittest.TestCase):
