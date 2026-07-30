@@ -115,14 +115,14 @@ q-axis angle (`Id = 0`, −90 electrical degrees) and one rotor position
 The hairpin schedule is not frozen. The loaded point binds twin analytical
 `turns_per_coil` (4 on the live twin) as FEMM conductors per slot and prefers
 the twin design phase current when it sits near the bus/power estimate
-(~535 A rms). On the 30 July reload this raised peak air-gap flux from about
-0.283 T open-circuit to about 1.34 T loaded and returned about −9.3 N·m from
-FEMM's weighted-stress integral — still only ~7% of the required ~125 N·m.
-That miss is treated as a design / current-angle / topology signal, not a
-reason to invent more turns. Angle and rotor-position sweeps, 24-vs-48 slot
-reconciliation, voltage closure, losses and demagnetisation still need to be
-solved. The artefact therefore always keeps the torque map and dynamometer
-correlation `OPEN`, status `PARTIAL`, and `ship_ok: false`.
+(~535 A rms). A coarse current-angle screen is required: the old −90°
+electrical seed was a near torque-null (~9 N·m). With bridge-legal magnet fill
+and a best angle near −45°, the live twin returns about **−96 N·m** (~77% of
+the required ~125 N·m) and sets `works_in_kit_context.duty_torque_screen_ok`
+when that ratio clears 75%. That is a kit-context screen, not a torque map.
+Position sweeps, 24-vs-48 slot reconciliation, voltage closure, losses and
+demagnetisation remain OPEN. The artefact keeps the torque map and
+dynamometer correlation `OPEN`, status `PARTIAL`, and `ship_ok: false`.
 
 Run the synthetic proveCatch separately:
 

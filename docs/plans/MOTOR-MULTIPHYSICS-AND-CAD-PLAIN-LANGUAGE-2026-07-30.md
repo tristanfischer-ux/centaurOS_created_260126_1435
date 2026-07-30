@@ -24,11 +24,11 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~16:00:** **More twin-bound screens landed — still not finished.**  
-Happy about: magnetic, rotor-dynamics, **structural**, and **inverter cold-plate** now **PARTIAL** on kit numbers; coil turns bound from twin; 4 parametric CAD families.  
-Not done: water jacket CFD, gears/oil, inverter packaging, torque map / dyno, release CAD = 0, `ship_ok` false.
+**Overall mood as of 2026-07-30 ~16:30:** **In-context magnetics now screens the duty — still not finished.**  
+Happy about: magnetic loaded point ~**96 N·m (~77% of ~125)** after fixing the −90° torque-null + magnet fill; stamp now shows **Works in kit context?** separately from smoke.  
+Not done: torque map / demag / dyno; water jacket; gears/oil; inverter packaging; release CAD = 0; `ship_ok` false.
 
-**Last scoreboard update:** 2026-07-30 (after OpenFOAM cold-plate duct + CalculiX rotor screen + twin `turns_per_coil` magnetic reload).
+**Last scoreboard update:** 2026-07-30 (magnetics current-angle + magnet-fill fix; kit-context honesty column).
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
@@ -36,7 +36,7 @@ Not done: water jacket CFD, gears/oil, inverter packaging, torque map / dyno, re
 |---|---|---|---|---|---|
 | 1 | Freeze one shared assembly revision for CAD + solvers + Blender + Excel | **STARTED** | Label `front-drive-concept-stub-2026-07-30` on the multiphysics stamp | Not a hard gate yet — old evidence can still sit beside new pictures | Make Excel/Quality reject mismatched revisions; bump revision whenever geometry changes |
 | 2 | Build CAD authority spine (case, stator, rotor, gears, cooling, …) | **STARTED** | Parametric families now: stator, rotor magnet carrier, planetary, **cold plate serpentine** (4 of 13) | Case, bearings, differential, oil, motor jacket, bus, connectors still Blender-only; **release CAD coverage = 0 / 13** | Next: motor jacket channels + cast case; supplier STEP when known |
-| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL** | Twin magnetic: OC + loaded point with **twin `turns_per_coil=4`** (no longer 1-turn placeholder). Twin ROSS: first critical ≈ **28,157 rpm** vs **19,500** (×1.44). Twin CalculiX steel-ring centrifugal screen → structural **PARTIAL** | Torque map / demag / dyno OPEN. Loaded torque vs ~125 N·m duty still a **design gap** (honest miss, not invented turns). Magnet-pocket burst OPEN | Sweep angle/position; reconcile 24-slot tree vs 48-slot mesh; keep burst FEA next |
+| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (duty screen yes)** | Root cause of ~9 N·m was **−90° current-angle null** + thin magnets. Fix: angle screen (best **−45°**) + bridge-legal magnet fill → **~96 N·m (~77% of 125)**; `works_in_kit_context` **true**. ROSS + CalculiX screens unchanged | Full MTPA/position map, demag, dyno, 24-vs-48 slot reconciliation, magnet-pocket burst still OPEN | Position sweep + voltage/thermal; keep `ship_ok` false |
 | 4 | Close gears, differential, structure | **STARTED (rotor screen only)** | CalculiX kit ring at 19,500 rpm (~103 MPa von Mises screening) | No ISO gear strength, no differential contact, no case/mount FEA | Twin-bound gear + case solves after ratio freeze |
 | 5 | Close cooling and lubrication | **PARTIAL (cold plate duct)** | OpenFOAM rectangular duct on family channel @ **12 L/min / 60 °C** → ~**25 kPa** headline Δp (PARTIAL). CAD family exists | Full serpentine STEP CHT OPEN; jacket CFD OPEN; oil CFD OPEN; module temps OPEN | Jacket CadQuery → OpenFOAM; CHT when solid mesh exists |
 | 6 | Close inverter packaging | **NOT STARTED** | Module volumes in Blender / physics tree | No supplier module identity, bus inductance, double-pulse | Freeze MPNs + supplier STEP; loss + inductance evidence |
@@ -47,7 +47,7 @@ Not done: water jacket CFD, gears/oil, inverter packaging, torque map / dyno, re
 
 | Check | Said we need | Status now | Good or bad? | Next fix |
 |---|---|---|---|---|
-| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | Progress — OC + loaded point at twin `turns_per_coil=4` / ~535 A. Peak air-gap ~1.34 T; **weighted-stress torque still ~9 N·m vs ~125 N·m required (~7%)** — design / angle / topology gap, not a 1-turn bug | MTPA angle + position sweep; 24-vs-48 slot reconciliation; demagnetisation |
+| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **Works in kit context (duty screen):** ~**96 N·m / 125 (~77%)** at −45° elec after magnet fill. Was ~9 N·m at the −90° null. Map / demag / dyno still OPEN | Multi-position MTPA map; 24-vs-48 slots; demagnetisation |
 | Rotor dynamics | Critical speeds vs 19,500 rpm | **PARTIAL** | Progress — kit-sized ROSS screen clear of band; **assumed bearings**, not supplier data | Replace bearing k/c with catalogue; modal correlation later |
 | Structural / burst | Case, rotor, mounts survive | **PARTIAL** | Progress — steel-ring centrifugal screen; **not** magnet-pocket burst or case FEA | Pocket burst + case/mount load cases |
 | Motor water jacket | Flow + heat at 12 L/min, 60 °C | **OPEN** | **Unfinished** | Jacket CadQuery → OpenFOAM |

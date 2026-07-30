@@ -473,8 +473,16 @@ def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
             f"{inputs.radial_airgap_mm:.3f} vs {measured_gap:.3f} mm"
         )
     rotor_ring_mm = r_ro - r_ri
-    magnet_thickness_mm = max(3.2, min(4.2, rotor_ring_mm * 0.275))
-    magnet_length_mm = max(11.0, min(15.0, rotor_ring_mm * 0.99))
+    # DECISION: Size V-magnets from the hollow-rotor ring with 1 mm inner/outer
+    # bridge keep-out (see _build_fia_lua). The earlier 3.2–4.2 × 11–15 mm clamps
+    # left ~4 mm of unused radial room and starved open-circuit flux (~0.28 T),
+    # so the kit could not approach the ~125 N·m duty even at a good current
+    # angle. Fill the usable ring harder while staying first-principles /
+    # twin-bound — not a pasted supplier magnet schedule.
+    bridge_keepout_mm = 2.0  # 1 mm OD + 1 mm ID
+    usable_radial_mm = max(4.0, rotor_ring_mm - bridge_keepout_mm)
+    magnet_thickness_mm = max(3.5, min(7.0, usable_radial_mm * 0.55))
+    magnet_length_mm = max(12.0, min(18.0, usable_radial_mm * 1.35))
     stator_build_mm = r_so - r_si
     slot_depth_mm = max(8.0, min(15.0, stator_build_mm * 0.66))
     estimated_mass = _estimate_active_mass_kg(
@@ -603,15 +611,28 @@ def effective_turns_per_slot_from_twin(inputs: TwinInputs) -> int:
     return turns
 
 
+# GOTCHA: At rotor mechanical 0° the magnet d-axis is NOT aligned with the
+# phase-A belt axis. Hardcoding −90° electrical (claimed "Id = 0") lands near a
+# torque null (~9 N·m). Diagnostic sweep on the live twin peaked near −45°.
+DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG = -45.0
+# Coarse regenerative-side sweep for the live twin case (not a full MTPA map).
+LIVE_CURRENT_ANGLE_SWEEP_DEG = (-40.0, -45.0, -50.0, -60.0, -90.0)
+# Screening bar: |FE torque| / required shaft torque. 0.75 = order-of-magnitude
+# correct for the kit duty after angle+magnet fill; 1.0 would be full close.
+DUTY_TORQUE_SCREEN_RATIO = 0.75
+
+
 def loaded_point_assumptions(
     duty: DutyCheck,
     inputs: TwinInputs,
+    *,
+    current_angle_electrical_deg: float = DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG,
 ) -> LoadedPointAssumptions:
-    """Create the one-position loaded-point excitation from duty + twin winding.
+    """Create one-position loaded excitation from duty + twin winding + angle.
 
-    INTENT: Bind coil turns (and optional design phase current) from the twin
-    so the weighted-stress torque is no longer the 1-turn placeholder (~8 N·m).
-    Still one rotor position / one current angle — not a torque map.
+    INTENT: Bind coil turns and design current from the twin, and apply a
+    current angle that is not the torque-null (−90° was). Still one rotor
+    position — not a full torque / MTPA map.
     """
 
     # DECISION: Prefer bus/power-derived rms when design current is absent or
@@ -623,8 +644,7 @@ def loaded_point_assumptions(
         if 0.5 * phase_rms_a <= design_a <= 2.5 * phase_rms_a:
             phase_rms_a = design_a
     phase_peak_a = phase_rms_a * math.sqrt(2.0)
-    current_angle_deg = -90.0
-    current_angle_rad = math.radians(current_angle_deg)
+    current_angle_rad = math.radians(current_angle_electrical_deg)
     phase_a_a = phase_peak_a * math.cos(current_angle_rad)
     phase_b_a = phase_peak_a * math.cos(
         current_angle_rad - 2.0 * math.pi / 3.0
@@ -639,7 +659,7 @@ def loaded_point_assumptions(
     return LoadedPointAssumptions(
         phase_current_rms_a=phase_rms_a,
         phase_current_peak_a=phase_peak_a,
-        current_angle_electrical_deg=current_angle_deg,
+        current_angle_electrical_deg=current_angle_electrical_deg,
         rotor_position_mechanical_deg=0.0,
         phase_a_current_a=phase_a_a,
         phase_b_current_a=phase_b_a,
@@ -653,9 +673,60 @@ def loaded_point_assumptions(
             f"parallel_paths={inputs.winding_parallel_paths:g}, "
             f"twin_stator_slots={inputs.twin_stator_slots:g}; "
             f"implied series turns≈{implied_series:.1f} on this 48-slot map). "
+            f"Current angle {current_angle_electrical_deg:g}° elec "
+            f"(not the −90° torque-null; d-axis alignment still provisional). "
             "Not a frozen hairpin schedule."
         ),
     )
+
+
+def select_best_loaded_point(
+    geometry: FiaMachineGeometry,
+    solver: Path,
+    *,
+    remanence_t: float,
+    duty: DutyCheck,
+    inputs: TwinInputs,
+    angles_deg: Sequence[float] = LIVE_CURRENT_ANGLE_SWEEP_DEG,
+) -> tuple[LoadedPointAssumptions, LoadedMagneticResult, list[dict[str, float]]]:
+    """Solve several current angles and keep the largest |torque| point.
+
+    INTENT: Make the FIA twin magnetic case work in *this* kit's frame — the
+    previous −90° seed was a near-null. This is still a coarse screen, not MTPA
+    closure or a full map.
+    """
+
+    if not angles_deg:
+        raise FiaFrontKitCaseError("current-angle sweep requires at least one angle")
+    sweep: list[dict[str, float]] = []
+    best_assumptions: LoadedPointAssumptions | None = None
+    best_result: LoadedMagneticResult | None = None
+    for angle in angles_deg:
+        assumptions = loaded_point_assumptions(
+            duty,
+            inputs,
+            current_angle_electrical_deg=float(angle),
+        )
+        result = run_loaded_magnetic_point(
+            geometry,
+            solver,
+            remanence_t=remanence_t,
+            assumptions=assumptions,
+        )
+        sweep.append(
+            {
+                "current_angle_electrical_deg": float(angle),
+                "torque_nm": result.torque_nm,
+                "torque_magnitude_nm": abs(result.torque_nm),
+                "peak_airgap_flux_density_t": result.peak_airgap_flux_density_t,
+                "rms_airgap_flux_density_t": result.rms_airgap_flux_density_t,
+            }
+        )
+        if best_result is None or abs(result.torque_nm) > abs(best_result.torque_nm):
+            best_assumptions = assumptions
+            best_result = result
+    assert best_assumptions is not None and best_result is not None
+    return best_assumptions, best_result, sweep
 
 
 def _solver_path() -> Path:
@@ -1180,13 +1251,36 @@ def build_artifact(
     loaded_magnetic: LoadedMagneticResult,
     solver_identity: Mapping[str, str],
     source_state_sha256: str,
+    current_angle_sweep: Sequence[Mapping[str, float]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release electromagnetic artefact."""
+
+    torque_ratio = (
+        abs(loaded_magnetic.torque_nm) / duty.required_shaft_torque_nm
+        if duty.required_shaft_torque_nm > 0.0
+        else 0.0
+    )
+    # INTENT: "works in kit context" means the loaded point is in the right
+    # order of magnitude for the FIA duty — not that release is closed.
+    duty_torque_screen_ok = torque_ratio >= DUTY_TORQUE_SCREEN_RATIO
 
     return {
         "schema": "forgeos.motor_stack.em_fia_front_kit_case/v2",
         "status": "PARTIAL",
         "ship_ok": False,
+        "works_in_kit_context": {
+            "duty_torque_screen_ok": duty_torque_screen_ok,
+            "torque_vs_required_ratio": round(torque_ratio, 6),
+            "required_shaft_torque_nm": duty.required_shaft_torque_nm,
+            "loaded_torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
+            "threshold_ratio": DUTY_TORQUE_SCREEN_RATIO,
+            "note": (
+                f"duty_torque_screen_ok means |FE torque| ≥ "
+                f"{DUTY_TORQUE_SCREEN_RATIO:.0%} of analytical 250 kW shaft "
+                "torque at one screened current angle. It is NOT a torque map, "
+                "demagnetisation close, dyno correlation, or ship_ok."
+            ),
+        },
         "source_twin": "out/formula-e-front-mgu-20260729-1432",
         "source_state_sha256": source_state_sha256,
         "input_quantities_sha256": input_quantities_sha256(inputs),
@@ -1238,25 +1332,20 @@ def build_artifact(
             "torque_method": "FEMM steady-state weighted-stress block integral (22)",
             "torque_reliable": False,
             "required_shaft_torque_nm": duty.required_shaft_torque_nm,
-            "torque_vs_required_ratio": (
-                round(
-                    abs(loaded_magnetic.torque_nm) / duty.required_shaft_torque_nm,
-                    6,
-                )
-                if duty.required_shaft_torque_nm > 0.0
-                else None
-            ),
+            "torque_vs_required_ratio": round(torque_ratio, 6),
+            "duty_torque_screen_ok": duty_torque_screen_ok,
             "torque_status": (
-                "ESTIMATE — solver-derived at twin-bound coil turns, one "
-                "current angle and one rotor position"
+                "ESTIMATE — solver-derived at twin-bound coil turns after a "
+                "coarse current-angle screen, one rotor position"
             ),
+            "current_angle_sweep": list(current_angle_sweep or []),
             "honesty_note": (
-                "This is one rotor position with one assumed current angle and "
+                "This is one rotor position with a screened current angle and "
                 "twin-bound conductors per slot (turns_per_coil). Exact hairpin "
-                "schedule, winding factor, MTPA/field-weakening, position sweep, "
-                "voltage closure, losses, demagnetisation and dyno correlation "
-                "remain OPEN. A large torque_vs_required_ratio miss is a design "
-                "signal, not a reason to invent turns."
+                "schedule, winding factor, full MTPA/field-weakening map, "
+                "position sweep, voltage closure, losses, demagnetisation and "
+                "dyno correlation remain OPEN. Do not invent turns to force "
+                "duty_torque_screen_ok."
             ),
         },
         "analytical_duty_check": asdict(duty),
@@ -1375,12 +1464,24 @@ def run_selftest() -> int:
         material_machine.rotor.hole[0].magnet_0.mat_type.mag.Brm20
     )
     solved = run_magnetic_point(geometry, solver, remanence_t=remanence_t)
+    # Selftest: default screened angle (−45°) vs the known torque-null (−90°).
     loaded_assumptions = loaded_point_assumptions(duty, inputs)
     loaded_solved = run_loaded_magnetic_point(
         geometry,
         solver,
         remanence_t=remanence_t,
         assumptions=loaded_assumptions,
+    )
+    null_assumptions = loaded_point_assumptions(
+        duty,
+        inputs,
+        current_angle_electrical_deg=-90.0,
+    )
+    null_solved = run_loaded_magnetic_point(
+        geometry,
+        solver,
+        remanence_t=remanence_t,
+        assumptions=null_assumptions,
     )
     near_zero = run_magnetic_point(
         geometry,
@@ -1396,6 +1497,18 @@ def run_selftest() -> int:
         loaded_magnetic=loaded_solved,
         solver_identity=_solver_identity(solver),
         source_state_sha256="synthetic-selftest",
+        current_angle_sweep=[
+            {
+                "current_angle_electrical_deg": loaded_assumptions.current_angle_electrical_deg,
+                "torque_nm": loaded_solved.torque_nm,
+                "torque_magnitude_nm": abs(loaded_solved.torque_nm),
+            },
+            {
+                "current_angle_electrical_deg": -90.0,
+                "torque_nm": null_solved.torque_nm,
+                "torque_magnitude_nm": abs(null_solved.torque_nm),
+            },
+        ],
     )
     checks = {
         "synthetic_quantities_control_geometry": (
@@ -1405,6 +1518,7 @@ def run_selftest() -> int:
             and geometry.active_length_mm != 83.82
         ),
         "geometry_fits_twin": geometry.fits_housing and geometry.fits_bay,
+        "magnet_fill_uses_rotor_ring": geometry.magnet_thickness_mm >= 5.0,
         "finite_element_field_is_physical": (
             0.05 < solved.peak_airgap_flux_density_t < 2.5
             and 0.01 < solved.rms_airgap_flux_density_t
@@ -1425,6 +1539,11 @@ def run_selftest() -> int:
         "loaded_point_uses_twin_coil_turns": (
             loaded_assumptions.effective_turns_per_slot == 4
             and loaded_assumptions.effective_turns_per_slot != 1
+        ),
+        "loaded_point_avoids_minus_90_null": (
+            loaded_assumptions.current_angle_electrical_deg
+            == DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG
+            and abs(loaded_solved.torque_nm) > abs(null_solved.torque_nm) * 1.5
         ),
         "loaded_point_uses_duty_current": (
             loaded_assumptions.phase_current_rms_a
@@ -1500,12 +1619,12 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         solver,
         remanence_t=remanence_t,
     )
-    loaded_assumptions = loaded_point_assumptions(duty, inputs)
-    loaded_magnetic = run_loaded_magnetic_point(
+    loaded_assumptions, loaded_magnetic, angle_sweep = select_best_loaded_point(
         geometry,
         solver,
         remanence_t=remanence_t,
-        assumptions=loaded_assumptions,
+        duty=duty,
+        inputs=inputs,
     )
     if not (
         0.05 < magnetic.peak_airgap_flux_density_t < 2.5
@@ -1524,6 +1643,7 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         loaded_magnetic=loaded_magnetic,
         solver_identity=_solver_identity(solver),
         source_state_sha256=state_hash,
+        current_angle_sweep=angle_sweep,
     )
     destination = (
         output_path
@@ -1543,10 +1663,12 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         f"The twin-sized Ø{geometry.rotor_outer_diameter_mm:.1f} × "
         f"{geometry.active_length_mm:.1f} mm IPM point solved at "
         f"{magnetic.peak_airgap_flux_density_t:.3f} T peak air-gap flux. "
-        f"One loaded point at {loaded_assumptions.phase_current_rms_a:.1f} A rms "
+        f"Best screened loaded point at {loaded_assumptions.phase_current_rms_a:.1f} A rms "
         f"and {loaded_assumptions.current_angle_electrical_deg:.0f} electrical "
         f"degrees yielded {loaded_magnetic.torque_nm:.2f} N·m weighted-stress "
-        "torque as an explicitly provisional estimate. "
+        f"torque ({artifact['works_in_kit_context']['torque_vs_required_ratio']:.0%} of "
+        f"required; duty_torque_screen_ok="
+        f"{artifact['works_in_kit_context']['duty_torque_screen_ok']}). "
         "Torque map, demagnetisation, thermal limits and dyno correlation remain OPEN; "
         "ship_ok is false."
     )

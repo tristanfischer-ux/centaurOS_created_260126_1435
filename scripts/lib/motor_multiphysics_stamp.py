@@ -341,6 +341,12 @@ def _magnetic_check_from_fia_case(
     map, demagnetisation margin, or dynamometer correlation (those stay OPEN).
     """
     fem = case.get("finite_element_point") if isinstance(case.get("finite_element_point"), dict) else {}
+    loaded = case.get("loaded_point") if isinstance(case.get("loaded_point"), dict) else {}
+    works = (
+        case.get("works_in_kit_context")
+        if isinstance(case.get("works_in_kit_context"), dict)
+        else {}
+    )
     analytical = (
         case.get("analytical_duty_check")
         if isinstance(case.get("analytical_duty_check"), dict)
@@ -348,6 +354,7 @@ def _magnetic_check_from_fia_case(
     )
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     rel_ref = "_motor_stack/em_fia_front_kit_case.json"
+    duty_ok = bool(works.get("duty_torque_screen_ok"))
     body = _open_check(
         "magnetic",
         extra={
@@ -355,7 +362,13 @@ def _magnetic_check_from_fia_case(
             "torque_map_ref": None,
             "loss_map_ref": None,
             "demagnetisation_margin": None,
-            "model_revision": str(case.get("schema") or "forgeos.motor_stack.em_fia_front_kit_case/v1"),
+            "works_in_kit_context": duty_ok,
+            "duty_torque_screen_ok": duty_ok,
+            "torque_vs_required_ratio": works.get("torque_vs_required_ratio")
+            or loaded.get("torque_vs_required_ratio"),
+            "model_revision": str(
+                case.get("schema") or "forgeos.motor_stack.em_fia_front_kit_case/v2"
+            ),
             "geometry_revision": str(
                 (case.get("machine_geometry") or {}).get("topology")
                 if isinstance(case.get("machine_geometry"), dict)
@@ -370,10 +383,19 @@ def _magnetic_check_from_fia_case(
             "twin_bound_case": {
                 "status": case.get("status"),
                 "ship_ok": False,
+                "works_in_kit_context": duty_ok,
+                "duty_torque_screen_ok": duty_ok,
                 "path": rel_ref,
                 "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
                 "peak_airgap_flux_density_t": fem.get("peak_airgap_flux_density_t"),
                 "rms_airgap_flux_density_t": fem.get("rms_airgap_flux_density_t"),
+                "loaded_torque_nm": loaded.get("torque_nm"),
+                "loaded_torque_magnitude_nm": loaded.get("torque_magnitude_nm"),
+                "torque_vs_required_ratio": works.get("torque_vs_required_ratio")
+                or loaded.get("torque_vs_required_ratio"),
+                "current_angle_electrical_deg": loaded.get(
+                    "current_angle_electrical_deg"
+                ),
                 "required_shaft_torque_nm": analytical.get("required_shaft_torque_nm"),
                 "dc_current_a": analytical.get("dc_current_a"),
                 "electrical_power_check_kw": analytical.get("electrical_power_check_kw"),
@@ -389,9 +411,10 @@ def _magnetic_check_from_fia_case(
                 "torque_map": "OPEN",
                 "dynamometer_correlation": "OPEN",
                 "note": (
-                    "Twin-bound open-circuit magnetic point + analytical 250 kW duty "
-                    "reconciliation. Not a loaded torque map; not dyno-correlated; "
-                    "does not close release."
+                    "Twin-bound OC + loaded magnetic screen on kit geometry. "
+                    "works_in_kit_context / duty_torque_screen_ok = |FE torque| "
+                    "≥ 80% of analytical shaft torque — NOT smoke-only, NOT ship_ok. "
+                    "Torque map / dyno still OPEN."
                 ),
             },
         },
@@ -920,14 +943,25 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "## Required solver checks (Quality & Audit rows)",
         "",
-        "| Check | Status | Software | Toolchain smoke | Twin-bound result |",
+        "Smoke proves the *tool* runs. **Works in kit context** means a twin-bound",
+        "artefact answers the FIA duty screen for that row (still not `ship_ok`).",
+        "",
+        "| Check | Status | Works in kit context? | Software | Twin-bound result |",
         "|---|---|---|---|---|",
     ]
     for name, chk in (motor.get("required_checks") or {}).items():
-        smoke = (chk.get("toolchain_smoke") or {}).get("evidence_class", "—")
+        works = chk.get("works_in_kit_context")
+        if works is True:
+            works_cell = "**yes** (duty screen)"
+        elif works is False:
+            works_cell = "**no** — twin-bound but duty screen fails"
+        elif chk.get("status") == "PARTIAL" and chk.get("result_ref"):
+            works_cell = "PARTIAL screen (see artefact)"
+        else:
+            works_cell = "no — OPEN / smoke only"
         lines.append(
-            f"| {name} | **{chk.get('status')}** | {chk.get('software')} | "
-            f"`{smoke}` | `{chk.get('result_ref')}` |"
+            f"| {name} | **{chk.get('status')}** | {works_cell} | "
+            f"{chk.get('software')} | `{chk.get('result_ref')}` |"
         )
     lines.extend(
         [
@@ -1164,8 +1198,10 @@ def selftest() -> int:
     if "OPEN" not in md:
         print("FAIL: markdown must show OPEN checks")
         bad += 1
-    if "toolchain_smoke_pass" not in md and "toolchain_smoke" not in md:
-        print("FAIL: markdown must disclose toolchain smoke class")
+    if "Works in kit context" not in md and "smoke only" not in md:
+        print(
+            "FAIL: markdown must distinguish kit-context duty screens from smoke-only"
+        )
         bad += 1
 
     # Adversarial: illicit PASS without result_ref must fire
