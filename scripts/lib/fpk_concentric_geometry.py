@@ -49,6 +49,7 @@ class FpkConcentricGeometry:
     rotor_od_mm: float
     rotor_id_mm: float
     airgap_mm: float
+    mean_airgap_diameter_mm: float
     stack_len_mm: float
     nest_len_mm: float
 
@@ -137,7 +138,8 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
     """PHANTM-style pure arithmetic: params → nested concentric mm.
 
     Physics sketch (concept, not FEA):
-      • airgap diameter from IPMSM tool ≈ rotor OD at mid-gap
+      • legacy ``rotor_airgap_diameter_mm`` is treated as the rotor OD seed;
+        this module writes the actual mean airgap diameter separately.
       • stator ID = rotor OD + 2·g; stator OD ≈ 1.35× rotor OD (radial build)
       • housing OD = stator OD + jacket; length = stack + end-winding allowance
       • hollow rotor ID must clear planetary: ring ID ≈ rotor ID − clearance
@@ -160,6 +162,7 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
         )
         rotor_od = od_cap / 1.42
     stator_id = rotor_od + 2.0 * airgap
+    mean_airgap_diameter = (rotor_od + stator_id) / 2.0
     stator_od = min(od_cap * 0.96, rotor_od * 1.35)
     housing_od = min(od_cap, stator_od + 12.0)
 
@@ -233,6 +236,7 @@ def derive_geometry(p: FpkConcentricParams) -> FpkConcentricGeometry:
         rotor_od_mm=round(rotor_od, 1),
         rotor_id_mm=round(rotor_id, 1),
         airgap_mm=round(airgap, 2),
+        mean_airgap_diameter_mm=round(mean_airgap_diameter, 2),
         stack_len_mm=round(stack, 1),
         nest_len_mm=round(nest_len, 1),
         sun_od_mm=round(sun_od, 1),
@@ -304,6 +308,11 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
         "fpk_stator_od_mm": q(g.stator_od_mm, "mm", "derived stator OD"),
         "fpk_stator_id_mm": q(g.stator_id_mm, "mm", "rotor OD + 2×airgap"),
         "fpk_rotor_od_mm": q(g.rotor_od_mm, "mm", "from rotor_airgap_diameter_mm (clamped)"),
+        "fpk_mean_airgap_diameter_mm": q(
+            g.mean_airgap_diameter_mm,
+            "mm",
+            "mean diameter between rotor OD and stator ID",
+        ),
         "fpk_rotor_id_mm": q(g.rotor_id_mm, "mm", "hollow bore for planetary nest"),
         "fpk_sun_od_mm": q(g.sun_od_mm, "mm", "planetary sun from gear_ratio + ring ID"),
         "fpk_planet_od_mm": q(g.planet_od_mm, "mm", "planet pitch diameter from R/S split"),
@@ -322,15 +331,22 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
         "fpk_mcu_d_mm": q(g.mcu_d_mm, "mm", "MCU shelf depth"),
         "fpk_mcu_h_mm": q(g.mcu_h_mm, "mm", "MCU package height"),
         "fpk_geometry_ok": {
-            "value": 1.0 if (g.nest_fits_rotor and g.stack_fits_bay and g.mcu_fits_bay) else 0.0,
+            "value": 1.0 if (
+                g.nest_fits_rotor
+                and g.stack_fits_bay
+                and g.mcu_fits_bay
+                and g.rotor_od_mm < g.mean_airgap_diameter_mm < g.stator_id_mm
+            ) else 0.0,
             "unit": "",
             "family": "dimensionless",
             "basis": "rated",
             "scope": "system",
             "source": "calculator",
             "source_detail": (
-                "1=concentric nest fits bay; notes=" + "; ".join(g.notes)
-                if g.notes else "1=concentric nest fits bay"
+                "1=concentric nest fits bay and mean airgap lies between rotor OD/stator ID; notes="
+                + "; ".join(g.notes)
+                if g.notes
+                else "1=concentric nest fits bay and mean airgap lies between rotor OD/stator ID"
             ),
         },
     }
@@ -352,6 +368,7 @@ def _selftest() -> None:
     assert g.housing_od_mm <= min(g.case_d_mm, g.case_h_mm) + 1e-6
     assert g.housing_len_mm <= g.case_w_mm + 1e-6
     assert g.rotor_id_mm < g.rotor_od_mm < g.stator_id_mm <= g.stator_od_mm
+    assert g.rotor_od_mm < g.mean_airgap_diameter_mm < g.stator_id_mm
     assert g.sun_od_mm < g.ring_id_mm
     assert g.planet_count in (3, 4)
     assert g.nest_fits_rotor, g.notes
@@ -363,6 +380,7 @@ def _selftest() -> None:
     assert g.mcu_h_mm <= 40.0
     wb = quantity_writeback(g)
     assert wb["fpk_geometry_ok"]["value"] == 1.0
+    assert wb["fpk_mean_airgap_diameter_mm"]["value"] > wb["fpk_rotor_od_mm"]["value"]
     # Adversarial: huge gear ratio still nests (planets shrink)
     g2 = derive_geometry(
         FpkConcentricParams(343, 259, 267, 122, 98, 14.0, 120, 500),

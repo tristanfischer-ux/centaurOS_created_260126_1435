@@ -56,7 +56,11 @@ PRINCIPAL_ROLES: tuple[tuple[str, str, str, str], ...] = (
     ("halfshaft_flange", "Halfshaft flanges", r"^u_se_td_halfshaft_flange_\d+$", "compound"),
     ("coolant_jacket", "Motor coolant jacket", r"^u_se_td_coolant_jacket$", "compound"),
     ("coolant_ports", "Coolant inlet/outlet", r"^u_se_td_coolant_(in|out)$", "compound"),
+    ("coolant_hoses", "Attached coolant hose stubs", r"^u_se_td_coolant_hose_\d+$", "compound"),
     ("hv_connector", "HV DC connector", r"^u_se_td_hv_connector(_barrel)?$", "compound"),
+    ("hv_cable_boot", "HV cable boot", r"^u_se_td_hv_cable_boot$", "compound"),
+    ("lv_harness", "LV/control harness boot", r"^u_se_td_lv_harness_boot$", "compound"),
+    ("control_ribbon", "Control/gate-drive ribbon", r"^u_se_td_(signal|gate_drive)_ribbon$", "compound"),
     ("output_shaft", "Output shaft stub", r"^u_se_td_output_shaft(_b)?$", "compound"),
 )
 
@@ -85,6 +89,7 @@ VIZ_ONLY_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"^u_se_td_bearing_cap_\d+$", "bearing cap"),
     (r"^u_se_td_lv_connector$", "LV connector"),
     (r"^u_se_td_coolant_(in|out)_flange$", "coolant port flange"),
+    (r"^u_se_td_coolant_clamp_\d+$", "coolant hose clamp"),
 )
 
 _INDEX_SUFFIX_RE = re.compile(r"_\d+$")
@@ -359,12 +364,20 @@ def _selftest() -> int:
         "u_se_td_inverter_coldplate",
         "u_se_td_pcb",
         "u_se_td_sic_inverter",
+        "u_se_td_coolant_hose_0",
+        "u_se_td_hv_cable_boot",
+        "u_se_td_lv_harness_boot",
+        "u_se_td_signal_ribbon",
         "u_se_td_cast_fin_0",
     ]
     synthetic_prov = {
         "u_se_td_pcb": {"kind": "cad_family", "family": "instrument_pcb"},
         "u_se_td_phase_bus_0": {"kind": "compound", "primitive": "l_busbar"},
         "u_se_td_inverter_coldplate": {"kind": "compound", "primitive": "ribbed_plate"},
+        "u_se_td_coolant_hose_0": {"kind": "compound", "primitive": "hose_stub"},
+        "u_se_td_hv_cable_boot": {"kind": "compound", "primitive": "loom_boot"},
+        "u_se_td_lv_harness_boot": {"kind": "compound", "primitive": "loom_boot"},
+        "u_se_td_signal_ribbon": {"kind": "compound", "primitive": "ribbon_harness"},
     }
     good = evaluate_mesh_authenticity(
         Path("."),

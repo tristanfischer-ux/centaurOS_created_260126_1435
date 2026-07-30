@@ -14011,6 +14011,7 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
         "u_se_td_phase_boot_",
         "u_se_td_phase_bus_",
         "u_se_td_signal_ribbon",
+        "u_se_td_gate_drive_ribbon",
         "u_se_td_hv_bus",
         "u_se_td_rotor_hint",
         "u_se_td_stator_hint",
@@ -14057,7 +14058,10 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert _traction_drive_exterior_keep_visible("u_se_td_motor_housing")
     assert _traction_drive_exterior_keep_visible("u_se_td_pack_housing")
     assert _traction_drive_exterior_keep_visible("u_se_td_hv_connector")
+    assert _traction_drive_exterior_keep_visible("u_se_td_hv_cable_boot")
+    assert _traction_drive_exterior_keep_visible("u_se_td_lv_harness_boot")
     assert _traction_drive_exterior_keep_visible("u_se_td_coolant_in")
+    assert _traction_drive_exterior_keep_visible("u_se_td_coolant_hose_0")
     assert _traction_drive_exterior_keep_visible("u_se_td_cast_fin_0")
     assert _traction_drive_exterior_keep_visible("u_se_td_coldplate_fastener_0")
     assert _traction_drive_exterior_keep_visible("u_se_td_nameplate")
@@ -14066,6 +14070,8 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     # public FE gold is a closed cassette; electronics live on ghost/cutaway.
     assert not _traction_drive_exterior_keep_visible("u_se_td_pcb")
     assert not _traction_drive_exterior_keep_visible("u_se_td_phase_cable_0")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_signal_ribbon")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_gate_drive_ribbon")
     assert not _traction_drive_exterior_keep_visible("u_se_td_pcb_edge_pads")
     assert not _traction_drive_exterior_keep_visible("u_se_td_hollow_rotor")
     assert not _traction_drive_exterior_keep_visible("u_se_td_planet_0")
@@ -14085,6 +14091,8 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "bay-fill front-axle packaging mode must remain in traction placer")
     assert "u_se_td_cast_fin_" in _src_td and "u_se_td_coldplate_fastener_" in _src_td, (
         "Lucid-gold race-hardware cues (cast fins + cold-plate fasteners) required")
+    assert "u_se_td_coolant_hose_" in _src_td and "u_se_td_hv_cable_boot" in _src_td, (
+        "service ports must have attached hose/loom boots, not cosmetic pegs")
     # proveCatch (2026-07-29): concentric FPK stack — hollow rotor hosts planetary+diff;
     # MCU busbars pierce into stator (public press TRAINING CHECK, not CAD paste).
     assert "u_se_td_hollow_rotor" in _src_td and "u_se_td_sun_gear" in _src_td
@@ -18864,6 +18872,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     # DECISION (2026-07-29 JLR SIGHT): HV connector is dark Amphenol-style orange/black
     # — bright toy-red brick failed the Lucid-gold training check on 04-product-exterior.
     mat_hv = fl.make_mat("m_se_td_hv", (0.10, 0.07, 0.05), metallic=0.40, roughness=0.40)
+    mat_rubber = fl.make_mat("m_se_td_rubber", (0.018, 0.017, 0.016), metallic=0.05, roughness=0.62)
     mat_fast = fl.make_mat("m_se_td_fast", (0.12, 0.12, 0.13), metallic=0.90, roughness=0.28)
     mat_pcb = fl.make_mat(
         "m_se_td_pcb",
@@ -19231,6 +19240,32 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module_objects=MO,
             rotation=(1.5707963, 0.0, 0.0),
         )
+        # INTENT (SIGHT 2026-07-30): ports must read as serviceable coolant
+        # fittings, not orange cosmetic pegs. Add a short attached EPDM hose
+        # stub + metal clamp, universal to FE traction packs and still honest
+        # about unresolved vehicle-side routing.
+        fl.add_cyl(
+            f"u_se_td_coolant_hose_{i}",
+            _mm3((px, y_face - 36.0, z_motor + motor_od * 0.08)),
+            6.2 * fl.MM,
+            30.0 * fl.MM,
+            mat_rubber,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(1.5707963, 0.0, 0.0),
+            vertices=24,
+        )
+        fl.add_cyl(
+            f"u_se_td_coolant_clamp_{i}",
+            _mm3((px, y_face - 25.0, z_motor + motor_od * 0.08)),
+            7.2 * fl.MM,
+            3.0 * fl.MM,
+            mat_fast,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(1.5707963, 0.0, 0.0),
+            vertices=24,
+        )
         fl.add_cyl(
             name,
             _mm3((px, y_face - 16.0, z_motor + motor_od * 0.08)),
@@ -19270,6 +19305,17 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module_objects=MO,
             rotation=(1.5707963, 0.0, 0.0),
         )
+    fl.add_cyl(
+        "u_se_td_hv_cable_boot",
+        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 31.0, inv_z + 2.0)),
+        8.5 * fl.MM,
+        28.0 * fl.MM,
+        mat_rubber,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=24,
+    )
     # Thin HV/EMI shield cover over the inverter service face — seats X-138.
     fl.add_box(
         "u_se_td_hv_shield",
@@ -19348,6 +19394,17 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_hv,
         module=story_mod,
         module_objects=MO,
+    )
+    fl.add_cyl(
+        "u_se_td_lv_harness_boot",
+        _mm3((x_motor + inv_w * 0.28, y_inv - inv_d * 0.55 - 18.0, inv_z - inv_h * 0.15)),
+        5.0 * fl.MM,
+        24.0 * fl.MM,
+        mat_rubber,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=18,
     )
     fl.add_cyl(
         "u_se_td_ground_stud",
@@ -19448,6 +19505,22 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module=story_mod,
             module_objects=MO,
         )
+    fl.add_box(
+        "u_se_td_signal_ribbon",
+        _mm3((x_inv + inv_w * 0.18, y_inv - inv_d * 0.30, (pcb_z + inv_z) * 0.5)),
+        _mm3((inv_w * 0.32, 4.0, 2.2)),
+        mat_rubber,
+        module=story_mod,
+        module_objects=MO,
+    )
+    fl.add_box(
+        "u_se_td_gate_drive_ribbon",
+        _mm3((x_inv - inv_w * 0.12, y_inv - inv_d * 0.12, (gd_z + inv_z) * 0.5)),
+        _mm3((inv_w * 0.28, 3.5, 2.0)),
+        mat_rubber,
+        module=story_mod,
+        module_objects=MO,
+    )
     for ci in range(3):
         fl.add_cyl(
             f"u_se_td_dclink_cap_{ci}",
@@ -19728,7 +19801,9 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                         r"^u_se_td_(motor_housing|stator_ring|stator_hint|hollow_rotor|"
                         r"rotor_hint|winding_end_\d+|sun_gear|planet_\d+|planet_carrier|"
                         r"ring_gear|gearbox|diff_nest|diff_bulge|coolant_jacket|coolant_in|"
-                        r"coolant_out|output_shaft(_b)?|end_bell_\d+|bearing_cap_\d+|"
+                        r"coolant_out|coolant_hose_\d+|coolant_clamp_\d+|"
+                        r"hv_cable_boot|lv_harness_boot|signal_ribbon|gate_drive_ribbon|"
+                        r"output_shaft(_b)?|end_bell_\d+|bearing_cap_\d+|"
                         r"jacket_band|microjet_\d+_\d+|motor_shaft|motor_cover|"
                         r"gearbox_cover|pinion_gear|intermediate_shaft|side_gear_\d+|"
                         r"output_gear_\d+|gearbox_bearing_\d+|oil_seal_\d+|gear_oil|"
