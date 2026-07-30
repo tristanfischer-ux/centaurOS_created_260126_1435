@@ -26016,6 +26016,14 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         _QA_OPEN_CELL.append(f"'{ws.title}'!$B${r}")
         r += 1
 
+    # ---- Motor multiphysics / CAD authority (FIA front kit) — mirrors
+    # JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md so Quality & Audit shows the same
+    # PARTIAL / works-in-kit-context truth as the stamp (2026-07-30). ----
+    try:
+        r = _render_motor_multiphysics_qa(ws, state, run_dir, r)
+    except Exception as _mm_exc:  # noqa: BLE001 — additive card; never kill the tab
+        print(f"  ! motor multiphysics Q&A card skipped (non-fatal): {_mm_exc}")
+
     # ---- the deterministic ship-gate AUDIT findings + benchmark net (the former ⚠ Audit
     # tab's content) — merged below the scorecard tables (Bundle B fix 2). ----
     r += 1
@@ -26405,6 +26413,19 @@ _dt(["Claim", "Basis / source", "Target", "Achieved", "Unit", "Verdict", "Notes"
 # S7 ship-gate axes card (Quality & Audit) — axis + live verdict formula over the Met operand.
 _dt(["Ship-gate axis", "Met (1/0, blank=n/a)", "Verdict", "Detail", ""], "ship-gate-axes",
     ["Ship-gate axis", "Verdict"])
+# FIA front-kit motor multiphysics scoreboard (Quality & Audit, 2026-07-30) —
+# mirrors JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md. Kit-context operand may be blank
+# when unknown; Status / Works formula / result path are always filled.
+_dt(["Check", "Status", "Kit context (1/0)", "Works in kit context?",
+     "Software · twin-bound result"],
+    "motor-multiphysics-checks",
+    ["Check", "Status", "Works in kit context?", "Software · twin-bound result"])
+_dt(["Metric", "Value", "Meaning", "", ""],
+    "motor-cad-authority",
+    ["Metric", "Value", "Meaning"])
+_dt(["Field", "Value", "Note", "", ""],
+    "motor-inverter-packaging",
+    ["Field", "Value", "Note"])
 _dt(["Metric", "Value", "Unit", "Notes / source"], "overview-metrics",
     ["Metric", "Value", "Notes / source"])
 _dt(["Category", "Cost (£)", "% of capex", "Share"], "overview-cost",
@@ -28436,26 +28457,20 @@ def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
 
 def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
     """INTENT (2026-07-30): restore motorMultiphysics + cadAuthority from the
-    twin sidecar written by fe-front-stamp-motor-multiphysics.py. Quality & Audit /
-    Engineering Analysis can later surface OPEN solver rows from these keys.
+    twin sidecar written by fe-front-stamp-motor-multiphysics.py. Quality & Audit
+    surfaces the same OPEN / PARTIAL / works-in-kit-context rows as the markdown.
 
-    HOOK: Prefer `motor-multiphysics.json` over a wiped/missing state block.
+    HOOK: Always prefer `motor-multiphysics.json` when present — the stamp script
+    is the authority. An early return on "state already has keys" left Excel with
+    stale OPEN rows after PARTIAL twin-bound screens landed.
     Never invents PASS / ship_ok — sidecar honesty fields are copied as-is.
     Markdown twin artefact: JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md
 
-    @description Rehydrate solver/CAD evidence stubs from sidecar when absent.
+    @description Rehydrate solver/CAD evidence stubs from sidecar (prefer sidecar).
     @param state Mutable run state
     @param run_dir Chain out directory
     @returns Whether state was updated from the sidecar
     """
-    has_motor = isinstance(state.get("motorMultiphysics"), dict) and isinstance(
-        (state.get("motorMultiphysics") or {}).get("required_checks"), dict
-    )
-    has_cad = isinstance(state.get("cadAuthority"), dict) and isinstance(
-        (state.get("cadAuthority") or {}).get("components"), list
-    )
-    if has_motor and has_cad:
-        return False
     side = os.path.join(run_dir or "", "motor-multiphysics.json")
     if not os.path.isfile(side):
         return False
@@ -28476,21 +28491,229 @@ def _ensure_motor_multiphysics_from_sidecar(state: dict, run_dir: str) -> bool:
         motor = dict(motor)
         motor["ship_ok"] = False
         motor["all_required_solver_checks_pass"] = False
-    if not has_motor:
-        state["motorMultiphysics"] = motor
-    if not has_cad:
-        state["cadAuthority"] = cad
+    state["motorMultiphysics"] = motor
+    state["cadAuthority"] = cad
+    pkg = restored.get("inverterPackaging")
+    if isinstance(pkg, dict):
+        state["inverterPackaging"] = pkg
     state["ship_ok"] = False
-    if not isinstance(state.get("motorMultiphysicsPointer"), dict):
-        state["motorMultiphysicsPointer"] = {
-            "sidecar": "motor-multiphysics.json",
-            "markdown": "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
-            "assembly_revision": restored.get("assembly_revision")
-            or motor.get("assembly_revision"),
-            "ship_ok": False,
-            "stamped_at": restored.get("stamped_at") or motor.get("stamped_at"),
-        }
+    state["motorMultiphysicsPointer"] = {
+        "sidecar": "motor-multiphysics.json",
+        "markdown": "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
+        "assembly_revision": restored.get("assembly_revision")
+        or motor.get("assembly_revision"),
+        "ship_ok": False,
+        "stamped_at": restored.get("stamped_at") or motor.get("stamped_at"),
+    }
     return True
+
+
+def _motor_check_works_in_kit(chk: dict) -> tuple:
+    """Normalise works_in_kit_context to (ok: bool|None, label: str).
+
+    @description Accepts bool or nested dict from twin-bound case JSON.
+    @param chk One required_checks entry
+    @returns (ok, human label for Excel)
+    """
+    if not isinstance(chk, dict):
+        return None, "—"
+    works = chk.get("works_in_kit_context")
+    if isinstance(works, bool):
+        return works, ("yes (duty screen)" if works
+                       else "no — twin-bound but duty screen fails")
+    if isinstance(works, dict):
+        # Prefer explicit *_ok keys when present
+        for key in ("duty_torque_screen_ok", "duty_strength_screen_ok",
+                    "oil_delivery_screen_ok", "packaging_screen_ok",
+                    "clear_of_operating_band", "below_assumed_yield",
+                    "delta_p_finite"):
+            if key in works:
+                ok = bool(works.get(key))
+                return ok, ("yes (duty screen)" if ok
+                            else f"no — {key}=false")
+        if "ok" in works:
+            ok = bool(works.get("ok"))
+            return ok, ("yes (duty screen)" if ok else "no — duty screen fails")
+    # PARTIAL with twin-bound artefact but missing flag → unknown
+    if str(chk.get("status") or "").upper() == "OPEN":
+        return False, "no — check still OPEN"
+    return None, "unknown (see twin artefact)"
+
+
+def _render_motor_multiphysics_qa(ws, state: dict, run_dir: str, r: int) -> int:
+    """Render FIA front-kit multiphysics + CAD authority on Quality & Audit.
+
+    INTENT (2026-07-30): the markdown stamp is useless if Excel never shows it.
+    Smoke ≠ kit-context; ship_ok stays false; gear_strength may honestly fail FoS.
+
+    @description Append scoreboard tables; return next free row.
+    @param ws Quality & Audit worksheet
+    @param state Mutable run state (sidecar may refresh keys)
+    @param run_dir Twin out directory
+    @param r Starting row
+    @returns Next free row index
+    """
+    _ensure_motor_multiphysics_from_sidecar(state, run_dir)
+    motor = state.get("motorMultiphysics")
+    if not isinstance(motor, dict) or not isinstance(motor.get("required_checks"), dict):
+        return r
+    cad = state.get("cadAuthority") if isinstance(state.get("cadAuthority"), dict) else {}
+    checks = motor.get("required_checks") or {}
+    rev = motor.get("assembly_revision") or "—"
+    stamped = str(motor.get("stamped_at") or "")[:19]
+    ship = bool(motor.get("ship_ok"))
+    r += 1
+    sub_banner(
+        ws, r,
+        f"Motor multiphysics — FIA front kit screens (rev {rev}; stamped {stamped}; "
+        f"ship_ok={'true' if ship else 'false'} — never race-ready from smokes alone)",
+        5,
+    )
+    r += 1
+    ws.cell(
+        r, 1,
+        "Smoke proves the tool runs. Works in kit context = twin-bound artefact "
+        "answers that row's FIA duty screen. PARTIAL ≠ PASS. See "
+        "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
+    ).font = FONT_NOTE
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    r += 1
+    header(ws, r, [
+        "Check", "Status", "Kit context (1/0)", "Works in kit context?",
+        "Software · twin-bound result",
+    ])
+    r += 1
+    _order = (
+        "magnetic", "rotor_dynamics", "structural", "water_jacket",
+        "inverter_cold_plate", "gear_oil", "gear_strength",
+    )
+    for name in list(_order) + [k for k in checks if k not in _order]:
+        chk = checks.get(name)
+        if not isinstance(chk, dict):
+            continue
+        status = str(chk.get("status") or "OPEN").upper()
+        works_ok, works_lbl = _motor_check_works_in_kit(chk)
+        ws.cell(r, 1, name).font = FONT_SUB
+        sc = ws.cell(r, 2, status)
+        if status == "PASS":
+            sc.fill = FILL_PASS
+        elif status == "PARTIAL":
+            sc.fill = FILL_ADVISORY
+        else:
+            sc.fill = FILL_FAIL
+        # LIVE-CHECK GATE: col C = 1/0/blank operand; col D formula reads it
+        if works_ok is True:
+            op_val = 1
+        elif works_ok is False:
+            op_val = 0
+        else:
+            op_val = None
+        ws.cell(r, 3, op_val).font = FONT_NOTE
+        vc = ws.cell(
+            r, 4,
+            f'=IF($C{r}="","— (unknown)",IF($C{r}>=1,"yes (duty screen)",'
+            f'"no — twin-bound but duty screen fails"))',
+        )
+        if works_ok is True:
+            vc.fill = FILL_PASS
+            vc.font = FONT_PASS
+        elif works_ok is False:
+            vc.fill = FILL_FAIL
+            vc.font = FONT_FAIL
+        else:
+            vc.fill = FILL_ADVISORY
+            vc.font = FONT_ADVISORY
+        ws.cell(
+            r, 5,
+            f"{chk.get('software') or '—'} · {chk.get('result_ref') or '—'} "
+            f"({works_lbl})",
+        ).font = FONT_NOTE
+        ws.cell(r, 5).alignment = WRAP_TOP
+        r += 1
+    # CAD authority summary (stamp uses *_count / authority_level keys)
+    comps = cad.get("components") if isinstance(cad.get("components"), list) else []
+    n_prin = int(cad.get("principal_components_total")
+                 or cad.get("principal_component_count")
+                 or len(comps) or 0)
+    n_param = int(cad.get("parametric_family_count") or sum(
+        1 for c in comps if isinstance(c, dict)
+        and str(c.get("authority_level") or c.get("authority") or "")
+        == "parametric_family"
+    ))
+    n_comm = int(cad.get("communication_only_count") or sum(
+        1 for c in comps if isinstance(c, dict)
+        and str(c.get("authority_level") or c.get("authority") or "")
+        == "communication_only"
+    ))
+    n_rel = int(cad.get("release_authority_count") or 0)
+    cov = cad.get("release_authority_coverage")
+    if cov is None:
+        cov = cad.get("release_coverage_fraction")
+    if cov is None and n_prin:
+        cov = n_rel / n_prin
+    r += 1
+    sub_banner(ws, r, "CAD authority — parametric ≠ release CAD", 5)
+    r += 1
+    header(ws, r, ["Metric", "Value", "Meaning", "", ""])
+    r += 1
+    for label, val, note, ok in (
+        ("Principal components", n_prin, "Tracked front-drive principals", True),
+        ("Parametric family", n_param, "CadQuery concept geometry (not supplier release)",
+         n_param > 0),
+        ("Communication only", n_comm, "Blender explainers — packaging only", True),
+        ("Release authority", n_rel,
+         f"Supplier/team STEP coverage "
+         f"{(float(cov) * 100.0) if isinstance(cov, (int, float)) else 0:.1f}%",
+         n_rel > 0),
+        ("ship_ok", "false" if not ship else "true",
+         "Always false until hardware + release CAD close", not ship),
+    ):
+        ws.cell(r, 1, label).font = FONT_SUB
+        vc = ws.cell(r, 2, val)
+        vc.fill = FILL_PASS if ok else FILL_FAIL
+        ws.cell(r, 3, note).font = FONT_NOTE
+        r += 1
+    pkg = state.get("inverterPackaging")
+    if isinstance(pkg, dict):
+        r += 1
+        sub_banner(ws, r, "Inverter packaging (analytical screen — not a solver PASS)", 5)
+        r += 1
+        works = pkg.get("works_in_kit_context")
+        if isinstance(works, dict):
+            works_ok = bool(works.get("packaging_screen_ok", works.get("ok")))
+        else:
+            works_ok = bool(works)
+        dens = pkg.get("power_density_kw_l", pkg.get("power_density_kw_per_l", "—"))
+        esl = pkg.get("bus_esl_nominal_nh", pkg.get("bus_esl_nH", "—"))
+        header(ws, r, ["Field", "Value", "Note", "", ""])
+        r += 1
+        rows_pkg = [
+            ("Status", str(pkg.get("status") or "PARTIAL"), "Analytical only"),
+            ("Works in kit context", "yes" if works_ok else "no",
+             "Density / ESL / footprint screen"),
+            ("DC bus / power",
+             f"{pkg.get('dc_bus_voltage_v', '—')} V / "
+             f"{pkg.get('continuous_electrical_power_kw', '—')} kW",
+             "Seed from FIA duty"),
+            ("Power density", f"{dens} kW/L", "MCU envelope seed"),
+            ("Bus ESL nominal", f"{esl} nH", "Double-pulse still OPEN"),
+            ("Module MPN / STEP",
+             str(pkg.get("module_mpn_and_step") or "OPEN"),
+             "Supplier identity still required"),
+        ]
+        for label, val, note in rows_pkg:
+            ws.cell(r, 1, label).font = FONT_SUB
+            vc = ws.cell(r, 2, val)
+            if label == "Works in kit context":
+                vc.fill = FILL_PASS if works_ok else FILL_FAIL
+            elif "OPEN" in str(val).upper():
+                vc.fill = FILL_FAIL
+            else:
+                vc.fill = FILL_ADVISORY
+            ws.cell(r, 3, note).font = FONT_NOTE
+            r += 1
+    r += 1
+    return r
 
 
 def _sc_pcb(wb, ws, state, run_dir):

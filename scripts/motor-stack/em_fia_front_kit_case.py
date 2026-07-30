@@ -8,9 +8,10 @@ interior-PM cross-section at the twin's rotor, stator, bore, air-gap and stack
 dimensions, and solves open-circuit and loaded magnetic points with native
 xfemm.
 
-The loaded point uses the analytical 250 kW phase-current estimate at one
-documented current angle and rotor position.  It does not close a
-torque/efficiency/demagnetisation map and remains OPEN for winding-detail and
+The loaded point uses the analytical 250 kW phase-current estimate after a
+coarse current-angle screen, then records a coarse mechanical rotor-position
+sweep at that fixed angle.  It does not close a torque/efficiency/
+demagnetisation / MTPA map and remains OPEN for winding-detail and
 dynamometer correlation.
 """
 
@@ -620,6 +621,120 @@ LIVE_CURRENT_ANGLE_SWEEP_DEG = (-40.0, -45.0, -50.0, -60.0, -90.0)
 # Screening bar: |FE torque| / required shaft torque. 0.75 = order-of-magnitude
 # correct for the kit duty after angle+magnet fill; 1.0 would be full close.
 DUTY_TORQUE_SCREEN_RATIO = 0.75
+# INTENT: Coarse mechanical rotor positions over half an electrical period for
+# an 8-pole machine (pole-pairs=4 → 90° mech = 360° elec). Enough to show
+# torque ripple / position dependence at fixed current angle — NOT MTPA.
+LIVE_ROTOR_POSITION_SWEEP_MECH_DEG = (0.0, 7.5, 15.0, 22.5, 30.0, 37.5, 45.0)
+# DECISION: Live twin default uses 4 points (endpoints + mid-span) so the case
+# finishes in a few FE solves; the full 7-point table remains selectable.
+LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG = (0.0, 15.0, 30.0, 45.0)
+
+
+def select_rotor_position_sweep_deg(
+    *,
+    positions_deg: Sequence[float] | None = None,
+    max_points: int | None = None,
+) -> tuple[float, ...]:
+    """Select coarse mechanical rotor positions for a fixed-angle torque sweep.
+
+    INTENT: Enough points to expose position dependence at one screened current
+    angle without claiming a full torque-ripple or MTPA map.
+
+    @description Prefer the canonical half-electrical-period table, optionally
+        thinned evenly (always keeping endpoints when max_points ≥ 2).
+    @param positions_deg Optional explicit mechanical degrees; defaults to the
+        live 7-point table.
+    @param max_points Optional cap; when set below the table length, subsample
+        evenly including the first and last entries.
+    @returns Ordered mechanical rotor positions in degrees.
+    @throws FiaFrontKitCaseError when the selection would be empty.
+    """
+
+    # GOTCHA: ``positions_deg or DEFAULT`` treats () as missing; require an
+    # explicit None check so empty caller input still fails closed.
+    source = (
+        LIVE_ROTOR_POSITION_SWEEP_MECH_DEG
+        if positions_deg is None
+        else positions_deg
+    )
+    base = tuple(float(position) for position in source)
+    if not base:
+        raise FiaFrontKitCaseError(
+            "rotor-position sweep requires at least one mechanical position"
+        )
+    if max_points is not None and max_points < 1:
+        raise FiaFrontKitCaseError("max_points must be >= 1")
+    if max_points is None or max_points >= len(base):
+        return base
+    if max_points == 1:
+        return (base[0],)
+    indices = [
+        int(round(index * (len(base) - 1) / (max_points - 1)))
+        for index in range(max_points)
+    ]
+    selected: list[float] = []
+    seen: set[int] = set()
+    for index in indices:
+        if index in seen:
+            continue
+        seen.add(index)
+        selected.append(base[index])
+    return tuple(selected)
+
+
+def summarize_rotor_position_sweep(
+    sweep: Sequence[Mapping[str, float]],
+    *,
+    required_shaft_torque_nm: float,
+) -> dict[str, Any]:
+    """Summarise torque vs rotor position without claiming MTPA closure.
+
+    @description Compute min/max/mean torque magnitude and duty ratios from a
+        coarse position sweep. Empty sweeps return null metrics.
+    @param sweep Rows with at least ``torque_nm``.
+    @param required_shaft_torque_nm Analytical shaft torque for ratioing.
+    @returns Summary dict safe to embed in the twin artefact / stamp.
+    """
+
+    if not sweep:
+        return {
+            "n_positions": 0,
+            "torque_min_nm": None,
+            "torque_max_nm": None,
+            "torque_mean_nm": None,
+            "torque_magnitude_min_nm": None,
+            "torque_magnitude_max_nm": None,
+            "torque_magnitude_mean_nm": None,
+            "torque_vs_required_ratio_min": None,
+            "torque_vs_required_ratio_max": None,
+            "torque_vs_required_ratio_mean": None,
+            "peak_to_peak_torque_nm": None,
+            "peak_to_peak_magnitude_nm": None,
+        }
+    torques = [float(row["torque_nm"]) for row in sweep]
+    magnitudes = [abs(torque) for torque in torques]
+    mean_torque = sum(torques) / len(torques)
+    mean_magnitude = sum(magnitudes) / len(magnitudes)
+    required = float(required_shaft_torque_nm)
+    ratios = (
+        [magnitude / required for magnitude in magnitudes]
+        if required > 0.0
+        else [0.0 for _ in magnitudes]
+    )
+    return {
+        "n_positions": len(sweep),
+        "torque_min_nm": round(min(torques), 6),
+        "torque_max_nm": round(max(torques), 6),
+        "torque_mean_nm": round(mean_torque, 6),
+        "torque_magnitude_min_nm": round(min(magnitudes), 6),
+        "torque_magnitude_max_nm": round(max(magnitudes), 6),
+        "torque_magnitude_mean_nm": round(mean_magnitude, 6),
+        "torque_vs_required_ratio_min": round(min(ratios), 6),
+        "torque_vs_required_ratio_max": round(max(ratios), 6),
+        "torque_vs_required_ratio_mean": round(sum(ratios) / len(ratios), 6),
+        "peak_to_peak_torque_nm": round(max(torques) - min(torques), 6),
+        "peak_to_peak_magnitude_nm": round(max(magnitudes) - min(magnitudes), 6),
+    }
 
 
 def loaded_point_assumptions(
@@ -627,12 +742,14 @@ def loaded_point_assumptions(
     inputs: TwinInputs,
     *,
     current_angle_electrical_deg: float = DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG,
+    rotor_position_mechanical_deg: float = 0.0,
 ) -> LoadedPointAssumptions:
     """Create one-position loaded excitation from duty + twin winding + angle.
 
     INTENT: Bind coil turns and design current from the twin, and apply a
-    current angle that is not the torque-null (−90° was). Still one rotor
-    position — not a full torque / MTPA map.
+    current angle that is not the torque-null (−90° was). Rotor position is
+    explicit so a coarse position sweep can rotate the IPM without claiming a
+    full torque / MTPA map.
     """
 
     # DECISION: Prefer bus/power-derived rms when design current is absent or
@@ -660,7 +777,7 @@ def loaded_point_assumptions(
         phase_current_rms_a=phase_rms_a,
         phase_current_peak_a=phase_peak_a,
         current_angle_electrical_deg=current_angle_electrical_deg,
-        rotor_position_mechanical_deg=0.0,
+        rotor_position_mechanical_deg=float(rotor_position_mechanical_deg),
         phase_a_current_a=phase_a_a,
         phase_b_current_a=phase_b_a,
         phase_c_current_a=phase_c_a,
@@ -674,7 +791,8 @@ def loaded_point_assumptions(
             f"twin_stator_slots={inputs.twin_stator_slots:g}; "
             f"implied series turns≈{implied_series:.1f} on this 48-slot map). "
             f"Current angle {current_angle_electrical_deg:g}° elec "
-            f"(not the −90° torque-null; d-axis alignment still provisional). "
+            f"(not the −90° torque-null; d-axis alignment still provisional); "
+            f"rotor {float(rotor_position_mechanical_deg):g}° mech. "
             "Not a frozen hairpin schedule."
         ),
     )
@@ -727,6 +845,65 @@ def select_best_loaded_point(
             best_result = result
     assert best_assumptions is not None and best_result is not None
     return best_assumptions, best_result, sweep
+
+
+def run_rotor_position_sweep(
+    geometry: FiaMachineGeometry,
+    solver: Path,
+    *,
+    remanence_t: float,
+    duty: DutyCheck,
+    inputs: TwinInputs,
+    current_angle_electrical_deg: float,
+    positions_deg: Sequence[float] | None = None,
+    seed_result_at_zero: LoadedMagneticResult | None = None,
+) -> tuple[list[dict[str, float]], dict[str, Any]]:
+    """Solve torque at coarse rotor positions for one fixed current angle.
+
+    INTENT: Show position dependence / ripple at the already-screened best
+    current angle without running a full MTPA or fine torque map.
+
+    DECISION: Reuse ``seed_result_at_zero`` for the 0° mechanical point when
+    that point was already solved during the current-angle screen, avoiding a
+    duplicate FE solve.
+    """
+
+    positions = select_rotor_position_sweep_deg(positions_deg=positions_deg)
+    sweep: list[dict[str, float]] = []
+    for position in positions:
+        if (
+            abs(position) < 1.0e-12
+            and seed_result_at_zero is not None
+        ):
+            result = seed_result_at_zero
+        else:
+            assumptions = loaded_point_assumptions(
+                duty,
+                inputs,
+                current_angle_electrical_deg=float(current_angle_electrical_deg),
+                rotor_position_mechanical_deg=float(position),
+            )
+            result = run_loaded_magnetic_point(
+                geometry,
+                solver,
+                remanence_t=remanence_t,
+                assumptions=assumptions,
+            )
+        sweep.append(
+            {
+                "rotor_position_mechanical_deg": float(position),
+                "current_angle_electrical_deg": float(current_angle_electrical_deg),
+                "torque_nm": result.torque_nm,
+                "torque_magnitude_nm": abs(result.torque_nm),
+                "peak_airgap_flux_density_t": result.peak_airgap_flux_density_t,
+                "rms_airgap_flux_density_t": result.rms_airgap_flux_density_t,
+            }
+        )
+    summary = summarize_rotor_position_sweep(
+        sweep,
+        required_shaft_torque_nm=duty.required_shaft_torque_nm,
+    )
+    return sweep, summary
 
 
 def _solver_path() -> Path:
@@ -907,6 +1084,12 @@ def _build_fia_lua(
     r_gap = (r_ro + r_si) / 2.0
     r_slot_inner = r_si + 1.0
     r_slot_outer = r_si + geometry.slot_depth_mm
+    # Stator stays fixed; rotate only rotor steel labels + V-magnets.
+    rotor_offset_rad = (
+        math.radians(loaded.rotor_position_mechanical_deg)
+        if loaded is not None
+        else 0.0
+    )
 
     # INTENT: This is a fresh Formula E-sized cross-section.  Pyleecan supplies
     # only the pinned nonlinear steel and NdFeB material records; no Prius
@@ -999,7 +1182,7 @@ def _build_fia_lua(
         )
     pole_pitch_rad = 2.0 * math.pi / ROTOR_POLES
     for pole_index in range(ROTOR_POLES):
-        pole_center = pole_index * pole_pitch_rad
+        pole_center = pole_index * pole_pitch_rad + rotor_offset_rad
         pole_polygons: list[tuple[complex, complex, complex, complex]] = []
         for side in (-1.0, 1.0):
             center_angle = pole_center + side * math.radians(11.0)
@@ -1041,7 +1224,7 @@ def _build_fia_lua(
         )
 
     lua.extend(_block_label_lua(0.0j, material="air", mesh_mm=1.5, group=0))
-    rotor_label_angle = math.radians(22.5)
+    rotor_label_angle = math.radians(22.5) + rotor_offset_rad
     rotor_label = complex(
         ((r_ri + r_ro) / 2.0) * math.cos(rotor_label_angle),
         ((r_ri + r_ro) / 2.0) * math.sin(rotor_label_angle),
@@ -1252,6 +1435,8 @@ def build_artifact(
     solver_identity: Mapping[str, str],
     source_state_sha256: str,
     current_angle_sweep: Sequence[Mapping[str, float]] | None = None,
+    rotor_position_sweep: Sequence[Mapping[str, float]] | None = None,
+    rotor_position_sweep_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release electromagnetic artefact."""
 
@@ -1263,6 +1448,14 @@ def build_artifact(
     # INTENT: "works in kit context" means the loaded point is in the right
     # order of magnitude for the FIA duty — not that release is closed.
     duty_torque_screen_ok = torque_ratio >= DUTY_TORQUE_SCREEN_RATIO
+    position_points = list(rotor_position_sweep or [])
+    position_summary = dict(
+        rotor_position_sweep_summary
+        or summarize_rotor_position_sweep(
+            position_points,
+            required_shaft_torque_nm=duty.required_shaft_torque_nm,
+        )
+    )
 
     return {
         "schema": "forgeos.motor_stack.em_fia_front_kit_case/v2",
@@ -1274,11 +1467,16 @@ def build_artifact(
             "required_shaft_torque_nm": duty.required_shaft_torque_nm,
             "loaded_torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
             "threshold_ratio": DUTY_TORQUE_SCREEN_RATIO,
+            "position_sweep_torque_vs_required_ratio_mean": position_summary.get(
+                "torque_vs_required_ratio_mean"
+            ),
             "note": (
                 f"duty_torque_screen_ok means |FE torque| ≥ "
                 f"{DUTY_TORQUE_SCREEN_RATIO:.0%} of analytical 250 kW shaft "
-                "torque at one screened current angle. It is NOT a torque map, "
-                "demagnetisation close, dyno correlation, or ship_ok."
+                "torque at one screened current angle (reference rotor "
+                "position). A coarse rotor-position sweep may be attached; "
+                "it is NOT a full MTPA / torque map, demagnetisation close, "
+                "dyno correlation, or ship_ok."
             ),
         },
         "source_twin": "out/formula-e-front-mgu-20260729-1432",
@@ -1309,8 +1507,8 @@ def build_artifact(
                 loaded_assumptions.current_angle_electrical_deg
             ),
             "current_angle_assumption": (
-                "Id = 0 nominal q-axis regenerative excitation; no MTPA or "
-                "field-weakening schedule has been solved"
+                "Screened regenerative current angle near the kit torque peak; "
+                "no MTPA or field-weakening schedule has been solved"
             ),
             "rotor_position_mechanical_deg": (
                 loaded_assumptions.rotor_position_mechanical_deg
@@ -1336,16 +1534,40 @@ def build_artifact(
             "duty_torque_screen_ok": duty_torque_screen_ok,
             "torque_status": (
                 "ESTIMATE — solver-derived at twin-bound coil turns after a "
-                "coarse current-angle screen, one rotor position"
+                "coarse current-angle screen; reference rotor position for the "
+                "duty screen (see rotor_position_sweep for position dependence)"
             ),
             "current_angle_sweep": list(current_angle_sweep or []),
             "honesty_note": (
-                "This is one rotor position with a screened current angle and "
-                "twin-bound conductors per slot (turns_per_coil). Exact hairpin "
-                "schedule, winding factor, full MTPA/field-weakening map, "
-                "position sweep, voltage closure, losses, demagnetisation and "
-                "dyno correlation remain OPEN. Do not invent turns to force "
-                "duty_torque_screen_ok."
+                "Reference loaded point uses a screened current angle and "
+                "twin-bound conductors per slot (turns_per_coil). A coarse "
+                "rotor-position sweep at that fixed angle may be attached to "
+                "show torque ripple / position dependence — it is NOT a full "
+                "MTPA, voltage, loss, demagnetisation or dyno map. Exact "
+                "hairpin schedule and winding factor remain OPEN. Do not invent "
+                "turns to force duty_torque_screen_ok."
+            ),
+        },
+        "rotor_position_sweep": {
+            "status": "PARTIAL" if position_points else "OPEN",
+            "kind": (
+                "coarse mechanical rotor-position sweep at fixed screened "
+                "current angle"
+            ),
+            "current_angle_electrical_deg": (
+                loaded_assumptions.current_angle_electrical_deg
+            ),
+            "positions_mechanical_deg": [
+                float(row["rotor_position_mechanical_deg"])
+                for row in position_points
+                if "rotor_position_mechanical_deg" in row
+            ],
+            "points": position_points,
+            "summary": position_summary,
+            "note": (
+                "PARTIAL coarse sweep only — enough to show torque vs "
+                "mechanical rotor position at one current angle. Not a full "
+                "MTPA map, fine ripple study, or ship_ok evidence."
             ),
         },
         "analytical_duty_check": asdict(duty),
@@ -1373,9 +1595,9 @@ def build_artifact(
         "torque_map": {
             "status": "OPEN",
             "reason": (
-                "One open-circuit point and one provisional loaded point plus "
-                "analytical 250 kW/speed reconciliation are not a rotor-position, "
-                "current-angle, voltage, loss, thermal or demagnetisation map."
+                "Open-circuit + screened loaded point + coarse rotor-position "
+                "sweep at one current angle are not a closed MTPA, voltage, "
+                "loss, thermal or demagnetisation map."
             ),
         },
         "dynamometer_correlation": {
@@ -1488,6 +1710,22 @@ def run_selftest() -> int:
         solver,
         remanence_t=remanence_t * 1.0e-6,
     )
+    # Selftest keeps FE count down: shape-check the position-sweep artefact
+    # from the already-solved 0° point; unit tests cover selection/summary.
+    selftest_position_sweep = [
+        {
+            "rotor_position_mechanical_deg": 0.0,
+            "current_angle_electrical_deg": (
+                loaded_assumptions.current_angle_electrical_deg
+            ),
+            "torque_nm": loaded_solved.torque_nm,
+            "torque_magnitude_nm": abs(loaded_solved.torque_nm),
+            "peak_airgap_flux_density_t": (
+                loaded_solved.peak_airgap_flux_density_t
+            ),
+            "rms_airgap_flux_density_t": loaded_solved.rms_airgap_flux_density_t,
+        }
+    ]
     artifact = build_artifact(
         inputs=inputs,
         geometry=geometry,
@@ -1509,6 +1747,7 @@ def run_selftest() -> int:
                 "torque_magnitude_nm": abs(null_solved.torque_nm),
             },
         ],
+        rotor_position_sweep=selftest_position_sweep,
     )
     checks = {
         "synthetic_quantities_control_geometry": (
@@ -1567,6 +1806,16 @@ def run_selftest() -> int:
             and artifact["torque_map"]["status"] == "OPEN"
             and artifact["dynamometer_correlation"]["status"] == "OPEN"
             and artifact["loaded_point"]["torque_reliable"] is False
+            and artifact["rotor_position_sweep"]["status"] in {"OPEN", "PARTIAL"}
+        ),
+        "position_sweep_helpers": (
+            select_rotor_position_sweep_deg(max_points=4)
+            == LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG
+            and summarize_rotor_position_sweep(
+                selftest_position_sweep,
+                required_shaft_torque_nm=duty.required_shaft_torque_nm,
+            )["n_positions"]
+            == 1
         ),
     }
     passed = all(checks.values())
@@ -1626,6 +1875,21 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         duty=duty,
         inputs=inputs,
     )
+    # DECISION: Four mechanical positions (0/15/30/45°) at the screened
+    # current angle — enough for ripple/position dependence without a full
+    # 7-point or MTPA campaign. Reuse the angle-screen 0° solve.
+    position_sweep, position_summary = run_rotor_position_sweep(
+        geometry,
+        solver,
+        remanence_t=remanence_t,
+        duty=duty,
+        inputs=inputs,
+        current_angle_electrical_deg=(
+            loaded_assumptions.current_angle_electrical_deg
+        ),
+        positions_deg=LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG,
+        seed_result_at_zero=loaded_magnetic,
+    )
     if not (
         0.05 < magnetic.peak_airgap_flux_density_t < 2.5
         and 0.01 < magnetic.rms_airgap_flux_density_t
@@ -1644,6 +1908,8 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         solver_identity=_solver_identity(solver),
         source_state_sha256=state_hash,
         current_angle_sweep=angle_sweep,
+        rotor_position_sweep=position_sweep,
+        rotor_position_sweep_summary=position_summary,
     )
     destination = (
         output_path
@@ -1669,8 +1935,15 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         f"torque ({artifact['works_in_kit_context']['torque_vs_required_ratio']:.0%} of "
         f"required; duty_torque_screen_ok="
         f"{artifact['works_in_kit_context']['duty_torque_screen_ok']}). "
-        "Torque map, demagnetisation, thermal limits and dyno correlation remain OPEN; "
-        "ship_ok is false."
+        f"Coarse rotor-position sweep ({position_summary['n_positions']} pts) "
+        f"|T| ratio min/mean/max="
+        f"{position_summary['torque_vs_required_ratio_min']:.2f}/"
+        f"{position_summary['torque_vs_required_ratio_mean']:.2f}/"
+        f"{position_summary['torque_vs_required_ratio_max']:.2f} "
+        f"(peak-to-peak |T|="
+        f"{position_summary['peak_to_peak_magnitude_nm']:.1f} N·m). "
+        "Full MTPA map, demagnetisation, thermal limits and dyno correlation "
+        "remain OPEN; ship_ok is false."
     )
     print(f"Artefact: {destination}")
     return 0

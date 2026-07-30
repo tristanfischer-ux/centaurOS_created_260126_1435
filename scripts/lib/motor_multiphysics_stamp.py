@@ -404,6 +404,16 @@ def _magnetic_check_from_fia_case(
         if isinstance(case.get("analytical_duty_check"), dict)
         else {}
     )
+    position_sweep = (
+        case.get("rotor_position_sweep")
+        if isinstance(case.get("rotor_position_sweep"), dict)
+        else {}
+    )
+    position_summary = (
+        position_sweep.get("summary")
+        if isinstance(position_sweep.get("summary"), dict)
+        else {}
+    )
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     rel_ref = "_motor_stack/em_fia_front_kit_case.json"
     duty_ok = bool(works.get("duty_torque_screen_ok"))
@@ -460,13 +470,39 @@ def _magnetic_check_from_fia_case(
                 "continuous_electrical_power_kw": inputs.get("continuous_electrical_power_kw"),
                 "dc_bus_voltage_v": inputs.get("dc_bus_voltage_v"),
                 "max_rotor_speed_rpm": inputs.get("max_rotor_speed_rpm"),
+                # Coarse position-sweep summary when present; absent on older artefacts.
+                "position_sweep": (
+                    {
+                        "status": position_sweep.get("status"),
+                        "n_positions": position_summary.get("n_positions"),
+                        "torque_vs_required_ratio_min": position_summary.get(
+                            "torque_vs_required_ratio_min"
+                        ),
+                        "torque_vs_required_ratio_mean": position_summary.get(
+                            "torque_vs_required_ratio_mean"
+                        ),
+                        "torque_vs_required_ratio_max": position_summary.get(
+                            "torque_vs_required_ratio_max"
+                        ),
+                        "peak_to_peak_magnitude_nm": position_summary.get(
+                            "peak_to_peak_magnitude_nm"
+                        ),
+                        "current_angle_electrical_deg": position_sweep.get(
+                            "current_angle_electrical_deg"
+                        ),
+                    }
+                    if position_summary.get("n_positions")
+                    else None
+                ),
                 "torque_map": "OPEN",
                 "dynamometer_correlation": "OPEN",
                 "note": (
-                    "Twin-bound OC + loaded magnetic screen on kit geometry. "
-                    "works_in_kit_context / duty_torque_screen_ok = |FE torque| "
-                    "≥ 80% of analytical shaft torque — NOT smoke-only, NOT ship_ok. "
-                    "Torque map / dyno still OPEN."
+                    "Twin-bound OC + loaded magnetic screen on kit geometry, "
+                    "optionally with a coarse rotor-position sweep at the "
+                    "screened current angle. works_in_kit_context / "
+                    "duty_torque_screen_ok = |FE torque| ≥ ~75% of analytical "
+                    "shaft torque at the reference position — NOT smoke-only, "
+                    "NOT full MTPA, NOT ship_ok. Torque map / dyno still OPEN."
                 ),
             },
         },

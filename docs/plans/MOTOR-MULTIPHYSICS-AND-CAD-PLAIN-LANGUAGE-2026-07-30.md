@@ -24,36 +24,37 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~16:30:** **In-context magnetics now screens the duty — still not finished.**  
-Happy about: magnetic loaded point ~**96 N·m (~77% of ~125)** after fixing the −90° torque-null + magnet fill; stamp now shows **Works in kit context?** separately from smoke.  
-Not done: torque map / demag / dyno; water jacket; gears/oil; inverter packaging; release CAD = 0; `ship_ok` false.
+**Overall mood as of 2026-07-30 ~17:45:** **Software twin-bound *screens* for the plan are landed — still not race-ready.**  
+Happy about: all **7** `required_checks` are **PARTIAL** with twin artefacts; **6/7** pass their kit-context duty screen; magnetics ~**96 N·m (~77% of ~125)**; water-jacket helical CAD + OpenFOAM duct; gear oil analytical screen; inverter packaging analytical screen; **Quality & Audit** now mirrors the stamp table.  
+Honest fail: **gear_strength** twin-bound but **works_in_kit_context = no** (FoS ≪ 1.2 — design signal, not greenwash).  
+Not done / cannot close in software: MTPA map, demag, dyno, HIL, flow bench, free-surface oil CFD, KISSsoft, case/mount FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
 
-**Last scoreboard update:** 2026-07-30 (magnetics current-angle + magnet-fill fix; kit-context honesty column).
+**Last scoreboard update:** 2026-07-30 (Excel Q&A card + plan closure for software screens).
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
 | # | What we said we would do | Status | What we have actually done | Gap still open | Plan to fix the gap |
 |---|---|---|---|---|---|
-| 1 | Freeze one shared assembly revision for CAD + solvers + Blender + Excel | **STARTED** | Label `front-drive-concept-stub-2026-07-30` on the multiphysics stamp | Not a hard gate yet — old evidence can still sit beside new pictures | Make Excel/Quality reject mismatched revisions; bump revision whenever geometry changes |
-| 2 | Build CAD authority spine (case, stator, rotor, gears, cooling, …) | **STARTED** | Parametric families now: stator, rotor magnet carrier, planetary, **cold plate serpentine** (4 of 13) | Case, bearings, differential, oil, motor jacket, bus, connectors still Blender-only; **release CAD coverage = 0 / 13** | Next: motor jacket channels + cast case; supplier STEP when known |
-| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (duty screen yes)** | Root cause of ~9 N·m was **−90° current-angle null** + thin magnets. Fix: angle screen (best **−45°**) + bridge-legal magnet fill → **~96 N·m (~77% of 125)**; `works_in_kit_context` **true**. ROSS + CalculiX screens unchanged | Full MTPA/position map, demag, dyno, 24-vs-48 slot reconciliation, magnet-pocket burst still OPEN | Position sweep + voltage/thermal; keep `ship_ok` false |
-| 4 | Close gears, differential, structure | **STARTED (rotor screen only)** | CalculiX kit ring at 19,500 rpm (~103 MPa von Mises screening) | No ISO gear strength, no differential contact, no case/mount FEA | Twin-bound gear + case solves after ratio freeze |
-| 5 | Close cooling and lubrication | **PARTIAL (cold plate duct)** | OpenFOAM rectangular duct on family channel @ **12 L/min / 60 °C** → ~**25 kPa** headline Δp (PARTIAL). CAD family exists | Full serpentine STEP CHT OPEN; jacket CFD OPEN; oil CFD OPEN; module temps OPEN | Jacket CadQuery → OpenFOAM; CHT when solid mesh exists |
-| 6 | Close inverter packaging | **NOT STARTED** | Module volumes in Blender / physics tree | No supplier module identity, bus inductance, double-pulse | Freeze MPNs + supplier STEP; loss + inductance evidence |
-| 7 | Make every result visible in the dossier | **STARTED** | Stamp promotes magnetic / ross / structural / cold-plate PARTIAL with file links | Latest Excel workbook may not yet mirror the new PARTIAL rows | Re-export Excel from stamp; Quality & Audit must match markdown table |
+| 1 | Freeze one shared assembly revision for CAD + solvers + Blender + Excel | **PARTIAL** | Label `front-drive-concept-stub-2026-07-30` on stamp + Excel card | Not a hard gate yet — bump discipline when geometry changes | Reject mismatched revisions in Excel when revision field diverges |
+| 2 | Build CAD authority spine (case, stator, rotor, gears, cooling, …) | **PARTIAL** | **5** parametric families: stator, rotor carrier, planetary, cold plate, **motor water jacket helical** | Case, bearings, differential, oil, bus, connectors still Blender-only; **release CAD = 0 / 13** | Cast case + supplier STEP when known |
+| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (duty screen yes)** | ~**96 N·m (~77%)** after −90° null fix; ROSS clear of band; CalculiX rotor ring screen | MTPA/position map, demag, dyno, 24-vs-48 slots, magnet-pocket burst OPEN | Position sweep + voltage/thermal; keep `ship_ok` false |
+| 4 | Close gears, differential, structure | **PARTIAL (honest FoS fail)** | ISO 6336-style twin screen **landed**; FoS bending ~0.18 / contact ~0.38 vs ≥1.2 → **works=no** | Differential contact, case/mount FEA, KISSsoft, load spectrum OPEN | Thicker face / coarser module / material — then re-screen |
+| 5 | Close cooling and lubrication | **PARTIAL (duct + oil screen)** | OpenFOAM cold-plate + **water-jacket** ducts @ 12 L/min / 60 °C; gear-oil analytical jet/churning/pickup | Full serpentine/helical CHT, free-surface oil CFD, module/winding temps OPEN | CHT when solid mesh exists; oil CFD after galleries |
+| 6 | Close inverter packaging | **PARTIAL (analytical)** | Density / DC current / ESL seed / cold-plate land / bay-fit screen; stamp + Excel rows | Module MPN, supplier STEP, double-pulse ESL OPEN | Freeze MPNs + measured ESL |
+| 7 | Make every result visible in the dossier | **DONE (software surface)** | Markdown stamp + `motor-multiphysics.json` + **Quality & Audit** multiphysics / CAD / inverter tables | Deeper Engineering Analysis plots still thin | Keep re-export after each stamp |
 | 8 | Correlate with hardware (dyno, HIL, flow bench, …) | **NOT STARTED** | Holds correctly left **OPEN** | Needs real hardware / team data | Cannot close in software alone |
 
 ### B. Solver check rows (what “OPEN / PARTIAL” means)
 
-| Check | Said we need | Status now | Good or bad? | Next fix |
+| Check | Said we need | Status now | Works in kit context? | Next fix |
 |---|---|---|---|---|
-| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **Works in kit context (duty screen):** ~**96 N·m / 125 (~77%)** at −45° elec after magnet fill. Was ~9 N·m at the −90° null. Map / demag / dyno still OPEN | Multi-position MTPA map; 24-vs-48 slots; demagnetisation |
-| Rotor dynamics | Critical speeds vs 19,500 rpm | **PARTIAL** | Progress — kit-sized ROSS screen clear of band; **assumed bearings**, not supplier data | Replace bearing k/c with catalogue; modal correlation later |
-| Structural / burst | Case, rotor, mounts survive | **PARTIAL** | Progress — steel-ring centrifugal screen; **not** magnet-pocket burst or case FEA | Pocket burst + case/mount load cases |
-| Motor water jacket | Flow + heat at 12 L/min, 60 °C | **OPEN** | **Unfinished** | Jacket CadQuery → OpenFOAM |
-| Inverter cold plate | Module temperatures / pressure drop | **PARTIAL** | Progress — duct Δp/velocity screen; **module temps OPEN** | Full serpentine CHT + heater-plate correlation |
-| Gear oil delivery | Jets, pickup, churning | **OPEN** | **Unfinished** | Oil CFD after galleries exist |
-| Gear strength | Tooth life for kit torque | **OPEN** | **Unfinished** | ISO 6336 / licensed gear tool |
+| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **yes** — ~96 N·m / 125 (~77%) | MTPA map; 24-vs-48 slots; demag; dyno |
+| Rotor dynamics | Critical speeds vs 19,500 rpm | **PARTIAL** | **yes** — clear of band (assumed bearings) | Catalogue k/c; modal correlation |
+| Structural / burst | Case, rotor, mounts survive | **PARTIAL** | **yes** — steel-ring centrifugal screen | Pocket burst + case/mount FEA |
+| Motor water jacket | Flow + heat at 12 L/min, 60 °C | **PARTIAL** | **yes** — OpenFOAM duct Δp screen | Helical CHT + winding temps |
+| Inverter cold plate | Module temperatures / pressure drop | **PARTIAL** | **yes** — duct Δp screen | Full serpentine CHT + heater plate |
+| Gear oil delivery | Jets, pickup, churning | **PARTIAL** | **yes** — analytical handbook screen | Free-surface CFD + bench |
+| Gear strength | Tooth life for kit torque | **PARTIAL** | **no** — FoS ≪ 1.2 (honest fail) | Resize teeth / material; KISSsoft |
 
 ### C. CAD authority (why “release coverage 0” sounds alarming)
 
@@ -63,15 +64,20 @@ We track 13 principal parts. Each is one of:
 2. **Parametric family** — our CadQuery geometry (concept, **not** supplier release)  
 3. **Supplier / team release CAD** — the only level that counts toward “release coverage”
 
-**Today: 4 parametric, 9 communication-only, 0 release → coverage 0%.**  
+**Today: 5 parametric, 8 communication-only, 0 release → coverage 0%.**  
 Expected early. **Not fab-ready.** Building the library ≠ closed manufacturing geometry.
 
-### D. What to expect next (short queue)
+### D. Plan closure (software screens) vs still open
 
-1. Excel re-export so Quality & Audit matches the stamp table.  
-2. Magnetic angle/position sweep + 24-vs-48 slot reconciliation.  
-3. Motor water-jacket CadQuery + OpenFOAM.  
-4. Keep `ship_ok = false`.
+**Finished for this plan’s software-screen track:** twin-bound artefacts under `_motor_stack/` for all seven checks; inverter packaging analytical screen; five CadQuery families; stamp + Excel Quality & Audit visibility; `ship_ok` forced false.
+
+**Still open (next campaigns — not claimed done):**
+
+1. Magnetic position/MTPA map + 24-vs-48 slot reconciliation.  
+2. Gear redesign so ISO FoS ≥ 1.2, then re-screen.  
+3. Full CHT / free-surface oil / case FEA / KISSsoft.  
+4. Hardware: dyno, HIL, flow bench, FIA port XYZ.  
+5. Keep `ship_ok = false` until those close.
 
 ---
 
