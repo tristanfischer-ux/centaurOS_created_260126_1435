@@ -76,6 +76,53 @@ field-solver output rather than a stored constant. All five checks must pass.
 This is a toolchain smoke proof, not a torque map, demagnetisation study,
 thermal correlation or dynamometer correlation. It changes no release state.
 
+### FIA-bound Formula E front-kit case
+
+The smoke command above proves that Pyleecan and xfemm work; it deliberately
+does **not** represent the Formula E front kit. Run the twin-bound case instead
+when producing front-powertrain evidence:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/em_fia_front_kit_case.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+The FIA case selectively reads `orchestratorContract.quantities` and
+`fpkConcentricGeometry` with `ijson`, so it does not load the large `state.json`
+into memory. It builds a fresh direct-xfemm 48-slot/eight-pole twin-V
+interior-permanent-magnet cross-section at the twin's controlled dimensions:
+approximately 122 mm rotor outside diameter, 123.4/164.7 mm stator
+inside/outside diameters, 0.7 mm radial air gap and 97.6 mm active length. The
+licensed Pyleecan definition contributes only its nonlinear electrical-steel
+B-H curve and neodymium-magnet material record; no Prius dimensions or
+proprietary Lucid geometry enter the mesh.
+
+The command performs one nonlinear open-circuit finite-element solve and
+writes:
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json
+```
+
+That artefact binds its input hash to 250 kW front-regeneration duty, 750 V
+direct-current bus within the assumed 600–900 V window, 19,500 rpm, the
+343×259×267 mm bay and the 32 kg soft whole-kit aspiration. It reports solved
+air-gap flux plus an analytical power/torque/current reconciliation. It always
+keeps the torque map and dynamometer correlation `OPEN`, status `PARTIAL`, and
+`ship_ok: false`.
+
+Run the synthetic proveCatch separately:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/em_fia_front_kit_case.py --selftest
+```
+
+The self-test solves the synthetic FIA geometry twice. Reducing magnet
+remanence by one million must collapse the solved field by at least five orders
+of magnitude, proving the headline flux is solver-derived. It also proves that
+the synthetic twin dimensions replace the educational machine dimensions and
+that no code path can set `ship_ok`.
+
 ### Fresh Python setup
 
 Pyleecan's full package metadata includes graphical-interface, visualization
