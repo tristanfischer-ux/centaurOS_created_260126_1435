@@ -164,10 +164,11 @@ _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK: list[dict[str, str]] = [
 # These prove the *tools* run — never that the FIA twin geometry was solved.
 _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
     "magnetic": {
-        "software": "Pyleecan + xfemm + analytical demag screen",
+        "software": "Pyleecan + xfemm + MTPA/demag screens",
         "paths": [
             "scripts/motor-stack/em_magnetic_selftest.py",
             "scripts/motor-stack/em_fia_front_kit_case.py",
+            "scripts/motor-stack/em_fia_mtpa_screen.py",
             "scripts/motor-stack/em_fia_demag_screen.py",
             "scripts/phantm/bin/femmcli",
         ],
@@ -498,6 +499,11 @@ def _load_fia_demag_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     return _load_fia_case_json(twin_dir, "em_fia_demag_screen.json")
 
 
+def _load_fia_mtpa_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA denser MTPA screen artefact if present."""
+    return _load_fia_case_json(twin_dir, "em_fia_mtpa_screen.json")
+
+
 def _load_fia_ross_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA ROSS rotor-dynamics case artefact if present."""
     return _load_fia_case_json(twin_dir, "ross_fia_front_kit_case.json")
@@ -616,12 +622,72 @@ def _demag_screen_cite(
     }
 
 
+def _mtpa_screen_cite(
+    mtpa_case: Optional[Mapping[str, Any]],
+    *,
+    twin_dir: Path,
+) -> Any:
+    """Cite the denser MTPA SCREEN while leaving the torque map OPEN.
+
+    INTENT: Surface the useful angle × position evidence without upgrading a
+    one-current-magnitude screen into torque-map or release closure.
+    """
+
+    if not isinstance(mtpa_case, Mapping):
+        return "OPEN"
+    grid = (
+        mtpa_case.get("grid")
+        if isinstance(mtpa_case.get("grid"), dict)
+        else {}
+    )
+    summary = (
+        mtpa_case.get("summary")
+        if isinstance(mtpa_case.get("summary"), dict)
+        else {}
+    )
+    coverage = (
+        mtpa_case.get("coverage")
+        if isinstance(mtpa_case.get("coverage"), dict)
+        else {}
+    )
+    rel_ref = "_motor_stack/em_fia_mtpa_screen.json"
+    return {
+        "status": mtpa_case.get("status") or "PARTIAL",
+        "ship_ok": False,
+        "path": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "grid_mode": grid.get("mode"),
+        "n_current_angles": grid.get("n_current_angles"),
+        "n_rotor_positions": grid.get("n_rotor_positions"),
+        "n_points": summary.get("n_points") or grid.get("n_points"),
+        "phase_current_rms_a": grid.get("phase_current_rms_a"),
+        "peak_torque_magnitude_nm": summary.get("peak_torque_magnitude_nm"),
+        "peak_airgap_flux_density_t": summary.get(
+            "peak_airgap_flux_density_t"
+        ),
+        "best_screened_current_angle_electrical_deg": summary.get(
+            "best_screened_current_angle_electrical_deg"
+        ),
+        "best_angle_mean_torque_magnitude_nm": summary.get(
+            "best_angle_mean_torque_magnitude_nm"
+        ),
+        "denser_than_smoke": coverage.get("denser_than_smoke"),
+        "torque_map": "OPEN",
+        "note": (
+            "Twin-bound current-angle × rotor-position SCREEN at one design "
+            "current magnitude. Not a closed torque/loss/voltage/thermal map; "
+            "not ship_ok."
+        ),
+    }
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
     demag_case: Optional[Mapping[str, Any]] = None,
+    mtpa_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote magnetic check to PARTIAL when a twin-bound open-circuit point exists.
 
@@ -655,6 +721,7 @@ def _magnetic_check_from_fia_case(
     rel_ref = "_motor_stack/em_fia_front_kit_case.json"
     duty_ok = bool(works.get("duty_torque_screen_ok"))
     demag_cite = _demag_screen_cite(demag_case, twin_dir=twin_dir)
+    mtpa_cite = _mtpa_screen_cite(mtpa_case, twin_dir=twin_dir)
     demag_margin: Any = None
     if isinstance(demag_cite, dict):
         demag_margin = demag_cite.get("demagnetisation_margin_ratio")
@@ -736,6 +803,7 @@ def _magnetic_check_from_fia_case(
                     else None
                 ),
                 "demag_screen": demag_cite,
+                "mtpa_screen": mtpa_cite,
                 "demagnetisation_margin": demag_margin,
                 "torque_map": "OPEN",
                 "demagnetisation_map": "OPEN",
@@ -1734,12 +1802,14 @@ def build_motor_multiphysics(
 
     fia_mag = _load_fia_magnetic_case(twin_dir)
     fia_demag = _load_fia_demag_case(twin_dir)
+    fia_mtpa = _load_fia_mtpa_case(twin_dir)
     if fia_mag is not None and twin_dir is not None:
         magnetic = _magnetic_check_from_fia_case(
             duty,
             fia_mag,
             twin_dir=Path(twin_dir),
             demag_case=fia_demag,
+            mtpa_case=fia_mtpa,
         )
         notes += (
             " Magnetic check PARTIAL: twin-bound open-circuit / loaded point in "
@@ -1748,6 +1818,10 @@ def build_motor_multiphysics(
         if fia_demag is not None:
             notes += (
                 " + hot demag SCREEN in _motor_stack/em_fia_demag_screen.json"
+            )
+        if fia_mtpa is not None:
+            notes += (
+                " + denser MTPA SCREEN in _motor_stack/em_fia_mtpa_screen.json"
             )
         notes += " (torque map / full demag map / dyno still OPEN)."
     else:
@@ -2159,8 +2233,8 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
         "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
-        "when a twin-bound artefact exists (magnetic point, analytical hot demag",
-        "screen, ROSS critical-speed screen, CalculiX rotor centrifugal screen,",
+        "when a twin-bound artefact exists (magnetic point, denser MTPA screen,",
+        "analytical hot demag screen, ROSS critical-speed screen, CalculiX rotor screen,",
         "OpenFOAM cold-plate duct, gear-oil screen, and/or ISO 6336-style",
         "gear-strength screen) while torque map, **full** demagnetisation map,",
         "magnet-pocket burst release FoS, free-surface oil CFD, KISSsoft, load",
@@ -2782,6 +2856,38 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "em_fia_mtpa_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.em_fia_mtpa_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "mtpa456",
+                    "grid": {
+                        "mode": "default",
+                        "n_current_angles": 7,
+                        "n_rotor_positions": 5,
+                        "n_points": 35,
+                        "phase_current_rms_a": 535.0,
+                    },
+                    "summary": {
+                        "n_points": 35,
+                        "peak_torque_magnitude_nm": 104.2,
+                        "peak_airgap_flux_density_t": 1.41,
+                        "best_screened_current_angle_electrical_deg": -45.0,
+                        "best_angle_mean_torque_magnitude_nm": 98.6,
+                    },
+                    "coverage": {
+                        "denser_than_smoke": True,
+                        "closed_torque_map": False,
+                    },
+                    "mtpa_screen": {"status": "PARTIAL"},
+                    "torque_map": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "ross_fia_front_kit_case.json").write_text(
             json.dumps(
                 {
@@ -3135,6 +3241,25 @@ def selftest() -> int:
             bad += 1
         elif demag_cite.get("demag_map") != "OPEN":
             print("FAIL: demag cite must leave full demag map OPEN")
+            bad += 1
+        mtpa_cite = mag_twin.get("mtpa_screen")
+        if not isinstance(mtpa_cite, dict) or mtpa_cite.get("status") != "PARTIAL":
+            print(
+                "FAIL: magnetic twin_bound_case must cite MTPA screen as PARTIAL "
+                "when artefact present"
+            )
+            bad += 1
+        elif mtpa_cite.get("n_points") != 35:
+            print("FAIL: MTPA cite must surface screen point count")
+            bad += 1
+        elif mtpa_cite.get("peak_torque_magnitude_nm") != 104.2:
+            print("FAIL: MTPA cite must surface peak torque magnitude")
+            bad += 1
+        elif mtpa_cite.get("ship_ok") is not False:
+            print("FAIL: MTPA cite must keep ship_ok false")
+            bad += 1
+        elif mtpa_cite.get("torque_map") != "OPEN":
+            print("FAIL: MTPA cite must leave torque map OPEN")
             bad += 1
         if mag.get("status") == "PASS" or mag_twin.get("ship_ok") is True:
             print("FAIL: magnetic must remain PARTIAL with ship_ok false")
