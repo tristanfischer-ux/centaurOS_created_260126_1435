@@ -28,6 +28,7 @@ ASSEMBLY_REVISION = "front-drive-concept-stub-2026-07-30"
 # INTENT (2026-07-30): Architecture / packaging blockers must be machine-readable
 # with permanent unblock paths — never chat-only, never greenwashed to ship_ok.
 BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
+BLOCKER_ID_POST_DIFF_FINAL_DRIVE = "POST_DIFF_FINAL_DRIVE_PACKAGING"
 _DIFF_NEST_PERMANENT_UNBLOCK: list[dict[str, str]] = [
     {
         "option_id": "enlarge_diff_nest",
@@ -67,6 +68,34 @@ _DIFF_NEST_PERMANENT_UNBLOCK: list[dict[str, str]] = [
             "scripts/motor-stack/iso_bevel_fia_front_kit_case.py;"
             "docs/plans/MOTOR-MULTIPHYSICS-AND-CAD-PLAIN-LANGUAGE-2026-07-30.md"
             "#architecture-blockers"
+        ),
+    },
+]
+_POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "package_post_diff_final_drive",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Design the remaining post-differential reduction stage at the "
+            "selected ratio, close gear/bearing/shaft/lubrication strength and "
+            "fit it inside the FIA front-kit bay."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py;"
+            "Tier 1 and 2 parts for cad /tier2_motor_drivetrain.py;"
+            "scripts/lib/fpk_concentric_geometry.py"
+        ),
+    },
+    {
+        "option_id": "revise_ratio_split_or_topology",
+        "kind": "architecture_decision",
+        "summary": (
+            "Revise the pre/post-differential ratio split or select another "
+            "final-drive topology if the packaged post-diff stage cannot fit."
+        ),
+        "code_hooks": (
+            "_motor_stack/diff_architecture_decision.json;"
+            "scripts/motor-stack/iso_bevel_fia_front_kit_case.py"
         ),
     },
 ]
@@ -179,8 +208,9 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
         "last_known_green": (
             "2026-07-30 — twin-bound ISO 6336-style planetary screen + "
             "straight-bevel differential handbook SCREEN on "
-            "formula-e-front-mgu-20260729-1432 (bevel nest FoS << 1.20; "
-            "duty_strength_screen_ok / bevel works flags honest; "
+            "formula-e-front-mgu-20260729-1432 (unbudgeted i=8 bevel nest fails; "
+            "cut_torque_at_diff i=2 screening clears at OD 120 mm while post-diff "
+            "final-drive packaging remains OPEN; "
             "ISO 23509 / KISSsoft / spectrum / tooth-contact FEA still OPEN)"
         ),
         "evidence_class": "toolchain_smoke_pass",
@@ -1202,6 +1232,16 @@ def _bevel_differential_cite_from_case(
         or recommended.get("architecture_hold")
         or None
     )
+    residual_blocker = (
+        bevel_case.get("residual_blocker")
+        if isinstance(bevel_case.get("residual_blocker"), Mapping)
+        else None
+    )
+    architecture_decision = (
+        bevel_case.get("architecture_decision")
+        if isinstance(bevel_case.get("architecture_decision"), Mapping)
+        else None
+    )
     return {
         "status": bevel_case.get("status") or "PARTIAL",
         "ship_ok": False,
@@ -1220,6 +1260,8 @@ def _bevel_differential_cite_from_case(
         "side_gear_teeth": geometry.get("side_gear_teeth"),
         "tooth_count_basis": geometry.get("tooth_count_basis"),
         "architecture_hold": architecture_hold,
+        "architecture_decision": architecture_decision,
+        "residual_blocker": residual_blocker,
         "iso23509_independent_check": "OPEN",
         "kisssoft_independent_check": "OPEN",
         "note": (
@@ -1229,6 +1271,11 @@ def _bevel_differential_cite_from_case(
             + (
                 f" Architecture hold: {architecture_hold}."
                 if architecture_hold
+                else ""
+            )
+            + (
+                f" Residual blocker: {residual_blocker.get('blocker_id')}."
+                if residual_blocker
                 else ""
             )
         ),
@@ -1285,6 +1332,39 @@ def collect_architecture_blockers(
                     "carrier-torque FoS ≥ 1.2 — architecture hold."
                 ),
                 "permanent_unblock_options": list(_DIFF_NEST_PERMANENT_UNBLOCK),
+                "human_decision_required": True,
+            }
+        )
+    residual = (
+        bevel.get("residual_blocker")
+        if isinstance(bevel.get("residual_blocker"), Mapping)
+        else None
+    )
+    if (
+        residual
+        and residual.get("blocker_id") == BLOCKER_ID_POST_DIFF_FINAL_DRIVE
+        and residual.get("status") == "OPEN"
+    ):
+        blockers.append(
+            {
+                "blocker_id": BLOCKER_ID_POST_DIFF_FINAL_DRIVE,
+                "domain": "gear_strength.final_drive_packaging",
+                "status": "OPEN",
+                "severity": "architecture_hold",
+                "ship_ok": False,
+                "cannot_greenwash": True,
+                "evidence_path": bevel.get("path")
+                or "_motor_stack/iso_bevel_fia_front_kit_case.json",
+                "minimum_strength_factor": bevel.get("minimum_strength_factor"),
+                "ratio_after_diff": residual.get("ratio_after_diff"),
+                "summary": residual.get("summary")
+                or (
+                    "Differential torque budget clears the bevel nest, but the "
+                    "remaining post-differential final-drive stage is not packaged."
+                ),
+                "permanent_unblock_options": list(
+                    _POST_DIFF_FINAL_DRIVE_PERMANENT_UNBLOCK
+                ),
                 "human_decision_required": True,
             }
         )
@@ -2948,6 +3028,90 @@ def selftest() -> int:
                 "FAIL: traction_motor_water_jacket must list "
                 "motor_water_jacket_helical family"
             )
+            bad += 1
+
+        # Regression: an applied torque split clears DIFF_NEST but must replace
+        # it with the still-OPEN post-differential final-drive packaging blocker.
+        (case_dir / "iso_bevel_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.iso_bevel_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "bevel_geometry": {
+                        "diff_od_mm": 120.0,
+                        "spider_pinion_teeth": 10,
+                        "side_gear_teeth": 14,
+                        "tooth_count_basis": "strength-driven screening geometry",
+                    },
+                    "duty_torques": {
+                        "carrier_input_torque_nm": 250.438538,
+                        "ratio_into_diff": 2.0,
+                        "ratio_after_diff": 4.0,
+                    },
+                    "strength_screen": {
+                        "minimum_bending_fos": 4.5655,
+                        "minimum_contact_fos": 1.2172,
+                        "minimum_strength_factor": 1.2172,
+                    },
+                    "margins": {
+                        "minimum_bending_fos": 4.5655,
+                        "minimum_contact_fos": 1.2172,
+                        "minimum_strength_factor": 1.2172,
+                    },
+                    "works_in_kit_context": {"duty_strength_screen_ok": True},
+                    "architecture_decision": {
+                        "selected_option": "cut_torque_at_diff",
+                        "status": "APPLIED_FOR_SCREENING",
+                        "ratio_into_diff": 2.0,
+                        "ratio_after_diff": 4.0,
+                        "ship_ok": False,
+                    },
+                    "residual_blocker": {
+                        "blocker_id": "POST_DIFF_FINAL_DRIVE_PACKAGING",
+                        "status": "OPEN",
+                        "ship_ok": False,
+                        "ratio_after_diff": 4.0,
+                        "summary": "Post-differential 4:1 stage packaging remains OPEN.",
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        residual_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
+        residual_blockers = residual_payload["motorMultiphysics"].get(
+            "architectureBlockers"
+        )
+        if (
+            not isinstance(residual_blockers, list)
+            or len(residual_blockers) != 1
+            or residual_blockers[0].get("blocker_id")
+            != "POST_DIFF_FINAL_DRIVE_PACKAGING"
+        ):
+            print(
+                "FAIL: cleared DIFF_NEST must be replaced by "
+                "POST_DIFF_FINAL_DRIVE_PACKAGING"
+            )
+            bad += 1
+        elif not residual_blockers[0].get("permanent_unblock_options"):
+            print("FAIL: post-diff blocker must name permanent_unblock_options")
+            bad += 1
+        elif residual_blockers[0].get("cannot_greenwash") is not True:
+            print("FAIL: post-diff blocker must set cannot_greenwash")
+            bad += 1
+        if BLOCKER_ID_DIFF_NEST in json.dumps(residual_blockers):
+            print("FAIL: DIFF_NEST blocker must stop once budgeted FoS clears")
+            bad += 1
+        if residual_payload["motorMultiphysics"].get("ship_ok") is not False:
+            print("FAIL: residual packaging blocker must keep ship_ok false")
+            bad += 1
+        residual_catch = prove_catch(residual_payload)
+        if (
+            not residual_catch.get("ok")
+            or int(residual_catch.get("open_architecture_blocker_count") or 0) != 1
+        ):
+            print("FAIL: proveCatch must enforce the post-diff residual blocker")
             bad += 1
 
     if bad:

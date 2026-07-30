@@ -22,7 +22,9 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
+import tempfile
 import time
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -61,6 +63,11 @@ K_BEVEL_CONTACT = 1.15
 SCREEN_FOS_MIN = 1.20
 ASSUMED_COMBINED_EFFICIENCY = 0.9777
 DEFAULT_GEAR_RATIO = 8.0
+CUT_TORQUE_OPTION = "cut_torque_at_diff"
+DEFAULT_RATIO_INTO_DIFF = 2.0
+DEFAULT_RATIO_AFTER_DIFF = 4.0
+DIFF_ARCHITECTURE_DECISION_FILENAME = "diff_architecture_decision.json"
+POST_DIFF_FINAL_DRIVE_BLOCKER = "POST_DIFF_FINAL_DRIVE_PACKAGING"
 
 # Documented packaging seeds when twin lacks bevel tooth counts / face.
 # Blender communication cues: side gear r≈0.28·diff_od → pitch≈0.56·OD;
@@ -89,6 +96,8 @@ class TwinInputs:
     continuous_electrical_power_kw: float
     front_regen_electrical_cap_kw: float
     gear_ratio: float
+    ratio_into_diff: float
+    ratio_after_diff: float | None
     diff_od_mm: float
     diff_len_mm: float
     gear_face_mm: float
@@ -97,6 +106,10 @@ class TwinInputs:
     spider_count: int
     bevel_face_width_mm: float
     motor_shaft_torque_nm: float | None
+    diff_architecture_option: str | None
+    diff_architecture_decision_status: str | None
+    diff_torque_budget_applied: bool
+    diff_torque_budget_source: str
     tooth_counts_from_twin: bool
     tooth_count_basis: str
 
@@ -208,6 +221,96 @@ def _optional_int(
     return int(round(value))
 
 
+def _string(values: Mapping[str, Any], keys: Sequence[str]) -> str | None:
+    """Return the first non-empty string from quantity-style mappings."""
+
+    for key in keys:
+        raw = values.get(key)
+        if isinstance(raw, Mapping):
+            raw = raw.get("value")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
+
+def _resolve_diff_architecture(
+    quantities: Mapping[str, Any],
+    architecture_decision: Mapping[str, Any],
+    *,
+    gear_ratio: float,
+) -> dict[str, Any]:
+    """Resolve the torque split from twin quantities before decision writeback.
+
+    INTENT: A settled twin quantity is the highest authority. A durable
+    architecture decision is the fallback; selecting cut_torque_at_diff without
+    explicit ratios applies the approved 2× then 4× screening defaults.
+    """
+
+    quantity_ratio_into = _optional_number(
+        quantities,
+        ("fpk_ratio_into_diff", "ratio_into_diff"),
+    )
+    quantity_ratio_after = _optional_number(
+        quantities,
+        ("fpk_ratio_after_diff", "ratio_after_diff"),
+    )
+    quantity_option = _string(
+        quantities,
+        ("fpk_diff_architecture_option", "diff_architecture_option"),
+    )
+    decision_option = _string(
+        architecture_decision,
+        ("selected_option", "option_id"),
+    )
+    selected_option = quantity_option or decision_option
+    if quantity_ratio_into is not None and selected_option is None:
+        selected_option = CUT_TORQUE_OPTION
+
+    is_applied = selected_option == CUT_TORQUE_OPTION
+    if not is_applied:
+        return {
+            "ratio_into_diff": gear_ratio,
+            "ratio_after_diff": None,
+            "selected_option": selected_option,
+            "status": None,
+            "applied": False,
+            "source": "full_gear_ratio_unbudgeted",
+        }
+
+    decision_ratio_into = _optional_number(
+        architecture_decision,
+        ("ratio_into_diff",),
+    )
+    decision_ratio_after = _optional_number(
+        architecture_decision,
+        ("ratio_after_diff",),
+    )
+    ratio_into = (
+        quantity_ratio_into
+        if quantity_ratio_into is not None
+        else decision_ratio_into or DEFAULT_RATIO_INTO_DIFF
+    )
+    ratio_after = (
+        quantity_ratio_after
+        if quantity_ratio_after is not None
+        else decision_ratio_after or DEFAULT_RATIO_AFTER_DIFF
+    )
+    source = (
+        "twin_quantities"
+        if quantity_ratio_into is not None
+        else "diff_architecture_decision"
+    )
+    return {
+        "ratio_into_diff": ratio_into,
+        "ratio_after_diff": ratio_after,
+        "selected_option": selected_option,
+        "status": _string(architecture_decision, ("status",))
+        or "APPLIED_FOR_SCREENING",
+        "applied": True,
+        "source": source,
+    }
+
+
 def _parse_box_len_mm(box: Any) -> float | None:
     """Parse leading length from principal-box strings like '19x19x19 mm'."""
 
@@ -253,6 +356,8 @@ def inputs_from_sections(
     quantities: Mapping[str, Any],
     concentric: Mapping[str, Any],
     physics_values: Mapping[str, Any] | None = None,
+    *,
+    architecture_decision: Mapping[str, Any] | None = None,
 ) -> TwinInputs:
     """Build controlled case inputs from selectively read twin sections.
 
@@ -262,6 +367,7 @@ def inputs_from_sections(
     """
 
     physics_values = physics_values or {}
+    architecture_decision = architecture_decision or {}
     max_rpm = _number(
         quantities,
         ("max_rotor_speed_rpm", "mgu_base_speed_rpm"),
@@ -273,6 +379,11 @@ def inputs_from_sections(
         default=250.0,
     )
     gear_ratio = _number(quantities, ("gear_ratio",), default=DEFAULT_GEAR_RATIO)
+    diff_architecture = _resolve_diff_architecture(
+        quantities,
+        architecture_decision,
+        gear_ratio=gear_ratio,
+    )
     diff_od_mm = _number(
         concentric,
         ("diff_od_mm",),
@@ -371,6 +482,12 @@ def inputs_from_sections(
             default=250.0,
         ),
         gear_ratio=gear_ratio,
+        ratio_into_diff=float(diff_architecture["ratio_into_diff"]),
+        ratio_after_diff=(
+            float(diff_architecture["ratio_after_diff"])
+            if diff_architecture["ratio_after_diff"] is not None
+            else None
+        ),
         diff_od_mm=diff_od_mm,
         diff_len_mm=diff_len_mm,
         gear_face_mm=gear_face_mm,
@@ -382,6 +499,10 @@ def inputs_from_sections(
             quantities,
             ("mgu_shaft_torque_nm", "envelope_mgu_torque_nm"),
         ),
+        diff_architecture_option=diff_architecture["selected_option"],
+        diff_architecture_decision_status=diff_architecture["status"],
+        diff_torque_budget_applied=bool(diff_architecture["applied"]),
+        diff_torque_budget_source=str(diff_architecture["source"]),
         tooth_counts_from_twin=from_twin,
         tooth_count_basis=tooth_basis,
     )
@@ -450,6 +571,33 @@ def _stream_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _load_diff_architecture_decision(state_path: Path) -> Mapping[str, Any]:
+    """Load the durable differential architecture decision beside the twin."""
+
+    decision_path = (
+        state_path.parent
+        / "_motor_stack"
+        / DIFF_ARCHITECTURE_DECISION_FILENAME
+    )
+    if not decision_path.is_file():
+        return {}
+    try:
+        payload = json.loads(decision_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise FiaFrontKitBevelError(
+            f"Invalid differential architecture decision {decision_path}: {exc}"
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise FiaFrontKitBevelError(
+            f"Differential architecture decision must be an object: {decision_path}"
+        )
+    if payload.get("ship_ok") is not False:
+        raise FiaFrontKitBevelError(
+            "Differential architecture decision must explicitly keep ship_ok=false"
+        )
+    return payload
+
+
 def load_twin_inputs(state_path: Path) -> tuple[TwinInputs, str]:
     """Selectively read a stable twin snapshot and return its file hash."""
 
@@ -459,6 +607,7 @@ def load_twin_inputs(state_path: Path) -> tuple[TwinInputs, str]:
     last_error = "Twin state changed during selective-read attempts"
     for attempt in range(5):
         before = state_path.stat()
+        architecture_decision = _load_diff_architecture_decision(state_path)
         quantities = dict(_read_section(state_path, "orchestratorContract.quantities"))
         if not quantities:
             quantities = dict(
@@ -473,7 +622,12 @@ def load_twin_inputs(state_path: Path) -> tuple[TwinInputs, str]:
             and before.st_mtime_ns == after.st_mtime_ns
         ):
             return (
-                inputs_from_sections(quantities, concentric, physics_values),
+                inputs_from_sections(
+                    quantities,
+                    concentric,
+                    physics_values,
+                    architecture_decision=architecture_decision,
+                ),
                 source_hash,
             )
         last_error = (
@@ -593,7 +747,7 @@ def propose_strength_feasible_bevel(
         face = 10.0
         while face <= 60.0 + 1.0e-9:
             for spider_z, side_z in tooth_pairs:
-                for spider_n in (2, 4):
+                for spider_n in (2, 4, 6):
                     length = max(face / 0.50, od * 0.90)
                     trial = replace(
                         inputs,
@@ -632,6 +786,8 @@ def propose_strength_feasible_bevel(
                         "minimum_contact_fos": screen.minimum_contact_fos,
                         "minimum_strength_factor": screen.minimum_strength_factor,
                         "clears_duty_screen": screen.works_in_kit_context,
+                        "carrier_input_torque_nm": screen.carrier_input_torque_nm,
+                        "ratio_into_diff": inputs.ratio_into_diff,
                         "volume_proxy_mm3": round(volume_proxy, 1),
                         "envelope_max_diff_od_mm": MAX_DIFF_OD_IN_KIT_MM,
                     }
@@ -657,13 +813,21 @@ def propose_strength_feasible_bevel(
         chosen["statement"] = (
             "Strength-driven bevel nest resize clears screening FoS ≥ "
             f"{SCREEN_FOS_MIN} inside OD ≤ {MAX_DIFF_OD_IN_KIT_MM:.0f} mm. "
-            "Not ISO 23509 / KISSsoft; ship_ok false."
+            + (
+                f"Applied {CUT_TORQUE_OPTION} at ratio_into_diff="
+                f"{inputs.ratio_into_diff:.3g}; "
+                f"{POST_DIFF_FINAL_DRIVE_BLOCKER} remains OPEN. "
+                if inputs.diff_torque_budget_applied
+                else ""
+            )
+            + "Not ISO 23509 / KISSsoft; ship_ok false."
         )
     else:
         chosen["statement"] = (
             "No straight-bevel nest inside the kit envelope "
             f"(OD ≤ {MAX_DIFF_OD_IN_KIT_MM:.0f} mm) clears FoS ≥ {SCREEN_FOS_MIN} "
-            f"at ~1000 N·m carrier. Best-in-envelope FoS ≈ "
+            f"at {float(chosen['carrier_input_torque_nm']):.0f} N·m carrier. "
+            "Best-in-envelope FoS ≈ "
             f"{chosen['minimum_strength_factor']:.3f}. Clearing typically needs "
             f"OD ≳ {MIN_CLEARING_DIFF_OD_HINT_MM:.0f} mm (outside planetary/bay "
             "nest) — architecture / packaging hold stays OPEN. Not greenwashed."
@@ -683,15 +847,20 @@ def run_strength_screen(
 ) -> StrengthScreen:
     """Compute spider–side bevel screening stresses and FoS.
 
-    INTENT: Carrier sees ≈ T_motor·i. Open equal-split: each side gear ≈ T/2.
-    Mesh force at side mean pitch is shared across spider pinions. Screen the
-    spider pinion (smaller Z) for bending and contact — usually critical.
+    INTENT: Carrier sees T_motor·ratio_into_diff when the approved torque split
+    is applied; otherwise it sees T_motor·gear_ratio. Open equal-split: each
+    side gear ≈ T/2. Mesh force is shared across spider pinions.
     """
 
     if motor_shaft_torque_nm <= 0.0:
         raise FiaFrontKitBevelError("motor_shaft_torque_nm must be positive")
 
-    carrier_nm = motor_shaft_torque_nm * inputs.gear_ratio
+    effective_ratio = (
+        inputs.ratio_into_diff
+        if inputs.diff_torque_budget_applied
+        else inputs.gear_ratio
+    )
+    carrier_nm = motor_shaft_torque_nm * effective_ratio
     side_nm = carrier_nm / 2.0
     mean_factor = geometry.mean_module_mm / geometry.outer_module_mm
     d_side_mean = geometry.side_pitch_diameter_mm * mean_factor
@@ -704,7 +873,7 @@ def run_strength_screen(
     ft_mesh = ft_total / float(geometry.spider_count)
 
     omega_carrier = (
-        inputs.max_rotor_speed_rpm / inputs.gear_ratio * 2.0 * math.pi / 60.0
+        inputs.max_rotor_speed_rpm / effective_ratio * 2.0 * math.pi / 60.0
     )
     v = abs(omega_carrier) * (d_side_mean / 2000.0)
     kv = _dynamic_factor_kv(v)
@@ -784,11 +953,20 @@ def build_artifact(
             "motor_shaft_torque_nm": screen.motor_shaft_torque_nm,
             "carrier_input_torque_nm": screen.carrier_input_torque_nm,
             "side_gear_torque_nm": screen.side_gear_torque_nm,
+            "ratio_into_diff": inputs.ratio_into_diff,
+            "ratio_after_diff": inputs.ratio_after_diff,
+            "total_ratio_product": (
+                round(inputs.ratio_into_diff * inputs.ratio_after_diff, 6)
+                if inputs.ratio_after_diff is not None
+                else inputs.gear_ratio
+            ),
             "assumed_combined_efficiency": ASSUMED_COMBINED_EFFICIENCY,
             "torque_basis": (
                 "shaft ≈ P_elec/(η_combined·ω) at max_rotor_speed_rpm "
-                "(~125 N·m for 250 kW / 19,500 rpm); carrier ≈ T·gear_ratio "
-                "(~1001 N·m at ratio 8); open equal-split side ≈ carrier/2"
+                "(~125 N·m for 250 kW / 19,500 rpm); carrier ≈ "
+                f"T·{'ratio_into_diff' if inputs.diff_torque_budget_applied else 'gear_ratio'} "
+                f"(ratio {inputs.ratio_into_diff if inputs.diff_torque_budget_applied else inputs.gear_ratio:.3g}); "
+                "open equal-split side ≈ carrier/2"
             ),
         },
         "strength_screen": {
@@ -847,7 +1025,7 @@ def build_artifact(
         "geometry_provenance": {
             "controlling_dimensions": (
                 "fpkConcentricGeometry.diff_od_mm (+ principal-box length) "
-                "and twin gear_ratio / duty; tooth counts per tooth_count_basis"
+                "and twin torque ratio / duty; tooth counts per tooth_count_basis"
             ),
             "cad_family": "compact_bevel_differential",
             "authority_level": "communication_only",
@@ -862,8 +1040,8 @@ def build_artifact(
         },
         "fia_question": (
             f"Does the mini bevel differential transmit carrier torque for "
-            f"{inputs.continuous_electrical_power_kw:.0f} kW / ratio "
-            f"{inputs.gear_ratio:.1f} (~{screen.carrier_input_torque_nm:.0f} N·m) "
+            f"{inputs.continuous_electrical_power_kw:.0f} kW / ratio into diff "
+            f"{inputs.ratio_into_diff:.1f} (~{screen.carrier_input_torque_nm:.0f} N·m) "
             "without tooth failure?"
         ),
         "iso23509_independent_check": {
@@ -895,6 +1073,28 @@ def build_artifact(
             "ISO 23509 / KISSsoft / spectrum / FEA closure on the current revision."
         ),
     }
+    if inputs.diff_torque_budget_applied:
+        artifact["architecture_decision"] = {
+            "selected_option": inputs.diff_architecture_option,
+            "status": inputs.diff_architecture_decision_status,
+            "ratio_into_diff": inputs.ratio_into_diff,
+            "ratio_after_diff": inputs.ratio_after_diff,
+            "source": inputs.diff_torque_budget_source,
+            "ship_ok": False,
+        }
+        if screen.works_in_kit_context:
+            artifact["residual_blocker"] = {
+                "blocker_id": POST_DIFF_FINAL_DRIVE_BLOCKER,
+                "status": "OPEN",
+                "ship_ok": False,
+                "ratio_after_diff": inputs.ratio_after_diff,
+                "summary": (
+                    "The differential strength screen is cleared only by moving "
+                    f"the remaining ~{inputs.ratio_after_diff:.3g}:1 reduction "
+                    "after the differential. Packaging, gears, bearings, shafts, "
+                    "lubrication and interfaces for that final-drive stage remain OPEN."
+                ),
+            }
     if packaging_seed_screen is not None and packaging_seed_geometry is not None:
         artifact["packaging_seed_screen"] = {
             "bevel_geometry": asdict(packaging_seed_geometry),
@@ -927,6 +1127,45 @@ def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def write_cut_torque_architecture_decision(
+    twin_dir: Path,
+    *,
+    ratio_into_diff: float = DEFAULT_RATIO_INTO_DIFF,
+    ratio_after_diff: float = DEFAULT_RATIO_AFTER_DIFF,
+) -> Path:
+    """Persist the approved screening-only differential torque split.
+
+    @description Writes a deterministic decision record consumed on future runs.
+    @param twin_dir Live twin directory
+    @param ratio_into_diff Reduction applied before the differential
+    @param ratio_after_diff Unpackaged reduction required after the differential
+    @returns Written decision path
+    @throws FiaFrontKitBevelError When either ratio is non-positive
+    """
+
+    if ratio_into_diff <= 0.0 or ratio_after_diff <= 0.0:
+        raise FiaFrontKitBevelError("Differential architecture ratios must be positive")
+    destination = (
+        twin_dir
+        / "_motor_stack"
+        / DIFF_ARCHITECTURE_DECISION_FILENAME
+    )
+    _atomic_write_json(
+        destination,
+        {
+            "schema": "forgeos.motor_stack.diff_architecture_decision/v1",
+            "selected_option": CUT_TORQUE_OPTION,
+            "ratio_into_diff": ratio_into_diff,
+            "ratio_after_diff": ratio_after_diff,
+            "total_ratio_product": round(ratio_into_diff * ratio_after_diff, 6),
+            "status": "APPLIED_FOR_SCREENING",
+            "ship_ok": False,
+            "residual_blocker": POST_DIFF_FINAL_DRIVE_BLOCKER,
+        },
+    )
+    return destination
 
 
 def _synthetic_sections() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -1054,6 +1293,109 @@ def run_selftest() -> int:
         "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
         in str(held_artifact.get("architecture_hold") or "")
     )
+    cut_torque_decision = {
+        "selected_option": "cut_torque_at_diff",
+        "ratio_into_diff": 2.0,
+        "ratio_after_diff": 4.0,
+        "status": "APPLIED_FOR_SCREENING",
+        "ship_ok": False,
+    }
+    quantity_override = {
+        **quantities,
+        "fpk_ratio_into_diff": {"value": 1.8, "unit": "ratio"},
+        "fpk_ratio_after_diff": {"value": 4.4, "unit": "ratio"},
+    }
+    quantity_override_inputs = inputs_from_sections(
+        quantity_override,
+        concentric,
+        {},
+        architecture_decision=cut_torque_decision,
+    )
+    defaulted_decision_inputs = inputs_from_sections(
+        quantities,
+        concentric,
+        {},
+        architecture_decision={
+            "selected_option": CUT_TORQUE_OPTION,
+            "status": "APPLIED_FOR_SCREENING",
+            "ship_ok": False,
+        },
+    )
+    budgeted_inputs = inputs_from_sections(
+        quantities,
+        concentric,
+        {},
+        architecture_decision=cut_torque_decision,
+    )
+    budgeted_recommended = propose_strength_feasible_bevel(
+        budgeted_inputs,
+        motor_shaft_torque_nm=torque,
+    )
+    budgeted_inputs = replace(
+        budgeted_inputs,
+        diff_od_mm=float(budgeted_recommended["diff_od_mm"]),
+        diff_len_mm=float(budgeted_recommended["diff_len_mm"]),
+        bevel_face_width_mm=float(budgeted_recommended["bevel_face_width_mm"]),
+        spider_pinion_teeth=int(budgeted_recommended["spider_pinion_teeth"]),
+        side_gear_teeth=int(budgeted_recommended["side_gear_teeth"]),
+        spider_count=int(budgeted_recommended["spider_count"]),
+    )
+    budgeted_geometry = derive_bevel_geometry(budgeted_inputs)
+    budgeted_screen = run_strength_screen(
+        budgeted_inputs,
+        budgeted_geometry,
+        motor_shaft_torque_nm=torque,
+    )
+    budgeted_artifact = build_artifact(
+        inputs=budgeted_inputs,
+        geometry=budgeted_geometry,
+        screen=budgeted_screen,
+        source_state_sha256="synthetic-selftest-budgeted",
+        source_twin="synthetic-selftest-budgeted",
+        recommended_geometry=budgeted_recommended,
+        controlling_geometry_source="strength_driven_resize",
+    )
+    checks["budgeted_i2_od120_clears_fos"] = (
+        budgeted_recommended.get("clears_duty_screen") is True
+        and float(budgeted_recommended["diff_od_mm"]) == 120.0
+        and budgeted_screen.minimum_strength_factor >= SCREEN_FOS_MIN
+    )
+    checks["budgeted_clear_removes_diff_nest_hold"] = (
+        "architecture_hold" not in budgeted_artifact
+        and "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
+        not in json.dumps(budgeted_artifact)
+    )
+    checks["budgeted_clear_emits_post_diff_residual"] = (
+        budgeted_artifact.get("residual_blocker", {}).get("blocker_id")
+        == "POST_DIFF_FINAL_DRIVE_PACKAGING"
+    )
+    checks["unbudgeted_i8_still_fails_nest"] = (
+        recommended.get("clears_duty_screen") is False
+        and "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
+        in str(recommended.get("architecture_hold") or "")
+    )
+    checks["budgeted_path_never_ships"] = budgeted_artifact["ship_ok"] is False
+    checks["twin_ratio_quantities_override_decision"] = (
+        quantity_override_inputs.ratio_into_diff == 1.8
+        and quantity_override_inputs.ratio_after_diff == 4.4
+        and quantity_override_inputs.diff_torque_budget_source == "twin_quantities"
+    )
+    checks["selected_option_defaults_to_approved_ratios"] = (
+        defaulted_decision_inputs.ratio_into_diff == DEFAULT_RATIO_INTO_DIFF
+        and defaulted_decision_inputs.ratio_after_diff == DEFAULT_RATIO_AFTER_DIFF
+    )
+    with tempfile.TemporaryDirectory(prefix="diff-decision-selftest-") as temp_dir:
+        decision_path = write_cut_torque_architecture_decision(Path(temp_dir))
+        written_decision = json.loads(decision_path.read_text(encoding="utf-8"))
+        checks["decision_writeback_is_durable_and_non_shipping"] = (
+            written_decision.get("selected_option") == CUT_TORQUE_OPTION
+            and written_decision.get("ratio_into_diff") == DEFAULT_RATIO_INTO_DIFF
+            and written_decision.get("ratio_after_diff") == DEFAULT_RATIO_AFTER_DIFF
+            and written_decision.get("status") == "APPLIED_FOR_SCREENING"
+            and written_decision.get("ship_ok") is False
+            and written_decision.get("residual_blocker")
+            == POST_DIFF_FINAL_DRIVE_BLOCKER
+        )
     passed = all(checks.values())
     print(
         json.dumps(
@@ -1069,6 +1411,10 @@ def run_selftest() -> int:
                 "works_in_kit_context": screen.works_in_kit_context,
                 "hot_torque_minimum_fos": hot.minimum_strength_factor,
                 "larger_nest_minimum_fos": big_screen.minimum_strength_factor,
+                "budgeted_i2_minimum_fos": budgeted_screen.minimum_strength_factor,
+                "budgeted_i2_carrier_input_torque_nm": (
+                    budgeted_screen.carrier_input_torque_nm
+                ),
                 "ship_ok": artifact["ship_ok"],
             },
             indent=2,
@@ -1078,7 +1424,14 @@ def run_selftest() -> int:
     return 0 if passed else 1
 
 
-def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
+def run_live_case(
+    twin_dir: Path,
+    output_path: Path | None = None,
+    *,
+    apply_cut_torque_at_diff: bool = False,
+    ratio_into_diff: float = DEFAULT_RATIO_INTO_DIFF,
+    ratio_after_diff: float = DEFAULT_RATIO_AFTER_DIFF,
+) -> int:
     """Run and persist one straight-bevel handbook screen against a live twin.
 
     When the packaging nest fails FoS, search a larger nest inside the kit
@@ -1086,6 +1439,12 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
     envelope candidate plus an architecture hold (do not greenwash).
     """
 
+    if apply_cut_torque_at_diff:
+        write_cut_torque_architecture_decision(
+            twin_dir,
+            ratio_into_diff=ratio_into_diff,
+            ratio_after_diff=ratio_after_diff,
+        )
     state_path = twin_dir / "state.json"
     seed_inputs, state_hash = load_twin_inputs(state_path)
     seed_geometry = derive_bevel_geometry(seed_inputs)
@@ -1185,8 +1544,9 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
     print(
         "FIA front-kit straight-bevel differential screen: "
         f"T_motor ≈ {screen.motor_shaft_torque_nm:.1f} N·m → "
-        f"T_carrier ≈ {screen.carrier_input_torque_nm:.1f} N·m at ratio "
-        f"{inputs.gear_ratio:.2f} (side ≈ {screen.side_gear_torque_nm:.1f} N·m). "
+        f"T_carrier ≈ {screen.carrier_input_torque_nm:.1f} N·m at ratio_into_diff "
+        f"{inputs.ratio_into_diff:.2f} (side ≈ {screen.side_gear_torque_nm:.1f} N·m; "
+        f"ratio_after_diff={inputs.ratio_after_diff or 0.0:.2f}). "
         f"Diff OD {geometry.diff_od_mm:.1f} mm, face {geometry.face_width_mm:.2f} mm, "
         f"Z_pinion/Z_side={geometry.spider_pinion_teeth}/{geometry.side_gear_teeth}, "
         f"{geometry.spider_count} spiders, m_mean={geometry.mean_module_mm:.3f} mm. "
@@ -1204,6 +1564,8 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
 def main() -> int:
     """Parse self-test or live-twin mode and run the requested case."""
 
+    env_option = os.environ.get("FPK_DIFF_ARCHITECTURE_OPTION", "").strip()
+    env_apply_cut_torque = env_option == CUT_TORQUE_OPTION
     parser = argparse.ArgumentParser(
         description=(
             "Solve the FIA-bound Formula E front-kit straight-bevel "
@@ -1226,12 +1588,45 @@ def main() -> int:
         type=Path,
         help="optional artefact path; defaults under the twin _motor_stack directory",
     )
+    parser.add_argument(
+        "--apply-cut-torque-at-diff",
+        action="store_true",
+        default=env_apply_cut_torque,
+        help=(
+            "persist and apply the cut_torque_at_diff screening decision "
+            "(env: FPK_DIFF_ARCHITECTURE_OPTION=cut_torque_at_diff)"
+        ),
+    )
+    parser.add_argument(
+        "--ratio-into-diff",
+        type=float,
+        default=float(
+            os.environ.get("FPK_RATIO_INTO_DIFF", DEFAULT_RATIO_INTO_DIFF)
+        ),
+        help="pre-differential ratio for the applied decision (default: 2.0)",
+    )
+    parser.add_argument(
+        "--ratio-after-diff",
+        type=float,
+        default=float(
+            os.environ.get("FPK_RATIO_AFTER_DIFF", DEFAULT_RATIO_AFTER_DIFF)
+        ),
+        help="post-differential ratio left as packaging blocker (default: 4.0)",
+    )
     args = parser.parse_args()
     if args.selftest:
-        if args.output is not None:
-            parser.error("--output is only valid with --twin")
+        if args.output is not None or args.apply_cut_torque_at_diff:
+            parser.error(
+                "--output/--apply-cut-torque-at-diff are only valid with --twin"
+            )
         return run_selftest()
-    return run_live_case(args.twin.resolve(), args.output)
+    return run_live_case(
+        args.twin.resolve(),
+        args.output,
+        apply_cut_torque_at_diff=args.apply_cut_torque_at_diff,
+        ratio_into_diff=args.ratio_into_diff,
+        ratio_after_diff=args.ratio_after_diff,
+    )
 
 
 if __name__ == "__main__":
