@@ -24,45 +24,59 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~18:40:** **Software screens advancing — still not race-ready.**  
-Happy about: **7/7** required checks PARTIAL; planetary gear + demag + pocket + case/mount kit screens; EM position sweep; Excel Q&A; **architecture blockers register** in stamp/Excel.  
-Honest architecture hold (tracked): **bevel differential** → `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` (OPEN; permanent unblock options named in code).  
-Not done: human architecture decision on diff nest; full MTPA/FW map; dyno/HIL; free-surface oil CFD; KISSsoft; full cast-case FEA; supplier STEP; **release CAD = 0%**; `ship_ok` **false**.
+**Overall mood as of 2026-07-30 ~19:45:** **Closure campaign running — still not race-ready.**  
+Landed in parallel: `cut_torque_at_diff` (bevel FoS≈**1.22**); denser MTPA screen (**35** FEMM points, peak ~**112 N·m**); Blender honors planetary m=1 / face=58 / ×4; lumped thermal screen; **6** hardware correlation holds registered OPEN.  
+Residual architecture blocker: `POST_DIFF_FINAL_DRIVE_PACKAGING` (ratio after diff still needs packaging).  
+`ship_ok` **false**; release CAD **0%**; hardware cannot close in software alone.
 
-**Last scoreboard update:** 2026-07-30 (architecture blockers registry + permanent unblock paths).
+**Last scoreboard update:** 2026-07-30 (Plan A closure campaign — diff budget + MTPA + Blender sync + thermal + hardware register).
 
 ### Architecture blockers (track + permanently unblock — not chat-only)
 
-| Blocker id | Status | Why blocked | Permanent unblock options (pick one + implement in code) | Guard |
+| Blocker id | Status | Why blocked | Permanent unblock | Guard |
 |---|---|---|---|---|
-| `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` | **OPEN** | Straight-bevel nest OD≤120 mm cannot clear FoS≥1.2 at ~1000 N·m carrier (best≈0.60; clearing hint OD≳220 mm) | (1) `enlarge_diff_nest` — raise nest/ring tip + CadQuery/Blender writeback; (2) `cut_torque_at_diff` — Decision Register freeze on torque budget / ratio split; (3) `change_diff_topology` — new topology family | Stamp `architectureBlockers[]` + proveCatch: OPEN blocker ⇒ `ship_ok` false; Excel Q&A table |
+| `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE` | **CLEARED (screening)** | Was: nest OD≤120 could not carry ~1000 N·m | Applied `cut_torque_at_diff`: `ratio_into_diff=2.0`, `ratio_after_diff=4.0` → carrier ≈250 N·m, FoS≈1.22 | Decision JSON `_motor_stack/diff_architecture_decision.json` |
+| `POST_DIFF_FINAL_DRIVE_PACKAGING` | **OPEN** | Remaining ×4 ratio after the open bevel is not yet a packaged CAD/Blender stage | Package outboard/final-drive stage in bay; sync CAD + Blender; re-screen interfaces | Stamp `architectureBlockers[]`; proveCatch ⇒ `ship_ok` false |
 
-Surfaces: `motorMultiphysics.architectureBlockers` · sidecar · markdown · Quality & Audit.
+Surfaces: `motorMultiphysics.architectureBlockers` · `hardwareCorrelation` · sidecar · markdown · Quality & Audit.
+
+### Plan A — how PARTIAL becomes DONE / PASS
+
+| # | DONE means (narrow software close) | PASS / release means (harder) | Can software alone finish? |
+|---|---|---|---|
+| 1 Shared revision | Excel rejects mismatched revision IDs | Same revision on supplier STEP + solvers + Blender PNGs | Mostly yes for the gate |
+| 2 CAD spine | Principal parts parametric or supplier-linked | Release coverage > 0 and rising toward 13/13 | Partial — supplier STEP needs humans |
+| 3 EM / rotor | Dense map + demag + rotordynamics screens bound to twin | Dyno-correlated torque/η map | Screens yes; PASS needs dyno |
+| 4 Gears / structure | Planetary + bevel screens clear; Blender matches; residual packaging closed | KISSsoft / contact FEA / spectrum | Screens + sync yes; full PASS no |
+| 5 Cooling / oil | Duct + lumped thermal + oil screens | CHT + flow/heater bench | Screens yes; CHT/bench no |
+| 6 Inverter | Packaging screen + MPN/ESL fields | Measured ESL + module STEP | Identity needs supplier |
+| 7 Visibility | Stamp + Excel show every check/blocker/hold | Same + Engineering Analysis plots | **DONE** for software surface |
+| 8 Hardware | Register exists with OPEN holds (no fake PASS) | Real dyno/HIL/flow/overspeed records | **Register yes; close holds NO** |
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
 | # | What we said we would do | Status | What we have actually done | Gap still open | Plan to fix the gap |
 |---|---|---|---|---|---|
 | 1 | Freeze one shared assembly revision for CAD + solvers + Blender + Excel | **PARTIAL** | Label `front-drive-concept-stub-2026-07-30` on stamp + Excel card | Not a hard gate yet — bump discipline when geometry changes | Reject mismatched revisions in Excel when revision field diverges |
-| 2 | Build CAD authority spine (case, stator, rotor, gears, cooling, …) | **PARTIAL** | **5** parametric families: stator, rotor carrier, planetary, cold plate, **motor water jacket helical** | Case, bearings, differential, oil, bus, connectors still Blender-only; **release CAD = 0 / 13** | Cast case + supplier STEP when known |
-| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (duty screen yes)** | ~**96 N·m (~77%)** at best angle/position; coarse **rotor-position sweep** (0–45° mech) shows strong position dependence (ratio min/mean/max ≈ 0.03/0.41/0.77) | Full MTPA/FW map, demag, dyno, 24-vs-48 slots, magnet-pocket burst OPEN | Voltage/thermal + denser map; keep `ship_ok` false |
-| 4 | Close gears, differential, structure | **PARTIAL (duty screen yes after resize)** | Packaging seed FoS≈0.18 **FAILED**; strength-driven resize **m=1.0 / face=58 / 4 planets** → FoS≈**1.21** (**works=yes**); seed retained in artefact | Differential contact, case/mount FEA, KISSsoft, load spectrum OPEN; Blender still on old seed until CAD writeback | Sync CadQuery/Blender to recommended geometry |
-| 5 | Close cooling and lubrication | **PARTIAL (duct + oil screen)** | OpenFOAM cold-plate + **water-jacket** ducts @ 12 L/min / 60 °C; gear-oil analytical jet/churning/pickup | Full serpentine/helical CHT, free-surface oil CFD, module/winding temps OPEN | CHT when solid mesh exists; oil CFD after galleries |
-| 6 | Close inverter packaging | **PARTIAL (analytical)** | Density / DC current / ESL seed / cold-plate land / bay-fit screen; stamp + Excel rows | Module MPN, supplier STEP, double-pulse ESL OPEN | Freeze MPNs + measured ESL |
-| 7 | Make every result visible in the dossier | **DONE (software surface)** | Markdown stamp + `motor-multiphysics.json` + **Quality & Audit** multiphysics / CAD / inverter tables | Deeper Engineering Analysis plots still thin | Keep re-export after each stamp |
-| 8 | Correlate with hardware (dyno, HIL, flow bench, …) | **NOT STARTED** | Holds correctly left **OPEN** | Needs real hardware / team data | Cannot close in software alone |
+| 2 | Build CAD authority spine (case, stator, rotor, gears, cooling, …) | **PARTIAL** | **5** parametric families; Blender now reads strength planetary stamp | Case, bearings, post-diff stage, oil, bus, connectors; **release CAD = 0 / 13** | Package `POST_DIFF_FINAL_DRIVE`; cast case + supplier STEP |
+| 3 | Close electromagnetic + rotating-mechanical evidence | **PARTIAL (denser screen)** | Point screen + demag + **MTPA SCREEN 7×5=35 pts**, peak ~**112 N·m** (~90% of 125); best angle −50° | Closed torque/loss/voltage map; 24-vs-48 slots; dyno | FW/voltage sweep; keep `torque_map` OPEN until dyno |
+| 4 | Close gears, differential, structure | **PARTIAL (screens advancing)** | Planetary FoS≈1.21; **cut_torque_at_diff** bevel FoS≈1.22; Blender sync to m/face/planets | **Post-diff ×4 packaging**; KISSsoft; case FEA; nest_fits_rotor check | Package residual ratio stage; full structural FEA |
+| 5 | Close cooling and lubrication | **PARTIAL (duct + lumped thermal)** | OF duct Δp + gear-oil screen + **analytical thermal** (winding ~92 °C, module ~112 °C) | Full CHT; free-surface oil CFD; bench | Solid+fluid mesh CHT when ready |
+| 6 | Close inverter packaging | **PARTIAL (analytical)** | Density / ESL seed / bay-fit + thermal module screen | Module MPN, STEP, double-pulse ESL | Freeze MPNs + measured ESL |
+| 7 | Make every result visible in the dossier | **DONE (software surface)** | Stamp + sidecar + Excel: checks, CAD, inverter, **blockers**, **hardwareCorrelation** | Deeper plots still thin | Re-export after each stamp |
+| 8 | Correlate with hardware (dyno, HIL, flow bench, …) | **PARTIAL (register only)** | `hardwareCorrelation` with **6 OPEN** holds (dyno, HIL, flow, heater, overspeed, double-pulse) linked to Decision Register | All holds need physical tests | Fill `correlation_ref` only from real bench data — never invent |
 
 ### B. Solver check rows (what “OPEN / PARTIAL” means)
 
 | Check | Said we need | Status now | Works in kit context? | Next fix |
 |---|---|---|---|---|
-| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **yes** — peak ~96 N·m / 125 (~77%); position sweep recorded | Full MTPA/FW; demag; dyno |
+| Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **yes** — denser MTPA screen peak ~112 / 125; map still OPEN | FW/voltage; dyno |
 | Rotor dynamics | Critical speeds vs 19,500 rpm | **PARTIAL** | **yes** — clear of band (assumed bearings) | Catalogue k/c; modal correlation |
-| Structural / burst | Case, rotor, mounts survive | **PARTIAL** | **yes** — ring + **magnet-pocket bridge** screens below assumed yield | Case/mount FEA; laminate anisotropy; release FoS |
-| Motor water jacket | Flow + heat at 12 L/min, 60 °C | **PARTIAL** | **yes** — OpenFOAM duct Δp screen | Helical CHT + winding temps |
-| Inverter cold plate | Module temperatures / pressure drop | **PARTIAL** | **yes** — duct Δp screen | Full serpentine CHT + heater plate |
+| Structural / burst | Case, rotor, mounts survive | **PARTIAL** | **yes** — ring + magnet-pocket + case/mount screens | Full cast-case FEA; overspeed bench |
+| Motor water jacket | Flow + heat at 12 L/min, 60 °C | **PARTIAL** | **yes** — OF Δp + lumped winding temp screen | Helical CHT + flow bench |
+| Inverter cold plate | Module temperatures / pressure drop | **PARTIAL** | **yes** — OF Δp + lumped module temp screen | Serpentine CHT + heater plate |
 | Gear oil delivery | Jets, pickup, churning | **PARTIAL** | **yes** — analytical handbook screen | Free-surface CFD + bench |
-| Gear strength | Tooth life for kit torque | **PARTIAL** | **yes** — after resize FoS≈1.21 (seed still FAIL) | CAD/Blender sync; KISSsoft; spectrum |
+| Gear strength | Tooth life for kit torque | **PARTIAL** | **yes** — planetary + budgeted bevel screens | Post-diff packaging; KISSsoft |
 
 ### C. CAD authority (why “release coverage 0” sounds alarming)
 
@@ -75,17 +89,21 @@ We track 13 principal parts. Each is one of:
 **Today: 5 parametric, 8 communication-only, 0 release → coverage 0%.**  
 Expected early. **Not fab-ready.** Building the library ≠ closed manufacturing geometry.
 
-### D. Plan closure (software screens) vs still open
+### D. Closure campaign status (2026-07-30 evening)
 
-**Finished for this plan’s software-screen track:** twin-bound artefacts under `_motor_stack/` for all seven checks; inverter packaging analytical screen; five CadQuery families; stamp + Excel Quality & Audit visibility; `ship_ok` forced false.
+**Done this campaign (software):**
+1. Diff nest permanent unblock path **`cut_torque_at_diff`** applied for screening (`ratio_into_diff=2`, `ratio_after_diff=4`).  
+2. Denser MTPA SCREEN (35 FEMM points) cited on stamp.  
+3. Blender/FPK concentric honors strength-resized planetary.  
+4. Lumped cooling thermal SCREEN.  
+5. `hardwareCorrelation` register (6 OPEN holds) — step 8 no longer “invisible.”
 
-**Still open (next campaigns — not claimed done):**
-
-1. **Architecture decision on `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE`** — pick enlarge nest / cut torque / change topology; implement writeback + re-screen (tracked in `architectureBlockers`).  
-2. Magnetic denser MTPA/FW map + 24-vs-48 slot reconciliation.  
-3. Sync Blender/edu_form to strength-resized planetary (gear FoS screen already works=yes).  
-4. Full CHT / free-surface oil / case FEA / KISSsoft.  
-5. Hardware: dyno, HIL, flow bench, FIA port XYZ.  
+**Still open (cannot fake):**
+1. Package **`POST_DIFF_FINAL_DRIVE_PACKAGING`** (the honest residual of cut-torque).  
+2. Closed EM map (voltage/FW/losses) + slot reconciliation.  
+3. Full CHT / free-surface oil / KISSsoft / cast-case FEA.  
+4. Supplier STEP / module MPN / measured ESL.  
+5. **Physical** dyno, HIL, flow bench, overspeed — register only until then.  
 6. Keep `ship_ok = false` until those close.
 
 ---
