@@ -31,6 +31,10 @@ class FpkClaimWiringTest(unittest.TestCase):
                 "part_index": [
                     {"id": "root", "parent_id": None},
                     {"id": "matched_leaf", "parent_id": "root"},
+                    {"id": "thermal_stack", "parent_id": "root"},
+                    {"id": "cold_plate_channel", "parent_id": "thermal_stack"},
+                    {"id": "tim_layer", "parent_id": "thermal_stack"},
+                    {"id": "gate_driver_board", "parent_id": "root"},
                     {"id": "empty_leaf", "parent_id": "root"},
                 ],
             },
@@ -90,7 +94,13 @@ class FpkClaimWiringTest(unittest.TestCase):
                'unmatched excerpt', NULL, 0.7, 'extract:10'),
               (4, 10, 'formula_e_front_mgu', 'matched_leaf', 'motor', 'no_claim',
                NULL, NULL, 'NO_ENGINEERING_CLAIM', NULL, NULL, NULL, NULL,
-               NULL, NULL, 0.0, 'extract:10');
+               NULL, NULL, 0.0, 'extract:10'),
+              (5, 10, 'formula_e_front_mgu', 'thermal_stack', 'thermal', 'thermal',
+               NULL, NULL, 'stack thermal resistance applies to child leaves',
+               NULL, NULL, NULL, NULL, 'ancestor excerpt', NULL, 0.8, 'extract:10'),
+              (6, 10, 'formula_e_front_mgu', 'gate_driver_pcb', 'power', 'electrical',
+               NULL, NULL, 'PCB board layout guidance', NULL, NULL, NULL, NULL,
+               'alias excerpt', NULL, 0.8, 'extract:10');
             """
         )
         con.commit()
@@ -103,11 +113,12 @@ class FpkClaimWiringTest(unittest.TestCase):
             stamped_at="2026-07-29T20:00:00+01:00",
         )
 
-        self.assertEqual(result["counts"]["claims_total"], 4)
-        self.assertEqual(result["counts"]["claims_eligible"], 3)
-        self.assertEqual(result["counts"]["claims_wired"], 2)
+        self.assertEqual(result["counts"]["claims_total"], 6)
+        self.assertEqual(result["counts"]["claims_eligible"], 5)
+        self.assertEqual(result["counts"]["claims_wired"], 4)
+        self.assertEqual(result["counts"]["claim_refs_attached"], 5)
         self.assertEqual(result["counts"]["claims_unmatched"], 1)
-        self.assertEqual(result["counts"]["leaves_with_claim_refs"], 1)
+        self.assertEqual(result["counts"]["leaves_with_claim_refs"], 4)
         self.assertEqual(result["unmatched_component_ids"], ["missing_leaf"])
 
         state = json.loads((self.twin / "state.json").read_text())
@@ -120,6 +131,26 @@ class FpkClaimWiringTest(unittest.TestCase):
         self.assertEqual(refs[0]["provenance"], "PEER_LITERATURE")
         self.assertEqual(refs[1]["provenance"], "ESTIMATE_UNVALIDATED")
         self.assertTrue(all(ref["closure_effect"] == "NONE" for ref in refs))
+        self.assertEqual(refs[0]["match_policy"], "EXACT_COMPONENT_ID_TO_LEAF")
+        self.assertEqual(refs[0]["source_component_id"], "matched_leaf")
+        self.assertEqual(refs[0]["target_leaf_id"], "matched_leaf")
+        self.assertEqual(
+            by_id["cold_plate_channel"]["claim_refs"][0]["match_policy"],
+            "EXACT_COMPONENT_ID_TO_DESCENDANT_LEAF",
+        )
+        self.assertEqual(
+            by_id["cold_plate_channel"]["claim_refs"][0]["matched_component_id"],
+            "thermal_stack",
+        )
+        self.assertEqual(by_id["tim_layer"]["claim_refs"][0]["claim_id"], 5)
+        self.assertEqual(
+            by_id["gate_driver_board"]["claim_refs"][0]["match_policy"],
+            "SAFE_COMPONENT_ALIAS_TO_LEAF",
+        )
+        self.assertEqual(
+            by_id["gate_driver_board"]["claim_refs"][0]["source_component_id"],
+            "gate_driver_pcb",
+        )
         self.assertNotIn("claim_refs", by_id["root"])
         self.assertEqual(state["raceHolds"], [{"id": "HOLD-1", "status": "OPEN"}])
         self.assertFalse(state["fpkClaimWiring"]["ship_ok"])
