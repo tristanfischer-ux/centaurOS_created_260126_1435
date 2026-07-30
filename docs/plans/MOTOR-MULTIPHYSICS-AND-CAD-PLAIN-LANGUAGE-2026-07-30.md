@@ -24,11 +24,12 @@
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~18:00:** **Software screens advancing — still not race-ready.**  
-Happy about: all **7** checks PARTIAL + kit-context **yes**; gear resize writeback (**m=1.0 / face=58 / n=4**, FoS≈1.21); EM position sweep; magnet-pocket bridge FEA (~147 MPa vs 355); case/mount analytical screen (governing FoS≈3.86); Excel Q&A mirrors stamp.  
-Not done: full MTPA/FW/demag, dyno/HIL, free-surface oil CFD, KISSsoft, full cast-case FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
+**Overall mood as of 2026-07-30 ~18:20:** **Software screens advancing — still not race-ready.**  
+Happy about: **7/7** required checks PARTIAL; planetary gear + demag + pocket + case/mount kit screens; EM position sweep; Excel Q&A.  
+Honest architecture hold: **bevel differential** seed FoS≈0.002; best-in-kit OD=120 mm still FoS≈0.60 — clearing needs OD≳220 mm → `DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE`.  
+Not done: full MTPA/FW map, dyno/HIL, free-surface oil CFD, KISSsoft, full cast-case FEA, supplier STEP, **release CAD = 0%**, `ship_ok` **false**.
 
-**Last scoreboard update:** 2026-07-30 (gear writeback + magnet pocket + case/mount screens).
+**Last scoreboard update:** 2026-07-30 (bevel architecture hold + demag + case/mount).
 
 ### A. Ordered closure plan (the 8 steps we committed to)
 
