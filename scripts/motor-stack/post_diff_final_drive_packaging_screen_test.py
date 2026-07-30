@@ -24,7 +24,7 @@ SPEC.loader.exec_module(MODULE)
 class PostDiffFinalDrivePackagingScreenTest(unittest.TestCase):
     """Exercise nominal fit and fail-closed packaging behavior."""
 
-    def test_nominal_twin_envelope_fits_but_strength_keeps_blocker_open(self) -> None:
+    def test_nominal_twin_duty_resizes_and_clears_for_software_screening(self) -> None:
         inputs = MODULE.TwinInputs(
             bay_width_mm=343.0,
             bay_depth_mm=259.0,
@@ -36,10 +36,14 @@ class PostDiffFinalDrivePackagingScreenTest(unittest.TestCase):
             max_rotor_speed_rpm=19500.0,
         )
 
-        screen = MODULE.estimate_packaging(inputs)
-        strength = MODULE.screen_post_diff_strength(
+        seed_screen = MODULE.estimate_packaging(inputs)
+        seed_strength = MODULE.screen_post_diff_strength(
             inputs,
-            screen,
+            seed_screen,
+            post_diff_input_torque_nm=125.219269,
+        )
+        screen, strength = MODULE.select_strength_feasible_packaging(
+            inputs,
             post_diff_input_torque_nm=125.219269,
         )
         interface = MODULE.build_interface_register(inputs, screen)
@@ -53,17 +57,23 @@ class PostDiffFinalDrivePackagingScreenTest(unittest.TestCase):
             source_bevel_sha256="bevel-sha",
         )
 
+        self.assertLess(seed_strength["strength_screen"]["minimum_strength_factor"], 1.2)
         self.assertTrue(screen.bay_fit)
         self.assertLess(screen.overall_depth_mm, 259.0)
         self.assertAlmostEqual(screen.ratio_from_teeth, 4.0)
-        self.assertEqual(artifact["status"], "PARTIAL")
+        self.assertGreater(screen.normal_module_mm, MODULE.NORMAL_MODULE_MM)
+        self.assertGreater(screen.face_width_mm, MODULE.FACE_WIDTH_MM)
+        self.assertEqual(artifact["status"], "SOFTWARE_CLOSED")
         self.assertFalse(artifact["ship_ok"])
-        self.assertEqual(artifact["architecture_blocker"]["status"], "OPEN")
+        self.assertEqual(artifact["architecture_blocker"]["status"], "CLEARED")
         self.assertTrue(artifact["closure_gate"]["parametric_family_exists"])
-        self.assertFalse(artifact["closure_gate"]["strength_screen_ok"])
+        self.assertTrue(artifact["closure_gate"]["strength_screen_ok"])
         self.assertTrue(artifact["closure_gate"]["interface_register_ok"])
-        self.assertFalse(artifact["closure_gate"]["blocker_may_clear"])
-        self.assertLess(strength["strength_screen"]["minimum_strength_factor"], 1.2)
+        self.assertTrue(artifact["closure_gate"]["blocker_may_clear"])
+        self.assertGreaterEqual(
+            strength["strength_screen"]["minimum_strength_factor"],
+            1.2,
+        )
 
     def test_low_torque_synthetic_case_clears_for_software_screening_only(self) -> None:
         inputs = MODULE.TwinInputs(
@@ -77,10 +87,8 @@ class PostDiffFinalDrivePackagingScreenTest(unittest.TestCase):
             max_rotor_speed_rpm=19500.0,
         )
 
-        screen = MODULE.estimate_packaging(inputs)
-        strength = MODULE.screen_post_diff_strength(
+        screen, strength = MODULE.select_strength_feasible_packaging(
             inputs,
-            screen,
             post_diff_input_torque_nm=5.0,
         )
         interface = MODULE.build_interface_register(inputs, screen)
@@ -124,10 +132,8 @@ class PostDiffFinalDrivePackagingScreenTest(unittest.TestCase):
             max_rotor_speed_rpm=19500.0,
         )
 
-        screen = MODULE.estimate_packaging(inputs)
-        strength = MODULE.screen_post_diff_strength(
+        screen, strength = MODULE.select_strength_feasible_packaging(
             inputs,
-            screen,
             post_diff_input_torque_nm=5.0,
         )
         interface = MODULE.build_interface_register(inputs, screen)
@@ -160,11 +166,9 @@ class PostDiffFinalDrivePackagingScreenTest(unittest.TestCase):
             max_rotor_speed_rpm=19500.0,
         )
 
-        screen = MODULE.estimate_packaging(inputs)
-        strength = MODULE.screen_post_diff_strength(
+        screen, strength = MODULE.select_strength_feasible_packaging(
             inputs,
-            screen,
-            post_diff_input_torque_nm=5.0,
+            post_diff_input_torque_nm=125.219269,
         )
         interface = MODULE.build_interface_register(
             inputs,

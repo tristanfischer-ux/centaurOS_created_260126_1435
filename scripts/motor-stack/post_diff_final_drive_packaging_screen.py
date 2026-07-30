@@ -56,6 +56,15 @@ BEARING_AXIAL_ALLOWANCE_MM = 14.0
 CASE_WALL_AXIAL_MM = 6.0
 CASE_RADIAL_CLEARANCE_MM = 6.0
 RATIO_TOLERANCE = 0.10
+RESIZE_PINION_TEETH_OPTIONS = (18, 19, 20, 21, 22, 24)
+RESIZE_HELIX_ANGLE_OPTIONS_DEG = (20.0, 15.0, 25.0)
+RESIZE_MODULE_MIN_MM = 1.15
+RESIZE_MODULE_MAX_MM = 2.50
+RESIZE_MODULE_STEP_MM = 0.05
+RESIZE_FACE_MIN_MM = 22.0
+RESIZE_FACE_MAX_MM = 100.0
+RESIZE_FACE_STEP_MM = 2.0
+RESIZE_MIN_BAY_MARGIN_MM = 5.0
 DEFAULT_RATIO_INTO_DIFF = 2.0
 DEFAULT_MAX_ROTOR_SPEED_RPM = 19500.0
 
@@ -97,6 +106,18 @@ class TwinInputs:
 
 
 @dataclass(frozen=True)
+class GearSeed:
+    """Selected post-diff helical gear seed for packaging and strength."""
+
+    pinion_teeth: int
+    wheel_teeth: int
+    normal_module_mm: float
+    helix_angle_deg: float
+    face_width_mm: float
+    geometry_source: str
+
+
+@dataclass(frozen=True)
 class PackagingScreen:
     """Calculated helical-pair and combined bay envelope."""
 
@@ -121,6 +142,20 @@ class PackagingScreen:
     width_margin_mm: float
     height_margin_mm: float
     bay_fit: bool
+    geometry_source: str
+
+
+def default_gear_seed() -> GearSeed:
+    """Return the historical compact seed before strength-driven resize."""
+
+    return GearSeed(
+        pinion_teeth=PINION_TEETH,
+        wheel_teeth=WHEEL_TEETH,
+        normal_module_mm=NORMAL_MODULE_MM,
+        helix_angle_deg=HELIX_ANGLE_DEG,
+        face_width_mm=FACE_WIDTH_MM,
+        geometry_source="packaging_seed",
+    )
 
 
 def _positive_number(
@@ -304,7 +339,10 @@ def load_bevel_case(twin: Path) -> Mapping[str, Any]:
     return bevel
 
 
-def estimate_packaging(inputs: TwinInputs) -> PackagingScreen:
+def estimate_packaging(
+    inputs: TwinInputs,
+    gear_seed: GearSeed | None = None,
+) -> PackagingScreen:
     """Estimate the combined differential plus dual helical-pair envelope.
 
     @description Computes pitch/tip diameters and a conservative rectangular
@@ -320,12 +358,21 @@ def estimate_packaging(inputs: TwinInputs) -> PackagingScreen:
         if not math.isfinite(float(value)) or float(value) <= 0.0:
             raise PostDiffPackagingError(f"{name} must be positive and finite")
 
-    ratio = WHEEL_TEETH / PINION_TEETH
-    transverse_module = NORMAL_MODULE_MM / math.cos(math.radians(HELIX_ANGLE_DEG))
-    pinion_pitch = PINION_TEETH * transverse_module
-    wheel_pitch = WHEEL_TEETH * transverse_module
-    pinion_tip = pinion_pitch + 2.0 * NORMAL_MODULE_MM
-    wheel_tip = wheel_pitch + 2.0 * NORMAL_MODULE_MM
+    seed = gear_seed or default_gear_seed()
+    ratio = seed.wheel_teeth / seed.pinion_teeth
+    if abs(ratio - inputs.ratio_after_diff) > RATIO_TOLERANCE:
+        raise PostDiffPackagingError(
+            "Selected post-diff gear seed does not represent ratio_after_diff "
+            f"{inputs.ratio_after_diff:.3f}: "
+            f"{seed.pinion_teeth}:{seed.wheel_teeth} = {ratio:.4f}"
+        )
+    transverse_module = seed.normal_module_mm / math.cos(
+        math.radians(seed.helix_angle_deg)
+    )
+    pinion_pitch = seed.pinion_teeth * transverse_module
+    wheel_pitch = seed.wheel_teeth * transverse_module
+    pinion_tip = pinion_pitch + 2.0 * seed.normal_module_mm
+    wheel_tip = wheel_pitch + 2.0 * seed.normal_module_mm
     center_distance = 0.5 * (pinion_pitch + wheel_pitch)
 
     # The diff occupies -Rdiff..+Rdiff. The outboard wheel is offset from the
@@ -345,7 +392,7 @@ def estimate_packaging(inputs: TwinInputs) -> PackagingScreen:
         + 2.0 * CASE_RADIAL_CLEARANCE_MM
     )
     overall_width = inputs.diff_len_mm + 2.0 * (
-        FACE_WIDTH_MM + BEARING_AXIAL_ALLOWANCE_MM + CASE_WALL_AXIAL_MM
+        seed.face_width_mm + BEARING_AXIAL_ALLOWANCE_MM + CASE_WALL_AXIAL_MM
     )
     remaining_short_edge = inputs.bay_depth_mm - inputs.diff_od_mm
     added_short_edge = overall_depth - inputs.diff_od_mm
@@ -354,13 +401,13 @@ def estimate_packaging(inputs: TwinInputs) -> PackagingScreen:
     height_margin = inputs.bay_height_mm - overall_height
 
     return PackagingScreen(
-        pinion_teeth=PINION_TEETH,
-        wheel_teeth=WHEEL_TEETH,
+        pinion_teeth=seed.pinion_teeth,
+        wheel_teeth=seed.wheel_teeth,
         ratio_from_teeth=round(ratio, 6),
-        normal_module_mm=NORMAL_MODULE_MM,
+        normal_module_mm=round(seed.normal_module_mm, 4),
         transverse_module_mm=round(transverse_module, 4),
-        helix_angle_deg=HELIX_ANGLE_DEG,
-        face_width_mm=FACE_WIDTH_MM,
+        helix_angle_deg=round(seed.helix_angle_deg, 4),
+        face_width_mm=round(seed.face_width_mm, 4),
         pinion_pitch_diameter_mm=round(pinion_pitch, 4),
         wheel_pitch_diameter_mm=round(wheel_pitch, 4),
         pinion_tip_diameter_mm=round(pinion_tip, 4),
@@ -375,6 +422,7 @@ def estimate_packaging(inputs: TwinInputs) -> PackagingScreen:
         width_margin_mm=round(width_margin, 4),
         height_margin_mm=round(height_margin, 4),
         bay_fit=width_margin >= 0.0 and depth_margin >= 0.0 and height_margin >= 0.0,
+        geometry_source=seed.geometry_source,
     )
 
 
@@ -505,6 +553,7 @@ def screen_post_diff_strength(
             "pinion_pitch_diameter_mm": screen.pinion_pitch_diameter_mm,
             "wheel_pitch_diameter_mm": screen.wheel_pitch_diameter_mm,
             "center_distance_mm": screen.center_distance_mm,
+            "geometry_source": screen.geometry_source,
         },
         "strength_screen": {
             "method": "iso6336_style_external_helical_screen_not_kisssoft",
@@ -547,7 +596,7 @@ def screen_post_diff_strength(
             "threshold_fos": SCREEN_FOS_MIN,
             "note": (
                 "duty_strength_screen_ok means min(bending, contact) FoS >= 1.2 "
-                "on the current 18:72 helical seed using bevel side-output torque. "
+                "on the selected helical seed using bevel side-output torque. "
                 "KISSsoft, race spectrum, scuffing, micropitting and bench remain OPEN."
             ),
         },
@@ -558,6 +607,146 @@ def screen_post_diff_strength(
             "bench_correlation": "OPEN",
         },
     }
+
+
+def _frange_scaled(start: float, stop: float, step: float) -> list[float]:
+    """Inclusive decimal range without accumulating binary float drift."""
+
+    scale = 100
+    start_i = int(round(start * scale))
+    stop_i = int(round(stop * scale))
+    step_i = int(round(step * scale))
+    return [value / scale for value in range(start_i, stop_i + 1, step_i)]
+
+
+def _candidate_score(screen: PackagingScreen) -> tuple[float, float, float, float]:
+    """Rank feasible post-diff candidates by compactness, then margin."""
+
+    volume_proxy = (
+        screen.normal_module_mm
+        * screen.face_width_mm
+        * screen.overall_depth_mm
+    )
+    weakest_margin = min(
+        screen.width_margin_mm,
+        screen.short_edge_margin_mm,
+        screen.height_margin_mm,
+    )
+    return (
+        round(volume_proxy, 6),
+        -round(weakest_margin, 6),
+        screen.normal_module_mm,
+        screen.face_width_mm,
+    )
+
+
+def select_strength_feasible_packaging(
+    inputs: TwinInputs,
+    *,
+    post_diff_input_torque_nm: float,
+) -> tuple[PackagingScreen, dict[str, Any]]:
+    """Select a bay-fit post-diff seed that clears the strength screen if possible.
+
+    INTENT: The historical 18:72, m_n=1.15, face=22 seed proved packaging only.
+    When true duty torque fails that seed, the source rule must resize geometry
+    inside the available bay margins instead of keeping an architecture blocker
+    open forever or lowering the load.
+
+    @description Searches ratio-four tooth counts, normal module, helix angle,
+    and face width. It returns the smallest feasible candidate with minimum
+    bay margin >= 5 mm; if none clears, it returns the strongest in-bay failing
+    candidate so the emitted artifact remains honest.
+    @param inputs Twin-bound packaging inputs
+    @param post_diff_input_torque_nm Bevel side-output torque into the pinion
+    @returns Packaging screen and matching strength artifact
+    @throws PostDiffPackagingError when selected seed inputs are invalid
+    """
+
+    seed_screen = estimate_packaging(inputs)
+    seed_strength = screen_post_diff_strength(
+        inputs,
+        seed_screen,
+        post_diff_input_torque_nm=post_diff_input_torque_nm,
+    )
+    if (
+        seed_screen.bay_fit
+        and seed_strength["works_in_kit_context"]["duty_strength_screen_ok"] is True
+    ):
+        return seed_screen, seed_strength
+
+    feasible: list[tuple[tuple[float, float, float, float], PackagingScreen, dict[str, Any]]] = []
+    best_failing: tuple[float, PackagingScreen, dict[str, Any]] | None = None
+    for helix_angle in RESIZE_HELIX_ANGLE_OPTIONS_DEG:
+        for pinion_teeth in RESIZE_PINION_TEETH_OPTIONS:
+            wheel_teeth_float = pinion_teeth * inputs.ratio_after_diff
+            wheel_teeth = int(round(wheel_teeth_float))
+            if abs(wheel_teeth - wheel_teeth_float) > 1.0e-9:
+                continue
+            for normal_module in _frange_scaled(
+                RESIZE_MODULE_MIN_MM,
+                RESIZE_MODULE_MAX_MM,
+                RESIZE_MODULE_STEP_MM,
+            ):
+                for face_width in _frange_scaled(
+                    RESIZE_FACE_MIN_MM,
+                    RESIZE_FACE_MAX_MM,
+                    RESIZE_FACE_STEP_MM,
+                ):
+                    candidate_seed = GearSeed(
+                        pinion_teeth=pinion_teeth,
+                        wheel_teeth=wheel_teeth,
+                        normal_module_mm=normal_module,
+                        helix_angle_deg=helix_angle,
+                        face_width_mm=face_width,
+                        geometry_source="strength_driven_resize",
+                    )
+                    try:
+                        candidate_screen = estimate_packaging(inputs, candidate_seed)
+                        candidate_strength = screen_post_diff_strength(
+                            inputs,
+                            candidate_screen,
+                            post_diff_input_torque_nm=post_diff_input_torque_nm,
+                        )
+                    except PostDiffPackagingError:
+                        continue
+                    if not candidate_screen.bay_fit:
+                        continue
+                    min_fos = float(
+                        candidate_strength["strength_screen"][
+                            "minimum_strength_factor"
+                        ]
+                    )
+                    if (
+                        min(
+                            candidate_screen.width_margin_mm,
+                            candidate_screen.short_edge_margin_mm,
+                            candidate_screen.height_margin_mm,
+                        )
+                        >= RESIZE_MIN_BAY_MARGIN_MM
+                        and candidate_strength["works_in_kit_context"][
+                            "duty_strength_screen_ok"
+                        ]
+                        is True
+                    ):
+                        feasible.append(
+                            (
+                                _candidate_score(candidate_screen),
+                                candidate_screen,
+                                candidate_strength,
+                            )
+                        )
+                    elif best_failing is None or min_fos > best_failing[0]:
+                        best_failing = (
+                            min_fos,
+                            candidate_screen,
+                            candidate_strength,
+                        )
+    if feasible:
+        _score, screen, strength = min(feasible, key=lambda item: item[0])
+        return screen, strength
+    if best_failing is not None:
+        return best_failing[1], best_failing[2]
+    return seed_screen, seed_strength
 
 
 def build_interface_register(
@@ -699,15 +888,15 @@ def build_artifact(
 
     if software_closed:
         blocker_summary = (
-            "The compact dual post-diff 4:1 helical-pair seed fits the bay, "
-            "the interface register proves no software float gaps, and the "
-            "ISO 6336-style helical screen clears FoS >= 1.2. Clearance is "
-            "software-screening only; release CAD, KISSsoft, fatigue, shafts, "
+            "The selected strength-resized dual post-diff 4:1 helical-pair seed "
+            "fits the bay, the interface register proves no software float gaps, "
+            "and the ISO 6336-style helical screen clears FoS >= 1.2. Clearance "
+            "is software-screening only; release CAD, KISSsoft, fatigue, shafts, "
             "bearings, lubrication and bench remain OPEN."
         )
     elif screen.bay_fit:
         blocker_summary = (
-            "The compact dual post-diff 4:1 helical-pair seed fits the bay envelope "
+            "The selected dual post-diff 4:1 helical-pair seed fits the bay envelope "
             "and its parametric CadQuery family is seeded, but software screening "
             "does not clear until the interface register and helical strength "
             "screen both pass FoS >= 1.2."
@@ -760,7 +949,8 @@ def build_artifact(
             "pinion_tip_diameter_mm": screen.pinion_tip_diameter_mm,
             "wheel_tip_diameter_mm": screen.wheel_tip_diameter_mm,
             "center_distance_mm": screen.center_distance_mm,
-            "authority": "screening_seed_not_release_geometry",
+            "geometry_source": screen.geometry_source,
+            "authority": "strength_screening_seed_not_release_geometry",
         },
         "envelope_mm": {
             "width_lateral": screen.overall_width_mm,
@@ -789,9 +979,9 @@ def build_artifact(
             "release_cad": False,
             "blender_mesh_prefix": "u_se_td_post_diff_",
             "note": (
-                "Rebuildable 18:72 dual-helical concept geometry exists. Blender "
+                "Rebuildable dual-helical concept geometry exists. Blender "
                 "traction placer emits physics-linked u_se_td_post_diff_* meshes "
-                "when this screen is present — not revision-bound release CAD."
+                "from this screen's selected gear seed — not revision-bound release CAD."
             ),
         },
         "architecture_blocker": {
@@ -896,21 +1086,25 @@ def selftest() -> int:
     """Prove nominal fit, non-fit catch, twin binding, and release honesty."""
 
     nominal = TwinInputs(343.0, 259.0, 267.0, 120.0, 108.0, 4.0, 2.0, 19500.0)
-    nominal_screen = estimate_packaging(nominal)
+    seed_screen = estimate_packaging(nominal)
+    nominal_screen, nominal_strength = select_strength_feasible_packaging(
+        nominal,
+        post_diff_input_torque_nm=125.219269,
+    )
     narrow_screen = estimate_packaging(
         TwinInputs(343.0, 160.0, 267.0, 120.0, 108.0, 4.0, 2.0, 19500.0)
     )
-    nominal_strength = screen_post_diff_strength(
+    seed_strength = screen_post_diff_strength(
         nominal,
-        nominal_screen,
+        seed_screen,
         post_diff_input_torque_nm=125.219269,
     )
-    low_torque_strength = screen_post_diff_strength(
+    low_torque_screen, low_torque_strength = select_strength_feasible_packaging(
         nominal,
-        nominal_screen,
         post_diff_input_torque_nm=5.0,
     )
     nominal_interface = build_interface_register(nominal, nominal_screen)
+    low_torque_interface = build_interface_register(nominal, low_torque_screen)
     gap_interface = build_interface_register(
         nominal,
         nominal_screen,
@@ -927,9 +1121,9 @@ def selftest() -> int:
     )
     clear_artifact = build_artifact(
         inputs=nominal,
-        screen=nominal_screen,
+        screen=low_torque_screen,
         strength_screen=low_torque_strength,
-        interface_register=nominal_interface,
+        interface_register=low_torque_interface,
         source_twin="synthetic-low-torque",
         source_state_sha256="state-sha",
         source_bevel_sha256="bevel-sha",
@@ -937,7 +1131,7 @@ def selftest() -> int:
     gap_artifact = build_artifact(
         inputs=nominal,
         screen=nominal_screen,
-        strength_screen=low_torque_strength,
+        strength_screen=nominal_strength,
         interface_register=gap_interface,
         source_twin="synthetic-gap",
         source_state_sha256="state-sha",
@@ -947,15 +1141,24 @@ def selftest() -> int:
         "ratio_is_four": nominal_screen.ratio_from_teeth == 4.0,
         "nominal_bay_fit": nominal_screen.bay_fit,
         "short_edge_below_259": nominal_screen.overall_depth_mm < 259.0,
+        "original_seed_strength_proves_resize_needed": (
+            seed_screen.geometry_source == "packaging_seed"
+            and seed_strength["strength_screen"]["minimum_strength_factor"] < 1.2
+        ),
+        "strength_resize_clears_duty": (
+            nominal_screen.geometry_source == "strength_driven_resize"
+            and nominal_strength["strength_screen"]["minimum_strength_factor"] >= 1.2
+        ),
         "narrow_short_edge_proves_catch": (
             not narrow_screen.bay_fit and narrow_screen.short_edge_margin_mm < 0.0
         ),
-        "status_partial": nominal_artifact["status"] == "PARTIAL",
+        "status_software_closed": nominal_artifact["status"] == "SOFTWARE_CLOSED",
         "never_ship_ok": nominal_artifact["ship_ok"] is False,
-        "realistic_seed_strength_keeps_blocker_open": (
-            nominal_artifact["architecture_blocker"]["status"] == "OPEN"
-            and nominal_artifact["closure_gate"]["strength_screen_ok"] is False
-            and nominal_strength["strength_screen"]["minimum_strength_factor"] < 1.2
+        "realistic_duty_blocker_clears_for_screening": (
+            nominal_artifact["architecture_blocker"]["status"] == "CLEARED"
+            and nominal_artifact["closure_gate"]["strength_screen_ok"] is True
+            and nominal_artifact["closure_gate"]["blocker_may_clear"] is True
+            and nominal_artifact["ship_ok"] is False
         ),
         "synthetic_strength_can_clear_screening_only": (
             clear_artifact["status"] == "SOFTWARE_CLOSED"
@@ -977,7 +1180,7 @@ def selftest() -> int:
             is True
             and nominal_artifact["closure_gate"]["blender_interface_status"]
             == "SOFTWARE_CLOSED"
-            and nominal_artifact["closure_gate"]["blocker_may_clear"] is False
+            and nominal_artifact["closure_gate"]["blocker_may_clear"] is True
         ),
     }
 
@@ -1017,11 +1220,9 @@ def selftest() -> int:
             encoding="utf-8",
         )
         loaded, state_sha, bevel_sha = load_twin_inputs(twin)
-        loaded_screen = estimate_packaging(loaded)
         loaded_bevel = load_bevel_case(twin)
-        loaded_strength = screen_post_diff_strength(
+        loaded_screen, loaded_strength = select_strength_feasible_packaging(
             loaded,
-            loaded_screen,
             post_diff_input_torque_nm=duty_torque_from_bevel_case(loaded_bevel),
         )
         loaded_interface = build_interface_register(loaded, loaded_screen)
@@ -1056,7 +1257,7 @@ def selftest() -> int:
         checks["atomic_write_emits_honest_artifact"] = (
             written.get("bay_fit") is True
             and written.get("ship_ok") is False
-            and written.get("architecture_blocker", {}).get("status") == "OPEN"
+            and written.get("architecture_blocker", {}).get("status") == "CLEARED"
             and strength_output.is_file()
             and interface_output.is_file()
         )
@@ -1074,7 +1275,10 @@ def selftest() -> int:
                 },
                 "short_edge_margin_mm": nominal_screen.short_edge_margin_mm,
                 "ship_ok": False,
-                "nominal_strength_min_fos": nominal_strength["strength_screen"][
+                "original_seed_strength_min_fos": seed_strength["strength_screen"][
+                    "minimum_strength_factor"
+                ],
+                "resized_strength_min_fos": nominal_strength["strength_screen"][
                     "minimum_strength_factor"
                 ],
                 "synthetic_clear_strength_min_fos": low_torque_strength[
@@ -1111,10 +1315,8 @@ def main() -> int:
     try:
         inputs, state_sha, bevel_sha = load_twin_inputs(args.twin)
         bevel = load_bevel_case(args.twin)
-        screen = estimate_packaging(inputs)
-        strength = screen_post_diff_strength(
+        screen, strength = select_strength_feasible_packaging(
             inputs,
-            screen,
             post_diff_input_torque_nm=duty_torque_from_bevel_case(bevel),
         )
         interface = build_interface_register(inputs, screen)
