@@ -161,6 +161,38 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
             motor_drivetrain.PYLEECAN_IPMSM_B_SOURCE,
             "Apache-2.0",
         ),
+        (
+            "ipmsm_rotor_magnet_carrier",
+            motor_drivetrain.ipmsm_rotor_magnet_carrier,
+            {
+                "outer_diameter": 160.40,
+                "shaft_diameter": 110.64,
+                "lamination_thickness": 0.50,
+                "pole_pairs": 4,
+                "bridge_thickness": 1.50,
+                "magnet_pocket_width": 17.00,
+                "magnet_pocket_depth": 6.50,
+                "magnet_recess": 1.00,
+                "slot_depth": 18.00,
+            },
+            motor_drivetrain.PYLEECAN_IPMSM_B_SOURCE,
+            "Apache-2.0",
+        ),
+        (
+            "planetary_gearset",
+            motor_drivetrain.planetary_gearset,
+            {
+                "module": 1.0,
+                "sun_teeth": 12,
+                "planet_teeth": 18,
+                "width": 10.0,
+                "rim_width": 3.0,
+                "planet_count": 3,
+                "bore_diameter": 6.0,
+            },
+            motor_drivetrain.CQ_GEARS_PLANETARY_SOURCE,
+            "Apache-2.0",
+        ),
     ]
     # DECISION: the OpenMotor STEP is registered only against its exact educational
     # identity. It must never become a generic traction-motor family fallback.
