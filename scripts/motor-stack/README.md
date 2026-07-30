@@ -330,3 +330,107 @@ speed. Halving rpm must drop von Mises by more than 55 %, proving the headline
 stress is solver-derived (ω² scaling). It also proves twin dimensions replace
 the smoke cantilever and that no code path can set `ship_ok` or close release
 FoS.
+
+## ISO 6336-style gear strength (analytical screen)
+
+There is no KISSsoft licence in this checkout. The twin-bound gear-strength
+screen is an analytical ISO 6336-style bending + contact check on the Formula E
+front-kit planetary packaging seeds:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/iso6336_fia_front_kit_case.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+It selectively reads `orchestratorContract.quantities` and
+`fpkConcentricGeometry` with `ijson`. Controlling inputs include max rotor
+speed, 250 kW continuous power, trial ratio 8, sun/planet/ring teeth and
+module, planet count, and face-width seed (~14 mm). Motor shaft torque is
+derived as \(P_\mathrm{elec}/(\eta_\mathrm{combined}\cdot\omega)\) ≈ 125 N·m;
+carrier output ≈ \(T\times 8\).
+
+Screening allowables (documented case-hardened MQ handbook seeds, not a melt
+certificate):
+
+- tooth-root bending \(\sigma_{F,\mathrm{allow}}\) = **450 MPa**
+  (ISO 6336-5:2016 MQ case-hardened ≈ 430–500 MPa; 16MnCr5/20MnCr5 class)
+- flank contact \(\sigma_{H,\mathrm{allow}}\) = **1500 MPa**
+  (ISO 6336-5:2016 MQ case-hardened ≈ 1500 MPa)
+
+`works_in_kit_context` is true only when min(bending, contact) FoS ≥ **1.20**
+on both sun–planet and planet–ring meshes. The live twin packaging seeds are
+currently **below** that bar (honest fail of the duty screen). Status stays
+`PARTIAL`, KISSsoft / race load spectrum / CalculiX tooth contact stay `OPEN`,
+and `ship_ok` is always false.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/iso6336_fia_front_kit_case.json
+```
+
+When that file exists, `scripts/fe-front-stamp-motor-multiphysics.py` promotes
+the multiphysics `gear_strength` check to **PARTIAL**.
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/iso6336_fia_front_kit_case.py --selftest
+```
+
+The self-test proves synthetic teeth/module/face control the geometry, torque
+is near 125 N·m, stresses are finite, and a 10× torque collapse proves the FoS
+is calculated rather than canned.
+
+## Gear-oil analytical screen (FIA front kit)
+
+Full free-surface OpenFOAM of jets / pickup / cornering oil migration is still
+**OPEN**. Prefer a twin-bound analytical PARTIAL over a fake CFD claim:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/gear_oil_fia_front_kit_case.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+The case reads gear ratio 8, planet count / OD, housing dims, ~125 N·m shaft
+torque class, 80 ml oil charge, and gear efficiency. It estimates jet flow need
+from gear loss ÷ (ρ·cp·ΔT), a partially-immersed disk-drag churning
+order-of-magnitude, and pickup adequacy vs estimated sump volume. OpenFOAM cavity
+smoke remains toolchain-only.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/gear_oil_fia_front_kit_case.json
+```
+
+When that file exists, the multiphysics stamp promotes `gear_oil` to **PARTIAL**
+(`minimum_jet_flow_l_min`, `churning_loss_w`). Free-surface CFD and bench stay
+OPEN; `ship_ok` stays false.
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/gear_oil_fia_front_kit_case.py --selftest
+```
+
+## Inverter packaging analytical screen (FIA front kit)
+
+Not a solver row. Packaging evidence (power density, DC current, ESL seed band,
+cold-plate land, MCU bay fit) lives under stamp `inverterPackaging`:
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/inverter_packaging_fia_front_kit_case.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+Reads 750 V / 250 kW, `fpk_mcu_*`, `fpk_bus_esl_*`, cold-plate channel seeds, and
+`sic_module_count`. Module MPN / STEP and double-pulse measured ESL stay **OPEN**.
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/inverter_packaging_fia_front_kit_case.json
+```
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/inverter_packaging_fia_front_kit_case.py --selftest
+```
+
+Re-stamp after either case:
+
+```bash
+.venv-motor/bin/python scripts/fe-front-stamp-motor-multiphysics.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+.venv-motor/bin/python scripts/lib/motor_multiphysics_stamp.py --selftest
+```

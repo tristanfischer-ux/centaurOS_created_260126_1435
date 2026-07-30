@@ -66,12 +66,19 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
     },
     "water_jacket": {
         "software": "OpenFOAM",
-        "paths": ["scripts/motor-stack/openfoam_smoke_selftest.sh"],
+        "paths": [
+            "scripts/motor-stack/openfoam_smoke_selftest.sh",
+            "scripts/motor-stack/openfoam_fia_water_jacket_case.py",
+            "scripts/motor-stack/openfoam_fia_water_jacket_case.sh",
+        ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
             "digest": "sha256:efba53ae22dc5154114a9dd346c979b3cd7f3e20ebed90e399230c02592aecbf",
         },
-        "last_known_green": "2026-07-30 — cavity tutorial residuals (generic; not jacket geometry)",
+        "last_known_green": (
+            "2026-07-30 — cavity smoke + twin-bound rectangular duct screen "
+            "(not full helical CHT)"
+        ),
         "evidence_class": "toolchain_smoke_pass",
     },
     "inverter_cold_plate": {
@@ -91,19 +98,36 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
         "evidence_class": "toolchain_smoke_pass",
     },
     "gear_oil": {
-        "software": "OpenFOAM",
-        "paths": ["scripts/motor-stack/openfoam_smoke_selftest.sh"],
+        "software": "Analytical handbook screen (+ OpenFOAM cavity smoke)",
+        "paths": [
+            "scripts/motor-stack/gear_oil_fia_front_kit_case.py",
+            "scripts/motor-stack/openfoam_smoke_selftest.sh",
+        ],
         "versions": {
             "openfoam_image": "microfluidica/openfoam:14",
+            "analytical": "gear_oil_fia_front_kit_case/v1",
         },
-        "last_known_green": "2026-07-30 — cavity smoke only; free-surface oil not run",
+        "last_known_green": (
+            "2026-07-30 — cavity smoke + twin-bound analytical jet/churning/"
+            "pickup screen (free-surface CFD OPEN)"
+        ),
         "evidence_class": "toolchain_smoke_pass",
     },
     "gear_strength": {
         "software": "ISO 6336 + KISSsoft + CalculiX",
-        "paths": ["scripts/motor-stack/calculix_smoke_selftest.sh"],
-        "versions": {"calculix_ccx": "2.21", "kisssoft": "licence_not_proven_in_repo"},
-        "last_known_green": "2026-07-30 — CalculiX structural smoke only; ISO 6336 / KISSsoft not twin-bound",
+        "paths": [
+            "scripts/motor-stack/iso6336_fia_front_kit_case.py",
+            "scripts/motor-stack/calculix_smoke_selftest.sh",
+        ],
+        "versions": {
+            "iso6336_screen": "analytical_simplified_v1",
+            "calculix_ccx": "2.21",
+            "kisssoft": "licence_not_proven_in_repo",
+        },
+        "last_known_green": (
+            "2026-07-30 — twin-bound ISO 6336-style analytical screen "
+            "(KISSsoft / spectrum / tooth-contact FEA still OPEN)"
+        ),
         "evidence_class": "toolchain_smoke_pass",
     },
 }
@@ -152,7 +176,8 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
         "cad_family": "planetary_gearset",
         "notes": (
             "Parametric planetary family seeded (cq_gears / Apache-2.0). "
-            "Tooth strength / ISO 6336 / twin ratio closure still OPEN."
+            "Twin-bound ISO 6336-style screen may be PARTIAL under _motor_stack/; "
+            "KISSsoft / race spectrum / tooth-contact FEA still OPEN."
         ),
     },
     {
@@ -171,10 +196,13 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "traction_motor_water_jacket",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "Cooling band intent — OpenFOAM jacket OPEN",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "motor_water_jacket_helical",
+        "notes": (
+            "Parametric helical jacket family seeded (ForgeOS source-owned). "
+            "CFD / conjugate heat transfer / winding temperatures still OPEN."
+        ),
     },
     {
         "component_id": "inverter_cold_plate",
@@ -329,6 +357,28 @@ def _load_fia_cold_plate_case(twin_dir: Optional[Path]) -> Optional[dict[str, An
     return _load_fia_case_json(twin_dir, "openfoam_fia_cold_plate_case.json")
 
 
+def _load_fia_water_jacket_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA OpenFOAM water-jacket duct artefact if present."""
+    return _load_fia_case_json(twin_dir, "openfoam_fia_water_jacket_case.json")
+
+
+def _load_fia_iso6336_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA ISO 6336-style gear-strength artefact if present."""
+    return _load_fia_case_json(twin_dir, "iso6336_fia_front_kit_case.json")
+
+
+def _load_fia_gear_oil_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA analytical gear-oil artefact if present."""
+    return _load_fia_case_json(twin_dir, "gear_oil_fia_front_kit_case.json")
+
+
+def _load_fia_inverter_packaging_case(
+    twin_dir: Optional[Path],
+) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA inverter packaging artefact if present."""
+    return _load_fia_case_json(twin_dir, "inverter_packaging_fia_front_kit_case.json")
+
+
 def _magnetic_check_from_fia_case(
     duty: Mapping[str, Any],
     case: Mapping[str, Any],
@@ -440,12 +490,14 @@ def _rotor_dynamics_check_from_fia_case(
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     model = case.get("rotor_model") if isinstance(case.get("rotor_model"), dict) else {}
     rel_ref = "_motor_stack/ross_fia_front_kit_case.json"
+    clear = bool(margins.get("clear_of_operating_band"))
     body = _open_check(
         "rotor_dynamics",
         extra={
             "status": "PARTIAL",
             "critical_speed_margin": margins.get("first_critical_over_operating"),
             "bearing_reaction_ref": None,
+            "works_in_kit_context": clear,
             "model_revision": str(case.get("schema") or "forgeos.motor_stack.ross_fia_front_kit_case/v1"),
             "geometry_revision": (
                 f"span={model.get('shaft_length_m')}m "
@@ -463,6 +515,7 @@ def _rotor_dynamics_check_from_fia_case(
             "twin_bound_case": {
                 "status": case.get("status"),
                 "ship_ok": False,
+                "works_in_kit_context": clear,
                 "path": rel_ref,
                 "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
                 "first_critical_speed_rpm": speeds.get("first_critical_speed_rpm"),
@@ -476,7 +529,8 @@ def _rotor_dynamics_check_from_fia_case(
                 "modal_or_dynamometer_correlation": "OPEN",
                 "note": (
                     "Twin-bound ROSS beam critical-speed screen on kit-sized shaft + "
-                    "rotor disk. Assumed bearing stiffness; not modal/dyno-correlated; "
+                    "rotor disk. works_in_kit_context = clear_of_operating_band. "
+                    "Assumed bearing stiffness; not modal/dyno-correlated; "
                     "does not close release."
                 ),
             },
@@ -506,12 +560,14 @@ def _structural_check_from_fia_case(
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     mesh = case.get("ring_mesh") if isinstance(case.get("ring_mesh"), dict) else {}
     rel_ref = "_motor_stack/calculix_fia_rotor_screen.json"
+    below_yield = bool(margins.get("below_assumed_yield"))
     body = _open_check(
         "structural",
         extra={
             "status": "PARTIAL",
             "load_case_set": "centrifugal_overspeed_ring_screen",
             "minimum_factor_of_safety": margins.get("screening_fos_vs_assumed_yield"),
+            "works_in_kit_context": below_yield,
             "model_revision": str(
                 case.get("schema") or "forgeos.motor_stack.calculix_fia_rotor_screen/v1"
             ),
@@ -532,6 +588,7 @@ def _structural_check_from_fia_case(
             "twin_bound_case": {
                 "status": case.get("status"),
                 "ship_ok": False,
+                "works_in_kit_context": below_yield,
                 "path": rel_ref,
                 "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
                 "max_von_mises_mpa": screening.get("max_von_mises_mpa"),
@@ -544,6 +601,7 @@ def _structural_check_from_fia_case(
                 "magnet_pocket_burst_fea": "OPEN",
                 "note": (
                     "Twin-bound CalculiX steel-ring centrifugal screen at kit rpm. "
+                    "works_in_kit_context = below_assumed_yield (screening only). "
                     "Assumed isotropic steel; not magnet-pocket burst; release FoS "
                     "not closed."
                 ),
@@ -576,17 +634,17 @@ def _cold_plate_check_from_fia_case(
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     rel_ref = "_motor_stack/openfoam_fia_cold_plate_case.json"
     headline_pa = pressure.get("headline_delta_p_pa")
+    has_delta_p = isinstance(headline_pa, (int, float)) and float(headline_pa) > 0.0
     body = _open_check(
         "inverter_cold_plate",
         extra={
             "status": "PARTIAL",
             "pressure_drop_kpa": (
-                round(float(headline_pa) / 1000.0, 4)
-                if isinstance(headline_pa, (int, float))
-                else None
+                round(float(headline_pa) / 1000.0, 4) if has_delta_p else None
             ),
             "maximum_module_temperature_c": None,
             "module_temperature_spread_c": None,
+            "works_in_kit_context": has_delta_p,
             "model_revision": str(
                 case.get("schema") or "forgeos.motor_stack.openfoam_fia_cold_plate_case/v1"
             ),
@@ -605,6 +663,7 @@ def _cold_plate_check_from_fia_case(
             "twin_bound_case": {
                 "status": case.get("status"),
                 "ship_ok": False,
+                "works_in_kit_context": has_delta_p,
                 "path": rel_ref,
                 "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
                 "headline_delta_p_pa": headline_pa,
@@ -617,14 +676,332 @@ def _cold_plate_check_from_fia_case(
                 "conjugate_heat_transfer": "OPEN",
                 "note": (
                     "Twin-bound OpenFOAM rectangular-duct screen on family channel "
-                    "section at kit coolant point. Not full serpentine STEP CHT; "
-                    "module ΔT not closed."
+                    "section at kit coolant point. works_in_kit_context = finite Δp. "
+                    "Not full serpentine STEP CHT; module ΔT not closed. "
+                    "See also inverterPackaging for MCU land / ESL screen."
                 ),
             },
         },
     )
     body["status"] = "PARTIAL"
     return body
+
+
+def _water_jacket_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote water_jacket to PARTIAL when a twin-bound OF duct exists.
+
+    INTENT: Make the 12 L/min / 60 °C jacket duct screen visible without
+    claiming winding temperatures or full helical conjugate heat transfer.
+    """
+    pressure = (
+        case.get("pressure_drop") if isinstance(case.get("pressure_drop"), dict) else {}
+    )
+    channel = (
+        case.get("channel_geometry")
+        if isinstance(case.get("channel_geometry"), dict)
+        else {}
+    )
+    inputs = (
+        case.get("input_quantities")
+        if isinstance(case.get("input_quantities"), dict)
+        else {}
+    )
+    rel_ref = "_motor_stack/openfoam_fia_water_jacket_case.json"
+    headline_pa = pressure.get("headline_delta_p_pa")
+    has_delta_p = isinstance(headline_pa, (int, float)) and float(headline_pa) > 0.0
+    body = _open_check(
+        "water_jacket",
+        extra={
+            "status": "PARTIAL",
+            "pressure_drop_kpa": (
+                round(float(headline_pa) / 1000.0, 4) if has_delta_p else None
+            ),
+            "maximum_winding_temperature_c": None,
+            "works_in_kit_context": has_delta_p,
+            "model_revision": str(
+                case.get("schema")
+                or "forgeos.motor_stack.openfoam_fia_water_jacket_case/v1"
+            ),
+            "geometry_revision": (
+                f"{channel.get('channel_width_m')}m × {channel.get('channel_depth_m')}m "
+                f"× {channel.get('helix_turns')} helix turns"
+                if channel
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                f"Does the jacket reject losses at {duty['coolant_flow_l_min']} L/min / "
+                f"{duty['coolant_inlet_c']} °C inlet without boiling or choking?"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "works_in_kit_context": has_delta_p,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "headline_delta_p_pa": headline_pa,
+                "inlet_velocity_m_s": channel.get("inlet_velocity_m_s"),
+                "reynolds_number": channel.get("reynolds_number"),
+                "coolant_flow_l_min": inputs.get("coolant_flow_l_min"),
+                "coolant_inlet_c": inputs.get("coolant_inlet_c"),
+                "cad_family": case.get("cad_family") or "motor_water_jacket_helical",
+                "winding_temperatures": "OPEN",
+                "conjugate_heat_transfer": "OPEN",
+                "note": (
+                    "Twin-bound OpenFOAM rectangular-duct screen on helical family "
+                    "channel section at kit coolant point. Not full jacket STEP CHT; "
+                    "winding ΔT not closed."
+                ),
+            },
+        },
+    )
+    body["status"] = "PARTIAL"
+    return body
+
+
+def _gear_oil_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote gear_oil to PARTIAL when a twin-bound analytical oil screen exists.
+
+    INTENT: Make jet-flow / churning / pickup screening visible without claiming
+    free-surface CFD or clear-case bench correlation.
+    """
+    screening = (
+        case.get("screening_results")
+        if isinstance(case.get("screening_results"), dict)
+        else {}
+    )
+    works = (
+        case.get("works_in_kit_context")
+        if isinstance(case.get("works_in_kit_context"), dict)
+        else {}
+    )
+    inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
+    rel_ref = "_motor_stack/gear_oil_fia_front_kit_case.json"
+    oil_ok = bool(works.get("oil_delivery_screen_ok"))
+    body = _open_check(
+        "gear_oil",
+        extra={
+            "status": "PARTIAL",
+            "minimum_jet_flow_l_min": screening.get("minimum_jet_flow_l_min"),
+            "churning_loss_w": screening.get("churning_loss_w"),
+            "works_in_kit_context": oil_ok,
+            "model_revision": str(
+                case.get("schema") or "forgeos.motor_stack.gear_oil_fia_front_kit_case/v1"
+            ),
+            "geometry_revision": (
+                f"ratio={inputs.get('gear_ratio')} planets={inputs.get('planet_count')} "
+                f"planet_od={inputs.get('planet_od_mm')}mm"
+                if inputs
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                "Oil jet / pickup / churning under race accel/brake/corner — "
+                "analytical screen; free-surface CFD OPEN"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "works_in_kit_context": oil_ok,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "minimum_jet_flow_l_min": screening.get("minimum_jet_flow_l_min"),
+                "churning_loss_w": screening.get("churning_loss_w"),
+                "pickup_charge_adequate": screening.get("pickup_charge_adequate"),
+                "gear_ratio": inputs.get("gear_ratio"),
+                "planet_count": inputs.get("planet_count"),
+                "required_shaft_torque_nm": inputs.get("required_shaft_torque_nm"),
+                "free_surface_cfd": "OPEN",
+                "bench_correlation": "OPEN",
+                "note": (
+                    "Twin-bound analytical jet/churning/pickup screen on planetary "
+                    "seeds. Not free-surface CFD; OpenFOAM cavity remains smoke-only."
+                ),
+            },
+        },
+    )
+    body["status"] = "PARTIAL"
+    # duty unused but keeps signature aligned with other FIA builders.
+    _ = duty
+    return body
+
+
+def _gear_strength_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote gear_strength to PARTIAL when a twin-bound ISO 6336 screen exists.
+
+    INTENT: Make the FIA front-kit planetary tooth screen visible without claiming
+    KISSsoft closure, race load-spectrum fatigue, or CalculiX tooth contact.
+    """
+    strength = (
+        case.get("strength_screen")
+        if isinstance(case.get("strength_screen"), dict)
+        else {}
+    )
+    margins = case.get("margins") if isinstance(case.get("margins"), dict) else {}
+    works = (
+        case.get("works_in_kit_context")
+        if isinstance(case.get("works_in_kit_context"), dict)
+        else {}
+    )
+    geometry = (
+        case.get("gear_geometry") if isinstance(case.get("gear_geometry"), dict) else {}
+    )
+    inputs = (
+        case.get("input_quantities")
+        if isinstance(case.get("input_quantities"), dict)
+        else {}
+    )
+    duty_torques = (
+        case.get("duty_torques") if isinstance(case.get("duty_torques"), dict) else {}
+    )
+    rel_ref = "_motor_stack/iso6336_fia_front_kit_case.json"
+    duty_ok = bool(works.get("duty_strength_screen_ok"))
+    min_fos = margins.get("minimum_strength_factor")
+    if min_fos is None:
+        min_fos = strength.get("minimum_strength_factor")
+    body = _open_check(
+        "gear_strength",
+        extra={
+            "status": "PARTIAL",
+            "ratio_revision": (
+                f"i={geometry.get('ratio_from_teeth')} "
+                f"S/P/R={geometry.get('sun_teeth')}/"
+                f"{geometry.get('planet_teeth')}/{geometry.get('ring_teeth')} "
+                f"m={geometry.get('module_mm')}mm"
+                if geometry
+                else None
+            ),
+            "minimum_strength_factor": min_fos,
+            "load_spectrum_ref": None,
+            "works_in_kit_context": duty_ok,
+            "duty_strength_screen_ok": duty_ok,
+            "model_revision": str(
+                case.get("schema")
+                or "forgeos.motor_stack.iso6336_fia_front_kit_case/v1"
+            ),
+            "geometry_revision": (
+                f"face={geometry.get('face_width_mm')}mm "
+                f"planets={geometry.get('planet_count')}"
+                if geometry
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                f"Does reduction + differential transmit reconciled torque for "
+                f"{duty['continuous_design_duty_kw']} kW duty without tooth failure?"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "works_in_kit_context": duty_ok,
+                "duty_strength_screen_ok": duty_ok,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "minimum_bending_fos": margins.get("minimum_bending_fos")
+                or strength.get("minimum_bending_fos"),
+                "minimum_contact_fos": margins.get("minimum_contact_fos")
+                or strength.get("minimum_contact_fos"),
+                "minimum_strength_factor": min_fos,
+                "motor_shaft_torque_nm": duty_torques.get("motor_shaft_torque_nm"),
+                "carrier_output_torque_nm": duty_torques.get(
+                    "carrier_output_torque_nm"
+                ),
+                "gear_ratio": inputs.get("gear_ratio"),
+                "kisssoft_independent_check": "OPEN",
+                "load_spectrum_fatigue": "OPEN",
+                "calculix_tooth_contact": "OPEN",
+                "note": (
+                    "Twin-bound ISO 6336-style analytical screen on kit planetary "
+                    "seeds. works_in_kit_context / duty_strength_screen_ok = "
+                    "min(bending, contact) FoS ≥ 1.2 vs assumed case-hardened "
+                    "allowables — NOT KISSsoft, NOT spectrum, NOT ship_ok."
+                ),
+            },
+        },
+    )
+    body["status"] = "PARTIAL"
+    return body
+
+
+def build_inverter_packaging(
+    *,
+    twin_dir: Optional[Path] = None,
+    stamped_at: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    """Build optional inverterPackaging section from twin-bound packaging artefact.
+
+    @description Not a solver required_check row — packaging evidence alongside
+    motorMultiphysics / cadAuthority. Returns None when artefact is absent.
+    @param twin_dir Twin directory for `_motor_stack/` artefacts
+    @param stamped_at ISO timestamp override
+    @returns inverterPackaging object or None
+    """
+    case = _load_fia_inverter_packaging_case(twin_dir)
+    if case is None or twin_dir is None:
+        return None
+    screening = (
+        case.get("screening_results")
+        if isinstance(case.get("screening_results"), dict)
+        else {}
+    )
+    works = (
+        case.get("works_in_kit_context")
+        if isinstance(case.get("works_in_kit_context"), dict)
+        else {}
+    )
+    inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
+    rel_ref = "_motor_stack/inverter_packaging_fia_front_kit_case.json"
+    stamped = stamped_at or _iso_now()
+    return {
+        "schema_version": "inverter-packaging/v1",
+        "stamped_at": stamped,
+        "status": "PARTIAL",
+        "ship_ok": False,
+        "works_in_kit_context": bool(works.get("packaging_screen_ok")),
+        "result_ref": rel_ref,
+        "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+        "input_hash": case.get("input_quantities_sha256"),
+        "dc_bus_voltage_v": inputs.get("dc_bus_voltage_v"),
+        "continuous_electrical_power_kw": inputs.get("continuous_electrical_power_kw"),
+        "dc_current_a": screening.get("dc_current_a"),
+        "power_density_kw_l": screening.get("power_density_kw_l"),
+        "bus_esl_nominal_nh": screening.get("bus_esl_nominal_nh"),
+        "esl_nominal_in_target_band": screening.get("esl_nominal_in_target_band"),
+        "sic_module_count": screening.get("sic_module_count"),
+        "cold_plate_covers_mcu_footprint": screening.get(
+            "cold_plate_covers_mcu_footprint"
+        ),
+        "mcu_box_mm": {
+            "w": inputs.get("mcu_w_mm"),
+            "d": inputs.get("mcu_d_mm"),
+            "h": inputs.get("mcu_h_mm"),
+        },
+        "module_mpn_and_step": "OPEN",
+        "double_pulse_and_measured_esl": "OPEN",
+        "notes": (
+            "Analytical MCU packaging screen. Cold-plate hydraulic Δp lives under "
+            "required_checks.inverter_cold_plate when present. ship_ok false."
+        ),
+        "twin_bound_case": case.get("works_in_kit_context"),
+    }
 
 
 def build_motor_multiphysics(
@@ -637,8 +1014,8 @@ def build_motor_multiphysics(
     """Build motorMultiphysics dict per plan schema.
 
     @description Records FIA duty + toolchain smoke pointers. Magnetic,
-    rotor_dynamics, structural, and inverter_cold_plate may be PARTIAL when
-    twin-bound FIA case artefacts exist; all_required still false.
+    rotor_dynamics, structural, inverter_cold_plate, gear_oil, and gear_strength
+    may be PARTIAL when twin-bound FIA case artefacts exist; all_required still false.
     @param state Optional twin state for quantity readback
     @param assembly_revision Shared CAD/solver/Blender revision label
     @param stamped_at ISO timestamp override
@@ -749,11 +1126,18 @@ def build_motor_multiphysics(
             },
         )
 
-    required_checks = {
-        "magnetic": magnetic,
-        "rotor_dynamics": rotor_dynamics,
-        "structural": structural,
-        "water_jacket": _open_check(
+    fia_jacket = _load_fia_water_jacket_case(twin_dir)
+    if fia_jacket is not None and twin_dir is not None:
+        water_jacket = _water_jacket_check_from_fia_case(
+            duty, fia_jacket, twin_dir=Path(twin_dir)
+        )
+        notes += (
+            " Water-jacket check PARTIAL: twin-bound OpenFOAM duct screen in "
+            "_motor_stack/openfoam_fia_water_jacket_case.json "
+            "(winding temperatures / full helical CHT still OPEN)."
+        )
+    else:
+        water_jacket = _open_check(
             "water_jacket",
             extra={
                 "pressure_drop_kpa": None,
@@ -763,17 +1147,28 @@ def build_motor_multiphysics(
                     f"{duty['coolant_inlet_c']} °C inlet without boiling or choking?"
                 ),
             },
-        ),
-        "inverter_cold_plate": inverter_cold_plate,
-        "gear_oil": _open_check(
-            "gear_oil",
-            extra={
-                "minimum_jet_flow_l_min": None,
-                "churning_loss_w": None,
-                "fia_question": "Oil jet / pickup / churning under race accel/brake/corner — OPEN",
-            },
-        ),
-        "gear_strength": _open_check(
+        )
+
+    fia_gear_oil = _load_fia_gear_oil_case(twin_dir)
+    if fia_gear_oil is not None and twin_dir is not None:
+        notes += (
+            " Gear-oil check PARTIAL: twin-bound analytical jet/churning/pickup "
+            "screen in _motor_stack/gear_oil_fia_front_kit_case.json "
+            "(free-surface CFD / bench still OPEN)."
+        )
+
+    fia_iso6336 = _load_fia_iso6336_case(twin_dir)
+    if fia_iso6336 is not None and twin_dir is not None:
+        gear_strength = _gear_strength_check_from_fia_case(
+            duty, fia_iso6336, twin_dir=Path(twin_dir)
+        )
+        notes += (
+            " Gear-strength check PARTIAL: twin-bound ISO 6336-style screen in "
+            "_motor_stack/iso6336_fia_front_kit_case.json "
+            "(KISSsoft / load spectrum / tooth-contact FEA still OPEN)."
+        )
+    else:
+        gear_strength = _open_check(
             "gear_strength",
             extra={
                 "ratio_revision": None,
@@ -784,7 +1179,29 @@ def build_motor_multiphysics(
                     f"{duty['continuous_design_duty_kw']} kW duty without tooth failure?"
                 ),
             },
+        )
+
+    required_checks = {
+        "magnetic": magnetic,
+        "rotor_dynamics": rotor_dynamics,
+        "structural": structural,
+        "water_jacket": water_jacket,
+        "inverter_cold_plate": inverter_cold_plate,
+        "gear_oil": (
+            _gear_oil_check_from_fia_case(duty, fia_gear_oil, twin_dir=Path(twin_dir))
+            if fia_gear_oil is not None and twin_dir is not None
+            else _open_check(
+                "gear_oil",
+                extra={
+                    "minimum_jet_flow_l_min": None,
+                    "churning_loss_w": None,
+                    "fia_question": (
+                        "Oil jet / pickup / churning under race accel/brake/corner — OPEN"
+                    ),
+                },
+            )
         ),
+        "gear_strength": gear_strength,
     }
 
     return {
@@ -887,7 +1304,8 @@ def build_stamp_payload(
         twin_dir=twin_dir,
     )
     cad = build_cad_authority(assembly_revision=assembly_revision, stamped_at=stamped)
-    return {
+    packaging = build_inverter_packaging(twin_dir=twin_dir, stamped_at=stamped)
+    payload: dict[str, Any] = {
         "schema_version": "motor-multiphysics-sidecar/v1",
         "stamped_at": stamped,
         "assembly_revision": assembly_revision,
@@ -896,6 +1314,9 @@ def build_stamp_payload(
         "ship_ok": False,
         "all_required_solver_checks_pass": False,
     }
+    if packaging is not None:
+        payload["inverterPackaging"] = packaging
+    return payload
 
 
 def render_markdown(payload: Mapping[str, Any]) -> str:
@@ -922,10 +1343,11 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
         "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
         "when a twin-bound artefact exists (magnetic point, ROSS critical-speed screen,",
-        "CalculiX rotor centrifugal screen, and/or OpenFOAM cold-plate duct) while",
-        "torque map, demagnetisation, magnet-pocket burst, module temperatures,",
-        "bearing identity, modal/dynamometer correlation and other domains remain",
-        "**OPEN**. `ship_ok` stays false.",
+        "CalculiX rotor centrifugal screen, OpenFOAM cold-plate duct, gear-oil screen,",
+        "and/or ISO 6336-style gear-strength screen) while torque map, demagnetisation,",
+        "magnet-pocket burst, free-surface oil CFD, KISSsoft, load spectrum, module",
+        "temperatures, bearing identity, modal/dynamometer correlation and other",
+        "domains remain **OPEN**. `ship_ok` stays false.",
         "",
         "## FIA binding duties (why the solvers exist)",
         "",
@@ -984,6 +1406,34 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             f"| `{c.get('component_id')}` | `{c.get('authority_level')}` | "
             f"`{c.get('source_type')}` | `{c.get('cad_family')}` |"
         )
+    packaging = payload.get("inverterPackaging")
+    if isinstance(packaging, Mapping):
+        mcu = packaging.get("mcu_box_mm") if isinstance(packaging.get("mcu_box_mm"), Mapping) else {}
+        lines.extend(
+            [
+                "",
+                "## Inverter packaging (analytical — not a solver row)",
+                "",
+                f"- **Status:** **{packaging.get('status')}** · **ship_ok:** false",
+                f"- **Works in kit context:** "
+                f"{'**yes**' if packaging.get('works_in_kit_context') else '**no**'}",
+                f"- **DC bus / power:** {packaging.get('dc_bus_voltage_v')} V / "
+                f"{packaging.get('continuous_electrical_power_kw')} kW → "
+                f"I_dc ≈ **{packaging.get('dc_current_a')} A**",
+                f"- **Power density:** **{packaging.get('power_density_kw_l')} kW/L** "
+                f"(MCU {mcu.get('w')}×{mcu.get('d')}×{mcu.get('h')} mm)",
+                f"- **Bus ESL nominal:** **{packaging.get('bus_esl_nominal_nh')} nH** "
+                f"(in target band: {packaging.get('esl_nominal_in_target_band')})",
+                f"- **SiC module count seed:** {packaging.get('sic_module_count')}",
+                f"- **Cold-plate land covers MCU footprint:** "
+                f"{packaging.get('cold_plate_covers_mcu_footprint')}",
+                f"- **Module MPN / STEP:** {packaging.get('module_mpn_and_step')}",
+                f"- **Double-pulse / measured ESL:** "
+                f"{packaging.get('double_pulse_and_measured_esl')}",
+                f"- Artefact: `{packaging.get('result_ref')}`",
+                "",
+            ]
+        )
     lines.extend(
         [
             "",
@@ -994,7 +1444,8 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             "> `ship_ok` stays false.",
             "",
             "Artefacts: `motor-multiphysics.json` (sidecar) · state keys",
-            "`motorMultiphysics` / `cadAuthority` when state write succeeds.",
+            "`motorMultiphysics` / `cadAuthority` / optional `inverterPackaging` "
+            "when state write succeeds.",
             "",
         ]
     )
@@ -1005,8 +1456,10 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
     """proveCatch: stamp must stay fail-closed; twin-bound checks may be PARTIAL with result_ref.
 
     @description Adversarial guards for the stub / twin-bound-partial stamp.
-    Magnetic, rotor_dynamics, structural, and inverter_cold_plate may be PARTIAL
-    when they cite a twin-bound artefact result_ref; everything else stays OPEN.
+    Magnetic, rotor_dynamics, structural, inverter_cold_plate, water_jacket,
+    gear_oil, and gear_strength may be PARTIAL when they cite a twin-bound
+    artefact result_ref; everything else stays OPEN. Optional inverterPackaging
+    may be PARTIAL with ship_ok false.
     @param payload Combined stamp payload
     @returns Catch dict with ok bool
     """
@@ -1014,7 +1467,15 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
     cad = payload.get("cadAuthority") or {}
     checks = motor.get("required_checks") or {}
     _partial_allowed = frozenset(
-        {"magnetic", "rotor_dynamics", "structural", "inverter_cold_plate"}
+        {
+            "magnetic",
+            "rotor_dynamics",
+            "structural",
+            "inverter_cold_plate",
+            "water_jacket",
+            "gear_oil",
+            "gear_strength",
+        }
     )
 
     def _status_ok(name: str, chk: Mapping[str, Any]) -> bool:
@@ -1084,6 +1545,16 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         "fired": illicit_pass,
         "intended_action": "block_greenwash_solver_pass",
     }
+    packaging = payload.get("inverterPackaging")
+    packaging_ok = True
+    if packaging is not None:
+        packaging_ok = (
+            isinstance(packaging, Mapping)
+            and packaging.get("status") in {"PARTIAL", "OPEN"}
+            and packaging.get("ship_ok") is False
+            and bool(packaging.get("result_ref"))
+        )
+    results["inverter_packaging_honest_or_absent"] = packaging_ok
     results["ok"] = (
         statuses_honest
         and remaining_open
@@ -1092,6 +1563,7 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         and duty_ok
         and stator_ok
         and smoke_tagged
+        and packaging_ok
         and not illicit_pass
     )
     return results
@@ -1135,6 +1607,8 @@ def apply_to_state(
     """
     state["motorMultiphysics"] = payload["motorMultiphysics"]
     state["cadAuthority"] = payload["cadAuthority"]
+    if isinstance(payload.get("inverterPackaging"), Mapping):
+        state["inverterPackaging"] = payload["inverterPackaging"]
     state["ship_ok"] = False
     # Small pointer so digests / Overview can find the sidecar without re-reading
     # the whole multiphysics block if a later wipe occurs.
@@ -1145,6 +1619,7 @@ def apply_to_state(
         "ship_ok": False,
         "all_required_solver_checks_pass": False,
         "stamped_at": payload.get("stamped_at"),
+        "has_inverter_packaging": isinstance(payload.get("inverterPackaging"), Mapping),
     }
 
 
@@ -1333,6 +1808,122 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "openfoam_fia_water_jacket_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.openfoam_fia_water_jacket_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "cad_family": "motor_water_jacket_helical",
+                    "input_quantities_sha256": "wjk789",
+                    "pressure_drop": {"headline_delta_p_pa": 18500.0},
+                    "channel_geometry": {
+                        "channel_width_m": 0.008,
+                        "channel_depth_m": 0.0035,
+                        "helix_turns": 5.0,
+                        "inlet_velocity_m_s": 7.14,
+                        "reynolds_number": 72000.0,
+                    },
+                    "input_quantities": {
+                        "coolant_flow_l_min": 12.0,
+                        "coolant_inlet_c": 60.0,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (case_dir / "gear_oil_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.gear_oil_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "mno345",
+                    "screening_results": {
+                        "minimum_jet_flow_l_min": 16.3,
+                        "churning_loss_w": 820.0,
+                        "pickup_charge_adequate": True,
+                    },
+                    "works_in_kit_context": {"oil_delivery_screen_ok": True},
+                    "input_quantities": {
+                        "gear_ratio": 8.0,
+                        "planet_count": 3,
+                        "planet_od_mm": 38.4,
+                        "required_shaft_torque_nm": 125.2,
+                    },
+                    "free_surface_cfd": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (case_dir / "iso6336_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.iso6336_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "stu901",
+                    "gear_geometry": {
+                        "ratio_from_teeth": 8.0,
+                        "sun_teeth": 18,
+                        "planet_teeth": 54,
+                        "ring_teeth": 126,
+                        "module_mm": 0.704,
+                        "face_width_mm": 14.0,
+                        "planet_count": 3,
+                    },
+                    "duty_torques": {
+                        "motor_shaft_torque_nm": 125.2,
+                        "carrier_output_torque_nm": 1001.6,
+                    },
+                    "strength_screen": {
+                        "minimum_bending_fos": 0.35,
+                        "minimum_contact_fos": 0.55,
+                        "minimum_strength_factor": 0.35,
+                    },
+                    "margins": {
+                        "minimum_bending_fos": 0.35,
+                        "minimum_contact_fos": 0.55,
+                        "minimum_strength_factor": 0.35,
+                    },
+                    "works_in_kit_context": {"duty_strength_screen_ok": False},
+                    "input_quantities": {"gear_ratio": 8.0},
+                    "kisssoft_independent_check": {"status": "OPEN"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (case_dir / "inverter_packaging_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.inverter_packaging_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "pqr678",
+                    "screening_results": {
+                        "dc_current_a": 333.333,
+                        "power_density_kw_l": 610.0,
+                        "bus_esl_nominal_nh": 6.39,
+                        "esl_nominal_in_target_band": True,
+                        "sic_module_count": 3,
+                        "cold_plate_covers_mcu_footprint": True,
+                    },
+                    "works_in_kit_context": {"packaging_screen_ok": True},
+                    "input_quantities": {
+                        "dc_bus_voltage_v": 750.0,
+                        "continuous_electrical_power_kw": 250.0,
+                        "mcu_w_mm": 115.2,
+                        "mcu_d_mm": 127.2,
+                        "mcu_h_mm": 28.0,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         partial_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
         mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
         if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
@@ -1347,6 +1938,9 @@ def selftest() -> int:
         if ross.get("critical_speed_margin") != 2.15:
             print("FAIL: rotor_dynamics must surface critical_speed_margin from artefact")
             bad += 1
+        if ross.get("works_in_kit_context") is not True:
+            print("FAIL: rotor_dynamics works_in_kit_context must be true when clear")
+            bad += 1
         structural = partial_payload["motorMultiphysics"]["required_checks"]["structural"]
         if structural.get("status") != "PARTIAL" or not structural.get("result_ref"):
             print(
@@ -1355,6 +1949,9 @@ def selftest() -> int:
             bad += 1
         if structural.get("minimum_factor_of_safety") != 3.01:
             print("FAIL: structural must surface screening FoS from artefact")
+            bad += 1
+        if structural.get("works_in_kit_context") is not True:
+            print("FAIL: structural works_in_kit_context must be true when below yield")
             bad += 1
         cold_chk = partial_payload["motorMultiphysics"]["required_checks"][
             "inverter_cold_plate"
@@ -1368,19 +1965,89 @@ def selftest() -> int:
         if cold_chk.get("pressure_drop_kpa") != 24.921:
             print("FAIL: inverter_cold_plate must surface Δp_kPa from artefact")
             bad += 1
-        if partial_payload["motorMultiphysics"].get("ship_ok") is True:
-            print("FAIL: PARTIAL magnetic/ross/calculix/OF must not set ship_ok")
+        if cold_chk.get("works_in_kit_context") is not True:
+            print("FAIL: inverter_cold_plate works_in_kit_context must be true when Δp set")
             bad += 1
-        if not prove_catch(partial_payload).get("ok"):
+        jacket_chk = partial_payload["motorMultiphysics"]["required_checks"][
+            "water_jacket"
+        ]
+        if jacket_chk.get("status") != "PARTIAL" or not jacket_chk.get("result_ref"):
             print(
-                "FAIL: proveCatch must accept magnetic+ross+calculix+OF PARTIAL "
+                "FAIL: twin-bound OpenFOAM case must mark water_jacket "
+                "PARTIAL with result_ref"
+            )
+            bad += 1
+        if jacket_chk.get("pressure_drop_kpa") != 18.5:
+            print("FAIL: water_jacket must surface Δp_kPa from artefact")
+            bad += 1
+        if jacket_chk.get("works_in_kit_context") is not True:
+            print("FAIL: water_jacket works_in_kit_context must be true when Δp set")
+            bad += 1
+        gear_oil = partial_payload["motorMultiphysics"]["required_checks"]["gear_oil"]
+        if gear_oil.get("status") != "PARTIAL" or not gear_oil.get("result_ref"):
+            print(
+                "FAIL: twin-bound gear_oil case must mark gear_oil PARTIAL with result_ref"
+            )
+            bad += 1
+        if gear_oil.get("minimum_jet_flow_l_min") != 16.3:
+            print("FAIL: gear_oil must surface minimum_jet_flow_l_min from artefact")
+            bad += 1
+        if gear_oil.get("churning_loss_w") != 820.0:
+            print("FAIL: gear_oil must surface churning_loss_w from artefact")
+            bad += 1
+        if gear_oil.get("works_in_kit_context") is not True:
+            print("FAIL: gear_oil works_in_kit_context must be true when screen ok")
+            bad += 1
+        gear_strength_chk = partial_payload["motorMultiphysics"]["required_checks"][
+            "gear_strength"
+        ]
+        if gear_strength_chk.get("status") != "PARTIAL" or not gear_strength_chk.get(
+            "result_ref"
+        ):
+            print(
+                "FAIL: twin-bound ISO 6336 case must mark gear_strength PARTIAL "
                 "with result_ref"
             )
             bad += 1
-        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 4:
+        if gear_strength_chk.get("minimum_strength_factor") != 0.35:
+            print("FAIL: gear_strength must surface minimum_strength_factor from artefact")
+            bad += 1
+        if gear_strength_chk.get("works_in_kit_context") is not False:
             print(
-                "FAIL: expected ≥4 parametric families "
-                "(stator, rotor, planetary, cold_plate)"
+                "FAIL: gear_strength works_in_kit_context must be false when "
+                "duty_strength_screen_ok is false"
+            )
+            bad += 1
+        packaging = partial_payload.get("inverterPackaging")
+        if not isinstance(packaging, dict) or packaging.get("status") != "PARTIAL":
+            print("FAIL: inverterPackaging section must be PARTIAL when artefact exists")
+            bad += 1
+        if packaging and packaging.get("ship_ok") is True:
+            print("FAIL: inverterPackaging must keep ship_ok false")
+            bad += 1
+        if packaging and packaging.get("dc_current_a") != 333.333:
+            print("FAIL: inverterPackaging must surface dc_current_a")
+            bad += 1
+        md_partial = render_markdown(partial_payload)
+        if "Inverter packaging" not in md_partial:
+            print("FAIL: markdown must include inverter packaging section")
+            bad += 1
+        if partial_payload["motorMultiphysics"].get("ship_ok") is True:
+            print(
+                "FAIL: PARTIAL magnetic/ross/calculix/OF/gear_oil/iso6336 "
+                "must not set ship_ok"
+            )
+            bad += 1
+        if not prove_catch(partial_payload).get("ok"):
+            print(
+                "FAIL: proveCatch must accept magnetic+ross+calculix+OF+gear_oil+"
+                "gear_strength PARTIAL with result_ref (+ inverterPackaging)"
+            )
+            bad += 1
+        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 5:
+            print(
+                "FAIL: expected ≥5 parametric families "
+                "(stator, rotor, planetary, cold_plate, water_jacket)"
             )
             bad += 1
         cold = next(
@@ -1397,6 +2064,24 @@ def selftest() -> int:
             or cold.get("cad_family") != "cold_plate_serpentine"
         ):
             print("FAIL: inverter_cold_plate must list cold_plate_serpentine family")
+            bad += 1
+        jacket_cad = next(
+            (
+                c
+                for c in partial_payload["cadAuthority"]["components"]
+                if c.get("component_id") == "traction_motor_water_jacket"
+            ),
+            None,
+        )
+        if (
+            not jacket_cad
+            or jacket_cad.get("authority_level") != "parametric_family"
+            or jacket_cad.get("cad_family") != "motor_water_jacket_helical"
+        ):
+            print(
+                "FAIL: traction_motor_water_jacket must list "
+                "motor_water_jacket_helical family"
+            )
             bad += 1
 
     if bad:
