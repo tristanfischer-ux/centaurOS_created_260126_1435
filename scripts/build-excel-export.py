@@ -2256,6 +2256,113 @@ _VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
 # mirrors; a REAL 0 tab still pins the floor at 0. ──
 _MIRROR_TABS = ("Executive Summary", "Quality & Audit")
 
+# Bar A / concept floor policy (2026-07-30 FE FPK): disclosed race-verification
+# holds (dyno/HIL/supplier Gerbers/homologation evidence) block SHIPS, but they
+# are not a concept-quality defect. The Verification tab itself remains FAIL.
+_RACE_VERIFICATION_TOKEN_RX = re.compile(
+    r"\b(?:race|homologation|fia|hil|hardware|dyno|gerber|gerbers|"
+    r"pinout|icd|populated|overspeed|burst|torque\s+map|efficiency\s+map|"
+    r"thermal\s+map|correlation|release\s+pack)\b",
+    re.I,
+)
+
+
+def _row_get(row: Any, key: str) -> Any:
+    if isinstance(row, dict):
+        return row.get(key)
+    return getattr(row, key, None)
+
+
+def _row_text_blob(row: Any) -> str:
+    fields = (
+        "axis", "claim", "target", "achieved", "method", "evidence_tier",
+        "evidence", "evidence_reference", "provenance", "owner", "next_action",
+        "id", "title", "summary", "why",
+    )
+    return " | ".join(str(_row_get(row, f) or "") for f in fields)
+
+
+def _is_hard_open_verification_row(row: Any) -> bool:
+    status = str(_row_get(row, "status") or "").strip().upper()
+    hardness = str(_row_get(row, "hardness") or "HARD").strip().upper()
+    return hardness == "HARD" and status in ("FAIL", "UNVERIFIED", "OPEN")
+
+
+def _is_disclosed_race_verification_hold(row: Any) -> bool:
+    """Universal race-hold classifier for Bar A concept-floor exclusion.
+
+    INTENT: hardware/race evidence gaps (HIL, supplier Gerbers, dyno correlation,
+    homologation evidence) are Bar B verification holds. They still FAIL the
+    Verification tab and ship gate, but do not define concept quality.
+    """
+    if not _is_hard_open_verification_row(row):
+        return False
+    blob = _row_text_blob(row)
+    axis = str(_row_get(row, "axis") or "").strip().lower()
+    has_hold_context = (
+        axis == "hold"
+        or bool(re.search(r"\b(?:hold|homologation|race|blocks_homologation|open_by_design)\b",
+                          blob, re.I))
+        or bool(_row_get(row, "blocks_homologation"))
+        or bool(_row_get(row, "open_by_design"))
+    )
+    return has_hold_context and bool(_RACE_VERIFICATION_TOKEN_RX.search(blob))
+
+
+def _decision_hold_rows(state: dict) -> List[dict]:
+    rows: List[dict] = []
+    for h in (state or {}).get("decisionHolds") or []:
+        if not isinstance(h, dict):
+            continue
+        if str(h.get("status") or "").upper() != "OPEN":
+            continue
+        if not (h.get("blocks_homologation") or h.get("open_by_design")):
+            continue
+        rows.append({
+            "axis": "hold",
+            "claim": "Race homologation hold — "
+                     + str(h.get("id") or "").strip() + ": "
+                     + str(h.get("title") or h.get("summary") or "").strip(),
+            "status": "OPEN",
+            "hardness": "HARD",
+            "provenance": str(h.get("evidence") or h.get("why") or ""),
+            "blocks_homologation": bool(h.get("blocks_homologation")),
+            "open_by_design": bool(h.get("open_by_design")),
+        })
+    return rows
+
+
+def _verification_concept_floor_policy(state: dict, tab_scores: dict) -> dict:
+    """Whether Verification's low score should be excluded from the Bar A floor.
+
+    The exclusion is deliberately narrow: the Verification surface must be failing,
+    and every HARD-open verification row we can see must classify as a disclosed
+    race/hardware hold. A non-hold HARD failure (brief miss, physics fail, cost
+    failure, silent omission) stays in the concept floor.
+    """
+    entry = (tab_scores or {}).get("Verification")
+    score = entry.get("score") if isinstance(entry, dict) else None
+    if not isinstance(score, (int, float)) or score >= 8:
+        return {"exclude": False, "hard_open_count": 0, "reason": ""}
+    spine_d = (state or {}).get("_verificationSpine") if isinstance(state, dict) else None
+    rows = spine_d.get("rows") if isinstance(spine_d, dict) else None
+    hard_open = [r for r in (rows or []) if _is_hard_open_verification_row(r)]
+    source = "verification spine"
+    if not hard_open:
+        hard_open = _decision_hold_rows(state or {})
+        source = "decision holds"
+    if not hard_open:
+        return {"exclude": False, "hard_open_count": 0, "reason": ""}
+    bad = [r for r in hard_open if not _is_disclosed_race_verification_hold(r)]
+    if bad:
+        return {"exclude": False, "hard_open_count": len(hard_open),
+                "reason": f"{len(bad)} HARD-open verification row(s) are not disclosed race holds"}
+    return {
+        "exclude": True,
+        "hard_open_count": len(hard_open),
+        "reason": f"{len(hard_open)} disclosed HARD-open race verification hold(s) from {source}",
+    }
+
 
 def _performance_card_fact(state: dict) -> dict:
     """DETERMINISTIC 'performance_card' verdict — corroborates (and, per the B3 doctrine,
@@ -2512,8 +2619,10 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 + " — register a scorer in _TAB_SCORERS / _content_score_tab so the tab's "
                   "score is arithmetic over its own rendered content, never a default.")
     facts, _ = _verdict_sections(state, run_dir)
+    race_policy = _verification_concept_floor_policy(state or {}, tab_scores or {})
     secs: Dict[str, Optional[float]] = {nm: d.get("score") for nm, d in facts.items()}
     tabs: Dict[str, Optional[float]] = {}
+    concept_tabs: Dict[str, Optional[float]] = {}
     for t, v in (tab_scores or {}).items():
         if str(t) in _MIRROR_TABS:
             continue      # a mirror RENDERS the floor — it never computes it (fixpoint fix)
@@ -2528,9 +2637,14 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 # CLAIM without both checks passing never sets this flag (stays scored, low).
                 continue
             sv = v.get("score")
-            tabs[str(t)] = float(sv) if isinstance(sv, (int, float)) else None  # UNSCORED → None
+            tv = float(sv) if isinstance(sv, (int, float)) else None  # UNSCORED → None
+            tabs[str(t)] = tv
+            if str(t) == "Verification" and race_policy.get("exclude"):
+                continue
+            concept_tabs[str(t)] = tv
+    concept_vals = list(secs.values()) + list(concept_tabs.values())
     all_vals = list(secs.values()) + list(tabs.values())
-    scored = [v for v in all_vals if v is not None]
+    scored = [v for v in concept_vals if v is not None]
     floor = min(scored) if scored else None
     open_n = sum(1 for v in all_vals if v is None or v < 8)
     ships = bool(scored) and open_n == 0
@@ -2543,7 +2657,7 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
         try:
             _spine = build_spine(_spine_d["rows"])
             _vs = score_spine(_spine)
-            if floor is None or _vs < floor:
+            if not race_policy.get("exclude") and (floor is None or _vs < floor):
                 floor = _vs
             if not ships_allowed(_spine):
                 ships = False
@@ -2692,7 +2806,7 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
             if not ship_axes_all_pass(_axes_v):
                 _unmet = [a["axis"] for a in _axes_v if a.get("applicable") and not a.get("passed")]
                 ships = False
-                if _unmet and _unmet != ["Tab floor ≥8"]:
+                if _unmet and _unmet != ["Bar A concept floor ≥8"]:
                     print(f"  ! ship-gate axis/axes unmet → blocked SHIPS (S7 unify): {_unmet}")
         except Exception as _axv_exc:  # noqa: BLE001 — never let the axis gate crash the verdict
             print(f"  ! ship-axes unification skipped (non-fatal): {_axv_exc}")
@@ -2709,7 +2823,11 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
             open_n = max(open_n, _race_open_n)
             print(f"  ! race-critical OPEN-by-design holds → blocked SHIPS "
                   f"({_race_open_n} hold(s); HIL / supplier Gerbers / dyno)")
-    return {"floor": floor, "open_issues": open_n,
+    if race_policy.get("exclude"):
+        open_n = max(open_n, int(race_policy.get("hard_open_count") or 1))
+    return {"floor": floor, "concept_floor": floor,
+            "verification_race_hold_exclusion": race_policy if race_policy.get("exclude") else None,
+            "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
 
@@ -2726,7 +2844,15 @@ def verdict_text(style: str = "line", v: Optional[dict] = None) -> str:
         return short
     fl = v.get("floor")
     fl_txt = (f"{fl:g}/10" if isinstance(fl, (int, float)) else "—")
-    return (f"VERDICT: {short} · floor {fl_txt} "
+    race_ex = v.get("verification_race_hold_exclusion")
+    if race_ex:
+        return (f"VERDICT: {short} · Bar A concept floor {fl_txt} "
+                f"(min of deterministic sections & non-mirror concept tabs; disclosed "
+                f"race Verification HARD-open holds are excluded from this concept floor "
+                f"but still FAIL Verification and block SHIPS/homologation); the LLM "
+                f"self-audit SCORE is advisory and never floors, but binding defects and "
+                f"ship-gate axes DO bind ships)")
+    return (f"VERDICT: {short} · Bar A concept floor {fl_txt} "
             f"(min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit "
             f"SCORE is advisory and never floors, but its blocking-defects DO bind ships "
             f"(+ ex-works>ceiling / process-plant leak / broken-vision binds); "
@@ -2743,11 +2869,15 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     this is the single readable surface + the source of the vision bind."""
     axes: List[dict] = []
     st = state if isinstance(state, dict) else {}
-    # 1. TAB FLOOR — min of every deterministic section & non-mirror tab (compute_verdict).
+    # 1. BAR A CONCEPT FLOOR — compute_verdict may exclude disclosed race Verification holds.
     fl = (v or {}).get("floor")
-    axes.append({"axis": "Tab floor ≥8", "applicable": True,
+    race_ex = (v or {}).get("verification_race_hold_exclusion")
+    axes.append({"axis": "Bar A concept floor ≥8", "applicable": True,
                  "passed": isinstance(fl, (int, float)) and fl >= 8,
-                 "detail": (f"floor {fl:g}/10" if isinstance(fl, (int, float)) else "floor —")})
+                 "detail": ((f"concept floor {fl:g}/10"
+                             + ("; Verification race holds excluded here and checked on the "
+                                "race/hardware ship axis" if race_ex else ""))
+                            if isinstance(fl, (int, float)) else "concept floor —")})
     # 2. SELF-AUDIT — the engine's own audit found no blocking defect.
     # ONE TRUTH. This axis used to count the RAW blocking_defects list while the verdict
     # path routed each defect through its compiled deterministic check and partitioned it
@@ -2920,18 +3050,24 @@ def _exec_own_score(entry: Optional[dict]) -> Optional[float]:
 
 
 def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
-    """Compute THE verdict (floor over NON-MIRROR surfaces — compute_verdict) and stamp
-    it onto the two mirror tabs, so they RENDER the floor instead of computing it:
+    """Compute THE verdict (Bar A floor over concept surfaces — compute_verdict) and stamp
+    it onto the two mirror tabs, so they RENDER the concept floor instead of computing it:
 
       • 'Executive Summary' — the cover shows min(floor, its OWN routed-finding score):
         it can never claim more than the weakest real sheet, and its own findings still
         cap it when they are worse than the floor. Any stale earlier cap line is replaced.
-      • 'Quality & Audit'  — its score IS the floor (identical to the verdict quote).
+      • 'Quality & Audit'  — its score IS the Bar A concept floor (identical to the verdict quote).
 
     Returns the verdict dict (callers feed it into _VERDICT). proveCatch in _selftest:
     a stale mirror 0 over a min-real-6 workbook re-stamps to 6; a real 0 tab stays 0."""
     v = compute_verdict(state, scores, run_dir)
     fl = v.get("floor")
+    race_ex = v.get("verification_race_hold_exclusion")
+    floor_name = "Bar A concept floor" if race_ex else "dossier floor"
+    floor_scope = ("min of deterministic sections & non-mirror concept tabs; disclosed "
+                   "race Verification holds are excluded here but still fail ship/homologation"
+                   if race_ex else
+                   "min of every deterministic section & non-mirror tab")
     es = scores.get("Executive Summary")
     if isinstance(es, dict) and isinstance(fl, (int, float)):
         own = _exec_own_score(es)
@@ -2947,13 +3083,17 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
         own_issues = [i for i in (es.get("issues") or []) if _SEV_ISSUE_RX.match(str(i))]
         iss = list(own_issues)
         if fl < (own if isinstance(own, (int, float)) else 10):
-            iss = [f"capped at the dossier FLOOR ({sc:g}/10): the cover cannot claim a higher "
-                   f"score than its weakest sheet — fix that sheet to raise this one"] + iss
+            if race_ex:
+                iss = [f"capped at the Bar A concept FLOOR ({sc:g}/10): race Verification "
+                       f"HARD-open holds are disclosed separately and still block SHIPS"] + iss
+            else:
+                iss = [f"capped at the dossier FLOOR ({sc:g}/10): the cover cannot claim a higher "
+                       f"score than its weakest sheet — fix that sheet to raise this one"] + iss
         es["score"] = sc
         es["status"] = "PASS" if sc >= 8 else "FAIL"
         es["issues"] = iss[:6]
-        es["basis"] = ("MIRROR of the dossier floor (min of every deterministic section & "
-                       "non-mirror tab) — re-stamped from the CURRENT scores, never a stale earlier cap"
+        es["basis"] = (f"MIRROR of the {floor_name} ({floor_scope}) — re-stamped from the "
+                       "CURRENT scores, never a stale earlier cap"
                        + (f"; own content check: {es.get('content_basis')}" if es.get("content_basis") else ""))
         # MIRROR OWN-CONTENT GATES THE VERDICT (2026-07-09 — run-2100 Goodhart: the json
         # carried verdict {ships: true, floor: 9.4} beside summary {min_score: 2,
@@ -2985,13 +3125,12 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
         "score": _qa_sc, "target": 8,
         "status": "PASS" if v.get("ships") else "FAIL",
         "issues": ([] if v.get("ships") else
-                   [f"the dossier does NOT ship — floor "
-                    f"{fl:g}/10 (min of every deterministic section & non-mirror tab, the SAME "
-                    f"number the verdict quotes); every surface must reach ≥8" if isinstance(fl, (int, float)) else
+                   [f"the dossier does NOT ship — {floor_name} "
+                    f"{fl:g}/10 ({floor_scope}, the SAME number the verdict quotes); "
+                    f"Verification/race evidence still must close before homologation" if isinstance(fl, (int, float)) else
                     "the dossier does NOT ship — no scored surface exists"]),
         "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
-        "basis": ("THE dossier floor — min score of every deterministic section & non-mirror tab "
-                  "(identical to the verdict computation)"
+        "basis": (f"THE {floor_name} — {floor_scope} (identical to the verdict computation)"
                   + (f"; own content check: {_qa_prev.get('content_basis')}" if _qa_prev.get("content_basis") else "")),
         # carry the content-derived counts forward (the mirror renders the floor, but its
         # own rendered tables are still cell-checked — checked/passed must survive the stamp)
@@ -25829,9 +25968,14 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
     if isinstance(_tabsc, dict) and _tabsc:
         r += 1
         _su = state.get("tabScorecardSummary") or {}
+        _race_policy = _verification_concept_floor_policy(state, _tabsc)
+        _concept_note = ("Bar A concept floor excludes disclosed Verification race holds; "
+                         "the Verification tab and ship gate still FAIL them. "
+                         if _race_policy.get("exclude") else "")
         sub_banner(ws, r, f"Per-tab quality — every tab against the ≥8 floor "
                           f"(worst: {_su.get('min_tab', '?')} {_su.get('min_score', '?')}/10; "
                           f"{len(_su.get('fail_tabs') or [])} FAIL, {len(_su.get('unscored_tabs') or [])} UNSCORED). "
+                          f"{_concept_note}"
                           f"Score = live formula; muted 'Audit:' columns hold the embedded "
                           f"score operands (passed/checked per component + the governing cap).", 5)
         r += 1
@@ -25873,9 +26017,10 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         _tab_last = r - 1
         _register_check_range(ws.title, "C", _tab_first, _tab_last)
         r += 1
-        # ---- THE LIVE FLOOR + OPEN-ISSUE CELLS — the ONE VERDICT's operands, computed
-        # IN-CELL over the section scores + the NON-MIRROR tab scores (cross-sheet MIN
-        # feeds every verdict surface + chip; mirrors reference, never enter, the MIN).
+        # ---- THE LIVE BAR A CONCEPT FLOOR + OPEN-ISSUE CELLS — the ONE VERDICT's
+        # operands, computed IN-CELL over the section scores + the NON-MIRROR concept
+        # tab scores (cross-sheet MIN feeds every verdict surface + chip; mirrors
+        # reference, never enter, the MIN).
         _nm_first = _tab_first + _n_mirrors
         _rngs = []
         if _sec_last >= _sec_first:
@@ -25894,13 +26039,19 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         for _tab2 in _order[_n_mirrors:]:
             if (_tabsc.get(_tab2) or {}).get("scored") is False:
                 continue
+            if _tab2 == "Verification" and _race_policy.get("exclude"):
+                continue
             _ref2 = _QA_SCORE_CELLS.get(_tab2)
             if _ref2:
                 _floor_tab_rows.append(int(_ref2.rsplit("$", 1)[1]))
         _rngs.extend(_contiguous_col_ranges("B", _floor_tab_rows))
         _rng_expr = ",".join(_rngs) if _rngs else '""'
-        ws.cell(r, 1, "LIVE FLOOR — min of every deterministic section & non-mirror tab "
-                      "(the ONE VERDICT's number, computed in-cell)").font = FONT_SUB
+        _floor_label = ("LIVE BAR A CONCEPT FLOOR — excludes disclosed race Verification "
+                        "HARD-open holds from the minimum (ship gate still fails them)"
+                        if _race_policy.get("exclude") else
+                        "LIVE BAR A CONCEPT FLOOR — min of every deterministic section & "
+                        "non-mirror tab (the ONE VERDICT's number, computed in-cell)")
+        ws.cell(r, 1, _floor_label).font = FONT_SUB
         _flc = ws.cell(r, 2, f'=IF(COUNT({_rng_expr})=0,"—",MIN({_rng_expr}))')
         _flc.fill = FILL_RESULT
         _QA_FLOOR_CELL.clear()
@@ -25909,12 +26060,13 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         # INTENT (2026-07-29 JLR): LIVE OPEN ISSUES must also floor on race-critical
         # OPEN-by-design holds (HIL / supplier Gerbers / dyno). Tab-floor alone can
         # under-count (python 6 vs workbook 5) and greenwash homologation gaps.
-        _race_open_n_qa = sum(
+        _race_open_n_qa = int(_race_policy.get("hard_open_count") or 0)
+        _race_open_n_qa = max(_race_open_n_qa, sum(
             1 for h in (state.get("decisionHolds") or [])
             if isinstance(h, dict)
             and str(h.get("status") or "").upper() == "OPEN"
             and (h.get("blocks_homologation") or h.get("open_by_design"))
-        )
+        ))
         ws.cell(r, 1, "LIVE OPEN ISSUES — max(tabs below 8/unscored, race OPEN-by-design "
                       "holds: HIL / supplier Gerbers / dyno)").font = FONT_SUB
         _opn_terms = [f'COUNTIF({_rg},"<8")+(COUNTA({_rg})-COUNT({_rg}))' for _rg in _rngs]
@@ -28805,10 +28957,16 @@ def _write_verdict_formulas(wb: Workbook, state: dict) -> int:
     short = (f'IF(AND({op}=0{_axis_and}),"SHIPS",'
              f'"DRAFT — "&{op}&" open issue"&IF({op}=1,"","s")'
              f'&IF({op}=0," (a ship-gate axis is unmet)",""))')
-    line = (f'="VERDICT: "&{short}&" · floor "&{_fx_num_txt(fl)}&"/10 '
-            f'(min of every DETERMINISTIC section & non-mirror tab — live cells on '
-            f'Quality & Audit; the LLM self-audit SCORE is advisory and never floors, but its '
-            f'blocking-defects + the ship-gate axes DO bind ships; ships at ≥8 on every scored surface)"')
+    if _VERDICT.get("verification_race_hold_exclusion"):
+        line = (f'="VERDICT: "&{short}&" · Bar A concept floor "&{_fx_num_txt(fl)}&"/10 '
+                f'(min of deterministic sections & non-mirror concept tabs — disclosed race '
+                f'Verification HARD-open holds are excluded from this concept floor but still '
+                f'FAIL Verification and block SHIPS/homologation; live cells on Quality & Audit)"')
+    else:
+        line = (f'="VERDICT: "&{short}&" · Bar A concept floor "&{_fx_num_txt(fl)}&"/10 '
+                f'(min of every DETERMINISTIC section & non-mirror tab — live cells on '
+                f'Quality & Audit; the LLM self-audit SCORE is advisory and never floors, but its '
+                f'blocking-defects + the ship-gate axes DO bind ships; ships at ≥8 on every scored surface)"')
     n = 0
     for _vt, _vr, _vc, _vstyle, _vsuf in _VERDICT_CELLS:
         if _vt not in wb.sheetnames:
@@ -30567,9 +30725,10 @@ def build(run_dir: str, out_path: str) -> dict:
           + ", ".join(f"{t}:{st['passed']}/{st['checked']}"
                       for t, st in sorted(_CELL_STATS.items())
                       if st['checked'] and st['passed'] < st['checked']))
-    # ── ONE FLOOR (fix 3): the 'Quality & Audit' tab's own score IS the dossier floor —
-    #    the same computation the verdict quotes (min of every NON-MIRROR section & tab,
-    #    floor-fixpoint fix 2026-07-03) — so its banner (A2) can never disagree with the
+    # ── ONE BAR A FLOOR (fix 3 + FE FPK 2026-07-30): 'Quality & Audit''s own score
+    #    IS the concept floor the verdict quotes (min of every NON-MIRROR concept
+    #    surface; disclosed race Verification holds bind SHIPS separately), so A2
+    #    can never disagree with the
     #    verdict line (A4). Both mirror tabs are re-stamped here from the FINAL scores
     #    (the X1 gate-feed + honest cap + X2 + content scorers have all merged), so a
     #    stale earlier cap can never survive into the shipped scorecard.
@@ -31135,6 +31294,52 @@ def _selftest() -> int:
         _vs_selftest()
     except Exception as _vs_exc:  # noqa: BLE001
         print(f"  FAIL verification_spine --selftest: {_vs_exc}"); bad += 1
+    # ═══ proveCatch Bar A concept floor (2026-07-30 FE FPK) — disclosed race
+    # hardware holds must not collapse the concept mirror floor, while any
+    # non-race HARD verification failure still floors normally. ═══
+    _race_spine_state = {"_verificationSpine": {"rows": [
+        {"axis": "brief", "claim": "brief power", "target": "closed", "achieved": "closed",
+         "status": "PASS", "hardness": "HARD", "provenance": "quantities.power_kw"},
+        {"axis": "hold", "claim": "Race homologation hold — HIL on populated inverter revision",
+         "target": "HIL report", "achieved": "missing", "status": "OPEN",
+         "hardness": "HARD", "provenance": "hil_present=false; blocks_homologation"},
+    ]}}
+    _race_scores = {
+        "Executive Summary": {"score": 0, "basis": "stale mirror"},
+        "Quality & Audit": {"score": 0, "basis": "stale mirror"},
+        "Verification": {"score": 4, "basis": "proof spine"},
+        "Drawings": {"score": 8.6, "basis": "drawing gates"},
+        "BoM": {"score": 9.2, "basis": "line arithmetic"},
+    }
+    _race_v = compute_verdict(_race_spine_state, _race_scores)
+    if abs((_race_v.get("floor") or 0) - 8.6) > 0.01 \
+            or _race_v.get("verification_race_hold_exclusion") is None \
+            or _race_v.get("ships") is not False:
+        print(f"  FAIL bar-a-floor: race HARD-open Verification hold must be excluded "
+              f"from concept floor but still block ships (got {_race_v})"); bad += 1
+    _fallback_state = {"decisionHolds": [{
+        "id": "DEC-HIL", "status": "OPEN",
+        "title": "HIL on populated inverter revision — MISSING",
+        "evidence": "hardware HIL report absent",
+        "blocks_homologation": True, "open_by_design": True,
+    }]}
+    _fallback_v = compute_verdict(_fallback_state, _race_scores)
+    if abs((_fallback_v.get("floor") or 0) - 8.6) > 0.01 \
+            or _fallback_v.get("verification_race_hold_exclusion") is None:
+        print(f"  FAIL bar-a-floor: decisionHold fallback must exclude disclosed "
+              f"race/hardware holds from concept floor (got {_fallback_v})"); bad += 1
+    _non_race_state = {"_verificationSpine": {"rows": [
+        {"axis": "brief", "claim": "brief power", "target": "closed", "achieved": "closed",
+         "status": "PASS", "hardness": "HARD", "provenance": "quantities.power_kw"},
+        {"axis": "physics", "claim": "phase-current arithmetic closure",
+         "target": "reconciled", "achieved": "diverged", "status": "FAIL",
+         "hardness": "HARD", "provenance": "calculation mismatch"},
+    ]}}
+    _non_race_v = compute_verdict(_non_race_state, _race_scores)
+    if abs((_non_race_v.get("floor") or 0) - 4.0) > 0.01 \
+            or _non_race_v.get("verification_race_hold_exclusion") is not None:
+        print(f"  FAIL bar-a-floor: non-race HARD verification failure must remain in "
+              f"the concept floor (got {_non_race_v})"); bad += 1
     # ═══ proveCatch Excel closure assemblers (2026-07-29 SOL) — DVP&R / OP matrix /
     # ICD must fire on traction signals and stay empty for plant. ═══
     try:
