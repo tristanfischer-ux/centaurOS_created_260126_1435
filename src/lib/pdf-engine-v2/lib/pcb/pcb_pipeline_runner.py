@@ -1209,6 +1209,47 @@ def selftest() -> None:
         raise AssertionError(
             f"multi-row IC grid must clear its SMD support band, got: {reason_wet}"
         )
+    # proveCatch (FE traction gate drive 2026-07-30): pad-radius pitch alone is
+    # too small for a 4×4 grid of long-body SOICs. U2 and U6 cleared electrically
+    # but their package AABBs overlapped on pass one, leaving a residual in Excel.
+    short_soic = "Test:FE_Short_SOIC"
+    long_soic = "Test:FE_Long_SOIC"
+    _footprint_cache[short_soic] = FootprintData(
+        pads=[
+            {"num": "1", "x": -2.5, "y": -1.5, "w": 1.0, "h": 1.0},
+            {"num": "2", "x": 2.5, "y": 1.5, "w": 1.0, "h": 1.0},
+        ],
+        bbox_w=7.0,
+        bbox_h=3.0,
+        resolved_from="selftest",
+    )
+    _footprint_cache[long_soic] = FootprintData(
+        pads=[
+            {"num": "1", "x": -3.0, "y": -3.0, "w": 1.0, "h": 1.0},
+            {"num": "2", "x": 3.0, "y": 3.0, "w": 1.0, "h": 1.0},
+        ],
+        bbox_w=7.0,
+        bbox_h=10.2,
+        resolved_from="selftest",
+    )
+    traction_gate_drive = [
+        Component("U1", "board interface", short_soic),
+        *[
+            Component(f"U{i}", "gate-drive channel", long_soic)
+            for i in range(2, 14)
+        ],
+    ]
+    place_traction = place_components(
+        traction_gate_drive, cfg, Path("/tmp/unused"), 120.0, 90.0, 12.0, 5.0,
+    )
+    ok_traction, reason_traction = validate_placement(
+        place_traction, traction_gate_drive, cfg, Path("/tmp/unused"), 120.0, 90.0,
+    )
+    if not ok_traction:
+        raise AssertionError(
+            "long-body IC grid must clear package AABBs on its first placement "
+            f"pass, got: {reason_traction}"
+        )
     # proveCatch (2026-07-21): coincident centres (old margin-clamp stack) must FAIL
     # even when pad circles barely clear — organoid wet_lab_hat F1≡C3.
     stacked_comps = [
@@ -1254,7 +1295,7 @@ def selftest() -> None:
     print(
         "pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + mounting holes + centred IC + "
         "motherboard counter-case + IC/SMD band + fuse pitch + LQFP band + multi-row "
-        "IC/SMD band + clamp_stack + anti-clamp dense + zero-route completeness)"
+        "IC/SMD band + long-body IC grid + clamp_stack + anti-clamp dense + zero-route completeness)"
     )
 
 # ─── Placement (unchanged algorithm; NAIVE — grid/edge placement, not a real
@@ -1443,11 +1484,17 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
             )
         return max(fp.bbox_w / 2, fp.bbox_h / 2, 0.5)
 
-    # Floor IC pitch by pad extents so LQFP-32 + SOIC-8 cannot start at 15 mm
-    # centres with nearest pads < min_gap (Poseidon retest iter-1 U1-vs-U2).
+    # Floor IC pitch by BOTH pad and package-body extents. Pad-only spacing let
+    # long SOIC bodies overlap vertically even when their copper cleared (FE
+    # traction gate-drive U2-vs-U6); the same 0.5 mm body gap is validated below.
     if ics:
         max_ic_extent = max(_pad_radial_extent(fp) for _, fp in ics)
-        ic_spacing = max(ic_spacing, 2 * max_ic_extent + 0.5)
+        max_ic_body_span = max(max(fp.bbox_w, fp.bbox_h) for _, fp in ics)
+        ic_spacing = max(
+            ic_spacing,
+            2 * max_ic_extent + 0.5,
+            max_ic_body_span + 0.51,  # 0.5 mm contract + 0.01 mm float tolerance
+        )
     # DECISION (2026-07-14): centre the IC grid on the board. The old
     # `cy - 20` / `cy + 10` offsets assumed ≥50 mm motherboards and shoved
     # SOIC pads off a 25–40 mm optical source daughterboard (colorimeter-1441).
