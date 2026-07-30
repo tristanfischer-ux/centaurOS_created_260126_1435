@@ -113,4 +113,47 @@ describe('buildPcbStateHonesty', () => {
     expect(honesty.fitness_fail_reason).toContain('requires 6 gate_drive_channel, implements 0')
     expect(honesty.fitness_fail_reason).toContain('requires 3 phase_current_sense, implements 0')
   })
+
+  it('proveCatch: complete draft channels never mint fabrication or ship readiness', () => {
+    const controlBoard: PcbArchitecturePlan['boards'][number] = {
+      ...ARCHITECTURE.boards[0],
+      boardId: 'traction_control',
+      role: 'traction_control_board',
+      domains: ['logic', 'analog'],
+      channelRequirements: [
+        { role: 'phase_current_sense', count: 3 },
+        { role: 'resolver_channel', count: 1 },
+        { role: 'vehicle_can', count: 1 },
+        { role: 'lv_buck_rail', count: 3 },
+        { role: 'hv_lv_isolation_barrier', count: 1 },
+      ],
+    }
+    const honesty = buildPcbStateHonesty({
+      architecture: {
+        ...ARCHITECTURE,
+        boards: [ARCHITECTURE.boards[0], controlBoard],
+      },
+      evidence: {
+        resolvedWordIds: [],
+        unresolvedWordIds: [],
+        implementedChannels: {
+          gate_drive_channel: 6,
+          desat_channel: 6,
+          phase_current_sense: 3,
+          resolver_channel: 1,
+          vehicle_can: 1,
+          lv_buck_rail: 3,
+          hv_lv_isolation_barrier: 1,
+        },
+      },
+      fabricationReady: false,
+      supplierGerbers: 'OPEN',
+    })
+
+    expect(honesty.designFitness.ok).toBe(true)
+    expect(honesty.NOT_FABRICATION_READY).toBe(true)
+    expect(honesty.forgeDraftOnly).toBe(true)
+    expect(honesty.supplier_gerbers).toBe('OPEN')
+    expect(honesty.ship_ok).toBe(false)
+  })
 })

@@ -133,7 +133,7 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   // from identity alone so pcb-architecture can plan reviewable boards.
   {
     category: 'power_electronics',
-    pattern: /(?:^|[_ -])(?:gate[_ -]?driver(?:[_ -]?board)?|sic[_ -]?traction[_ -]?inverter|traction[_ -]?inverter|dc[_ -]?link[_ -]?capacitor(?:[_ -]?bank)?|hv[_ -]?dc[_ -]?fuse)(?:$|[_ -])/i,
+    pattern: /(?:^|[_ -])(?:gate[_ -]?driver(?:[_ -]?board)?|sic[_ -]?traction[_ -]?inverter|traction[_ -]?inverter|dc[_ -]?link[_ -]?capacitor(?:[_ -]?bank)?|hv[_ -]?dc[_ -]?fuse|lv[_ -]?buck[_ -]?(?:rails?|regulators?))(?=$|[_ -])/i,
   },
   {
     category: 'processor',
@@ -141,7 +141,7 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   },
   {
     category: 'analog_frontend',
-    pattern: /(?:^|[_ -])(?:phase[_ -]?current[_ -]?(?:sensor|sense)|resolver(?:[_ -]?(?:sensor|interface))?)(?:$|[_ -])/i,
+    pattern: /(?:^|[_ -])(?:phase[_ -]?current[_ -]?(?:sensor|sense)|current[_ -]?sense[_ -]?front[_ -]?end|dc[_ -]?link[_ -]?voltage[_ -]?sense|resolver(?:[_ -]?(?:sensor|interface))?)(?:$|[_ -])/i,
   },
   {
     category: 'connectivity',

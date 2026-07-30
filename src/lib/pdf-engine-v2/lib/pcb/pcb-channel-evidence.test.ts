@@ -176,11 +176,12 @@ describe('pcb-channel-evidence', () => {
   it('proveCatch: FE traction topology mints only evidenced draft channels', () => {
     const counts = deriveImplementedChannelCounts({
       components: [
+        { characterId: 'phase_current_sensor', nameHuman: 'Phase current sensor x3' },
         { characterId: 'current_sense_frontend', nameHuman: 'Phase current sense front-end x3' },
         { characterId: 'resolver_signal_interface', nameHuman: 'Resolver signal interface' },
         { characterId: 'decoupling_capacitor', nameHuman: 'Decoupling capacitor (Resolver signal interface)' },
         { characterId: 'can_fd_transceiver', nameHuman: 'CAN-FD transceiver' },
-        { characterId: 'lv_buck_rails', nameHuman: 'LV buck power rails' },
+        { characterId: 'lv_buck_rails', nameHuman: 'LV buck power rails x3' },
       ],
       functionRequirements: [],
       requiredRoles: [
@@ -196,10 +197,44 @@ describe('pcb-channel-evidence', () => {
     expect(counts.phase_current_sense).toBe(3)
     expect(counts.resolver_channel).toBe(1)
     expect(counts.vehicle_can).toBe(1)
-    expect(counts.lv_buck_rail).toBe(1)
+    expect(counts.lv_buck_rail).toBe(3)
     // GOTCHA: channel requirements alone must not mint safety-critical power-stage proof.
     expect(counts.gate_drive_channel).toBe(0)
     expect(counts.desat_channel).toBe(0)
     expect(counts.hv_lv_isolation_barrier).toBe(0)
+  })
+
+  it('proveCatch: six paired draft gate-driver and desat footprints mint six channels', () => {
+    const components = Array.from({ length: 6 }, (_, i) => ([
+      {
+        characterId: 'isolated_gate_driver_channel',
+        nameHuman: `Isolated gate driver ${i + 1}`,
+      },
+      {
+        characterId: 'desat_protection_channel',
+        nameHuman: `Desaturation protection ${i + 1}`,
+      },
+    ])).flat()
+    const counts = deriveImplementedChannelCounts({
+      components,
+      functionRequirements: [],
+      requiredRoles: ['gate_drive_channel', 'desat_channel'],
+    })
+
+    expect(counts.gate_drive_channel).toBe(6)
+    expect(counts.desat_channel).toBe(6)
+  })
+
+  it('proveCatch: phase current count requires both sensor and front-end footprints', () => {
+    const counts = deriveImplementedChannelCounts({
+      components: [
+        { characterId: 'phase_current_sensor', quantityInDesign: 3 },
+        { characterId: 'current_sense_frontend', quantityInDesign: 2 },
+      ],
+      functionRequirements: [],
+      requiredRoles: ['phase_current_sense'],
+    })
+
+    expect(counts.phase_current_sense).toBe(2)
   })
 })

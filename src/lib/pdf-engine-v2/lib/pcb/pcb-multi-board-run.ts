@@ -231,6 +231,12 @@ export function runBespokeMultiBoardPcb(
       boardId: board.boardId,
       systemNets,
       requiredFunctionRoles: board.channelRequirements.map((r) => r.role),
+      requiredFunctionCounts: Object.fromEntries(
+        board.channelRequirements.map((requirement) => [
+          requirement.role,
+          requirement.count,
+        ]),
+      ),
     })
     const pipelineResult = runPipeline(projectDir, chainOutDir, {
       boardRole: board.role,

@@ -166,8 +166,20 @@ export function deriveImplementedChannelCounts(args: {
   // INTENT (2026-07-30 FE traction): traction-control evidence is counted from
   // fitted topology nouns/footprints, never from the channel requirement itself.
   // Supplier/HIL release stays separate; these counts only lift draft fidelity.
+  if ((counts.gate_drive_channel ?? 0) === 0) {
+    counts.gate_drive_channel = countRoleInstances(
+      components,
+      /isolated[_ -]?gate[_ -]?driver[_ -]?channel|gate[_ -]?drive[_ -]?channel[_ -]?driver/i,
+    )
+  }
+  if ((counts.desat_channel ?? 0) === 0) {
+    counts.desat_channel = countRoleInstances(
+      components,
+      /desat(?:uration)?[_ -]?(?:protection|sense|detector)[_ -]?channel/i,
+    )
+  }
   if ((counts.phase_current_sense ?? 0) === 0) {
-    counts.phase_current_sense = Math.max(
+    counts.phase_current_sense = minPositive(
       countRoleInstances(components, /phase[_ -]?current[_ -]?sensor/i),
       countRoleInstances(components, /current[_ -]?sense[_ -]?front[_ -]?end/i),
     )

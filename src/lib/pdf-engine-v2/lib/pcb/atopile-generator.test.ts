@@ -18,6 +18,7 @@ import { join } from 'node:path'
 import { classifyFunction, expandPhysicalInstances, generateAtopileProject } from './atopile-generator'
 import type { AtopileComponentRecord } from './atopile-generator'
 import { derivePcbArchitecture } from './pcb-architecture'
+import { deriveImplementedChannelCounts } from './pcb-channel-evidence'
 import { lookupCached } from '../distributors/db-only-cascade'
 
 import type { PcbBoardGeometry } from './pcb-contract'
@@ -86,6 +87,122 @@ describe('atopile-generator', () => {
     expect(classifyFunction('current_sense_frontend')).toBe('op_amp')
     expect(classifyFunction('lv_buck_rails')).toBe('regulator')
     expect(classifyFunction('dc_link_voltage_sense')).toBe('passive_r')
+    expect(classifyFunction('isolated_gate_driver_channel')).toBe('gate_driver_ic')
+    expect(classifyFunction('desat_protection_channel')).toBe('sensor_ic')
+    expect(classifyFunction('hv_lv_isolation_barrier')).toBe('isolator_ic')
+  })
+
+  it('proveCatch: required FE traction counts produce physical draft footprints and channel nets', () => {
+    const design = {
+      moduleDecomposition: {
+        modules: [{
+          module: 'traction_control',
+          sub_modules: [{
+            id: 'electronics',
+            words: [
+              {
+                id: 'gate_driver_board_word',
+                name_human: 'Gate Driver Board',
+                content_character: { character_id: 'gate_driver_board' },
+                modifier_characters: [],
+              },
+              {
+                id: 'phase_current_sensor_word',
+                name_human: 'Phase Current Sensor',
+                content_character: { character_id: 'phase_current_sensor' },
+                modifier_characters: [],
+              },
+              {
+                id: 'current_sense_frontend_word',
+                name_human: 'Phase Current Sense Front-end',
+                content_character: { character_id: 'current_sense_frontend' },
+                modifier_characters: [],
+              },
+              {
+                id: 'lv_buck_rails_word',
+                name_human: 'LV Buck Rails',
+                content_character: { character_id: 'lv_buck_rails' },
+                modifier_characters: [],
+              },
+              {
+                id: 'control_mcu_word',
+                name_human: 'Control MCU',
+                content_character: { character_id: 'control_mcu' },
+                modifier_characters: [],
+              },
+              {
+                id: 'dc_link_voltage_sense_word',
+                name_human: 'DC-link Voltage Sense',
+                content_character: { character_id: 'dc_link_voltage_sense' },
+                modifier_characters: [],
+              },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const gateDir = makeTmpDir('atopile-traction-gate-')
+    const controlDir = makeTmpDir('atopile-traction-control-')
+    tmpDirs.push(gateDir, controlDir)
+    const gate = generateAtopileProject(design, gateDir, {
+      requiredWordIds: ['gate_driver_board_word'],
+      boardRole: 'traction_gate_drive_board',
+      requiredFunctionRoles: ['gate_drive_channel', 'desat_channel'],
+      requiredFunctionCounts: {
+        gate_drive_channel: 6,
+        desat_channel: 6,
+      },
+    } as Parameters<typeof generateAtopileProject>[2] & {
+      requiredFunctionCounts: Record<string, number>
+    })
+    const control = generateAtopileProject(design, controlDir, {
+      requiredWordIds: [
+        'phase_current_sensor_word',
+        'current_sense_frontend_word',
+        'lv_buck_rails_word',
+        'control_mcu_word',
+        'dc_link_voltage_sense_word',
+      ],
+      boardRole: 'traction_control_board',
+      requiredFunctionRoles: [
+        'phase_current_sense',
+        'lv_buck_rail',
+        'hv_lv_isolation_barrier',
+      ],
+      requiredFunctionCounts: {
+        phase_current_sense: 3,
+        lv_buck_rail: 3,
+        hv_lv_isolation_barrier: 1,
+      },
+    } as Parameters<typeof generateAtopileProject>[2] & {
+      requiredFunctionCounts: Record<string, number>
+    })
+    const components = [...gate.components, ...control.components]
+    const counts = deriveImplementedChannelCounts({
+      components,
+      functionRequirements: [
+        ...gate.functionRequirements,
+        ...control.functionRequirements,
+      ],
+      requiredRoles: [
+        'gate_drive_channel',
+        'desat_channel',
+        'phase_current_sense',
+        'lv_buck_rail',
+        'hv_lv_isolation_barrier',
+      ],
+    })
+
+    expect(counts).toMatchObject({
+      gate_drive_channel: 6,
+      desat_channel: 6,
+      phase_current_sense: 3,
+      lv_buck_rail: 3,
+      hv_lv_isolation_barrier: 1,
+    })
+    expect(gate.nets.filter((net) => /^GATE_DRIVE_OUT_\d+$/.test(net.name))).toHaveLength(6)
+    expect(gate.nets.filter((net) => /^DESAT_SENSE_\d+$/.test(net.name))).toHaveLength(6)
   })
   afterAll(() => {
     for (const dir of tmpDirs) {

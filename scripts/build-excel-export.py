@@ -20244,8 +20244,10 @@ def _pcb_honest_draft_components(pcb: dict, assessment: dict) -> List[Tuple[str,
         ) else 0, 1),
         ("required channel counts disclosed", 1 if isinstance(req_counts, dict) and bool(req_counts) else 0, 1),
         ("implemented channel counts disclosed", 1 if isinstance(impl_counts, dict) and bool(impl_counts) else 0, 1),
-        ("fitness failure reason disclosed", 1 if (
-            bool(str(pcb.get("fitness_fail_reason") or "").strip()) or bool(high_findings)
+        ("fitness verdict / failure reason disclosed", 1 if (
+            fitness.get("ok") is True
+            or bool(str(pcb.get("fitness_fail_reason") or "").strip())
+            or bool(high_findings)
         ) else 0, 1),
         ("PCB-local ship flag is false", 1 if pcb.get("ship_ok") is not True else 0, 1),
         # Cap the tab at draft quality: excellent honesty, explicitly not fab-ready.
@@ -37850,6 +37852,32 @@ def _selftest() -> int:
         if _ev_a.get("readiness") != "ENGINEERING DRAFT" or _evidenced_draft.get("ship_ok") is not False:
             print(f"  FAIL PCB draft honesty: evidenced draft must stay ENGINEERING DRAFT/ship_ok false, "
                   f"readiness={_ev_a.get('readiness')!r} ship_ok={_evidenced_draft.get('ship_ok')!r}"); bad += 1
+        # proveCatch (WP5 clean direction): closing every required channel clears
+        # designFitness, so an empty failure reason is correct and must not floor
+        # an otherwise 9/10 honest draft to zero.
+        _PCB_ASSESS_CACHE.pop(_p5_td, None)
+        _clean_evidenced_draft = dict(_draft_pcb)
+        _clean_evidenced_draft["implemented_channel_counts"] = {
+            "gate_drive_channel": 6,
+            "desat_channel": 6,
+        }
+        _clean_evidenced_draft["implementedChannels"] = dict(
+            _clean_evidenced_draft["implemented_channel_counts"]
+        )
+        _clean_evidenced_draft["fitness_fail_reason"] = ""
+        _clean_evidenced_draft["designFitness"] = {"ok": True, "findings": []}
+        _clean_ev_a = _pcb_two_axis_assessment(_clean_evidenced_draft, _p5_td)
+        _clean_ev_comps = (
+            _pcb_honest_draft_hygiene_components(_clean_ev_a)
+            + _pcb_honest_draft_components(_clean_evidenced_draft, _clean_ev_a)
+        )
+        _clean_ev_score = min(
+            10.0 * p / c for (_label, p, c) in _clean_ev_comps if c
+        )
+        if abs(_clean_ev_score - 9.0) > 0.01:
+            print(f"  FAIL PCB draft honesty: clean evidenced NOT_FAB draft must score 9.0 "
+                  f"without inventing a fitness failure reason, got {_clean_ev_score!r} "
+                  f"from {_clean_ev_comps!r}"); bad += 1
         # proveCatch (fixpack16): Tier-1 hygiene row surfaces when firmwareProof.tier1
         # is recorded — ok → scored 1/1; hard-fail (ok=false,skipped=false) → 0/1;
         # skipped alone must NOT floor (1/1 with skipped label).

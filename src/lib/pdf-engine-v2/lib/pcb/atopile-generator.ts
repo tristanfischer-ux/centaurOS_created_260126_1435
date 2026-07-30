@@ -157,7 +157,7 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'power_mosfet', test: /discharge[_-]?load[_-]?mosfet|hardware[_-]?cutout|(^|[_-])mosfet($|[_-])|power[_-]?mosfet|load[_-]?switch[_-]?mosfet|tec[_-]?power[_-]?mosfet/i },
   { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver|(?:heater|stir|pump)[_-]?.*driver/i },
   { id: 'regulator', test: /lv[_-]?buck[_-]?rails?|charge[_-]?current[_-]?source|source[_-]?sink[_-]?stage|linear[_-]?source[_-]?sink|isolated[_-]?ac[_-]?dc|ac[_-]?dc[_-]?power[_-]?module|controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
-  { id: 'sensor_ic', test: /over[_-]?under[_-]?voltage|overvoltage|undervoltage|overcurrent[_-]?comparator|overtemp[_-]?trip|comparator[_-]?latch|photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
+  { id: 'sensor_ic', test: /desat(?:uration)?[_-]?(?:protection|sense|detector|channel)|over[_-]?under[_-]?voltage|overvoltage|undervoltage|overcurrent[_-]?comparator|overtemp[_-]?trip|comparator[_-]?latch|photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|hall|lid[_-]?sense|monitor[_-]?ic|cell[_-]?monitor|fan[_-]?failure|fan[_-]?tach|tachometer/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless|wi[_-]?fi|host[_-]?protocol[_-]?bridge|protocol[_-]?bridge|level[_-]?shifter/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
@@ -173,7 +173,7 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   // `isolate_wet_peripherals` role stayed unfilled → design-fitness FAIL → pcbGate fired → PCB 0.
   // Placed AFTER diode_protection so an "esd_isolation" TVS still classifies as diode_protection,
   // but BEFORE connectivity_ic so "usb_isolator" isn't swallowed by the usb/level-shifter rule.
-  { id: 'isolator_ic', test: /galvanic[_-]?isolator|digital[_-]?isolator|usb[_-]?isolator|opto[_-]?isolator|(^|[_-])isolator($|[_-])|adum\d/i },
+  { id: 'isolator_ic', test: /hv[_-]?lv[_-]?(?:isolation|isolator|barrier)|galvanic[_-]?isolator|digital[_-]?isolator|usb[_-]?isolator|opto[_-]?isolator|(^|[_-])isolator($|[_-])|adum\d/i },
   // INTENT (2026-07-20): flash_storage is the engine's common character_id —
   // flash_memory alone left NinjaPCR thermal_controller unresolved after
   // role-only collection started seeing the word.
@@ -759,6 +759,8 @@ export interface GenerateAtopileProjectOptions {
   symbolsRoot?: string
   requiredWordIds?: string[]
   requiredFunctionRoles?: string[]
+  /** Architecture role → physical channel count; drives draft footprint expansion. */
+  requiredFunctionCounts?: Record<string, number>
   /** Architecture board role (e.g. wet_lab_hat) — densify companions key off this. */
   boardRole?: string
   /** Architecture board id (e.g. wet_actuation) — inter-board mates key off this. */
@@ -1378,6 +1380,175 @@ function ensureHostHatActuationDriveWords(
       quantity: 1,
     })
   }
+  return out
+}
+
+/**
+ * @description Materialize architecture channel counts as repeated draft
+ * footprints when the scoped board already contains the functional anchors.
+ * @param words Architecture-scoped electronic words for one board
+ * @param requiredFunctionCounts Architecture role → required physical count
+ * @returns Words with repeated channel footprints and safety companions
+ *
+ * INTENT (2026-07-30 WP5): a parent "gate-driver board" noun is not six gate
+ * channels. Reviewable product evidence needs six fitted drivers, six desat
+ * paths and their output connectors; control evidence likewise needs each phase
+ * sensor/AFE and buck footprint. Exact identities remain explicitly draft.
+ *
+ * DECISION: channel requirements alone never synthesize hardware. Each family
+ * requires existing board evidence: gate-driver assembly, sensor+AFE pair,
+ * buck regulator, or MCU+HV-sense boundary. Empty token boards stay empty.
+ */
+function ensureDraftChannelTopologyWords(
+  words: ElectronicWordRef[],
+  requiredFunctionCounts: Record<string, number> | undefined,
+): ElectronicWordRef[] {
+  if (!requiredFunctionCounts) return words
+  const target = (role: string): number => {
+    const raw = requiredFunctionCounts[role]
+    return typeof raw === 'number' && Number.isFinite(raw) && raw > 0
+      ? Math.min(64, Math.floor(raw))
+      : 0
+  }
+  const identity = (word: ElectronicWordRef): string =>
+    `${word.wordId} ${word.characterId} ${word.nameHuman}`
+  const out = words.map((word) => ({ ...word }))
+  const initialBlob = out.map(identity).join(' ')
+  const anchor = out[0]
+  const moduleId = anchor?.moduleId ?? 'power_control'
+  const subModuleId = anchor?.subModuleId ?? 'channel_topology'
+
+  const ensureExistingRoleCount = (pattern: RegExp, required: number): boolean => {
+    if (required <= 0) return false
+    const indices = out
+      .map((word, index) => pattern.test(identity(word)) ? index : -1)
+      .filter((index) => index >= 0)
+    if (indices.length === 0) return false
+    const current = indices.reduce((sum, index) => {
+      const quantity = out[index]?.quantity ?? 1
+      return sum + Math.max(1, Math.floor(quantity))
+    }, 0)
+    if (current < required) {
+      const index = indices[0]!
+      const word = out[index]!
+      out[index] = {
+        ...word,
+        quantity: Math.max(1, Math.floor(word.quantity ?? 1)) + (required - current),
+      }
+    }
+    return true
+  }
+
+  const pushDraftRole = (
+    wordId: string,
+    nameHuman: string,
+    characterId: string,
+    quantity: number,
+    category: string,
+    form: string,
+  ): void => {
+    if (quantity <= 0) return
+    out.push({
+      moduleId,
+      subModuleId,
+      wordId,
+      nameHuman,
+      characterId,
+      modifiers: {
+        form,
+        part_number: 'TBD (detailed design)',
+      },
+      categories: [category],
+      quantity,
+    })
+  }
+
+  const gateCount = target('gate_drive_channel')
+  const desatCount = target('desat_channel')
+  const hasGateAssembly =
+    /gate[_ -]?driver[_ -]?board|traction[_ -]?gate[_ -]?drive|sic[_ -]?gate[_ -]?drive/i
+      .test(initialBlob)
+  if (hasGateAssembly && gateCount > 0 && desatCount > 0) {
+    const hasGateChannels = ensureExistingRoleCount(
+      /isolated[_ -]?gate[_ -]?driver[_ -]?channel|gate[_ -]?drive[_ -]?channel[_ -]?driver/i,
+      gateCount,
+    )
+    if (!hasGateChannels) {
+      pushDraftRole(
+        'isolated_gate_driver_channel_word',
+        'Draft isolated gate-driver channel',
+        'isolated_gate_driver_channel',
+        gateCount,
+        'driver',
+        'SOIC-8 draft gate-driver footprint; exact isolated driver MPN and pinout OPEN',
+      )
+    }
+    const hasDesatChannels = ensureExistingRoleCount(
+      /desat(?:uration)?[_ -]?(?:protection|sense|detector)[_ -]?channel/i,
+      desatCount,
+    )
+    if (!hasDesatChannels) {
+      pushDraftRole(
+        'desat_protection_channel_word',
+        'Draft desaturation-protection channel',
+        'desat_protection_channel',
+        desatCount,
+        'sensor',
+        'SOIC-8 draft desat-sense footprint; threshold network and exact MPN OPEN',
+      )
+    }
+    if (!ensureExistingRoleCount(/gate[_ -]?(?:drive[_ -]?)?output[_ -]?connector/i, gateCount)) {
+      pushDraftRole(
+        'gate_drive_output_connector_word',
+        'Draft gate-drive output connector',
+        'gate_drive_output_connector',
+        gateCount,
+        'connector',
+        '2-pin draft power-stage interface; connector family and keying OPEN',
+      )
+    }
+  }
+
+  const phaseCount = target('phase_current_sense')
+  const phaseSensorPattern = /phase[_ -]?current[_ -]?sensor/i
+  const phaseAfePattern = /current[_ -]?sense[_ -]?front[_ -]?end/i
+  const hasPhaseSensors = out.some((word) => phaseSensorPattern.test(identity(word)))
+  const hasPhaseAfes = out.some((word) => phaseAfePattern.test(identity(word)))
+  // GOTCHA: do not complete half a measurement path. Both fitted families must
+  // exist before either is expanded to the architecture's physical count.
+  if (hasPhaseSensors && hasPhaseAfes && phaseCount > 0) {
+    ensureExistingRoleCount(phaseSensorPattern, phaseCount)
+    ensureExistingRoleCount(phaseAfePattern, phaseCount)
+  }
+
+  ensureExistingRoleCount(
+    /lv[_ -]?buck[_ -]?rails?|buck[_ -]?(?:regulator|rail)/i,
+    target('lv_buck_rail'),
+  )
+
+  const isolationCount = target('hv_lv_isolation_barrier')
+  const hasControlAnchor =
+    /(?:control|main)[_ -]?(?:mcu|microcontroller)|microcontroller[_ -]?(?:mcu|control)/i
+      .test(initialBlob)
+  const hasHvSenseAnchor =
+    /dc[_ -]?link[_ -]?voltage[_ -]?sense|phase[_ -]?current[_ -]?(?:sensor|sense)/i
+      .test(initialBlob)
+  if (
+    isolationCount > 0
+    && hasControlAnchor
+    && hasHvSenseAnchor
+    && !ensureExistingRoleCount(/hv[_ -]?lv[_ -]?(?:isolation|isolator|barrier)/i, isolationCount)
+  ) {
+    pushDraftRole(
+      'hv_lv_isolation_barrier_word',
+      'Draft HV/LV signal isolation barrier',
+      'hv_lv_isolation_barrier',
+      isolationCount,
+      'isolation',
+      'SOIC-8 dual-domain draft isolator footprint; isolation rating and exact MPN OPEN',
+    )
+  }
+
   return out
 }
 
@@ -2948,6 +3119,145 @@ function wireChannelInstrumentNets(
 }
 
 /**
+ * @description Wire architecture-expanded draft channel footprints into named
+ * gate/desat, phase-sense, LV-rail and isolation paths.
+ *
+ * INTENT (2026-07-30 WP5): repeated footprints without copper relationships are
+ * quantity theatre. These named nets make each draft channel inspectable while
+ * keeping exact pinout/rating release OPEN and fabrication readiness false.
+ */
+function wireDraftChannelTopologyNets(
+  components: AtopileComponentRecord[],
+  ensureNet: (name: string, kind: AtopileNetRecord['kind']) => AtopileNetRecord,
+  addMember: (net: AtopileNetRecord, instanceName: string, pin: string) => void,
+): void {
+  const drivers = listIndexedRoleComponents(
+    components,
+    /isolated[_ -]?gate[_ -]?driver[_ -]?channel|gate[_ -]?drive[_ -]?channel[_ -]?driver/i,
+  )
+  const desats = listIndexedRoleComponents(
+    components,
+    /desat(?:uration)?[_ -]?(?:protection|sense|detector)[_ -]?channel/i,
+  )
+  const gateConnectors = listIndexedRoleComponents(
+    components,
+    /gate[_ -]?(?:drive[_ -]?)?output[_ -]?connector/i,
+  )
+  const gateCount = Math.min(drivers.length, desats.length, gateConnectors.length)
+  for (let i = 0; i < gateCount; i += 1) {
+    const driver = drivers[i]!
+    const desat = desats[i]!
+    const connector = gateConnectors[i]!
+    const gateOut = ensureNet(`GATE_DRIVE_OUT_${i}`, 'signal')
+    const desatSense = ensureNet(`DESAT_SENSE_${i}`, 'signal')
+    addMember(
+      gateOut,
+      driver.instanceName,
+      findPinMatching(driver, [/^OUT$/i, /^VO$/i]) ?? ensureComponentPin(driver, 'OUT'),
+    )
+    addMember(
+      gateOut,
+      connector.instanceName,
+      findPinMatching(connector, [/^P1$/i, /^1__/i]) ?? ensureComponentPin(connector, 'P1'),
+    )
+    addMember(
+      desatSense,
+      desat.instanceName,
+      findPinMatching(desat, [/^OUT$/i, /^VO$/i]) ?? ensureComponentPin(desat, 'OUT'),
+    )
+    addMember(
+      desatSense,
+      driver.instanceName,
+      findPinMatching(driver, [/^DESAT$/i]) ?? ensureComponentPin(driver, 'DESAT'),
+    )
+    addMember(
+      desatSense,
+      connector.instanceName,
+      findPinMatching(connector, [/^P2$/i, /^2__/i]) ?? ensureComponentPin(connector, 'P2'),
+    )
+  }
+
+  const phaseSensors = listIndexedRoleComponents(
+    components,
+    /phase[_ -]?current[_ -]?sensor/i,
+  )
+  const phaseAfes = listIndexedRoleComponents(
+    components,
+    /current[_ -]?sense[_ -]?front[_ -]?end/i,
+  )
+  const mcu = components.find((component) => component.functionClass === 'microcontroller')
+  const phaseCount = Math.min(phaseSensors.length, phaseAfes.length)
+  for (let i = 0; i < phaseCount; i += 1) {
+    const sensor = phaseSensors[i]!
+    const afe = phaseAfes[i]!
+    const raw = ensureNet(`PHASE_CURRENT_RAW_${i}`, 'signal')
+    const adc = ensureNet(`PHASE_CURRENT_ADC_${i}`, 'signal')
+    addMember(
+      raw,
+      sensor.instanceName,
+      findPinMatching(sensor, [/^OUT$/i, /^VO$/i]) ?? ensureComponentPin(sensor, 'OUT'),
+    )
+    addMember(
+      raw,
+      afe.instanceName,
+      findPinMatching(afe, [/^IN_POS$/i, /^INP$/i]) ?? ensureComponentPin(afe, 'IN_POS'),
+    )
+    addMember(
+      adc,
+      afe.instanceName,
+      findPinMatching(afe, [/^OUT$/i, /^VO$/i]) ?? ensureComponentPin(afe, 'OUT'),
+    )
+    if (mcu) {
+      addMember(adc, mcu.instanceName, ensureComponentPin(mcu, `PHASE_CURRENT_ADC_${i}`))
+    }
+  }
+
+  const bucks = listIndexedRoleComponents(
+    components,
+    /lv[_ -]?buck[_ -]?rails?|buck[_ -]?(?:regulator|rail)/i,
+  )
+  for (let i = 0; i < bucks.length; i += 1) {
+    const buck = bucks[i]!
+    const rail = ensureNet(`LV_BUCK_RAIL_${i}`, 'power')
+    addMember(
+      rail,
+      buck.instanceName,
+      findPinMatching(buck, [/^VOUT$/i, /^OUT$/i]) ?? ensureComponentPin(buck, 'VOUT'),
+    )
+  }
+
+  const isolator = listIndexedRoleComponents(
+    components,
+    /hv[_ -]?lv[_ -]?(?:isolation|isolator|barrier)/i,
+  )[0]
+  const hvSense = listIndexedRoleComponents(
+    components,
+    /dc[_ -]?link[_ -]?voltage[_ -]?sense/i,
+  )[0]
+  if (isolator && hvSense && mcu) {
+    const sensePins = twoTerminalPins(hvSense)
+    const highSide = ensureNet('HV_ISO_SENSE', 'signal')
+    const lowSide = ensureNet('LV_ISO_SENSE', 'signal')
+    const isolatedVdd = ensureNet('HV_ISO_VDD', 'power')
+    const isolatedGnd = ensureNet('HV_ISO_GND', 'ground')
+    if (sensePins) addMember(highSide, hvSense.instanceName, sensePins[0])
+    addMember(
+      highSide,
+      isolator.instanceName,
+      findPinMatching(isolator, [/^VIA$/i, /^IN1$/i]) ?? ensureComponentPin(isolator, 'VIA'),
+    )
+    addMember(
+      lowSide,
+      isolator.instanceName,
+      findPinMatching(isolator, [/^VOA$/i, /^OUT1$/i]) ?? ensureComponentPin(isolator, 'VOA'),
+    )
+    addMember(lowSide, mcu.instanceName, ensureComponentPin(mcu, 'HV_ISO_SENSE'))
+    addMember(isolatedVdd, isolator.instanceName, ensureComponentPin(isolator, 'VDD2'))
+    addMember(isolatedGnd, isolator.instanceName, ensureComponentPin(isolator, 'GND2'))
+  }
+}
+
+/**
  * @description Drop empty nets and topology invent stubs (`NET_*`) that never
  * got a second endpoint. Never prune power/ground, crossBoard cable nets with
  * ≥1 member, or intentional single-node actuator outputs (e.g. STIR_MOTOR_A).
@@ -3058,6 +3368,7 @@ function buildNets(
   // I²C/SWD pad copper + POWER_/SENSE_/SAFETY_CHANNEL_* spines for Tier-2 bind.
   wireOnBoardI2cAndSwdNets(components, nets, ensureNet, addMember)
   wireChannelInstrumentNets(components, ensureNet, addMember)
+  wireDraftChannelTopologyNets(components, ensureNet, addMember)
 
   // Topology-derived signal nets: extend each participating component with a
   // fresh generic signal pin (concept-stage placeholder, consistent with the
@@ -3302,16 +3613,20 @@ export function generateAtopileProject(
   const scopedElectronicWords = requiredWordIds
     ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
     : allElectronicWords
-  // INTENT: densify with published gold companions — heater FFC+hall, OD
-  // photodiode+TIA+passives, HAT 2×20 socket, inter-board cable mates, and
-  // (when fixture publishes) host-HAT heater MOSFET + stir/pump DRV8876.
+  const channelTopologyWords = ensureDraftChannelTopologyWords(
+    scopedElectronicWords,
+    opts.requiredFunctionCounts,
+  )
+  // INTENT: densify channel-count footprints plus published gold companions —
+  // heater FFC+hall, OD photodiode+TIA+passives, HAT 2×20 socket, inter-board
+  // cable mates, and (when fixture publishes) host-HAT actuation drivers.
   const electronicWords = ensureInterBoardConnectorWords(
     ensureHostHatActuationDriveWords(
       ensurePowerIndicatorBallastWords(
         ensureHatHostConnectorWords(
           ensureOdGoldCompanionWords(
             ensureHeaterGoldCompanionWords(
-              scopedElectronicWords,
+              channelTopologyWords,
               opts.requiredFunctionRoles,
             ),
             opts.requiredFunctionRoles,

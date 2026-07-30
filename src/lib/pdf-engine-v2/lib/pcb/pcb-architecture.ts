@@ -344,7 +344,7 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
       return /gate[_ -]?driv|desat|half[_ -]?bridge[_ -]?driver|sic[_ -]?driver|isolated[_ -]?driver/i.test(text)
     }
     if (candidate.role === 'traction_control_board') {
-      return /(?:oem[_ -]?)?inverter[_ -]?control|control[_ -]?board|phase[_ -]?current|resolver|can[_ -]?fd|vehicle[_ -]?interface|microcontroller|mcu|temperature[_ -]?probe/i.test(text)
+      return /(?:oem[_ -]?)?inverter[_ -]?control|control[_ -]?board|phase[_ -]?current|current[_ -]?sense[_ -]?front[_ -]?end|resolver|can[_ -]?fd|vehicle[_ -]?interface|microcontroller|mcu|temperature[_ -]?probe|lv[_ -]?buck|dc[_ -]?link[_ -]?voltage[_ -]?sense|hv[_ -]?lv[_ -]?isolat/i.test(text)
     }
     return false
   })

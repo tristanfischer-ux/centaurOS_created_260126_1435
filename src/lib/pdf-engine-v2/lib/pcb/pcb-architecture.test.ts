@@ -122,6 +122,12 @@ describe('derivePcbArchitecture', () => {
           nameHuman: 'Phase Current Sensor',
           characterId: 'phase_current_sensor',
         },
+        {
+          id: 'lv_buck_rails_word',
+          nameHuman: 'LV Buck Rails',
+          characterId: 'lv_buck_rails',
+          modifiers: [{ kind: 'form', value: 'SOT-23-5 buck regulator IC' }],
+        },
       ],
     )
     const plan = derivePcbArchitecture(state)
@@ -137,6 +143,7 @@ describe('derivePcbArchitecture', () => {
     expect(byId.oem_inverter_control_board_word.placement).toBe('off_board_module')
     expect(byId.sic_traction_inverter_word.placement).toBe('off_board_module')
     expect(byId.phase_current_sensor_word.boardId).toBe('traction_control')
+    expect(byId.lv_buck_rails_word.boardId).toBe('traction_control')
     expect(plan.boards[0].channelRequirements).toEqual([
       { role: 'gate_drive_channel', count: 6 },
       { role: 'desat_channel', count: 6 },
