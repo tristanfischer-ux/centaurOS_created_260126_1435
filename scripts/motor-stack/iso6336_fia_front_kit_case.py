@@ -323,6 +323,32 @@ def _stream_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _apply_gear_geometry_writeback(
+    twin_dir: Path,
+    quantities: dict[str, Any],
+    concentric: dict[str, Any],
+) -> None:
+    """Overlay strength-driven gear dims when gear_geometry_writeback.json exists.
+
+    INTENT: After the packaging seed failed FoS, the writeback sidecar (and
+    patched state quantities) is the controlling packaging seed for re-runs so
+    we do not keep rediscovering the same undersized m/face every time.
+    """
+
+    side = twin_dir / "_motor_stack" / "gear_geometry_writeback.json"
+    if not side.is_file():
+        return
+    try:
+        payload = json.loads(side.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    for key, entry in (payload.get("quantities") or {}).items():
+        if isinstance(entry, Mapping) and entry.get("value") is not None:
+            quantities[key] = dict(entry)
+    for key, value in (payload.get("fpkConcentricGeometry") or {}).items():
+        concentric[key] = value
+
+
 def load_twin_inputs(state_path: Path) -> tuple[TwinInputs, str]:
     """Selectively read a stable twin snapshot and return its file hash."""
 
@@ -330,12 +356,16 @@ def load_twin_inputs(state_path: Path) -> tuple[TwinInputs, str]:
         raise FiaFrontKitGearError(f"Twin state not found: {state_path}")
 
     last_error = "Twin state changed during selective-read attempts"
+    twin_dir = state_path.parent
     for attempt in range(5):
         before = state_path.stat()
-        quantities = _read_section(state_path, "orchestratorContract.quantities")
+        quantities = dict(_read_section(state_path, "orchestratorContract.quantities"))
         if not quantities:
-            quantities = _read_section(state_path, "engineeringContract.quantities")
-        concentric = _read_section(state_path, "fpkConcentricGeometry")
+            quantities = dict(
+                _read_section(state_path, "engineeringContract.quantities")
+            )
+        concentric = dict(_read_section(state_path, "fpkConcentricGeometry"))
+        _apply_gear_geometry_writeback(twin_dir, quantities, concentric)
         source_hash = _stream_sha256(state_path)
         after = state_path.stat()
         if (

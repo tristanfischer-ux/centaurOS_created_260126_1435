@@ -49,7 +49,7 @@ Not done: full MTPA/FW map, demag, dyno, HIL, free-surface oil CFD, KISSsoft, ca
 |---|---|---|---|---|
 | Magnetic field / torque | Map proving 250 kW duty | **PARTIAL** | **yes** — peak ~96 N·m / 125 (~77%); position sweep recorded | Full MTPA/FW; demag; dyno |
 | Rotor dynamics | Critical speeds vs 19,500 rpm | **PARTIAL** | **yes** — clear of band (assumed bearings) | Catalogue k/c; modal correlation |
-| Structural / burst | Case, rotor, mounts survive | **PARTIAL** | **yes** — steel-ring centrifugal screen | Pocket burst + case/mount FEA |
+| Structural / burst | Case, rotor, mounts survive | **PARTIAL** | **yes** — ring + **magnet-pocket bridge** screens below assumed yield | Case/mount FEA; laminate anisotropy; release FoS |
 | Motor water jacket | Flow + heat at 12 L/min, 60 °C | **PARTIAL** | **yes** — OpenFOAM duct Δp screen | Helical CHT + winding temps |
 | Inverter cold plate | Module temperatures / pressure drop | **PARTIAL** | **yes** — duct Δp screen | Full serpentine CHT + heater plate |
 | Gear oil delivery | Jets, pickup, churning | **PARTIAL** | **yes** — analytical handbook screen | Free-surface CFD + bench |
