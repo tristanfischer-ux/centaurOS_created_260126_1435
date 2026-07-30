@@ -58,6 +58,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
         "paths": [
             "scripts/motor-stack/calculix_smoke_selftest.sh",
             "scripts/motor-stack/calculix_fia_rotor_screen.py",
+            "scripts/motor-stack/calculix_fia_magnet_pocket_screen.py",
             "scripts/motor-stack/calculix.Dockerfile",
         ],
         "versions": {"calculix_ccx": "2.21", "image": "forgeos/calculix:2.21-arm64"},
@@ -354,6 +355,11 @@ def _load_fia_calculix_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]
     return _load_fia_case_json(twin_dir, "calculix_fia_rotor_screen.json")
 
 
+def _load_fia_magnet_pocket_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA magnet-pocket / iron-bridge screen artefact if present."""
+    return _load_fia_case_json(twin_dir, "calculix_fia_magnet_pocket_screen.json")
+
+
 def _load_fia_cold_plate_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
     """Load twin-bound FIA OpenFOAM cold-plate duct artefact if present."""
     return _load_fia_case_json(twin_dir, "openfoam_fia_cold_plate_case.json")
@@ -583,11 +589,13 @@ def _structural_check_from_fia_case(
     case: Mapping[str, Any],
     *,
     twin_dir: Path,
+    magnet_pocket_case: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Promote structural to PARTIAL when a twin-bound CalculiX screen exists.
 
-    INTENT: Make the FIA front-kit centrifugal ring screen visible without
-    claiming magnet-pocket burst FEA or closed release FoS (those stay OPEN).
+    INTENT: Make the FIA front-kit centrifugal ring screen visible, and cite the
+    magnet-pocket / iron-bridge screen when present, without claiming closed
+    release FoS (always OPEN) or flipping ship_ok.
     """
     screening = (
         case.get("screening_results")
@@ -599,11 +607,62 @@ def _structural_check_from_fia_case(
     mesh = case.get("ring_mesh") if isinstance(case.get("ring_mesh"), dict) else {}
     rel_ref = "_motor_stack/calculix_fia_rotor_screen.json"
     below_yield = bool(margins.get("below_assumed_yield"))
+    # GOTCHA: works_in_kit_context stays ring-screen below_yield so proveCatch
+    # on the ring artefact alone does not break when the pocket screen is absent.
+    magnet_pocket_evidence: Any = "OPEN"
+    if isinstance(magnet_pocket_case, Mapping):
+        pocket_screening = (
+            magnet_pocket_case.get("screening_results")
+            if isinstance(magnet_pocket_case.get("screening_results"), dict)
+            else {}
+        )
+        pocket_margins = (
+            magnet_pocket_case.get("margins")
+            if isinstance(magnet_pocket_case.get("margins"), dict)
+            else {}
+        )
+        pocket_works = (
+            magnet_pocket_case.get("works_in_kit_context")
+            if isinstance(magnet_pocket_case.get("works_in_kit_context"), dict)
+            else {}
+        )
+        pocket_rel = "_motor_stack/calculix_fia_magnet_pocket_screen.json"
+        magnet_pocket_evidence = {
+            "status": magnet_pocket_case.get("status") or "PARTIAL",
+            "ship_ok": False,
+            "path": pocket_rel,
+            "absolute_path": str((Path(twin_dir) / pocket_rel).resolve()),
+            "max_von_mises_mpa": pocket_screening.get("max_von_mises_mpa"),
+            "analytical_bridge_stress_mpa": pocket_screening.get(
+                "analytical_bridge_stress_mpa"
+            ),
+            "screening_fos_vs_yield_fea": pocket_margins.get(
+                "screening_fos_vs_assumed_yield_fea"
+            ),
+            "screening_fos_vs_yield_analytical": pocket_margins.get(
+                "screening_fos_vs_assumed_yield_analytical"
+            ),
+            "below_assumed_yield": pocket_margins.get("below_assumed_yield"),
+            "works_in_kit_context": bool(
+                pocket_works.get("bridge_screen_ok")
+                if "bridge_screen_ok" in pocket_works
+                else pocket_margins.get("below_assumed_yield")
+            ),
+            "release_fos_closed": False,
+            "note": (
+                "Twin-bound analytical+CalculiX outer iron-bridge / magnet-pocket "
+                "centrifugal SCREEN. Not release FoS; not fillet burst mesh."
+            ),
+        }
     body = _open_check(
         "structural",
         extra={
             "status": "PARTIAL",
-            "load_case_set": "centrifugal_overspeed_ring_screen",
+            "load_case_set": (
+                "centrifugal_overspeed_ring_screen+magnet_pocket_bridge_screen"
+                if isinstance(magnet_pocket_evidence, dict)
+                else "centrifugal_overspeed_ring_screen"
+            ),
             "minimum_factor_of_safety": margins.get("screening_fos_vs_assumed_yield"),
             "works_in_kit_context": below_yield,
             "model_revision": str(
@@ -636,12 +695,18 @@ def _structural_check_from_fia_case(
                 "below_assumed_yield": margins.get("below_assumed_yield"),
                 "release_fos_closed": False,
                 "max_rotor_speed_rpm": inputs.get("max_rotor_speed_rpm"),
-                "magnet_pocket_burst_fea": "OPEN",
+                "magnet_pocket_burst_fea": magnet_pocket_evidence,
                 "note": (
                     "Twin-bound CalculiX steel-ring centrifugal screen at kit rpm. "
-                    "works_in_kit_context = below_assumed_yield (screening only). "
-                    "Assumed isotropic steel; not magnet-pocket burst; release FoS "
-                    "not closed."
+                    "works_in_kit_context = ring below_assumed_yield (screening only). "
+                    "Assumed isotropic steel; release FoS not closed."
+                    + (
+                        " Magnet-pocket / iron-bridge screen cited when present "
+                        "(still SCREENING, not release)."
+                        if isinstance(magnet_pocket_evidence, dict)
+                        else " Magnet-pocket burst FEA remains OPEN until "
+                        "calculix_fia_magnet_pocket_screen.json is present."
+                    )
                 ),
             },
         },
@@ -1130,15 +1195,24 @@ def build_motor_multiphysics(
         )
 
     fia_calculix = _load_fia_calculix_case(twin_dir)
+    fia_magnet_pocket = _load_fia_magnet_pocket_case(twin_dir)
     if fia_calculix is not None and twin_dir is not None:
         structural = _structural_check_from_fia_case(
-            duty, fia_calculix, twin_dir=Path(twin_dir)
+            duty,
+            fia_calculix,
+            twin_dir=Path(twin_dir),
+            magnet_pocket_case=fia_magnet_pocket,
         )
         notes += (
             " Structural check PARTIAL: twin-bound CalculiX rotor centrifugal "
-            "screen in _motor_stack/calculix_fia_rotor_screen.json "
-            "(magnet-pocket burst / release FoS still OPEN)."
+            "screen in _motor_stack/calculix_fia_rotor_screen.json"
         )
+        if fia_magnet_pocket is not None:
+            notes += (
+                " + magnet-pocket / iron-bridge screen in "
+                "_motor_stack/calculix_fia_magnet_pocket_screen.json"
+            )
+        notes += " (release FoS still OPEN)."
     else:
         structural = _open_check(
             "structural",
@@ -1834,6 +1908,32 @@ def selftest() -> int:
             + "\n",
             encoding="utf-8",
         )
+        (case_dir / "calculix_fia_magnet_pocket_screen.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.calculix_fia_magnet_pocket_screen/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "pocket123",
+                    "screening_results": {
+                        "max_von_mises_mpa": 95.0,
+                        "analytical_bridge_stress_mpa": 42.0,
+                        "max_principal_stress_mpa": 100.0,
+                        "max_abs_displacement_mm": 0.008,
+                    },
+                    "margins": {
+                        "screening_fos_vs_assumed_yield_fea": 3.74,
+                        "screening_fos_vs_assumed_yield_analytical": 8.45,
+                        "below_assumed_yield": True,
+                        "release_fos_closed": False,
+                    },
+                    "works_in_kit_context": {"bridge_screen_ok": True},
+                    "input_quantities": {"max_rotor_speed_rpm": 19500.0},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (case_dir / "openfoam_fia_cold_plate_case.json").write_text(
             json.dumps(
                 {
@@ -2003,6 +2103,23 @@ def selftest() -> int:
             bad += 1
         if structural.get("works_in_kit_context") is not True:
             print("FAIL: structural works_in_kit_context must be true when below yield")
+            bad += 1
+        structural_twin = structural.get("twin_bound_case") or {}
+        pocket_cite = structural_twin.get("magnet_pocket_burst_fea")
+        if not isinstance(pocket_cite, dict) or pocket_cite.get("status") != "PARTIAL":
+            print(
+                "FAIL: structural twin_bound_case must cite magnet-pocket screen "
+                "as PARTIAL evidence when artefact present"
+            )
+            bad += 1
+        elif pocket_cite.get("max_von_mises_mpa") != 95.0:
+            print("FAIL: magnet-pocket cite must surface FEA von Mises from artefact")
+            bad += 1
+        elif pocket_cite.get("ship_ok") is not False:
+            print("FAIL: magnet-pocket cite must keep ship_ok false")
+            bad += 1
+        if structural.get("status") == "PASS" or structural_twin.get("ship_ok") is True:
+            print("FAIL: structural must remain PARTIAL with ship_ok false")
             bad += 1
         cold_chk = partial_payload["motorMultiphysics"]["required_checks"][
             "inverter_cold_plate"

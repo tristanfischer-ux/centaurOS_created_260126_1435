@@ -307,9 +307,10 @@ Work directories stay under `scripts/motor-stack/` so Colima can see them (macOS
 `TMPDIR` under `/var/folders` is not mounted). Native `ccx` is preferred when
 present; otherwise `forgeos/calculix:2.21-arm64`.
 
-The artefact always keeps magnet-pocket burst FEA and release FoS `OPEN`,
-status `PARTIAL`, and `ship_ok: false`. Screening FoS vs assumed yield is
-informational only — never a closed release factor of safety.
+The artefact keeps release FoS `OPEN`, status `PARTIAL`, and `ship_ok: false`.
+Screening FoS vs assumed yield is informational only — never a closed release
+factor of safety. Magnet-pocket burst is covered by the companion screen below
+when that artefact is present; otherwise the stamp still records it as `OPEN`.
 
 ```text
 out/formula-e-front-mgu-20260729-1432/_motor_stack/calculix_fia_rotor_screen.json
@@ -330,6 +331,38 @@ speed. Halving rpm must drop von Mises by more than 55 %, proving the headline
 stress is solver-derived (ω² scaling). It also proves twin dimensions replace
 the smoke cantilever and that no code path can set `ship_ok` or close release
 FoS.
+
+### FIA-bound Formula E front-kit magnet-pocket / iron-bridge screen
+
+Companion to the solid-ring screen. Derives the same 1 mm outer iron bridge and
+V-pocket magnet size as `em_fia_front_kit_case.py`, then combines:
+
+1. an analytical outer-bridge membrane stress from one NdFeB bar's centrifugal
+   force;
+2. a coarse CalculiX C3D8 ligament solid under `*DLOAD CENTRIF` plus magnet-face
+   pressure at ~19,500 rpm.
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/calculix_fia_magnet_pocket_screen.py \
+  --twin out/formula-e-front-mgu-20260729-1432
+```
+
+```text
+out/formula-e-front-mgu-20260729-1432/_motor_stack/calculix_fia_magnet_pocket_screen.json
+```
+
+When present, the stamp cites it under
+`structural.twin_bound_case.magnet_pocket_burst_fea` as additional **PARTIAL**
+screening evidence. Structural stays PARTIAL; `ship_ok` stays false; release FoS
+stays OPEN. This is not a fillet burst mesh or closed retention FoS.
+
+```bash
+.venv-motor/bin/python scripts/motor-stack/calculix_fia_magnet_pocket_screen.py --selftest
+```
+
+The self-test solves at 19,500 rpm and again at 10× rpm. Ten-times rpm must raise
+FEA von Mises by more than 20× and analytical bridge stress by more than 50×
+(ω² scaling), proving the headline stresses are not canned constants.
 
 ## ISO 6336-style gear strength (analytical screen)
 
