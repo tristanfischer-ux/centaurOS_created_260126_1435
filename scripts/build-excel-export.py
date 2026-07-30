@@ -10337,29 +10337,75 @@ def _brief_metric_status(metric: dict, quantities: Dict[str, Any], brief_text: s
     )
 
 
+_WORKED_RESULT_LITERAL_RE = re.compile(
+    r"([-+]?(?:\d[\d,]*\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)"
+    r"\s*([A-Za-z°µμ%][A-Za-z0-9°µμ%/.\-^*·]*)?\s*$"
+)
+
+
+def _worked_result_value_unit(w: dict) -> Tuple[Optional[float], str]:
+    """Return a worked-calc result value/unit from either structured fields or transcript text."""
+    res = w.get("result")
+    if isinstance(res, dict):
+        val, unit = num(res.get("value")), str(res.get("unit") or w.get("result_unit") or "")
+    else:
+        val, unit = num(res), str(w.get("result_unit") or "")
+    if val is not None:
+        return val, unit
+    unit = unit or str(w.get("unit") or "")
+    ev_s = safe_eval_substitution(w.get("substitution"))
+    if ev_s is not None:
+        return ev_s, unit
+    # GOTCHA: some legacy contract worked-calcs are transcript-only, e.g.
+    # "n_max = 21,450 (tool input) = 21,450 rpm". The Calculations tab can render
+    # this honestly, but Verification still needs the final result literal.
+    tail = str(w.get("substitution") or "").rsplit("=", 1)[-1].strip()
+    m = _WORKED_RESULT_LITERAL_RE.search(tail)
+    if not m:
+        return None, unit
+    parsed = num(m.group(1).replace(",", ""))
+    parsed_unit = (m.group(2) or unit or "").strip()
+    return parsed, parsed_unit
+
+
 def _iter_worked_results(state: dict) -> List[dict]:
-    """Flatten toolsUsedPage worked calcs to {tool_id, label, value, unit}."""
+    """Flatten worked calcs to {tool_id, label, value, unit} for the Verification spine."""
     out: List[dict] = []
+    seen = set()
+
+    def append_worked(tid: str, w: dict) -> None:
+        if not isinstance(w, dict):
+            return
+        val, unit = _worked_result_value_unit(w)
+        if val is None:
+            return
+        row = {
+            "tool_id": tid,
+            "label": str(w.get("label") or ""),
+            "value": val,
+            "unit": unit,
+        }
+        key = (row["tool_id"], row["label"], row["value"], row["unit"])
+        if key in seen:
+            return
+        seen.add(key)
+        out.append(row)
+
     for t in ((state.get("toolsUsedPage") or {}).get("tools") or []):
         if not isinstance(t, dict):
             continue
         tid = str(t.get("tool_id") or "")
         for w in (t.get("worked") or []):
-            if not isinstance(w, dict):
+            append_worked(tid, w)
+    for root_key in ("orchestratorContract", "engineeringContract"):
+        worked_by_tool = ((state.get(root_key) or {}).get("worked_calculations") or {})
+        if not isinstance(worked_by_tool, dict):
+            continue
+        for tid, rows in worked_by_tool.items():
+            if not isinstance(rows, list):
                 continue
-            res = w.get("result")
-            if isinstance(res, dict):
-                val, unit = num(res.get("value")), str(res.get("unit") or w.get("result_unit") or "")
-            else:
-                val, unit = num(res), str(w.get("result_unit") or "")
-            if val is None:
-                continue
-            out.append({
-                "tool_id": tid,
-                "label": str(w.get("label") or ""),
-                "value": val,
-                "unit": unit,
-            })
+            for w in rows:
+                append_worked(str(tid or ""), w)
     return out
 
 
@@ -10829,8 +10875,23 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             continue
         recon_attempted += 1
         w = m["worked"]
-        status = "PASS" if m["ok"] else "FAIL"
-        if m["ok"]:
+        # INTENT (2026-07-30 FPK): the race cassette's used speed and retention
+        # capacity are different proof quantities. A retention/overspeed worked
+        # row closes the HARD arithmetic spine when capacity >= used max rpm;
+        # DEC-006 remains the SOFT race hold until dyno/FEA evidence exists.
+        retention_capacity = (
+            re.search(r"rotor.*speed|speed.*rotor|rpm", qn, re.I)
+            and re.search(r"\bretention\b|\boverspeed\b", str(w.get("label") or ""), re.I)
+            and (w.get("unit") or "").strip().lower() == "rpm"
+        )
+        if retention_capacity:
+            ok = bool(m["worked_value"] >= qval * (1 - _QTY_WORKED_TOL))
+            compare = "ge"
+        else:
+            ok = bool(m["ok"])
+            compare = "eq"
+        status = "PASS" if ok else "FAIL"
+        if ok:
             recon_ok += 1
         if _recon_rows_emitted >= _max_recon_rows:
             continue
@@ -10841,7 +10902,7 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             provenance=(f"quantities.{qn} ↔ {w['tool_id']} / {w['label']} "
                         f"(rel err {m['rel_err'] * 100:.2f}%)"),
             target=qval, achieved=m["worked_value"], unit=qunit or w.get("unit") or "",
-            target_num=qval, achieved_num=m["worked_value"], compare="eq",
+            target_num=qval, achieved_num=m["worked_value"], compare=compare,
             tol_frac=_QTY_WORKED_TOL,
         ))
     # If system_thermal was never visited in candidates but composition closes, count it.
@@ -31013,6 +31074,23 @@ def _selftest() -> int:
     )
     if not (_ok_m and _ok_m.get("ok")):
         print("  FAIL unit-family: retention rpm worked calc must close max_rotor_speed_rpm"); bad += 1
+    _legacy_retention_state = {
+        "orchestratorContract": {
+            "quantities": {"max_rotor_speed_rpm": {"value": 19500.0, "unit": "rpm"}},
+            "worked_calculations": {"motor:rotor-centrifugal-stress": [{
+                "label": "Design max rotor speed (retention)",
+                "substitution": "n_max = 21,450 (tool input) = 21,450 rpm",
+            }]},
+        },
+        "toolsUsedPage": {"tools": []},
+    }
+    _legacy_rows = _assemble_verification_rows(_legacy_retention_state, "")
+    _legacy_rpm = next((r for r in _legacy_rows
+                        if "Max rotor speed" in str(r.get("claim") or "")), None)
+    if not (_legacy_rpm and _legacy_rpm.get("status") == "PASS"
+            and _legacy_rpm.get("compare") == "ge"):
+        print(f"  FAIL unit-family: transcript-only retention rpm must close as capacity>=used "
+              f"(got {_legacy_rpm})"); bad += 1
     # Contract signatures for the three new tables must be registered (uncontracted
     # header() → hard-fail at build). proveCatch: signature lookup succeeds.
     for _cols, _fam in (
