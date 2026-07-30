@@ -14027,6 +14027,12 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
         "u_se_td_gearbox",       # seated BoM mesh = internal planetary nest
         "u_se_td_diff_bulge",    # seated BoM mesh = internal mini-diff
         "u_se_td_gear_rib_",
+        # Phase N2 PE volume under MCU lid — cutaway/ghost only on closed 04–07.
+        "u_se_td_pe_module_",
+        "u_se_td_pe_busbar_",
+        "u_se_td_pe_busbar_ins_",
+        "u_se_td_pe_filmcap_",
+        "u_se_td_pe_gd_flex",
     )
     return not any(nm.startswith(p) or p.rstrip("_") == nm for p in _interior)
 
@@ -14093,6 +14099,30 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "Lucid-gold race-hardware cues (cast fins + cold-plate fasteners) required")
     assert "u_se_td_coolant_hose_" in _src_td and "u_se_td_hv_cable_boot" in _src_td, (
         "service ports must have attached hose/loom boots, not cosmetic pegs")
+    # proveCatch (Phase N2): HV connector family + cast language + PE density + routes.
+    assert "_fpk_place_hv_connector" in _src_td and "mat_braid" in _src_td, (
+        "HV connector family (keyed shell + braid boot) must be placed")
+    assert "_fpk_place_cast_language_cues" in _src_td, (
+        "cast-language body cues (ribs / bolt circles / gasket lips) required")
+    assert "_fpk_place_pe_volume_density" in _src_td, (
+        "PE volume under MCU lid must place module bricks")
+    assert "_fpk_draw_principal_vehicle_routes" in _src_td, (
+        "principal HV/coolant/LV vehicle routes required so route-audit ≠ 0")
+    _src_hv = _insp_td.getsource(_fpk_place_hv_connector)
+    assert "hvil" in _src_hv.lower() and "braid" in _src_hv.lower(), (
+        "HV connector family helper must include HVIL + braid boot")
+    _src_cast = _insp_td.getsource(_fpk_place_cast_language_cues)
+    assert "gasket_lip" in _src_cast and "cast_rib" in _src_cast, (
+        "cast-language helper must place gasket lips + ribs")
+    assert "cast_rib_cam" in _src_cast, (
+        "cast ribs must face the service-face camera (−Y), not only +Y")
+    _src_pe = _insp_td.getsource(_fpk_place_pe_volume_density)
+    assert "pe_module" in _src_pe and "pe_busbar" in _src_pe, (
+        "PE density helper must place module bricks + busbar cues")
+    assert _traction_drive_exterior_keep_visible("u_se_td_cast_rib_cam_0")
+    assert _traction_drive_exterior_keep_visible("u_se_td_vehicle_hv")
+    assert not _traction_drive_exterior_keep_visible("u_se_td_pe_module_0"), (
+        "PE module bricks are cutaway/ghost only on closed exterior")
     # proveCatch (2026-07-29): concentric FPK stack — hollow rotor hosts planetary+diff;
     # MCU busbars pierce into stator (public press TRAINING CHECK, not CAD paste).
     assert "u_se_td_hollow_rotor" in _src_td and "u_se_td_sun_gear" in _src_td
@@ -18444,10 +18474,19 @@ def _fpk_place_sic_inverter_stack(name, center_mm, size_mm, mat, story_mod, MO):
         )
 
 
-def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story_mod, MO):
-    """Compound HV DC connector — keyed body + cylindrical interface barrel."""
+def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story_mod, MO,
+                            mat_rubber=None, mat_braid=None):
+    """Compound HV DC connector family — keyed shell + HVIL + braid boot (not a peg).
+
+    INTENT (Phase N2 / public EDU grammar): BorgWarner iDM / FE press kits show a
+    *family* — keyed plastic shell, interlock (HVIL) cue, and braid/strain-relief
+    boot — never an orange cosmetic peg. Universal traction-pack morphology.
+    """
     cx, cy, cz = center_mm
     w, d, h = size_mm
+    mat_r = mat_rubber or mat_body
+    mat_b = mat_braid or mat_steel
+    # Keyed shell body (rectangular land + D-key flat on −Y face).
     fl.add_box(
         name,
         (cx * fl.MM, cy * fl.MM, cz * fl.MM),
@@ -18456,16 +18495,284 @@ def _fpk_place_hv_connector(name, center_mm, size_mm, mat_body, mat_steel, story
         module=story_mod,
         module_objects=MO,
     )
+    # Keying flat / hood land (reads as keyed shell, not a smooth brick).
+    fl.add_box(
+        f"{name}_key_flat",
+        (cx * fl.MM, (cy - d * 0.28) * fl.MM, (cz + h * 0.18) * fl.MM),
+        (w * 0.72 * fl.MM, max(4.0, d * 0.18) * fl.MM, h * 0.28 * fl.MM),
+        mat_body,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # Interface barrel (metallic insert into the keyed shell).
     fl.add_cyl(
         f"{name}_barrel",
-        (cx * fl.MM, (cy - d * 0.35) * fl.MM, cz * fl.MM),
+        (cx * fl.MM, (cy - d * 0.38) * fl.MM, cz * fl.MM),
         max(8.0, min(w, h) * 0.28) * fl.MM,
-        max(12.0, d * 0.55) * fl.MM,
+        max(14.0, d * 0.58) * fl.MM,
         mat_steel,
         module=story_mod,
         module_objects=MO,
         rotation=(1.5707963, 0.0, 0.0),
         vertices=24,
+    )
+    # HVIL interlock pin (smaller companion — public HV connector grammar).
+    fl.add_cyl(
+        f"{name}_hvil",
+        ((cx + w * 0.28) * fl.MM, (cy - d * 0.42) * fl.MM, (cz - h * 0.12) * fl.MM),
+        2.2 * fl.MM,
+        10.0 * fl.MM,
+        mat_steel,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=16,
+    )
+    # Braid / EMI shield collar + strain-relief boot (compound, not a lone stub).
+    fl.add_cyl(
+        f"{name}_braid_collar",
+        (cx * fl.MM, (cy - d * 0.55 - 6.0) * fl.MM, cz * fl.MM),
+        10.5 * fl.MM,
+        8.0 * fl.MM,
+        mat_b,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=24,
+    )
+    fl.add_cyl(
+        f"{name}_braid_boot",
+        (cx * fl.MM, (cy - d * 0.55 - 22.0) * fl.MM, cz * fl.MM),
+        9.0 * fl.MM,
+        26.0 * fl.MM,
+        mat_r,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(1.5707963, 0.0, 0.0),
+        vertices=24,
+    )
+
+
+def _fpk_place_cast_language_cues(
+    *,
+    x_motor, y_motor, z_motor, motor_od, motor_len,
+    x_inv, y_inv, inv_z, inv_w, inv_d, inv_h, shelf_z, shelf_h,
+    cas_w, cas_d, z0, bay_fill,
+    mat_alum, mat_steel, mat_cf, mat_fast, story_mod, MO, rot_along_x, _mm3,
+):
+    """Cast/machined EDU cues — ribs, bolt circles, ear mounts, gasket lips.
+
+    INTENT (Phase N2): public EDU exteriors read as cast housings with parting
+    language (ribs, fastener circles, gasket lands) — not smooth clay cylinders.
+    Lucid/BorgWarner photos = TRAINING CHECK only; no silhouette paste.
+    """
+    # Circumferential gasket lip cues at each end bell (seal land language).
+    for gi, gx in enumerate((-1.0, 1.0)):
+        fl.add_cyl(
+            f"u_se_td_gasket_lip_{gi}",
+            _mm3((x_motor + gx * (motor_len * 0.5 - 3.0), y_motor, z_motor)),
+            (motor_od * 0.5 + 5.5) * fl.MM,
+            3.5 * fl.MM,
+            mat_cf,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=64,
+        )
+    # Bolt circle on −X end bell (bearing cartridge fastener language).
+    bell_bolt_r = motor_od * 0.38
+    for bi in range(8):
+        ang = (bi / 8.0) * math.tau
+        by = y_motor + bell_bolt_r * math.cos(ang)
+        bz = z_motor + bell_bolt_r * math.sin(ang)
+        fl.add_cyl(
+            f"u_se_td_end_bolt_{bi}",
+            _mm3((x_motor - motor_len * 0.5 + 2.5, by, bz)),
+            2.4 * fl.MM,
+            5.0 * fl.MM,
+            mat_fast,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=12,
+        )
+    # Longitudinal cast ribs — service face (−Y, camera) + rear (+Y) so 04 reads denser.
+    for ri in range(6):
+        fx = x_motor - motor_len * 0.32 + ri * (motor_len * 0.12)
+        for side, sy in (("cam", -1.0), ("rear", 1.0)):
+            fl.add_box(
+                f"u_se_td_cast_rib_{side}_{ri}",
+                _mm3((fx, y_motor + sy * motor_od * 0.50, z_motor)),
+                _mm3((3.2, 8.0, motor_od * 0.62)),
+                mat_alum,
+                module=story_mod,
+                module_objects=MO,
+            )
+    # MCU shelf gasket land (deck ↔ lid seal cue).
+    fl.add_box(
+        "u_se_td_mcu_gasket_lip",
+        _mm3((x_inv, y_inv, shelf_z + shelf_h * 0.55)),
+        _mm3((inv_w * 1.02, inv_d * 1.05, 2.0)),
+        mat_cf,
+        module=story_mod,
+        module_objects=MO,
+    )
+    # Ear mounts with bolt pads (chassis attach language) — denser than plain bumps.
+    ear_pts = (
+        (-0.46, -0.46), (0.46, -0.46), (-0.46, 0.46), (0.46, 0.46),
+        (0.0, -0.50), (0.0, 0.50),
+    )
+    for ei, (ex, ey) in enumerate(ear_pts):
+        ex_mm = (cas_w if bay_fill else motor_len + 36.0) * ex * 0.5
+        ey_mm = (cas_d if bay_fill else motor_od + 40.0) * ey * 0.5
+        fl.add_box(
+            f"u_se_td_mount_pad_{ei}",
+            _mm3((x_motor + ex_mm, y_motor + ey_mm, z0 + 5.0)),
+            _mm3((22.0, 16.0, 7.0)),
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+        )
+        fl.add_cyl(
+            f"u_se_td_mount_bolt_{ei}",
+            _mm3((x_motor + ex_mm, y_motor + ey_mm, z0 + 9.5)),
+            3.0 * fl.MM,
+            4.0 * fl.MM,
+            mat_fast,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+
+def _fpk_place_pe_volume_density(
+    *,
+    x_inv, y_inv, inv_z, inv_w, inv_d, inv_h,
+    mat_sic, mat_bus, mat_cap, mat_copper, mat_alum, story_mod, MO, _mm3,
+):
+    """Denser PE volume under MCU lid — module bricks + laminated busbar cues.
+
+    INTENT (Phase N2 / OSTI SiC packaging grammar): under the lid must read as a
+    populated power-electronics volume, not a flat roof plate.
+    """
+    # Extra half-bridge module bricks (denser than the 3-carrier stack alone).
+    for mi, (mx, my) in enumerate((
+        (-0.18, 0.22), (0.18, 0.22), (-0.18, -0.22), (0.18, -0.22),
+    )):
+        fl.add_box(
+            f"u_se_td_pe_module_{mi}",
+            _mm3((x_inv + inv_w * mx, y_inv + inv_d * my, inv_z + inv_h * 0.08)),
+            _mm3((inv_w * 0.22, inv_d * 0.28, max(5.0, inv_h * 0.42))),
+            mat_sic,
+            module=story_mod,
+            module_objects=MO,
+        )
+    # Laminated DC busbar stack cues between modules (cutaway / ghost readable).
+    for bi, bx in enumerate((-0.12, 0.12)):
+        fl.add_box(
+            f"u_se_td_pe_busbar_{bi}",
+            _mm3((x_inv + inv_w * bx, y_inv, inv_z + inv_h * 0.22)),
+            _mm3((inv_w * 0.08, inv_d * 0.70, 2.8)),
+            mat_bus,
+            module=story_mod,
+            module_objects=MO,
+        )
+        fl.add_box(
+            f"u_se_td_pe_busbar_ins_{bi}",
+            _mm3((x_inv + inv_w * bx, y_inv, inv_z + inv_h * 0.28)),
+            _mm3((inv_w * 0.06, inv_d * 0.65, 1.4)),
+            mat_alum,
+            module=story_mod,
+            module_objects=MO,
+        )
+    # Film-cap bank cue (orthogonal to dclink cans already on −Y).
+    for ci in range(4):
+        fl.add_box(
+            f"u_se_td_pe_filmcap_{ci}",
+            _mm3((
+                x_inv - inv_w * 0.30 + ci * inv_w * 0.18,
+                y_inv + inv_d * 0.32,
+                inv_z - inv_h * 0.05,
+            )),
+            _mm3((inv_w * 0.12, inv_d * 0.14, inv_h * 0.55)),
+            mat_cap,
+            module=story_mod,
+            module_objects=MO,
+        )
+    # Gate-drive flex strip cue across modules (Zoe/EDU cutaway colour story).
+    fl.add_box(
+        "u_se_td_pe_gd_flex",
+        _mm3((x_inv, y_inv - inv_d * 0.05, inv_z + inv_h * 0.35)),
+        _mm3((inv_w * 0.75, 3.0, 1.6)),
+        mat_copper,
+        module=story_mod,
+        module_objects=MO,
+    )
+
+
+def _fpk_draw_principal_vehicle_routes(
+    *,
+    x_motor, y_motor, z_motor, motor_od,
+    x_inv, y_inv, inv_z, inv_w, inv_d, inv_h,
+    y_face, mat_port, mat_rubber, mat_hv, mat_steel, story_mod, MO, MAT, _mm3,
+):
+    """Short HV / coolant / LV runs to vehicle-side spheres — route-audit > 0.
+
+    INTENT (Phase N2): sealed hero products previously drew ZERO topology
+    (route-audit routes=0). Concept EDU grammar still needs a few principal
+    external ties to vehicle-side anchors so Connection trace / route-audit are
+    not empty. Chassis mating XYZ remains OPEN (spheres = concept anchors).
+    """
+    # Vehicle-side concept spheres (bay boundary — not FIA ICD XYZ).
+    veh = {
+        "hv": (x_motor - inv_w * 0.32, y_face - 95.0, inv_z + 2.0),
+        "cool_in": (x_motor - 24.0, y_face - 90.0, z_motor + motor_od * 0.08),
+        "cool_out": (x_motor + 24.0, y_face - 90.0, z_motor + motor_od * 0.08),
+        "lv": (x_motor + inv_w * 0.28, y_face - 85.0, inv_z - inv_h * 0.15),
+    }
+    mat_veh = fl.make_mat("m_se_td_veh_anchor", (0.25, 0.28, 0.32), metallic=0.55, roughness=0.40)
+    for key, (vx, vy, vz) in veh.items():
+        fl.add_sphere(
+            f"u_se_td_vehicle_{key}",
+            _mm3((vx, vy, vz)),
+            7.0 * fl.MM,
+            mat_veh,
+            module=story_mod,
+            module_objects=MO,
+        )
+
+    def _pipe(nm, mech, a, b, dia_mm, mat):
+        # Manhattan stub: port → outboard → vehicle sphere (short, honest concept).
+        mid = (a[0], (a[1] + b[1]) * 0.5, a[2])
+        wp = [tuple(float(c) for c in a), tuple(float(c) for c in mid), tuple(float(c) for c in b)]
+        try:
+            fl.prim_pipe_run(
+                nm, wp, dia_mm, material=mat, flanges=False,
+                module=story_mod, module_objects=MO,
+            )
+        except Exception:
+            # Fallback: smooth curve if prim_pipe_run unavailable in headless selftest.
+            try:
+                fl.add_smooth_pipe(
+                    nm, [(p[0] * fl.MM, p[1] * fl.MM, p[2] * fl.MM) for p in wp],
+                    (dia_mm * 0.5) * fl.MM, mat,
+                    module=story_mod, module_objects=MO,
+                )
+            except Exception as _pe:
+                print(f"[univ][sealed] FPK route draw skipped {nm}: {_pe}")
+                return
+        _route_log_add(nm, mech, wp, (a[0], a[1]), (b[0], b[1]))
+
+    hv_a = (x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 40.0, inv_z + 2.0)
+    _pipe("u_td_route_hv_dc", "electrical_bus", hv_a, veh["hv"], 12.0, mat_hv)
+    cool_in_a = (x_motor - 24.0, y_face - 40.0, z_motor + motor_od * 0.08)
+    cool_out_a = (x_motor + 24.0, y_face - 40.0, z_motor + motor_od * 0.08)
+    _pipe("u_td_route_coolant_in", "cooling_water", cool_in_a, veh["cool_in"], 10.0, mat_port)
+    _pipe("u_td_route_coolant_out", "cooling_water", cool_out_a, veh["cool_out"], 10.0, mat_port)
+    lv_a = (x_motor + inv_w * 0.28, y_inv - inv_d * 0.55 - 30.0, inv_z - inv_h * 0.15)
+    _pipe("u_td_route_lv", "signal_cable", lv_a, veh["lv"], 6.0, mat_rubber)
+    print(
+        f"[univ][sealed] FPK principal vehicle routes drawn "
+        f"(HV + coolant×2 + LV → vehicle-side spheres; route-audit coverage)"
     )
 
 
@@ -19158,6 +19465,14 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         story_mod,
         MO,
     )
+    # INTENT (Phase N2): denser PE volume under MCU lid — module bricks + busbars.
+    _fpk_place_pe_volume_density(
+        x_inv=x_inv, y_inv=y_inv, inv_z=inv_z,
+        inv_w=inv_w, inv_d=inv_d, inv_h=inv_h,
+        mat_sic=mat_sic, mat_bus=mat_bus, mat_cap=mat_cap,
+        mat_copper=mat_copper, mat_alum=mat_alum,
+        story_mod=story_mod, MO=MO, _mm3=_mm3,
+    )
 
     # Gear / diff seating meshes — CONCENTRIC (inside hollow rotor), not an
     # external −Y box. Names kept for traction_spine_manifest BoM joins.
@@ -19276,6 +19591,9 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
             module_objects=MO,
             rotation=(1.5707963, 0.0, 0.0),
         )
+    # INTENT (Phase N2): HV connector *family* — keyed shell + HVIL + braid boot
+    # (BorgWarner/FE public EDU grammar). Not an orange peg.
+    mat_braid = fl.make_mat("m_se_td_braid", (0.42, 0.40, 0.32), metallic=0.75, roughness=0.35)
     _fpk_place_hv_connector(
         "u_se_td_hv_connector",
         (x_motor - inv_w * 0.32, y_inv - inv_d * 0.55, inv_z),
@@ -19284,37 +19602,30 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_steel,
         story_mod,
         MO,
+        mat_rubber=mat_rubber,
+        mat_braid=mat_braid,
     )
-    # HV connector keying hood + twin pin towers (Amphenol-style service face).
-    fl.add_box(
-        "u_se_td_hv_hood",
-        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 10.0, inv_z + 2.0)),
-        _mm3((34.0, 10.0, 18.0)),
-        mat_hv,
-        module=story_mod,
-        module_objects=MO,
-    )
-    for pi, px_off in enumerate((-8.0, 8.0)):
-        fl.add_cyl(
-            f"u_se_td_hv_pin_{pi}",
-            _mm3((x_motor - inv_w * 0.32 + px_off, y_inv - inv_d * 0.55 - 16.0, inv_z + 2.0)),
-            3.5 * fl.MM,
-            12.0 * fl.MM,
-            mat_steel,
-            module=story_mod,
-            module_objects=MO,
-            rotation=(1.5707963, 0.0, 0.0),
-        )
+    # Alias loom boot principal (authenticity role `hv_cable_boot`) — extends the
+    # family braid boot toward the vehicle loom.
     fl.add_cyl(
         "u_se_td_hv_cable_boot",
-        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 31.0, inv_z + 2.0)),
-        8.5 * fl.MM,
-        28.0 * fl.MM,
+        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 48.0, inv_z + 2.0)),
+        9.5 * fl.MM,
+        22.0 * fl.MM,
         mat_rubber,
         module=story_mod,
         module_objects=MO,
         rotation=(1.5707963, 0.0, 0.0),
         vertices=24,
+    )
+    # Legacy hood cue kept as viz_only keying land (public Amphenol-style face).
+    fl.add_box(
+        "u_se_td_hv_hood",
+        _mm3((x_motor - inv_w * 0.32, y_inv - inv_d * 0.55 - 8.0, inv_z + 6.0)),
+        _mm3((30.0, 8.0, 12.0)),
+        mat_hv,
+        module=story_mod,
+        module_objects=MO,
     )
     # Thin HV/EMI shield cover over the inverter service face — seats X-138.
     fl.add_box(
@@ -19435,6 +19746,18 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_steel,
         module=story_mod,
         module_objects=MO,
+    )
+    # INTENT (Phase N2): cast-language body — ribs, bolt circles, gasket lips, ears.
+    _fpk_place_cast_language_cues(
+        x_motor=x_motor, y_motor=y_motor, z_motor=z_motor,
+        motor_od=motor_od, motor_len=motor_len,
+        x_inv=x_inv, y_inv=y_inv, inv_z=inv_z,
+        inv_w=inv_w, inv_d=inv_d, inv_h=inv_h,
+        shelf_z=shelf_z, shelf_h=shelf_h,
+        cas_w=cas_w, cas_d=cas_d, z0=z0, bay_fill=bay_fill,
+        mat_alum=mat_alum, mat_steel=mat_steel, mat_cf=mat_cf,
+        mat_fast=mat_fast, story_mod=story_mod, MO=MO,
+        rot_along_x=rot_along_x, _mm3=_mm3,
     )
     x_port = x_motor - cas_w * 0.45
     x_gear = x_motor  # for cutaway busbar math below
@@ -19746,6 +20069,20 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         story_mod,
         MO,
     )
+    # INTENT (Phase N2): principal HV/coolant/LV edges → vehicle-side spheres so
+    # route-audit is not 0 on sealed hero products (chassis ICD XYZ still OPEN).
+    try:
+        _fpk_draw_principal_vehicle_routes(
+            x_motor=x_motor, y_motor=y_motor, z_motor=z_motor, motor_od=motor_od,
+            x_inv=x_inv, y_inv=y_inv, inv_z=inv_z,
+            inv_w=inv_w, inv_d=inv_d, inv_h=inv_h,
+            y_face=y_face,
+            mat_port=mat_port, mat_rubber=mat_rubber, mat_hv=mat_hv,
+            mat_steel=mat_steel, story_mod=story_mod, MO=MO,
+            MAT={}, _mm3=_mm3,
+        )
+    except Exception as _rt_exc:
+        print(f"[univ][sealed] FPK vehicle routes skipped: {_rt_exc}")
     mode = (
         "bay-fill CONCENTRIC FPK (MCU shelf → stator → hollow rotor → planetary/diff)"
         if bay_fill else
@@ -19789,8 +20126,18 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                         _prov[_nm] = {"kind": "compound", "primitive": "lipped_shelf"}
                     elif re.search(r"^u_se_td_sic_inverter(_mod_\d+)?$", _nm):
                         _prov[_nm] = {"kind": "compound", "primitive": "sic_module_stack"}
-                    elif re.search(r"^u_se_td_hv_connector(_barrel)?$", _nm):
-                        _prov[_nm] = {"kind": "compound", "primitive": "hv_connector"}
+                    elif re.search(r"^u_se_td_hv_connector(_barrel|_key_flat|_hvil|_braid_collar|_braid_boot)?$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "hv_connector_family"}
+                    elif re.search(r"^u_se_td_pe_(module|busbar|busbar_ins|filmcap)_\d+$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "pe_volume"}
+                    elif re.search(r"^u_se_td_pe_gd_flex$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "pe_volume"}
+                    elif re.search(r"^u_se_td_(cast_rib|gasket_lip|end_bolt|mount_pad|mount_bolt)_\d+$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "cast_language"}
+                    elif re.search(r"^u_se_td_mcu_gasket_lip$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "cast_language"}
+                    elif re.search(r"^u_se_td_vehicle_(hv|cool_in|cool_out|lv)$", _nm):
+                        _prov[_nm] = {"kind": "compound", "primitive": "vehicle_anchor"}
                     elif re.search(r"^u_se_td_magnet_\d+$", _nm):
                         _prov[_nm] = {"kind": "compound", "primitive": "magnet_segment"}
                     elif re.search(
@@ -27848,19 +28195,81 @@ def main():
                     roughness=0.18,
                     alpha=0.18,
                 )
+                # INTENT (Phase N2 / Zoe trainer grammar): for traction EDU packs the
+                # sealed crate panels are already hidden — ghosting only those reads as
+                # a glass curtain. Also ghost the motor housing / jacket / end bells so
+                # windings / magnets / gears show through like a sectioned motoreducer.
+                _ghost_td_mat = None
+                if _IS_TRACTION_DRIVE_FORM:
+                    _ghost_td_mat = fl.make_mat(
+                        "m_se_td_ghost_housing",
+                        fl._to_linear((0.10, 0.11, 0.13)),
+                        metallic=0.35,
+                        roughness=0.28,
+                        alpha=0.22,
+                    )
                 # Snapshot current materials on ALL shell objects + front cover.
                 _ghost_snap = {}
                 _ghost_objs = list(_SEALED_SHELL_OBJECTS)
                 if _SEALED_FRONT_COVER is not None:
                     _ghost_objs.append(_SEALED_FRONT_COVER)
+                # DECISION (Phase N2): on traction, HIDE the sealed crate panels for
+                # ghost — translucent crate = glass curtain. Ghost the motor housing
+                # instead so windings/magnets/gears read like a Zoe trainer.
+                if _IS_TRACTION_DRIVE_FORM:
+                    for _crate in list(_ghost_objs):
+                        if _crate is not None and (
+                            str(getattr(_crate, "name", "")).startswith("u_se_product_")
+                            or _crate is _SEALED_FRONT_COVER
+                        ):
+                            _crate.hide_render = True
+                    _ghost_objs = [
+                        o for o in _ghost_objs
+                        if o is not None and not str(getattr(o, "name", "")).startswith("u_se_product_")
+                        and o is not _SEALED_FRONT_COVER
+                    ]
+                if _IS_TRACTION_DRIVE_FORM and hasattr(bpy, "data"):
+                    _td_ghost_pfx = (
+                        "u_se_td_motor_housing",
+                        "u_se_td_coolant_jacket",
+                        "u_se_td_jacket_band",
+                        "u_se_td_end_bell_",
+                        "u_se_td_mcu_shelf",
+                        "u_se_td_cast_fin_",
+                        "u_se_td_cast_rib_",
+                        "u_se_td_gasket_lip_",
+                    )
+                    for _to in bpy.data.objects:
+                        if getattr(_to, "type", None) != "MESH":
+                            continue
+                        _tn = _to.name
+                        if any(_tn == p or _tn.startswith(p) for p in _td_ghost_pfx):
+                            _ghost_objs.append(_to)
                 for _gob in _ghost_objs:
                     if _gob and _gob.data and _gob.data.materials:
                         _ghost_snap[_gob.name] = list(_gob.data.materials)
                         _gob.data.materials.clear()
-                        _gob.data.materials.append(_ghost_shell_mat)
+                        _use = (
+                            _ghost_td_mat
+                            if (_IS_TRACTION_DRIVE_FORM
+                                and _gob.name.startswith("u_se_td_")
+                                and _ghost_td_mat is not None)
+                            else _ghost_shell_mat
+                        )
+                        _gob.data.materials.append(_use)
                     elif _gob and _gob.data:
                         _ghost_snap[_gob.name] = []
-                        _gob.data.materials.append(_ghost_shell_mat)
+                        _use = (
+                            _ghost_td_mat
+                            if (_IS_TRACTION_DRIVE_FORM
+                                and _gob.name.startswith("u_se_td_")
+                                and _ghost_td_mat is not None)
+                            else _ghost_shell_mat
+                        )
+                        _gob.data.materials.append(_use)
+                    # Traction housing ghosts must be un-hidden so the Zoe cutaway reads.
+                    if _gob is not None and _gob.name.startswith("u_se_td_"):
+                        _gob.hide_render = False
                 # Front cover: make visible so the product reads as a closed translucent box.
                 _ghost_front_cover_was_hidden = None
                 if _SEALED_FRONT_COVER is not None:
@@ -27871,15 +28280,40 @@ def main():
                 # shell panels with the ghost material above.
                 if _prepare_sealed_product_view is not None:
                     _prepare_sealed_product_view("00-hero", True)
+                # INTENT (Phase N2): after view preparer, force Zoe-class visibility —
+                # show concentric guts; keep housing translucent (not opaque again).
+                if _IS_TRACTION_DRIVE_FORM and hasattr(bpy, "data"):
+                    for _to in bpy.data.objects:
+                        if getattr(_to, "type", None) != "MESH":
+                            continue
+                        _tn = _to.name
+                        # Hide sealed crate again — prepare may have un-hidden panels
+                        # (glass-curtain defect on 08).
+                        if _tn.startswith("u_se_product_") or _tn.startswith("u_skid_encl_"):
+                            _to.hide_render = True
+                            continue
+                        if not _tn.startswith("u_se_td_"):
+                            continue
+                        # Show everything traction; housing materials re-applied below.
+                        _to.hide_render = False
                 # Re-apply ghost material (view preparer may have reset it via
                 # _SEALED_CUTAWAY_MATERIAL on _SEALED_SHELL_OBJECTS).
                 for _gob in _ghost_objs:
                     if _gob and _gob.data:
                         _gob.data.materials.clear()
-                        _gob.data.materials.append(_ghost_shell_mat)
-                # Front cover must be un-hidden for the ghost pass (closed translucent box).
+                        _use = (
+                            _ghost_td_mat
+                            if (_IS_TRACTION_DRIVE_FORM
+                                and _gob.name.startswith("u_se_td_")
+                                and _ghost_td_mat is not None)
+                            else _ghost_shell_mat
+                        )
+                        _gob.data.materials.append(_use)
+                        if _gob.name.startswith("u_se_td_"):
+                            _gob.hide_render = False
+                # Front cover: hide on traction ghost (crate curtain); else show.
                 if _SEALED_FRONT_COVER is not None:
-                    _SEALED_FRONT_COVER.hide_render = False
+                    _SEALED_FRONT_COVER.hide_render = bool(_IS_TRACTION_DRIVE_FORM)
                 # Re-use the hero camera (already computed above as _hero_cam).
                 fl.clear_cameras()
                 if _hero_cam:

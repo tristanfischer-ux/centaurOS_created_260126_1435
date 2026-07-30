@@ -67,6 +67,18 @@ PRINCIPAL_ROLES: tuple[tuple[str, str, str, str], ...] = (
 # Cosmetic / fastener meshes — labelled viz_only, excluded from principal denominator.
 VIZ_ONLY_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"^u_se_td_cast_fin_\d+$", "exterior cooling fin"),
+    (r"^u_se_td_cast_rib(_cam|_rear)?_\d+$", "cast housing rib"),
+    (r"^u_se_td_gasket_lip_\d+$", "end-bell gasket lip"),
+    (r"^u_se_td_end_bolt_\d+$", "end-bell bolt circle"),
+    (r"^u_se_td_mount_pad_\d+$", "chassis mount pad"),
+    (r"^u_se_td_mount_bolt_\d+$", "chassis mount bolt"),
+    (r"^u_se_td_mcu_gasket_lip$", "MCU shelf gasket land"),
+    (r"^u_se_td_pe_module_\d+$", "PE half-bridge module brick"),
+    (r"^u_se_td_pe_busbar(_ins)?_\d+$", "PE laminated busbar cue"),
+    (r"^u_se_td_pe_filmcap_\d+$", "PE film capacitor bank"),
+    (r"^u_se_td_pe_gd_flex$", "PE gate-drive flex cue"),
+    (r"^u_se_td_vehicle_(hv|cool_in|cool_out|lv)$", "vehicle-side concept anchor"),
+    (r"^u_se_td_hv_connector_(key_flat|hvil|braid_collar|braid_boot)$", "HV connector family cue"),
     (r"^u_se_td_coldplate_fastener_\d+$", "cold-plate fastener"),
     (r"^u_se_td_coldplate_machine_face$", "machined face cue"),
     (r"^u_se_td_nameplate$", "nameplate decal"),
@@ -421,6 +433,32 @@ def _selftest() -> int:
     if "u_se_td_cast_fin_0" not in viz_meshes:
         print("  FAIL cast_fin must be viz_only")
         bad += 1
+    # Phase N2: cast-language + PE volume cues labelled viz_only when present.
+    n2 = evaluate_mesh_authenticity(
+        Path("."),
+        form_data={
+            "meshes": [
+                *synthetic_meshes,
+                "u_se_td_cast_rib_cam_0",
+                "u_se_td_gasket_lip_0",
+                "u_se_td_pe_module_0",
+                "u_se_td_vehicle_hv",
+                "u_se_td_hv_connector_hvil",
+            ],
+            "mesh_provenance": synthetic_prov,
+        },
+    )
+    n2_viz = {v["mesh"] for v in n2.get("viz_only") or []}
+    for must in (
+        "u_se_td_cast_rib_cam_0",
+        "u_se_td_gasket_lip_0",
+        "u_se_td_pe_module_0",
+        "u_se_td_vehicle_hv",
+        "u_se_td_hv_connector_hvil",
+    ):
+        if must not in n2_viz:
+            print(f"  FAIL Phase N2 viz_only missing {must}")
+            bad += 1
 
     if bad:
         print(f"fpk_mesh_authenticity selftest: {bad} FAIL")
