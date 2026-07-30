@@ -67,7 +67,7 @@ def main() -> int:
     else:
         state_error = "state.json missing"
 
-    payload = build_stamp_payload(state=state)
+    payload = build_stamp_payload(state=state, twin_dir=twin)
     catch = prove_catch(payload)
     if not catch.get("ok"):
         print(f"proveCatch failed before write: {json.dumps(catch)}", file=sys.stderr)

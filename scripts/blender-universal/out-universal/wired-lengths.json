@@ -1,0 +1,73 @@
+{
+ "schema": "wired-lengths/3",
+ "edges_total": 14,
+ "edges_wired": 0,
+ "edges_drawn": 0,
+ "edges_routed_logical": 0,
+ "edges_skipped": 14,
+ "edges_drawn_by_spine": 0,
+ "port_fallbacks": 0,
+ "fanout_groups_trayed": 0,
+ "fanout_groups_detected": 0,
+ "total_routed_length_m": 0,
+ "length_m_by_service": {},
+ "skipped": [
+  {
+   "edge": "Hv DC Fuse\u2192Hv DC Busbar Link [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192SiC Traction Inverter [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "SiC Traction Inverter\u2192Traction Ipmsm Motor Generator [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Utility Incomer\u2192Traction Ipmsm Motor Generator [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Traction Ipmsm Motor Generator\u2192Hv DC Busbar Link [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Hv DC Fuse [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Gate Driver Board [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Oem Inverter Control Board [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Mgu Cold Plate [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Coolant Manifold [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Traction Drive Housing [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Traction Motor [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Hv DC Busbar Link\u2192Phase Overcurrent Trip [electrical_bus/power]",
+   "reason": "source is an abstract boundary / unported part"
+  },
+  {
+   "edge": "Inverter Desat Protection\u2192Oem Inverter Control Board [signal/signal]",
+   "reason": "source is an abstract boundary / unported part"
+  }
+ ],
+ "runs": []
+}

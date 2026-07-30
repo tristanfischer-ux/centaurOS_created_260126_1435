@@ -1,587 +1,167 @@
 {
  "schema": "connection-ledger/1",
- "count": 95,
+ "count": 14,
  "note": "Ledger-authored connections (part\u2192part\u2192service). Blender measures the lengths; the BoM costs these. `adjacency` is the per-part trace (inputs/outputs by name).",
  "rows": [
   {
-   "from_part": "Gac Softener",
-   "to_part": "Softener Vessel",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 14.5,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Softener Vessel",
-   "to_part": "grp_membrane_housings",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 14.5,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (source delivery)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "grp_membrane_housings",
-   "to_part": "Uf Module Bank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Uf Module Bank",
-   "to_part": "Ro High Pressure Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 11,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty ro_high_pressure_pump_throughput_m3_h = 11 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Ro High Pressure Pump",
-   "to_part": "Reverse Osmosis Skid",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 11,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty ro_high_pressure_pump_throughput_m3_h = 11 m3/h (source delivery)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Reverse Osmosis Skid",
-   "to_part": "ro_membrane_elements",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "ro_membrane_elements",
-   "to_part": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Drain Collection Sump",
-   "to_part": "Uv Disinfection",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 225,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty uv_disinfection_throughput_m3_h = 225 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Uv Disinfection",
-   "to_part": "Nursery Cloth Filter",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_cloth_filter_throughput_m3_h = 45 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Cloth Filter",
-   "to_part": "Gac Filter",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_cloth_filter_throughput_m3_h = 45 m3/h (source delivery)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Gac Filter",
-   "to_part": "Cloth Filter",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 90,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty cloth_filter_throughput_m3_h = 90 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Cloth Filter",
-   "to_part": "Drain Water Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 90,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty cloth_filter_throughput_m3_h = 90 m3/h (source delivery)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Drain Water Tank",
-   "to_part": "Nursery Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Drain Collection Sump",
-   "to_part": "Drain Transfer Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Drain Transfer Pump",
-   "to_part": "Nursery Drain Transfer Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Drain Transfer Pump",
-   "to_part": "Cip Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 4,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty cip_tank_line_flow_m3_h = 4 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Cip Tank",
-   "to_part": "Cleanwater Reservoir Reserve Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 4,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty cip_tank_line_flow_m3_h = 4 m3/h (source delivery)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Cleanwater Reservoir Reserve Tank",
-   "to_part": "Fresh Water Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Nutrient Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nutrient Tank",
-   "to_part": "Acid Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty acid_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Acid Dosing Pump",
-   "to_part": "Chemical Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Chemical Dosing Pump",
-   "to_part": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (source delivery)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
-   "to_part": "Fertigation Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 90.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty fertigation_dosing_pump_throughput_m3_h = 90 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Fertigation Dosing Pump",
-   "to_part": "Fertigation Dosing Pump Backup",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 90.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty fertigation_dosing_pump_backup_throughput_m3_h = 90 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Fertigation Dosing Pump Backup",
-   "to_part": "Hand Watering Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 25,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty hand_watering_pump_throughput_m3_h = 25 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Hand Watering Pump",
-   "to_part": "Irrigation Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 225,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty irrigation_pump_flow_m3_h = 225 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Irrigation Pump",
-   "to_part": "Nursery Acid Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_acid_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Acid Dosing Pump",
-   "to_part": "Nursery Chemical Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Chemical Dosing Pump",
-   "to_part": "Nursery Fertigation Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_fertigation_dosing_pump_throughput_m3_h = 45 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Fertigation Dosing Pump",
-   "to_part": "Distribution Manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 25,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty distribution_manifold_throughput_m3_h = 25 m3/h (destination demand)",
-   "material_context": null,
-   "source": "contract"
-  },
-  {
-   "from_part": "Nursery Drain Collection Sump",
-   "to_part": "Gac Softener",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 14.5,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty gac_softener_throughput_m3_h = 14.5 m3/h (destination demand)",
-   "material_context": "recirculation return loop \u2014 recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)",
-   "source": "contract"
-  },
-  {
-   "from_part": "Conductivity Sensor",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Flow Meter",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Ph Sensor",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Orp Sensor",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Level Transmitter",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "pH Analyser",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Pressure Transmitter",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Silica Analyzer",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Chlorine Sensor",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Tds Sensor",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Leak Detection Sensor",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "signal",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "contract"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Permeate Outlet",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 225.0,
-   "required_unit": "m3/h",
-   "required_basis": null,
-   "material_context": "process water (inter-module recirculation/service)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Mains Incomer",
-   "to_part": "Standby Diesel Generator",
+   "from_part": "Hv DC Fuse",
+   "to_part": "Hv DC Busbar Link",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 4.3,
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "HV DC bus",
+   "source": "contract"
+  },
+  {
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "SiC Traction Inverter",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "HV DC to SiC",
+   "source": "contract"
+  },
+  {
+   "from_part": "SiC Traction Inverter",
+   "to_part": "Traction Ipmsm Motor Generator",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "3-phase AC",
+   "source": "contract"
+  },
+  {
+   "from_part": "Utility Incomer",
+   "to_part": "Traction Ipmsm Motor Generator",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
    "required_unit": "A",
    "required_basis": null,
    "material_context": "utility incomer / main distribution feeder",
    "source": "completion"
   },
   {
-   "from_part": "Standby Diesel Generator",
-   "to_part": "Transformer",
+   "from_part": "Traction Ipmsm Motor Generator",
+   "to_part": "Hv DC Busbar Link",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 4.3,
+   "required_value": 0.4,
    "required_unit": "A",
    "required_basis": null,
    "material_context": "utility incomer / main distribution feeder",
    "source": "completion"
   },
   {
-   "from_part": "Transformer",
-   "to_part": "Main Switchboard",
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Hv DC Fuse",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 4.3,
+   "required_value": 0.4,
    "required_unit": "A",
    "required_basis": null,
-   "material_context": "utility incomer / main distribution feeder",
+   "material_context": "busbar protective tap (fuse / surge / relay)",
    "source": "completion"
   },
   {
-   "from_part": "Main Switchboard",
-   "to_part": "Motor Control Center",
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Gate Driver Board",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "utility incomer / main distribution feeder",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Electrical Control Panel",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
+   "required_value": 0.4,
    "required_unit": "A",
    "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "Electrical Control Panel",
-   "to_part": "Digital Control Panel",
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Oem Inverter Control Board",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Mgu Cold Plate",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Coolant Manifold",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Traction Drive Housing",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Traction Motor",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 561.3,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Hv DC Busbar Link",
+   "to_part": "Phase Overcurrent Trip",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 0.4,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Inverter Desat Protection",
+   "to_part": "Oem Inverter Control Board",
    "mechanism": "signal",
    "service": "signal",
    "constraint_kind": "current_rating",
@@ -589,633 +169,15 @@
    "required_unit": "A",
    "required_basis": null,
    "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "3 Phase Power Input",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Control + Instrument UPS",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Control + Instrument UPS",
-   "to_part": "Digital Control Panel",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "SCADA / Plant Control System",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Digital Control Panel",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "Ultrafiltration Module",
-   "to_part": "Fresh Water Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 3.375,
-   "required_unit": "m3/h",
-   "required_basis": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Uv Disinfection",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 16.2,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Fertigation Dosing Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Acid Dosing Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 0.1,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Chemical Dosing Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 0.1,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Hand Watering Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Drain Transfer Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 3.1,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Cloth Filter",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Nursery Fertigation Dosing Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Nursery Acid Dosing Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 0.1,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Nursery Chemical Dosing Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 0.1,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Nursery Cloth Filter",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Nursery Drain Transfer Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 3.1,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Irrigation Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Fertigation Dosing Pump Backup",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Ro High Pressure Pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 6.7,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Gac Filter",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Permeate Outlet",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Concentrate Outlet",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Electrical Control Cabinet",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 4.3,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "Electrical Control Cabinet",
-   "to_part": "Digital Control Panel",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "required_basis": null,
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "Permeate Outlet",
-   "to_part": "Acid Dosing Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty acid_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
-   "material_context": "process-flow output (direction-closer: nearest downstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Motor Control Center",
-   "to_part": "Digital Control Panel",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "power_feed",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "power feed (distribution hub -> powered part)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Softener Vessel",
-   "to_part": "Inlet Flow Control Valve",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "final_control_element",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "actuator/valve on the host's process line (actuator-host closer: explicit _actuator_of or sibling-group host)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Softener Vessel",
-   "to_part": "Solenoid Valves",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "final_control_element",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "actuator/valve on the host's process line (actuator-host closer: explicit _actuator_of or sibling-group host)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Softener Vessel",
-   "to_part": "Ultrafiltration Module",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 14.5,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (source delivery)",
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Softener Vessel",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 14.5,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (destination demand)",
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Drain Collection Sump",
-   "to_part": "Effluent / disposal \u2014 battery limit",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "discharge to disposal (battery limit)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Drain Transfer Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Drain Transfer Pump",
-   "to_part": "Effluent / disposal \u2014 battery limit",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty drain_transfer_pump_throughput_m3_h = 45 m3/h (source delivery)",
-   "material_context": "discharge to disposal (battery limit)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Nursery Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Nursery Drain Collection Sump",
-   "to_part": "Effluent / disposal \u2014 battery limit",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "discharge to disposal (battery limit)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Nursery Drain Transfer Pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Nursery Drain Transfer Pump",
-   "to_part": "Effluent / disposal \u2014 battery limit",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 45.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty nursery_drain_transfer_pump_throughput_m3_h = 45 m3/h (source delivery)",
-   "material_context": "discharge to disposal (battery limit)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fresh Water Tank",
-   "to_part": "Drain Water Tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Drain Water Tank",
-   "to_part": "Effluent / disposal \u2014 battery limit",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "required_basis": null,
-   "material_context": "discharge to disposal (battery limit)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fertigation Dosing Pump",
-   "to_part": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 90.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty fertigation_dosing_pump_throughput_m3_h = 90 m3/h (source delivery)",
-   "material_context": "process output (residual closer: nearest consumer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Acid Dosing Pump",
-   "to_part": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty acid_dosing_pump_throughput_m3_h = 0.04 m3/h (source delivery)",
-   "material_context": "process output (residual closer: nearest consumer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Chemical Dosing Pump",
-   "to_part": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 0.04,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (source delivery)",
-   "material_context": "process output (residual closer: nearest consumer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "Fertigation Dosing Pump Backup",
-   "to_part": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": 90.0,
-   "required_unit": "m3/h",
-   "required_basis": "contract qty fertigation_dosing_pump_backup_throughput_m3_h = 90 m3/h (source delivery)",
-   "material_context": "process output (residual closer: nearest consumer)",
    "source": "completion"
   }
  ],
  "dropped": [
   {
-   "from": "Uf Module Bank",
-   "to": "Uf Module Bank",
-   "mechanism": "fluid_loop",
-   "reason": "self-loop"
-  },
-  {
-   "from": "Drain Collection Sump",
-   "to": "Uv Disinfection",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "ro_membrane_elements",
-   "to": "Drain Collection Sump",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Acid Dosing Pump",
-   "to": "Chemical Dosing Pump",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Nutrient Tank",
-   "to": "Acid Dosing Pump",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Chemical Dosing Pump",
-   "to": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Acid Dosing Pump",
-   "to": "Chemical Dosing Pump",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Fertigation Dosing Pump",
-   "to": "Fertigation Dosing Pump Backup",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
-   "to": "Fertigation Dosing Pump",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Fertigation Dosing Pump Backup",
-   "to": "Hand Watering Pump",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Fertigation Dosing Pump",
-   "to": "Fertigation Dosing Pump Backup",
-   "mechanism": "fluid_loop",
-   "reason": "duplicate"
-  },
-  {
-   "from": "Fresh Water Tank",
-   "to": "Mains Incomer",
-   "mechanism": "fluid_loop",
-   "reason": "service-domain mismatch (fluid line on electrical/control gear)"
+   "from": "Hv DC Connector",
+   "to": "Hv DC Fuse",
+   "mechanism": "electrical_bus",
+   "reason": "unresolved-non-boundary-endpoint"
   }
  ],
  "completeness": {
@@ -1223,1289 +185,214 @@
   "concerns": []
  },
  "adjacency": {
-  "Gac Softener": {
+  "Hv DC Fuse": {
    "inputs": [
     {
-     "from": "Nursery Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Softener Vessel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Softener Vessel": {
-   "inputs": [
-    {
-     "from": "Gac Softener",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "grp_membrane_housings",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Inlet Flow Control Valve",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Solenoid Valves",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Ultrafiltration Module",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "grp_membrane_housings": {
-   "inputs": [
-    {
-     "from": "Softener Vessel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Uf Module Bank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Uf Module Bank": {
-   "inputs": [
-    {
-     "from": "grp_membrane_housings",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Ro High Pressure Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Ro High Pressure Pump": {
-   "inputs": [
-    {
-     "from": "Uf Module Bank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": [
     {
-     "to": "Reverse Osmosis Skid",
-     "mechanism": "fluid_loop",
-     "service": "water"
+     "to": "Hv DC Busbar Link",
+     "mechanism": "electrical_bus",
+     "service": "power"
     }
    ]
   },
-  "Reverse Osmosis Skid": {
+  "Hv DC Busbar Link": {
    "inputs": [
     {
-     "from": "Ro High Pressure Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "ro_membrane_elements",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "ro_membrane_elements": {
-   "inputs": [
-    {
-     "from": "Reverse Osmosis Skid",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Drain Collection Sump": {
-   "inputs": [
-    {
-     "from": "ro_membrane_elements",
-     "mechanism": "fluid_loop",
-     "service": "water"
+     "from": "Hv DC Fuse",
+     "mechanism": "electrical_bus",
+     "service": "power"
     },
     {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Fertigation Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Acid Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Chemical Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Fertigation Dosing Pump Backup",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Uv Disinfection",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Effluent / disposal \u2014 battery limit",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Uv Disinfection": {
-   "inputs": [
-    {
-     "from": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
+     "from": "Traction Ipmsm Motor Generator",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": [
     {
-     "to": "Nursery Cloth Filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
+     "to": "SiC Traction Inverter",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Hv DC Fuse",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Gate Driver Board",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Oem Inverter Control Board",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Mgu Cold Plate",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Coolant Manifold",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Traction Drive Housing",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Traction Motor",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Phase Overcurrent Trip",
+     "mechanism": "electrical_bus",
+     "service": "power"
     }
    ]
   },
-  "Nursery Cloth Filter": {
+  "SiC Traction Inverter": {
    "inputs": [
     {
-     "from": "Uv Disinfection",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": [
     {
-     "to": "Gac Filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
+     "to": "Traction Ipmsm Motor Generator",
+     "mechanism": "electrical_bus",
+     "service": "power"
     }
    ]
   },
-  "Gac Filter": {
+  "Traction Ipmsm Motor Generator": {
    "inputs": [
     {
-     "from": "Nursery Cloth Filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
+     "from": "SiC Traction Inverter",
+     "mechanism": "electrical_bus",
+     "service": "power"
     },
     {
-     "from": "Motor Control Center",
+     "from": "Utility Incomer",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": [
     {
-     "to": "Cloth Filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Cloth Filter": {
-   "inputs": [
-    {
-     "from": "Gac Filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
+     "to": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
-   ],
-   "outputs": [
-    {
-     "to": "Drain Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
    ]
   },
-  "Drain Water Tank": {
-   "inputs": [
-    {
-     "from": "Cloth Filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Nursery Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Effluent / disposal \u2014 battery limit",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Nursery Drain Collection Sump": {
-   "inputs": [
-    {
-     "from": "Drain Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Gac Softener",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Effluent / disposal \u2014 battery limit",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Drain Transfer Pump": {
-   "inputs": [
-    {
-     "from": "Nursery Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Nursery Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Effluent / disposal \u2014 battery limit",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Nursery Drain Transfer Pump": {
-   "inputs": [
-    {
-     "from": "Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Cip Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Effluent / disposal \u2014 battery limit",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Cip Tank": {
-   "inputs": [
-    {
-     "from": "Nursery Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Cleanwater Reservoir Reserve Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Cleanwater Reservoir Reserve Tank": {
-   "inputs": [
-    {
-     "from": "Cip Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Fresh Water Tank": {
-   "inputs": [
-    {
-     "from": "Cleanwater Reservoir Reserve Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Ultrafiltration Module",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Nutrient Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Permeate Outlet",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Softener Vessel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Nursery Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Nursery Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Nutrient Tank": {
-   "inputs": [
-    {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Acid Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Acid Dosing Pump": {
-   "inputs": [
-    {
-     "from": "Nutrient Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "Permeate Outlet",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Chemical Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Chemical Dosing Pump": {
-   "inputs": [
-    {
-     "from": "Acid Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5": {
-   "inputs": [
-    {
-     "from": "Chemical Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Fertigation Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Fertigation Dosing Pump": {
-   "inputs": [
-    {
-     "from": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Fertigation Dosing Pump Backup",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Fertigation Dosing Pump Backup": {
-   "inputs": [
-    {
-     "from": "Fertigation Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Hand Watering Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Hand Watering Pump": {
-   "inputs": [
-    {
-     "from": "Fertigation Dosing Pump Backup",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Irrigation Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Irrigation Pump": {
-   "inputs": [
-    {
-     "from": "Hand Watering Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Nursery Acid Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Nursery Acid Dosing Pump": {
-   "inputs": [
-    {
-     "from": "Irrigation Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Nursery Chemical Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Nursery Chemical Dosing Pump": {
-   "inputs": [
-    {
-     "from": "Nursery Acid Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Nursery Fertigation Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Nursery Fertigation Dosing Pump": {
-   "inputs": [
-    {
-     "from": "Nursery Chemical Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Distribution Manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Distribution Manifold": {
-   "inputs": [
-    {
-     "from": "Nursery Fertigation Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": []
-  },
-  "Conductivity Sensor": {
+  "Utility Incomer": {
    "inputs": [],
    "outputs": [
     {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
+     "to": "Traction Ipmsm Motor Generator",
+     "mechanism": "electrical_bus",
+     "service": "power"
     }
    ]
   },
-  "SCADA / Plant Control System": {
+  "Gate Driver Board": {
    "inputs": [
     {
-     "from": "Conductivity Sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Flow Meter",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Ph Sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Orp Sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Level Transmitter",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "pH Analyser",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Pressure Transmitter",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Silica Analyzer",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Chlorine Sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Tds Sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Leak Detection Sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": []
   },
-  "Flow Meter": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Ph Sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Orp Sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Level Transmitter": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "pH Analyser": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Pressure Transmitter": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Silica Analyzer": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Chlorine Sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Tds Sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Leak Detection Sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Permeate Outlet": {
+  "Oem Inverter Control Board": {
    "inputs": [
     {
-     "from": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
+    },
+    {
+     "from": "Inverter Desat Protection",
+     "mechanism": "signal",
+     "service": "signal"
     }
    ],
-   "outputs": [
-    {
-     "to": "Acid Dosing Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
+   "outputs": []
   },
-  "Mains Incomer": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "Standby Diesel Generator",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "Standby Diesel Generator": {
+  "Mgu Cold Plate": {
    "inputs": [
     {
-     "from": "Mains Incomer",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Transformer",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "Transformer": {
-   "inputs": [
-    {
-     "from": "Standby Diesel Generator",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Main Switchboard",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "Main Switchboard": {
-   "inputs": [
-    {
-     "from": "Transformer",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "Motor Control Center": {
-   "inputs": [
-    {
-     "from": "Main Switchboard",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Electrical Control Panel",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "3 Phase Power Input",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Control + Instrument UPS",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "SCADA / Plant Control System",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Digital Control Panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "to": "Uv Disinfection",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Fertigation Dosing Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Acid Dosing Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Chemical Dosing Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Hand Watering Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Drain Transfer Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Cloth Filter",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Nursery Fertigation Dosing Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Nursery Acid Dosing Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Nursery Chemical Dosing Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Nursery Cloth Filter",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Nursery Drain Transfer Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Irrigation Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Fertigation Dosing Pump Backup",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Ro High Pressure Pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Gac Filter",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Permeate Outlet",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Concentrate Outlet",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Electrical Control Cabinet",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Digital Control Panel",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "Electrical Control Panel": {
-   "inputs": [
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Digital Control Panel",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Digital Control Panel": {
-   "inputs": [
-    {
-     "from": "Electrical Control Panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Control + Instrument UPS",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Motor Control Center",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Electrical Control Cabinet",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": []
   },
-  "3 Phase Power Input": {
+  "Coolant Manifold": {
    "inputs": [
     {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
    "outputs": []
   },
-  "Control + Instrument UPS": {
+  "Traction Drive Housing": {
    "inputs": [
     {
-     "from": "Motor Control Center",
+     "from": "Hv DC Busbar Link",
      "mechanism": "electrical_bus",
      "service": "power"
     }
    ],
+   "outputs": []
+  },
+  "Traction Motor": {
+   "inputs": [
+    {
+     "from": "Hv DC Busbar Link",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": []
+  },
+  "Phase Overcurrent Trip": {
+   "inputs": [
+    {
+     "from": "Hv DC Busbar Link",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": []
+  },
+  "Inverter Desat Protection": {
+   "inputs": [],
    "outputs": [
     {
-     "to": "Digital Control Panel",
+     "to": "Oem Inverter Control Board",
      "mechanism": "signal",
      "service": "signal"
     }
    ]
-  },
-  "Ultrafiltration Module": {
-   "inputs": [
-    {
-     "from": "Softener Vessel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Fresh Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "Concentrate Outlet": {
-   "inputs": [
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "Electrical Control Cabinet": {
-   "inputs": [
-    {
-     "from": "Motor Control Center",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "Digital Control Panel",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Inlet Flow Control Valve": {
-   "inputs": [
-    {
-     "from": "Softener Vessel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": []
-  },
-  "Solenoid Valves": {
-   "inputs": [
-    {
-     "from": "Softener Vessel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": []
-  },
-  "Effluent / disposal \u2014 battery limit": {
-   "inputs": [
-    {
-     "from": "Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Nursery Drain Collection Sump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Nursery Drain Transfer Pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "Drain Water Tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": []
   }
  },
  "referential_integrity": {

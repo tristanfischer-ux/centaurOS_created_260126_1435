@@ -1,1109 +1,137 @@
 {
   "schema": "parts-manifest/1",
-  "count": 58,
+  "count": 5,
   "bbox_mm": {
-    "x_min_mm": -13865.0,
-    "x_max_mm": 13150.0,
-    "y_min_mm": -10350.5,
-    "y_max_mm": 8769.5,
-    "z_min_mm": -915.0,
-    "z_max_mm": 5647.0,
-    "length_mm": 27015.0,
-    "width_mm": 19120.0,
-    "height_mm": 5647.0
+    "x_min_mm": -158.3,
+    "x_max_mm": 193.0,
+    "y_min_mm": -75.0,
+    "y_max_mm": 82.0,
+    "z_min_mm": 319.7,
+    "z_max_mm": 445.7,
+    "length_mm": 351.3,
+    "width_mm": 157.0,
+    "height_mm": 126.0
   },
-  "site": {
-    "deck_m2": 840.8,
-    "hull_m2": 495.0,
-    "utilisation": 0.589,
-    "deck_rect_mm": [
-      -16770.0,
-      -13596.0,
-      16150.0,
-      11945.0
-    ],
-    "hull_aisle_mm": 1000.0,
-    "cell_mm": 500.0,
-    "basis": "hull = union of drawn-equipment footprints (parts-manifest rows, real geometry) each inflated 1 m (its access strip); deck = drawn u_ground_slab plan rect (mesh bbox + 3 m apron)"
-  },
+  "site": null,
   "rooms": [],
+  "density": {
+    "verdict": "pass",
+    "m2_per_m3h": null,
+    "m2_per_equip": 0.01,
+    "reason": "0.0 m\u00b2/equip (no circulation flow)",
+    "punch": null
+  },
+  "placement_fp": "b65ac692175cd6bb",
   "parts": [
     {
-      "tag": "u_distribution_manifold",
-      "equipment_tag": "M-101",
-      "name": "Distribution Manifold",
-      "module": "mass_fluid_transport_process",
-      "shape": "inline_spool",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        10892.5,
-        -750.0,
-        900.0
-      ],
-      "dims_mm": {
-        "dia": 372.0,
-        "len": 1415.0
-      }
-    },
-    {
-      "tag": "u_nursery_acid_dosing_pump",
-      "equipment_tag": "P-101",
-      "name": "Nursery Acid Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        8550.0,
-        -807.4,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_nursery_chemical_dosing_pump",
-      "equipment_tag": "P-102",
-      "name": "Nursery Chemical Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        9650.0,
-        -807.4,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_nursery_fertigation_dosing_pump",
-      "equipment_tag": "P-103",
-      "name": "Nursery Fertigation Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        10750.0,
-        -807.4,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_ro_high_pressure_pump",
-      "equipment_tag": "P-104",
-      "name": "Ro High Pressure Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        11850.0,
-        -807.4,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_hand_watering_pump",
-      "equipment_tag": "P-105",
-      "name": "Hand Watering Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        7450.0,
-        -795.7,
-        692.0
-      ],
-      "dims_mm": {
-        "w": 900.0,
-        "d": 500.0,
-        "h": 700.0
-      }
-    },
-    {
-      "tag": "u_nursery_drain_transfer_pump",
-      "equipment_tag": "P-106",
-      "name": "Nursery Drain Transfer Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -4650.0,
-        5311.8,
-        777.1
-      ],
-      "dims_mm": {
-        "w": 1095.0,
-        "d": 608.0,
-        "h": 852.0
-      }
-    },
-    {
-      "tag": "u_irrigation_pump",
-      "equipment_tag": "P-107",
-      "name": "Irrigation Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -6450.0,
-        5541.2,
-        1115.4
-      ],
-      "dims_mm": {
-        "w": 1872.0,
-        "d": 1040.0,
-        "h": 1456.0
-      }
-    },
-    {
-      "tag": "u_acid_dosing_pump_inst0",
-      "equipment_tag": "P-108",
-      "name": "Acid Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -12949.9,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_acid_dosing_pump_inst1",
-      "equipment_tag": "P-109",
-      "name": "Acid Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -11929.9,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_chemical_dosing_pump_inst0",
-      "equipment_tag": "P-110",
-      "name": "Chemical Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -11049.9,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_chemical_dosing_pump_inst1",
-      "equipment_tag": "P-111",
-      "name": "Chemical Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -10029.9,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_drain_transfer_pump_inst0",
-      "equipment_tag": "P-112",
-      "name": "Drain Transfer Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -9149.9,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_drain_transfer_pump_inst1",
-      "equipment_tag": "P-113",
-      "name": "Drain Transfer Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -8129.9,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_fertigation_dosing_pump_inst0",
-      "equipment_tag": "P-114",
-      "name": "Fertigation Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        750.1,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_fertigation_dosing_pump_inst1",
-      "equipment_tag": "P-115",
-      "name": "Fertigation Dosing Pump",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        1770.1,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_fertigation_dosing_pump_backup_inst0",
-      "equipment_tag": "P-116",
-      "name": "Fertigation Dosing Pump Backup",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        2750.1,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_fertigation_dosing_pump_backup_inst1",
-      "equipment_tag": "P-117",
-      "name": "Fertigation Dosing Pump Backup",
-      "module": "mass_fluid_transport_process",
-      "shape": "pump",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        3770.1,
-        5550.0,
-        669.6
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 660.0
-      }
-    },
-    {
-      "tag": "u_drain_water_tank_inst0",
-      "equipment_tag": "TK-101",
-      "name": "Drain Water Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -994.0,
-        -7900.5,
-        3247.0
-      ],
-      "dims_mm": {
-        "dia": 4900.0,
-        "len": 4800.0
-      }
-    },
-    {
-      "tag": "u_drain_water_tank_inst1",
-      "equipment_tag": "TK-102",
-      "name": "Drain Water Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        4494.0,
-        -7900.5,
-        3247.0
-      ],
-      "dims_mm": {
-        "dia": 4900.0,
-        "len": 4800.0
-      }
-    },
-    {
-      "tag": "u_fresh_water_tank",
-      "equipment_tag": "TK-103",
-      "name": "Fresh Water Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        10350.0,
-        -7900.5,
-        3247.0
-      ],
-      "dims_mm": {
-        "dia": 4900.0,
-        "len": 4800.0
-      }
-    },
-    {
-      "tag": "u_cleanwater_reservoir_reserve_tank",
-      "equipment_tag": "TK-104",
-      "name": "Cleanwater Reservoir Reserve Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -8650.0,
-        -6050.0,
-        1637.6
-      ],
-      "dims_mm": {
-        "dia": 8000.0,
-        "len": 1800.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst0",
-      "equipment_tag": "TK-105",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -3082.0,
-        -156.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst1",
-      "equipment_tag": "TK-106",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -1850.0,
-        -156.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst2",
-      "equipment_tag": "TK-107",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -618.0,
-        -156.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nursery_drain_collection_sump",
-      "equipment_tag": "TK-108",
-      "name": "Nursery Drain Collection Sump",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        6450.0,
-        50.0,
-        -215.0
-      ],
-      "dims_mm": {
-        "dia": 2100.0,
-        "len": 1400.0
-      }
-    },
-    {
-      "tag": "u_drain_collection_sump_inst0",
-      "equipment_tag": "TK-109",
-      "name": "Drain Collection Sump",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        1574.0,
-        155.5,
-        -208.9
-      ],
-      "dims_mm": {
-        "dia": 2100.0,
-        "len": 1400.0
-      }
-    },
-    {
-      "tag": "u_drain_collection_sump_inst1",
-      "equipment_tag": "TK-110",
-      "name": "Drain Collection Sump",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        3926.0,
-        155.5,
-        -208.9
-      ],
-      "dims_mm": {
-        "dia": 2100.0,
-        "len": 1400.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst3",
-      "equipment_tag": "TK-111",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -3082.0,
-        1075.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst4",
-      "equipment_tag": "TK-112",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -1850.0,
-        1075.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst5",
-      "equipment_tag": "TK-113",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -618.0,
-        1075.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst6",
-      "equipment_tag": "TK-114",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -3082.0,
-        2307.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_nutrient_tank_inst7",
-      "equipment_tag": "TK-115",
-      "name": "Nutrient Tank",
-      "module": "mass_fluid_transport_process",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -1850.0,
-        2307.5,
-        995.3
-      ],
-      "dims_mm": {
-        "dia": 1100.0,
-        "len": 1100.0
-      }
-    },
-    {
-      "tag": "u_cip_tank",
-      "equipment_tag": "TK-116",
-      "name": "Cip Tank",
-      "module": "maintenance_serviceability",
-      "shape": "tank",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -12650.0,
-        8069.5,
-        1121.3
-      ],
-      "dims_mm": {
-        "dia": 1400.0,
-        "len": 1300.0
-      }
-    },
-    {
-      "tag": "u_transformer",
-      "equipment_tag": "TX-101",
-      "name": "Transformer",
-      "module": "structure_containment",
-      "shape": "transformer_box",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -10450.0,
-        7670.0,
-        960.0
-      ],
-      "dims_mm": {
-        "w": 1200.0,
-        "d": 1020.0,
-        "h": 1320.0
-      }
-    },
-    {
-      "tag": "u_softener_vessel_inst0",
-      "equipment_tag": "V-101",
-      "name": "Softener Vessel",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -6822.0,
-        3271.5,
-        1308.4
-      ],
-      "dims_mm": {
-        "dia": 1200.0,
-        "len": 1300.0
-      }
-    },
-    {
-      "tag": "u_softener_vessel_inst1",
-      "equipment_tag": "V-102",
-      "name": "Softener Vessel",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -5478.0,
-        3271.5,
-        1308.4
-      ],
-      "dims_mm": {
-        "dia": 1200.0,
-        "len": 1300.0
-      }
-    },
-    {
-      "tag": "u_gac_filter",
-      "equipment_tag": "V-103",
-      "name": "Gac Filter",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -8350.0,
-        3317.5,
-        1388.2
-      ],
-      "dims_mm": {
-        "dia": 1300.0,
-        "len": 1400.0
-      }
-    },
-    {
-      "tag": "u_nursery_cloth_filter",
-      "equipment_tag": "V-104",
-      "name": "Nursery Cloth Filter",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -10050.0,
-        3417.5,
-        2248.0
-      ],
-      "dims_mm": {
-        "dia": 1500.0,
-        "len": 3000.0
-      }
-    },
-    {
-      "tag": "u_uv_disinfection",
-      "equipment_tag": "V-105",
-      "name": "Uv Disinfection",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        11450.0,
-        3867.5,
-        849.2
-      ],
-      "dims_mm": {
-        "dia": 1830.0,
-        "len": 1098.4
-      }
-    },
-    {
-      "tag": "u_cloth_filter_inst0",
-      "equipment_tag": "V-106",
-      "name": "Cloth Filter",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        9570.5,
-        3978.5,
-        1738.9
-      ],
-      "dims_mm": {
-        "dia": 1133.0,
-        "len": 2877.8
-      }
-    },
-    {
-      "tag": "u_cloth_filter_inst1",
-      "equipment_tag": "V-107",
-      "name": "Cloth Filter",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        10466.5,
-        3978.5,
-        1738.9
-      ],
-      "dims_mm": {
-        "dia": 1133.0,
-        "len": 2877.8
-      }
-    },
-    {
-      "tag": "u_gac_softener",
-      "equipment_tag": "V-108",
-      "name": "Gac Softener",
-      "module": "mass_fluid_transport_process",
-      "shape": "vertical_vessel",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        8350.0,
-        4076.7,
-        1468.8
-      ],
-      "dims_mm": {
-        "dia": 900.0,
-        "len": 1800.0
-      }
-    },
-    {
-      "tag": "u_reverse_osmosis_skid",
-      "equipment_tag": "Z-101",
-      "name": "Reverse Osmosis Skid",
-      "module": "mass_fluid_transport_process",
-      "shape": "skid_box",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        8950.0,
-        1550.0,
-        1100.0
-      ],
-      "dims_mm": {
-        "w": 3230.0,
-        "d": 1500.0,
-        "h": 1600.0
-      }
-    },
-    {
-      "tag": "u_uf_module_bank",
-      "equipment_tag": "Z-102",
-      "name": "Uf Module Bank",
-      "module": "mass_fluid_transport_process",
-      "shape": "skid_box",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        11450.0,
-        1550.0,
-        1100.0
-      ],
-      "dims_mm": {
-        "w": 3230.0,
-        "d": 1500.0,
-        "h": 1600.0
-      }
-    },
-    {
-      "tag": "u_ultrafiltration_module",
-      "equipment_tag": "Z-103",
-      "name": "Ultrafiltration Module",
-      "module": "mass_fluid_transport_process",
-      "shape": "skid_box",
-      "qty": 1,
-      "region_rank": 45,
-      "pos_mm": [
-        -12250.0,
-        3350.0,
-        1100.0
-      ],
-      "dims_mm": {
-        "w": 3230.0,
-        "d": 1500.0,
-        "h": 1600.0
-      }
-    },
-    {
-      "tag": "u_main_switchboard",
-      "equipment_tag": "EP-101",
-      "name": "Main Switchboard",
-      "module": "energy_storage_source",
-      "shape": "cabinet",
+      "tag": "INV-1",
+      "equipment_tag": "INV-1",
+      "name": "SiC Traction Inverter \u00b7 350 kW \u00b7 268x201x101 mm",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
       "qty": 1,
       "region_rank": 50,
       "pos_mm": [
-        -8150.0,
-        7470.0,
-        1350.0
+        128.0,
+        0.0,
+        366.0
       ],
       "dims_mm": {
-        "w": 1600.0,
-        "d": 860.0,
-        "h": 2100.0
-      }
+        "w": 130.0,
+        "d": 150.0,
+        "h": 84.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
     },
     {
-      "tag": "u_mains_incomer",
-      "equipment_tag": "EP-102",
-      "name": "Mains Incomer",
-      "module": "energy_storage_source",
-      "shape": "cabinet",
+      "tag": "X-110",
+      "equipment_tag": "X-110",
+      "name": "Hv DC Connector",
+      "module": "energy_conversion_transduction",
+      "shape": "box",
       "qty": 1,
       "region_rank": 50,
       "pos_mm": [
-        -6350.0,
-        7470.0,
-        1350.0
+        128.0,
+        -65.0,
+        366.0
       ],
       "dims_mm": {
-        "w": 1600.0,
-        "d": 860.0,
-        "h": 2100.0
-      }
+        "w": 36.0,
+        "d": 20.0,
+        "h": 28.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
     },
     {
-      "tag": "u_3_phase_power_input",
-      "equipment_tag": "D-101",
-      "name": "3 Phase Power Input",
-      "module": "power_distribution",
-      "shape": "cabinet",
-      "qty": 1,
-      "region_rank": 60,
-      "pos_mm": [
-        5150.0,
-        5570.0,
-        1350.0
-      ],
-      "dims_mm": {
-        "w": 1600.0,
-        "d": 860.0,
-        "h": 2100.0
-      }
-    },
-    {
-      "tag": "u_scada_plant_control_system",
-      "equipment_tag": "EP-103",
-      "name": "SCADA / Plant Control System",
-      "module": "power_distribution",
-      "shape": "cabinet_small",
-      "qty": 1,
-      "region_rank": 60,
-      "pos_mm": [
-        7300.0,
-        5550.0,
-        1200.0
-      ],
-      "dims_mm": {
-        "w": 700.0,
-        "d": 820.0,
-        "h": 1800.0
-      }
-    },
-    {
-      "tag": "u_motor_control_center",
-      "equipment_tag": "EP-104",
-      "name": "Motor Control Center",
-      "module": "power_distribution",
-      "shape": "cabinet",
-      "qty": 1,
-      "region_rank": 60,
-      "pos_mm": [
-        9850.0,
-        5850.0,
-        1350.0
-      ],
-      "dims_mm": {
-        "w": 1600.0,
-        "d": 1020.0,
-        "h": 2100.0
-      }
-    },
-    {
-      "tag": "u_standby_diesel_generator",
-      "equipment_tag": "G-201",
-      "name": "Standby Diesel Generator",
-      "module": "power_distribution",
+      "tag": "X-116",
+      "equipment_tag": "X-116",
+      "name": "Traction Ipmsm Motor Generator \u00b7 350 kW \u00b7 133x156x156 mm",
+      "module": "energy_conversion_transduction",
       "shape": "box",
       "qty": 1,
-      "region_rank": 60,
+      "region_rank": 50,
       "pos_mm": [
-        8150.0,
-        5870.0,
-        812.5
+        -88.3,
+        0.0,
+        382.7
       ],
       "dims_mm": {
-        "w": 932.0,
-        "d": 792.0,
-        "h": 1025.0
-      }
+        "w": 140.0,
+        "d": 126.0,
+        "h": 126.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
     },
     {
-      "tag": "u_control_instrument_ups",
-      "equipment_tag": "U-201",
-      "name": "Control + Instrument UPS",
-      "module": "power_distribution",
-      "shape": "instrument",
-      "qty": 1,
-      "region_rank": 60,
-      "pos_mm": [
-        6400.0,
-        5550.0,
-        600.0
-      ],
-      "dims_mm": {
-        "w": 600.0,
-        "d": 510.0,
-        "h": 600.0
-      }
-    },
-    {
-      "tag": "u_electrical_control_panel",
-      "equipment_tag": "X-101",
-      "name": "Electrical Control Panel",
-      "module": "power_distribution",
+      "tag": "X-117",
+      "equipment_tag": "X-117",
+      "name": "Reduction Gear Stage \u00b7 8 ratio \u00b7 160x110x130 mm",
+      "module": "energy_conversion_transduction",
       "shape": "box",
       "qty": 1,
-      "region_rank": 60,
+      "region_rank": 50,
       "pos_mm": [
-        12650.0,
-        3950.0,
-        850.0
+        21.3,
+        0.0,
+        372.1
       ],
       "dims_mm": {
-        "w": 1000.0,
-        "d": 1220.0,
-        "h": 1100.0
-      }
+        "w": 63.3,
+        "d": 107.1,
+        "h": 96.2
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
     },
     {
-      "tag": "u_concentrate_outlet",
-      "equipment_tag": "X-103",
-      "name": "Concentrate Outlet",
-      "module": "environmental_interface",
+      "tag": "X-121",
+      "equipment_tag": "X-121",
+      "name": "Mgu Cold Plate \u00b7 17.5 kW \u00b7 140x119x18 mm",
+      "module": "energy_conversion_transduction",
       "shape": "box",
       "qty": 1,
-      "region_rank": 60,
+      "region_rank": 50,
       "pos_mm": [
-        -3050.0,
-        7570.0,
-        850.0
+        115.0,
+        73.0,
+        378.6
       ],
       "dims_mm": {
-        "w": 1000.0,
-        "d": 1060.0,
-        "h": 1100.0
-      }
-    },
-    {
-      "tag": "u_permeate_outlet",
-      "equipment_tag": "X-104",
-      "name": "Permeate Outlet",
-      "module": "environmental_interface",
-      "shape": "box",
-      "qty": 1,
-      "region_rank": 60,
-      "pos_mm": [
-        -1650.0,
-        7570.0,
-        850.0
-      ],
-      "dims_mm": {
-        "w": 2030.0,
-        "d": 1060.0,
-        "h": 1100.0
-      }
-    },
-    {
-      "tag": "u_electrical_control_cabinet",
-      "equipment_tag": "I-102",
-      "name": "Electrical Control Cabinet",
-      "module": "safety_protection",
-      "shape": "instrument",
-      "qty": 1,
-      "region_rank": 70,
-      "pos_mm": [
-        -10808.1,
-        2449.4,
-        645.0
-      ],
-      "dims_mm": {
-        "w": 372.5,
-        "d": 570.0,
-        "h": 600.0
-      }
-    },
-    {
-      "tag": "u_digital_control_panel",
-      "equipment_tag": "I-103",
-      "name": "Digital Control Panel",
-      "module": "control_compute_communication",
-      "shape": "instrument",
-      "qty": 1,
-      "region_rank": 70,
-      "pos_mm": [
-        -4775.0,
-        7450.0,
-        495.0
-      ],
-      "dims_mm": {
-        "w": 372.5,
-        "d": 570.0,
-        "h": 410.0
-      }
+        "w": 16.0,
+        "d": 18.0,
+        "h": 16.0
+      },
+      "geometry_source": "traction_drive_story_mesh",
+      "signature_family": "traction_pack",
+      "entity_type": "bom_component"
     }
   ]
 }

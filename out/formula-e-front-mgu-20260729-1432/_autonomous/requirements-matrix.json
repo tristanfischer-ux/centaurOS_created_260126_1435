@@ -132,7 +132,8 @@
       "title": "Literature claims + corpus hash",
       "status": "OPEN",
       "acceptance": "claims > baseline; corpus_hash frozen for P1c",
-      "proveCatch": "literature_quality_floor"
+      "proveCatch": "literature_quality_floor",
+      "note": "extract draining with empty-doc markers; real claims still growing"
     },
     {
       "id": "REQ-3",
@@ -153,10 +154,11 @@
     {
       "id": "REQ-5",
       "item": 5,
-      "title": "Topology HV− and coolant-in",
-      "status": "PARTIAL",
+      "title": "Topology HV\u2212 and coolant-in",
+      "status": "PROVISIONAL_DONE",
       "acceptance": "edges present or proveCatch fires",
-      "proveCatch": "missing_hv_minus_or_coolant_in"
+      "proveCatch": "missing_hv_minus_or_coolant_in",
+      "note": "17/17 bay-relative routed; external XYZ still OPEN (race hold)"
     },
     {
       "id": "REQ-6",
@@ -221,7 +223,7 @@
       "FIA_approved",
       "SHIPS"
     ],
-    "note": "No FIA technical regulations PDF held in twin — forbid compliant language."
+    "note": "No FIA technical regulations PDF held in twin \u2014 forbid compliant language."
   },
   "ship_ok_policy": {
     "fail_closed_on": [

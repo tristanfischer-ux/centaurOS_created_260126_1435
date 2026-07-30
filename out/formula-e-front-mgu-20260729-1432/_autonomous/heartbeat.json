@@ -1,8 +1,8 @@
 {
-  "updated_at": "2026-07-29T19:41:40Z",
-  "updated_at_unix": 1785354100,
-  "phase": "P9",
+  "updated_at": "2026-07-30T13:47:23Z",
+  "updated_at_unix": 1785419243,
+  "phase": "X",
   "state": "RUNNING",
-  "step": "redteam_done",
-  "note": "Sol, GLM 5.2, and Kimi all REJECT; 24 FATALs dispositioned; all race holds OPEN; REQ-9 DONE; 20 database claim links stamped"
+  "step": "excel_draft",
+  "note": "Rebuild Excel DRAFT (ship_ok false)"
 }

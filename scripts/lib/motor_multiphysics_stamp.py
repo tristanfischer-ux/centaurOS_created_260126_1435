@@ -98,7 +98,7 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
 }
 
 # Principal CAD register for an integrated front drive (plan § Major machine parts).
-# Only ipmsm_stator_lamination is a seeded parametric family today.
+# Stator, rotor carrier, and planetary gearset are parametric educational families.
 _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     {
         "component_id": "traction_drive_housing",
@@ -119,10 +119,13 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "rotor_magnet_carrier",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
         "cad_family": "ipmsm_rotor_magnet_carrier",
-        "notes": "Family planned (educational CAD plan); Blender magnet blocks only today",
+        "notes": (
+            "Parametric V-pocket carrier family seeded (Apache-2.0 educational). "
+            "Not yet the twin-bound burst/demagnetisation release rotor."
+        ),
     },
     {
         "component_id": "rotor_bearing_stack",
@@ -133,10 +136,13 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "planetary_reduction_set",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "Visual tooth cues / seed counts — ratio strength OPEN",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "planetary_gearset",
+        "notes": (
+            "Parametric planetary family seeded (cq_gears / Apache-2.0). "
+            "Tooth strength / ISO 6336 / twin ratio closure still OPEN."
+        ),
     },
     {
         "component_id": "compact_bevel_differential",
@@ -275,18 +281,107 @@ def _open_check(
     return body
 
 
+def _load_fia_magnetic_case(twin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Load twin-bound FIA magnetic case artefact if present."""
+    if twin_dir is None:
+        return None
+    path = Path(twin_dir) / "_motor_stack" / "em_fia_front_kit_case.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _magnetic_check_from_fia_case(
+    duty: Mapping[str, Any],
+    case: Mapping[str, Any],
+    *,
+    twin_dir: Path,
+) -> dict[str, Any]:
+    """Promote magnetic check to PARTIAL when a twin-bound open-circuit point exists.
+
+    INTENT: Make the FIA front-kit magnetic case visible without claiming a torque
+    map, demagnetisation margin, or dynamometer correlation (those stay OPEN).
+    """
+    fem = case.get("finite_element_point") if isinstance(case.get("finite_element_point"), dict) else {}
+    analytical = (
+        case.get("analytical_duty_check")
+        if isinstance(case.get("analytical_duty_check"), dict)
+        else {}
+    )
+    inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
+    rel_ref = "_motor_stack/em_fia_front_kit_case.json"
+    body = _open_check(
+        "magnetic",
+        extra={
+            "status": "PARTIAL",
+            "torque_map_ref": None,
+            "loss_map_ref": None,
+            "demagnetisation_margin": None,
+            "model_revision": str(case.get("schema") or "forgeos.motor_stack.em_fia_front_kit_case/v1"),
+            "geometry_revision": str(
+                (case.get("machine_geometry") or {}).get("topology")
+                if isinstance(case.get("machine_geometry"), dict)
+                else None
+            ),
+            "input_hash": case.get("input_quantities_sha256"),
+            "result_ref": rel_ref,
+            "fia_question": (
+                f"Can the machine deliver {duty['continuous_design_duty_kw']} kW "
+                "front regen inside voltage/current/temp/demag limits?"
+            ),
+            "twin_bound_case": {
+                "status": case.get("status"),
+                "ship_ok": False,
+                "path": rel_ref,
+                "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
+                "peak_airgap_flux_density_t": fem.get("peak_airgap_flux_density_t"),
+                "rms_airgap_flux_density_t": fem.get("rms_airgap_flux_density_t"),
+                "required_shaft_torque_nm": analytical.get("required_shaft_torque_nm"),
+                "dc_current_a": analytical.get("dc_current_a"),
+                "electrical_power_check_kw": analytical.get("electrical_power_check_kw"),
+                "front_regen_cap_respected": analytical.get("front_regen_cap_respected"),
+                "fits_bay": (
+                    (case.get("machine_geometry") or {}).get("fits_bay")
+                    if isinstance(case.get("machine_geometry"), dict)
+                    else None
+                ),
+                "continuous_electrical_power_kw": inputs.get("continuous_electrical_power_kw"),
+                "dc_bus_voltage_v": inputs.get("dc_bus_voltage_v"),
+                "max_rotor_speed_rpm": inputs.get("max_rotor_speed_rpm"),
+                "torque_map": "OPEN",
+                "dynamometer_correlation": "OPEN",
+                "note": (
+                    "Twin-bound open-circuit magnetic point + analytical 250 kW duty "
+                    "reconciliation. Not a loaded torque map; not dyno-correlated; "
+                    "does not close release."
+                ),
+            },
+        },
+    )
+    # GOTCHA: _open_check defaults status OPEN; twin-bound case must win.
+    body["status"] = "PARTIAL"
+    return body
+
+
 def build_motor_multiphysics(
     *,
     state: Optional[Mapping[str, Any]] = None,
     assembly_revision: str = ASSEMBLY_REVISION,
     stamped_at: Optional[str] = None,
+    twin_dir: Optional[Path] = None,
 ) -> dict[str, Any]:
-    """Build motorMultiphysics dict per plan schema — all checks OPEN.
+    """Build motorMultiphysics dict per plan schema.
 
-    @description Records FIA duty + toolchain smoke pointers; never sets ship_ok.
+    @description Records FIA duty + toolchain smoke pointers. Magnetic may be
+    PARTIAL when a twin-bound FIA case artefact exists; all_required still false.
     @param state Optional twin state for quantity readback
     @param assembly_revision Shared CAD/solver/Blender revision label
     @param stamped_at ISO timestamp override
+    @param twin_dir Twin directory for `_motor_stack/` artefacts
     @returns motorMultiphysics object
     """
     duty = extract_fia_duty(state)
@@ -301,8 +396,15 @@ def build_motor_multiphysics(
         "Toolchain smokes prove solver executables — they do not close FIA evidence."
     )
 
-    required_checks = {
-        "magnetic": _open_check(
+    fia_mag = _load_fia_magnetic_case(twin_dir)
+    if fia_mag is not None and twin_dir is not None:
+        magnetic = _magnetic_check_from_fia_case(duty, fia_mag, twin_dir=Path(twin_dir))
+        notes += (
+            " Magnetic check PARTIAL: twin-bound open-circuit point in "
+            "_motor_stack/em_fia_front_kit_case.json (torque map / dyno still OPEN)."
+        )
+    else:
+        magnetic = _open_check(
             "magnetic",
             extra={
                 "torque_map_ref": None,
@@ -313,7 +415,10 @@ def build_motor_multiphysics(
                     "front regen inside voltage/current/temp/demag limits?"
                 ),
             },
-        ),
+        )
+
+    required_checks = {
+        "magnetic": magnetic,
         "rotor_dynamics": _open_check(
             "rotor_dynamics",
             extra={
@@ -464,17 +569,22 @@ def build_stamp_payload(
     *,
     state: Optional[Mapping[str, Any]] = None,
     assembly_revision: str = ASSEMBLY_REVISION,
+    twin_dir: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Combine motorMultiphysics + cadAuthority into one sidecar payload.
 
     @description Single artefact Excel / overview can read without the huge state.
     @param state Optional twin state
     @param assembly_revision Shared revision
+    @param twin_dir Twin directory for `_motor_stack/` artefacts
     @returns Combined payload
     """
     stamped = _iso_now()
     motor = build_motor_multiphysics(
-        state=state, assembly_revision=assembly_revision, stamped_at=stamped
+        state=state,
+        assembly_revision=assembly_revision,
+        stamped_at=stamped,
+        twin_dir=twin_dir,
     )
     cad = build_cad_authority(assembly_revision=assembly_revision, stamped_at=stamped)
     return {
@@ -510,10 +620,10 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "## Plain English",
         "",
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
-        "OpenFOAM). Those smokes use **generic** training geometry — they are **not**",
-        "revision-matched solves of this Formula E front powertrain kit. Every required",
-        "check below stays **OPEN** until a twin-bound result file, geometry revision,",
-        "input hash and acceptance limit exist.",
+        "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
+        "when a twin-bound artefact exists (e.g. one magnetic open-circuit point) while",
+        "torque map, demagnetisation, dynamometer correlation and the other domains",
+        "remain **OPEN**. `ship_ok` stays false.",
         "",
         "## FIA binding duties (why the solvers exist)",
         "",
@@ -547,7 +657,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
             "",
             f"- Principal components: **{cad.get('principal_components_total')}**",
             f"- Parametric family: **{cad.get('parametric_family_count')}** "
-            f"(stator lamination family only)",
+            f"(stator + rotor carrier + planetary; not release CAD)",
             f"- Communication only: **{cad.get('communication_only_count')}**",
             f"- Release authority (supplier/team): **{cad.get('release_authority_count')}** "
             f"/ coverage **{cad.get('release_authority_coverage')}**",
@@ -579,17 +689,32 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
 
 
 def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """proveCatch: smokes-only stamp must keep every check OPEN and ship_ok false.
+    """proveCatch: stamp must stay fail-closed; magnetic may be PARTIAL with a result_ref.
 
-    @description Adversarial guards for the stub stamp.
+    @description Adversarial guards for the stub / twin-bound-partial stamp.
     @param payload Combined stamp payload
     @returns Catch dict with ok bool
     """
     motor = payload.get("motorMultiphysics") or {}
     cad = payload.get("cadAuthority") or {}
     checks = motor.get("required_checks") or {}
-    all_open = bool(checks) and all(
-        isinstance(c, Mapping) and c.get("status") == "OPEN" for c in checks.values()
+
+    def _status_ok(name: str, chk: Mapping[str, Any]) -> bool:
+        status = chk.get("status")
+        if status == "OPEN":
+            return True
+        # PARTIAL only for magnetic when a twin-bound artefact is cited.
+        if name == "magnetic" and status == "PARTIAL" and chk.get("result_ref"):
+            return True
+        return False
+
+    statuses_honest = bool(checks) and all(
+        isinstance(c, Mapping) and _status_ok(name, c) for name, c in checks.items()
+    )
+    non_magnetic_open = all(
+        isinstance(c, Mapping) and c.get("status") == "OPEN"
+        for name, c in checks.items()
+        if name != "magnetic" and isinstance(c, Mapping)
     )
     duty = motor.get("fia_duty") or {}
     duty_ok = all(
@@ -610,19 +735,22 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         for c in (cad.get("components") or [])
         if isinstance(c, Mapping)
     )
+    parametric_count = int(cad.get("parametric_family_count") or 0)
     smoke_tagged = all(
         ((c.get("toolchain_smoke") or {}).get("evidence_class") == "toolchain_smoke_pass")
         for c in checks.values()
         if isinstance(c, Mapping)
     )
     results = {
-        "all_required_checks_open": all_open,
+        "statuses_honest_open_or_magnetic_partial": statuses_honest,
+        "non_magnetic_checks_open": non_magnetic_open,
         "ship_ok_false": motor.get("ship_ok") is False and payload.get("ship_ok") is False,
         "all_required_solver_checks_pass_false": (
             motor.get("all_required_solver_checks_pass") is False
         ),
         "fia_duty_fields_present": duty_ok,
         "stator_parametric_family_listed": stator_ok,
+        "parametric_family_count_ge_1": parametric_count >= 1,
         "toolchain_smoke_tagged_not_pass": smoke_tagged,
         "release_authority_coverage_zero": cad.get("release_authority_coverage") == 0.0,
         "never_ship_ok_true_on_smoke_only": True,
@@ -639,7 +767,8 @@ def prove_catch(payload: Mapping[str, Any]) -> dict[str, Any]:
         "intended_action": "block_greenwash_solver_pass",
     }
     results["ok"] = (
-        all_open
+        statuses_honest
+        and non_magnetic_open
         and results["ship_ok_false"]
         and results["all_required_solver_checks_pass_false"]
         and duty_ok
@@ -767,6 +896,59 @@ def selftest() -> int:
         print("FAIL: proveCatch must fail on illicit PASS")
         bad += 1
 
+    # Twin-bound FIA magnetic case → magnetic PARTIAL; other checks stay OPEN.
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="fpk-motor-stack-") as tmp:
+        twin_tmp = Path(tmp)
+        case_dir = twin_tmp / "_motor_stack"
+        case_dir.mkdir(parents=True)
+        (case_dir / "em_fia_front_kit_case.json").write_text(
+            json.dumps(
+                {
+                    "schema": "forgeos.motor_stack.em_fia_front_kit_case/v1",
+                    "status": "PARTIAL",
+                    "ship_ok": False,
+                    "input_quantities_sha256": "abc123",
+                    "finite_element_point": {
+                        "peak_airgap_flux_density_t": 0.28,
+                        "rms_airgap_flux_density_t": 0.21,
+                    },
+                    "analytical_duty_check": {
+                        "required_shaft_torque_nm": 125.2,
+                        "dc_current_a": 333.3,
+                        "electrical_power_check_kw": 250.0,
+                        "front_regen_cap_respected": True,
+                    },
+                    "input_quantities": {
+                        "continuous_electrical_power_kw": 250.0,
+                        "dc_bus_voltage_v": 750.0,
+                        "max_rotor_speed_rpm": 19500.0,
+                    },
+                    "machine_geometry": {
+                        "topology": "48-slot / 8-pole test",
+                        "fits_bay": True,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        partial_payload = build_stamp_payload(state=fake_state, twin_dir=twin_tmp)
+        mag = partial_payload["motorMultiphysics"]["required_checks"]["magnetic"]
+        if mag.get("status") != "PARTIAL" or not mag.get("result_ref"):
+            print("FAIL: twin-bound FIA case must mark magnetic PARTIAL with result_ref")
+            bad += 1
+        if partial_payload["motorMultiphysics"].get("ship_ok") is True:
+            print("FAIL: PARTIAL magnetic must not set ship_ok")
+            bad += 1
+        if not prove_catch(partial_payload).get("ok"):
+            print("FAIL: proveCatch must accept magnetic PARTIAL with result_ref")
+            bad += 1
+        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 3:
+            print("FAIL: expected ≥3 parametric families (stator, rotor, planetary)")
+            bad += 1
+
     if bad:
         print(f"selftest FAIL ({bad})")
         return 1
@@ -776,6 +958,7 @@ def selftest() -> int:
                 "ok": True,
                 "checks": list((payload["motorMultiphysics"]["required_checks"]).keys()),
                 "principal_components": payload["cadAuthority"]["principal_components_total"],
+                "parametric_family_count": payload["cadAuthority"]["parametric_family_count"],
                 "proveCatch": catch,
             },
             indent=2,
