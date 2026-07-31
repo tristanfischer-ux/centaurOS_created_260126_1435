@@ -3066,6 +3066,33 @@ def _build_assumption_based_design(
 
     register = build_register(Path(twin_dir))
     write_register(Path(twin_dir), register)
+    # FLOW: Also fill Bar B checklist under assumptions (not homologation).
+    try:
+        from fpk_bar_b_readiness import (  # type: ignore
+            apply_decision_assumption_annotations,
+            build_bar_b,
+            write_register as write_bar_b,
+        )
+    except ImportError:
+        from fpk_bar_b_readiness import (
+            apply_decision_assumption_annotations,
+            build_bar_b,
+            write_register as write_bar_b,
+        )
+
+    bar_b = build_bar_b(Path(twin_dir))
+    write_bar_b(Path(twin_dir), bar_b)
+    apply_decision_assumption_annotations(Path(twin_dir), bar_b)
+    register = dict(register)
+    register["bar_b_readiness"] = {
+        "verdict": bar_b.get("verdict"),
+        "ship_ok": False,
+        "counts": bar_b.get("counts"),
+        "markdown": "JLR-FE-FRONT-FPK-BAR-B-READINESS.md",
+        "json": "JLR-FE-FRONT-FPK-BAR-B-READINESS.json",
+        "plan": "docs/plans/JLR-FE-FRONT-FPK-BAR-B-UNDER-ASSUMPTIONS-2026-07-31.md",
+    }
+    write_register(Path(twin_dir), register)
     return register
 
 
