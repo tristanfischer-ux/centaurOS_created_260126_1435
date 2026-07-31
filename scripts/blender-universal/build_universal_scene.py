@@ -53,6 +53,10 @@ from render_view_contract import (
 from cad_asset_resolver import CadAssetResolver
 import human_factors_instrument as hfi
 import instrument_form_grammar as ifg
+try:
+    import bom_physical_properties as bom_phys
+except Exception:  # pragma: no cover — never block Blender on props import
+    bom_phys = None
 
 # ── FAST PIPE-RUN PATCH (universal router robustness) ─────────────────────────
 # The stock forge_blender_lib.add_pipe calls bpy.ops.object.select_all + convert
@@ -1517,16 +1521,34 @@ def _num(s):
     return float(m.group()) if m else None
 
 
-def parse_dimension(dim_value):
-    """Parse a dimension string → a normalised dict in MM. Recognises:
+def parse_dimension(dim_value, *, allow_structured: bool = True):
+    """Parse a dimension string → a normalised dict in MM.
+
+    Recognises classic plant forms:
       "<W> m dia x <H> m"  → cylinder  {kind:cyl, dia_mm, len_mm}
       "<a>x<b>x<c> mm"     → box       {kind:box, w_mm,d_mm,h_mm}
       "<a> m² area"        → area      {kind:area, area_m2}
       "<a> m stack dia"    → cyl with only dia  {kind:cyl, dia_mm}
-    Returns None if nothing usable. Accepts ASCII x and Unicode × / ×.
+
+    When allow_structured=True (default for standalone callers), also accepts
+    densify OD/ID / `od_mm=…` blobs via bom_physical_properties.
+
+    GOTCHA: extract_parts already ran bom_phys on the FULL modifier set — its
+    fallback MUST call allow_structured=False so we do not double-parse and
+    accidentally prefer a worse string-only result over structured atoms.
     """
     if not dim_value:
         return None
+    if allow_structured and bom_phys is not None:
+        try:
+            _bp = bom_phys.extract_physical_props(
+                [{"kind": "dimension", "value": str(dim_value)}]
+            )
+            _bd = bom_phys.props_to_blender_dim(_bp)
+            if _bd:
+                return _bd
+        except Exception:  # noqa: BLE001
+            pass
     s = str(dim_value).strip().lower().replace("×", "x").replace("·", ".")
 
     # area, e.g. "15 m² area" / "15 m2 area"
@@ -1631,9 +1653,11 @@ class Part:
     """A physical, renderable part resolved from a word."""
     __slots__ = ("name", "module_id", "region_key", "region_rank",
                  "shape", "dim", "qty", "form", "match_tokens",
-                 "obj_anchor", "placed_xyz_mm", "anchors", "ports", "_consolidated")
+                 "obj_anchor", "placed_xyz_mm", "anchors", "ports", "_consolidated",
+                 "material", "mass_kg", "thickness_mm", "physical")
 
-    def __init__(self, name, module_id, region_key, region_rank, shape, dim, qty, form):
+    def __init__(self, name, module_id, region_key, region_rank, shape, dim, qty, form,
+                 material=None, mass_kg=None, thickness_mm=None, physical=None):
         self.name = name
         self.module_id = module_id
         self.region_key = region_key
@@ -1642,6 +1666,10 @@ class Part:
         self.dim = dim
         self.qty = qty
         self.form = form
+        self.material = material
+        self.mass_kg = mass_kg
+        self.thickness_mm = thickness_mm
+        self.physical = physical or {}
         self.match_tokens = tokenise(name)
         self.obj_anchor = None        # (assembly dict) once placed
         self.placed_xyz_mm = None     # CENTRE anchor (mm) for legacy bbox/routing
@@ -2100,31 +2128,58 @@ def extract_parts(state):
                 if NON_PHYSICAL_RE.search(name):
                     dropped.append(name)
                     continue
-                # Accept BOTH "dimension" (singular) and "dimensions" (plural) —
-                # real states emit either (the corpus uses ~2:1 singular:plural),
-                # so reading only the singular silently dropped the size of many
-                # device parts (e.g. the edge-AI GPU card carries "dimensions").
+                # ── DIMENSION CASCADE (single authority — no parallel readers) ──
+                # PREVIOUSLY Blender sized Part.dim from, in practice:
+                #   (a) word modifier kind=dimension|dimensions → parse_dimension()
+                #   (b) else duty-scaled pump/fan default (_machine_duty_scaled_dim)
+                #   (c) else instrument noun proxy (_instrument_proxy_dim)
+                #   (d) else TYPE_DEFAULTS_MM[shape] inside resolved_dims_mm()
+                # Traction FPK u_se_td_* story meshes NEVER used this path — they
+                # still come from fpk_concentric_geometry.geometry_from_quantities
+                # (contract quantities). Do not wire BoM dims into that placer here.
+                #
+                # NOW step (a) is shared with BoM via bom_physical_properties
+                # (structured od_mm/thickness/mass/material + free-text). Fallbacks
+                # (b)–(d) unchanged. No second reader of requirementsBom.
+                _phys = {}
+                if bom_phys is not None:
+                    try:
+                        _phys = bom_phys.extract_physical_props(mods) or {}
+                    except Exception:  # noqa: BLE001
+                        _phys = {}
                 dim = None
-                for mc in mods:
-                    if mc.get("kind") in ("dimension", "dimensions"):
-                        dim = parse_dimension(mc.get("value"))
-                        if dim:
-                            break
+                if bom_phys is not None and _phys:
+                    try:
+                        dim = bom_phys.props_to_blender_dim(_phys)
+                    except Exception:  # noqa: BLE001
+                        dim = None
+                # Classic plant metres / m³ / m² — bom_phys returns None for these.
+                # allow_structured=False: structured path already ran on full mods.
+                if dim is None:
+                    for mc in mods:
+                        if mc.get("kind") in ("dimension", "dimensions"):
+                            dim = parse_dimension(
+                                mc.get("value"), allow_structured=False)
+                            if dim:
+                                break
+                if dim is not None and _phys.get("thickness_mm") is not None:
+                    dim = dict(dim)
+                    dim["thickness_mm"] = float(_phys["thickness_mm"])
                 qty = 1
                 for mc in mods:
                     if mc.get("kind") == "quantity":
                         qty = parse_quantity(mc.get("value"))
                         break
                 shape = classify_shape(name, form, module_id)
-                # DUTY-SCALED default for an undimensioned small rotating machine
-                # (2026-07-06, GA/Renders litter fix — see the module-level comment
-                # above _machine_duty_m3h): only fires when the word has NO explicit
-                # dimension AND the plant states a real duty (capacity modifier or a
-                # matched contract flow quantity) — never fabricates a size.
+                _part_material = _phys.get("material")
+                _part_mass = _phys.get("mass_kg")
+                _part_thk = _phys.get("thickness_mm")
+                # (b) DUTY-SCALED default — only when NO explicit dimension.
                 if dim is None and shape in _REPLICATED_MACHINE_KIND:
                     duty = _machine_duty_m3h(name, mods, quantities)
                     if duty is not None:
                         dim = _machine_duty_scaled_dim(duty)
+                # (c) instrument noun proxy — only when still undimensioned.
                 if instrument_device and dim is None:
                     dim = _instrument_proxy_dim(name, module_id, quantities)
                 # UNIVERSAL backstop: a part carrying an explicit CYLINDER dim
@@ -2153,7 +2208,11 @@ def extract_parts(state):
                 # shape-FAMILY mismatch, not the name, so any future class hits it too.
                 if dim and dim.get("kind") == "box" and shape in _ROUND_VESSEL_SHAPES:
                     shape = "box"
-                parts.append(Part(name, module_id, region_key, rank, shape, dim, qty, form))
+                parts.append(Part(
+                    name, module_id, region_key, rank, shape, dim, qty, form,
+                    material=_part_material, mass_kg=_part_mass,
+                    thickness_mm=_part_thk, physical=_phys,
+                ))
     # A qty-N big VESSEL/TANK is replicated DOWNSTREAM in build_part (one Part, N
     # instances drawn as a compact grid, each with a unique object base-name) so the
     # 3D render, the parts-manifest AND every 2D drawing all show N tanks. Replicating
@@ -2916,8 +2975,23 @@ def _module_hue(module_id):
     return MODULE_EQUIP_COLOURS[idx % len(MODULE_EQUIP_COLOURS)]
 
 
-def _mat_for(shape, MAT, module_id=None):
+def _mat_for(shape, MAT, module_id=None, material=None):
     key, rgb, met, rough = SHAPE_MAT.get(shape, SHAPE_MAT["box"])
+    # UNIVERSAL (2026-07-31): BoM material_spec / material_grade drives PBR when
+    # present — stainless vs Al vs NdFeB vs FR4 must not all render as shape-default.
+    _bom_mat = None
+    if bom_phys is not None and material:
+        try:
+            _bom_mat = bom_phys.material_to_pbr(str(material))
+        except Exception:  # noqa: BLE001
+            _bom_mat = None
+    if _bom_mat is not None:
+        rgb, met, rough = _bom_mat
+        slug = re.sub(r"[^a-z0-9]+", "_", str(material).lower())[:40].strip("_") or "bom"
+        mkey = f"u_bommat__{slug}__{key}"
+        if mkey not in MAT:
+            MAT[mkey] = fl.make_mat(f"m_{mkey}", rgb, metallic=met, roughness=rough)
+        return MAT[mkey], key
     # COLOUR-CODE principal equipment by MODULE (each subsystem = one colour group);
     # keep the SHAPE's metallic/roughness for the material feel. Cache per (module,
     # shape) so the feel still varies by shape within a module. No module → shape colour.
@@ -3647,8 +3721,13 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
     repeat in a tight cluster."""
     shape = part.shape
     mod = part.module_id
-    mat, _ = _mat_for(shape, MAT, mod)
+    mat, _ = _mat_for(shape, MAT, mod, material=getattr(part, "material", None))
     rd = resolved_dims_mm(part)
+    # Honour BoM wall thickness on resolved geometry (shells / plates).
+    _thk = getattr(part, "thickness_mm", None)
+    if _thk is not None and rd is not None:
+        rd = dict(rd)
+        rd["thickness_mm"] = float(_thk)
     nm = "u_" + re.sub(r"[^a-z0-9]+", "_", part.name.lower()).strip("_")[:40]
 
     # BELOW-GRADE / gravity-drain collection point (Sam Green SME review 2026-07-08,
@@ -14043,7 +14122,10 @@ def _traction_drive_exterior_keep_visible(name: str) -> bool:
     return not any(nm.startswith(p) or p.rstrip("_") == nm for p in _interior)
 
 
-_FPK_SECTION_SOURCE_PREFIXES = (
+# INTENT (2026-07-31 SIGHT): motor_housing / coolant_jacket / end_bells are SOLID
+# cylinders from fl.add_cyl — NOT thin-walled shells. Bisecting them leaves an
+# opaque half-plug. Open views SHELL-OFF these solids entirely.
+_FPK_SHELL_OFF_PREFIXES = (
     "u_se_td_motor_housing",
     "u_se_td_coolant_jacket",
     "u_se_td_jacket_band",
@@ -14052,6 +14134,36 @@ _FPK_SECTION_SOURCE_PREFIXES = (
     "u_se_td_gearbox_cover",
     "u_se_td_inverter_cover",
     "u_se_td_cassette_cover",
+    "u_se_td_inverter_housing_wall_",
+    "u_se_td_bay_endwall_",
+    "u_se_td_resolver_bulge",
+    "u_se_td_cast_rib_",
+    # Legacy solid bore plug name — hide if a stale twin still has one.
+    "u_se_td_rotor_hint",
+)
+_FPK_SHELL_OFF_EXACT = (
+    "u_se_td_pack_housing",
+    "u_se_td_inverter_housing",
+)
+# Hollow story barrels: hide full mesh, SHOW rear-half section so the side camera
+# looks into the planetary/diff nest (a full tube's outer wall still reads sealed).
+_FPK_SECTION_SHOW_EXACT = (
+    "u_se_td_stator_ring",
+    "u_se_td_stator_hint",
+    "u_se_td_hollow_rotor",
+    "u_se_td_ring_gear",
+)
+# Back-compat aliases used by proveCatch / ghost helpers.
+_FPK_SECTION_SOURCE_PREFIXES = _FPK_SHELL_OFF_PREFIXES
+_FPK_SECTION_SOURCE_EXACT = _FPK_SHELL_OFF_EXACT
+# Opaque BoM envelopes that read as solid blocks over tooth/module geometry.
+_FPK_SECTION_HIDE_EXACT = (
+    "u_se_td_gearbox",            # seated nest volume — planets are the story
+    "u_se_td_post_diff_envelope", # packaging envelope — pinions/wheels are the story
+    "u_se_td_diff_bulge",         # solid cue over diff nest
+)
+_FPK_SECTION_HIDE_PREFIXES = (
+    # Only hide half-plugs of SHELL-OFF skins — section_* of stator/rotor are shown.
 )
 _FPK_SECTION_EXPOSE_PREFIXES = (
     "u_se_td_stator_",
@@ -14062,32 +14174,57 @@ _FPK_SECTION_EXPOSE_PREFIXES = (
     "u_se_td_planet_",
     "u_se_td_planet_carrier",
     "u_se_td_ring_gear",
-    "u_se_td_gearbox",
-    "u_se_td_diff_",
-    "u_se_td_post_diff_",
+    "u_se_td_gearbox_bearing_",
+    "u_se_td_diff_nest",
+    "u_se_td_post_diff_pinion_",
+    "u_se_td_post_diff_wheel_",
+    "u_se_td_side_gear_",
+    "u_se_td_pinion_gear",
+    "u_se_td_output_gear_",
     "u_se_td_motor_shaft",
+    "u_se_td_intermediate_shaft",
+    "u_se_td_output_shaft",
     "u_se_td_pe_module_",
     "u_se_td_pe_busbar_",
     "u_se_td_pe_filmcap_",
     "u_se_td_pe_gd_flex",
     "u_se_td_sic_inverter",
+    "u_se_td_dclink_cap_",
     "u_se_td_control_pcb",
     "u_se_td_gate_drive_pcb",
     "u_se_td_pcb",
     "u_se_td_inverter_coldplate",
     "u_se_td_phase_bus_",
     "u_se_td_hv_bus",
+    "u_se_td_halfshaft_flange_",
 )
 _FPK_SECTION_OBJECTS = {}
 
 
-def _fpk_build_rear_half_section(source):
-    """Duplicate one shell and remove its camera-facing (-Y) half.
+def _fpk_is_shell_off_name(name: str) -> bool:
+    """True if this mesh is a solid outer skin that must disappear on open cutaways."""
+    nm = name or ""
+    if nm in _FPK_SHELL_OFF_EXACT:
+        return True
+    return any(nm == prefix or nm.startswith(prefix) for prefix in _FPK_SHELL_OFF_PREFIXES)
 
-    INTENT: A transparent full housing still stacks two shell surfaces in front
-    of the mechanism and turns the concentric drivetrain into a dark silhouette.
-    The section keeps the structurally explanatory rear half while opening the
-    service/front half, as an engineering trainer would.
+
+def _fpk_is_section_show_name(name: str) -> bool:
+    """True if this hollow barrel should render as a rear-half section on open views."""
+    return (name or "") in _FPK_SECTION_SHOW_EXACT
+
+
+def _fpk_is_section_source_name(name: str) -> bool:
+    """True if open views alter this mesh (shell-off OR section-show)."""
+    return _fpk_is_shell_off_name(name) or _fpk_is_section_show_name(name)
+
+
+def _fpk_build_rear_half_section(source):
+    """Duplicate one mesh and remove its camera-facing (-Y) half.
+
+    Used for hollow stator/rotor barrels on open views so the side camera looks
+    into the nest. Solid outer housings are shell-off instead (never shown as
+    half-plugs — SIGHT 2026-07-31).
     """
     import bmesh
     from mathutils import Vector
@@ -14140,13 +14277,529 @@ def _fpk_build_rear_half_section(source):
     return section
 
 
-def _fpk_apply_functional_section_view(view_name, entering):
-    """Apply the traction-only section state for hero/cutaway/ghost views.
+# INTENT (2026-07-31 Tristan): exploded assembly — every story mesh gets its
+# own offset so parts read individually (not 4 coaxial blobs). Group seeds
+# keep family clusters; per-object lattice fans siblings apart. Offsets are
+# mm-class fractions of a typical FPK envelope, NOT Lucid STEP paste.
+# Restored on exit via _FPK_EXPLODE_LOC_SNAP.
+_FPK_EXPLODE_LOC_SNAP = []
+_FPK_EXPLODE_SKIP_PREFIXES = (
+    "u_se_td_housing", "u_se_td_case", "u_se_td_jacket", "u_se_td_cover",
+    "u_se_td_end_bell", "u_se_td_pack_base", "u_se_td_bay", "u_se_td_ground",
+    "u_se_td_endpoint", "u_se_td_vehicle",
+    # Tooth-detail fragments read as sphere clutter when fully exploded — keep
+    # them nested on the parent gear body in the catalogue view.
+    "u_se_td_sun_gear_tooth_", "u_se_td_ring_gear_tooth_",
+    "u_se_td_planet_tooth_", "u_se_td_output_gear_tooth_",
+)
+# INTENT: Tristan 2026-07-31 — every story part visible individually. Family
+# seeds give axial story (MCU↑ / motor← / nest→ / diff→→); catalogue pitch
+# (~110 mm) fans siblings so magnets/planets/PE bricks do not overlap.
+_FPK_EXPLODE_GROUP_SEEDS_M = (
+    # (name_prefixes, base_dx, base_dy, base_dz, family_rank)
+    (("u_se_td_mcu_shelf", "u_se_td_sic_inverter", "u_se_td_pe_",
+      "u_se_td_control_pcb", "u_se_td_gate_drive_pcb", "u_se_td_pcb",
+      "u_se_td_inverter_coldplate", "u_se_td_dclink_cap_", "u_se_td_hv_"),
+     0.0, 0.0, 0.160, 0),
+    (("u_se_td_stator_", "u_se_td_winding_end_", "u_se_td_section_stator",
+      "u_se_td_hollow_rotor", "u_se_td_section_hollow", "u_se_td_magnet_",
+      "u_se_td_section_ring", "u_se_td_slot_", "u_se_td_coil_"),
+     -0.180, 0.0, 0.0, 1),
+    (("u_se_td_sun_gear", "u_se_td_planet_", "u_se_td_planet_carrier",
+      "u_se_td_ring_gear", "u_se_td_gearbox", "u_se_td_gearbox_bearing_",
+      "u_se_td_carrier_"),
+     0.140, 0.0, 0.0, 2),
+    (("u_se_td_diff_", "u_se_td_post_diff_", "u_se_td_side_gear_",
+      "u_se_td_pinion_gear", "u_se_td_output_gear_", "u_se_td_halfshaft_",
+      "u_se_td_bevel_"),
+     0.320, 0.0, 0.0, 3),
+    (("u_se_td_oil_", "u_se_td_jet_", "u_se_td_microjet_", "u_se_td_sump",
+      "u_se_td_baffle", "u_se_td_coldplate", "u_se_td_jacket_channel",
+      "u_se_td_coolant_"),
+     0.0, 0.180, 0.040, 4),
+    (("u_se_td_bearing_", "u_se_td_seal_", "u_se_td_oil_seal",
+      "u_se_td_resolver", "u_se_td_sensor_", "u_se_td_encoder",
+      "u_se_td_busbar_", "u_se_td_connector_", "u_se_td_phase_"),
+     0.0, -0.180, 0.060, 5),
+)
+_FPK_EXPLODE_CATALOGUE_PITCH_M = (0.110, 0.100, 0.095)  # x, y, z
+_FPK_EXPLODE_CATALOGUE_COLS = 6
 
-    Closed 04–07 views retain the complete opaque production skin. Open views
-    hide those full shells, show their rear-half section duplicates, and force
-    the stator→rotor→planetary→diff→PE chain visible. Vehicle endpoint spheres
-    remain in-scene for route-audit but never become required product geometry.
+
+def _fpk_explode_group_seed(name: str):
+    """Return (base_dx, base_dy, base_dz, family_rank) metres, or None to skip."""
+    nm = name or ""
+    if nm.startswith("u_se_td_section_"):
+        nm = "u_se_td_" + nm.removeprefix("u_se_td_section_")
+    if any(nm.startswith(p) for p in _FPK_EXPLODE_SKIP_PREFIXES):
+        return None
+    if not nm.startswith("u_se_td_"):
+        return None
+    for prefixes, dx, dy, dz, rank in _FPK_EXPLODE_GROUP_SEEDS_M:
+        if any(nm == p or nm.startswith(p) for p in prefixes):
+            return dx, dy, dz, rank
+    # Unknown story mesh — still explode individually (catch-all catalogue).
+    return 0.0, 0.0, 0.080, 6
+
+
+def _fpk_explode_delta_for(name: str, index: int = 0):
+    """Return (dx,dy,dz) metres for one mesh — family seed + catalogue cell.
+
+    INTENT: Tristan 2026-07-31 — see every Blender part individually. Dense
+    35 mm lattices looked like a sphere cloud; catalogue pitch (~110 mm) +
+    larger family seeds keep magnets / planets / PE / jets readable.
+    """
+    seed = _fpk_explode_group_seed(name)
+    if seed is None:
+        return None
+    dx0, dy0, dz0, rank = seed
+    px, py, pz = _FPK_EXPLODE_CATALOGUE_PITCH_M
+    cols = _FPK_EXPLODE_CATALOGUE_COLS
+    col = index % cols
+    row = (index // cols) % 4
+    layer = index // (cols * 4)
+    # Rank shifts whole families onto distinct catalogue bands.
+    band_y = (rank - 2.5) * (py * 1.35)
+    return (
+        dx0 + (col - (cols - 1) / 2.0) * px,
+        dy0 + band_y + (row - 1.5) * py,
+        dz0 + layer * pz,
+    )
+
+
+def _fpk_apply_exploded_view(view_name, entering):
+    """Shell-off + per-part catalogue explode for 13-product-exploded.
+
+    DECISION: explode is a VIEW pose (location deltas), not new meshes — same
+    story objects as the cutaway, restored from _FPK_EXPLODE_LOC_SNAP on exit.
+    """
+    global _FPK_EXPLODE_LOC_SNAP
+    if not _IS_TRACTION_DRIVE_FORM or not hasattr(bpy, "data"):
+        return
+    is_exploded = bool(
+        entering and "explod" in str(view_name).lower()
+    )
+    if is_exploded:
+        if _FPK_EXPLODE_LOC_SNAP:
+            # Already applied — idempotent.
+            return
+        # Open cutaway first (shell-off + expose nest).
+        _fpk_apply_functional_section_view(view_name, True)
+        # Group by family rank so catalogue bands stay coherent.
+        by_rank = {}
+        for obj in bpy.data.objects:
+            if getattr(obj, "type", None) != "MESH":
+                continue
+            seed = _fpk_explode_group_seed(obj.name)
+            if seed is None:
+                continue
+            rank = seed[3]
+            by_rank.setdefault(rank, []).append(obj)
+        snap = []
+        moved = 0
+        for rank in sorted(by_rank):
+            members = sorted(by_rank[rank], key=lambda o: o.name)
+            for index, obj in enumerate(members):
+                delta = _fpk_explode_delta_for(obj.name, index=index)
+                if delta is None:
+                    continue
+                snap.append((obj, obj.location.copy()))
+                obj.location = (
+                    obj.location.x + delta[0],
+                    obj.location.y + delta[1],
+                    obj.location.z + delta[2],
+                )
+                moved += 1
+        _FPK_EXPLODE_LOC_SNAP = snap
+        print(
+            f"[univ][fpk-explode] entered {view_name}: moved={moved} "
+            f"individual meshes (catalogue lattice, pitch="
+            f"{_FPK_EXPLODE_CATALOGUE_PITCH_M[0]*1000:.0f}mm)",
+            flush=True,
+        )
+        return
+    # Restore.
+    if _FPK_EXPLODE_LOC_SNAP:
+        for obj, loc in _FPK_EXPLODE_LOC_SNAP:
+            try:
+                if obj is not None and obj.name in bpy.data.objects:
+                    obj.location = loc
+            except Exception as exc:  # noqa: BLE001
+                print(f"[univ][fpk-explode] restore skip: {exc}")
+        print(f"[univ][fpk-explode] restored {len(_FPK_EXPLODE_LOC_SNAP)} locations",
+              flush=True)
+        _FPK_EXPLODE_LOC_SNAP = []
+
+
+# ── PARTS-ON-PAPER CATALOGUE (14) ───────────────────────────────────────────
+# INTENT (2026-07-31 Tristan): "all the parts almost laid out on a big piece of
+# paper" so the kit can be INVENTORIED by eye. 13-product-exploded answers "how
+# does it come apart"; this answers "is every part actually there". Layout maths
+# lives in the bpy-free scripts/lib/fpk_parts_catalogue.py so it is unit-testable
+# (proveCatch on overlap + coverage + per-family counts); this function is only
+# the Blender projection of that plan.
+_FPK_CATALOGUE_SNAP = []          # (obj, matrix_world, hide_render) to restore
+_FPK_CATALOGUE_TEMP = []          # label / paper objects to delete on exit
+_FPK_CATALOGUE_MATSNAP = []       # (material, alpha, blend_method) to restore
+_FPK_CATALOGUE_LAST = {}          # coverage record for the render log + gate
+
+
+def _fpk_world_extents_mm(obj):
+    """WORLD-aligned bbox extents (dx, dy, dz) of one object, in mm.
+
+    GOTCHA (2026-07-31): `obj.dimensions` is the LOCAL bound_box times scale and
+    IGNORES ROTATION. Every ring/cylinder here is built with
+    `rotation=rot_along_x`, so its local extents are (dia, dia, length) while its
+    WORLD extents are (length, dia, dia). Deciding a world-space presentation
+    rotation from `obj.dimensions` therefore left exactly the cylindrical parts
+    edge-on — Winding End, Jacket Band, Stator Ring, Gasket Lip, Motor Cover and
+    Gearbox Cover all rendered as thin slivers, while axis-aligned boxes (Pack
+    Base, the PCBs, Magnet) came out correct because for them local == world.
+    """
+    try:
+        import mathutils  # noqa: PLC0415
+        pts = [obj.matrix_world @ mathutils.Vector(c) for c in obj.bound_box]
+        xs = [p.x for p in pts]
+        ys = [p.y for p in pts]
+        zs = [p.z for p in pts]
+        return (
+            (max(xs) - min(xs)) / fl.MM,
+            (max(ys) - min(ys)) / fl.MM,
+            (max(zs) - min(zs)) / fl.MM,
+        )
+    except Exception:  # noqa: BLE001
+        return (0.0, 0.0, 0.0)
+
+
+def _fpk_catalogue_footprint_mm(obj):
+    """Largest horizontal extent of one object, in mm (world-aligned)."""
+    ex = _fpk_world_extents_mm(obj)
+    return max(ex[0], ex[1])
+
+
+def _fpk_apply_parts_catalogue_view(view_name, entering):
+    """Lay every inventoriable kit part flat on a labelled paper sheet.
+
+    One cell per part FAMILY, captioned "Name xN"; siblings are hidden (their
+    count is what proves they exist, and coverage reconciles sum(xN) against the
+    inventoriable mesh total, so the collapse cannot silently drop parts).
+    Housings are laid out alongside everything else rather than parked, because
+    the ask is to see the WHOLE kit; row pitch comes from each row's own largest
+    part so a 420 mm housing and an 8 mm bolt are both readable without
+    rescaling any geometry.
+    """
+    global _FPK_CATALOGUE_SNAP, _FPK_CATALOGUE_TEMP, _FPK_CATALOGUE_LAST
+    global _FPK_CATALOGUE_MATSNAP
+    if not _IS_TRACTION_DRIVE_FORM or not hasattr(bpy, "data"):
+        return
+    want = bool(entering and "catalogue" in str(view_name).lower())
+    if not want:
+        # ── Restore ──────────────────────────────────────────────────────────
+        for obj in _FPK_CATALOGUE_TEMP:
+            try:
+                if obj is not None and obj.name in bpy.data.objects:
+                    bpy.data.objects.remove(obj, do_unlink=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[univ][fpk-catalogue] cleanup skip: {exc}")
+        # matrix_world restores rotation, scale AND location in one go — the pose
+        # applies all three, so anything less would leave parts mis-oriented for
+        # every later view.
+        for obj, mtx, hidden in _FPK_CATALOGUE_SNAP:
+            try:
+                if obj is not None and obj.name in bpy.data.objects:
+                    obj.matrix_world = mtx
+                    obj.hide_render = hidden
+            except Exception as exc:  # noqa: BLE001
+                print(f"[univ][fpk-catalogue] restore skip: {exc}")
+        # Materials are SHARED — a forgotten restore would make every later
+        # ghost/cutaway view render opaque.
+        for mat, alpha0, blend0 in _FPK_CATALOGUE_MATSNAP:
+            try:
+                bsdf = mat.node_tree.nodes.get("Principled BSDF")
+                if bsdf:
+                    bsdf.inputs["Alpha"].default_value = alpha0
+                if blend0 is not None:
+                    mat.blend_method = blend0
+            except Exception as exc:  # noqa: BLE001
+                print(f"[univ][fpk-catalogue] material restore skip: {exc}")
+        if _FPK_CATALOGUE_SNAP or _FPK_CATALOGUE_TEMP:
+            print(f"[univ][fpk-catalogue] restored {len(_FPK_CATALOGUE_SNAP)} "
+                  f"objects, {len(_FPK_CATALOGUE_MATSNAP)} materials, removed "
+                  f"{len(_FPK_CATALOGUE_TEMP)} labels", flush=True)
+        _FPK_CATALOGUE_SNAP, _FPK_CATALOGUE_TEMP = [], []
+        _FPK_CATALOGUE_MATSNAP = []
+        return
+    if _FPK_CATALOGUE_SNAP:
+        return   # idempotent
+
+    import mathutils  # noqa: PLC0415
+
+    from fpk_parts_catalogue import (  # noqa: PLC0415
+        CataloguePart, apply_rotation_steps_to_dims, catalogue_coverage,
+        catalogue_family, fragment_parent_family, human_label,
+        plan_catalogue_layout, presentation_rotation_steps,
+    )
+
+    # Group live meshes into families; the LARGEST sibling is the representative
+    # that gets drawn, so its cell is always big enough for what is in it.
+    by_family, frags_by_family = {}, {}
+    for obj in bpy.data.objects:
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        fam = catalogue_family(obj.name)
+        if fam is not None:
+            by_family.setdefault(fam, []).append(obj)
+            continue
+        pfam = fragment_parent_family(obj.name)
+        if pfam is not None:
+            frags_by_family.setdefault(pfam, []).append(obj)
+    if not by_family:
+        print("[univ][fpk-catalogue] no inventoriable meshes — skipped", flush=True)
+        return
+
+    parts, reps = [], {}
+    for fam, objs in by_family.items():
+        rep = max(objs, key=_fpk_catalogue_footprint_mm)
+        # Present the part on its characteristic face. The fit scale must be
+        # computed from the extents AFTER that rotation — a ring turned face-up
+        # is much wider than the edge-on sliver its assembly pose presented.
+        # WORLD extents, never obj.dimensions (which ignores rotation).
+        dims_mm = _fpk_world_extents_mm(rep)
+        if min(dims_mm) <= 0.0:
+            dims_mm = (10.0, 10.0, 10.0)
+        steps = presentation_rotation_steps(dims_mm)
+        rot_w, rot_d, _rot_h = apply_rotation_steps_to_dims(dims_mm, steps)
+        reps[fam] = (rep, objs, steps)
+        parts.append(CataloguePart(
+            family=fam, count=len(objs),
+            footprint_mm=max(rot_w, rot_d, 4.0),
+            label=human_label(fam, len(objs)),
+            true_size_mm=max(dims_mm),
+        ))
+    parts.sort(key=lambda p: (-p.footprint_mm, p.family))
+
+    aspect = 1.5
+    try:
+        aspect = max(1.0, float(bpy.context.scene.render.resolution_x)
+                     / float(bpy.context.scene.render.resolution_y))
+    except Exception:  # noqa: BLE001
+        pass
+    placements, (sheet_w, sheet_d) = plan_catalogue_layout(parts, aspect=aspect)
+
+    # ── Pose the representatives onto the sheet ─────────────────────────────
+    def _group_bbox(group):
+        """World bbox (min, max) of a set of objects."""
+        pts = []
+        for o in group:
+            for corner in o.bound_box:
+                pts.append(o.matrix_world @ mathutils.Vector(corner))
+        if not pts:
+            return None
+        return (
+            mathutils.Vector((min(p.x for p in pts), min(p.y for p in pts),
+                              min(p.z for p in pts))),
+            mathutils.Vector((max(p.x for p in pts), max(p.y for p in pts),
+                              max(p.z for p in pts))),
+        )
+
+    snap, moved, toothed = [], 0, 0
+    place_by_family = {p.family: p for p in placements}
+    posed = set()
+    cat_heights = {}
+    for fam, (rep, objs, steps) in reps.items():
+        pl = place_by_family.get(fam)
+        if pl is None:
+            continue
+        for obj in objs:
+            snap.append((obj, obj.matrix_world.copy(), bool(obj.hide_render)))
+            if obj is not rep:
+                obj.hide_render = True          # its existence is the xN caption
+            posed.add(obj.name)
+        rep.hide_render = False
+        # The gear and ITS TEETH move as one rigid group. Hiding the teeth (the
+        # first attempt) left "Ring Gear x2" as a bald cylinder nobody could
+        # recognise as a gear — coverage passed while identity was destroyed.
+        group = [rep]
+        for frag in frags_by_family.get(fam, ()):
+            snap.append((frag, frag.matrix_world.copy(), bool(frag.hide_render)))
+            frag.hide_render = False
+            group.append(frag)
+            posed.add(frag.name)
+        if len(group) > 1:
+            toothed += 1
+
+        bb = _group_bbox(group)
+        if bb is None:
+            continue
+        centre = (bb[0] + bb[1]) / 2.0
+        # Rotate to the presentation face and scale into the cell, both about the
+        # group's own centre so the teeth stay seated on their gear. Scaling is a
+        # VIEW pose (restored on exit) and is DISCLOSED — the caption prints the
+        # part's true size, because at true relative scale this kit's 52:1 range
+        # made the smaller half of the inventory invisible.
+        rot = mathutils.Matrix.Identity(4)
+        for axis, angle in steps:
+            rot = mathutils.Matrix.Rotation(angle, 4, axis) @ rot
+        s = float(pl.display_scale)
+        about = (mathutils.Matrix.Translation(centre)
+                 @ mathutils.Matrix.Scale(s, 4) @ rot
+                 @ mathutils.Matrix.Translation(-centre))
+        for o in group:
+            o.matrix_world = about @ o.matrix_world
+
+        # Seat the posed group in its cell, resting ON the paper.
+        bb2 = _group_bbox(group)
+        if bb2 is not None:
+            c2 = (bb2[0] + bb2[1]) / 2.0
+            move = mathutils.Matrix.Translation(mathutils.Vector((
+                pl.x_mm * fl.MM - c2.x,
+                pl.y_mm * fl.MM - c2.y,
+                -bb2[0].z,
+            )))
+            for o in group:
+                o.matrix_world = move @ o.matrix_world
+            # Remember the seated height: the caption has to clear the part's
+            # OBLIQUE projection, and a tall part throws its silhouette much
+            # further down-screen than a flat one. A fixed offset cannot serve
+            # both (Motor Housing and Ring Gear printed over their own captions).
+            cat_heights[fam] = (bb2[1].z - bb2[0].z) / fl.MM
+        moved += 1
+
+    # Everything else — vehicle endpoints, bay walls, datum helpers and the
+    # studio ground plane — is hidden for the duration. compute_scene_bbox()
+    # ignores hide_render, so stray geometry left at the old kit location
+    # silently wrecked the framing on the first render (that loose grey slab in
+    # the top-left corner was fl_ground_*).
+    # NOT just MESH: routed conduit / harness runs are CURVE objects, and a
+    # MESH-only sweep left two copper rods floating in the top margin of the
+    # first oriented render. Every renderable non-catalogue object is parked.
+    parked = 0
+    for obj in list(bpy.data.objects):
+        if getattr(obj, "type", None) not in {
+                "MESH", "CURVE", "SURFACE", "META", "FONT"}:
+            continue
+        if obj.name.startswith("u_cat_") or obj.name in posed:
+            continue
+        snap.append((obj, obj.matrix_world.copy(), bool(obj.hide_render)))
+        obj.hide_render = True
+        parked += 1
+
+    # ── Force every catalogue part OPAQUE ───────────────────────────────────
+    # The ghost/cutaway passes leave translucent skins on the housings. On an
+    # inventory sheet that rendered Gasket Lip / Motor Housing / Inverter Cover /
+    # Cast Rib / Pack Housing as near-invisible pale ghosts — present in the
+    # count, absent to the eye, which is exactly the failure this view exists to
+    # prevent. Materials are shared, so this is snapshotted and restored on exit.
+    _FPK_CATALOGUE_MATSNAP = []
+    _seen_mats = set()
+    for fam, (rep, _objs, _steps) in reps.items():
+        for mat in (rep.data.materials if rep.data else ()):
+            if mat is None or mat.name in _seen_mats:
+                continue
+            _seen_mats.add(mat.name)
+            try:
+                bsdf = mat.node_tree.nodes.get("Principled BSDF")
+                alpha0 = float(bsdf.inputs["Alpha"].default_value) if bsdf else 1.0
+                blend0 = getattr(mat, "blend_method", None)
+                if alpha0 >= 0.999 and blend0 in (None, "OPAQUE"):
+                    continue
+                _FPK_CATALOGUE_MATSNAP.append((mat, alpha0, blend0))
+                if bsdf:
+                    bsdf.inputs["Alpha"].default_value = 1.0
+                if blend0 is not None:
+                    mat.blend_method = "OPAQUE"
+            except Exception as exc:  # noqa: BLE001
+                print(f"[univ][fpk-catalogue] opaque skip {mat.name}: {exc}")
+
+    # ── Paper ground + labels ───────────────────────────────────────────────
+    temp = []
+    pad = max(sheet_w, sheet_d) * 0.06
+    # Light (Tristan runs light-mode only) but tonally clear of the pale grey
+    # castings, which vanished against a near-white sheet.
+    paper_mat = fl.make_mat("u_cat_paper", (0.82, 0.81, 0.78), metallic=0.0,
+                            roughness=0.95)
+    ink_mat = fl.make_mat("u_cat_ink", (0.08, 0.09, 0.11), metallic=0.0,
+                          roughness=0.85)
+    try:
+        bpy.ops.mesh.primitive_plane_add(size=1.0, location=(
+            (sheet_w / 2.0) * fl.MM, (-sheet_d / 2.0) * fl.MM, -0.0015))
+        paper = bpy.context.active_object
+        paper.name = "u_cat_paper_sheet"
+        paper.scale = ((sheet_w + pad * 2) * fl.MM, (sheet_d + pad * 2) * fl.MM, 1.0)
+        paper.data.materials.clear()
+        paper.data.materials.append(paper_mat)
+        temp.append(paper)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[univ][fpk-catalogue] paper plane skipped: {exc}")
+
+    # Labels lie FLAT on the paper under each part, reading with the sheet.
+    for pl in placements:
+        try:
+            cu = bpy.data.curves.new(f"u_cat_lbl_{pl.family}", type="FONT")
+            # Identity above, TRUE size below — the disclosure that makes the
+            # per-cell display scaling honest.
+            cu.body = pl.caption
+            # Cells are uniform, so one caption size serves every part.
+            cu.size = pl.cell_mm * 0.088 * fl.MM
+            cu.align_x = "CENTER"
+            cu.align_y = "TOP"
+            cu.space_line = 0.92
+            cu.materials.append(ink_mat)
+            txt = bpy.data.objects.new(f"u_cat_lbl_{pl.family}", cu)
+            # Anchored at the top of the caption band beneath the part, so a
+            # two-line caption grows downward into its own cell and can never
+            # collide with the row below. The clearance SCALES WITH THE PART'S
+            # SEATED HEIGHT because the camera is oblique (~55 deg): a tall part
+            # throws its silhouette down-screen roughly cos(55)~0.57 of its
+            # height, so a fixed offset let Motor Housing and Ring Gear print
+            # over their own captions while flat parts had clearance to spare.
+            _drop = pl.cell_mm * 0.30 + cat_heights.get(pl.family, 0.0) * 0.60
+            _drop = min(_drop, pl.cell_mm * 0.62)   # never reach the row below
+            txt.location = (pl.x_mm * fl.MM,
+                            (pl.y_mm - _drop) * fl.MM,
+                            0.0008)
+            bpy.context.collection.objects.link(txt)
+            temp.append(txt)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[univ][fpk-catalogue] label {pl.family} skipped: {exc}")
+
+    _FPK_CATALOGUE_SNAP = snap
+    _FPK_CATALOGUE_TEMP = temp
+    cov = catalogue_coverage(
+        [o.name for o in bpy.data.objects if getattr(o, "type", None) == "MESH"],
+        placements,
+    )
+    # The camera frames from THESE numbers, not compute_scene_bbox(): the sheet
+    # extent is known exactly here, and a scene query would also count hidden
+    # off-sheet geometry.
+    _FPK_CATALOGUE_LAST = dict(
+        cov,
+        sheet_mm=[round(sheet_w, 1), round(sheet_d, 1)],
+        labels=len(placements),
+        centre_m=[(sheet_w / 2.0) * fl.MM, (-sheet_d / 2.0) * fl.MM, 0.0],
+        span_m=[sheet_w * fl.MM, sheet_d * fl.MM],
+    )
+    print(
+        f"[univ][fpk-catalogue] entered {view_name}: {moved} families on a "
+        f"{sheet_w:.0f}x{sheet_d:.0f} mm sheet, {len(placements)} labels, "
+        f"{cov['placed_instances']}/{cov['inventoriable']} parts accounted "
+        f"(coverage_ok={cov['ok']}, toothed_groups={toothed}, "
+        f"off_sheet_hidden={parked})",
+        flush=True,
+    )
+    if not cov["ok"]:
+        print(f"[univ][fpk-catalogue] WARNING coverage gap: "
+              f"missing={cov['missing_families'][:8]}", flush=True)
+
+
+def _fpk_apply_functional_section_view(view_name, entering):
+    """Apply traction cutaway state for hero/ghost/open views.
+
+    Closed 04–07 keep the opaque production skin. Open views:
+      1) SHELL-OFF solid outer housings (motor jacket, end bells, covers…)
+      2) SHOW rear-half sections of hollow stator/rotor barrels
+      3) Force planets / diff / PE / SiC visible
+    Vehicle endpoint spheres stay scene anchors only.
     """
     if not _IS_TRACTION_DRIVE_FORM or not hasattr(bpy, "data"):
         return []
@@ -14157,31 +14810,55 @@ def _fpk_apply_functional_section_view(view_name, entering):
         and (
             view_name not in exterior_views
             or "ghost" in str(view_name).lower()
+            or "explod" in str(view_name).lower()
         )
     )
-    sources = [
+    shell_off = [
         obj for obj in bpy.data.objects
         if getattr(obj, "type", None) == "MESH"
         and not obj.name.startswith("u_se_td_section_")
-        and any(
-            obj.name == prefix or obj.name.startswith(prefix)
-            for prefix in _FPK_SECTION_SOURCE_PREFIXES
-        )
+        and _fpk_is_shell_off_name(obj.name)
+    ]
+    section_show = [
+        obj for obj in bpy.data.objects
+        if getattr(obj, "type", None) == "MESH"
+        and not obj.name.startswith("u_se_td_section_")
+        and _fpk_is_section_show_name(obj.name)
     ]
 
     if is_open_view:
-        for source in sources:
+        for source in section_show:
             section = _FPK_SECTION_OBJECTS.get(source.name)
             if section is None or section.name not in bpy.data.objects:
-                section = _fpk_build_rear_half_section(source)
-                _FPK_SECTION_OBJECTS[source.name] = section
+                try:
+                    section = _fpk_build_rear_half_section(source)
+                    _FPK_SECTION_OBJECTS[source.name] = section
+                    # Copy materials so the half-barrel keeps steel/copper look.
+                    if source.data and source.data.materials and section.data:
+                        section.data.materials.clear()
+                        for mat in source.data.materials:
+                            section.data.materials.append(mat)
+                except RuntimeError as exc:
+                    print(f"[univ][section] skip {source.name}: {exc}")
 
-    source_names = {source.name for source in sources}
-    for source in sources:
+    shell_off_names = {obj.name for obj in shell_off}
+    section_show_names = {obj.name for obj in section_show}
+    for source in shell_off:
+        source.hide_render = is_open_view
+    for source in section_show:
+        # Full barrel hidden on open views; rear-half section shown instead.
         source.hide_render = is_open_view
         section = _FPK_SECTION_OBJECTS.get(source.name)
         if section is not None and section.name in bpy.data.objects:
             section.hide_render = not is_open_view
+
+    # Closed views: hide any leftover section duplicates.
+    if not is_open_view:
+        for section in _FPK_SECTION_OBJECTS.values():
+            if section is not None and section.name in bpy.data.objects:
+                section.hide_render = True
+        for source in shell_off + section_show:
+            source.hide_render = False
 
     visible_story = set()
     for obj in bpy.data.objects:
@@ -14189,55 +14866,103 @@ def _fpk_apply_functional_section_view(view_name, entering):
         if name.startswith("u_se_td_vehicle_"):
             obj.hide_render = True
             continue
-        # GOTCHA: broad story prefixes can also match a shell source
-        # (`u_se_td_gearbox` matches `u_se_td_gearbox_cover`). Never restore a
-        # full shell after replacing it with its rear-half section duplicate.
+        if is_open_view and name in _FPK_SECTION_HIDE_EXACT:
+            obj.hide_render = True
+            continue
+        # Shell-off half-plugs must never render; stator/rotor half-sections may.
+        if is_open_view and name.startswith("u_se_td_section_"):
+            src_key = "u_se_td_" + name.removeprefix("u_se_td_section_")
+            if src_key in shell_off_names or _fpk_is_shell_off_name(src_key):
+                obj.hide_render = True
+                continue
+            if src_key in section_show_names:
+                obj.hide_render = False
+                visible_story.add(name)
+                continue
         if (
             is_open_view
-            and name not in source_names
+            and name not in shell_off_names
+            and name not in section_show_names
             and any(name.startswith(prefix) for prefix in _FPK_SECTION_EXPOSE_PREFIXES)
         ):
             obj.hide_render = False
             visible_story.add(name)
-
     if is_open_view:
-        opaque_full_shells = [obj.name for obj in sources if not obj.hide_render]
-        if opaque_full_shells:
+        opaque_full = [
+            obj.name for obj in shell_off + section_show if not obj.hide_render
+        ]
+        if opaque_full:
             raise RuntimeError(
                 "[univ][section] opaque full shells still hide drivetrain: "
-                + ", ".join(sorted(opaque_full_shells))
+                + ", ".join(sorted(opaque_full))
             )
+        for required_shell in _FPK_SHELL_OFF_EXACT:
+            if any(obj.name == required_shell for obj in bpy.data.objects
+                   if getattr(obj, "type", None) == "MESH"):
+                full = bpy.data.objects.get(required_shell)
+                if full is not None and not full.hide_render:
+                    raise RuntimeError(
+                        f"[univ][section] {required_shell} still render-visible on open view"
+                    )
+        # proveCatch: hollow barrel rear-halves must be the ones that render.
+        shown_barrel_sections = [
+            obj.name for obj in bpy.data.objects
+            if getattr(obj, "type", None) == "MESH"
+            and obj.name.startswith("u_se_td_section_")
+            and not obj.hide_render
+        ]
+        if not any("stator_ring" in n or "hollow_rotor" in n for n in shown_barrel_sections):
+            # Only enforce when the full barrels exist in the scene.
+            if any(n in section_show_names for n in _FPK_SECTION_SHOW_EXACT):
+                raise RuntimeError(
+                    "[univ][section] hollow stator/rotor rear-half missing on open view — "
+                    "side camera would still see a sealed barrel wall"
+                )
         required_story = {
             "stator": "u_se_td_stator_",
             "rotor": "u_se_td_hollow_rotor",
             "planetary": "u_se_td_planet_",
-            "differential": "u_se_td_diff_",
-            "post_diff_final_drive": "u_se_td_post_diff_",
+            "differential": "u_se_td_diff_nest",
+            "post_diff_final_drive": "u_se_td_post_diff_pinion_",
             "power_electronics": "u_se_td_pe_module_",
+            "sic_inverter": "u_se_td_sic_inverter",
         }
+        present_prefixes = {
+            role: prefix
+            for role, prefix in required_story.items()
+            if any(
+                getattr(obj, "type", None) == "MESH"
+                and str(getattr(obj, "name", "")).startswith(prefix)
+                for obj in bpy.data.objects
+            )
+        }
+        # Stator/rotor may be represented by section_* names on open views.
+        def _story_present(prefix: str) -> bool:
+            if any(name.startswith(prefix) for name in visible_story):
+                return True
+            tail = prefix.removeprefix("u_se_td_").rstrip("_")
+            return any(tail in name for name in shown_barrel_sections)
+
         missing = [
-            role for role, prefix in required_story.items()
-            if not any(name.startswith(prefix) for name in visible_story)
+            role for role, prefix in present_prefixes.items()
+            if not _story_present(prefix)
         ]
         if missing:
             raise RuntimeError(
                 "[univ][section] functional story missing: " + ", ".join(missing)
             )
-        sections = [
-            section for section in _FPK_SECTION_OBJECTS.values()
-            if section is not None and section.name in bpy.data.objects
-            and not section.hide_render
-        ]
-        if len(sections) < 4:
+        hidden_shells = [s.name for s in shell_off if s.hide_render]
+        if len(hidden_shells) < 4:
             raise RuntimeError(
-                f"[univ][section] only {len(sections)} rear-half shell sections; "
-                "motor/end-bell/MCU cutaway is incomplete"
+                f"[univ][section] only {len(hidden_shells)} skins shell-off; "
+                "motor/jacket/end-bell/MCU cutaway is incomplete"
             )
         print(
-            f"[univ][section] {view_name}: {len(sections)} rear-half shells; "
-            f"{len(visible_story)} story meshes visible; vehicle spheres hidden"
+            f"[univ][section] {view_name}: shell-off {len(hidden_shells)} skins; "
+            f"{len(shown_barrel_sections)} hollow rear-half barrels; "
+            f"{len(visible_story)} story meshes visible"
         )
-        return sections
+        return list(shell_off) + list(section_show)
     return []
 
 
@@ -14292,7 +15017,7 @@ def _selftest_fpk_functional_section_geometry() -> None:
 
 
 def _selftest_fpk_functional_section_view_state() -> None:
-    """proveCatch: open views section shells; closed views restore them."""
+    """proveCatch: open views shell-off skins; closed views restore them."""
     global _IS_TRACTION_DRIVE_FORM
 
     old_flag = _IS_TRACTION_DRIVE_FORM
@@ -14304,6 +15029,8 @@ def _selftest_fpk_functional_section_view_state() -> None:
         "u_se_td_end_bell_0",
         "u_se_td_inverter_cover",
         "u_se_td_gearbox_cover",
+        "u_se_td_pack_housing",
+        "u_se_td_inverter_housing",
     )
     try:
         for name in (
@@ -14313,28 +15040,53 @@ def _selftest_fpk_functional_section_view_state() -> None:
             "u_se_td_gearbox",
             "u_se_td_planet_0",
             "u_se_td_diff_nest",
+            "u_se_td_post_diff_pinion_0",
+            "u_se_td_sic_inverter",
             "u_se_td_pe_module_0",
             "u_se_td_vehicle_hv",
+            "u_se_td_pack_housing_flange_0",
         ):
             bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 0.0))
             obj = bpy.context.active_object
             obj.name = name
             created.append(obj)
         _IS_TRACTION_DRIVE_FORM = True
-        sections = _fpk_apply_functional_section_view("00-hero", True)
-        assert len(sections) >= 4
+        hidden_skins = _fpk_apply_functional_section_view("00-hero", True)
+        assert len(hidden_skins) >= 4
         for name in shell_names:
             assert bpy.data.objects[name].hide_render, (
                 f"open view left opaque full shell visible: {name}")
+        # Full stator/rotor barrels hidden; their rear-half sections must SHOW.
+        assert bpy.data.objects["u_se_td_stator_ring"].hide_render
+        assert bpy.data.objects["u_se_td_hollow_rotor"].hide_render
+        stator_sec = bpy.data.objects.get("u_se_td_section_stator_ring")
+        rotor_sec = bpy.data.objects.get("u_se_td_section_hollow_rotor")
+        assert stator_sec is not None and not stator_sec.hide_render, (
+            "open view must show hollow stator rear-half")
+        assert rotor_sec is not None and not rotor_sec.hide_render, (
+            "open view must show hollow rotor rear-half")
+        # Shell-off half-plugs (motor housing etc.) must stay hidden.
+        for obj in bpy.data.objects:
+            if obj.name.startswith("u_se_td_section_motor_housing"):
+                assert obj.hide_render, (
+                    f"open view left solid housing half-plug visible: {obj.name}")
         assert not bpy.data.objects["u_se_td_planet_0"].hide_render
         assert not bpy.data.objects["u_se_td_diff_nest"].hide_render
+        assert not bpy.data.objects["u_se_td_post_diff_pinion_0"].hide_render
+        assert not bpy.data.objects["u_se_td_sic_inverter"].hide_render
+        assert bpy.data.objects["u_se_td_gearbox"].hide_render, (
+            "opaque gearbox nest volume must hide so planets read")
+        assert bpy.data.objects.get("u_se_td_section_pack_housing_flange_0") is None
         assert bpy.data.objects["u_se_td_vehicle_hv"].hide_render
-
         _fpk_apply_functional_section_view("04-product-exterior", True)
         for obj in created[:len(shell_names)]:
             assert not obj.hide_render, (
                 f"closed exterior failed to restore full shell: {obj.name}")
-        assert all(section.hide_render for section in sections)
+        assert all(
+            section.hide_render
+            for section in _FPK_SECTION_OBJECTS.values()
+            if section is not None and section.name in bpy.data.objects
+        )
         assert bpy.data.objects["u_se_td_vehicle_hv"].hide_render
     finally:
         _IS_TRACTION_DRIVE_FORM = old_flag
@@ -14439,9 +15191,9 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert not _traction_drive_exterior_keep_visible("u_se_td_vehicle_hv")
     assert not _traction_drive_exterior_keep_visible("u_se_td_pe_module_0"), (
         "PE module bricks are cutaway/ghost only on closed exterior")
-    # proveCatch (2026-07-30): a translucent full housing still hides the planetary
-    # story. Cutaway/ghost preparation must replace camera-facing full shells with
-    # sectioned duplicates while keeping opaque closed-exterior shells untouched.
+    # proveCatch (2026-07-31): solid fl.add_cyl housings cannot be "sectioned" into
+    # a readable cutaway — half-plugs still occlude guts. Open views must SHELL-OFF
+    # skins and expose the concentric story; closed 04–07 keep full opaque skin.
     _section_fn = globals().get("_fpk_apply_functional_section_view")
     assert callable(_section_fn), (
         "traction cutaway requires _fpk_apply_functional_section_view")
@@ -14451,21 +15203,61 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "u_se_td_coolant_jacket",
         "u_se_td_end_bell_",
         "u_se_td_inverter_cover",
+        "u_se_td_inverter_housing_wall_",
     ):
         assert _section_shell in _FPK_SECTION_SOURCE_PREFIXES, (
-            f"functional section helper must remove/split {_section_shell}")
+            f"shell-off helper must hide {_section_shell} on open views")
+    assert "u_se_td_pack_housing" in _FPK_SECTION_SOURCE_EXACT, (
+        "pack housing must be shell-off on open views (not left as opaque clay)")
+    assert "u_se_td_inverter_housing" in _FPK_SECTION_SOURCE_EXACT, (
+        "inverter housing must be shell-off on open views")
+    assert _fpk_is_section_source_name("u_se_td_pack_housing")
+    assert _fpk_is_section_source_name("u_se_td_inverter_housing")
+    assert not _fpk_is_section_source_name("u_se_td_pack_housing_flange_0"), (
+        "mount flanges must stay — only the pack barrel is shell-off listed")
     assert (
         "u_se_td_planet_" in _FPK_SECTION_EXPOSE_PREFIXES
-        and "u_se_td_diff_" in _FPK_SECTION_EXPOSE_PREFIXES
-        and "u_se_td_post_diff_" in _FPK_SECTION_EXPOSE_PREFIXES
+        and "u_se_td_diff_nest" in _FPK_SECTION_EXPOSE_PREFIXES
+        and "u_se_td_post_diff_pinion_" in _FPK_SECTION_EXPOSE_PREFIXES
+        and "u_se_td_sic_inverter" in _FPK_SECTION_EXPOSE_PREFIXES
     ), (
-        "functional section must expose planetary, differential, and post-diff story meshes")
+        "open cutaway must expose planetary, differential, post-diff, and SiC story meshes")
+    assert "u_se_td_gearbox" in _FPK_SECTION_HIDE_EXACT, (
+        "opaque gearbox nest volume must hide on open views so planets read")
+    assert "u_se_td_stator_ring" in _FPK_SECTION_SHOW_EXACT, (
+        "hollow stator barrel must rear-half-section on open views")
+    assert "u_se_td_hollow_rotor" in _FPK_SECTION_SHOW_EXACT, (
+        "hollow rotor barrel must rear-half-section on open views")
+    # proveCatch (2026-07-31): exploded catalogue offsets for nest / PE / motor.
+    assert _fpk_explode_delta_for("u_se_td_planet_1") is not None, (
+        "planet must explode along pack axis")
+    assert _fpk_explode_delta_for("u_se_td_sic_inverter") is not None, (
+        "SiC inverter must explode with MCU shelf group")
+    assert _fpk_explode_delta_for("u_se_td_pack_base") is None, (
+        "pack base must stay put in exploded view")
+    assert _fpk_explode_delta_for("u_se_td_sun_gear_tooth_0") is None, (
+        "gear tooth fragments must stay nested — exploding them reads as sphere clutter")
+    _diff_seed = _fpk_explode_group_seed("u_se_td_diff_nest")
+    assert _diff_seed is not None and _diff_seed[0] >= 0.25, (
+        f"diff family seed must stay ≥250 mm +X (got {_diff_seed})")
+    _p0 = _fpk_explode_delta_for("u_se_td_planet_0", index=0)
+    _p1 = _fpk_explode_delta_for("u_se_td_planet_1", index=1)
+    assert abs(_p0[0] - _p1[0]) + abs(_p0[1] - _p1[1]) >= 0.08, (
+        "sibling planets must catalogue-separate by ≥80 mm so each reads individually")
+    assert _FPK_EXPLODE_CATALOGUE_PITCH_M[0] >= 0.09, (
+        "catalogue pitch must stay large enough for individual-part SIGHT")
+    assert "shell-off" in _src_section, (
+        "open-view helper must shell-off solid housings (not show opaque half-plugs)")
+    assert "add_hollow_cyl" in _src_td, (
+        "stator/rotor must be true hollow tubes — solid add_cyl occludes the nest")
     assert "_fpk_place_post_diff_final_drive" in _src_td, (
         "traction placer must wire post-diff final-drive meshes")
     assert "post_diff_final_drive_geometry" in _src_td, (
         "post-diff placement must consume packaging-screen geometry module")
     assert "opaque full shells still hide drivetrain" in _src_section, (
         "functional section must hard-fail if a full shell remains over internals")
+    assert "hollow stator/rotor rear-half missing" in _src_section, (
+        "open views must hard-fail if hollow barrel sections are absent")
     _src_prepare = _insp_td.getsource(_prepare_sealed_product_view)
     assert "_fpk_apply_functional_section_view" in _src_prepare, (
         "sealed hero/exterior preparer must wire the traction functional section")
@@ -14606,7 +15398,19 @@ def _prepare_sealed_product_view(view_name, entering):
     # section, not a full translucent shell. Closed 04–07 views still restore
     # the complete opaque case before their exterior keep-list is applied.
     if _IS_TRACTION_DRIVE_FORM:
-        _fpk_apply_functional_section_view(view_name, entering)
+        _vn = str(view_name).lower()
+        if "catalogue" in _vn:
+            # Inventory sheet: parts laid flat on paper, NOT a cutaway pose.
+            _fpk_apply_parts_catalogue_view(view_name, entering)
+        elif "explod" in _vn:
+            _fpk_apply_exploded_view(view_name, entering)
+        else:
+            # Leaving an exploded / catalogue view must restore poses before
+            # any other mode re-poses the same objects.
+            if not entering:
+                _fpk_apply_exploded_view(view_name, False)
+                _fpk_apply_parts_catalogue_view(view_name, False)
+            _fpk_apply_functional_section_view(view_name, entering)
     if entering and view_name in exterior_views:
         # COMPOSER=1: the composed product is the u_se_cf_* meshes on/around the shell base.
         # Show the shell + composed parts; hide all other product-namespace clutter.
@@ -19231,10 +20035,11 @@ def _fpk_place_ontology_fff_parts(
     # ── Ring gear (fixed annulus inside rotor bore) ──────────────────────────
     ring_od = min(rotor_id - 1.0, ring_id + 6.0)
     ring_id_inner = max(ring_id - 4.0, sun_od + planet_od + 2.0)
-    fl.add_cyl(
+    fl.add_hollow_cyl(
         "u_se_td_ring_gear",
         _mm3((x_motor, y_motor, z_motor)),
         (ring_od * 0.5) * fl.MM,
+        (ring_id_inner * 0.5) * fl.MM,
         gear_face * fl.MM,
         mat_steel,
         module=story_mod,
@@ -20450,11 +21255,14 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         gear_face = nest_len * 0.35
         bus_s = 10.0
 
-    # L2 — stator ring + wave-wound end-winding bands.
-    fl.add_cyl(
+    # L2 — stator RING (true annulus). DECISION (2026-07-31 SIGHT): a solid
+    # cylinder here reads as another sealed housing after shell-off; the bore
+    # must stay open so rear-half section + planets are visible.
+    fl.add_hollow_cyl(
         "u_se_td_stator_ring",
         _mm3((x_motor, y_motor, z_motor)),
         (stator_od * 0.5) * fl.MM,
+        (stator_id * 0.5) * fl.MM,
         nest_len * fl.MM,
         mat_steel,
         module=story_mod,
@@ -20462,29 +21270,63 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         rotation=rot_along_x,
         vertices=_cyl_v,
     )
-    fl.add_cyl(
-        "u_se_td_stator_hint",
-        _mm3((x_motor, y_motor, z_motor)),
-        (stator_id * 0.5) * fl.MM,
-        (nest_len * 0.92) * fl.MM,
-        mat_copper,
-        module=story_mod,
-        module_objects=MO,
-        rotation=rot_along_x,
-        vertices=_cyl_v,
-    )
-    for wi, wx in enumerate((-1.0, 1.0)):
-        fl.add_cyl(
-            f"u_se_td_winding_end_{wi}",
-            _mm3((x_motor + wx * nest_len * 0.42, y_motor, z_motor)),
-            (stator_od * 0.48) * fl.MM,
-            (motor_len * 0.08) * fl.MM,
+    # Thin copper winding sleeve on the stator bore — hollow, never a solid plug.
+    _wind_or = stator_id * 0.5
+    _wind_ir = max(rotor_od * 0.5 + 1.5, stator_id * 0.5 - 4.0)
+    if _wind_ir < _wind_or * 0.98:
+        fl.add_hollow_cyl(
+            "u_se_td_stator_hint",
+            _mm3((x_motor, y_motor, z_motor)),
+            _wind_or * fl.MM,
+            _wind_ir * fl.MM,
+            (nest_len * 0.90) * fl.MM,
             mat_copper,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
             vertices=64,
         )
+    # END WINDINGS — ANNULAR, never solid discs (2026-07-31 SIGHT fix).
+    # These were `add_cyl` at stator_od*0.48, i.e. a full-diameter SOLID disc
+    # capping each end of the motor. That is what made every open view read as a
+    # black box: the shell-off/section passes correctly exposed the planetary
+    # nest, magnets and shafts, and then two copper discs sealed the bore right
+    # back up again — the "solid copper ellipsoid" visible in 08-product-ghost-
+    # shell.png. Real end-turn bundles are a torus around an OPEN bore, so the
+    # bore must stay see-through. Keyed on the concentric geometry (rotor bore),
+    # so it is right for any motor this placer builds, not just this kit.
+    _we_or = stator_od * 0.48
+    _we_ir = max(rotor_od * 0.5 * 1.02, _we_or * 0.30)
+    for wi, wx in enumerate((-1.0, 1.0)):
+        _we_loc = _mm3((x_motor + wx * nest_len * 0.42, y_motor, z_motor))
+        _we_depth = (motor_len * 0.08) * fl.MM
+        if _we_ir < _we_or * 0.98:
+            fl.add_hollow_cyl(
+                f"u_se_td_winding_end_{wi}",
+                _we_loc,
+                _we_or * fl.MM,
+                _we_ir * fl.MM,
+                _we_depth,
+                mat_copper,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_along_x,
+                vertices=64,
+            )
+        else:
+            # Degenerate bore (rotor fills the stator): a ring would be invisible,
+            # so keep the solid puck rather than emitting nothing.
+            fl.add_cyl(
+                f"u_se_td_winding_end_{wi}",
+                _we_loc,
+                _we_or * fl.MM,
+                _we_depth,
+                mat_copper,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_along_x,
+                vertices=64,
+            )
         # Microjet oil spray cues at end-winding (tiny ports — cooling grammar).
         for ji in range(4):
             ang = (ji / 4.0) * math.tau
@@ -20501,11 +21343,12 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 vertices=12,
             )
 
-    # L3 — hollow PM rotor barrel (structural home for transmission).
-    fl.add_cyl(
+    # L3 — hollow PM rotor barrel (TRUE tube — planetary/diff live in the bore).
+    fl.add_hollow_cyl(
         "u_se_td_hollow_rotor",
         _mm3((x_motor, y_motor, z_motor)),
         (rotor_od * 0.5) * fl.MM,
+        (rotor_id * 0.5) * fl.MM,
         (nest_len * 0.88) * fl.MM,
         mat_steel,
         module=story_mod,
@@ -20513,17 +21356,8 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         rotation=rot_along_x,
         vertices=_cyl_v,
     )
-    fl.add_cyl(
-        "u_se_td_rotor_hint",
-        _mm3((x_motor, y_motor, z_motor)),
-        (rotor_id * 0.5) * fl.MM,
-        (nest_len * 0.80) * fl.MM,
-        mat_cf,
-        module=story_mod,
-        module_objects=MO,
-        rotation=rot_along_x,
-        vertices=48,
-    )
+    # GOTCHA: never place a solid "rotor_hint" plug in the bore — that was the
+    # 2026-07-31 clay-shell defect after motor_housing shell-off.
 
     # L4 — planetary sun + planets + mini-diff nest inside hollow rotor.
     fl.add_cyl(
@@ -28795,17 +29629,25 @@ def main():
                 )
                 # INTENT (Phase N2 / Zoe trainer grammar): for traction EDU packs the
                 # sealed crate panels are already hidden — ghosting only those reads as
-                # a glass curtain. Also ghost the motor housing / jacket / end bells so
-                # windings / magnets / gears show through like a sectioned motoreducer.
+                # a glass curtain. Housings are SOLID cylinders; ghost alpha without
+                # Cycles Transmission still reads opaque. Prefer shell-off (below) so
+                # windings/magnets/gears read; optional glass silhouette is secondary.
                 _ghost_td_mat = None
                 if _IS_TRACTION_DRIVE_FORM:
                     _ghost_td_mat = fl.make_mat(
                         "m_se_td_ghost_housing",
-                        fl._to_linear((0.10, 0.11, 0.13)),
-                        metallic=0.35,
-                        roughness=0.28,
-                        alpha=0.22,
+                        fl._to_linear((0.55, 0.58, 0.62)),
+                        metallic=0.05,
+                        roughness=0.06,
+                        alpha=0.12,
+                        kind="glass",
+                        ior=1.5,
                     )
+                    try:
+                        _ghost_td_mat.surface_render_method = "BLENDED"
+                        _ghost_td_mat.use_transparency_overlap = True
+                    except AttributeError:
+                        pass
                 # Snapshot current materials on ALL shell objects + front cover.
                 _ghost_snap = {}
                 _ghost_objs = list(_SEALED_SHELL_OBJECTS)
@@ -28836,6 +29678,10 @@ def main():
                         "u_se_td_cast_rib_",
                         "u_se_td_gasket_lip_",
                         "u_se_td_section_",
+                        "u_se_td_pack_housing",
+                        "u_se_td_inverter_housing",
+                        "u_se_td_inverter_cover",
+                        "u_se_td_cassette_cover",
                     )
                     for _to in bpy.data.objects:
                         if getattr(_to, "type", None) != "MESH":
@@ -28878,8 +29724,9 @@ def main():
                 # shell panels with the ghost material above.
                 if _prepare_sealed_product_view is not None:
                     _prepare_sealed_product_view("00-hero", True)
-                # INTENT (Phase N2): after view preparer, force Zoe-class visibility —
-                # show concentric guts; keep housing translucent (not opaque again).
+                # INTENT (Phase N2 + 2026-07-31 SIGHT): show concentric guts; do NOT
+                # un-hide solid housings here — shell-off in _fpk_apply_functional_
+                # section_view is what makes stator/planets/diff/SiC readable.
                 if _IS_TRACTION_DRIVE_FORM and hasattr(bpy, "data"):
                     for _to in bpy.data.objects:
                         if getattr(_to, "type", None) != "MESH":
@@ -28892,12 +29739,25 @@ def main():
                             continue
                         if not _tn.startswith("u_se_td_"):
                             continue
-                        # Show everything traction; housing materials re-applied below.
+                        if (
+                            _fpk_is_section_source_name(_tn)
+                            or _tn in _FPK_SECTION_HIDE_EXACT
+                            or _tn.startswith("u_se_td_section_")
+                            or _tn.startswith("u_se_td_vehicle_")
+                        ):
+                            _to.hide_render = True
+                            continue
                         _to.hide_render = False
-                # Re-apply ghost material (view preparer may have reset it via
-                # _SEALED_CUTAWAY_MATERIAL on _SEALED_SHELL_OBJECTS).
+                # Re-apply ghost material on any remaining non-skin ghost objs
+                # (crate path); traction skins stay shell-off below.
                 for _gob in _ghost_objs:
                     if _gob and _gob.data:
+                        if _IS_TRACTION_DRIVE_FORM and (
+                            _fpk_is_section_source_name(_gob.name)
+                            or _gob.name.startswith("u_se_td_section_")
+                        ):
+                            _gob.hide_render = True
+                            continue
                         _gob.data.materials.clear()
                         _use = (
                             _ghost_td_mat
@@ -28907,11 +29767,7 @@ def main():
                             else _ghost_shell_mat
                         )
                         _gob.data.materials.append(_use)
-                        if _gob.name.startswith("u_se_td_"):
-                            _gob.hide_render = False
-                # The generic "show everything traction" loop above deliberately
-                # cannot know shell semantics. Re-assert the functional section so
-                # full motor/end-bell/MCU shells do not return over the internals.
+                # Re-assert shell-off + story expose (authoritative for open views).
                 if _IS_TRACTION_DRIVE_FORM:
                     _fpk_apply_functional_section_view(
                         "08-product-ghost-shell", True)
@@ -29120,6 +29976,121 @@ def main():
                         _go.hide_render = False
                 except Exception as _gx_exc:  # noqa: BLE001 — extra views never block 08
                     print(f"[univ][ghost] extra cutaway views skipped: {_gx_exc}")
+                # EXPLODED ASSEMBLY (Tristan 2026-07-31): concentric FPK cutaways still
+                # read as sealed clay — axially separate MCU / motor / nest / diff so
+                # internals parse. required=False in the view contract.
+                if _IS_TRACTION_DRIVE_FORM:
+                    # FRAMING (2026-07-31): an ORTHO camera's framing is set by
+                    # ortho_scale alone, and ortho_scale governs the LARGER render
+                    # axis. Scaling it by the bbox's max dimension therefore crops
+                    # the other axis on any non-square frame — which is why 13
+                    # shipped with parts running off all four edges while the log
+                    # said "reframed from the post-explode bbox". Cover the
+                    # PROJECTED extent on both axes, exactly as render_inspection
+                    # already does (_ortho_scale there).
+                    def _fpk_fit_ortho(span_w, span_h, margin=1.12):
+                        try:
+                            _asp = (float(bpy.context.scene.render.resolution_x)
+                                    / float(bpy.context.scene.render.resolution_y))
+                        except Exception:  # noqa: BLE001
+                            _asp = 1.5
+                        return max(span_w, span_h * _asp) * margin
+
+                    try:
+                        _fpk_apply_exploded_view("13-product-exploded", True)
+                        fl.clear_cameras()
+                        (gx0, gx1), (gy0, gy1), (gz0, gz1) = fl.compute_scene_bbox()
+                        _gcx, _gcy, _gcz = (gx0+gx1)/2, (gy0+gy1)/2, (gz0+gz1)/2
+                        _gdx, _gdy, _gdz = gx1-gx0, gy1-gy0, gz1-gz0
+                        _gmd = max(_gdx, _gdy, _gdz, 0.35)
+                        _gpd = _gmd * 2.15 / math.sqrt(2)
+                        _ex_loc = (_gcx + _gpd, _gcy - _gpd, _gcz + _gmd * 0.55)
+                        _ex_tgt = (_gcx, _gcy, _gcz)
+                        # Viewed down a 45° diagonal: horizontal extent is the
+                        # footprint diagonal; vertical is height plus the
+                        # foreshortened depth.
+                        _ex_w = math.hypot(_gdx, _gdy)
+                        _ex_h = _gdz + _ex_w * 0.5
+                        fl.setup_camera(loc=_ex_loc, target=_ex_tgt,
+                                        ortho_scale=_fpk_fit_ortho(_ex_w, _ex_h))
+                        fl.orient_billboards_to_camera(_ex_loc, _ex_tgt)
+                        fl.disable_freestyle()
+                        fl.init_scene_cycles_hero()
+                        bpy.context.scene.render.filepath = str(
+                            Path(out_dir) / "13-product-exploded.png")
+                        bpy.ops.render.render(write_still=True)
+                        fl.init_scene_back_to_eevee()
+                        print(f"[univ][fpk-explode] 13-product-exploded.png → {out_dir}")
+                    except Exception as _ex_exc:  # noqa: BLE001
+                        print(f"[univ][fpk-explode] exploded view skipped: {_ex_exc}")
+                    finally:
+                        _fpk_apply_exploded_view("13-product-exploded", False)
+
+                    # PARTS-ON-PAPER CATALOGUE (Tristan 2026-07-31): the INVENTORY
+                    # sheet — every kit part flat and labelled so he can check each
+                    # one is really there. Deliberately a top-oblique ORTHO on a
+                    # light paper ground: a perspective hero makes far-row parts
+                    # smaller than near-row ones, which is precisely what stops a
+                    # catalogue being readable as an inventory.
+                    try:
+                        _cat_res_x0 = bpy.context.scene.render.resolution_x
+                        _cat_res_y0 = bpy.context.scene.render.resolution_y
+                        # A ~100-cell sheet needs the pixels; captions must survive
+                        # the Excel gallery, not just a full-screen viewer.
+                        bpy.context.scene.render.resolution_x = 3600
+                        bpy.context.scene.render.resolution_y = 2400
+                        _fpk_apply_parts_catalogue_view(
+                            "14-product-parts-catalogue", True)
+                        fl.clear_cameras()
+                        # Frame from the sheet the layout actually produced.
+                        # compute_scene_bbox() ignores hide_render, so a scene
+                        # query would still count the parked off-sheet meshes and
+                        # shrink the sheet to a corner of the frame.
+                        _cinfo = _FPK_CATALOGUE_LAST or {}
+                        _cspan = _cinfo.get("span_m")
+                        _ccen = _cinfo.get("centre_m")
+                        if _cspan and _ccen:
+                            _ccx, _ccy, _ccz = _ccen
+                            _cdx, _cdy = _cspan
+                            _cdz = max(_cdx, _cdy) * 0.06
+                        else:
+                            (cx0, cx1), (cy0, cy1), (cz0, cz1) = fl.compute_scene_bbox()
+                            _ccx, _ccy, _ccz = (cx0+cx1)/2, (cy0+cy1)/2, (cz0+cz1)/2
+                            _cdx, _cdy, _cdz = cx1-cx0, cy1-cy0, cz1-cz0
+                        _cmd = max(_cdx, _cdy, _cdz, 0.25)
+                        # Top-oblique at ~55 deg. The first render used ~69 deg,
+                        # which flattened every cylinder into a rectangle and
+                        # made pale parts vanish into the pale sheet; a shallower
+                        # angle gives each part a visible side and a cast shadow
+                        # so it reads as a solid, while the grid still reads flat.
+                        _cat_loc = (_ccx, _ccy - _cmd * 0.72, _ccz + _cmd * 1.03)
+                        _cat_tgt = (_ccx, _ccy, _ccz)
+                        # At 55 deg the sheet's Y extent foreshortens by ~sin(55).
+                        _cat_scale = _fpk_fit_ortho(
+                            _cdx, _cdy * 0.82 + _cdz * 0.60, margin=1.06)
+                        fl.setup_camera(loc=_cat_loc, target=_cat_tgt,
+                                        ortho_scale=_cat_scale)
+                        fl.orient_billboards_to_camera(_cat_loc, _cat_tgt)
+                        fl.disable_freestyle()
+                        fl.init_scene_cycles_hero()
+                        bpy.context.scene.render.filepath = str(
+                            Path(out_dir) / "14-product-parts-catalogue.png")
+                        bpy.ops.render.render(write_still=True)
+                        fl.init_scene_back_to_eevee()
+                        print("[univ][fpk-catalogue] 14-product-parts-catalogue.png "
+                              f"→ {out_dir}")
+                    except Exception as _cat_exc:  # noqa: BLE001
+                        print(f"[univ][fpk-catalogue] catalogue view skipped: {_cat_exc}")
+                        import traceback as _cat_tb
+                        _cat_tb.print_exc()
+                    finally:
+                        _fpk_apply_parts_catalogue_view(
+                            "14-product-parts-catalogue", False)
+                        try:
+                            bpy.context.scene.render.resolution_x = _cat_res_x0
+                            bpy.context.scene.render.resolution_y = _cat_res_y0
+                        except Exception:  # noqa: BLE001
+                            pass
                 # INTERACTIVE 3D DELIVERABLE (Tristan 2026-07-27): "a 3D version of the
                 # image with the ghost shell on and off, which you can manipulate in 3D."
                 # Exported from INSIDE the same prepared ghost state as the three stills,

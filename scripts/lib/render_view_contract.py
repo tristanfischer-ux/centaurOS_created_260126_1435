@@ -546,6 +546,31 @@ _PRODUCT_VIEWS = (
         required=False,
     ),
     ViewSpec(
+        # INTENT (2026-07-31 Tristan): cutaway/ghost still reads as sealed clay on
+        # concentric FPK packs. An exploded assembly separates MCU / motor / nest /
+        # diff / PE along the pack axis so internals parse. required=False — only
+        # traction (and future axial packs) emit it; absence must not fail the gate.
+        "product_exploded", "13-product-exploded.png",
+        "Interior — exploded assembly",
+        "Shell-off exploded view of the principal internal architecture along the pack axis.",
+        required=False,
+    ),
+    ViewSpec(
+        # INTENT (2026-07-31 Tristan): "all the parts almost laid out on a big
+        # piece of paper" — the INVENTORY view. 13-product-exploded is the
+        # assembly story (how the kit comes apart along its axis); this sheet is
+        # how you check every part is actually there: one labelled cell per part
+        # family on a light paper ground, captioned "Name xN". Coverage JSON
+        # proving parts exist is NOT this — a human must be able to point at one.
+        # required=False — only concentric/traction packs emit it; absence must
+        # never fail the render gate for products that have no kit to lay out.
+        "product_parts_catalogue", "14-product-parts-catalogue.png",
+        "Parts catalogue — inventory sheet",
+        "Every kit part laid out flat and labelled, with quantities, so the "
+        "build content can be inventoried by eye.",
+        required=False,
+    ),
+    ViewSpec(
         "product_left", "05-product-left.png",
         "Exterior — left three-quarter",
         "Left-side product view showing enclosure depth and mounting relationship.",
@@ -676,6 +701,20 @@ def _selftest() -> None:
     )
     db = resolve_design_envelope_mm(derived_brief)
     assert db == dw, f"brief ceiling must not inflate pack toward brief, got {db} vs {dw}"
+    # proveCatch (2026-07-31): the parts-catalogue inventory sheet is registered,
+    # is NOT required (non-kit products must not fail the gate), and is DISTINCT
+    # from the exploded assembly story — collapsing the two is the exact mistake
+    # that left Tristan unable to inventory 13-product-exploded.
+    _view_ids = {v.view_id: v for v in _PRODUCT_VIEWS}
+    assert "product_parts_catalogue" in _view_ids, "inventory sheet must be registered"
+    _cat = _view_ids["product_parts_catalogue"]
+    assert _cat.filename == "14-product-parts-catalogue.png", _cat.filename
+    assert _cat.required is False, "a non-kit product must not fail on its absence"
+    assert not _cat.alternates, (
+        "the catalogue must have NO fallback — showing another render under an "
+        "inventory caption is the 00-hero 'empty translucent box' defect again")
+    assert _view_ids["product_exploded"].filename != _cat.filename, (
+        "explode (assembly story) and catalogue (inventory) are separate views")
     assert "07-product-service" in sealed_exterior_view_names(True), (
         "instrument service view must use closed exterior, not cutaway slabs")
     assert "00-hero" not in sealed_exterior_view_names(True), (

@@ -2,6 +2,19 @@
 
 Started 2026-07-29T18:51:35Z
 
+## How to view the kit (2026-07-31)
+
+| Question | Open this |
+|---|---|
+| "Is every part actually there?" | `14-product-parts-catalogue.png` — INVENTORY sheet: 97 labelled cells, one per part family, captioned `Name xN` + true size in mm, largest (Pack Base 336 mm) to smallest (End Bolt 5.00 mm). 188/188 meshes reconciled. |
+| "What's inside it?" | `08-product-ghost-shell.png` — cutaway; the bore is open through to the planetary nest. Also `09`–`12` for side/rear/top/front, and `product-3d-shell-off.usdz` to rotate in Quick Look. |
+| "How does it come apart?" | `13-product-exploded.png` — ASSEMBLY story along the pack axis. Not an inventory; use `14` for that. |
+| "Engineering drawings" | `drawings/general-arrangement.png`, `drawings/single-line-diagram.png` |
+
+Reading the catalogue: each part is scaled to fit its cell so a 336 mm housing and a 5 mm bolt are both legible — the TRUE size is printed under every part, so nothing about scale is hidden. `xN` is how many of that part are in the kit; the counts sum to the full mesh inventory by construction.
+
+KNOWN RESIDUAL: many parts still render as dark spheres/domes (magnets, bearings, bolts, planets). That is the sphere-proxy authenticity gap, not a layout problem — it needs CAD/compound primitives (`seed_internal_cad_assets.py`, tier2 motor drivetrain). Gears carry their teeth; magnets and bearings do not yet have real shapes.
+
 ## Log
 
 - `2026-07-29T18:51:35Z` phase=0 state=RUNNING step=plan_written starting plan vet + watchdog
@@ -3053,3 +3066,2378 @@ Started 2026-07-29T18:51:35Z
 - `2026-07-30T13:46:36Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
 - `2026-07-30T13:46:41Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
 - `2026-07-30T13:47:23Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T21:47:19Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T21:50:01Z` Council CONDITIONAL via sol: The concept dossier has strong breadth, but it does not yet pass Bar A because the calculation workbook lacks visible working, closure quality is below the stated floor, and most bill of materials identities remain unresolved. Fix workbook 
+- `2026-07-30T21:50:01Z` Starting work package WP6
+- `2026-07-30T21:50:04Z` Finished work package WP6 ok=True steps=1
+- `2026-07-30T21:50:04Z` Starting work package WP3
+- `2026-07-30T21:50:05Z` Finished work package WP3 ok=False steps=1
+- `2026-07-30T21:52:06Z` Cycle 7/24 — rebuilding have/expect scoreboard
+- `2026-07-30T21:52:06Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T21:53:03Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T21:53:03Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T21:53:03Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T21:53:13Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T21:53:15Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T21:53:16Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T21:53:16Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T21:53:16Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T21:53:16Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T21:53:17Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T21:53:23Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T21:53:25Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T21:53:30Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T21:55:40Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T21:56:11Z` Council REJECT via sol: The concept dossier is not yet Bar A complete because the calculation workbook provides no visible working, the closure quality floor is four out of ten, 36 full-text papers remain unresolved, and most bill-of-materials lines lack a real or
+- `2026-07-30T21:56:11Z` Starting work package WP6
+- `2026-07-30T21:56:13Z` Finished work package WP6 ok=True steps=1
+- `2026-07-30T21:56:13Z` Starting work package WP3
+- `2026-07-30T21:56:14Z` Finished work package WP3 ok=False steps=1
+- `2026-07-30T21:56:51Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T21:56:51Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T21:57:26Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T21:58:15Z` Cycle 8/24 — rebuilding have/expect scoreboard
+- `2026-07-30T21:58:15Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:03:14Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T22:03:14Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T22:03:14Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T22:03:20Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:03:22Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:03:23Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T22:03:23Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T22:03:23Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T22:03:23Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T22:03:24Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T22:03:30Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T22:03:32Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T22:03:37Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T22:03:54Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete because four explicit blockers remain. The largest gains come from making the calculations auditable, restoring honest quality closure, resolving the bill of materials identifiers, and
+- `2026-07-30T22:03:54Z` Starting work package WP1
+- `2026-07-30T22:04:03Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:04:13Z` Finished work package WP1 ok=True steps=2
+- `2026-07-30T22:04:13Z` Starting work package WP2
+- `2026-07-30T22:04:21Z` Finished work package WP2 ok=True steps=1
+- `2026-07-30T22:05:47Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T22:06:21Z` Cycle 9/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:06:22Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:07:07Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:07:08Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T22:07:45Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T22:11:45Z` Council REJECT via sol: The concept has broad physics, interface, bill-of-materials, and model coverage, but the dossier cannot pass Bar A while calculations show no working, the printed-circuit-board workbook evidence is absent, and the quality floor is four. Clo
+- `2026-07-30T22:11:45Z` Starting work package WP5
+- `2026-07-30T22:11:45Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T22:11:45Z` Starting work package WP4
+- `2026-07-30T22:11:48Z` Finished work package WP4 ok=True steps=2
+- `2026-07-30T22:13:21Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T22:13:21Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T22:13:21Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T22:13:28Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:13:30Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:13:31Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T22:13:31Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T22:13:31Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T22:13:31Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T22:13:32Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T22:13:38Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T22:13:41Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T22:13:46Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T22:13:49Z` Cycle 10/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:13:49Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:16:04Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T22:17:16Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:17:17Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T22:17:59Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T22:19:33Z` Council REJECT via sol: The concept dossier is not yet Bar A because four explicit blockers remain, including empty calculation evidence and a quality floor of only 4 out of 10. The fastest route to closure is to repair the workbook calculation, quality, verificat
+- `2026-07-30T22:19:33Z` Starting work package WP5
+- `2026-07-30T22:19:33Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T22:19:33Z` Starting work package WP7
+- `2026-07-30T22:19:37Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T22:21:37Z` Cycle 11/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:21:38Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:23:29Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T22:23:29Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T22:23:29Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T22:23:38Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:23:40Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:23:41Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T22:23:41Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T22:23:41Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T22:23:41Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T22:23:42Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T22:23:49Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T22:23:51Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T22:23:56Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T22:26:07Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T22:27:08Z` Council REJECT via sol: The concept dossier is not yet Bar A complete because the calculations do not show their working, closure honesty scores only four out of ten, most bill-of-materials identifiers remain unresolved, and 36 full-text papers are unprocessed. Th
+- `2026-07-30T22:27:08Z` Starting work package WP6
+- `2026-07-30T22:27:10Z` Finished work package WP6 ok=True steps=1
+- `2026-07-30T22:27:10Z` Starting work package WP4
+- `2026-07-30T22:27:13Z` Finished work package WP4 ok=True steps=2
+- `2026-07-30T22:27:16Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:27:17Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T22:27:50Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T22:29:13Z` Cycle 12/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:29:14Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:33:25Z` Council REJECT via sol: The concept dossier is broad but does not yet meet Bar A because the calculation workbook shows no auditable working and the closure-honesty floor is only 4 out of 10. Fix the workbook and verification evidence first, then resolve bill-of-m
+- `2026-07-30T22:33:25Z` Starting work package WP5
+- `2026-07-30T22:33:25Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T22:33:25Z` Starting work package WP7
+- `2026-07-30T22:33:28Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T22:33:39Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T22:33:39Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T22:33:39Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T22:33:46Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:33:48Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:33:49Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T22:33:49Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T22:33:49Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T22:33:49Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T22:33:50Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T22:33:55Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T22:33:57Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T22:34:02Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T22:35:29Z` Cycle 13/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:35:30Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:36:05Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T22:37:12Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:37:13Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T22:37:59Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T22:39:14Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete because the calculation working, audit closure, purchasing definition, and remaining literature extraction are materially unfinished. The strongest assets are the physics coverage, tes
+- `2026-07-30T22:39:14Z` Starting work package WP5
+- `2026-07-30T22:39:14Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T22:39:14Z` Starting work package WP2
+- `2026-07-30T22:39:20Z` Finished work package WP2 ok=True steps=1
+- `2026-07-30T22:41:20Z` Cycle 14/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:41:21Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:43:47Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T22:43:47Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T22:43:47Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T22:43:53Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:43:55Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:43:56Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T22:43:56Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T22:43:56Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T22:43:56Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T22:43:57Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T22:44:02Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T22:44:04Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T22:44:09Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T22:45:08Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete. The calculation workbook does not show its working, the quality and verification evidence is weak, 36 full-text papers remain unprocessed, and most bill-of-materials lines lack a real
+- `2026-07-30T22:45:08Z` Starting work package WP2
+- `2026-07-30T22:45:14Z` Finished work package WP2 ok=True steps=1
+- `2026-07-30T22:45:14Z` Starting work package WP5
+- `2026-07-30T22:45:14Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T22:46:12Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T22:47:15Z` Cycle 15/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:47:16Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:47:18Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:47:18Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T22:47:54Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T22:53:03Z` Council REJECT via sol: The concept dossier does not yet meet Bar A because the calculation workbook shows no working, the closure-quality floor is 4, most bill-of-materials identifiers remain unresolved, and 36 full-text papers remain unprocessed. The underlying 
+- `2026-07-30T22:53:03Z` Starting work package WP5
+- `2026-07-30T22:53:03Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T22:53:03Z` Starting work package WP7
+- `2026-07-30T22:53:06Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T22:53:54Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T22:53:54Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T22:53:54Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T22:54:00Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T22:54:02Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:54:03Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T22:54:03Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T22:54:03Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T22:54:03Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T22:54:04Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T22:54:10Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T22:54:12Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T22:54:16Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T22:55:07Z` Cycle 16/24 — rebuilding have/expect scoreboard
+- `2026-07-30T22:55:08Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T22:56:19Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T22:57:29Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T22:57:30Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T22:58:12Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:00:35Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A because four explicit closure blockers remain. The highest-leverage work is to expose the calculation chain and raise the weakest audit tabs, then close literature extraction and replace bill-o
+- `2026-07-30T23:00:35Z` Starting work package WP3
+- `2026-07-30T23:00:37Z` Finished work package WP3 ok=False steps=1
+- `2026-07-30T23:00:37Z` Starting work package WP7
+- `2026-07-30T23:00:40Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T23:02:41Z` Cycle 17/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:02:42Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:04:01Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:04:01Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:04:01Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:04:08Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:04:10Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:04:11Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:04:11Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:04:11Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:04:11Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:04:12Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:04:18Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:04:20Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:04:24Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:06:11Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while the calculations and quality evidence score zero and the verification score is four. Close the workbook evidence first, then correct the bill of materials and finish dispositioning th
+- `2026-07-30T23:06:11Z` Starting work package WP6
+- `2026-07-30T23:06:14Z` Finished work package WP6 ok=True steps=1
+- `2026-07-30T23:06:14Z` Starting work package WP4
+- `2026-07-30T23:06:17Z` Finished work package WP4 ok=True steps=2
+- `2026-07-30T23:06:27Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:07:33Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:07:34Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:08:05Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:08:18Z` Cycle 18/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:08:18Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:11:51Z` Council REJECT via sol: The dossier is broad but not yet auditable at Bar A because the Calculations, Executive Summary, and Quality and Audit tabs score zero, while Verification scores four. Close the workbook evidence chain first, then finish the 36 literature e
+- `2026-07-30T23:11:51Z` Starting work package WP5
+- `2026-07-30T23:11:51Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T23:11:51Z` Starting work package WP1
+- `2026-07-30T23:11:52Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:11:52Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:11:52Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:11:58Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:12:00Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:12:01Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:12:01Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:12:01Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:12:01Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:12:02Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:12:06Z` Finished work package WP1 ok=True steps=2
+- `2026-07-30T23:12:08Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:12:10Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:12:14Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:14:07Z` Cycle 19/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:14:07Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:14:17Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:14:17Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:15:23Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:15:24Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:16:08Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:17:47Z` Council CONDITIONAL via sol: The concept dossier has broad technical coverage, but it does not yet meet Bar A because four closure blockers remain. The fastest route is to repair the calculation and audit evidence first, then make the bill of materials traceable and fi
+- `2026-07-30T23:17:47Z` Starting work package WP5
+- `2026-07-30T23:17:47Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T23:17:47Z` Starting work package WP7
+- `2026-07-30T23:17:51Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T23:19:52Z` Cycle 20/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:19:52Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:22:40Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while the Calculations and Quality and Audit tabs score zero and the verification score remains four. Close the workbook evidence chain first, then resolve bill-of-materials identities and 
+- `2026-07-30T23:22:40Z` Starting work package WP5
+- `2026-07-30T23:22:40Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T23:22:40Z` Starting work package WP7
+- `2026-07-30T23:22:44Z` Finished work package WP7 ok=True steps=3
+
+## ONTRACK 2026-07-30T23:23:13Z
+- STALL 362s count=1 — wake_signal written; claims=32453 topo=17/17
+- `2026-07-30T23:24:18Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:24:18Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:24:18Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:24:24Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:24:26Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:24:27Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:24:27Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:24:27Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:24:27Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:24:28Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:24:34Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:24:36Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:24:40Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:24:45Z` Cycle 21/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:24:45Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:26:43Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:27:48Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:27:49Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:28:17Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:29:57Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete because four explicit blockers remain and three workbook tabs score zero. The highest-leverage work is to expose the calculations in Excel, repair the audit and verification trail, dis
+- `2026-07-30T23:29:57Z` Starting work package WP1
+- `2026-07-30T23:29:57Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:29:57Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:29:57Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:30:03Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:30:05Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:30:06Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:30:06Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:30:06Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:30:06Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:30:07Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:30:12Z` Finished work package WP1 ok=True steps=2
+- `2026-07-30T23:30:12Z` Starting work package WP2
+- `2026-07-30T23:30:13Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:30:15Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:30:18Z` Finished work package WP2 ok=True steps=1
+- `2026-07-30T23:30:20Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:32:18Z` Cycle 22/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:32:19Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:32:25Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:33:33Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:33:34Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:34:05Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:34:25Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:34:25Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:34:25Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:34:31Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:34:33Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:34:34Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:34:34Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:34:34Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:34:34Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:34:35Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:34:41Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:34:43Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:34:47Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:36:51Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:37:22Z` Council CONDITIONAL via sol: The concept dossier has strong technical breadth, but it does not yet meet Bar A because four declared blockers remain. The fastest route is to repair the workbook evidence chain first, then close the bounded literature backlog and replace 
+- `2026-07-30T23:37:22Z` Starting work package WP6
+- `2026-07-30T23:37:24Z` Finished work package WP6 ok=True steps=1
+- `2026-07-30T23:37:24Z` Starting work package WP7
+- `2026-07-30T23:37:28Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T23:37:58Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:37:59Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:38:35Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:39:29Z` Cycle 23/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:39:30Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:44:32Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:44:32Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:44:32Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:44:38Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:44:40Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:44:41Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:44:41Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:44:41Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:44:41Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:44:42Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:44:48Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:44:50Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:44:54Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:45:22Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while four declared blockers remain. The fastest route is to repair the zero-scoring Excel evidence and closure controls first, then close bill-of-materials identity and literature extracti
+- `2026-07-30T23:45:22Z` Starting work package WP5
+- `2026-07-30T23:45:22Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T23:45:22Z` Starting work package WP7
+- `2026-07-30T23:45:27Z` Finished work package WP7 ok=True steps=3
+- `2026-07-30T23:46:57Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:47:28Z` Cycle 24/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:47:29Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:48:04Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:48:04Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:48:42Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:51:12Z` Council REJECT via sol: The concept has strong physics coverage, interface accounting, calculator packs, and a credible bill-of-materials structure, but five explicit Bar A blockers remain. The fastest route to closure is to repair the workbook evidence chain firs
+- `2026-07-30T23:51:12Z` Starting work package WP5
+- `2026-07-30T23:51:12Z` Finished work package WP5 ok=True steps=1
+- `2026-07-30T23:51:12Z` Starting work package WP2
+- `2026-07-30T23:51:18Z` Finished work package WP2 ok=True steps=1
+- `2026-07-30T23:53:18Z` Half-done closure loop exiting (max cycles or Bar A met). ship_ok remains false.
+- `2026-07-30T23:54:39Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-30T23:54:39Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-30T23:54:39Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-30T23:54:45Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:54:46Z` Half-done closure loop started. Plan: docs/plans/JLR-FE-FRONT-FPK-HALF-DONE-CLOSURE-PLAIN-LANGUAGE-2026-07-30.md
+- `2026-07-30T23:54:47Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:54:48Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-30T23:54:48Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-30T23:54:48Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-30T23:54:48Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-30T23:54:49Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-30T23:54:52Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-30T23:54:52Z` Cycle 1/24 — rebuilding have/expect scoreboard
+- `2026-07-30T23:54:53Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-30T23:54:55Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-30T23:54:57Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-30T23:55:01Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-30T23:57:04Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-30T23:58:09Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-30T23:58:10Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-30T23:58:37Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-30T23:59:22Z` Council REJECT via sol: The concept dossier is not yet Bar A because four explicit blockers remain, including zero show-your-working calculation coverage and a closure-honesty floor of four. The physics structure, interface inventory, printed circuit board draft, 
+- `2026-07-30T23:59:22Z` Starting work package WP6
+- `2026-07-30T23:59:23Z` Finished work package WP6 ok=True steps=1
+- `2026-07-30T23:59:23Z` Starting work package WP3
+- `2026-07-30T23:59:24Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T00:01:25Z` Cycle 2/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:01:25Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:04:23Z` Council CONDITIONAL via sol: The concept dossier has strong technical breadth, but it does not yet meet Bar A because the calculations are not shown in the workbook and closure evidence is weak. The fastest route is to repair the calculation, verification, quality, and
+- `2026-07-31T00:04:23Z` Starting work package WP6
+- `2026-07-31T00:04:25Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T00:04:25Z` Starting work package WP7
+- `2026-07-31T00:04:28Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T00:04:46Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:04:46Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:04:46Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:04:53Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:04:55Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:04:56Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:04:56Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:04:56Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:04:56Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:04:57Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:05:03Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:05:05Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:05:10Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:06:29Z` Cycle 3/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:06:30Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:07:16Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:08:24Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:08:25Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:08:55Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while the Calculations and Quality and Audit tabs score zero, Verification scores four, and most bill-of-materials lines lack a defensible sourcing disposition. Close the workbook evidence 
+- `2026-07-31T00:08:55Z` Starting work package WP6
+- `2026-07-31T00:08:57Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T00:08:57Z` Starting work package WP7
+- `2026-07-31T00:09:01Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T00:09:02Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T00:11:02Z` Cycle 4/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:11:02Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:14:54Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:14:54Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:14:54Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:15:00Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:15:02Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:15:03Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:15:03Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:15:03Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:15:03Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:15:04Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:15:09Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:15:11Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:15:16Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:16:49Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete because the workbook does not show its calculation working, the quality floor is only 4, most bill-of-material identifiers are unresolved, and 36 full-text papers remain unprocessed. C
+- `2026-07-31T00:16:49Z` Starting work package WP6
+- `2026-07-31T00:16:51Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T00:16:51Z` Starting work package WP3
+- `2026-07-31T00:16:54Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T00:17:19Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:18:25Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:18:25Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:18:54Z` Cycle 5/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:18:55Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:19:05Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T00:22:45Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while the calculations and quality evidence tabs score zero and the verification floor is only four. The highest-leverage repair is to expose the working calculations and rebuild the audit 
+- `2026-07-31T00:22:45Z` Starting work package WP6
+- `2026-07-31T00:22:47Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T00:22:47Z` Starting work package WP3
+- `2026-07-31T00:22:48Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T00:24:49Z` Cycle 6/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:24:49Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:25:01Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:25:01Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:25:01Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:25:07Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:25:09Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:25:10Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:25:10Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:25:10Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:25:10Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:25:11Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:25:16Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:25:18Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:25:23Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:27:26Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:28:31Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:28:32Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:29:05Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T00:30:06Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A because its calculations do not show their working, closure evidence is weak, and the bill of materials is dominated by unresolved identifiers. Close those evidence-chain failures before spendi
+- `2026-07-31T00:30:06Z` Starting work package WP1
+- `2026-07-31T00:30:06Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:30:06Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:30:06Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:30:12Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:30:14Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:30:15Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:30:15Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:30:15Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:30:15Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:30:16Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:30:21Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T00:30:21Z` Starting work package WP2
+- `2026-07-31T00:30:22Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:30:24Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:30:26Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T00:30:29Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:32:27Z` Cycle 7/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:32:28Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:32:31Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:33:38Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:33:39Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:34:18Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T00:35:08Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:35:08Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:35:08Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:35:14Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:35:16Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:35:17Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:35:17Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:35:17Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:35:17Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:35:18Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:35:24Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:35:26Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:35:30Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:36:54Z` Council REJECT via sol: The concept dossier is broad but not closed: four explicit blockers remain, including missing calculation workings and weak closure evidence. The fastest route to Bar A is to repair the calculation and quality sheets first, then close part 
+- `2026-07-31T00:36:54Z` Starting work package WP2
+- `2026-07-31T00:37:01Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T00:37:01Z` Starting work package WP7
+- `2026-07-31T00:37:06Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T00:37:34Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:38:45Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:38:46Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:39:07Z` Cycle 8/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:39:08Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:39:18Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T00:42:46Z` Council REJECT via sol: The concept dossier is not at Bar A because its calculation sheet shows no auditable working, the closure-quality floor is 4 out of 10, most bill-of-materials identifiers remain unresolved, and 36 open papers remain unprocessed. The underly
+- `2026-07-31T00:42:46Z` Starting work package WP5
+- `2026-07-31T00:42:46Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T00:42:46Z` Starting work package WP7
+- `2026-07-31T00:42:49Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T00:44:50Z` Cycle 9/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:44:51Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:45:15Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:45:15Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:45:15Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:45:22Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:45:24Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:45:24Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:45:25Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:45:25Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:45:25Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:45:26Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:45:31Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:45:33Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:45:38Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:47:41Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:48:49Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:48:50Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:49:40Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T00:50:21Z` Council REJECT via sol: The concept dossier is broad but does not yet meet Bar A because four explicit blockers remain. The highest-leverage work is to expose the calculations in Excel and repair the quality floor, followed by closing literature extraction and rep
+- `2026-07-31T00:50:21Z` Starting work package WP5
+- `2026-07-31T00:50:21Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T00:50:21Z` Starting work package WP7
+- `2026-07-31T00:50:24Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T00:52:25Z` Cycle 10/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:52:26Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:55:23Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T00:55:23Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T00:55:23Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T00:55:29Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T00:55:31Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:55:32Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T00:55:32Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T00:55:32Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T00:55:32Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T00:55:33Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T00:55:39Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T00:55:41Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T00:55:45Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T00:56:51Z` Council REJECT via sol: The concept dossier is broad but does not yet meet Bar A because four explicit blockers remain. The highest-leverage fixes are restoring visible calculation traceability and closure honesty, followed by resolving bill-of-materials identitie
+- `2026-07-31T00:56:51Z` Starting work package WP5
+- `2026-07-31T00:56:51Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T00:56:51Z` Starting work package WP7
+- `2026-07-31T00:56:56Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T00:57:48Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T00:58:54Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T00:58:55Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T00:58:57Z` Cycle 11/24 — rebuilding have/expect scoreboard
+- `2026-07-31T00:58:58Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T00:59:31Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T01:04:47Z` Council REJECT via sol: The dossier is broad but not yet Bar A complete because two core Excel evidence tabs score zero, the closure-quality floor is four, most bill-of-materials lines lack usable sourcing identities, and 36 full-text papers remain unprocessed. Fi
+- `2026-07-31T01:04:47Z` Starting work package WP6
+- `2026-07-31T01:04:49Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T01:04:49Z` Starting work package WP3
+- `2026-07-31T01:04:50Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T01:05:30Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T01:05:30Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T01:05:30Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T01:05:36Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T01:05:38Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:05:39Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T01:05:39Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T01:05:39Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T01:05:39Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T01:05:40Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T01:05:45Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T01:05:47Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T01:05:52Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T01:06:50Z` Cycle 12/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:06:51Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:07:55Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T01:09:01Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:09:02Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T01:09:31Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T01:11:45Z` Council REJECT via sol: The concept dossier is not yet acceptable at Bar A because core calculations do not show their working, closure evidence scores only four out of ten, and the bill of materials remains dominated by unresolved identifiers. The fastest route t
+- `2026-07-31T01:11:45Z` Starting work package WP6
+- `2026-07-31T01:11:46Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T01:11:46Z` Starting work package WP4
+- `2026-07-31T01:11:49Z` Finished work package WP4 ok=True steps=2
+- `2026-07-31T01:13:49Z` Cycle 13/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:13:50Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:15:37Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T01:15:37Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T01:15:38Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T01:15:46Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T01:15:48Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:15:49Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T01:15:49Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T01:15:49Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T01:15:49Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T01:15:50Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T01:15:56Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T01:15:58Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T01:16:03Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T01:18:05Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T01:19:12Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:19:13Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T01:19:15Z` Council REJECT via sol: The concept dossier is broad but not yet reviewable as a defensible engineering calculation pack. The strongest assets are the physics tree, interface coverage, tested calculators, draft printed-circuit-board content, and concept bill of ma
+- `2026-07-31T01:19:15Z` Starting work package WP3
+- `2026-07-31T01:19:16Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T01:19:16Z` Starting work package WP6
+- `2026-07-31T01:19:18Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T01:19:47Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T01:21:18Z` Cycle 14/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:21:19Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:25:47Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T01:25:47Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T01:25:47Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T01:25:54Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T01:25:56Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:25:57Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T01:25:57Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T01:25:57Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T01:25:57Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T01:25:58Z` Council CONDITIONAL via sol: The concept dossier has credible breadth, but it does not yet meet Bar A because four closure gates remain open. The highest-leverage action is repairing the workbook evidence chain: calculations, quality audit, verification, and executive 
+- `2026-07-31T01:25:58Z` Starting work package WP5
+- `2026-07-31T01:25:58Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T01:25:58Z` Starting work package WP7
+- `2026-07-31T01:25:58Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T01:26:02Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T01:26:05Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T01:26:07Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T01:26:12Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T01:28:03Z` Cycle 15/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:28:03Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:28:31Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T01:29:46Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:29:47Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T01:30:24Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T01:33:25Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while four declared blockers remain. The fastest route is to repair the workbook evidence and closure controls first, then resolve the bill of materials and the 36 unprocessed papers. Print
+- `2026-07-31T01:33:25Z` Starting work package WP5
+- `2026-07-31T01:33:25Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T01:33:25Z` Starting work package WP7
+- `2026-07-31T01:33:29Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T01:35:30Z` Cycle 16/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:35:30Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:35:55Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T01:35:55Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T01:35:55Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T01:36:02Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T01:36:04Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:36:05Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T01:36:05Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T01:36:05Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T01:36:05Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T01:36:06Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T01:36:13Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T01:36:15Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T01:36:20Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T01:38:33Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T01:39:42Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:39:43Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T01:40:15Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T01:40:24Z` Council CONDITIONAL via sol: The concept dossier has strong technical breadth, but it does not yet meet Bar A because the calculation workbook and quality evidence fail their own acceptance thresholds. Close the calculation and audit defects first, then resolve part id
+- `2026-07-31T01:40:24Z` Starting work package WP6
+- `2026-07-31T01:40:26Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T01:40:26Z` Starting work package WP4
+- `2026-07-31T01:40:29Z` Finished work package WP4 ok=True steps=2
+- `2026-07-31T01:42:29Z` Cycle 17/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:42:30Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:46:03Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T01:46:03Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T01:46:03Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T01:46:10Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T01:46:12Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:46:13Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T01:46:13Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T01:46:13Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T01:46:13Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T01:46:14Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T01:46:20Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T01:46:22Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T01:46:27Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T01:48:37Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T01:49:46Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:49:47Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T01:49:51Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete because four declared blockers remain. The highest-leverage repair is to expose calculation working and restore the quality floor, followed by resolving bill of materials identities an
+- `2026-07-31T01:49:51Z` Starting work package WP6
+- `2026-07-31T01:49:53Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T01:49:53Z` Starting work package WP7
+- `2026-07-31T01:49:57Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T01:50:16Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T01:51:58Z` Cycle 18/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:51:58Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T01:56:11Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T01:56:11Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T01:56:11Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T01:56:18Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T01:56:20Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T01:56:21Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T01:56:21Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T01:56:21Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T01:56:21Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T01:56:22Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T01:56:28Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T01:56:30Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T01:56:35Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T01:57:30Z` Council CONDITIONAL via sol: The concept has broad technical coverage, but it does not yet meet Bar A because four closure gates remain open. The fastest route is to repair the calculation evidence and quality audit first, then close bill-of-materials identification an
+- `2026-07-31T01:57:30Z` Starting work package WP5
+- `2026-07-31T01:57:30Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T01:57:30Z` Starting work package WP7
+- `2026-07-31T01:57:35Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T01:58:50Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T01:59:37Z` Cycle 19/24 — rebuilding have/expect scoreboard
+- `2026-07-31T01:59:37Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:00:00Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:00:01Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T02:00:36Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T02:04:53Z` Council REJECT via sol: The concept dossier is broad but not closable at Bar A because the calculations workbook, printed-circuit-board workbook tab, and closure evidence remain materially incomplete. The bill of materials also contains too many placeholder or mis
+- `2026-07-31T02:04:53Z` Starting work package WP5
+- `2026-07-31T02:04:53Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T02:04:53Z` Starting work package WP4
+- `2026-07-31T02:04:55Z` Finished work package WP4 ok=True steps=2
+- `2026-07-31T02:06:19Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T02:06:19Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T02:06:19Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T02:06:25Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:06:28Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:06:28Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T02:06:28Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T02:06:28Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T02:06:28Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T02:06:29Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T02:06:35Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T02:06:37Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T02:06:42Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T02:06:56Z` Cycle 20/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:06:56Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:08:50Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T02:09:59Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:09:59Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T02:10:25Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T02:11:47Z` Council REJECT via sol: The concept dossier has broad technical coverage, but it does not yet meet Bar A because four explicit blockers remain. The highest-leverage fixes are to restore visible calculation working, repair the closure and verification evidence, fin
+- `2026-07-31T02:11:47Z` Starting work package WP5
+- `2026-07-31T02:11:47Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T02:11:47Z` Starting work package WP7
+- `2026-07-31T02:11:51Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T02:13:52Z` Cycle 21/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:13:52Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:16:26Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T02:16:26Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T02:16:26Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T02:16:33Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:16:36Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:16:36Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T02:16:36Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T02:16:36Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T02:16:36Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T02:16:37Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T02:16:43Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T02:16:45Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T02:16:49Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T02:17:51Z` Council REJECT via sol: The concept dossier is not yet acceptable because its calculations do not show their working, closure evidence is weak, 36 full-text papers remain unprocessed, and most bill-of-materials lines lack defensible sourcing identities. The underl
+- `2026-07-31T02:17:51Z` Starting work package WP6
+- `2026-07-31T02:17:53Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T02:17:53Z` Starting work package WP1
+- `2026-07-31T02:18:02Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:18:14Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T02:18:56Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T02:20:06Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:20:07Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T02:20:14Z` Cycle 22/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:20:15Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:20:40Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T02:26:32Z` Council REJECT via sol: The concept dossier does not yet meet Bar A because the calculations workbook shows no working, closure quality is below the required floor, most bill-of-materials identifiers remain unresolved, and 36 full-text papers remain unprocessed. T
+- `2026-07-31T02:26:32Z` Starting work package WP5
+- `2026-07-31T02:26:32Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T02:26:32Z` Starting work package WP7
+- `2026-07-31T02:26:34Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T02:26:34Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T02:26:34Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T02:26:36Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T02:26:41Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:26:43Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:26:44Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T02:26:44Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T02:26:44Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T02:26:44Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T02:26:45Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T02:26:50Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T02:26:53Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T02:26:57Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T02:28:37Z` Cycle 23/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:28:38Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:29:01Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T02:30:10Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:30:11Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T02:30:43Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T02:34:03Z` Council CONDITIONAL via sol: The concept dossier has strong breadth, but it does not yet clear Bar A because the calculation working, closure evidence, bill of materials sourcing, and remaining literature extraction are incomplete. The highest leverage is to repair the
+- `2026-07-31T02:34:03Z` Starting work package WP5
+- `2026-07-31T02:34:03Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T02:34:03Z` Starting work package WP7
+- `2026-07-31T02:34:07Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T02:36:09Z` Cycle 24/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:36:10Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:36:42Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T02:36:42Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T02:36:42Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T02:36:51Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:36:54Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:36:55Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T02:36:55Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T02:36:55Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T02:36:55Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T02:36:56Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T02:37:02Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T02:37:04Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T02:37:09Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T02:39:26Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T02:40:08Z` Council CONDITIONAL via sol: The concept dossier has strong technical breadth, but it does not yet meet Bar A because four explicit closure gates remain open. Prioritise audit honesty and visible calculations first, then close purchased-part identification and the rema
+- `2026-07-31T02:40:08Z` Starting work package WP7
+- `2026-07-31T02:40:12Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T02:40:12Z` Starting work package WP5
+- `2026-07-31T02:40:12Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T02:40:34Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:40:34Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T02:41:10Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T02:42:13Z` Half-done closure loop exiting (max cycles or Bar A met). ship_ok remains false.
+- `2026-07-31T02:46:52Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T02:46:53Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T02:46:53Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T02:47:00Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:47:01Z` Half-done closure loop started. Plan: docs/plans/JLR-FE-FRONT-FPK-HALF-DONE-CLOSURE-PLAIN-LANGUAGE-2026-07-30.md
+- `2026-07-31T02:47:02Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:47:03Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T02:47:03Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T02:47:03Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T02:47:03Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T02:47:04Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T02:47:08Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:47:08Z` Cycle 1/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:47:09Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:47:10Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T02:47:12Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T02:47:16Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T02:49:54Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T02:51:15Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:51:16Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T02:51:42Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T02:51:45Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A complete because the calculations do not show their working, closure honesty scores only 4 out of 10, and the verification and executive-summary tabs remain materially incomplete. The bill of m
+- `2026-07-31T02:51:45Z` Starting work package WP6
+- `2026-07-31T02:51:47Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T02:51:47Z` Starting work package WP4
+- `2026-07-31T02:51:51Z` Finished work package WP4 ok=True steps=2
+- `2026-07-31T02:53:52Z` Cycle 2/24 — rebuilding have/expect scoreboard
+- `2026-07-31T02:53:52Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T02:57:01Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T02:57:01Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T02:57:01Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T02:57:08Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T02:57:10Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T02:57:11Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T02:57:11Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T02:57:11Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T02:57:11Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T02:57:12Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T02:57:17Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T02:57:19Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T02:57:24Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T02:59:35Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T02:59:46Z` Council REJECT via sol: The concept dossier is broad but cannot pass Bar A while the calculation workbook and quality evidence remain effectively empty. The fastest route is to expose the existing calculations in Excel, rebuild the audit trail around them, then re
+- `2026-07-31T02:59:46Z` Starting work package WP5
+- `2026-07-31T02:59:46Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T02:59:46Z` Starting work package WP7
+- `2026-07-31T02:59:50Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T03:00:43Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:00:44Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:01:19Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:01:51Z` Cycle 3/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:01:52Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:05:48Z` Council REJECT via sol: The concept dossier is broad but not closed: four explicit blockers remain, including two zero-scoring workbook areas. The fastest route to Bar A is to repair the visible calculation and audit trail first, then close the bill of materials a
+- `2026-07-31T03:05:48Z` Starting work package WP5
+- `2026-07-31T03:05:48Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T03:05:48Z` Starting work package WP7
+- `2026-07-31T03:05:51Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T03:07:09Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:07:09Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:07:09Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:07:16Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:07:18Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:07:19Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:07:19Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:07:19Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:07:19Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:07:20Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:07:25Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:07:28Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:07:32Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T03:07:52Z` Cycle 4/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:07:53Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:09:46Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T03:10:53Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:10:54Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:11:42Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:11:46Z` Council REJECT via sol: The dossier does not yet meet the concept dossier standard because four explicit blockers remain, including two zero-scoring Excel areas. The fastest route is to expose the engineering calculations first, use them to repair verification and
+- `2026-07-31T03:11:46Z` Starting work package WP2
+- `2026-07-31T03:11:52Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T03:11:52Z` Starting work package WP7
+- `2026-07-31T03:11:56Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T03:13:57Z` Cycle 5/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:13:57Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:17:17Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:17:17Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:17:17Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:17:24Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:17:27Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:17:28Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:17:28Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:17:28Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:17:28Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:17:29Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:17:35Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:17:37Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:17:42Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T03:19:24Z` Council REJECT via sol: The concept dossier is not yet Bar A complete because the calculations and quality evidence fail the workbook floor, most bill-of-materials sourcing identities are unresolved, and 36 open full-text papers remain unprocessed. The underlying 
+- `2026-07-31T03:19:24Z` Starting work package WP6
+- `2026-07-31T03:19:26Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T03:19:26Z` Starting work package WP3
+- `2026-07-31T03:19:28Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T03:19:58Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T03:21:08Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:21:09Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:21:29Z` Cycle 6/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:21:29Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:21:45Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:27:07Z` Council REJECT via sol: The concept dossier is broad but not yet Bar A because its calculations do not show their working, its weakest closure evidence scores four out of ten, and most bill-of-materials lines lack usable identification. Close the workbook evidence
+- `2026-07-31T03:27:07Z` Starting work package WP6
+- `2026-07-31T03:27:09Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T03:27:09Z` Starting work package WP4
+- `2026-07-31T03:27:11Z` Finished work package WP4 ok=True steps=2
+- `2026-07-31T03:27:25Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:27:25Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:27:26Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:27:32Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:27:35Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:27:35Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:27:35Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:27:35Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:27:36Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:27:37Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:27:43Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:27:45Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:27:50Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T03:29:12Z` Cycle 7/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:29:12Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:30:10Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T03:31:23Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:31:23Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:32:10Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:34:58Z` Council REJECT via sol: The concept dossier is not at Bar A because the calculation working is absent, the quality floor is 4 rather than 9, most bill-of-material identifiers remain unresolved, and 36 open full-text papers are unprocessed. The underlying physics, 
+- `2026-07-31T03:34:58Z` Starting work package WP6
+- `2026-07-31T03:35:00Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T03:35:00Z` Starting work package WP3
+- `2026-07-31T03:35:02Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T03:37:03Z` Cycle 8/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:37:03Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:37:33Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:37:33Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:37:33Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:37:40Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:37:42Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:37:43Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:37:43Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:37:43Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:37:43Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:37:44Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:37:49Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:37:52Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:37:56Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T03:40:24Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T03:41:36Z` Council REJECT via sol: The concept dossier is technically broad but fails Bar A because four explicit closure blockers remain. The highest-leverage repair is the workbook evidence chain: calculations, verification, quality audit, executive summary, and drawings m
+- `2026-07-31T03:41:36Z` Starting work package WP5
+- `2026-07-31T03:41:36Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T03:41:36Z` Starting work package WP7
+- `2026-07-31T03:41:37Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:41:38Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:41:40Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T03:42:12Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:43:41Z` Cycle 9/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:43:41Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:47:41Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:47:41Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:47:41Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:47:47Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:47:49Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:47:50Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:47:50Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:47:50Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:47:50Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:47:51Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:47:56Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:47:58Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:48:03Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T03:50:29Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T03:50:48Z` Council REJECT via sol: The concept dossier is not yet Bar A because the calculations do not show their working, the closure-quality floor is only 4 out of 10, and the bill of materials remains mostly unresolved. The underlying physics, literature coverage, interf
+- `2026-07-31T03:50:48Z` Starting work package WP5
+- `2026-07-31T03:50:48Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T03:50:48Z` Starting work package WP7
+- `2026-07-31T03:50:52Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T03:51:39Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:51:39Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:51:40Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:52:52Z` Cycle 10/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:52:53Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:52:53Z` Council None via None: 
+- `2026-07-31T03:52:53Z` Starting work package WP2
+- `2026-07-31T03:53:00Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T03:53:00Z` Starting work package WP1
+- `2026-07-31T03:53:00Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:53:00Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:53:00Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:53:07Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:53:09Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:53:09Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:53:09Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:53:09Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:53:10Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:53:11Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:53:15Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T03:53:16Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:53:18Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:53:23Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T03:55:16Z` Cycle 11/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:55:16Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:55:17Z` Council None via None: 
+- `2026-07-31T03:55:17Z` Starting work package WP2
+- `2026-07-31T03:55:24Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T03:55:24Z` Starting work package WP1
+- `2026-07-31T03:55:32Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:55:43Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T03:55:50Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T03:57:01Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:57:02Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T03:57:02Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T03:57:43Z` Cycle 12/24 — rebuilding have/expect scoreboard
+- `2026-07-31T03:57:44Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T03:57:44Z` Council None via None: 
+- `2026-07-31T03:57:44Z` Starting work package WP2
+- `2026-07-31T03:57:48Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T03:57:48Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T03:57:48Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T03:57:50Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T03:57:50Z` Starting work package WP1
+- `2026-07-31T03:57:54Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:57:56Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T03:57:56Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T03:57:57Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T03:57:57Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T03:57:57Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T03:57:57Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T03:57:58Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T03:58:04Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T03:58:05Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T03:58:06Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T03:58:11Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:00:05Z` Cycle 13/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:00:06Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:00:06Z` Council None via None: 
+- `2026-07-31T04:00:06Z` Starting work package WP2
+- `2026-07-31T04:00:13Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:00:13Z` Starting work package WP1
+- `2026-07-31T04:00:21Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:00:32Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:00:37Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:01:51Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:01:52Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:01:53Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:02:32Z` Cycle 14/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:02:33Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:02:33Z` Council None via None: 
+- `2026-07-31T04:02:33Z` Starting work package WP2
+- `2026-07-31T04:02:39Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:02:39Z` Starting work package WP1
+- `2026-07-31T04:02:40Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:02:40Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:02:40Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:02:47Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:02:49Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:02:49Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:02:50Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:02:50Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:02:50Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:02:51Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:02:55Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:02:57Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:02:59Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:03:04Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:04:56Z` Cycle 15/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:04:56Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:04:57Z` Council None via None: 
+- `2026-07-31T04:04:57Z` Starting work package WP2
+- `2026-07-31T04:05:04Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:05:04Z` Starting work package WP1
+- `2026-07-31T04:05:13Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:05:24Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:05:34Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:06:46Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:06:46Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:06:47Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:07:24Z` Cycle 16/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:07:25Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:07:25Z` Council None via None: 
+- `2026-07-31T04:07:25Z` Starting work package WP2
+- `2026-07-31T04:07:31Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:07:31Z` Starting work package WP1
+- `2026-07-31T04:07:32Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:07:32Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:07:32Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:07:38Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:07:40Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:07:40Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:07:40Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:07:41Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:07:41Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:07:42Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:07:46Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:07:48Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:07:50Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:07:54Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:08:01Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:09:47Z` Cycle 17/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:09:47Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:09:48Z` Council None via None: 
+- `2026-07-31T04:09:48Z` Starting work package WP2
+- `2026-07-31T04:09:55Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:09:55Z` Starting work package WP1
+- `2026-07-31T04:10:03Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:10:14Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:10:22Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:11:32Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:11:33Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:11:34Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:12:14Z` Cycle 18/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:12:15Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:12:15Z` Council None via None: 
+- `2026-07-31T04:12:15Z` Starting work package WP2
+- `2026-07-31T04:12:21Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:12:21Z` Starting work package WP1
+- `2026-07-31T04:12:22Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:12:22Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:12:22Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:12:29Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:12:31Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:12:32Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:12:32Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:12:32Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:12:32Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:12:33Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:12:37Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:12:39Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:12:41Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:12:45Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:14:38Z` Cycle 19/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:14:39Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:14:40Z` Council None via None: 
+- `2026-07-31T04:14:40Z` Starting work package WP2
+- `2026-07-31T04:14:46Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:14:46Z` Starting work package WP1
+- `2026-07-31T04:14:54Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:15:05Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:15:12Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:16:22Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:16:23Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:16:23Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:17:06Z` Cycle 20/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:17:06Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:17:07Z` Council None via None: 
+- `2026-07-31T04:17:07Z` Starting work package WP2
+- `2026-07-31T04:17:12Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:17:12Z` Starting work package WP1
+- `2026-07-31T04:17:13Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:17:13Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:17:13Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:17:19Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:17:21Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:17:22Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:17:22Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:17:22Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:17:22Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:17:23Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:17:28Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:17:29Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:17:31Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:17:36Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:18:10Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:19:28Z` Cycle 21/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:19:29Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:19:29Z` Council None via None: 
+- `2026-07-31T04:19:29Z` Starting work package WP2
+- `2026-07-31T04:19:36Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:19:36Z` Starting work package WP1
+- `2026-07-31T04:19:45Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:19:55Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:20:03Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:21:14Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:21:14Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:21:15Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:21:56Z` Cycle 22/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:21:56Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:21:57Z` Council None via None: 
+- `2026-07-31T04:21:57Z` Starting work package WP2
+- `2026-07-31T04:22:02Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:22:02Z` Starting work package WP1
+- `2026-07-31T04:22:03Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:22:03Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:22:03Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:22:09Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:22:11Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:22:11Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:22:11Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:22:12Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:22:12Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:22:13Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:22:17Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:22:18Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:22:21Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:22:25Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:24:18Z` Cycle 23/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:24:19Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:24:19Z` Council None via None: 
+- `2026-07-31T04:24:19Z` Starting work package WP2
+- `2026-07-31T04:24:26Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:24:26Z` Starting work package WP1
+- `2026-07-31T04:24:34Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:24:45Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:24:51Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:26:02Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:26:03Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:26:03Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:26:45Z` Cycle 24/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:26:46Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:26:46Z` Council None via None: 
+- `2026-07-31T04:26:46Z` Starting work package WP2
+- `2026-07-31T04:26:52Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:26:52Z` Starting work package WP1
+- `2026-07-31T04:26:52Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:26:52Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:26:52Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:26:58Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:27:00Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:27:01Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:27:01Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:27:01Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:27:01Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:27:02Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:27:07Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:27:08Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:27:10Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:27:15Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:28:18Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:29:07Z` Half-done closure loop exiting (max cycles or Bar A met). ship_ok remains false.
+- `2026-07-31T04:29:41Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:30:51Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:30:52Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:30:52Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:38:19Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:38:19Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:38:20Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:38:26Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:38:27Z` Half-done closure loop started. Plan: docs/plans/JLR-FE-FRONT-FPK-HALF-DONE-CLOSURE-PLAIN-LANGUAGE-2026-07-30.md
+- `2026-07-31T04:38:29Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:38:29Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:38:29Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:38:29Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:38:29Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:38:31Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:38:33Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:38:34Z` Cycle 1/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:38:34Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:38:35Z` Council None via None: 
+- `2026-07-31T04:38:35Z` Starting work package WP2
+- `2026-07-31T04:38:37Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:38:39Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:38:41Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:38:41Z` Starting work package WP1
+- `2026-07-31T04:38:43Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:38:47Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:38:58Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:40:59Z` Cycle 2/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:40:59Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:41:00Z` Council None via None: 
+- `2026-07-31T04:41:00Z` Starting work package WP2
+- `2026-07-31T04:41:07Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:41:07Z` Starting work package WP1
+- `2026-07-31T04:41:11Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:41:12Z` phase=L state=DEGRADED step=ensure_db_failed ensure.sh DB bars failed: fulltext_prove=0 db_prove=1
+- `2026-07-31T04:41:19Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:42:16Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:42:17Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:42:17Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:43:20Z` Cycle 3/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:43:20Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:43:21Z` Council None via None: 
+- `2026-07-31T04:43:21Z` Starting work package WP2
+- `2026-07-31T04:43:26Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:43:26Z` Starting work package WP1
+- `2026-07-31T04:43:27Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:43:27Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:43:27Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32436 pending=0
+- `2026-07-31T04:43:33Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:43:35Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:43:36Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:43:36Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:43:36Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:43:36Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:43:37Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:43:42Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:43:43Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:43:45Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:43:50Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:45:42Z` Cycle 4/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:45:43Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:45:43Z` Council None via None: 
+- `2026-07-31T04:45:43Z` Starting work package WP2
+- `2026-07-31T04:45:50Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:45:50Z` Starting work package WP1
+- `2026-07-31T04:45:58Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:46:09Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:46:16Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:47:27Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:47:27Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:47:28Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:48:09Z` Cycle 5/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:48:10Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:48:10Z` Council None via None: 
+- `2026-07-31T04:48:10Z` Starting work package WP2
+- `2026-07-31T04:48:16Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:48:16Z` Starting work package WP1
+- `2026-07-31T04:48:16Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:48:16Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:48:16Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:48:22Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:48:24Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:48:25Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:48:25Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:48:25Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:48:25Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:48:26Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:48:31Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:48:32Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:48:33Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:48:34Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:48:39Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:50:31Z` Cycle 6/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:50:32Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:50:32Z` Council None via None: 
+- `2026-07-31T04:50:32Z` Starting work package WP2
+- `2026-07-31T04:50:39Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:50:39Z` Starting work package WP1
+- `2026-07-31T04:50:47Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:50:58Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:51:05Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:52:15Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:52:16Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:52:17Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:52:58Z` Cycle 7/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:52:59Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:52:59Z` Council None via None: 
+- `2026-07-31T04:52:59Z` Starting work package WP2
+- `2026-07-31T04:53:05Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:53:05Z` Starting work package WP1
+- `2026-07-31T04:53:05Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:53:05Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:53:06Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:53:12Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:53:15Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:53:15Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:53:15Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:53:15Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:53:16Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:53:17Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:53:21Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:53:22Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:53:24Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:53:29Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:55:21Z` Cycle 8/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:55:22Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:55:22Z` Council None via None: 
+- `2026-07-31T04:55:22Z` Starting work package WP2
+- `2026-07-31T04:55:29Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:55:29Z` Starting work package WP1
+- `2026-07-31T04:55:38Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:55:48Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:55:55Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T04:57:06Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:57:06Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T04:57:07Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T04:57:49Z` Cycle 9/24 — rebuilding have/expect scoreboard
+- `2026-07-31T04:57:49Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T04:57:53Z` Council None via None: 
+- `2026-07-31T04:57:53Z` Starting work package WP2
+- `2026-07-31T04:57:59Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T04:57:59Z` Starting work package WP1
+- `2026-07-31T04:57:59Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T04:57:59Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T04:57:59Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T04:58:05Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T04:58:07Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T04:58:08Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T04:58:08Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T04:58:08Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T04:58:08Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T04:58:09Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T04:58:14Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T04:58:15Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T04:58:17Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T04:58:21Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T04:58:42Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:00:14Z` Cycle 10/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:00:15Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:00:15Z` Council None via None: 
+- `2026-07-31T05:00:15Z` Starting work package WP2
+- `2026-07-31T05:00:22Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:00:22Z` Starting work package WP1
+- `2026-07-31T05:00:30Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:00:42Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:00:48Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:01:59Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:02:00Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:02:00Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:02:43Z` Cycle 11/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:02:43Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:02:44Z` Council None via None: 
+- `2026-07-31T05:02:44Z` Starting work package WP2
+- `2026-07-31T05:02:49Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:02:49Z` Starting work package WP1
+- `2026-07-31T05:02:49Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:02:50Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:02:50Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:02:56Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:02:58Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:02:58Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:02:58Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:02:59Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:02:59Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:03:00Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:03:04Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:03:06Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:03:08Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:03:12Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:05:05Z` Cycle 12/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:05:05Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:05:06Z` Council None via None: 
+- `2026-07-31T05:05:06Z` Starting work package WP2
+- `2026-07-31T05:05:13Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:05:13Z` Starting work package WP1
+- `2026-07-31T05:05:21Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:05:31Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:05:39Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:06:50Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:06:50Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:06:51Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:07:32Z` Cycle 13/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:07:32Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:07:33Z` Council None via None: 
+- `2026-07-31T05:07:33Z` Starting work package WP2
+- `2026-07-31T05:07:38Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:07:38Z` Starting work package WP1
+- `2026-07-31T05:07:39Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:07:39Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:07:39Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:07:45Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:07:47Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:07:48Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:07:48Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:07:48Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:07:48Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:07:49Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:07:53Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:07:55Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:07:57Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:08:01Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:08:50Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:09:54Z` Cycle 14/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:09:54Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:09:55Z` Council None via None: 
+- `2026-07-31T05:09:55Z` Starting work package WP2
+- `2026-07-31T05:10:02Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:10:02Z` Starting work package WP1
+- `2026-07-31T05:10:10Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:10:20Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:10:29Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:11:44Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:11:45Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:11:45Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:12:21Z` Cycle 15/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:12:22Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:12:22Z` Council None via None: 
+- `2026-07-31T05:12:22Z` Starting work package WP2
+- `2026-07-31T05:12:28Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:12:28Z` Starting work package WP1
+- `2026-07-31T05:12:28Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:12:28Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:12:28Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:12:35Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:12:37Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:12:38Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:12:38Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:12:38Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:12:38Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:12:39Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:12:44Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:12:45Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:12:47Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:12:52Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:14:44Z` Cycle 16/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:14:45Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:14:45Z` Council None via None: 
+- `2026-07-31T05:14:45Z` Starting work package WP2
+- `2026-07-31T05:14:52Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:14:52Z` Starting work package WP1
+- `2026-07-31T05:15:00Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:15:11Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:15:19Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:16:30Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:16:31Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:16:31Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:17:11Z` Cycle 17/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:17:12Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:17:13Z` Council None via None: 
+- `2026-07-31T05:17:13Z` Starting work package WP2
+- `2026-07-31T05:17:19Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:17:19Z` Starting work package WP1
+- `2026-07-31T05:17:19Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:17:19Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:17:19Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:17:25Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:17:27Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:17:28Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:17:28Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:17:28Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:17:28Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:17:29Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:17:34Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:17:35Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:17:38Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:17:43Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:18:59Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:19:34Z` Cycle 18/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:19:35Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:19:35Z` Council None via None: 
+- `2026-07-31T05:19:35Z` Starting work package WP2
+- `2026-07-31T05:19:42Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:19:42Z` Starting work package WP1
+- `2026-07-31T05:19:51Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:20:02Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:20:09Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:21:21Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:21:22Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:21:22Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:22:02Z` Cycle 19/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:22:03Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:22:03Z` Council None via None: 
+- `2026-07-31T05:22:03Z` Starting work package WP2
+- `2026-07-31T05:22:09Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:22:09Z` Starting work package WP1
+- `2026-07-31T05:22:09Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:22:09Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:22:09Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:22:15Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:22:17Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:22:18Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:22:18Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:22:18Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:22:18Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:22:19Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:22:24Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:22:25Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:22:27Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:22:32Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:24:24Z` Cycle 20/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:24:25Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:24:26Z` Council None via None: 
+- `2026-07-31T05:24:26Z` Starting work package WP2
+- `2026-07-31T05:24:32Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:24:32Z` Starting work package WP1
+- `2026-07-31T05:24:40Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:24:51Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:24:58Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:26:10Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:26:11Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:26:11Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:26:52Z` Cycle 21/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:26:52Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:26:53Z` Council None via None: 
+- `2026-07-31T05:26:53Z` Starting work package WP2
+- `2026-07-31T05:26:58Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:26:58Z` Starting work package WP1
+- `2026-07-31T05:26:59Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:26:59Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:26:59Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:27:05Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:27:07Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:27:08Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:27:08Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:27:08Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:27:08Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:27:09Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:27:14Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:27:15Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:27:17Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:27:22Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:29:09Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:29:14Z` Cycle 22/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:29:15Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:29:15Z` Council None via None: 
+- `2026-07-31T05:29:15Z` Starting work package WP2
+- `2026-07-31T05:29:22Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:29:22Z` Starting work package WP1
+- `2026-07-31T05:29:30Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:29:41Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:29:55Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:31:07Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:31:08Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:31:08Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:31:42Z` Cycle 23/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:31:42Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:31:43Z` Council None via None: 
+- `2026-07-31T05:31:43Z` Starting work package WP2
+- `2026-07-31T05:31:49Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:31:49Z` Starting work package WP1
+- `2026-07-31T05:31:49Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:31:49Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:31:49Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:31:56Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:31:58Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:31:59Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:31:59Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:31:59Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:31:59Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:32:00Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:32:05Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:32:06Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:32:08Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:32:13Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:34:05Z` Cycle 24/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:34:06Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:34:07Z` Council None via None: 
+- `2026-07-31T05:34:07Z` Starting work package WP2
+- `2026-07-31T05:34:14Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:34:14Z` Starting work package WP1
+- `2026-07-31T05:34:23Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:34:34Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:34:44Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:35:53Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:35:54Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:35:54Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:36:35Z` Half-done closure loop exiting (max cycles or Bar A met). ship_ok remains false.
+- `2026-07-31T05:39:10Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:39:10Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:39:10Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:39:16Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:39:17Z` Half-done closure loop started. Plan: docs/plans/JLR-FE-FRONT-FPK-HALF-DONE-CLOSURE-PLAIN-LANGUAGE-2026-07-30.md
+- `2026-07-31T05:39:18Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:39:19Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:39:19Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:39:19Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:39:19Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:39:20Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:39:23Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:39:23Z` Cycle 1/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:39:24Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:39:24Z` Council None via None: 
+- `2026-07-31T05:39:24Z` Starting work package WP2
+- `2026-07-31T05:39:26Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:39:28Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:39:30Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:39:30Z` Starting work package WP1
+- `2026-07-31T05:39:33Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:39:36Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:39:47Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:41:47Z` Cycle 2/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:41:48Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:41:49Z` Council None via None: 
+- `2026-07-31T05:41:49Z` Starting work package WP2
+- `2026-07-31T05:42:01Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:42:01Z` Starting work package WP1
+- `2026-07-31T05:42:10Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:42:25Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:42:35Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:43:24Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:43:25Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:43:25Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:44:35Z` Cycle 3/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:44:36Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:44:36Z` Council None via None: 
+- `2026-07-31T05:44:36Z` Starting work package WP2
+- `2026-07-31T05:44:43Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:44:43Z` Starting work package WP1
+- `2026-07-31T05:44:43Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:44:43Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:44:44Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:44:53Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:44:56Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:44:56Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:44:56Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:44:56Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:44:57Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:44:58Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:45:03Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:45:04Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:45:06Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:45:11Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:47:03Z` Cycle 4/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:47:04Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:47:05Z` Council None via None: 
+- `2026-07-31T05:47:05Z` Starting work package WP2
+- `2026-07-31T05:47:11Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:47:11Z` Starting work package WP1
+- `2026-07-31T05:47:20Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:47:30Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:47:43Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:48:59Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:49:00Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:49:00Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:49:17Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:49:17Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:49:17Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:49:24Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:49:26Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:49:27Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:49:27Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:49:27Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:49:27Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:49:28Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:49:31Z` Cycle 5/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:49:31Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:49:32Z` Council None via None: 
+- `2026-07-31T05:49:32Z` Starting work package WP2
+- `2026-07-31T05:49:34Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:49:36Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:49:38Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:49:38Z` Starting work package WP1
+- `2026-07-31T05:49:41Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:49:44Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:49:54Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:51:55Z` Cycle 6/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:51:55Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:51:59Z` Council None via None: 
+- `2026-07-31T05:51:59Z` Starting work package WP2
+- `2026-07-31T05:52:06Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:52:06Z` Starting work package WP1
+- `2026-07-31T05:52:09Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:52:14Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:52:24Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:53:17Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:53:18Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:53:18Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:54:24Z` Cycle 7/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:54:25Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:54:28Z` Council None via None: 
+- `2026-07-31T05:54:28Z` Starting work package WP2
+- `2026-07-31T05:54:34Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:54:34Z` Starting work package WP1
+- `2026-07-31T05:54:34Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:54:34Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:54:34Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:54:40Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:54:42Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:54:43Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:54:43Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:54:43Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:54:43Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:54:44Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:54:52Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:54:52Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:54:54Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:54:59Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T05:56:52Z` Cycle 8/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:56:53Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:56:53Z` Council None via None: 
+- `2026-07-31T05:56:53Z` Starting work package WP2
+- `2026-07-31T05:57:00Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:57:00Z` Starting work package WP1
+- `2026-07-31T05:57:10Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:57:24Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:57:31Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T05:58:42Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:58:43Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T05:58:43Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T05:59:24Z` Cycle 9/24 — rebuilding have/expect scoreboard
+- `2026-07-31T05:59:25Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T05:59:25Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T05:59:25Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T05:59:25Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T05:59:25Z` Council None via None: 
+- `2026-07-31T05:59:25Z` Starting work package WP2
+- `2026-07-31T05:59:31Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T05:59:31Z` Starting work package WP1
+- `2026-07-31T05:59:31Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:59:33Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T05:59:34Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T05:59:34Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T05:59:34Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T05:59:34Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T05:59:35Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T05:59:38Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T05:59:42Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T05:59:44Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T05:59:47Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T05:59:49Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:01:47Z` Cycle 10/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:01:48Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:01:49Z` Council None via None: 
+- `2026-07-31T06:01:49Z` Starting work package WP2
+- `2026-07-31T06:01:56Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:01:56Z` Starting work package WP1
+- `2026-07-31T06:02:05Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:02:16Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:02:19Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:03:50Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:03:51Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:03:52Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:04:16Z` Cycle 11/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:04:17Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:04:17Z` Council None via None: 
+- `2026-07-31T06:04:17Z` Starting work package WP2
+- `2026-07-31T06:04:25Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:04:25Z` Starting work package WP1
+- `2026-07-31T06:04:25Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:04:25Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:04:25Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:04:33Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:04:36Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:04:37Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:04:37Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:04:37Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:04:37Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:04:39Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:04:44Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:04:45Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:04:47Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:04:52Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:06:44Z` Cycle 12/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:06:45Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:06:46Z` Council None via None: 
+- `2026-07-31T06:06:46Z` Starting work package WP2
+- `2026-07-31T06:06:52Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:06:52Z` Starting work package WP1
+- `2026-07-31T06:07:01Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:07:11Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:07:19Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:08:45Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:08:46Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:08:46Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:09:12Z` Cycle 13/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:09:12Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:09:13Z` Council None via None: 
+- `2026-07-31T06:09:13Z` Starting work package WP2
+- `2026-07-31T06:09:20Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:09:20Z` Starting work package WP1
+- `2026-07-31T06:09:20Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:09:20Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:09:20Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:09:29Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:09:32Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:09:32Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:09:32Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:09:33Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:09:33Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:09:34Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:09:41Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:09:41Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:09:42Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:09:45Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:09:50Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:11:42Z` Cycle 14/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:11:42Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:11:43Z` Council None via None: 
+- `2026-07-31T06:11:43Z` Starting work package WP2
+- `2026-07-31T06:11:50Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:11:50Z` Starting work package WP1
+- `2026-07-31T06:11:58Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:12:10Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:12:47Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:13:58Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:13:59Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:14:00Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:14:11Z` Cycle 15/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:14:11Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:14:12Z` Council None via None: 
+- `2026-07-31T06:14:12Z` Starting work package WP2
+- `2026-07-31T06:14:17Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:14:17Z` Starting work package WP1
+- `2026-07-31T06:14:18Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:14:18Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:14:18Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:14:24Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:14:27Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:14:27Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:14:27Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:14:28Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:14:28Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:14:29Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:14:34Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:14:35Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:14:37Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:14:42Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:16:34Z` Cycle 16/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:16:35Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:16:36Z` Council None via None: 
+- `2026-07-31T06:16:36Z` Starting work package WP2
+- `2026-07-31T06:16:42Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:16:42Z` Starting work package WP1
+- `2026-07-31T06:16:51Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:17:02Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:17:11Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:18:24Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:18:25Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:18:25Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:19:03Z` Cycle 17/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:19:04Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:19:04Z` Council None via None: 
+- `2026-07-31T06:19:04Z` Starting work package WP2
+- `2026-07-31T06:19:10Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:19:10Z` Starting work package WP1
+- `2026-07-31T06:19:10Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:19:10Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:19:10Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:19:16Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:19:19Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:19:19Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:19:19Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:19:19Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:19:20Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:19:21Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:19:25Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:19:27Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:19:29Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:19:34Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:19:50Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:21:26Z` Cycle 18/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:21:27Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:21:27Z` Council None via None: 
+- `2026-07-31T06:21:27Z` Starting work package WP2
+- `2026-07-31T06:21:34Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:21:34Z` Starting work package WP1
+- `2026-07-31T06:21:43Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:21:54Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:22:03Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:23:14Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:23:15Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:23:15Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:23:54Z` Cycle 19/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:23:55Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:23:55Z` Council None via None: 
+- `2026-07-31T06:23:55Z` Starting work package WP2
+- `2026-07-31T06:24:01Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:24:01Z` Starting work package WP1
+- `2026-07-31T06:24:01Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:24:01Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:24:01Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:24:08Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:24:10Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:24:11Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:24:11Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:24:11Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:24:11Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:24:12Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:24:17Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:24:18Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:24:20Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:24:25Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:26:17Z` Cycle 20/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:26:18Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:26:18Z` Council None via None: 
+- `2026-07-31T06:26:18Z` Starting work package WP2
+- `2026-07-31T06:26:25Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:26:25Z` Starting work package WP1
+- `2026-07-31T06:26:34Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:26:45Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:26:50Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:28:01Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:28:02Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:28:02Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:28:45Z` Cycle 21/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:28:46Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:28:47Z` Council None via None: 
+- `2026-07-31T06:28:47Z` Starting work package WP2
+- `2026-07-31T06:28:52Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:28:52Z` Starting work package WP1
+- `2026-07-31T06:28:52Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:28:53Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:28:53Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:28:59Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:29:01Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:29:02Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:29:02Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:29:02Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:29:02Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:29:03Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:29:08Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:29:09Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:29:11Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:29:16Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:29:58Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:31:09Z` Cycle 22/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:31:09Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:31:10Z` Council None via None: 
+- `2026-07-31T06:31:10Z` Starting work package WP2
+- `2026-07-31T06:31:17Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:31:17Z` Starting work package WP1
+- `2026-07-31T06:31:26Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:31:37Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:31:41Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:32:52Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:32:53Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:32:53Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:33:37Z` Cycle 23/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:33:38Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:33:38Z` Council None via None: 
+- `2026-07-31T06:33:38Z` Starting work package WP2
+- `2026-07-31T06:33:44Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:33:44Z` Starting work package WP1
+- `2026-07-31T06:33:44Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:33:44Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:33:44Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:33:51Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:33:53Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:33:53Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:33:53Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:33:54Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:33:54Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:33:55Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:33:59Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:34:00Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:34:03Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:34:07Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:36:00Z` Cycle 24/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:36:01Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:36:01Z` Council None via None: 
+- `2026-07-31T06:36:01Z` Starting work package WP2
+- `2026-07-31T06:36:08Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:36:08Z` Starting work package WP1
+- `2026-07-31T06:36:17Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:36:27Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:36:33Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:37:43Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:37:44Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:37:44Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:38:28Z` Half-done closure loop exiting (max cycles or Bar A met). ship_ok remains false.
+- `2026-07-31T06:39:59Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:39:59Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:40:00Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:40:06Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:40:07Z` Half-done closure loop started. Plan: docs/plans/JLR-FE-FRONT-FPK-HALF-DONE-CLOSURE-PLAIN-LANGUAGE-2026-07-30.md
+- `2026-07-31T06:40:08Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:40:09Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:40:09Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:40:09Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:40:09Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:40:10Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:40:13Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:40:14Z` Cycle 1/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:40:14Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:40:15Z` Council None via None: 
+- `2026-07-31T06:40:15Z` Starting work package WP2
+- `2026-07-31T06:40:16Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:40:18Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:40:22Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:40:22Z` Starting work package WP1
+- `2026-07-31T06:40:23Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:40:28Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:40:39Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:42:39Z` Cycle 2/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:42:40Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:42:40Z` Council None via None: 
+- `2026-07-31T06:42:40Z` Starting work package WP2
+- `2026-07-31T06:42:46Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:42:46Z` Starting work package WP1
+- `2026-07-31T06:42:47Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:42:50Z` phase=L state=DEGRADED step=ensure_db_failed ensure.sh DB bars failed: fulltext_prove=0 db_prove=1
+- `2026-07-31T06:42:56Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:43:53Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:43:54Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:43:55Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:44:57Z` Cycle 3/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:44:58Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:44:58Z` Council None via None: 
+- `2026-07-31T06:44:58Z` Starting work package WP2
+- `2026-07-31T06:45:04Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:45:04Z` Starting work package WP1
+- `2026-07-31T06:45:04Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:45:04Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:45:04Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:45:10Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:45:12Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:45:13Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:45:13Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:45:13Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:45:13Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:45:14Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:45:18Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:45:20Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:45:22Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:45:26Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:47:19Z` Cycle 4/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:47:19Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:47:20Z` Council None via None: 
+- `2026-07-31T06:47:20Z` Starting work package WP2
+- `2026-07-31T06:47:27Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:47:27Z` Starting work package WP1
+- `2026-07-31T06:47:36Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:47:47Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:47:52Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:49:03Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:49:04Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:49:04Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:49:47Z` Cycle 5/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:49:48Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:49:49Z` Council None via None: 
+- `2026-07-31T06:49:49Z` Starting work package WP2
+- `2026-07-31T06:49:54Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:49:54Z` Starting work package WP1
+- `2026-07-31T06:49:54Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:49:55Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:49:55Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:50:01Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:50:03Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:50:03Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:50:04Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:50:04Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:50:04Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:50:05Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:50:09Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:50:11Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:50:13Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:50:13Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:50:17Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:52:10Z` Cycle 6/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:52:10Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:52:11Z` Council None via None: 
+- `2026-07-31T06:52:11Z` Starting work package WP2
+- `2026-07-31T06:52:18Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:52:18Z` Starting work package WP1
+- `2026-07-31T06:52:26Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:52:37Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:52:42Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:53:54Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:53:54Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:53:55Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T06:54:37Z` Cycle 7/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:54:38Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:54:38Z` Council None via None: 
+- `2026-07-31T06:54:38Z` Starting work package WP2
+- `2026-07-31T06:54:44Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T06:54:44Z` Starting work package WP1
+- `2026-07-31T06:54:45Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T06:54:45Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T06:54:45Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T06:54:53Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T06:54:55Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:54:56Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T06:54:56Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T06:54:56Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T06:54:56Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T06:54:57Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T06:55:02Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T06:55:03Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T06:55:06Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T06:55:10Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T06:57:02Z` Cycle 8/24 — rebuilding have/expect scoreboard
+- `2026-07-31T06:57:03Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T06:57:39Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T06:58:52Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T06:58:53Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T06:59:34Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T07:00:14Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T07:00:14Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T07:00:14Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T07:00:20Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:00:22Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:00:23Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T07:00:23Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T07:00:23Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T07:00:23Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T07:00:24Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T07:00:30Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T07:00:32Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T07:00:37Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T07:03:04Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T07:04:16Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:04:16Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T07:04:49Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T07:07:16Z` Council REJECT via sol: The concept dossier is broad but does not yet meet Bar A because its calculations do not show their working, the closure-quality floor is only 4 out of 10, 36 full-text papers remain unresolved, and most bill-of-materials identifiers are pl
+- `2026-07-31T07:07:16Z` Starting work package WP2
+- `2026-07-31T07:07:22Z` Finished work package WP2 ok=True steps=1
+- `2026-07-31T07:07:22Z` Starting work package WP7
+- `2026-07-31T07:07:26Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T07:09:26Z` Cycle 9/24 — rebuilding have/expect scoreboard
+- `2026-07-31T07:09:27Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T07:10:21Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T07:10:21Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T07:10:21Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T07:10:32Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:10:34Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:10:35Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T07:10:35Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T07:10:35Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T07:10:35Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T07:10:36Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T07:10:41Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T07:10:43Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T07:10:48Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T07:13:12Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T07:14:23Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:14:24Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T07:15:03Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T07:16:20Z` Council REJECT via sol: Bar A is blocked by missing calculation working, a quality floor of four, weak bill-of-materials identification, and 36 unprocessed full-text papers. Fix the workbook evidence first because it affects calculations, verification, quality, an
+- `2026-07-31T07:16:20Z` Starting work package WP6
+- `2026-07-31T07:16:21Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T07:16:21Z` Starting work package WP4
+- `2026-07-31T07:16:24Z` Finished work package WP4 ok=True steps=2
+- `2026-07-31T07:18:24Z` Cycle 10/24 — rebuilding have/expect scoreboard
+- `2026-07-31T07:18:25Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T07:20:33Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T07:20:33Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T07:20:33Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T07:20:45Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:20:48Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:20:49Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T07:20:49Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T07:20:49Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T07:20:49Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T07:20:51Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T07:20:59Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T07:21:02Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T07:21:07Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+
+## ONTRACK 2026-07-31T07:27:42Z
+- STALL 361s count=1 — wake_signal written; claims=32453 topo=17/17
+- `2026-07-31T07:29:40Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T07:30:55Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:31:04Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:31:04Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T07:31:49Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T07:37:23Z` Council REJECT via sol: The concept dossier has strong breadth, but it does not yet meet Bar A because four explicit blockers remain. The highest-leverage repair is to expose the engineering calculations and then raise the weak audit and verification tabs, followe
+- `2026-07-31T07:37:23Z` Starting work package WP5
+- `2026-07-31T07:37:23Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T07:37:23Z` Starting work package WP7
+- `2026-07-31T07:37:29Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T07:39:30Z` Cycle 11/24 — rebuilding have/expect scoreboard
+- `2026-07-31T07:39:31Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+
+## ONTRACK 2026-07-31T07:39:46Z
+- STALL 362s count=1 — wake_signal written; claims=32453 topo=17/17
+- `2026-07-31T07:40:56Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T07:40:57Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T07:40:57Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T07:41:06Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:41:09Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:41:10Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T07:41:10Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T07:41:10Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T07:41:10Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T07:41:11Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T07:41:20Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T07:41:22Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T07:41:28Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T07:46:01Z` Council REJECT via sol: The concept dossier is not yet Bar A complete because its calculation working is absent, closure evidence is below the quality floor, and most bill-of-materials identities remain unresolved. The literature, physics structure, interfaces, pr
+- `2026-07-31T07:46:01Z` Starting work package WP6
+- `2026-07-31T07:46:03Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T07:46:03Z` Starting work package WP1
+- `2026-07-31T07:46:12Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:46:23Z` Finished work package WP1 ok=True steps=2
+- `2026-07-31T07:46:41Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T07:47:58Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:47:59Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T07:48:23Z` Cycle 12/24 — rebuilding have/expect scoreboard
+- `2026-07-31T07:48:24Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T07:48:38Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T07:51:08Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T07:51:08Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T07:51:08Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T07:51:17Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T07:51:19Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T07:51:20Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T07:51:20Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T07:51:20Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T07:51:21Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T07:51:22Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T07:51:30Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T07:51:33Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T07:51:38Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+
+## ONTRACK 2026-07-31T07:57:51Z
+- STALL 361s count=1 — wake_signal written; claims=32453 topo=17/17
+- `2026-07-31T07:59:00Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T08:00:23Z` Council REJECT via sol: The concept dossier is close in breadth but fails Bar A because four closure blockers remain. The highest-leverage fixes are to expose the calculation working, repair the quality and verification evidence, close the remaining literature ext
+- `2026-07-31T08:00:23Z` Starting work package WP5
+- `2026-07-31T08:00:23Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T08:00:23Z` Starting work package WP7
+- `2026-07-31T08:00:31Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T08:00:36Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T08:00:37Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T08:01:13Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T08:01:18Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T08:01:18Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T08:01:18Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T08:01:27Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T08:01:30Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T08:01:31Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T08:01:31Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T08:01:31Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T08:01:31Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T08:01:32Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T08:01:40Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T08:01:43Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T08:01:48Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T08:02:32Z` Cycle 13/24 — rebuilding have/expect scoreboard
+- `2026-07-31T08:02:32Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T08:07:36Z` Council CONDITIONAL via sol: The concept dossier is broad but cannot pass Bar A while the Calculations and Quality and Audit tabs score zero and the verification score remains four. Close workbook traceability first, then resolve bill-of-materials sourcing and the 36 u
+- `2026-07-31T08:07:36Z` Starting work package WP6
+- `2026-07-31T08:07:38Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T08:07:38Z` Starting work package WP3
+- `2026-07-31T08:07:39Z` Finished work package WP3 ok=False steps=1
+
+## ONTRACK 2026-07-31T08:07:54Z
+- STALL 361s count=1 — wake_signal written; claims=32453 topo=17/17
+- `2026-07-31T08:09:40Z` Cycle 14/24 — rebuilding have/expect scoreboard
+- `2026-07-31T08:09:41Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+- `2026-07-31T08:09:50Z` phase=X state=RUNNING step=excel_draft Rebuild Excel DRAFT (ship_ok false)
+- `2026-07-31T08:11:27Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T08:11:28Z` phase=C state=RUNNING step=sol_db_audit Sol audit of DB+FFF overnight state
+- `2026-07-31T08:11:37Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T08:12:10Z` phase=F state=RUNNING step=overnight_complete done L_ok=True gaps=0
+- `2026-07-31T08:13:33Z` Council CONDITIONAL via sol: The concept dossier has strong breadth, traceable physics coverage, a credible draft printed-circuit-board scope, and an appropriately blocked fabrication and homologation status. It is not yet Bar A because the workbook does not show calcu
+- `2026-07-31T08:13:33Z` Starting work package WP6
+- `2026-07-31T08:13:35Z` Finished work package WP6 ok=True steps=1
+- `2026-07-31T08:13:35Z` Starting work package WP3
+- `2026-07-31T08:13:37Z` Finished work package WP3 ok=False steps=1
+- `2026-07-31T08:15:37Z` Cycle 15/24 — rebuilding have/expect scoreboard
+- `2026-07-31T08:15:38Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
+
+## ONTRACK 2026-07-31T08:19:57Z
+- STALL 361s count=1 — wake_signal written; claims=32453 topo=17/17
+- `2026-07-31T08:21:03Z` Council CONDITIONAL via sol: The concept dossier is broad but not yet auditable enough for Bar A acceptance. The immediate blockers are missing spreadsheet working, weak closure evidence, poorly resolved part identities, and 36 unprocessed full-text papers. Hardware ma
+- `2026-07-31T08:21:03Z` Starting work package WP5
+- `2026-07-31T08:21:03Z` Finished work package WP5 ok=True steps=1
+- `2026-07-31T08:21:03Z` Starting work package WP7
+- `2026-07-31T08:21:08Z` Finished work package WP7 ok=True steps=3
+- `2026-07-31T08:21:38Z` phase=L state=RUNNING step=overnight_start Overnight FFF FPK start (10.0h)
+- `2026-07-31T08:21:38Z` phase=L state=RUNNING step=literature_continuous_start Starting OA fulltext continuous
+- `2026-07-31T08:21:38Z` phase=L state=RUNNING step=literature_progress fulltext=423 claims=32453 pending=0
+- `2026-07-31T08:21:48Z` phase=L state=RUNNING step=ensure_timers ensure.sh: watchdog+ontrack+fulltext+extract+db USEFUL (fulltext_prove=0 db_prove=0)
+- `2026-07-31T08:21:50Z` phase=A state=RUNNING step=fff_audit Auditing literature + form-follows-function gaps
+- `2026-07-31T08:21:51Z` phase=F state=RUNNING step=first_principles_selftest Executing first_principles_selftest
+- `2026-07-31T08:21:51Z` phase=F state=RUNNING step=concentric_geometry_selftest Executing concentric_geometry_selftest
+- `2026-07-31T08:21:51Z` phase=F state=RUNNING step=mesh_authenticity_stamp Executing mesh_authenticity_stamp
+- `2026-07-31T08:21:52Z` phase=F state=RUNNING step=topology_stamp Executing topology_stamp
+- `2026-07-31T08:21:53Z` phase=F state=RUNNING step=db_writeback_prove Executing db_writeback_prove
+- `2026-07-31T08:22:01Z` phase=F state=RUNNING step=claim_wire Executing claim_wire
+- `2026-07-31T08:22:04Z` phase=F state=RUNNING step=physics_engines Executing physics_engines
+- `2026-07-31T08:22:09Z` phase=F state=RUNNING step=blender_rerender Blender Cycles re-render (FFF phenotype)
+- `2026-07-31T08:23:09Z` Cycle 16/24 — rebuilding have/expect scoreboard
+- `2026-07-31T08:23:09Z` Calling Sol + GLM 5.2 + Kimi (Opus 5 fallback) for next priorities
