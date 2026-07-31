@@ -85,6 +85,20 @@ def build_bar_b(twin_dir: Path) -> dict[str, Any]:
         if isinstance(rotor.get("works_in_kit_context"), Mapping)
         else {}
     )
+    rotor_scr = (
+        rotor.get("screening_results")
+        if isinstance(rotor.get("screening_results"), Mapping)
+        else {}
+    )
+    rotor_fos = (
+        rotor_works.get("minimum_factor_of_safety")
+        or rotor.get("minimum_factor_of_safety")
+        or rotor_scr.get("minimum_factor_of_safety")
+        or rotor_scr.get("screening_fos")
+        or (rotor.get("margins") or {}).get("minimum_factor_of_safety")
+        if isinstance(rotor.get("margins"), dict)
+        else None
+    )
 
     rows = [
         {
@@ -121,7 +135,7 @@ def build_bar_b(twin_dir: Path) -> dict[str, Any]:
                 "(not instrumented overspeed)"
             ),
             "result_under_assumption": (
-                f"Rotor screening FoS≈{rotor_works.get('minimum_factor_of_safety') or rotor.get('minimum_factor_of_safety') or '—'}; "
+                f"Rotor screening FoS≈{rotor_fos or '—'}; "
                 f"pocket screen present={pocket.get('status') == 'PARTIAL' or bool(pocket)}"
             ),
             "evidence": [

@@ -3220,6 +3220,23 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         for row in assumption.get("asks_from_partner") or []:
             if isinstance(row, Mapping):
                 lines.append(f"| {row.get('priority')} | {row.get('ask')} |")
+        bar_b = assumption.get("bar_b_readiness")
+        if isinstance(bar_b, Mapping):
+            counts = bar_b.get("counts") if isinstance(bar_b.get("counts"), Mapping) else {}
+            lines.extend(
+                [
+                    "",
+                    "### Bar B list (filled under assumptions — not homologated)",
+                    "",
+                    f"**Verdict:** `{bar_b.get('verdict')}`  ",
+                    f"Assumed concept **{counts.get('assumed_concept')}** · "
+                    f"Needs hardware **{counts.get('needs_hardware')}** · "
+                    f"Needs partner input **{counts.get('needs_partner_input')}** · "
+                    f"`ship_ok` still **false**.",
+                    f"- Twin: `{bar_b.get('markdown')}`",
+                    f"- Plan: `{bar_b.get('plan')}`",
+                ]
+            )
         lines.extend(["", "---", ""])
     lines.extend(
         [
