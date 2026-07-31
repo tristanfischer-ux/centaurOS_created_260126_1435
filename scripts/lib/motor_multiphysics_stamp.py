@@ -32,6 +32,17 @@ BLOCKER_ID_DIFF_NEST = "DIFF_NEST_TOO_SMALL_FOR_CARRIER_TORQUE"
 BLOCKER_ID_POST_DIFF_FINAL_DRIVE = "POST_DIFF_FINAL_DRIVE_PACKAGING"
 BLOCKER_ID_PLANETARY_VS_ROTOR_BORE = "PLANETARY_STRENGTH_VS_ROTOR_BORE"
 BLOCKER_ID_EM_TORQUE_VS_ROTOR_BORE = "EM_TORQUE_VS_ROTOR_BORE"
+BLOCKER_ID_EM_DUTY_TORQUE_SCREEN = "EM_DUTY_TORQUE_SCREEN"
+BLOCKER_ID_GEAR_OIL_CORNERING = "GEAR_OIL_CORNERING_PICKUP"
+BLOCKER_ID_GEAR_OIL_JET_GALLERY = "GEAR_OIL_JET_GALLERY"
+
+_STACK_DIR = ROOT / "scripts" / "motor-stack"
+if str(_STACK_DIR) not in sys.path:
+    sys.path.insert(0, str(_STACK_DIR))
+try:
+    from shaft_torque_identity import evaluate_duty_torque_screen_ok as _eval_duty_screen
+except ImportError:  # pragma: no cover — selftest environments without stack path
+    _eval_duty_screen = None  # type: ignore[assignment]
 POST_DIFF_FINAL_DRIVE_COMPONENT_ID = "post_diff_final_drive"
 POST_DIFF_FINAL_DRIVE_CAD_FAMILY = "post_diff_final_drive_helical"
 POST_DIFF_PACKAGING_SCREEN_FILENAME = (
@@ -1088,7 +1099,36 @@ def _magnetic_check_from_fia_case(
     )
     inputs = case.get("input_quantities") if isinstance(case.get("input_quantities"), dict) else {}
     rel_ref = "_motor_stack/em_fia_front_kit_case.json"
-    duty_ok = bool(works.get("duty_torque_screen_ok"))
+    # INTENT (F-EM-1 / F-PROC-1): recompute duty_ok from mean + torque_reliable so
+    # a stale artefact that greened peak-alone cannot survive a re-stamp.
+    required_t = (
+        analytical.get("required_shaft_torque_nm")
+        or works.get("required_shaft_torque_nm")
+        or loaded.get("required_shaft_torque_nm")
+    )
+    peak_t = loaded.get("torque_magnitude_nm") or works.get("loaded_torque_magnitude_nm")
+    mean_t = (
+        position_summary.get("torque_magnitude_mean_nm")
+        or works.get("torque_magnitude_mean_nm")
+        or loaded.get("torque_magnitude_mean_nm")
+    )
+    torque_reliable = loaded.get("torque_reliable")
+    if torque_reliable is None:
+        torque_reliable = works.get("torque_reliable")
+    if torque_reliable is None:
+        torque_reliable = False
+    duty_diag: dict[str, Any] = {}
+    if _eval_duty_screen is not None and required_t is not None and peak_t is not None:
+        duty_ok, duty_diag = _eval_duty_screen(
+            required_shaft_torque_nm=float(required_t),
+            peak_torque_magnitude_nm=float(peak_t),
+            mean_torque_magnitude_nm=(
+                float(mean_t) if mean_t is not None else None
+            ),
+            torque_reliable=bool(torque_reliable),
+        )
+    else:
+        duty_ok = bool(works.get("duty_torque_screen_ok"))
     demag_cite = _demag_screen_cite(demag_case, twin_dir=twin_dir)
     mtpa_cite = _mtpa_screen_cite(mtpa_case, twin_dir=twin_dir)
     voltage_fw_cite = _voltage_fw_screen_cite(
@@ -1138,12 +1178,21 @@ def _magnetic_check_from_fia_case(
                 "rms_airgap_flux_density_t": fem.get("rms_airgap_flux_density_t"),
                 "loaded_torque_nm": loaded.get("torque_nm"),
                 "loaded_torque_magnitude_nm": loaded.get("torque_magnitude_nm"),
+                "torque_magnitude_mean_nm": duty_diag.get("mean_torque_magnitude_nm")
+                or mean_t,
+                "torque_reliable": bool(torque_reliable),
+                "duty_screen_fail_reasons": duty_diag.get("fail_reasons"),
+                "mean_torque_vs_required_ratio": duty_diag.get(
+                    "mean_torque_vs_required_ratio"
+                ),
                 "torque_vs_required_ratio": works.get("torque_vs_required_ratio")
-                or loaded.get("torque_vs_required_ratio"),
+                or loaded.get("torque_vs_required_ratio")
+                or duty_diag.get("peak_torque_vs_required_ratio"),
                 "current_angle_electrical_deg": loaded.get(
                     "current_angle_electrical_deg"
                 ),
-                "required_shaft_torque_nm": analytical.get("required_shaft_torque_nm"),
+                "required_shaft_torque_nm": required_t
+                or analytical.get("required_shaft_torque_nm"),
                 "dc_current_a": analytical.get("dc_current_a"),
                 "electrical_power_check_kw": analytical.get("electrical_power_check_kw"),
                 "front_regen_cap_respected": analytical.get("front_regen_cap_respected"),
@@ -1160,6 +1209,9 @@ def _magnetic_check_from_fia_case(
                     {
                         "status": position_sweep.get("status"),
                         "n_positions": position_summary.get("n_positions"),
+                        "torque_magnitude_mean_nm": position_summary.get(
+                            "torque_magnitude_mean_nm"
+                        ),
                         "torque_vs_required_ratio_min": position_summary.get(
                             "torque_vs_required_ratio_min"
                         ),
@@ -1189,16 +1241,11 @@ def _magnetic_check_from_fia_case(
                 "demagnetisation_map": "OPEN",
                 "dynamometer_correlation": "OPEN",
                 "note": (
-                    "Twin-bound OC + loaded magnetic screen on kit geometry, "
-                    "optionally with a coarse rotor-position sweep at the "
-                    "screened current angle, an analytical hot demag SCREEN, "
-                    "an analytical voltage / field-weakening SCREEN, and a hybrid "
-                    "torque-map SCREEN (current scaling, loss corners, FW "
-                    "capability). works_in_kit_context / duty_torque_screen_ok = |FE torque| "
-                    "≥ ~75% of analytical shaft torque at the reference "
-                    "position — NOT smoke-only, NOT full MTPA, NOT demag map "
-                    "PASS, NOT FW calibration, NOT ship_ok. Torque map / FW "
-                    "map / full demag map / dyno still OPEN."
+                    "Twin-bound OC + loaded magnetic screen. "
+                    "duty_torque_screen_ok requires torque_reliable=True AND "
+                    "position-sweep mean |T| ≥ required shaft torque — peak / "
+                    "best-angle interest alone must never PASS. Not MTPA, demag "
+                    "map, FW calibration, dyno, or ship_ok."
                 ),
             },
         },
@@ -1559,6 +1606,42 @@ def _cooling_network_cite(
         if isinstance(network_case.get("margins"), Mapping)
         else {}
     )
+    inputs_q = (
+        network_case.get("input_quantities")
+        if isinstance(network_case.get("input_quantities"), Mapping)
+        else {}
+    )
+    # F-TH-1: always publish W-level loss ledger on the process surface.
+    copper_w = (
+        screening.get("copper_loss_w")
+        or inputs_q.get("copper_loss_w")
+        or inputs_q.get("mgu_copper_loss_w")
+    )
+    iron_w = (
+        screening.get("iron_loss_w")
+        or inputs_q.get("iron_loss_w")
+        or inputs_q.get("mgu_iron_loss_w")
+    )
+    magnet_w = (
+        screening.get("magnet_loss_w")
+        or inputs_q.get("magnet_loss_w")
+        or inputs_q.get("mgu_magnet_loss_w")
+    )
+    inverter_w = (
+        screening.get("inverter_loss_w")
+        or inputs_q.get("inverter_loss_w")
+        or (
+            float(inputs_q["inverter_dissipated_kw"]) * 1000.0
+            if inputs_q.get("inverter_dissipated_kw") is not None
+            else None
+        )
+    )
+    motor_w = screening.get("motor_loss_w")
+    if motor_w is None and any(x is not None for x in (copper_w, iron_w, magnet_w)):
+        motor_w = float(copper_w or 0) + float(iron_w or 0) + float(magnet_w or 0)
+    total_w = screening.get("total_loss_w")
+    if total_w is None and motor_w is not None and inverter_w is not None:
+        total_w = float(motor_w) + float(inverter_w)
     rel_ref = "_motor_stack/analytical_fia_cooling_network_screen.json"
     return {
         "status": network_case.get("status") or "PARTIAL",
@@ -1578,6 +1661,15 @@ def _cooling_network_cite(
         "coupled_screen_ok": screening.get("coupled_screen_ok"),
         "winding_margin_pct": margins.get("winding_margin_pct"),
         "module_margin_pct": margins.get("module_margin_pct"),
+        "copper_loss_w": copper_w,
+        "iron_loss_w": iron_w,
+        "magnet_loss_w": magnet_w,
+        "inverter_loss_w": inverter_w,
+        "motor_loss_w": motor_w,
+        "total_loss_w": total_w,
+        "loss_ledger_published": any(
+            x is not None for x in (copper_w, inverter_w, motor_w, total_w)
+        ),
         "conjugate_heat_transfer": (
             (network_case.get("conjugate_heat_transfer") or {}).get("status")
             if isinstance(network_case.get("conjugate_heat_transfer"), Mapping)
@@ -1591,7 +1683,8 @@ def _cooling_network_cite(
         "note": (
             "Twin-bound series hydraulic + convection thermal NETWORK screen "
             "coupling OpenFOAM duct Δp to winding/module temperatures at "
-            "12 L/min / 60 °C kit duty. Not CHT; not flow-bench correlated."
+            "12 L/min / 60 °C kit duty. Loss ledger (Cu/Fe/magnet/inverter W) "
+            "is published for honesty; not CHT; not flow-bench correlated."
         ),
     }
 
@@ -1838,6 +1931,7 @@ def _gear_oil_check_from_fia_case(
                 "immersion_fraction_geometry": screening.get("immersion_fraction_geometry"),
                 "cornering_pickup_ok": screening.get("cornering_pickup_ok"),
                 "pickup_charge_adequate": screening.get("pickup_charge_adequate"),
+                "pickup_gallery_adequate": screening.get("pickup_gallery_adequate"),
                 "geometry_source": screening.get("geometry_source"),
                 "gear_ratio": inputs.get("gear_ratio"),
                 "planet_count": inputs.get("planet_count"),
@@ -1848,7 +1942,8 @@ def _gear_oil_check_from_fia_case(
                 "note": (
                     "Twin-bound geometry analytical jet/churning/pickup/cornering "
                     "screen on planetary writeback. RESULT_UNDER_ASSUMPTIONS — "
-                    "not free-surface CFD; OpenFOAM cavity remains smoke-only."
+                    "not free-surface CFD; OpenFOAM cavity remains smoke-only. "
+                    "cornering/gallery fails escalate to architectureBlockers."
                 ),
             },
         },
@@ -2134,6 +2229,63 @@ def _post_diff_unblock_options(
     return options
 
 
+_GEAR_OIL_CORNERING_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "raise_sump_or_baffle",
+        "kind": "architecture_decision",
+        "summary": (
+            "Increase active sump / add baffles so cornering immersion fraction "
+            "stays ≥ 0.08 at the screening lateral-g, then re-run the oil screen."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/gear_oil_fia_front_kit_case.py"
+            "#compute_cornering_screen"
+        ),
+    },
+    {
+        "option_id": "dry_sump_scavenge",
+        "kind": "architecture_decision",
+        "summary": (
+            "Adopt dry-sump / scavenge pickup so splash immersion is not the "
+            "sole cornering oil delivery path."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/gear_oil_fia_front_kit_case.py#run_oil_screen"
+        ),
+    },
+]
+_GEAR_OIL_JET_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "enlarge_jet_nozzles",
+        "kind": "geometry_writeback",
+        "summary": (
+            "Increase jet nozzle diameter / count so Bernoulli orifice ΔP at the "
+            "required jet L/min stays under the 450 kPa gallery screen (SI ΔP is "
+            "physically high on 1 mm seeds — not a units bug)."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/gear_oil_fia_front_kit_case.py"
+            "#compute_jet_gallery_screen;#JET_NOZZLE_DIAMETER_MM"
+        ),
+    },
+]
+_EM_DUTY_SCREEN_UNBLOCK: list[dict[str, str]] = [
+    {
+        "option_id": "close_reliable_torque_map",
+        "kind": "evidence",
+        "summary": (
+            "Close a position/MTPA map or dyno correlation so torque_reliable can "
+            "become true AND position-sweep mean |T| ≥ required shaft torque."
+        ),
+        "code_hooks": (
+            "scripts/motor-stack/shaft_torque_identity.py"
+            "#evaluate_duty_torque_screen_ok;"
+            "scripts/motor-stack/em_fia_front_kit_case.py#build_artifact"
+        ),
+    },
+]
+
+
 def collect_architecture_blockers(
     motor: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -2143,7 +2295,7 @@ def collect_architecture_blockers(
     Every hold that prevents honest PASS must appear here with permanent
     unblock options (geometry writeback, architecture decision, or freeze).
 
-    @description Reads gear_strength bevel cite (extend as new holds land).
+    @description Reads gear_strength, magnetic, and gear_oil cites.
     @param motor motorMultiphysics object
     @returns List of blocker dicts (may be empty)
     """
@@ -2152,17 +2304,19 @@ def collect_architecture_blockers(
     if not isinstance(checks, Mapping):
         return blockers
     gear = checks.get("gear_strength")
-    if not isinstance(gear, Mapping):
-        return blockers
-    twin_case = gear.get("twin_bound_case")
-    if not isinstance(twin_case, Mapping):
-        return blockers
+    twin_case: Mapping[str, Any] = {}
+    if isinstance(gear, Mapping):
+        _tc = gear.get("twin_bound_case")
+        if isinstance(_tc, Mapping):
+            twin_case = _tc
     planetary_hold = str(twin_case.get("architecture_hold") or "")
-    if BLOCKER_ID_PLANETARY_VS_ROTOR_BORE in planetary_hold or (
+    if twin_case and (
+        BLOCKER_ID_PLANETARY_VS_ROTOR_BORE in planetary_hold or (
         twin_case.get("nest_fits_rotor") is False
         and twin_case.get("works_in_kit_context") is False
         and twin_case.get("minimum_strength_factor") is not None
         and float(twin_case.get("minimum_strength_factor") or 0.0) < 1.2
+    )
     ):
         blockers.append(
             {
@@ -2187,7 +2341,7 @@ def collect_architecture_blockers(
                 "human_decision_required": True,
             }
         )
-    bevel = twin_case.get("bevel_differential_screen")
+    bevel = twin_case.get("bevel_differential_screen") if twin_case else None
     if isinstance(bevel, Mapping):
         hold = str(bevel.get("architecture_hold") or "")
         if BLOCKER_ID_DIFF_NEST in hold or (
@@ -2365,7 +2519,40 @@ def collect_architecture_blockers(
                 magnetic.get("torque_vs_required_ratio")
                 or mag_twin.get("torque_vs_required_ratio")
             )
-            if nest_fits is True and not duty_torque_ok:
+            # ⭐ ARCHITECTURE vs EVIDENCE (2026-07-31). This raised on
+            # `not duty_torque_ok` alone, but duty_torque_screen_ok is False for
+            # TWO unrelated reasons: (a) the machine is genuinely short of
+            # torque — the real magnet-volume-vs-bore ARCHITECTURE conflict this
+            # blocker names; or (b) `torque_reliable=false`, the Bar B EVIDENCE
+            # hold that stays set until dyno/map close and has nothing to do with
+            # architecture. Conflating them kept EM_TORQUE_VS_ROTOR_BORE OPEN
+            # with the summary "duty torque screen is below the required shaft
+            # torque" while the measured mean was 1.43x required — a false
+            # statement in the stamp. Raise the ARCHITECTURE blocker only when
+            # the MEAN is genuinely short; the Bar B hold is tracked separately
+            # and still keeps ship_ok false on its own.
+            # MEAN, never peak: peak must never mint or clear a duty verdict.
+            _mean_ratio = (
+                magnetic.get("mean_torque_vs_required_ratio")
+                or mag_twin.get("mean_torque_vs_required_ratio")
+            )
+            _fail_reasons = (
+                mag_twin.get("duty_screen_fail_reasons")
+                or magnetic.get("duty_screen_fail_reasons")
+                or []
+            )
+            _mean_clears = False
+            try:
+                _mean_clears = (
+                    _mean_ratio is not None and float(_mean_ratio) >= 1.0)
+            except (TypeError, ValueError):
+                _mean_clears = False
+            # Suppress ONLY when the mean genuinely clears AND nothing but the
+            # evidence hold is outstanding. Any other fail reason still raises.
+            _evidence_hold_only = _mean_clears and (
+                {str(r) for r in _fail_reasons} <= {"torque_reliable=false"}
+            )
+            if nest_fits is True and not duty_torque_ok and not _evidence_hold_only:
                 blockers.append(
                     {
                         "blocker_id": BLOCKER_ID_EM_TORQUE_VS_ROTOR_BORE,
@@ -2379,6 +2566,10 @@ def collect_architecture_blockers(
                         "nest_fits_rotor": True,
                         "duty_torque_screen_ok": False,
                         "torque_vs_required_ratio": torque_ratio,
+                        "torque_reliable": mag_twin.get("torque_reliable"),
+                        "torque_magnitude_mean_nm": mag_twin.get(
+                            "torque_magnitude_mean_nm"
+                        ),
                         "required_shaft_torque_nm": mag_twin.get(
                             "required_shaft_torque_nm"
                         ),
@@ -2398,6 +2589,104 @@ def collect_architecture_blockers(
                         "human_decision_required": True,
                     }
                 )
+            elif not duty_torque_ok and nest_fits is not True:
+                # F-EM-1: duty screen fail must escalate even without nest clash.
+                blockers.append(
+                    {
+                        "blocker_id": BLOCKER_ID_EM_DUTY_TORQUE_SCREEN,
+                        "domain": "magnetic.duty_torque_screen",
+                        "status": "OPEN",
+                        "severity": "architecture_hold",
+                        "ship_ok": False,
+                        "cannot_greenwash": True,
+                        "evidence_path": mag_twin.get("path")
+                        or "_motor_stack/em_fia_front_kit_case.json",
+                        "duty_torque_screen_ok": False,
+                        "torque_reliable": mag_twin.get("torque_reliable"),
+                        "torque_magnitude_mean_nm": mag_twin.get(
+                            "torque_magnitude_mean_nm"
+                        ),
+                        "mean_torque_vs_required_ratio": mag_twin.get(
+                            "mean_torque_vs_required_ratio"
+                        ),
+                        "duty_screen_fail_reasons": mag_twin.get(
+                            "duty_screen_fail_reasons"
+                        ),
+                        "required_shaft_torque_nm": mag_twin.get(
+                            "required_shaft_torque_nm"
+                        ),
+                        "loaded_torque_magnitude_nm": mag_twin.get(
+                            "loaded_torque_magnitude_nm"
+                        ),
+                        "summary": (
+                            "EM duty_torque_screen_ok is false — peak FEMM "
+                            "interest alone is not continuous duty; mean |T| "
+                            "and/or torque_reliable must clear before any PASS."
+                        ),
+                        "permanent_unblock_options": list(_EM_DUTY_SCREEN_UNBLOCK),
+                        "human_decision_required": True,
+                    }
+                )
+    # F-OIL-1 / F-OIL-2: cornering or jet-gallery fail must not stay chat-only.
+    gear_oil = checks.get("gear_oil")
+    if isinstance(gear_oil, Mapping):
+        oil_twin = gear_oil.get("twin_bound_case")
+        if not isinstance(oil_twin, Mapping):
+            oil_twin = {}
+        cornering_ok = gear_oil.get("cornering_pickup_ok")
+        if cornering_ok is None:
+            cornering_ok = oil_twin.get("cornering_pickup_ok")
+        gallery_ok = oil_twin.get("pickup_gallery_adequate")
+        if gallery_ok is None:
+            gallery_ok = gear_oil.get("pickup_gallery_adequate")
+        jet_kpa = oil_twin.get("jet_pressure_required_kpa")
+        if jet_kpa is None:
+            jet_kpa = gear_oil.get("jet_pressure_required_kpa")
+        if cornering_ok is False:
+            blockers.append(
+                {
+                    "blocker_id": BLOCKER_ID_GEAR_OIL_CORNERING,
+                    "domain": "gear_oil.cornering_pickup",
+                    "status": "OPEN",
+                    "severity": "architecture_hold",
+                    "ship_ok": False,
+                    "cannot_greenwash": True,
+                    "evidence_path": oil_twin.get("path")
+                    or "_motor_stack/gear_oil_fia_front_kit_case.json",
+                    "cornering_pickup_ok": False,
+                    "summary": (
+                        "Gear-oil cornering_pickup_ok is False — splash immersion "
+                        "under screening lateral-g is inadequate; do not claim "
+                        "architecture oil delivery is cleared."
+                    ),
+                    "permanent_unblock_options": list(_GEAR_OIL_CORNERING_UNBLOCK),
+                    "human_decision_required": True,
+                }
+            )
+        if gallery_ok is False or (
+            jet_kpa is not None and float(jet_kpa) >= 450.0
+        ):
+            blockers.append(
+                {
+                    "blocker_id": BLOCKER_ID_GEAR_OIL_JET_GALLERY,
+                    "domain": "gear_oil.jet_gallery",
+                    "status": "OPEN",
+                    "severity": "architecture_hold",
+                    "ship_ok": False,
+                    "cannot_greenwash": True,
+                    "evidence_path": oil_twin.get("path")
+                    or "_motor_stack/gear_oil_fia_front_kit_case.json",
+                    "pickup_gallery_adequate": gallery_ok,
+                    "jet_pressure_required_kpa": jet_kpa,
+                    "summary": (
+                        "Gear-oil jet gallery screen fails — Bernoulli orifice ΔP "
+                        f"at seeded nozzles is {jet_kpa} kPa (SI-coherent; ≥450 kPa "
+                        "gallery bar). Enlarge nozzles/count; do not treat as units bug."
+                    ),
+                    "permanent_unblock_options": list(_GEAR_OIL_JET_UNBLOCK),
+                    "human_decision_required": True,
+                }
+            )
     return blockers
 
 
@@ -4910,51 +5199,54 @@ def selftest() -> int:
         residual_blockers = residual_payload["motorMultiphysics"].get(
             "architectureBlockers"
         )
-        if (
-            not isinstance(residual_blockers, list)
-            or len(residual_blockers) != 1
-            or residual_blockers[0].get("blocker_id")
-            != "POST_DIFF_FINAL_DRIVE_PACKAGING"
-        ):
+        residual_by_id = {
+            b.get("blocker_id"): b
+            for b in (residual_blockers or [])
+            if isinstance(b, Mapping)
+        }
+        post_diff_blocker = residual_by_id.get("POST_DIFF_FINAL_DRIVE_PACKAGING")
+        # GOTCHA: EM duty re-eval (mean/reliable) may also OPEN EM_* blockers on the
+        # same fixture — post-diff must still be present and non-greenwashable.
+        if post_diff_blocker is None:
             print(
                 "FAIL: cleared DIFF_NEST must be replaced by "
                 "POST_DIFF_FINAL_DRIVE_PACKAGING"
             )
             bad += 1
-        elif not residual_blockers[0].get("permanent_unblock_options"):
+        elif not post_diff_blocker.get("permanent_unblock_options"):
             print("FAIL: post-diff blocker must name permanent_unblock_options")
             bad += 1
-        elif residual_blockers[0].get("cannot_greenwash") is not True:
+        elif post_diff_blocker.get("cannot_greenwash") is not True:
             print("FAIL: post-diff blocker must set cannot_greenwash")
             bad += 1
         elif (
-            residual_blockers[0].get("evidence_path")
+            post_diff_blocker.get("evidence_path")
             != "_motor_stack/post_diff_final_drive_packaging_screen.json"
         ):
             print("FAIL: post-diff blocker must cite packaging-screen evidence")
             bad += 1
-        elif residual_blockers[0].get("bay_fit") is not True:
+        elif post_diff_blocker.get("bay_fit") is not True:
             print("FAIL: post-diff blocker must surface packaging-screen bay_fit")
             bad += 1
-        elif residual_blockers[0].get("parametric_family_exists") is not True:
+        elif post_diff_blocker.get("parametric_family_exists") is not True:
             print("FAIL: post-diff blocker must surface seeded parametric CAD family")
             bad += 1
         elif (
-            residual_blockers[0].get("cad_family")
+            post_diff_blocker.get("cad_family")
             != POST_DIFF_FINAL_DRIVE_CAD_FAMILY
         ):
             print("FAIL: post-diff blocker must name the seeded CadQuery family")
             bad += 1
-        elif residual_blockers[0].get("software_packaging_screen_ok") is not True:
+        elif post_diff_blocker.get("software_packaging_screen_ok") is not True:
             print("FAIL: bay fit plus seeded CAD must record software screen progress")
             bad += 1
-        elif residual_blockers[0].get("software_progress_status") != "SOFTWARE_SEEDED":
+        elif post_diff_blocker.get("software_progress_status") != "SOFTWARE_SEEDED":
             print("FAIL: post-diff blocker must distinguish SOFTWARE_SEEDED progress")
             bad += 1
-        elif residual_blockers[0].get("closure_eligible") is not False:
+        elif post_diff_blocker.get("closure_eligible") is not False:
             print("FAIL: software-seeded CAD must not clear the release blocker")
             bad += 1
-        elif residual_blockers[0].get("blender_interface_status") not in (
+        elif post_diff_blocker.get("blender_interface_status") not in (
             "OPEN",
             "PARTIAL",
         ):
@@ -4966,7 +5258,7 @@ def selftest() -> int:
             isinstance(option, Mapping)
             and option.get("option_id") == "package_post_diff_final_drive"
             and option.get("progress_status") == "SOFTWARE_SEEDED"
-            for option in residual_blockers[0].get("permanent_unblock_options") or []
+            for option in post_diff_blocker.get("permanent_unblock_options") or []
         ):
             print("FAIL: permanent unblock must record SOFTWARE_SEEDED progress")
             bad += 1
@@ -5000,9 +5292,11 @@ def selftest() -> int:
             print("FAIL: residual packaging blocker must keep ship_ok false")
             bad += 1
         residual_catch = prove_catch(residual_payload)
+        open_n = int(residual_catch.get("open_architecture_blocker_count") or 0)
         if (
             not residual_catch.get("ok")
-            or int(residual_catch.get("open_architecture_blocker_count") or 0) != 1
+            or open_n < 1
+            or "POST_DIFF_FINAL_DRIVE_PACKAGING" not in residual_by_id
         ):
             print("FAIL: proveCatch must enforce the post-diff residual blocker")
             bad += 1
@@ -5051,6 +5345,36 @@ def selftest() -> int:
         bad += 1
     elif em_blocker.get("duty_torque_screen_ok") is not False:
         print("FAIL: EM_TORQUE blocker must record duty_torque_screen_ok false")
+        bad += 1
+
+    oil_blockers = collect_architecture_blockers(
+        {
+            "required_checks": {
+                "gear_strength": {
+                    "twin_bound_case": {
+                        "nest_fits_rotor": True,
+                        "minimum_strength_factor": 1.25,
+                    }
+                },
+                "gear_oil": {
+                    "cornering_pickup_ok": False,
+                    "jet_pressure_required_kpa": 1678.0,
+                    "twin_bound_case": {
+                        "cornering_pickup_ok": False,
+                        "pickup_gallery_adequate": False,
+                        "jet_pressure_required_kpa": 1678.0,
+                        "path": "_motor_stack/gear_oil_fia_front_kit_case.json",
+                    },
+                },
+            }
+        }
+    )
+    oil_ids = {b.get("blocker_id") for b in oil_blockers}
+    if BLOCKER_ID_GEAR_OIL_CORNERING not in oil_ids:
+        print("FAIL: proveCatch must escalate cornering_pickup_ok=False")
+        bad += 1
+    if BLOCKER_ID_GEAR_OIL_JET_GALLERY not in oil_ids:
+        print("FAIL: proveCatch must escalate jet gallery / high ΔP fail")
         bad += 1
 
     if bad:

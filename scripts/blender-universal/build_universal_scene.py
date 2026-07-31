@@ -19972,30 +19972,23 @@ def _fpk_draw_principal_vehicle_routes(
     )
 
 
-def _fpk_place_tooth_cues(name_prefix, center_mm, od_mm, face_mm, n_teeth_cue,
-                          mat, story_mod, MO, rot_along_x):
-    """Readable tooth stubs around a gear pitch circle — FFF cue, not FEA microgeometry.
+def _fpk_gear_module_mm(explicit, ref_dia_mm, ref_teeth=24.0):
+    """Gear module (mm) for tooth generation — contract value, else ratio-sane.
 
-    INTENT: drawings must show gears are toothed mechanisms forced by ratio/torque,
-    not smooth decorative cylinders. Cue count is capped for mesh budget.
+    The module is what forces BOTH the ratio and the bending stress, so the
+    teeth drawn are the teeth the design has. `explicit` is the contract's
+    gear_module_mm (a float, or a {value: …} quantity, or None); the fallback
+    keeps a sensible tooth count for a gear of this diameter rather than
+    inventing a decorative depth.
     """
-    n = max(8, min(int(n_teeth_cue), 18))
-    cx, cy, cz = center_mm
-    tip = max(1.2, od_mm * 0.045)
-    tw = max(1.0, (math.pi * od_mm) / (n * 2.2))
-    for i in range(n):
-        ang = (i / float(n)) * math.tau
-        ty = cy + (od_mm * 0.5 + tip * 0.35) * math.cos(ang)
-        tz = cz + (od_mm * 0.5 + tip * 0.35) * math.sin(ang)
-        fl.add_box(
-            f"{name_prefix}_tooth_{i}",
-            (cx * fl.MM, ty * fl.MM, tz * fl.MM),
-            (face_mm * 0.85 * fl.MM, tip * fl.MM, tw * fl.MM),
-            mat,
-            module=story_mod,
-            module_objects=MO,
-            rotation=rot_along_x,
-        )
+    val = explicit.get("value") if isinstance(explicit, dict) else explicit
+    try:
+        m = float(val)
+        if m > 0.0:
+            return m
+    except (TypeError, ValueError):
+        pass
+    return max(0.8, float(ref_dia_mm) / float(ref_teeth))
 
 
 def _fpk_place_ontology_fff_parts(
@@ -20035,22 +20028,23 @@ def _fpk_place_ontology_fff_parts(
     # ── Ring gear (fixed annulus inside rotor bore) ──────────────────────────
     ring_od = min(rotor_id - 1.0, ring_id + 6.0)
     ring_id_inner = max(ring_id - 4.0, sun_od + planet_od + 2.0)
-    fl.add_hollow_cyl(
+    # INTERNAL gear: teeth point inward from the bore, built into the same mesh.
+    # Was a smooth annulus plus loose tooth stubs parked near it, which read as a
+    # plain ring at any distance.
+    _ring_mod_mm = _fpk_gear_module_mm(
+        (quantities or {}).get("gear_module_mm"), ring_id_inner, ref_teeth=48.0)
+    fl.add_spur_gear(
         "u_se_td_ring_gear",
         _mm3((x_motor, y_motor, z_motor)),
-        (ring_od * 0.5) * fl.MM,
         (ring_id_inner * 0.5) * fl.MM,
         gear_face * fl.MM,
+        max(12, int(round(ring_id_inner / _ring_mod_mm))),
         mat_steel,
+        module_m=_ring_mod_mm * fl.MM,
+        internal=True,
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
-        vertices=_cyl_v,
-    )
-    _fpk_place_tooth_cues(
-        "u_se_td_ring_gear", (x_motor, y_motor, z_motor),
-        ring_id_inner, gear_face, ring_teeth_cue,
-        mat_steel, story_mod, MO, rot_along_x,
     )
 
     # ── Permanent magnet segments on rotor OD (IPMSM seed) ──────────────────
@@ -20061,6 +20055,15 @@ def _fpk_place_ontology_fff_parts(
         ang = (mi / float(magnet_n)) * math.tau
         my = y_motor + mag_r * math.cos(ang)
         mz = z_motor + mag_r * math.sin(ang)
+        # Magnets are ARC SEGMENTS on the rotor, not loose bricks: a box tangent
+        # to the bore reads as a chocolate bar in any close view (Tristan
+        # 2026-07-31). Rotating each about the pack axis by its own angular
+        # position seats it flush and gives the rotor a segmented pole face.
+        _mag_rot = (
+            rot_along_x[0] + ang,
+            rot_along_x[1],
+            rot_along_x[2],
+        )
         fl.add_box(
             f"u_se_td_magnet_{mi}",
             _mm3((x_motor, my, mz)),
@@ -20068,7 +20071,7 @@ def _fpk_place_ontology_fff_parts(
             mat_magnet,
             module=story_mod,
             module_objects=MO,
-            rotation=rot_along_x,
+            rotation=_mag_rot,
         )
 
     # ── Motor shaft through sun / carrier ────────────────────────────────────
@@ -20084,12 +20087,10 @@ def _fpk_place_ontology_fff_parts(
         vertices=24,
     )
 
-    # ── Sun tooth cues (ratio-forced teeth language) ─────────────────────────
-    _fpk_place_tooth_cues(
-        "u_se_td_sun_gear", (x_motor, y_motor, z_motor),
-        sun_od, gear_face, sun_teeth_cue,
-        mat_steel, story_mod, MO, rot_along_x,
-    )
+    # SUN TEETH: removed 2026-07-31. The sun gear is now built by
+    # fl.add_spur_gear with its teeth INSIDE the same mesh, so adding loose
+    # `u_se_td_sun_gear_tooth_*` stubs here would double the teeth and scatter
+    # fragments the pose passes then have to chase.
 
     # ── Diff internals: pinion + side gears + intermediate shaft ─────────────
     fl.add_cyl(
@@ -21360,16 +21361,28 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     # 2026-07-31 clay-shell defect after motor_housing shell-off.
 
     # L4 — planetary sun + planets + mini-diff nest inside hollow rotor.
-    fl.add_cyl(
+    # REAL GEARS (2026-07-31 Tristan: "not a single thing looks like a gear").
+    # These were plain add_cyl discs. Tooth count comes from the SAME module the
+    # ratio and bending stress use (z = d/m), so the teeth you see are the teeth
+    # the design actually has.
+    _g_mod_mm = _fpk_gear_module_mm(
+        getattr(_fpk_g, "gear_module_mm", None) if _fpk_g is not None else None,
+        sun_od, ref_teeth=24.0)
+
+    def _teeth_for(dia_mm):
+        return max(8, int(round(float(dia_mm) / _g_mod_mm)))
+
+    fl.add_spur_gear(
         "u_se_td_sun_gear",
         _mm3((x_motor, y_motor, z_motor)),
         (sun_od * 0.5) * fl.MM,
         gear_face * fl.MM,
+        _teeth_for(sun_od),
         mat_steel,
+        module_m=_g_mod_mm * fl.MM,
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
-        vertices=32,
     )
     fl.add_cyl(
         "u_se_td_planet_carrier",
@@ -21389,16 +21402,20 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         # INTENT: The strength writeback owns the nominal tooth face. Meshing
         # members must share that exact axial width; presentation shrink factors
         # made a 58 mm solved face bake as only 53.36 mm in the exported GLB.
-        fl.add_cyl(
+        # Planets previously had NO teeth at all — the tooth-cue helper was only
+        # ever called for the sun and ring, so four smooth pucks orbited a
+        # toothed sun. They mesh with both, so they carry the same module.
+        fl.add_spur_gear(
             f"u_se_td_planet_{pi}",
             _mm3((x_motor, py, pz)),
             (planet_od * 0.5) * fl.MM,
             gear_face * fl.MM,
+            _teeth_for(planet_od),
             mat_steel,
+            module_m=_g_mod_mm * fl.MM,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
-            vertices=24,
         )
     fl.add_cyl(
         "u_se_td_diff_nest",

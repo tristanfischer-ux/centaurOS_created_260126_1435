@@ -776,6 +776,175 @@ def add_cyl(name, location, radius, height, material, module=None, module_object
     return obj
 
 
+def add_spur_gear(
+    name,
+    location,
+    pitch_radius,
+    face_width,
+    n_teeth,
+    material,
+    module_m=None,
+    bore_radius=0.0,
+    internal=False,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+):
+    """A gear that LOOKS like a gear: body + real teeth, joined into ONE mesh.
+
+    INTENT (2026-07-31 Tristan: "not a single thing here looks like a gear or an
+    electric motor part"): gears were `add_cyl` — featureless discs — with a few
+    shallow tooth stubs scattered nearby as SEPARATE objects (tip only ~4.5% of
+    OD, capped at 18, and planet gears got none at all). At any real viewing
+    distance that reads as a plain cylinder. Teeth belong to the gear, so they
+    are built into the same mesh: one object per gear, correct at every camera,
+    nothing to keep in sync and no loose crumbs left behind by a pose.
+
+    Geometry is standard spur-gear proportions off the MODULE (addendum = m,
+    dedendum = 1.25m), so tooth depth is forced by the same quantity the ratio
+    and bending stress are — not a decorative fraction. `internal=True` cuts the
+    teeth INWARD from the bore for a ring/annulus gear.
+
+    All lengths in METRES (lib convention). Returns the joined object.
+    """
+    pitch_r = float(pitch_radius)
+    face = float(face_width)
+    z = max(6, int(n_teeth))
+    if pitch_r <= 0 or face <= 0:
+        raise ValueError("pitch_radius and face_width must be positive")
+    # Module from the tooth count when not supplied (m = d / z).
+    m = float(module_m) if module_m else (2.0 * pitch_r / z)
+    addendum, dedendum = m, 1.25 * m
+    # Keep teeth visible but never so deep the body vanishes.
+    addendum = min(addendum, pitch_r * 0.22)
+    dedendum = min(dedendum, pitch_r * 0.28)
+
+    if internal:
+        # Ring gear: annular body, teeth projecting inward from the bore.
+        body_outer = pitch_r + dedendum * 2.2
+        body_inner = pitch_r + addendum
+        body = add_hollow_cyl(
+            name, location, body_outer, body_inner, face, material,
+            rotation=rotation, vertices=max(48, min(128, z * 3)),
+        )
+        tooth_mid = pitch_r + addendum * 0.5
+        tooth_h = addendum * 2.0
+    else:
+        root_r = max(pitch_r - dedendum, pitch_r * 0.35)
+        if bore_radius and 0 < float(bore_radius) < root_r * 0.9:
+            body = add_hollow_cyl(
+                name, location, root_r, float(bore_radius), face, material,
+                rotation=rotation, vertices=max(48, min(128, z * 3)),
+            )
+        else:
+            body = add_cyl(
+                name, location, root_r, face, material,
+                rotation=rotation, vertices=max(48, min(128, z * 3)),
+            )
+        tooth_mid = (root_r + pitch_r + addendum) * 0.5
+        tooth_h = (pitch_r + addendum) - root_r
+
+    # Circular pitch sets the tooth thickness — teeth occupy ~half the pitch, so
+    # the gaps between them are as readable as the teeth themselves.
+    tooth_w = max(m * 0.9, (math.tau * pitch_r) / (z * 2.05))
+    rot_e = mathutils.Euler(rotation, "XYZ")
+    rot_m = rot_e.to_matrix().to_4x4()
+    origin = mathutils.Vector(location)
+    teeth = []
+    for i in range(z):
+        ang = (i / float(z)) * math.tau
+        # Local frame: gear lies in the local YZ plane, axis along local X — the
+        # same convention add_cyl produces before `rotation` is applied.
+        local = mathutils.Vector((
+            0.0, tooth_mid * math.cos(ang), tooth_mid * math.sin(ang)))
+        world = origin + (rot_m @ local)
+        t_rot = (rot_m @ mathutils.Euler(
+            (ang, 0.0, 0.0), "XYZ").to_matrix().to_4x4()).to_euler()
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=world,
+                                        rotation=t_rot)
+        t = bpy.context.active_object
+        t.name = f"{name}_t{i}"
+        # (along-axis face) x (radial depth) x (circumferential thickness)
+        t.scale = (face * 0.5, tooth_h * 0.5, tooth_w * 0.5)
+        t.data.materials.append(material)
+        teeth.append(t)
+
+    # Join teeth INTO the body so the gear is one part.
+    try:
+        bpy.ops.object.select_all(action="DESELECT")
+        for t in teeth:
+            t.select_set(True)
+        body.select_set(True)
+        bpy.context.view_layer.objects.active = body
+        bpy.ops.object.join()
+        body.name = name
+    except Exception as exc:  # noqa: BLE001 — a gear body beats no gear at all
+        print(f"[lib][gear] join failed for {name}: {exc}")
+    if module and module_objects is not None:
+        module_objects[module].append(body)
+    return body
+
+
+def add_hollow_cyl(
+    name,
+    location,
+    outer_radius,
+    inner_radius,
+    height,
+    material,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+    vertices=48,
+):
+    """Annular cylinder (tube) — outer skin with a real bore.
+
+    INTENT (FPK cutaway 2026-07-31): a solid fl.add_cyl named "hollow_rotor" still
+    occludes the planetary nest. Boolean-difference a slightly longer inner
+    cylinder so stator/rotor barrels read as tubes; open-view rear-half sections
+    then look into the mechanism instead of a solid half-plug.
+    """
+    outer_r = float(outer_radius)
+    inner_r = float(inner_radius)
+    if inner_r <= 0.0 or inner_r >= outer_r * 0.98:
+        return add_cyl(
+            name, location, outer_r, height, material,
+            module=module, module_objects=module_objects,
+            rotation=rotation, vertices=vertices,
+        )
+    bpy.ops.mesh.primitive_cylinder_add(
+        location=location, radius=outer_r, depth=height,
+        rotation=rotation, vertices=vertices)
+    outer = bpy.context.active_object
+    outer.name = name
+    bpy.ops.mesh.primitive_cylinder_add(
+        location=location, radius=inner_r, depth=float(height) * 1.05,
+        rotation=rotation, vertices=max(16, vertices // 2))
+    cutter = bpy.context.active_object
+    cutter.name = name + "_bore_cutter"
+    cutter.hide_render = True
+    mod = outer.modifiers.new(name + "_hollow", "BOOLEAN")
+    mod.operation = "DIFFERENCE"
+    mod.solver = "EXACT"
+    try:
+        mod.object = cutter
+    except AttributeError:
+        mod.object = cutter
+    bpy.context.view_layer.objects.active = outer
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    mesh = cutter.data
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    if mesh is not None and mesh.users == 0:
+        bpy.data.meshes.remove(mesh)
+    if outer.data.materials:
+        outer.data.materials.clear()
+    outer.data.materials.append(material)
+    shade_smooth_object(outer)
+    if module and module_objects is not None:
+        module_objects[module].append(outer)
+    return outer
+
+
 def add_torus(name, location, major_radius, minor_radius, material, module=None, module_objects=None, rotation=(0, 0, 0)):
     bpy.ops.mesh.primitive_torus_add(location=location, major_radius=major_radius, minor_radius=minor_radius, rotation=rotation)
     obj = bpy.context.active_object

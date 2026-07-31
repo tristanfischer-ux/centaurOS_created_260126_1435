@@ -24,6 +24,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,6 +34,16 @@ import ijson
 import pyleecan
 from pyleecan.Functions.load import load
 
+_STACK_DIR = Path(__file__).resolve().parent
+if str(_STACK_DIR) not in sys.path:
+    sys.path.insert(0, str(_STACK_DIR))
+from shaft_torque_identity import (  # noqa: E402
+    DUTY_TORQUE_MEAN_CLEAR_RATIO as _DUTY_MEAN_CLEAR,
+    DUTY_TORQUE_PEAK_INTEREST_RATIO as _DUTY_PEAK_INTEREST,
+    evaluate_duty_torque_screen_ok,
+    omega_rad_s as _omega_rad_s,
+    required_shaft_torque_nm as _required_shaft_torque_nm,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
@@ -550,13 +561,20 @@ def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
 def analytical_duty_check(inputs: TwinInputs) -> DutyCheck:
     """Reconcile the FIA electrical duty at the maximum rotor-speed point."""
 
-    omega_rad_s = inputs.max_rotor_speed_rpm * 2.0 * math.pi / 60.0
+    # FLOW: canonical identity in shaft_torque_identity.py — gear ISO/bevel/mount
+    # must use the same T = P/(ηω) rule (F-EM-2).
+    omega_rad_s = _omega_rad_s(inputs.max_rotor_speed_rpm)
     combined_efficiency = (
         inputs.machine_efficiency_assumption
         * inputs.inverter_efficiency_assumption
     )
+    required_torque_nm = _required_shaft_torque_nm(
+        continuous_electrical_power_kw=inputs.continuous_electrical_power_kw,
+        max_rotor_speed_rpm=inputs.max_rotor_speed_rpm,
+        machine_efficiency=inputs.machine_efficiency_assumption,
+        inverter_efficiency=inputs.inverter_efficiency_assumption,
+    )
     shaft_power_kw = inputs.continuous_electrical_power_kw / combined_efficiency
-    required_torque_nm = shaft_power_kw * 1_000.0 / omega_rad_s
     power_check_kw = (
         required_torque_nm * omega_rad_s * combined_efficiency / 1_000.0
     )
@@ -634,9 +652,9 @@ def effective_turns_per_slot_from_twin(inputs: TwinInputs) -> int:
 DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG = -45.0
 # Coarse regenerative-side sweep for the live twin case (not a full MTPA map).
 LIVE_CURRENT_ANGLE_SWEEP_DEG = (-40.0, -45.0, -50.0, -60.0, -90.0)
-# Screening bar: |FE torque| / required shaft torque. 0.75 = order-of-magnitude
-# correct for the kit duty after angle+magnet fill; 1.0 would be full close.
-DUTY_TORQUE_SCREEN_RATIO = 0.75
+# Re-exports for callers/tests that historically imported these from this module.
+DUTY_TORQUE_SCREEN_RATIO = _DUTY_PEAK_INTEREST
+DUTY_TORQUE_MEAN_CLEAR_RATIO = _DUTY_MEAN_CLEAR
 # INTENT: Coarse mechanical rotor positions over half an electrical period for
 # an 8-pole machine (pole-pairs=4 → 90° mech = 360° elec). Enough to show
 # torque ripple / position dependence at fixed current angle — NOT MTPA.
@@ -644,6 +662,14 @@ LIVE_ROTOR_POSITION_SWEEP_MECH_DEG = (0.0, 7.5, 15.0, 22.5, 30.0, 37.5, 45.0)
 # DECISION: Live twin default uses 4 points (endpoints + mid-span) so the case
 # finishes in a few FE solves; the full 7-point table remains selectable.
 LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG = (0.0, 15.0, 30.0, 45.0)
+# DEC-EM-1 (2026-07-31): the 4-point fast sweep is NOT enough to trust a MEAN
+# torque — 4 samples across a half-electrical period alias the ripple, and the
+# duty screen is decided on the mean. `torque_reliable` was correctly false
+# because of this. 37 points at 1.25° mech resolves the ripple properly, so the
+# mean is a mean and not an artefact of where the four samples happened to land.
+LIVE_ROTOR_POSITION_SWEEP_DENSE_MECH_DEG = tuple(
+    round(i * 1.25, 3) for i in range(37)
+)
 
 
 def select_rotor_position_sweep_deg(
@@ -874,14 +900,26 @@ def run_rotor_position_sweep(
     positions_deg: Sequence[float] | None = None,
     seed_result_at_zero: LoadedMagneticResult | None = None,
 ) -> tuple[list[dict[str, float]], dict[str, Any]]:
-    """Solve torque at coarse rotor positions for one fixed current angle.
+    """Solve torque at rotor positions holding the current angle IN THE ROTOR FRAME.
 
     INTENT: Show position dependence / ripple at the already-screened best
     current angle without running a full MTPA or fine torque map.
 
+    ⭐ FIX (2026-07-31, exposed by the DEC-EM-1 37-point sweep): this previously
+    held the stator current angle FIXED IN SPACE while mechanically rotating the
+    rotor. That is not a torque map — it is the machine being driven out of
+    synchronism, and |T| duly collapsed 214.7 → 6.65 N·m over 13.75° mech
+    (min/mean/max = 0.01/1.01/1.71 of required, 213 N·m peak-to-peak). Under
+    field-oriented control the current vector rotates WITH the rotor, so the
+    commanded angle is constant in the ROTOR frame. The electrical angle must
+    therefore advance by pole_pairs × Δmechanical. Without this the "mean over
+    rotor positions" is not a duty metric at all — and because the duty screen is
+    decided on that mean, BOTH the old 4-point mean (118.748) and the dense
+    37-point mean (125.931) were artefacts of sampling an unphysical curve.
+
     DECISION: Reuse ``seed_result_at_zero`` for the 0° mechanical point when
     that point was already solved during the current-angle screen, avoiding a
-    duplicate FE solve.
+    duplicate FE solve. Still valid: at 0° mech the frames coincide.
     """
 
     positions = select_rotor_position_sweep_deg(positions_deg=positions_deg)
@@ -893,10 +931,15 @@ def run_rotor_position_sweep(
         ):
             result = seed_result_at_zero
         else:
+            # Hold the commanded angle in the ROTOR frame: advance the stator
+            # excitation electrically with the rotor (θ_e = p · θ_m).
+            pole_pairs = max(1, int(geometry.rotor_poles) // 2)
             assumptions = loaded_point_assumptions(
                 duty,
                 inputs,
-                current_angle_electrical_deg=float(current_angle_electrical_deg),
+                current_angle_electrical_deg=float(
+                    current_angle_electrical_deg + pole_pairs * float(position)
+                ),
                 rotor_position_mechanical_deg=float(position),
             )
             result = run_loaded_magnetic_point(
@@ -1456,14 +1499,6 @@ def build_artifact(
 ) -> dict[str, Any]:
     """Assemble the honest, permanently non-release electromagnetic artefact."""
 
-    torque_ratio = (
-        abs(loaded_magnetic.torque_nm) / duty.required_shaft_torque_nm
-        if duty.required_shaft_torque_nm > 0.0
-        else 0.0
-    )
-    # INTENT: "works in kit context" means the loaded point is in the right
-    # order of magnitude for the FIA duty — not that release is closed.
-    duty_torque_screen_ok = torque_ratio >= DUTY_TORQUE_SCREEN_RATIO
     position_points = list(rotor_position_sweep or [])
     position_summary = dict(
         rotor_position_sweep_summary
@@ -1472,6 +1507,19 @@ def build_artifact(
             required_shaft_torque_nm=duty.required_shaft_torque_nm,
         )
     )
+    # GOTCHA: torque_reliable stays False until dyno/map close — that alone
+    # keeps duty_torque_screen_ok False (honesty). Mean must also clear 1.0×.
+    torque_reliable = False
+    mean_mag = position_summary.get("torque_magnitude_mean_nm")
+    duty_torque_screen_ok, duty_diag = evaluate_duty_torque_screen_ok(
+        required_shaft_torque_nm=duty.required_shaft_torque_nm,
+        peak_torque_magnitude_nm=abs(loaded_magnetic.torque_nm),
+        mean_torque_magnitude_nm=(
+            float(mean_mag) if mean_mag is not None else None
+        ),
+        torque_reliable=torque_reliable,
+    )
+    torque_ratio = float(duty_diag["peak_torque_vs_required_ratio"])
 
     return {
         "schema": "forgeos.motor_stack.em_fia_front_kit_case/v2",
@@ -1483,16 +1531,23 @@ def build_artifact(
             "required_shaft_torque_nm": duty.required_shaft_torque_nm,
             "loaded_torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
             "threshold_ratio": DUTY_TORQUE_SCREEN_RATIO,
+            "mean_clear_ratio": DUTY_TORQUE_MEAN_CLEAR_RATIO,
+            "torque_reliable": torque_reliable,
+            "torque_magnitude_mean_nm": duty_diag.get("mean_torque_magnitude_nm"),
+            "mean_torque_vs_required_ratio": duty_diag.get(
+                "mean_torque_vs_required_ratio"
+            ),
+            "peak_interest_ok": duty_diag.get("peak_interest_ok"),
+            "fail_reasons": duty_diag.get("fail_reasons"),
             "position_sweep_torque_vs_required_ratio_mean": position_summary.get(
                 "torque_vs_required_ratio_mean"
             ),
             "note": (
-                f"duty_torque_screen_ok means |FE torque| ≥ "
-                f"{DUTY_TORQUE_SCREEN_RATIO:.0%} of analytical 250 kW shaft "
-                "torque at one screened current angle (reference rotor "
-                "position). A coarse rotor-position sweep may be attached; "
-                "it is NOT a full MTPA / torque map, demagnetisation close, "
-                "dyno correlation, or ship_ok."
+                "duty_torque_screen_ok requires (1) torque_reliable=True and "
+                f"(2) position-sweep mean |T| ≥ {DUTY_TORQUE_MEAN_CLEAR_RATIO:.0%} "
+                "of analytical 250 kW shaft torque. Peak / best-angle |T| is "
+                f"interest-only (bar {DUTY_TORQUE_SCREEN_RATIO:.0%}) and must "
+                "never alone mint a PASS. Not MTPA, demag close, dyno, or ship_ok."
             ),
         },
         "source_twin": "out/formula-e-front-mgu-20260729-1432",
@@ -1544,10 +1599,15 @@ def build_artifact(
             "torque_nm": loaded_magnetic.torque_nm,
             "torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
             "torque_method": "FEMM steady-state weighted-stress block integral (22)",
-            "torque_reliable": False,
+            "torque_reliable": torque_reliable,
             "required_shaft_torque_nm": duty.required_shaft_torque_nm,
             "torque_vs_required_ratio": round(torque_ratio, 6),
+            "torque_magnitude_mean_nm": duty_diag.get("mean_torque_magnitude_nm"),
+            "mean_torque_vs_required_ratio": duty_diag.get(
+                "mean_torque_vs_required_ratio"
+            ),
             "duty_torque_screen_ok": duty_torque_screen_ok,
+            "duty_screen_fail_reasons": duty_diag.get("fail_reasons"),
             "torque_status": (
                 "ESTIMATE — solver-derived at twin-bound coil turns after a "
                 "coarse current-angle screen; reference rotor position for the "
@@ -1833,6 +1893,32 @@ def run_selftest() -> int:
             )["n_positions"]
             == 1
         ),
+        # proveCatch F-EM-1: peak interest OK + mean below required + unreliable
+        # must NEVER mint duty_torque_screen_ok (council FATAL on twin).
+        "duty_screen_rejects_peak_alone_greenwash": (
+            evaluate_duty_torque_screen_ok(
+                required_shaft_torque_nm=125.21,
+                peak_torque_magnitude_nm=207.12,
+                mean_torque_magnitude_nm=118.75,
+                torque_reliable=False,
+            )[0]
+            is False
+            and evaluate_duty_torque_screen_ok(
+                required_shaft_torque_nm=125.21,
+                peak_torque_magnitude_nm=207.12,
+                mean_torque_magnitude_nm=118.75,
+                torque_reliable=True,
+            )[0]
+            is False
+            and evaluate_duty_torque_screen_ok(
+                required_shaft_torque_nm=125.21,
+                peak_torque_magnitude_nm=207.12,
+                mean_torque_magnitude_nm=130.0,
+                torque_reliable=True,
+            )[0]
+            is True
+            and artifact["works_in_kit_context"]["duty_torque_screen_ok"] is False
+        ),
     }
     passed = all(checks.values())
     print(
@@ -1891,9 +1977,11 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         duty=duty,
         inputs=inputs,
     )
-    # DECISION: Four mechanical positions (0/15/30/45°) at the screened
-    # current angle — enough for ripple/position dependence without a full
-    # 7-point or MTPA campaign. Reuse the angle-screen 0° solve.
+    # DEC-EM-1 (2026-07-31): was FOUR positions (0/15/30/45°). Four samples
+    # across a half-electrical period ALIAS the torque ripple, and the duty
+    # screen is decided on the MEAN — so the mean was an artefact of sample
+    # placement, which is exactly why torque_reliable was false. Now the dense
+    # 37-point / 1.25° sweep so the mean is defensible. Reuse the 0° solve.
     position_sweep, position_summary = run_rotor_position_sweep(
         geometry,
         solver,
@@ -1903,7 +1991,7 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         current_angle_electrical_deg=(
             loaded_assumptions.current_angle_electrical_deg
         ),
-        positions_deg=LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG,
+        positions_deg=LIVE_ROTOR_POSITION_SWEEP_DENSE_MECH_DEG,
         seed_result_at_zero=loaded_magnetic,
     )
     if not (

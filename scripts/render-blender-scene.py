@@ -43,6 +43,24 @@ TEMPLATES_DIR = REPO_ROOT / "scripts" / "blender-templates"
 BLENDER_BIN = os.environ.get(
     "BLENDER_BIN", "/Applications/Blender.app/Contents/MacOS/Blender"
 )
+
+# ⭐ BLENDER EXITS 0 WHEN ITS --python SCRIPT DIES (2026-07-31, Tristan-flagged).
+# `blender --background --python x.py` prints the SyntaxError / traceback and then
+# returns 0, so `subprocess.run(..., check=True)` NEVER fires. On 2026-07-31 a
+# SyntaxError in build_universal_scene.py killed the geometry builder TWICE and
+# this script still printed "[render-scene] UNIVERSAL OK — cover + 8 module
+# page(s)" and returned exit 0: it fell through to the copy-the-previous-hero
+# path, so the output PNGs were present AND freshly-mtimed. A green exit code, an
+# OK banner and fresh timestamps over a run where nothing was built — anything
+# gating on rc==0 or on mtime would have shipped the previous run's images as new.
+#
+# `--python-exit-code N` makes Blender return N when the script raises. VERIFIED
+# on this build (5.1.1): a script with "name assigned before global declaration"
+# exits 0 without the flag and 1 with it. proveCatch: `--selftest` below drives a
+# deliberately-broken script through the REAL Blender and asserts non-zero, so if
+# a future Blender drops or renames the flag the guard fails loudly instead of
+# silently reverting to the exit-0 lie.
+BLENDER_FAIL_FLAGS = ("--python-exit-code", "1")
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 from blender_out_lock import blender_out_dir_lock  # noqa: E402
 from render_view_contract import is_product_scale, required_views  # noqa: E402
@@ -248,7 +266,7 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
     try:
         with blender_out_dir_lock(out_dir, timeout_s=2400.0):
             subprocess.run(
-                [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
+                [BLENDER_BIN, "--background", *BLENDER_FAIL_FLAGS, "--python", str(universal), "--", str(state_path)],
                 env=env,
                 check=True,
                 timeout=900,
@@ -267,7 +285,7 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
             env_shaded["BLENDER_PRESENTATION_BEVEL"] = "1"
             try:
                 subprocess.run(
-                    [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
+                    [BLENDER_BIN, "--background", *BLENDER_FAIL_FLAGS, "--python", str(universal), "--", str(state_path)],
                     env=env_shaded, check=True, timeout=900,
                 )
                 hero_path = out_dir / "00-hero.png"
@@ -356,10 +374,112 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
         written = 1
     _cover_name = cover_src.name if cover_src is not None else "shaded 00-hero"
     print(f"[render-scene] UNIVERSAL OK — cover + {written} module page(s) from {_cover_name}", flush=True)
+    # INTENT (2026-07-31 Tristan): ad-hoc Blender re-renders (_rerender-*, --force)
+    # used to leave drawings/general-arrangement.* 20h stale while heroes refreshed.
+    # GA projects parts-manifest — rewrite it whenever Blender just rewrote the
+    # train. Non-fatal: a missing draw_ga must never fail the shaded pass.
+    _refresh_projection_drawings_after_blender(out_dir)
+    return 0
+
+
+def _refresh_projection_drawings_after_blender(out_dir: Path) -> None:
+    """Regenerate GA (+ SLD when present) from the just-written parts-manifest.
+
+    DECISION: call draw_ga / draw_single_line directly — NOT full generate_drawing_set
+    (that re-invokes Blender for CAD artifacts and caused IsADirectoryError races
+    on this twin). Projection drawings are pure SVG from the manifest.
+    """
+    manifest = out_dir / "parts-manifest.json"
+    if not manifest.is_file() or manifest.stat().st_size < 50:
+        print("[render-scene] drawings refresh skipped (no parts-manifest.json)",
+              flush=True)
+        return
+    scripts = REPO_ROOT / "scripts" / "blender-universal"
+    for script_name, png_name in (
+        ("draw_ga.py", "general-arrangement.png"),
+        ("draw_single_line.py", "single-line-diagram.png"),
+    ):
+        script = scripts / script_name
+        if not script.is_file():
+            continue
+        try:
+            r = subprocess.run(
+                [sys.executable, str(script), str(out_dir)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                cwd=str(REPO_ROOT),
+            )
+            out_png = out_dir / "drawings" / png_name
+            if out_png.is_file():
+                print(
+                    f"[render-scene] drawings refresh: {png_name} "
+                    f"(rc={r.returncode}, mtime fresh)",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"[render-scene] drawings refresh: {script_name} produced no "
+                    f"{png_name} (rc={r.returncode}) "
+                    f"{(r.stderr or r.stdout or '')[-200:]}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001 — never block Blender success
+            print(f"[render-scene] drawings refresh skipped ({script_name}): {exc}",
+                  file=sys.stderr)
+
+
+def _selftest() -> int:
+    """proveCatch: a dead Blender script MUST NOT look like a successful render.
+
+    Drives the REAL Blender with a deliberately-broken script. Without
+    BLENDER_FAIL_FLAGS Blender returns 0 (the 2026-07-31 "UNIVERSAL OK over a
+    SyntaxError" defect); with them it must return non-zero so `check=True`
+    raises and the caller returns 6. Asserting against the real binary means a
+    future Blender that drops or renames --python-exit-code fails here loudly
+    rather than silently restoring the exit-0 lie.
+    """
+    import tempfile
+    broken = "def f():\n    y = 1\n    global y\n"
+    try:
+        compile(broken, "broken", "exec")
+        print("[selftest] FAIL: fixture is not actually broken", file=sys.stderr)
+        return 1
+    except SyntaxError:
+        pass
+    if not Path(BLENDER_BIN).exists():
+        print(f"[selftest] SKIP: no Blender at {BLENDER_BIN}")
+        return 0
+    with tempfile.TemporaryDirectory() as td:
+        script = Path(td) / "broken.py"
+        script.write_text(broken)
+        bare = subprocess.run(
+            [BLENDER_BIN, "--background", "--python", str(script)],
+            capture_output=True, timeout=300,
+        ).returncode
+        guarded = subprocess.run(
+            [BLENDER_BIN, "--background", *BLENDER_FAIL_FLAGS, "--python", str(script)],
+            capture_output=True, timeout=300,
+        ).returncode
+    if guarded == 0:
+        print(
+            "[selftest] FAIL: Blender returned 0 for a BROKEN script even with "
+            f"{' '.join(BLENDER_FAIL_FLAGS)} — a dead builder would again be "
+            "reported as a successful render. Check whether this Blender still "
+            "supports --python-exit-code.",
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        f"[selftest] OK: broken script → exit {bare} unguarded, {guarded} guarded "
+        f"(the guard is what makes check=True fire)"
+    )
     return 0
 
 
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     p = argparse.ArgumentParser()
     p.add_argument("--state", required=True, help="absolute path to state.json")
     p.add_argument("--out-dir", required=True, help="directory to write images into")
@@ -546,7 +666,7 @@ def main() -> int:
     )
     try:
         subprocess.run(
-            [BLENDER_BIN, "--background", "--python", str(template)],
+            [BLENDER_BIN, "--background", *BLENDER_FAIL_FLAGS, "--python", str(template)],
             env=env,
             check=True,
             timeout=900,  # LLM-generated scenes can have 150+ primitives → ~10 min render

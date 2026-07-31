@@ -9345,18 +9345,28 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         #    carries a real line cost); commodity / sub-component lines leave it blank ──
         _is_principal = (not _is_subcomp) and bool(_line_num)
         if _is_principal:
-            # duty / rating = the requirement text (carries the sizing, '132 kW motor …')
-            dc = ws.cell(r, 11, _req_raw); dc.alignment = WRAP_TOP; dc.font = FONT_NOTE; dc.border = BORDER
+            # duty / rating = the requirement text + geometry/mass summary so the
+            # ledger surfaces OD/ID/thickness/mass without shifting column letters
+            # (Row-check / MPN contracts stay on N/O/P).
+            _geom = _bom_row_geometry_summary(row)
+            _duty = _req_raw
+            if _geom and _geom not in _duty:
+                _duty = f"{_req_raw}\n[{_geom}]" if _req_raw else f"[{_geom}]"
+            dc = ws.cell(r, 11, clean_cell(_duty)); dc.alignment = WRAP_TOP; dc.font = FONT_NOTE; dc.border = BORDER
             # MATERIAL — the contract's resolved value: the row's own material / MoC token,
             # or the explicit 'N/A — proprietary assembly …' disclosure for a bought-out
             # package (issue 7: an assembly's blank material is a stated reason, never a gap).
-            _mat = _cr.get("material") if _cr else clean_cell(row.get("material", ""))
+            _mat = _cr.get("material") if _cr else clean_cell(_bom_row_material(row) or row.get("material", ""))
             mcell = ws.cell(r, 12, clean_cell(_mat))
             mcell.alignment = WRAP_TOP
             mcell.border = BORDER
             if str(_mat or "").startswith("N/A"):
                 mcell.font = FONT_NOTE
-            sc = ws.cell(r, 13, clean_cell(row.get("basis", "")))
+            _basis_txt = clean_cell(row.get("basis", ""))
+            if _geom and _geom not in _basis_txt:
+                _basis_txt = (f"{_basis_txt} · geom: {_geom}" if _basis_txt
+                              else f"geom: {_geom}")
+            sc = ws.cell(r, 13, _basis_txt)
             sc.alignment = WRAP_TOP; sc.font = FONT_NOTE; sc.border = BORDER
             # MPN / datasheet — the contract's resolved reference (partVerifications by
             # tag → head noun → the row's own non-placeholder `part`); an ENGINEERED
@@ -22405,8 +22415,20 @@ _MATERIAL_TOKEN_RE = re.compile(
 
 def _bom_row_material(row: dict) -> str:
     """The material the row itself discloses: the `material` field first, else the
-    MoC / material token in its basis or requirement text. '' = none stated."""
+    MoC / material token in its basis or requirement text. '' = none stated.
+
+    UNIVERSAL (2026-07-31): also accept material_grade / material_spec / physical.material
+    so densify + word modifiers project into the ledger Material column.
+    """
     m = str(row.get("material") or "").strip()
+    if m:
+        return m
+    for alt in ("material_grade", "material_spec", "moc"):
+        m = str(row.get(alt) or "").strip()
+        if m:
+            return m
+    phys = row.get("physical") if isinstance(row.get("physical"), dict) else {}
+    m = str(phys.get("material") or "").strip()
     if m:
         return m
     for src in (row.get("basis"), row.get("requirement")):
@@ -22416,11 +22438,50 @@ def _bom_row_material(row: dict) -> str:
     return ""
 
 
+def _bom_row_geometry_summary(row: dict) -> str:
+    """One-line geometry · thickness · mass for Engineering-spec (universal).
+
+    Mass is appended here for DISPLAY only — never written back into
+    dimensions_mm (that leftover caused Blender re-parse pollution).
+    """
+    bits = []
+    dims = str(row.get("dimensions_mm") or "")
+    # Scrub accidental mass tails from stored geometry strings.
+    dims = re.sub(r"\s*[·•]\s*m\s*=\s*-?\d+(?:\.\d+)?\s*kg\b", "", dims, flags=re.I).strip(" ·•")
+    if dims:
+        bits.append(dims)
+    else:
+        atoms = []
+        if row.get("od_mm") is not None:
+            atoms.append(f"OD {row['od_mm']:g}")
+        if row.get("id_mm") is not None:
+            atoms.append(f"ID {row['id_mm']:g}")
+        if row.get("width_mm") is not None and row.get("depth_mm") is not None:
+            h = row.get("height_mm")
+            if h is not None:
+                atoms.append(f"{row['width_mm']:g}×{row['depth_mm']:g}×{h:g}")
+            else:
+                atoms.append(f"{row['width_mm']:g}×{row['depth_mm']:g}")
+        if atoms:
+            bits.append(" ".join(atoms) + " mm")
+    thk = row.get("thickness_mm") if row.get("thickness_mm") is not None else row.get("wall_mm")
+    if thk is not None and "t=" not in " ".join(bits).lower():
+        bits.append(f"t={float(thk):g} mm")
+    if row.get("radius_mm") is not None and row.get("od_mm") is None:
+        bits.append(f"R={float(row['radius_mm']):g} mm")
+    if row.get("mass_kg") is not None:
+        bits.append(f"m={float(row['mass_kg']):g} kg")
+    return " · ".join(bits)
+
+
 # Fabrication signals — data the row already carries that says "this is a PHYSICAL part
 # fabricated / sized to a geometry" (a vessel shell, a routed pipe run, a structural
 # frame): physics-sized dimension / mass fields, a take-off or made-to-spec basis, a
 # routed connection. Everything else is a bought-out ASSEMBLY / PACKAGE priced as a unit.
-_FAB_FIELDS = ("wall_mm", "mass_kg", "diameter_m", "height_m", "footprint_m2", "length_m")
+_FAB_FIELDS = (
+    "wall_mm", "mass_kg", "diameter_m", "height_m", "footprint_m2", "length_m",
+    "od_mm", "id_mm", "thickness_mm", "radius_mm", "width_mm", "length_mm",
+)
 _FAB_BASIS_RE = re.compile(
     r"take-?off|made-to-spec|tapered wall|structural|steelwork|fabricat|"
     r"\bpipe £|\bduct £|\bcable £|/m @|"
@@ -39698,6 +39759,14 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "10-product-ghost-shell-back.png",
         "11-product-ghost-shell-top.png",
         "12-product-ghost-shell-front.png",
+        # INTENT (2026-07-31): exploded FPK / axial packs — shell-off + separated
+        # internals so gears/PE read. required=False in view contract; bundle when present.
+        "13-product-exploded.png",
+        # INTENT (2026-07-31 Tristan): the INVENTORY sheet — every kit part laid
+        # flat on labelled paper with quantities, so the build content can be
+        # checked by eye. Distinct from 13 (which is the assembly story);
+        # required=False in the view contract, so bundle it when present.
+        "14-product-parts-catalogue.png",
         "blender-cover.png",
     ]
     # 01-top.png is the INTERIOR ANNOTATED PLAN — a real customer view for PLANT-scale
@@ -39719,6 +39788,11 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "10-product-ghost-shell-back.png": "Product — translucent see-inside, rear elevation",
         "11-product-ghost-shell-top.png": "Product — translucent see-inside, top-down plan",
         "12-product-ghost-shell-front.png": "Product — translucent see-inside, front elevation",
+        "13-product-exploded.png": "Product — exploded assembly (internals separated along pack axis)",
+        "14-product-parts-catalogue.png": (
+            "Parts catalogue — every kit part laid out flat and labelled with "
+            "quantities and true size (each part scaled to fit its cell)"
+        ),
         "blender-cover.png": "Product hero — cover render",
     }
     # HARD ASSERTION (2026-07-23): no deliverable render may be a byte-copy of an
@@ -39846,10 +39920,49 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             _cp(_rp, f"renders/{_rn}")
 
     # ── 6. ENGINEERING DRAWINGS ────────────────────────────────────────────────
+    # INTENT (2026-07-31 Tristan): pack was shipping 20h-old ga-A1.pdf while Blender
+    # heroes refreshed hourly — because (a) ad-hoc re-renders never rewrote GA and
+    # (b) the bundle only copied *.pdf. Refresh stale projection drawings from the
+    # live parts-manifest before copy, and ship PNG/SVG masters too.
     _drawings_dir = os.path.join(run_dir, "drawings")
+    _manifest_p = os.path.join(run_dir, "parts-manifest.json")
+    if os.path.isfile(_manifest_p) and os.path.isdir(_drawings_dir):
+        try:
+            _man_mtime = os.path.getmtime(_manifest_p)
+            _ga_png = os.path.join(_drawings_dir, "general-arrangement.png")
+            _ga_pdf = os.path.join(_drawings_dir, "ga-A1.pdf")
+            _ga_mtime = 0.0
+            for _gp in (_ga_png, _ga_pdf):
+                if os.path.isfile(_gp):
+                    _ga_mtime = max(_ga_mtime, os.path.getmtime(_gp))
+            if _ga_mtime + 2.0 < _man_mtime:
+                _draw_ga = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "blender-universal", "draw_ga.py",
+                )
+                if os.path.isfile(_draw_ga):
+                    import subprocess as _sp_ga
+                    _sp_ga.run(
+                        [sys.executable, _draw_ga, run_dir],
+                        capture_output=True, text=True, timeout=180,
+                    )
+                    print(
+                        "[bundle] refreshed stale GA from parts-manifest "
+                        f"(manifest newer by {_man_mtime - _ga_mtime:.0f}s)",
+                        flush=True,
+                    )
+        except Exception as _ga_exc:  # noqa: BLE001
+            print(f"[bundle] GA freshness refresh skipped: {_ga_exc}", flush=True)
     if os.path.isdir(_drawings_dir):
         for _pf in sorted(_glob.glob(os.path.join(_drawings_dir, "*.pdf"))):
             _cp(_pf, f"drawings/{os.path.basename(_pf)}")
+        # Masters the Excel Drawings tab + Jack glance use (not PDF-only).
+        for _ext in ("*.png", "*.svg"):
+            for _mf in sorted(_glob.glob(os.path.join(_drawings_dir, _ext))):
+                _bn = os.path.basename(_mf)
+                if _bn.startswith("inspect-"):
+                    continue
+                _cp(_mf, f"drawings/{_bn}")
     else:
         skipped.append("drawings/ (absent — fluid products / non-drawing run)")
 
