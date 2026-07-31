@@ -90,14 +90,17 @@ def build_bar_b(twin_dir: Path) -> dict[str, Any]:
         if isinstance(rotor.get("screening_results"), Mapping)
         else {}
     )
+    rotor_margins = (
+        rotor.get("margins") if isinstance(rotor.get("margins"), Mapping) else {}
+    )
     rotor_fos = (
         rotor_works.get("minimum_factor_of_safety")
         or rotor.get("minimum_factor_of_safety")
         or rotor_scr.get("minimum_factor_of_safety")
+        or rotor_scr.get("screening_fos_vs_yield")
         or rotor_scr.get("screening_fos")
-        or (rotor.get("margins") or {}).get("minimum_factor_of_safety")
-        if isinstance(rotor.get("margins"), dict)
-        else None
+        or rotor_margins.get("screening_fos_vs_assumed_yield")
+        or rotor_margins.get("minimum_factor_of_safety")
     )
 
     rows = [
