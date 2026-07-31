@@ -487,10 +487,14 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "rotor_bearing_stack",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
-        "notes": "Generic bearing seats — no supplier identity",
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "rotor_bearing_stack",
+        "notes": (
+            "Parametric shaft + twin-bearing seat family seeded (ForgeOS "
+            "source-owned). Supplier identity, preload, rated life and "
+            "thermal fits remain OPEN."
+        ),
     },
     {
         "component_id": "planetary_reduction_set",
@@ -505,13 +509,15 @@ _PRINCIPAL_COMPONENTS: list[dict[str, Any]] = [
     },
     {
         "component_id": "compact_bevel_differential",
-        "authority_level": "communication_only",
-        "source_type": "blender_compound",
-        "cad_family": None,
+        "authority_level": "parametric_family",
+        "source_type": "cadquery_family",
+        "cad_family": "compact_bevel_differential",
         "notes": (
-            "Architecture communication — twin-bound straight-bevel handbook "
-            "SCREEN may be cited under gear_strength.twin_bound_case; "
-            "ISO 23509 / KISSsoft / contact pattern still OPEN"
+            "Parametric carrier / spider / side-gear packaging nest seeded "
+            "(ForgeOS source-owned, tied to iso_bevel strength resize). "
+            "Twin-bound straight-bevel handbook SCREEN may be cited under "
+            "gear_strength.twin_bound_case; ISO 23509 / KISSsoft / contact "
+            "pattern still OPEN."
         ),
     },
     {
