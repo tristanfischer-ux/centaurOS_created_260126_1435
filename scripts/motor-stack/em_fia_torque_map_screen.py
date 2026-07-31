@@ -59,15 +59,19 @@ VOLTAGE_FW_FILENAME = "em_fia_voltage_fw_screen.json"
 POLE_PAIRS = ROTOR_POLES // 2
 
 # INTENT: Extend the MTPA FEMM anchor without re-solving every combination.
-CURRENT_MAGNITUDE_FRACTIONS = (0.5, 0.75, 1.0)
+CURRENT_MAGNITUDE_FRACTIONS = (0.25, 0.4, 0.55, 0.7, 0.85, 1.0)
 # Denser speed axis than the voltage screen's four fractions.
 FW_SPEED_FRACTIONS = (
     0.0,
+    0.125,
     0.25,
+    0.375,
     0.5,
     0.625,
     0.75,
+    0.8125,
     0.875,
+    0.9375,
     1.0,
 )
 # Assumed phase resistance for loss SCREEN only — not identified from test.
@@ -103,8 +107,11 @@ class HybridTorqueMapResult:
     """Immutable hybrid screen summary."""
 
     femm_anchor_points: int
+    angle_interpolated_points: int
     current_scaled_points: int
     fw_capability_points: int
+    loss_grid_points: int
+    speed_torque_envelope_points: int
     loss_corner_points: int
     total_screen_points: int
     peak_torque_magnitude_nm: float
@@ -164,16 +171,66 @@ def _scale_torque_with_current(
     return float(torque_nm) * fraction
 
 
-def build_current_scaled_grid(
+def interpolate_angle_grid(
     femm_points: Sequence[Mapping[str, float]],
+) -> list[dict[str, Any]]:
+    """Insert analytical mid-angle points between FEMM anchors at fixed position.
+
+    INTENT: Densify the current-angle axis without extra FEMM solves — linear
+    torque interpolation between adjacent commanded angles at the same rotor
+    position is adequate for a comparative SCREEN.
+    """
+
+    by_position: dict[float, list[dict[str, Any]]] = {}
+    for point in femm_points:
+        position = float(point["rotor_position_mechanical_deg"])
+        by_position.setdefault(position, []).append(dict(point))
+    rows: list[dict[str, Any]] = []
+    for position, group in sorted(by_position.items()):
+        ordered = sorted(
+            group,
+            key=lambda row: float(row["current_angle_electrical_deg"]),
+        )
+        for left, right in zip(ordered, ordered[1:]):
+            left_angle = float(left["current_angle_electrical_deg"])
+            right_angle = float(right["current_angle_electrical_deg"])
+            mid_angle = 0.5 * (left_angle + right_angle)
+            left_torque = float(left["torque_nm"])
+            right_torque = float(right["torque_nm"])
+            mid_torque = 0.5 * (left_torque + right_torque)
+            peak_b = 0.5 * (
+                float(left.get("peak_airgap_flux_density_t", 0.0))
+                + float(right.get("peak_airgap_flux_density_t", 0.0))
+            )
+            rms_b = 0.5 * (
+                float(left.get("rms_airgap_flux_density_t", peak_b * 0.58))
+                + float(right.get("rms_airgap_flux_density_t", peak_b * 0.58))
+            )
+            rows.append(
+                {
+                    "current_angle_electrical_deg": round(mid_angle, 6),
+                    "rotor_position_mechanical_deg": position,
+                    "torque_nm": round(mid_torque, 6),
+                    "torque_magnitude_nm": round(abs(mid_torque), 6),
+                    "peak_airgap_flux_density_t": round(peak_b, 6),
+                    "rms_airgap_flux_density_t": round(rms_b, 6),
+                    "evidence_class": "analytical_angle_interpolation_from_femm_anchor",
+                    "interpolated_between_angles_deg": [left_angle, right_angle],
+                }
+            )
+    return rows
+
+
+def build_current_scaled_grid(
+    anchor_points: Sequence[Mapping[str, float]],
     *,
     current_fractions: Sequence[float] = CURRENT_MAGNITUDE_FRACTIONS,
     design_current_a: float,
 ) -> list[dict[str, Any]]:
-    """Expand FEMM anchors across current-magnitude fractions."""
+    """Expand FEMM + interpolated anchors across current-magnitude fractions."""
 
     rows: list[dict[str, Any]] = []
-    for point in femm_points:
+    for point in anchor_points:
         base_torque = float(point["torque_nm"])
         angle = float(point["current_angle_electrical_deg"])
         position = float(point["rotor_position_mechanical_deg"])
@@ -227,46 +284,97 @@ def estimate_copper_loss_kw(
     return 3.0 * current**2 * phase_resistance_ohm / 1_000.0
 
 
-def build_loss_corners(
+def build_loss_grid(
     *,
     duty: DutyCheck,
     inputs: TwinInputs,
     peak_point: Mapping[str, float],
     current_fractions: Sequence[float] = CURRENT_MAGNITUDE_FRACTIONS,
+    speed_fractions: Sequence[float] = FW_SPEED_FRACTIONS,
 ) -> list[dict[str, Any]]:
-    """Estimate loss corners at max speed and scaled currents."""
+    """Estimate copper + iron losses across speed × current operating grid."""
 
     rows: list[dict[str, Any]] = []
     max_speed_rpm = float(inputs.max_rotor_speed_rpm)
     peak_b = float(peak_point.get("peak_airgap_flux_density_t", 0.0))
     rms_b = float(peak_point.get("rms_airgap_flux_density_t", peak_b * 0.58))
     design_current = float(inputs.phase_current_design_a or duty.dc_current_a)
-    for fraction in current_fractions:
-        current_a = design_current * fraction
-        elec_freq_hz = max_speed_rpm * POLE_PAIRS / 60.0
-        copper_kw = estimate_copper_loss_kw(current_a)
-        iron_kw = estimate_iron_loss_kw(rms_b, electrical_frequency_hz=elec_freq_hz)
-        total_kw = copper_kw + iron_kw
-        mechanical_kw = duty.shaft_power_kw * fraction
-        efficiency = (
-            mechanical_kw / (mechanical_kw + total_kw)
-            if mechanical_kw + total_kw > 0.0
-            else 0.0
-        )
-        rows.append(
-            {
-                "speed_rpm": max_speed_rpm,
-                "current_fraction": fraction,
-                "phase_current_rms_a": round(current_a, 3),
-                "copper_loss_kw": round(copper_kw, 6),
-                "iron_loss_kw": round(iron_kw, 6),
-                "total_electrical_loss_kw": round(total_kw, 6),
-                "efficiency_screen": round(efficiency, 6),
-                "peak_airgap_flux_density_t": round(peak_b, 6),
-                "rms_airgap_flux_density_t": round(rms_b, 6),
-                "evidence_class": "analytical_loss_screen",
-            }
-        )
+    for speed_fraction in speed_fractions:
+        speed_rpm = max_speed_rpm * speed_fraction
+        elec_freq_hz = speed_rpm * POLE_PAIRS / 60.0
+        for fraction in current_fractions:
+            current_a = design_current * fraction
+            copper_kw = estimate_copper_loss_kw(current_a)
+            iron_kw = estimate_iron_loss_kw(
+                rms_b,
+                electrical_frequency_hz=elec_freq_hz,
+            )
+            total_kw = copper_kw + iron_kw
+            mechanical_kw = duty.shaft_power_kw * fraction * max(speed_fraction, 0.0)
+            efficiency = (
+                mechanical_kw / (mechanical_kw + total_kw)
+                if mechanical_kw + total_kw > 0.0
+                else 0.0
+            )
+            rows.append(
+                {
+                    "speed_rpm": round(speed_rpm, 3),
+                    "speed_fraction": speed_fraction,
+                    "current_fraction": fraction,
+                    "phase_current_rms_a": round(current_a, 3),
+                    "copper_loss_kw": round(copper_kw, 6),
+                    "iron_loss_kw": round(iron_kw, 6),
+                    "total_electrical_loss_kw": round(total_kw, 6),
+                    "efficiency_screen": round(efficiency, 6),
+                    "peak_airgap_flux_density_t": round(peak_b, 6),
+                    "rms_airgap_flux_density_t": round(rms_b, 6),
+                    "evidence_class": "analytical_loss_screen",
+                }
+            )
+    return rows
+
+
+def build_speed_torque_envelope(
+    *,
+    inputs: TwinInputs,
+    peak_torque_magnitude_nm: float,
+    fw_curve: Sequence[Mapping[str, Any]],
+    current_fractions: Sequence[float] = CURRENT_MAGNITUDE_FRACTIONS,
+    nominal_dc_bus_v: float | None = None,
+) -> list[dict[str, Any]]:
+    """Cross speed × current with voltage-limited torque from FW capability."""
+
+    bus_v = float(nominal_dc_bus_v or inputs.dc_bus_voltage_v)
+    by_speed: dict[float, float] = {}
+    for row in fw_curve:
+        if float(row.get("dc_bus_voltage_v") or 0.0) != bus_v:
+            continue
+        speed_fraction = float(row["speed_fraction"])
+        by_speed[speed_fraction] = float(row["available_peak_torque_nm"])
+    rows: list[dict[str, Any]] = []
+    for speed_fraction, voltage_limited_torque in sorted(by_speed.items()):
+        speed_rpm = float(inputs.max_rotor_speed_rpm) * speed_fraction
+        for fraction in current_fractions:
+            current_limited_torque = peak_torque_magnitude_nm * fraction
+            available_torque = min(current_limited_torque, voltage_limited_torque)
+            rows.append(
+                {
+                    "speed_rpm": round(speed_rpm, 3),
+                    "speed_fraction": speed_fraction,
+                    "current_fraction": fraction,
+                    "dc_bus_voltage_v": bus_v,
+                    "current_limited_peak_torque_nm": round(
+                        current_limited_torque,
+                        6,
+                    ),
+                    "voltage_limited_peak_torque_nm": round(
+                        voltage_limited_torque,
+                        6,
+                    ),
+                    "available_peak_torque_nm": round(available_torque, 6),
+                    "evidence_class": "analytical_speed_current_torque_envelope",
+                }
+            )
     return rows
 
 
@@ -350,6 +458,8 @@ def run_hybrid_screen(
     list[dict[str, Any]],
     list[dict[str, Any]],
     list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
     HybridTorqueMapResult,
 ]:
     """Assemble the hybrid torque-map screen from FEMM anchors + analytics."""
@@ -363,15 +473,17 @@ def run_hybrid_screen(
         required_shaft_torque_nm=duty.required_shaft_torque_nm,
     )
     design_current = float(inputs.phase_current_design_a or duty.dc_current_a)
+    angle_interpolated = interpolate_angle_grid(femm_points)
+    anchor_points = [dict(point) for point in femm_points] + angle_interpolated
     current_scaled = build_current_scaled_grid(
-        femm_points,
+        anchor_points,
         design_current_a=design_current,
     )
     peak_point = max(
         femm_points,
         key=lambda row: abs(float(row["torque_nm"])),
     )
-    loss_corners = build_loss_corners(
+    loss_grid = build_loss_grid(
         duty=duty,
         inputs=inputs,
         peak_point=peak_point,
@@ -382,18 +494,30 @@ def run_hybrid_screen(
         open_circuit_rms_airgap_flux_density_t=open_circuit_rms_airgap_flux_density_t,
         peak_torque_magnitude_nm=float(mtpa_summary["peak_torque_magnitude_nm"]),
     )
+    speed_torque_envelope = build_speed_torque_envelope(
+        inputs=inputs,
+        peak_torque_magnitude_nm=float(mtpa_summary["peak_torque_magnitude_nm"]),
+        fw_curve=fw_curve,
+    )
     peak_magnitude = float(mtpa_summary["peak_torque_magnitude_nm"])
     required = float(duty.required_shaft_torque_nm)
     summary = HybridTorqueMapResult(
         femm_anchor_points=len(femm_points),
+        angle_interpolated_points=len(angle_interpolated),
         current_scaled_points=len(current_scaled),
         fw_capability_points=len(fw_curve),
-        loss_corner_points=len(loss_corners),
+        loss_grid_points=len(loss_grid),
+        speed_torque_envelope_points=len(speed_torque_envelope),
+        loss_corner_points=len(
+            [row for row in loss_grid if float(row["speed_fraction"]) >= 0.999]
+        ),
         total_screen_points=(
             len(femm_points)
+            + len(angle_interpolated)
             + len(current_scaled)
             + len(fw_curve)
-            + len(loss_corners)
+            + len(loss_grid)
+            + len(speed_torque_envelope)
         ),
         peak_torque_magnitude_nm=peak_magnitude,
         peak_torque_current_fraction=1.0,
@@ -411,7 +535,14 @@ def run_hybrid_screen(
         rotor_inner_diameter_mm=geometry.rotor_inner_diameter_mm,
         geometry_matches_twin=_geometry_matches_twin(geometry, inputs),
     )
-    return current_scaled, loss_corners, fw_curve, summary
+    return (
+        angle_interpolated,
+        current_scaled,
+        loss_grid,
+        fw_curve,
+        speed_torque_envelope,
+        summary,
+    )
 
 
 def build_artifact(
@@ -420,9 +551,11 @@ def build_artifact(
     geometry: FiaMachineGeometry,
     duty: DutyCheck,
     femm_points: Sequence[Mapping[str, float]],
+    angle_interpolated: Sequence[Mapping[str, Any]],
     current_scaled: Sequence[Mapping[str, Any]],
-    loss_corners: Sequence[Mapping[str, Any]],
+    loss_grid: Sequence[Mapping[str, Any]],
     fw_curve: Sequence[Mapping[str, Any]],
+    speed_torque_envelope: Sequence[Mapping[str, Any]],
     summary: HybridTorqueMapResult,
     source_state_sha256: str,
     source_twin: str,
@@ -430,6 +563,11 @@ def build_artifact(
 ) -> dict[str, Any]:
     """Assemble the permanently non-release hybrid torque-map artefact."""
 
+    loss_corners = [
+        dict(row)
+        for row in loss_grid
+        if float(row.get("speed_fraction") or 0.0) >= 0.999
+    ]
     return {
         "schema": SCHEMA,
         "status": "PARTIAL",
@@ -445,12 +583,13 @@ def build_artifact(
             "matches_twin_concentric": summary.geometry_matches_twin,
             "note": (
                 "Post bore-enlarge writeback geometry (target ID 130.5 / "
-                "OD 159.8 mm class). Hybrid screen refuses stale 92.7/122 "
+                "OD 197.1 mm class). Hybrid screen refuses stale 92.7/122 "
                 "artefacts when twin geometry disagrees."
             ),
         },
         "femm_anchor_refs": dict(femm_anchor_refs),
         "femm_anchor_points": [dict(point) for point in femm_points],
+        "angle_interpolated_grid": [dict(row) for row in angle_interpolated],
         "current_scaled_grid": [dict(row) for row in current_scaled],
         "loss_screen": {
             "status": "PARTIAL",
@@ -460,7 +599,10 @@ def build_artifact(
                 f"α={IRON_LOSS_KALPHA} Ke={IRON_LOSS_KE_W_PER_KG} "
                 f"steel_mass_kg={STEEL_MASS_KG_SCREEN}"
             ),
-            "corners": [dict(row) for row in loss_corners],
+            "speed_fractions": list(FW_SPEED_FRACTIONS),
+            "current_fractions": list(CURRENT_MAGNITUDE_FRACTIONS),
+            "grid": [dict(row) for row in loss_grid],
+            "corners": loss_corners,
         },
         "fw_capability_curve": {
             "status": "PARTIAL",
@@ -477,16 +619,33 @@ def build_artifact(
                 "field-weakening schedule."
             ),
         },
+        "speed_torque_envelope": {
+            "status": "PARTIAL",
+            "dc_bus_voltage_v": float(inputs.dc_bus_voltage_v),
+            "speed_fractions": list(FW_SPEED_FRACTIONS),
+            "current_fractions": list(CURRENT_MAGNITUDE_FRACTIONS),
+            "points": [dict(row) for row in speed_torque_envelope],
+            "note": (
+                "Speed × current torque envelope at nominal bus — combines "
+                "FEMM peak current scaling with voltage-limited FW capability."
+            ),
+        },
         "summary": asdict(summary),
         "coverage": {
             "femm_anchor_points": summary.femm_anchor_points,
+            "angle_interpolated_points": summary.angle_interpolated_points,
             "current_scaled_points": summary.current_scaled_points,
             "fw_capability_points": summary.fw_capability_points,
+            "loss_grid_points": summary.loss_grid_points,
+            "speed_torque_envelope_points": summary.speed_torque_envelope_points,
             "loss_corner_points": summary.loss_corner_points,
             "total_screen_points": summary.total_screen_points,
             "denser_than_mtpa_alone": summary.total_screen_points > 35,
             "speeds_evaluated": len(FW_SPEED_FRACTIONS),
             "current_magnitudes_evaluated": len(CURRENT_MAGNITUDE_FRACTIONS),
+            "angles_evaluated_femm_plus_interpolated": (
+                summary.femm_anchor_points + summary.angle_interpolated_points
+            ),
             "losses_evaluated": True,
             "fw_capability_evaluated": True,
             "closed_torque_map": False,
@@ -500,8 +659,9 @@ def build_artifact(
                 6,
             ),
             "selection_metric": (
-                "FEMM peak |torque| at design current, extended analytically "
-                "across current fractions, speed/bus FW envelope and loss corners"
+                "FEMM peak |torque| at design current, angle-interpolated "
+                "anchors, current scaling, speed×current loss grid, speed×"
+                "current torque envelope, and FW capability vs bus"
             ),
             "note": (
                 "Hybrid denser SCREEN only. Not an optimisation-grade torque "
@@ -665,7 +825,14 @@ def run_selftest() -> int:
         grid=grid,
         solve_point=mock_solve,
     )
-    current_scaled, loss_corners, fw_curve, summary = run_hybrid_screen(
+    (
+        angle_interpolated,
+        current_scaled,
+        loss_grid,
+        fw_curve,
+        speed_torque_envelope,
+        summary,
+    ) = run_hybrid_screen(
         inputs=inputs,
         geometry=geometry,
         duty=duty,
@@ -677,9 +844,11 @@ def run_selftest() -> int:
         geometry=geometry,
         duty=duty,
         femm_points=femm_points,
+        angle_interpolated=angle_interpolated,
         current_scaled=current_scaled,
-        loss_corners=loss_corners,
+        loss_grid=loss_grid,
         fw_curve=fw_curve,
+        speed_torque_envelope=speed_torque_envelope,
         summary=summary,
         source_state_sha256="synthetic-selftest",
         source_twin="synthetic-selftest",
@@ -689,21 +858,31 @@ def run_selftest() -> int:
             "em_fia_voltage_fw_screen": "synthetic",
         },
     )
+    anchor_count = len(femm_points) + len(angle_interpolated)
     checks = {
         "geometry_binds_enlarged_bore": (
             summary.rotor_inner_diameter_mm == 130.5
             and summary.rotor_outer_diameter_mm == 159.8
         ),
-        "denser_than_mtpa_alone": summary.total_screen_points > 35,
+        "denser_than_legacy_164_pt_screen": summary.total_screen_points > 164,
+        "angle_interpolation_present": summary.angle_interpolated_points > 0,
         "current_scaled_is_cartesian": (
             summary.current_scaled_points
-            == len(femm_points) * len(CURRENT_MAGNITUDE_FRACTIONS)
+            == anchor_count * len(CURRENT_MAGNITUDE_FRACTIONS)
         ),
         "fw_curve_covers_buses": (
             summary.fw_capability_points
             == len(FW_SPEED_FRACTIONS) * 3
         ),
-        "loss_corners_present": summary.loss_corner_points == len(
+        "loss_grid_covers_speed_current": (
+            summary.loss_grid_points
+            == len(FW_SPEED_FRACTIONS) * len(CURRENT_MAGNITUDE_FRACTIONS)
+        ),
+        "speed_torque_envelope_present": (
+            summary.speed_torque_envelope_points
+            == len(FW_SPEED_FRACTIONS) * len(CURRENT_MAGNITUDE_FRACTIONS)
+        ),
+        "loss_corners_at_max_speed": summary.loss_corner_points == len(
             CURRENT_MAGNITUDE_FRACTIONS
         ),
         "release_honesty": (
@@ -748,7 +927,14 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         twin_dir,
         inputs,
     )
-    current_scaled, loss_corners, fw_curve, summary = run_hybrid_screen(
+    (
+        angle_interpolated,
+        current_scaled,
+        loss_grid,
+        fw_curve,
+        speed_torque_envelope,
+        summary,
+    ) = run_hybrid_screen(
         inputs=inputs,
         geometry=geometry,
         duty=duty,
@@ -760,18 +946,20 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         geometry=geometry,
         duty=duty,
         femm_points=femm_points,
+        angle_interpolated=angle_interpolated,
         current_scaled=current_scaled,
-        loss_corners=loss_corners,
+        loss_grid=loss_grid,
         fw_curve=fw_curve,
+        speed_torque_envelope=speed_torque_envelope,
         summary=summary,
         source_state_sha256=state_hash,
         source_twin=_source_twin_label(twin_dir),
         femm_anchor_refs={
-            "em_fia_front_kit_case": str(
-                (twin_dir / "_motor_stack" / EM_CASE_FILENAME).resolve()
-            ),
             "em_fia_mtpa_screen": str(
                 (twin_dir / "_motor_stack" / MTPA_FILENAME).resolve()
+            ),
+            "em_fia_front_kit_case": str(
+                (twin_dir / "_motor_stack" / EM_CASE_FILENAME).resolve()
             ),
             "em_fia_voltage_fw_screen": str(
                 (twin_dir / "_motor_stack" / VOLTAGE_FW_FILENAME).resolve()
@@ -788,9 +976,11 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         "FIA hybrid torque-map SCREEN complete: "
         f"{summary.total_screen_points} total points "
         f"({summary.femm_anchor_points} FEMM + "
+        f"{summary.angle_interpolated_points} angle-interp + "
         f"{summary.current_scaled_points} current-scaled + "
         f"{summary.fw_capability_points} FW + "
-        f"{summary.loss_corner_points} loss); peak |T|="
+        f"{summary.loss_grid_points} loss-grid + "
+        f"{summary.speed_torque_envelope_points} speed×current); peak |T|="
         f"{summary.peak_torque_magnitude_nm:.2f} N·m "
         f"({summary.peak_torque_vs_required_ratio:.2f}× required); "
         f"rotor ID/OD {summary.rotor_inner_diameter_mm:.1f}/"

@@ -422,8 +422,8 @@ _KNOWN_SMOKE: dict[str, dict[str, Any]] = {
             "analytical": "gear_oil_fia_front_kit_case/v1",
         },
         "last_known_green": (
-            "2026-07-30 — cavity smoke + twin-bound analytical jet/churning/"
-            "pickup screen (free-surface CFD OPEN)"
+            "2026-07-31 — geometry-bound analytical jet/churning/pickup/cornering "
+            "screen on gear writeback (free-surface CFD OPEN)"
         ),
         "evidence_class": "toolchain_smoke_pass",
     },
@@ -1013,8 +1013,13 @@ def _torque_map_screen_cite(
         "path": rel_ref,
         "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
         "femm_anchor_points": coverage.get("femm_anchor_points"),
+        "angle_interpolated_points": coverage.get("angle_interpolated_points"),
         "current_scaled_points": coverage.get("current_scaled_points"),
         "fw_capability_points": coverage.get("fw_capability_points"),
+        "loss_grid_points": coverage.get("loss_grid_points"),
+        "speed_torque_envelope_points": coverage.get(
+            "speed_torque_envelope_points"
+        ),
         "loss_corner_points": coverage.get("loss_corner_points"),
         "total_screen_points": coverage.get("total_screen_points"),
         "peak_torque_magnitude_nm": summary.get("peak_torque_magnitude_nm"),
@@ -1029,8 +1034,9 @@ def _torque_map_screen_cite(
         "torque_map": "OPEN",
         "field_weakening_map": "OPEN",
         "note": (
-            "Twin-bound hybrid FEMM+analytical torque-map SCREEN with current "
-            "scaling, loss corners and FW capability curve. Not a closed "
+            "Twin-bound hybrid FEMM+analytical torque-map SCREEN with angle "
+            "interpolation, current scaling, speed×current loss grid, speed×"
+            "current torque envelope and FW capability curve. Not a closed "
             "torque/loss/FW map; not ship_ok."
         ),
     }
@@ -1795,9 +1801,12 @@ def _gear_oil_check_from_fia_case(
             "status": "PARTIAL",
             "minimum_jet_flow_l_min": screening.get("minimum_jet_flow_l_min"),
             "churning_loss_w": screening.get("churning_loss_w"),
+            "jet_pressure_required_kpa": screening.get("jet_pressure_required_kpa"),
+            "immersion_fraction_geometry": screening.get("immersion_fraction_geometry"),
+            "cornering_pickup_ok": screening.get("cornering_pickup_ok"),
             "works_in_kit_context": oil_ok,
             "model_revision": str(
-                case.get("schema") or "forgeos.motor_stack.gear_oil_fia_front_kit_case/v1"
+                case.get("schema") or "forgeos.motor_stack.gear_oil_fia_front_kit_case/v2"
             ),
             "geometry_revision": (
                 f"ratio={inputs.get('gear_ratio')} planets={inputs.get('planet_count')} "
@@ -1819,15 +1828,21 @@ def _gear_oil_check_from_fia_case(
                 "absolute_path": str((Path(twin_dir) / rel_ref).resolve()),
                 "minimum_jet_flow_l_min": screening.get("minimum_jet_flow_l_min"),
                 "churning_loss_w": screening.get("churning_loss_w"),
+                "jet_pressure_required_kpa": screening.get("jet_pressure_required_kpa"),
+                "immersion_fraction_geometry": screening.get("immersion_fraction_geometry"),
+                "cornering_pickup_ok": screening.get("cornering_pickup_ok"),
                 "pickup_charge_adequate": screening.get("pickup_charge_adequate"),
+                "geometry_source": screening.get("geometry_source"),
                 "gear_ratio": inputs.get("gear_ratio"),
                 "planet_count": inputs.get("planet_count"),
                 "required_shaft_torque_nm": inputs.get("required_shaft_torque_nm"),
+                "honesty_frame": case.get("honesty_frame"),
                 "free_surface_cfd": "OPEN",
                 "bench_correlation": "OPEN",
                 "note": (
-                    "Twin-bound analytical jet/churning/pickup screen on planetary "
-                    "seeds. Not free-surface CFD; OpenFOAM cavity remains smoke-only."
+                    "Twin-bound geometry analytical jet/churning/pickup/cornering "
+                    "screen on planetary writeback. RESULT_UNDER_ASSUMPTIONS — "
+                    "not free-surface CFD; OpenFOAM cavity remains smoke-only."
                 ),
             },
         },
@@ -3022,6 +3037,32 @@ def build_hardware_correlation(
     }
 
 
+def _build_assumption_based_design(
+    twin_dir: Optional[Path],
+) -> Optional[dict[str, Any]]:
+    """Build Jack-facing assumption → results register when a twin is present.
+
+    INTENT: Tristan needs a review narrative that is not a wall of PARTIAL.
+    Educated guesses are frozen and named; results are labelled under those
+    assumptions; ship_ok stays false.
+    """
+
+    if twin_dir is None:
+        return None
+    try:
+        from fpk_assumption_based_design import (  # type: ignore
+            build_register,
+            write_register,
+        )
+    except ImportError:
+        sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+        from fpk_assumption_based_design import build_register, write_register
+
+    register = build_register(Path(twin_dir))
+    write_register(Path(twin_dir), register)
+    return register
+
+
 def build_stamp_payload(
     *,
     state: Optional[Mapping[str, Any]] = None,
@@ -3050,6 +3091,7 @@ def build_stamp_payload(
         twin_dir=twin_dir,
     )
     packaging = build_inverter_packaging(twin_dir=twin_dir, stamped_at=stamped)
+    assumption_design = _build_assumption_based_design(twin_dir)
     payload: dict[str, Any] = {
         "schema_version": "motor-multiphysics-sidecar/v1",
         "stamped_at": stamped,
@@ -3062,6 +3104,8 @@ def build_stamp_payload(
     }
     if packaging is not None:
         payload["inverterPackaging"] = packaging
+    if assumption_design is not None:
+        payload["assumptionBasedDesign"] = assumption_design
     blockers = motor.get("architectureBlockers")
     if isinstance(blockers, list):
         payload["architectureBlockers"] = blockers
@@ -3084,20 +3128,75 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         f"**Stamped:** {payload.get('stamped_at')}  ",
         f"**Assembly revision:** `{payload.get('assembly_revision')}`  ",
         f"**Schema:** `{motor.get('schema_version')}` / `{cad.get('schema_version')}`  ",
-        "**ship_ok:** **false**  ",
-        "**all_required_solver_checks_pass:** **false**",
+        "**ship_ok:** **false** (not homologated)  ",
+        "**all_required_solver_checks_pass:** **false** (hardware correlation not claimed)",
         "",
-        "## Plain English",
+    ]
+    assumption = payload.get("assumptionBasedDesign")
+    if isinstance(assumption, Mapping):
+        lines.extend(
+            [
+                "## What you can show in a design review (read this first)",
+                "",
+                f"**Review status:** `{assumption.get('review_status')}`  ",
+                f"{assumption.get('pitch')}",
+                "",
+                "We **froze educated design assumptions** where team/supplier data is "
+                "missing, ran the stack, and report **results under those assumptions**. "
+                "That is a usable concept pack — not a wall of unfinished work, and not "
+                "a race-release claim. Partner asks replace the assumed rows.",
+                "",
+                f"- Full brief: `{assumption.get('brief_markdown')}`",
+                f"- Email ask draft: `{assumption.get('email_draft_markdown')}`",
+                "- Twin register: `JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.md`",
+                "",
+                "| Result | Status |",
+                "|---|---|",
+            ]
+        )
+        for row in assumption.get("results_under_assumptions") or []:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"| {row.get('statement')} — {row.get('value')} | "
+                    f"**{row.get('status')}** |"
+                )
+        lines.extend(
+            [
+                "",
+                "### Frozen assumptions (educated guesses)",
+                "",
+                "| ID | Value | Replace with |",
+                "|---|---|---|",
+            ]
+        )
+        for row in assumption.get("assumptions") or []:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"| `{row.get('id')}` | {row.get('value')} | "
+                    f"{row.get('replace_with')} |"
+                )
+        lines.extend(
+            [
+                "",
+                "### Ask list for JLR / suppliers",
+                "",
+                "| Priority | Ask |",
+                "|---|---|",
+            ]
+        )
+        for row in assumption.get("asks_from_partner") or []:
+            if isinstance(row, Mapping):
+                lines.append(f"| {row.get('priority')} | {row.get('ask')} |")
+        lines.extend(["", "---", ""])
+    lines.extend(
+        [
+        "## Engineering stamp detail (PARTIAL = screening under assumptions)",
         "",
         "Solver *toolchains* have been smoke-tested (Pyleecan+xfemm, ROSS, CalculiX,",
-        "OpenFOAM). Generic smokes alone are **not** enough. A check may be **PARTIAL**",
-        "when a twin-bound artefact exists (magnetic point, denser MTPA screen,",
-        "analytical hot demag screen, ROSS critical-speed screen, CalculiX rotor screen,",
-        "OpenFOAM cold-plate duct, gear-oil screen, and/or ISO 6336-style",
-        "gear-strength screen) while torque map, **full** demagnetisation map,",
-        "magnet-pocket burst release FoS, free-surface oil CFD, KISSsoft, load",
-        "spectrum, module temperatures, bearing identity, modal/dynamometer",
-        "correlation and other domains remain **OPEN**. `ship_ok` stays false.",
+        "OpenFOAM). A check is **PARTIAL** when a twin-bound screening artefact exists",
+        "under the frozen assumptions above. Formal PASS / `ship_ok` still needs",
+        "hardware correlation — intentional honesty, not a missing slide deck.",
+        "Prefer the assumption-based section for Jack-facing review.",
         "",
         "## FIA binding duties (why the solvers exist)",
         "",
@@ -3120,7 +3219,8 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "| Check | Status | Works in kit context? | Software | Twin-bound result |",
         "|---|---|---|---|---|",
-    ]
+        ]
+    )
     for name, chk in (motor.get("required_checks") or {}).items():
         works = chk.get("works_in_kit_context")
         if works is True:
@@ -3539,6 +3639,8 @@ def apply_to_state(
         state["hardwareCorrelation"] = payload["hardwareCorrelation"]
     if isinstance(payload.get("inverterPackaging"), Mapping):
         state["inverterPackaging"] = payload["inverterPackaging"]
+    if isinstance(payload.get("assumptionBasedDesign"), Mapping):
+        state["assumptionBasedDesign"] = payload["assumptionBasedDesign"]
     blockers = payload.get("architectureBlockers")
     if isinstance(blockers, list):
         state["architectureBlockers"] = blockers
@@ -3557,14 +3659,22 @@ def apply_to_state(
             for b in listed
             if isinstance(b, Mapping) and b.get("status") == "OPEN"
         )
+    assumption = payload.get("assumptionBasedDesign")
     state["motorMultiphysicsPointer"] = {
         "sidecar": "motor-multiphysics.json",
         "markdown": "JLR-FE-FRONT-FPK-MOTOR-MULTIPHYSICS.md",
+        "assumption_based_design": "JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.md",
         "assembly_revision": payload.get("assembly_revision"),
         "ship_ok": False,
         "all_required_solver_checks_pass": False,
+        "review_status": (
+            assumption.get("review_status")
+            if isinstance(assumption, Mapping)
+            else None
+        ),
         "stamped_at": payload.get("stamped_at"),
         "has_inverter_packaging": isinstance(payload.get("inverterPackaging"), Mapping),
+        "has_assumption_based_design": isinstance(assumption, Mapping),
         "hardware_correlation_open_count": (
             payload.get("hardwareCorrelation", {}).get("open_count")
             if isinstance(payload.get("hardwareCorrelation"), Mapping)
@@ -3840,27 +3950,33 @@ def selftest() -> int:
                     "input_quantities_sha256": "torquemap321",
                     "geometry_binding": {
                         "rotor_inner_diameter_mm": 130.5,
-                        "rotor_outer_diameter_mm": 159.8,
+                        "rotor_outer_diameter_mm": 197.1,
                         "matches_twin_concentric": True,
                     },
                     "summary": {
                         "femm_anchor_points": 35,
-                        "current_scaled_points": 105,
-                        "fw_capability_points": 21,
-                        "loss_corner_points": 3,
-                        "total_screen_points": 164,
-                        "peak_torque_magnitude_nm": 118.4,
-                        "peak_torque_vs_required_ratio": 0.909,
+                        "angle_interpolated_points": 30,
+                        "current_scaled_points": 390,
+                        "fw_capability_points": 33,
+                        "loss_grid_points": 66,
+                        "speed_torque_envelope_points": 66,
+                        "loss_corner_points": 6,
+                        "total_screen_points": 620,
+                        "peak_torque_magnitude_nm": 207.124,
+                        "peak_torque_vs_required_ratio": 1.654,
                         "rotor_inner_diameter_mm": 130.5,
-                        "rotor_outer_diameter_mm": 159.8,
+                        "rotor_outer_diameter_mm": 197.1,
                         "geometry_matches_twin": True,
                     },
                     "coverage": {
                         "femm_anchor_points": 35,
-                        "current_scaled_points": 105,
-                        "fw_capability_points": 21,
-                        "loss_corner_points": 3,
-                        "total_screen_points": 164,
+                        "angle_interpolated_points": 30,
+                        "current_scaled_points": 390,
+                        "fw_capability_points": 33,
+                        "loss_grid_points": 66,
+                        "speed_torque_envelope_points": 66,
+                        "loss_corner_points": 6,
+                        "total_screen_points": 620,
                         "denser_than_mtpa_alone": True,
                         "losses_evaluated": True,
                         "fw_capability_evaluated": True,
@@ -4354,16 +4470,16 @@ def selftest() -> int:
                 "screen as PARTIAL when artefact present"
             )
             bad += 1
-        elif torque_map_cite.get("total_screen_points") != 164:
+        elif torque_map_cite.get("total_screen_points") != 620:
             print("FAIL: torque-map cite must surface total screen point count")
             bad += 1
-        elif torque_map_cite.get("peak_torque_magnitude_nm") != 118.4:
+        elif torque_map_cite.get("peak_torque_magnitude_nm") != 207.124:
             print("FAIL: torque-map cite must surface peak torque magnitude")
             bad += 1
         elif torque_map_cite.get("rotor_inner_diameter_mm") != 130.5:
             print("FAIL: torque-map cite must bind enlarged rotor ID")
             bad += 1
-        elif torque_map_cite.get("rotor_outer_diameter_mm") != 159.8:
+        elif torque_map_cite.get("rotor_outer_diameter_mm") != 197.1:
             print("FAIL: torque-map cite must bind enlarged rotor OD")
             bad += 1
         elif torque_map_cite.get("ship_ok") is not False:
@@ -4609,11 +4725,11 @@ def selftest() -> int:
         if prove_catch(evil).get("ok"):
             print("FAIL: proveCatch must fire when OPEN blockers coexist with ship_ok")
             bad += 1
-        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 8:
+        if int(partial_payload["cadAuthority"].get("parametric_family_count") or 0) < 10:
             print(
-                "FAIL: expected ≥8 parametric families "
-                "(stator, rotor, planetary, post_diff, cold_plate, water_jacket, "
-                "case_shell, bus_stack, port_cluster)"
+                "FAIL: expected ≥10 parametric families "
+                "(stator, rotor, planetary, post_diff, bevel_diff, bearing_stack, "
+                "cold_plate, water_jacket, case_shell, bus_stack, port_cluster)"
             )
             bad += 1
         cold = next(

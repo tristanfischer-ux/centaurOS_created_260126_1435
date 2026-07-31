@@ -32,8 +32,31 @@ class FiaTorqueMapScreenContractTest(unittest.TestCase):
         )
 
     def test_fw_curve_point_count(self) -> None:
-        self.assertEqual(len(SCREEN.FW_SPEED_FRACTIONS), 7)
-        self.assertEqual(len(SCREEN.CURRENT_MAGNITUDE_FRACTIONS), 3)
+        self.assertEqual(len(SCREEN.FW_SPEED_FRACTIONS), 11)
+        self.assertEqual(len(SCREEN.CURRENT_MAGNITUDE_FRACTIONS), 6)
+
+    def test_angle_interpolation_adds_midpoints(self) -> None:
+        femm = [
+            {
+                "current_angle_electrical_deg": -50.0,
+                "rotor_position_mechanical_deg": 0.0,
+                "torque_nm": -100.0,
+                "peak_airgap_flux_density_t": 1.2,
+            },
+            {
+                "current_angle_electrical_deg": -40.0,
+                "rotor_position_mechanical_deg": 0.0,
+                "torque_nm": -120.0,
+                "peak_airgap_flux_density_t": 1.3,
+            },
+        ]
+        interpolated = SCREEN.interpolate_angle_grid(femm)
+        self.assertEqual(len(interpolated), 1)
+        self.assertAlmostEqual(
+            interpolated[0]["current_angle_electrical_deg"],
+            -45.0,
+        )
+        self.assertAlmostEqual(interpolated[0]["torque_nm"], -110.0)
 
 
 if __name__ == "__main__":
