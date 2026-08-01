@@ -1,0 +1,94 @@
+{
+  "bearing_supplier_identity": {
+    "reason": "Assumed isotropic stiffness/damping; no catalogue part.",
+    "status": "OPEN"
+  },
+  "critical_speeds": {
+    "clear_of_operating_band": true,
+    "critical_speeds_rpm": [
+      24733.81,
+      24733.86,
+      25203.5,
+      106923.667
+    ],
+    "first_critical_speed_hz": 412.230162,
+    "first_critical_speed_rad_s": 2590.118497,
+    "first_critical_speed_rpm": 24733.81,
+    "margin_ratio_first_over_operating": 1.2684,
+    "operating_regime": "subcritical_screening",
+    "operating_speed_rpm": 19500.0,
+    "subcritical_margin_factor_required": 1.2
+  },
+  "fia_question": "Are critical speeds clear of the 19,500 rpm operating band with margin?",
+  "geometry_provenance": {
+    "controlling_dimensions": "state.fpkConcentricGeometry with orchestratorContract quantity fallbacks",
+    "generic_1m_smoke_shaft_used": false,
+    "lucid_or_proprietary_cad_used": false,
+    "statement": "Kit-sized ROSS beam model from twin housing/rotor dimensions; not the generic ross_rotor_selftest 1 m shaft."
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "bearing_span_mm": 140.5,
+    "continuous_electrical_power_kw": 250.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "shaft_outer_diameter_mm": 105.9
+  },
+  "input_quantities_sha256": "4accf598a8980ebbe7e1b7ca27e3482594100b3490395351c7e695ded839f666",
+  "margins": {
+    "clear_of_operating_band": true,
+    "first_critical_over_operating": 1.2684,
+    "note": "Screening margin only \u2014 assumed bearing stiffness/damping and steel equivalent disk. Not a supplier Campbell diagram.",
+    "required_subcritical_factor": 1.2
+  },
+  "modal_or_dynamometer_correlation": {
+    "statement": "Critical-speed prediction still requires modal test and/or dynamometer coast-down correlation on the current hardware revision.",
+    "status": "OPEN"
+  },
+  "model_assumptions": [
+    "Solid steel shaft OD equals rotor bore (or fpk_shaft_od_mm when present).",
+    "Bearing span equals housing length (or fpk_bearing_span_mm when present).",
+    "6 equal beam elements span the bearings.",
+    "One midspan DiskElement approximates laminated rotor + magnets as steel.",
+    "Bearing kxx=5.000e+07 N/m, cxx=5.000e+03 N\u00b7s/m (isotropic, identical ends).",
+    "No gear overhang, resolver stub, differential shafts, or housing flexibility.",
+    "No gyroscopic speed sweep / unbalance response / squeeze-film dampers."
+  ],
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS without dyno or modal correlation.",
+  "rotor_model": {
+    "bearing_cxx_n_s_m": 5000.0,
+    "bearing_kxx_n_m": 50000000.0,
+    "bearing_nodes": [
+      0,
+      6
+    ],
+    "disk_inner_diameter_m": 0.10590000000000001,
+    "disk_node": 3,
+    "disk_outer_diameter_m": 0.1394,
+    "disk_width_m": 0.09758,
+    "fits_bay": true,
+    "fits_housing_length": true,
+    "material_name": "FiaFrontKitScreeningSteel",
+    "shaft_element_count": 6,
+    "shaft_length_m": 0.1405,
+    "shaft_outer_diameter_m": 0.10590000000000001
+  },
+  "schema": "forgeos.motor_stack.ross_fia_front_kit_case/v1",
+  "ship_ok": false,
+  "solver": {
+    "name": "ROSS",
+    "package": "ross-rotordynamics",
+    "version": "2.3.0"
+  },
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL"
+}

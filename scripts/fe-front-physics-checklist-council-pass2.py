@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Pass-2 council: retry Kimi + fill thin assemblies (TX / fasteners / sensors).
+"""Pass-2 council: retry fragile seat + fill thin assemblies (TX / fasteners / sensors).
 
 Merges into existing _physics_checklist_council/merged.json and rewrites the
-comprehensive checklist markdown.
+comprehensive checklist markdown. Seats follow council_models → model_routing.
 """
 from __future__ import annotations
 
@@ -123,8 +123,8 @@ def main() -> int:
 
     def run(name: str, model: str) -> tuple[str, dict]:
         focus = (
-            "FULL thin assemblies + Kimi must emit JSON only"
-            if name == "kimi"
+            "FULL thin assemblies + auditor seat must emit JSON only"
+            if name == "minimax_m3"
             else "thin assemblies TX/fasteners/sensors/lube/harness"
         )
         print(f"[pass2] calling {name} …", flush=True)

@@ -1,0 +1,111 @@
+{
+  "cad_family": "cold_plate_serpentine",
+  "channel_geometry": {
+    "channel_depth_m": 0.0013360000000000002,
+    "channel_width_m": 0.005345,
+    "cross_section_area_m2": 7.140920000000001e-06,
+    "density_for_pressure_kg_m3": 983.2,
+    "estimated_full_path_length_m": 1.4799645943005142,
+    "flow_split": "total_flow_divided_by_pass_count",
+    "hydraulic_diameter_m": 0.002137679988025745,
+    "inlet_velocity_m_s": 3.500949457492872,
+    "kinematic_viscosity_m2_s": 4.78e-07,
+    "pass_count": 8,
+    "pass_length_m": 0.174,
+    "reynolds_number": 15656.714632577616,
+    "volumetric_flow_per_pass_m3_s": 2.5e-05,
+    "volumetric_flow_total_m3_s": 0.0002
+  },
+  "conjugate_heat_transfer": {
+    "statement": "Full serpentine STEP CHT remains OPEN.",
+    "status": "OPEN"
+  },
+  "fia_question": "What duct velocity / pressure drop appear at 12 L/min / 60 \u00b0C on the cold_plate_serpentine channel section?",
+  "flow_bench_correlation": {
+    "statement": "No measured cold-plate \u0394p / flow-bench correlation yet.",
+    "status": "OPEN"
+  },
+  "fluid": {
+    "density_for_pressure_kg_m3": 983.2,
+    "kinematic_viscosity_m2_s": 4.78e-07,
+    "label": "water_like_at_60C",
+    "note": "Isothermal water \u03bd and \u03c1 at ~60 \u00b0C for duct screening. Twin EGW CoolProp density is recorded in input_quantities when present but is not used as the OpenFOAM viscosity model."
+  },
+  "geometry_provenance": {
+    "controlling_dimensions": "orchestratorContract coolant_* + cold_plate_channel_* with cold_plate_serpentine family defaults",
+    "full_serpentine_step_meshed": false,
+    "lucid_or_proprietary_cad_used": false,
+    "statement": "Twin-bound rectangular-channel screen using family channel dims and FIA coolant point; not supplier cold-plate CAD."
+  },
+  "honesty_notes": [
+    "PARTIAL means a twin-bound OpenFOAM duct screen exists \u2014 not release.",
+    "ship_ok is permanently false for this artefact schema.",
+    "Do not claim module \u0394T closed from this pressure/velocity screen.",
+    "Re is transitional/turbulent for the FIA point; laminar solver \u0394p is a screen, cross-checked with Darcy laminar/Blasius analytics."
+  ],
+  "input_quantities": {
+    "channel_depth_mm": 1.336,
+    "channel_pitch_mm": 8.0,
+    "channel_width_mm": 5.345,
+    "coolant_flow_l_min": 12.0,
+    "coolant_inlet_c": 60.0,
+    "pass_count": 8,
+    "plate_length_mm": 180.0,
+    "twin_analytical_delta_p_pa": null,
+    "twin_coolant_density_kg_m3": 1040.4899931631571,
+    "wall_mm": 3.0
+  },
+  "input_quantities_sha256": "63e39c80cf8c919edab377664e4e3fc6a092157d9454c173c37e9909e73a4c5b",
+  "model_assumptions": [
+    "Rectangular duct cross-section = family channel_width \u00d7 channel_depth.",
+    "Duct length = one pass (plate_length \u2212 2\u00d7wall).",
+    "Inlet velocity from (12 L/min total) / pass_count / channel area.",
+    "Water-like \u03bd = 4.780e-07 m\u00b2/s at ~60 \u00b0C (documented).",
+    "Laminar steady SIMPLE \u2014 not a mesh-converged turbulent CHT study.",
+    "Full-path \u0394p \u2248 n \u00d7 per-pass solver \u0394p; U-bend / port losses OPEN.",
+    "No solid domain, no TIM, no module junction temperatures."
+  ],
+  "module_temperatures": {
+    "statement": "This case does not close module temperatures or conjugate heat transfer. Pressure-drop and velocity screening only.",
+    "status": "OPEN"
+  },
+  "pressure_drop": {
+    "analytical_darcy_blasius_pa": 13854.857,
+    "analytical_darcy_laminar_pa": 2004.793,
+    "analytical_full_path_blasius_pa": 117843.088,
+    "analytical_full_path_laminar_pa": 17051.851,
+    "estimated_full_path_delta_p_pa": 24921.2372576,
+    "friction_factor_blasius": 0.02824958,
+    "friction_factor_laminar": 0.0040877,
+    "headline_delta_p_pa": 24921.237,
+    "headline_source": "openfoam_laminar_n_times_per_pass",
+    "solver_delta_p_kinematic_m2_s2": 3.1683835,
+    "solver_delta_p_pa": 3115.1546572,
+    "solver_delta_p_per_pass_pa": 3115.1546572
+  },
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS without conjugate thermal closure and flow-bench correlation.",
+  "schema": "forgeos.motor_stack.openfoam_fia_cold_plate_case/v1",
+  "ship_ok": false,
+  "solver": {
+    "case_dir": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/openfoam_fia_cold_plate_case_work",
+    "converged": true,
+    "image": "microfluidica/openfoam:14",
+    "latest_time": "59",
+    "mesh_cells": {
+      "x": 40,
+      "y": 8,
+      "z": 4
+    },
+    "name": "OpenFOAM foamRun / incompressibleFluid (laminar SIMPLE)",
+    "runtime": "docker",
+    "u_field_present": true
+  },
+  "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "velocity": {
+    "flow_split": "total_flow_divided_by_pass_count",
+    "inlet_velocity_m_s": 3.500949457492872,
+    "reynolds_number": 15656.714632577616
+  }
+}

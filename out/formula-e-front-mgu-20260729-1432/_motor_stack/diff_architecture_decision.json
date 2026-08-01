@@ -1,0 +1,10 @@
+{
+  "ratio_after_diff": 4.0,
+  "ratio_into_diff": 2.0,
+  "residual_blocker": "POST_DIFF_FINAL_DRIVE_PACKAGING",
+  "schema": "forgeos.motor_stack.diff_architecture_decision/v1",
+  "selected_option": "cut_torque_at_diff",
+  "ship_ok": false,
+  "status": "APPLIED_FOR_SCREENING",
+  "total_ratio_product": 8.0
+}

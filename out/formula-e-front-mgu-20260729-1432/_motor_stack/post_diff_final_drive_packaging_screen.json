@@ -1,0 +1,119 @@
+{
+  "schema": "forgeos.motor_stack.post_diff_final_drive_packaging_screen/v1",
+  "status": "SOFTWARE_CLOSED",
+  "ship_ok": false,
+  "bay_fit": true,
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+  "source_bevel_sha256": "13e21dbabb419f9e82276071ec8fb5e300c9f3d9ab80a64d23eb4395779343ab",
+  "source_evidence": {
+    "bay_envelope": "state.json#orchestratorContract.quantities",
+    "diff_nest": "_motor_stack/iso_bevel_fia_front_kit_case.json#bevel_geometry",
+    "ratio_decision": "_motor_stack/iso_bevel_fia_front_kit_case.json#architecture_decision.ratio_after_diff",
+    "strength_screen": "_motor_stack/iso6336_post_diff_final_drive_screen.json",
+    "interface_register": "_motor_stack/post_diff_final_drive_interface_register.json"
+  },
+  "input_quantities": {
+    "bay_width_mm": 343.0,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "diff_od_mm": 120.0,
+    "diff_len_mm": 108.0,
+    "ratio_after_diff": 4.0,
+    "ratio_into_diff": 2.0,
+    "max_rotor_speed_rpm": 19500.0
+  },
+  "topology": {
+    "screened_concept": "dual_post_diff_parallel_axis_helical_pairs",
+    "pair_count": 2,
+    "arrangement": "one pair per differential output; pinions coaxial with side outputs; pairs axially outboard and clocked in the same radial direction",
+    "ratio_target": 4.0,
+    "ratio_from_teeth": 4.0
+  },
+  "gear_seed": {
+    "pinion_teeth": 24,
+    "wheel_teeth": 96,
+    "normal_module_mm": 1.4,
+    "transverse_module_mm": 1.5447,
+    "helix_angle_deg": 25.0,
+    "face_width_mm": 46.0,
+    "pinion_pitch_diameter_mm": 37.0735,
+    "wheel_pitch_diameter_mm": 148.294,
+    "pinion_tip_diameter_mm": 39.8735,
+    "wheel_tip_diameter_mm": 151.094,
+    "center_distance_mm": 92.6837,
+    "geometry_source": "strength_driven_resize",
+    "authority": "strength_screening_seed_not_release_geometry"
+  },
+  "envelope_mm": {
+    "width_lateral": 240.0,
+    "depth_short_edge": 240.2307,
+    "height": 163.094,
+    "bay_width": 343.0,
+    "bay_depth_short_edge": 259.0,
+    "bay_height": 267.0,
+    "width_margin": 103.0,
+    "short_edge_margin": 18.7693,
+    "height_margin": 103.906
+  },
+  "short_edge_budget_mm": {
+    "bay_short_edge": 259.0,
+    "diff_nest_od": 120.0,
+    "remaining_after_diff_nest": 139.0,
+    "added_beyond_diff_nest": 120.2307,
+    "combined_screened_envelope": 240.2307,
+    "margin": 18.7693
+  },
+  "cad_authority": {
+    "status": "SOFTWARE_SEEDED",
+    "parametric_family_exists": true,
+    "cad_family": "post_diff_final_drive_helical",
+    "source": "Tier 1 and 2 parts for cad /tier2_motor_drivetrain.py#post_diff_final_drive_helical",
+    "release_cad": false,
+    "blender_mesh_prefix": "u_se_td_post_diff_",
+    "note": "Rebuildable dual-helical concept geometry exists. Blender traction placer emits physics-linked u_se_td_post_diff_* meshes from this screen's selected gear seed \u2014 not revision-bound release CAD."
+  },
+  "architecture_blocker": {
+    "blocker_id": "POST_DIFF_FINAL_DRIVE_PACKAGING",
+    "status": "CLEARED",
+    "clearance_scope": "software_screening_only",
+    "ship_ok": false,
+    "bay_fit": true,
+    "minimum_strength_factor": 1.2005,
+    "interface_ok": true,
+    "cannot_greenwash": "Software screening clearance is not release clearance: release CAD, KISSsoft, race spectrum fatigue, bearing/shaft/spline/lube design, and bench validation remain OPEN.",
+    "summary": "The selected strength-resized dual post-diff 4:1 helical-pair seed fits the bay, the interface register proves no software float gaps, and the ISO 6336-style helical screen clears FoS >= 1.2. Clearance is software-screening only; release CAD, KISSsoft, fatigue, shafts, bearings, lubrication and bench remain OPEN."
+  },
+  "closure_gate": {
+    "bay_fit_required": true,
+    "bay_fit": true,
+    "parametric_family_required": true,
+    "parametric_family_exists": true,
+    "software_packaging_screen_ok": true,
+    "strength_screen_required": true,
+    "strength_screen_ok": true,
+    "strength_screen_path": "_motor_stack/iso6336_post_diff_final_drive_screen.json",
+    "minimum_strength_factor": 1.2005,
+    "required_strength_factor": 1.2,
+    "interface_register_required": true,
+    "interface_register_ok": true,
+    "interface_register_path": "_motor_stack/post_diff_final_drive_interface_register.json",
+    "blender_interface_status": "SOFTWARE_CLOSED",
+    "blender_meshes_defined": true,
+    "blender_mesh_prefix": "u_se_td_post_diff_",
+    "blender_geometry_module": "scripts/lib/post_diff_final_drive_geometry.py",
+    "blocker_may_clear": true,
+    "clearance_scope": "software_screening_only",
+    "reason": "Bay fit, CadQuery family, Blender meshes, no-float-gap interface register, and helical strength FoS >= 1.2 all pass for software screening only. Release checks remain OPEN."
+  },
+  "honesty_notes": [
+    "Software-screening closure only; never a CAD release or ship permission.",
+    "CadQuery family seeded; Blender placer syncs u_se_td_post_diff_* meshes.",
+    "ISO 6336-style helical tooth screen is analytical; KISSsoft remains OPEN.",
+    "No micropitting, scuffing, race-spectrum life, or bench close.",
+    "No bearing life, shaft deflection, spline standard, seal, tolerance, NVH, or lubrication close.",
+    "Dual output stages preserve differential action only if both mirrored gear paths and halfshaft interfaces are packaged as assumed.",
+    "Real suspension/halfshaft/CV-joint keep-outs and FIA/team interface drawings can invalidate bay_fit.",
+    "ship_ok remains false whether bay_fit is true or false."
+  ]
+}

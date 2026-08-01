@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Close-out push council — Sol + GLM + Kimi (Opus fallback).
+"""Close-out push council — Sol + Grok + MiniMax (Opus fallback).
 
 INTENT: Produce an actionable Bar A/B close-out plan for the FE front FPK twin,
 not a generic reject. Reads `_redteam_digest_v2.json` + closeout tracker excerpt.
+
+Seats: scripts/lib/council_models.py → model_routing.py.
 """
 
 from __future__ import annotations
@@ -24,7 +26,8 @@ OUT_DIR = OUT / "_closeout_council_v1"
 
 from scripts.lib.council_models import (  # noqa: E402
     COUNCIL_MODELS,
-    run_kimi_with_opus5_fallback,
+    FRAGILE_SEAT_NAME,
+    run_fragile_seat_with_fallback,
 )
 
 SYSTEM = """You are a senior Formula E powertrain engineering programme manager advising
@@ -146,7 +149,7 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=3) as pool:
         futs = []
         for name, model in COUNCIL_MODELS.items():
-            if name == "kimi":
+            if name == FRAGILE_SEAT_NAME:
                 continue
             futs.append(pool.submit(run_seat, name, model))
         for fut in as_completed(futs):
@@ -156,13 +159,13 @@ def main() -> int:
                 json.dumps(obj, indent=2) + "\n", encoding="utf-8"
             )
 
-    def kimi_call(name: str, model: str) -> dict:
+    def fragile_call(name: str, model: str) -> dict:
         return call_model(model, user, api_key)
 
-    seat, model_id, kimi_obj = run_kimi_with_opus5_fallback(kimi_call)
-    results[seat] = kimi_obj
+    seat, model_id, fragile_obj = run_fragile_seat_with_fallback(fragile_call)
+    results[seat] = fragile_obj
     (OUT_DIR / f"{seat}.json").write_text(
-        json.dumps(kimi_obj, indent=2) + "\n", encoding="utf-8"
+        json.dumps(fragile_obj, indent=2) + "\n", encoding="utf-8"
     )
 
     merged = {

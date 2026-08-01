@@ -1,0 +1,259 @@
+{
+  "coverage": {
+    "back_emf_estimated_from_oc_femm": true,
+    "closed_field_weakening_map": false,
+    "closed_torque_map": false,
+    "dc_bus_cases": 3,
+    "ld_lq_maps_identified": false,
+    "loaded_terminal_voltage_estimated": true,
+    "pwm_overmodulation_evaluated": false,
+    "rs_identified": false,
+    "saturation_map_evaluated": false,
+    "speed_points": 4,
+    "temperature_corners_evaluated": false,
+    "twin_dc_bus_min_nominal_max_evaluated": true
+  },
+  "field_weakening_map": {
+    "reason": "A controller-grade FW schedule requires identified Rs, saturated Ld/Lq/\u03c8pm maps, current/voltage circles, thermal limits and dyno correlation.",
+    "status": "OPEN"
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "continuous_electrical_power_kw": 250.0,
+    "dc_bus_max_voltage_v": 900.0,
+    "dc_bus_min_voltage_v": 600.0,
+    "dc_bus_voltage_v": 750.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "inverter_efficiency_assumption": 0.98766,
+    "machine_efficiency_assumption": 0.98995,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "phase_current_design_a": 477.0,
+    "radial_airgap_mm": 0.7,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "turns_per_coil": 4.0,
+    "turns_per_phase": 14.0,
+    "twin_stator_slots": 24.0,
+    "winding_parallel_paths": 2.0
+  },
+  "input_quantities_sha256": "85d586e816c5d4abac013e7dc5e35c020790702711e5442f06f3fa1641d461e9",
+  "machine_geometry": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "estimated_active_material_mass_kg": 13.088,
+    "fits_bay": true,
+    "fits_housing": true,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "magnet_length_mm": 14.5793,
+    "magnet_regions": 16,
+    "magnet_thickness_mm": 8.85,
+    "radial_airgap_mm": 0.7000000000000028,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "rotor_poles": 8,
+    "slot_depth_mm": 15.0,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "stator_slots": 24,
+    "topology": "24-slot / 8-pole twin-V interior permanent-magnet synchronous machine"
+  },
+  "max_speed_bus_cases": [
+    {
+      "available_line_line_rms_voltage_v": 367.423461,
+      "back_emf_voltage_utilisation": 0.442386,
+      "controlling_voltage_utilisation": 0.923931,
+      "dc_bus_voltage_v": 600.0,
+      "estimated_back_emf_line_line_rms_v": 154.415797,
+      "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+      "field_weakening_indicated": false,
+      "loaded_voltage_utilisation": 0.923931,
+      "speed_rpm": 19500.0,
+      "usable_line_line_rms_voltage_v_with_reserve": 349.052288,
+      "voltage_headroom": 0.076069
+    },
+    {
+      "available_line_line_rms_voltage_v": 459.279327,
+      "back_emf_voltage_utilisation": 0.353909,
+      "controlling_voltage_utilisation": 0.739145,
+      "dc_bus_voltage_v": 750.0,
+      "estimated_back_emf_line_line_rms_v": 154.415797,
+      "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+      "field_weakening_indicated": false,
+      "loaded_voltage_utilisation": 0.739145,
+      "speed_rpm": 19500.0,
+      "usable_line_line_rms_voltage_v_with_reserve": 436.31536,
+      "voltage_headroom": 0.260855
+    },
+    {
+      "available_line_line_rms_voltage_v": 551.135192,
+      "back_emf_voltage_utilisation": 0.294924,
+      "controlling_voltage_utilisation": 0.615954,
+      "dc_bus_voltage_v": 900.0,
+      "estimated_back_emf_line_line_rms_v": 154.415797,
+      "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+      "field_weakening_indicated": false,
+      "loaded_voltage_utilisation": 0.615954,
+      "speed_rpm": 19500.0,
+      "usable_line_line_rms_voltage_v_with_reserve": 523.578433,
+      "voltage_headroom": 0.384046
+    }
+  ],
+  "model_assumptions": [
+    "Spatial OC B_rms is treated as a sinusoidal radial wave; \u03a6pk\u22482\u221a2\u00b7B_rms\u00b7r_g\u00b7L/p.",
+    "PM phase flux linkage \u2248 kw\u00b7Nphase\u00b7\u03a6pk with kw=0.96.",
+    "Back-EMF scales linearly with electrical speed from the OC estimate.",
+    "Loaded terminal V_LL estimate uses Pdc/(\u03b7inv\u00b7\u221a3\u00b7Irms\u00b7PF) with PF=0.95.",
+    "Usable inverter voltage applies a 0.95 control reserve to Vdc\u00b7\u221a3/(2\u221a2).",
+    "No Rs/Ld/Lq voltage vector or saturated dq flux map is claimed."
+  ],
+  "open_circuit_evidence": {
+    "evidence_class": "existing twin-bound 2D nonlinear FEMM OC point",
+    "input_quantities_sha256": "85d586e816c5d4abac013e7dc5e35c020790702711e5442f06f3fa1641d461e9",
+    "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json",
+    "rms_airgap_flux_density_t": 0.237612701
+  },
+  "release_statement": "SCREEN evidence only. No field-weakening calibration, FIA homologation, dynamometer correlation, race evidence or permission to ship.",
+  "schema": "forgeos.motor_stack.em_fia_voltage_fw_screen/v1",
+  "screening_results": {
+    "back_emf_no_fw_speed_rpm_at_min_bus": 44079.167,
+    "electrical_frequency_hz_at_max_speed": 1300.0,
+    "estimated_back_emf_line_line_rms_v_at_max_speed": 154.415797,
+    "estimated_back_emf_phase_rms_v_at_max_speed": 89.152002,
+    "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+    "estimated_peak_flux_per_pole_wb": 0.00114848,
+    "estimated_pm_flux_linkage_peak_wb": 0.015435577,
+    "field_weakening_indicated_at_max_speed": false,
+    "max_speed_bus_cases": [
+      {
+        "available_line_line_rms_voltage_v": 367.423461,
+        "back_emf_voltage_utilisation": 0.442386,
+        "controlling_voltage_utilisation": 0.923931,
+        "dc_bus_voltage_v": 600.0,
+        "estimated_back_emf_line_line_rms_v": 154.415797,
+        "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+        "field_weakening_indicated": false,
+        "loaded_voltage_utilisation": 0.923931,
+        "speed_rpm": 19500.0,
+        "usable_line_line_rms_voltage_v_with_reserve": 349.052288,
+        "voltage_headroom": 0.076069
+      },
+      {
+        "available_line_line_rms_voltage_v": 459.279327,
+        "back_emf_voltage_utilisation": 0.353909,
+        "controlling_voltage_utilisation": 0.739145,
+        "dc_bus_voltage_v": 750.0,
+        "estimated_back_emf_line_line_rms_v": 154.415797,
+        "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+        "field_weakening_indicated": false,
+        "loaded_voltage_utilisation": 0.739145,
+        "speed_rpm": 19500.0,
+        "usable_line_line_rms_voltage_v_with_reserve": 436.31536,
+        "voltage_headroom": 0.260855
+      },
+      {
+        "available_line_line_rms_voltage_v": 551.135192,
+        "back_emf_voltage_utilisation": 0.294924,
+        "controlling_voltage_utilisation": 0.615954,
+        "dc_bus_voltage_v": 900.0,
+        "estimated_back_emf_line_line_rms_v": 154.415797,
+        "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+        "field_weakening_indicated": false,
+        "loaded_voltage_utilisation": 0.615954,
+        "speed_rpm": 19500.0,
+        "usable_line_line_rms_voltage_v_with_reserve": 523.578433,
+        "voltage_headroom": 0.384046
+      }
+    ],
+    "max_speed_rpm": 19500.0,
+    "open_circuit_rms_airgap_flux_density_t": 0.237612701,
+    "phase_current_rms_a": 477.0,
+    "power_factor_screen": 0.95,
+    "speed_points": [
+      {
+        "electrical_frequency_hz": 0.0,
+        "estimated_back_emf_line_line_rms_v": 0.0,
+        "estimated_back_emf_phase_rms_v": 0.0,
+        "speed_rpm": 0.0
+      },
+      {
+        "electrical_frequency_hz": 650.0,
+        "estimated_back_emf_line_line_rms_v": 77.207898,
+        "estimated_back_emf_phase_rms_v": 44.576001,
+        "speed_rpm": 9750.0
+      },
+      {
+        "electrical_frequency_hz": 975.0,
+        "estimated_back_emf_line_line_rms_v": 115.811847,
+        "estimated_back_emf_phase_rms_v": 66.864001,
+        "speed_rpm": 14625.0
+      },
+      {
+        "electrical_frequency_hz": 1300.0,
+        "estimated_back_emf_line_line_rms_v": 154.415797,
+        "estimated_back_emf_phase_rms_v": 89.152002,
+        "speed_rpm": 19500.0
+      }
+    ],
+    "verdict": "NOT_INDICATED_BY_COARSE_BACK_EMF_AND_LOADED_VOLTAGE_SCREEN",
+    "voltage_control_reserve": 0.95,
+    "worst_case_voltage_headroom": 0.076069,
+    "worst_case_voltage_utilisation": 0.923931
+  },
+  "ship_ok": false,
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "speed_points": [
+    {
+      "electrical_frequency_hz": 0.0,
+      "estimated_back_emf_line_line_rms_v": 0.0,
+      "estimated_back_emf_phase_rms_v": 0.0,
+      "speed_rpm": 0.0
+    },
+    {
+      "electrical_frequency_hz": 650.0,
+      "estimated_back_emf_line_line_rms_v": 77.207898,
+      "estimated_back_emf_phase_rms_v": 44.576001,
+      "speed_rpm": 9750.0
+    },
+    {
+      "electrical_frequency_hz": 975.0,
+      "estimated_back_emf_line_line_rms_v": 115.811847,
+      "estimated_back_emf_phase_rms_v": 66.864001,
+      "speed_rpm": 14625.0
+    },
+    {
+      "electrical_frequency_hz": 1300.0,
+      "estimated_back_emf_line_line_rms_v": 154.415797,
+      "estimated_back_emf_phase_rms_v": 89.152002,
+      "speed_rpm": 19500.0
+    }
+  ],
+  "status": "PARTIAL",
+  "torque_map": {
+    "reason": "Voltage screening does not add current-magnitude, full speed, loss, temperature, mesh-convergence or dyno torque coverage.",
+    "status": "OPEN"
+  },
+  "voltage_fw_screen": {
+    "back_emf_no_fw_speed_rpm_at_min_bus": 44079.167,
+    "estimated_back_emf_line_line_rms_v_at_max_speed": 154.415797,
+    "estimated_loaded_terminal_line_line_rms_v": 322.500158,
+    "field_weakening_indicated_at_max_speed": false,
+    "max_speed_rpm": 19500.0,
+    "note": "A false FW indication means only that this coarse OC back-EMF and loaded terminal-voltage estimate stays below the FIA bus ceiling. It does not prove that field weakening is unnecessary.",
+    "status": "PARTIAL",
+    "verdict": "NOT_INDICATED_BY_COARSE_BACK_EMF_AND_LOADED_VOLTAGE_SCREEN",
+    "worst_case_voltage_headroom": 0.076069,
+    "worst_case_voltage_utilisation": 0.923931
+  }
+}

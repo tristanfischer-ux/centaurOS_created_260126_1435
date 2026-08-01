@@ -1,0 +1,114 @@
+{
+  "fia_question": "Do the cast case wall and bay mounts survive motor reaction ~125 N\u00b7m and carrier output ~1002 N\u00b7m inside the 343\u00d7259\u00d7267 mm / 32 kg box as a SCREENING check?",
+  "geometry_provenance": {
+    "controlling_dimensions": "state.fpkConcentricGeometry housing OD/length with orchestratorContract bay / mass / power / rpm fallbacks",
+    "full_case_calculix_used": false,
+    "lucid_or_proprietary_cad_used": false,
+    "smoke_cantilever_used": false,
+    "statement": "Kit-sized analytical flange + bay-mount + thin-wall torsion screen from twin housing / bay / duty; not the CalculiX smoke cantilever and not a supplier cast mesh."
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "continuous_electrical_power_kw": 250.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "gear_ratio": 8.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "rotor_outer_diameter_mm": 139.4
+  },
+  "input_quantities_sha256": "6f27a83b67d271680c0d67b8d6f1bfd17c82eb18b2e9ee407b4af59ae3ec8b3d",
+  "margins": {
+    "bay_mount_shear_fos": 3.864,
+    "bay_mount_tension_fos": 59.715,
+    "below_assumed_allowables": true,
+    "flange_bolt_shear_fos": 58.003,
+    "housing_wall_torsion_fos": 652.106,
+    "minimum_screening_fos": 3.864,
+    "note": "SCREENING only against assumed ISO 898-1 class 8.8 bolt allowables and 180 MPa cast-Al yield. Equal-share bolt shear, thin-wall Bredt torsion, 5 g mass tension. Not supplier cast FEA, not fastener FEA, not fatigue. Never claim release FoS.",
+    "release_fos_closed": false,
+    "screen_fos_min": 1.2
+  },
+  "material_assumptions": {
+    "assumed_wall_thickness_mm": 8.0,
+    "bolt_class": "8.8",
+    "bolt_shear_yield_mpa": 371.2,
+    "bolt_stress_area_mm2": 36.6,
+    "bolt_yield_mpa": 640.0,
+    "bump_g": 5.0,
+    "cast_aluminium_name": "FiaFrontKitScreeningCastAluminium",
+    "cast_aluminium_yield_mpa": 180.0,
+    "label": "Assumed M8 class 8.8 fasteners + A356-T6-class cast aluminium screening allowables \u2014 not supplier melt / heat-treat / fastener certificates."
+  },
+  "model_assumptions": [
+    "Motor reaction torque = continuous electrical power / (\u03b7=0.9777 \u00d7 \u03c9) \u2014 same seed as iso6336_fia_front_kit_case (~125 N\u00b7m).",
+    "Carrier output torque = motor torque \u00d7 gear_ratio (default 8 \u2192 ~1000 N\u00b7m).",
+    "6 flange bolts on a circle at 90% of housing OD; equal-share tangential shear from motor reaction.",
+    "4 bay mounts on a pitch circle at 55% of min(bay_w, bay_d); equal-share tangential shear from carrier output.",
+    "Bay-mount tension from mass_aspiration \u00d7 5 g / 4 mounts (not a homologated crash pulse).",
+    "Housing wall torsion: thin closed cylinder \u03c4 = T / (2\u03c0 r\u00b2 t) with assumed t = 8 mm cast Al.",
+    "No ribbing, boss local stress, thread strip, preload, or fatigue.",
+    "Full cast-case CalculiX remains OPEN (mesh of whole housing deferred)."
+  ],
+  "mount_geometry": {
+    "bay_mount_count": 4,
+    "bay_mount_pitch_radius_mm": 71.225,
+    "bolt_class": "8.8",
+    "bolt_stress_area_mm2": 36.6,
+    "fits_bay": true,
+    "flange_bolt_circle_radius_mm": 89.1,
+    "flange_bolt_count": 6,
+    "housing_inner_radius_mm": 91.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_radius_mm": 99.0,
+    "wall_thickness_mm": 8.0
+  },
+  "release_fos": {
+    "statement": "Screening FoS vs assumed bolt / cast-Al allowables is informational. Release factor of safety requires supplier cast FEA, fastener drawings, preload procedure, and correlated loads \u2014 not closed here.",
+    "status": "OPEN"
+  },
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS or closed release FoS from this screening case.",
+  "schema": "forgeos.motor_stack.analytical_fia_case_mount_screen/v1",
+  "screening_results": {
+    "assumed_bolt_shear_yield_mpa": 371.2,
+    "assumed_bolt_yield_mpa": 640.0,
+    "assumed_cast_al_yield_mpa": 180.0,
+    "bay_mount_shear_force_n": 3516.161,
+    "bay_mount_shear_fos": 3.864,
+    "bay_mount_shear_stress_mpa": 96.07,
+    "bay_mount_tension_force_n": 392.266,
+    "bay_mount_tension_fos": 59.715,
+    "bay_mount_tension_stress_mpa": 10.7177,
+    "below_assumed_allowables": true,
+    "carrier_output_torque_nm": 1001.7542,
+    "flange_bolt_shear_force_n": 234.23,
+    "flange_bolt_shear_fos": 58.003,
+    "flange_bolt_shear_stress_mpa": 6.3997,
+    "housing_wall_torsion_fos": 652.106,
+    "housing_wall_torsion_stress_mpa": 0.276,
+    "minimum_screening_fos": 3.864,
+    "motor_reaction_torque_nm": 125.2193
+  },
+  "ship_ok": false,
+  "solver": {
+    "calculix_full_case": {
+      "reason": "Full cast-case / mount CalculiX mesh is deferred \u2014 too heavy for the screening self-test path; analytical bolt + wall screens are the PARTIAL evidence here.",
+      "status": "OPEN"
+    },
+    "name": "Analytical handbook screen",
+    "runtime": "analytical",
+    "version": "v1"
+  },
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "works_in_kit_context": {
+    "case_mount_screen_ok": true,
+    "fits_bay": true,
+    "minimum_screening_fos": 3.864
+  }
+}

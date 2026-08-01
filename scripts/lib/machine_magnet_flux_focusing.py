@@ -329,9 +329,15 @@ def rebalance(
                 pole_pitch_at_magnet_mm=pitch,
                 effective_airgap_mm=circuit.effective_airgap_mm,
             )
+            # ⭐ NAMESPACE THE PROPOSAL (2026-08-01). These are PROPOSED
+            # dimensions, not the machine's. Emitting them under the same keys
+            # as as-built geometry made the geometry-coherence gate read a
+            # RECOMMENDATION as a rival description of the machine and report a
+            # split — a false positive of my own making. A proposal must never
+            # be indistinguishable from a measurement in an artefact.
             entry = {
-                "magnet_thickness_mm": round(t, 2),
-                "magnet_length_mm": round(length, 2),
+                "proposed_magnet_thickness_mm": round(t, 2),
+                "proposed_magnet_length_mm": round(length, 2),
                 "volume_per_bar_mm2": round(t * length, 1),
                 "focusing_ratio": round(cand.focusing_ratio, 3),
                 "airgap_flux_T": round(cand.airgap_flux_t, 4),
@@ -487,11 +493,11 @@ def _selftest() -> int:
         # for the operator, so an exactly-at-the-limit solution can round just
         # over it. A hundredth of a millimetre is below any manufacturing
         # tolerance and cannot mask a real overrun.
-        half = (best["magnet_length_mm"] / 2.0 * math.sin(math.radians(20.0))
-                + best["magnet_thickness_mm"] / 2.0 * math.cos(math.radians(20.0)))
+        half = (best["proposed_magnet_length_mm"] / 2.0 * math.sin(math.radians(20.0))
+                + best["proposed_magnet_thickness_mm"] / 2.0 * math.cos(math.radians(20.0)))
         check("rebalance.fits_radially", half <= 7.375 + 0.01,
               f"half extent {half:.3f} exceeds the placer budget 7.375")
-        tang = 2 * best["magnet_length_mm"] * math.cos(math.radians(20.0))
+        tang = 2 * best["proposed_magnet_length_mm"] * math.cos(math.radians(20.0))
         check("rebalance.fits_tangentially",
               tang <= 0.90 * starved.pole_pitch_at_magnet_mm + 0.01,
               f"tangential {tang:.2f} exceeds 90% of pole pitch")
@@ -570,8 +576,8 @@ def main() -> int:
                   "V-magnets collide). Pass is_buildable=<the placer's own test> "
                   "before quoting or committing these numbers.")
         if reb:
-            print(f"  REBALANCE -> t={reb['magnet_thickness_mm']} mm "
-                  f"L={reb['magnet_length_mm']} mm  "
+            print(f"  REBALANCE -> t={reb['proposed_magnet_thickness_mm']} mm "
+                  f"L={reb['proposed_magnet_length_mm']} mm  "
                   f"A_m/A_g={reb['focusing_ratio']}  "
                   f"B_gap={reb['airgap_flux_T']} T "
                   f"({res['rebalance']['airgap_flux_gain_x']}x)")

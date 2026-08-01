@@ -1,0 +1,207 @@
+{
+  "analytical_duty_check": {
+    "available_line_line_rms_voltage_v": 459.279327,
+    "bus_inside_assumed_window": true,
+    "combined_regen_efficiency": 0.977734,
+    "dc_current_a": 333.333333,
+    "duty_power_matches": true,
+    "electrical_power_check_kw": 250.0,
+    "estimated_phase_rms_current_a": 334.943391,
+    "front_regen_cap_respected": true,
+    "required_shaft_torque_nm": 125.214912,
+    "rotor_surface_speed_m_s": 142.329855,
+    "shaft_power_kw": 255.693262
+  },
+  "coverage": {
+    "cartesian_current_angle_by_rotor_position": true,
+    "closed_torque_map": false,
+    "current_magnitudes": 1,
+    "denser_than_smoke": true,
+    "losses_evaluated": false,
+    "mesh_convergence_evaluated": false,
+    "screen_point_count": 4,
+    "smoke_point_count": 1,
+    "speeds": 0,
+    "temperatures": 0,
+    "voltage_limit_evaluated": false
+  },
+  "grid": {
+    "current_angles_electrical_deg": [
+      -40.0,
+      -50.0
+    ],
+    "current_magnitude_basis": "Twin design I_rms selected by em_fia_front_kit_case.",
+    "default_campaign": "7 current angles \u00d7 5 rotor positions = 35 loaded FEMM points",
+    "excitation_tracking": "phase excitation angle = rotor-relative commanded current angle + 4 pole-pairs \u00d7 rotor mechanical position",
+    "fast_campaign": "2 current angles \u00d7 2 rotor positions = 4 loaded FEMM points",
+    "mode": "fast",
+    "n_current_angles": 2,
+    "n_points": 4,
+    "n_rotor_positions": 2,
+    "phase_current_rms_a": 477.0,
+    "rotor_positions_mechanical_deg": [
+      0.0,
+      22.5
+    ]
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "continuous_electrical_power_kw": 250.0,
+    "dc_bus_max_voltage_v": 900.0,
+    "dc_bus_min_voltage_v": 600.0,
+    "dc_bus_voltage_v": 750.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "inverter_efficiency_assumption": 0.98766,
+    "machine_efficiency_assumption": 0.98995,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "phase_current_design_a": 477.0,
+    "radial_airgap_mm": 0.7,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "turns_per_coil": 4.0,
+    "turns_per_phase": 14.0,
+    "twin_stator_slots": 24.0,
+    "winding_parallel_paths": 2.0
+  },
+  "input_quantities_sha256": "85d586e816c5d4abac013e7dc5e35c020790702711e5442f06f3fa1641d461e9",
+  "machine_geometry": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "estimated_active_material_mass_kg": 13.088,
+    "fits_bay": true,
+    "fits_housing": true,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "magnet_length_mm": 14.5793,
+    "magnet_regions": 16,
+    "magnet_thickness_mm": 8.85,
+    "radial_airgap_mm": 0.7000000000000028,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "rotor_poles": 8,
+    "slot_depth_mm": 15.0,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "stator_slots": 24,
+    "topology": "24-slot / 8-pole twin-V interior permanent-magnet synchronous machine"
+  },
+  "mtpa_screen": {
+    "best_screened_current_angle_electrical_deg": -40.0,
+    "note": "Comparative denser SCREEN only. This is not an optimisation-grade MTPA schedule and cannot close torque_map.",
+    "selection_metric": "largest mean |weighted-stress torque| across sampled rotor positions at one design current magnitude",
+    "status": "PARTIAL"
+  },
+  "points": [
+    {
+      "current_angle_electrical_deg": -40.0,
+      "mean_airgap_flux_density_t": 0.5987123067863723,
+      "minimum_airgap_flux_density_t": 0.01451446173723911,
+      "peak_airgap_flux_density_t": 1.639071298164475,
+      "phase_excitation_angle_electrical_deg": -40.0,
+      "rms_airgap_flux_density_t": 0.7951773799210465,
+      "rotor_position_mechanical_deg": 0.0,
+      "torque_magnitude_nm": 24.66725629223204,
+      "torque_nm": 24.66725629223204
+    },
+    {
+      "current_angle_electrical_deg": -40.0,
+      "mean_airgap_flux_density_t": 0.700218628249882,
+      "minimum_airgap_flux_density_t": 0.04517645102335188,
+      "peak_airgap_flux_density_t": 1.30858384699643,
+      "phase_excitation_angle_electrical_deg": 50.0,
+      "rms_airgap_flux_density_t": 0.8051438227967354,
+      "rotor_position_mechanical_deg": 22.5,
+      "torque_magnitude_nm": 137.6415618700606,
+      "torque_nm": -137.6415618700606
+    },
+    {
+      "current_angle_electrical_deg": -50.0,
+      "mean_airgap_flux_density_t": 0.6233404386019186,
+      "minimum_airgap_flux_density_t": 0.111406762122338,
+      "peak_airgap_flux_density_t": 1.553124541394001,
+      "phase_excitation_angle_electrical_deg": -50.0,
+      "rms_airgap_flux_density_t": 0.7769012503176527,
+      "rotor_position_mechanical_deg": 0.0,
+      "torque_magnitude_nm": 35.12160108190083,
+      "torque_nm": 35.12160108190083
+    },
+    {
+      "current_angle_electrical_deg": -50.0,
+      "mean_airgap_flux_density_t": 0.6994956832491334,
+      "minimum_airgap_flux_density_t": 0.05208458702654613,
+      "peak_airgap_flux_density_t": 1.482052755399056,
+      "phase_excitation_angle_electrical_deg": 40.0,
+      "rms_airgap_flux_density_t": 0.8251417912702883,
+      "rotor_position_mechanical_deg": 22.5,
+      "torque_magnitude_nm": 120.7026588227618,
+      "torque_nm": -120.7026588227618
+    }
+  ],
+  "release_statement": "SCREEN evidence only. No FIA homologation, team interface close, dynamometer correlation, race evidence, or permission to ship.",
+  "runtime": {
+    "seconds": 84.399,
+    "seconds_per_point": 21.1
+  },
+  "schema": "forgeos.motor_stack.em_fia_mtpa_screen/v1",
+  "ship_ok": false,
+  "solver": {
+    "name": "xfemm femmcli",
+    "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/phantm/bin/femmcli",
+    "pyleecan_revision": "7937d675fb77701ac8f2c65816b583cb29270e12",
+    "pyleecan_version": "1.5.2",
+    "version": "femmcli version 0.0.0-dev\nusing triangle 1.6.0 (builtin)"
+  },
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "summary": {
+    "best_angle_mean_torque_magnitude_nm": 81.154409,
+    "best_angle_mean_torque_vs_required_ratio": 0.648121,
+    "best_screened_current_angle_electrical_deg": -40.0,
+    "by_current_angle": [
+      {
+        "current_angle_electrical_deg": -50.0,
+        "mean_torque_vs_required_ratio": 0.622227,
+        "n_positions": 2,
+        "torque_magnitude_mean_nm": 77.91213,
+        "torque_magnitude_peak_nm": 120.702659,
+        "torque_max_nm": 35.121601,
+        "torque_mean_nm": -42.790529,
+        "torque_min_nm": -120.702659
+      },
+      {
+        "current_angle_electrical_deg": -40.0,
+        "mean_torque_vs_required_ratio": 0.648121,
+        "n_positions": 2,
+        "torque_magnitude_mean_nm": 81.154409,
+        "torque_magnitude_peak_nm": 137.641562,
+        "torque_max_nm": 24.667256,
+        "torque_mean_nm": -56.487153,
+        "torque_min_nm": -137.641562
+      }
+    ],
+    "n_current_angles": 2,
+    "n_points": 4,
+    "n_rotor_positions_per_angle": 2,
+    "peak_airgap_flux_density_t": 1.639071298,
+    "peak_torque_current_angle_electrical_deg": -40.0,
+    "peak_torque_magnitude_nm": 137.641562,
+    "peak_torque_nm": -137.641562,
+    "peak_torque_rotor_position_mechanical_deg": 22.5,
+    "required_shaft_torque_nm": 125.214912
+  },
+  "torque_map": {
+    "reason": "One-current-magnitude current-angle \u00d7 rotor-position screen does not cover speed/voltage, current magnitude, losses, temperature, demagnetisation, field weakening, mesh convergence, or dynamometer correlation.",
+    "status": "OPEN"
+  }
+}

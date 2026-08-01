@@ -31,7 +31,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 from scripts.lib.council_models import (  # noqa: E402
     COUNCIL_MODELS,
-    run_kimi_with_opus5_fallback,
+    FRAGILE_SEAT_NAME,
+    run_fragile_seat_with_fallback,
 )
 
 MAX_CYCLES = int(os.environ.get("FPK_CLOSURE_MAX_CYCLES", "12"))
@@ -479,23 +480,24 @@ def run_council(board: dict[str, Any]) -> dict[str, Any]:
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         futs = {
-            pool.submit(seat_call, "glm52", COUNCIL_MODELS["glm52"]): "glm52",
-            pool.submit(seat_call, "sol", COUNCIL_MODELS["sol"]): "sol",
+            pool.submit(seat_call, name, mid): name
+            for name, mid in COUNCIL_MODELS.items()
+            if name != FRAGILE_SEAT_NAME
         }
         for fut in as_completed(futs):
             name = futs[fut]
             results["seats"][name] = fut.result()
 
-    def kimi_call(name: str, model: str) -> dict[str, Any]:
+    def fragile_call(name: str, model: str) -> dict[str, Any]:
         return seat_call(name, model)
 
-    seat, mid, kobj = run_kimi_with_opus5_fallback(kimi_call)
-    results["seats"][seat] = kobj
-    results["kimi_seat_model"] = mid
+    seat, mid, fobj = run_fragile_seat_with_fallback(fragile_call)
+    results["seats"][seat] = fobj
+    results["fragile_seat_model"] = mid
 
-    # Merge ordered packages (first non-empty from sol, then glm, then kimi)
+    # Merge ordered packages (first non-empty from sol, then grok, then auditor)
     ordered: list[dict[str, Any]] = []
-    for key in ("sol", "glm52", seat):
+    for key in ("sol", "grok45", seat):
         obj = results["seats"].get(key) or {}
         pkgs = obj.get("ordered_work_packages") or []
         if pkgs:

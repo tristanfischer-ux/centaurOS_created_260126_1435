@@ -1,0 +1,203 @@
+{
+  "architecture_decision": {
+    "ratio_after_diff": 4.0,
+    "ratio_into_diff": 2.0,
+    "selected_option": "cut_torque_at_diff",
+    "ship_ok": false,
+    "source": "diff_architecture_decision",
+    "status": "APPLIED_FOR_SCREENING"
+  },
+  "bevel_geometry": {
+    "cone_distance_mm": 40.5538,
+    "diff_len_mm": 108.0,
+    "diff_od_mm": 120.0,
+    "face_width_mm": 10.0,
+    "mean_module_mm": 4.13305,
+    "outer_module_mm": 4.71429,
+    "pinion_pitch_diameter_mm": 47.1429,
+    "pressure_angle_deg": 20.0,
+    "ratio_u": 1.4,
+    "shaft_angle_deg": 90.0,
+    "side_gear_teeth": 14,
+    "side_pitch_diameter_mm": 66.0,
+    "spider_count": 6,
+    "spider_pinion_teeth": 10,
+    "tooth_count_basis": "Strength-driven bevel nest resize clears screening FoS \u2265 1.2 inside OD \u2264 120 mm. Applied cut_torque_at_diff at ratio_into_diff=2; POST_DIFF_FINAL_DRIVE_PACKAGING remains OPEN. Not ISO 23509 / KISSsoft; ship_ok false.",
+    "tooth_counts_from_twin": false
+  },
+  "calculix_tooth_contact": {
+    "statement": "3D bevel tooth contact / carrier deflection FEA not run.",
+    "status": "OPEN"
+  },
+  "controlling_geometry_source": "strength_driven_resize",
+  "duty_torques": {
+    "assumed_combined_efficiency": 0.9777,
+    "carrier_input_torque_nm": 250.438538,
+    "motor_shaft_torque_nm": 125.219269,
+    "ratio_after_diff": 4.0,
+    "ratio_into_diff": 2.0,
+    "side_gear_torque_nm": 125.219269,
+    "torque_basis": "shaft \u2248 P_elec/(\u03b7_combined\u00b7\u03c9) at max_rotor_speed_rpm (~125 N\u00b7m for 250 kW / 19,500 rpm); carrier \u2248 T\u00b7ratio_into_diff (ratio 2); open equal-split side \u2248 carrier/2",
+    "total_ratio_product": 8.0
+  },
+  "fia_question": "Does the mini bevel differential transmit carrier torque for 250 kW / ratio into diff 2.0 (~250 N\u00b7m) without tooth failure?",
+  "geometry_provenance": {
+    "authority_level": "parametric_family",
+    "cad_family": "compact_bevel_differential",
+    "calculix_tooth_contact_used": false,
+    "controlling_dimensions": "fpkConcentricGeometry.diff_od_mm (+ principal-box length) and twin torque ratio / duty; tooth counts per tooth_count_basis",
+    "iso23509_used": false,
+    "kisssoft_used": false,
+    "statement": "Twin-bound analytical straight-bevel handbook screen on compact_bevel_differential parametric packaging nest; not ISO 23509 / KISSsoft closure."
+  },
+  "input_quantities": {
+    "bevel_face_width_mm": 10.0,
+    "continuous_electrical_power_kw": 250.0,
+    "diff_architecture_decision_status": "APPLIED_FOR_SCREENING",
+    "diff_architecture_option": "cut_torque_at_diff",
+    "diff_len_mm": 108.0,
+    "diff_od_mm": 120.0,
+    "diff_torque_budget_applied": true,
+    "diff_torque_budget_source": "diff_architecture_decision",
+    "front_regen_electrical_cap_kw": 250.0,
+    "gear_face_mm": 14.0,
+    "gear_ratio": 8.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "motor_shaft_torque_nm": 117.0,
+    "ratio_after_diff": 4.0,
+    "ratio_into_diff": 2.0,
+    "side_gear_teeth": 14,
+    "spider_count": 6,
+    "spider_pinion_teeth": 10,
+    "tooth_count_basis": "Strength-driven bevel nest resize clears screening FoS \u2265 1.2 inside OD \u2264 120 mm. Applied cut_torque_at_diff at ratio_into_diff=2; POST_DIFF_FINAL_DRIVE_PACKAGING remains OPEN. Not ISO 23509 / KISSsoft; ship_ok false.",
+    "tooth_counts_from_twin": false
+  },
+  "input_quantities_sha256": "570d855beafc33997d6530e392367ac45def377da927dc4eb555f38b85164b22",
+  "iso23509_independent_check": {
+    "reason": "This case is a simplified bending/contact handbook screen \u2014 not a full ISO 23509 bevel geometry / rating close.",
+    "status": "OPEN"
+  },
+  "kisssoft_independent_check": {
+    "reason": "No KISSsoft licence proven in this repository checkout.",
+    "status": "OPEN"
+  },
+  "load_spectrum_fatigue": {
+    "statement": "Race accel/brake/corner torque spectrum, wheel-speed difference and Miner damage sum are not closed; continuous-duty equal-split screening only.",
+    "status": "OPEN"
+  },
+  "margins": {
+    "minimum_bending_fos": 4.5655,
+    "minimum_contact_fos": 1.2172,
+    "minimum_strength_factor": 1.2172,
+    "note": "Screening FoS only \u2014 simplified straight-bevel handbook factors on packaging nest; no hypoid, no spiral, no ISO 23509 cone close, no contact pattern.",
+    "required_screen_fos": 1.2
+  },
+  "model_assumptions": [
+    "Open straight-bevel differential, 90\u00b0 shaft angle, equal torque split.",
+    "Pressure angle 20.0\u00b0, KA=1.25, KV=1+v/80 (screening).",
+    "Y_bevel=0.85, K_bevel_contact=1.15 (handbook knockdowns \u2014 not ISO 23509 Method B).",
+    "\u03c3F_allow=450.0 MPa, \u03c3H_allow=1500.0 MPa (case-hardened MQ handbook seeds).",
+    "Tooth counts: Strength-driven bevel nest resize clears screening FoS \u2265 1.2 inside OD \u2264 120 mm. Applied cut_torque_at_diff at ratio_into_diff=2; POST_DIFF_FINAL_DRIVE_PACKAGING remains OPEN. Not ISO 23509 / KISSsoft; ship_ok false..",
+    "Pitch diameters from fractions of twin diff_od (side 0.55\u00d7OD, pinion from conjugate module).",
+    "Ideal spider load share (K\u03b3=1) \u2014 real bias / cross-pin OPEN."
+  ],
+  "packaging_seed_screen": {
+    "bevel_geometry": {
+      "cone_distance_mm": 6.4886,
+      "diff_len_mm": 19.2,
+      "diff_od_mm": 19.2,
+      "face_width_mm": 1.9466,
+      "mean_module_mm": 0.64114,
+      "outer_module_mm": 0.75429,
+      "pinion_pitch_diameter_mm": 7.5429,
+      "pressure_angle_deg": 20.0,
+      "ratio_u": 1.4,
+      "shaft_angle_deg": 90.0,
+      "side_gear_teeth": 14,
+      "side_pitch_diameter_mm": 10.56,
+      "spider_count": 2,
+      "spider_pinion_teeth": 10,
+      "tooth_count_basis": "documented packaging seed (twin tooth counts absent \u2014 communication geometry / Blender cues, not ISO 23509 closed)",
+      "tooth_counts_from_twin": false
+    },
+    "minimum_bending_fos": 0.0092,
+    "minimum_contact_fos": 0.0547,
+    "minimum_strength_factor": 0.0092,
+    "statement": "As-read twin / Blender packaging nest \u2014 retained when a strength search records recommended_geometry.",
+    "works_in_kit_context": false
+  },
+  "recommended_geometry": {
+    "bevel_face_width_mm": 10.0,
+    "carrier_input_torque_nm": 250.438538,
+    "clears_duty_screen": true,
+    "cone_distance_mm": 40.5538,
+    "diff_len_mm": 108.0,
+    "diff_od_mm": 120.0,
+    "envelope_max_diff_od_mm": 120.0,
+    "mean_module_mm": 4.13305,
+    "minimum_bending_fos": 4.5655,
+    "minimum_contact_fos": 1.2172,
+    "minimum_strength_factor": 1.2172,
+    "ratio_into_diff": 2.0,
+    "side_gear_teeth": 14,
+    "spider_count": 6,
+    "spider_pinion_teeth": 10,
+    "statement": "Strength-driven bevel nest resize clears screening FoS \u2265 1.2 inside OD \u2264 120 mm. Applied cut_torque_at_diff at ratio_into_diff=2; POST_DIFF_FINAL_DRIVE_PACKAGING remains OPEN. Not ISO 23509 / KISSsoft; ship_ok false.",
+    "volume_proxy_mm3": 144000.0
+  },
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS without ISO 23509 / KISSsoft / spectrum / FEA closure on the current revision.",
+  "residual_blocker": {
+    "blocker_id": "POST_DIFF_FINAL_DRIVE_PACKAGING",
+    "ratio_after_diff": 4.0,
+    "ship_ok": false,
+    "status": "OPEN",
+    "summary": "The differential strength screen is cleared only by moving the remaining ~4:1 reduction after the differential. Packaging, gears, bearings, shafts, lubrication and interfaces for that final-drive stage remain OPEN."
+  },
+  "schema": "forgeos.motor_stack.iso_bevel_fia_front_kit_case/v1",
+  "ship_ok": false,
+  "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "strength_screen": {
+    "allowables": {
+      "sigma_f_allow_mpa": 450.0,
+      "sigma_f_basis": "ISO 6336-5:2016 MQ case-hardened steel \u03c3F lim \u2248 430\u2013500 MPa; screening allowable 450 MPa (applied to straight-bevel virtual spur)",
+      "sigma_h_allow_mpa": 1500.0,
+      "sigma_h_basis": "ISO 6336-5:2016 MQ case-hardened steel \u03c3H lim \u2248 1500 MPa; screening allowable 1500 MPa (Hertz at mean pitch)"
+    },
+    "application_factor_ka": 1.25,
+    "k_bevel_contact": 1.15,
+    "meshes": [
+      {
+        "bending_fos": 4.5655,
+        "bending_ok": true,
+        "bending_stress_mpa": 98.566,
+        "contact_fos": 1.2172,
+        "contact_ok": true,
+        "contact_stress_mpa": 1232.372,
+        "dynamic_factor_kv": 1.3692,
+        "mesh_name": "spider_side_bevel",
+        "pinion_mean_pitch_diameter_mm": 41.3305,
+        "pinion_teeth": 10,
+        "pitch_line_velocity_m_s": 29.5394,
+        "tangential_force_n": 721.359,
+        "tooth_form_factor_yf": 2.8046,
+        "wheel_mean_pitch_diameter_mm": 57.8626,
+        "wheel_teeth": 14
+      }
+    ],
+    "method": "straight_bevel_handbook_screening_not_iso23509",
+    "minimum_bending_fos": 4.5655,
+    "minimum_contact_fos": 1.2172,
+    "minimum_strength_factor": 1.2172,
+    "screen_fos_required": 1.2,
+    "y_bevel_form": 0.85
+  },
+  "works_in_kit_context": {
+    "controlling_geometry_source": "strength_driven_resize",
+    "duty_strength_screen_ok": true,
+    "minimum_strength_factor": 1.2172,
+    "note": "duty_strength_screen_ok means min(bending, contact) FoS \u2265 1.2 on the spider\u2013side bevel mesh with assumed case-hardened allowables \u2014 NOT ISO 23509, NOT KISSsoft, NOT spectrum, NOT ship_ok.",
+    "threshold_fos": 1.2
+  }
+}

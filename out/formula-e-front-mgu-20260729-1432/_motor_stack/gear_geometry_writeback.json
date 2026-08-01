@@ -1,0 +1,9 @@
+{
+  "architecture_hold": "PLANETARY_STRENGTH_VS_ROTOR_BORE \u2014 best nest inside rotor ID 105.9 mm reaches FoS \u2248 1.005 (< 1.2); enlarge rotor bore, change tooth counts/topology, or accept external planetary; do not claim PASS",
+  "fpkConcentricGeometry": {},
+  "invalidated": true,
+  "note": "Previous strength resize exceeded rotor bore and was invalidated. Controllers must use packaging seed until PLANETARY_STRENGTH_VS_ROTOR_BORE is unblocked.",
+  "quantities": {},
+  "schema": "forgeos.motor_stack.gear_geometry_writeback/v1",
+  "ship_ok": false
+}

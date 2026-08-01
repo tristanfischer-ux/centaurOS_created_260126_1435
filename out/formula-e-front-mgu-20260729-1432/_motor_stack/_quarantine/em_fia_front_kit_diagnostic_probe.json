@@ -1,0 +1,73 @@
+{
+  "enlarged_magnet_oc_and_best_angle": {
+    "current_angle_electrical_deg": -60.0,
+    "loaded_peak_t": 1.223026686439754,
+    "loaded_torque_magnitude_nm": 94.22188932499763,
+    "loaded_torque_nm": -94.22188932499763,
+    "magnet_length_mm": 17.5,
+    "magnet_thickness_mm": 7.0,
+    "open_circuit_peak_t": 0.2501861763469056,
+    "open_circuit_rms_t": 0.2044412126839112,
+    "solve_s": 52.85,
+    "torque_vs_required": 0.7524813763794973
+  },
+  "fine_angle_sweep": [
+    {
+      "current_angle_electrical_deg": -45.0,
+      "peak_airgap_t": 1.504338745862543,
+      "rms_airgap_t": 0.8276293945501433,
+      "solve_s": 17.33,
+      "torque_magnitude_nm": 72.90151917853703,
+      "torque_nm": -72.90151917853703
+    },
+    {
+      "current_angle_electrical_deg": -55.0,
+      "peak_airgap_t": 1.354914032059021,
+      "rms_airgap_t": 0.806359146004481,
+      "solve_s": 18.82,
+      "torque_magnitude_nm": 66.0913413939904,
+      "torque_nm": -66.0913413939904
+    },
+    {
+      "current_angle_electrical_deg": -70.0,
+      "peak_airgap_t": 1.383678455840672,
+      "rms_airgap_t": 0.7748204467210362,
+      "solve_s": 18.88,
+      "torque_magnitude_nm": 45.37386707972227,
+      "torque_nm": -45.37386707972227
+    }
+  ],
+  "note": "Follow-up finer angle + bridge-legal magnet growth. Not PASS.",
+  "phase_current_rms_a": 535.0,
+  "prior_angle_sweep": [
+    {
+      "current_angle_electrical_deg": -60.0,
+      "peak_airgap_t": 1.335804658648955,
+      "rms_airgap_t": 0.7908998546607144,
+      "solve_s": 19.31,
+      "torque_magnitude_nm": 59.26390903681221,
+      "torque_nm": -59.26390903681221
+    },
+    {
+      "current_angle_electrical_deg": -90.0,
+      "peak_airgap_t": 1.337850025885678,
+      "rms_airgap_t": 0.7602562900120263,
+      "solve_s": 19.49,
+      "torque_magnitude_nm": 9.304934096695073,
+      "torque_nm": -9.304934096695073
+    },
+    {
+      "current_angle_electrical_deg": -135.0,
+      "peak_airgap_t": 1.431138258643569,
+      "rms_airgap_t": 0.7451999057346508,
+      "solve_s": 20.0,
+      "torque_magnitude_nm": 49.46584755208373,
+      "torque_nm": 49.46584755208373
+    }
+  ],
+  "required_shaft_torque_nm": 125.214912,
+  "schema": "forgeos.motor_stack.em_fia_front_kit_diagnostic_probe/v1",
+  "ship_ok": false,
+  "status": "DIAGNOSTIC_ONLY",
+  "wall_time_s": 108.36
+}

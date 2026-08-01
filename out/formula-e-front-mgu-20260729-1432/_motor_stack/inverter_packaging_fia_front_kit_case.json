@@ -1,0 +1,79 @@
+{
+  "cold_plate_cfd_note": "Hydraulic \u0394p may also appear under motorMultiphysics.inverter_cold_plate when openfoam_fia_cold_plate_case.json exists \u2014 packaging screen here is geometric/electrical, not CHT.",
+  "double_pulse_and_measured_esl": {
+    "statement": "Twin fpk_bus_esl_* values are analytical laminated-bus seeds. Double-pulse switching energy and measured stray inductance are OPEN.",
+    "status": "OPEN"
+  },
+  "evidence_class": "twin_bound_analytical_packaging_partial",
+  "fia_question": "Can a SiC MCU package 250 kW at 750 V inside the MCU box / cold-plate land with ESL in the laminated-bus target band?",
+  "input_quantities": {
+    "bay_d_mm": 259.0,
+    "bay_h_mm": 267.0,
+    "bay_w_mm": 343.0,
+    "bus_esl_high_nh": 9.9,
+    "bus_esl_low_nh": 4.15,
+    "bus_esl_nominal_nh": 6.39,
+    "cold_plate_channel_count": 8,
+    "cold_plate_channel_height_mm": 1.336,
+    "cold_plate_channel_width_mm": 5.345,
+    "cold_plate_delta_p_pa": null,
+    "cold_plate_length_mm": 235.3,
+    "cold_plate_width_mm": 139.6,
+    "continuous_electrical_power_kw": 250.0,
+    "dc_bus_voltage_v": 750.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "inverter_dissipated_kw": 4.318,
+    "inverter_efficiency": 0.98766,
+    "mass_inverter_kg": 8.2,
+    "mcu_d_mm": 139.6,
+    "mcu_h_mm": 28.0,
+    "mcu_w_mm": 235.3,
+    "sic_module_count": 3
+  },
+  "input_quantities_sha256": "4e1a93a70a0790231e99124e7aeb27fdcbdb88ffd24cf9179970fdc9b7ec2115",
+  "model_assumptions": [
+    "DC current = continuous electrical power / DC bus voltage (no ripple).",
+    "ESL target band 3.0\u201315.0 nH (preferred high \u226410.0 nH).",
+    "Cold-plate land defaults to MCU footprint when plate length is unset (serpentine family training length 180.0\u00d7120.0 mm is not forced as the kit land).",
+    "SiC module count from twin quantity seed \u2014 not a frozen BOM line."
+  ],
+  "module_mpn_and_step": {
+    "sic_module_count_seed": 3,
+    "statement": "Phase-module count is a twin seed only. Supplier MPN, package STEP, and terminal geometry that drive the laminated bus remain OPEN.",
+    "status": "OPEN"
+  },
+  "release_statement": "Concept packaging evidence only. No module procurement identity, no measured ESL, no HIL. ship_ok stays false.",
+  "schema": "forgeos.motor_stack.inverter_packaging_fia_front_kit_case/v1",
+  "screening_results": {
+    "bus_esl_high_nh": 9.9,
+    "bus_esl_low_nh": 4.15,
+    "bus_esl_nominal_nh": 6.39,
+    "cold_plate_covers_mcu_footprint": true,
+    "cold_plate_delta_p_pa_seed": null,
+    "cold_plate_interface_area_mm2": 32847.88,
+    "current_density_a_per_module": 111.11,
+    "dc_current_a": 333.333,
+    "esl_high_within_preferred": true,
+    "esl_nominal_in_target_band": true,
+    "esl_preferred_high_nh": 10.0,
+    "esl_target_band_nh": [
+      3.0,
+      15.0
+    ],
+    "inverter_dissipated_kw": 4.318,
+    "mcu_fits_bay": true,
+    "mcu_footprint_area_mm2": 32847.88,
+    "mcu_volume_l": 0.91974,
+    "power_density_in_band": true,
+    "power_density_kw_l": 271.82,
+    "sic_module_count": 3
+  },
+  "ship_ok": false,
+  "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "works_in_kit_context": {
+    "packaging_screen_ok": true,
+    "statement": "Analytical MCU packaging screen (density / DC current / ESL seed / cold-plate land / bay fit). Module MPN, supplier STEP, and double-pulse ESL measurement remain OPEN."
+  }
+}

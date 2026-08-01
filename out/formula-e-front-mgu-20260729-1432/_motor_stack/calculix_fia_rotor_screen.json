@@ -1,0 +1,92 @@
+{
+  "fia_question": "Does a steel-equivalent rotor ring survive centrifugal load at 19,500 rpm as a SCREENING stress check?",
+  "geometry_provenance": {
+    "controlling_dimensions": "state.fpkConcentricGeometry with orchestratorContract quantity fallbacks",
+    "lucid_or_proprietary_cad_used": false,
+    "smoke_cantilever_used": false,
+    "statement": "Kit-sized CalculiX ring sector from twin rotor OD/ID/active length; not the generic calculix_smoke_selftest cantilever."
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "continuous_electrical_power_kw": 250.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4
+  },
+  "input_quantities_sha256": "8ca07ca0502c0822a9c58de0eed8d313028172e01877081bbb4025729014f130",
+  "magnet_pocket_burst_fea": {
+    "reason": "This case is a solid-ring centrifugal screen only.",
+    "status": "OPEN"
+  },
+  "margins": {
+    "below_assumed_yield": true,
+    "note": "SCREENING only against assumed isotropic steel yield (355 MPa). Not laminate stack, not magnet-pocket burst, not sleeve retention, not fatigue. Never claim release FoS.",
+    "release_fos_closed": false,
+    "screening_fos_vs_assumed_yield": 2.635
+  },
+  "material_assumptions": {
+    "E_mpa": 210000.0,
+    "assumed_yield_mpa": 355.0,
+    "label": "Assumed isotropic steel screening properties \u2014 not supplier laminate stack, magnet, or retention-sleeve material cards.",
+    "name": "FiaFrontKitScreeningSteel",
+    "nu": 0.3,
+    "rho_tonne_mm3": 7.81e-09
+  },
+  "model_assumptions": [
+    "Coarse C3D8 quarter-ring solid from rotor ID to OD.",
+    "Axial length = 25% of twin active/stack length.",
+    "Centrifugal *DLOAD CENTRIF at max_rotor_speed_rpm about the kit axis.",
+    "Symmetry on \u03b8=0 (UY) and \u03b8=90\u00b0 (UX); UZ fixed on z=0 face.",
+    "No magnet pockets, bridges, sleeves, interference, or laminate anisotropy.",
+    "No case / mount / joint / torque-reaction load cases."
+  ],
+  "release_fos": {
+    "statement": "Screening FoS vs assumed steel yield is informational. Release factor of safety requires signed material cards, retention detail, and correlated FEA \u2014 not closed here.",
+    "status": "OPEN"
+  },
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS or closed release FoS from this screening case.",
+  "ring_mesh": {
+    "axial_length_mm": 24.395,
+    "element_count": 8,
+    "element_type": "C3D8",
+    "fits_twin_rotor": true,
+    "material_name": "FiaFrontKitScreeningSteel",
+    "n_axial": 1,
+    "n_radial": 2,
+    "n_theta": 4,
+    "node_count": 30,
+    "rotor_inner_radius_mm": 52.95,
+    "rotor_outer_radius_mm": 69.7,
+    "sector_angle_deg": 90.0
+  },
+  "schema": "forgeos.motor_stack.calculix_fia_rotor_screen/v1",
+  "screening_results": {
+    "analytical_hoop_outer_mpa": 158.2133,
+    "assumed_steel_yield_mpa": 355.0,
+    "below_assumed_yield": true,
+    "max_abs_displacement_mm": 0.035966,
+    "max_principal_stress_mpa": 96.9367,
+    "max_von_mises_mpa": 134.7243,
+    "omega2_rad2_s2": 4169907.859,
+    "omega_rad_s": 2042.035225,
+    "operating_speed_rpm": 19500.0,
+    "screening_fos_vs_yield": 2.635
+  },
+  "ship_ok": false,
+  "solver": {
+    "image": "forgeos/calculix:2.21-arm64",
+    "name": "CalculiX CrunchiX",
+    "runtime": "docker",
+    "version": "2.21"
+  },
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL"
+}

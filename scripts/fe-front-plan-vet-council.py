@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""INTENT: Sol + GLM + Kimi (Opus 5 fallback) vet the autonomous 1–9 plan
+"""INTENT: Sol + Grok + MiniMax (Opus 5 fallback) vet the autonomous 1–9 plan
 before execution. Writes per-seat JSON + merged.md. Does not execute the plan.
+
+Seats: scripts/lib/council_models.py → model_routing.py.
 """
 from __future__ import annotations
 
@@ -15,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.lib.council_models import (  # noqa: E402
     COUNCIL_MODELS,
-    run_kimi_with_opus5_fallback,
+    FRAGILE_SEAT_NAME,
+    run_fragile_seat_with_fallback,
 )
 
 PLAN = ROOT / "docs/plans/JLR-FE-FRONT-FPK-AUTONOMOUS-1-9-2026-07-29.md"
@@ -127,11 +130,12 @@ def main() -> int:
         print(f"[plan-vet] calling {name} ({model}) …", flush=True)
         return name, call_model(name, model, api_key, user)
 
-    # Parallel Sol + GLM; Kimi with Opus5 fallback sequential after or in pool
+    # Parallel Grok + Sol; MiniMax with Opus5 fallback sequential
     with ThreadPoolExecutor(max_workers=2) as ex:
         futs = [
-            ex.submit(run_seat, "glm52", COUNCIL_MODELS["glm52"]),
-            ex.submit(run_seat, "sol", COUNCIL_MODELS["sol"]),
+            ex.submit(run_seat, name, mid)
+            for name, mid in COUNCIL_MODELS.items()
+            if name != FRAGILE_SEAT_NAME
         ]
         for fut in as_completed(futs):
             name, obj = fut.result()
@@ -139,10 +143,10 @@ def main() -> int:
             (OUT / f"{name}.json").write_text(json.dumps(obj, indent=2), encoding="utf-8")
             print(f"[plan-vet] wrote {name}.json verdict={obj.get('verdict')}", flush=True)
 
-    def kimi_call(name: str, model: str) -> dict:
+    def fragile_call(name: str, model: str) -> dict:
         return call_model(name, model, api_key, user)
 
-    seat, mid, kobj = run_kimi_with_opus5_fallback(kimi_call)
+    seat, mid, kobj = run_fragile_seat_with_fallback(fragile_call)
     results[seat] = kobj
     (OUT / f"{seat}.json").write_text(json.dumps(kobj, indent=2), encoding="utf-8")
     print(f"[plan-vet] wrote {seat}.json verdict={kobj.get('verdict')}", flush=True)

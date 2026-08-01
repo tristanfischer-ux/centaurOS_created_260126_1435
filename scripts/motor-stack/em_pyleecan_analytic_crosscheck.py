@@ -113,7 +113,20 @@ def crosscheck(twin: Path) -> dict:
     I_rms = _num(q, "phase_current_design_a", default=477.0)
     rpm = _num(q, "max_rotor_speed_rpm", default=19500.0)
     airgap_mm = 0.7
-    magnet_th_mm = _num(q, "magnet_thickness_mm", default=6.0)
+    # ⭐ A FOURTH MAGNET, from a HARDCODED DEFAULT (2026-08-01). The twin has no
+    # `magnet_thickness_mm` quantity, so this line silently used 6.0 mm on every
+    # run — while em_fia_front_kit_case built 8.85 and the demag/pocket screens
+    # built 7.00. Four screens, four magnets. A default that is never overridden
+    # is not a default, it is an undeclared constant.
+    import sys as _sys
+    _sys.path.insert(0, str(REPO_ROOT / "scripts" / "motor-stack"))
+    from em_fia_front_kit_case import solve_v_magnet_dimensions  # noqa: PLC0415
+
+    magnet_th_mm, _magnet_len_mm = solve_v_magnet_dimensions(
+        rotor_inner_diameter_mm=_num(q, "fpk_rotor_id_mm",
+                                     "rotor_inner_diameter_mm", default=105.9),
+        rotor_outer_diameter_mm=rotor_od_mm,
+    )
 
     # ── Winding factor from the SOLVED layout ───────────────────────────────
     wdg = datamodel()

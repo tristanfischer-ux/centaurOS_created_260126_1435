@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""INTENT: Adversarial JLR-FE red-team council — GLM 5.2 + SOL + Kimi K3
-(Opus 5 if Kimi fails).
+"""INTENT: Adversarial JLR-FE red-team council — Grok 4.5 + Sol + MiniMax-M3
+(Opus 5 if MiniMax fails).
 
 Reads the live twin digest and asks each model to rip the deliverable apart
 as Jaguar Land Rover Formula E Head of Technology. Writes per-model JSON + a
 merged punch list. Does NOT auto-fix — verification is a separate pass.
+
+Seats come from scripts/lib/council_models.py → model_routing.py (single map).
 
 FLOW: prefer `_redteam_digest_v2.json` (assumption/Bar B era); fall back to
 legacy `_redteam_digest.json`. Output dir `_redteam_v2/` when v2 digest used.
@@ -26,10 +28,11 @@ DIGEST_V2 = OUT / "_redteam_digest_v2.json"
 DIGEST_LEGACY = OUT / "_redteam_digest.json"
 from scripts.lib.council_models import (  # noqa: E402
     COUNCIL_MODELS,
-    run_kimi_with_opus5_fallback,
+    FRAGILE_SEAT_NAME,
+    run_fragile_seat_with_fallback,
 )
 
-MODELS = dict(COUNCIL_MODELS)  # glm52 / sol / kimi; kimi → opus5 on fail
+MODELS = dict(COUNCIL_MODELS)  # grok45 / sol / minimax_m3; fragile → opus5
 
 SYSTEM = """You are an adversarial chartered powertrain engineer hired by Jaguar Land Rover
 Formula E Head of Technology to REJECT a supplier engineering pack.
@@ -251,19 +254,19 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=3) as ex:
         futs = {}
         for name, mid in MODELS.items():
-            if name == "kimi":
+            if name == FRAGILE_SEAT_NAME:
                 futs[
                     ex.submit(
-                        run_kimi_with_opus5_fallback,
+                        run_fragile_seat_with_fallback,
                         lambda n, m: _seat(n, m),
                     )
-                ] = "kimi_seat"
+                ] = "fragile_seat"
             else:
                 futs[ex.submit(_seat, name, mid)] = name
         for fut in as_completed(futs):
             tag = futs[fut]
             try:
-                if tag == "kimi_seat":
+                if tag == "fragile_seat":
                     seat_name, model_id, payload = fut.result()
                     results[seat_name] = payload
                     used_models[seat_name] = model_id
@@ -313,7 +316,7 @@ def main() -> int:
         },
         "n_findings": len(merged),
         "findings": merged,
-        "kimi_fallback": "anthropic/claude-opus-5 if kimi fails",
+        "fragile_seat_fallback": "anthropic/claude-opus-5 if minimax_m3 fails",
         "plan": "docs/plans/JLR-FE-FRONT-FPK-ADVERSARIAL-REDTEAM-PLAN-2026-07-31.md",
     }
     (out_dir / "merged-findings.json").write_text(json.dumps(summary, indent=2) + "\n")

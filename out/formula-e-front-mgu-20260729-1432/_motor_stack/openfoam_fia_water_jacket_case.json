@@ -1,0 +1,113 @@
+{
+  "cad_family": "motor_water_jacket_helical",
+  "channel_geometry": {
+    "channel_depth_m": 0.0035,
+    "channel_mean_diameter_m": 0.192,
+    "channel_width_m": 0.008,
+    "cross_section_area_m2": 2.8e-05,
+    "density_for_pressure_kg_m3": 983.2,
+    "duct_length_m": 0.6057649727755461,
+    "estimated_full_path_length_m": 3.0288248638777304,
+    "flow_split": "full_flow_single_helical_channel",
+    "helix_pitch_m": 0.055839999999999994,
+    "helix_turns": 5.0,
+    "hydraulic_diameter_m": 0.004869565217391305,
+    "inlet_velocity_m_s": 7.142857142857143,
+    "kinematic_viscosity_m2_s": 4.78e-07,
+    "reynolds_number": 72766.96379843552,
+    "volumetric_flow_total_m3_s": 0.0002
+  },
+  "conjugate_heat_transfer": {
+    "statement": "Full helical jacket STEP CHT remains OPEN.",
+    "status": "OPEN"
+  },
+  "fia_question": "What duct velocity / pressure drop appear at 12 L/min / 60 \u00b0C on the motor_water_jacket_helical channel section?",
+  "flow_bench_correlation": {
+    "statement": "No measured jacket \u0394p / flow-bench correlation yet.",
+    "status": "OPEN"
+  },
+  "fluid": {
+    "density_for_pressure_kg_m3": 983.2,
+    "kinematic_viscosity_m2_s": 4.78e-07,
+    "label": "water_like_at_60C",
+    "note": "Isothermal water \u03bd and \u03c1 at ~60 \u00b0C for duct screening. Twin EGW CoolProp density is recorded in input_quantities when present but is not used as the OpenFOAM viscosity model."
+  },
+  "geometry_provenance": {
+    "controlling_dimensions": "orchestratorContract coolant_* + fpk_housing_* / fpk_stator_od with motor_water_jacket_helical family channel defaults",
+    "full_helical_step_meshed": false,
+    "lucid_or_proprietary_cad_used": false,
+    "statement": "Twin-bound rectangular-channel screen using family channel dims and FIA coolant point; not supplier water-jacket CAD."
+  },
+  "honesty_notes": [
+    "PARTIAL means a twin-bound OpenFOAM duct screen exists \u2014 not release.",
+    "ship_ok is permanently false for this artefact schema.",
+    "Do not claim winding \u0394T closed from this pressure/velocity screen.",
+    "Re is transitional/turbulent for the FIA point; laminar solver \u0394p is a screen, cross-checked with Darcy laminar/Blasius analytics."
+  ],
+  "input_quantities": {
+    "axial_length_mm": 295.2,
+    "channel_depth_mm": 3.5,
+    "channel_width_mm": 8.0,
+    "coolant_flow_l_min": 12.0,
+    "coolant_inlet_c": 60.0,
+    "end_margin_mm": 8.0,
+    "helix_turns": 5.0,
+    "housing_outer_diameter_mm": 198.0,
+    "jacket_inner_diameter_mm": 188.2,
+    "outer_shell_mm": 1.25,
+    "twin_coolant_density_kg_m3": 1040.4899931631571
+  },
+  "input_quantities_sha256": "9ab856cebe124f0146f74c0b33fb72a604ba4772f370482b38615ad8e4e8d49a",
+  "model_assumptions": [
+    "Rectangular duct cross-section = family channel_width \u00d7 channel_depth.",
+    "Duct length = one helical turn developed length.",
+    "Inlet velocity from full 12 L/min / channel area (series helix).",
+    "Water-like \u03bd = 4.780e-07 m\u00b2/s at ~60 \u00b0C (documented).",
+    "Laminar steady SIMPLE \u2014 not a mesh-converged turbulent CHT study.",
+    "Full-path \u0394p \u2248 n_turns \u00d7 per-turn solver \u0394p; port/manifold losses OPEN.",
+    "No solid domain, no winding temperatures, no boiling assessment."
+  ],
+  "pressure_drop": {
+    "analytical_darcy_blasius_pa": 60030.684,
+    "analytical_darcy_laminar_pa": 2744.198,
+    "analytical_full_path_blasius_pa": 300153.421,
+    "analytical_full_path_laminar_pa": 13720.992,
+    "estimated_full_path_delta_p_pa": 20161.3291064,
+    "friction_factor_blasius": 0.01923993,
+    "friction_factor_laminar": 0.00087952,
+    "headline_delta_p_pa": 20161.329,
+    "headline_source": "openfoam_laminar_n_times_per_turn",
+    "solver_delta_p_kinematic_m2_s2": 4.1011654,
+    "solver_delta_p_pa": 4032.26582128,
+    "solver_delta_p_per_turn_pa": 4032.26582128
+  },
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship. Never claim PASS without conjugate thermal closure and flow-bench correlation.",
+  "schema": "forgeos.motor_stack.openfoam_fia_water_jacket_case/v1",
+  "ship_ok": false,
+  "solver": {
+    "case_dir": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/openfoam_fia_water_jacket_case_work",
+    "converged": true,
+    "image": "microfluidica/openfoam:14",
+    "latest_time": "65",
+    "mesh_cells": {
+      "x": 40,
+      "y": 8,
+      "z": 4
+    },
+    "name": "OpenFOAM foamRun / incompressibleFluid (laminar SIMPLE)",
+    "runtime": "docker",
+    "u_field_present": true
+  },
+  "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "velocity": {
+    "flow_split": "full_flow_single_helical_channel",
+    "inlet_velocity_m_s": 7.142857142857143,
+    "reynolds_number": 72766.96379843552
+  },
+  "winding_temperatures": {
+    "statement": "This case does not close winding temperatures or conjugate heat transfer. Pressure-drop and velocity screening only.",
+    "status": "OPEN"
+  }
+}

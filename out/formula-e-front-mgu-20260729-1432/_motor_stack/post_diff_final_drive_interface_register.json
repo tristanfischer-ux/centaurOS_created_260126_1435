@@ -1,0 +1,56 @@
+{
+  "schema": "forgeos.motor_stack.post_diff_final_drive_interface_register/v1",
+  "status": "SOFTWARE_CLOSED",
+  "ship_ok": false,
+  "interface_ok": true,
+  "source": "scripts/motor-stack/post_diff_final_drive_packaging_screen.py",
+  "source_geometry": {
+    "packaging_screen": "_motor_stack/post_diff_final_drive_packaging_screen.json",
+    "blender_geometry_module": "scripts/lib/post_diff_final_drive_geometry.py",
+    "blender_mesh_prefix": "u_se_td_post_diff_"
+  },
+  "differential_output": {
+    "side_gear_output_od_mm": 40.8,
+    "spline_intent": "involute_spline_screening_placeholder_release_open",
+    "left_output_axis": "diff_side_output_left_x",
+    "right_output_axis": "diff_side_output_right_x"
+  },
+  "post_diff_pinion_interface": {
+    "pinion_bore_od_mm": 40.8,
+    "pinion_axis": "coaxial_with_diff_side_output",
+    "left_pinion_center_x_mm": -77.0,
+    "right_pinion_center_x_mm": 77.0,
+    "pair_axial_offset_mm": 77.0
+  },
+  "halfshaft_output": {
+    "wheel_bore_mm": 34.0,
+    "halfshaft_stub_od_mm": 34.0,
+    "spline_intent": "wheel_side_involute_spline_screening_placeholder_release_open",
+    "left_stub_axis": "post_diff_wheel_left_halfshaft_axis",
+    "right_stub_axis": "post_diff_wheel_right_halfshaft_axis"
+  },
+  "axial_stack_mm": {
+    "diff_len": 108.0,
+    "gear_face_width": 46.0,
+    "diff_output_face_abs_x": 54.0,
+    "pinion_inner_face_abs_x": 54.0,
+    "diff_to_pinion_gap": 0.0,
+    "wheel_to_halfshaft_stub_gap": 0.0
+  },
+  "consistency_checks": {
+    "diff_output_to_pinion_bore_od_mismatch_mm": 0.0,
+    "wheel_bore_to_halfshaft_stub_od_mismatch_mm": 0.0,
+    "diff_to_pinion_axial_gap_mm": 0.0,
+    "wheel_to_halfshaft_stub_gap_mm": 0.0,
+    "pinion_coaxial_with_diff_output": true,
+    "wheel_coaxial_with_halfshaft_stub": true,
+    "no_float_gaps": true,
+    "tolerance_mm": 0.05
+  },
+  "release_checks": {
+    "spline_standard_and_tooth_count": "OPEN",
+    "cv_joint_supplier_icd": "OPEN",
+    "bearing_reactions_and_seal_stack": "OPEN",
+    "bench_correlation": "OPEN"
+  }
+}

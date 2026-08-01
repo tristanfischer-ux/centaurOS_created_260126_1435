@@ -1,0 +1,37 @@
+{
+  "controlling_geometry_source": "packaging_seed_rotor_bore_hold",
+  "packaging_seed": {
+    "face_width_mm": 14.0,
+    "gear_module_mm": 0.703968253968254,
+    "minimum_strength_factor": 0.1727,
+    "planet_count": 3
+  },
+  "recommended": {
+    "architecture_hold": "PLANETARY_STRENGTH_VS_ROTOR_BORE \u2014 best nest inside rotor ID 105.9 mm reaches FoS \u2248 1.005 (< 1.2); enlarge rotor bore, change tooth counts/topology, or accept external planetary; do not claim PASS",
+    "clears_duty_screen": false,
+    "envelope": {
+      "bay_max_ring_tip_diameter_mm": 140.0,
+      "max_face_width_mm": 60.0,
+      "max_ring_tip_diameter_mm": 103.9,
+      "rotor_bore_limited": true
+    },
+    "face_width_mm": 60.0,
+    "gear_module_mm": 0.8,
+    "minimum_bending_fos": 1.2506,
+    "minimum_contact_fos": 1.0053,
+    "minimum_strength_factor": 1.0053,
+    "planet_count": 4,
+    "planet_pitch_diameter_mm": 43.2,
+    "planet_teeth": 54,
+    "ring_pitch_diameter_mm": 100.8,
+    "ring_teeth": 126,
+    "ring_tip_diameter_mm": 102.8,
+    "rotor_id_mm": 105.9,
+    "statement": "PLANETARY_STRENGTH_VS_ROTOR_BORE \u2014 best nest inside rotor ID 105.9 mm reaches FoS \u2248 1.005 (< 1.2); enlarge rotor bore, change tooth counts/topology, or accept external planetary; do not claim PASS",
+    "sun_pitch_diameter_mm": 14.4,
+    "sun_teeth": 18,
+    "volume_proxy_mm3": 4934.4
+  },
+  "schema": "forgeos.motor_stack.iso6336_recommended_geometry/v1",
+  "ship_ok": false
+}

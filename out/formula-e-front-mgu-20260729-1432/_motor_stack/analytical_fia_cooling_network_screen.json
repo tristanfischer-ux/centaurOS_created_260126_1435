@@ -1,0 +1,153 @@
+{
+  "branch_hydraulics": {
+    "inverter_cold_plate": {
+      "artefact_ref": "_motor_stack/openfoam_fia_cold_plate_case.json",
+      "branch_id": "inverter_cold_plate",
+      "channel_depth_m": 0.0013360000000000002,
+      "channel_width_m": 0.005345,
+      "developed_length_m": 1.4799645943005142,
+      "headline_delta_p_pa": 24921.237,
+      "hydraulic_diameter_m": 0.002137679988025745,
+      "inlet_velocity_m_s": 3.500949457492872,
+      "pass_count": 8,
+      "reynolds_number": 15656.714632577616
+    },
+    "motor_water_jacket": {
+      "artefact_ref": "_motor_stack/openfoam_fia_water_jacket_case.json",
+      "branch_id": "motor_water_jacket",
+      "channel_depth_m": 0.0035,
+      "channel_width_m": 0.008,
+      "developed_length_m": 2.6842381560933544,
+      "headline_delta_p_pa": 17776.328,
+      "hydraulic_diameter_m": 0.004869565217391305,
+      "inlet_velocity_m_s": 7.142857142857143,
+      "pass_count": null,
+      "reynolds_number": 72766.96379843552
+    }
+  },
+  "conjugate_heat_transfer": {
+    "statement": "No solid/fluid conjugate mesh, TIM map, or transient lap duty.",
+    "status": "OPEN"
+  },
+  "flow_bench": {
+    "statement": "No measured jacket/cold-plate pressure-flow or heater-plate temperature correlation.",
+    "status": "OPEN"
+  },
+  "honesty_notes": [
+    "PARTIAL couples duct \u0394p evidence to convection-limited temperatures.",
+    "coupled_screen_ok is a screening margin only \u2014 not release PASS.",
+    "CHT, flow-bench, and heater-plate correlation remain OPEN."
+  ],
+  "hydraulic_network": {
+    "cold_plate_delta_p_pa": 24921.237,
+    "coolant_flow_l_min": 12.0,
+    "coolant_inlet_c": 60.0,
+    "jacket_delta_p_pa": 17776.328,
+    "pressure_margin_kpa": 107.3024,
+    "pressure_margin_ratio": 0.7153,
+    "pressure_screen_ok": true,
+    "pump_pressure_budget_kpa": 150.0,
+    "topology": "series_jacket_then_cold_plate",
+    "total_delta_p_kpa": 42.6976,
+    "total_delta_p_pa": 42697.565
+  },
+  "input_binding_sha256": "a7ece8d1445ffdeee673269db5eb3ccb98b1e075e92dba352e68d0f8b179b93b",
+  "input_quantities": {
+    "coolant_flow_l_min": 12.0,
+    "coolant_inlet_c": 60.0,
+    "copper_loss_w": 2180.49,
+    "inverter_loss_w": 4318.0,
+    "iron_loss_w": 135.56,
+    "jacket_wall_r_m2k_per_w": 0.00012,
+    "magnet_limit_c": 150.0,
+    "magnet_loss_w": 0.0,
+    "magnet_to_winding_k_per_w": 0.05,
+    "module_footprint_mm2": 45000.0,
+    "module_limit_c": 175.0,
+    "module_to_coolant_k_per_w": 0.01,
+    "pump_pressure_budget_kpa": 150.0,
+    "sic_module_count": 6,
+    "tim_r_m2k_per_w": 0.0001,
+    "winding_limit_c": 180.0
+  },
+  "margins": {
+    "limits_are_release_authority": false,
+    "magnet_margin_c": 82.923,
+    "magnet_margin_pct": 55.28,
+    "module_margin_c": 105.569,
+    "module_margin_pct": 60.33,
+    "pressure_margin_kpa": 107.3024,
+    "pressure_margin_ratio": 0.7153,
+    "winding_margin_c": 112.923,
+    "winding_margin_pct": 62.74
+  },
+  "model": {
+    "convection_basis": "CoolProp fluid props + ht/fluids Nu correlation at branch Re from OpenFOAM duct screens",
+    "coolant_topology": "series_jacket_then_cold_plate",
+    "evidence_class": "analytical_cht_style_screen",
+    "name": "series_hydraulic_parallel_convection_thermal_network",
+    "pressure_basis": "OpenFOAM headline_delta_p_pa per branch summed at kit flow",
+    "solid_resistance_basis": "area-normalised TIM + jacket wall (K\u00b7m\u00b2/W \u00f7 contact area); module_to_coolant_k_per_w seed kept for lumped-screen parity"
+  },
+  "release_statement": "Concept evidence only. Never claim thermal or hydraulic release, FIA race readiness, or permission to ship from this network screen.",
+  "schema": "forgeos.motor_stack.analytical_fia_cooling_network_screen/v1",
+  "screening_results": {
+    "coupled_screen_ok": true,
+    "maximum_magnet_temperature_c": 67.077,
+    "maximum_module_temperature_c": 69.431,
+    "maximum_winding_temperature_c": 67.077,
+    "motor_loss_w": 2316.05,
+    "pressure_margin_kpa": 107.3024,
+    "pressure_screen_ok": true,
+    "temperature_screen_ok": true,
+    "total_delta_p_kpa": 42.6976,
+    "total_loss_w": 6634.05
+  },
+  "ship_ok": false,
+  "source_state_sha256": "2a56c7cd5bb92945d47cf70917ea268c782bec535b546146f9ca9c96815b9b15",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "thermal_network": {
+    "all_temperatures_below_limits": true,
+    "cold_plate_convection": {
+      "branch_id": "inverter_cold_plate",
+      "correlation": "ht.conv_internal.Nu_conv_internal",
+      "h_conv_w_m2k": 129057.62,
+      "nusselt": 663.651,
+      "r_conv_k_per_w": 0.000392,
+      "reynolds_number": 15656.71,
+      "wetted_area_m2": 0.01978
+    },
+    "coolant_bulk_cold_plate_c": 66.139,
+    "coolant_bulk_jacket_c": 61.589,
+    "coolant_cold_plate_outlet_c": 69.1,
+    "coolant_jacket_outlet_c": 63.177,
+    "jacket_convection": {
+      "branch_id": "motor_water_jacket",
+      "correlation": "ht.conv_internal.Nu_conv_internal",
+      "h_conv_w_m2k": 38022.53,
+      "nusselt": 447.461,
+      "r_conv_k_per_w": 0.000426,
+      "reynolds_number": 72766.96,
+      "wetted_area_m2": 0.06174
+    },
+    "magnet_below_limit": true,
+    "magnet_margin_c": 82.923,
+    "magnet_margin_pct": 55.28,
+    "magnet_temperature_c": 67.077,
+    "module_below_limit": true,
+    "module_margin_c": 105.569,
+    "module_margin_pct": 60.33,
+    "module_temperature_c": 69.431,
+    "winding_below_limit": true,
+    "winding_margin_c": 112.923,
+    "winding_margin_pct": 62.74,
+    "winding_temperature_c": 67.077
+  },
+  "upstream_artefacts": {
+    "cold_plate": "_motor_stack/openfoam_fia_cold_plate_case.json",
+    "cold_plate_input_hash": "82cf1249eb0dd362d7ffe3449cbdf7ef699394e7884c897ef98fb98a78a41fab",
+    "water_jacket": "_motor_stack/openfoam_fia_water_jacket_case.json",
+    "water_jacket_input_hash": "723dee0b3861b534ef1eefe481ea743bee87d713c327e1ac6634d86a0f334f66"
+  }
+}

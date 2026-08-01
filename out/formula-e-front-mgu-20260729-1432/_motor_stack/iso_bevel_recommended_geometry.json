@@ -1,0 +1,29 @@
+{
+  "controlling_geometry_source": "strength_driven_resize",
+  "packaging_seed": {
+    "bevel_face_width_mm": 3.0,
+    "diff_od_mm": 19.2,
+    "minimum_strength_factor": 0.0092
+  },
+  "recommended": {
+    "bevel_face_width_mm": 10.0,
+    "carrier_input_torque_nm": 250.438538,
+    "clears_duty_screen": true,
+    "cone_distance_mm": 40.5538,
+    "diff_len_mm": 108.0,
+    "diff_od_mm": 120.0,
+    "envelope_max_diff_od_mm": 120.0,
+    "mean_module_mm": 4.13305,
+    "minimum_bending_fos": 4.5655,
+    "minimum_contact_fos": 1.2172,
+    "minimum_strength_factor": 1.2172,
+    "ratio_into_diff": 2.0,
+    "side_gear_teeth": 14,
+    "spider_count": 6,
+    "spider_pinion_teeth": 10,
+    "statement": "Strength-driven bevel nest resize clears screening FoS \u2265 1.2 inside OD \u2264 120 mm. Applied cut_torque_at_diff at ratio_into_diff=2; POST_DIFF_FINAL_DRIVE_PACKAGING remains OPEN. Not ISO 23509 / KISSsoft; ship_ok false.",
+    "volume_proxy_mm3": 144000.0
+  },
+  "schema": "forgeos.motor_stack.iso_bevel_recommended_geometry/v1",
+  "ship_ok": false
+}

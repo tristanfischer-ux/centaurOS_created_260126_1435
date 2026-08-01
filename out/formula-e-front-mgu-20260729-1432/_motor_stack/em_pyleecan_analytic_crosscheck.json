@@ -1,0 +1,42 @@
+{
+  "schema": "forgeos.motor_stack.em_pyleecan_analytic_crosscheck/v1",
+  "machine": {
+    "stator_slots": 24,
+    "rotor_poles": 8,
+    "pole_pairs": 4,
+    "winding_factor_kw1": 1.0,
+    "winding_symmetric": true,
+    "turns_per_phase": 14.0,
+    "rotor_od_mm": 139.4,
+    "stack_mm": 97.58,
+    "magnet_Br_T": 1.24,
+    "magnet_mur": 1.05,
+    "magnet_thickness_mm": 8.85
+  },
+  "flux": {
+    "B_gap_peak_T": 0.6661,
+    "flux_focusing_ratio_Am_over_Ag": 0.5623,
+    "magnet_operating_flux_T": 1.1847,
+    "pole_area_m2": 0.005395,
+    "flux_per_pole_Wb": 0.002288,
+    "lambda_pm_design_Wb": 0.03203,
+    "lambda_pm_from_back_emf_Wb": 0.015436,
+    "back_emf_line_line_rms_v": 154.415797
+  },
+  "torque_nm": {
+    "route_A_design_flux": 129.64,
+    "route_B_measured_back_emf": 62.48,
+    "fe_deck_mean": 45.652854,
+    "required": 125.214912
+  },
+  "verdict": {
+    "notes": [
+      "DESIGN flux linkage and MEASURED back-EMF disagree by 2.08x \u2014 the winding/flux model is internally inconsistent",
+      "the deck's OWN back-EMF implies 1.37x the torque its FE integral reports \u2014 the torque integration is the suspect, not the machine"
+    ],
+    "design_vs_backemf_ratio": 2.075,
+    "backemf_vs_fe_ratio": 1.368,
+    "fe_vs_required": 0.3646,
+    "backemf_vs_required": 0.4989
+  }
+}

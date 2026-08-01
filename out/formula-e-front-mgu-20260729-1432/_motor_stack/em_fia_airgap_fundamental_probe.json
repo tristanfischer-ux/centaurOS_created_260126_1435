@@ -1,0 +1,14 @@
+{
+  "schema": "forgeos.motor_stack.airgap_fundamental_probe/v1",
+  "trace_available": false,
+  "note": "the deck exposes only peak/rms/mean airgap B, not the 720-point trace \u2014 reporting the aggregates and an rms-derived estimate",
+  "B_peak_local_T": 0.3175,
+  "B_rms_T": 0.2379,
+  "B1_estimate_from_rms_T": 0.3364,
+  "remanence_T": 1.24,
+  "healthy_band_T": [
+    0.7,
+    1.0
+  ],
+  "verdict": "B1_WEAK (rms-derived estimate) \u2014 magnetic circuit suspect"
+}

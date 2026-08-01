@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""INTENT: Sol + GLM-5.2 + Kimi explode the front FPK into a comprehensive
+"""INTENT: Sol + Grok 4.5 + MiniMax explode the front FPK into a comprehensive
 flat component → physics checklist, then merge.
+
+Seats: scripts/lib/council_models.py → model_routing.py.
 
 Uses a FLAT row schema (survives token truncation better than deep trees).
 Also salvages prior truncated nested JSON if present.
@@ -28,10 +30,11 @@ OUT = ROOT / "out/formula-e-front-mgu-20260729-1432"
 COUNCIL_DIR = OUT / "_physics_checklist_council"
 from scripts.lib.council_models import (  # noqa: E402
     COUNCIL_MODELS,
-    run_kimi_with_opus5_fallback,
+    FRAGILE_SEAT_NAME,
+    run_fragile_seat_with_fallback,
 )
 
-MODELS = dict(COUNCIL_MODELS)  # kimi → anthropic/claude-opus-5 on fail
+MODELS = dict(COUNCIL_MODELS)  # minimax_m3 → anthropic/claude-opus-5 on fail
 
 SYSTEM = """You are a principal Formula E / EV powertrain engineer.
 
@@ -694,14 +697,14 @@ def main() -> int:
                 obj = {"parse_error": True, "error": str(e)}
             return name, obj
 
-        def run_kimi_seat() -> tuple[str, dict]:
+        def run_fragile_seat() -> tuple[str, dict]:
             def _call(n: str, m: str) -> dict:
                 try:
                     return call_model(m, user, api_key)
                 except Exception as e:
                     return {"parse_error": True, "error": str(e)}
 
-            seat, _mid, obj = run_kimi_with_opus5_fallback(_call)
+            seat, _mid, obj = run_fragile_seat_with_fallback(_call)
             return seat, obj
 
         with ThreadPoolExecutor(max_workers=3) as ex:
@@ -709,8 +712,8 @@ def main() -> int:
             for n, m in MODELS.items():
                 if n in skip:
                     continue
-                if n == "kimi":
-                    futs.append(ex.submit(run_kimi_seat))
+                if n == FRAGILE_SEAT_NAME:
+                    futs.append(ex.submit(run_fragile_seat))
                 else:
                     futs.append(ex.submit(run_one, n, m))
             for fut in as_completed(futs):

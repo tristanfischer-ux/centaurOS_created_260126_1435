@@ -1,0 +1,73 @@
+{
+  "schema": "forgeos.motor_stack.iso6336_post_diff_final_drive_screen/v1",
+  "status": "PARTIAL",
+  "ship_ok": false,
+  "source": "scripts/motor-stack/post_diff_final_drive_packaging_screen.py",
+  "duty_torques": {
+    "post_diff_input_torque_nm": 125.219269,
+    "halfshaft_output_torque_nm": 500.877076,
+    "ratio_after_diff": 4.0,
+    "ratio_into_diff": 2.0,
+    "pinion_speed_rpm": 9750.0,
+    "torque_basis": "post-diff pinion input torque equals bevel side_gear_torque_nm from cut_torque_at_diff; it is not divided by ratio_after_diff"
+  },
+  "gear_seed": {
+    "pinion_teeth": 24,
+    "wheel_teeth": 96,
+    "normal_module_mm": 1.4,
+    "transverse_module_mm": 1.5447,
+    "face_width_mm": 46.0,
+    "helix_angle_deg": 25.0,
+    "pinion_pitch_diameter_mm": 37.0735,
+    "wheel_pitch_diameter_mm": 148.294,
+    "center_distance_mm": 92.6837,
+    "geometry_source": "strength_driven_resize"
+  },
+  "strength_screen": {
+    "method": "iso6336_style_external_helical_screen_not_kisssoft",
+    "screen_fos_required": 1.2,
+    "application_factor_ka": 1.25,
+    "helix_bending_factor_y_beta": 0.9063,
+    "helix_contact_factor_z_beta": 0.952,
+    "allowables": {
+      "sigma_f_allow_mpa": 450.0,
+      "sigma_h_allow_mpa": 1500.0,
+      "sigma_f_basis": "ISO 6336-5:2016 MQ case-hardened steel sigma_F lim approx 430-500 MPa; screening allowable 450 MPa (16MnCr5/20MnCr5 class)",
+      "sigma_h_basis": "ISO 6336-5:2016 MQ case-hardened steel sigma_H lim approx 1500 MPa; screening allowable 1500 MPa"
+    },
+    "meshes": [
+      {
+        "mesh_name": "post_diff_pinion_wheel_helical",
+        "pinion_teeth": 24,
+        "wheel_teeth": 96,
+        "pinion_pitch_diameter_mm": 37.0735,
+        "wheel_pitch_diameter_mm": 148.294,
+        "tangential_force_n": 6755.19,
+        "pitch_line_velocity_m_s": 18.9263,
+        "dynamic_factor_kv": 1.2366,
+        "tooth_form_factor_yf": 2.5509,
+        "bending_stress_mpa": 374.843,
+        "contact_stress_mpa": 1247.193,
+        "bending_fos": 1.2005,
+        "contact_fos": 1.2027,
+        "bending_ok": true,
+        "contact_ok": true
+      }
+    ],
+    "minimum_bending_fos": 1.2005,
+    "minimum_contact_fos": 1.2027,
+    "minimum_strength_factor": 1.2005
+  },
+  "works_in_kit_context": {
+    "duty_strength_screen_ok": true,
+    "minimum_strength_factor": 1.2005,
+    "threshold_fos": 1.2,
+    "note": "duty_strength_screen_ok means min(bending, contact) FoS >= 1.2 on the selected helical seed using bevel side-output torque. KISSsoft, race spectrum, scuffing, micropitting and bench remain OPEN."
+  },
+  "release_checks": {
+    "kisssoft_independent_check": "OPEN",
+    "load_spectrum_fatigue": "OPEN",
+    "micropitting_scuffing": "OPEN",
+    "bench_correlation": "OPEN"
+  }
+}

@@ -45,8 +45,8 @@
       "airgap_flux_T": 0.6661
     },
     "best_rebalance": {
-      "magnet_thickness_mm": 5.5,
-      "magnet_length_mm": 23.34,
+      "proposed_magnet_thickness_mm": 5.5,
+      "proposed_magnet_length_mm": 23.34,
       "volume_per_bar_mm2": 128.4,
       "focusing_ratio": 0.9,
       "airgap_flux_T": 0.9962,

@@ -1,0 +1,118 @@
+{
+  "bench_correlation": {
+    "statement": "Clear-case or instrumented flow-bench correlation still OPEN.",
+    "status": "OPEN"
+  },
+  "cornering_screen": {
+    "cornering_pickup_ok": false,
+    "free_surface_tilt_deg": 68.2,
+    "immersion_fraction_cornering": 0.0715,
+    "lateral_g_assumed": 2.5,
+    "oil_level_drop_mm": 13.927
+  },
+  "fia_question": "Oil jet / pickup / churning under race accel/brake/corner \u2014 geometry-bound analytical twin screen; free-surface CFD OPEN",
+  "fluid": {
+    "cp_j_kg_k": 2000.0,
+    "density_kg_m3": 870.0,
+    "jet_allowed_delta_t_k": 15.0,
+    "kinematic_viscosity_m2_s": 1.5e-05,
+    "oil_class_seed": "75W-90 class (grade OPEN)"
+  },
+  "free_surface_cfd": {
+    "statement": "OpenFOAM free-surface oil (jets, pickup, aeration, churning under accel/brake/corner) is not run. Prefer this analytical PARTIAL over a fake CFD claim. Optional cavity smoke remains toolchain-only.",
+    "status": "OPEN"
+  },
+  "frozen_assumption_refs": [
+    "A-COOL",
+    "A-RATIO",
+    "A-SPEED"
+  ],
+  "geometry_screen": {
+    "active_sump_volume_ml": 123.44,
+    "geometry_source": "gear_geometry_writeback",
+    "housing_inner_radius_mm": 93.0,
+    "immersion_fraction_geometry": 0.4342,
+    "oil_level_height_mm": 16.673,
+    "planet_immersion_depth_mm": 16.673,
+    "ring_inner_radius_mm": 44.35,
+    "sump_annulus_area_mm2": 20992.37,
+    "sump_axial_length_mm": 5.88
+  },
+  "honesty_frame": "RESULT_UNDER_ASSUMPTIONS",
+  "input_quantities": {
+    "continuous_electrical_power_kw": 250.0,
+    "gear_efficiency": 0.97,
+    "gear_face_mm": 14.0,
+    "gear_oil_volume_ml": 350.0,
+    "gear_ratio": 8.0,
+    "geometry_source": "gear_geometry_writeback",
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "jet_nozzle_diameter_mm": 1.8,
+    "max_rotor_speed_rpm": 19500.0,
+    "mgu_shaft_power_kw": 238.918,
+    "mgu_shaft_torque_nm": 117.0,
+    "planet_count": 3,
+    "planet_face_width_mm": 14.0,
+    "planet_od_mm": 38.4,
+    "required_shaft_torque_nm": 116.99994059578292,
+    "ring_id_mm": 88.7,
+    "slosh_length_mm": 30.0,
+    "sun_od_mm": 12.0
+  },
+  "input_quantities_sha256": "7a4e93475fd4cf38effbd608f75083abb5dc8d3df77179b0d688b4681d083afb",
+  "jet_gallery_screen": {
+    "jet_pressure_required_kpa": 271.463,
+    "jet_velocity_m_s": 17.986,
+    "nozzle_count": 6,
+    "nozzle_diameter_mm": 1.8,
+    "pickup_gallery_adequate": true,
+    "scavenge_flow_required_l_min": 20.5964,
+    "scavenge_margin_factor": 1.25
+  },
+  "model_assumptions": [
+    "Ring-fixed planetary: carrier_rpm = sun_rpm / gear_ratio.",
+    "All gear inefficiency assumed rejected into oil for jet-flow sizing.",
+    "Planet immersion from annular sump geometry + oil charge (housing wall seed 6.0 mm).",
+    "Churning uses Cd=0.45 immersed-disk drag OoM, not correlated.",
+    "Oil properties are 75W-90 class seeds \u2014 supplier grade OPEN.",
+    "Cornering slosh uses 2.5 g lateral tilt over 30.0 mm slosh length \u2014 screening only.",
+    "Jet orifice Cd and nozzle diameter are seeds \u2014 gallery STEP OPEN."
+  ],
+  "release_statement": "Concept evidence only. Analytical oil screen does not close galleries, jets, seals, or race lubrication. Never claim PASS without free-surface CFD + bench. ship_ok stays false.",
+  "schema": "forgeos.motor_stack.gear_oil_fia_front_kit_case/v2",
+  "screening_results": {
+    "carrier_speed_rpm": 2437.5,
+    "charge_fraction_of_sump": 2.8354,
+    "churning_loss_per_planet_w": 400.72,
+    "churning_loss_w": 1202.17,
+    "cornering_pickup_ok": false,
+    "estimated_sump_volume_ml": 123.44,
+    "gear_loss_kw": 7.1675,
+    "geometry_source": "gear_geometry_writeback",
+    "immersion_fraction_geometry": 0.4342,
+    "jet_flow_per_mesh_l_min": 2.7462,
+    "jet_pressure_required_kpa": 271.463,
+    "minimum_jet_flow_l_min": 16.4771,
+    "pickup_charge_adequate": true,
+    "pickup_gallery_adequate": true,
+    "planet_tip_speed_m_s": 17.74,
+    "scavenge_flow_required_l_min": 20.5964,
+    "sun_tip_speed_m_s": 12.252,
+    "tip_speed_splash_ok": true
+  },
+  "ship_ok": false,
+  "solver": {
+    "evidence_class": "twin_bound_geometry_analytical_partial",
+    "free_surface_cfd": "OPEN",
+    "openfoam_role": "cavity smoke proves OpenFOAM toolchain only \u2014 NOT oil galleries",
+    "software": "geometry-bound analytical handbook screen (annular-sump immersion + immersed-disk churning + jet orifice + cornering slosh + scavenge margin)"
+  },
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "works_in_kit_context": {
+    "oil_delivery_screen_ok": false,
+    "statement": "Geometry-bound jet-need + churning OoM + charge/pickup/cornering flags on twin planetary writeback. RESULT_UNDER_ASSUMPTIONS \u2014 not free-surface CFD, not clear-case bench, not seal-temperature closure."
+  }
+}

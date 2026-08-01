@@ -1,0 +1,166 @@
+{
+  "schema_version": "motor-hardware-correlation/v2",
+  "stamped_at": "2026-07-31T11:49:13Z",
+  "assembly_revision": "front-drive-concept-stub-2026-07-30",
+  "status": "OPEN",
+  "bench_prep_ref": "_motor_stack/hardware_correlation_bench_prep.json",
+  "holds": [
+    {
+      "hold_id": "DYNO_TORQUE_EFFICIENCY_MAP",
+      "domain": "motor_inverter_performance",
+      "decision_register_ids": [
+        "DEC-010"
+      ],
+      "required_evidence": "Calibrated dyno raw data + torque/efficiency map over speed, current, voltage, and coolant conditions, revision-hashed to the assembly.",
+      "predicted_model_refs": [
+        "_motor_stack/em_fia_front_kit_case.json",
+        "_motor_stack/em_fia_mtpa_screen.json",
+        "_motor_stack/em_fia_voltage_fw_screen.json",
+        "_motor_stack/em_fia_torque_map_screen.json"
+      ],
+      "measurement_recipe": "Mount the revision-matched MGU and inverter on a calibrated dyno; hold coolant inlet conditions, sweep the modelled speed/current grid, and record shaft torque, DC/AC power, temperatures, and efficiency.",
+      "acceptance_band": "At revision-matched points, measured torque is within \u00b110% of the model and efficiency within \u00b13 percentage points, with no limit exceedance.",
+      "predicted_model_refs_present": {
+        "_motor_stack/em_fia_front_kit_case.json": true,
+        "_motor_stack/em_fia_mtpa_screen.json": true,
+        "_motor_stack/em_fia_voltage_fw_screen.json": true,
+        "_motor_stack/em_fia_torque_map_screen.json": true
+      },
+      "software_prep_status": "READY_FOR_BENCH",
+      "status": "OPEN",
+      "ship_ok": false,
+      "blocks_ship": true,
+      "evidence_ref": null,
+      "correlated_revision": null
+    },
+    {
+      "hold_id": "HIL_POPULATED_INVERTER",
+      "domain": "controls_and_power_electronics",
+      "decision_register_ids": [
+        "DEC-008"
+      ],
+      "required_evidence": "Hardware-in-the-loop pass on the populated inverter revision, including safe-off, sensing, resolver, CAN, desaturation, and fault handling.",
+      "predicted_model_refs": [
+        "_motor_stack/inverter_packaging_fia_front_kit_case.json",
+        "_motor_stack/em_fia_voltage_fw_screen.json"
+      ],
+      "measurement_recipe": "Connect the populated inverter to a real-time plant simulator; replay normal, sensor-fault, resolver, CAN-loss, desaturation, and safe-off cases while logging commands, sensed values, and protection timing.",
+      "acceptance_band": "Every commanded state and protection transition matches the approved sequence; scaled analogue channels are within \u00b15% and no unsafe output persists after a trip.",
+      "predicted_model_refs_present": {
+        "_motor_stack/inverter_packaging_fia_front_kit_case.json": true,
+        "_motor_stack/em_fia_voltage_fw_screen.json": true
+      },
+      "software_prep_status": "READY_FOR_BENCH",
+      "status": "OPEN",
+      "ship_ok": false,
+      "blocks_ship": true,
+      "evidence_ref": null,
+      "correlated_revision": null
+    },
+    {
+      "hold_id": "FLOW_BENCH_JACKET_AND_COLD_PLATE",
+      "domain": "cooling_hydraulics",
+      "decision_register_ids": [],
+      "required_evidence": "Measured pressure-flow curves for the motor jacket and inverter cold plate at controlled coolant temperature and concentration.",
+      "predicted_model_refs": [
+        "_motor_stack/openfoam_fia_cold_plate_case.json",
+        "_motor_stack/openfoam_fia_water_jacket_case.json",
+        "_motor_stack/analytical_fia_cooling_network_screen.json"
+      ],
+      "measurement_recipe": "Bench each revision-matched coolant article with the specified coolant mix and inlet temperature; step flow across the operating range and record stabilised inlet/outlet pressure, flow, and fluid temperature.",
+      "acceptance_band": "Measured pressure drop is within \u00b115% of each modelled point for both articles and preserves the predicted monotonic pressure-flow trend.",
+      "predicted_model_refs_present": {
+        "_motor_stack/openfoam_fia_cold_plate_case.json": true,
+        "_motor_stack/openfoam_fia_water_jacket_case.json": true,
+        "_motor_stack/analytical_fia_cooling_network_screen.json": true
+      },
+      "software_prep_status": "READY_FOR_BENCH",
+      "status": "OPEN",
+      "ship_ok": false,
+      "blocks_ship": true,
+      "evidence_ref": null,
+      "correlated_revision": null
+    },
+    {
+      "hold_id": "HEATER_PLATE_MODULE_TEMPS",
+      "domain": "inverter_thermal",
+      "decision_register_ids": [
+        "DEC-001"
+      ],
+      "required_evidence": "Heater-plate test with calibrated module/case/coolant temperatures and TIM/contact stack matching the populated SiC module revision.",
+      "predicted_model_refs": [
+        "_motor_stack/analytical_fia_cooling_thermal_screen.json",
+        "_motor_stack/analytical_fia_cooling_network_screen.json",
+        "_motor_stack/inverter_packaging_fia_front_kit_case.json"
+      ],
+      "measurement_recipe": "Build the revision-matched module/TIM/cold-plate stack, apply calibrated heater power at controlled coolant conditions, and log steady module, case, plate, inlet, and outlet temperatures.",
+      "acceptance_band": "Steady module temperature is within \u00b15 \u00b0C of prediction and measured junction-to-coolant thermal resistance is within \u00b115% of the model.",
+      "predicted_model_refs_present": {
+        "_motor_stack/analytical_fia_cooling_thermal_screen.json": true,
+        "_motor_stack/analytical_fia_cooling_network_screen.json": true,
+        "_motor_stack/inverter_packaging_fia_front_kit_case.json": true
+      },
+      "software_prep_status": "READY_FOR_BENCH",
+      "status": "OPEN",
+      "ship_ok": false,
+      "blocks_ship": true,
+      "evidence_ref": null,
+      "correlated_revision": null
+    },
+    {
+      "hold_id": "OVERSPEED_ROTOR_RETENTION",
+      "domain": "rotor_structural",
+      "decision_register_ids": [
+        "DEC-006"
+      ],
+      "required_evidence": "Instrumented overspeed/retention test and correlated rotor stress model at the controlled maximum-speed release condition.",
+      "predicted_model_refs": [
+        "_motor_stack/calculix_fia_rotor_screen.json",
+        "_motor_stack/calculix_fia_magnet_pocket_screen.json",
+        "_motor_stack/ross_fia_front_kit_case.json"
+      ],
+      "measurement_recipe": "Spin the revision-matched rotor in a guarded rig through the approved speed steps; record speed, vibration, strain or growth, and post-test magnet/sleeve/bridge inspection evidence.",
+      "acceptance_band": "Measured strain or radial growth is within \u00b115% of the structural model, critical-speed trend agrees within \u00b110%, and retention remains intact.",
+      "predicted_model_refs_present": {
+        "_motor_stack/calculix_fia_rotor_screen.json": true,
+        "_motor_stack/calculix_fia_magnet_pocket_screen.json": true,
+        "_motor_stack/ross_fia_front_kit_case.json": true
+      },
+      "software_prep_status": "READY_FOR_BENCH",
+      "status": "OPEN",
+      "ship_ok": false,
+      "blocks_ship": true,
+      "evidence_ref": null,
+      "correlated_revision": null
+    },
+    {
+      "hold_id": "DOUBLE_PULSE_ESL_SIC",
+      "domain": "inverter_switching",
+      "decision_register_ids": [
+        "DEC-001",
+        "DEC-008"
+      ],
+      "required_evidence": "Double-pulse switching waveforms on populated SiC hardware with measured commutation-loop ESL, overshoot, switching loss, and gate settings.",
+      "predicted_model_refs": [
+        "_motor_stack/inverter_packaging_fia_front_kit_case.json"
+      ],
+      "measurement_recipe": "Run a guarded double-pulse test on the populated revision at the modelled DC bus/current points; capture gate voltage, VDS, current, timing, temperature, and commutation-loop geometry.",
+      "acceptance_band": "Measured loop ESL is within \u00b120% of prediction, voltage overshoot within \u00b110%, and Eon/Eoff within \u00b115%, with no protection or device-limit breach.",
+      "predicted_model_refs_present": {
+        "_motor_stack/inverter_packaging_fia_front_kit_case.json": true
+      },
+      "software_prep_status": "READY_FOR_BENCH",
+      "status": "OPEN",
+      "ship_ok": false,
+      "blocks_ship": true,
+      "evidence_ref": null,
+      "correlated_revision": null
+    }
+  ],
+  "hold_count": 6,
+  "open_count": 6,
+  "ready_for_bench_count": 6,
+  "all_holds_closed": false,
+  "ship_ok": false,
+  "honesty": "Software-only work can prepare model-linked bench recipes. It cannot close correlation: PASS needs revision-matched physical data. Every hold remains OPEN and ship_ok remains false."
+}
