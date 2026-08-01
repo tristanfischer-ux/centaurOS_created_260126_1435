@@ -247,13 +247,41 @@ def main() -> int:
     verdict = "INCONCLUSIVE"
     if lowest is not None:
         if rising and spread > 0.05:
+            # The DIRECTION of the ratio says reluctance-dominated either way,
+            # but the wording must not assert "below the reference" when the
+            # measurement is ABOVE it. With a MEASURED lambda_pm the PM-only
+            # prediction is a floor, and FE torque exceeding it is the expected
+            # result, not a fault; with an OVERSTATED 1-D reference the same
+            # physics reads as FE falling short. Same diagnosis, opposite sign.
+            # TWO ROUTES TO THE PM SHARE, AND THEY DISAGREE. Report BOTH as a
+            # range rather than picking the one that suits the narrative:
+            #   (a) the curve fit's linear term — but it also absorbs
+            #       cross-saturation, so it OVERSTATES pure PM;
+            #   (b) 1.5*p*lambda_pm*I from the measured OPEN-CIRCUIT linkage —
+            #       but loading changes lambda, so it is not the loaded value.
+            # On the live machine these give 62% and 28%. Both say reluctance is
+            # substantial and the PM circuit is weak, which is what the fix
+            # depends on; neither is precise enough to quote alone.
+            share = ""
+            if a_pm and torques[-1]:
+                fit_pm = a_pm * currents[-1]
+                ref_pm = 1.5 * pole_pairs * lambda_pm * currents[-1]
+                lo, hi = sorted((fit_pm / torques[-1], ref_pm / torques[-1]))
+                share = (f" PM share is between {lo * 100:.0f}% and "
+                         f"{hi * 100:.0f}% of the measured {torques[-1]:.1f} N.m "
+                         f"(curve fit {fit_pm:.1f} N.m vs measured-lambda "
+                         f"{ref_pm:.1f} N.m — these DISAGREE by "
+                         f"{max(fit_pm, ref_pm) / min(fit_pm, ref_pm):.2f}x and "
+                         "the disagreement is unresolved), so reluctance carries "
+                         f"{(1 - hi) * 100:.0f}-{(1 - lo) * 100:.0f}%.")
             verdict = (
-                "PM TORQUE FAR BELOW THE REFERENCE, RELUCTANCE-DOMINATED. The "
-                "ratio RISES with current, so torque is SUPERLINEAR — the "
-                "opposite of saturation. The quadratic (reluctance) term is "
-                "carrying the machine. The linear fit's PM slope gives the FE's "
-                "REAL flux linkage; compare it against whatever the reference "
-                "claimed and treat the difference as the fault to explain.")
+                "RELUCTANCE-DOMINATED. The ratio RISES with current "
+                f"({ratios[0]:.2f} -> {ratios[-1]:.2f}), so torque is "
+                "SUPERLINEAR — the OPPOSITE of saturation, which would make it "
+                "fall. The quadratic reluctance term is carrying the machine "
+                "while the PM term is weak." + share +
+                " Fix the PM circuit (pole arc / flux focusing), not the "
+                "winding or the integration.")
         elif spread > 0.15:
             verdict = ("SATURATION — the ratio FALLS with current, so the "
                        "discrepancy is physical. Compare only at the lowest "
