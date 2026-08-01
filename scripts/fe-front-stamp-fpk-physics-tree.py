@@ -96,6 +96,17 @@ def main() -> int:
                 "domains": list(n.domains),
                 "open_until": list(n.open_until),
                 "physics_keys": sorted(n.physics.keys()),
+                # ⭐ CARRY THE DIMENSION VALUES, not just the key NAMES
+                # (2026-08-01). fe-front-densify-bom-from-physics-tree's
+                # dimension_for_leaf() reads leaf["physics"][...] to attach
+                # dimensions to a BoM line — and part_index exposed only
+                # `physics_keys`, so it ALWAYS fell through to "dimensions OPEN
+                # TBD". The magnet respec had nowhere to land as a result.
+                "physics": {k: v for k, v in n.physics.items()
+                            if k in ("od_mm", "id_mm", "length_mm", "width_mm",
+                                     "height_mm", "thickness_mm", "stack_mm",
+                                     "bars", "poles", "mass_kg",
+                                     "axial_segments_required")},
             }
             for n in flatten_tree(root)
         ],

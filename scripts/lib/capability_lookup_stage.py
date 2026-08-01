@@ -361,7 +361,7 @@ def main() -> int:
     print(f"Artefact: {out}")
     if not gate["ok"] and args.enforce:
         print("  CAPABILITY GATE BLOCKS — do not start design work.")
-        return 44
+        return 45
     return 0
 
 

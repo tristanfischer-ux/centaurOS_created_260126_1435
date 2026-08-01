@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from pathlib import Path
 from dataclasses import asdict, dataclass, field
 from typing import Any, Mapping, Optional
 
@@ -412,6 +413,9 @@ class FpkContext:
     n_rpm: float
     t_nm: float
     pole_pairs: int
+    # Slot count — needed for the SLOT-PASSING frequency that drives magnet
+    # eddy loss (Zs*n/60 in the rotor frame, NOT the electrical p*n/60).
+    n_slots: int
     d_gap_mm: float
     stack_mm: float
     stator_od_mm: float
@@ -440,6 +444,7 @@ def context_from_quantities(q: Mapping[str, Any]) -> FpkContext:
         n_rpm=_num(q, "mgu_base_speed_rpm", default=19500.0),
         t_nm=_num(q, "mgu_shaft_torque_nm", default=120.0),
         pole_pairs=int(_num(q, "pole_pairs", default=4.0)),
+        n_slots=int(_num(q, "stator_slots", "fpk_stator_slots", default=24.0)),
         d_gap_mm=_num(q, "rotor_airgap_diameter_mm", "fpk_rotor_od_mm", default=122.0),
         stack_mm=_num(q, "stack_length_mm", default=98.0),
         stator_od_mm=_num(q, "fpk_stator_od_mm", default=165.0),
@@ -641,13 +646,52 @@ def _build_stator_windings(ctx: FpkContext, parent: str) -> PhysicsNode:
 
 
 def _build_magnets(ctx: FpkContext, parent: str) -> PhysicsNode:
-    segs = 2 * ctx.pole_pairs
+    poles = 2 * ctx.pole_pairs
     m = _mat("NdFeB_N42UH")
-    thick = 3.0
-    vol_cm3 = math.pi * (ctx.d_gap_mm / 10.0) * (thick / 10.0) * (ctx.stack_mm / 10.0) * 0.55
-    mass = vol_cm3 * (m["density_kg_m3"] / 1000.0) / 1000.0 * 1000.0 / 1000.0
-    # fix: vol_cm3 * density g/cm3 / 1000 → kg; density 7.5 g/cm3
+
+    # ⭐⭐ A FIFTH MAGNET (2026-08-01). `thick = 3.0` was hardcoded here while
+    # em_fia_front_kit_case built 8.85 mm, em_fia_demag_screen and
+    # calculix_fia_magnet_pocket_screen built 7.00, and
+    # em_pyleecan_analytic_crosscheck defaulted to 6.0. Five definitions of one
+    # part, and THIS one feeds the BILL OF MATERIALS — so the BoM was describing
+    # a magnet no analysis had ever solved. Take it from the shared rule.
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "motor-stack"))
+        from em_fia_front_kit_case import solve_v_magnet_dimensions  # noqa: PLC0415
+
+        thick, length_mm = solve_v_magnet_dimensions(
+            rotor_inner_diameter_mm=ctx.d_gap_mm * 0.76,
+            rotor_outer_diameter_mm=ctx.d_gap_mm)
+        dim_source = "solve_v_magnet_dimensions (shared with the EM/demag/pocket screens)"
+    except Exception:  # noqa: BLE001 — degrade LOUDLY, never silently diverge
+        thick, length_mm = 3.0, 14.0
+        dim_source = ("LOCAL FALLBACK — shared sizing unavailable; this BoM may "
+                      "describe a DIFFERENT magnet from the analyses")
+
+    # BARS, not poles: a V-magnet layout carries TWO bars per pole.
+    bars = poles * 2
+    vol_cm3 = bars * (thick / 10.0) * (length_mm / 10.0) * (ctx.stack_mm / 10.0)
     mass_kg = vol_cm3 * 7.5 / 1000.0
+
+    # ⭐ AXIAL SEGMENTATION IS A SEPARATE QUANTITY FROM POLE COUNT, and the two
+    # were conflated under the name "segments". Eddy loss scales with segment
+    # width SQUARED: unsegmented gives ~39 kW on this machine, 4 segments 2.4 kW
+    # (more than the copper loss), 8 segments 0.61 kW. It is a hard requirement
+    # and it must reach the BoM as its own line item.
+    try:
+        _sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from machine_loss_bounds import magnet_eddy_bound  # noqa: PLC0415
+
+        bound = magnet_eddy_bound(
+            ac_flux_amplitude_t=0.0765, stator_slots=ctx.n_slots,
+            speed_rpm=ctx.n_rpm,
+            magnet_volume_m3=vol_cm3 * 1e-6,
+            unsegmented_width_m=length_mm / 1000.0)
+        axial_segments = bound.get("minimum_viable_segments")
+        eddy_note = bound.get("verdict")
+    except Exception:  # noqa: BLE001
+        axial_segments, eddy_note = None, "eddy bound unavailable"
     root = PhysicsNode(
         id="permanent_magnet_set",
         name="Permanent Magnet Set",
@@ -659,7 +703,14 @@ def _build_magnets(ctx: FpkContext, parent: str) -> PhysicsNode:
         special_manufacture=True,
         domains=("magnetic", "thermal", "mechanical", "material", "manufacturing"),
         physics={
-            "segments": segs,
+            "poles": poles,
+            "bars": bars,
+            "thickness_mm": round(thick, 3),
+            "length_mm": round(length_mm, 3),
+            "stack_mm": round(ctx.stack_mm, 2),
+            "dimension_source": dim_source,
+            "axial_segments_required": axial_segments,
+            "axial_segmentation_note": eddy_note,
             "br_t": m["br_t"],
             "hcj_ka_m": m["hcj_ka_m"],
             "volume_cm3": round(vol_cm3, 2),
@@ -679,7 +730,9 @@ def _build_magnets(ctx: FpkContext, parent: str) -> PhysicsNode:
             "motor",
             "NdFeB_N42UH",
             ("magnetic", "thermal", "material"),
-            {"count": segs, "thickness_mm": thick},
+            {"count": bars, "thickness_mm": round(thick, 3),
+             "length_mm": round(length_mm, 3),
+             "axial_segments_required": axial_segments},
             special=True,
             open_until=("supplier_magnet_grade",),
         ),

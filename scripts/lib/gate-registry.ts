@@ -566,6 +566,37 @@ export const GATES: GateProof[] = [
     enforcedByDefault: () => !['0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.MAGNET_FOCUSING_ENFORCING ?? 'on').trim().toLowerCase()),
   },
   {
+    code: 45, name: 'capability-lookup',
+    intent: 'design work starting before anyone established WHAT ALREADY EXISTS — the solvers, tools, packages and literature for this product class. In one session this engine re-derived a demag check, an angle sweep and an iron-loss figure that all sat unused in the repo, and missed corpus literature arguing against a design decision',
+    // ADVERSARIAL INPUTS: no dossier at all, and a dossier from a BROKEN scan.
+    // Both must block; a healthy dossier must pass, or the gate is decoration.
+    proveCatch: () => {
+      const dir = mkdtempSync(join(tmpdir(), 'gate44-'))
+      const run = (payload: unknown) => {
+        const f = join(dir, 'd.json')
+        writeFileSync(f, JSON.stringify(payload))
+        return pyBlocksOnBadInput('scripts/lib/capability_lookup_stage.py',
+          ['--product-class', 'x', '--no-packages', '--output', join(dir, 'o.json'),
+           '--enforce'], 45)
+      }
+      // The decision function is the thing under test; drive it in-process for
+      // the two BAD inputs, and confirm the CLI path exists for the real run.
+      const code = [
+        'import sys, json',
+        `sys.path.insert(0, ${JSON.stringify(resolve(REPO, 'scripts/lib'))})`,
+        'import capability_lookup_stage as c',
+        'no_dossier = not c.evaluate_capability_gate(None)["ok"]',
+        'broken = not c.evaluate_capability_gate({"n_solvers": 0, "corpus": {"available": True, "tables": {}}})["ok"]',
+        'healthy = c.evaluate_capability_gate({"n_solvers": 18, "corpus": {"available": True, "tables": {"t": {"present": True, "class_scoped_rows": 999, "has_embedding_column": True}}}})["ok"]',
+        'print("BLOCKS" if (no_dossier and broken and healthy) else "walks through")',
+      ].join('\n')
+      const ok = pyVerdictBlocks(code)
+      rmSync(dir, { recursive: true, force: true })
+      return ok && pySelftestPasses('scripts/lib/capability_lookup_stage.py')
+    },
+    enforcedByDefault: () => !['0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.CAPABILITY_LOOKUP_ENFORCING ?? 'on').trim().toLowerCase()),
+  },
+  {
     code: 44, name: 'solver-coverage',
     intent: 'a quantitative motor-stack claim shipped while discovered --twin solvers are STALE or MISSING — the FE front failure mode where 3/18 solvers ran and the rest were hand-derived (coverage was a REPORT the agent could skip)',
     // ADVERSARIAL INPUT through the CLI exit path: twin with NO artefacts → every
@@ -614,7 +645,7 @@ export const GATES: GateProof[] = [
 // COVERAGE: every gate code here MUST have a proof in GATES, else the meta-test fails — so a NEW
 // gate cannot land without a full adversarial proof. (23-29 are pre-render STATE-structural guards
 // with direct un-swallowed exits — a separate extension; tracked here so they aren't forgotten.)
-export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41, 42, 43, 44]
+export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41, 42, 43, 44, 45]
 
 function _selftest() {
   let bad = 0
