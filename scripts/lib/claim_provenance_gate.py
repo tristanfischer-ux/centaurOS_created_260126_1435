@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -273,6 +274,12 @@ def _selftest() -> int:
     return 1 if fails else 0
 
 
+def _enforce_mode_from_env() -> str:
+    """'off' unless CLAIM_PROVENANCE_ENFORCING is truthy. Mirrors gates 31-40."""
+    raw = str(os.environ.get("CLAIM_PROVENANCE_ENFORCING", "")).strip().lower()
+    return "off" if raw in ("", "0", "false", "no", "off", "shadow") else "on"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--claims", type=Path)
@@ -297,7 +304,10 @@ def main() -> int:
     if args.output:
         args.output.write_text(json.dumps(res, indent=2))
     print(f"\n  {res['n_backed']}/{res['n_claims']} claims backed by a fresh artefact")
-    if not res["ok"] and args.enforce:
+    # Enforcement is also settable by environment, so the chain can turn it on
+    # without every caller passing a flag (mirrors the gates 31-40 pattern).
+    enforcing = args.enforce or _enforce_mode_from_env() != "off"
+    if not res["ok"] and enforcing:
         print("  CLAIM-PROVENANCE GATE BLOCKS — do not ship these numbers.")
         return 41
     return 0

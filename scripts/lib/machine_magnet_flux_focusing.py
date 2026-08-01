@@ -119,6 +119,16 @@ class MagnetCircuit:
             self.recoil_permeability * self.effective_airgap_mm)
 
 
+def enforce_mode_from_env() -> str:
+    """'off' unless MAGNET_FOCUSING_ENFORCING is truthy — a starved magnet is a
+    DESIGN finding, not a wrongness, so it flags by default and blocks on
+    request (the gate-severity philosophy of gates 31-40)."""
+    import os
+    from machine_excitation_tracking import OFF_TOKENS  # one shared rule
+    raw = str(os.environ.get("MAGNET_FOCUSING_ENFORCING", "")).strip().lower()
+    return "off" if raw in OFF_TOKENS else "on"
+
+
 def screen(circuit: MagnetCircuit) -> dict:
     """Judge a magnet circuit and, when it is starved, say what to change."""
     findings: list[dict] = []
@@ -427,6 +437,8 @@ def main() -> int:
     ap.add_argument("--output", type=Path)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--enforce", action="store_true",
+                    help="exit 43 when the screen BLOCKS (default: report)")
     args = ap.parse_args()
 
     if args.selftest:
@@ -465,6 +477,12 @@ def main() -> int:
                   f"B_gap={reb['airgap_flux_T']} T "
                   f"({res['rebalance']['airgap_flux_gain_x']}x)")
     print(f"Artefact: {out}")
+    # Enforcement mirrors gate 41: the CLI must be able to BLOCK, so the
+    # registry can prove the catch from OUTSIDE rather than by importing the
+    # screen in-process (Sol, pre-commit council 2026-08-01).
+    if not res["ok"] and (args.enforce or enforce_mode_from_env() != "off"):
+        print("  GATE BLOCKS — do not ship this machine's numbers.")
+        return 43
     return 0
 
 

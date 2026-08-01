@@ -74,6 +74,23 @@ MAX_ASYNC_RATIO = 0.35
 HIGHEST_HARMONIC_OF_INTEREST = 2
 
 
+# ONE truthiness rule, shared by every gate in this family and mirrored exactly
+# in gate-registry.ts. Sol (pre-commit council) found Python and TS disagreeing
+# on whitespace and on the empty string, which meant a gate could read as
+# enforced on one side and shadow on the other.
+OFF_TOKENS = ("", "0", "false", "no", "off", "shadow")
+
+
+def enforce_mode_from_env(var: str = "EXCITATION_TRACKING_ENFORCING",
+                          default: str = "on") -> str:
+    """'on' by default for THIS screen: it BINDS the duty gate directly, so a
+    mis-excited machine cannot present a mean. Set the var to a falsy token to
+    return it to advisory."""
+    import os
+    raw = str(os.environ.get(var, default)).strip().lower()
+    return "off" if raw in OFF_TOKENS else "on"
+
+
 def harmonics(torque: Sequence[float], max_k: int = 8) -> dict[int, float]:
     """Amplitudes of a torque trace spanning EXACTLY one electrical period.
 
@@ -383,6 +400,8 @@ def main() -> int:
     ap.add_argument("--output", type=Path)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--enforce", action="store_true",
+                    help="exit 42 when the screen BLOCKS (default: report)")
     args = ap.parse_args()
 
     if args.selftest:
@@ -409,6 +428,12 @@ def main() -> int:
             print(f"  [{f['severity']}] {f['rule']}: {f['detail']}")
         print(f"  ok = {res['ok']}")
     print(f"Artefact: {out}")
+    # Enforcement mirrors gate 41: the CLI must be able to BLOCK, so the
+    # registry can prove the catch from OUTSIDE rather than by importing the
+    # screen in-process (Sol, pre-commit council 2026-08-01).
+    if not res["ok"] and (args.enforce or enforce_mode_from_env() != "off"):
+        print("  GATE BLOCKS — do not ship this machine's numbers.")
+        return 42
     return 0
 
 

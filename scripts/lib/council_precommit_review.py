@@ -17,7 +17,7 @@ THE SEAT DISCIPLINE (scripts/lib/model_routing.py). CritPt tops out at 32%, so
 NO seat here validates anything — validation belongs to the solvers, the
 selftests and the gate registry. Seats are asked what they are good at:
 
-    CORROBORATE  z-ai/glm-5.2       does the reasoning hold? standing first call
+    CORROBORATE  x-ai/grok-4.5      does the reasoning hold? standing second opinion
     PROPOSE      openai/gpt-5.6-sol what did this miss? escalation only
     AUDIT        minimax/minimax-m3 is each claim SUPPORTED by the diff itself?
 
@@ -237,8 +237,11 @@ def main() -> int:
         ap.error("--claim required")
 
     import model_routing as mr
+    # Grok replaces GLM as the corroborating lineage: 3/3 returned against
+    # GLM's 2/4, and cheaper than Sol by 3.4x. Sol stays in the CODE-REVIEW
+    # seat, which is where its record is strongest.
     seats = {
-        "glm52": (mr.CORROBORATE.model, "corroborate"),
+        "grok45": (mr.DIAGNOSE.model, "corroborate"),
         "sol": (mr.PROPOSE.model, "propose"),
         "minimax_m3": (mr.AUDIT.model, "audit"),
     }

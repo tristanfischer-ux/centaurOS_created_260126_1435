@@ -18,7 +18,9 @@
  * Run:  npx tsx scripts/lib/gate-registry.ts --selftest   (in scripts/verify-engine-guards.sh).
  */
 import { execFileSync } from 'child_process'
-import { resolve } from 'path'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { resolve, join } from 'path'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv } from '../../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { issueIsBlocking, physicsCriticEnforceModeFromEnv } from './physics-critic-enforcement'
@@ -66,6 +68,25 @@ const gateBlockEnforced = () => ['1', 'true', 'yes', 'on'].includes(String(proce
 const pySelftestPasses = (rel: string) => {
   try { execFileSync('python3', [resolve(REPO, rel), '--selftest'], { stdio: 'pipe', timeout: 30_000 }); return true }
   catch { return false }
+}
+
+/** Drive a Python gate with a deliberately BAD input and assert it BLOCKS.
+ *  Stronger than running its --selftest: this proves the gate's decision fires
+ *  from the outside, which is what "prove the catch" actually means. */
+const pyBlocksOnBadInput = (rel: string, argv: string[], expectExit: number) => {
+  try {
+    execFileSync('python3', [resolve(REPO, rel), ...argv], { stdio: 'pipe', timeout: 60_000 })
+    return false                                  // exited 0 = walked straight through
+  } catch (e) {
+    return (e as { status?: number }).status === expectExit
+  }
+}
+/** Drive a Python screen in-process and assert its verdict is a BLOCK. */
+const pyVerdictBlocks = (code: string) => {
+  try {
+    const out = execFileSync('python3', ['-c', code], { stdio: 'pipe', timeout: 60_000 }).toString()
+    return out.trim().endsWith('BLOCKS')
+  } catch { return false }
 }
 
 const BENCH_EXP: BenchmarkExpectation = {
@@ -435,12 +456,121 @@ export const GATES: GateProof[] = [
     },
     enforcedByDefault: () => designClosureEnforceModeFromEnv(undefined) !== 'off',
   },
+  {
+    code: 41, name: 'claim-provenance',
+    intent: 'a quantitative claim shipped with NO fresh artefact behind it — the number quoted from memory, from a stale solve, or hand-carried past a re-run (FE front MGU 2026-08-01: mean|T| figures of 118 / 93.6 / 57.84 were quoted for days over a machine whose excitation was never in synchronism)',
+    // ADVERSARIAL INPUT: a claim whose artefact does not exist at all. The gate
+    // must exit 41, not report and continue.
+    proveCatch: () => {
+      const dir = mkdtempSync(join(tmpdir(), 'gate41-'))
+      const claims = join(dir, 'claims.json')
+      writeFileSync(claims, JSON.stringify({
+        claims: [{
+          name: 'torque_nm', value: 125.21,
+          artefact: 'no_such_solver_output.json',
+          key_path: 'works.torque_nm',
+          run_to_fix: 'run the solver',
+        }],
+      }))
+      const fired = pyBlocksOnBadInput('scripts/lib/claim_provenance_gate.py',
+        ['--claims', claims, '--enforce'], 41)
+      // ...and an EMPTY registry must not read as a pass either.
+      writeFileSync(claims, JSON.stringify({ claims: [] }))
+      const emptyFired = pyBlocksOnBadInput('scripts/lib/claim_provenance_gate.py',
+        ['--claims', claims, '--enforce'], 41)
+      rmSync(dir, { recursive: true, force: true })
+      return fired && emptyFired && pySelftestPasses('scripts/lib/claim_provenance_gate.py')
+    },
+    enforcedByDefault: () => ['1', 'true', 'yes', 'on'].includes(String(process.env.CLAIM_PROVENANCE_ENFORCING || '').toLowerCase()),
+  },
+  {
+    code: 42, name: 'excitation-tracking',
+    intent: 'a rotating-machine duty judged on a mean taken while the stator field was walking PAST the rotor — torque swinging through zero, so the "mean" describes no operating point at all (FE front MGU: async harmonics 53.65/80.17 N.m against a DC of 3.75)',
+    // ADVERSARIAL INPUT through the CLI's OWN EXIT PATH (not an in-process
+    // import), so this proves the gate BLOCKS operationally, matching gate 41.
+    proveCatch: () => {
+      const dir = mkdtempSync(join(tmpdir(), 'gate42-'))
+      const ms = join(dir, '_motor_stack'); mkdirSync(ms, { recursive: true })
+      const pts: unknown[] = []
+      for (let i = 0; i < 37; i++) {
+        const t = 2 * Math.PI * i / 36
+        pts.push({
+          rotor_position_mechanical_deg: 45 * i / 36,
+          // the live fault: tiny DC, huge async k=1/k=2, real cogging at k=3
+          torque_nm: 3.75 + 53.65 * Math.sin(t) + 80.17 * Math.sin(2 * t) + 31.11 * Math.sin(3 * t),
+        })
+      }
+      writeFileSync(join(ms, 'em_fia_front_kit_case.json'), JSON.stringify({
+        machine: { stator_slots: 24, rotor_poles: 8 },
+        rotor_position_sweep: { points: pts },
+      }))
+      const fired = pyBlocksOnBadInput('scripts/lib/machine_excitation_tracking.py',
+        ['--twin', dir, '--output', join(dir, 'out.json'), '--enforce'], 42)
+      // ...and a SYNCHRONISED machine with real cogging must NOT block, or the
+      // gate is decoration that fires on everything.
+      const good: unknown[] = []
+      for (let i = 0; i < 37; i++) {
+        good.push({
+          rotor_position_mechanical_deg: 45 * i / 36,
+          torque_nm: 125 + 18 * Math.sin(2 * Math.PI * 3 * i / 36),
+        })
+      }
+      writeFileSync(join(ms, 'em_fia_front_kit_case.json'), JSON.stringify({
+        machine: { stator_slots: 24, rotor_poles: 8 },
+        rotor_position_sweep: { points: good },
+      }))
+      let healthyPasses = false
+      try {
+        execFileSync('python3', [resolve(REPO, 'scripts/lib/machine_excitation_tracking.py'),
+          '--twin', dir, '--output', join(dir, 'out2.json'), '--enforce'],
+          { stdio: 'pipe', timeout: 60_000 })
+        healthyPasses = true
+      } catch { healthyPasses = false }
+      rmSync(dir, { recursive: true, force: true })
+      return fired && healthyPasses
+    },
+    enforcedByDefault: () => !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.EXCITATION_TRACKING_ENFORCING ?? 'on').trim().toLowerCase()),
+  },
+  {
+    code: 43, name: 'magnet-flux-focusing',
+    intent: 'a permanent-magnet machine whose magnets spend their volume on THICKNESS (which saturates at a few multiples of mur*g) while the pole FACE is starved, so the magnet de-focuses flux — legal in every existing screen and structurally incapable of its duty (FE front MGU: A_m/A_g = 0.562 at 12x mur*g, i.e. 95.5% of Br)',
+    // ADVERSARIAL INPUT through the CLI's OWN EXIT PATH, matching gates 41-42.
+    proveCatch: () => {
+      const dir = mkdtempSync(join(tmpdir(), 'gate43-'))
+      const spec = join(dir, 'machine.json')
+      const write = (o: unknown) => writeFileSync(spec, JSON.stringify(o))
+      // the live starved geometry: thickness saturated, face area starved
+      write({
+        remanence_t: 1.24, recoil_permeability: 1.05, magnet_thickness_mm: 8.85,
+        magnet_length_mm: 14.5793, magnets_per_pole: 2, magnet_tilt_deg: 20.0,
+        rotor_outer_diameter_mm: 139.4, bridge_mm: 1.0, poles: 8, airgap_mm: 0.7,
+      })
+      const fired = pyBlocksOnBadInput('scripts/lib/machine_magnet_flux_focusing.py',
+        ['--machine-json', spec, '--output', join(dir, 'o.json'), '--enforce'], 43)
+      // a WELL-focused magnet must not block
+      write({
+        remanence_t: 1.24, recoil_permeability: 1.05, magnet_thickness_mm: 5.0,
+        magnet_length_mm: 25.9, magnets_per_pole: 2, magnet_tilt_deg: 0.0,
+        rotor_outer_diameter_mm: 139.4, bridge_mm: 1.0, poles: 8, airgap_mm: 0.7,
+      })
+      let healthyPasses = false
+      try {
+        execFileSync('python3', [resolve(REPO, 'scripts/lib/machine_magnet_flux_focusing.py'),
+          '--machine-json', spec, '--output', join(dir, 'o2.json'), '--enforce'],
+          { stdio: 'pipe', timeout: 60_000 })
+        healthyPasses = true
+      } catch { healthyPasses = false }
+      rmSync(dir, { recursive: true, force: true })
+      return fired && healthyPasses
+    },
+    enforcedByDefault: () => !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.MAGNET_FOCUSING_ENFORCING ?? '').trim().toLowerCase()),
+  },
 ]
 
 // COVERAGE: every gate code here MUST have a proof in GATES, else the meta-test fails — so a NEW
 // gate cannot land without a full adversarial proof. (23-29 are pre-render STATE-structural guards
 // with direct un-swallowed exits — a separate extension; tracked here so they aren't forgotten.)
-export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 30, 31, 32, 33, 34, 35, 36, 39, 40]
+export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41, 42, 43]
 
 function _selftest() {
   let bad = 0
