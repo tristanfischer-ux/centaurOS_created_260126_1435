@@ -30,60 +30,95 @@
 | Signal | Value | Bar |
 |---|---|---|
 | `duty_torque_screen_ok` | **false** | Blocks A |
-| FE mean \|T\| / required | **57.84 / 125.21 = 0.462** | Blocks A |
-| **Honest delivered ratio** | **0.327** (signed mean −40.92, 24 of 37 points negative) | Blocks A |
-| Ripple | ~**207%** p-p; torque REVERSES SIGN; `torque_reliable=false` | DEC-EM-1 |
-| Oil screening | **CLEARED** (analytical cornering + gallery) | Helps A |
-| Planetary strength writeback | **INVALIDATED** (`PLANETARY_STRENGTH_VS_ROTOR_BORE`) — paused until EM OD freeze | Blocks A |
+| **Delivered mean torque** | **48.8 N·m / 125.21 = 0.39** | Blocks A |
+| **Excitation tracking** | **OK** — async k1/k2 ratios 0.0002 (were 14.3 / 21.4) | **CLOSED** |
+| Analytic routes (2, independent) | 126.95 and 131.11 N·m — agree to 3%, both ~1.02× required | The contradiction |
+| Airgap fundamental B1 | ~0.34 T est vs 0.70–1.00 T healthy band | Blocks A |
+| Magnet flux focusing | A_m/A_g = 0.562, thickness at 12× mur·g (95.5% of Br) | Design lever |
+| Oil screening | **CLEARED** | Helps A |
+| Planetary strength writeback | **INVALIDATED** — paused until EM OD freeze | Blocks A |
 | PCB | Draft / **NOT_FAB** | Honest |
-| Geometry coherence | 41 blocking → **6** remaining (probe contamination residue) | Hygiene |
-| Solver coverage | 3/18 → **18/19 FRESH** | Hygiene |
 
-**Verdict:** on the correct Bar A critical path (EM honesty). Not close to Bar A pass. Bar B not closable in software.
+**Verdict:** the excitation fault is closed and proven closed. The machine now
+measures **48.8 N·m against 125.21 required**. Two independent analytic routes
+say 127–131 N·m over the same mesh, so a ~2.6× gap remains unexplained. Bar A
+not passing. Bar B not closable in software.
 
-> **IN FLIGHT AT COMPACT:** a re-run of `em_fia_front_kit_case.py` carrying BOTH panel fixes (advance sign + slot opening) was launched at ~09:42 BST, log `/tmp/em-both.log`, pre-run snapshot `/tmp/em-b10.json`. **Read the log and `cmp` the artefact before trusting any number above.** If the numbers moved, replace this table.
+### ⚠ Every torque number before 2026-08-01 evening is void
 
----
+`mean|T|` values of 118, 93.6, 57.84 and 64.6 were all rectified means over a
+sweep whose excitation was NOT tracking the rotor. They do not describe this
+machine. Do not quote them, and do not compare new numbers against them.
 
-## 2. The EM story — how 4.34 became 57.84, and what the panel found
+## 2. The EM story
 
-Every step was a **real bug**, each verified independently:
+### The winding chain — real bugs, each verified, all still valid
 
-| Fix | Torque | Root cause |
-|---|---|---|
-| baseline | 4.34 | hardcoded 12-slot belt map valid only at 48 slots; at 24 it produced a 120°-periodic broken MMF (three belts never forming a rotating field) |
-| swat_em winding | 31.76 | winding layout now solved, kw1 = 1.0, symmetric |
-| turns 4 → 7 | 43.34 | `turns_per_coil=4` inconsistent with `turns_per_phase=14` |
-| twin-derived slot count | **57.84** | slot count and phase-A MMF axis both derived, not assumed |
+| Fix | Root cause |
+|---|---|
+| swat_em winding | hardcoded 12-slot belt map valid only at 48 slots; at the twin's 24 it produced a 120°-electrical-periodic broken MMF — three belts that never formed a rotating field |
+| turns 4 → 7 | `turns_per_coil=4` inconsistent with `turns_per_phase=14`; 7 is what the contract's own turns_per_phase implies |
+| twin-derived slot count | slot count and phase-A MMF axis both derived from the solved layout, not assumed |
 
-**Refuted by direct test** (do not re-litigate): rms/peak confusion (twin correctly 477 rms → 674.58 peak); missing sector multiplier (the LUA deck emits all 24 slots and 16 magnet blocks — genuine full 360°); truncated stress integral (splitting the airgap moved the answer 57.83 → 57.84, so the integral was **not** truncated).
+The torque figures those steps produced (4.34 → 31.76 → 43.34 → 57.84) are
+**void** — see the warning in §1. The FIXES are sound; the numbers measured a
+mis-excited machine.
 
-### The 3-seat OpenRouter panel (`out/…/_em_review_v2/`)
+**Refuted by direct test — do not re-litigate:** rms/peak confusion (477 rms →
+674.58 peak, applied correctly); missing sector multiplier (the LUA deck emits
+all 24 slots and 16 magnet blocks — a genuine full 360° model); truncated stress
+integral (splitting the airgap moved the answer 57.83 → 57.84); √6 current
+under-application (`phase_current_peak_a` is exactly 477·√2, no √3 anywhere);
+poles-vs-pole-pairs in the advance rate (with `p`=4 the async bins go to zero;
+with `2p` they would not).
 
-Seats returned: `sol` (openai/gpt-5.6-sol), `grok45` (x-ai/grok-4.5), `kimi_k3` (moonshotai/kimi-k3). **GLM 5.2 never returned** — the 4th seat is still open.
+### The three faults the panel gave me — how they actually resolved
 
-Three faults they found, all fixed in `920abb552`:
+| panel fault | outcome |
+|---|---|
+| advance sign backwards | **REAL, but I flipped it the WRONG WAY.** Settled by measurement: 37 points over a full pole pitch, both signs. `−p·θm` gives async k=1/k=2 of 53.65/80.17 N·m; `+p·θm` gives **0.01/0.01**. Four orders of magnitude. Default is now `+`. |
+| slot opening 46% → 14% | **WRONG, and my error not theirs.** `slot_half_width_rad` spans `r_slot_inner`→`r_slot_outer`: it is the FULL SLOT. This deck has no mouth geometry, so a semi-closed slot cannot be expressed in it at all. Setting 0.07 shrank the whole slot to 14% of pitch, cutting copper to under a third at unchanged current and leaving 86% of pitch as tooth — a 104 N·m slot-periodic swing that read convincingly as cogging. Reverted to 0.23 (46% full width, a normal 46/54 split) and renamed `FIA_SLOT_WIDTH_FRAC`. |
+| duty screen fed `mean\|T\|` | **REAL and kept.** The screen now binds on the DELIVERED mean and on `excitation_tracking_ok`. |
 
-1. **Advance sign backwards.** `+p·θm` gives signed mean −7.13; `−p·θm` gives +26.12. The rotor-frame current angle must counter-rotate.
-2. **Slot opening 46% of slot pitch** (`slot_half_width_rad = slot_pitch_rad * 0.23`) — 6.9° mech at 24 slots. Real traction machines run semi-closed at 10–20%. Now `0.07` via `FIA_SLOT_OPEN_FRAC`.
-3. **Duty screen fed `mean|T|`, not delivered torque.** `mean|T| = 57.84` while the signed mean is **−40.92** with 24 of 37 points negative. The honest ratio is 0.327, not 0.462. `summarize_rotor_position_sweep()` now emits `delivered_mean_torque_nm`, `sign_reversals`, `torque_sign_consistent`.
+The panel's slot advice was *true about real machines*. I applied it to a
+parameter that means something else without reading what it built. See
+`scripts/lib/model_routing.py`: no model validates physics (CritPt ceiling 32%).
 
-### ⚠ The slot opening is currently a MODEL fix
+### Three more source bugs, in the angle screen
 
-Narrowing the slot changed the FE deck only. **If narrowing it is what makes the machine work, that is a real design requirement for the physical stator lamination and it must reach the BoM and the drawings** — not just the LUA deck. This is unfinished work, not a closed item.
+Found after the excitation closed, all of which made the machine look worse:
 
-### If torque is still short after the re-run
+1. **Solved each angle at rotor position 0 only** — ranking on `DC + cogging(0)`,
+   and cogging is 76.8 N·m. Position 0 read +55.01 while the true mean was
+   −43.13. Measured single-position error up to **99.2 N·m**.
+2. **Ranked on `abs(torque)`** — a large braking point wins.
+3. **Angle list was entirely negative** (−40…−90). With the sign corrected the
+   optimum sits in the other half-plane, so the search space excluded the answer.
 
-Run the decisive experiment, already written and **never yet executed**:
+Fixed by ranking on a cogging-cancelled mean over three positions a third of a
+slot pitch apart (annihilates the cogging fundamental and its 2nd harmonic
+exactly), spanning both half-planes. Best angle −30° elec.
 
-```bash
-.venv/bin/python scripts/motor-stack/em_fia_airgap_fundamental_probe.py \
-  --twin out/formula-e-front-mgu-20260729-1432
-```
+### The remaining contradiction — and the probe that settles it
 
-Open-circuit airgap **fundamental** B1 against the 0.70–1.00 T healthy band. B1 healthy ⇒ the torque PATH is wrong. B1 weak ⇒ the MAGNETIC CIRCUIT is wrong (magnet vectors, material, pocket geometry, slot openings shunting flux) and no winding or integration work will help. The two conclusions demand completely different fixes — that is why it is worth a dedicated run.
+Same deck, same mesh, same machine:
 
-Also unexecuted: EM brief v2 §6 step 1, the **linear-material FE run** (fix µr, drop the BH curve). If linear FE ≈ 131 N·m the gap is saturation and the machine is genuinely short; if it stays ≈ 58 N·m the integration is still wrong.
+| route | value |
+|---|---|
+| back-EMF 324.06 V l-l rms | **131.11 N·m** |
+| analytic design flux (flux-focusing corrected) | **126.95 N·m** |
+| FE torque integral, excitation synchronised | **48.8 N·m** |
+
+Saturation and an ampere-turns scale error are indistinguishable at design
+current. `scripts/motor-stack/em_fia_torque_scaling_probe.py` separates them: at
+LOW current the iron does not saturate, so `T = 1.5·p·λ_pm·I_q` must hold exactly
+with λ_pm from the deck's own back-EMF. **A ratio flat in current is a SCALE
+error** (2.0 ⇒ the parallel-path division is missing — with Npcp=2 each conductor
+carries I_phase/2, and the deck applies turns=7 with the full phase current).
+**A ratio that moves with current is SATURATION.**
+
+Both Grok 4.5 and DeepSeek V4 Flash independently named the missing
+turns/parallel-path table as the blocker. Do not resolve it by argument.
 
 ---
 
