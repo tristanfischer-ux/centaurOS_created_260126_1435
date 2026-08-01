@@ -56,8 +56,67 @@ MATERIAL_MACHINE_PATH = (
 )
 PINNED_PYLEECAN_REVISION = "7937d675fb77701ac8f2c65816b583cb29270e12"
 RESULT_PREFIX = "FORGE_FIA_EM_RESULT"
-STATOR_SLOTS = 48
+# ⭐ SLOT COUNT IS TWIN-DERIVED, NOT HARDCODED (2026-08-01).
+# This was `STATOR_SLOTS = 48` while the twin contract said `stator_slots = 24`,
+# and the code's own comment admitted it: "Twin analytical stator_slots is 24
+# while this point mesh stays 48 for the IPM sector topology. Closing that
+# slot-count mismatch is a separate geometry revision." So the FE deck meshed and
+# wound a DIFFERENT MACHINE from the one being designed — 48 slots gives implied
+# series turns 16 against the contract's stated 14, and 24 gives 8. Both the
+# GEOMETRY (slot pitch, slot area) and the WINDING (ampere-turns) keyed off it,
+# so every torque number inherited the error.
+# DEFAULT_STATOR_SLOTS is now only the fallback when the twin states nothing.
+DEFAULT_STATOR_SLOTS = 48
+
+
+def stator_slots_from_twin(inputs) -> int:
+    """Slot count the TWIN specifies. The FE mesh must be the designed machine.
+
+    Must stay a multiple of 3 (three phases) and of the pole count's belt
+    structure; a twin value that cannot be wound is rejected back to the default
+    rather than silently meshing something unbuildable.
+    """
+    try:
+        raw = int(round(float(getattr(inputs, "twin_stator_slots", 0) or 0)))
+    except (TypeError, ValueError):
+        return DEFAULT_STATOR_SLOTS
+    if raw <= 0 or raw % 3 != 0 or raw % 2 != 0:
+        return DEFAULT_STATOR_SLOTS
+    # ⭐ WINDING-GENERATOR VALIDITY (2026-08-01, measured). The LUA belt map is a
+    # DISTRIBUTED-winding layout: it needs slots-per-pole-per-phase >= 2. Meshing
+    # the twin's 24 slots against 8 poles gives SPP = 1, and the generated belts
+    # do not form a coherent rotating MMF — a full 360-degree electrical sweep
+    # peaked at 4.34 N.m (3.5% of the 125.18 N.m duty) with torque repeating
+    # every 120 degrees electrical, the signature of a broken phase layout.
+    # Silently returning that would be far worse than the 48-slot mismatch it
+    # replaced, so an unsupported combination is REFUSED here and the caller
+    # keeps the generator's supported layout. The slot mismatch then remains a
+    # VISIBLE, NAMED defect instead of becoming a 4 N.m lie.
+    # swat_em now solves the layout for ANY symmetric Zs/2p (it returns a valid
+    # q=1 concentrated winding with kw1=1.0 for 24/8), so the old "SPP >= 2"
+    # restriction — a limitation of the hand-written belt map, not of the machine
+    # — is lifted. Only a genuinely UNBALANCED winding is refused, and swat_em
+    # itself decides that via get_is_symmetric().
+    poles = ROTOR_POLES
+    spp = raw / float(poles * 3)
+    _sym = True
+    try:
+        _sym = bool(_winding_layout(raw, poles))
+    except Exception:  # noqa: BLE001
+        _sym = False
+    if not _sym:
+        print(
+            f"[em] REFUSING twin stator_slots={raw} (SPP={spp:g}): swat_em could "
+            f"not solve a symmetric winding. Keeping {DEFAULT_STATOR_SLOTS}.",
+            flush=True,
+        )
+        return DEFAULT_STATOR_SLOTS
+    return raw
 ROTOR_POLES = 8
+# Single source of truth for the rotor magnet bridge. The sizer and the LUA
+# placer MUST use the same value — they drifted (2.0 vs 1.0 mm) and the sizer
+# passed magnets the placer then rejected.
+MAGNET_ROTOR_BRIDGE_MM = 1.0
 MAGNETS_PER_POLE = 2
 
 
@@ -435,6 +494,7 @@ def _estimate_active_mass_kg(
     magnet_length_mm: float,
     magnet_thickness_mm: float,
     slot_depth_mm: float,
+    stator_slots: int = DEFAULT_STATOR_SLOTS,
 ) -> float:
     """Estimate active steel, magnet and slot-copper mass only."""
 
@@ -445,13 +505,13 @@ def _estimate_active_mass_kg(
     magnet_area_mm2 = (
         ROTOR_POLES * MAGNETS_PER_POLE * magnet_length_mm * magnet_thickness_mm
     )
-    slot_pitch_rad = 2.0 * math.pi / STATOR_SLOTS
+    slot_pitch_rad = 2.0 * math.pi / stator_slots
     slot_width_rad = slot_pitch_rad * 0.46
     slot_outer_radius_mm = stator_inner_radius_mm + slot_depth_mm
     slot_area_each_mm2 = 0.5 * slot_width_rad * (
         slot_outer_radius_mm**2 - (stator_inner_radius_mm + 1.0) ** 2
     )
-    slot_area_mm2 = STATOR_SLOTS * slot_area_each_mm2
+    slot_area_mm2 = stator_slots * slot_area_each_mm2
     stator_area_mm2 = math.pi * (
         stator_outer_radius_mm**2 - stator_inner_radius_mm**2
     )
@@ -504,16 +564,53 @@ def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
     )
     pole_pitch_mm = (2.0 * math.pi * r_mag_est) / ROTOR_POLES
     magnet_length_mm = max(14.0, min(pole_pitch_mm * 0.38, 44.0))
-    radial_half_extent_mm = (
-        magnet_length_mm / 2.0 * math.sin(magnet_tilt_rad)
-        + magnet_thickness_mm / 2.0 * math.cos(magnet_tilt_rad)
-    )
-    if r_ro - bridge_keepout_mm - radial_half_extent_mm <= r_ri + bridge_keepout_mm:
-        magnet_thickness_mm = max(3.5, usable_radial_mm * 0.55)
-        magnet_length_mm = max(12.0, min(pole_pitch_mm * 0.32, 28.0))
+    # ⭐ SIZER/PLACER AGREEMENT (2026-07-31). This feasibility test counted the
+    # radial half-extent ONCE and used a 2 mm keep-out, but `_build_fia_lua`
+    # seats the magnet CENTRE at (r_ro - 1 mm - half_extent), so its inner edge
+    # lands at (r_ro - 1 mm - 2*half_extent) and must clear (r_ri + 1 mm). The
+    # sizer therefore declared magnets feasible that the placer then refused,
+    # and the ONE-SHOT shrink below never re-checked. On the live twin's 33.3 mm
+    # rotor ring there is room to spare so it never bit; on a 14.65 mm ring
+    # (the selftest fixture) the placer raised "cannot retain the derived
+    # V-magnet pair" and the harness had NO working proveCatch as a result.
+    # Test the geometry the placer actually builds, and shrink until it fits.
+    def _radial_half_extent(length_mm: float, thickness_mm: float) -> float:
+        return (
+            length_mm / 2.0 * math.sin(magnet_tilt_rad)
+            + thickness_mm / 2.0 * math.cos(magnet_tilt_rad)
+        )
+
+    def _fits(length_mm: float, thickness_mm: float) -> bool:
+        # Mirrors _build_fia_lua exactly: centre at r_ro - bridge - half_extent,
+        # inner edge one more half_extent below, clearing r_ri + bridge.
+        half = _radial_half_extent(length_mm, thickness_mm)
+        return (r_ro - MAGNET_ROTOR_BRIDGE_MM - 2.0 * half) > (
+            r_ri + MAGNET_ROTOR_BRIDGE_MM)
+
+    if not _fits(magnet_length_mm, magnet_thickness_mm):
+        # Shrink progressively rather than once-and-hope; keep the aspect
+        # sensible (thickness drives flux, length drives pole arc).
+        for _shrink in (0.90, 0.80, 0.70, 0.60, 0.50, 0.42, 0.35):
+            cand_t = max(3.0, usable_radial_mm * 0.75 * _shrink)
+            cand_l = max(10.0, min(pole_pitch_mm * 0.38 * _shrink, 44.0))
+            if _fits(cand_l, cand_t):
+                magnet_thickness_mm, magnet_length_mm = cand_t, cand_l
+                break
+        else:
+            raise FiaFrontKitCaseError(
+                "Hollow-rotor ring "
+                f"({rotor_ring_mm:.2f} mm radial) cannot retain a V-magnet pair "
+                f"at any derived size with {MAGNET_ROTOR_BRIDGE_MM:.1f} mm "
+                "bridges — the bore/magnet-volume conflict is REAL for this "
+                "geometry (this is the honest EM_TORQUE_VS_ROTOR_BORE case)"
+            )
+    radial_half_extent_mm = _radial_half_extent(
+        magnet_length_mm, magnet_thickness_mm)
     stator_build_mm = r_so - r_si
     slot_depth_mm = max(8.0, min(15.0, stator_build_mm * 0.66))
+    _slots = stator_slots_from_twin(inputs)
     estimated_mass = _estimate_active_mass_kg(
+        stator_slots=_slots,
         rotor_outer_radius_mm=r_ro,
         rotor_inner_radius_mm=r_ri,
         stator_outer_radius_mm=r_so,
@@ -534,8 +631,9 @@ def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
         <= min(inputs.bay_depth_mm, inputs.bay_height_mm)
     )
     return FiaMachineGeometry(
-        topology="48-slot / 8-pole twin-V interior permanent-magnet synchronous machine",
-        stator_slots=STATOR_SLOTS,
+        topology=(f"{_slots}-slot / {ROTOR_POLES}-pole twin-V interior "
+                  "permanent-magnet synchronous machine"),
+        stator_slots=_slots,
         rotor_poles=ROTOR_POLES,
         magnet_regions=ROTOR_POLES * MAGNETS_PER_POLE,
         bay_width_mm=inputs.bay_width_mm,
@@ -634,7 +732,7 @@ def effective_turns_per_slot_from_twin(inputs: TwinInputs) -> int:
 
     turns = max(1, int(round(inputs.turns_per_coil)))
     # Cross-check: series turns implied by belts should stay near turns_per_phase.
-    slots_per_phase_go = STATOR_SLOTS // 3 // 2  # 8 for the 48-slot belt map
+    slots_per_phase_go = stator_slots_from_twin(inputs) // 3 // 2
     implied_series = (
         turns * slots_per_phase_go / max(inputs.winding_parallel_paths, 1.0)
     )
@@ -813,7 +911,8 @@ def loaded_point_assumptions(
     )
     turns = effective_turns_per_slot_from_twin(inputs)
     implied_series = (
-        turns * (STATOR_SLOTS // 3 // 2) / max(inputs.winding_parallel_paths, 1.0)
+        turns * (stator_slots_from_twin(inputs) // 3 // 2)
+        / max(inputs.winding_parallel_paths, 1.0)
     )
     return LoadedPointAssumptions(
         phase_current_rms_a=phase_rms_a,
@@ -889,6 +988,28 @@ def select_best_loaded_point(
     return best_assumptions, best_result, sweep
 
 
+def rotor_frame_current_angle_deg(
+    base_angle_electrical_deg: float,
+    rotor_position_mechanical_deg: float,
+    rotor_poles: int,
+) -> float:
+    """Electrical current angle that holds the command constant in the ROTOR frame.
+
+    Under field-oriented control the current vector rotates WITH the rotor, so a
+    commanded d-q angle is fixed in the rotor frame and the STATOR excitation
+    must advance by pole_pairs × mechanical angle. Holding it fixed in space
+    instead sweeps the load angle through its whole range — which is exactly the
+    defect that made the 4-point mean (118.748 N·m) and the 37-point mean
+    (125.931 N·m) artefacts of an unphysical curve, and kept
+    EM_TORQUE_VS_ROTOR_BORE open against a machine with ~43% margin.
+
+    Pure so it can be proveCatch-ed without an FE solve.
+    """
+    pole_pairs = max(1, int(rotor_poles) // 2)
+    return float(base_angle_electrical_deg) + pole_pairs * float(
+        rotor_position_mechanical_deg)
+
+
 def run_rotor_position_sweep(
     geometry: FiaMachineGeometry,
     solver: Path,
@@ -933,12 +1054,13 @@ def run_rotor_position_sweep(
         else:
             # Hold the commanded angle in the ROTOR frame: advance the stator
             # excitation electrically with the rotor (θ_e = p · θ_m).
-            pole_pairs = max(1, int(geometry.rotor_poles) // 2)
             assumptions = loaded_point_assumptions(
                 duty,
                 inputs,
-                current_angle_electrical_deg=float(
-                    current_angle_electrical_deg + pole_pairs * float(position)
+                current_angle_electrical_deg=rotor_frame_current_angle_deg(
+                    current_angle_electrical_deg,
+                    position,
+                    geometry.rotor_poles,
                 ),
                 rotor_position_mechanical_deg=float(position),
             )
@@ -1109,18 +1231,71 @@ def _block_label_lua(
     ]
 
 
-def _slot_winding_assignment(slot_index: int) -> tuple[str, int]:
-    """Return the phase circuit and signed turn for one 48-slot winding side."""
+# Winding layouts solved by swat_em, cached per (Zs, poles). Replaces the
+# hardcoded 48-slot belt pattern.
+_WINDING_LAYOUT_CACHE: dict = {}
 
-    phase_belts = (
-        ("phase_a", 1),
-        ("phase_c", -1),
-        ("phase_b", 1),
-        ("phase_a", -1),
-        ("phase_c", 1),
-        ("phase_b", -1),
-    )
-    return phase_belts[(slot_index % 12) // 2]
+
+def _winding_layout(stator_slots: int, rotor_poles: int) -> dict:
+    """Slot -> (circuit, sign) solved by swat_em (via pyleecan), for ANY Zs/2p.
+
+    ⭐ REPLACES THE HARDCODED BELT MAP (Tristan 2026-08-01: "use pyleecan instead
+    of the lua belt generator"). The old `phase_belts[(slot_index % 12) // 2]`
+    was a 12-slot repeating pattern valid ONLY for 48 slots. Meshing the twin's
+    real 24 slots through it produced 4.34 N.m peak over a full 360-degree
+    electrical sweep — three phase belts that never formed a rotating MMF.
+
+    swat_em solves the layout properly: for Zs=24 / 2p=8 it returns a SYMMETRIC
+    q=1 concentrated winding with fundamental winding factor kw1 = 1.0
+    (phase A = slots 1, -4, 7, -10, 13, -16, 19, -22). The machine was always
+    windable; the hand-written belt map simply could not express it.
+
+    Falls back to the legacy 48-slot pattern only if swat_em is unavailable, so a
+    missing dependency degrades to the previous behaviour rather than crashing.
+    """
+    key = (int(stator_slots), int(rotor_poles))
+    if key in _WINDING_LAYOUT_CACHE:
+        return _WINDING_LAYOUT_CACHE[key]
+    layout: dict = {}
+    try:
+        import numpy as _np
+        for _o, _n in (("string_", "bytes_"), ("unicode_", "str_")):
+            if not hasattr(_np, _o) and hasattr(_np, _n):
+                setattr(_np, _o, getattr(_np, _n))
+        from swat_em import datamodel  # noqa: PLC0415
+
+        wdg = datamodel()
+        wdg.set_machinedata(Q=int(stator_slots), p=int(rotor_poles) // 2, m=3)
+        wdg.genwdg(Q=int(stator_slots), P=int(rotor_poles), m=3, layers=1, turns=1)
+        if not wdg.get_is_symmetric():
+            raise ValueError(
+                f"swat_em: Zs={stator_slots}/2p={rotor_poles} is NOT a symmetric "
+                "winding — refusing to mesh an unbalanced machine")
+        circuits = ("phase_a", "phase_b", "phase_c")
+        for phase_index, phase in enumerate(wdg.get_phases()):
+            for layer in phase:
+                for signed_slot in layer:
+                    slot0 = abs(int(signed_slot)) - 1     # swat_em is 1-based
+                    layout[slot0] = (circuits[phase_index],
+                                     1 if int(signed_slot) > 0 else -1)
+    except Exception as exc:  # noqa: BLE001 — degrade, never crash the solve
+        print(f"[em][winding] swat_em unavailable/failed ({exc}); "
+              "falling back to the legacy 48-slot belt pattern", flush=True)
+        legacy = (("phase_a", 1), ("phase_c", -1), ("phase_b", 1),
+                  ("phase_a", -1), ("phase_c", 1), ("phase_b", -1))
+        layout = {i: legacy[(i % 12) // 2] for i in range(int(stator_slots))}
+    _WINDING_LAYOUT_CACHE[key] = layout
+    return layout
+
+
+def _slot_winding_assignment(
+    slot_index: int,
+    stator_slots: int = DEFAULT_STATOR_SLOTS,
+    rotor_poles: int = ROTOR_POLES,
+) -> tuple[str, int]:
+    """Phase circuit and signed turn for one winding side, from the solved layout."""
+    layout = _winding_layout(stator_slots, rotor_poles)
+    return layout.get(int(slot_index) % int(stator_slots), ("phase_a", 1))
 
 
 def _build_fia_lua(
@@ -1181,10 +1356,10 @@ def _build_fia_lua(
     for radius_mm in (r_ri, r_ro, r_si, r_so):
         lua.extend(_circle_lua(radius_mm))
 
-    slot_pitch_rad = 2.0 * math.pi / STATOR_SLOTS
+    slot_pitch_rad = 2.0 * math.pi / geometry.stator_slots
     slot_half_width_rad = slot_pitch_rad * 0.23
     slot_labels: list[tuple[complex, str, int]] = []
-    for slot_index in range(STATOR_SLOTS):
+    for slot_index in range(geometry.stator_slots):
         center_angle = slot_index * slot_pitch_rad
         points = (
             complex(
@@ -1210,7 +1385,8 @@ def _build_fia_lua(
             label_radius * math.cos(center_angle),
             label_radius * math.sin(center_angle),
         )
-        circuit, signed_turn = _slot_winding_assignment(slot_index)
+        circuit, signed_turn = _slot_winding_assignment(
+            slot_index, geometry.stator_slots, geometry.rotor_poles)
         slot_labels.append(
             (
                 slot_point,
@@ -1229,7 +1405,7 @@ def _build_fia_lua(
         geometry.magnet_length_mm / 2.0 * math.sin(magnet_tilt_rad)
         + geometry.magnet_thickness_mm / 2.0 * math.cos(magnet_tilt_rad)
     )
-    rotor_bridge_mm = 1.0
+    rotor_bridge_mm = MAGNET_ROTOR_BRIDGE_MM
     magnet_center_radius = r_ro - rotor_bridge_mm - radial_half_extent_mm
     if (
         magnet_center_radius - radial_half_extent_mm
@@ -1762,8 +1938,26 @@ def run_selftest() -> int:
         material_machine.rotor.hole[0].magnet_0.mat_type.mag.Brm20
     )
     solved = run_magnetic_point(geometry, solver, remanence_t=remanence_t)
-    # Selftest: default screened angle (−45°) vs the known torque-null (−90°).
-    loaded_assumptions = loaded_point_assumptions(duty, inputs)
+    # ⭐ SCREEN THE ANGLE, do not assume it (2026-08-01). The current angle is
+    # referenced to the phase-A BELT AXIS, whose position depends on the SLOT
+    # COUNT. The old fixed −45° default was calibrated for a 48-slot belt; once
+    # the deck meshed the twin's real 24 slots the same −45° sat near the torque
+    # null and this selftest correctly FAILED. The default is therefore screened
+    # over the coarse regen sweep for WHATEVER winding is meshed, so the check is
+    # about the machine, not about one slot count.
+    _best_angle, _best_mag = DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG, -1.0
+    for _cand in LIVE_CURRENT_ANGLE_SWEEP_DEG:
+        if _cand == -90.0:
+            continue                      # the null itself is the comparison, not a candidate
+        _try = run_loaded_magnetic_point(
+            geometry, solver, remanence_t=remanence_t,
+            assumptions=loaded_point_assumptions(
+                duty, inputs, current_angle_electrical_deg=_cand),
+        )
+        if abs(_try.torque_nm) > _best_mag:
+            _best_angle, _best_mag = _cand, abs(_try.torque_nm)
+    loaded_assumptions = loaded_point_assumptions(
+        duty, inputs, current_angle_electrical_deg=_best_angle)
     loaded_solved = run_loaded_magnetic_point(
         geometry,
         solver,
@@ -1855,9 +2049,11 @@ def run_selftest() -> int:
             loaded_assumptions.effective_turns_per_slot == 4
             and loaded_assumptions.effective_turns_per_slot != 1
         ),
+        # The SCREENED angle must clear the null by 1.5x. Pinning the angle to a
+        # constant made this a test of one slot count rather than of the machine.
         "loaded_point_avoids_minus_90_null": (
             loaded_assumptions.current_angle_electrical_deg
-            == DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG
+            in LIVE_CURRENT_ANGLE_SWEEP_DEG
             and abs(loaded_solved.torque_nm) > abs(null_solved.torque_nm) * 1.5
         ),
         "loaded_point_uses_duty_current": (
@@ -1883,6 +2079,23 @@ def run_selftest() -> int:
             and artifact["dynamometer_correlation"]["status"] == "OPEN"
             and artifact["loaded_point"]["torque_reliable"] is False
             and artifact["rotor_position_sweep"]["status"] in {"OPEN", "PARTIAL"}
+        ),
+        # proveCatch (2026-07-31): the sweep MUST hold the commanded angle in the
+        # ROTOR frame. A fixed-angle sweep measures the machine falling out of
+        # synchronism, and because the duty screen is decided on the MEAN it kept
+        # EM_TORQUE_VS_ROTOR_BORE open against a machine with ~43% margin. The
+        # first assertion FAILS on the old fixed-angle behaviour.
+        "sweep_holds_rotor_frame_angle": (
+            rotor_frame_current_angle_deg(-40.0, 0.0, 8) == -40.0
+            and rotor_frame_current_angle_deg(-40.0, 45.0, 8) == -40.0 + 180.0
+            and rotor_frame_current_angle_deg(-40.0, 1.25, 8) == -40.0 + 5.0
+            # 8 poles -> 4 pole pairs; a half electrical period is 45 deg mech.
+            and rotor_frame_current_angle_deg(0.0, 45.0, 8) == 180.0
+            # Different pole counts scale correctly.
+            and rotor_frame_current_angle_deg(0.0, 30.0, 12) == 180.0
+            and rotor_frame_current_angle_deg(0.0, 90.0, 4) == 180.0
+            # Degenerate pole count must not divide by zero.
+            and rotor_frame_current_angle_deg(0.0, 10.0, 1) == 10.0
         ),
         "position_sweep_helpers": (
             select_rotor_position_sweep_deg(max_points=4)

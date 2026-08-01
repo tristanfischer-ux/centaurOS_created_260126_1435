@@ -3198,11 +3198,71 @@ def build_motor_multiphysics(
         ),
     }
     blockers = collect_architecture_blockers(motor_body)
+    # ⭐ GEOMETRY COHERENCE (2026-07-31, universal). Every screen must describe
+    # ONE machine, and that machine must fit its envelope. The FE front twin was
+    # found holding TWO: the demag and rotor-structural screens were solved on a
+    # 122.0 mm rotor while the torque screens used 197.1 mm — and the 197.1 mm
+    # rotor does not fit the bay at all (needs 279.9 mm of cross-section against
+    # a 197.98 mm cap). Every artefact was internally consistent and NOTHING
+    # compared them, so a duty torque belonging to an uninstallable motor was
+    # quoted as the design's. Keyed on geometry fields + the stated envelope,
+    # never on a product class, so it covers any twin with physics screens.
+    coh = _geometry_coherence_blockers(motor_body)
+    if coh:
+        blockers = list(blockers) + coh
     motor_body["architectureBlockers"] = blockers
     motor_body["architecture_blockers_open_count"] = sum(
         1 for b in blockers if b.get("status") == "OPEN"
     )
     return motor_body
+
+
+def _geometry_coherence_blockers(motor_body: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Architecture blockers for split / uninstallable geometry. Never raises."""
+    try:
+        from fpk_geometry_coherence import (  # noqa: PLC0415
+            check_artefact_agreement, check_envelope_fit,
+        )
+    except ImportError:
+        return []
+    try:
+        twin_dir = motor_body.get("_twin_dir") or motor_body.get("twin_dir")
+        artefacts: dict[str, dict[str, float]] = {}
+        contract_geom: dict[str, float] = {}
+        envelope: dict[str, float] = {}
+        src = motor_body.get("_coherence_inputs")
+        if isinstance(src, Mapping):
+            artefacts = dict(src.get("artefacts") or {})
+            contract_geom = dict(src.get("contract_geometry") or {})
+            envelope = dict(src.get("envelope_mm") or {})
+        if not artefacts and not contract_geom:
+            return []
+        findings = check_artefact_agreement(artefacts, contract_geom or None)
+        if envelope:
+            for geom in list(artefacts.values()) + ([contract_geom] if contract_geom else []):
+                findings.extend(check_envelope_fit(geom, envelope))
+        out: list[dict[str, Any]] = []
+        seen: set = set()
+        for f in findings:
+            if f.severity != "HIGH" or (f.code, f.message) in seen:
+                continue
+            seen.add((f.code, f.message))
+            out.append({
+                "blocker_id": f.code,
+                "domain": "geometry.coherence",
+                "status": "OPEN",
+                "severity": "architecture_hold",
+                "ship_ok": False,
+                "cannot_greenwash": True,
+                "summary": f.message,
+                "detail": f.detail,
+                "human_decision_required": True,
+                "evidence_path": str(twin_dir or "_motor_stack"),
+            })
+        return out
+    except Exception as exc:  # noqa: BLE001 — never block the stamp on the gate
+        print(f"[stamp] geometry-coherence gate skipped: {exc}")
+        return []
 
 
 def build_cad_authority(
