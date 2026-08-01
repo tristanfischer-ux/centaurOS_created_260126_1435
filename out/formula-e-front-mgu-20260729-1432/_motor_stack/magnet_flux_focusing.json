@@ -38,6 +38,7 @@
   ],
   "ok": false,
   "rebalance": {
+    "buildability_source": "APPROXIMATE built-in geometry \u2014 verify against the real placer before quoting",
     "current": {
       "magnet_thickness_mm": 8.85,
       "focusing_ratio": 0.562,

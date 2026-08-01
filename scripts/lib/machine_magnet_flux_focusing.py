@@ -563,6 +563,12 @@ def main() -> int:
         for f in res["findings"]:
             print(f"  [{f['severity']}] {f['rule']}: {f['detail']}")
         reb = res["rebalance"]["best_rebalance"]
+        if reb and "APPROXIMATE" in res["rebalance"].get("buildability_source", ""):
+            print("  ⚠ REBALANCE IS UNVERIFIED — no placer test was supplied, so "
+                  "these dimensions may not BUILD. The recommended 7.0 x 23.34 mm "
+                  "for the FE front MGU was refused by the real placer (the "
+                  "V-magnets collide). Pass is_buildable=<the placer's own test> "
+                  "before quoting or committing these numbers.")
         if reb:
             print(f"  REBALANCE -> t={reb['magnet_thickness_mm']} mm "
                   f"L={reb['magnet_length_mm']} mm  "

@@ -1,0 +1,168 @@
+{
+  "demagnetisation_map": {
+    "statement": "Full current \u00d7 rotor-position \u00d7 magnet-temperature demagnetisation map is not closed. This artefact is a single-point hot knee screen.",
+    "status": "OPEN"
+  },
+  "em_case_cross_check": {
+    "current_angle_electrical_deg": -30.0,
+    "em_case_path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json",
+    "em_case_present": true,
+    "loaded_peak_airgap_flux_density_t": 1.699361042569246,
+    "loaded_peak_airgap_h_a_per_m": 1352308.5501134614,
+    "loaded_torque_magnitude_nm": 17.81492042394876,
+    "phase_current_rms_a": 477.0
+  },
+  "fia_question": "Does the N42UH magnet stay above its knee at ~160 \u00b0C under loaded ~477 A rms / -30\u00b0 elec as a SCREENING check (full demag map still OPEN)?",
+  "geometry_provenance": {
+    "controlling_dimensions": "state.fpkConcentricGeometry rotor/stator + orchestratorContract turns / phase_current_design_a / duty",
+    "lucid_or_proprietary_cad_used": false,
+    "magnet_sizing": "Same V-pocket keep-outs as em_fia_front_kit_case / calculix_fia_magnet_pocket_screen",
+    "statement": "Twin-bound analytical hot demag SCREEN on kit magnet thickness and design current; not educational-machine magnets and not a release demag map.",
+    "training_geometry_used": false
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "continuous_electrical_power_kw": 250.0,
+    "dc_bus_voltage_v": 750.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "phase_current_design_a": 477.0,
+    "radial_airgap_mm": 0.7,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "turns_per_coil": 4.0,
+    "turns_per_phase": 14.0,
+    "winding_parallel_paths": 2.0
+  },
+  "input_quantities_sha256": "7e3130cd41917875cd05205f98c0ae7faa421ab878b90ec018d0668e35821f8c",
+  "magnet_geometry": {
+    "fits_twin_rotor": true,
+    "magnet_center_radius_mm": 62.0486,
+    "magnet_length_mm": 14.5793,
+    "magnet_thickness_mm": 8.85,
+    "magnet_tilt_deg": 20.0,
+    "magnets_per_pole": 2,
+    "outer_bridge_thickness_mm": 1.0,
+    "poles": 8,
+    "radial_airgap_mm": 0.7
+  },
+  "margins": {
+    "below_knee": true,
+    "demag_map_closed": false,
+    "demagnetisation_margin_headroom": 0.791307,
+    "demagnetisation_margin_ratio": 4.791725,
+    "h_knee_a_per_m": 507450.0,
+    "h_operating_a_per_m": 105901.327,
+    "note": "SCREENING only: analytical Hk(T) vs Id-projected armature H at 160 \u00b0C for N42UH. Not a full FE demag map, not supplier BH, not short-circuit corner. Never claim demag PASS / ship_ok from this screen.",
+    "release_fos_closed": false,
+    "screen_margin_ratio_min": 1.0,
+    "screen_ok": true
+  },
+  "material_assumptions": {
+    "alpha_br_per_k": -0.0012,
+    "alpha_hcj_per_k": -0.005,
+    "br_seed_t": 1.28,
+    "catalogue_t_max_c": 180.0,
+    "hcj_20c_a_per_m": 1990000.0,
+    "knee_fraction": 0.85,
+    "label": "N42UH-class seed (phantm NDFEB_GRADES + fpk_physics_tree NdFeB_N42UH) \u2014 supplier grade / BH curve OPEN.",
+    "magnet_grade": "N42UH",
+    "mu_r_recoil": 1.05
+  },
+  "model_assumptions": [
+    "Peak armature MMF F_a = (3\u221a2/\u03c0)\u00b7(k_w\u00b7N_ph\u00b7I_rms)/n_poles with k_w=0.96.",
+    "Id fraction = |sin(\u03b3 \u2212 -90\u00b0)| from the EM kit q-axis convention (\u221290\u00b0 \u2248 pure q).",
+    "Operating H \u2248 F_d / magnet_thickness (pessimistic SCREEN; iron + leakage reluctance ignored).",
+    "H_knee = 0.85\u00b7Hcj(T); Hcj linear derate from catalogue minimum at 20 \u00b0C.",
+    "Hot magnet screen at 160 \u00b0C inside 140\u2013180 \u00b0C band.",
+    "Full FE demagnetisation map (I \u00d7 \u03b8 \u00d7 T) remains OPEN.",
+    "Three-phase short-circuit / inverter-fault demag corner remains OPEN."
+  ],
+  "release_statement": "Concept evidence only. No FIA homologation, supplier magnet curve, race evidence or permission to ship. Never claim demag PASS or ship_ok from this screening case.",
+  "schema": "forgeos.motor_stack.em_fia_demag_screen/v1",
+  "screening_results": {
+    "armature_mmf_peak_at_per_pole": 1082.2162,
+    "below_knee": true,
+    "br_hot_t": 1.06496,
+    "catalogue_t_max_c": 180.0,
+    "current_angle_electrical_deg": -30.0,
+    "demagnetisation_margin_headroom": 0.791307,
+    "demagnetisation_margin_ratio": 4.791725,
+    "demagnetising_mmf_at_per_pole": 937.2267,
+    "h_knee_a_per_m": 507450.0,
+    "h_operating_a_per_m": 105901.327,
+    "h_operating_full_armature_a_per_m": 122284.319,
+    "hcj_hot_a_per_m": 597000.0,
+    "id_fraction": 0.866025,
+    "knee_fraction": 0.85,
+    "magnet_grade": "N42UH",
+    "magnet_temp_c": 160.0,
+    "magnet_thickness_m": 0.00885,
+    "phase_current_peak_a": 674.579869,
+    "phase_current_rms_a": 477.0,
+    "screen_ok": true,
+    "turns_per_phase": 14.0,
+    "winding_factor": 0.96
+  },
+  "ship_ok": false,
+  "solver": {
+    "name": "Analytical knee / Hci demagnetisation screen",
+    "runtime": "analytical",
+    "version": "v1",
+    "xfemm_demag_map": {
+      "reason": "Full xfemm demag map deferred; optional cheap FE air-gap numbers are read from em_fia_front_kit_case.json when present.",
+      "status": "OPEN"
+    }
+  },
+  "source_state_sha256": "642ee4f55a9037a97a153e34de2769a7e47a911fc743e546f235727721650d17",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "temperature_band_c": {
+    "high": 180.0,
+    "low": 140.0,
+    "nominal_screen": 160.0,
+    "rows": [
+      {
+        "demagnetisation_margin_headroom": 0.84348,
+        "demagnetisation_margin_ratio": 6.388966,
+        "h_knee_a_per_m": 676600.0,
+        "h_operating_a_per_m": 105901.327,
+        "hcj_hot_a_per_m": 796000.0,
+        "magnet_temp_c": 140.0,
+        "screen_ok": true
+      },
+      {
+        "demagnetisation_margin_headroom": 0.791307,
+        "demagnetisation_margin_ratio": 4.791725,
+        "h_knee_a_per_m": 507450.0,
+        "h_operating_a_per_m": 105901.327,
+        "hcj_hot_a_per_m": 597000.0,
+        "magnet_temp_c": 160.0,
+        "screen_ok": true
+      },
+      {
+        "demagnetisation_margin_headroom": 0.68696,
+        "demagnetisation_margin_ratio": 3.194483,
+        "h_knee_a_per_m": 338300.0,
+        "h_operating_a_per_m": 105901.327,
+        "hcj_hot_a_per_m": 398000.0,
+        "magnet_temp_c": 180.0,
+        "screen_ok": true
+      }
+    ]
+  },
+  "works_in_kit_context": {
+    "demag_screen_ok": true,
+    "demagnetisation_margin_ratio": 4.791725,
+    "magnet_grade": "N42UH",
+    "magnet_temp_c": 160.0
+  }
+}
