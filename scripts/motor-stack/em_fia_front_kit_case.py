@@ -1072,7 +1072,15 @@ def rotor_frame_current_angle_deg(
     # Env override so BOTH signs can be measured at full resolution without
     # editing this constant between runs (the edit-and-rerun loop is what
     # produced the aliased evidence in the first place).
-    sign = -1.0 if os.environ.get("FIA_ADVANCE_SIGN", "-") .strip() != "+" else 1.0
+    # ⭐⭐ SETTLED BY MEASUREMENT (2026-08-01): the advance is POSITIVE.
+    # 37-point sweep over a full 45 deg pole pitch, both signs, same everything
+    # else. The async signature is the whole test:
+    #     -p*theta_m :  k=1 53.65   k=2 80.17  N.m   <- delta sweeping
+    #     +p*theta_m :  k=1  0.01   k=2  0.01  N.m   <- delta HELD
+    # Four orders of magnitude. The excitation tracks the rotor only with +.
+    # The earlier "-" was chosen from 5 samples over 15 deg mech, which cannot
+    # resolve a reluctance term moving 240 deg of phase across that span.
+    sign = 1.0 if os.environ.get("FIA_ADVANCE_SIGN", "+").strip() != "-" else -1.0
     return (float(base_angle_electrical_deg) + axis
             + sign * pole_pairs * float(rotor_position_mechanical_deg))
 
@@ -1460,16 +1468,29 @@ def _build_fia_lua(
         lua.extend(_circle_lua(radius_mm))
 
     slot_pitch_rad = 2.0 * math.pi / geometry.stator_slots
-    # ⭐ SLOT OPENING (2026-08-01). Was 0.23 half-width = 46% of SLOT PITCH — a
-    # very wide open slot. Because it is a fraction of PITCH, halving the slot
-    # count DOUBLES the physical opening (3.45 deg at 48 slots, 6.9 deg at 24).
-    # Grok 4.5 + Sol both flagged the consequence: a lumpy airgap field with big
-    # local tooth-tip spikes but a WEAK FUNDAMENTAL B1, and mean torque tracks
-    # B1, not local Bpeak. That explains the low mean AND the 207% slot-rate
-    # ripple with one mechanism. Real traction IPMSMs use semi-closed slots at
-    # roughly 10-20% of pitch. Overridable for A/B testing.
-    _slot_open_frac = float(os.environ.get("FIA_SLOT_OPEN_FRAC", "0.07"))
-    slot_half_width_rad = slot_pitch_rad * _slot_open_frac
+    # ⭐⭐ THIS IS THE FULL SLOT WIDTH, NOT A SLOT OPENING (corrected 2026-08-01).
+    #
+    # The polygon below runs from r_slot_inner to r_slot_outer at a CONSTANT
+    # angular half-width, so this deck models a straight OPEN slot over its whole
+    # radial depth. There is no separate mouth geometry: a semi-closed slot —
+    # narrow opening at the bore, wide body behind it — IS NOT MODELLED HERE AT
+    # ALL, and no value of this fraction can create one.
+    #
+    # WHAT WENT WRONG. A model panel advised "real traction IPMSMs use
+    # semi-closed slots at roughly 10-20% of pitch", which is TRUE ABOUT REAL
+    # MACHINES, and it was applied here by setting this fraction to 0.07. That
+    # did not narrow a slot opening. It shrank the ENTIRE SLOT to 14% of pitch,
+    # cutting the copper area to under a third while carrying the same current
+    # and leaving 86% of the pitch as tooth. The result was a 104 N.m
+    # slot-pitch-periodic torque swing on a machine that should make ~55 N.m —
+    # a self-inflicted fault that masqueraded as cogging.
+    #
+    # 0.23 half-width = 46% of pitch full width, i.e. a roughly 46/54 slot/tooth
+    # split. That is a NORMAL open-slot proportion and is the correct default.
+    # If semi-closed slots are ever wanted, they need real mouth geometry in the
+    # LUA, not a smaller number here.
+    _slot_width_frac = float(os.environ.get("FIA_SLOT_WIDTH_FRAC", "0.23"))
+    slot_half_width_rad = slot_pitch_rad * _slot_width_frac
     slot_labels: list[tuple[complex, str, int]] = []
     for slot_index in range(geometry.stator_slots):
         center_angle = slot_index * slot_pitch_rad

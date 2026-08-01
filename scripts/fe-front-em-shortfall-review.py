@@ -24,14 +24,46 @@ BRIEF = ROOT / os.environ.get("EM_REVIEW_BRIEF",
 OUT_DIR = ROOT / os.environ.get("EM_REVIEW_OUT",
                                "out/formula-e-front-mgu-20260729-1432/_em_review_v2")
 
-SEATS: dict[str, str] = {
+SEATS: dict[str, tuple[str, str]] = {
     # Tristan 2026-08-01: "call on the new DeepSeek V4 Flash 0731 version, and
     # ask Kimi K3 too. Grok 4.5 high as a sparring partner." IDs were read from
     # the live OpenRouter model list, never inferred from the nickname.
-    "deepseek_v4_flash": "deepseek/deepseek-v4-flash-0731",
-    "kimi_k3": "moonshotai/kimi-k3",
-    "grok45": "x-ai/grok-4.5",
+    # Each seat carries a ROLE. The auditor must NOT be asked the physics
+    # question — see scripts/lib/model_routing.py: CritPt tops out at 32%, so no
+    # seat here VALIDATES anything. Validation belongs to xfemm and the gates.
+    # EM_REVIEW_SEATS (comma-separated) selects a subset.
+    "glm52": ("z-ai/glm-5.2", "physics"),          # STANDING FIRST CALL
+    "sol": ("openai/gpt-5.6-sol", "physics"),      # escalation, never unchecked
+    "deepseek_v4_flash": ("deepseek/deepseek-v4-flash-0731", "physics"),
+    "kimi_k3": ("moonshotai/kimi-k3", "physics"),
+    "grok45": ("x-ai/grok-4.5", "physics"),
+    # CritPt 4% — never asked physics; only whether a claim is supported.
+    "minimax_m3": ("minimax/minimax-m3", "audit"),
 }
+
+SYSTEM_AUDIT = """You are a CLAIM AUDITOR. You are NOT being asked to do
+physics, and you must not attempt it — you hold this seat because you are good
+at spotting claims that outrun their evidence, not because you can check the
+maths.
+
+For EVERY load-bearing claim in the document, decide ONLY:
+  SUPPORTED    — the document itself contains the measurement or derivation
+  UNSUPPORTED  — asserted with no evidence given here
+  OVERSTATED   — evidence exists but is weaker than the claim made of it
+  CONTRADICTED — another part of the document disagrees with it
+
+Pay special attention to: numbers quoted with more confidence than their source
+warrants; a mean taken over data that may not support a mean; conclusions drawn
+from a measurement the author has already called unreliable; and any place the
+author writes "ruled out" without stating the test that ruled it out.
+
+Return STRICT JSON only, no markdown fence:
+{
+  "claims": [{"claim": "...", "verdict": "SUPPORTED|UNSUPPORTED|OVERSTATED|CONTRADICTED", "why": "...", "quote": "..."}],
+  "weakest_link": "...",
+  "what_would_settle_it": ["..."],
+  "one_line_summary": "..."
+}"""
 
 SYSTEM = """You are a chartered electrical machines engineer reviewing another
 engineer's analysis of a Formula E front MGU that is failing its duty torque.
@@ -77,7 +109,8 @@ def load_api_key() -> str:
     raise SystemExit("OPENROUTER_API_KEY missing")
 
 
-def call_model(seat: str, model: str, user: str, api_key: str) -> dict:
+def call_model(seat: str, model: str, user: str, api_key: str,
+               role: str = "physics") -> dict:
     body = {
         "model": model,
         "temperature": 0.15,
@@ -86,7 +119,8 @@ def call_model(seat: str, model: str, user: str, api_key: str) -> dict:
         # which surfaced as a "parse" failure rather than "budget exhausted".
         "max_tokens": 40000,
         "messages": [
-            {"role": "system", "content": SYSTEM},
+            {"role": "system",
+             "content": SYSTEM_AUDIT if role == "audit" else SYSTEM},
             {"role": "user", "content": user},
         ],
     }
@@ -166,21 +200,27 @@ def main() -> int:
     api_key = load_api_key()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     results: dict[str, dict] = {}
-    with cf.ThreadPoolExecutor(max_workers=len(SEATS)) as pool:
-        futs = {pool.submit(call_model, s, m, user, api_key): s
-                for s, m in SEATS.items()}
+    wanted = [x.strip() for x in os.environ.get("EM_REVIEW_SEATS", "").split(",")
+              if x.strip()]
+    seats = {k: v for k, v in SEATS.items() if not wanted or k in wanted}
+    if not seats:
+        raise SystemExit(f"no seats matched {wanted}; known: {sorted(SEATS)}")
+    with cf.ThreadPoolExecutor(max_workers=len(seats)) as pool:
+        futs = {pool.submit(call_model, s, m, user, api_key, role): s
+                for s, (m, role) in seats.items()}
         for fut in cf.as_completed(futs):
             res = fut.result()
             seat = res["seat"]
             results[seat] = res
             (OUT_DIR / f"{seat}.json").write_text(json.dumps(res, indent=2))
             status = "OK" if res.get("ok") else f"FAIL ({res.get('error') or 'parse'})"
-            verdict = (res.get("review") or {}).get("verdict", "—")
+            rev = res.get("review") or {}
+            verdict = rev.get("verdict") or rev.get("weakest_link") or "—"
             print(f"  [{status:22s}] {seat:9s} {res['model']:24s} verdict={verdict}",
                   flush=True)
     (OUT_DIR / "panel.json").write_text(json.dumps(results, indent=2))
     ok = [r for r in results.values() if r.get("ok")]
-    print(f"\n{len(ok)}/{len(SEATS)} seats returned. → {OUT_DIR}")
+    print(f"\n{len(ok)}/{len(seats)} seats returned. → {OUT_DIR}")
     verdicts = [(r["seat"], (r.get("review") or {}).get("verdict")) for r in ok]
     print("verdicts:", verdicts)
     return 0
