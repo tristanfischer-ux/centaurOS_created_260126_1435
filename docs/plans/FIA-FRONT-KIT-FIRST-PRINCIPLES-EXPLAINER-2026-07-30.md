@@ -223,15 +223,15 @@ Twin loaded point: `phase_current_peak_a = 756.604…`, `phase_current_rms_a = 5
 
 | Item | Value |
 |---|---:|
-| Analytical required shaft torque | **125.215 N·m** |
-| FE loaded magnitude (best screened angle −45° elec) | **96.293 N·m** |
-| Ratio | \(96.293 / 125.215 = 0.769\) → **76.9%** |
-| Duty screen threshold on twin | ≥ 75% → `duty_torque_screen_ok = true` |
-| `works_in_kit_context` | **true** (duty screen only) |
+| Analytical required shaft torque | **~125.21 N·m** (canonical T=P/(ηω)) |
+| FE loaded **peak** magnitude (best angle) | **~207 N·m** (live twin; historical ~96 N·m rows are stale) |
+| Position-sweep **mean** magnitude | **~118.75 N·m** |
+| Duty screen rule (SOURCE, 2026-07-31) | `duty_torque_screen_ok` only if **mean ≥ required** and `torque_reliable=true` — **never peak alone** |
+| Live `duty_torque_screen_ok` | **false** (mean &lt; required; `torque_reliable=false`) |
 | Torque map / demagnetisation / dyno | **OPEN** |
 | `ship_ok` | **false** |
 
-So: the machine **screens** in kit context (~77% of analytical duty at one angle / one rotor position). It does **not** close the magnetic map. Do not read `works_in_kit_context` as finished engineering.
+So: peak FEMM torque must **not** be read as continuous capability at n_max. The duty screen **fails** on the live twin until mean/reliable evidence clears. Do not read any `works_in_kit_context` flag as finished engineering or homologation.
 
 ---
 
@@ -493,7 +493,7 @@ Ruthless reading rule: **smoke ≠ working in kit context ≠ map closed ≠ `sh
 
 | Package | Question we ask it | What PASS would mean | Status on THIS twin | Works in kit context yet? |
 |---|---|---|---|---|
-| **Pyleecan + xfemm (FEMM)** | Can the IPM deliver the 250 kW / ~125 N·m shaft duty inside voltage, current, thermal and demag limits? | Twin-bound torque / loss / demag **maps** correlated later on dyno | Twin-bound loaded point **PARTIAL**: ~96 N·m (~77%); map OPEN; `ship_ok` false | **Duty screen yes** (~77% ≥ 75% threshold) — **not** map closed |
+| **Pyleecan + xfemm (FEMM)** | Can the IPM deliver the 250 kW / ~125 N·m shaft duty inside voltage, current, thermal and demag limits? | Twin-bound torque / loss / demag **maps** correlated later on dyno | Twin-bound loaded point **PARTIAL**: peak ~207 N·m / mean ~119 N·m vs required ~125 N·m; `torque_reliable=false`; map OPEN; `ship_ok` false | **`duty_torque_screen_ok=false`** (mean ≥ required **and** reliable — never peak alone) — **not** map closed |
 | **ROSS** | Are critical speeds clear of 19,500 rpm with margin? | Catalogue bearings + correlated Campbell / unbalance response | Twin-bound beam screen **PARTIAL**: first critical ~28.2k rpm, margin ~1.44; bearings assumed | **Partial screen** — not release |
 | **Gmsh + CalculiX** | Do rotor retention, case, mounts survive speed and torque in the bay/mass box? | Pocket burst + case/mount load cases with named materials and FoS policy | Twin-bound **ring** centrifugal screen **PARTIAL**: ~103 MPa, FoS~3.4 vs 355 MPa yield seed; pocket/case OPEN | **Partial screen** only |
 | **OpenFOAM** | Do jacket / cold plate / oil reject heat and deliver oil at 12 L/min / 60 °C without boiling or starve? | CHT + module temps + jacket + oil free-surface, then flow-bench correlation | Cold-plate **duct** Δp ~25 kPa **PARTIAL**; jacket **OPEN**; oil **OPEN** | Cold-plate duct screen only |

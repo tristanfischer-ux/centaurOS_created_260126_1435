@@ -5,9 +5,22 @@
 **Rule:** Prefer full words over abbreviations. When a short form is unavoidable, expand it on first use.  
 **Standing practice:** Parallel sub-agents with **Grok 4.5** (morphology / continuity) and **GPT-5.6 Sol** (PCB / council); keep extract loops alive via `fe-front-autonomous-ensure.sh`.
 
+**Canonical close-out tracker (2026-07-31):** [`JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md`](./JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md) — use that for Bar A/B push steps. This half-done note is historical.
+
 ---
 
-## 0. Status update — 2026-07-30 ~09:55 UTC+1
+## 0. Status update — 2026-07-31 (supersedes 09:55 block for blockers)
+
+| Item | Live |
+|---|---|
+| Architecture blockers OPEN | **1** — `EM_TORQUE_VS_ROTOR_BORE` (oil cornering + jet gallery **CLEARED** screening) |
+| Oil architecture | Baffled 30 mm / Ø1.8 mm / ~626 ml charge |
+| Blender | Per-part explode **code landed**; `--force` re-render in flight |
+| `ship_ok` | **false** |
+
+---
+
+## 0.0 Status update — 2026-07-30 ~09:55 UTC+1 (historical)
 
 ### Verdict
 

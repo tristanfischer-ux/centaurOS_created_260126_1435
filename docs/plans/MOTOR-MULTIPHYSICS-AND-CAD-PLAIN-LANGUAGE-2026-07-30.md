@@ -42,17 +42,17 @@ You asked whether “DONE software” and “PASS release” are Part A and Part
 | **OPEN** on a check | That proof is **missing** — treat as unfinished, not “fine” |
 | **Release coverage 0** | **Bad for shipping.** Zero parts have supplier or team release CAD. Normal at this stage; **not** success |
 
-**Overall mood as of 2026-07-30 ~22:05:** **Part A software-screening bar largely met. Part B deliberately OPEN.**  
-Live stamp: **0 OPEN architecture blockers**; all 7 solver checks **PARTIAL** with `works_in_kit_context=true` (formal PASS forbidden without benches); parametric CAD families **9**; release CAD **0%**; hardware holds **6/6 OPEN** + `READY_FOR_BENCH`.  
+**Overall mood as of 2026-07-31 (SIGHT refresh):** **Part A software screening is NOT cleared.** Part B remains deliberately OPEN.  
+Live stamp: **3 OPEN architecture blockers** (`EM_TORQUE_VS_ROTOR_BORE`, `GEAR_OIL_CORNERING_PICKUP`, `GEAR_OIL_JET_GALLERY`); `duty_torque_screen_ok=false` (mean ~119 N·m &lt; required ~125 N·m; `torque_reliable=false`); parametric CAD families present; release CAD **0%**; hardware holds OPEN + `READY_FOR_BENCH`.  
 `ship_ok` **false** (correct).
 
-**Last scoreboard update:** 2026-07-30 ~22:05 (Part A screening burst).
+**Last scoreboard update:** 2026-07-31 (honesty refresh after red-team SOURCE fixes — do not trust the 2026-07-30 “0 OPEN” line).
 
 ### What “all stages pass” means here
 
 | Finish line | Can go green from this repo? | Live status |
 |---|---|---|
-| Part A — architecture blockers cleared (software screening) | **Yes** | **0 OPEN** (diff nest, planetary bore, post-diff all CLEARED screening) |
+| Part A — architecture blockers cleared (software screening) | **Yes when evidence clears** | **3 OPEN** (EM torque vs bore, gear-oil cornering pickup, gear-oil jet gallery) — **not** cleared |
 | Part A — every required check has twin-bound screen + works in kit | **Yes as PARTIAL** | **7/7 PARTIAL**, `still_open_checks=[]` |
 | Part A — Blender matches physics geometry | **Yes** | Re-render in flight for rotor OD **197.1** / post-diff resize |
 | Formal solver check **PASS** + `ship_ok=true` | **No — needs Part B benches** | Intentionally **false** / not PASS |

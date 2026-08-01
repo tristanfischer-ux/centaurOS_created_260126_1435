@@ -14,11 +14,21 @@ two bars per pole. 477 A rms phase current. Required shaft torque 125.21 N·m.
 
 ## 2. The observation I want attacked
 
-I sweep 37 rotor positions over **45° mechanical = 360° electrical** (p = 4),
-holding the current angle fixed **in the rotor frame**. For a synchronous machine
-that should give near-constant torque plus slot ripple. It does not:
+> **CORRECTION (issued after the panel was dispatched).** An earlier version of
+> this section said "45° mechanical = 360° electrical". That is **wrong**: at
+> p = 4, 45° mech is one POLE PITCH = **180° electrical**. The harmonic indices
+> below are therefore *cycles per 45° mech pole pitch*, so k=1 is 2× electrical,
+> k=2 is 4×, and k=3 is 6× electrical (which coincides here with 24-slot
+> cogging). The physics reading is unaffected — δ sweeping at 2p·θm still puts
+> the PM term at k=1 and the reluctance term at k=2 — but please read the
+> indices in the stated basis, not as electrical orders.
 
-| harmonic (cycles per 45° mech) | amplitude N·m | what I think it is |
+I sweep 37 rotor positions over **45° mechanical (one pole pitch = 180°
+electrical, p = 4)**, holding the current angle fixed **in the rotor frame**. For
+a synchronous machine that should give near-constant torque plus slot ripple. It
+does not:
+
+| harmonic (cycles per 45° mech pole pitch) | amplitude N·m | what I think it is |
 |---|---|---|
 | DC | **3.75** | the useful torque |
 | k=1 | 53.65 | PM term, sin(δ), with δ sweeping |

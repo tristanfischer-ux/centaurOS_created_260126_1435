@@ -7,13 +7,17 @@
 
 **Live machine-readable twin file:**  
 `out/formula-e-front-mgu-20260729-1432/JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.json`  
-**Email ask draft:** [`JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md`](./JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md)
+**Email ask draft (show Anvil work → name guesses → five precise asks):** [`JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md`](./JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md)
+
+**Internet scavenger (short):** Bay / 32 kg / 19.5k rpm / 250 kW front regen are already public (Lucid / FE / FIA press) and are what we froze. Chassis XYZ, race SiC MPN, Gerbers, and bench maps are **not** on the open web — they sit behind manufacturer / NDA / team data (see email appendix).
 
 ---
 
 ## One-sentence pitch
 
-Under a frozen set of packaging and duty assumptions consistent with the public Formula E front-kit envelope, we have a concentric motor–inverter–planetary–diff layout that **fits the bay**, **screens torque and gear strength for 250 kW front regen**, and **keeps thermal margins at 60 °C / 12 L/min** — ready for JLR to overwrite assumptions with interface, module, and dyno truth.
+Under frozen packaging and duty assumptions consistent with the public Formula E front-kit envelope, the concentric motor–inverter–planetary–diff layout is **sized into the bay**, but the **electromagnetic duty-torque screen does not clear** (position-sweep mean ~119 N·m vs required ~125 N·m at n_max; `torque_reliable=false` — peak FEMM alone is not a pass). **Open architecture blockers:** `EM_TORQUE_VS_ROTOR_BORE`, `GEAR_OIL_CORNERING_PICKUP`, `GEAR_OIL_JET_GALLERY`. Thermal network screening at 60 °C / 12 L/min remains a separate RESULT UNDER ASSUMPTIONS. Not homologated — replace assumptions when JLR inputs arrive; `ship_ok` stays false.
+
+*(Machine pitch is regenerated from the twin by `scripts/lib/fpk_assumption_based_design.py` — see `JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.json`.)*
 
 ---
 
@@ -57,7 +61,7 @@ The old “PARTIAL / OPEN” language in the engineering stamp still exists for 
 | Concentric cassette fits bay | Housing Ø **251.8 × L 140.5 mm**; rotor ID **130.5** / OD **197.1**; planetary nest fits bore | RESULT UNDER ASSUMPTIONS |
 | Diff nest torque budget | Cut torque at open bevel (`ratio_into_diff=2`); bevel FoS≈**1.22** | RESULT UNDER ASSUMPTIONS |
 | Post-diff final drive | 24:96 helical stage; FoS≈**1.20**; bay fit; interface gaps **0 mm** | RESULT UNDER ASSUMPTIONS |
-| Architecture blockers | **0 OPEN** at software-screening level | RESULT UNDER ASSUMPTIONS |
+| Architecture blockers | **3 OPEN** — `EM_TORQUE_VS_ROTOR_BORE`, `GEAR_OIL_CORNERING_PICKUP`, `GEAR_OIL_JET_GALLERY` | OPEN (honest — not cleared) |
 | Blender / CAD | Physics-linked renders; **9** parametric CadQuery families | RESULT UNDER ASSUMPTIONS |
 | Release / supplier STEP | **0 / 14** principals | NEEDS JLR / SUPPLIER INPUT |
 
@@ -65,7 +69,7 @@ The old “PARTIAL / OPEN” language in the engineering stamp still exists for 
 
 | Result | Under assumptions | Label |
 |---|---|---|
-| Shaft torque vs 250 kW duty | FEMM loaded point ~**207 N·m** vs ~**125 N·m** required (≥75% duty screen) | RESULT UNDER ASSUMPTIONS |
+| Shaft torque vs 250 kW duty | T=P/ω at 19,500 rpm / 250 kW elec ⇒ ~**125 N·m** required. FEMM **peak** ~**207 N·m**; **mean** ~**119 N·m**; `torque_reliable=false`; **`duty_torque_screen_ok=false`** (mean/reliable must clear — peak alone never passes). | RESULT UNDER ASSUMPTIONS (screen fails) |
 | Denser EM evidence | MTPA 35 FEMM pts + hybrid map **620** pts (angle-interp, speed×current loss/FW); voltage/FW screen at 19,500 rpm | RESULT UNDER ASSUMPTIONS |
 | Cooling network @ 60 °C / 12 L/min | Δp≈**43 kPa**; T_winding≈**67 °C**; T_module≈**71 °C**; coupled screen OK | RESULT UNDER ASSUMPTIONS |
 | Planetary strength | FoS≈**1.21**, nest fits rotor | RESULT UNDER ASSUMPTIONS |

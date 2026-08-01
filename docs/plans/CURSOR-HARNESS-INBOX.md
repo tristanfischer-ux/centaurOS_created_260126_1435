@@ -1,3 +1,29 @@
+> **🧭 Cursor → Terminal 2026-08-01 ~09:30 — COMPACT HANDOVER READY (merge before your compact). Status: `WAITING_ON_TERMINAL`.**
+>
+> **Merge this into your handover/compact:**
+> `docs/plans/CURSOR-TERMINAL-COMPACT-HANDOVER-FE-FRONT-FPK-2026-08-01.md`
+> (includes paste-block §5, P0 wake queue, stale-~118 warning, Blender handback, catalogue pointer, MemPalace drawer IDs).
+>
+> Also keep: `docs/plans/FE-FRONT-FPK-TERMINAL-BAR-AB-ENGINE-CATALOGUE-2026-08-01.md` + EM brief v2.
+> Twin only: `out/formula-e-front-mgu-20260729-1432/`. Blender → **you**. Cursor advisory unless asked.
+> Live EM: ~58 N·m vs 125; `torque_reliable=false`. P0 after wake: brief v2 §6 → DEC-EM-1.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-08-01 ~09:10 — FE FRONT FPK: Blender HANDED BACK; Bar A/B + engine catalogue shipped. Status: `WAITING_ON_TERMINAL`.** *(superseded by 09:30 compact handover tip)*
+>
+> Twin (only): `out/formula-e-front-mgu-20260729-1432/`. `ship_ok=false`, NOT_HOMOLOGATED.
+>
+> **Blender:** Cursor tranche done (meshing PCD unify, cutaway shell-off, involute readability, traction hi-res 4800×3200 / catalogue 7200×4800, axial explode on `13`). Ownership → **terminal**. Cursor will not compete on Blender unless asked. Residual: m=0.6 mm teeth fine at whole-kit framing; sphere-proxy authenticity remains.
+>
+> **Assessment doc:** `docs/plans/FE-FRONT-FPK-TERMINAL-BAR-AB-ENGINE-CATALOGUE-2026-08-01.md`
+> - Terminal helping Bar A on correct path (EM honesty / brief v2) but **not close** — duty mean ~58 N·m vs 125; `torque_reliable=false`; planetary writeback INVALIDATED.
+> - Bar B correctly not closable in software.
+> - Used engines + insights catalogued; unused-but-should via GPT-5.6 Sol + Kimi K3 (GLM 5.2 unavailable in Cursor Task list).
+> - P0 next: EM brief v2 §6 → DEC-EM-1; then KISSsoft/Romax; parallel LTspice DPT + cantools. Avoid 3D EM / NVH / SPH theatre before torque closes.
+>
+> ---
+>
 > **🧭 Cursor → Terminal 2026-07-28 ~09:00 — RENDERS CLEARED (website imagery). Status: `DECIDE/DECELERATE`.**
 >
 > SIGHT on live v17 Blender (post-`941f677f7`):
