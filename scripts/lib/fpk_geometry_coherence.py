@@ -42,6 +42,22 @@ GEOMETRY_ALIASES: dict[str, tuple[str, ...]] = {
     "housing_od_mm": ("housing_outer_diameter_mm", "housing_od_mm", "fpk_housing_od_mm"),
     "housing_len_mm": ("housing_length_mm", "housing_len_mm", "fpk_housing_len_mm"),
     "active_length_mm": ("active_length_mm", "stack_len_mm", "stack_length_mm"),
+    # ⭐ MAGNET DIMENSIONS ADDED 2026-08-01. This gate was written after the
+    # rotor 122.0-vs-197.1 split and caught it — but it only compared rotor,
+    # stator, housing and stack, so it was BLIND to the magnet. Three screens of
+    # the FE front MGU were meanwhile sizing two different magnets:
+    #   em_fia_front_kit_case        8.85 x 14.58 mm
+    #   em_fia_demag_screen          7.00 x 18.00 mm
+    #   calculix_fia_magnet_pocket   7.00 x 18.00 mm
+    # Demagnetising H runs through the THICKNESS and centrifugal retention
+    # scales with the bar MASS, so both of those screens were reporting margins
+    # for a magnet the torque model does not contain — and every one of them
+    # passed its own selftest while doing so. The same class of fault the gate
+    # exists for, in a dimension it did not look at.
+    "magnet_thickness_mm": ("magnet_thickness_mm", "magnet_t_mm",
+                            "fpk_magnet_thickness_mm"),
+    "magnet_length_mm": ("magnet_length_mm", "magnet_l_mm",
+                         "fpk_magnet_length_mm"),
 }
 
 # Two artefacts disagree when a shared dimension differs by more than this.
@@ -240,6 +256,44 @@ def _selftest() -> None:
     assert any(f.code == "ARTEFACT_GEOMETRY_SPLIT" for f in split), (
         "the real two-machine split MUST fire — a demag screen solved on a "
         "different rotor than the torque case is not a design")
+
+    # ── The MAGNET split found on the same twin (2026-08-01) ────────────────
+    # This gate caught the rotor split above and was BLIND to this one for as
+    # long as both existed, because GEOMETRY_ALIASES had no magnet entries.
+    # Three screens, two magnets: em_fia_front_kit_case built 8.85 x 14.58 mm
+    # while em_fia_demag_screen and calculix_fia_magnet_pocket_screen both
+    # built 7.00 x 18.00 mm. Demagnetising H runs through the THICKNESS and
+    # centrifugal retention scales with the bar MASS, so both were reporting
+    # margins for a magnet the torque model does not contain — and each passed
+    # its OWN selftest throughout.
+    magnet_split = {
+        "em_fia_front_kit_case.json": {
+            "magnet_thickness_mm": 8.85, "magnet_length_mm": 14.5793},
+        "em_fia_demag_screen.json": {
+            "magnet_thickness_mm": 7.00, "magnet_length_mm": 18.00},
+        "calculix_fia_magnet_pocket_screen.json": {
+            "magnet_thickness_mm": 7.00, "magnet_length_mm": 18.00},
+    }
+    mag = check_artefact_agreement(magnet_split)
+    assert sum(1 for f in mag if f.code == "ARTEFACT_GEOMETRY_SPLIT") >= 2, (
+        "the real THREE-screen magnet split MUST fire on BOTH thickness and "
+        "length — a demag margin and a retention FoS computed for a magnet the "
+        "torque model does not contain are not margins for this machine")
+
+    # ...and the corrected, shared-rule geometry must stay SILENT, or the gate
+    # is decoration that fires on everything.
+    agreed = {n: {"magnet_thickness_mm": 6.0, "magnet_length_mm": 22.5}
+              for n in magnet_split}
+    assert not check_artefact_agreement(agreed), (
+        "three screens agreeing on one magnet must produce NO finding")
+
+    # The alias table must actually carry the magnet, or the checks above pass
+    # vacuously on hand-built dicts while real artefacts stay invisible.
+    extracted = extract_geometry(
+        {"geometry": {"magnet_thickness_mm": 6.0, "magnet_length_mm": 22.5}})
+    assert "magnet_thickness_mm" in extracted and "magnet_length_mm" in extracted, (
+        "GEOMETRY_ALIASES does not extract magnet dimensions from a real "
+        "artefact — the magnet checks above would be vacuous")
     codes = {f.code for f in split}
     assert all(f.severity == "HIGH" for f in split), split
     # It must name BOTH groups so the operator can see which screens to re-run.
