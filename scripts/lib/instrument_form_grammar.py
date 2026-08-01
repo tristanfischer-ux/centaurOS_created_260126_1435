@@ -318,6 +318,27 @@ def desirability_silhouette_ok(body_h_mm: float, cube_h_mm: float, step_h_mm: fl
     )
 
 
+def body_luminance_mean(png_path: str) -> float | None:
+    """Body-face mean luminance (8-bit RGB mean) for directional routing.
+
+    INTENT: vision_route_fix needs the numeric value — boolean ok alone
+    cannot distinguish clay (>130) from crushed (<70). Same patch as
+    body_luminance_ok. Returns None if imaging libs / file unavailable.
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+    except ImportError:
+        return None
+    try:
+        im = np.asarray(Image.open(png_path).convert("RGB"), dtype=np.float32)
+    except OSError:
+        return None
+    h, w, _ = im.shape
+    patch = im[h * 42 // 100 : h * 58 // 100, w * 32 // 100 : w * 55 // 100]
+    return float(patch.mean())
+
+
 def body_luminance_ok(
     png_path: str,
     *,
@@ -330,16 +351,9 @@ def body_luminance_ok(
     ≈150+; crushed ≈30–50. Sample the LOWER-CENTRE product face — NOT a full
     centre crop (dark studio void tanks the median and false-fails).
     """
-    try:
-        from PIL import Image
-        import numpy as np
-    except ImportError:
+    mean = body_luminance_mean(png_path)
+    if mean is None:
         return True  # skip when imaging libs unavailable in CI
-    im = np.asarray(Image.open(png_path).convert("RGB"), dtype=np.float32)
-    h, w, _ = im.shape
-    # Front/side body face on the sealed 3/4 product shot.
-    patch = im[h * 42 // 100 : h * 58 // 100, w * 32 // 100 : w * 55 // 100]
-    mean = float(patch.mean())
     return mean_min <= mean <= mean_max
 
 

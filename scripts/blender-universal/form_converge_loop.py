@@ -36,6 +36,10 @@ import render_quality_score as rqs  # noqa: E402
 
 sys.path.insert(0, str(_ROOT / "scripts" / "lib"))
 import form_render_glance as frg  # noqa: E402
+from vision_route_fix import (  # noqa: E402
+    run_loop as vision_run_loop,
+    to_env as vision_knobs_to_env,
+)
 
 BLENDER = os.environ.get("BLENDER_BIN") or "/Applications/Blender.app/Contents/MacOS/Blender"
 if not Path(BLENDER).exists():
@@ -61,7 +65,7 @@ def _channel_count_from_state(state_path: Path, override: int | None) -> int:
 
 
 def _render(state_path: Path, out_dir: Path, *, samples: int, frame_scale: float,
-            inspect: bool) -> bool:
+            inspect: bool, studio_knobs: dict | None = None) -> bool:
     env = dict(
         os.environ,
         BLENDER_OUT_DIR=str(out_dir),
@@ -71,6 +75,13 @@ def _render(state_path: Path, out_dir: Path, *, samples: int, frame_scale: float
         BLENDER_CYCLES_SAMPLES=str(samples),
         BLENDER_PRESENTATION_BEVEL="1",
     )
+    # INTENT: presentation-only softbox/frame nudges from vision_route_fix.
+    # Never mutates geometry. Exposure ≤0 enforced inside Blender resolve.
+    if studio_knobs:
+        knobs = dict(studio_knobs)
+        knobs["frame_scale"] = float(frame_scale)
+        env.update(vision_knobs_to_env(knobs))
+        env["INSPECT_FRAME_SCALE"] = f"{float(frame_scale):.3f}"
     cmd = [
         BLENDER, "--background", "--python",
         str(_THIS / "build_universal_scene.py"),
@@ -85,6 +96,32 @@ def _render(state_path: Path, out_dir: Path, *, samples: int, frame_scale: float
     except Exception as exc:
         (out_dir / "form-converge-blender.log").write_text(f"render exception: {exc}")
         return False
+
+
+def _presentation_nudge(
+    out_dir: Path,
+    *,
+    hero: Path,
+    source_audit_clear: bool,
+    knobs0: dict | None = None,
+) -> dict:
+    """Measure body luminance → run vision_route_fix once (no ship PASS).
+
+    Returns a dict suitable for trajectory + optional studio_knobs for re-render.
+    """
+    lum = ifg.body_luminance_mean(str(hero)) if hero.exists() else None
+    result = vision_run_loop(
+        body_luminance=lum,
+        evidence_complete=lum is not None,
+        source_audit_clear=source_audit_clear,
+        knobs0=knobs0,
+        max_iters=1,
+    )
+    payload = result.to_dict()
+    payload["body_luminance"] = lum
+    (out_dir / "vision-route-fix.json").write_text(
+        json.dumps(payload, indent=2))
+    return payload
 
 
 def _mesh_names_from_out(out_dir: Path) -> list[str]:
@@ -339,6 +376,57 @@ def run(
             print("[form-converge] final glance PASS (hero + exterior)")
             converged = True
 
+    # INTENT: after SOURCE (checklist+glance) clear, close the Solvaix gap for
+    # PRESENTATION only — body luminance → softbox/exposure knobs → one re-render.
+    # Never sets ship_pass; never mutates geometry. Council-hardened 2026-07-29.
+    presentation_report = None
+    hero_path = out_dir / "00-hero.png"
+    if last_ok and hero_path.exists() and form_id in (
+        "optical_handheld", "thermocycler", "lab_microscope", "syringe_pump",
+    ):
+        presentation_report = _presentation_nudge(
+            out_dir,
+            hero=hero_path,
+            source_audit_clear=bool(last_ok),
+        )
+        if trajectory:
+            trajectory[-1]["presentation"] = {
+                "reason": presentation_report.get("reason"),
+                "converged": presentation_report.get("converged"),
+                "ship_pass": presentation_report.get("ship_pass"),
+                "body_luminance": presentation_report.get("body_luminance"),
+                "final_knobs": presentation_report.get("final_knobs"),
+            }
+        if presentation_report.get("reason") == "awaiting_re_render":
+            knobs = presentation_report.get("final_knobs") or {}
+            fs = float(knobs.get("frame_scale", frame_scale))
+            print(f"[form-converge] presentation nudge → re-render "
+                  f"(key={knobs.get('key_energy')} lum="
+                  f"{presentation_report.get('body_luminance')})")
+            _render(
+                state_path, out_dir,
+                samples=max(samples, 64),
+                frame_scale=fs,
+                inspect=False,
+                studio_knobs=knobs,
+            )
+            # Re-measure; do NOT claim ship PASS from this loop.
+            presentation_report = _presentation_nudge(
+                out_dir,
+                hero=out_dir / "00-hero.png",
+                source_audit_clear=True,
+                knobs0=knobs,
+            )
+            if trajectory:
+                trajectory[-1]["presentation_after"] = {
+                    "reason": presentation_report.get("reason"),
+                    "body_luminance": presentation_report.get("body_luminance"),
+                    "final_knobs": presentation_report.get("final_knobs"),
+                }
+            print(f"[form-converge] presentation after: "
+                  f"{presentation_report.get('reason')} "
+                  f"lum={presentation_report.get('body_luminance')}")
+
     drawings = None
     if converged:
         drawings = _regen_drawings(state_path, out_dir)
@@ -356,12 +444,15 @@ def run(
         "converged": converged,
         "rounds": len(trajectory),
         "trajectory": trajectory,
+        "presentation": presentation_report,
         "drawings": drawings,
         "gold_why": _gold_why,
         "encode_checklist": "docs/plans/UNIVERSAL-ENCODE-CHECKLIST-2026-07-16.md",
         "note": (
             "Converged = mesh checklist PASS + form_render_glance PASS (+ framing when available). "
             "Glance FAIL routes to form grammar / placer SOURCE (not reframe). "
+            "Presentation nudge (vision_route_fix) may adjust softbox/frame after SOURCE "
+            "clear — never invents ship PASS; never mutates geometry. "
             "On converge, generate_drawing_set regenerates GA/interconnect from new form."
         ),
     }
@@ -412,6 +503,11 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
+        # vision_route_fix first — council DECISIVE proveCatch (empty ≠ PASS)
+        from vision_route_fix.vision_defect_schema import selftest as _vds
+        from vision_route_fix.presentation_knobs import selftest as _vpk
+        from vision_route_fix.vision_route_fix_loop import selftest as _vrl
+        assert _vds() == 0 and _vpk() == 0 and _vrl() == 0
         ifg._selftest()
         ok, miss = ifg.syringe_pump_checklist_ok([], 2)
         assert not ok and miss
@@ -422,7 +518,8 @@ def main() -> int:
         assert ifg.resolve_form_family(product_class="ninjapcr") == "thermocycler"
         assert ifg.resolve_form_family(product_class="lab_microscope") == "lab_microscope"
         assert "syringe_pump" in ifg.FORM_FAMILIES and "lab_microscope" in ifg.FORM_FAMILIES
-        print("form_converge_loop --selftest OK (incl. form_render_glance + FORM_FAMILIES)")
+        print("form_converge_loop --selftest OK "
+              "(vision_route_fix + form_render_glance + FORM_FAMILIES)")
         return 0
     if not args.state_json or not args.out_dir:
         ap.error("state_json and out_dir required (unless --selftest)")
