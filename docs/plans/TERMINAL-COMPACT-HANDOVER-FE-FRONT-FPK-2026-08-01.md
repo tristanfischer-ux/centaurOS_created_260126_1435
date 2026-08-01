@@ -27,28 +27,43 @@
 
 ## 1. Live scoreboard
 
-| Signal | Value | Bar |
+**DEC-EM-1 is RESOLVED by measurement** — see
+[`DEC-EM-1-DECISION-BRIEF-2026-08-01.md`](./DEC-EM-1-DECISION-BRIEF-2026-08-01.md).
+
+| Signal | Baseline (twin as it stands) | Rebalanced (the decision) |
 |---|---|---|
-| `duty_torque_screen_ok` | **false** | Blocks A |
-| **Delivered mean torque** | **48.8 N·m / 125.21 = 0.39** | Blocks A |
-| **Excitation tracking** | **OK** — async k1/k2 ratios 0.0002 (were 14.3 / 21.4) | **CLOSED** |
-| Analytic routes (2, independent) | 126.95 and 131.11 N·m — agree to 3%, both ~1.02× required | The contradiction |
-| Airgap fundamental B1 | ~0.34 T est vs 0.70–1.00 T healthy band | Blocks A |
-| Magnet flux focusing | A_m/A_g = 0.562, thickness at 12× mur·g (95.5% of Br) | Design lever |
-| Oil screening | **CLEARED** | Helps A |
-| Planetary strength writeback | **INVALIDATED** — paused until EM OD freeze | Blocks A |
-| PCB | Draft / **NOT_FAB** | Honest |
+| delivered torque / 125.21 required | 47.42 N·m = **0.379×** | **145.73 N·m = 1.16×** |
+| torque sign across a pole pitch | crosses zero 4× | **never crosses zero** |
+| excitation tracking k1/k2 | 14.3 / 21.4 | **0.0 / 0.0** |
+| λ_pm fundamental | 0.002903 Wb | **0.031057 Wb** |
+| linkage THD | 198.2% | **6.9%** |
+| demag margin @160 °C, 477 A rms | ×4.79 | **×3.25 (OK)** |
+| `duty_torque_screen_ok` | **false** | **false** — `torque_reliable` hardcoded false pending dyno |
+| `ship_ok` | **false** | **false** |
 
-**Verdict:** the excitation fault is closed and proven closed. The machine now
-measures **48.8 N·m against 125.21 required**. Two independent analytic routes
-say 127–131 N·m over the same mesh, so a ~2.6× gap remains unexplained. Bar A
-not passing. Bar B not closable in software.
+**The decision: magnet respec alone** — t 8.85 → 6.0 mm, L 14.58 → 22.5 mm.
+No stack change, no housing change, no rotor OD change, so the planetary
+strength writeback is untouched.
 
-### ⚠ Every torque number before 2026-08-01 evening is void
+**The cause, one fact:** magnets spanning 56% of the pole pitch, bunched at ±11°
+of a 45° pole, make a flux PULSE whose 3rd harmonic is 1.90× its fundamental.
+The 3rd is zero-sequence and produces NO torque. Widening the arc converts that
+dead energy into fundamental — a measured 10.7× flux gain where the area ratio
+alone predicts 1.46×.
 
-`mean|T|` values of 118, 93.6, 57.84 and 64.6 were all rectified means over a
-sweep whose excitation was NOT tracking the rotor. They do not describe this
-machine. Do not quote them, and do not compare new numbers against them.
+### ⚠ Every torque number quoted before 2026-08-01 evening is VOID
+
+118, 93.6, 57.84, 64.6, 48.8, 112.458 — all superseded. The first four were
+rectified means over a machine whose excitation was never in synchronism; 48.8
+was measured before the pole arc was understood; 112.458 was measured at γ=0,
+which is not the optimum. Do not quote or compare against any of them.
+
+### The twin holds the BASELINE, deliberately
+
+`_motor_stack/em_fia_front_kit_case.json` describes the 8.85 mm machine, because
+the DESIGN is still baseline until DEC-EM-1 is executed. The rebalanced result
+lives in `em_fia_front_kit_case_REBALANCED.json`. Do not conflate them — a probe
+value left in state becomes the design value.
 
 ## 2. The EM story
 
