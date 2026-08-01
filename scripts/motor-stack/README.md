@@ -450,29 +450,30 @@ out/formula-e-front-mgu-20260729-1432/_motor_stack/iso_bevel_fia_front_kit_case.
 .venv-motor/bin/python scripts/motor-stack/iso_bevel_fia_front_kit_case.py --selftest
 ```
 
-## Gear-oil analytical screen (FIA front kit)
+## Gear-oil geometry-bound analytical screen (FIA front kit)
 
 Full free-surface OpenFOAM of jets / pickup / cornering oil migration is still
-**OPEN**. Prefer a twin-bound analytical PARTIAL over a fake CFD claim:
+**OPEN**. Prefer a twin-bound geometry analytical PARTIAL over a fake CFD claim:
 
 ```bash
 .venv-motor/bin/python scripts/motor-stack/gear_oil_fia_front_kit_case.py \
   --twin out/formula-e-front-mgu-20260729-1432
 ```
 
-The case reads gear ratio 8, planet count / OD, housing dims, ~125 N·m shaft
-torque class, 80 ml oil charge, and gear efficiency. It estimates jet flow need
-from gear loss ÷ (ρ·cp·ΔT), a partially-immersed disk-drag churning
-order-of-magnitude, and pickup adequacy vs estimated sump volume. OpenFOAM cavity
-smoke remains toolchain-only.
+The case reads gear ratio, planet count / OD / face from `gear_geometry_writeback`
+when present, housing dims, ~125 N·m shaft torque class, and 80 ml oil charge.
+It couples annular-sump immersion, jet-orifice pressure head, scavenge margin,
+immersed-disk churning OoM, and a 2.5 g cornering slosh screen. Honesty frame:
+`RESULT_UNDER_ASSUMPTIONS`. OpenFOAM cavity smoke remains toolchain-only.
 
 ```text
 out/formula-e-front-mgu-20260729-1432/_motor_stack/gear_oil_fia_front_kit_case.json
 ```
 
 When that file exists, the multiphysics stamp promotes `gear_oil` to **PARTIAL**
-(`minimum_jet_flow_l_min`, `churning_loss_w`). Free-surface CFD and bench stay
-OPEN; `ship_ok` stays false.
+(`minimum_jet_flow_l_min`, `churning_loss_w`, `jet_pressure_required_kpa`,
+`immersion_fraction_geometry`). Free-surface CFD and bench stay OPEN; `ship_ok`
+stays false.
 
 ```bash
 .venv-motor/bin/python scripts/motor-stack/gear_oil_fia_front_kit_case.py --selftest

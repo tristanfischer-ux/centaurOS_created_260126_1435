@@ -219,6 +219,8 @@ def _selftest() -> None:
         s = solve_planetary_tooth_set(sun, planet, sun + 2 * planet, n)
         assert s.z_ring == s.z_sun + 2 * s.z_planet, s
         assert (s.z_sun + s.z_ring) % n == 0, s
+        assert not any(n0.startswith("pcd_meshing_mismatch") for n0 in s.notes), (
+            f"meshing-consistent PCDs must not flag mismatch: {s.notes}")
 
     # ── ADVERSARIAL 4: an arrangement that CANNOT be equally spaced must RAISE,
     # not be quietly rounded into place. sun=20/planet=30/ring=80 with 3 planets

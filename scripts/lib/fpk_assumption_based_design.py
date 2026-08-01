@@ -27,6 +27,8 @@ from typing import Any, Mapping, Optional
 SCHEMA = "forgeos.fpk.assumption_based_design/v1"
 OUTPUT_BASENAME = "JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.json"
 MARKDOWN_BASENAME = "JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.md"
+# INTENT (2026-07-31): Jack fills blanks in Excel — not a wall of PARTIAL in markdown.
+JACK_XLSX_BASENAME = "JLR-FE-FRONT-FPK-ASSUMPTIONS-FOR-JACK.xlsx"
 
 
 def _qty_value(quantities: Mapping[str, Any], key: str, default: Any = None) -> Any:
@@ -79,7 +81,20 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
     cad = mm.get("cadAuthority") if isinstance(mm.get("cadAuthority"), Mapping) else {}
 
     em_works = em.get("works_in_kit_context") if isinstance(em.get("works_in_kit_context"), Mapping) else {}
+    em_loaded = em.get("loaded_point") if isinstance(em.get("loaded_point"), Mapping) else {}
+    em_sweep = (
+        ((em.get("rotor_position_sweep") or {}).get("summary"))
+        if isinstance(em.get("rotor_position_sweep"), Mapping)
+        else {}
+    )
+    if not isinstance(em_sweep, Mapping):
+        em_sweep = {}
     cool_scr = cool.get("screening_results") if isinstance(cool.get("screening_results"), Mapping) else {}
+    cool_inq = (
+        cool.get("input_quantities")
+        if isinstance(cool.get("input_quantities"), Mapping)
+        else {}
+    )
     gear_scr = (
         gear_oil.get("screening_results")
         if isinstance(gear_oil.get("screening_results"), Mapping)
@@ -216,12 +231,20 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
         {
             "id": "R-EM-DUTY",
             "status": "RESULT_UNDER_ASSUMPTIONS",
-            "statement": "Electromagnetic duty torque screen",
+            "statement": "Electromagnetic duty torque screen (peak ≠ continuous at n_max)",
+            # DECISION: Red-team 2026-07-31 (Sol/GLM/Grok) FATAL — presenting peak
+            # FEMM 207 N·m next to required 125 N·m without mean/reliable/T=Pω reads as
+            # 423 kW at 19.5k rpm. Always cite peak + mean + reliable + required.
             "value": (
-                f"Loaded FE torque "
-                f"{em_works.get('loaded_torque_magnitude_nm', '—')} N·m vs required "
-                f"{em_works.get('required_shaft_torque_nm', '—')} N·m; "
-                f"duty_torque_screen_ok={em_works.get('duty_torque_screen_ok')}"
+                f"Required at n_max≈T=P/ω "
+                f"{em_loaded.get('required_shaft_torque_nm') or em_works.get('required_shaft_torque_nm', '—')} N·m; "
+                f"FEMM peak "
+                f"{em_loaded.get('torque_magnitude_nm') or em_works.get('loaded_torque_magnitude_nm', '—')} N·m; "
+                f"position-sweep mean "
+                f"{em_sweep.get('torque_magnitude_mean_nm', '—')} N·m; "
+                f"torque_reliable={em_loaded.get('torque_reliable', em_works.get('torque_reliable'))}; "
+                f"duty_torque_screen_ok="
+                f"{em_loaded.get('duty_torque_screen_ok', em_works.get('duty_torque_screen_ok'))}"
             ),
             "evidence": "_motor_stack/em_fia_front_kit_case.json",
         },
@@ -233,7 +256,11 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
                 f"Δp={cool_scr.get('total_delta_p_kpa', '—')} kPa; "
                 f"T_winding={cool_scr.get('maximum_winding_temperature_c', '—')} °C; "
                 f"T_module={cool_scr.get('maximum_module_temperature_c', '—')} °C; "
-                f"coupled_ok={cool_scr.get('coupled_screen_ok')}"
+                f"coupled_ok={cool_scr.get('coupled_screen_ok')}; "
+                f"Cu={cool_scr.get('copper_loss_w', cool_inq.get('copper_loss_w', '—'))} W; "
+                f"inv={cool_scr.get('inverter_loss_w', cool_inq.get('inverter_loss_w', '—'))} W; "
+                f"motor_loss={cool_scr.get('motor_loss_w', '—')} W; "
+                f"total_loss={cool_scr.get('total_loss_w', '—')} W"
             ),
             "evidence": "_motor_stack/analytical_fia_cooling_network_screen.json",
         },
@@ -246,7 +273,8 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
                 f"ΔP_jet={gear_scr.get('jet_pressure_required_kpa', '—')} kPa; "
                 f"churning={gear_scr.get('churning_loss_w', '—')} W; "
                 f"immersion={gear_scr.get('immersion_fraction_geometry', '—')}; "
-                f"cornering_ok={gear_scr.get('cornering_pickup_ok')}"
+                f"cornering_ok={gear_scr.get('cornering_pickup_ok')}; "
+                f"gallery_ok={gear_scr.get('pickup_gallery_adequate')}"
             ),
             "evidence": "_motor_stack/gear_oil_fia_front_kit_case.json",
         },
@@ -390,16 +418,17 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
         if isinstance(b, Mapping) and b.get("status") == "OPEN"
     ]
 
+    duty_ok = em_loaded.get("duty_torque_screen_ok", em_works.get("duty_torque_screen_ok"))
+    pitch = _build_pitch(
+        duty_torque_screen_ok=duty_ok,
+        open_blocker_ids=open_blocker_ids,
+    )
+
     return {
         "schema": SCHEMA,
         "stamped_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "twin": str(twin_dir),
-        "pitch": (
-            "Under frozen packaging and duty assumptions consistent with the public "
-            "Formula E front-kit envelope, the concentric motor–inverter–planetary–diff "
-            "layout fits the bay and screens torque, gear strength, and thermal margins. "
-            "Not homologated — replace assumptions when JLR inputs arrive."
-        ),
+        "pitch": pitch,
         "review_status": "RESULTS_AVAILABLE_UNDER_ASSUMPTIONS",
         "ship_ok": False,
         "homologation": "NOT_CLAIMED",
@@ -418,14 +447,68 @@ def build_register(twin_dir: Path) -> dict[str, Any]:
         "email_draft_markdown": (
             "docs/plans/JLR-FE-FRONT-FPK-EMAIL-ASK-JACK-2026-07-31.md"
         ),
+        "jack_fill_in_xlsx": JACK_XLSX_BASENAME,
         "proveCatch": {
             "ship_ok_false": True,
             "has_assumptions": len(assumptions) >= 6,
             "has_results": len(results) >= 7,
             "has_asks": len(asks) >= 5,
             "review_status_is_results_available": True,
+            "pitch_not_greenwash_when_duty_fails": (
+                duty_ok is not False
+                or (
+                    "does not clear" in pitch.lower()
+                    and "screens torque" not in pitch.lower()
+                )
+            ),
         },
     }
+
+
+def _build_pitch(
+    *,
+    duty_torque_screen_ok: Any,
+    open_blocker_ids: list[Any],
+) -> str:
+    """Jack-facing pitch from live screen truth — never claim screens cleared when they did not.
+
+    INTENT: Red-team 2026-07-31 — static copy said the layout "screens torque…"
+    while duty_torque_screen_ok=False and architecture blockers were OPEN.
+    """
+
+    blockers = [str(b) for b in open_blocker_ids if b]
+    bay = (
+        "Under frozen packaging and duty assumptions consistent with the public "
+        "Formula E front-kit envelope, the concentric motor–inverter–planetary–diff "
+        "layout is sized into the bay."
+    )
+    if duty_torque_screen_ok is True and not blockers:
+        return (
+            f"{bay} Analytical screens for duty torque, gear strength, and thermal "
+            "margins clear under those assumptions. Not homologated — replace "
+            "assumptions when JLR inputs arrive."
+        )
+    parts = [bay]
+    if duty_torque_screen_ok is False:
+        parts.append(
+            "The electromagnetic duty-torque screen does not clear "
+            "(mean / reliability vs required shaft torque at n_max) — peak FEMM "
+            "torque alone is not a pass."
+        )
+    elif duty_torque_screen_ok is not True:
+        parts.append(
+            "Duty-torque screen status is incomplete on the twin — do not treat "
+            "as cleared."
+        )
+    if blockers:
+        parts.append(
+            "Open architecture blockers: " + ", ".join(blockers) + "."
+        )
+    parts.append(
+        "Not homologated — replace assumptions when JLR inputs arrive; "
+        "ship_ok stays false."
+    )
+    return " ".join(parts)
 
 
 def render_markdown(register: Mapping[str, Any]) -> str:
@@ -497,8 +580,318 @@ def render_markdown(register: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def write_register(twin_dir: Path, register: Mapping[str, Any]) -> tuple[Path, Path]:
-    """Atomically write JSON + markdown into the twin."""
+def write_jack_workbook(twin_dir: Path, register: Mapping[str, Any]) -> Path:
+    """Write a Jack-fillable Excel: our frozen values + blank confirm/replace columns.
+
+    INTENT: Partner review needs a sheet he can edit — yellow cells = fill these.
+    Sheets: Instructions | Assumptions (fill) | Results (context) | Asks (fill).
+    """
+    from openpyxl import Workbook
+    from openpyxl.comments import Comment
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    thin = Border(
+        left=Side(style="thin", color="BBBBBB"),
+        right=Side(style="thin", color="BBBBBB"),
+        top=Side(style="thin", color="BBBBBB"),
+        bottom=Side(style="thin", color="BBBBBB"),
+    )
+    fill_header = PatternFill("solid", fgColor="1F2937")
+    font_header = Font(color="FFFFFF", bold=True, name="Calibri", size=11)
+    fill_ours = PatternFill("solid", fgColor="F3F4F6")
+    fill_jack = PatternFill("solid", fgColor="FEF3C7")
+    fill_readonly = PatternFill("solid", fgColor="E0E7FF")
+    fill_warn = PatternFill("solid", fgColor="FEE2E2")
+    wrap = Alignment(wrap_text=True, vertical="top")
+
+    def _style_header(ws, ncols: int) -> None:
+        for col in range(1, ncols + 1):
+            cell = ws.cell(1, col)
+            cell.fill = fill_header
+            cell.font = font_header
+            cell.alignment = wrap
+            cell.border = thin
+
+    def _autosize(ws, widths: list[int]) -> None:
+        for i, w in enumerate(widths, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws0 = wb.active
+    ws0.title = "Instructions"
+    ws0["A1"] = "JLR FE Front Powertrain Kit — Assumption register for Jack"
+    ws0["A1"].font = Font(bold=True, size=14, name="Calibri")
+    for i, line in enumerate(
+        [
+            "",
+            f"Stamped: {register.get('stamped_at')}",
+            f"Review status: {register.get('review_status')}",
+            f"ship_ok: {register.get('ship_ok')} — homologation: {register.get('homologation')}",
+            "",
+            str(register.get("pitch") or ""),
+            "",
+            str(register.get("honesty") or ""),
+            "",
+            "HOW TO USE",
+            "1. Open 'Assumptions (fill)' — grey = what Anvil froze; YELLOW = your cells.",
+            "2. Per row: leave blank to accept our freeze, OR put the authoritative "
+            "value in Jack_value and set Jack_status to REPLACE.",
+            "3. 'Asks (fill)' lists partner inputs that close those rows — put STEP / "
+            "datasheet / CSV paths in Jack_attachment_or_link.",
+            "4. 'Results (context)' is read-only screening under current freezes.",
+            "",
+            "Jack_status codes: CONFIRM | REPLACE | UNKNOWN | N/A",
+            "",
+            "We will not invent chassis XYZ, race SiC MPN, Gerbers, or dyno maps.",
+        ],
+        start=2,
+    ):
+        ws0.cell(i, 1, line).alignment = wrap
+    ws0.column_dimensions["A"].width = 100
+
+    ws1 = wb.create_sheet("Assumptions (fill)")
+    headers1 = [
+        "ID",
+        "Assumption",
+        "Our_frozen_value",
+        "Our_status",
+        "Replace_with_when_you_have_it",
+        "Jack_status",
+        "Jack_value",
+        "Jack_notes",
+        "Closes_ask_IDs",
+    ]
+    for c, h in enumerate(headers1, start=1):
+        ws1.cell(1, c, h)
+    _style_header(ws1, len(headers1))
+
+    ask_by_closes: dict[str, list[str]] = {}
+    for ask in register.get("asks_from_partner") or []:
+        if not isinstance(ask, Mapping):
+            continue
+        for closes in ask.get("closes") or []:
+            ask_by_closes.setdefault(str(closes), []).append(str(ask.get("id") or ""))
+
+    n_assumptions = 0
+    for r, row in enumerate(register.get("assumptions") or [], start=2):
+        if not isinstance(row, Mapping):
+            continue
+        n_assumptions += 1
+        aid = str(row.get("id") or "")
+        vals = [
+            aid,
+            str(row.get("statement") or ""),
+            str(row.get("value") or ""),
+            str(row.get("status") or ""),
+            str(row.get("replace_with") or ""),
+            "",
+            "",
+            "",
+            ", ".join(ask_by_closes.get(aid, [])),
+        ]
+        for c, v in enumerate(vals, start=1):
+            cell = ws1.cell(r, c, v)
+            cell.alignment = wrap
+            cell.border = thin
+            cell.fill = fill_ours if c <= 5 or c == 9 else fill_jack
+        if str(row.get("status") or "").startswith("NEEDS"):
+            ws1.cell(r, 4).fill = fill_warn
+        ws1.cell(r, 6).comment = Comment(
+            "CONFIRM | REPLACE | UNKNOWN | N/A", "Anvil"
+        )
+        ws1.row_dimensions[r].height = 36
+    _autosize(ws1, [10, 36, 42, 22, 40, 14, 28, 36, 16])
+    ws1.freeze_panes = "A2"
+    ws1.auto_filter.ref = f"A1:I{max(2, n_assumptions + 1)}"
+
+    ws2 = wb.create_sheet("Results (context)")
+    headers2 = ["ID", "Result", "Value_under_assumptions", "Status", "Evidence"]
+    for c, h in enumerate(headers2, start=1):
+        ws2.cell(1, c, h)
+    _style_header(ws2, len(headers2))
+    for r, row in enumerate(register.get("results_under_assumptions") or [], start=2):
+        if not isinstance(row, Mapping):
+            continue
+        for c, v in enumerate(
+            [
+                str(row.get("id") or ""),
+                str(row.get("statement") or ""),
+                str(row.get("value") or ""),
+                str(row.get("status") or ""),
+                str(row.get("evidence") or ""),
+            ],
+            start=1,
+        ):
+            cell = ws2.cell(r, c, v)
+            cell.alignment = wrap
+            cell.border = thin
+            cell.fill = fill_readonly
+        ws2.row_dimensions[r].height = 40
+    _autosize(ws2, [14, 40, 70, 28, 40])
+    ws2.freeze_panes = "A2"
+
+    ws3 = wb.create_sheet("Asks (fill)")
+    headers3 = [
+        "Priority",
+        "Ask_ID",
+        "What_we_need",
+        "Closes_assumption_IDs",
+        "Decision_register",
+        "Jack_have_it",
+        "Jack_attachment_or_link",
+        "Jack_owner",
+        "Jack_notes",
+    ]
+    for c, h in enumerate(headers3, start=1):
+        ws3.cell(1, c, h)
+    _style_header(ws3, len(headers3))
+    for r, ask in enumerate(register.get("asks_from_partner") or [], start=2):
+        if not isinstance(ask, Mapping):
+            continue
+        for c, v in enumerate(
+            [
+                ask.get("priority"),
+                str(ask.get("id") or ""),
+                str(ask.get("ask") or ""),
+                ", ".join(str(x) for x in (ask.get("closes") or [])),
+                ", ".join(str(x) for x in (ask.get("decision_register") or [])),
+                "",
+                "",
+                "",
+                "",
+            ],
+            start=1,
+        ):
+            cell = ws3.cell(r, c, v)
+            cell.alignment = wrap
+            cell.border = thin
+            cell.fill = fill_ours if c <= 5 else fill_jack
+        ws3.cell(r, 6).comment = Comment("Y / N / PARTIAL", "Anvil")
+        ws3.row_dimensions[r].height = 36
+    _autosize(ws3, [10, 16, 52, 22, 22, 12, 36, 18, 32])
+    ws3.freeze_panes = "A2"
+
+    out_path = twin_dir / JACK_XLSX_BASENAME
+    temporary = out_path.with_name(f".{out_path.name}.{os.getpid()}.tmp.xlsx")
+    wb.save(temporary)
+    os.replace(temporary, out_path)
+    return out_path
+
+
+# FLOW: Jack fills yellow cells → ingest_jack_workbook → freezes override JSON
+# → dependent screens marked INVALIDATED_PENDING_RERUN (never silent overwrite).
+JACK_INGEST_BASENAME = "jack-assumption-overrides.json"
+_ASSUMPTION_TO_SCREEN_INVALIDATION = {
+    "A-DUTY": ("R-EM-DUTY", "magnetic", "EM_DUTY_TORQUE_SCREEN"),
+    "A-BAY": ("R-BAY-FIT", "packaging"),
+    "A-BUS": ("R-EM-DUTY", "magnetic"),
+    "A-COOL": ("R-COOL-NET", "cooling", "gear_oil"),
+    "A-SPEED": ("R-EM-DUTY", "R-STRUCT-ROTOR", "magnetic"),
+    "A-RATIO": ("R-GEAR-PLANET", "R-BEVEL-DIFF", "R-GEAR-OIL"),
+    "A-SIC": ("R-COOL-NET", "pcb"),
+    "A-IFACE": ("R-BAY-FIT", "interfaces"),
+}
+
+
+def ingest_jack_workbook(twin_dir: Path, xlsx_path: Optional[Path] = None) -> dict[str, Any]:
+    """Read Jack yellow cells and stamp overrides + screen invalidations.
+
+    INTENT (F-ASK-1): the xlsx is a controlled overwrite surface — REPLACE with a
+    value freezes a new assumption seed and INVALIDATES dependent screens until
+    re-run. CONFIRM alone does not invent authority. ship_ok stays false.
+    """
+    from openpyxl import load_workbook
+
+    path = xlsx_path or (twin_dir / JACK_XLSX_BASENAME)
+    if not path.is_file():
+        return {
+            "ok": False,
+            "error": f"missing {path.name}",
+            "ship_ok": False,
+            "overrides": [],
+            "screens_invalidated": [],
+        }
+    wb = load_workbook(path, data_only=False)
+    if "Assumptions (fill)" not in wb.sheetnames:
+        return {
+            "ok": False,
+            "error": "Assumptions (fill) sheet missing",
+            "ship_ok": False,
+            "overrides": [],
+            "screens_invalidated": [],
+        }
+    ws = wb["Assumptions (fill)"]
+    overrides: list[dict[str, Any]] = []
+    invalidated: set[str] = set()
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or not row[0]:
+            continue
+        aid = str(row[0]).strip()
+        jack_status = (str(row[5]).strip().upper() if row[5] is not None else "")
+        jack_value = row[6]
+        jack_notes = row[7]
+        if jack_status in ("", "CONFIRM", "UNKNOWN", "N/A"):
+            if jack_status == "CONFIRM":
+                overrides.append(
+                    {
+                        "id": aid,
+                        "action": "CONFIRM",
+                        "jack_value": None,
+                        "jack_notes": jack_notes,
+                        "authority": "partner_confirm_under_assumptions",
+                    }
+                )
+            continue
+        if jack_status == "REPLACE":
+            if jack_value in (None, ""):
+                overrides.append(
+                    {
+                        "id": aid,
+                        "action": "REPLACE_REJECTED_EMPTY",
+                        "jack_value": None,
+                        "jack_notes": jack_notes,
+                        "error": "REPLACE requires Jack_value",
+                    }
+                )
+                continue
+            overrides.append(
+                {
+                    "id": aid,
+                    "action": "REPLACE",
+                    "jack_value": jack_value,
+                    "jack_notes": jack_notes,
+                    "authority": "partner_overwrite_pending_rerun",
+                }
+            )
+            for screen in _ASSUMPTION_TO_SCREEN_INVALIDATION.get(aid, ()):
+                invalidated.add(str(screen))
+    payload = {
+        "schema": "fpk-jack-assumption-overrides/v1",
+        "ship_ok": False,
+        "stamped_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source_xlsx": path.name,
+        "overrides": overrides,
+        "screens_invalidated": sorted(invalidated),
+        "note": (
+            "Partner REPLACE freezes override the Anvil seed for the named "
+            "assumption and mark dependent screens INVALIDATED_PENDING_RERUN. "
+            "Re-stamp multiphysics / ABD after applying overrides. Never mint ship_ok."
+        ),
+    }
+    out = twin_dir / JACK_INGEST_BASENAME
+    temporary = out.with_name(f".{out.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, out)
+    payload["ok"] = True
+    payload["path"] = str(out)
+    return payload
+
+
+def write_register(
+    twin_dir: Path, register: Mapping[str, Any], *, write_xlsx: bool = True
+) -> tuple[Path, Path, Optional[Path]]:
+    """Atomically write JSON + markdown (+ Jack Excel) into the twin."""
 
     twin_dir.mkdir(parents=True, exist_ok=True)
     json_path = twin_dir / OUTPUT_BASENAME
@@ -509,11 +902,14 @@ def write_register(twin_dir: Path, register: Mapping[str, Any]) -> tuple[Path, P
         temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
         temporary.write_text(text, encoding="utf-8")
         os.replace(temporary, path)
-    return json_path, md_path
+    xlsx_path: Optional[Path] = None
+    if write_xlsx:
+        xlsx_path = write_jack_workbook(twin_dir, register)
+    return json_path, md_path, xlsx_path
 
 
 def selftest() -> int:
-    """ProveCatch: register is reviewable, ship_ok false, asks present."""
+    """ProveCatch: register is reviewable, ship_ok false, asks present, xlsx writable."""
 
     with tempfile.TemporaryDirectory(prefix="fpk-assumption-selftest-") as raw:
         twin = Path(raw)
@@ -547,10 +943,21 @@ def selftest() -> int:
             json.dumps(
                 {
                     "works_in_kit_context": {
-                        "duty_torque_screen_ok": True,
-                        "loaded_torque_magnitude_nm": 200.0,
-                        "required_shaft_torque_nm": 125.0,
-                    }
+                        "duty_torque_screen_ok": False,
+                        "loaded_torque_magnitude_nm": 207.12,
+                        "required_shaft_torque_nm": 125.21,
+                        "torque_reliable": False,
+                        "torque_magnitude_mean_nm": 118.75,
+                    },
+                    "loaded_point": {
+                        "torque_magnitude_nm": 207.12,
+                        "required_shaft_torque_nm": 125.21,
+                        "torque_reliable": False,
+                        "duty_torque_screen_ok": False,
+                    },
+                    "rotor_position_sweep": {
+                        "summary": {"torque_magnitude_mean_nm": 118.75}
+                    },
                 }
             ),
             encoding="utf-8",
@@ -563,7 +970,15 @@ def selftest() -> int:
                         "total_delta_p_kpa": 42.7,
                         "maximum_winding_temperature_c": 67.0,
                         "maximum_module_temperature_c": 71.0,
-                    }
+                        "copper_loss_w": 2180.0,
+                        "inverter_loss_w": 4318.0,
+                        "motor_loss_w": 2316.0,
+                        "total_loss_w": 6634.0,
+                    },
+                    "input_quantities": {
+                        "copper_loss_w": 2180.0,
+                        "inverter_loss_w": 4318.0,
+                    },
                 }
             ),
             encoding="utf-8",
@@ -591,11 +1006,63 @@ def selftest() -> int:
             "proveCatch": (register.get("proveCatch") or {}).get("ship_ok_false")
             is True,
         }
-        json_path, md_path = write_register(twin, register)
+        json_path, md_path, xlsx_path = write_register(twin, register)
         checks["wrote_json"] = json_path.is_file()
         checks["wrote_md"] = md_path.is_file() and "RESULT_UNDER_ASSUMPTIONS" in (
             md_path.read_text(encoding="utf-8")
         )
+        checks["wrote_xlsx"] = bool(xlsx_path and xlsx_path.is_file())
+        if checks["wrote_xlsx"] and xlsx_path is not None:
+            from openpyxl import load_workbook
+
+            wb = load_workbook(xlsx_path)
+            checks["xlsx_has_fill_sheet"] = "Assumptions (fill)" in wb.sheetnames
+            checks["xlsx_has_asks_sheet"] = "Asks (fill)" in wb.sheetnames
+            # proveCatch: yellow fill columns exist (Jack blanks)
+            ws = wb["Assumptions (fill)"]
+            checks["xlsx_jack_blank_col"] = ws["F2"].value in (None, "")
+            # proveCatch F-ASK-1: REPLACE with value invalidates dependent screens
+            ws["F2"] = "REPLACE"
+            ws["G2"] = 260
+            wb.save(xlsx_path)
+            ingest = ingest_jack_workbook(twin, xlsx_path)
+            checks["jack_ingest_ok"] = ingest.get("ok") is True
+            checks["jack_ingest_invalidates"] = "R-EM-DUTY" in (
+                ingest.get("screens_invalidated") or []
+            )
+            checks["jack_ingest_ship_ok_false"] = ingest.get("ship_ok") is False
+            # Empty REPLACE must not silently clear
+            ws["F2"] = "REPLACE"
+            ws["G2"] = None
+            wb.save(xlsx_path)
+            ingest2 = ingest_jack_workbook(twin, xlsx_path)
+            rejected = [
+                o
+                for o in (ingest2.get("overrides") or [])
+                if o.get("action") == "REPLACE_REJECTED_EMPTY"
+            ]
+            checks["jack_empty_replace_rejected"] = len(rejected) >= 1
+            # Loss ledger surfaces on R-COOL-NET
+            cool_row = next(
+                (
+                    r
+                    for r in (register.get("results_under_assumptions") or [])
+                    if r.get("id") == "R-COOL-NET"
+                ),
+                {},
+            )
+            checks["cool_loss_ledger_in_value"] = "Cu=" in str(
+                cool_row.get("value") or ""
+            )
+            # proveCatch: pitch must not greenwash when duty_ok=False
+            pitch = str(register.get("pitch") or "")
+            checks["pitch_names_duty_fail"] = "does not clear" in pitch.lower()
+            checks["pitch_no_screens_torque_greenwash"] = (
+                "screens torque" not in pitch.lower()
+            )
+            checks["proveCatch_pitch"] = (
+                register.get("proveCatch") or {}
+            ).get("pitch_not_greenwash_when_duty_fails") is True
         if not all(checks.values()):
             print("FAIL", json.dumps(checks, indent=2))
             return 1
@@ -608,19 +1075,36 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--twin", type=Path, help="Twin directory")
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument(
+        "--ingest-jack",
+        action="store_true",
+        help="Read Jack yellow cells from the twin xlsx and stamp overrides",
+    )
+    parser.add_argument(
+        "--no-xlsx",
+        action="store_true",
+        help="Skip Jack fill-in workbook (JSON+markdown only)",
+    )
     args = parser.parse_args()
     if args.selftest:
         return selftest()
     if not args.twin:
         parser.error("--twin is required unless --selftest")
     twin = args.twin.resolve()
+    if args.ingest_jack:
+        result = ingest_jack_workbook(twin)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
     register = build_register(twin)
-    json_path, md_path = write_register(twin, register)
+    json_path, md_path, xlsx_path = write_register(
+        twin, register, write_xlsx=not args.no_xlsx
+    )
     print(
         json.dumps(
             {
                 "json": str(json_path),
                 "markdown": str(md_path),
+                "jack_xlsx": str(xlsx_path) if xlsx_path else None,
                 "review_status": register.get("review_status"),
                 "ship_ok": register.get("ship_ok"),
                 "assumption_count": len(register.get("assumptions") or []),

@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 import time
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -25,6 +26,13 @@ from typing import Any, Mapping, Sequence
 
 import ijson
 
+_STACK_DIR = Path(__file__).resolve().parent
+if str(_STACK_DIR) not in sys.path:
+    sys.path.insert(0, str(_STACK_DIR))
+from shaft_torque_identity import (  # noqa: E402
+    ASSUMED_COMBINED_EFFICIENCY as _CANONICAL_COMBINED_ETA,
+    required_shaft_torque_nm as _required_shaft_torque_nm,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
@@ -66,8 +74,8 @@ ZH_SPUR_20DEG = 2.495
 # Minimum bending/contact FoS for works_in_kit_context duty screen.
 SCREEN_FOS_MIN = 1.20
 # Assumed combined machine+inverter efficiency when deriving shaft torque from
-# electrical duty (matches EM FIA case order of magnitude → ~125 N·m).
-ASSUMED_COMBINED_EFFICIENCY = 0.9777
+# electrical duty — canonical seed in shaft_torque_identity.py (F-EM-2).
+ASSUMED_COMBINED_EFFICIENCY = _CANONICAL_COMBINED_ETA
 DEFAULT_FACE_WIDTH_MM = 14.0
 DEFAULT_GEAR_RATIO = 8.0
 
@@ -344,6 +352,121 @@ def _max_ring_tip_for_rotor_mm(rotor_id_mm: float) -> float:
     )
 
 
+def _gear_writeback_qty(
+    value: float | int,
+    unit: str,
+    detail: str,
+    *,
+    lineage_from: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Build a contract-ready quantity with recorded origin (never sourceless)."""
+
+    out: dict[str, Any] = {
+        "value": value,
+        "unit": unit,
+        "source": "calculator",
+        "source_detail": detail,
+        "condition": (
+            "strength-driven ISO 6336 packaging resize "
+            "(seed failed FoS or nest bore hold)"
+        ),
+    }
+    if lineage_from:
+        out["lineage"] = {
+            "from": list(lineage_from),
+            "via": "iso6336_strength_driven_resize",
+        }
+    return out
+
+
+def _gear_writeback_quantities(recommended: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Quantities stamped into gear_geometry_writeback.json + twin state.
+
+    INTENT: bare value/unit entries were merged into state with a schema-like
+    source tag and no source_detail → provenance SOURCELESS HIGH on
+    gear_face_mm / planet_count while fpk_* aliases already carried detail.
+    """
+
+    face = float(recommended["face_width_mm"])
+    module = float(recommended["gear_module_mm"])
+    planets = int(recommended["planet_count"])
+    face_detail = (
+        "ISO 6336 strength-driven planetary face width "
+        f"(gear_geometry_writeback; face={face:g} mm)"
+    )
+    module_detail = (
+        "ISO 6336 strength-driven tooth module "
+        f"(gear_geometry_writeback; m={module:g} mm)"
+    )
+    planet_detail = (
+        "ISO 6336 strength-driven planet count "
+        f"(gear_geometry_writeback; N={planets})"
+    )
+    # DECISION: prose source_detail only (no lineage.from) — upstream torque /
+    # ratio keys are not always present as contract quantities, and orphan MED
+    # edges would muddy the audit without helping the sourceless catch.
+    return {
+        "fpk_gear_face_mm": _gear_writeback_qty(face, "mm", face_detail),
+        "fpk_planet_count": _gear_writeback_qty(planets, "count", planet_detail),
+        "fpk_planet_od_mm": _gear_writeback_qty(
+            float(recommended["planet_pitch_diameter_mm"]),
+            "mm",
+            "ISO 6336 strength-driven planet pitch diameter",
+        ),
+        "fpk_ring_id_mm": _gear_writeback_qty(
+            float(recommended["ring_pitch_diameter_mm"]),
+            "mm",
+            "ISO 6336 strength-driven ring pitch diameter",
+        ),
+        "fpk_ring_tip_diameter_mm": _gear_writeback_qty(
+            float(recommended["ring_tip_diameter_mm"]),
+            "mm",
+            "ISO 6336 strength-driven ring tip diameter",
+        ),
+        "fpk_sun_od_mm": _gear_writeback_qty(
+            float(recommended["sun_pitch_diameter_mm"]),
+            "mm",
+            "ISO 6336 strength-driven sun pitch diameter",
+        ),
+        "gear_face_mm": _gear_writeback_qty(face, "mm", face_detail),
+        "gear_module_mm": _gear_writeback_qty(module, "mm", module_detail),
+        "planet_count": _gear_writeback_qty(planets, "count", planet_detail),
+    }
+
+
+def _sync_gear_writeback_into_state(
+    twin_dir: Path, recommended: Mapping[str, Any]
+) -> None:
+    """Merge writeback quantities into state.json with full provenance.
+
+    FLOW: iso6336 run_live_case → gear_geometry_writeback.json → this sync
+    → orchestratorContract.quantities (Excel / provenance audit consumers).
+    """
+
+    state_path = twin_dir / "state.json"
+    if not state_path.is_file():
+        return
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(state, dict):
+        return
+    oc = state.setdefault("orchestratorContract", {})
+    if not isinstance(oc, dict):
+        return
+    q = oc.setdefault("quantities", {})
+    if not isinstance(q, dict):
+        return
+    for key, entry in _gear_writeback_quantities(recommended).items():
+        q[key] = dict(entry)
+    temporary = state_path.with_suffix(".json.tmp")
+    temporary.write_text(
+        json.dumps(state, indent=2, sort_keys=False) + "\n", encoding="utf-8"
+    )
+    temporary.replace(state_path)
+
+
 def _apply_gear_geometry_writeback(
     twin_dir: Path,
     quantities: dict[str, Any],
@@ -445,20 +568,20 @@ def derive_motor_shaft_torque_nm(inputs: TwinInputs) -> float:
 
     INTENT: Gears see mechanical shaft torque. For regen at the FIA electrical
     cap, shaft power ≈ electrical / η_combined → ~125 N·m at 19,500 rpm /
-    250 kW (same order as the EM FIA analytical duty check).
+    250 kW. FLOW: shaft_torque_identity.required_shaft_torque_nm (F-EM-2).
     """
 
-    omega = inputs.max_rotor_speed_rpm * 2.0 * math.pi / 60.0
-    if omega <= 0.0:
-        raise FiaFrontKitGearError("max_rotor_speed_rpm must be positive")
-    # DECISION: Always screen at continuous electrical duty / η / ω (~125 N·m).
-    # Twin mgu_shaft_torque_nm may be a different operating seed and must not
-    # quietly under-screen the 250 kW FIA case (recorded separately in inputs).
-    return (
-        inputs.continuous_electrical_power_kw
-        * 1000.0
-        / (ASSUMED_COMBINED_EFFICIENCY * omega)
-    )
+    try:
+        # DECISION: Always screen at continuous electrical duty / η / ω (~125 N·m).
+        # Twin mgu_shaft_torque_nm may be a different operating seed and must not
+        # quietly under-screen the 250 kW FIA case (recorded separately in inputs).
+        return _required_shaft_torque_nm(
+            continuous_electrical_power_kw=inputs.continuous_electrical_power_kw,
+            max_rotor_speed_rpm=inputs.max_rotor_speed_rpm,
+            combined_efficiency=ASSUMED_COMBINED_EFFICIENCY,
+        )
+    except ValueError as exc:
+        raise FiaFrontKitGearError(str(exc)) from exc
 
 
 def derive_gear_geometry(inputs: TwinInputs) -> GearGeometry:
@@ -1322,46 +1445,10 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
                         ),
                         "sun_od_mm": float(recommended["sun_pitch_diameter_mm"]),
                     },
-                    "quantities": {
-                        "fpk_gear_face_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["face_width_mm"]),
-                        },
-                        "fpk_planet_count": {
-                            "unit": "count",
-                            "value": int(recommended["planet_count"]),
-                        },
-                        "fpk_planet_od_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["planet_pitch_diameter_mm"]),
-                        },
-                        "fpk_ring_id_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["ring_pitch_diameter_mm"]),
-                        },
-                        "fpk_ring_tip_diameter_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["ring_tip_diameter_mm"]),
-                        },
-                        "fpk_sun_od_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["sun_pitch_diameter_mm"]),
-                        },
-                        "gear_face_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["face_width_mm"]),
-                        },
-                        "gear_module_mm": {
-                            "unit": "mm",
-                            "value": float(recommended["gear_module_mm"]),
-                        },
-                        "planet_count": {
-                            "unit": "count",
-                            "value": int(recommended["planet_count"]),
-                        },
-                    },
+                    "quantities": _gear_writeback_quantities(recommended),
                 },
             )
+            _sync_gear_writeback_into_state(twin_dir, recommended)
         else:
             # Invalidate the previous oversized writeback so Blender stops
             # showing a nest that cannot fit the rotor.

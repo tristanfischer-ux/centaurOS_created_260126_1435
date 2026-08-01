@@ -492,6 +492,32 @@ def build_concept_word(
             "provenance": "fpk_bom_densify/v1",
         }
     )
+    # UNIVERSAL (2026-07-31): also emit `material` so requirements_bom /
+    # Excel / Blender share one MoC field (material_grade alone was dropped).
+    mods.append(
+        {
+            "kind": "material",
+            "value": mat,
+            "basis": mat_basis,
+            "provenance": "fpk_bom_densify/v1",
+        }
+    )
+    # Structured mm atoms when densify falls back to physics_tree leaf keys.
+    physics = leaf.get("physics") if isinstance(leaf.get("physics"), dict) else {}
+    for pk in ("od_mm", "id_mm", "length_mm", "width_mm", "height_mm", "thickness_mm"):
+        val = physics.get(pk)
+        if val is None:
+            continue
+        try:
+            mods.append({
+                "kind": pk,
+                "value": str(float(val)),
+                "unit": "mm",
+                "basis": "physics_tree leaf",
+                "provenance": "fpk_bom_densify/v1",
+            })
+        except (TypeError, ValueError):
+            continue
     return {
         "id": f"{lid}_word",
         "name_human": lname,
@@ -687,13 +713,29 @@ def attach_modifiers_to_existing(
                         if tok and (tok in key or key in tok):
                             lit = val
                             break
+                    _mat_val = lit or mat
                     add_mod(
                         word,
                         "material_grade",
-                        lit or mat,
+                        _mat_val,
                         "literature_claim" if lit else basis,
                     )
+                    # Mirror onto canonical `material` for BoM/Excel/Blender.
+                    if not has_kind(word, "material"):
+                        add_mod(
+                            word,
+                            "material",
+                            _mat_val,
+                            "literature_claim" if lit else basis,
+                        )
                     mats_added += 1
+                elif has_kind(word, "material_grade") and not has_kind(word, "material"):
+                    # Backfill material from an existing grade-only stamp.
+                    for mc in word.get("modifier_characters") or []:
+                        if isinstance(mc, dict) and mc.get("kind") == "material_grade":
+                            add_mod(word, "material", mc.get("value") or mat, "material_grade_mirror")
+                            mats_added += 1
+                            break
                 break
     return dims_added, mats_added
 

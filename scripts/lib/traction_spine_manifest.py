@@ -154,6 +154,60 @@ _TRACTION_SEATS: list[tuple[str, str, str]] = [
 ]
 
 
+# INTENT (2026-07-31 Tristan): GA was drawing every traction seat as a box because
+# the seater always emitted shape="box" from the world AABB. Motor / rotor / ring /
+# sun / planet / diff are cylinders about the pack X-axis in Blender — stamp
+# horizontal_cylinder + dia/len so draw_ga can show END-VIEW circles (SIDE elev).
+_TRACTION_CYLINDER_PREFIXES: tuple[str, ...] = (
+    "u_se_td_motor_housing",
+    "u_se_td_hollow_rotor",
+    "u_se_td_stator_ring",
+    "u_se_td_stator_hint",
+    "u_se_td_ring_gear",
+    "u_se_td_sun_gear",
+    "u_se_td_planet_",
+    "u_se_td_gearbox",
+    "u_se_td_diff_bulge",
+    "u_se_td_diff_nest",
+    "u_se_td_post_diff_",
+    "u_se_td_halfshaft_flange",
+    "u_se_td_magnet",
+)
+
+
+def _is_traction_cylinder_prefix(mesh_pref: str) -> bool:
+    nm = mesh_pref or ""
+    return any(nm == p or nm.startswith(p) for p in _TRACTION_CYLINDER_PREFIXES)
+
+
+def _dims_for_traction_seat(
+    mesh_pref: str, bb: tuple[float, float, float, float, float, float]
+) -> tuple[str, dict[str, Any]]:
+    """Return (shape, dims_mm) for a seated traction principal.
+
+    DECISION: Keep w/d/h as the faithful world AABB so GA plan/front projections
+    stay identity-locked to Blender. For axial cylinders also emit dia + len +
+    axis=x so the SIDE elevation can draw an end-view circle (Y×Z ≈ dia×dia).
+    """
+    x0, x1, y0, y1, z0, z1 = bb
+    w = round(max(x1 - x0, 1.0), 1)
+    d = round(max(y1 - y0, 1.0), 1)
+    h = round(max(z1 - z0, 1.0), 1)
+    if not _is_traction_cylinder_prefix(mesh_pref):
+        return "box", {"w": w, "d": d, "h": h}
+    # Pack axis is +X (axial motor|gear|inverter train). Diameter = radial extent.
+    dia = round(max(d, h, 1.0), 1)
+    axial = round(max(w, 1.0), 1)
+    return "horizontal_cylinder", {
+        "w": w,
+        "d": d,
+        "h": h,
+        "dia": dia,
+        "len": axial,
+        "axis": "x",
+    }
+
+
 def _norm(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(name or "").lower()).strip()
 
@@ -459,12 +513,13 @@ def seat_traction_principals_in_manifest(
         if _norm(name) in have_names or (tag and tag in have_tags):
             continue
         x0, x1, y0, y1, z0, z1 = bb
+        shape, dims_mm = _dims_for_traction_seat(mesh_pref, bb)
         row = {
             "tag": tag,
             "equipment_tag": tag,
             "name": name,
             "module": str(pick.get("module") or "energy_conversion_transduction"),
-            "shape": "box",
+            "shape": shape,
             "qty": int(pick.get("qty") or 1),
             "region_rank": 50,
             "pos_mm": [
@@ -472,11 +527,7 @@ def seat_traction_principals_in_manifest(
                 round((y0 + y1) / 2.0, 1),
                 round((z0 + z1) / 2.0, 1),
             ],
-            "dims_mm": {
-                "w": round(max(x1 - x0, 1.0), 1),
-                "d": round(max(y1 - y0, 1.0), 1),
-                "h": round(max(z1 - z0, 1.0), 1),
-            },
+            "dims_mm": dims_mm,
             "geometry_source": "traction_drive_story_mesh",
             "signature_family": "traction_pack",
             "entity_type": "bom_component",
@@ -645,6 +696,28 @@ def _selftest() -> None:
                 f"(got {sorted(tags_poison)})"
             )
             bad += 1
+    # proveCatch (2026-07-31): motor/gear seats must carry dia so GA can draw circles.
+    by_name = {str(r.get("name")): r for r in rows}
+    motor = by_name.get("Traction Ipmsm Motor Generator") or {}
+    md = motor.get("dims_mm") or {}
+    if motor.get("shape") != "horizontal_cylinder" or "dia" not in md:
+        print(
+            f"  FAIL motor must be horizontal_cylinder with dia "
+            f"(shape={motor.get('shape')!r} dims={md})"
+        )
+        bad += 1
+    else:
+        # motor bbox Y=80 Z=140 → dia=140; axial X=120
+        if float(md.get("dia") or 0) < 100:
+            print(f"  FAIL motor dia too small: {md}")
+            bad += 1
+        if str(md.get("axis") or "") != "x":
+            print(f"  FAIL motor axis must be x (got {md.get('axis')!r})")
+            bad += 1
+    inv = by_name.get("SiC Traction Inverter") or {}
+    if inv.get("shape") != "box" or "dia" in (inv.get("dims_mm") or {}):
+        print(f"  FAIL inverter must stay a box without dia (got {inv})")
+        bad += 1
     if bad:
         print(f"traction_spine_manifest selftest: {bad} FAIL(s)")
         sys.exit(1)

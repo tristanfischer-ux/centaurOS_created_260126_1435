@@ -5,9 +5,13 @@
 Reads the live twin digest and asks each model to rip the deliverable apart
 as Jaguar Land Rover Formula E Head of Technology. Writes per-model JSON + a
 merged punch list. Does NOT auto-fix — verification is a separate pass.
+
+FLOW: prefer `_redteam_digest_v2.json` (assumption/Bar B era); fall back to
+legacy `_redteam_digest.json`. Output dir `_redteam_v2/` when v2 digest used.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -18,7 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 OUT = ROOT / "out/formula-e-front-mgu-20260729-1432"
-DIGEST = OUT / "_redteam_digest.json"
+DIGEST_V2 = OUT / "_redteam_digest_v2.json"
+DIGEST_LEGACY = OUT / "_redteam_digest.json"
 from scripts.lib.council_models import (  # noqa: E402
     COUNCIL_MODELS,
     run_kimi_with_opus5_fallback,
@@ -29,21 +34,31 @@ MODELS = dict(COUNCIL_MODELS)  # glm52 / sol / kimi; kimi → opus5 on fail
 SYSTEM = """You are an adversarial chartered powertrain engineer hired by Jaguar Land Rover
 Formula E Head of Technology to REJECT a supplier engineering pack.
 
-Your job is to find every reason a competent FE tech lead would refuse to rely on
-this dossier to develop future vehicles. Be extremely harsh. Do not praise. Do not
-hedge. Ship-gate "SHIPS / 8.9" is irrelevant — that is the author's own scorecard.
+PRIMARY TARGET = THE ENTIRE PROCESS, not a partner email. Attack the chain from
+brief → engineering contract → motor multiphysics (FEMM / thermal / ISO 6336 /
+CalculiX / OpenFOAM / Ross) → assumption register → Bar B readiness → PCB/HIL →
+Blender morphology → Excel dossier → ship_ok. Email/Jack narrative is ONE surface
+among many — do not let it dominate.
 
-Focus especially on:
-1) Blender / morphology photorealism vs Lucid/Atieva sealed FPK training check
-2) PCB / Gerbers / firmware / pinout / HIL honesty
-3) Whether Excel cells contain LIVE formulas vs pasted literals (traceability)
-4) Power flow: where power comes from, where it goes, assumptions
-5) Thermal / coolant assumptions
-6) Mass / weight assumptions
-7) Magnetic / electromagnetic assumptions (IPMSM, field weakening, SiC)
-8) Wiring / topology / harness completeness
-9) Physics correctness of formulas (I_ph, T=P/ω, gear, FIA energy)
-10) Whether this is first-class enough for a Tier-1 automotive tech lead
+Be extremely harsh. Do not praise. Do not hedge. Author scorecards are irrelevant.
+
+Attack ALL of these surfaces (cite evidence from the digest):
+P1) PROCESS COHERENCE: do quantities stay identity-locked across EM / gears / cooling / CAD?
+P2) GREENWASH: "Bar B list filled" / "RESULTS UNDER ASSUMPTIONS" / OK/CLEARED → race-ready?
+P3) EM ARITHMETIC: 250 kW ↔ T=P/ω ↔ rpm ↔ peak vs mean vs torque_reliable
+P4) THERMAL PROCESS: loss split → network → OpenFOAM Δp — units bugs or fantasy temps?
+P5) GEARS / OIL: FoS≈1.2 screening theatre? cornering_ok=False buried?
+P6) STRUCTURE / DYNAMICS: CalculiX FoS / Ross critical — mislabeled as retention proof?
+P7) PCB / Gerbers / firmware / HIL — any false PASS? forgeDraftOnly respected?
+P8) Blender morphology vs Lucid training check; clay shells; cutaway honesty
+P9) Excel LIVE formulas vs pasted literals on power/thermal
+P10) Interfaces XYZ types-only — invented millimetres?
+P11) Mass 32 kg aspiration vs CAD roll-up
+P12) ship_ok / homologationHonesty must stay NOT_HOMOLOGATED
+P13) Assumption→ask loop — can a partner overwrite freezes, or is the process closed?
+P14) Jack surfaces (email / fill-in xlsx) — secondary; flag only if process-critical
+
+Use independent_arithmetic in the digest. If claimed torques disagree with T=P/ω, mark FATAL.
 
 Return STRICT JSON:
 {
@@ -53,9 +68,13 @@ Return STRICT JSON:
   "high_findings": [...],
   "med_findings": [...],
   "physics_checks": [{"quantity":"...","claimed":"...","expected_check":"...","likely_wrong":true/false,"why":"..."}],
+  "process_coherence_verdict": {"verdict":"...","problems":["..."]},
+  "greenwash_verdict": {"verdict":"...","problems":["..."]},
   "excel_traceability": {"verdict":"...","problems":["..."]},
   "pcb_verdict": {"verdict":"...","problems":["..."]},
   "blender_verdict": {"verdict":"...","problems":["..."]},
+  "multiphysics_verdict": {"verdict":"...","problems":["..."]},
+  "assumption_loop_verdict": {"verdict":"...","problems":["..."]},
   "top_10_punchlist_for_fix": ["..."]
 }
 No markdown outside JSON.
@@ -170,42 +189,57 @@ def call_model(model: str, user: str, api_key: str) -> dict:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="FE front FPK adversarial red-team council")
+    parser.add_argument(
+        "--rebuild-digest",
+        action="store_true",
+        help="Run fe-front-build-redteam-digest.py before calling models",
+    )
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Force legacy _redteam_digest.json + _redteam/ output",
+    )
+    args = parser.parse_args()
+
+    if args.rebuild_digest and not args.legacy:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "fe_front_build_redteam_digest",
+            ROOT / "scripts" / "fe-front-build-redteam-digest.py",
+        )
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.main()
+
     api_key = load_env()
-    digest = json.loads(DIGEST.read_text())
-    excel_note = {
+    if args.legacy or not DIGEST_V2.exists():
+        digest_path = DIGEST_LEGACY if DIGEST_LEGACY.exists() else DIGEST_V2
+        out_dir = OUT / "_redteam"
+    else:
+        digest_path = DIGEST_V2
+        out_dir = OUT / "_redteam_v2"
+    if not digest_path.exists():
+        raise SystemExit(f"digest missing: {digest_path} (pass --rebuild-digest)")
+
+    digest = json.loads(digest_path.read_text())
+    excel_note = digest.get("excel_notes") or {
         "formula_coverage_pct_by_sheet_sample": {
             "Calculations": 21.5,
             "Brief": 8.9,
             "Engineering Analysis": 11.4,
-            "Financial model": 67.2,
-            "Bill of Materials": 31.2,
-            "Executive Summary": 13.1,
         },
-        "calculations_sheet_observation": (
-            "Many design quantities appear as bare numeric literals in column C "
-            "(e.g. C16=350 traction_motor_power_kw, C18=117 torque) with prose in E/F — "
-            "NOT Excel formulas deriving from Inputs. Traceability claim FAILS."
-        ),
-        "topology_routed": "0/18 edges routed in Blender connection ledger (unresolved electrical/thermal)",
-        "pcb_pipeline": None,
-        "pcb_disposition": digest.get("pcb", {}).get("disposition"),
-        "form_meshes": digest.get("form"),
-        "operator_concerns": [
-            "Blender render not first-class vs Lucid gold",
-            "PCB story: no Gerbers, COTS hand-wave unacceptable for JLR HoT",
-            "Not FIA homologated — must get MUCH closer in engineering substance",
-            "Dyno holds still open",
-            "All physics cells must be formulas, fully traceable",
-            "Power/heat/weight/magnetism assumptions must be explicit and correct",
-            "Wiring: where power comes from / goes to must be complete",
-        ],
+        "require_check": "FPK power/thermal LIVE trace must exist; bare literals FAIL",
     }
     user = (
-        "ARTEFACT DIGEST (state + scorecard + BoM + quantities + decisions):\n"
+        "ARTEFACT DIGEST v2 — FULL PROCESS (brief→contract→multiphysics→assumptions→"
+        "Bar B→PCB→Blender→Excel→ship_ok). Jack email is secondary.\n"
         + json.dumps(digest, indent=2)[:120000]
-        + "\n\nEXCEL / WIRING / PCB NOTES:\n"
+        + "\n\nEXCEL / TRACEABILITY NOTES:\n"
         + json.dumps(excel_note, indent=2)
-        + "\n\nRip this apart. Return JSON only."
+        + "\n\nRip the PROCESS apart as JLR FE HoT. Return JSON only."
     )
 
     results: dict = {}
@@ -243,12 +277,10 @@ def main() -> int:
                 results[tag] = {"error": str(e)}
                 print(f"[fail] {tag}: {e}", flush=True)
 
-    out_dir = OUT / "_redteam"
     out_dir.mkdir(exist_ok=True)
     for name, payload in results.items():
         (out_dir / f"{name}.json").write_text(json.dumps(payload, indent=2) + "\n")
 
-    # Merge punch ids
     merged: list[dict] = []
     for name, payload in results.items():
         if not isinstance(payload, dict) or payload.get("parse_error") or payload.get("error"):
@@ -269,17 +301,23 @@ def main() -> int:
             })
 
     summary = {
+        "digest": str(digest_path.name),
         "models": used_models or MODELS,
         "verdicts": {
             n: (results[n].get("verdict") if isinstance(results[n], dict) else "ERROR")
             for n in results
         },
+        "confidences": {
+            n: (results[n].get("confidence") if isinstance(results[n], dict) else None)
+            for n in results
+        },
         "n_findings": len(merged),
         "findings": merged,
         "kimi_fallback": "anthropic/claude-opus-5 if kimi fails",
+        "plan": "docs/plans/JLR-FE-FRONT-FPK-ADVERSARIAL-REDTEAM-PLAN-2026-07-31.md",
     }
     (out_dir / "merged-findings.json").write_text(json.dumps(summary, indent=2) + "\n")
-    print(json.dumps(summary["verdicts"], indent=2))
+    print(json.dumps({"verdicts": summary["verdicts"], "confidences": summary["confidences"]}, indent=2))
     print(f"wrote {out_dir} findings={len(merged)}")
     return 0
 

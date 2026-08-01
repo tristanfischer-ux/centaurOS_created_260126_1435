@@ -500,6 +500,22 @@ def quantity_writeback(g: FpkConcentricGeometry) -> dict[str, dict[str, Any]]:
             "mm",
             "planetary face width; strength-resize stamp retained when present",
         ),
+        # Aliases consumed by oil/ISO/Blender — must carry source_detail so
+        # provenance does not treat them as sourceless next to fpk_*.
+        "gear_face_mm": q(
+            g.gear_face_mm,
+            "mm",
+            "alias of fpk_gear_face_mm — planetary face width",
+        ),
+        "planet_count": {
+            "value": g.planet_count,
+            "unit": "count",
+            "family": "count",
+            "basis": "rated",
+            "scope": "module",
+            "source": "calculator",
+            "source_detail": "alias of fpk_planet_count — planet count",
+        },
         "fpk_diff_od_mm": q(g.diff_od_mm, "mm", "mini-diff nest OD inside carrier"),
         "fpk_mcu_w_mm": q(g.mcu_w_mm, "mm", "MCU shelf span"),
         "fpk_mcu_d_mm": q(g.mcu_d_mm, "mm", "MCU shelf depth"),

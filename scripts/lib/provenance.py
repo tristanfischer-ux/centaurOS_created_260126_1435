@@ -284,6 +284,12 @@ _GENERIC_ROLE = {
     # shared only the device noun 'inverter' after generic strip and false-flagged
     # 128×. Same pattern as motor/pump above — device type ≠ physical role.
     "inverter", "converter", "rectifier", "pcs", "mgu", "mcu", "drive",
+    # INTENT (2026-07-31 Formula E front FPK Calculations HIGH): planetary face
+    # width (fpk_gear_face_mm = 58 mm) and tooth module (gear_module_mm = 1 mm)
+    # shared only the device noun 'gear' after generic strip and false-flagged
+    # 58×. Face width ≠ module ≠ pitch diameter — orthogonal gear metrics
+    # (also guarded by _GEAR_METRIC_GROUPS when a stem like 'planetary' remains).
+    "gear", "gears", "planetary", "bevel",
     "dosing", "metering", "throughput", "transfer", "circulation", "recirc", "feed", "pressure",
     # location / zone qualifiers (Codema ship 2026-07-08 P2-J): 'nursery' is a WHERE, not a
     # WHAT — nursery_acid_dosing (0.04 m³/h metering) and nursery_fertigation (45 m³/h
@@ -363,10 +369,29 @@ _DIMENSION_GROUPS = {
     "width": {"width", "wide"},
 }
 
+# GEAR-METRIC axes (Formula E front FPK 2026-07-31): face width, tooth module,
+# and pitch diameter are orthogonal ISO 6336 inputs that share mm + a stem
+# token (gear/planetary). Same pattern as vessel height vs diameter — never
+# a same-role contradiction when families differ; two competing FACE claims
+# still flag.
+_GEAR_METRIC_GROUPS = {
+    "face_width": {"face", "facewidth"},
+    "module": {"module", "mod"},
+    "pitch": {"pitch"},
+}
+
 
 def _dimension_group(key: str) -> Optional[str]:
     toks = set(_NUM_RE.findall(str(key).lower()))
     for group, members in _DIMENSION_GROUPS.items():
+        if toks & members:
+            return group
+    return None
+
+
+def _gear_metric_group(key: str) -> Optional[str]:
+    toks = set(_NUM_RE.findall(str(key).lower()))
+    for group, members in _GEAR_METRIC_GROUPS.items():
         if toks & members:
             return group
     return None
@@ -456,7 +481,7 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
             continue
         by_unit.setdefault(unit, []).append(
             (key, float(v), roles, _dimension_group(key), _vessel_class_group(key),
-             _temperature_kind(key), _range_bound_group(key)),
+             _temperature_kind(key), _range_bound_group(key), _gear_metric_group(key)),
         )
 
     for unit, items in by_unit.items():
@@ -469,15 +494,19 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         flagged: Dict[str, tuple] = {}   # hi_key -> (lo_key, ratio, hi, lo)
         n = len(items)
         for i in range(n):
-            ki, vi, ri, di, vi_cls, ti, bi = items[i]
+            ki, vi, ri, di, vi_cls, ti, bi, gi = items[i]
             for j in range(i + 1, n):
-                kj, vj, rj, dj, vj_cls, tj, bj = items[j]
+                kj, vj, rj, dj, vj_cls, tj, bj, gj = items[j]
                 if di and dj and di != dj:
                     # a HEIGHT-family quantity and a DIAMETER/WIDTH-family quantity are
                     # distinct geometric roles even when they share an equipment-stem token
                     # (absorber_column_height_tt_m vs absorber_diameter_m both carry
                     # 'absorber' but measure orthogonal axes of the same vessel) — never
                     # a same-role contradiction, regardless of stem overlap.
+                    continue
+                if gi and gj and gi != gj:
+                    # face width vs tooth module vs pitch diameter — orthogonal gear
+                    # metrics (ISO 6336), never a same-role contradiction.
                     continue
                 if (vi_cls or vj_cls) and vi_cls != vj_cls:
                     # a STORAGE RESERVOIR and a COLLECTION SUMP/PIT share 'drain' but are
@@ -762,6 +791,29 @@ def _selftest() -> int:
     }}}
     expect(any(f.kind == "divergence" for f in audit_provenance(same_fia).findings),
            "two competing FIA usable-energy claims that disagree must still flag")
+
+    # GEAR-METRIC axis guard (Formula E front FPK 2026-07-31): face width 58 mm
+    # vs tooth module 1 mm share 'gear' / stem — must NOT flag. Two competing
+    # face-width claims that disagree must still flag.
+    gear_axes = {"orchestratorContract": {"quantities": {
+        "fpk_gear_face_mm": {"value": 58.0, "unit": "mm", "source": "calculator",
+                             "source_detail": "planetary face width"},
+        "gear_face_mm": {"value": 58.0, "unit": "mm", "source": "calculator",
+                         "source_detail": "alias face width"},
+        "gear_module_mm": {"value": 1.0, "unit": "mm", "source": "calculator",
+                           "source_detail": "tooth module"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(gear_axes).findings),
+           "gear face width vs tooth module must NOT cluster as same physical role")
+    same_face = {"orchestratorContract": {"quantities": {
+        "fpk_gear_face_mm": {"value": 58.0, "unit": "mm", "source": "calculator",
+                             "source_detail": "strength resize face"},
+        "planetary_face_width_mm": {"value": 1.0, "unit": "mm", "source": "calculator",
+                                    "source_detail": "competing face claim"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_face).findings),
+           "two competing gear face-width claims that disagree must still flag")
+
     # GOTCHA: total_* is an aggregate qualifier vs max_* (per-unit/peak) — that
     # pair is skipped by the roll-up guard. Use two non-aggregate keys that share
     # the domain token 'simultaneous' so the catch stays live.

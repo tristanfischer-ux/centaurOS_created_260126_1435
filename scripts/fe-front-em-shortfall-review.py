@@ -19,11 +19,18 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs/plans/FE-FRONT-EM-TORQUE-REVIEW-BRIEF-v2-2026-08-01.md"
-OUT_DIR = ROOT / "out/formula-e-front-mgu-20260729-1432/_em_review_v2"
+BRIEF = ROOT / os.environ.get("EM_REVIEW_BRIEF",
+                             "docs/plans/FE-FRONT-EM-TORQUE-REVIEW-BRIEF-v2-2026-08-01.md")
+OUT_DIR = ROOT / os.environ.get("EM_REVIEW_OUT",
+                               "out/formula-e-front-mgu-20260729-1432/_em_review_v2")
 
 SEATS: dict[str, str] = {
+    # Tristan 2026-08-01: "call on the new DeepSeek V4 Flash 0731 version, and
+    # ask Kimi K3 too. Grok 4.5 high as a sparring partner." IDs were read from
+    # the live OpenRouter model list, never inferred from the nickname.
+    "deepseek_v4_flash": "deepseek/deepseek-v4-flash-0731",
     "kimi_k3": "moonshotai/kimi-k3",
+    "grok45": "x-ai/grok-4.5",
 }
 
 SYSTEM = """You are a chartered electrical machines engineer reviewing another

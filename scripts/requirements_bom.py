@@ -43,6 +43,16 @@ try:
 except Exception:           # pragma: no cover  (defensive — keeps --selftest standalone)
     _dcl = None             # type: ignore
 
+# UNIVERSAL physical-property contract (BoM ↔ Blender): thickness / OD-ID /
+# radius / LWH / mass / material — including material_grade → material.
+try:
+    _lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+    if _lib_dir not in sys.path:
+        sys.path.insert(0, _lib_dir)
+    import bom_physical_properties as _bom_phys  # type: ignore
+except Exception:           # pragma: no cover
+    _bom_phys = None        # type: ignore
+
 # SHARED phase authority (scripts/blender-universal/connection_sizing.py): the SAME
 # liquid/gas/steam classifier the universal Blender connection-sizer uses, so the
 # bill-of-materials sizes a fluid edge by its PHYSICAL phase rather than assuming
@@ -6264,6 +6274,28 @@ def _selftest() -> int:
     if any(str(r["requirement"]).lower().startswith("compute ui") for r in _gs_amb):
         print("  FAIL gold-spine reconcile: must SKIP on ambiguous (>1 compute anchor)"); bad += 1
 
+    # UNIVERSAL physical-property project (2026-07-31): word mass + material_grade
+    # + OD/ID must land on the BoM row (proveCatch — Blender/Excel share this).
+    if _bom_phys is not None:
+        try:
+            _bom_phys._selftest()
+            _phys_row: dict = {"tag": "T-PHYS", "requirement": "Hollow Rotor", "basis": "test"}
+            _bom_phys.project_onto_bom_row(_phys_row, _bom_phys.extract_physical_props([
+                {"kind": "material_grade", "value": "electrical steel laminate"},
+                {"kind": "mass", "value": "11.5 kg"},
+                {"kind": "dimension", "value": "OD 197.1 / ID 130.5 mm"},
+            ]))
+            if not _phys_row.get("mass_kg") or abs(float(_phys_row["mass_kg"]) - 11.5) > 1e-6:
+                print(f"  FAIL physical-props mass project → {_phys_row.get('mass_kg')}"); bad += 1
+            if "electrical steel" not in str(_phys_row.get("material") or "").lower():
+                print(f"  FAIL physical-props material_grade → {_phys_row.get('material')}"); bad += 1
+            if not _phys_row.get("od_mm") or not _phys_row.get("thickness_mm"):
+                print(f"  FAIL physical-props OD/thickness → {_phys_row}"); bad += 1
+        except Exception as _pe:  # noqa: BLE001
+            print(f"  FAIL bom_physical_properties selftest: {_pe}"); bad += 1
+    else:
+        print("  FAIL bom_physical_properties module failed to import"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -8879,6 +8911,16 @@ def assemble(out_dir: str):
                                             f"(part-specified material; {_PLANT_CORROSION})")
                         else:
                             row["basis"] = f"{row.get('basis','')} · MoC: {_moc} for {_PLANT_CORROSION}"
+                # UNIVERSAL physical props (2026-07-31): project word modifiers
+                # (dimension / od_mm / thickness / mass / material_grade) onto the
+                # row so Excel + Blender share one contract. Take-off fields win
+                # when already present (overwrite=False).
+                if _bom_phys is not None:
+                    try:
+                        _phys = _bom_phys.extract_physical_props(md)
+                        _bom_phys.project_onto_bom_row(row, _phys, overwrite=False)
+                    except Exception as _phys_exc:  # noqa: BLE001
+                        print(f"[requirements_bom] physical-props skip '{name}': {_phys_exc}")
                 rows.append(row)
                 # ── itemise the ASSEMBLY BREAKDOWN beneath the parent: one row per
                 # physics-sized sub-component, scaled to SUM to the parent's line cost.

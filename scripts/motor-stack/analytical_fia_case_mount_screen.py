@@ -21,6 +21,7 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -28,12 +29,20 @@ from typing import Any, Mapping, Sequence
 
 import ijson
 
+_STACK_DIR = Path(__file__).resolve().parent
+if str(_STACK_DIR) not in sys.path:
+    sys.path.insert(0, str(_STACK_DIR))
+from shaft_torque_identity import (  # noqa: E402
+    ASSUMED_COMBINED_EFFICIENCY as _CANONICAL_COMBINED_ETA,
+    required_shaft_torque_nm as _required_shaft_torque_nm,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
 SCHEMA = "forgeos.motor_stack.analytical_fia_case_mount_screen/v1"
 
 # Match iso6336_fia_front_kit_case torque derivation (~125 N·m @ 250 kW / 19.5k).
-ASSUMED_COMBINED_EFFICIENCY = 0.9777
+ASSUMED_COMBINED_EFFICIENCY = _CANONICAL_COMBINED_ETA
 DEFAULT_GEAR_RATIO = 8.0
 
 # Mount / fastener screening assumptions (documented — not team drawings).
@@ -293,16 +302,17 @@ def derive_motor_shaft_torque_nm(inputs: TwinInputs) -> float:
 
     INTENT: Same continuous-duty derivation as iso6336_fia_front_kit_case
     (~125 N·m at 250 kW / 19,500 rpm) so gear and case screens share one load.
+    FLOW: shaft_torque_identity.required_shaft_torque_nm (F-EM-2).
     """
 
-    omega = inputs.max_rotor_speed_rpm * 2.0 * math.pi / 60.0
-    if omega <= 0.0:
-        raise FiaCaseMountScreenError("max_rotor_speed_rpm must be positive")
-    return (
-        inputs.continuous_electrical_power_kw
-        * 1000.0
-        / (ASSUMED_COMBINED_EFFICIENCY * omega)
-    )
+    try:
+        return _required_shaft_torque_nm(
+            continuous_electrical_power_kw=inputs.continuous_electrical_power_kw,
+            max_rotor_speed_rpm=inputs.max_rotor_speed_rpm,
+            combined_efficiency=ASSUMED_COMBINED_EFFICIENCY,
+        )
+    except ValueError as exc:
+        raise FiaCaseMountScreenError(str(exc)) from exc
 
 
 def derive_mount_geometry(inputs: TwinInputs) -> MountGeometry:

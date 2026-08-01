@@ -520,14 +520,21 @@ def sync_front_fpk_power_reconcile_tools_page(page: dict[str, Any], state: Mappi
 
 
 def prove_catch(plan: Mapping[str, Any]) -> dict[str, Any]:
-    """proveCatch: excel_all_literal_power_chain when signal exists but no LIVE cells."""
+    """proveCatch: literal-only power chain OR missing T_shaft=P/ω LIVE cell."""
     fires = bool(plan.get("has_fpk_power_trace")) and bool(plan.get("literal_power_chain"))
+    live_ids = {str(c.get("id")) for c in (plan.get("live_cells") or [])}
+    # F-XL-1 / F-EM-2: LIVE floor must include shaft torque identity cell.
+    missing_shaft = bool(plan.get("has_fpk_power_trace")) and "T_shaft" not in live_ids
     return {
         "excel_all_literal_power_chain": {
             "fired": fires,
             "intended_action": "block_greenwash_excel_power_chain",
         },
-        "ok": not fires,
+        "excel_missing_shaft_torque_live": {
+            "fired": missing_shaft,
+            "intended_action": "require_T_shaft_equals_P_over_omega_live_cell",
+        },
+        "ok": (not fires) and (not missing_shaft),
     }
 
 

@@ -288,6 +288,41 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
             "internal://component_geometry_types/vehicle_interface_port_cluster",
             "ForgeOS-source-owned",
         ),
+        (
+            "compact_bevel_differential",
+            motor_drivetrain.compact_bevel_differential,
+            {
+                "diff_od": 120.0,
+                "diff_len": 108.0,
+                "side_gear_teeth": 14,
+                "spider_pinion_teeth": 10,
+                "spider_count": 6,
+                "face_width": 10.0,
+                "cross_pin_diameter": 8.0,
+                "output_shaft_diameter": 28.0,
+                "output_shaft_length": 36.0,
+                "carrier_wall": 6.0,
+            },
+            "internal://component_geometry_types/compact_bevel_differential",
+            "ForgeOS-source-owned",
+        ),
+        (
+            "rotor_bearing_stack",
+            motor_drivetrain.rotor_bearing_stack,
+            {
+                "shaft_diameter": 55.0,
+                "shaft_length": 180.0,
+                "bearing_od": 100.0,
+                "bearing_width": 18.0,
+                "bearing_bore": 55.05,
+                "bearing_count": 2,
+                "bearing_spacing": 90.0,
+                "shoulder_diameter": 104.0,
+                "seat_depth": 1.5,
+            },
+            "internal://component_geometry_types/rotor_bearing_stack",
+            "ForgeOS-source-owned",
+        ),
     ]
     # DECISION: the OpenMotor STEP is registered only against its exact educational
     # identity. It must never become a generic traction-motor family fallback.

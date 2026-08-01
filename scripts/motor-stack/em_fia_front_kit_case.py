@@ -1053,8 +1053,28 @@ def rotor_frame_current_angle_deg(
     # so it removed the gross aliasing yet left the machine still walking out of
     # synchronism. The residual 334% swing is at SLOT PITCH and is the separate
     # 46%-of-pitch slot-opening cogging, not a phasing fault.
+    # ⭐ THE 5-POINT MEASUREMENT ABOVE WAS ALIASED (2026-08-01). It sampled 5
+    # rotor positions over 15 deg mech. With the advance wrong, the relative
+    # angle delta sweeps at 2p*theta_m, and a salient machine's RELUCTANCE term
+    # goes as sin(2*delta) = 4p*theta_m — 240 deg of phase per 15 deg mech. Five
+    # samples cannot resolve that, so the "mean" of each candidate was an alias
+    # artefact and the sign it selected is not trustworthy.
+    #
+    # The 37-point sweep over a full 45 deg mech (360 deg electrical) resolves
+    # it properly, and its harmonic content says delta is SWEEPING, not held:
+    #     DC   3.75 N.m   <- the useful torque; should dominate
+    #     k=1 53.65 N.m   <- PM term, sin(delta),  delta sweeping at 2p*theta_m
+    #     k=2 80.17 N.m   <- reluctance term, sin(2*delta)
+    #     k=3 31.11 N.m   <- 24-slot cogging (legitimate)
+    # A correctly-tracking excitation holds delta constant and leaves k=1 and
+    # k=2 near zero.
+    #
+    # Env override so BOTH signs can be measured at full resolution without
+    # editing this constant between runs (the edit-and-rerun loop is what
+    # produced the aliased evidence in the first place).
+    sign = -1.0 if os.environ.get("FIA_ADVANCE_SIGN", "-") .strip() != "+" else 1.0
     return (float(base_angle_electrical_deg) + axis
-            - pole_pairs * float(rotor_position_mechanical_deg))
+            + sign * pole_pairs * float(rotor_position_mechanical_deg))
 
 
 def run_rotor_position_sweep(

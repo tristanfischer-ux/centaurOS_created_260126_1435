@@ -24,6 +24,7 @@ import json
 import math
 import os
 import re
+import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass, replace
@@ -32,6 +33,13 @@ from typing import Any, Mapping, Sequence
 
 import ijson
 
+_STACK_DIR = Path(__file__).resolve().parent
+if str(_STACK_DIR) not in sys.path:
+    sys.path.insert(0, str(_STACK_DIR))
+from shaft_torque_identity import (  # noqa: E402
+    ASSUMED_COMBINED_EFFICIENCY as _CANONICAL_COMBINED_ETA,
+    required_shaft_torque_nm as _required_shaft_torque_nm,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "out" / "formula-e-front-mgu-20260729-1432"
@@ -61,7 +69,7 @@ ZH_SPUR_20DEG = 2.495
 Y_BEVEL_FORM = 0.85
 K_BEVEL_CONTACT = 1.15
 SCREEN_FOS_MIN = 1.20
-ASSUMED_COMBINED_EFFICIENCY = 0.9777
+ASSUMED_COMBINED_EFFICIENCY = _CANONICAL_COMBINED_ETA
 DEFAULT_GEAR_RATIO = 8.0
 CUT_TORQUE_OPTION = "cut_torque_at_diff"
 DEFAULT_RATIO_INTO_DIFF = 2.0
@@ -655,16 +663,17 @@ def derive_motor_shaft_torque_nm(inputs: TwinInputs) -> float:
 
     INTENT: Same continuous-duty derivation as iso6336_fia_front_kit_case
     (~125 N·m at 250 kW / 19,500 rpm). Carrier torque is then T × gear_ratio.
+    FLOW: shaft_torque_identity.required_shaft_torque_nm (F-EM-2).
     """
 
-    omega = inputs.max_rotor_speed_rpm * 2.0 * math.pi / 60.0
-    if omega <= 0.0:
-        raise FiaFrontKitBevelError("max_rotor_speed_rpm must be positive")
-    return (
-        inputs.continuous_electrical_power_kw
-        * 1000.0
-        / (ASSUMED_COMBINED_EFFICIENCY * omega)
-    )
+    try:
+        return _required_shaft_torque_nm(
+            continuous_electrical_power_kw=inputs.continuous_electrical_power_kw,
+            max_rotor_speed_rpm=inputs.max_rotor_speed_rpm,
+            combined_efficiency=ASSUMED_COMBINED_EFFICIENCY,
+        )
+    except ValueError as exc:
+        raise FiaFrontKitBevelError(str(exc)) from exc
 
 
 def derive_bevel_geometry(inputs: TwinInputs) -> BevelGeometry:
@@ -1028,14 +1037,14 @@ def build_artifact(
                 "and twin torque ratio / duty; tooth counts per tooth_count_basis"
             ),
             "cad_family": "compact_bevel_differential",
-            "authority_level": "communication_only",
+            "authority_level": "parametric_family",
             "iso23509_used": False,
             "kisssoft_used": False,
             "calculix_tooth_contact_used": False,
             "statement": (
                 "Twin-bound analytical straight-bevel handbook screen on "
-                "compact_bevel_differential packaging nest; not ISO 23509 / "
-                "KISSsoft closure."
+                "compact_bevel_differential parametric packaging nest; not "
+                "ISO 23509 / KISSsoft closure."
             ),
         },
         "fia_question": (

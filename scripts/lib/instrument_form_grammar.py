@@ -92,6 +92,15 @@ INSTRUMENT_CYCLES_SAMPLES_DEFAULT = 128
 # ghost + modules) complete in one process. Pairs with the Cycles bounce/tile caps in
 # forge_blender_lib.init_scene_cycles_hero.
 INSTRUMENT_RENDER_RESOLUTION = (2400, 1600)
+# INTENT (2026-08-01 Tristan): FE traction pack planetary teeth are physically
+# fine (m≈0.6 mm) — correct design, not a bug. At 2400×1600 the same framing
+# gives ~9 px of tooth depth on a planet, which reads as "striations". Double
+# the pixels at IDENTICAL camera framing so the teeth resolve; do NOT enlarge
+# the gears (that would be a fake design change). Traction packs are metal-
+# heavy (not the glass-heavy instrument OOM case that forced 2400 for sealed
+# instruments). Override: BLENDER_RENDER_RESOLUTION=WxH.
+TRACTION_RENDER_RESOLUTION = (4800, 3200)
+TRACTION_CATALOGUE_RENDER_RESOLUTION = (7200, 4800)
 # GOTCHA: never lift exposure for instruments — softboxes already model the
 # form; +0.15 crushed charcoal to clay-white (2026-07-13).
 INSTRUMENT_EXPOSURE_LIFT = 0.0
@@ -1446,6 +1455,15 @@ def _selftest() -> None:
         part_blob="Peltier Tec Module Od Photodiode Peristaltic Pump",
         is_instrument=True,
     ) == "lab_electronics"
+    # proveCatch (2026-08-01): traction hi-res is same aspect, strictly larger
+    # than the instrument floor — more pixels, not a different crop.
+    assert TRACTION_RENDER_RESOLUTION[0] > INSTRUMENT_RENDER_RESOLUTION[0]
+    assert TRACTION_RENDER_RESOLUTION[1] > INSTRUMENT_RENDER_RESOLUTION[1]
+    assert abs(
+        TRACTION_RENDER_RESOLUTION[0] / TRACTION_RENDER_RESOLUTION[1]
+        - INSTRUMENT_RENDER_RESOLUTION[0] / INSTRUMENT_RENDER_RESOLUTION[1]
+    ) < 1e-9, "traction hi-res must keep the same framing aspect"
+    assert TRACTION_CATALOGUE_RENDER_RESOLUTION[0] >= 7200
     print("instrument_form_grammar _selftest: OK (beauty + desirability + use-physics)")
 
 
