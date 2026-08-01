@@ -55,6 +55,17 @@
       ],
       "tolerance": 0.05,
       "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python $SCRATCH/lam_sweep_reb.py"
+    },
+    {
+      "name": "delivered_torque_rebalanced_nm",
+      "value": -145.4425,
+      "artefact": "../_motor_stack/em_fia_front_kit_case_REBALANCED.json",
+      "key_path": "rotor_position_sweep.summary.torque_mean_nm",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.02,
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_front_kit_case.py --twin out/formula-e-front-mgu-20260729-1432"
     }
   ]
 }
