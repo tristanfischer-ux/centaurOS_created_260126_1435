@@ -18,7 +18,7 @@
  * Run:  npx tsx scripts/lib/gate-registry.ts --selftest   (in scripts/verify-engine-guards.sh).
  */
 import { execFileSync } from 'child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync, utimesSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve, join } from 'path'
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv } from '../../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
@@ -565,12 +565,56 @@ export const GATES: GateProof[] = [
     },
     enforcedByDefault: () => !['0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.MAGNET_FOCUSING_ENFORCING ?? 'on').trim().toLowerCase()),
   },
+  {
+    code: 44, name: 'solver-coverage',
+    intent: 'a quantitative motor-stack claim shipped while discovered --twin solvers are STALE or MISSING — the FE front failure mode where 3/18 solvers ran and the rest were hand-derived (coverage was a REPORT the agent could skip)',
+    // ADVERSARIAL INPUT through the CLI exit path: twin with NO artefacts → every
+    // discovered solver is MISSING → must exit 44, not soft-fail and continue.
+    proveCatch: () => {
+      const dir = mkdtempSync(join(tmpdir(), 'gate44-'))
+      writeFileSync(join(dir, 'state.json'), '{}')
+      const prev = process.env.SOLVER_COVERAGE_ENFORCING
+      process.env.SOLVER_COVERAGE_ENFORCING = 'on'
+      const fired = pyBlocksOnBadInput('scripts/lib/fpk_solver_coverage.py',
+        ['--twin', dir, '--enforce'], 44)
+      // HEALTHY: every discovered solver has a FRESH artefact → must NOT block
+      const ms = join(dir, '_motor_stack'); mkdirSync(ms, { recursive: true })
+      const solverDir = resolve(REPO, 'scripts/motor-stack')
+      const stems = readdirSync(solverDir).filter((n) => {
+        if (!n.endsWith('.py') || n.endsWith('_test.py') || n.includes('selftest')) return false
+        try {
+          const src = readFileSync(join(solverDir, n), 'utf8')
+          return src.includes('"--twin"') || src.includes("'--twin'")
+        } catch { return false }
+      }).map((n) => n.replace(/\.py$/, ''))
+      const past = new Date(Date.now() - 60_000)
+      utimesSync(join(dir, 'state.json'), past, past)
+      for (const stem of stems) {
+        const art = join(ms, `${stem}.json`)
+        writeFileSync(art, '{}')
+        const now = new Date()
+        utimesSync(art, now, now)
+      }
+      let healthyPasses = false
+      try {
+        execFileSync('python3', [resolve(REPO, 'scripts/lib/fpk_solver_coverage.py'),
+          '--twin', dir, '--enforce'],
+          { stdio: 'pipe', timeout: 60_000, env: { ...process.env, SOLVER_COVERAGE_ENFORCING: 'on' } })
+        healthyPasses = true
+      } catch { healthyPasses = false }
+      if (prev === undefined) delete process.env.SOLVER_COVERAGE_ENFORCING
+      else process.env.SOLVER_COVERAGE_ENFORCING = prev
+      rmSync(dir, { recursive: true, force: true })
+      return fired && healthyPasses && pySelftestPasses('scripts/lib/fpk_solver_coverage.py')
+    },
+    enforcedByDefault: () => !['0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.SOLVER_COVERAGE_ENFORCING ?? 'on').trim().toLowerCase()),
+  },
 ]
 
 // COVERAGE: every gate code here MUST have a proof in GATES, else the meta-test fails — so a NEW
 // gate cannot land without a full adversarial proof. (23-29 are pre-render STATE-structural guards
 // with direct un-swallowed exits — a separate extension; tracked here so they aren't forgotten.)
-export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41, 42, 43]
+export const ALL_GATE_CODES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41, 42, 43, 44]
 
 function _selftest() {
   let bad = 0

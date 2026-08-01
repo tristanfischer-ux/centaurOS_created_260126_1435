@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -109,7 +110,17 @@ def main() -> int:
     # checked" — and "invalid numeric values are not robustly rejected". Both
     # are real: a sweep from a DIFFERENT machine, or a partial-period one, would
     # be adopted silently as the reference that every ratio is judged against.
-    lam_sweep = twin / "_motor_stack" / "oc_flux_linkage_sweep.json"
+    # ⭐ THE REFERENCE MUST TRACK THE GEOMETRY (found mid-measurement
+    # 2026-08-01). When the magnet override is active the machine is NOT the
+    # one the baseline sweep describes, so comparing against the baseline
+    # lambda_pm silently reports a ratio for a machine that does not exist.
+    # Prefer a REBALANCED sweep when the override is set; refuse to fall back
+    # to the baseline, because a wrong reference is worse than none.
+    _override = (os.environ.get("FIA_MAGNET_THICKNESS_MM")
+                 or os.environ.get("FIA_MAGNET_LENGTH_MM"))
+    lam_name = ("oc_flux_linkage_sweep_REBALANCED.json" if _override
+                else "oc_flux_linkage_sweep.json")
+    lam_sweep = twin / "_motor_stack" / lam_name
     measured_lambda = None
     measured_reject = ""
     if lam_sweep.exists():
@@ -142,7 +153,10 @@ def main() -> int:
     if e_ll_rms:
         omega_e = rpm * 2.0 * math.pi / 60.0 * pole_pairs
         lambda_pm = (e_ll_rms / math.sqrt(3.0)) * math.sqrt(2.0) / omega_e
-    reference_source = "1-D transform of open-circuit airgap RMS B"
+    reference_source = ("1-D transform of open-circuit airgap RMS B"
+                        + (" [WARNING: a magnet override is active but no "
+                           "rebalanced sweep was found — this reference "
+                           "describes a DIFFERENT machine]" if _override else ""))
     if measured_lambda:
         lambda_pm = measured_lambda
         reference_source = ("MEASURED open-circuit flux-linkage fundamental "

@@ -41,6 +41,7 @@ day it lands.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -53,6 +54,10 @@ SOLVER_DIR = ROOT / "scripts" / "motor-stack"
 
 # A solver's artefact conventionally shares its stem, under _motor_stack/.
 ARTEFACT_SUBDIR = "_motor_stack"
+
+# Gate 44 — same class as claim-provenance (41): a REPORT that exits 0 while
+# solvers are STALE/MISSING is Goodhart. Exit 44 under enforce.
+GATE_EXIT = 44
 
 
 @dataclass
@@ -130,6 +135,13 @@ def evaluate_solver_coverage(
                 script.stem, str(script), art.name, "STALE", age,
                 f"artefact is {abs(age) / 60.0:.1f} min older than its inputs"))
     fresh = [r for r in rows if r.state == "FRESH"]
+    not_fresh = [r for r in rows if r.state != "FRESH"]
+    # FLOW: blocked twin → punchlist names the exact scripts to re-run
+    # → agent re-runs → artefact FRESH → gate clears. No orphan "ok: false".
+    punchlist = [
+        f"{sys.executable} {r.script} --twin {twin_p}"
+        for r in not_fresh
+    ]
     return {
         "schema": "forgeos.fpk.solver_coverage/v1",
         "twin": str(twin_p),
@@ -139,8 +151,21 @@ def evaluate_solver_coverage(
         "missing": sum(1 for r in rows if r.state == "MISSING"),
         "coverage_pct": round(100.0 * len(fresh) / max(1, len(rows)), 1),
         "rows": [r.__dict__ for r in rows],
+        "punchlist": punchlist,
         "ok": all(r.state == "FRESH" for r in rows),
     }
+
+
+def enforce_mode_from_env() -> str:
+    """ENFORCING BY DEFAULT — mirrors claim-provenance (gate 41).
+
+    DECISION: break the gates 31-40 shadow-by-default convention. A STALE or
+    MISSING solver artefact is not a judgement call; it is exactly the failure
+    mode that let 15/18 motor-stack solvers sit unused while arithmetic was
+    published as engineering. SOLVER_COVERAGE_ENFORCING=off|shadow → report only.
+    """
+    raw = str(os.environ.get("SOLVER_COVERAGE_ENFORCING", "on")).strip().lower()
+    return "off" if raw in ("0", "false", "no", "off", "shadow") else "on"
 
 
 def run_solver(script: Path, twin: Path, python: str, timeout: int = 5400) -> tuple[bool, str]:
@@ -195,8 +220,28 @@ def _selftest() -> None:
         assert row2["state"] == "FRESH", row2
         missing = next(r for r in res2["rows"] if r["name"] == "calculix_fia_rotor_screen")
         assert missing["state"] == "MISSING", missing
+        assert res2["punchlist"], "missing solvers must route a punchlist"
+        assert any("calculix_fia_rotor_screen" in c for c in res2["punchlist"])
+    # proveCatch via CLI exit path: STALE twin under --enforce MUST exit 44
+    with tempfile.TemporaryDirectory() as td:
+        twin = Path(td)
+        (twin / ARTEFACT_SUBDIR).mkdir()
+        art = twin / ARTEFACT_SUBDIR / "em_fia_mtpa_screen.json"
+        art.write_text("{}")
+        time.sleep(0.01)
+        (twin / "state.json").write_text("{}")  # newer → STALE
+        proc = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()),
+             "--twin", str(twin), "--enforce"],
+            capture_output=True, text=True, env={
+                **os.environ, "SOLVER_COVERAGE_ENFORCING": "on",
+            },
+        )
+        assert proc.returncode == GATE_EXIT, (
+            f"--enforce on stale coverage must exit {GATE_EXIT}, got "
+            f"{proc.returncode}: {(proc.stdout or proc.stderr)[-400:]}")
     print(f"fpk_solver_coverage _selftest: OK — {len(found)} solvers DISCOVERED "
-          "by entrypoint; stale + missing both caught")
+          f"by entrypoint; stale + missing both caught; --enforce exits {GATE_EXIT}")
 
 
 def main(argv: list[str]) -> int:
@@ -205,7 +250,8 @@ def main(argv: list[str]) -> int:
         return 0
     twin = Path(argv[argv.index("--twin") + 1]) if "--twin" in argv else None
     if twin is None:
-        print("usage: fpk_solver_coverage.py --twin <dir> [--run] [--python P]",
+        print("usage: fpk_solver_coverage.py --twin <dir> "
+              "[--run] [--python P] [--enforce]",
               file=sys.stderr)
         return 2
     python = argv[argv.index("--python") + 1] if "--python" in argv else sys.executable
@@ -226,9 +272,20 @@ def main(argv: list[str]) -> int:
         res = evaluate_solver_coverage(twin)
         print(f"\nafter run: {res['fresh']}/{res['solvers_discovered']} FRESH "
               f"({res['coverage_pct']}%)")
+    if res.get("punchlist") and not res["ok"]:
+        print("\n  PUNCHLIST — run these, then re-check:")
+        for cmd in res["punchlist"]:
+            print(f"    {cmd}")
     out = Path(twin) / "solver-coverage.json"
     out.write_text(json.dumps(res, indent=2))
     print(f"\n→ {out}")
+    # INTENT: report-only was the exact failure mode (coverage ok:false + exit 0
+    # or soft exit 1 the agent ignored). Gate 44 refuses under enforce.
+    want_enforce = "--enforce" in argv or enforce_mode_from_env() != "off"
+    if not res["ok"] and want_enforce:
+        print("  SOLVER-COVERAGE GATE BLOCKS (exit 44) — "
+              "do not ship claims while solvers are STALE/MISSING.")
+        return GATE_EXIT
     return 0 if res["ok"] else 1
 
 

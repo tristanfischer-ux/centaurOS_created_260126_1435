@@ -1,0 +1,79 @@
+{
+  "schema": "forgeos.motor_stack.torque_scaling_probe/v1",
+  "winding": {
+    "turns_per_slot_applied": 7,
+    "winding_parallel_paths": 2.0,
+    "note": "FEMM MMF per slot = turns x circuit current. If the circuit current is the PHASE current while the conductors sit in Npcp parallel paths, the applied ampere-turns are Npcp times too large."
+  },
+  "lambda_pm_wb_reference": 0.002903,
+  "lambda_pm_reference_source": "MEASURED open-circuit flux-linkage fundamental (full electrical period)",
+  "lambda_pm_reference_rejected": null,
+  "lambda_pm_wb_from_back_emf": 0.002903,
+  "back_emf_line_line_rms_v": 324.05577,
+  "current_angle_electrical_deg": 0.0,
+  "points": [
+    {
+      "phase_current_peak_a": 50.0,
+      "fe_torque_nm": 9.1872,
+      "analytic_torque_nm": 0.8709,
+      "ratio_fe_over_analytic": 10.5495,
+      "peak_airgap_flux_density_t": 0.5316407001333744,
+      "positions_averaged_mech_deg": [
+        0.0,
+        5.0,
+        10.0
+      ],
+      "single_position_torque_nm": 8.8543
+    },
+    {
+      "phase_current_peak_a": 200.0,
+      "fe_torque_nm": 39.9077,
+      "analytic_torque_nm": 3.4835,
+      "ratio_fe_over_analytic": 11.4563,
+      "peak_airgap_flux_density_t": 1.067017889153544,
+      "positions_averaged_mech_deg": [
+        0.0,
+        5.0,
+        10.0
+      ],
+      "single_position_torque_nm": 26.0884
+    },
+    {
+      "phase_current_peak_a": 400.0,
+      "fe_torque_nm": 79.6447,
+      "analytic_torque_nm": 6.9669,
+      "ratio_fe_over_analytic": 11.4318,
+      "peak_airgap_flux_density_t": 1.385208408048445,
+      "positions_averaged_mech_deg": [
+        0.0,
+        5.0,
+        10.0
+      ],
+      "single_position_torque_nm": 48.4649
+    },
+    {
+      "phase_current_peak_a": 674.58,
+      "fe_torque_nm": 112.4584,
+      "analytic_torque_nm": 11.7494,
+      "ratio_fe_over_analytic": 9.5714,
+      "peak_airgap_flux_density_t": 1.529348093294893,
+      "positions_averaged_mech_deg": [
+        0.0,
+        5.0,
+        10.0
+      ],
+      "single_position_torque_nm": 69.4886
+    }
+  ],
+  "ratio_spread": 1.8849,
+  "ratio_rising_with_current": false,
+  "fit_T_equals_a_I_plus_b_I2": {
+    "a_pm_nm_per_a": 0.229158,
+    "b_reluctance_nm_per_a2": "-9.1069e-05",
+    "lambda_pm_from_torque_wb": 0.038193,
+    "lambda_pm_from_reference_wb": 0.002903,
+    "disagreement_x": 0.076,
+    "note": "The reference lambda_pm comes from the voltage/FW screen, which derives back-EMF ANALYTICALLY from the FE's open-circuit airgap RMS B via a 1-D sinusoidal-flux relation. It is NOT an independent FE measurement of back-EMF, so it must not be presented as a second witness agreeing with the analytic design-flux route."
+  },
+  "verdict": "SATURATION \u2014 the ratio FALLS with current, so the discrepancy is physical. Compare only at the lowest current, where the ratio is 10.550."
+}

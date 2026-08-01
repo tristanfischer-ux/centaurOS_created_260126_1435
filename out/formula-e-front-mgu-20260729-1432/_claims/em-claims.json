@@ -44,6 +44,17 @@
       ],
       "tolerance": 0.05,
       "run_to_fix": ".venv/bin/python $SCRATCH/lam_sweep.py"
+    },
+    {
+      "name": "lambda_pm_rebalanced_wb",
+      "value": 0.031057,
+      "artefact": "../_motor_stack/oc_flux_linkage_sweep_REBALANCED.json",
+      "key_path": "lambda_pm_fundamental_wb",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.05,
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python $SCRATCH/lam_sweep_reb.py"
     }
   ]
 }
