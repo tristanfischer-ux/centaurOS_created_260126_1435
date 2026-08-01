@@ -1480,8 +1480,24 @@ def _build_fia_lua(
     remanence_t: float,
     fem_name: str,
     loaded: LoadedPointAssumptions | None = None,
+    open_circuit_turns_per_slot: int = 1,
 ) -> str:
-    """Build the FIA-sized interior-PM xfemm model for one magnetic point."""
+    """Build the FIA-sized interior-PM xfemm model for one magnetic point.
+
+    `open_circuit_turns_per_slot` is the turn count assigned to the slot blocks
+    when there is no loaded point. It only scales the REPORTED flux linkage (it
+    carries no current, so it cannot change the field); pass the machine's real
+    turns/slot to read lambda_pm directly in webers.
+    """
+    # Council review (Sol, 2026-08-01) flagged this as silently coerced. A turn
+    # count that is zero, negative or fractional does not describe a winding,
+    # and would scale the reported flux linkage into nonsense.
+    if (open_circuit_turns_per_slot != int(open_circuit_turns_per_slot)
+            or int(open_circuit_turns_per_slot) < 1):
+        raise FiaFrontKitCaseError(
+            "open_circuit_turns_per_slot must be a positive whole number of "
+            f"turns; got {open_circuit_turns_per_slot!r}")
+    _oc_turns_per_slot = int(open_circuit_turns_per_slot)
 
     material_machine = load(str(MATERIAL_MACHINE_PATH))
     magnet_material = material_machine.rotor.hole[0].magnet_0.mat_type.mag
@@ -1519,14 +1535,20 @@ def _build_fia_lua(
             f"{coercive_field_a_m:.12g},0,0,0,0,1,0,0,0)"
         ),
     ]
-    if loaded is not None:
-        lua.extend(
-            [
-                f'mi_addcircprop("phase_a",{loaded.phase_a_current_a:.12g},1)',
-                f'mi_addcircprop("phase_b",{loaded.phase_b_current_a:.12g},1)',
-                f'mi_addcircprop("phase_c",{loaded.phase_c_current_a:.12g},1)',
-            ]
-        )
+    # ⭐ CIRCUITS ARE ALWAYS DEFINED, at zero current when unloaded. The winding
+    # physically exists whether or not current flows, and FEMM can only report
+    # flux linkage for a circuit that EXISTS. Without this, open-circuit
+    # lambda_pm is unmeasurable and has to be inferred from the airgap probe —
+    # which is exactly the inference that produced this campaign's 5.01x
+    # disagreement. Zero-current copper is magnetically identical to
+    # unassigned copper, so the OC field itself is unchanged.
+    lua.extend(
+        [
+            f'mi_addcircprop("phase_a",{(loaded.phase_a_current_a if loaded else 0.0):.12g},1)',
+            f'mi_addcircprop("phase_b",{(loaded.phase_b_current_a if loaded else 0.0):.12g},1)',
+            f'mi_addcircprop("phase_c",{(loaded.phase_c_current_a if loaded else 0.0):.12g},1)',
+        ]
+    )
     for h_a_m, b_t in material_machine.stator.mat_type.mag.BH_curve.get_data():
         lua.append(f'mi_addbhpoint("m400",{float(b_t):.12g},{float(h_a_m):.12g})')
     # r_gap (mid-airgap) is drawn so the airgap becomes TWO air regions. FEMM's
@@ -1593,11 +1615,11 @@ def _build_fia_lua(
         slot_labels.append(
             (
                 slot_point,
-                circuit if loaded is not None else "<None>",
+                circuit,
                 (
                     signed_turn * loaded.effective_turns_per_slot
                     if loaded is not None
-                    else 0
+                    else signed_turn * _oc_turns_per_slot
                 ),
             )
         )
@@ -1786,6 +1808,28 @@ def _build_fia_lua(
                 "mo_clearblock()",
             ]
         )
+    # ⭐⭐ MEASURE FLUX LINKAGE FROM THE SOLVED FIELD (2026-08-01). This deck has
+    # never asked FEMM what the winding actually links; every lambda_pm in this
+    # campaign was INFERRED from the airgap B probe through a 1-D sinusoidal
+    # relation. That inference is what produced the "two independent routes
+    # agree" claim (they were one route) and the unresolved 5.01x disagreement
+    # against the flux linkage implied by the measured low-current torque slope.
+    #
+    # mo_getcircuitproperties returns (current, volts, flux_linkage) for a named
+    # circuit, integrated over the ACTUAL coil regions of the ACTUAL solved
+    # field. At OPEN CIRCUIT that flux linkage IS lambda_pm, with no geometry
+    # assumption, no winding-factor assumption and no sinusoid assumption. It is
+    # the independent witness the campaign has been missing.
+    #
+    # UNIVERSAL: keyed off the circuit NAMES the deck already created, so any
+    # machine with named phase circuits gets this for free.
+    for circuit in ("phase_a", "phase_b", "phase_c"):
+        lua.extend([
+            f'ci_{circuit}, vi_{circuit}, fi_{circuit} = '
+            f'mo_getcircuitproperties("{circuit}")',
+            f'print("{RESULT_PREFIX} flux_linkage_{circuit}_wb="..fi_{circuit})',
+            f'print("{RESULT_PREFIX} circuit_current_{circuit}_a="..ci_{circuit})',
+        ])
     lua.append("quit()")
     return "\n".join(lua) + "\n"
 
@@ -1796,6 +1840,7 @@ def _execute_magnetic_point(
     *,
     remanence_t: float,
     loaded: LoadedPointAssumptions | None,
+    open_circuit_turns_per_slot: int = 1,
 ) -> dict[str, float]:
     """Run one native xfemm magnetic point and return its numeric evidence."""
 
@@ -1808,6 +1853,7 @@ def _execute_magnetic_point(
                 remanence_t=remanence_t,
                 fem_name="fia_front_kit.fem",
                 loaded=loaded,
+                open_circuit_turns_per_slot=open_circuit_turns_per_slot,
             ),
             encoding="utf-8",
         )
@@ -1827,6 +1873,9 @@ def _execute_magnetic_point(
         if separator:
             values[key.strip()] = float(raw_value.strip())
     expected = {"peak_t", "rms_t", "mean_t", "minimum_t"}
+    for _c in ("phase_a", "phase_b", "phase_c"):
+        expected.add(f"flux_linkage_{_c}_wb")
+        expected.add(f"circuit_current_{_c}_a")
     if loaded is not None:
         expected.add("torque_nm")
     if process.returncode != 0 or values.keys() != expected:

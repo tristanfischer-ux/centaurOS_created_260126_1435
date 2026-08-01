@@ -1,0 +1,49 @@
+{
+  "_intent": "Load-bearing EM numbers for DEC-EM-1. Every one must be backed by a FRESH solver artefact or the gate blocks. Cursor 2026-08-01: 'a quantitative claim must not ship without a FRESH solver artefact - enforced.'",
+  "claims": [
+    {
+      "name": "delivered_mean_torque_nm",
+      "value": 41.9045,
+      "artefact": "../_motor_stack/em_fia_torque_scaling_probe.json",
+      "key_path": "points.4.fe_torque_nm",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.001,
+      "run_to_fix": ".venv/bin/python scripts/motor-stack/em_fia_torque_scaling_probe.py --twin out/formula-e-front-mgu-20260729-1432 --currents 50,100,200,400,674.58"
+    },
+    {
+      "name": "excitation_tracking_ok",
+      "value": 0.0002,
+      "artefact": "../_motor_stack/excitation_tracking.json",
+      "key_path": "async_ratio_k2",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.001,
+      "run_to_fix": ".venv/bin/python scripts/lib/machine_excitation_tracking.py --twin out/formula-e-front-mgu-20260729-1432"
+    },
+    {
+      "name": "magnet_flux_focusing_ratio",
+      "value": 0.5623,
+      "artefact": "../_motor_stack/magnet_flux_focusing.json",
+      "key_path": "derived.focusing_ratio_Am_over_Ag",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.001,
+      "run_to_fix": ".venv/bin/python scripts/lib/machine_magnet_flux_focusing.py --machine-json <spec>"
+    },
+    {
+      "name": "lambda_pm_fundamental_wb",
+      "value": 0.002903,
+      "artefact": "../_motor_stack/oc_flux_linkage_sweep.json",
+      "key_path": "lambda_pm_fundamental_wb",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.05,
+      "run_to_fix": ".venv/bin/python scratchpad/lam_sweep.py"
+    }
+  ]
+}
