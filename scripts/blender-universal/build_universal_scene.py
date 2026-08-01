@@ -19770,16 +19770,16 @@ def _fpk_place_cast_language_cues(
         ang = (bi / float(max(4, bolt_n))) * math.tau
         by = y_motor + bell_bolt_r * math.cos(ang)
         bz = z_motor + bell_bolt_r * math.sin(ang)
-        fl.add_cyl(
+        fl.add_hex_bolt(
             f"u_se_td_end_bolt_{bi}",
             _mm3((x_motor - motor_len * 0.5 + 2.5, by, bz)),
-            (head_d * 0.5) * fl.MM,
-            head_h * fl.MM,
+            (head_d * 0.30) * fl.MM,
+            max(head_h * 2.6, head_d * 1.6) * fl.MM,
             mat_fast,
+            head_across_flats=(head_d * 1.05) * fl.MM,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
-            vertices=12,
         )
     # Longitudinal stiffening ribs — count from unsupported cast span rule.
     span = max(motor_len * 0.85, 1.0)
@@ -19817,12 +19817,13 @@ def _fpk_place_cast_language_cues(
             module=story_mod,
             module_objects=MO,
         )
-        fl.add_cyl(
+        fl.add_hex_bolt(
             f"u_se_td_mount_bolt_{ei}",
             _mm3((x_motor + ex_mm, y_motor + ey_mm, z0 + 9.5)),
-            bolt_pad_d * fl.MM,
-            4.0 * fl.MM,
+            (bolt_pad_d * 0.55) * fl.MM,
+            14.0 * fl.MM,
             mat_fast,
+            head_across_flats=(bolt_pad_d * 2.0) * fl.MM,
             module=story_mod,
             module_objects=MO,
         )
@@ -19855,13 +19856,17 @@ def _fpk_place_pe_volume_density(
             module_objects=MO,
         )
     for bi, bx in enumerate((-0.12, 0.12)[: max(1, min(2, n))]):
-        fl.add_box(
+        fl.add_busbar(
             f"u_se_td_pe_busbar_{bi}",
             _mm3((x_inv + inv_w * bx, y_inv, inv_z + inv_h * 0.22)),
-            _mm3((inv_w * 0.08, inv_d * 0.70, 2.8)),
+            (inv_d * 0.70) * fl.MM,
+            (inv_w * 0.08) * fl.MM,
+            2.8 * fl.MM,
             mat_bus,
+            n_terminals=2,
             module=story_mod,
             module_objects=MO,
+            rotation=(0.0, 0.0, 1.5707963),
         )
         fl.add_box(
             f"u_se_td_pe_busbar_ins_{bi}",
@@ -19972,6 +19977,31 @@ def _fpk_draw_principal_vehicle_routes(
     )
 
 
+def _fpk_solve_tooth_set(sun_pcd_mm, planet_pcd_mm, ring_pcd_mm, n_planets):
+    """The PHYSICS-LED tooth set for this planetary, or None if unsolvable.
+
+    ⭐ (2026-07-31 Tristan): "show all the exact teeth on each gear as per the
+    correct physics led dimensions — the teeth number should be correct and the
+    right size height and width and angles." Tooth COUNT, module, addendum,
+    dedendum and pressure angle therefore all come from
+    scripts/lib/fpk_gear_teeth, solved from the CALCULATED pitch diameters under
+    the real constraints (common module, integer teeth, meshing in teeth, equal
+    planet spacing, undercut limit). It is NOT derived from a convenient
+    `z = d/m` with an invented m — that was the previous behaviour and it drew
+    teeth that corresponded to nothing.
+    """
+    try:
+        from fpk_gear_teeth import solve_planetary_tooth_set  # noqa: PLC0415
+        return solve_planetary_tooth_set(
+            float(sun_pcd_mm), float(planet_pcd_mm), float(ring_pcd_mm),
+            int(n_planets))
+    except Exception as exc:  # noqa: BLE001 — a gear body beats a crashed render
+        print(f"[univ][gear] tooth set unsolved ({exc}) — "
+              "gears will be drawn WITHOUT teeth rather than with invented ones",
+              flush=True)
+        return None
+
+
 def _fpk_gear_module_mm(explicit, ref_dia_mm, ref_teeth=24.0):
     """Gear module (mm) for tooth generation — contract value, else ratio-sane.
 
@@ -20031,21 +20061,35 @@ def _fpk_place_ontology_fff_parts(
     # INTERNAL gear: teeth point inward from the bore, built into the same mesh.
     # Was a smooth annulus plus loose tooth stubs parked near it, which read as a
     # plain ring at any distance.
-    _ring_mod_mm = _fpk_gear_module_mm(
-        (quantities or {}).get("gear_module_mm"), ring_id_inner, ref_teeth=48.0)
-    fl.add_spur_gear(
-        "u_se_td_ring_gear",
-        _mm3((x_motor, y_motor, z_motor)),
-        (ring_id_inner * 0.5) * fl.MM,
-        gear_face * fl.MM,
-        max(12, int(round(ring_id_inner / _ring_mod_mm))),
-        mat_steel,
-        module_m=_ring_mod_mm * fl.MM,
-        internal=True,
-        module=story_mod,
-        module_objects=MO,
-        rotation=rot_along_x,
-    )
+    _ts = _fpk_solve_tooth_set(sun_od, planet_od, ring_id_inner, planet_n)
+    if _ts is not None:
+        print(f"[univ][gear] solved tooth set: m={_ts.module_mm} mm  "
+              f"z_sun={_ts.z_sun} z_planet={_ts.z_planet} z_ring={_ts.z_ring}  "
+              f"ratio_actual={_ts.ratio_actual:.4f}  notes={_ts.notes}", flush=True)
+        fl.add_involute_gear(
+            "u_se_td_ring_gear",
+            _mm3((x_motor, y_motor, z_motor)),
+            _ts.module_mm,
+            _ts.z_ring,
+            gear_face * fl.MM,
+            mat_steel,
+            internal=True,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+    else:
+        fl.add_hollow_cyl(
+            "u_se_td_ring_gear",
+            _mm3((x_motor, y_motor, z_motor)),
+            (ring_id_inner * 0.5 + 3.0) * fl.MM,
+            (ring_id_inner * 0.5) * fl.MM,
+            gear_face * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
 
     # ── Permanent magnet segments on rotor OD (IPMSM seed) ──────────────────
     mag_thick = max(2.5, (rotor_od - rotor_id) * 0.22)
@@ -20075,16 +20119,24 @@ def _fpk_place_ontology_fff_parts(
         )
 
     # ── Motor shaft through sun / carrier ────────────────────────────────────
-    fl.add_cyl(
+    # Stepped journals, not a plain rod: a real shaft steps down to its bearing
+    # lands and seal lands, and that is what makes it read as a shaft.
+    _sh_r = max(shaft_r * 0.85, 6.0)
+    _sh_l = nest_len * 0.95
+    fl.add_stepped_shaft(
         "u_se_td_motor_shaft",
         _mm3((x_motor, y_motor, z_motor)),
-        max(shaft_r * 0.85, 6.0) * fl.MM,
-        (nest_len * 0.95) * fl.MM,
+        (
+            (_sh_r * 0.72 * fl.MM, _sh_l * 0.16 * fl.MM),   # splined nose
+            (_sh_r * 0.88 * fl.MM, _sh_l * 0.12 * fl.MM),   # bearing journal
+            (_sh_r * 1.00 * fl.MM, _sh_l * 0.44 * fl.MM),   # body
+            (_sh_r * 0.88 * fl.MM, _sh_l * 0.12 * fl.MM),   # bearing journal
+            (_sh_r * 0.72 * fl.MM, _sh_l * 0.16 * fl.MM),   # seal land / nose
+        ),
         mat_steel,
         module=story_mod,
         module_objects=MO,
         rotation=rot_along_x,
-        vertices=24,
     )
 
     # SUN TEETH: removed 2026-07-31. The sun gear is now built by
@@ -20144,22 +20196,26 @@ def _fpk_place_ontology_fff_parts(
         )
 
     # ── Gearbox bearings + oil seals + oil charge ────────────────────────────
+    # Real bearings (races + rolling elements), not solid pucks — a bearing with
+    # no bore rendered as a featureless dome on the parts catalogue.
     for bi, bx in enumerate((-1.0, 1.0)):
-        fl.add_cyl(
+        _brg_or = max(10.0, carrier_od * 0.22)
+        fl.add_rolling_bearing(
             f"u_se_td_gearbox_bearing_{bi}",
             _mm3((x_motor + bx * nest_len * 0.32, y_motor, z_motor)),
-            max(10.0, carrier_od * 0.22) * fl.MM,
+            _brg_or * fl.MM,
             6.0 * fl.MM,
             mat_steel,
+            bore_radius=max(shaft_r * 1.05, _brg_or * 0.45) * fl.MM,
+            n_balls=10,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
-            vertices=24,
         )
     seal_n = 4
     for si in range(seal_n):
         sx = -1.0 if si < 2 else 1.0
-        fl.add_cyl(
+        fl.add_hollow_cyl(
             f"u_se_td_oil_seal_{si}",
             _mm3((
                 x_motor + sx * (motor_len * 0.5 + 2.0 + (si % 2) * 3.0),
@@ -20167,6 +20223,7 @@ def _fpk_place_ontology_fff_parts(
                 z_motor,
             )),
             (shaft_r * 1.55) * fl.MM,
+            (shaft_r * 1.02) * fl.MM,   # lip seals are RINGS — the shaft passes through
             3.0 * fl.MM,
             mat_alum,
             module=story_mod,
@@ -20256,7 +20313,7 @@ def _fpk_place_ontology_fff_parts(
 
     # ── Halfshaft flanges + encoder + UVW terminals ─────────────────────────
     for fi, fx in enumerate((-1.0, 1.0)):
-        fl.add_cyl(
+        fl.add_bolted_flange(
             f"u_se_td_halfshaft_flange_{fi}",
             _mm3((
                 x_motor + fx * (motor_len * 0.5 + shaft_stub * 0.85),
@@ -20264,12 +20321,13 @@ def _fpk_place_ontology_fff_parts(
                 z_motor,
             )),
             (shaft_r * 2.8) * fl.MM,
+            (shaft_r * 0.95) * fl.MM,
             8.0 * fl.MM,
             mat_steel,
+            n_holes=6,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
-            vertices=32,
         )
     fl.add_cyl(
         "u_se_td_encoder",
@@ -21011,12 +21069,13 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         (-0.35, -0.30), (0.0, -0.30), (0.35, -0.30),
         (-0.35, 0.30), (0.0, 0.30), (0.35, 0.30),
     )[:_cp_n]):
-        fl.add_cyl(
+        fl.add_hex_bolt(
             f"u_se_td_coldplate_fastener_{fi}",
             _mm3((x_inv + inv_w * fx, y_inv + inv_d * fy, inv_z + inv_h * 0.5 + 4.5)),
-            2.8 * fl.MM,
-            3.5 * fl.MM,
+            1.6 * fl.MM,
+            9.0 * fl.MM,
             mat_fast,
+            head_across_flats=5.6 * fl.MM,
             module=story_mod,
             module_objects=MO,
         )
@@ -21365,25 +21424,37 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     # These were plain add_cyl discs. Tooth count comes from the SAME module the
     # ratio and bending stress use (z = d/m), so the teeth you see are the teeth
     # the design actually has.
-    _g_mod_mm = _fpk_gear_module_mm(
-        getattr(_fpk_g, "gear_module_mm", None) if _fpk_g is not None else None,
-        sun_od, ref_teeth=24.0)
-
-    def _teeth_for(dia_mm):
-        return max(8, int(round(float(dia_mm) / _g_mod_mm)))
-
-    fl.add_spur_gear(
-        "u_se_td_sun_gear",
-        _mm3((x_motor, y_motor, z_motor)),
-        (sun_od * 0.5) * fl.MM,
-        gear_face * fl.MM,
-        _teeth_for(sun_od),
-        mat_steel,
-        module_m=_g_mod_mm * fl.MM,
-        module=story_mod,
-        module_objects=MO,
-        rotation=rot_along_x,
-    )
+    # PHYSICS-LED TOOTH SET — solved from the CALCULATED pitch diameters under
+    # the real planetary constraints; never an invented module.
+    # Meshing-consistent ring PCD: ring = sun + 2*planet. This is the physical
+    # relation the tooth set must satisfy, so derive it rather than reach for a
+    # rounded ring_id (which is not in scope here in any case).
+    _ring_pcd_for_set = sun_od + 2.0 * planet_od
+    _ts_sun = _fpk_solve_tooth_set(sun_od, planet_od, _ring_pcd_for_set, planet_n)
+    if _ts_sun is not None:
+        fl.add_involute_gear(
+            "u_se_td_sun_gear",
+            _mm3((x_motor, y_motor, z_motor)),
+            _ts_sun.module_mm,
+            _ts_sun.z_sun,
+            gear_face * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+        )
+    else:
+        fl.add_cyl(
+            "u_se_td_sun_gear",
+            _mm3((x_motor, y_motor, z_motor)),
+            (sun_od * 0.5) * fl.MM,
+            gear_face * fl.MM,
+            mat_steel,
+            module=story_mod,
+            module_objects=MO,
+            rotation=rot_along_x,
+            vertices=32,
+        )
     fl.add_cyl(
         "u_se_td_planet_carrier",
         _mm3((x_motor, y_motor, z_motor)),
@@ -21405,18 +21476,30 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         # Planets previously had NO teeth at all — the tooth-cue helper was only
         # ever called for the sun and ring, so four smooth pucks orbited a
         # toothed sun. They mesh with both, so they carry the same module.
-        fl.add_spur_gear(
-            f"u_se_td_planet_{pi}",
-            _mm3((x_motor, py, pz)),
-            (planet_od * 0.5) * fl.MM,
-            gear_face * fl.MM,
-            _teeth_for(planet_od),
-            mat_steel,
-            module_m=_g_mod_mm * fl.MM,
-            module=story_mod,
-            module_objects=MO,
-            rotation=rot_along_x,
-        )
+        if _ts_sun is not None:
+            fl.add_involute_gear(
+                f"u_se_td_planet_{pi}",
+                _mm3((x_motor, py, pz)),
+                _ts_sun.module_mm,
+                _ts_sun.z_planet,
+                gear_face * fl.MM,
+                mat_steel,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_along_x,
+            )
+        else:
+            fl.add_cyl(
+                f"u_se_td_planet_{pi}",
+                _mm3((x_motor, py, pz)),
+                (planet_od * 0.5) * fl.MM,
+                gear_face * fl.MM,
+                mat_steel,
+                module=story_mod,
+                module_objects=MO,
+                rotation=rot_along_x,
+                vertices=24,
+            )
     fl.add_cyl(
         "u_se_td_diff_nest",
         _mm3((x_motor, y_motor, z_motor)),

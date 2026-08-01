@@ -885,6 +885,469 @@ def add_spur_gear(
     return body
 
 
+def add_involute_gear(
+    name,
+    location,
+    module_mm,
+    n_teeth,
+    face_width,
+    material,
+    internal=False,
+    bore_radius=0.0,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+    pressure_angle_deg=20.0,
+):
+    """A gear built from the CALCULATED tooth set with REAL involute flanks.
+
+    INTENT (2026-07-31 Tristan): "the right dimensions including the correct
+    number of teeth and the correct geometries of the teeth — they are there to
+    represent the exact physical characteristics that have been calculated."
+    This supersedes the trapezoidal-tooth `add_spur_gear`: tooth COUNT comes from
+    the solved planetary set (scripts/lib/fpk_gear_teeth), and the flank is a
+    true involute swept from the base circle, so the drawn tooth is the designed
+    tooth rather than a decorative wedge.
+
+    `module_mm` is the gear module in MILLIMETRES (the design quantity);
+    `face_width` and `bore_radius` are in METRES like the rest of the lib.
+    The gear is built in the local XY plane and extruded along local Z.
+    """
+    import bmesh  # noqa: PLC0415 — only needed for real profile construction
+
+    m_mm = float(module_mm)
+    z = int(n_teeth)
+    if m_mm <= 0 or z < 4:
+        raise ValueError("module_mm must be positive and n_teeth >= 4")
+    MM = 0.001
+    alpha = math.radians(pressure_angle_deg)
+    r_pitch = m_mm * z / 2.0 * MM
+    r_base = r_pitch * math.cos(alpha)
+    add_m, ded_m = 1.00 * m_mm * MM, 1.25 * m_mm * MM
+    if internal:
+        r_tip, r_root = r_pitch - add_m, r_pitch + ded_m
+    else:
+        r_tip, r_root = r_pitch + add_m, max(r_pitch - ded_m, m_mm * MM * 0.35)
+
+    def _inv(a):
+        return math.tan(a) - a
+
+    half_at_pitch = math.pi / (2.0 * z)
+    n_flank = 5
+
+    def _flank(sign):
+        """Involute flank points from root to tip; sign mirrors across the tooth."""
+        out = []
+        lo = max(min(r_root, r_tip), r_base * 1.0001) if not internal else min(r_root, r_tip)
+        hi = max(r_root, r_tip) if internal else r_tip
+        lo = max(lo, r_base * 1.0001)
+        for i in range(n_flank + 1):
+            r = lo + (hi - lo) * (i / n_flank)
+            r = max(r, r_base * 1.0001)
+            a_r = math.acos(min(1.0, r_base / r))
+            th = half_at_pitch + _inv(alpha) - _inv(a_r)
+            out.append((r, sign * th))
+        return out
+
+    pitch_ang = math.tau / z
+    outline = []
+    for k in range(z):
+        c = k * pitch_ang
+        rising = _flank(+1)
+        falling = list(reversed(_flank(-1)))
+        # root -> up one flank -> across the tip -> down the other flank
+        outline.append((r_root, c - half_at_pitch * 1.55))
+        for r, th in reversed(rising):
+            outline.append((r, c - th))
+        for r, th in falling:
+            outline.append((r, c - th))
+        outline.append((r_root, c + half_at_pitch * 1.55))
+
+    bm = bmesh.new()
+    half_w = float(face_width) / 2.0
+    ring_lo, ring_hi = [], []
+    for r, th in outline:
+        x, y = r * math.cos(th), r * math.sin(th)
+        ring_lo.append(bm.verts.new((x, y, -half_w)))
+        ring_hi.append(bm.verts.new((x, y, +half_w)))
+    bm.verts.ensure_lookup_table()
+    n = len(ring_lo)
+    for i in range(n):
+        j = (i + 1) % n
+        try:
+            bm.faces.new((ring_lo[i], ring_lo[j], ring_hi[j], ring_hi[i]))
+        except ValueError:
+            pass
+    # Caps: bore for a solid gear, or an outer rim for an internal ring gear.
+    r_hub = float(bore_radius) if bore_radius else 0.0
+    if internal:
+        r_hub = max(r_root * 1.14, r_root + 2.0 * m_mm * MM)
+    hub_lo, hub_hi = [], []
+    if r_hub > 0:
+        for i in range(max(24, z)):
+            a = (i / max(24, z)) * math.tau
+            hub_lo.append(bm.verts.new((r_hub * math.cos(a), r_hub * math.sin(a), -half_w)))
+            hub_hi.append(bm.verts.new((r_hub * math.cos(a), r_hub * math.sin(a), +half_w)))
+        bm.verts.ensure_lookup_table()
+        hn = len(hub_lo)
+        for i in range(hn):
+            j = (i + 1) % hn
+            try:
+                bm.faces.new((hub_lo[j], hub_lo[i], hub_hi[i], hub_hi[j]))
+            except ValueError:
+                pass
+        for lo_ring, hub_ring, flip in ((ring_lo, hub_lo, False), (ring_hi, hub_hi, True)):
+            for i in range(n):
+                j = (i + 1) % n
+                a = math.atan2(lo_ring[i].co.y, lo_ring[i].co.x)
+                b = math.atan2(lo_ring[j].co.y, lo_ring[j].co.x)
+                hi_i = hub_ring[int((a % math.tau) / math.tau * len(hub_ring)) % len(hub_ring)]
+                hi_j = hub_ring[int((b % math.tau) / math.tau * len(hub_ring)) % len(hub_ring)]
+                if hi_i is hi_j:
+                    tri = (lo_ring[i], lo_ring[j], hi_i)
+                    try:
+                        bm.faces.new(tri[::-1] if flip else tri)
+                    except ValueError:
+                        pass
+                else:
+                    quad = (lo_ring[i], lo_ring[j], hi_j, hi_i)
+                    try:
+                        bm.faces.new(quad[::-1] if flip else quad)
+                    except ValueError:
+                        pass
+    else:
+        # CAP AS A TRIANGLE FAN, never one huge n-gon. A gear outline is ~750
+        # vertices and strongly concave; `bm.faces.new` on that fails, and a
+        # swallowed failure leaves the gear OPEN — the render then shows the
+        # inside of the side walls as parallel stripes instead of a toothed
+        # face (exactly what the planet did). A gear profile is star-shaped
+        # about its centre, so a fan from a centre vertex is always valid.
+        for ring, z_sign, flip in ((ring_lo, -1.0, False), (ring_hi, +1.0, True)):
+            hub = bm.verts.new((0.0, 0.0, z_sign * half_w))
+            bm.verts.ensure_lookup_table()
+            for i in range(n):
+                j = (i + 1) % n
+                tri = (ring[i], ring[j], hub)
+                try:
+                    bm.faces.new(tri[::-1] if flip else tri)
+                except ValueError:
+                    pass
+    bm.normal_update()
+    me = bpy.data.meshes.new(name + "_mesh")
+    bm.to_mesh(me)
+    bm.free()
+    obj = bpy.data.objects.new(name, me)
+    obj.location = location
+    obj.rotation_mode = "XYZ"
+    obj.rotation_euler = rotation
+    obj.data.materials.append(material)
+    bpy.context.collection.objects.link(obj)
+    if module and module_objects is not None:
+        module_objects[module].append(obj)
+    return obj
+
+
+def add_busbar(
+    name,
+    location,
+    length,
+    width,
+    thickness,
+    material,
+    n_terminals=2,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+):
+    """A busbar that reads as a busbar: flat bar with terminal holes at each end.
+
+    INTENT (2026-07-31 standing bar): busbars were plain boxes, so `PE Busbar x2`,
+    `Phase Bus Leg V x3` and `HV Bus Leg H` were indistinguishable coloured
+    slabs on the catalogue. The TERMINAL HOLES are the cue that says "this bolts
+    to something and carries current". Bar runs along local X. Lengths in METRES.
+    """
+    ln, w, t = float(length), float(width), float(thickness)
+    if min(ln, w, t) <= 0:
+        raise ValueError("length, width and thickness must be positive")
+    bar = add_box(name, location, (ln, w, t), material, rotation=rotation)
+    n = max(0, int(n_terminals))
+    if n:
+        r_hole = min(w * 0.26, ln * 0.08)
+        rot_m = mathutils.Euler(rotation, "XYZ").to_matrix().to_4x4()
+        origin = mathutils.Vector(location)
+        cutters = []
+        for i in range(n):
+            # Terminals sit near each end of the bar.
+            frac = -0.5 + (i / max(1, n - 1)) if n > 1 else 0.0
+            local = mathutils.Vector((frac * ln * 0.78, 0.0, 0.0))
+            bpy.ops.mesh.primitive_cylinder_add(
+                location=origin + (rot_m @ local), radius=r_hole,
+                depth=t * 4.0,
+                rotation=(mathutils.Euler(rotation, "XYZ").to_matrix().to_4x4()).to_euler(),
+                vertices=12)
+            c = bpy.context.active_object
+            c.name = f"{name}_term{i}"
+            c.hide_render = True
+            cutters.append(c)
+        try:
+            for c in cutters:
+                mod = bar.modifiers.new(f"{name}_t{c.name}", "BOOLEAN")
+                mod.operation = "DIFFERENCE"
+                mod.solver = "EXACT"
+                mod.object = c
+            bpy.context.view_layer.objects.active = bar
+            for mod in list(bar.modifiers):
+                bpy.ops.object.modifier_apply(modifier=mod.name)
+            for c in cutters:
+                bpy.data.objects.remove(c, do_unlink=True)
+        except Exception as exc:  # noqa: BLE001 — a flat bar beats no busbar
+            print(f"[lib][busbar] terminals failed for {name}: {exc}")
+    if module and module_objects is not None:
+        module_objects[module].append(bar)
+    return bar
+
+
+def add_stepped_shaft(
+    name,
+    location,
+    steps,
+    material,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+):
+    """A shaft that reads as a shaft: journal steps, not a plain rod.
+
+    INTENT (2026-07-31 standing bar): `Motor Shaft`, `Output Shaft`,
+    `Intermediate Shaft` were single cylinders and rendered as identical dark
+    pills. Real shafts step down to bearing journals and seal lands — the STEPS
+    are what make it a shaft rather than a bar.
+
+    `steps` is an ordered sequence of (radius, length) in METRES, laid end to end
+    along local Z and centred on `location`. Joined into ONE mesh.
+    """
+    segs = [(float(r), float(l)) for r, l in steps if float(r) > 0 and float(l) > 0]
+    if not segs:
+        raise ValueError("steps must contain at least one positive (radius, length)")
+    total = sum(l for _r, l in segs)
+    rot_m = mathutils.Euler(rotation, "XYZ").to_matrix().to_4x4()
+    origin = mathutils.Vector(location)
+    made = []
+    z = -total / 2.0
+    for i, (r, l) in enumerate(segs):
+        local = mathutils.Vector((0.0, 0.0, z + l / 2.0))
+        obj = add_cyl(f"{name}__s{i}", origin + (rot_m @ local), r, l, material,
+                      rotation=rotation, vertices=24)
+        made.append(obj)
+        z += l
+    body = made[0]
+    if len(made) > 1:
+        try:
+            bpy.ops.object.select_all(action="DESELECT")
+            for o in made:
+                o.select_set(True)
+            bpy.context.view_layer.objects.active = body
+            bpy.ops.object.join()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[lib][shaft] join failed for {name}: {exc}")
+    body.name = name
+    if module and module_objects is not None:
+        module_objects[module].append(body)
+    return body
+
+
+def add_hex_bolt(
+    name,
+    location,
+    shank_radius,
+    length,
+    material,
+    head_across_flats=None,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+):
+    """A fastener that reads as a fastener: hex head + shank, one mesh.
+
+    INTENT (2026-07-31 Tristan, "every item must look like the part it
+    represents"): bolts were plain cylinders/spheres, so `Mount Bolt x4`,
+    `End Bolt x8` and `Coldplate Fastener x6` rendered as identical dark pills.
+    A hex head is the single cue that makes a fastener unmistakable at catalogue
+    scale. Standard-ish proportions: A/F ~1.8x shank diameter, head ~0.7x
+    diameter thick. Lengths in METRES; the shank runs along local +Z before
+    `rotation`.
+    """
+    r = float(shank_radius)
+    ln = float(length)
+    if r <= 0 or ln <= 0:
+        raise ValueError("shank_radius and length must be positive")
+    af = float(head_across_flats) if head_across_flats else r * 3.6
+    head_h = max(r * 1.4, ln * 0.18)
+    rot_m = mathutils.Euler(rotation, "XYZ").to_matrix().to_4x4()
+    origin = mathutils.Vector(location)
+
+    def _at(dz):
+        return origin + (rot_m @ mathutils.Vector((0.0, 0.0, dz)))
+
+    shank = add_cyl(
+        name, _at(0.0), r, ln, material, rotation=rotation, vertices=20)
+    # Hex head: a 6-sided cylinder is exactly a hex prism.
+    bpy.ops.mesh.primitive_cylinder_add(
+        location=_at(ln / 2.0 + head_h / 2.0), radius=af / 2.0,
+        depth=head_h, rotation=rotation, vertices=6)
+    head = bpy.context.active_object
+    head.name = f"{name}_head"
+    head.data.materials.append(material)
+    try:
+        bpy.ops.object.select_all(action="DESELECT")
+        head.select_set(True)
+        shank.select_set(True)
+        bpy.context.view_layer.objects.active = shank
+        bpy.ops.object.join()
+        shank.name = name
+    except Exception as exc:  # noqa: BLE001
+        print(f"[lib][bolt] join failed for {name}: {exc}")
+    if module and module_objects is not None:
+        module_objects[module].append(shank)
+    return shank
+
+
+def add_bolted_flange(
+    name,
+    location,
+    outer_radius,
+    bore_radius,
+    thickness,
+    material,
+    n_holes=6,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+):
+    """A flange that reads as a flange: bored disc with a bolt circle, one mesh.
+
+    INTENT (2026-07-31): flanges were plain discs, indistinguishable from covers
+    and plates on the catalogue. The BOLT CIRCLE is the cue. Holes are cut with
+    booleans against the ring so the part stays a single mesh.
+    Lengths in METRES.
+    """
+    r_o = float(outer_radius)
+    r_b = float(bore_radius)
+    t = float(thickness)
+    if r_o <= 0 or t <= 0:
+        raise ValueError("outer_radius and thickness must be positive")
+    r_b = min(max(r_b, 0.0), r_o * 0.75)
+    body = (
+        add_hollow_cyl(name, location, r_o, r_b, t, material,
+                       rotation=rotation, vertices=48)
+        if r_b > 0 else
+        add_cyl(name, location, r_o, t, material, rotation=rotation, vertices=48)
+    )
+    n = max(3, int(n_holes))
+    r_hole = max((r_o - r_b) * 0.16, r_o * 0.05)
+    r_circle = (r_o + max(r_b, r_o * 0.35)) * 0.5
+    rot_m = mathutils.Euler(rotation, "XYZ").to_matrix().to_4x4()
+    origin = mathutils.Vector(location)
+    cutters = []
+    for i in range(n):
+        ang = (i / float(n)) * math.tau
+        local = mathutils.Vector((
+            r_circle * math.cos(ang), r_circle * math.sin(ang), 0.0))
+        bpy.ops.mesh.primitive_cylinder_add(
+            location=origin + (rot_m @ local), radius=r_hole,
+            depth=t * 3.0, rotation=rotation, vertices=12)
+        c = bpy.context.active_object
+        c.name = f"{name}_hole{i}"
+        c.hide_render = True
+        cutters.append(c)
+    try:
+        for c in cutters:
+            mod = body.modifiers.new(f"{name}_bc{c.name}", "BOOLEAN")
+            mod.operation = "DIFFERENCE"
+            mod.solver = "EXACT"
+            mod.object = c
+        bpy.context.view_layer.objects.active = body
+        for mod in list(body.modifiers):
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+        for c in cutters:
+            bpy.data.objects.remove(c, do_unlink=True)
+    except Exception as exc:  # noqa: BLE001 — a bored disc beats no flange
+        print(f"[lib][flange] bolt circle failed for {name}: {exc}")
+    if module and module_objects is not None:
+        module_objects[module].append(body)
+    return body
+
+
+def add_rolling_bearing(
+    name,
+    location,
+    outer_radius,
+    width,
+    material,
+    bore_radius=None,
+    n_balls=10,
+    module=None,
+    module_objects=None,
+    rotation=(0, 0, 0),
+):
+    """A bearing that reads as a bearing: outer race + inner race + rolling elements.
+
+    INTENT (2026-07-31, same complaint as the gears): bearings and seals were
+    solid `add_cyl` PUCKS with no bore. A bearing without a bore cannot look like
+    anything but a blob — on the parts catalogue "Gearbox Bearing x2" and
+    "Bearing Cap x2" rendered as featureless domes. Deep-groove proportions:
+    bore ~0.55 of OD, races ~18% of the radial build, balls on the pitch circle.
+
+    Joined into ONE mesh so the bearing is one part, like add_spur_gear.
+    All lengths in METRES.
+    """
+    r_o = float(outer_radius)
+    w = float(width)
+    if r_o <= 0 or w <= 0:
+        raise ValueError("outer_radius and width must be positive")
+    r_b = float(bore_radius) if bore_radius else r_o * 0.55
+    r_b = min(max(r_b, r_o * 0.25), r_o * 0.80)
+    race = max((r_o - r_b) * 0.28, r_o * 0.04)
+    outer = add_hollow_cyl(
+        name, location, r_o, r_o - race, w, material,
+        rotation=rotation, vertices=48,
+    )
+    parts = []
+    inner = add_hollow_cyl(
+        f"{name}_inner", location, r_b + race, r_b, w, material,
+        rotation=rotation, vertices=48,
+    )
+    parts.append(inner)
+    # Rolling elements on the pitch circle, in the plane of the race.
+    r_pitch = (r_o - race + r_b + race) * 0.5
+    ball_r = max(min((r_o - race) - (r_b + race), w) * 0.42, r_o * 0.03)
+    rot_m = mathutils.Euler(rotation, "XYZ").to_matrix().to_4x4()
+    origin = mathutils.Vector(location)
+    for i in range(max(4, int(n_balls))):
+        ang = (i / float(max(4, int(n_balls)))) * math.tau
+        local = mathutils.Vector((
+            0.0, r_pitch * math.cos(ang), r_pitch * math.sin(ang)))
+        bpy.ops.mesh.primitive_uv_sphere_add(
+            radius=ball_r, location=origin + (rot_m @ local), segments=16, ring_count=8)
+        b = bpy.context.active_object
+        b.name = f"{name}_b{i}"
+        b.data.materials.append(material)
+        parts.append(b)
+    try:
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in parts:
+            o.select_set(True)
+        outer.select_set(True)
+        bpy.context.view_layer.objects.active = outer
+        bpy.ops.object.join()
+        outer.name = name
+    except Exception as exc:  # noqa: BLE001 — a race ring beats no bearing
+        print(f"[lib][bearing] join failed for {name}: {exc}")
+    if module and module_objects is not None:
+        module_objects[module].append(outer)
+    return outer
+
+
 def add_hollow_cyl(
     name,
     location,
