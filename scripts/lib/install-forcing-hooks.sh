@@ -80,8 +80,9 @@ say() { printf '  %-52s %s\n' "$1" "$2"; }
 
 echo "── pre-commit: the checks that do not depend on remembering ──"
 
-for m in machine_excitation_tracking machine_magnet_flux_focusing model_routing \
-         claim_provenance_gate council_precommit_review fpk_geometry_coherence; do
+for m in machine_excitation_tracking machine_magnet_flux_focusing machine_loss_bounds \
+         model_routing claim_provenance_gate council_precommit_review \
+         fpk_geometry_coherence; do
   if [ -f "scripts/lib/$m.py" ]; then
     if $PY "scripts/lib/$m.py" --selftest >/dev/null 2>&1; then
       say "$m --selftest" "ok"
