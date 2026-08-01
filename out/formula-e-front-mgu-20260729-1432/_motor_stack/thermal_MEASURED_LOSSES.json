@@ -1,0 +1,70 @@
+{
+  "conjugate_heat_transfer": {
+    "statement": "No solid/fluid conjugate heat-transfer mesh, contact/TIM map, transient lap duty, or mesh convergence.",
+    "status": "OPEN"
+  },
+  "flow_bench": {
+    "statement": "No measured jacket/cold-plate pressure-flow or heater-plate temperature correlation.",
+    "status": "OPEN"
+  },
+  "honesty_notes": [
+    "PARTIAL is a twin-bound steady lumped screen, not CHT validation.",
+    "A below-limit screen does not set PASS or ship_ok.",
+    "Hardware flow-bench and heater-plate/module correlation remain OPEN."
+  ],
+  "input_quantities": {
+    "contract_magnet_temperature_c": 101.82,
+    "contract_module_temperature_c": null,
+    "contract_winding_temperature_c": 86.82,
+    "coolant_cp_j_kgk": 3503.1484638024453,
+    "coolant_density_kg_m3": 1040.4899931631571,
+    "coolant_flow_l_min": 12.0,
+    "coolant_inlet_c": 60.0,
+    "copper_loss_w": 1611.0,
+    "inverter_dissipated_kw": 4.318,
+    "iron_loss_w": 1020.5,
+    "magnet_limit_c": 150.0,
+    "magnet_loss_w": 610.0,
+    "magnet_to_winding_k_per_w": 0.05,
+    "module_limit_c": 175.0,
+    "module_to_coolant_k_per_w": 0.01,
+    "winding_limit_c": 180.0,
+    "winding_to_coolant_k_per_w": 0.01
+  },
+  "input_quantities_sha256": "37f7bcb25497d1358c0dcb02c2047060db51d49aeeecb8e1d7d9d50986d2a8b3",
+  "model": {
+    "contract_temperature_policy": "maximum = max(independent calculation, contract writeback when present)",
+    "evidence_class": "analytical_screen",
+    "name": "steady_lumped_coolant_plus_three_temperature_nodes",
+    "thermal_resistance_basis": "orchestratorContract quantities when present; otherwise explicit motor:thermal-lumped-compatible screening seeds"
+  },
+  "release_statement": "Concept evidence only. Never claim thermal release, FIA race readiness, or permission to ship from this lumped screen.",
+  "schema": "forgeos.motor_stack.analytical_fia_cooling_thermal_screen/v1",
+  "screening_results": {
+    "all_temperatures_below_screen_limits": true,
+    "calculated_magnet_temperature_c": 127.185,
+    "calculated_module_temperature_c": 113.55,
+    "calculated_winding_temperature_c": 96.685,
+    "coolant_mass_flow_kg_s": 0.208098,
+    "coolant_outlet_temperature_c": 70.37,
+    "coolant_temperature_rise_k": 10.3697,
+    "inverter_loss_w": 4318.0,
+    "magnet_below_screen_limit": true,
+    "maximum_magnet_temperature_c": 127.185,
+    "maximum_module_temperature_c": 113.55,
+    "maximum_winding_temperature_c": 96.685,
+    "module_below_screen_limit": true,
+    "motor_loss_w": 3241.5,
+    "total_loss_w": 7559.5,
+    "winding_below_screen_limit": true
+  },
+  "ship_ok": false,
+  "source_state_sha256": "eda227a69ed18b4b8f4a16231fe4eb088cb2f72540cc15ecf8e255b621cd9ec1",
+  "source_twin": "/private/tmp/twin-corrected-losses",
+  "status": "PARTIAL",
+  "temperature_screen": {
+    "all_below_screen_limits": true,
+    "limits_are_release_authority": false,
+    "status": "PARTIAL"
+  }
+}

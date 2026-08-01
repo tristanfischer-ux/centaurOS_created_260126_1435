@@ -1968,6 +1968,39 @@ def _build_fia_lua(
              f"mo_getpointvalues({_px:.12g},{_py:.12g})"),
             f'print("{RESULT_PREFIX} rotor_frame_b_{_k}_t="..(rBx*rBx+rBy*rBy)^0.5)',
         ])
+    # ⭐⭐ STATOR TOOTH + YOKE PROBES (2026-08-01) — iron loss must be measured.
+    #
+    # motor_loss_point.py reads `iron_b_t` (default 1.2 T) and `iron_mass_kg`
+    # (default 5.0). The twin supplies NEITHER, so every iron-loss figure this
+    # campaign has quoted describes a generic 5 kg of iron at 1.2 T — and is
+    # INSENSITIVE to the magnet rebalance, which is the change being evaluated.
+    #
+    # Unlike the ROTOR (which rotates with the fundamental and so sees only
+    # asynchronous harmonics), the STATOR is stationary and the fundamental
+    # sweeps past it, so stator iron loss IS driven at electrical frequency
+    # p*n/60 = 1300 Hz. Teeth and yoke carry very different flux densities and
+    # must be probed separately: the tooth concentrates pole flux into the
+    # tooth fraction, the yoke carries half the pole flux around the back.
+    _slot_pitch_p = 2.0 * math.pi / geometry.stator_slots
+    _r_tooth = r_si + geometry.slot_depth_mm * 0.5
+    _r_yoke = (r_slot_outer + r_so) / 2.0
+    for _k in range(3):
+        # TOOTH CENTRE sits BETWEEN two slots — offset by half a slot pitch
+        # from the slot centres, or the probe lands in copper and reads nothing.
+        _ang = (_k + 0.5) * _slot_pitch_p
+        lua.extend([
+            ("tA,tBx,tBy,tSig,tE,tHx,tHy,tJe,tJs,tMu1,tMu2,tPe,tPh="
+             f"mo_getpointvalues({_r_tooth * math.cos(_ang):.12g},"
+             f"{_r_tooth * math.sin(_ang):.12g})"),
+            f'print("{RESULT_PREFIX} tooth_b_{_k}_t="..(tBx*tBx+tBy*tBy)^0.5)',
+        ])
+        _ya = _k * 2.0 * math.pi / 3.0
+        lua.extend([
+            ("yA,yBx,yBy,ySig,yE,yHx,yHy,yJe,yJs,yMu1,yMu2,yPe,yPh="
+             f"mo_getpointvalues({_r_yoke * math.cos(_ya):.12g},"
+             f"{_r_yoke * math.sin(_ya):.12g})"),
+            f'print("{RESULT_PREFIX} yoke_b_{_k}_t="..(yBx*yBx+yBy*yBy)^0.5)',
+        ])
     lua.append("quit()")
     return "\n".join(lua) + "\n"
 
@@ -2016,6 +2049,8 @@ def _execute_magnetic_point(
         expected.add(f"circuit_current_{_c}_a")
     for _k in range(3):
         expected.add(f"rotor_frame_b_{_k}_t")
+        expected.add(f"tooth_b_{_k}_t")
+        expected.add(f"yoke_b_{_k}_t")
     if loaded is not None:
         expected.add("torque_nm")
     if process.returncode != 0 or values.keys() != expected:
