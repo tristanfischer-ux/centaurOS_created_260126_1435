@@ -104,10 +104,67 @@ class GAPart:
     # underground for drainage". UNIVERSAL: keyed on the generic noun in the name,
     # never a class name. See _BELOW_GRADE_NAME_RE.
     is_below_grade: bool = False
+    # INTENT (2026-07-31 FPK): axial motor/gear/diff (axis along X) must show as
+    # an END-VIEW circle on the SIDE elevation (Y×Z), not a box. Plan/front stay
+    # rectangular (looking across the axis).
+    is_end_circle: bool = False
 
 
 def _round_extent(centre, half):
     return centre - half, centre + half
+
+
+def _gapart_from_manifest_row(r: dict) -> GAPart:
+    """Project one parts-manifest row into a GAPart (box / vertical / horizontal cyl)."""
+    pos = r.get("pos_mm") or [0, 0, 0]
+    x, y, z = (float(pos[0]), float(pos[1]), float(pos[2]))
+    d = r.get("dims_mm") or {}
+    shape = str(r.get("shape") or "")
+    axis = str(d.get("axis") or "").lower()
+    is_horizontal_cyl = (
+        shape == "horizontal_cylinder"
+        or (axis == "x" and "dia" in d)
+    )
+    if is_horizontal_cyl:
+        w = float(d.get("w") or d.get("len") or 0.0)
+        dep = float(d.get("d") or d.get("dia") or 0.0)
+        h = float(d.get("h") or d.get("dia") or 0.0)
+        is_round = False
+        is_end_circle = True
+        x0, x1 = _round_extent(x, w / 2.0)
+        y0, y1 = _round_extent(y, dep / 2.0)
+        z0, z1 = z - h / 2.0, z + h / 2.0
+    elif "dia" in d:
+        dia = float(d.get("dia") or 0.0)
+        length = float(d.get("len") or 0.0)
+        is_round = True
+        is_end_circle = False
+        x0, x1 = _round_extent(x, dia / 2.0)
+        y0, y1 = _round_extent(y, dia / 2.0)
+        z0, z1 = z - length / 2.0, z + length / 2.0
+    else:
+        w = float(d.get("w") or 0.0)
+        dep = float(d.get("d") or 0.0)
+        h = float(d.get("h") or 0.0)
+        is_round = False
+        is_end_circle = False
+        x0, x1 = _round_extent(x, w / 2.0)
+        y0, y1 = _round_extent(y, dep / 2.0)
+        z0, z1 = z - h / 2.0, z + h / 2.0
+    _name = r.get("name") or ""
+    return GAPart(
+        tag=r.get("equipment_tag") or "?",
+        obj_tag=r.get("tag") or "",
+        name=_name,
+        module=r.get("module") or "",
+        shape=shape,
+        qty=int(r.get("qty") or 1),
+        is_round=is_round,
+        x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1, cx=x, cy=y,
+        rank=int(r.get("region_rank") or 10**9),
+        is_below_grade=bool(_BELOW_GRADE_NAME_RE.search(_name)),
+        is_end_circle=is_end_circle,
+    )
 
 
 def _instrument_envelope_bbox(ww: float, dd: float, hh: float) -> dict:
@@ -493,39 +550,10 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
     with open(p) as fh:
         man = json.load(fh)
 
-    parts: list[GAPart] = []
-    for r in (man.get("parts") or []):
-        pos = r.get("pos_mm") or [0, 0, 0]
-        x, y, z = (float(pos[0]), float(pos[1]), float(pos[2]))
-        d = r.get("dims_mm") or {}
-        if "dia" in d:
-            dia = float(d.get("dia") or 0.0)
-            length = float(d.get("len") or 0.0)
-            is_round = True
-            x0, x1 = _round_extent(x, dia / 2.0)
-            y0, y1 = _round_extent(y, dia / 2.0)
-            # a vessel/tank/column stands on its base: z is the CENTRE, height=len.
-            z0, z1 = z - length / 2.0, z + length / 2.0
-        else:
-            w = float(d.get("w") or 0.0)
-            dep = float(d.get("d") or 0.0)
-            h = float(d.get("h") or 0.0)
-            is_round = False
-            x0, x1 = _round_extent(x, w / 2.0)
-            y0, y1 = _round_extent(y, dep / 2.0)
-            z0, z1 = z - h / 2.0, z + h / 2.0
-        _name = r.get("name") or ""
-        parts.append(GAPart(
-            tag=r.get("equipment_tag") or "?",
-            obj_tag=r.get("tag") or "",
-            name=_name,
-            module=r.get("module") or "",
-            shape=r.get("shape") or "",
-            qty=int(r.get("qty") or 1),
-            is_round=is_round,
-            x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1, cx=x, cy=y,
-            rank=int(r.get("region_rank") or 10**9),
-            is_below_grade=bool(_BELOW_GRADE_NAME_RE.search(_name))))
+    parts: list[GAPart] = [
+        _gapart_from_manifest_row(r) for r in (man.get("parts") or [])
+        if isinstance(r, dict)
+    ]
 
     bbox = man.get("bbox_mm") or {}
     if not bbox and parts:
@@ -718,39 +746,10 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
                             meta["placement_fp"] = str(man["placement_fp"]).lower()
                             # Re-project from the rewritten rows (keep dims, new xy).
                             parts.clear()
-                            for r in rows:
-                                pos = r.get("pos_mm") or [0, 0, 0]
-                                x, y, z = (float(pos[0]), float(pos[1]), float(pos[2]))
-                                d = r.get("dims_mm") or {}
-                                if "dia" in d:
-                                    dia = float(d.get("dia") or 0.0)
-                                    length = float(d.get("len") or 0.0)
-                                    is_round = True
-                                    x0, x1 = _round_extent(x, dia / 2.0)
-                                    y0, y1 = _round_extent(y, dia / 2.0)
-                                    z0, z1 = z - length / 2.0, z + length / 2.0
-                                else:
-                                    w_ = float(d.get("w") or 0.0)
-                                    dep = float(d.get("d") or 0.0)
-                                    h_ = float(d.get("h") or 0.0)
-                                    is_round = False
-                                    x0, x1 = _round_extent(x, w_ / 2.0)
-                                    y0, y1 = _round_extent(y, dep / 2.0)
-                                    z0, z1 = z - h_ / 2.0, z + h_ / 2.0
-                                _name = r.get("name") or ""
-                                parts.append(GAPart(
-                                    tag=r.get("equipment_tag") or "?",
-                                    obj_tag=r.get("tag") or "",
-                                    name=_name,
-                                    module=r.get("module") or "",
-                                    shape=r.get("shape") or "",
-                                    qty=int(r.get("qty") or 1),
-                                    is_round=is_round,
-                                    x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1,
-                                    cx=x, cy=y,
-                                    rank=int(r.get("region_rank") or 10**9),
-                                    is_below_grade=bool(
-                                        _BELOW_GRADE_NAME_RE.search(_name))))
+                            parts.extend(
+                                _gapart_from_manifest_row(r)
+                                for r in rows if isinstance(r, dict)
+                            )
                             print(f"[ga] instrument role-XY spread: {n_rew} part(s) "
                                   f"un-collapsed + parts-manifest rewritten")
                             meta["instrument_role_xy_spread"] = n_rew
@@ -2646,7 +2645,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # ───────────────────────── SIDE elevation ─────────────────────────
     svg.text(side_x, side_y - 30, "ELEVATION B–B", size=13, weight="bold",
              fill=EQ_INK, spacing="1.0")
-    svg.text(side_x + 118, side_y - 30, "(looking east)", size=9.5, fill=MUTED)
+    if meta.get("is_traction_drive_pack"):
+        svg.text(side_x + 118, side_y - 30,
+                 "(looking along motor axis · end view — gears as circles)",
+                 size=9.5, fill=MUTED)
+    else:
+        svg.text(side_x + 118, side_y - 30, "(looking east)", size=9.5, fill=MUTED)
     # side elevation: horizontal axis = plant WIDTH (y, north→south, matches plan
     # rows); vertical axis = plant HEIGHT (z). Width on paper = plan_h.
     _draw_elev_frame(svg, side_x, side_y, plan_h, front_h, W, H, ppm,
@@ -2695,7 +2699,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         # plan rows run north(top)→south; keep the same handedness as the plan.
         px = side_x + (y_max - p.y1) * ppm
         py = side_y + (z_max - p.z1) * ppm
-        _draw_elevation_item(svg, px, py, pw, ph, p)
+        # SIDE looks along +X — axial cylinders show as end-view circles.
+        _draw_elevation_item(svg, px, py, pw, ph, p, end_view=True)
         _pa = _proj_audit_extra(p, "side", meta)
         if _pa:
             svg.rect(px, py, pw, ph, stroke="none", fill="none",
@@ -2825,7 +2830,7 @@ def _draw_elev_frame(svg, ox, oy, pw, ph, horiz_mm, H_mm, ppm, z_min, z_max,
         lvl += pitch
 
 
-def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart):
+def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, *, end_view: bool = False):
     """One equipment OUTLINE in an elevation. Cylinders (vessels/columns/tanks/
     stacks) draw as a capsule (rounded top) so they read as vessels, not boxes;
     everything else a rect. Tagging is NOT done here — the view collects its
@@ -2834,11 +2839,31 @@ def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart):
 
     below_grade items (sump / drainpit / manhole) draw with the SAME dashed +
     hatch below-grade convention as the plan (Sam Green SME review 2026-07-08) so
-    a reader scanning either the plan OR an elevation sees the same buried signal."""
+    a reader scanning either the plan OR an elevation sees the same buried signal.
+
+    INTENT (2026-07-31 FPK): when `end_view=True` (SIDE elev looking along pack
+    X-axis) and `is_end_circle`, draw a circle — the engineering end-view of a
+    gear/rotor. FRONT (across-axis) stays a rectangle even if nearly square."""
     pw = max(pw, 1.5)
     ph = max(ph, 1.5)
     fill = "url(#ug-hatch)" if p.is_below_grade else EQ_FILL
     dash = "5,3" if p.is_below_grade else None
+    # Axial cylinder end-view: SIDE elev Y×Z ≈ dia×dia → circle + centre cross.
+    if (
+        end_view
+        and getattr(p, "is_end_circle", False)
+        and pw > 4
+        and ph > 4
+    ):
+        aspect = max(pw, ph) / max(min(pw, ph), 1e-6)
+        # 1.55: allows slightly non-square radial AABB (post-diff helical ~1.47).
+        if aspect <= 1.55:
+            r = min(pw, ph) / 2.0
+            ccx, ccy = px + pw / 2.0, py + ph / 2.0
+            svg.circle(ccx, ccy, r, stroke=EQ_INK, width=1.4, fill=fill, dash=dash)
+            svg.line(ccx - r, ccy, ccx + r, ccy, stroke=DATUM_INK, width=0.6, dash="4,3")
+            svg.line(ccx, ccy - r, ccx, ccy + r, stroke=DATUM_INK, width=0.6, dash="4,3")
+            return
     if p.is_round and p.shape == "tank" and ph > 8 and pw > 5:
         # Atmospheric OPEN-TOP process tank (RAS rearing tank etc.): a flat-top
         # cylindrical shell with a water-surface line — NOT a domed/capsule roof.
@@ -3136,8 +3161,9 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
         )
     elif meta.get("is_traction_drive_pack"):
         _view_note = (
-            "Front (shell ghosted) + top + side · axial motor|gear|inverter train · "
-            "matches Blender pack layout · dimensions in millimetres unless noted."
+            "Front (shell ghosted) + top + side end-view · axial motor|gear|inverter "
+            "train · gears/rotors as circles on B–B · matches Blender pack layout · "
+            "dimensions in millimetres unless noted."
         )
     elif meta.get("is_product_scale"):
         _view_note = (
@@ -4015,16 +4041,34 @@ def _selftest() -> int:
         "parts": [
             {"tag": "X-116", "equipment_tag": "X-116",
              "name": "Traction Ipmsm Motor Generator",
+             "shape": "horizontal_cylinder",
              "pos_mm": [-119.0, 0.0, 382.7],
-             "dims_mm": {"w": 140.0, "d": 126.0, "h": 126.0},
+             "dims_mm": {
+                 "w": 140.0, "d": 126.0, "h": 126.0,
+                 "dia": 126.0, "len": 140.0, "axis": "x",
+             },
              "geometry_source": "traction_drive_story_mesh"},
             {"tag": "X-117", "equipment_tag": "X-117",
              "name": "Reduction Gear Stage",
+             "shape": "horizontal_cylinder",
              "pos_mm": [-25.4, 0.0, 372.1],
-             "dims_mm": {"w": 68.0, "d": 107.1, "h": 96.2},
+             "dims_mm": {
+                 "w": 68.0, "d": 107.1, "h": 96.2,
+                 "dia": 107.1, "len": 68.0, "axis": "x",
+             },
+             "geometry_source": "traction_drive_story_mesh"},
+            {"tag": "X-140", "equipment_tag": "X-140",
+             "name": "Ring Gear",
+             "shape": "horizontal_cylinder",
+             "pos_mm": [-20.0, 0.0, 382.0],
+             "dims_mm": {
+                 "w": 12.0, "d": 100.0, "h": 100.0,
+                 "dia": 100.0, "len": 12.0, "axis": "x",
+             },
              "geometry_source": "traction_drive_story_mesh"},
             {"tag": "INV-1", "equipment_tag": "INV-1",
              "name": "SiC Traction Inverter",
+             "shape": "box",
              "pos_mm": [110.5, 0.0, 366.0],
              "dims_mm": {"w": 130.0, "d": 143.9, "h": 84.0},
              "geometry_source": "traction_drive_story_mesh"},
@@ -4089,6 +4133,24 @@ def _selftest() -> int:
         bad += 1
     else:
         print("  PASS ga-traction-faithful: placed-pack envelope + axial train")
+    # proveCatch (2026-07-31): gears/motor must draw as END-VIEW circles on SIDE,
+    # not only boxes (Tristan: "GA dont show gears or things that are circles").
+    if not getattr(_by_tag["X-116"], "is_end_circle", False):
+        print("  FAIL ga-traction-circles: motor must be is_end_circle")
+        bad += 1
+    if getattr(_by_tag["INV-1"], "is_end_circle", False):
+        print("  FAIL ga-traction-circles: inverter must stay a box")
+        bad += 1
+    _n_circ = len(re.findall(r"<circle\b", _td_svg))
+    if _n_circ < 2:
+        print(f"  FAIL ga-traction-circles: expected ≥2 <circle> for motor/gear "
+              f"end-views (got {_n_circ})")
+        bad += 1
+    elif "end view" not in _td_svg.lower() and "circles" not in _td_svg.lower():
+        print("  FAIL ga-traction-circles: SIDE subtitle must mention end-view circles")
+        bad += 1
+    else:
+        print(f"  PASS ga-traction-circles: {_n_circ} circle(s) + end-view label")
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0
 

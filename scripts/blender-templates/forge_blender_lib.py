@@ -981,7 +981,12 @@ def add_involute_gear(
     # Caps: bore for a solid gear, or an outer rim for an internal ring gear.
     r_hub = float(bore_radius) if bore_radius else 0.0
     if internal:
-        r_hub = max(r_root * 1.14, r_root + 2.0 * m_mm * MM)
+        # GOTCHA (2026-08-01 SIGHT): r_root*1.14 made a ~103 mm smooth outer
+        # disc that DOMINATED the face-on catalogue cell — the internal teeth
+        # (only ~1.3 mm deep on the bore) vanished and "Ring Gear" read as a
+        # plain annulus. Keep a thin structural rim so the toothed bore is the
+        # silhouette a human reads as a ring gear.
+        r_hub = r_root + max(2.0 * m_mm * MM, 0.0020)
     hub_lo, hub_hi = [], []
     if r_hub > 0:
         for i in range(max(24, z)):
@@ -1036,6 +1041,10 @@ def add_involute_gear(
     me = bpy.data.meshes.new(name + "_mesh")
     bm.to_mesh(me)
     bm.free()
+    # INTENT (2026-08-01 SIGHT): flat-shade tooth flanks so involute facets
+    # read as teeth, not a smoothed cylinder that collapses to "striations".
+    me.polygons.foreach_set("use_smooth", [False] * len(me.polygons))
+    me.update()
     obj = bpy.data.objects.new(name, me)
     obj.location = location
     obj.rotation_mode = "XYZ"

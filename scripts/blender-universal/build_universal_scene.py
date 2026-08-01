@@ -14140,19 +14140,23 @@ _FPK_SHELL_OFF_PREFIXES = (
     "u_se_td_cast_rib_",
     # Legacy solid bore plug name — hide if a stale twin still has one.
     "u_se_td_rotor_hint",
+    # INTENT (2026-08-01 SIGHT): rear-half sections of these barrels still
+    # read as SOLID DISCS on the iso hero — the remaining +Y half occludes the
+    # sun/planet/ring nest. Shell-off entirely on open views; ring gear stays
+    # full (not sectioned) so internal teeth remain readable.
+    "u_se_td_stator_ring",
+    "u_se_td_stator_hint",
+    "u_se_td_hollow_rotor",
+    # Magnets sit on rotor OD; with the tube shell-off they form opaque brown
+    # slabs that wall the nest (SIGHT 00-hero). Windings carry the EM story.
+    "u_se_td_magnet_",
 )
 _FPK_SHELL_OFF_EXACT = (
     "u_se_td_pack_housing",
     "u_se_td_inverter_housing",
 )
-# Hollow story barrels: hide full mesh, SHOW rear-half section so the side camera
-# looks into the planetary/diff nest (a full tube's outer wall still reads sealed).
-_FPK_SECTION_SHOW_EXACT = (
-    "u_se_td_stator_ring",
-    "u_se_td_stator_hint",
-    "u_se_td_hollow_rotor",
-    "u_se_td_ring_gear",
-)
+# No rear-half barrel sections — nest exposure is by shell-off (see above).
+_FPK_SECTION_SHOW_EXACT = ()
 # Back-compat aliases used by proveCatch / ghost helpers.
 _FPK_SECTION_SOURCE_PREFIXES = _FPK_SHELL_OFF_PREFIXES
 _FPK_SECTION_SOURCE_EXACT = _FPK_SHELL_OFF_EXACT
@@ -14161,18 +14165,17 @@ _FPK_SECTION_HIDE_EXACT = (
     "u_se_td_gearbox",            # seated nest volume — planets are the story
     "u_se_td_post_diff_envelope", # packaging envelope — pinions/wheels are the story
     "u_se_td_diff_bulge",         # solid cue over diff nest
+    # Solid carrier disc sits on the planet face and reads as a blank puck over
+    # the toothed nest (SIGHT 00-hero / 08). Hide on open views; planets remain.
+    "u_se_td_planet_carrier",
 )
 _FPK_SECTION_HIDE_PREFIXES = (
     # Only hide half-plugs of SHELL-OFF skins — section_* of stator/rotor are shown.
 )
 _FPK_SECTION_EXPOSE_PREFIXES = (
-    "u_se_td_stator_",
     "u_se_td_winding_end_",
-    "u_se_td_hollow_rotor",
-    "u_se_td_magnet_",
     "u_se_td_sun_gear",
     "u_se_td_planet_",
-    "u_se_td_planet_carrier",
     "u_se_td_ring_gear",
     "u_se_td_gearbox_bearing_",
     "u_se_td_diff_nest",
@@ -14277,57 +14280,88 @@ def _fpk_build_rear_half_section(source):
     return section
 
 
-# INTENT (2026-07-31 Tristan): exploded assembly — every story mesh gets its
-# own offset so parts read individually (not 4 coaxial blobs). Group seeds
-# keep family clusters; per-object lattice fans siblings apart. Offsets are
-# mm-class fractions of a typical FPK envelope, NOT Lucid STEP paste.
-# Restored on exit via _FPK_EXPLODE_LOC_SNAP.
+# INTENT (2026-08-01 Tristan): 13-product-exploded must read as an ENGINEERING
+# exploded assembly — parts slide apart along the pack axis in assembly order,
+# still in the right place relative to each other. The previous "catalogue
+# lattice" scattered every mesh onto a grid ("all over the place") and made 13
+# useless next to the real inventory sheet (14). Restored via _FPK_EXPLODE_LOC_SNAP.
 _FPK_EXPLODE_LOC_SNAP = []
 _FPK_EXPLODE_SKIP_PREFIXES = (
     "u_se_td_housing", "u_se_td_case", "u_se_td_jacket", "u_se_td_cover",
     "u_se_td_end_bell", "u_se_td_pack_base", "u_se_td_bay", "u_se_td_ground",
     "u_se_td_endpoint", "u_se_td_vehicle",
-    # Tooth-detail fragments read as sphere clutter when fully exploded — keep
-    # them nested on the parent gear body in the catalogue view.
+    "u_se_td_pack_housing", "u_se_td_motor_housing", "u_se_td_coolant_jacket",
+    "u_se_td_motor_cover", "u_se_td_gearbox_cover", "u_se_td_inverter_cover",
+    "u_se_td_cassette_cover", "u_se_td_cast_rib_", "u_se_td_resolver_bulge",
+    # Opaque BoM envelopes — they read as black boxes over the staged guts.
+    "u_se_td_gearbox", "u_se_td_post_diff_envelope", "u_se_td_diff_bulge",
+    "u_se_td_inverter_housing",
+    # Fastener / spray clutter turns an assembly explode into confetti.
+    "u_se_td_microjet_", "u_se_td_mount_bolt", "u_se_td_end_bolt",
+    "u_se_td_fastener", "u_se_td_bolt_", "u_se_td_ground_stud",
+    # Tooth fragments travel with their parent gear — never free-float.
     "u_se_td_sun_gear_tooth_", "u_se_td_ring_gear_tooth_",
     "u_se_td_planet_tooth_", "u_se_td_output_gear_tooth_",
 )
-# INTENT: Tristan 2026-07-31 — every story part visible individually. Family
-# seeds give axial story (MCU↑ / motor← / nest→ / diff→→); catalogue pitch
-# (~110 mm) fans siblings so magnets/planets/PE bricks do not overlap.
+# On explode entry these stay hidden — envelopes / housings / fastener confetti.
+# Pack base is SKIP (does not move) but stays visible as the assembly datum.
+_FPK_EXPLODE_HIDE_PREFIXES = (
+    "u_se_td_housing", "u_se_td_case", "u_se_td_jacket", "u_se_td_cover",
+    "u_se_td_end_bell", "u_se_td_bay", "u_se_td_ground",
+    "u_se_td_endpoint", "u_se_td_vehicle",
+    "u_se_td_pack_housing", "u_se_td_motor_housing", "u_se_td_coolant_jacket",
+    "u_se_td_motor_cover", "u_se_td_gearbox_cover", "u_se_td_inverter_cover",
+    "u_se_td_cassette_cover", "u_se_td_cast_rib_", "u_se_td_resolver_bulge",
+    "u_se_td_gearbox", "u_se_td_post_diff_envelope", "u_se_td_diff_bulge",
+    "u_se_td_inverter_housing",
+    "u_se_td_microjet_", "u_se_td_mount_bolt", "u_se_td_end_bolt",
+    "u_se_td_fastener", "u_se_td_bolt_", "u_se_td_ground_stud",
+)
+# Axial assembly stages (metres). Pack axis = +X (motor / shaft).
+#   MCU shelf lifts in +Z; stator slides −X; rotor/nest/diff stage along +X;
+#   service parts step slightly in ±Y. NO lattice — siblings keep assembly pose.
 _FPK_EXPLODE_GROUP_SEEDS_M = (
-    # (name_prefixes, base_dx, base_dy, base_dz, family_rank)
+    # (name_prefixes, dx, dy, dz, family_rank)
     (("u_se_td_mcu_shelf", "u_se_td_sic_inverter", "u_se_td_pe_",
       "u_se_td_control_pcb", "u_se_td_gate_drive_pcb", "u_se_td_pcb",
-      "u_se_td_inverter_coldplate", "u_se_td_dclink_cap_", "u_se_td_hv_"),
-     0.0, 0.0, 0.160, 0),
-    (("u_se_td_stator_", "u_se_td_winding_end_", "u_se_td_section_stator",
-      "u_se_td_hollow_rotor", "u_se_td_section_hollow", "u_se_td_magnet_",
-      "u_se_td_section_ring", "u_se_td_slot_", "u_se_td_coil_"),
-     -0.180, 0.0, 0.0, 1),
+      "u_se_td_inverter_coldplate", "u_se_td_dclink_cap_", "u_se_td_hv_",
+      "u_se_td_inverter_housing"),
+     0.0, 0.0, 0.110, 0),
+    (("u_se_td_stator_", "u_se_td_winding_end_", "u_se_td_slot_", "u_se_td_coil_"),
+     -0.090, 0.0, 0.0, 1),
+    (("u_se_td_hollow_rotor", "u_se_td_magnet_", "u_se_td_motor_shaft"),
+     -0.025, 0.0, 0.0, 2),
     (("u_se_td_sun_gear", "u_se_td_planet_", "u_se_td_planet_carrier",
-      "u_se_td_ring_gear", "u_se_td_gearbox", "u_se_td_gearbox_bearing_",
-      "u_se_td_carrier_"),
-     0.140, 0.0, 0.0, 2),
+      "u_se_td_ring_gear", "u_se_td_gearbox_bearing_", "u_se_td_carrier_"),
+     0.085, 0.0, 0.0, 3),
     (("u_se_td_diff_", "u_se_td_post_diff_", "u_se_td_side_gear_",
       "u_se_td_pinion_gear", "u_se_td_output_gear_", "u_se_td_halfshaft_",
-      "u_se_td_bevel_"),
-     0.320, 0.0, 0.0, 3),
+      "u_se_td_bevel_", "u_se_td_output_shaft", "u_se_td_intermediate_shaft"),
+     0.200, 0.0, 0.0, 4),
     (("u_se_td_oil_", "u_se_td_jet_", "u_se_td_microjet_", "u_se_td_sump",
       "u_se_td_baffle", "u_se_td_coldplate", "u_se_td_jacket_channel",
       "u_se_td_coolant_"),
-     0.0, 0.180, 0.040, 4),
+     0.0, 0.070, 0.0, 5),
     (("u_se_td_bearing_", "u_se_td_seal_", "u_se_td_oil_seal",
       "u_se_td_resolver", "u_se_td_sensor_", "u_se_td_encoder",
       "u_se_td_busbar_", "u_se_td_connector_", "u_se_td_phase_"),
-     0.0, -0.180, 0.060, 5),
+     0.040, 0.0, 0.045, 6),
 )
-_FPK_EXPLODE_CATALOGUE_PITCH_M = (0.110, 0.100, 0.095)  # x, y, z
-_FPK_EXPLODE_CATALOGUE_COLS = 6
+# Planets open radially from the sun so the nest reads, without leaving orbit.
+_FPK_EXPLODE_PLANET_RADIAL = 1.55
+# Meshes the cutaway shells off but the explode must SHOW (assembly stages).
+_FPK_EXPLODE_FORCE_SHOW_PREFIXES = (
+    "u_se_td_stator_", "u_se_td_winding_end_", "u_se_td_hollow_rotor",
+    "u_se_td_magnet_", "u_se_td_sun_gear", "u_se_td_planet_",
+    "u_se_td_planet_carrier", "u_se_td_ring_gear", "u_se_td_diff_",
+    "u_se_td_post_diff_", "u_se_td_motor_shaft", "u_se_td_sic_inverter",
+    "u_se_td_control_pcb", "u_se_td_gate_drive_pcb", "u_se_td_pe_",
+    "u_se_td_phase_bus_", "u_se_td_hv_bus",
+)
 
 
 def _fpk_explode_group_seed(name: str):
-    """Return (base_dx, base_dy, base_dz, family_rank) metres, or None to skip."""
+    """Return (dx, dy, dz, family_rank) metres, or None to skip."""
     nm = name or ""
     if nm.startswith("u_se_td_section_"):
         nm = "u_se_td_" + nm.removeprefix("u_se_td_section_")
@@ -14338,40 +14372,31 @@ def _fpk_explode_group_seed(name: str):
     for prefixes, dx, dy, dz, rank in _FPK_EXPLODE_GROUP_SEEDS_M:
         if any(nm == p or nm.startswith(p) for p in prefixes):
             return dx, dy, dz, rank
-    # Unknown story mesh — still explode individually (catch-all catalogue).
-    return 0.0, 0.0, 0.080, 6
+    # Unknown story mesh: stay with the pack (no scatter).
+    return None
 
 
 def _fpk_explode_delta_for(name: str, index: int = 0):
-    """Return (dx,dy,dz) metres for one mesh — family seed + catalogue cell.
+    """Return (dx,dy,dz) metres — pure assembly-stage offset, no lattice.
 
-    INTENT: Tristan 2026-07-31 — see every Blender part individually. Dense
-    35 mm lattices looked like a sphere cloud; catalogue pitch (~110 mm) +
-    larger family seeds keep magnets / planets / PE / jets readable.
+    INTENT (2026-08-01 Tristan): explode must keep parts in the right place
+    relative to each other. ``index`` is accepted for call-site compat but
+    must NOT fan siblings onto a catalogue grid (that was the defect).
     """
+    del index  # assembly explode is index-free by design
     seed = _fpk_explode_group_seed(name)
     if seed is None:
         return None
-    dx0, dy0, dz0, rank = seed
-    px, py, pz = _FPK_EXPLODE_CATALOGUE_PITCH_M
-    cols = _FPK_EXPLODE_CATALOGUE_COLS
-    col = index % cols
-    row = (index // cols) % 4
-    layer = index // (cols * 4)
-    # Rank shifts whole families onto distinct catalogue bands.
-    band_y = (rank - 2.5) * (py * 1.35)
-    return (
-        dx0 + (col - (cols - 1) / 2.0) * px,
-        dy0 + band_y + (row - 1.5) * py,
-        dz0 + layer * pz,
-    )
+    dx0, dy0, dz0, _rank = seed
+    return (dx0, dy0, dz0)
 
 
 def _fpk_apply_exploded_view(view_name, entering):
-    """Shell-off + per-part catalogue explode for 13-product-exploded.
+    """Axial assembly explode for 13-product-exploded.
 
-    DECISION: explode is a VIEW pose (location deltas), not new meshes — same
-    story objects as the cutaway, restored from _FPK_EXPLODE_LOC_SNAP on exit.
+    DECISION: VIEW pose only (location deltas), restored from
+    ``_FPK_EXPLODE_LOC_SNAP``. Stages slide along the pack axis; planets open
+    radially about the sun. Inventory scatter belongs in 14, not here.
     """
     global _FPK_EXPLODE_LOC_SNAP
     if not _IS_TRACTION_DRIVE_FORM or not hasattr(bpy, "data"):
@@ -14381,40 +14406,51 @@ def _fpk_apply_exploded_view(view_name, entering):
     )
     if is_exploded:
         if _FPK_EXPLODE_LOC_SNAP:
-            # Already applied — idempotent.
             return
-        # Open cutaway first (shell-off + expose nest).
+        # Shell-off opaque exterior skins, then re-show assembly-stage guts the
+        # cutaway hid (rotor / magnets / carrier) so the explode can stage them.
         _fpk_apply_functional_section_view(view_name, True)
-        # Group by family rank so catalogue bands stay coherent.
-        by_rank = {}
+        # Hide envelopes / fastener confetti; show the staged assembly guts.
         for obj in bpy.data.objects:
             if getattr(obj, "type", None) != "MESH":
                 continue
-            seed = _fpk_explode_group_seed(obj.name)
-            if seed is None:
+            nm = obj.name or ""
+            if any(nm.startswith(p) for p in _FPK_EXPLODE_HIDE_PREFIXES):
+                obj.hide_render = True
                 continue
-            rank = seed[3]
-            by_rank.setdefault(rank, []).append(obj)
+            if any(nm.startswith(p) for p in _FPK_EXPLODE_FORCE_SHOW_PREFIXES):
+                obj.hide_render = False
+        sun = bpy.data.objects.get("u_se_td_sun_gear")
+        axis_y = float(sun.location.y) if sun is not None else 0.0
+        axis_z = float(sun.location.z) if sun is not None else 0.0
         snap = []
         moved = 0
-        for rank in sorted(by_rank):
-            members = sorted(by_rank[rank], key=lambda o: o.name)
-            for index, obj in enumerate(members):
-                delta = _fpk_explode_delta_for(obj.name, index=index)
-                if delta is None:
-                    continue
-                snap.append((obj, obj.location.copy()))
-                obj.location = (
-                    obj.location.x + delta[0],
-                    obj.location.y + delta[1],
-                    obj.location.z + delta[2],
-                )
-                moved += 1
+        for obj in sorted(
+            (o for o in bpy.data.objects if getattr(o, "type", None) == "MESH"),
+            key=lambda o: o.name,
+        ):
+            if obj.hide_render:
+                continue
+            delta = _fpk_explode_delta_for(obj.name)
+            if delta is None:
+                continue
+            snap.append((obj, obj.location.copy()))
+            x = obj.location.x + delta[0]
+            y = obj.location.y + delta[1]
+            z = obj.location.z + delta[2]
+            # Planets stay on their clock positions; open the nest radially.
+            if (obj.name or "").startswith("u_se_td_planet_"):
+                oy = y - axis_y
+                oz = z - axis_z
+                y = axis_y + oy * _FPK_EXPLODE_PLANET_RADIAL
+                z = axis_z + oz * _FPK_EXPLODE_PLANET_RADIAL
+            obj.location = (x, y, z)
+            moved += 1
         _FPK_EXPLODE_LOC_SNAP = snap
         print(
             f"[univ][fpk-explode] entered {view_name}: moved={moved} "
-            f"individual meshes (catalogue lattice, pitch="
-            f"{_FPK_EXPLODE_CATALOGUE_PITCH_M[0]*1000:.0f}mm)",
+            f"meshes (axial assembly explode, planet_radial="
+            f"{_FPK_EXPLODE_PLANET_RADIAL})",
             flush=True,
         )
         return
@@ -14567,8 +14603,20 @@ def _fpk_apply_parts_catalogue_view(view_name, entering):
         dims_mm = _fpk_world_extents_mm(rep)
         if min(dims_mm) <= 0.0:
             dims_mm = (10.0, 10.0, 10.0)
-        steps = presentation_rotation_steps(dims_mm)
-        rot_w, rot_d, _rot_h = apply_rotation_steps_to_dims(dims_mm, steps)
+        steps = list(presentation_rotation_steps(dims_mm))
+        # INTENT (2026-08-01 SIGHT): dead face-on + softbox flattens m=0.6 mm
+        # involute flanks into a featureless disc. A small tip tilt (universal
+        # for gear families) lets the tooth faces catch light without inventing
+        # geometry — same mesh, readable silhouette.
+        if fam in ("sun_gear", "planet", "ring_gear", "pinion_gear",
+                   "output_gear", "side_gear"):
+            steps.append(("X", 0.35))  # ~20 deg tip toward camera
+        # Footprint for layout ignores the tip tilt; use face-up extents.
+        face_steps = [
+            s for s in steps
+            if not (s[0] == "X" and abs(float(s[1]) - 0.35) < 1e-6)
+        ]
+        rot_w, rot_d, _rot_h = apply_rotation_steps_to_dims(dims_mm, face_steps)
         reps[fam] = (rep, objs, steps)
         parts.append(CataloguePart(
             family=fam, count=len(objs),
@@ -14904,24 +14952,28 @@ def _fpk_apply_functional_section_view(view_name, entering):
                     raise RuntimeError(
                         f"[univ][section] {required_shell} still render-visible on open view"
                     )
-        # proveCatch: hollow barrel rear-halves must be the ones that render.
+        # proveCatch: opaque barrels that would hide the nest must be shell-off.
+        for barrel in ("u_se_td_hollow_rotor", "u_se_td_stator_ring"):
+            full = bpy.data.objects.get(barrel)
+            if full is not None and not full.hide_render:
+                raise RuntimeError(
+                    f"[univ][section] {barrel} still render-visible on open view — "
+                    "iso hero would read a solid disc over the toothed nest"
+                )
         shown_barrel_sections = [
             obj.name for obj in bpy.data.objects
             if getattr(obj, "type", None) == "MESH"
             and obj.name.startswith("u_se_td_section_")
             and not obj.hide_render
         ]
-        if not any("stator_ring" in n or "hollow_rotor" in n for n in shown_barrel_sections):
-            # Only enforce when the full barrels exist in the scene.
-            if any(n in section_show_names for n in _FPK_SECTION_SHOW_EXACT):
-                raise RuntimeError(
-                    "[univ][section] hollow stator/rotor rear-half missing on open view — "
-                    "side camera would still see a sealed barrel wall"
-                )
+        # DECISION (2026-08-01): no rear-half barrel sections — they still
+        # occlude the nest from the iso camera. Story = windings + magnets +
+        # toothed nest (not the hollow tubes themselves).
         required_story = {
-            "stator": "u_se_td_stator_",
-            "rotor": "u_se_td_hollow_rotor",
+            "windings": "u_se_td_winding_end_",
             "planetary": "u_se_td_planet_",
+            "sun": "u_se_td_sun_gear",
+            "ring": "u_se_td_ring_gear",
             "differential": "u_se_td_diff_nest",
             "post_diff_final_drive": "u_se_td_post_diff_pinion_",
             "power_electronics": "u_se_td_pe_module_",
@@ -14936,12 +14988,9 @@ def _fpk_apply_functional_section_view(view_name, entering):
                 for obj in bpy.data.objects
             )
         }
-        # Stator/rotor may be represented by section_* names on open views.
+
         def _story_present(prefix: str) -> bool:
-            if any(name.startswith(prefix) for name in visible_story):
-                return True
-            tail = prefix.removeprefix("u_se_td_").rstrip("_")
-            return any(tail in name for name in shown_barrel_sections)
+            return any(name.startswith(prefix) for name in visible_story)
 
         missing = [
             role for role, prefix in present_prefixes.items()
@@ -14959,8 +15008,8 @@ def _fpk_apply_functional_section_view(view_name, entering):
             )
         print(
             f"[univ][section] {view_name}: shell-off {len(hidden_shells)} skins; "
-            f"{len(shown_barrel_sections)} hollow rear-half barrels; "
-            f"{len(visible_story)} story meshes visible"
+            f"{len(shown_barrel_sections)} section clones; "
+            f"{len(visible_story)} story meshes visible (nest exposed)"
         )
         return list(shell_off) + list(section_show)
     return []
@@ -15039,6 +15088,9 @@ def _selftest_fpk_functional_section_view_state() -> None:
             "u_se_td_hollow_rotor",
             "u_se_td_gearbox",
             "u_se_td_planet_0",
+            "u_se_td_planet_carrier",
+            "u_se_td_sun_gear",
+            "u_se_td_ring_gear",
             "u_se_td_diff_nest",
             "u_se_td_post_diff_pinion_0",
             "u_se_td_sic_inverter",
@@ -15056,21 +15108,25 @@ def _selftest_fpk_functional_section_view_state() -> None:
         for name in shell_names:
             assert bpy.data.objects[name].hide_render, (
                 f"open view left opaque full shell visible: {name}")
-        # Full stator/rotor barrels hidden; their rear-half sections must SHOW.
+        # Full stator/rotor barrels shell-off — NOT half-sectioned (iso hero
+        # still saw the remaining half as a solid disc over the nest).
         assert bpy.data.objects["u_se_td_stator_ring"].hide_render
         assert bpy.data.objects["u_se_td_hollow_rotor"].hide_render
-        stator_sec = bpy.data.objects.get("u_se_td_section_stator_ring")
-        rotor_sec = bpy.data.objects.get("u_se_td_section_hollow_rotor")
-        assert stator_sec is not None and not stator_sec.hide_render, (
-            "open view must show hollow stator rear-half")
-        assert rotor_sec is not None and not rotor_sec.hide_render, (
-            "open view must show hollow rotor rear-half")
+        assert bpy.data.objects.get("u_se_td_section_stator_ring") is None, (
+            "open view must not build stator rear-half — shell-off only")
+        assert bpy.data.objects.get("u_se_td_section_hollow_rotor") is None, (
+            "open view must not build rotor rear-half — shell-off only")
         # Shell-off half-plugs (motor housing etc.) must stay hidden.
         for obj in bpy.data.objects:
             if obj.name.startswith("u_se_td_section_motor_housing"):
                 assert obj.hide_render, (
                     f"open view left solid housing half-plug visible: {obj.name}")
         assert not bpy.data.objects["u_se_td_planet_0"].hide_render
+        assert not bpy.data.objects["u_se_td_sun_gear"].hide_render
+        assert not bpy.data.objects["u_se_td_ring_gear"].hide_render, (
+            "toothed ring must stay fully visible on open cutaway")
+        assert bpy.data.objects["u_se_td_planet_carrier"].hide_render, (
+            "solid carrier disc must hide so planet teeth read")
         assert not bpy.data.objects["u_se_td_diff_nest"].hide_render
         assert not bpy.data.objects["u_se_td_post_diff_pinion_0"].hide_render
         assert not bpy.data.objects["u_se_td_sic_inverter"].hide_render
@@ -15224,11 +15280,11 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "open cutaway must expose planetary, differential, post-diff, and SiC story meshes")
     assert "u_se_td_gearbox" in _FPK_SECTION_HIDE_EXACT, (
         "opaque gearbox nest volume must hide on open views so planets read")
-    assert "u_se_td_stator_ring" in _FPK_SECTION_SHOW_EXACT, (
-        "hollow stator barrel must rear-half-section on open views")
-    assert "u_se_td_hollow_rotor" in _FPK_SECTION_SHOW_EXACT, (
-        "hollow rotor barrel must rear-half-section on open views")
-    # proveCatch (2026-07-31): exploded catalogue offsets for nest / PE / motor.
+    assert _FPK_SECTION_SHOW_EXACT == (), (
+        "open cutaway shells-off barrels — no rear-half section list")
+    assert "u_se_td_hollow_rotor" in _FPK_SHELL_OFF_PREFIXES, (
+        "hollow rotor must shell-off on hero cutaway so the nest is visible")
+    # proveCatch (2026-08-01): axial assembly explode — not a catalogue scatter.
     assert _fpk_explode_delta_for("u_se_td_planet_1") is not None, (
         "planet must explode along pack axis")
     assert _fpk_explode_delta_for("u_se_td_sic_inverter") is not None, (
@@ -15238,14 +15294,20 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
     assert _fpk_explode_delta_for("u_se_td_sun_gear_tooth_0") is None, (
         "gear tooth fragments must stay nested — exploding them reads as sphere clutter")
     _diff_seed = _fpk_explode_group_seed("u_se_td_diff_nest")
-    assert _diff_seed is not None and _diff_seed[0] >= 0.25, (
-        f"diff family seed must stay ≥250 mm +X (got {_diff_seed})")
+    assert _diff_seed is not None and _diff_seed[0] >= 0.18, (
+        f"diff family must stage further +X than the nest (got {_diff_seed})")
     _p0 = _fpk_explode_delta_for("u_se_td_planet_0", index=0)
     _p1 = _fpk_explode_delta_for("u_se_td_planet_1", index=1)
-    assert abs(_p0[0] - _p1[0]) + abs(_p0[1] - _p1[1]) >= 0.08, (
-        "sibling planets must catalogue-separate by ≥80 mm so each reads individually")
-    assert _FPK_EXPLODE_CATALOGUE_PITCH_M[0] >= 0.09, (
-        "catalogue pitch must stay large enough for individual-part SIGHT")
+    assert _p0 == _p1, (
+        "sibling planets must share the SAME axial stage — lattice scatter is forbidden")
+    _sun_d = _fpk_explode_delta_for("u_se_td_sun_gear")
+    assert _sun_d is not None and abs(_sun_d[0] - _p0[0]) < 1e-9, (
+        "sun and planets stay in one nest stage (radial open is pose-time only)")
+    _mcu_d = _fpk_explode_delta_for("u_se_td_sic_inverter")
+    assert _mcu_d is not None and _mcu_d[2] > 0.05, (
+        "MCU/SiC must lift in +Z so the electronics stage reads above the pack")
+    assert "axial assembly explode" in _insp_td.getsource(_fpk_apply_exploded_view), (
+        "explode helper must be the axial assembly path, not a catalogue lattice")
     assert "shell-off" in _src_section, (
         "open-view helper must shell-off solid housings (not show opaque half-plugs)")
     assert "add_hollow_cyl" in _src_td, (
@@ -15256,8 +15318,8 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "post-diff placement must consume packaging-screen geometry module")
     assert "opaque full shells still hide drivetrain" in _src_section, (
         "functional section must hard-fail if a full shell remains over internals")
-    assert "hollow stator/rotor rear-half missing" in _src_section, (
-        "open views must hard-fail if hollow barrel sections are absent")
+    assert "solid disc over the toothed nest" in _src_section, (
+        "open views must hard-fail if hollow_rotor/stator still hide the nest")
     _src_prepare = _insp_td.getsource(_prepare_sealed_product_view)
     assert "_fpk_apply_functional_section_view" in _src_prepare, (
         "sealed hero/exterior preparer must wire the traction functional section")
@@ -15278,6 +15340,13 @@ def _selftest_instrument_mesh_keep_prefixes() -> None:
         "planet meshes must bake the strength-solved face width without visual shrink")
     assert "gear_face * 0.9" not in _src_ontology, (
         "sun/ring tooth meshes must share the exact strength-solved face width")
+    # proveCatch (2026-08-01): one meshing PCD rule — never ring_id−4 for teeth.
+    assert "_fpk_meshing_ring_pcd_mm" in _src_ontology, (
+        "ring gear tooth solve must use meshing-consistent PCD helper")
+    assert "ring_id - 4" not in _src_ontology, (
+        "ring_id-4 tooth PCD was the pcd_meshing_mismatch defect — forbidden")
+    assert "_fpk_meshing_ring_pcd_mm" in _src_td, (
+        "sun/planet nest must use the same meshing-consistent ring PCD")
     # proveCatch (2026-07-29): crushed FR4 sRGB (0.025,0.14,…) linearises to
     # ~black and ships an invisible board. Gate the SOURCE sRGB floor.
     _fr4 = (0.22, 0.52, 0.28)
@@ -19977,6 +20046,16 @@ def _fpk_draw_principal_vehicle_routes(
     )
 
 
+def _fpk_meshing_ring_pcd_mm(sun_pcd_mm, planet_pcd_mm):
+    """Ring pitch diameter that physically meshes: sun + 2×planet.
+
+    INTENT (2026-08-01): the ontology ring path used ``ring_id - 4`` as the
+    tooth-solve PCD while sun/planets used ``sun + 2×planet``. That logged
+    ``pcd_meshing_mismatch`` (88.8 vs 84.7 mm) and split the nest. One rule.
+    """
+    return float(sun_pcd_mm) + 2.0 * float(planet_pcd_mm)
+
+
 def _fpk_solve_tooth_set(sun_pcd_mm, planet_pcd_mm, ring_pcd_mm, n_planets):
     """The PHYSICS-LED tooth set for this planetary, or None if unsolvable.
 
@@ -20029,6 +20108,7 @@ def _fpk_place_ontology_fff_parts(
     shaft_r, shaft_stub, inv_w, inv_d, inv_h, inv_z, x_inv, y_inv, cas_w, cas_d,
     mat_steel, mat_alum, mat_magnet, mat_oil, mat_pcb, mat_copper,
     story_mod, MO, rot_along_x, _mm3, _cyl_v, quantities,
+    mat_gear=None,
 ):
     """Place every missing first-principles ontology sub-component (FFF).
 
@@ -20039,6 +20119,7 @@ def _fpk_place_ontology_fff_parts(
     FLOW: geometry mm + derive_physics → named u_se_td_* meshes
       → fpk_blender_coverage proveCatch.
     """
+    mat_gear = mat_gear or mat_steel
     # Physics seeds (pole pairs / magnet count / teeth) when contract present.
     pole_pairs = 4
     magnet_n = 8
@@ -20056,13 +20137,20 @@ def _fpk_place_ontology_fff_parts(
         print(f"[univ][sealed] FPK physics seeds fallback: {_seed_exc}")
 
     # ── Ring gear (fixed annulus inside rotor bore) ──────────────────────────
-    ring_od = min(rotor_id - 1.0, ring_id + 6.0)
-    ring_id_inner = max(ring_id - 4.0, sun_od + planet_od + 2.0)
+    # GOTCHA: never pass ``ring_id - 4`` as the tooth PCD — that was the
+    # pcd_meshing_mismatch (sun+2*planet vs ring−4). Meshing law is one formula.
+    ring_pcd = _fpk_meshing_ring_pcd_mm(sun_od, planet_od)
     # INTERNAL gear: teeth point inward from the bore, built into the same mesh.
     # Was a smooth annulus plus loose tooth stubs parked near it, which read as a
     # plain ring at any distance.
-    _ts = _fpk_solve_tooth_set(sun_od, planet_od, ring_id_inner, planet_n)
+    _ts = _fpk_solve_tooth_set(sun_od, planet_od, ring_pcd, planet_n)
     if _ts is not None:
+        _mismatch = [n for n in _ts.notes if n.startswith("pcd_meshing_mismatch")]
+        if _mismatch:
+            raise RuntimeError(
+                "[univ][gear] meshing-consistent ring PCD still flagged mismatch: "
+                + "; ".join(_mismatch)
+            )
         print(f"[univ][gear] solved tooth set: m={_ts.module_mm} mm  "
               f"z_sun={_ts.z_sun} z_planet={_ts.z_planet} z_ring={_ts.z_ring}  "
               f"ratio_actual={_ts.ratio_actual:.4f}  notes={_ts.notes}", flush=True)
@@ -20072,7 +20160,7 @@ def _fpk_place_ontology_fff_parts(
             _ts.module_mm,
             _ts.z_ring,
             gear_face * fl.MM,
-            mat_steel,
+            mat_gear,
             internal=True,
             module=story_mod,
             module_objects=MO,
@@ -20082,8 +20170,8 @@ def _fpk_place_ontology_fff_parts(
         fl.add_hollow_cyl(
             "u_se_td_ring_gear",
             _mm3((x_motor, y_motor, z_motor)),
-            (ring_id_inner * 0.5 + 3.0) * fl.MM,
-            (ring_id_inner * 0.5) * fl.MM,
+            (ring_pcd * 0.5 + 3.0) * fl.MM,
+            (ring_pcd * 0.5) * fl.MM,
             gear_face * fl.MM,
             mat_steel,
             module=story_mod,
@@ -20583,6 +20671,12 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     mat_cf = fl.make_mat("m_se_td_cf", (0.055, 0.058, 0.062), metallic=0.22, roughness=0.48)
     mat_alum = fl.make_mat("m_se_td_alum", (0.08, 0.085, 0.095), metallic=0.62, roughness=0.38)
     mat_steel = fl.make_mat("m_se_td_steel", (0.18, 0.19, 0.21), metallic=0.88, roughness=0.26)
+    # INTENT (2026-08-01 SIGHT): pack-scale m=0.6 mm teeth vanish into dark
+    # steel under softbox. Gears keep a lighter, slightly rougher metal so
+    # involute flanks catch light — still steel, not a decorative paint.
+    mat_gear = fl.make_mat(
+        "m_se_td_gear", (0.42, 0.44, 0.47), metallic=0.82, roughness=0.38,
+    )
     mat_sic = fl.make_mat("m_se_td_sic", (0.045, 0.048, 0.055), metallic=0.40, roughness=0.42)
     mat_port = fl.make_mat("m_se_td_port", (0.55, 0.18, 0.08), metallic=0.35, roughness=0.38)
     # DECISION (2026-07-29 JLR SIGHT): HV connector is dark Amphenol-style orange/black
@@ -21420,25 +21514,26 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
     # 2026-07-31 clay-shell defect after motor_housing shell-off.
 
     # L4 — planetary sun + planets + mini-diff nest inside hollow rotor.
-    # REAL GEARS (2026-07-31 Tristan: "not a single thing looks like a gear").
-    # These were plain add_cyl discs. Tooth count comes from the SAME module the
-    # ratio and bending stress use (z = d/m), so the teeth you see are the teeth
-    # the design actually has.
-    # PHYSICS-LED TOOTH SET — solved from the CALCULATED pitch diameters under
-    # the real planetary constraints; never an invented module.
-    # Meshing-consistent ring PCD: ring = sun + 2*planet. This is the physical
-    # relation the tooth set must satisfy, so derive it rather than reach for a
-    # rounded ring_id (which is not in scope here in any case).
-    _ring_pcd_for_set = sun_od + 2.0 * planet_od
+    # PHYSICS-LED TOOTH SET — one solve for sun/planets/ring; ring PCD is always
+    # sun + 2×planet (never ring_id−4). Planet centres sit on the SOLVED pitch
+    # circles so the drawn nest matches the tooth set, not a rounded OD proxy.
+    _ring_pcd_for_set = _fpk_meshing_ring_pcd_mm(sun_od, planet_od)
     _ts_sun = _fpk_solve_tooth_set(sun_od, planet_od, _ring_pcd_for_set, planet_n)
     if _ts_sun is not None:
+        print(
+            f"[univ][gear] nest tooth set: m={_ts_sun.module_mm} mm "
+            f"z={_ts_sun.z_sun}/{_ts_sun.z_planet}/{_ts_sun.z_ring} "
+            f"pcd={_ts_sun.sun_pcd_mm:.1f}/{_ts_sun.planet_pcd_mm:.1f}/"
+            f"{_ts_sun.ring_pcd_mm:.1f} mm ratio={_ts_sun.ratio_actual:.3f}",
+            flush=True,
+        )
         fl.add_involute_gear(
             "u_se_td_sun_gear",
             _mm3((x_motor, y_motor, z_motor)),
             _ts_sun.module_mm,
             _ts_sun.z_sun,
             gear_face * fl.MM,
-            mat_steel,
+            mat_gear,
             module=story_mod,
             module_objects=MO,
             rotation=rot_along_x,
@@ -21466,16 +21561,18 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         rotation=rot_along_x,
         vertices=32,
     )
+    # Planet centre radius = (sun_pcd + planet_pcd) / 2 from the SOLVED set.
+    if _ts_sun is not None:
+        _planet_centre_r = 0.5 * (_ts_sun.sun_pcd_mm + _ts_sun.planet_pcd_mm)
+    else:
+        _planet_centre_r = 0.5 * float(planet_pcd)
     for pi in range(int(planet_n)):
         ang = (pi / float(planet_n)) * math.tau
-        py = y_motor + (planet_pcd * 0.5) * math.cos(ang)
-        pz = z_motor + (planet_pcd * 0.5) * math.sin(ang)
+        py = y_motor + _planet_centre_r * math.cos(ang)
+        pz = z_motor + _planet_centre_r * math.sin(ang)
         # INTENT: The strength writeback owns the nominal tooth face. Meshing
         # members must share that exact axial width; presentation shrink factors
         # made a 58 mm solved face bake as only 53.36 mm in the exported GLB.
-        # Planets previously had NO teeth at all — the tooth-cue helper was only
-        # ever called for the sun and ring, so four smooth pucks orbited a
-        # toothed sun. They mesh with both, so they carry the same module.
         if _ts_sun is not None:
             fl.add_involute_gear(
                 f"u_se_td_planet_{pi}",
@@ -21483,7 +21580,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
                 _ts_sun.module_mm,
                 _ts_sun.z_planet,
                 gear_face * fl.MM,
-                mat_steel,
+                mat_gear,
                 module=story_mod,
                 module_objects=MO,
                 rotation=rot_along_x,
@@ -21549,7 +21646,7 @@ def _place_traction_drive_pack_layout(W, D, H, base_z, t, story_mod, MO):
         mat_steel=mat_steel, mat_alum=mat_alum, mat_magnet=mat_magnet,
         mat_oil=mat_oil, mat_pcb=mat_pcb, mat_copper=mat_copper,
         story_mod=story_mod, MO=MO, rot_along_x=rot_along_x,
-        _mm3=_mm3, _cyl_v=_cyl_v, quantities=_cq_fff,
+        _mm3=_mm3, _cyl_v=_cyl_v, quantities=_cq_fff, mat_gear=mat_gear,
     )
 
     # Solid phase busbars pierce MCU underside → stator — L-busbar compounds (P6).
@@ -29554,9 +29651,21 @@ def main():
         _scn = bpy.context.scene
         # ── #3 QUALITY (Tristan 2026-06-22) — higher resolution + samples + AO. The early
         #    setup set 2400×1600/64; bump here (nothing resets between) for a crisper final.
-        #    Instruments get a slightly higher product-shot resolution.
+        #    Traction packs (2026-08-01): 2× same framing so fine involute teeth resolve
+        #    without enlarging geometry. Instruments stay at the OOM-safe 2400×1600.
         try:
-            if _IS_INSTRUMENT_DEVICE or _IS_TRACTION_DRIVE_FORM:
+            _env_res = (os.environ.get("BLENDER_RENDER_RESOLUTION") or "").strip().lower()
+            if _env_res and "x" in _env_res:
+                _rx, _ry = (int(p) for p in _env_res.split("x", 1))
+                _scn.render.resolution_x, _scn.render.resolution_y = _rx, _ry
+                print(f"[univ][render] resolution override {_rx}×{_ry} "
+                      f"(BLENDER_RENDER_RESOLUTION)", flush=True)
+            elif _IS_TRACTION_DRIVE_FORM:
+                _rx, _ry = ifg.TRACTION_RENDER_RESOLUTION
+                _scn.render.resolution_x, _scn.render.resolution_y = _rx, _ry
+                print(f"[univ][render] traction product resolution {_rx}×{_ry} "
+                      f"(same framing, more pixels for fine teeth)", flush=True)
+            elif _IS_INSTRUMENT_DEVICE:
                 _rx, _ry = ifg.INSTRUMENT_RENDER_RESOLUTION
                 _scn.render.resolution_x, _scn.render.resolution_y = _rx, _ry
                 # apply_instrument_color_management already set exposure bias;
@@ -30136,9 +30245,13 @@ def main():
                         _cat_res_x0 = bpy.context.scene.render.resolution_x
                         _cat_res_y0 = bpy.context.scene.render.resolution_y
                         # A ~100-cell sheet needs the pixels; captions must survive
-                        # the Excel gallery, not just a full-screen viewer.
-                        bpy.context.scene.render.resolution_x = 3600
-                        bpy.context.scene.render.resolution_y = 2400
+                        # the Excel gallery. Traction catalogue is 2× (same sheet
+                        # framing) so m=0.6 mm involute teeth resolve in-cell.
+                        _cat_rx, _cat_ry = ifg.TRACTION_CATALOGUE_RENDER_RESOLUTION
+                        bpy.context.scene.render.resolution_x = int(_cat_rx)
+                        bpy.context.scene.render.resolution_y = int(_cat_ry)
+                        print(f"[univ][fpk-catalogue] resolution {_cat_rx}×{_cat_ry}",
+                              flush=True)
                         _fpk_apply_parts_catalogue_view(
                             "14-product-parts-catalogue", True)
                         fl.clear_cameras()
