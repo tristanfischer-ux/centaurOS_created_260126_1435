@@ -67,6 +67,30 @@ def _num(q: dict, *keys: str, default=None):
     return default
 
 
+def _flux_focusing_ratio(quantities: dict) -> float:
+    """A_m/A_g for the V-magnet pair, from the SOLVED geometry.
+
+    Derived from the same `derive_fia_geometry` the FE deck builds from, so the
+    analytic route and the FE route describe ONE machine. Never a typed
+    constant — a hardcoded focusing ratio would silently stop tracking the
+    geometry the moment the rotor is resized, which is exactly the failure this
+    module exists to detect.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(REPO_ROOT / "scripts" / "motor-stack"))
+    import em_fia_front_kit_case as _m  # noqa: PLC0415
+
+    geometry = _m.derive_fia_geometry(_m.inputs_from_sections(quantities, {}))
+    tilt = math.radians(20.0)
+    r_ro = geometry.rotor_outer_diameter_mm / 2.0
+    half = (geometry.magnet_length_mm / 2.0 * math.sin(tilt)
+            + geometry.magnet_thickness_mm / 2.0 * math.cos(tilt))
+    r_mag = r_ro - _m.MAGNET_ROTOR_BRIDGE_MM - half
+    pole_pitch_mm = 2.0 * math.pi * r_mag / _m.ROTOR_POLES
+    face_mm = 2.0 * geometry.magnet_length_mm * math.cos(tilt)
+    return face_mm / pole_pitch_mm
+
+
 def crosscheck(twin: Path) -> dict:
     _numpy2_compat()
     from pyleecan.Functions.load import load
@@ -99,9 +123,26 @@ def crosscheck(twin: Path) -> dict:
     symmetric = bool(wdg.get_is_symmetric())
 
     # ── Airgap flux density (magnet operating point, 1-D) ───────────────────
-    # B_gap = Br * (t_m / (t_m + mur*g_eff)); Carter ~1.0 ignored (optimistic).
+    # SOURCE BUG FIXED 2026-08-01. This previously read
+    #     B_gap_pk = Br * (t_m / (t_m + mur*g_eff))
+    # which is the operating point of a magnet whose FACE FILLS THE WHOLE POLE.
+    # It omits the FLUX-FOCUSING RATIO A_m/A_g, and on an IPM whose magnet
+    # covers only part of the pole that overstates airgap flux by 1/focus.
+    #
+    # The correct pair (see scripts/lib/fpk_magnet_flux_focusing.py):
+    #     B_m   = Br / (1 + mur * g_eff * (A_m/A_g) / t_m)     magnet operating point
+    #     B_gap = B_m * (A_m/A_g)                              what crosses the gap
+    #
+    # WHY THIS MATTERED. The omission inflated route A by 1.72x and produced the
+    # headline "DESIGN flux linkage and MEASURED back-EMF disagree by 1.64x --
+    # the winding/flux model is internally inconsistent". There was no winding
+    # inconsistency: the 1.64x WAS the missing focusing ratio. With it included,
+    # design lambda_pm 0.0309 Wb vs measured 0.0324 Wb -- agreement to 4.6% --
+    # and route A falls 215.01 -> ~125 N.m, converging with route B's 131.11.
     g_eff = airgap_mm
-    B_gap_pk = Br * (magnet_th_mm / (magnet_th_mm + mur * g_eff))
+    focus = _flux_focusing_ratio(q)
+    B_m = Br / (1.0 + mur * g_eff * focus / magnet_th_mm)
+    B_gap_pk = B_m * focus
     # Pole area at the airgap.
     D_gap = (rotor_od_mm + 2.0 * airgap_mm) * 1e-3
     L = stack_mm * 1e-3
@@ -168,6 +209,8 @@ def crosscheck(twin: Path) -> dict:
         },
         "flux": {
             "B_gap_peak_T": round(B_gap_pk, 4),
+            "flux_focusing_ratio_Am_over_Ag": round(focus, 4),
+            "magnet_operating_flux_T": round(B_m, 4),
             "pole_area_m2": round(pole_area, 6),
             "flux_per_pole_Wb": round(flux_per_pole, 6),
             "lambda_pm_design_Wb": round(lambda_pm_design, 6),
