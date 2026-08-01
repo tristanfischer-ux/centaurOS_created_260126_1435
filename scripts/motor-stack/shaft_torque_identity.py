@@ -32,12 +32,23 @@ def evaluate_duty_torque_screen_ok(
     mean_torque_magnitude_nm: float | None,
     torque_reliable: bool,
     mean_clear_ratio: float = DUTY_TORQUE_MEAN_CLEAR_RATIO,
+    excitation_tracking_ok: bool | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Decide duty_torque_screen_ok from mean + reliability — never peak alone.
 
     INTENT (red-team F-EM-1): peak FEMM ~207 N·m must not greenwash duty when
     position-sweep mean ~119 N·m sits below required ~125 N·m, or when
     torque_reliable is still false.
+
+    ⭐ EXCITATION TRACKING (2026-08-01). A mean is only a mean if the sweep it
+    came from measured ONE operating point. When the stator field walks past the
+    rotor, torque swings through zero and the "mean" is an average over a
+    machine that was never in synchronism — on the live FE front kit, mean|T|
+    read 64.6 N·m while the DELIVERED mean was 3.75 and the deck's own back-EMF
+    implied 131. Passing `excitation_tracking_ok=False` therefore BLOCKS the
+    duty screen outright rather than letting a meaningless average be compared
+    against the requirement. `None` means the screen was not run — that is
+    recorded, and does not block, so older callers keep their behaviour.
     """
     required = float(required_shaft_torque_nm)
     peak = abs(float(peak_torque_magnitude_nm))
@@ -46,6 +57,8 @@ def evaluate_duty_torque_screen_ok(
     fail_reasons: list[str] = []
     if not torque_reliable:
         fail_reasons.append("torque_reliable=false")
+    if excitation_tracking_ok is False:
+        fail_reasons.append("excitation_not_tracking_rotor")
     if mean_torque_magnitude_nm is None:
         fail_reasons.append("no_position_sweep_mean")
     else:
@@ -71,6 +84,7 @@ def evaluate_duty_torque_screen_ok(
             None if mean_ratio is None else round(mean_ratio, 6)
         ),
         "mean_clear_ratio": mean_clear_ratio,
+        "excitation_tracking_ok": excitation_tracking_ok,
         "peak_interest_ratio_threshold": DUTY_TORQUE_PEAK_INTEREST_RATIO,
         "peak_interest_ok": peak_ratio >= DUTY_TORQUE_PEAK_INTEREST_RATIO,
         "fail_reasons": fail_reasons,
