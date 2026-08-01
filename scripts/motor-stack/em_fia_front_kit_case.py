@@ -1029,7 +1029,18 @@ def loaded_point_assumptions(
     # wildly larger than the analytical estimate; otherwise use the twin's
     # design current seed so the loaded point tracks the physics tree.
     phase_rms_a = duty.estimated_phase_rms_current_a
-    if inputs.phase_current_design_a is not None:
+    # ⭐ CURRENT A/B OVERRIDE. The twin clamps design current to +/-2.5x of the
+    # duty estimate, which is right for the design path but blocks the question
+    # "what current does THIS machine need to make the duty?" — the question
+    # that sets copper loss, and therefore the thermal answer. Copper loss goes
+    # as I^2, so a machine with torque margin is also a machine with thermal
+    # headroom, and the size of that headroom must be MEASURED.
+    _i_override = os.environ.get("FIA_PHASE_CURRENT_RMS_A")
+    if _i_override:
+        phase_rms_a = float(_i_override)
+        print(f"[em][current] OVERRIDE {phase_rms_a:.1f} A rms (A/B measurement)",
+              flush=True)
+    elif inputs.phase_current_design_a is not None:
         design_a = float(inputs.phase_current_design_a)
         if 0.5 * phase_rms_a <= design_a <= 2.5 * phase_rms_a:
             phase_rms_a = design_a
