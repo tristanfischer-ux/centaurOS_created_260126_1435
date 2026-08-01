@@ -1837,6 +1837,36 @@ def build_artifact(
             "tracking the rotor and every mean over this sweep is unreliable.",
             flush=True,
         )
+    # ⭐ EXCITATION TRACKING BINDS THE DUTY SCREEN (2026-08-01). The sign-reversal
+    # warning above was ADVISORY — it printed and the screen went on comparing a
+    # meaningless average against the requirement. Run the harmonic screen and
+    # let its verdict BLOCK, so a mis-excited machine can never present a mean.
+    excitation_ok: bool | None = None
+    excitation_report: dict | None = None
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+        from fpk_excitation_tracking import screen as _excitation_screen
+
+        _pos = [float(r["rotor_position_mechanical_deg"]) for r in position_points]
+        _tq = [float(r["torque_nm"]) for r in position_points]
+        if len(_pos) >= 3:
+            _span = _pos[-1] - _pos[0]
+            if abs(_tq[-1] - _tq[0]) <= 1e-3 * max(1.0, abs(_tq[0])):
+                _tq = _tq[:-1]            # drop the repeated endpoint sample
+            else:
+                _span += (_pos[-1] - _pos[0]) / (len(_pos) - 1)
+            excitation_report = _excitation_screen(
+                _tq, mechanical_span_deg=_span,
+                pole_pairs=ROTOR_POLES // 2,
+                stator_slots=stator_slots_from_twin(inputs))
+            excitation_ok = bool(excitation_report.get("ok"))
+            for _f in excitation_report.get("findings", []):
+                print(f"[em][excitation] {_f['severity']} {_f['rule']}: "
+                      f"{_f['detail']}", flush=True)
+    except Exception as exc:  # noqa: BLE001 — never let the screen kill the solve
+        print(f"[em][excitation] screen unavailable ({exc}); "
+              "duty screen will NOT be bound to tracking", flush=True)
+
     duty_torque_screen_ok, duty_diag = evaluate_duty_torque_screen_ok(
         required_shaft_torque_nm=duty.required_shaft_torque_nm,
         peak_torque_magnitude_nm=abs(loaded_magnetic.torque_nm),
@@ -1844,12 +1874,16 @@ def build_artifact(
             float(mean_mag) if mean_mag is not None else None
         ),
         torque_reliable=torque_reliable,
+        excitation_tracking_ok=excitation_ok,
     )
     torque_ratio = float(duty_diag["peak_torque_vs_required_ratio"])
 
     return {
         "schema": "forgeos.motor_stack.em_fia_front_kit_case/v2",
         "status": "PARTIAL",
+        # The screen's own verdict, recorded so the block is auditable rather
+        # than a print that scrolls past. `None` = screen did not run.
+        "excitation_tracking": excitation_report,
         "ship_ok": False,
         "works_in_kit_context": {
             "duty_torque_screen_ok": duty_torque_screen_ok,
