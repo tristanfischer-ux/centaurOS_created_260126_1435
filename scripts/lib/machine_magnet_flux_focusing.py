@@ -120,13 +120,21 @@ class MagnetCircuit:
 
 
 def enforce_mode_from_env() -> str:
-    """'off' unless MAGNET_FOCUSING_ENFORCING is truthy — a starved magnet is a
-    DESIGN finding, not a wrongness, so it flags by default and blocks on
-    request (the gate-severity philosophy of gates 31-40)."""
+    """ENFORCING BY DEFAULT (Tristan 2026-08-01: "turn them on by default").
+
+    The earlier reasoning — "a starved magnet is a DESIGN finding, not a
+    wrongness, so it flags rather than blocks" — did not survive contact with
+    this campaign. The FE front MGU spent days being treated as a torque-
+    integration problem while the actual fault was a magnet de-focusing flux at
+    A_m/A_g = 0.562. A machine that cannot make its duty because its pole arc is
+    wrong is not a soft finding to note in passing; every downstream number it
+    produces is describing a machine that will not work.
+
+    MAGNET_FOCUSING_ENFORCING=off returns it to reporting.
+    """
     import os
-    from machine_excitation_tracking import OFF_TOKENS  # one shared rule
-    raw = str(os.environ.get("MAGNET_FOCUSING_ENFORCING", "")).strip().lower()
-    return "off" if raw in OFF_TOKENS else "on"
+    raw = str(os.environ.get("MAGNET_FOCUSING_ENFORCING", "on")).strip().lower()
+    return "off" if raw in ("0", "false", "no", "off", "shadow") else "on"
 
 
 def screen(circuit: MagnetCircuit) -> dict:

@@ -275,9 +275,19 @@ def _selftest() -> int:
 
 
 def _enforce_mode_from_env() -> str:
-    """'off' unless CLAIM_PROVENANCE_ENFORCING is truthy. Mirrors gates 31-40."""
-    raw = str(os.environ.get("CLAIM_PROVENANCE_ENFORCING", "")).strip().lower()
-    return "off" if raw in ("", "0", "false", "no", "off", "shadow") else "on"
+    """ENFORCING BY DEFAULT (Tristan 2026-08-01: "turn them on by default").
+
+    This gate deliberately breaks the gates 31-40 shadow-by-default convention.
+    Those gates default to shadow because a false positive would block a run
+    over a judgement call. This one cannot false-positive on a judgement: it
+    asserts only that a number has a fresh artefact behind it, which is either
+    true or it is not. Shipping a figure with nothing behind it is not a
+    borderline case, so there is nothing to be lenient about.
+
+    CLAIM_PROVENANCE_ENFORCING=off returns it to reporting.
+    """
+    raw = str(os.environ.get("CLAIM_PROVENANCE_ENFORCING", "on")).strip().lower()
+    return "off" if raw in ("0", "false", "no", "off", "shadow") else "on"
 
 
 def main() -> int:
@@ -285,7 +295,8 @@ def main() -> int:
     ap.add_argument("--claims", type=Path)
     ap.add_argument("--output", type=Path)
     ap.add_argument("--enforce", action="store_true",
-                    help="exit non-zero when a claim is unbacked (default: report)")
+                    help="exit 41 when a claim is unbacked (ON BY DEFAULT; "
+                         "set CLAIM_PROVENANCE_ENFORCING=off to report only)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:

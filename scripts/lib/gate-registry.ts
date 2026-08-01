@@ -481,7 +481,7 @@ export const GATES: GateProof[] = [
       rmSync(dir, { recursive: true, force: true })
       return fired && emptyFired && pySelftestPasses('scripts/lib/claim_provenance_gate.py')
     },
-    enforcedByDefault: () => ['1', 'true', 'yes', 'on'].includes(String(process.env.CLAIM_PROVENANCE_ENFORCING || '').toLowerCase()),
+    enforcedByDefault: () => !['0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.CLAIM_PROVENANCE_ENFORCING ?? 'on').trim().toLowerCase()),
   },
   {
     code: 42, name: 'excitation-tracking',
@@ -563,7 +563,7 @@ export const GATES: GateProof[] = [
       rmSync(dir, { recursive: true, force: true })
       return fired && healthyPasses
     },
-    enforcedByDefault: () => !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.MAGNET_FOCUSING_ENFORCING ?? '').trim().toLowerCase()),
+    enforcedByDefault: () => !['0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.MAGNET_FOCUSING_ENFORCING ?? 'on').trim().toLowerCase()),
   },
 ]
 
