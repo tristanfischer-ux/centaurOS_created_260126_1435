@@ -112,14 +112,29 @@ def main() -> int:
     # 0, i.e. i_q ~ cos(gamma) — so gamma = 0 is the pure-q-axis drive.
     gamma_deg = 0.0
 
-    rows = []
-    for token in args.currents.split(","):
-        i_peak = float(token)
+    # ⭐ COGGING MUST BE CANCELLED HERE TOO (learned the hard way, twice).
+    # The FIRST version of this probe solved at rotor position 0, exactly the
+    # bug just fixed in select_best_loaded_point. Cogging is a large fixed
+    # offset, so it swamps a 4 N.m reading at 50 A and barely dents a 62 N.m
+    # one at 400 A — which manufactured a ratio that RISES with current
+    # (0.427 -> 0.874) and looks like neither saturation nor a scale error.
+    # Averaging three positions a third of a slot pitch apart annihilates the
+    # cogging fundamental and its 2nd harmonic exactly, same as the angle screen.
+    import dataclasses
+    slot_pitch_deg = 360.0 / max(1, m.stator_slots_from_twin(inputs))
+    probe_positions = [f * slot_pitch_deg for f in (0.0, 1.0 / 3.0, 2.0 / 3.0)]
+
+    def _solve(i_peak: float, position_deg: float):
         assumptions = m.loaded_point_assumptions(
-            duty, inputs, current_angle_electrical_deg=gamma_deg)
+            duty, inputs,
+            current_angle_electrical_deg=m.rotor_frame_current_angle_deg(
+                gamma_deg,
+                rotor_position_mechanical_deg=position_deg,
+                stator_slots=m.stator_slots_from_twin(inputs),
+                rotor_poles=m.ROTOR_POLES),
+            rotor_position_mechanical_deg=position_deg)
         # Override the current directly; the twin-clamped design current cannot
         # reach the low values this probe needs.
-        import dataclasses
         assumptions = dataclasses.replace(
             assumptions,
             **{
@@ -130,9 +145,15 @@ def main() -> int:
                    math.radians(gamma_deg) - 2.0 * math.pi / 3.0),
                "phase_c_current_a": i_peak * math.cos(
                    math.radians(gamma_deg) + 2.0 * math.pi / 3.0)})
-        result = m.run_loaded_magnetic_point(
+        return m.run_loaded_magnetic_point(
             geometry, solver, remanence_t=remanence, assumptions=assumptions)
-        t_fe = abs(float(result.torque_nm))
+
+    rows = []
+    for token in args.currents.split(","):
+        i_peak = float(token)
+        solved = [_solve(i_peak, pos) for pos in probe_positions]
+        t_fe = abs(sum(float(r.torque_nm) for r in solved) / len(solved))
+        result = solved[0]
         t_analytic = 1.5 * pole_pairs * lambda_pm * i_peak
         rows.append({
             "phase_current_peak_a": i_peak,
@@ -141,6 +162,8 @@ def main() -> int:
             "ratio_fe_over_analytic": (round(t_fe / t_analytic, 4)
                                        if t_analytic else None),
             "peak_airgap_flux_density_t": result.peak_airgap_flux_density_t,
+            "positions_averaged_mech_deg": [round(p, 4) for p in probe_positions],
+            "single_position_torque_nm": round(abs(float(result.torque_nm)), 4),
         })
         print(f"  I={i_peak:7.1f} A pk   FE={t_fe:8.3f}   "
               f"analytic={t_analytic:8.3f}   ratio={t_fe / t_analytic:6.3f}   "
@@ -148,16 +171,48 @@ def main() -> int:
 
     ratios = [r["ratio_fe_over_analytic"] for r in rows
               if r["ratio_fe_over_analytic"]]
+    currents = [r["phase_current_peak_a"] for r in rows]
+    torques = [r["fe_torque_nm"] for r in rows]
     lowest = ratios[0] if ratios else None
     spread = (max(ratios) - min(ratios)) if len(ratios) > 1 else 0.0
+    rising = bool(len(ratios) > 1 and ratios[-1] > ratios[0])
+
+    # Separate the PM (linear in I) and RELUCTANCE (quadratic in I) terms by
+    # least squares: T = a*I + b*I^2. The PM slope `a` gives the torque-derived
+    # flux linkage, which is the machine's REAL PM capability as the FE sees it.
+    a_pm = b_rel = lam_torque = None
+    if len(rows) >= 3:
+        n = len(currents)
+        s11 = sum(i ** 2 for i in currents)
+        s12 = sum(i ** 3 for i in currents)
+        s22 = sum(i ** 4 for i in currents)
+        t1 = sum(i * t for i, t in zip(currents, torques))
+        t2 = sum(i * i * t for i, t in zip(currents, torques))
+        det = s11 * s22 - s12 * s12
+        if abs(det) > 0:
+            a_pm = (t1 * s22 - t2 * s12) / det
+            b_rel = (s11 * t2 - s12 * t1) / det
+            lam_torque = a_pm / (1.5 * pole_pairs)
+
+    # ⭐ THE DIRECTION OF THE RATIO IS THE DIAGNOSIS, and the first version of
+    # this file got it backwards. SATURATION drives FE torque BELOW linear as
+    # current rises, so the ratio FALLS. A ratio that RISES means torque is
+    # SUPERLINEAR — the reluctance term (quadratic in I) is carrying the machine
+    # while the PM term is far weaker than the reference assumes.
     verdict = "INCONCLUSIVE"
     if lowest is not None:
-        if spread > 0.15:
+        if rising and spread > 0.05:
             verdict = (
-                "SATURATION — the ratio MOVES with current, so the discrepancy "
-                "is physical, not a fixed scale error. Compare only at the "
-                "lowest current, where the ratio is "
-                f"{lowest:.3f}.")
+                "PM TORQUE FAR BELOW THE REFERENCE, RELUCTANCE-DOMINATED. The "
+                "ratio RISES with current, so torque is SUPERLINEAR — the "
+                "opposite of saturation. The quadratic (reluctance) term is "
+                "carrying the machine. The linear fit's PM slope gives the FE's "
+                "REAL flux linkage; compare it against whatever the reference "
+                "claimed and treat the difference as the fault to explain.")
+        elif spread > 0.15:
+            verdict = ("SATURATION — the ratio FALLS with current, so the "
+                       "discrepancy is physical. Compare only at the lowest "
+                       f"current, where the ratio is {lowest:.3f}.")
         elif abs(lowest - 2.0) < 0.15:
             verdict = ("SCALE ERROR 2x — the FE applies DOUBLE the ampere-turns. "
                        "With Npcp parallel paths each conductor carries "
@@ -165,12 +220,11 @@ def main() -> int:
         elif abs(lowest - 0.5) < 0.08:
             verdict = "SCALE ERROR 0.5x — the FE applies HALF the ampere-turns."
         elif abs(lowest - 1.0) < 0.12:
-            verdict = ("TORQUE PATH SCALED CORRECTLY — the design-current gap is "
+            verdict = ("TORQUE PATH SCALED CORRECTLY — any design-current gap is "
                        "SATURATION and the machine is genuinely short.")
         else:
             verdict = (f"UNEXPLAINED CONSTANT FACTOR {lowest:.3f} — flat in "
-                       "current, so a scale error, but not a familiar one. "
-                       "Publish the turns/parallel-path table and re-derive.")
+                       "current, so a scale error, but not a familiar one.")
 
     res = {
         "schema": "forgeos.motor_stack.torque_scaling_probe/v1",
@@ -187,6 +241,21 @@ def main() -> int:
         "current_angle_electrical_deg": gamma_deg,
         "points": rows,
         "ratio_spread": round(spread, 4),
+        "ratio_rising_with_current": rising,
+        "fit_T_equals_a_I_plus_b_I2": {
+            "a_pm_nm_per_a": (round(a_pm, 6) if a_pm else None),
+            "b_reluctance_nm_per_a2": (f"{b_rel:.4e}" if b_rel else None),
+            "lambda_pm_from_torque_wb": (round(lam_torque, 6) if lam_torque else None),
+            "lambda_pm_from_reference_wb": round(lambda_pm, 6),
+            "disagreement_x": (round(lambda_pm / lam_torque, 3)
+                               if lam_torque else None),
+            "note": ("The reference lambda_pm comes from the voltage/FW screen, "
+                     "which derives back-EMF ANALYTICALLY from the FE's "
+                     "open-circuit airgap RMS B via a 1-D sinusoidal-flux "
+                     "relation. It is NOT an independent FE measurement of "
+                     "back-EMF, so it must not be presented as a second "
+                     "witness agreeing with the analytic design-flux route."),
+        },
         "verdict": verdict,
     }
     out = args.output or (twin / "_motor_stack" / "em_fia_torque_scaling_probe.json")
