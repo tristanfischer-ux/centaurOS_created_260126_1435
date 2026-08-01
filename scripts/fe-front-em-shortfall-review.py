@@ -97,6 +97,54 @@ Return STRICT JSON only, no markdown fence:
 }"""
 
 
+def _extract_json_objects(text: str) -> list[dict]:
+    """Every balanced {...} in `text` that parses, largest first.
+
+    WHY NOT first-brace-to-last-brace: reasoning models narrate before they
+    answer ("Need strict JSON. Need find arithmetic errors, ... {"), and that
+    prose contains braces. Spanning from the FIRST '{' to the LAST '}' then
+    swallows the narration and fails with a misleading
+    "Expecting property name enclosed in double quotes: line 1 column 2" —
+    which reads as a broken model rather than a bad extractor. Scanning for
+    BALANCED objects and keeping the largest one that actually parses recovers
+    the answer even when it is buried in commentary.
+
+    String-aware: braces inside JSON string literals must not change depth.
+    """
+    found: list[dict] = []
+    depth = 0
+    start = -1
+    in_str = False
+    escape = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    try:
+                        obj = json.loads(text[start:i + 1])
+                        if isinstance(obj, dict):
+                            found.append(obj)
+                    except json.JSONDecodeError:
+                        pass
+                    start = -1
+    return sorted(found, key=lambda o: len(json.dumps(o)), reverse=True)
+
+
 def load_api_key() -> str:
     key = os.environ.get("OPENROUTER_API_KEY", "")
     if key:
@@ -162,8 +210,14 @@ def call_model(seat: str, model: str, user: str, api_key: str,
         # Reasoning models (Kimi K3, GLM) can return content=None with the answer
         # under `reasoning` / `reasoning_content`. The v1 run lost 2 of 4 seats to
         # `'NoneType' object has no attribute 'strip'` for exactly this reason.
-        text = (msg.get("content") or msg.get("reasoning")
-                or msg.get("reasoning_content") or "")
+        # finish_reason distinguishes "the model rambled" from "the model was
+        # CUT OFF mid-thought". Both previously surfaced as a parse failure.
+        finish = (payload["choices"][0].get("finish_reason") or "")
+        field = "content"
+        text = msg.get("content") or ""
+        if not text:
+            text = msg.get("reasoning") or msg.get("reasoning_content") or ""
+            field = "reasoning"
         if isinstance(text, list):
             text = " ".join(
                 part.get("text", "") if isinstance(part, dict) else str(part)
@@ -176,15 +230,22 @@ def call_model(seat: str, model: str, user: str, api_key: str,
             text = text.split("```", 2)[1]
             text = text.split("\n", 1)[1] if "\n" in text else text
             text = text.rsplit("```", 1)[0]
-        try:
-            return {"seat": seat, "model": model, "ok": True, "review": json.loads(text)}
-        except json.JSONDecodeError:
-            start, end = text.find("{"), text.rfind("}")
-            if start >= 0 and end > start:
-                return {"seat": seat, "model": model, "ok": True,
-                        "review": json.loads(text[start:end + 1])}
-            return {"seat": seat, "model": model, "ok": False,
-                    "parse_error": True, "raw": text[:4000]}
+        candidates = _extract_json_objects(text)
+        # Prefer an object that looks like the requested schema over any
+        # incidental JSON the model may have quoted in its narration.
+        keys = ("verdict", "claims", "suspected_fe_model_errors",
+                "recommended_levers", "weakest_link")
+        for obj in candidates:
+            if any(k in obj for k in keys):
+                return {"seat": seat, "model": model, "ok": True, "review": obj}
+        if candidates:
+            return {"seat": seat, "model": model, "ok": True,
+                    "review": candidates[0], "schema_mismatch": True}
+        return {"seat": seat, "model": model, "ok": False, "parse_error": True,
+                "finish_reason": finish, "used_field": field,
+                "hint": ("hit the token cap while reasoning — raise max_tokens"
+                         if finish == "length" else "no balanced JSON in reply"),
+                "raw": text[:4000]}
     except Exception as exc:  # noqa: BLE001 — one dead seat must not kill the panel
         return {"seat": seat, "model": model, "ok": False, "error": str(exc)}
 
