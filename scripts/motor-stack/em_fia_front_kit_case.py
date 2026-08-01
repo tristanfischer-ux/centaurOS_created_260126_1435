@@ -527,6 +527,73 @@ def _estimate_active_mass_kg(
     return steel_volume_m3 * 7_650.0 + magnet_volume_m3 * 7_500.0 + copper_volume_m3 * 8_960.0
 
 
+def solve_v_magnet_dimensions(
+    *,
+    rotor_inner_diameter_mm: float,
+    rotor_outer_diameter_mm: float,
+    rotor_poles: int = ROTOR_POLES,
+    bridge_keepout_mm: float = 2.0,
+    magnet_tilt_deg: float = 20.0,
+) -> tuple[float, float]:
+    """THE one V-magnet sizing rule. (thickness_mm, length_mm).
+
+    ⭐ EXTRACTED SO THERE IS EXACTLY ONE (2026-08-01). em_fia_demag_screen had
+    its own rule — max(3.5, min(7.0, usable*0.55)) x max(12.0, min(18.0,
+    usable*1.35)) — against this module's max(4.0, min(12.0, usable*0.75)) x
+    pole-pitch*0.38. On the live twin: 7.00 x 18.00 mm there, 8.85 x 14.58 mm
+    here. TWO DIFFERENT MAGNETS in two screens of ONE machine, while the demag
+    screen's own docstring said "Share magnet sizing with em_fia_front_kit_case
+    ... so torque, pocket stress and demag screens tell one pocket story."
+    The intent was right; the implementation had diverged.
+
+    It is not cosmetic: demagnetising H runs through the magnet THICKNESS, so
+    the demag margin was being reported for a magnet the torque model does not
+    contain — and the A/B override could never reach it, so a rebalanced magnet
+    could not be demag-checked at all.
+
+    Honours FIA_MAGNET_THICKNESS_MM / FIA_MAGNET_LENGTH_MM so every caller sees
+    the same override.
+    """
+    r_ri = rotor_inner_diameter_mm / 2.0
+    r_ro = rotor_outer_diameter_mm / 2.0
+    rotor_ring_mm = r_ro - r_ri
+    usable_radial_mm = max(4.0, rotor_ring_mm - bridge_keepout_mm)
+    thickness = max(4.0, min(12.0, usable_radial_mm * 0.75))
+    r_mag_est = max(r_ri + bridge_keepout_mm + 2.0,
+                    r_ro - bridge_keepout_mm - usable_radial_mm * 0.45)
+    pole_pitch_mm = (2.0 * math.pi * r_mag_est) / rotor_poles
+    length = max(14.0, min(pole_pitch_mm * 0.38, 44.0))
+
+    tilt = math.radians(magnet_tilt_deg)
+
+    def _fits(l_mm: float, t_mm: float) -> bool:
+        half = l_mm / 2.0 * math.sin(tilt) + t_mm / 2.0 * math.cos(tilt)
+        return (r_ro - MAGNET_ROTOR_BRIDGE_MM - 2.0 * half) > (
+            r_ri + MAGNET_ROTOR_BRIDGE_MM)
+
+    t_over = os.environ.get("FIA_MAGNET_THICKNESS_MM")
+    l_over = os.environ.get("FIA_MAGNET_LENGTH_MM")
+    if t_over or l_over:
+        cand_t = float(t_over) if t_over else thickness
+        cand_l = float(l_over) if l_over else length
+        if not _fits(cand_l, cand_t):
+            raise FiaFrontKitCaseError(
+                f"magnet override {cand_t:.2f} x {cand_l:.2f} mm does not fit "
+                f"the {rotor_ring_mm:.2f} mm rotor ring")
+        return cand_t, cand_l
+
+    if not _fits(length, thickness):
+        for shrink in (0.90, 0.80, 0.70, 0.60, 0.50, 0.42, 0.35):
+            cand_t = max(3.0, usable_radial_mm * 0.75 * shrink)
+            cand_l = max(10.0, min(pole_pitch_mm * 0.38 * shrink, 44.0))
+            if _fits(cand_l, cand_t):
+                return cand_t, cand_l
+        raise FiaFrontKitCaseError(
+            f"Hollow-rotor ring ({rotor_ring_mm:.2f} mm radial) cannot retain a "
+            "V-magnet pair at any derived size")
+    return thickness, length
+
+
 def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
     """Derive a fresh direct-xfemm IPM cross-section from twin dimensions."""
 

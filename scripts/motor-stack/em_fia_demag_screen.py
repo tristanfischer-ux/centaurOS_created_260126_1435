@@ -345,6 +345,30 @@ def input_quantities_sha256(inputs: TwinInputs) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _magnet_matches_shared_rule(inputs, geometry) -> bool:
+    """Does this screen's magnet equal the one the torque model builds?
+
+    The invariant the old band check should have been: one machine, one magnet.
+    A demag margin computed for a magnet the EM model does not contain is not a
+    margin for this machine.
+    """
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from em_fia_front_kit_case import solve_v_magnet_dimensions
+
+        t, l = solve_v_magnet_dimensions(
+            rotor_inner_diameter_mm=inputs.rotor_inner_diameter_mm,
+            rotor_outer_diameter_mm=inputs.rotor_outer_diameter_mm,
+            bridge_keepout_mm=BRIDGE_KEEPOUT_MM,
+            magnet_tilt_deg=MAGNET_TILT_DEG,
+        )
+        return (abs(t - geometry.magnet_thickness_mm) < 1e-3
+                and abs(l - geometry.magnet_length_mm) < 1e-3)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def derive_magnet_geometry(inputs: TwinInputs) -> MagnetGeometry:
     """Map twin rotor ring onto EM-matched V-magnet thickness (demag path).
 
@@ -361,8 +385,30 @@ def derive_magnet_geometry(inputs: TwinInputs) -> MagnetGeometry:
         )
     rotor_ring_mm = ro - ri
     usable_radial_mm = max(4.0, rotor_ring_mm - BRIDGE_KEEPOUT_MM)
-    magnet_thickness_mm = max(3.5, min(7.0, usable_radial_mm * 0.55))
-    magnet_length_mm = max(12.0, min(18.0, usable_radial_mm * 1.35))
+
+    # ⭐⭐ ONE SIZING RULE (2026-08-01). This screen used to size the magnet
+    # ITSELF — max(3.5, min(7.0, usable*0.55)) x max(12.0, min(18.0,
+    # usable*1.35)) — giving 7.00 x 18.00 mm on the live twin while
+    # em_fia_front_kit_case built 8.85 x 14.58 mm. TWO DIFFERENT MAGNETS in two
+    # screens of ONE machine, despite this function's own docstring promising to
+    # "share magnet sizing with em_fia_front_kit_case ... so torque, pocket
+    # stress and demag screens tell one pocket story". The intent was right and
+    # the implementation had drifted.
+    #
+    # It matters because demagnetising H runs through the magnet THICKNESS: the
+    # x3.79 margin this screen reported was a margin for a magnet the torque
+    # model does not contain, and the magnet A/B override could not reach here
+    # at all — so a rebalanced magnet could never be demag-checked.
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from em_fia_front_kit_case import solve_v_magnet_dimensions  # noqa: PLC0415
+
+    magnet_thickness_mm, magnet_length_mm = solve_v_magnet_dimensions(
+        rotor_inner_diameter_mm=inputs.rotor_inner_diameter_mm,
+        rotor_outer_diameter_mm=inputs.rotor_outer_diameter_mm,
+        bridge_keepout_mm=BRIDGE_KEEPOUT_MM,
+        magnet_tilt_deg=MAGNET_TILT_DEG,
+    )
     tilt = math.radians(MAGNET_TILT_DEG)
     radial_half_extent_mm = (
         magnet_length_mm / 2.0 * math.sin(tilt)
@@ -817,9 +863,14 @@ def run_selftest() -> int:
         band_rows=band,
     )
     checks = {
-        "synthetic_magnet_thickness_in_band": (
-            3.5 <= geometry.magnet_thickness_mm <= 7.0
-        ),
+        # ⭐ THE ASSERTION THAT MATTERS, replacing a hardcoded 3.5-7.0 mm band
+        # (2026-08-01). That band was calibrated to this screen's OWN sizing
+        # rule — so it PASSED for years while the screen sized a 7.00 mm magnet
+        # against the EM deck's 8.85 mm. It was validating the divergence, not
+        # catching it. What must be true is that BOTH screens describe THE SAME
+        # MAGNET; assert that directly against the shared derivation.
+        "magnet_matches_the_em_deck": _magnet_matches_shared_rule(
+            inputs, geometry),
         "geometry_fits_twin_rotor": geometry.fits_twin_rotor,
         "id_fraction_at_minus_45": abs(results.id_fraction - math.sqrt(0.5)) < 1.0e-6,
         "nominal_fields_positive_finite": (
