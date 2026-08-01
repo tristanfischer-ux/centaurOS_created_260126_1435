@@ -200,6 +200,62 @@ def screen(circuit: MagnetCircuit) -> dict:
     }
 
 
+
+def _rect_corners(cx: float, cy: float, length: float, thickness: float,
+                  angle_rad: float) -> list[tuple[float, float]]:
+    """Corners of a rotated rectangle — the same construction the placer uses."""
+    ca, sa = math.cos(angle_rad), math.sin(angle_rad)
+    ax, ay = ca * length / 2.0, sa * length / 2.0        # along the long axis
+    bx, by = -sa * thickness / 2.0, ca * thickness / 2.0  # across it
+    return [(cx - ax - bx, cy - ay - by), (cx + ax - bx, cy + ay - by),
+            (cx + ax + bx, cy + ay + by), (cx - ax + bx, cy - ay + by)]
+
+
+def _rects_overlap(a: list[tuple[float, float]],
+                   b: list[tuple[float, float]]) -> bool:
+    """Separating-axis test for two convex quads."""
+    for poly in (a, b):
+        n = len(poly)
+        for i in range(n):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % n]
+            ax, ay = -(y2 - y1), (x2 - x1)               # edge normal
+            pa = [ax * x + ay * y for x, y in a]
+            pb = [ax * x + ay * y for x, y in b]
+            if max(pa) <= min(pb) + 1e-9 or max(pb) <= min(pa) + 1e-9:
+                return False                              # separating axis found
+    return True
+
+
+def v_pair_is_buildable(*, length_mm: float, thickness_mm: float,
+                        magnet_centre_radius_mm: float, half_separation_deg: float,
+                        tilt_rad: float) -> bool:
+    """Do the two bars of a V-pair actually CLEAR each other as PLACED?
+
+    ⭐ WHY THIS REPLACED A FILL HEURISTIC (2026-08-01, found by measurement).
+    `rebalance()` used to bound length with `n * L * cos(tilt) <= 0.9 * pitch`,
+    a tangential FILL fraction. That is not the constraint the placer applies:
+    it seats the bars at +/- half_separation_deg with a tilt, and REFUSES the
+    geometry if the two rectangles intersect. The heuristic therefore
+    over-promised — the recommended 7.0 x 23.34 mm rebalance, quoted all day as
+    a 1.53x gain, raised "Derived V-magnet polygons intersect in pole 0" the
+    moment it was built. A screen that recommends an unbuildable geometry is
+    worse than one that recommends nothing.
+
+    Same class of fault as the documented sizer/placer disagreement in
+    em_fia_front_kit_case.derive_fia_geometry, reproduced in the tangential
+    direction instead of the radial one.
+    """
+    rects = []
+    for side in (-1.0, 1.0):
+        centre_angle = side * math.radians(half_separation_deg)
+        cx = magnet_centre_radius_mm * math.cos(centre_angle)
+        cy = magnet_centre_radius_mm * math.sin(centre_angle)
+        long_axis = math.pi / 2.0 + side * tilt_rad + centre_angle * 0.0
+        rects.append(_rect_corners(cx, cy, length_mm, thickness_mm, long_axis))
+    return not _rects_overlap(rects[0], rects[1])
+
+
 def rebalance(
     circuit: MagnetCircuit,
     *,
@@ -207,6 +263,9 @@ def rebalance(
     magnet_tilt_rad: float,
     max_tangential_fill: float = 0.90,
     n_bars_per_pole: int = 2,
+    half_separation_deg: float | None = None,
+    magnet_centre_radius_mm: float | None = None,
+    is_buildable: "callable | None" = None,
 ) -> dict:
     """Hold magnet VOLUME roughly constant and move it from thickness to face.
 
@@ -238,6 +297,29 @@ def rebalance(
         # tangential: n * L * cos(tilt) <= fill * pitch
         l_tangential = max_tangential_fill * pitch / (n_bars_per_pole * cos_t)
         length = min(l_radial, l_tangential)
+        # ⭐ ASK THE PLACER, DO NOT REIMPLEMENT IT (2026-08-01, learned twice).
+        # The fill heuristic above over-promised: it recommended 7.0 x 23.34 mm,
+        # quoted all day as a 1.53x gain, which the real placer refused with
+        # "Derived V-magnet polygons intersect in pole 0". A local
+        # separating-axis reimplementation ALSO disagreed with the placer — it
+        # accepted 22.74 mm where the true maximum was 22.59. Two attempts to
+        # model someone else's constraint, two disagreements.
+        #
+        # So callers may inject `is_buildable(length_mm, thickness_mm)` — the
+        # PLACER'S OWN test. The built-in geometric fallback stays for callers
+        # that have none, but it is documented as approximate and must never be
+        # the basis of a shipped recommendation.
+        if length > 0 and is_buildable is not None:
+            while length > 1.0 and not is_buildable(length, t):
+                length -= 0.05
+        elif (length > 0 and half_separation_deg is not None
+                and magnet_centre_radius_mm is not None and n_bars_per_pole == 2):
+            while length > 1.0 and not v_pair_is_buildable(
+                    length_mm=length, thickness_mm=t,
+                    magnet_centre_radius_mm=magnet_centre_radius_mm,
+                    half_separation_deg=half_separation_deg,
+                    tilt_rad=magnet_tilt_rad):
+                length -= 0.1
         if length > 0:
             cand = MagnetCircuit(
                 remanence_t=circuit.remanence_t,
@@ -261,6 +343,9 @@ def rebalance(
 
     gain = (best["airgap_flux_T"] / circuit.airgap_flux_t) if best else None
     return {
+        "buildability_source": ("caller-supplied placer test" if is_buildable
+                                else "APPROXIMATE built-in geometry — verify "
+                                     "against the real placer before quoting"),
         "current": {
             "magnet_thickness_mm": round(circuit.magnet_thickness_mm, 2),
             "focusing_ratio": round(circuit.focusing_ratio, 3),

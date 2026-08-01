@@ -587,6 +587,30 @@ def derive_fia_geometry(inputs: TwinInputs) -> FiaMachineGeometry:
         return (r_ro - MAGNET_ROTOR_BRIDGE_MM - 2.0 * half) > (
             r_ri + MAGNET_ROTOR_BRIDGE_MM)
 
+    # ⭐ A/B OVERRIDE (2026-08-01). The magnet rebalance must be MEASURED, not
+    # computed: the flux-focusing screen predicts >=1.53x from face area alone,
+    # but the linkage is 3rd-harmonic dominated (3rd = 1.90x the fundamental),
+    # so broadening the pole should ALSO convert harmonic energy into
+    # fundamental — a gain the area ratio cannot predict. Overriding the two
+    # magnet dimensions lets the same deck solve both geometries with
+    # everything else held identical, which is the only honest comparison.
+    # The fit test below still runs, so an override that will not build is
+    # rejected rather than silently shrunk.
+    _t_override = os.environ.get("FIA_MAGNET_THICKNESS_MM")
+    _l_override = os.environ.get("FIA_MAGNET_LENGTH_MM")
+    if _t_override or _l_override:
+        cand_t = float(_t_override) if _t_override else magnet_thickness_mm
+        cand_l = float(_l_override) if _l_override else magnet_length_mm
+        if not _fits(cand_l, cand_t):
+            raise FiaFrontKitCaseError(
+                f"magnet override {cand_t:.2f} x {cand_l:.2f} mm does not fit "
+                f"the {rotor_ring_mm:.2f} mm rotor ring with "
+                f"{MAGNET_ROTOR_BRIDGE_MM:.1f} mm bridges — the placer would "
+                "refuse it")
+        magnet_thickness_mm, magnet_length_mm = cand_t, cand_l
+        print(f"[em][magnet] OVERRIDE t={cand_t:.3f} mm L={cand_l:.3f} mm "
+              "(A/B rebalance measurement)", flush=True)
+
     if not _fits(magnet_length_mm, magnet_thickness_mm):
         # Shrink progressively rather than once-and-hope; keep the aspect
         # sensible (thickness drives flux, length drives pole arc).
