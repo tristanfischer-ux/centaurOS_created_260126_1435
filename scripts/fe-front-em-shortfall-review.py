@@ -19,14 +19,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs/plans/FE-FRONT-EM-TORQUE-SHORTFALL-REVIEW-BRIEF-2026-07-31.md"
-OUT_DIR = ROOT / "out/formula-e-front-mgu-20260729-1432/_em_shortfall_review"
+BRIEF = ROOT / "docs/plans/FE-FRONT-EM-TORQUE-REVIEW-BRIEF-v2-2026-08-01.md"
+OUT_DIR = ROOT / "out/formula-e-front-mgu-20260729-1432/_em_review_v2"
 
 SEATS: dict[str, str] = {
-    "glm52": "z-ai/glm-5.2",
     "kimi_k3": "moonshotai/kimi-k3",
-    "sol": "openai/gpt-5.6-sol",
-    "grok45": "x-ai/grok-4.5",
 }
 
 SYSTEM = """You are a chartered electrical machines engineer reviewing another
@@ -77,7 +74,10 @@ def call_model(seat: str, model: str, user: str, api_key: str) -> dict:
     body = {
         "model": model,
         "temperature": 0.15,
-        "max_tokens": 8000,
+        # Reasoning models spend the budget THINKING before emitting the answer.
+        # At 8000 Kimi K3 ran out mid-derivation and never produced the JSON —
+        # which surfaced as a "parse" failure rather than "budget exhausted".
+        "max_tokens": 40000,
         "messages": [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": user},
@@ -89,10 +89,48 @@ def call_model(seat: str, model: str, user: str, api_key: str) -> dict:
         headers={"Authorization": f"Bearer {api_key}",
                  "Content-Type": "application/json"},
     )
+    # OpenRouter emits WHITESPACE KEEP-ALIVE PADDING while a slow model thinks
+    # (hundreds of blank lines before the JSON body). If the connection ends
+    # mid-stream the body is padding-only and json.loads dies with a misleading
+    # "Expecting value: line 253 column 1" — which reads as a model/parse fault
+    # rather than a truncated HTTP response. Strip, verify, and retry.
+    payload = None
+    last_err = ""
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=900) as resp:
+                raw = resp.read().decode().strip()
+            if not raw:
+                last_err = "empty body (keep-alive padding only)"
+                continue
+            start = raw.find("{")
+            if start < 0:
+                last_err = f"no JSON in {len(raw)} bytes of body"
+                continue
+            payload = json.loads(raw[start:])
+            break
+        except json.JSONDecodeError as exc:
+            last_err = f"truncated body: {exc}"
+        except Exception as exc:  # noqa: BLE001
+            last_err = f"{type(exc).__name__}: {exc}"
+    if payload is None:
+        return {"seat": seat, "model": model, "ok": False,
+                "error": f"{last_err} (after 3 attempts)"}
     try:
-        with urllib.request.urlopen(req, timeout=600) as resp:
-            payload = json.loads(resp.read().decode())
-        text = payload["choices"][0]["message"]["content"].strip()
+        msg = payload["choices"][0]["message"]
+        # Reasoning models (Kimi K3, GLM) can return content=None with the answer
+        # under `reasoning` / `reasoning_content`. The v1 run lost 2 of 4 seats to
+        # `'NoneType' object has no attribute 'strip'` for exactly this reason.
+        text = (msg.get("content") or msg.get("reasoning")
+                or msg.get("reasoning_content") or "")
+        if isinstance(text, list):
+            text = " ".join(
+                part.get("text", "") if isinstance(part, dict) else str(part)
+                for part in text)
+        text = str(text).strip()
+        if not text:
+            return {"seat": seat, "model": model, "ok": False,
+                    "error": f"empty content; keys={sorted(msg.keys())}"}
         if text.startswith("```"):
             text = text.split("```", 2)[1]
             text = text.split("\n", 1)[1] if "\n" in text else text

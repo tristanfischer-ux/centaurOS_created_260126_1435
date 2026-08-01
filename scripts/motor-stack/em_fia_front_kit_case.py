@@ -889,6 +889,19 @@ def summarize_rotor_position_sweep(
         "torque_vs_required_ratio_mean": round(sum(ratios) / len(ratios), 6),
         "peak_to_peak_torque_nm": round(max(torques) - min(torques), 6),
         "peak_to_peak_magnitude_nm": round(max(magnitudes) - min(magnitudes), 6),
+        # ⭐ DELIVERED torque = |mean of the SIGNED curve| (2026-08-01, Kimi K3
+        # panel). The duty screen had been fed `torque_magnitude_mean_nm`, the
+        # mean of |T|, which OVERSTATES delivered torque whenever the curve
+        # changes sign: a sweep of +38 and -122 gave mean|T| = 57.84 while the
+        # true average shaft torque was near zero. A machine cannot deliver the
+        # average of the absolute value of its torque.
+        "delivered_mean_torque_nm": round(abs(mean_torque), 6),
+        # A synchronous machine held at a fixed ROTOR-FRAME current angle must
+        # NOT reverse torque. Any reversal means the excitation is not tracking
+        # the rotor, and every mean over that sweep is meaningless.
+        "sign_reversals": sum(
+            1 for a, b in zip(torques, torques[1:]) if a * b < 0),
+        "torque_sign_consistent": all(t >= 0 for t in torques) or all(t <= 0 for t in torques),
     }
 
 
@@ -1028,8 +1041,20 @@ def rotor_frame_current_angle_deg(
             stator_slots if stator_slots else DEFAULT_STATOR_SLOTS, rotor_poles)
     except Exception:  # noqa: BLE001
         axis = 0.0
+    # ⭐ SIGN (2026-08-01, measured). The advance must be NEGATIVE: the FE rotates
+    # the rotor in the OPPOSITE angular sense to the current-phasor convention, so
+    # the stator excitation tracks the rotor only when it advances by -p*theta_m.
+    # Measured over positions 0/3.75/7.5/11.25/15 deg mech at a fixed rotor-frame
+    # command, signed torque:
+    #     no advance : mean  -0.02 N.m, spread 300000% (pure out-of-sync)
+    #     +p*theta_m : mean  -7.13 N.m, spread   1190%  <- what was implemented
+    #     -p*theta_m : mean +26.12 N.m, spread    334%  <- the only coherent one
+    # The earlier "rotor-frame fix" advanced the angle but in the wrong direction,
+    # so it removed the gross aliasing yet left the machine still walking out of
+    # synchronism. The residual 334% swing is at SLOT PITCH and is the separate
+    # 46%-of-pitch slot-opening cogging, not a phasing fault.
     return (float(base_angle_electrical_deg) + axis
-            + pole_pairs * float(rotor_position_mechanical_deg))
+            - pole_pairs * float(rotor_position_mechanical_deg))
 
 
 def run_rotor_position_sweep(
@@ -1415,7 +1440,16 @@ def _build_fia_lua(
         lua.extend(_circle_lua(radius_mm))
 
     slot_pitch_rad = 2.0 * math.pi / geometry.stator_slots
-    slot_half_width_rad = slot_pitch_rad * 0.23
+    # ⭐ SLOT OPENING (2026-08-01). Was 0.23 half-width = 46% of SLOT PITCH — a
+    # very wide open slot. Because it is a fraction of PITCH, halving the slot
+    # count DOUBLES the physical opening (3.45 deg at 48 slots, 6.9 deg at 24).
+    # Grok 4.5 + Sol both flagged the consequence: a lumpy airgap field with big
+    # local tooth-tip spikes but a WEAK FUNDAMENTAL B1, and mean torque tracks
+    # B1, not local Bpeak. That explains the low mean AND the 207% slot-rate
+    # ripple with one mechanism. Real traction IPMSMs use semi-closed slots at
+    # roughly 10-20% of pitch. Overridable for A/B testing.
+    _slot_open_frac = float(os.environ.get("FIA_SLOT_OPEN_FRAC", "0.07"))
+    slot_half_width_rad = slot_pitch_rad * _slot_open_frac
     slot_labels: list[tuple[complex, str, int]] = []
     for slot_index in range(geometry.stator_slots):
         center_angle = slot_index * slot_pitch_rad
@@ -1771,7 +1805,18 @@ def build_artifact(
     # GOTCHA: torque_reliable stays False until dyno/map close — that alone
     # keeps duty_torque_screen_ok False (honesty). Mean must also clear 1.0×.
     torque_reliable = False
-    mean_mag = position_summary.get("torque_magnitude_mean_nm")
+    # Use DELIVERED torque (|mean of signed|), never the mean of |T|.
+    mean_mag = position_summary.get("delivered_mean_torque_nm")
+    if mean_mag is None:
+        mean_mag = position_summary.get("torque_magnitude_mean_nm")
+    if position_summary.get("torque_sign_consistent") is False:
+        print(
+            f"[em][duty] WARNING: torque REVERSES SIGN "
+            f"({position_summary.get('sign_reversals')} crossings) across the "
+            "rotor sweep at a fixed rotor-frame angle — the excitation is not "
+            "tracking the rotor and every mean over this sweep is unreliable.",
+            flush=True,
+        )
     duty_torque_screen_ok, duty_diag = evaluate_duty_torque_screen_ok(
         required_shaft_torque_nm=duty.required_shaft_torque_nm,
         peak_torque_magnitude_nm=abs(loaded_magnetic.torque_nm),
