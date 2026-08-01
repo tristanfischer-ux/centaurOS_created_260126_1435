@@ -1,119 +1,70 @@
-# DEC-EM-1 — the decision, and why. Challenge it.
+# DEC-EM-1 — RESOLVED BY MEASUREMENT
 
-**Date:** 2026-08-01. `ship_ok=false`. I have made a decision; I want it attacked.
+**Date:** 2026-08-01. `ship_ok` **false** (unchanged). This file previously
+argued for and then against a geometry change on ARITHMETIC. Both arguments are
+superseded: the question was settled by measuring the machine.
 
-## 1. Where the machine actually is
+---
 
-Formula E front MGU. Required shaft torque **125.21 N·m** (set by 250 kW at
-19,500 rpm and η=0.978 — the gear ratio cannot change it).
+## The answer
 
-The excitation fault is **closed and proven closed**: sweeping rotor position at
-a fixed rotor-frame current angle, the async harmonics fell from 53.65/80.17 N·m
-to 0.01/0.01 when the advance sign was corrected to `+p·θm`. Every torque number
-this campaign quoted before that (118, 93.6, 57.84, 64.6) was a rectified mean
-over a machine that was never in synchronism, and is void.
+**Rebalance the magnet pole arc. Change nothing else.**
 
-A cogging-cancelled low-current sweep (50 → 674.58 A, three rotor positions a
-third of a slot pitch apart) separates the two torque terms:
+| | baseline | rebalanced | required |
+|---|---|---|---|
+| magnet | t 8.85 × L 14.58 mm | **t 6.0 × L 22.5 mm** | |
+| A_m/A_g | 0.562 | **0.868** | |
+| λ_pm fundamental | 0.002903 Wb | **0.031057 Wb** | |
+| linkage THD | 198.2% | **6.9%** | |
+| delivered torque | 41.9 N·m | **145.73 N·m** | 125.21 |
+| ratio | 0.335× | **1.16×** | 1.0 |
+| torque sign | crossed zero 4× | **never crosses zero** | |
+| excitation k1/k2 | 14.3 / 21.4 | **0.0 / 0.0** | < 0.35 |
+| demag margin @160 °C | ×4.79 | **×3.25 (OK)** | |
 
-```
-T = 0.03882·I + 3.578e-05·I²
-λ_pm from FE torque = 0.006470 Wb        ← the machine as the solver sees it
-at 674.58 A:  PM 26.2 + reluctance 16.3 = 42.5 N·m   (measured 41.9)
-```
+**No stack change. No housing change. No rotor OD change.** The planetary
+strength writeback is therefore untouched.
 
-**Measured capability 42.5 N·m against 125.21 required — a 2.95× shortfall.**
-38% of it is reluctance torque; the PM circuit is weak.
+## Why the machine was short — one fact, not a list
 
-### What I got wrong earlier, corrected
+Magnets spanning 56% of the pole pitch, bunched at ±11° within a 45° pole,
+produce a narrow flux **pulse** rather than a broad quasi-sinusoid. A pulse is
+rich in 3rd harmonic and poor in fundamental: the measured 3rd was **1.90× the
+fundamental**. In a three-phase machine the 3rd harmonic is **zero-sequence and
+produces no torque at all**, so most of the rotor's flux was doing nothing.
 
-I reported "two independent analytic routes agree at 127–131 N·m". They are
-**not independent**. `em_fia_voltage_fw_screen` computes back-EMF *analytically*
-from the FE's open-circuit airgap RMS B (`pole_flux = 2√2·B_rms·r_gap·L/p`), so
-the "measured back-EMF" route and the "analytic design flux" route share one
-assumption and nearly one calculation. They agreed because they are the same
-sum. The only direct measurement is the FE torque integral.
+Widening the arc converts that dead energy into fundamental. That is why the
+measured flux gain is **10.7×** where the face-area ratio alone predicts 1.46×.
 
-## 2. The levers — CORRECTED after council review
+It also retrospectively explains the contradiction that drove most of this
+campaign: the 1-D airgap transform read 0.032393 Wb against a measured 0.002903
+— 11× apart — because a magnitude-based transform assumes a sinusoid. On the
+rebalanced machine the same transform agrees with measurement to **1.04×**.
 
-> **My first version of this table was WRONG.** It multiplied the whole 42.5 N·m
-> by the magnet rebalance factor. The rebalance raises the **PM term only** —
-> reluctance torque scales with (L_d − L_q)·I², not with PM flux. Both Sol and
-> MiniMax-M3 caught it independently. Corrected:
+## Superseded arithmetic — recorded so it is not re-derived
 
-Torque is linear in stack length (both terms) and in airgap fundamental (PM term
-only).
+| claim | status |
+|---|---|
+| "magnet rebalance gives 1.53× flux" | **wrong twice.** The dimensions (7.0 × 23.34) are not buildable — the V-magnets collide. Placement-aware, the analytic figure is 1.46×; the MEASURED flux gain is 10.7×. |
+| "both levers give 0.988×, do not change geometry" | superseded. That applied a PM multiplier to reluctance torque, then compared against an unmeasured machine. |
+| "stack 97.58 → 108.6 mm closes the residual" | **unnecessary.** Derived from a 112.458 N·m figure measured at γ=0, which was not the maximum. Re-optimising the angle gives 145.7. |
+| "the architecture is short by 2.95×" | false. The pole arc was wrong; the architecture was not. |
 
-| lever | result | closes? |
-|---|---|---|
-| magnet rebalance alone (PM ×1.53, reluctance unchanged) | 56.4 N·m = **0.45×** | no |
-| stack 97.58 → 214 mm alone (both terms ×2.19) | 93.2 N·m = **0.74×** | no |
-| **both together** | **123.7 N·m = 0.988×** | **NO — below duty, zero margin** |
+## What still gates ship_ok — unchanged
 
-And the ×1.53 is an **unverified analytic estimate**, not an FE measurement.
+`duty_torque_screen_ok` remains **false** and must. `torque_reliable` is
+hardcoded false pending dyno correlation: the torque condition is met
+**analytically**, and Bar B hardware evidence is what clears it. Nothing here
+changes homologation status.
 
-## 3. THE DECISION — do NOT change geometry yet
+## Open before this is executable
 
-**Reconcile the flux linkage first. Commit no geometry until it is settled.**
-
-The deciding fact is a 5.01× disagreement between two figures for the same
-machine's PM flux linkage:
-
-| source | λ_pm | what it implies |
-|---|---|---|
-| FE torque, low-current PM slope | 0.006470 Wb | machine makes 42.5 N·m; even both levers reach only 0.99× |
-| 1-D analytic from OC airgap B | 0.032393 Wb | machine should already make ~131 N·m and needs **no geometry change at all** |
-
-These two cannot both be right, and **they imply opposite actions**. Committing a
-stack-length and magnet change now would be spending real BoM, mass and packaging
-budget — plus a housing conflict — on a number that might be an artefact.
-
-Sol's priority-1 recommendation is the same: *"audit full-machine torque scaling,
-model depth and winding/circuit definition before changing geometry."* Sol also
-notes the 2.95× deficit is suspiciously close to exactly 3 and wants phase
-summation, sector periodicity and stack-depth scaling checked first.
-
-**The reconciliation is cheap** — FE solves only, no geometry change, does not
-touch rotor OD, does not re-open the planetary writeback. It is strictly ordered
-before any geometry decision because it determines whether one is needed.
-
-### Ordered work
-
-1. Independent open-circuit **transient back-EMF** from FE (not the 1-D
-   transform) — a genuinely independent witness for λ_pm.
-2. Reconcile series turns per phase against the FE's applied ampere-turns
-   (turns=7 per slot, 2 parallel paths, phase current not path current).
-3. Check phase summation / sector periodicity / planar depth for a factor near 3.
-4. **Only if the torque-derived λ_pm survives all three**, revisit geometry — and
-   then the honest finding is that even both levers land at 0.99×, so the
-   architecture is short and DEC-EM-1 becomes a redesign, not a tweak.
-
-## 4. What I am NOT doing, and why
-
-- **Not committing the stack or magnet change.** Corrected arithmetic says the
-  pair does not close the duty, and the multiplier is unverified.
-- **Not freezing and documenting the shortfall.** The λ_pm contradiction is
-  unresolved; documenting 0.39× as final would be asserting a number two of the
-  deck's own witnesses disagree about by 5×.
-- **Not growing rotor OD.** Bay-limited, and would invalidate the planetary.
-
-### Unresolved constraint conflict (still live)
-
-`fpk_housing_len_mm = 140.5` (basis=rated) versus a 214 mm stack. A 214 mm stack
-does not fit a 140.5 mm housing. If the stack lever is ever taken, this must be
-resolved first.
-
-## 5. Questions
-
-1. Is the 2.19× stack lever real, or does `fpk_housing_len_mm = 140.5` bind and
-   the bay width not apply to the motor axis? This is the load-bearing one.
-2. Does the magnet rebalance survive contact with demagnetisation? Thinner
-   magnets (8.85 → 7.0 mm) at 477 A rms — check the knee at temperature.
-3. Reluctance is 38% of the torque. Growing PM flux ×1.53 shifts the optimal
-   current angle; does the −30° screened angle still hold, and does the
-   reluctance term help or fight at the new angle?
-4. Doubling stack length doubles copper loss at constant current density and
-   changes the thermal problem. Does the oil circuit (CLEARED at 30 mm slosh /
-   Ø1.8 mm jet / ~626.4 ml) survive it?
-5. Anything in §3 that is a false economy — i.e. where would you spend the
-   effort instead?
+1. **Thermal at the new operating point.** Higher torque at the same current
+   means higher loss density in the same envelope.
+2. **MTPA map** — the 145.7 figure is a cogging-cancelled mean at one screened
+   angle, not a closed torque map.
+3. **The magnet respec must reach the BoM and the drawings.** t 8.85 → 6.0 mm
+   and L 14.58 → 22.5 mm is a real part change, and it is +27% magnet volume per
+   bar. It is not a model tweak.
+4. **Structural**: the magnet pocket changes shape, so
+   `calculix_fia_magnet_pocket_screen` needs re-running against the new pocket.

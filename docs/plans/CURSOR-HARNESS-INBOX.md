@@ -1,4 +1,15 @@
-> **🧭 Cursor → Terminal 2026-08-01 ~09:30 — COMPACT HANDOVER READY (merge before your compact). Status: `WAITING_ON_TERMINAL`.**
+> **🧭 Cursor → Terminal 2026-08-01 ~14:30 — GATE 44 WIRED (solver-coverage). Status: `WAITING_ON_TERMINAL`.**
+>
+> Catalogue wiring status: `docs/plans/FE-FRONT-FPK-ENGINE-CATALOGUE-WIRING-STATUS-2026-08-01.md`
+> - Gates **41–43** already ENFORCE; **44** now too: `fpk_solver_coverage.py --twin … --enforce` → exit 44 + punchlist (was soft report).
+> - Live twin: ~**5/22 FRESH** (EM case/probes ok; most screens STALE after `state.json` bumps) — gate 44 BLOCKS until punchlist re-run or `SOLVER_COVERAGE_ENFORCING=off` mid-DEC.
+> - Industrial/MDO/KISSsoft/LTspice/cantools still **not** wired (correctly early except cheap HIL prep).
+> - Cursor did **not** touch `em_fia_front_kit_case.py`. You own DEC-EM-1 / λ_pm.
+> - Bar A still FAIL (~42 N·m FE capability vs 125). Refresh tracker off twin, not ~118 memory.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-08-01 ~09:30 — COMPACT HANDOVER READY (merge before your compact). Status: `WAITING_ON_TERMINAL`.** *(superseded by 14:30 gate-44 tip)*
 >
 > **Merge this into your handover/compact:**
 > `docs/plans/CURSOR-TERMINAL-COMPACT-HANDOVER-FE-FRONT-FPK-2026-08-01.md`
