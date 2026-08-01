@@ -135,8 +135,26 @@ def derive_pocket_bridge_geometry(inputs: TwinInputs) -> PocketBridgeGeometry:
         )
     rotor_ring_mm = ro - ri
     usable_radial_mm = max(4.0, rotor_ring_mm - BRIDGE_KEEPOUT_MM)
-    magnet_thickness_mm = max(3.5, min(7.0, usable_radial_mm * 0.55))
-    magnet_length_mm = max(12.0, min(18.0, usable_radial_mm * 1.35))
+    # ⭐⭐ THE THIRD MACHINE (2026-08-01). This screen sized the magnet with the
+    # same divergent rule as em_fia_demag_screen — 7.00 x 18.00 mm on the live
+    # twin — while em_fia_front_kit_case built 8.85 x 14.58 mm. Three screens of
+    # ONE machine, two different magnets between them, and the demag screen's
+    # docstring named THIS FILE as one of the three that were supposed to "tell
+    # one pocket story".
+    #
+    # It matters here specifically: this screen computes the centrifugal load
+    # from the MAGNET BAR MASS and the bridge stress that retains it. A magnet
+    # 21% thinner and 23% longer than the modelled one is a different mass and a
+    # different lever arm, so the reported factor of safety was for a bar the EM
+    # model does not contain.
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from em_fia_front_kit_case import solve_v_magnet_dimensions  # noqa: PLC0415
+
+    magnet_thickness_mm, magnet_length_mm = solve_v_magnet_dimensions(
+        rotor_inner_diameter_mm=inputs.rotor_inner_diameter_mm,
+        rotor_outer_diameter_mm=inputs.rotor_outer_diameter_mm,
+    )
     tilt = math.radians(MAGNET_TILT_DEG)
     radial_half_extent_mm = (
         magnet_length_mm / 2.0 * math.sin(tilt)

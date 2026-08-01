@@ -66,6 +66,17 @@
       ],
       "tolerance": 0.02,
       "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_front_kit_case.py --twin out/formula-e-front-mgu-20260729-1432"
+    },
+    {
+      "name": "mtpa_mean_torque_rebalanced_nm",
+      "value": 147.539,
+      "artefact": "../_motor_stack/em_fia_mtpa_screen_REBALANCED.json",
+      "key_path": "summary.best_angle_mean_torque_magnitude_nm",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.01,
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_mtpa_screen.py --twin out/formula-e-front-mgu-20260729-1432 --output out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_mtpa_screen_REBALANCED.json"
     }
   ]
 }
