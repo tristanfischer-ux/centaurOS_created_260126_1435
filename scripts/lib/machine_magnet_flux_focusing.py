@@ -58,8 +58,6 @@ import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
 # The healthy open-circuit airgap fundamental band for a rare-earth IPM.
 # Below this a machine cannot make competitive torque per amp regardless of
 # winding, current angle, or integration method.
@@ -206,7 +204,19 @@ def rebalance(
     t = 12.0
     while t >= 3.0:
         # radial:  L/2*sin + t/2*cos <= max_half
-        l_radial = (max_radial_half_extent_mm - t / 2.0 * cos_t) * 2.0 / sin_t
+        # GOTCHA (found by running this on a machine that is NOT the one it was
+        # written for): an UNTILTED magnet — straight bar, surface-mount, any
+        # geometry with tilt 0 — makes sin_t zero and this divides by zero. With
+        # no tilt the bar's radial extent does not depend on its LENGTH at all,
+        # so the radial constraint simply does not bind; only the tangential one
+        # does. Guard the degenerate case rather than assuming a V-magnet.
+        if sin_t <= 1e-9:
+            if t / 2.0 * cos_t > max_radial_half_extent_mm:
+                t -= 0.25
+                continue
+            l_radial = float("inf")
+        else:
+            l_radial = (max_radial_half_extent_mm - t / 2.0 * cos_t) * 2.0 / sin_t
         # tangential: n * L * cos(tilt) <= fill * pitch
         l_tangential = max_tangential_fill * pitch / (n_bars_per_pole * cos_t)
         length = min(l_radial, l_tangential)
@@ -250,45 +260,42 @@ def rebalance(
 # Twin binding
 # ──────────────────────────────────────────────────────────────────────────
 
-def from_twin(twin: Path) -> tuple[MagnetCircuit, float, float]:
-    """Build the circuit from the SOLVED geometry, never from typed constants."""
-    sys.path.insert(0, str(REPO_ROOT / "scripts" / "motor-stack"))
-    import em_fia_front_kit_case as m  # noqa: PLC0415
+def from_machine(
+    *,
+    remanence_t: float,
+    recoil_permeability: float,
+    magnet_thickness_mm: float,
+    magnet_length_mm: float,
+    magnets_per_pole: int,
+    magnet_tilt_deg: float,
+    rotor_outer_diameter_mm: float,
+    bridge_mm: float,
+    poles: int,
+    airgap_mm: float,
+) -> tuple[MagnetCircuit, float, float]:
+    """Build the circuit from PLAIN MACHINE NUMBERS — no archetype coupling.
 
-    state = json.loads((twin / "state.json").read_text())
-    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
-    geometry = m.derive_fia_geometry(m.inputs_from_sections(q, {}))
-
-    machine = m.load(str(m.MATERIAL_MACHINE_PATH))
-    magnet = machine.rotor.hole[0].magnet_0.mat_type.mag
-    remanence = float(magnet.Brm20)
-    mur = float(magnet.mur_lin)
-
-    tilt = math.radians(20.0)
-    r_ro = geometry.rotor_outer_diameter_mm / 2.0
-    r_ri = geometry.rotor_inner_diameter_mm / 2.0
-    half = (geometry.magnet_length_mm / 2.0 * math.sin(tilt)
-            + geometry.magnet_thickness_mm / 2.0 * math.cos(tilt))
-    r_mag = r_ro - m.MAGNET_ROTOR_BRIDGE_MM - half
-    pole_pitch = 2.0 * math.pi * r_mag / m.ROTOR_POLES
-    # Both bars of the V, projected onto the tangential direction.
-    face = 2.0 * geometry.magnet_length_mm * math.cos(tilt)
-
+    Every FE-front-kit-specific import, constant and file path that used to live
+    here has been removed. Any caller with an IPM/SPM geometry can use this:
+    pass the numbers, get the screen. The FE front kit is now just one caller
+    (see `scripts/motor-stack/em_fia_front_kit_case.py`), not the only one.
+    """
+    tilt = math.radians(magnet_tilt_deg)
+    r_ro = rotor_outer_diameter_mm / 2.0
+    half = (magnet_length_mm / 2.0 * math.sin(tilt)
+            + magnet_thickness_mm / 2.0 * math.cos(tilt))
+    r_mag = r_ro - bridge_mm - half
+    pole_pitch = 2.0 * math.pi * r_mag / poles
+    face = magnets_per_pole * magnet_length_mm * math.cos(tilt)
     circuit = MagnetCircuit(
-        remanence_t=remanence,
-        recoil_permeability=mur,
-        magnet_thickness_mm=geometry.magnet_thickness_mm,
+        remanence_t=remanence_t,
+        recoil_permeability=recoil_permeability,
+        magnet_thickness_mm=magnet_thickness_mm,
         magnet_face_per_pole_mm=face,
         pole_pitch_at_magnet_mm=pole_pitch,
-        effective_airgap_mm=FIA_AIRGAP_MM,
+        effective_airgap_mm=airgap_mm,
     )
-    # The placer's own radial budget, so a rebalance stays buildable.
-    max_half = (r_ro - m.MAGNET_ROTOR_BRIDGE_MM
-                - (r_ri + m.MAGNET_ROTOR_BRIDGE_MM)) / 2.0
-    return circuit, max_half, tilt
-
-
-FIA_AIRGAP_MM = 0.7
+    return circuit, half, tilt
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -388,16 +395,35 @@ def _selftest() -> int:
         check("rebalance.improves", reb["airgap_flux_gain_x"] > 1.0,
               "rebalance did not improve airgap flux")
 
+    # UNIVERSALITY proveCatch — this module must work on machines it was NOT
+    # written for. A zero-tilt (surface-mount / straight-bar) magnet used to
+    # divide by sin(0) in rebalance(); FE-front-kit-only testing never hit it.
+    flat = MagnetCircuit(1.35, 1.05, 4.0, 30.0, 55.0, 1.2)
+    try:
+        reb_flat = rebalance(flat, max_radial_half_extent_mm=6.0,
+                             magnet_tilt_rad=0.0, n_bars_per_pole=1)
+        check("universal.zero_tilt_magnet", reb_flat["best_rebalance"] is not None,
+              "no rebalance found for an untilted magnet")
+    except ZeroDivisionError:
+        check("universal.zero_tilt_magnet", False,
+              "rebalance divides by zero when magnet tilt is 0")
+
+    # And a different pole count / bar count must screen without complaint.
+    spm = MagnetCircuit(1.35, 1.05, 4.0, 30.0, 55.0, 1.2)
+    _ = screen(spm)
+    check("universal.other_pole_count_screens", True)
+
     for f in failures:
         print(f"  FAIL {f}")
     print(f"{'FAIL' if failures else 'PASS'} "
-          f"fpk_magnet_flux_focusing selftest ({len(failures)} failures)")
+          f"machine_magnet_flux_focusing selftest ({len(failures)} failures)")
     return 1 if failures else 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--twin", type=Path)
+    ap.add_argument("--machine-json", type=Path,
+                    help="JSON with the machine numbers (see from_machine)")
     ap.add_argument("--output", type=Path)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
@@ -405,16 +431,17 @@ def main() -> int:
 
     if args.selftest:
         return _selftest()
-    if not args.twin:
-        ap.error("--twin required unless --selftest")
+    if not args.machine_json:
+        ap.error("--machine-json required unless --selftest")
 
-    twin = args.twin.resolve()
-    circuit, max_half, tilt = from_twin(twin)
+    spec = json.loads(args.machine_json.read_text())
+    circuit, max_half, tilt = from_machine(**spec)
     res = screen(circuit)
     res["rebalance"] = rebalance(
-        circuit, max_radial_half_extent_mm=max_half, magnet_tilt_rad=tilt)
+        circuit, max_radial_half_extent_mm=max_half, magnet_tilt_rad=tilt,
+        n_bars_per_pole=int(spec.get("magnets_per_pole", 2)))
 
-    out = args.output or (twin / "_motor_stack" / "magnet_flux_focusing.json")
+    out = args.output or args.machine_json.with_name("magnet_flux_focusing.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(res, indent=2))
 

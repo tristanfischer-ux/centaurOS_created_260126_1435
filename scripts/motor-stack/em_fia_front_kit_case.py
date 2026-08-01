@@ -1936,7 +1936,7 @@ def build_artifact(
     excitation_report: dict | None = None
     try:
         sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
-        from fpk_excitation_tracking import screen as _excitation_screen
+        from machine_excitation_tracking import screen as _excitation_screen
 
         _pos = [float(r["rotor_position_mechanical_deg"]) for r in position_points]
         _tq = [float(r["torque_nm"]) for r in position_points]

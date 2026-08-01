@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
-"""Shared OpenRouter council model seats for FPK challenge loops.
+"""Shared OpenRouter council / advisory model seats.
 
-INTENT (Tristan 2026-07-29): Sol + Kimi K3 + GLM regularly. If Kimi fails
-(parse / empty / timeout / HTTP) → retry that seat with Opus 5.
+INTENT (Tristan 2026-07-29, refined 2026-08-01):
+- Formal challenge council: GLM + Sol + Kimi (Kimi → Opus 5).
+- Day-to-day advisory triad: GLM (default second opinion) → Sol (hard
+  physics escalation only) → MiniMax-M3 (evidence/claim checker).
+
+PHYSICS CEILING: CritPt tops out ~32%. No LLM validates magnetics/EM —
+solvers + gates do. Sol leads CritPt but is near-worst at non-hallucination;
+never accept Sol unchecked. Prefer GLM as standing first call.
 
 See: .cursor/rules/multi-model-challenge-council.mdc
+     docs/plans/LLM-ADVISORY-TRIAD-PHYSICS-CEILING-2026-08-01.md
 """
 from __future__ import annotations
 
 from typing import Any, Callable
 
-# Primary three seats
+# ---------------------------------------------------------------------------
+# Formal three-seat challenge council (milestones / HoT reject)
+# ---------------------------------------------------------------------------
 COUNCIL_MODELS: dict[str, str] = {
     "glm52": "z-ai/glm-5.2",
     "sol": "openai/gpt-5.6-sol",
@@ -20,6 +29,36 @@ COUNCIL_MODELS: dict[str, str] = {
 # Tristan 2026-07-29: Kimi seat fallback
 KIMI_FALLBACK_NAME = "opus5"
 KIMI_FALLBACK_MODEL = "anthropic/claude-opus-5"
+
+# ---------------------------------------------------------------------------
+# Advisory triad (maker ≠ checker) — Tristan 2026-08-01 CritPt doctrine
+# ---------------------------------------------------------------------------
+# Default second opinion: usable CritPt + high honesty, ~⅛ Sol cost.
+DEFAULT_SECOND_OPINION_NAME = "glm52"
+DEFAULT_SECOND_OPINION_MODEL = "z-ai/glm-5.2"
+
+# Hard physics escalation only — never accept unchecked (~18% non-hallucination).
+PHYSICS_ESCALATION_NAME = "sol"
+PHYSICS_ESCALATION_MODEL = "openai/gpt-5.6-sol"
+PHYSICS_ESCALATION_PRO_MODEL = "openai/gpt-5.6-sol-pro"  # same price band; A/B ok
+
+# Claim / evidence checker — ask "is this supported?", NOT "do the physics".
+CHECKER_NAME = "minimax_m3"
+CHECKER_MODEL = "minimax/minimax-m3"
+CHECKER_LONG_CONTEXT_MODEL = "qwen/qwen3.7-max"
+
+# Cheap voice only — weak CritPt AND weak honesty; not standing second opinion.
+DEEPSEEK_VOICE_MODEL = "deepseek/deepseek-v4-pro"
+
+# Avoid as Sol substitute (≈6× cost for worse CritPt per 2026-08-01 brief).
+AVOID_AS_SOL_SUBSTITUTE = "openai/gpt-5.5-pro"
+
+ADVISORY_TRIAD: dict[str, str] = {
+    "second_opinion": DEFAULT_SECOND_OPINION_MODEL,
+    "physics_escalation": PHYSICS_ESCALATION_MODEL,
+    "checker": CHECKER_MODEL,
+    "checker_long_context": CHECKER_LONG_CONTEXT_MODEL,
+}
 
 
 def kimi_result_failed(obj: Any) -> bool:
@@ -75,3 +114,13 @@ def run_kimi_with_opus5_fallback(
             result["fallback_from"] = kimi_name
             result["fallback_model"] = opus_model
     return opus_name, opus_model, result
+
+
+def advisory_role_model(role: str) -> str:
+    """
+    @description Resolve OpenRouter model id for an advisory triad role.
+    @param role one of: second_opinion | physics_escalation | checker | checker_long_context
+    @returns OpenRouter model id
+    @throws KeyError if role unknown
+    """
+    return ADVISORY_TRIAD[role]

@@ -325,11 +325,12 @@ def _selftest() -> int:
     for f in failures:
         print(f"  FAIL {f}")
     print(f"{'FAIL' if failures else 'PASS'} "
-          f"fpk_excitation_tracking selftest ({len(failures)} failures)")
+          f"machine_excitation_tracking selftest ({len(failures)} failures)")
     return 1 if failures else 0
 
 
-def from_twin(twin: Path) -> dict:
+def from_twin(twin: Path,
+              artefact: str = "_motor_stack/em_fia_front_kit_case.json") -> dict:
     """Read the deck's rotor sweep and screen it.
 
     GOTCHA: the span must be derived from the SAMPLING GEOMETRY, never from
@@ -341,7 +342,7 @@ def from_twin(twin: Path) -> dict:
     cogging an async fault on a healthy machine.
     """
     em = json.loads(
-        (twin / "_motor_stack" / "em_fia_front_kit_case.json").read_text())
+        (twin / artefact).read_text())
     pts = em["rotor_position_sweep"]["points"]
     positions = [float(p["rotor_position_mechanical_deg"]) for p in pts]
     torque = [float(p["torque_nm"]) for p in pts]
