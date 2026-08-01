@@ -1,0 +1,1318 @@
+{
+  "schema": "forgeos.capability_lookup/v1",
+  "product_class": "formula_e_front_mgu",
+  "corpus": {
+    "database": "/Users/tristanfischer/.forge-truth/forge-truth.db",
+    "available": true,
+    "tables": {
+      "fpk_extracted_claims": {
+        "present": true,
+        "total_rows": 32453,
+        "class_scoped_rows": 32453,
+        "searchable_columns": [
+          "symbol",
+          "expression",
+          "value_text",
+          "claim_kind"
+        ],
+        "has_embedding_column": true,
+        "search_mode": "hybrid"
+      },
+      "fpk_component_literature": {
+        "present": true,
+        "total_rows": 24946,
+        "class_scoped_rows": 24946,
+        "searchable_columns": [
+          "contribution",
+          "component_id",
+          "topic_id"
+        ],
+        "has_embedding_column": false,
+        "search_mode": "LEXICAL ONLY"
+      },
+      "pretraining_extracted_specs": {
+        "present": true,
+        "total_rows": 47523,
+        "class_scoped_rows": 32383,
+        "searchable_columns": [
+          "spec_key",
+          "spec_value",
+          "raw_excerpt"
+        ],
+        "has_embedding_column": true,
+        "search_mode": "hybrid"
+      },
+      "pretraining_extracted_standards": {
+        "present": true,
+        "total_rows": 4237,
+        "class_scoped_rows": 0,
+        "searchable_columns": [
+          "standard_name",
+          "scope",
+          "raw_excerpt"
+        ],
+        "has_embedding_column": true,
+        "search_mode": "hybrid"
+      }
+    }
+  },
+  "solvers": [
+    {
+      "path": "scripts/fe-front-densify-bom-from-physics-tree.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/fe-front-half-done-closure-loop.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/fe-front-overnight-fff-fpk.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/fe-front-prove-db-knowledge.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/fe-front-prove-literature-active.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/fe-front-quality-advisory-stamp.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/fe-front-sol-db-audit.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/fe-front-stamp-fpk-excel-live-plan.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/fe-front-stamp-fpk-mesh-authenticity.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/fe-front-stamp-fpk-physics-tree.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/fe-front-stamp-motor-multiphysics.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/fe-front-wire-fpk-claims.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/ingest/writeback-fpk-executable-knowledge.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/capability_lookup_stage.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/fpk_assumption_based_design.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/fpk_bar_b_readiness.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/fpk_quantity_lineage.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/fpk_solver_coverage.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/machine_excitation_tracking.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/analytical_fia_case_mount_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/analytical_fia_cooling_network_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/analytical_fia_cooling_thermal_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/calculix_fia_magnet_pocket_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/calculix_fia_rotor_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_airgap_fundamental_probe.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_demag_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_front_kit_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_mtpa_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_torque_map_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_torque_scaling_probe.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/motor-stack/em_fia_voltage_fw_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/em_pyleecan_analytic_crosscheck.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/motor-stack/em_pyleecan_fia_front_kit_case.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/motor-stack/gear_oil_fia_front_kit_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/inverter_packaging_fia_front_kit_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/iso6336_fia_front_kit_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/iso_bevel_fia_front_kit_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/openfoam_fia_cold_plate_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/openfoam_fia_water_jacket_case.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/post_diff_final_drive_packaging_screen.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/motor-stack/ross_fia_front_kit_case.py",
+      "has_selftest": true
+    }
+  ],
+  "n_solvers": 41,
+  "tools": [
+    {
+      "path": "scripts/lib/orchestrator/tools/python/absorption_column_htu_ntu.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/acoustic_modem_link.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/aeroelastic_flutter.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/aerosandbox_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/aerospike_engine.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/agitation_power.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/air_breathing_ep.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/airframe_fea_landing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ambiance_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/arc_flash_analysis.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/arc_flash_ieee1584.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/asf_chain_growth.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/atmospheric_scintillation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/attitude_torque.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/auv_hydro.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/bagging_throughput_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/balloon_buoyancy.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/battery_c_rate_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/battery_eclipse_cycle.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/battery_lithium_sulphur.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/beamforming_codebook.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/bemt_propeller.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/biocompatibility_check.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/biological_shielding.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/biosteam_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/blood_pump_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/building_envelope_heat_loss.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/bvlos_part23_certification.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cable_ampacity.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cable_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/calibration_imperfection.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cantera_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ccs_protocol_compliance.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cell_balance_model.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ceramic_electrolyte_conductivity.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/chemical_propulsion_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/clean_in_place_cip.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cmg_control_moment_gyro.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/co2_enrichment_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/coherent_optical_receiver.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cold_atom_interferometer.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cold_gas_thruster.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/composite_tow_steering.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/conjunction_probability.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/contactor_geometry.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/control_systems_run.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/coolprop_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/coriolis_gyroscope.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/corrosion_anode_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cryocooler_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/crystalliser_evaporator_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/cybersecurity_threat_model.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/debris_impact_detector.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/debris_radar_cross_section.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/decay_heat_loca.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/defrost_cycle_model.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/dehumidification_calc.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/delta_v_budget.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/deployable_boom.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/dexterity_kinematics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/digital_metal_forming.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/dilution_fridge_cooling_power.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/dissolved_oxygen_control.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/downstream_chromatography.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/downwash_recirculation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/dryer_thermal_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/duty_cycle_energy.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/dynamic_walking_zmp.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/eer_seer_calculation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electric_propulsion_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electric_pump_fed.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electrical_cable_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electrical_transformer_sizing.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electro_absorption_modulator.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electrolyser_efficiency.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/electrospray_thruster.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/enclosure_emc.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ev_battery_charging_curve.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/extruder_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fan_coil_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/feep_thrust.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fia_net_usable_energy.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fia_power_regen_split.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/field_weakening_mtpa.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fire_suppression_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fired_heater_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/flare_thermal_oxidiser.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/flash_separation_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/flow_compliance.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fluids_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/folded_optics_telescope.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/fso_link_budget.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/g99_dynamic_compliance.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gas_compressor_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gear_ratio.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gear_ratio_traction.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gearbox_load_spectrum.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gimbal_balance_cog.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/glucose_sensor.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/grounding_lightning.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gust_response_atmospheric.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/gust_response_drone.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/hapsira_orbit_chaser_target.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/heat_pipe_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/helium_circulation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ht_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/hvac_load_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/hybrid_propulsion_combustion.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/hyperspectral_imager.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/inference_throughput.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ins_navigation_drift.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/inverter_current_voltage_envelope.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/inverter_sic_loss.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/iodine_hall_thruster.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ipmsm_analytical_sizing.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/irrigation_pump_sizing.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/joint_actuator_torque.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/kla_oxygen.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/l_band_iot_link.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/launch_vibration.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/led_par.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/li_metal_dendrite.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/lifecycle_co2.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/link_budget_rf.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/machine_vision_inspection.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/magnetic_shielding.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/magnetics_coil_rl.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/magnetics_vr_detent.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/magnetics_vr_drive.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/magnetorquer_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/membrane_humidification.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/methane_absorption_spectroscopy.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mgu_thermal_lumped.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/microgravity_alloy_solidification.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/microgravity_fibre_optic.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/microgravity_semiconductor.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/microwave_control_pulse.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mintpy_insar_processing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mission_endurance_at_depth.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mli_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/monod_kinetics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/motion_kinematics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/motor_at_altitude.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/motor_loss_point.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/motor_prop_match.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mpd_thrust.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mplc_turbulence_compensation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mppt_tracking_model.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/mrr_chip_load.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/multi_constellation_gnss_antenna.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/nb_iot_satellite_link.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/network_bandwidth.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/neutron_physics_keff.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ngspice_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ngspice_run_test.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/noise_emission_dba.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/nrlmsise00_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/nutrient_solution_chemistry.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/obstacle_avoidance_sensor.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/onboard_ai_inference.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/opencv_machine_vision_inspection.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/opendss_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/optical_acquisition_tracking_pointing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/opv_solar_cell.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/orbit_propagator_j2.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/orbital_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/osmosis_membrane.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pandapower_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pcm_thermal_storage.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pcsel_laser_design.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/peep_valve_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pem_membrane_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pemfc_polarisation_curve.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pest_control_uvc.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/ph_titration_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/phased_array_antenna.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pilot_workload.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/plant_growth.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pointing_acquisition_tracking.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/power_module_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pressure_vessel.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/process_pump_sizing.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/propellant_tank_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/propeller_at_low_re.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/protection_coordination.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/proximity_operations.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/psychrolib_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pt_loading_optimisation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pvlib_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pybamm_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pybullet_robotic_arm_capture.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pyne_rtg_radioisotope.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/pyrcs_radar_cross_section.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qkd_link_budget.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qkd_satellite_pass_geometry.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qrng_entropy_rate.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/quantum_chip_packaging.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qubit_chip_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qubit_count_to_logical.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qutip_cold_atom_interferometer.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/qutip_qubit_dynamics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/radiator_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reaction_feasibility_gibbs.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reaction_stoichiometry_balance.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reaction_wheel_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reactor_cstr_pfr_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/recovery_method_logistics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reentry_capsule_heating.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reflector_surface_rms.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/refrigeration_cycle.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/refuelling_interface.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/regeneration_energy.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/regulatory_caa_part107.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/regulatory_certification_cost.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/regulatory_faa_airspace.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/regulatory_fda_cgmp.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/regulatory_imo_maritime.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/reliability_fmea.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/rf_mems_beamsteering.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/robotic_capture_mechanics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/rocketcea_combustion.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/rolling_resistance.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/rotor_centrifugal_stress.py",
+      "has_selftest": true
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/rotor_tilt_transition.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/rtg_radioisotope.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/runtime_calc.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/sar_antenna_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/satellite_laser_ranging.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/scop_seasonal_efficiency.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/smart_thermal_coating.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/solar_array_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/solar_sail.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/sonar_acoustic.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/sorbent_kinetics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/space_weather_sensor.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/spectral_hyperspectral_imager.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/spindle_thermal.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/stack_compression_pressure.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/staged_combustion_engine.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/steam_generator_sizing.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/storage_tank_liquid_fuel.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/sun_sensor_accuracy.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/supply_chain_risk.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/tdoa_fdoa_geolocation.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_all_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_class_plan_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_deep_class_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_heavy_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_layer1_libraries.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_layer1_space_libraries.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_new_class_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_priority_class_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_remaining_class_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_satellite_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/test_space_sector_tools.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/thermal_envelope.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/thermal_ir_detector.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/thermal_strap.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/thermo_run.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/transport_logistics.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/trapped_ion_qubit.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/tsiolkovsky_delta_v.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/vdes_maritime.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/warranty_reliability_battery.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/water_treatment_ro.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/wearable_battery_life.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/wind_resource_model.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/wireless_link_budget.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/wireless_power_microwave.py",
+      "has_selftest": false
+    },
+    {
+      "path": "scripts/lib/orchestrator/tools/python/yield_economics_npv.py",
+      "has_selftest": false
+    }
+  ],
+  "n_tools": 270,
+  "packages_available": [],
+  "packages_missing": [],
+  "notes": [
+    "fpk_component_literature is LEXICAL ONLY (24946 rows) \u2014 semantic search unavailable until it is embedded"
+  ],
+  "gate": {
+    "ok": true,
+    "findings": []
+  }
+}

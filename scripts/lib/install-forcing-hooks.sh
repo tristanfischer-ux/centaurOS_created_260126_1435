@@ -82,7 +82,7 @@ echo "── pre-commit: the checks that do not depend on remembering ──"
 
 for m in machine_excitation_tracking machine_magnet_flux_focusing machine_loss_bounds \
          model_routing claim_provenance_gate council_precommit_review \
-         fpk_geometry_coherence; do
+         fpk_geometry_coherence capability_lookup_stage; do
   if [ -f "scripts/lib/$m.py" ]; then
     if $PY "scripts/lib/$m.py" --selftest >/dev/null 2>&1; then
       say "$m --selftest" "ok"
@@ -112,6 +112,22 @@ for reg in out/*/_claims/*.json; do
     fail=1
   fi
 done
+
+# CAPABILITY LOOKUP: design must not proceed without knowing what already
+# exists. SCOPED TO ACTIVE TWINS ONLY — this repo holds 1594 out/ directories,
+# and a hook that blocks on all of them is a hook that gets disabled within a
+# day. A gate everyone bypasses is worse than no gate. "Active" = state.json
+# touched in the last 2 days, which is the work anyone is actually doing.
+while IFS= read -r tw; do
+  [ -n "$tw" ] || continue
+  d="$(dirname "$tw")"
+  if [ -f "$d/_capability/capability_dossier.json" ]; then
+    say "capability dossier: $(basename "$d")" "present"
+  else
+    say "capability dossier: $(basename "$d")" "MISSING — run capability_lookup_stage"
+    fail=1
+  fi
+done < <(find out -maxdepth 2 -name state.json -mtime -2 2>/dev/null)
 
 if [ "$fail" -ne 0 ]; then
   cat <<'MSG'
