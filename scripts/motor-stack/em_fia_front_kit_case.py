@@ -780,7 +780,21 @@ LIVE_ROTOR_POSITION_SWEEP_DENSE_MECH_DEG = tuple(
 # torque null (~9 N·m). Diagnostic sweep on the live twin peaked near −45°.
 DEFAULT_CURRENT_ANGLE_ELECTRICAL_DEG = -45.0
 # Coarse regenerative-side sweep for the live twin case (not a full MTPA map).
-LIVE_CURRENT_ANGLE_SWEEP_DEG = (-40.0, -45.0, -50.0, -60.0, -90.0)
+# ⭐⭐ THE SEARCH SPACE MUST CONTAIN THE ANSWER (2026-08-01). This was
+# (-40, -45, -50, -60, -90) — ENTIRELY NEGATIVE. With the advance sign corrected
+# to +p*theta_m the best point moved to the other half-plane, and a screen that
+# never evaluates a positive angle cannot find it however finely it samples the
+# negative one. The screened -60 deg produced a DELIVERED mean of -43.13 N.m:
+# the machine was being held at a braking angle and its duty judged on it.
+# Span both half-planes; refinement can come later, but never at the cost of
+# excluding half the space.
+LIVE_CURRENT_ANGLE_SWEEP_DEG = (
+    -90.0, -60.0, -45.0, -30.0, -15.0, 0.0, 15.0, 30.0, 45.0, 60.0, 90.0)
+
+# Rotor positions used to CANCEL COGGING inside the angle screen, as fractions
+# of one slot pitch. Three points at 0, 1/3, 2/3 of a slot pitch average the
+# 3rd-harmonic slot cogging (and its multiples) to exactly zero.
+ANGLE_SCREEN_COGGING_CANCEL_FRACTIONS = (0.0, 1.0 / 3.0, 2.0 / 3.0)
 # Re-exports for callers/tests that historically imported these from this module.
 DUTY_TORQUE_SCREEN_RATIO = _DUTY_PEAK_INTEREST
 DUTY_TORQUE_MEAN_CLEAR_RATIO = _DUTY_MEAN_CLEAR
@@ -976,42 +990,98 @@ def select_best_loaded_point(
     inputs: TwinInputs,
     angles_deg: Sequence[float] = LIVE_CURRENT_ANGLE_SWEEP_DEG,
 ) -> tuple[LoadedPointAssumptions, LoadedMagneticResult, list[dict[str, float]]]:
-    """Solve several current angles and keep the largest |torque| point.
+    """Solve several current angles and keep the best COGGING-CANCELLED point.
 
-    INTENT: Make the FIA twin magnetic case work in *this* kit's frame — the
-    previous −90° seed was a near-null. This is still a coarse screen, not MTPA
-    closure or a full map.
+    ⭐⭐ WHY THIS IS NOT A SINGLE-POSITION SCREEN (2026-08-01). It used to solve
+    each angle at rotor position 0 ONLY and keep the largest |torque|. Both
+    halves of that were wrong, and together they chose a braking angle:
+
+      * At position 0 the measured torque is DC + cogging(0), and cogging here
+        is 76.8 N·m against a DC of -43.1. Position 0 read +55.01 N·m while the
+        machine's actual delivered mean over a pole pitch was -43.13. The screen
+        was reading the cogging, not the machine.
+      * Ranking on abs(torque) makes a large BRAKING point win outright.
+
+    Fix: evaluate every angle at three rotor positions spaced a third of a slot
+    pitch apart, which averages the 3rd-harmonic slot cogging (and its
+    multiples) to EXACTLY zero, and rank on that cogging-cancelled mean. The
+    single-position torque is still recorded per angle so the difference between
+    the two is visible rather than hidden.
+
+    Still a coarse screen, not MTPA closure or a full map.
     """
 
     if not angles_deg:
         raise FiaFrontKitCaseError("current-angle sweep requires at least one angle")
+    slot_pitch_deg = 360.0 / max(1, stator_slots_from_twin(inputs))
+    probe_positions = [f * slot_pitch_deg
+                       for f in ANGLE_SCREEN_COGGING_CANCEL_FRACTIONS]
     sweep: list[dict[str, float]] = []
     best_assumptions: LoadedPointAssumptions | None = None
     best_result: LoadedMagneticResult | None = None
+    best_mean: float | None = None
+    best_angle: float = float(angles_deg[0])
     for angle in angles_deg:
-        assumptions = loaded_point_assumptions(
-            duty,
-            inputs,
-            current_angle_electrical_deg=float(angle),
-        )
-        result = run_loaded_magnetic_point(
-            geometry,
-            solver,
-            remanence_t=remanence_t,
-            assumptions=assumptions,
-        )
+        torques: list[float] = []
+        first_assumptions: LoadedPointAssumptions | None = None
+        first_result: LoadedMagneticResult | None = None
+        for position in probe_positions:
+            assumptions = loaded_point_assumptions(
+                duty,
+                inputs,
+                current_angle_electrical_deg=rotor_frame_current_angle_deg(
+                    float(angle),
+                    rotor_position_mechanical_deg=float(position),
+                    stator_slots=stator_slots_from_twin(inputs),
+                    rotor_poles=ROTOR_POLES,
+                ),
+                rotor_position_mechanical_deg=float(position),
+            )
+            result = run_loaded_magnetic_point(
+                geometry,
+                solver,
+                remanence_t=remanence_t,
+                assumptions=assumptions,
+            )
+            torques.append(float(result.torque_nm))
+            if first_result is None:
+                first_assumptions, first_result = assumptions, result
+        mean_torque = sum(torques) / len(torques)
+        assert first_result is not None and first_assumptions is not None
         sweep.append(
             {
                 "current_angle_electrical_deg": float(angle),
-                "torque_nm": result.torque_nm,
-                "torque_magnitude_nm": abs(result.torque_nm),
-                "peak_airgap_flux_density_t": result.peak_airgap_flux_density_t,
-                "rms_airgap_flux_density_t": result.rms_airgap_flux_density_t,
+                # The cogging-cancelled mean is the number the screen RANKS on.
+                "cogging_cancelled_mean_torque_nm": round(mean_torque, 6),
+                "torque_nm": first_result.torque_nm,
+                "torque_magnitude_nm": abs(first_result.torque_nm),
+                "single_position_error_nm": round(
+                    first_result.torque_nm - mean_torque, 6),
+                "probe_positions_mech_deg": [round(p, 4) for p in probe_positions],
+                "peak_airgap_flux_density_t":
+                    first_result.peak_airgap_flux_density_t,
+                "rms_airgap_flux_density_t":
+                    first_result.rms_airgap_flux_density_t,
             }
         )
-        if best_result is None or abs(result.torque_nm) > abs(best_result.torque_nm):
-            best_assumptions = assumptions
-            best_result = result
+        if best_mean is None or abs(mean_torque) > abs(best_mean):
+            best_mean = mean_torque
+            best_angle = float(angle)
+    # Seat the chosen point at rotor position 0 ONCE, after the scan, so
+    # downstream stages (which assume the loaded point is the zero-position
+    # reference) keep their contract. Solving it inside the loop re-solved on
+    # every improvement — up to one wasted FE solve per angle.
+    if best_mean is not None:
+        best_assumptions = loaded_point_assumptions(
+            duty, inputs, current_angle_electrical_deg=best_angle)
+        best_result = run_loaded_magnetic_point(
+            geometry, solver, remanence_t=remanence_t,
+            assumptions=best_assumptions)
+        print(f"[em][angle-screen] best angle by COGGING-CANCELLED mean: "
+              f"{best_assumptions.current_angle_electrical_deg:g} deg elec, "
+              f"mean {best_mean:.2f} N.m over {len(probe_positions)} positions "
+              f"({', '.join(f'{p:.2f}' for p in probe_positions)} deg mech)",
+              flush=True)
     assert best_assumptions is not None and best_result is not None
     return best_assumptions, best_result, sweep
 
