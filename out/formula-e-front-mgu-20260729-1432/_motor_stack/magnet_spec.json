@@ -1,0 +1,12 @@
+{
+  "remanence_t": 1.24,
+  "recoil_permeability": 1.05,
+  "magnet_thickness_mm": 8.85,
+  "magnet_length_mm": 14.5793,
+  "magnets_per_pole": 2,
+  "magnet_tilt_deg": 20.0,
+  "rotor_outer_diameter_mm": 139.4,
+  "bridge_mm": 1.0,
+  "poles": 8,
+  "airgap_mm": 0.7
+}

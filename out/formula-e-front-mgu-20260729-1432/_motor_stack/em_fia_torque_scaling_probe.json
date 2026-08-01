@@ -1,0 +1,40 @@
+{
+  "schema": "forgeos.motor_stack.torque_scaling_probe/v1",
+  "winding": {
+    "turns_per_slot_applied": 7,
+    "winding_parallel_paths": 2.0,
+    "note": "FEMM MMF per slot = turns x circuit current. If the circuit current is the PHASE current while the conductors sit in Npcp parallel paths, the applied ampere-turns are Npcp times too large."
+  },
+  "lambda_pm_wb_reference": 0.032393,
+  "lambda_pm_reference_source": "1-D transform of open-circuit airgap RMS B",
+  "lambda_pm_reference_rejected": "lambda is None, not a number",
+  "lambda_pm_wb_from_back_emf": 0.032393,
+  "back_emf_line_line_rms_v": 324.05577,
+  "current_angle_electrical_deg": 0.0,
+  "points": [
+    {
+      "phase_current_peak_a": 50.0,
+      "fe_torque_nm": 1.3568,
+      "analytic_torque_nm": 9.7179,
+      "ratio_fe_over_analytic": 0.1396,
+      "peak_airgap_flux_density_t": 0.6305609220526593,
+      "positions_averaged_mech_deg": [
+        0.0,
+        5.0,
+        10.0
+      ],
+      "single_position_torque_nm": 4.1472
+    }
+  ],
+  "ratio_spread": 0.0,
+  "ratio_rising_with_current": false,
+  "fit_T_equals_a_I_plus_b_I2": {
+    "a_pm_nm_per_a": null,
+    "b_reluctance_nm_per_a2": null,
+    "lambda_pm_from_torque_wb": null,
+    "lambda_pm_from_reference_wb": 0.032393,
+    "disagreement_x": null,
+    "note": "The reference lambda_pm comes from the voltage/FW screen, which derives back-EMF ANALYTICALLY from the FE's open-circuit airgap RMS B via a 1-D sinusoidal-flux relation. It is NOT an independent FE measurement of back-EMF, so it must not be presented as a second witness agreeing with the analytic design-flux route."
+  },
+  "verdict": "UNEXPLAINED CONSTANT FACTOR 0.140 \u2014 flat in current, so a scale error, but not a familiar one."
+}

@@ -32,7 +32,7 @@
         "../../../scripts/motor-stack/em_fia_front_kit_case.py"
       ],
       "tolerance": 0.001,
-      "run_to_fix": ".venv/bin/python scripts/lib/machine_magnet_flux_focusing.py --machine-json <spec>"
+      "run_to_fix": ".venv/bin/python scripts/lib/machine_magnet_flux_focusing.py --machine-json out/formula-e-front-mgu-20260729-1432/_motor_stack/magnet_spec.json --output out/formula-e-front-mgu-20260729-1432/_motor_stack/magnet_flux_focusing.json"
     },
     {
       "name": "lambda_pm_fundamental_wb",
@@ -43,7 +43,7 @@
         "../../../scripts/motor-stack/em_fia_front_kit_case.py"
       ],
       "tolerance": 0.05,
-      "run_to_fix": ".venv/bin/python scratchpad/lam_sweep.py"
+      "run_to_fix": ".venv/bin/python $SCRATCH/lam_sweep.py"
     }
   ]
 }

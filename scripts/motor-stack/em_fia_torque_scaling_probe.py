@@ -98,12 +98,57 @@ def main() -> int:
                          "estimated_back_emf_line_line_rms_v",
                          "back_emf_line_line_rms_v",
                          "open_circuit_line_line_rms_v")
+    # ⭐ PREFER THE MEASURED FUNDAMENTAL over the 1-D transform (2026-08-01).
+    # The voltage/FW screen derives back-EMF ANALYTICALLY from open-circuit
+    # airgap RMS B, which on this machine overstates lambda_pm by 11x because
+    # the flux linkage is 3rd-harmonic dominated (3rd = 1.90x the fundamental,
+    # THD 198%) and a magnitude-based transform cannot see that. If a measured
+    # open-circuit flux-linkage sweep exists, IT is the reference.
+    # Sol (pre-commit council): "the sweep file is trusted solely by field name;
+    # its machine identity, electrical-period coverage and sample count are not
+    # checked" — and "invalid numeric values are not robustly rejected". Both
+    # are real: a sweep from a DIFFERENT machine, or a partial-period one, would
+    # be adopted silently as the reference that every ratio is judged against.
+    lam_sweep = twin / "_motor_stack" / "oc_flux_linkage_sweep.json"
+    measured_lambda = None
+    measured_reject = ""
+    if lam_sweep.exists():
+        try:
+            sweep = json.loads(lam_sweep.read_text())
+            raw = sweep.get("lambda_pm_fundamental_wb")
+            n = int(sweep.get("n_samples", 0))
+            span = float(sweep.get("electrical_period_mech_deg", 0.0))
+            expected_span = 360.0 / pole_pairs
+            if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+                measured_reject = f"lambda is {raw!r}, not a number"
+            elif not math.isfinite(float(raw)) or float(raw) <= 0.0:
+                measured_reject = f"lambda is {raw!r} (must be finite and > 0)"
+            elif n < 8:
+                measured_reject = f"only {n} samples — too few to resolve a fundamental"
+            elif abs(span - expected_span) > 1e-6:
+                measured_reject = (
+                    f"sweep spans {span:g} deg mech but ONE electrical period at "
+                    f"p={pole_pairs} is {expected_span:g} deg — this sweep does "
+                    "not describe this machine")
+            else:
+                measured_lambda = float(raw)
+        except (json.JSONDecodeError, TypeError, ValueError, OSError) as exc:
+            measured_reject = f"{type(exc).__name__}: {exc}"
+        if measured_reject:
+            print(f"  [reference] REJECTED the measured sweep — {measured_reject}",
+                  file=sys.stderr)
+
     rpm = float(getattr(inputs, "max_rotor_speed_rpm", 19500.0) or 19500.0)
     if e_ll_rms:
         omega_e = rpm * 2.0 * math.pi / 60.0 * pole_pairs
         lambda_pm = (e_ll_rms / math.sqrt(3.0)) * math.sqrt(2.0) / omega_e
+    reference_source = "1-D transform of open-circuit airgap RMS B"
+    if measured_lambda:
+        lambda_pm = measured_lambda
+        reference_source = ("MEASURED open-circuit flux-linkage fundamental "
+                            "(full electrical period)")
     if not lambda_pm:
-        print("back-EMF unavailable — cannot form the analytic reference",
+        print("no reference lambda_pm available",
               file=sys.stderr)
         return 2
 
@@ -236,6 +281,11 @@ def main() -> int:
                      "sit in Npcp parallel paths, the applied ampere-turns are "
                      "Npcp times too large."),
         },
+        "lambda_pm_wb_reference": round(lambda_pm, 6),
+        "lambda_pm_reference_source": reference_source,
+        "lambda_pm_reference_rejected": measured_reject or None,
+        # Kept for schema back-compatibility: renaming a published key breaks
+        # every consumer that reads it (Sol, pre-commit council).
         "lambda_pm_wb_from_back_emf": round(lambda_pm, 6),
         "back_emf_line_line_rms_v": e_ll_rms,
         "current_angle_electrical_deg": gamma_deg,
@@ -263,7 +313,7 @@ def main() -> int:
     out.write_text(json.dumps(res, indent=2))
     print()
     print(f"  turns/slot applied = {turns_per_slot}   parallel paths = {npcp:g}")
-    print(f"  lambda_pm (back-EMF) = {lambda_pm:.6f} Wb")
+    print(f"  lambda_pm reference = {lambda_pm:.6f} Wb  [{reference_source}]")
     print(f"  VERDICT: {verdict}")
     print(f"Artefact: {out}")
     return 0

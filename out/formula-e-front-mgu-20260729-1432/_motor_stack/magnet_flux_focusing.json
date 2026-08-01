@@ -1,0 +1,57 @@
+{
+  "schema": "forgeos.motor_stack.magnet_flux_focusing/v1",
+  "circuit": {
+    "remanence_t": 1.24,
+    "recoil_permeability": 1.05,
+    "magnet_thickness_mm": 8.85,
+    "magnet_face_per_pole_mm": 27.40012125244799,
+    "pole_pitch_at_magnet_mm": 48.73289811944592,
+    "effective_airgap_mm": 0.7
+  },
+  "derived": {
+    "focusing_ratio_Am_over_Ag": 0.5623,
+    "magnet_operating_flux_T": 1.1847,
+    "magnet_utilisation_frac_of_Br": 0.9554,
+    "thickness_saturation_multiple": 12.04,
+    "airgap_flux_T": 0.6661,
+    "healthy_band_T": [
+      0.7,
+      1.0
+    ]
+  },
+  "findings": [
+    {
+      "severity": "HIGH",
+      "rule": "magnet_face_area_starved",
+      "detail": "flux-focusing ratio A_m/A_g = 0.562 (< 0.75) \u2014 the magnet face covers only 56% of the pole's airgap area, so it DE-focuses flux. Airgap flux scales roughly linearly with this ratio."
+    },
+    {
+      "severity": "HIGH",
+      "rule": "magnet_thickness_saturated",
+      "detail": "t_m = 8.85 mm is 12.0x (mur*g_eff); the magnet already sits at 95.5% of Br. Further thickness buys effectively no flux while consuming the radial room face area needs."
+    },
+    {
+      "severity": "HIGH",
+      "rule": "airgap_fundamental_below_band",
+      "detail": "B_gap = 0.666 T is below the healthy band 0.7-1.0 T. Torque tracks the airgap FUNDAMENTAL, so no winding, current-angle or torque-integration work can recover this."
+    }
+  ],
+  "ok": false,
+  "rebalance": {
+    "current": {
+      "magnet_thickness_mm": 8.85,
+      "focusing_ratio": 0.562,
+      "airgap_flux_T": 0.6661
+    },
+    "best_rebalance": {
+      "magnet_thickness_mm": 5.5,
+      "magnet_length_mm": 23.34,
+      "volume_per_bar_mm2": 128.4,
+      "focusing_ratio": 0.9,
+      "airgap_flux_T": 0.9962,
+      "magnet_utilisation": 0.8926
+    },
+    "airgap_flux_gain_x": 1.496,
+    "note": "Torque scales with the airgap FUNDAMENTAL, so this gain carries through to shaft torque roughly one-for-one at fixed current."
+  }
+}
