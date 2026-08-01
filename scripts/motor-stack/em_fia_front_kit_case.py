@@ -1932,6 +1932,42 @@ def _build_fia_lua(
             f'print("{RESULT_PREFIX} flux_linkage_{circuit}_wb="..fi_{circuit})',
             f'print("{RESULT_PREFIX} circuit_current_{circuit}_a="..ci_{circuit})',
         ])
+    # ⭐⭐ ROTOR-FRAME B PROBE (2026-08-01) — the field a MAGNET actually sees.
+    #
+    # Rotor eddy loss is driven ONLY by the ASYNCHRONOUS field. The fundamental
+    # rotates WITH the magnet, so it is DC in the rotor frame and induces
+    # nothing; only slot and MMF harmonics do. Probing a STATOR-fixed point, or
+    # taking the spatial max of airgap B and watching it change with rotor
+    # position, measures neither — the first sees the fundamental sweep past,
+    # the second sees a maximum move. Using the latter as a ripple proxy gives
+    # 1.2 GW/m^3, which is absurd by three orders of magnitude and is how you
+    # know the proxy is wrong.
+    #
+    # These probes sit just OUTSIDE the magnet, at a fixed angle RELATIVE TO THE
+    # POLE, so they rotate with the rotor. Their variation across a rotor sweep
+    # IS the AC field the magnet experiences, and its amplitude is what bounds
+    # eddy loss.
+    _rotor_offset = (math.radians(loaded.rotor_position_mechanical_deg)
+                     if loaded is not None else 0.0)
+    # PROBE INSIDE THE MAGNET, not at the rotor surface. The first version sat
+    # at r_ro - 0.5 mm, which is SATURATED BRIDGE IRON (measured DC 2.05-2.30 T)
+    # — and the bridge CARRIES the slot harmonic, so its 0.35 T of AC is not
+    # what the magnet behind it experiences. Putting that figure through the
+    # slab formula gives 3.95 GW/m^3, impossible by three orders of magnitude,
+    # which is how the misplacement announced itself.
+    _tilt_p = math.radians(20.0)
+    _half_p = (geometry.magnet_length_mm / 2.0 * math.sin(_tilt_p)
+               + geometry.magnet_thickness_mm / 2.0 * math.cos(_tilt_p))
+    _r_probe = r_ro - MAGNET_ROTOR_BRIDGE_MM - _half_p
+    for _k, _side in enumerate((-1.0, 0.0, 1.0)):
+        _ang = _rotor_offset + _side * math.radians(11.0)
+        _px = _r_probe * math.cos(_ang)
+        _py = _r_probe * math.sin(_ang)
+        lua.extend([
+            ("rA,rBx,rBy,rSig,rE,rHx,rHy,rJe,rJs,rMu1,rMu2,rPe,rPh="
+             f"mo_getpointvalues({_px:.12g},{_py:.12g})"),
+            f'print("{RESULT_PREFIX} rotor_frame_b_{_k}_t="..(rBx*rBx+rBy*rBy)^0.5)',
+        ])
     lua.append("quit()")
     return "\n".join(lua) + "\n"
 
@@ -1978,6 +2014,8 @@ def _execute_magnetic_point(
     for _c in ("phase_a", "phase_b", "phase_c"):
         expected.add(f"flux_linkage_{_c}_wb")
         expected.add(f"circuit_current_{_c}_a")
+    for _k in range(3):
+        expected.add(f"rotor_frame_b_{_k}_t")
     if loaded is not None:
         expected.add("torque_nm")
     if process.returncode != 0 or values.keys() != expected:
