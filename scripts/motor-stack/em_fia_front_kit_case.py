@@ -716,32 +716,63 @@ def analytical_duty_check(inputs: TwinInputs) -> DutyCheck:
 
 
 def effective_turns_per_slot_from_twin(inputs: TwinInputs) -> int:
-    """Map twin analytical winding seeds onto this 48-slot FEMM belt model.
+    """Turns per coil, DERIVED so the winding is self-consistent with the twin.
 
-    DECISION: Use ``turns_per_coil`` as the FEMM slot conductor count.  The
-    48-slot belt map gives eight go and eight return sides per phase; with
-    ``winding_parallel_paths`` that recovers the twin's ``turns_per_phase``
-    order (14 ≈ 4 × 8 / 2).  Do **not** stuff ``turns_per_phase`` into every
-    slot — that overstates ampere-turns by about the belt multiplicity.
+    ⭐ (2026-08-01) The twin carries THREE winding numbers that disagreed:
+    turns_per_phase=14, turns_per_coil=4, winding_parallel_paths=2. With the
+    swat_em-solved layout at the contract's 24 slots each phase has 4 coils, so:
 
-    GOTCHA: Twin analytical ``stator_slots`` is 24 while this point mesh stays
-    48 for the IPM sector topology.  Closing that slot-count mismatch is a
-    separate geometry revision; this function only removes the absurd 1-turn
-    placeholder.
+        series turns/phase = coils_per_phase * Ntcoil / Npcp
+        4 * 4 / 2 =  8   <- what turns_per_coil=4 actually gives
+        4 * 7 / 2 = 14   <- EXACTLY the contract's turns_per_phase
+
+    So turns_per_coil=4 is the inconsistent field; 7 is the value the contract's
+    own turns_per_phase implies. Running at 4 gave 4/7 of the correct ampere-turns
+    and therefore ~57% of the torque, since torque is linear in turns.
+
+    turns_per_phase is the AUTHORITATIVE figure (it is what the voltage/back-EMF
+    and current ratings are set from), so the per-coil count is derived from it
+    and the solved layout rather than trusted as an independent input. Falls back
+    to the stated turns_per_coil only when the derivation is not possible.
     """
+    stated = max(1, int(round(inputs.turns_per_coil)))
+    try:
+        slots = stator_slots_from_twin(inputs)
+        layout = _winding_layout(slots, ROTOR_POLES)
+        sides = sum(1 for _slot, (circ, _sgn) in layout.items() if circ == "phase_a")
+        coils_per_phase = max(1, sides // 2)      # single layer: 2 sides = 1 coil
+        npcp = max(1.0, float(inputs.winding_parallel_paths))
+        derived = inputs.turns_per_phase * npcp / coils_per_phase
+        if derived >= 0.5 and abs(derived - round(derived)) < 1e-6:
+            derived_i = int(round(derived))
+            if derived_i != stated:
+                print(
+                    f"[em][winding] turns_per_coil DERIVED as {derived_i} from "
+                    f"turns_per_phase={inputs.turns_per_phase:g}, "
+                    f"coils/phase={coils_per_phase}, parallel={npcp:g} "
+                    f"(twin stated {stated} — inconsistent; stated value would "
+                    f"give {coils_per_phase * stated / npcp:g} turns/phase)",
+                    flush=True,
+                )
+            return derived_i
+    except Exception as exc:  # noqa: BLE001 — never block the solve
+        print(f"[em][winding] turns derivation unavailable ({exc}); "
+              f"using stated turns_per_coil={stated}", flush=True)
+    return stated
 
-    turns = max(1, int(round(inputs.turns_per_coil)))
-    # Cross-check: series turns implied by belts should stay near turns_per_phase.
-    slots_per_phase_go = stator_slots_from_twin(inputs) // 3 // 2
-    implied_series = (
-        turns * slots_per_phase_go / max(inputs.winding_parallel_paths, 1.0)
-    )
-    if abs(implied_series - inputs.turns_per_phase) > max(
-        4.0, 0.5 * inputs.turns_per_phase
-    ):
-        # Prefer coil seed still; document the mismatch in winding_model text.
-        pass
-    return turns
+
+# INTENT: Coarse mechanical rotor positions over half an electrical period for
+# an 8-pole machine (pole-pairs=4 -> 45 deg mech = 180 deg elec).
+LIVE_ROTOR_POSITION_SWEEP_MECH_DEG = (0.0, 7.5, 15.0, 22.5, 30.0, 37.5, 45.0)
+# DECISION: Live twin default used 4 points so the case finishes in a few FE
+# solves; the full 7-point table remains selectable.
+LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG = (0.0, 15.0, 30.0, 45.0)
+# DEC-EM-1 (2026-07-31): 4 points ALIAS the torque ripple, and the duty screen is
+# decided on the MEAN — so the mean was an artefact of sample placement, which is
+# why torque_reliable was false. 37 points at 1.25 deg resolves it properly.
+LIVE_ROTOR_POSITION_SWEEP_DENSE_MECH_DEG = tuple(
+    round(i * 1.25, 3) for i in range(37)
+)
 
 
 # GOTCHA: At rotor mechanical 0° the magnet d-axis is NOT aligned with the
@@ -753,22 +784,6 @@ LIVE_CURRENT_ANGLE_SWEEP_DEG = (-40.0, -45.0, -50.0, -60.0, -90.0)
 # Re-exports for callers/tests that historically imported these from this module.
 DUTY_TORQUE_SCREEN_RATIO = _DUTY_PEAK_INTEREST
 DUTY_TORQUE_MEAN_CLEAR_RATIO = _DUTY_MEAN_CLEAR
-# INTENT: Coarse mechanical rotor positions over half an electrical period for
-# an 8-pole machine (pole-pairs=4 → 90° mech = 360° elec). Enough to show
-# torque ripple / position dependence at fixed current angle — NOT MTPA.
-LIVE_ROTOR_POSITION_SWEEP_MECH_DEG = (0.0, 7.5, 15.0, 22.5, 30.0, 37.5, 45.0)
-# DECISION: Live twin default uses 4 points (endpoints + mid-span) so the case
-# finishes in a few FE solves; the full 7-point table remains selectable.
-LIVE_ROTOR_POSITION_SWEEP_FAST_MECH_DEG = (0.0, 15.0, 30.0, 45.0)
-# DEC-EM-1 (2026-07-31): the 4-point fast sweep is NOT enough to trust a MEAN
-# torque — 4 samples across a half-electrical period alias the ripple, and the
-# duty screen is decided on the mean. `torque_reliable` was correctly false
-# because of this. 37 points at 1.25° mech resolves the ripple properly, so the
-# mean is a mean and not an artefact of where the four samples happened to land.
-LIVE_ROTOR_POSITION_SWEEP_DENSE_MECH_DEG = tuple(
-    round(i * 1.25, 3) for i in range(37)
-)
-
 
 def select_rotor_position_sweep_deg(
     *,
@@ -992,6 +1007,7 @@ def rotor_frame_current_angle_deg(
     base_angle_electrical_deg: float,
     rotor_position_mechanical_deg: float,
     rotor_poles: int,
+    stator_slots: int = 0,
 ) -> float:
     """Electrical current angle that holds the command constant in the ROTOR frame.
 
@@ -1006,8 +1022,14 @@ def rotor_frame_current_angle_deg(
     Pure so it can be proveCatch-ed without an FE solve.
     """
     pole_pairs = max(1, int(rotor_poles) // 2)
-    return float(base_angle_electrical_deg) + pole_pairs * float(
-        rotor_position_mechanical_deg)
+    # Reference the command to where phase A ACTUALLY is for this winding.
+    try:
+        axis = _phase_a_axis_electrical_deg(
+            stator_slots if stator_slots else DEFAULT_STATOR_SLOTS, rotor_poles)
+    except Exception:  # noqa: BLE001
+        axis = 0.0
+    return (float(base_angle_electrical_deg) + axis
+            + pole_pairs * float(rotor_position_mechanical_deg))
 
 
 def run_rotor_position_sweep(
@@ -1061,6 +1083,7 @@ def run_rotor_position_sweep(
                     current_angle_electrical_deg,
                     position,
                     geometry.rotor_poles,
+                    geometry.stator_slots,
                 ),
                 rotor_position_mechanical_deg=float(position),
             )
@@ -1288,6 +1311,36 @@ def _winding_layout(stator_slots: int, rotor_poles: int) -> dict:
     return layout
 
 
+def _phase_a_axis_electrical_deg(stator_slots: int, rotor_poles: int) -> float:
+    """Electrical angle of the phase-A MMF axis for the SOLVED layout.
+
+    ⭐ (2026-08-01) The rotor-frame angle advance (theta_e = p * theta_m) is
+    referenced to where phase A actually sits. The old hand-written belt map put
+    phase A in one place; the swat_em layout puts it somewhere else
+    (slots 1,-4,7,-10,... vs the 12-slot pattern). Changing the winding without
+    re-deriving this reference left the current vector misaligned with the rotor
+    at theta_m = 0, so the sweep walked in and out of synchronism — reintroducing
+    the very fault the rotor-frame fix removed. Symptom: 37-point ripple of
+    119.7 N.m peak-to-peak on a 57.83 N.m mean (207%), with min 2.97 N.m.
+
+    The fundamental MMF phasor of phase A is sum(sign_k * exp(j*p*theta_k)) over
+    its slots; its argument IS the axis. Derived from the layout, so it tracks any
+    winding swat_em produces.
+    """
+    import cmath  # noqa: PLC0415
+    layout = _winding_layout(stator_slots, rotor_poles)
+    pole_pairs = max(1, int(rotor_poles) // 2)
+    acc = 0j
+    for slot, (circuit, sign) in layout.items():
+        if circuit != "phase_a":
+            continue
+        theta_mech = (2.0 * math.pi * int(slot)) / float(stator_slots)
+        acc += float(sign) * cmath.exp(1j * pole_pairs * theta_mech)
+    if abs(acc) < 1e-9:
+        return 0.0
+    return math.degrees(cmath.phase(acc))
+
+
 def _slot_winding_assignment(
     slot_index: int,
     stator_slots: int = DEFAULT_STATOR_SLOTS,
@@ -1353,7 +1406,12 @@ def _build_fia_lua(
         )
     for h_a_m, b_t in material_machine.stator.mat_type.mag.BH_curve.get_data():
         lua.append(f'mi_addbhpoint("m400",{float(b_t):.12g},{float(h_a_m):.12g})')
-    for radius_mm in (r_ri, r_ro, r_si, r_so):
+    # r_gap (mid-airgap) is drawn so the airgap becomes TWO air regions. FEMM's
+    # weighted stress tensor requires the selected block's boundary to lie in
+    # FREE SPACE — selecting the whole gap makes the boundary abut the stator
+    # steel and FEMM refuses with "A valid selection cannot abut a region which
+    # is not free space". Splitting the gap puts the boundary mid-air.
+    for radius_mm in (r_ri, r_ro, r_gap, r_si, r_so):
         lua.extend(_circle_lua(radius_mm))
 
     slot_pitch_rad = 2.0 * math.pi / geometry.stator_slots
@@ -1467,12 +1525,23 @@ def _build_fia_lua(
     lua.extend(
         _block_label_lua(rotor_label, material="m400", mesh_mm=0.8, group=1)
     )
+    _gap_mesh = min(0.12, geometry.radial_airgap_mm / 5.0)
+    # INNER airgap half (rotor side) — travels WITH the rotor selection.
     lua.extend(
         _block_label_lua(
-            complex(r_gap, 0.0),
+            complex((r_ro + r_gap) / 2.0, 0.0),
             material="air",
-            mesh_mm=min(0.12, geometry.radial_airgap_mm / 5.0),
+            mesh_mm=_gap_mesh,
             group=2,
+        )
+    )
+    # OUTER airgap half (stator side) — stays with the stationary part.
+    lua.extend(
+        _block_label_lua(
+            complex((r_gap + r_si) / 2.0, 0.0),
+            material="air",
+            mesh_mm=_gap_mesh,
+            group=6,
         )
     )
     stator_label_radius = r_so - 2.0
@@ -1547,11 +1616,27 @@ def _build_fia_lua(
         # DECISION: FEMM's steady-state weighted-stress block integral provides
         # a useful one-position torque estimate without pretending that this
         # provisional winding definition is a converged torque map.
+        # ⭐ THE TORQUE-INTEGRATION FAULT (2026-08-01). This selected ONLY the
+        # rotor steel (group 1) and the magnets (group 5). FEMM's weighted stress
+        # tensor, block integral 22, requires the selection to ALSO CONTAIN THE
+        # AIRGAP AIR (group 2): the weighting function must transition from 1 on
+        # the moving body to 0 on the stationary one, and that transition happens
+        # ACROSS THE AIRGAP. With no air selected there is no transition region,
+        # so the integral runs over a truncated volume and UNDER-REPORTS.
+        #
+        # Independently corroborated before the fix was found: the deck's own
+        # back-EMF (324.1 V l-l rms) implies ~131 N.m at 477 A rms via
+        # T = 1.5*p*lambda_pm*Iq, while the integral returned 57.8 N.m — a 2.27x
+        # discrepancy. Grok 4.5 and Sol both independently returned
+        # MODEL_ERROR_LIKELY and named the torque integration as the suspect.
         lua.extend(
             [
                 "mo_clearblock()",
-                "mo_groupselectblock(1)",
-                "mo_groupselectblock(5)",
+                "mo_groupselectblock(1)",   # rotor steel
+                "mo_groupselectblock(5)",   # magnets
+                "mo_groupselectblock(2)",   # INNER airgap half — the
+                # selection boundary now sits MID-AIRGAP, i.e. in free space,
+                # which is what integral 22 requires.
                 f'print("{RESULT_PREFIX} torque_nm="..mo_blockintegral(22))',
                 "mo_clearblock()",
             ]
@@ -1774,7 +1859,7 @@ def build_artifact(
             ),
             "torque_nm": loaded_magnetic.torque_nm,
             "torque_magnitude_nm": abs(loaded_magnetic.torque_nm),
-            "torque_method": "FEMM steady-state weighted-stress block integral (22)",
+            "torque_method": "FEMM steady-state weighted-stress block integral (22) over rotor steel + magnets + AIRGAP AIR (the airgap is required for the weighting-function transition; omitting it under-reported by ~2.3x)",
             "torque_reliable": torque_reliable,
             "required_shaft_torque_nm": duty.required_shaft_torque_nm,
             "torque_vs_required_ratio": round(torque_ratio, 6),
