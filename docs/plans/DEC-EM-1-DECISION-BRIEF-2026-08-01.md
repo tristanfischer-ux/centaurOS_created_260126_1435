@@ -34,55 +34,74 @@ the "measured back-EMF" route and the "analytic design flux" route share one
 assumption and nearly one calculation. They agreed because they are the same
 sum. The only direct measurement is the FE torque integral.
 
-## 2. The levers, measured not guessed
+## 2. The levers — CORRECTED after council review
 
-Torque is **linear** in both stack length and airgap fundamental.
+> **My first version of this table was WRONG.** It multiplied the whole 42.5 N·m
+> by the magnet rebalance factor. The rebalance raises the **PM term only** —
+> reluctance torque scales with (L_d − L_q)·I², not with PM flux. Both Sol and
+> MiniMax-M3 caught it independently. Corrected:
 
-| lever | mechanism | result | closes? |
-|---|---|---|---|
-| magnet rebalance (t 8.85→7.0, L 14.58→23.34 mm; A_m/A_g 0.562→0.90) | ×1.53 airgap flux | 65.0 N·m = **0.52×** | **no** |
-| stack 97.58 → 214 mm | ×2.19 active length | 93.1 N·m = **0.74×** | **no** |
-| **both together** | ×3.35 | **142.5 N·m = 1.14×** | **yes** |
+Torque is linear in stack length (both terms) and in airgap fundamental (PM term
+only).
 
-## 3. THE DECISION
+| lever | result | closes? |
+|---|---|---|
+| magnet rebalance alone (PM ×1.53, reluctance unchanged) | 56.4 N·m = **0.45×** | no |
+| stack 97.58 → 214 mm alone (both terms ×2.19) | 93.2 N·m = **0.74×** | no |
+| **both together** | **123.7 N·m = 0.988×** | **NO — below duty, zero margin** |
 
-**Do both, and do the stack first.** Neither alone closes the duty; the two
-together close it with 14% margin.
+And the ×1.53 is an **unverified analytic estimate**, not an FE measurement.
 
-Reasoning:
+## 3. THE DECISION — do NOT change geometry yet
 
-1. **Neither single lever is sufficient**, so "pick one" was a false choice — the
-   question is only whether the pair is affordable.
-2. **The stack lever is the larger one (2.19× vs 1.53×) and nobody had looked at
-   it.** The machine runs a 97.58 mm stack.
-3. **The stack lever does NOT touch rotor OD**, so it does not invalidate the
-   planetary strength writeback. The magnet rebalance also holds rotor OD fixed
-   (it trades magnet thickness for length *inside* the existing rotor ring, and
-   was solved against the placer's own radial budget). **So DEC-EM-1 as decided
-   re-opens nothing that is currently closed.** That is the main reason to
-   prefer it over the rotor-OD growth I was previously circling.
-4. **Cost is honest and bounded**: +27% magnet volume per bar, and a longer
-   housing. It is a BoM and mass change, not an architecture change.
+**Reconcile the flux linkage first. Commit no geometry until it is settled.**
 
-### The constraint conflict this exposes, unresolved
+The deciding fact is a 5.01× disagreement between two figures for the same
+machine's PM flux linkage:
 
-The twin carries `fpk_housing_len_mm = 140.5` (basis=**rated**) while the
-front-bay envelope is W 343 × D 259 × H 267 mm. A 214 mm stack does not fit a
-140.5 mm housing. Either the housing grows toward the bay's ~308 mm usable width
-(if the motor axis runs across the bay width), or the 214 mm figure is wrong.
-**I have not resolved which, and the decision above depends on it.** This is the
-first thing to attack.
+| source | λ_pm | what it implies |
+|---|---|---|
+| FE torque, low-current PM slope | 0.006470 Wb | machine makes 42.5 N·m; even both levers reach only 0.99× |
+| 1-D analytic from OC airgap B | 0.032393 Wb | machine should already make ~131 N·m and needs **no geometry change at all** |
+
+These two cannot both be right, and **they imply opposite actions**. Committing a
+stack-length and magnet change now would be spending real BoM, mass and packaging
+budget — plus a housing conflict — on a number that might be an artefact.
+
+Sol's priority-1 recommendation is the same: *"audit full-machine torque scaling,
+model depth and winding/circuit definition before changing geometry."* Sol also
+notes the 2.95× deficit is suspiciously close to exactly 3 and wants phase
+summation, sector periodicity and stack-depth scaling checked first.
+
+**The reconciliation is cheap** — FE solves only, no geometry change, does not
+touch rotor OD, does not re-open the planetary writeback. It is strictly ordered
+before any geometry decision because it determines whether one is needed.
+
+### Ordered work
+
+1. Independent open-circuit **transient back-EMF** from FE (not the 1-D
+   transform) — a genuinely independent witness for λ_pm.
+2. Reconcile series turns per phase against the FE's applied ampere-turns
+   (turns=7 per slot, 2 parallel paths, phase current not path current).
+3. Check phase summation / sector periodicity / planar depth for a factor near 3.
+4. **Only if the torque-derived λ_pm survives all three**, revisit geometry — and
+   then the honest finding is that even both levers land at 0.99×, so the
+   architecture is short and DEC-EM-1 becomes a redesign, not a tweak.
 
 ## 4. What I am NOT doing, and why
 
-- **Not freezing and documenting the shortfall.** A dossier saying "0.39× of
-  duty, architecture short" would be honest but wrong: the machine has 3.35× of
-  unexploited, measured, bay-legal lever. Documenting a shortfall we know how to
-  close would be a false negative.
-- **Not growing rotor OD.** It is bay-limited to 139.42 mm and would invalidate
-  the planetary writeback. The two chosen levers avoid it.
-- **Not chasing the airgap-probe discrepancy further.** It is an rms-derived
-  estimate of a quantity the torque measurement now supersedes.
+- **Not committing the stack or magnet change.** Corrected arithmetic says the
+  pair does not close the duty, and the multiplier is unverified.
+- **Not freezing and documenting the shortfall.** The λ_pm contradiction is
+  unresolved; documenting 0.39× as final would be asserting a number two of the
+  deck's own witnesses disagree about by 5×.
+- **Not growing rotor OD.** Bay-limited, and would invalidate the planetary.
+
+### Unresolved constraint conflict (still live)
+
+`fpk_housing_len_mm = 140.5` (basis=rated) versus a 214 mm stack. A 214 mm stack
+does not fit a 140.5 mm housing. If the stack lever is ever taken, this must be
+resolved first.
 
 ## 5. Questions
 
