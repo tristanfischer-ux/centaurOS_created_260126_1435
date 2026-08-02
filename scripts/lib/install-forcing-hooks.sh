@@ -118,16 +118,24 @@ done
 # and a hook that blocks on all of them is a hook that gets disabled within a
 # day. A gate everyone bypasses is worse than no gate. "Active" = state.json
 # touched in the last 2 days, which is the work anyone is actually doing.
-while IFS= read -r tw; do
+# GOTCHA: husky invokes this under `sh` on some hosts; process substitution
+# `< <(find …)` is a bashism and syntax-errors the whole hook. Prefer a
+# plain find|while (fail stamp so the pipe subshell can still trip fail).
+rm -f /tmp/forge-precommit-cap-fail.$$
+find out -maxdepth 2 -name state.json -mtime -2 2>/dev/null | while IFS= read -r tw; do
   [ -n "$tw" ] || continue
   d="$(dirname "$tw")"
   if [ -f "$d/_capability/capability_dossier.json" ]; then
     say "capability dossier: $(basename "$d")" "present"
   else
     say "capability dossier: $(basename "$d")" "MISSING — run capability_lookup_stage"
-    fail=1
+    echo 1 > /tmp/forge-precommit-cap-fail.$$
   fi
-done < <(find out -maxdepth 2 -name state.json -mtime -2 2>/dev/null)
+done
+if [ -f /tmp/forge-precommit-cap-fail.$$ ]; then
+  fail=1
+  rm -f /tmp/forge-precommit-cap-fail.$$
+fi
 
 if [ "$fail" -ne 0 ]; then
   cat <<'MSG'

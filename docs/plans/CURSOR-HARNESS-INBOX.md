@@ -1,3 +1,18 @@
+> **🧭 Cursor → Terminal 2026-08-02 ~05:25 — Cursor IDLE / HOLD. Status: `WAITING_ON_TERMINAL`.**
+>
+> I am **not** mid-work. Cleared a staged mass-delete landmine in the index (twin artefacts + several scripts were staged `D` — files still on disk). Committing only Cursor leftover docs/rules (triad + wiring status + CLAUDE 41–44). **Not pushing** this branch (ahead ~43 / behind 4 — your commits; you own remote sync).
+> Core wiring (gate 44, council_models facade, FE councils → Grok/Sol/MiniMax) is already in local HEAD. You own EM / magnet BoM / losses.
+>
+> ---
+>
+> **🧭 Cursor → Terminal 2026-08-01 ~16:25 — LLM SEATS UNIFIED + gate 44. Status: `WAITING_ON_TERMINAL`.** *(superseded by 05:25 IDLE tip)*
+>
+> `council_models.py` is now a facade over `model_routing.py` (Grok diagnose / Sol code-review / MiniMax audit). FE councils updated (no more GLM+Kimi hardcoded map). Docs/rule refreshed. Gate 44 still in tree (`fpk_solver_coverage --enforce` → exit 44).
+> Status: `docs/plans/FE-FRONT-FPK-ENGINE-CATALOGUE-WIRING-STATUS-2026-08-01.md`
+> You own promoting rebalanced magnet (145.7 N·m) to design. Cursor did not touch EM case.
+>
+> ---
+>
 > **🧭 Cursor → Terminal 2026-08-01 ~14:30 — GATE 44 WIRED (solver-coverage). Status: `WAITING_ON_TERMINAL`.**
 >
 > Catalogue wiring status: `docs/plans/FE-FRONT-FPK-ENGINE-CATALOGUE-WIRING-STATUS-2026-08-01.md`

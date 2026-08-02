@@ -1,51 +1,83 @@
----
-description: Regularly challenge work with Sol + Kimi K3 + GLM (not self-grade alone)
-alwaysApply: true
----
+# Multi-Model Challenge Council + Advisory Triad
 
-# Multi-Model Challenge Council (Sol · Kimi K3 · GLM)
+**STANDING DIRECTIVE (Tristan 2026-07-29, refined 2026-08-01 from in-anger record):** Do not rely on a single model’s self-assessment. Convene multi-model challenge regularly — and **route by role**, not by “ask the smartest model.”
 
-**STANDING DIRECTIVE (Tristan 2026-07-29):** Do not rely on a single model’s self-assessment. On a **regular basis**, use **Sol**, **Kimi K3**, and **GLM** to challenge and improve the work — especially FPK / dossier / physics / literature depth.
+**Single source of truth for model ids:** `scripts/lib/model_routing.py`  
+**Facade imported by FE councils:** `scripts/lib/council_models.py` (must stay locked to routing — `--selftest`)
 
-## Models (OpenRouter)
+## Physics ceiling (structural — read before trusting any LLM on EM)
+
+| Benchmark | Reality |
+|---|---|
+| **CritPt** (research physics) | World-best ≈ **32%** — two-thirds of research-level physics wrong |
+| **GPQA Diamond** | Saturated ~92–94% — **does not discriminate**; never pick models on GPQA |
+
+**Consequence:** No LLM is a **validator** for magnetics / electromagnetics / hard physics. Models are **hypothesis generators** and **method reviewers**. Validation stays in **xfemm / solvers / gate registry / proveCatch / twin artefacts**.
+
+**Worse — anti-correlation:** physics skill and non-hallucination honesty pull apart. GPT-5.6 Sol leads CritPt and is among the **worst** at admitting ignorance (~18% non-hallucination). Never accept Sol domain advice unchecked.
+
+## Advisory triad (maker ≠ checker — use this day-to-day)
+
+Revised 2026-08-01 from the FE front session record (12 council runs), not from benchmarks alone:
+
+| Role | Model | OpenRouter id | When |
+|---|---|---|---|
+| **Standing diagnose** | Grok 4.5 | `x-ai/grok-4.5` | Default second opinion — 3/3 returned; named the campaign-defining fault |
+| **Code review / propose** | GPT-5.6 Sol | `openai/gpt-5.6-sol` | Diffs, pre-commit, hard escalation; **never** unchecked domain advice |
+| **Checker** | MiniMax-M3 | `minimax/minimax-m3` | “Is this claim supported by the given artefacts?” — **not** physics |
+| **Backup voice** | DeepSeek V4 Flash 0731 | `deepseek/deepseek-v4-flash-0731` | Always-on cheap fourth lineage; **never** auditor |
+| Demoted corroborator | GLM-5.2 | `z-ai/glm-5.2` | Optional only — returned 2/4; not standing first call |
+| Long-context honesty | Qwen3.7 Max | `qwen/qwen3.7-max` | When MiniMax context is too short |
+
+**Dropped:** Kimi K3 (1/3 return, token-cap deaths).  
+**Avoid:** `gpt-5.5-pro` as Sol substitute (~5× cost, worse CritPt).
+
+## Full challenge council (milestones / HoT reject)
 
 | Seat | Model id | Fallback |
 |---|---|---|
+| Grok | `x-ai/grok-4.5` | — |
 | Sol | `openai/gpt-5.6-sol` | — |
-| Kimi K3 | `moonshotai/kimi-k3` | **`anthropic/claude-opus-5`** if Kimi fails |
-| GLM | `z-ai/glm-5.2` | — |
+| MiniMax | `minimax/minimax-m3` | **`anthropic/claude-opus-5`** if MiniMax fails |
 
-**Kimi → Opus 5 (Tristan 2026-07-29):** If Kimi returns parse error, reasoning-without-JSON, timeout, empty rows, or HTTP failure — **immediately retry that seat with Opus 5**. Do not drop the third seat. Label outputs `kimi` vs `opus5` in artefacts so provenance is clear.
+Optional fourth: DeepSeek Flash as backup voice over the merged punchlist (not as auditor).
 
-## When to convene (minimum cadence)
+## When to convene
 
-Run a challenge pass after any of:
-
-1. A substantive physics / parts / PCB / morphology milestone
-2. A new literature or checklist corpus merge
-3. Claiming “ready for HoT / DRAFT pack review”
-4. Getting stuck in self-confirmation (green gates, pretty renders)
-
-Do **not** wait only for end-of-programme red-team.
+| Cadence | Action |
+|---|---|
+| After every load-bearing numeric claim | MiniMax (or Qwen long-ctx) evidence check |
+| After substantive physics / PCB / morphology milestone | Grok diagnose on digest |
+| Before DEC-* freeze / “ready for HoT” / stuck in self-green | Full Grok+Sol+MiniMax council |
+| Hard EM / magnetics disagreement (analytic vs FE vs back-EMF) | Sol code/method review **then** solver re-run — Sol never closes the gate |
+| Pre-commit on arithmetic / claim patches | `council_precommit_review.py` (uses `model_routing`) |
 
 ## How
 
-1. Feed a **digest of delivered artefacts** (not just `state.json` intent) — SIGHT.
-2. Ask all three **in parallel** to REJECT / find gaps / deepen first-principles.
-3. Merge into a punchlist; fix at **SOURCE** (CORE FIX PRINCIPLE); re-challenge.
-4. Harden parsers: truncated JSON, `content=null`, Kimi reasoning-without-JSON — salvage or re-prompt “JSON only, first char `{`”. If Kimi still fails → **Opus 5** for that seat.
+1. Feed a **digest of delivered artefacts** (twin JSON, solver outputs, PNGs) — SIGHT, not intent alone.
+2. Ask **role-appropriate** questions (diagnose ≠ code review ≠ evidence audit).
+3. Merge punchlist; fix at **SOURCE** + proveCatch; re-challenge.
+4. Harden parsers: truncated JSON, keep-alive padding, reasoning-without-JSON.
 
-## Existing scripts (extend, don’t reinvent)
+## Existing scripts
 
+- `scripts/lib/model_routing.py` — seats + `seats_for(task)` + CritPt disclaimer
+- `scripts/lib/council_models.py` — facade (`COUNCIL_MODELS`, `ADVISORY_TRIAD`)
+- `scripts/lib/council_precommit_review.py` — pre-commit triad
 - `scripts/fe-front-redteam-council.py` — HoT adversarial reject
-- `scripts/fe-front-physics-checklist-council.py` (+ pass2) — component/physics explosion
-- Pattern for new councils: same three models, flat JSON schema, merge + gap vs engine
+- `scripts/fe-front-physics-checklist-council.py`
+- Canonical note: `docs/plans/LLM-ADVISORY-TRIAD-PHYSICS-CEILING-2026-08-01.md`
 
 ## Anti-patterns
 
 | Bad | Good |
 |---|---|
-| “I think this is solid” without council | Sol+Kimi+GLM punchlist |
-| One model only | All three seats |
-| Praise-seeking prompts | Adversarial / completeness prompts |
-| Ignoring truncated replies | Salvage + retry with flat schema |
+| Sol as default second opinion | Grok first; Sol for code review / hard escalation |
+| Treating Sol/CritPt winner as validator | Sol = hypothesis; xfemm/gates = validation |
+| Picking models on GPQA | Ignore GPQA; use CritPt + honesty + cost + return rate |
+| Asking MiniMax to size magnets | MiniMax: “is the claim supported?” |
+| DeepSeek as physics authority or auditor | Cheap voice only |
+| GLM as standing first call after demotion | Optional corroborator only |
+| One model self-grades green | Triad or full council |
+| Accepting Sol without MiniMax/solver check | Escalation always dual-checked |
+| Divergent ids in `council_models` vs `model_routing` | Facade + `--selftest` must stay green |

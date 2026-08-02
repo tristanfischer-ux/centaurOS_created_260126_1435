@@ -12,11 +12,12 @@
 
 | Layer | Status |
 |---|---|
-| Bar A | **FAIL** — duty ~42 N·m FE capability vs 125.21; DEC-EM-1 hold on geometry |
-| Bar B | Correctly open (dyno/HIL/fab/XYZ/VOF/FIA) |
-| Stack solvers on twin | **Wired, currently FAILING gate 44** — ~5/22 FRESH after recent `state.json` bumps; EM case + probes fresh, most screens STALE |
-| Honesty gates 41–43 | **Wired + ENFORCE by default** (CLI + gate-registry proveCatch) |
-| Solver-coverage gate 44 | **Just wired** — was report/`exit 1`; now `--enforce` → exit 44 + punchlist |
+| Bar A (analytic torque) | **PASS path measured** — rebalanced → **145.7 N·m** (1.16×); twin still baseline until respec is design |
+| Bar B | Correctly open; `ship_ok` false (`torque_reliable` pending dyno) |
+| Stack solvers on twin | Gate 44 ready; many screens STALE — punchlist re-run still owed |
+| Honesty gates 41–43 | **Wired + ENFORCE by default** |
+| Solver-coverage gate 44 | **Wired** (`--enforce` → exit 44 + punchlist + proveCatch) |
+| LLM seats | **Unified** — `council_models` → `model_routing` (Grok/Sol/MiniMax); FE councils updated |
 | Industrial / MDO / KISSsoft / LTspice / cantools | **Not wired** (correctly early for most; HIL prep is the cheap parallel) |
 
 ---
@@ -43,10 +44,10 @@
 
 | Item | Wired into engine? | What to do |
 |---|---|---|
-| Design-space / DEC-EM-1 (not FEMM↔JMAG swap) | Decision brief exists | Terminal: reconcile λ_pm before geometry change |
-| JMAG **or** Motor-CAD+Maxwell | **No** | After / parallel to DEC diagnosis — pick one |
-| pymoo / OpenMDAO around FE | **No** | After λ_pm story stable enough to optimise |
-| KISSsoft / Romax LTCA | **No** | Only after EM OD freeze |
+| Design-space / DEC-EM-1 (not FEMM↔JMAG swap) | **Resolved by measurement** (magnet respec alone) | Land rebalanced magnet as design; keep OD |
+| JMAG **or** Motor-CAD+Maxwell | **No** | Industrial second opinion after respec freeze |
+| pymoo / OpenMDAO around FE | **No** | Optional; duty already closes on measured respec |
+| KISSsoft / Romax LTCA | **No** | Re-open — OD unchanged so prior writeback path may revive |
 | LTspice DPT + FastHenry → PLECS | **No** | Cheap parallel for SiC honesty |
 | OpenFOAM VOF / Particleworks | **No** | After gear freeze |
 | cantools + Renode | **No** | Cheap Bar B prep now |
@@ -81,22 +82,22 @@ npx tsx scripts/lib/gate-registry.ts --selftest
 
 ---
 
-## 3. What Cursor did this session (non-colliding)
+## 3. What Cursor did (non-colliding)
 
 1. Audited catalogue vs twin / gates / motor-stack.
-2. Promoted `fpk_solver_coverage.py` from soft report to **gate 44** (`--enforce` → exit 44, punchlist, env default ON, `--selftest` proveCatch).
-3. Registered proveCatch in `scripts/lib/gate-registry.ts` + `ALL_GATE_CODES`.
-4. Documented exits 41–44 in `CLAUDE.md`.
-5. **Did not** edit `em_fia_front_kit_case.py` or DEC-EM geometry (terminal lane).
+2. Promoted `fpk_solver_coverage.py` to **gate 44** (`--enforce` → exit 44, punchlist, proveCatch).
+3. Registered proveCatch in `gate-registry.ts` + `ALL_GATE_CODES`; exits 41–44 in `CLAUDE.md`.
+4. **Unified LLM seats:** `council_models.py` is now a facade over `model_routing.py`; FE councils (`redteam`, `physics-checklist`, `plan-vet`, `closeout`, `half-done`) call Grok/Sol/MiniMax (not GLM/Kimi). Rule + triad doc updated.
+5. **Did not** edit `em_fia_front_kit_case.py` (terminal EM lane).
 
 ---
 
 ## 4. Suggested next (split ownership)
 
 **Terminal (EM critical path)**  
-1. DEC-EM-1 λ_pm reconciliation (transient BEMF / turns / paths) — hold geometry.  
-2. Refresh Bar A tracker from twin (~42 N·m capability, not stale ~118).  
-3. Clear gate 44: re-run punchlist (or `fpk_solver_coverage.py --twin … --run`) so coverage is all-FRESH before shipping non-EM claims.
+1. Promote rebalanced magnet (t=6.0 / L=22.5) from probe override to design deck.  
+2. Refresh Bar A tracker (145.7 N·m rebalanced vs baseline ~42; not stale ~118).  
+3. Clear gate 44 punchlist before shipping non-EM claims.
 
 **Cursor (parallel, if free)**  
 1. Optional: cantools DBC scaffold + Renode stub (Bar B prep).  
@@ -110,8 +111,9 @@ npx tsx scripts/lib/gate-registry.ts --selftest
 | Signal | Approx | Source of truth |
 |---|---|---|
 | Duty required | 125.21 N·m @ 20 000 rpm | Brief / duty screen |
-| FE capability (post DEC arithmetic honesty) | ~42 N·m | DEC-EM-1 brief |
-| Excitation tracking | CLOSED (+p·θm) | Gate 42 domain |
-| Magnet face | Starved (A_m/A_g≈0.56) — do not “fix” with whole-torque scale factor | Gate 43 + DEC brief |
+| Baseline FE capability | ~42 N·m | Twin baseline artefact |
+| Rebalanced delivered mean | **145.7 N·m** (1.16×) | `em_fia_front_kit_case_REBALANCED.json` |
+| Excitation (rebalanced) | k1/k2 = 0; sign consistent | Gate 42 domain |
+| Magnet face (rebalanced) | A_m/A_g ≈ 0.87 buildable | Gate 43 + placer |
 | `ship_ok` | false | Standing |
 | Homologation | NOT_HOMOLOGATED | Standing |
