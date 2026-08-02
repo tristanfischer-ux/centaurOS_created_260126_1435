@@ -50,7 +50,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 UNIVERSAL_SELFTESTS = (
     "machine_excitation_tracking", "machine_magnet_flux_focusing",
     "machine_loss_bounds", "model_routing", "claim_provenance_gate",
-    "fpk_geometry_coherence", "capability_lookup_stage",
+    "machine_geometry_coherence", "capability_lookup_stage",
 )
 
 MIN_ARTEFACT_BYTES = 32

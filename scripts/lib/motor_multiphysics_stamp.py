@@ -3220,7 +3220,7 @@ def build_motor_multiphysics(
 def _geometry_coherence_blockers(motor_body: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Architecture blockers for split / uninstallable geometry. Never raises."""
     try:
-        from fpk_geometry_coherence import (  # noqa: PLC0415
+        from machine_geometry_coherence import (  # noqa: PLC0415
             check_artefact_agreement, check_envelope_fit,
         )
     except ImportError:

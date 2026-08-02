@@ -82,7 +82,7 @@ echo "── pre-commit: the checks that do not depend on remembering ──"
 
 for m in machine_excitation_tracking machine_magnet_flux_focusing machine_loss_bounds \
          model_routing claim_provenance_gate council_precommit_review \
-         fpk_geometry_coherence capability_lookup_stage \
+         machine_geometry_coherence capability_lookup_stage \
          stage_boundary_check calculation_guard; do
   if [ -f "scripts/lib/$m.py" ]; then
     if $PY "scripts/lib/$m.py" --selftest >/dev/null 2>&1; then

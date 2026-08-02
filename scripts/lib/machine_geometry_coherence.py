@@ -34,6 +34,12 @@ from typing import Any, Iterable, Mapping, Optional
 # Geometry fields a solver artefact may record, mapped to a canonical name.
 # Any artefact that records one of these is claiming "I was solved on THIS
 # machine", which is exactly what must agree across the twin.
+# ⭐ ALIASES ARE A REGISTRY, NOT A SCHEMA (2026-08-02). The `fpk_*` entries below
+# are ONE naming convention this engine happens to use — they are additive, not
+# definitional. Any archetype registers its own names here and the mechanism is
+# unchanged; nothing in the comparison logic knows what an fpk is. The module was
+# named fpk_geometry_coherence until today, which made a universal check look
+# campaign-specific.
 GEOMETRY_ALIASES: dict[str, tuple[str, ...]] = {
     "rotor_od_mm": ("rotor_outer_diameter_mm", "rotor_od_mm", "fpk_rotor_od_mm"),
     "rotor_id_mm": ("rotor_inner_diameter_mm", "rotor_id_mm", "fpk_rotor_id_mm"),
@@ -337,7 +343,7 @@ def _selftest() -> None:
     assert extract_geometry({}) == {}
 
     print(
-        f"fpk_geometry_coherence _selftest: OK — real two-machine split FIRES "
+        f"machine_geometry_coherence _selftest: OK — real two-machine split FIRES "
         f"({len(split)} finding/s, codes={sorted(codes)}), 197.1 mm rotor rejected "
         f"against a 139.4 mm bay cap, coherent twin passes clean")
 
