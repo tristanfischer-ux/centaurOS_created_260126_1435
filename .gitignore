@@ -144,3 +144,15 @@ state-*.json
 out/
 *.pyc
 out-ras-*.log
+
+# Repo-root run artefacts and OS junk (tidied 2026-08-02)
+# chain run logs written to the repo root; out-ras-*.log was already ignored
+out-formula-e-*.log
+# gate output written to the repo root, not a source file
+drawing-gates.json
+drawing-manifest.json
+drawings-inspection.json
+# macOS finder junk; was tracked by mistake
+.DS_Store
+# generated ledger written to the repo root (out_dir = repo root, zero rows)
+parts-ledger.json

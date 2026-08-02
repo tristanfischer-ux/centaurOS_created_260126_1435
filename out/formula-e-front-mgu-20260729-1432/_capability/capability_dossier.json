@@ -27,8 +27,8 @@
           "component_id",
           "topic_id"
         ],
-        "has_embedding_column": false,
-        "search_mode": "LEXICAL ONLY"
+        "has_embedding_column": true,
+        "search_mode": "hybrid"
       },
       "pretraining_extracted_specs": {
         "present": true,
@@ -134,6 +134,10 @@
       "has_selftest": true
     },
     {
+      "path": "scripts/lib/p_stage_discipline.py",
+      "has_selftest": true
+    },
+    {
       "path": "scripts/motor-stack/analytical_fia_case_mount_screen.py",
       "has_selftest": true
     },
@@ -222,7 +226,7 @@
       "has_selftest": true
     }
   ],
-  "n_solvers": 41,
+  "n_solvers": 42,
   "tools": [
     {
       "path": "scripts/lib/orchestrator/tools/python/absorption_column_htu_ntu.py",
@@ -1306,11 +1310,45 @@
     }
   ],
   "n_tools": 270,
-  "packages_available": [],
-  "packages_missing": [],
-  "notes": [
-    "fpk_component_literature is LEXICAL ONLY (24946 rows) \u2014 semantic search unavailable until it is embedded"
+  "packages_available": [
+    "pyleecan",
+    "swat_em",
+    "numpy",
+    "scipy",
+    "sympy",
+    "CoolProp",
+    "ht",
+    "ross",
+    "matplotlib",
+    "pandas"
   ],
+  "packages_missing": [
+    "femm",
+    "cantools",
+    "pymoo",
+    "openmdao",
+    "meshio",
+    "gmsh",
+    "SciDataTool"
+  ],
+  "native_solvers_available": [
+    {
+      "name": "femmcli",
+      "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/phantm/bin/femmcli",
+      "env_var": "FEMMCLI"
+    },
+    {
+      "name": "blender",
+      "path": "/opt/homebrew/Caskroom/blender/5.1.1/blender.wrapper.sh",
+      "env_var": "BLENDER"
+    }
+  ],
+  "native_solvers_missing": [
+    "ccx"
+  ],
+  "packages_probed": true,
+  "python_probed": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/.venv/bin/python",
+  "notes": [],
   "gate": {
     "ok": true,
     "findings": []

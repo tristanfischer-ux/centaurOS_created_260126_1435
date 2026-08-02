@@ -538,6 +538,270 @@ def post_diff_final_drive_helical(params: dict[str, object]) -> cq.Workplane:
     return cq.Workplane(obj=cq.Compound.makeCompound(solids))
 
 
+def _resolve_compact_bevel_differential_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate the FIA front-kit bevel differential packaging nest.
+
+    Defaults mirror iso_bevel_recommended_geometry strength-driven resize
+    (diff_od 120 mm, side/pinion tooth counts 14/10, face 10 mm).
+    """
+    diff_od = _number(params, "diff_od", 120.0)
+    diff_len = _number(params, "diff_len", 108.0)
+    side_gear_teeth = int(params.get("side_gear_teeth", 14))
+    spider_pinion_teeth = int(params.get("spider_pinion_teeth", 10))
+    spider_count = int(params.get("spider_count", 6))
+    face_width = _number(params, "face_width", 10.0)
+    cross_pin_diameter = _number(params, "cross_pin_diameter", 8.0)
+    output_shaft_diameter = _number(params, "output_shaft_diameter", 28.0)
+    output_shaft_length = _number(params, "output_shaft_length", 36.0)
+    carrier_wall = _number(params, "carrier_wall", 6.0)
+
+    if side_gear_teeth < 8 or spider_pinion_teeth < 6:
+        raise ValueError("tooth counts must stay above packaging minimums")
+    if spider_count < 2:
+        raise ValueError("spider_count must be at least 2")
+    if carrier_wall * 2.0 >= diff_od:
+        raise ValueError("carrier_wall leaves no internal volume")
+    if face_width >= diff_len - 2.0 * carrier_wall:
+        raise ValueError("face_width exceeds carrier internal length")
+    if output_shaft_diameter >= diff_od - 2.0 * carrier_wall - 4.0:
+        raise ValueError("output_shaft_diameter exceeds carrier bore")
+
+    mean_module = diff_od * 0.34 / max(side_gear_teeth, 1)
+    side_pitch_radius = mean_module * side_gear_teeth / 2.0
+    pinion_pitch_radius = mean_module * spider_pinion_teeth / 2.0
+
+    return {
+        "diff_od": diff_od,
+        "diff_len": diff_len,
+        "side_gear_teeth": side_gear_teeth,
+        "spider_pinion_teeth": spider_pinion_teeth,
+        "spider_count": spider_count,
+        "face_width": face_width,
+        "cross_pin_diameter": cross_pin_diameter,
+        "output_shaft_diameter": output_shaft_diameter,
+        "output_shaft_length": output_shaft_length,
+        "carrier_wall": carrier_wall,
+        "mean_module_mm": mean_module,
+        "side_pitch_radius_mm": side_pitch_radius,
+        "pinion_pitch_radius_mm": pinion_pitch_radius,
+    }
+
+
+def compact_bevel_differential_metrics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit packaging scalars for the compact bevel differential family."""
+    p = _resolve_compact_bevel_differential_params(params)
+    inner_diameter = float(p["diff_od"]) - 2.0 * float(p["carrier_wall"])
+    return {
+        "diff_od_mm": float(p["diff_od"]),
+        "diff_len_mm": float(p["diff_len"]),
+        "side_gear_teeth": int(p["side_gear_teeth"]),
+        "spider_pinion_teeth": int(p["spider_pinion_teeth"]),
+        "spider_count": int(p["spider_count"]),
+        "face_width_mm": float(p["face_width"]),
+        "inner_diameter_mm": inner_diameter,
+        "mean_module_mm": float(p["mean_module_mm"]),
+    }
+
+
+def compact_bevel_differential(params: dict[str, object]) -> cq.Workplane:
+    """Build a compact open bevel differential packaging nest.
+
+    INTENT: communicate carrier, cross-pin, spider pinions, side gears and
+    output stubs as honest parametric training geometry tied to the FIA
+    strength-driven tooth-count resize — not ISO 23509 tooth surfaces.
+    """
+    p = _resolve_compact_bevel_differential_params(params)
+    diff_od = float(p["diff_od"])
+    diff_len = float(p["diff_len"])
+    face_width = float(p["face_width"])
+    carrier_wall = float(p["carrier_wall"])
+    cross_pin_diameter = float(p["cross_pin_diameter"])
+    output_shaft_diameter = float(p["output_shaft_diameter"])
+    output_shaft_length = float(p["output_shaft_length"])
+    side_pitch_radius = float(p["side_pitch_radius_mm"])
+    pinion_pitch_radius = float(p["pinion_pitch_radius_mm"])
+    spider_count = int(p["spider_count"])
+
+    inner_radius = diff_od / 2.0 - carrier_wall
+    solids: list[cq.Workplane] = []
+
+    carrier = (
+        cq.Workplane("XY")
+        .circle(diff_od / 2.0)
+        .circle(inner_radius)
+        .extrude(diff_len)
+    )
+    solids.append(carrier)
+
+    z_center = diff_len / 2.0
+    z_offset = z_center - face_width / 2.0
+
+    # Side gears — simplified straight-bevel frustums on ±Y.
+    side_outer = min(side_pitch_radius + face_width * 0.9, inner_radius - 2.0)
+    side_inner = max(side_outer - face_width * 0.75, pinion_pitch_radius + 2.0)
+    for sign in (-1.0, 1.0):
+        side_gear = (
+            cq.Workplane("XZ")
+            .workplane(offset=sign * (inner_radius - face_width * 0.35))
+            .circle(side_outer)
+            .circle(side_inner)
+            .extrude(face_width)
+        )
+        solids.append(side_gear)
+        output_shaft = (
+            cq.Workplane("XZ")
+            .workplane(offset=sign * (inner_radius + output_shaft_length / 2.0))
+            .circle(output_shaft_diameter / 2.0)
+            .extrude(output_shaft_length)
+        )
+        solids.append(output_shaft)
+
+    # Cross pin through the carrier bore.
+    cross_pin = (
+        cq.Workplane("YZ")
+        .workplane(offset=0.0)
+        .circle(cross_pin_diameter / 2.0)
+        .extrude(diff_len + 4.0, both=True)
+    )
+    solids.append(cross_pin)
+
+    # Spider pinions on the cross pin at equal azimuth spacing.
+    pinion_od = pinion_pitch_radius * 2.0 + face_width * 0.35
+    pinion_id = max(cross_pin_diameter + 1.5, pinion_od - face_width * 0.8)
+    for index in range(spider_count):
+        angle = 360.0 * index / spider_count
+        pinion = (
+            cq.Workplane("XY")
+            .workplane(offset=z_offset)
+            .transformed(rotate=(0.0, 0.0, angle))
+            .center(pinion_pitch_radius, 0.0)
+            .circle(pinion_od / 2.0)
+            .circle(pinion_id / 2.0)
+            .extrude(face_width)
+        )
+        solids.append(pinion)
+
+    return cq.Workplane(obj=cq.Compound.makeCompound([s.val() for s in solids]))
+
+
+def _resolve_rotor_bearing_stack_params(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Validate a traction-motor shaft + twin-bearing packaging stack."""
+    shaft_diameter = _number(params, "shaft_diameter", 55.0)
+    shaft_length = _number(params, "shaft_length", 180.0)
+    bearing_od = _number(params, "bearing_od", 100.0)
+    bearing_width = _number(params, "bearing_width", 18.0)
+    bearing_bore = _number(params, "bearing_bore", shaft_diameter + 0.05)
+    bearing_count = int(params.get("bearing_count", 2))
+    bearing_spacing = _number(params, "bearing_spacing", 90.0)
+    shoulder_diameter = _number(params, "shoulder_diameter", bearing_od + 4.0)
+    seat_depth = _number(params, "seat_depth", 1.5)
+
+    if bearing_count < 1:
+        raise ValueError("bearing_count must be at least 1")
+    if bearing_bore < shaft_diameter:
+        raise ValueError("bearing_bore must be at least shaft_diameter")
+    if bearing_od <= bearing_bore + 2.0:
+        raise ValueError("bearing_od must exceed bearing_bore")
+    if bearing_spacing + bearing_width > shaft_length - bearing_width:
+        raise ValueError("bearing stack does not fit on shaft_length")
+    if shoulder_diameter < bearing_od:
+        raise ValueError("shoulder_diameter must retain the bearing outer race")
+
+    return {
+        "shaft_diameter": shaft_diameter,
+        "shaft_length": shaft_length,
+        "bearing_od": bearing_od,
+        "bearing_width": bearing_width,
+        "bearing_bore": bearing_bore,
+        "bearing_count": bearing_count,
+        "bearing_spacing": bearing_spacing,
+        "shoulder_diameter": shoulder_diameter,
+        "seat_depth": seat_depth,
+    }
+
+
+def rotor_bearing_stack_metrics(
+    params: dict[str, object],
+) -> dict[str, float | int]:
+    """Emit packaging scalars for the rotor bearing stack family."""
+    p = _resolve_rotor_bearing_stack_params(params)
+    span = (
+        float(p["bearing_spacing"])
+        + float(p["bearing_width"]) * float(p["bearing_count"])
+    )
+    return {
+        "shaft_diameter_mm": float(p["shaft_diameter"]),
+        "shaft_length_mm": float(p["shaft_length"]),
+        "bearing_od_mm": float(p["bearing_od"]),
+        "bearing_width_mm": float(p["bearing_width"]),
+        "bearing_count": int(p["bearing_count"]),
+        "bearing_span_mm": span,
+    }
+
+
+def rotor_bearing_stack(params: dict[str, object]) -> cq.Workplane:
+    """Build a shaft with twin deep-groove bearing seats (training geometry).
+
+    INTENT: give forge-truth recognisable front/rear motor bearing packaging
+    without supplier identity, preload solves or rated-life claims.
+    """
+    p = _resolve_rotor_bearing_stack_params(params)
+    shaft_diameter = float(p["shaft_diameter"])
+    shaft_length = float(p["shaft_length"])
+    bearing_od = float(p["bearing_od"])
+    bearing_width = float(p["bearing_width"])
+    bearing_bore = float(p["bearing_bore"])
+    bearing_count = int(p["bearing_count"])
+    bearing_spacing = float(p["bearing_spacing"])
+    shoulder_diameter = float(p["shoulder_diameter"])
+    seat_depth = float(p["seat_depth"])
+
+    solids: list[cq.Workplane] = []
+
+    shaft = (
+        cq.Workplane("XY")
+        .circle(shaft_diameter / 2.0)
+        .extrude(shaft_length)
+    )
+    solids.append(shaft)
+
+    first_bearing_z = (shaft_length - bearing_spacing - bearing_width) / 2.0
+    for index in range(bearing_count):
+        z_base = first_bearing_z + index * bearing_spacing
+        shoulder = (
+            cq.Workplane("XY")
+            .workplane(offset=z_base - 0.05)
+            .circle(shoulder_diameter / 2.0)
+            .circle(shaft_diameter / 2.0)
+            .extrude(seat_depth + 0.1)
+        )
+        solids.append(shoulder)
+        outer_race = (
+            cq.Workplane("XY")
+            .workplane(offset=z_base)
+            .circle(bearing_od / 2.0)
+            .circle(bearing_bore / 2.0 + 0.8)
+            .extrude(bearing_width)
+        )
+        inner_race = (
+            cq.Workplane("XY")
+            .workplane(offset=z_base + bearing_width * 0.15)
+            .circle(bearing_bore / 2.0 + 0.4)
+            .circle(shaft_diameter / 2.0 + 0.05)
+            .extrude(bearing_width * 0.7)
+        )
+        solids.append(outer_race)
+        solids.append(inner_race)
+
+    return cq.Workplane(obj=cq.Compound.makeCompound([s.val() for s in solids]))
+
+
 def cold_plate_serpentine_hydraulics(params: dict[str, object]) -> dict[str, float | int]:
     """Emit rectangular-channel hydraulic scalars for the serpentine family.
 
@@ -1533,6 +1797,136 @@ TIER2_MOTOR_DRIVETRAIN = {
             ),
         },
     },
+    "compact_bevel_differential": {
+        "function": compact_bevel_differential,
+        "name": "Compact Bevel Differential",
+        "category": "drivetrain",
+        "default_colour": "#8A8A8A",
+        "visual_tags": [
+            "differential",
+            "bevel",
+            "carrier",
+            "spider",
+            "drivetrain",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "diff_od": {
+                "type": "number", "default": 120.0, "min": 40.0, "unit": "mm"
+            },
+            "diff_len": {
+                "type": "number", "default": 108.0, "min": 30.0, "unit": "mm"
+            },
+            "side_gear_teeth": {
+                "type": "integer", "default": 14, "min": 8
+            },
+            "spider_pinion_teeth": {
+                "type": "integer", "default": 10, "min": 6
+            },
+            "spider_count": {
+                "type": "integer", "default": 6, "min": 2
+            },
+            "face_width": {
+                "type": "number", "default": 10.0, "min": 2.0, "unit": "mm"
+            },
+            "cross_pin_diameter": {
+                "type": "number", "default": 8.0, "min": 2.0, "unit": "mm"
+            },
+            "output_shaft_diameter": {
+                "type": "number", "default": 28.0, "min": 8.0, "unit": "mm"
+            },
+            "output_shaft_length": {
+                "type": "number", "default": 36.0, "min": 8.0, "unit": "mm"
+            },
+            "carrier_wall": {
+                "type": "number", "default": 6.0, "min": 2.0, "unit": "mm"
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "carrier_bore",
+                "type": "concentric_bore",
+                "position": "centre",
+            },
+            {
+                "name": "halfshaft_outputs",
+                "type": "dual_concentric_bore",
+                "position": "side_gear_axes",
+            },
+        ],
+        "training_provenance": {
+            "source_url": None,
+            "source_revision": None,
+            "licence": "ForgeOS-source-owned",
+            "use": (
+                "ForgeOS packaging nest tied to iso_bevel strength resize; "
+                "not ISO 23509 tooth surfaces or release gear CAD"
+            ),
+        },
+    },
+    "rotor_bearing_stack": {
+        "function": rotor_bearing_stack,
+        "name": "Traction Rotor Bearing Stack",
+        "category": "drivetrain",
+        "default_colour": "#707070",
+        "visual_tags": [
+            "bearing",
+            "shaft",
+            "rotor",
+            "traction_motor",
+            "training_geometry",
+        ],
+        "param_schema": {
+            "shaft_diameter": {
+                "type": "number", "default": 55.0, "min": 10.0, "unit": "mm"
+            },
+            "shaft_length": {
+                "type": "number", "default": 180.0, "min": 40.0, "unit": "mm"
+            },
+            "bearing_od": {
+                "type": "number", "default": 100.0, "min": 20.0, "unit": "mm"
+            },
+            "bearing_width": {
+                "type": "number", "default": 18.0, "min": 4.0, "unit": "mm"
+            },
+            "bearing_bore": {
+                "type": "number", "default": 55.05, "min": 10.0, "unit": "mm"
+            },
+            "bearing_count": {
+                "type": "integer", "default": 2, "min": 1
+            },
+            "bearing_spacing": {
+                "type": "number", "default": 90.0, "min": 10.0, "unit": "mm"
+            },
+            "shoulder_diameter": {
+                "type": "number", "default": 104.0, "min": 20.0, "unit": "mm"
+            },
+            "seat_depth": {
+                "type": "number", "default": 1.5, "min": 0.5, "unit": "mm"
+            },
+        },
+        "mounting_interfaces": [
+            {
+                "name": "shaft_drive_end",
+                "type": "concentric_bore",
+                "position": "z_min",
+            },
+            {
+                "name": "bearing_outer_races",
+                "type": "dual_cylindrical_seat",
+                "position": "along_shaft",
+            },
+        ],
+        "training_provenance": {
+            "source_url": None,
+            "source_revision": None,
+            "licence": "ForgeOS-source-owned",
+            "use": (
+                "ForgeOS shaft + twin-bearing packaging training geometry; "
+                "no supplier identity, preload or rated-life claims"
+            ),
+        },
+    },
     "cold_plate_serpentine": {
         "function": cold_plate_serpentine,
         "name": "Serpentine Cold Plate",
@@ -2214,6 +2608,46 @@ def _selftest_water_jacket(temp_root: Path) -> None:
     )
 
 
+def _selftest_compact_bevel_differential(temp_root: Path) -> None:
+    """Prove strength-resize defaults rebuild a multi-solid differential nest."""
+    model = compact_bevel_differential({})
+    metrics = compact_bevel_differential_metrics({})
+    bbox = model.val().BoundingBox()
+    solid_count = model.solids().size()
+    assert solid_count >= 8
+    assert metrics["diff_od_mm"] == 120.0
+    assert metrics["side_gear_teeth"] == 14
+    assert bbox.xlen > 80.0
+    assert bbox.ylen > 80.0
+    assert bbox.zlen > 90.0
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "compact_bevel_differential", temp_root
+    )
+    print(
+        "[compact-bevel-differential] selftest PASS: "
+        f"solids={solid_count}, STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
+def _selftest_rotor_bearing_stack(temp_root: Path) -> None:
+    """Prove twin-bearing shaft stack exports substantial geometry."""
+    model = rotor_bearing_stack({})
+    metrics = rotor_bearing_stack_metrics({})
+    bbox = model.val().BoundingBox()
+    solid_count = model.solids().size()
+    assert solid_count >= 5
+    assert metrics["bearing_count"] == 2
+    assert abs(bbox.zlen - 180.0) < 1.0
+    assert bbox.xlen > 100.0
+    step_size, stl_size = _export_and_assert_substantial(
+        model, "rotor_bearing_stack", temp_root
+    )
+    print(
+        "[rotor-bearing-stack] selftest PASS: "
+        f"solids={solid_count}, STEP={step_size} bytes, STL={stl_size} bytes"
+    )
+
+
 def _selftest() -> int:
     """Run all educational motor/drivetrain family self-tests."""
     with tempfile.TemporaryDirectory(prefix="forge-motor-drivetrain-") as temp_dir:
@@ -2222,6 +2656,8 @@ def _selftest() -> int:
         _selftest_rotor(temp_root)
         _selftest_planetary(temp_root)
         _selftest_post_diff_final_drive(temp_root)
+        _selftest_compact_bevel_differential(temp_root)
+        _selftest_rotor_bearing_stack(temp_root)
         _selftest_cold_plate(temp_root)
         _selftest_water_jacket(temp_root)
         _selftest_integrated_drive_case_shell(temp_root)
