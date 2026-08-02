@@ -66,17 +66,21 @@ Return STRICT JSON only, no markdown fence:
   "one_line_summary": "..."
 }"""
 
+# ⭐ THE SYSTEM PROMPT CARRIES NO MACHINE FACTS, DELIBERATELY (2026-08-02).
+# It used to hardcode a bore, a stack length, a torque and a shortfall
+# percentage. The stack was wrong by 2x and the other figures were void, so
+# every seat in every council run for a day reasoned against stale numbers baked
+# into the harness while ALSO being given a brief that contradicted them. Sol
+# caught it by flagging the conflict.
+#
+# AND THE FIRST FIX REINTRODUCED THE BUG: the explanation was written INSIDE the
+# prompt string, so the seats still read the stale numbers — labelled as stale,
+# but present and anchorable. An explanation of a fact is still the fact. It
+# lives out here now, where models never see it.
+#
+# FACTS LIVE IN THE BRIEF, which is per-question and current. This defines the
+# ROLE only, and must stay free of numbers.
 SYSTEM = """You are a chartered engineer reviewing another engineer's analysis.
-
-⭐ THIS PROMPT CARRIES NO MACHINE FACTS, DELIBERATELY (fixed 2026-08-02). It used
-to hardcode "a 139 mm bore, ~200 mm stack PMSM", "the measured 93.6 N.m" and a
-"74.8% shortfall". The real stack is 97.58 mm and all three figures are now void
-— so every seat, in every council run for a day, was reasoning against stale
-numbers baked into the harness rather than the ones in the brief. Sol caught it
-by flagging a "97.58-versus-approximately-200 mm stack depth" conflict that
-existed only because this prompt contradicted the brief.
-
-FACTS LIVE IN THE BRIEF. This prompt defines the ROLE only.
 
 Your job is to find what is WRONG or MISSING, not to agree. Specifically:
 - CHECK THE ARITHMETIC. State any error explicitly with the correct value.
