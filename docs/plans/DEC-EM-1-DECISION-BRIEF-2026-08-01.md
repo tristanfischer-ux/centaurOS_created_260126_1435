@@ -1,3 +1,39 @@
+> ## ⛔ REVERSED BY MEASUREMENT (2026-08-02)
+>
+> **The magnet respec does NOT clear duty. This decision is withdrawn.**
+>
+> The FE was over-exciting by the parallel-path factor. FEMM has no concept of
+> parallel paths, so `mi_addcircprop(674.58)` with 7 turns/slot built a machine
+> with **28 series turns per phase** where the contract specifies **14** —
+> confirmed by pyleecan's own `comp_Ntsp()` and by an FE/analytic flux-linkage
+> ratio of **1.964** on the near-sinusoidal rebalanced field.
+>
+> Re-solved at the correct excitation (238.5 A rms per path, turns/slot 7):
+>
+> | | torque | vs 125.21 |
+> |---|---|---|
+> | rebalanced, **correct** excitation | **81.64 N·m** | **0.652×** |
+> | rebalanced, as previously modelled | 145.73 N·m | 1.164× |
+> | baseline, correct excitation (est.) | ~26.6 N·m | ~0.212× |
+>
+> Saturation softened it — ratio 0.560 rather than the 0.500 of pure linearity,
+> exactly as MiniMax-M3 argued — but not nearly enough.
+>
+> **The respec is still worth 3.07×** and every other screen still passes on it
+> (demag ×3.25, pocket FoS ×1.88). It is simply not sufficient alone.
+>
+> **And stack cannot close the rest.** The residual is 1.534×, needing a 149.7 mm
+> stack against a **140.5 mm housing**. Even a 120 mm stack reaches only 0.802×.
+>
+> This is an **architecture gap**, not a tweak — the position the campaign was in
+> before the magnet finding, but now with the cause understood and quantified.
+>
+> ⚠ ONE CONFIRMATION OUTSTANDING: this halved the circuit current as a proxy for
+> the correct topology. All three seats prefer Sol's **six explicit branch
+> circuits** (A1/A2, B1/B2, C1/C2). The MMF per slot is identical either way, so
+> the torque should not move — but the flux-linkage reporting and copper-loss
+> bookkeeping differ, and that has not been run.
+
 # DEC-EM-1 — RESOLVED BY MEASUREMENT
 
 > ## ⚠⚠ HOLD — A 2× WINDING DISCREPANCY IS OPEN (2026-08-02)

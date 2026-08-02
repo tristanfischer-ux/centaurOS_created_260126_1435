@@ -27,7 +27,13 @@
 
 ## 1. Live scoreboard
 
-> ⚠⚠ **HOLD — every torque figure below is provisional.** pyleecan says the FE
+> ⛔ **REVERSED (2026-08-02).** The FE over-excited by the parallel-path factor:
+> FEMM built 28 series turns where the contract says 14. Re-solved correctly the
+> rebalanced machine gives **81.64 N·m = 0.652× of duty — it does NOT clear**.
+> Stack cannot close the 1.534× residual (needs 149.7 mm against a 140.5 mm
+> housing). Every torque number below is VOID. See DEC-EM-1 §REVERSED.
+>
+> ~~HOLD — every torque figure below is provisional.~~ pyleecan says the FE
 > builds a 28-series-turn machine where the contract specifies 14 (FE λ_pm /
 > analytic = 1.964 on the near-sinusoidal rebalanced field). If that carries to
 > torque, all of it halves and DEC-EM-1 reverses. Measurement in flight. See

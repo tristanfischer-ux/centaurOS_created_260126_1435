@@ -1,0 +1,702 @@
+{
+  "analytical_duty_check": {
+    "available_line_line_rms_voltage_v": 459.279327,
+    "bus_inside_assumed_window": true,
+    "combined_regen_efficiency": 0.977734,
+    "dc_current_a": 333.333333,
+    "duty_power_matches": true,
+    "electrical_power_check_kw": 250.0,
+    "estimated_phase_rms_current_a": 334.943391,
+    "front_regen_cap_respected": true,
+    "required_shaft_torque_nm": 125.214912,
+    "rotor_surface_speed_m_s": 142.329855,
+    "shaft_power_kw": 255.693262
+  },
+  "dynamometer_correlation": {
+    "statement": "Torque, efficiency, voltage and thermal predictions still require dynamometer correlation on the current hardware revision.",
+    "status": "OPEN"
+  },
+  "excitation_tracking": {
+    "async_ratio_k1": 0.0,
+    "async_ratio_k2": 0.0,
+    "dc_torque_nm": -81.6449,
+    "findings": [],
+    "harmonics_nm": {
+      "k=1": 0.0023,
+      "k=2": 0.0017,
+      "k=3": 20.0318,
+      "k=4": 0.0028,
+      "k=5": 0.0011,
+      "k=6": 4.7255,
+      "k=7": 0.0031,
+      "k=8": 0.0023
+    },
+    "legitimate_harmonics": {
+      "12": "24x electrical ripple",
+      "15": "30x electrical ripple",
+      "18": "36x electrical ripple",
+      "3": "24-slot cogging",
+      "6": "12x electrical ripple",
+      "9": "18x electrical ripple"
+    },
+    "mechanical_span_deg": 45.0,
+    "n_samples": 36,
+    "ok": true,
+    "resolvable": true,
+    "schema": "forgeos.motor_stack.excitation_tracking/v1"
+  },
+  "finite_element_point": {
+    "kind": "2D nonlinear open-circuit magnetostatic",
+    "mean_airgap_flux_density_t": 0.2597674548931893,
+    "minimum_airgap_flux_density_t": 0.02645706295070988,
+    "peak_airgap_flux_density_t": 0.2942208605536172,
+    "rms_airgap_flux_density_t": 0.2671395805463431,
+    "torque_nm": null,
+    "torque_status": "OPEN \u2014 open-circuit point has no current excitation"
+  },
+  "geometry_provenance": {
+    "controlling_dimensions": "state.fpkConcentricGeometry with orchestratorContract quantity fallbacks",
+    "lucid_or_proprietary_cad_used": false,
+    "material_records": "Pyleecan IPMSM_B M400-50A B-H and NdFeB properties only, Apache-2.0 source revision 7937d675fb77701ac8f2c65816b583cb29270e12",
+    "statement": "Fresh direct-xfemm 48-slot/eight-pole twin-V IPM geometry; no educational-machine or Lucid silhouette coordinates copied.",
+    "training_geometry_used": false
+  },
+  "input_quantities": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "continuous_electrical_power_kw": 250.0,
+    "dc_bus_max_voltage_v": 900.0,
+    "dc_bus_min_voltage_v": 600.0,
+    "dc_bus_voltage_v": 750.0,
+    "front_regen_electrical_cap_kw": 250.0,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "inverter_efficiency_assumption": 0.98766,
+    "machine_efficiency_assumption": 0.98995,
+    "mass_aspiration_kg": 32.0,
+    "max_rotor_speed_rpm": 19500.0,
+    "phase_current_design_a": 477.0,
+    "radial_airgap_mm": 0.7,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "turns_per_coil": 4.0,
+    "turns_per_phase": 14.0,
+    "twin_stator_slots": 24.0,
+    "winding_parallel_paths": 2.0
+  },
+  "input_quantities_sha256": "85d586e816c5d4abac013e7dc5e35c020790702711e5442f06f3fa1641d461e9",
+  "loaded_point": {
+    "current_angle_assumption": "Screened regenerative current angle near the kit torque peak; no MTPA or field-weakening schedule has been solved",
+    "current_angle_electrical_deg": -30.0,
+    "current_angle_sweep": [
+      {
+        "cogging_cancelled_mean_torque_nm": -0.045474,
+        "current_angle_electrical_deg": -90.0,
+        "peak_airgap_flux_density_t": 0.881421052673636,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.3736014593884878,
+        "single_position_error_nm": 0.031829,
+        "torque_magnitude_nm": 0.01364524889393395,
+        "torque_nm": -0.01364524889393395
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -55.544706,
+        "current_angle_electrical_deg": -60.0,
+        "peak_airgap_flux_density_t": 1.169767019318389,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.4577818441943957,
+        "single_position_error_nm": -3.327929,
+        "torque_magnitude_nm": 58.87263492575163,
+        "torque_nm": -58.87263492575163
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -73.050551,
+        "current_angle_electrical_deg": -45.0,
+        "peak_airgap_flux_density_t": 1.262591372212356,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.4956863905415043,
+        "single_position_error_nm": -1.972941,
+        "torque_magnitude_nm": 75.0234914883172,
+        "torque_nm": -75.0234914883172
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -82.635827,
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.314307573281444,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.522193766149232,
+        "single_position_error_nm": 4.204831,
+        "torque_magnitude_nm": 78.43099542865798,
+        "torque_nm": -78.43099542865798
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -81.379477,
+        "current_angle_electrical_deg": -15.0,
+        "peak_airgap_flux_density_t": 1.344841375620427,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.5963547414635658,
+        "single_position_error_nm": 18.71138,
+        "torque_magnitude_nm": 62.66809671591749,
+        "torque_nm": -62.66809671591749
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -69.146345,
+        "current_angle_electrical_deg": 0.0,
+        "peak_airgap_flux_density_t": 1.323956280899001,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.6651585508128937,
+        "single_position_error_nm": 27.054334,
+        "torque_magnitude_nm": 42.09201076458476,
+        "torque_nm": -42.09201076458476
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -52.335911,
+        "current_angle_electrical_deg": 15.0,
+        "peak_airgap_flux_density_t": 1.226898455413297,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.6990235646834253,
+        "single_position_error_nm": 28.676502,
+        "torque_magnitude_nm": 23.65940904355799,
+        "torque_nm": -23.65940904355799
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -39.850118,
+        "current_angle_electrical_deg": 30.0,
+        "peak_airgap_flux_density_t": 1.076826117690793,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.7169975589918326,
+        "single_position_error_nm": 29.396059,
+        "torque_magnitude_nm": 10.45405921632907,
+        "torque_nm": -10.45405921632907
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -39.607938,
+        "current_angle_electrical_deg": 45.0,
+        "peak_airgap_flux_density_t": 1.327679230081625,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.7434283485998616,
+        "single_position_error_nm": 26.999807,
+        "torque_magnitude_nm": 12.60813041844775,
+        "torque_nm": -12.60813041844775
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": -40.047861,
+        "current_angle_electrical_deg": 60.0,
+        "peak_airgap_flux_density_t": 1.454821009311292,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.7815532900002538,
+        "single_position_error_nm": 17.88063,
+        "torque_magnitude_nm": 22.16723135645438,
+        "torque_nm": -22.16723135645438
+      },
+      {
+        "cogging_cancelled_mean_torque_nm": 0.010862,
+        "current_angle_electrical_deg": 90.0,
+        "peak_airgap_flux_density_t": 1.3089287773273,
+        "probe_positions_mech_deg": [
+          0.0,
+          5.0,
+          10.0
+        ],
+        "rms_airgap_flux_density_t": 0.8011259949069507,
+        "single_position_error_nm": -0.010521,
+        "torque_magnitude_nm": 0.0003415872306515816,
+        "torque_nm": 0.0003415872306515816
+      }
+    ],
+    "duty_basis": "analytical 250 kW continuous electrical duty check",
+    "duty_screen_fail_reasons": [
+      "torque_reliable=false",
+      "mean_ratio=0.6513<1.0"
+    ],
+    "duty_torque_screen_ok": false,
+    "effective_turns_per_slot": 7,
+    "honesty_note": "Reference loaded point uses a screened current angle and twin-bound conductors per slot (turns_per_coil). A coarse rotor-position sweep at that fixed angle may be attached to show torque ripple / position dependence \u2014 it is NOT a full MTPA, voltage, loss, demagnetisation or dyno map. Exact hairpin schedule and winding factor remain OPEN. Do not invent turns to force duty_torque_screen_ok.",
+    "kind": "2D nonlinear loaded magnetostatic at one rotor position",
+    "mean_airgap_flux_density_t": 0.4419139557182605,
+    "mean_torque_vs_required_ratio": 0.651345,
+    "minimum_airgap_flux_density_t": 0.07918057909262191,
+    "peak_airgap_flux_density_t": 1.314307572982785,
+    "phase_current_peak_a": 337.28993462598316,
+    "phase_current_rms_a": 238.5,
+    "phase_instantaneous_current_a": {
+      "a": 292.101651826894,
+      "b": -292.10165182689394,
+      "c": 2.0653051941216514e-14
+    },
+    "required_shaft_torque_nm": 125.214912,
+    "rms_airgap_flux_density_t": 0.5221937659646916,
+    "rotor_position_mechanical_deg": 0.0,
+    "torque_magnitude_mean_nm": 81.558081,
+    "torque_magnitude_nm": 78.43099532943242,
+    "torque_method": "FEMM steady-state weighted-stress block integral (22) over rotor steel + magnets + AIRGAP AIR (the airgap is required for the weighting-function transition; omitting it under-reported by ~2.3x)",
+    "torque_nm": -78.43099532943242,
+    "torque_reliable": false,
+    "torque_status": "ESTIMATE \u2014 solver-derived at twin-bound coil turns after a coarse current-angle screen; reference rotor position for the duty screen (see rotor_position_sweep for position dependence)",
+    "torque_vs_required_ratio": 0.626371,
+    "winding_model": "48-slot/eight-pole integral-slot phase belts A+, C-, B+, A-, C+, B-; 7 conductors/slot from twin turns_per_coil=4 (twin turns_per_phase=14, parallel_paths=2, twin_stator_slots=24; implied series turns\u224814.0 on this 48-slot map). Current angle -30\u00b0 elec (not the \u221290\u00b0 torque-null; d-axis alignment still provisional); rotor 0\u00b0 mech. Not a frozen hairpin schedule."
+  },
+  "machine_geometry": {
+    "active_length_mm": 97.58,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "estimated_active_material_mass_kg": 13.0866,
+    "fits_bay": true,
+    "fits_housing": true,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "magnet_length_mm": 22.5,
+    "magnet_regions": 16,
+    "magnet_thickness_mm": 6.0,
+    "radial_airgap_mm": 0.7000000000000028,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "rotor_poles": 8,
+    "slot_depth_mm": 15.0,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "stator_slots": 24,
+    "topology": "24-slot / 8-pole twin-V interior permanent-magnet synchronous machine"
+  },
+  "mass_note": "Active-material estimate excludes housing, end windings, coolant, resolver, bearings, inverter, gears and differential; the ~32 kg whole-kit aspiration remains a soft OPEN constraint.",
+  "release_statement": "Concept evidence only. No FIA homologation, team interface closure, race evidence or permission to ship.",
+  "rotor_position_sweep": {
+    "current_angle_electrical_deg": -30.0,
+    "kind": "coarse mechanical rotor-position sweep at fixed screened current angle",
+    "note": "PARTIAL coarse sweep only \u2014 enough to show torque vs mechanical rotor position at one current angle. Not a full MTPA map, fine ripple study, or ship_ok evidence.",
+    "points": [
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.314307572982785,
+        "rms_airgap_flux_density_t": 0.5221937659646916,
+        "rotor_position_mechanical_deg": 0.0,
+        "torque_magnitude_nm": 78.43099532943242,
+        "torque_nm": -78.43099532943242
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.247919837375239,
+        "rms_airgap_flux_density_t": 0.5303303864957201,
+        "rotor_position_mechanical_deg": 1.25,
+        "torque_magnitude_nm": 64.28961292960005,
+        "torque_nm": -64.28961292960005
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.141647865657668,
+        "rms_airgap_flux_density_t": 0.5569967448974393,
+        "rotor_position_mechanical_deg": 2.5,
+        "torque_magnitude_nm": 55.96338638282364,
+        "torque_nm": -55.96338638282364
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.003642100263075,
+        "rms_airgap_flux_density_t": 0.5923018681047999,
+        "rotor_position_mechanical_deg": 3.75,
+        "torque_magnitude_nm": 60.33612306636707,
+        "torque_nm": -60.33612306636707
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.096923845519339,
+        "rms_airgap_flux_density_t": 0.6173269881792823,
+        "rotor_position_mechanical_deg": 5.0,
+        "torque_magnitude_nm": 72.02399138067254,
+        "torque_nm": -72.02399138067254
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.173026616671709,
+        "rms_airgap_flux_density_t": 0.6196755366961907,
+        "rotor_position_mechanical_deg": 6.25,
+        "torque_magnitude_nm": 82.42512854574328,
+        "torque_nm": -82.42512854574328
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.237684116182408,
+        "rms_airgap_flux_density_t": 0.6048302180819091,
+        "rotor_position_mechanical_deg": 7.5,
+        "torque_magnitude_nm": 92.1874096819656,
+        "torque_nm": -92.1874096819656
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.289069441625025,
+        "rms_airgap_flux_density_t": 0.5856724929556834,
+        "rotor_position_mechanical_deg": 8.75,
+        "torque_magnitude_nm": 97.63084901105894,
+        "torque_nm": -97.63084901105894
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.332537833820144,
+        "rms_airgap_flux_density_t": 0.5695707631414869,
+        "rotor_position_mechanical_deg": 10.0,
+        "torque_magnitude_nm": 97.4524938106351,
+        "torque_nm": -97.4524938106351
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.361992186454912,
+        "rms_airgap_flux_density_t": 0.556313605150463,
+        "rotor_position_mechanical_deg": 11.25,
+        "torque_magnitude_nm": 96.09678985471355,
+        "torque_nm": -96.09678985471355
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.373480467819858,
+        "rms_airgap_flux_density_t": 0.5428645595785146,
+        "rotor_position_mechanical_deg": 12.5,
+        "torque_magnitude_nm": 94.10374467612216,
+        "torque_nm": -94.10374467612216
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.363086091120352,
+        "rms_airgap_flux_density_t": 0.5291735271593581,
+        "rotor_position_mechanical_deg": 13.75,
+        "torque_magnitude_nm": 88.80227115380474,
+        "torque_nm": -88.80227115380474
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.316489277159635,
+        "rms_airgap_flux_density_t": 0.5221856577147359,
+        "rotor_position_mechanical_deg": 15.0,
+        "torque_magnitude_nm": 78.43975159878414,
+        "torque_nm": -78.43975159878414
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.246834754213958,
+        "rms_airgap_flux_density_t": 0.5302863370106506,
+        "rotor_position_mechanical_deg": 16.25,
+        "torque_magnitude_nm": 64.2802900738702,
+        "torque_nm": -64.2802900738702
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.143224663261894,
+        "rms_airgap_flux_density_t": 0.5570332807051157,
+        "rotor_position_mechanical_deg": 17.5,
+        "torque_magnitude_nm": 55.96100014782688,
+        "torque_nm": -55.96100014782688
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.00572655701353,
+        "rms_airgap_flux_density_t": 0.5922235614760366,
+        "rotor_position_mechanical_deg": 18.75,
+        "torque_magnitude_nm": 60.32879024320258,
+        "torque_nm": -60.32879024320258
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.097720622050664,
+        "rms_airgap_flux_density_t": 0.6173687161029346,
+        "rotor_position_mechanical_deg": 20.0,
+        "torque_magnitude_nm": 72.01733090121033,
+        "torque_nm": -72.01733090121033
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.172585778414912,
+        "rms_airgap_flux_density_t": 0.6196873299675728,
+        "rotor_position_mechanical_deg": 21.25,
+        "torque_magnitude_nm": 82.42527881513043,
+        "torque_nm": -82.42527881513043
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.237406435601106,
+        "rms_airgap_flux_density_t": 0.6048062412266353,
+        "rotor_position_mechanical_deg": 22.5,
+        "torque_magnitude_nm": 92.18381519643489,
+        "torque_nm": -92.18381519643489
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.289193731743016,
+        "rms_airgap_flux_density_t": 0.5856845075705168,
+        "rotor_position_mechanical_deg": 23.75,
+        "torque_magnitude_nm": 97.62816361431956,
+        "torque_nm": -97.62816361431956
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.331241547462277,
+        "rms_airgap_flux_density_t": 0.5695109543281429,
+        "rotor_position_mechanical_deg": 25.0,
+        "torque_magnitude_nm": 97.46233297418374,
+        "torque_nm": -97.46233297418374
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.360892017963252,
+        "rms_airgap_flux_density_t": 0.5562014047968845,
+        "rotor_position_mechanical_deg": 26.25,
+        "torque_magnitude_nm": 96.10236661190054,
+        "torque_nm": -96.10236661190054
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.374034200786664,
+        "rms_airgap_flux_density_t": 0.5427562053447237,
+        "rotor_position_mechanical_deg": 27.5,
+        "torque_magnitude_nm": 94.09978556498376,
+        "torque_nm": -94.09978556498376
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.362343292714556,
+        "rms_airgap_flux_density_t": 0.5291904413315406,
+        "rotor_position_mechanical_deg": 28.75,
+        "torque_magnitude_nm": 88.80835809111898,
+        "torque_nm": -88.80835809111898
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.315826239568218,
+        "rms_airgap_flux_density_t": 0.5222114312628336,
+        "rotor_position_mechanical_deg": 30.0,
+        "torque_magnitude_nm": 78.43220044581004,
+        "torque_nm": -78.43220044581004
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.248315382675212,
+        "rms_airgap_flux_density_t": 0.5302907830779928,
+        "rotor_position_mechanical_deg": 31.25,
+        "torque_magnitude_nm": 64.25453603183871,
+        "torque_nm": -64.25453603183871
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.141524371238641,
+        "rms_airgap_flux_density_t": 0.5570678960167718,
+        "rotor_position_mechanical_deg": 32.5,
+        "torque_magnitude_nm": 55.96193944554614,
+        "torque_nm": -55.96193944554614
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.005032370390666,
+        "rms_airgap_flux_density_t": 0.5922742205771105,
+        "rotor_position_mechanical_deg": 33.75,
+        "torque_magnitude_nm": 60.34497868137043,
+        "torque_nm": -60.34497868137043
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.097006249780982,
+        "rms_airgap_flux_density_t": 0.6173240068774295,
+        "rotor_position_mechanical_deg": 35.0,
+        "torque_magnitude_nm": 72.01839618994558,
+        "torque_nm": -72.01839618994558
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.173332601371335,
+        "rms_airgap_flux_density_t": 0.6196605532748065,
+        "rotor_position_mechanical_deg": 36.25,
+        "torque_magnitude_nm": 82.42120837632612,
+        "torque_nm": -82.42120837632612
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.237239325827982,
+        "rms_airgap_flux_density_t": 0.6047479404636238,
+        "rotor_position_mechanical_deg": 37.5,
+        "torque_magnitude_nm": 92.18772659944982,
+        "torque_nm": -92.18772659944982
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.288776072214842,
+        "rms_airgap_flux_density_t": 0.5856448825069541,
+        "rotor_position_mechanical_deg": 38.75,
+        "torque_magnitude_nm": 97.63759421218826,
+        "torque_nm": -97.63759421218826
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.330632126004639,
+        "rms_airgap_flux_density_t": 0.5695110441759763,
+        "rotor_position_mechanical_deg": 40.0,
+        "torque_magnitude_nm": 97.46551903063477,
+        "torque_nm": -97.46551903063477
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.360686529314905,
+        "rms_airgap_flux_density_t": 0.5561302056606269,
+        "rotor_position_mechanical_deg": 41.25,
+        "torque_magnitude_nm": 96.10451718543793,
+        "torque_nm": -96.10451718543793
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.373852001889201,
+        "rms_airgap_flux_density_t": 0.5427897531904732,
+        "rotor_position_mechanical_deg": 42.5,
+        "torque_magnitude_nm": 94.10111312225091,
+        "torque_nm": -94.10111312225091
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.360678018121248,
+        "rms_airgap_flux_density_t": 0.5292439002581838,
+        "rotor_position_mechanical_deg": 43.75,
+        "torque_magnitude_nm": 88.80821717463677,
+        "torque_nm": -88.80821717463677
+      },
+      {
+        "current_angle_electrical_deg": -30.0,
+        "peak_airgap_flux_density_t": 1.314307572985035,
+        "rms_airgap_flux_density_t": 0.5221937659671965,
+        "rotor_position_mechanical_deg": 45.0,
+        "torque_magnitude_nm": 78.43099533069142,
+        "torque_nm": -78.43099533069142
+      }
+    ],
+    "positions_mechanical_deg": [
+      0.0,
+      1.25,
+      2.5,
+      3.75,
+      5.0,
+      6.25,
+      7.5,
+      8.75,
+      10.0,
+      11.25,
+      12.5,
+      13.75,
+      15.0,
+      16.25,
+      17.5,
+      18.75,
+      20.0,
+      21.25,
+      22.5,
+      23.75,
+      25.0,
+      26.25,
+      27.5,
+      28.75,
+      30.0,
+      31.25,
+      32.5,
+      33.75,
+      35.0,
+      36.25,
+      37.5,
+      38.75,
+      40.0,
+      41.25,
+      42.5,
+      43.75,
+      45.0
+    ],
+    "status": "PARTIAL",
+    "summary": {
+      "delivered_mean_torque_nm": 81.558081,
+      "n_positions": 37,
+      "peak_to_peak_magnitude_nm": 41.676594,
+      "peak_to_peak_torque_nm": 41.676594,
+      "sign_reversals": 0,
+      "torque_magnitude_max_nm": 97.637594,
+      "torque_magnitude_mean_nm": 81.558081,
+      "torque_magnitude_min_nm": 55.961,
+      "torque_max_nm": -55.961,
+      "torque_mean_nm": -81.558081,
+      "torque_min_nm": -97.637594,
+      "torque_sign_consistent": true,
+      "torque_vs_required_ratio_max": 0.77976,
+      "torque_vs_required_ratio_mean": 0.651345,
+      "torque_vs_required_ratio_min": 0.44692
+    }
+  },
+  "schema": "forgeos.motor_stack.em_fia_front_kit_case/v2",
+  "ship_ok": false,
+  "solver": {
+    "name": "xfemm femmcli",
+    "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/phantm/bin/femmcli",
+    "pyleecan_revision": "7937d675fb77701ac8f2c65816b583cb29270e12",
+    "pyleecan_version": "1.5.2",
+    "version": "femmcli version 0.0.0-dev\nusing triangle 1.6.0 (builtin)"
+  },
+  "source_state_sha256": "2d5167d5f943144a731688c3636e4c83d9ec2a34a2c1bab3e2c3debdaa804b4a",
+  "source_twin": "out/formula-e-front-mgu-20260729-1432",
+  "status": "PARTIAL",
+  "torque_map": {
+    "reason": "Open-circuit + screened loaded point + coarse rotor-position sweep at one current angle are not a closed MTPA, voltage, loss, thermal or demagnetisation map.",
+    "status": "OPEN"
+  },
+  "works_in_kit_context": {
+    "duty_torque_screen_ok": false,
+    "fail_reasons": [
+      "torque_reliable=false",
+      "mean_ratio=0.6513<1.0"
+    ],
+    "loaded_torque_magnitude_nm": 78.43099532943242,
+    "mean_clear_ratio": 1.0,
+    "mean_torque_vs_required_ratio": 0.651345,
+    "note": "duty_torque_screen_ok requires (1) torque_reliable=True and (2) position-sweep mean |T| \u2265 100% of analytical 250 kW shaft torque. Peak / best-angle |T| is interest-only (bar 75%) and must never alone mint a PASS. Not MTPA, demag close, dyno, or ship_ok.",
+    "peak_interest_ok": false,
+    "position_sweep_torque_vs_required_ratio_mean": 0.651345,
+    "required_shaft_torque_nm": 125.214912,
+    "threshold_ratio": 0.75,
+    "torque_magnitude_mean_nm": 81.558081,
+    "torque_reliable": false,
+    "torque_vs_required_ratio": 0.626371
+  }
+}
