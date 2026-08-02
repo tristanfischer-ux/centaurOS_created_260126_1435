@@ -138,6 +138,20 @@ def stator_iron_loss(
     region (3.66 kg against 2.96 kg), so lumping understates the dominant term
     twice over.
 
+    ⚠ THIS IS NOT A MEASURED LOSS, and calling it one is a real overstatement
+    (MiniMax-M3, council 2026-08-02): "presented as ground truth but actually a
+    post-processed simulation output whose fidelity depends on unstated
+    Steinmetz coefficients, lamination grade, and gauge." Correct. What is
+    MEASURED is the FLUX DENSITY, from FE probes. The LOSS is MODELLED from it
+    using coefficients that default here (kh=0.02, ke=1e-5, alpha=1.8) and a
+    lamination gauge that is not established anywhere in this twin. Describe
+    results as "FE-measured flux through a modelled loss coefficient", never as
+    a measured loss.
+
+    TWO NAMED GAPS, both of which move the answer more than the topology debate:
+      * Steinmetz coefficients are DEFAULTS, not this steel's.
+      * Lamination gauge is UNSTATED; eddy loss goes as gauge squared.
+
     NOTE (corpus, `fpk:fea:P_core`): the literature for this class describes a
     HIERARCHICAL method computing core loss from the analytical air-gap field
     solution, which is more rigorous than this Steinmetz form. Recorded as a

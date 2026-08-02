@@ -68,3 +68,70 @@ changes homologation status.
    bar. It is not a model tweak.
 4. **Structural**: the magnet pocket changes shape, so
    `calculix_fia_magnet_pocket_screen` needs re-running against the new pocket.
+
+
+---
+
+## P3 — corpus findings acted on (2026-08-02)
+
+The forge-truth corpus was queried before deriving anything further. Four
+findings bear on this decision; none is closed, and each is recorded rather
+than absorbed.
+
+### 1. ⚠ The corpus argues AGAINST the respec direction
+
+`fpk:geometry:58bf626998` — *"preventive measures are taken to avert PM
+demagnetization. These consist of the multiclass design of rotor poles,
+**increasing the thickness of PM**, and using supporter cylinders."*
+
+DEC-EM-1 **reduces** thickness 8.85 → 6.0 mm. The demag screen returns ×3.25 at
+160 °C against a thermal prediction of 127.2 °C, so the measured margin holds —
+but the literature says this direction costs robustness, and that is a standing
+caveat on the decision, not a resolved point.
+
+### 2. Grain-oriented steel — the 7× is probably NOT applicable
+
+`fpk:material:296d849f4e` — *"Kowal et al. [7] applied a grain-oriented material
+to the stator and the iron loss is seven times less."* Four independent
+extractions, all keyed to `stator_core`, none stating the topology.
+
+GO steel is **anisotropic**: its low-loss axis is the rolling direction. In a
+radial-flux stator the **tooth flux is radial** and the **yoke flux
+circumferential**, so one sheet orientation cannot favour both. Bounds against
+the 1020.5 W:
+
+| case | iron loss | motor loss |
+|---|---|---|
+| blanket 7× (if it applied) | 145.8 W | 2379 W |
+| **yoke only 7×** (the circumferential path) | 474.5 W | 2708 W |
+| yoke only 2× (realistic segmented) | 702.0 W | 2936 W |
+
+The yoke is 62% of the iron loss **and** the circumferential path, so it is
+where a directional grade could plausibly act. **Teeth cannot benefit.** Treat
+the blanket 7× as inapplicable until the source topology is established.
+
+### 3. ⚠ "Measured iron loss" was the wrong term — corrected
+
+MiniMax-M3: *"presented as ground truth but actually a post-processed simulation
+output whose fidelity depends on unstated Steinmetz coefficients, lamination
+grade, and gauge."* Correct, and now fixed in `machine_loss_bounds`.
+
+What is measured is the **flux density**. The **loss** is modelled from it with
+coefficients that DEFAULT (`kh=0.02, ke=1e-5, α=1.8`) and a **lamination gauge
+that is not established anywhere in this twin**. Eddy loss goes as gauge
+squared, so that single unstated number moves the answer more than the
+grain-orientation debate does.
+
+### 4. A more rigorous method exists and is not implemented
+
+`fpk:fea:P_core` — the *hierarchical method* computing core loss from the
+analytical air-gap field solution. Recorded in `machine_loss_bounds` as a known
+refinement.
+
+### What P3 changes about the decision
+
+**Nothing yet, and that is the honest answer.** The magnet respec still stands
+on torque, demag and pocket retention. The iron-loss lever is real but smaller
+and more conditional than the corpus headline suggests, and the loss numbers
+themselves carry two unstated inputs. The next measurement is not a topology
+argument — it is establishing the **lamination gauge and grade**.

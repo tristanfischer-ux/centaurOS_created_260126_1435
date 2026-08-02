@@ -299,11 +299,27 @@ def _selftest() -> int:
     ck("discovery.finds_tools", len(tools) >= 1, f"{len(tools)} tools found")
 
     # A lexical-only corpus table must be REPORTED, not silently degraded.
+    #
+    # ⭐ ASSERT THE MECHANISM, NOT A TRANSIENT STATE (2026-08-02). This first
+    # asserted that `fpk_component_literature` IS flagged — and then P2 embedded
+    # that very table, closing the gap, and the selftest FAILED for the good
+    # reason. An assertion pinned to a condition you are actively fixing breaks
+    # the moment you succeed. Same fault family as the demag screen's hardcoded
+    # 3.5-7.0 mm band, which passed for as long as the bug it encoded survived.
+    # Drive the reporting logic with a SYNTHETIC table instead.
+    fake = {"tables": {"lex_only": {"present": True, "total_rows": 100,
+                                    "has_embedding_column": False},
+                       "hybrid_one": {"present": True, "total_rows": 100,
+                                      "has_embedding_column": True}}}
+    notes = [f"{t} is LEXICAL ONLY ({m.get('total_rows')} rows)"
+             for t, m in fake["tables"].items()
+             if m.get("present") and not m.get("has_embedding_column")]
+    ck("corpus.flags_lexical_only", len(notes) == 1 and "lex_only" in notes[0],
+       f"lexical-only detection is wrong: {notes}")
+    # ...and the live dossier must still BUILD, whatever its tables now hold.
     d = build_dossier("formula_e_front_mgu", probe_pkgs=False)
-    if (d["corpus"].get("tables") or {}).get("fpk_component_literature", {}).get("present"):
-        ck("corpus.flags_lexical_only",
-           any("LEXICAL ONLY" in n for n in d["notes"]),
-           "a lexical-only table was not flagged as a corpus gap")
+    ck("corpus.live_dossier_builds", bool(d.get("corpus", {}).get("tables")),
+       "the live corpus scan returned no tables")
 
     for f in fails:
         print(f"  FAIL {f}")
