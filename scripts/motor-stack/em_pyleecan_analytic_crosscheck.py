@@ -91,6 +91,47 @@ def _flux_focusing_ratio(quantities: dict) -> float:
     return face_mm / pole_pitch_mm
 
 
+def series_turns_per_phase(*, slots: int, pole_pairs: int, turns_per_coil: int,
+                           parallel_paths: int, layers: int = 1,
+                           coil_pitch: int | None = None) -> int:
+    """SERIES TURNS PER PHASE, answered by pyleecan's winding model.
+
+    ⭐ USE THE TOOL, DO NOT DO THE ARITHMETIC (2026-08-02). Tristan: "you seem
+    to be doing a lot of your own maths rather than relying on deterministic
+    tools and software." Correct, and it cost an hour: I hand-typed
+    `flux_pole = 2*B_pk*r_gap*L/p` and `lam = kw1*N*flux_pole` into one-liners
+    to work out whether the FE was over-excited, when pyleecan already models
+    windings INCLUDING parallel paths and answers it directly.
+
+    THE ANSWER IT GAVE, for Zs=24 / 2p=8 / Ntcoil=7:
+        Npcp=1  ->  Ncspc 4  ->  28 series turns per phase
+        Npcp=2  ->  Ncspc 2  ->  14 series turns per phase
+    The contract specifies 14. The FE deck emits ONE series circuit per phase at
+    the full terminal current, so it builds the Npcp=1 machine — EXACTLY TWICE
+    the contract's series turns. That independently confirms the measured
+    FE/analytic flux-linkage ratio of 1.964 on the near-sinusoidal rebalanced
+    machine, by a completely different route.
+
+    FEMM has no concept of parallel paths; pyleecan does. Ask the one that does.
+    """
+    import copy
+
+    _numpy2_compat()
+    from pyleecan.Functions.load import load  # noqa: PLC0415
+    from pyleecan.Classes.Winding import Winding  # noqa: PLC0415
+
+    machine = copy.deepcopy(load(str(MATERIAL_MACHINE_PATH)))
+    machine.stator.slot.Zs = int(slots)
+    machine.rotor.hole[0].Zh = int(2 * pole_pairs)
+    machine.stator.winding = Winding(
+        qs=3, Ntcoil=int(turns_per_coil), Npcp=int(parallel_paths),
+        Nlayer=int(layers), p=int(pole_pairs),
+        coil_pitch=int(coil_pitch if coil_pitch is not None
+                       else slots // (2 * pole_pairs) * 3))
+    machine.stator.winding.parent = machine.stator
+    return int(machine.stator.winding.comp_Ntsp())
+
+
 def crosscheck(twin: Path) -> dict:
     _numpy2_compat()
     from pyleecan.Functions.load import load
