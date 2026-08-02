@@ -1,0 +1,13 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "discipline-bind-review-to-diff",
+  "intent": "Bind every finish council to the EXACT diff it reviewed.",
+  "maps_to_plan_item": "COMPACT-HANDOVER-FE-FRONT-FPK-2026-08-02.md \u00a75 item 7",
+  "why_now": "",
+  "explicitly_not_doing": [],
+  "depends_on": [],
+  "success_criteria": [],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-02T12:37:54Z"
+}

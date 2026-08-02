@@ -128,8 +128,30 @@ for m in machine_excitation_tracking machine_magnet_flux_focusing machine_loss_b
   fi
 done
 
-if [ -f scripts/lib/gate-registry.ts ] && command -v npx >/dev/null 2>&1; then
-  if npx --no-install tsx scripts/lib/gate-registry.ts --selftest >/dev/null 2>&1; then
+# ⭐⭐ "COULD NOT RUN" IS NOT "FAILED", AND A GATE MUST NOT DEPEND ON A CACHE
+# (2026-08-02). This ran `npx --no-install tsx`, and `tsx` is NOT a dependency
+# of this repo — it was resolving from ~/.npm/_npx, which expired mid-session.
+# The hook then reported the gate registry as FAIL, indistinguishable from "a
+# gate stopped catching", on a day spent fixing exactly that confusion. Resolve
+# a runner in order of reliability, and report UNAVAILABLE separately from FAIL
+# so nobody debugs a phantom regression.
+if [ -f scripts/lib/gate-registry.ts ]; then
+  TSRUN=""
+  if [ -x node_modules/.bin/tsx ]; then
+    TSRUN="node_modules/.bin/tsx"
+  else
+    for c in "$HOME"/.npm/_npx/*/node_modules/.bin/tsx; do
+      [ -x "$c" ] && TSRUN="$c" && break
+    done
+    if [ -z "$TSRUN" ] && [ -x node_modules/.bin/ts-node ]; then
+      TSRUN="node_modules/.bin/ts-node"
+    fi
+  fi
+  if [ -z "$TSRUN" ]; then
+    say "gate-registry (every gate proves its catch)" "UNAVAILABLE — no tsx/ts-node"
+    echo "      Install one (npm i -D tsx) so this check cannot silently lapse."
+    echo "      NOT counted as a failure: the gates are unproven here, not broken."
+  elif "$TSRUN" scripts/lib/gate-registry.ts --selftest >/dev/null 2>&1; then
     say "gate-registry (every gate proves its catch)" "ok"
   else
     say "gate-registry (every gate proves its catch)" "FAIL"; fail=1
@@ -217,12 +239,12 @@ if git diff --cached --name-only 2>/dev/null | grep -qE '^scripts/(motor-stack|l
     for panel in "$twin"/_discipline/*-finish-council.json; do
       [ -e "$panel" ] || continue
       if [ -z "$newest_staged" ] || [ "$panel" -nt "$newest_staged" ]; then
-        if $PY scripts/lib/p_stage_discipline.py verify-panel --panel "$panel" >/dev/null 2>&1; then
+        if $PY scripts/lib/p_stage_discipline.py verify-panel --panel "$panel" --against-staged --refuse-truncated --twin "$twin" >/dev/null 2>&1; then
           echo 1 > "$councilstamp"
-          say "finish council: $(basename "$panel")" "reviewed + fully answered"
+          say "finish council: $(basename "$panel")" "reviewed THIS diff + fully answered"
         else
           say "finish council: $(basename "$panel")" "NOT fully answered"
-          $PY scripts/lib/p_stage_discipline.py verify-panel --panel "$panel" 2>&1 | sed 's/^/      /'
+          $PY scripts/lib/p_stage_discipline.py verify-panel --panel "$panel" --against-staged --refuse-truncated --twin "$twin" 2>&1 | sed 's/^/      /'
         fi
       fi
     done
@@ -248,11 +270,20 @@ if [ "$fail" -ne 0 ]; then
 
 COMMIT BLOCKED. Fix the above, or `git commit --no-verify` deliberately.
 
-Not run here (costs money and minutes) — run it yourself before landing
-anything with a load-bearing claim:
+The council is NOT run here (it costs money and minutes) — but it is not
+optional either. `p_stage_discipline.py finish` runs council_precommit_review
+on the staged diff and stamps the panel with that diff's sha256, and the check
+above refuses a panel that reviewed DIFFERENT code. So the order is:
 
-  .venv/bin/python scripts/lib/council_precommit_review.py --staged \
-      --claim "<what this change asserts>"
+  1. stage your change
+  2. .venv/bin/python scripts/lib/p_stage_discipline.py finish \
+         --stage-id <id> --twin <twin> --claim "<the numbers>" \
+         --produced <artefacts...> --next "<next>"
+  3. answer every finding, then commit
+
+Running `finish` must be the LAST action before committing: answering a council
+means editing code, which changes the diff and correctly invalidates the panel
+that demanded the edit.
 
 MSG
   exit 1

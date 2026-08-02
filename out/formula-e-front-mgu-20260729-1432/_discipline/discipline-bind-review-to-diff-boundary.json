@@ -1,0 +1,12 @@
+{
+  "schema": "forgeos.p_stage_discipline.boundary/v1",
+  "stage_id": "discipline-bind-review-to-diff",
+  "exit_code": 0,
+  "verdict": "PROCEED",
+  "log": "\u2500\u2500 FINISHED: discipline-bind-review-to-diff\n   [ok ] PRESENT    scripts/lib/p_stage_discipline.py\n\u2500\u2500 NEXT: Discipline: generator/hook equivalence check, one surface. Then handover 5.3 \u2014 the architecture change that closes 0.651x\n\u2500\u2500 GATES: 7/7 pass\n\u2500\u2500 PROCEED\n",
+  "produced": [
+    "scripts/lib/p_stage_discipline.py"
+  ],
+  "needs": [],
+  "checked_utc": "2026-08-02T13:22:17Z"
+}

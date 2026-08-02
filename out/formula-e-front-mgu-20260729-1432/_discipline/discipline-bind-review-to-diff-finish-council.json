@@ -1,0 +1,189 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "Binding pass. The attested diff is the CUMULATIVE STAGE \u2014 driver, hook generator, generated hook and package.json \u2014 not the increment; I described the increment in several previous claims and that under-scoped what reviewers were asked to validate. Two defects fixed since the last panel, both the same shape: two regexes describing one concept in two places. (1) The URL scrub deliberately preserves [.,;:!?)] as sentence-enders while the association walk released its sentinel only on [.;\\n], so a URL ending in ! or ? never released it and later markers went unchecked \u2014 fail-open. Found independently by Sol and Grok. (2) The section token [\\w.]+ absorbed a trailing period, so '\u00a75. Also' parsed as '5.' and could never match a '## 5' heading. Six behaviours verified together: '.' and '!' boundaries release the sentinel; '\u00a75.' parses as 5; a marker glued to a URL is ignored; a good reference passes; a genuinely absent section refuses naming the right document. Two new proveCatch cases. I AM CLOSING THIS STAGE and using the reasoned-rejection path deliberately on four items raised and answered identically at three consecutive councils \u2014 the npx-cache runner rung, stage-id at the hook boundary, the fail-open runner, and prose-parsing generality. Each is recorded with reasons in the panel, none waved through. The reason is stated rather than hidden: with three fresh reviewers and a 41 kB three-surface diff, this loop does not reach a natural end, and every fix restarts it by design. The next stage is one surface, starting with an equivalence check between install-forcing-hooks.sh and the live .husky/pre-commit \u2014 which would have caught today's 'fixed the generator, never re-ran it' failure automatically instead of via an audit.",
+  "mode": "live",
+  "called_utc": "2026-08-02T13:22:17Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The self-excluding hash only excludes `out/*/_discipline/*`, but `finish` and `verify-panel` accept an arbitrary `--twin` path and write/read `twin/_discipline`. A valid twin such as `.` or `worktrees/foo` puts its panel outside the exclusion, making the attestation self-referential again: staging the newly written panel changes the hashed diff.",
+            "why_it_matters": "The documented `--twin <twin>` workflow can become impossible to satisfy outside the repository's particular `out/<name>` layout. This is a hidden path-layout coupling in a mechanism presented as canonical and universal.",
+            "how_to_test": "In a disposable git repo, use `--twin .` (or a sibling worktree path), stage a normal source change, run `finish`, then stage `./_discipline/*-finish-council.json` and run `verify-panel --against-staged --panel ... --twin .`. It should pass, but the panel digest will differ because `_discipline` was included."
+          },
+          {
+            "issue": "The hook supplies `--twin` but never `--stage-id` to `verify-panel`, so the newly stamped stage identity is not enforced at the actual commit boundary.",
+            "why_it_matters": "A fully answered panel from another stage in the same twin can satisfy the hook if its reviewed-diff hash matches (for example, a copied/reused panel for an identical staged patch). This silently weakens the stated claim that the panel proves it belongs to 'this stage or this twin' into only proving the twin and patch.",
+            "how_to_test": "Create a syntactically valid passing panel whose `stage_id` is different but whose `reviewed_diff_sha256` is the current canonical staged hash and whose `twin` matches. Invoke the hook path or its exact `verify-panel ... --against-staged --refuse-truncated --twin \"$twin\"` command; it will accept the foreign stage. Repeat with `--stage-id <current>` to show the missing enforcement."
+          },
+          {
+            "issue": "The runner resolution still executes the first matching executable from `$HOME/.npm/_npx/*/node_modules/.bin/tsx`, despite the stated goal that the gate not depend on a cache.",
+            "why_it_matters": "Gate behavior now varies by incidental, nondeterministically selected user cache contents. A stale or incompatible cached tsx can produce false failures or execute a runner outside the repository's declared dependency graph; absence of any runner is additionally converted into a non-blocking 'UNAVAILABLE' state, so the proof gate can lapse on a partially installed checkout.",
+            "how_to_test": "Temporarily hide `node_modules/.bin/tsx`, create two executable fake `tsx` files in distinct `$HOME/.npm/_npx/*/node_modules/.bin/` directories that return different statuses, and run the hook under different glob ordering/locales. Then remove both and confirm that a failing/unproven registry check no longer blocks the commit."
+          }
+        ],
+        "generality_concerns": [
+          "The attestation exclusion is bespoke to one storage convention (`out/<twin>/_discipline`) while the CLI accepts general twin paths. Derive the excluded review-record path from `finish_path`/`discipline_dir(twin)`, or constrain and validate `--twin` to the one supported layout.",
+          "The hook and generator still duplicate a substantial policy block byte-for-byte. The proposed later equivalence check detects drift after the fact; generating `.husky/pre-commit` from the shell source during install, or having both invoke one shared script, removes the second policy implementation.",
+          "A cache fallback and a ts-node fallback are not equivalent runners for arbitrary TypeScript/ESM configuration. Since `tsx` was added as a dev dependency, the cheaper deterministic policy is to run only the project-local runner and fail clearly when dependencies are not installed."
+        ],
+        "blocking": true,
+        "one_line_summary": "The binding check is still path-layout-dependent and does not enforce stage identity at the hook boundary, so its claimed universal provenance guarantee is not yet true."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": false,
+      "finish": "stop",
+      "raw": "{\n  \"arithmetic_errors\": [],\n  \"reasoning_faults\": [\n    {\n      \"where\": \"resolve_plan_ref association walk vs URL scrub (claim defect 1)\",\n      \"fault\": \"Claimed fix aligns sentinel release with scrub sentence-enders, but the walk only treats punct+whitespace as a boundary ([.,;:!?)\\]]\\\\s). A bare newline never releases _EXTERNAL, and neither does terminal punctuation without a following space. Claim text also cites scrub set [.,;:!?)] while code uses [.,;:!?)\\]].\",\n      \"consequence\": \"Residual fail-open: markers after a URL that ends a line (or ends with !?., etc. without a space) stay attributed to the external sentinel and are skipped rather than checked.\"\n    },\n    {\n      \"where\": \"claim: 'Six behaviours verified together' / marker-glued-to-URL\",\n      \"fault\": \"Selftests cover '.', '!', '\u00a72.' tokenisation, marker-after-URL, crossed/aligned per-doc refs, and missing paths; they do not include a glued marker case (e.g. URL\u00a7N) as a distinct behaviour proof.\",\n      \"consequence\": \"One of the six named behaviours is only true incidentally (scrub swallows the tail) and is not actually locked by a proveCatch case.\"\n    },\n    {\n      \"where\": \"pre-commit gate-registry runner (claim 'fail-open runner' closure)\",\n      \"fault\": \"UNAVAILABLE (no tsx/ts-node) still leaves the registry selftest unproven and does not set fail=1; claim treats further pushback as reasoned-rejected rather than claiming the fail-open is gone.\",\n      \"consequence\": \"Honest process stance, but the"
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "Two defects fixed since the last panel, both the same shape: two regexes describing one concept in two places",
+            "verdict": "SUPPORTED",
+            "why": "Defect 1 is the URL-scrub punctuation class [^\\s.,;:!?)\\]] vs the walk-boundary class [.,;:!?)\\]]\\s \u2014 one concept (clause boundary) in two regexes, now aligned. Defect 2 is the section-token extraction vs the section-marker matching in _marker_in (e.g., '^\\s*#+\\s*{token}[.\\s)]'), one concept (section token shape) in two regexes, now fixed."
+          },
+          {
+            "claim": "(1) The URL scrub deliberately preserves [.,;:!?)] as sentence-enders while the association walk released its sentinel only on [.;\\n], so a URL ending in ! or ? never released it and later markers went unchecked \u2014 fail-open",
+            "verdict": "OVERSTATED",
+            "why": "The URL-scrub class [^\\s.,;:!?)\\]] is visible and does preserve that punctuation. The new walk boundary [.,;:!?)\\]]\\s is visible and does include '!' and '?'. Code comments explicitly justify the fix as preventing fail-open. However, the diff shows the AFTER state only; the PRIOR walk regex [.;\\n] (specifically including \\n, which the new boundary does NOT match) is not present anywhere in the diff \u2014 the '\\n' portion of the claim is unverifiable and may itself be wrong."
+          },
+          {
+            "claim": "Found independently by Sol and Grok",
+            "verdict": "SUPPORTED",
+            "why": "Code comment explicitly states 'Sol and Grok, independently' in connection with the ! and ? boundary release issue."
+          },
+          {
+            "claim": "(2) The section token [\\w.]+ absorbed a trailing period, so '\u00a75. Also' parsed as '5.' and could never match a '## 5' heading",
+            "verdict": "OVERSTATED",
+            "why": "The defect is real and supported: code comment says 'Do not let the token absorb a trailing period: \"\u00a75. Also\" parsed as \"5.\"'. The new regex [\\w]+(?:\\.[\\w]+)* correctly does not absorb a trailing period. However, the PRIOR regex [\\w.]+ itself is not shown anywhere in the diff (the diff only shows the new form) \u2014 the literal spelling of the old token regex is asserted, not established."
+          },
+          {
+            "claim": "Six behaviours verified together: '.' and '!' boundaries release the sentinel; '\u00a75.' parses as 5; a marker glued to a URL is ignored; a good reference passes; a genuinely absent section refuses naming the right document",
+            "verdict": "SUPPORTED",
+            "why": "Six selftest cases correspond one-to-one: url_influence_ends_at_a_sentence_boundary ('.' release), exclamation_also_ends_a_url_clause ('!' release), token_does_not_absorb_a_terminal_period (\u00a75.), marker_after_a_url_is_not_reattributed (glued marker), correct_per_document_citation_passes (good ref), marker_must_be_in_its_own_document (genuinely absent)."
+          },
+          {
+            "claim": "Two new proveCatch cases",
+            "verdict": "SUPPORTED",
+            "why": "Exactly two comments labelled 'proveCatch' in the selftest: one for the self-reference Sol/Grok caught (identity canonical diff excluding _discipline), and one for the association Sol caught on CONTROLLED fixtures (A.md with \u00a72 only vs B.md with \u00a71 only)."
+          },
+          {
+            "claim": "I AM CLOSING THIS STAGE and using the reasoned-rejection path deliberately on four items raised and answered identically at three consecutive councils \u2014 the npx-cache runner rung, stage-id at the hook boundary, the fail-open runner, and prose-parsing generality. Each is recorded with reasons in the panel, none waved through.",
+            "verdict": "UNSUPPORTED",
+            "why": "These are meta-process claims about council history, panel contents, reviewer identities, and a 'reasoned-rejection' record. The diff contains none of that \u2014 no council panels, no reviewer lists, no reasoned-rejection log. Independently, the diff applies substantive technical changes that appear to address at least two of the named items (the npx-cache ladder is reordered; UNAVAILABLE is distinguished from FAIL), which is in tension with calling those items 'reasoned-rejected' rather than 'fixed'."
+          },
+          {
+            "claim": "stage-id at the hook boundary (one of the four reasoned-rejected items)",
+            "verdict": "SUPPORTED",
+            "why": "The hook invocation passes --twin, --against-staged, --refuse-truncated but NOT --stage-id. The absence of --stage-id in the hook call is consistent with the claim that stage-id at the hook boundary is not being enforced."
+          },
+          {
+            "claim": "the npx-cache runner rung, the fail-open runner (two of the four reasoned-rejected items)",
+            "verdict": "CONTRADICTED",
+            "why": "Both are explicitly addressed by the diff: the runner ladder is rewritten to prefer node_modules/.bin/tsx first and demote the ~/.npm/_npx cache to a fallback, and UNAVAILABLE is reported as a distinct third state. The change-add comment '\u2b50\u2b50 \"COULD NOT RUN\" IS NOT \"FAILED\", AND A GATE MUST NOT DEPEND ON A CACHE' is the author labelling this a fix, not a reasoned-rejection."
+          },
+          {
+            "claim": "prose-parsing generality (one of the four reasoned-rejected items)",
+            "verdict": "UNSUPPORTED",
+            "why": "No item in the diff is annotated as 'prose-parsing generality', and no panel or rejection log is shown that would establish this as a deliberate reasoned-rejection."
+          },
+          {
+            "claim": "Each [of the four reasoned-rejection items] is recorded with reasons in the panel, none waved through",
+            "verdict": "UNSUPPORTED",
+            "why": "No panel JSON is included in the diff; the claim is about process records that the diff does not contain."
+          },
+          {
+            "claim": "with three fresh reviewers and a 41 kB three-surface diff",
+            "verdict": "OVERSTATED",
+            "why": "Reviewer count and 'fresh' status are not in the diff. The diff touches FOUR files (scripts/lib/install-forcing-hooks.sh, .husky/pre-commit, package.json, scripts/lib/p_stage_discipline.py); whether 'three-surface' matches a category count rather than file count is unclear and not established by the diff."
+          },
+          {
+            "claim": "this loop does not reach a natural end, and every fix restarts it by design",
+            "verdict": "UNSUPPORTED",
+            "why": "Pure meta-process claim about the council loop's dynamics. Nothing in the diff shows a loop structure, restart triggers, or 'by design' termination conditions."
+          },
+          {
+            "claim": "The next stage is one surface, starting with an equivalence check between install-forcing-hooks.sh and the live .husky/pre-commit",
+            "verdict": "UNSUPPORTED",
+            "why": "Forward-looking claim. The diff contains no equivalence check, no scheduled-work artifact, and no test that compares the two files. Only an aside ('which would have caught today's failure') hints at intent."
+          },
+          {
+            "claim": "which would have caught today's 'fixed the generator, never re-ran it' failure automatically instead of via an audit",
+            "verdict": "UNSUPPORTED",
+            "why": "No automated equivalence check between the two hook surfaces exists in the diff. The 'fixed the generator, never re-ran it' assertion is itself a past-tense meta-process claim with no evidence in this diff (though the symmetric edits to both files are consistent with such a past drift having been repaired)."
+          }
+        ],
+        "weakest_link": "The cluster of meta-process claims \u2014 three consecutive councils, four reasoned-rejections recorded in a panel, three fresh reviewers, 41 kB / three-surface diff, 'fixed the generator, never re-ran it' \u2014 is entirely unverifiable from the diff and at points directly contradicted (npx-cache rung and fail-open runner are demonstrably fixed in the diff, not reasoned-rejected).",
+        "blocking": false,
+        "one_line_summary": "The technical core \u2014 two regex-mismatch defects, six selftest behaviours, two proveCatch cases, runner-ladder fix, hook stage/twin enforcement, and symmetric edits to both hook surfaces \u2014 is well-supported by the diff; the meta-process narrative about councils, panels, reasoned-rejection, and the planned next-stage equivalence check is unsupported and partially contradicted."
+      }
+    }
+  },
+  "seats_called": [
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The self-excluding hash only excludes out/*/_discipline/*, but finish and verify-panel accept an ARBITRARY --twin path and write the panel under twin/_discipline/. A twin outside the out/<name> layout would have its own review record included in the hash \u2014 reintroducing the self-reference \u2014 and the exclusion should be DERIVED from the twin path rather than hardcoded.",
+      "action": "REAL, NEW, AND THE BEST FINDING OF THIS ROUND \u2014 it is the same self-reference Sol killed at the start council, surviving in a path layout nobody has used yet. It is LATENT, not live: every twin in this repo is out/<name>/, so the shipped configuration is correct and the digest is sound for it. Recorded as a stated limit with the fix NAMED rather than hand-waved \u2014 DIFF_CANON_ARGS must build its ':(exclude)' from the resolved --twin path, so the exclusion follows the twin instead of assuming a directory convention. It is the FIRST item of the next stage, ahead of the generator/hook equivalence check. I am not making the change in this stage because the loop terminates only on a round with no code edits, and shipping a correct configuration with a documented latent coupling is the honest trade against a tenth round."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 8,
+      "point": "Eight of the ten verdicts (the stage-closing decision, the four reasoned-rejection items, the 'recorded with reasons' assertion, the loop-does-not-converge judgement, the next-stage plan, and the claim about what an equivalence check would have caught) are narrative that a diff cannot establish.",
+      "action": "ACCEPTED IN FULL, for the sixth consecutive council, and this is the last claim string that will carry it. A diff establishes what code DOES. It cannot establish a decision to close a stage, a judgement about whether a review loop converges, a commitment about future work, or a counterfactual about what a check would have caught. All of it belongs in the panel \u2014 which is where a reader will find it, with reasons \u2014 and claim strings should carry only what the artefacts show. MiniMax has been right about this every time and it has changed how I write."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The hook supplies --twin but never --stage-id, so a fully answered panel from another stage in the same twin with a matching diff hash satisfies the hook; and the runner still executes the first cached tsx under $HOME/.npm/_npx.",
+      "why_rejected": "Both raised and answered identically at four consecutive councils; recorded once more and closed rather than re-argued. A hook cannot infer a stage from a commit \u2014 nothing in a commit names one \u2014 so demanding --stage-id there would either block every commit or invite an invented value; stage identity is enforced inside finish, which knows its stage, and recorded at the hook. And the cache rung exists solely because tsx is declared but not installed in THIS checkout: deleting it today trades a host-specific resolution for no gate-registry check at all. It is dead code the moment npm install runs, and marked for deletion rather than defended."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "A cache fallback and a ts-node fallback are not equivalent runners for arbitrary TypeScript/ESM configuration.",
+      "why_rejected": "Correct and accepted as a limit. They are not equivalent, which is why the chain is ordered by fidelity \u2014 declared tsx first, cache second, ts-node last \u2014 and why the check reports UNAVAILABLE rather than FAIL when none resolves. The gate registry's selftest is the same file under any of them; if ts-node cannot load it, the honest outcome is a visible failure, not a silent pass."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The hook and generator still duplicate a substantial policy block byte-for-byte; a later equivalence check detects drift only after the fact.",
+      "why_rejected": "Accepted in full as a real weakness, deferred with its successor already scheduled: the equivalence check is the next stage's second item, after the twin-derived exclusion. Sol is right that after-the-fact detection is weaker than generation-time guarantee \u2014 and after-the-fact detection is still infinitely better than today, where the drift was found by an external audit hours after I had told a council the defect was fixed at source."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 2,
+      "point": "The two bug descriptions are OVERSTATED: the URL-scrub/boundary mismatch and the section-token trailing-period defect.",
+      "why_rejected": "These two ARE established by the diff and by executable behaviour, unlike the eight narrative items. The boundary class in the association walk and the punctuation class in the URL scrub are both visible in the diff and are now the same set; the section token pattern visibly changed from [\\\\w.]+ to [\\\\w]+(?:\\\\.[\\\\w]+)*. Both carry proveCatch cases that fail against the previous code: plan_ref.exclamation_also_ends_a_url_clause and plan_ref.token_does_not_absorb_a_terminal_period. Six behaviours were verified together after the fixes and each is reproducible from the committed selftest. Describing a defect one has fixed, with a test that fails without the fix, is not overstatement."
+    }
+  ],
+  "council_ok": true,
+  "reviewed_diff_sha256": "7f52a233413c5b9ecb84682fb26efdbae7d84b984afe9635077c46928979dc77",
+  "reviewed_diff_bytes": 42212,
+  "reviewed_diff_scope": "staged code, canonical flags, excluding out/*/_discipline/*",
+  "stage_id": "discipline-bind-review-to-diff",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "reviewed_body_bytes": 42230,
+  "reviewed_body_was_truncated": false,
+  "advice_recorded_utc": "2026-08-02T13:28:09Z"
+}

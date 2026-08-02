@@ -41,6 +41,7 @@ Exit 49 = discipline violation.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -83,6 +84,168 @@ def _run(cmd: list[str], *, timeout: int = 900) -> tuple[int, str]:
 
 
 # ── plan fit ────────────────────────────────────────────────────────────────
+# Sentinel for "the most recent reference was an external URL", so markers that
+# follow it are attributed to nothing rather than to the last local document.
+_EXTERNAL = object()
+
+
+def _marker_in(body: str, token: str) -> bool:
+    """Is a section/item marker present, LINE-ANCHORED, in this document?"""
+    import re  # noqa: PLC0415
+    # Case-INSENSITIVE: resolve_plan_ref lowercases the token, so a
+    # case-sensitive match here could never find "§5A" from a cited "§5a"
+    # (Grok, fourth council).
+    flags = re.M | re.I
+    return bool(
+        re.search(rf"^\s*#+.*§\s*{re.escape(token)}\b", body, flags=flags)
+        or re.search(rf"^\s*#+\s*{re.escape(token)}[.\s)]", body, flags=flags)
+        or re.search(rf"^\s*{re.escape(token)}\.\s", body, flags=flags))
+
+
+def resolve_plan_ref(plan_ref: str, *, repo: Path = REPO_ROOT) -> tuple[bool, str]:
+    """Does the cited plan item actually EXIST? -> (ok, explanation).
+
+    ⭐ A plan reference that resolves to nothing is the same as no plan
+    reference (side-channel audit, 2026-08-02: "put --plan-ref under open plan
+    items so the REFUSAL path has teeth on-stage, not just in selftest"). The
+    original check was `--plan-ref` non-empty, which any string satisfies —
+    including a plausible-looking citation of a document that does not exist,
+    which is exactly what a hurry produces.
+
+    Deterministic and forgiving in the right direction: find any token that
+    looks like a path to a file that exists, then require any section
+    marker to appear in THE DOCUMENT IT IS CITED AGAINST: the reference is
+    walked left to right, so a marker belongs to the most recently named file,
+    and only markers appearing before any file are checked against all of them.
+    Only `§N` and `item N` markers are checked —
+    earlier versions of this docstring promised quoted-phrase matching that was
+    never implemented, and twice described a matching rule that had already been
+    replaced. Nothing here requires quotes. If this sentence and the code ever
+    disagree again, the code is right — and the real answer is a plan-item
+    registry with stable ids, which deletes this parser. A reference
+    naming no file at all is accepted with a note — a tracker row or a DEC id
+    may live outside the repo — because refusing those would push people to
+    invent file paths, which is worse than a soft note.
+    """
+    import re  # noqa: PLC0415
+    text = (plan_ref or "").strip()
+    if not text:
+        return False, "empty"
+    # Strip URLs first: `https://example.com/plan.md` would otherwise yield
+    # `example.com/plan.md` as a local-path candidate (Sol). An external
+    # reference is not a repo plan item and must not be probed as one.
+    # A URL becomes a SENTINEL rather than whitespace: markers that follow an
+    # external reference belong to it and must be IGNORED, not reattributed to
+    # the last local document. Blanking the URL left " §99" behind, which the
+    # association walk then charged to the previous real file — a wrong refusal
+    # naming the wrong document (Sol, seventh council; my first patch walked the
+    # scrubbed text but did not fix the attribution).
+    # Do NOT let the URL swallow trailing sentence punctuation: `\S+` ate the
+    # full stop in "see https://x.com/a. Also §5", which removed the very
+    # boundary that ends the URL's influence and left §5 suppressed.
+    scrubbed = re.sub(r"\b[a-z][a-z0-9+.-]*://\S*[^\s.,;:!?)\]]",
+                      " \x00EXTERNAL\x00 ", text, flags=re.I)
+    candidates = re.findall(r"[\w./-]+\.(?:md|json|ts|py|tsx)", scrubbed)
+    resolved = []
+    for cand in candidates:
+        # Repo-confined: an absolute path or one that escapes upward is not a
+        # plan reference for THIS repo, and resolving it would let the gate read
+        # arbitrary local files (Sol, Grok).
+        if cand.startswith("/") or ".." in Path(cand).parts:
+            return False, (f"cites {cand!r}, which is outside this repository — "
+                           "a plan reference must live in the repo")
+        for base in (repo, repo / "docs" / "plans", repo / "docs"):
+            probe = (base / cand)
+            try:
+                inside = probe.resolve().is_relative_to(repo.resolve())
+            except (OSError, ValueError):
+                inside = False
+            if inside and probe.exists():
+                resolved.append(probe)
+                break
+        else:
+            return False, (f"cites {cand!r}, which does not exist — a plan "
+                           "reference that resolves to nothing is no reference")
+    if not resolved:
+        return True, ("names no file in this repo; accepted as an external "
+                      "tracker/DEC reference, unverified")
+    # Any section marker NAMED in the reference must appear in its document.
+    # Match the way people actually CITE, not one literal spelling. "§5 item 7"
+    # points at a numbered list entry rendered as "7." at the start of a line,
+    # and a section as "## 5" or "5." — demanding the literal string "item 7"
+    # made a correct reference fail, and an over-strict gate is a bypassed gate.
+    # ⭐ ASSOCIATE EACH MARKER WITH ITS OWN DOCUMENT (Sol, fifth council). The
+    # previous rule — "every marker must appear in SOME cited document" — was a
+    # correction of an earlier one that demanded every marker in EVERY document,
+    # and it overshot: "A.md §1 and B.md §2" passed when A held only §2 and B
+    # only §1. A plausible-but-wrong per-document citation was accepted. Walk
+    # the reference left to right instead: a marker belongs to the most recent
+    # document named before it, and markers appearing before any document are
+    # checked against all of them.
+    bodies = {doc: doc.read_text(errors="replace") for doc in resolved}
+    # Keyed by both the full cited path and the basename, so two documents
+    # sharing a basename in different directories do not collide (Sol).
+    by_name: dict = {}
+    for doc in resolved:
+        by_name.setdefault(doc.name, doc)
+        by_name[str(doc)] = doc
+    current: Path | None = None
+    leading: list[str] = []
+    for token_match in re.finditer(
+            # A sentence boundary ENDS a URL's influence. Without this the
+            # sentinel suppressed every later marker until the next local file
+            # appeared, so "PLAN.md, see https://ref, §5" left §5 unchecked —
+            # FAIL-OPEN, which is the failure this whole layer refuses (Sol,
+            # eighth council). After a boundary, markers fall back to being
+            # checked against every cited document rather than skipped.
+            # Must match the punctuation the URL scrub deliberately PRESERVES
+            # ([.,;:!?)\]]), or a URL ending a sentence with ! or ? never
+            # releases the sentinel and later markers stay unchecked (Sol and
+            # Grok, independently). The scrub and the walk have to agree on
+            # what ends a clause.
+            r"(?P<boundary>[.,;:!?)\]]\s)"
+            r"|(?P<external>\x00EXTERNAL\x00)"
+            r"|(?P<file>[\w./-]+\.(?:md|json|ts|py|tsx))"
+            # Do not let the token absorb a trailing period: "§5. Also" parsed
+            # as "5." and could never match a "## 5" heading (Sol).
+            r"|§\s*(?P<sec>[\w]+(?:\.[\w]+)*)"
+            # ⭐ Walk the SCRUBBED text (Sol, seventh council). Stripping URLs
+            # only while collecting candidates left the association walk seeing
+            # a URL's own "§99" and attributing it to the previously named real
+            # document — a wrong refusal with a misleading message.
+            r"|item\s+(?P<item>\d+)", scrubbed, flags=re.I):
+        if token_match.group("boundary"):
+            if current is _EXTERNAL:
+                current = None            # the URL's clause is over
+            continue
+        if token_match.group("external"):
+            current = _EXTERNAL
+            continue
+        named = token_match.group("file")
+        if named:
+            current = next(
+                (d for key, d in by_name.items() if key.endswith(named)),
+                by_name.get(named.rsplit("/", 1)[-1], current))
+            continue
+        token = (token_match.group("sec") or token_match.group("item") or "")
+        token = token.strip().lower()
+        if not token:
+            continue
+        if current is _EXTERNAL:
+            continue                      # the marker belongs to the URL
+        if current is None:
+            leading.append(token)
+            continue
+        if not _marker_in(bodies[current], token):
+            return False, (f"cites section/item {token!r} in {current.name}, "
+                           "which does not appear in THAT document")
+    for token in leading:
+        if not any(_marker_in(body, token) for body in bodies.values()):
+            return False, (f"cites section/item {token!r}, which appears in "
+                           f"none of {', '.join(d.name for d in resolved)}")
+    return True, f"resolves to {', '.join(d.name for d in resolved)}"
+
+
 def build_plan_fit(args) -> dict:
     """The stage must map to an OPEN plan item. 'While I'm here' is the enemy.
 
@@ -214,7 +377,7 @@ MAX_COVERS = 8
 
 
 def build_review_body(claim: str, diff: str, *,
-                      budget: int = DIFF_BUDGET_CHARS) -> str:
+                      budget: int = DIFF_BUDGET_CHARS) -> tuple[str, bool]:
     """Assemble the diff a council sees — prioritised, and HONEST about cuts.
 
     ⭐⭐ SILENT TRUNCATION MADE THREE SEATS CONFIDENTLY WRONG (2026-08-02). This
@@ -282,7 +445,12 @@ def build_review_body(claim: str, diff: str, *,
             "from the change — you have simply not been given them. Say "
             "explicitly that you cannot assess them:\n"
             f"{listing}\n\n")
-    return f"{header}DIFF:\n```diff\n{''.join(kept)}\n```"
+    # ⭐ Return the FACT, do not make the caller grep for a marker. The first
+    # version set `reviewed_body_was_truncated = "THIS DIFF IS INCOMPLETE" in
+    # body`, which was True for every review of THIS FILE — the diff contains
+    # the source that defines the marker string. A self-referential detector,
+    # in the module whose whole subject is self-reference.
+    return f"{header}DIFF:\n```diff\n{''.join(kept)}\n```", bool(dropped)
 
 
 def unrejected_blocking(panel: dict) -> list:
@@ -290,9 +458,75 @@ def unrejected_blocking(panel: dict) -> list:
     return sorted(unanswered_findings(panel))
 
 
+# ⭐⭐ A CANONICAL, SELF-EXCLUDING VIEW OF THE STAGED CODE (2026-08-02, start
+# council). Two findings killed the naive design before it was finished:
+#
+#   Sol/Grok: hashing the whole staged patch is SELF-REFERENTIAL. Writing
+#   `reviewed_diff_sha256` into a panel that is itself staged changes
+#   `git diff --cached`, so the hash could never match its own commit. The
+#   review record is not the code under review — `_discipline/` is excluded.
+#
+#   Sol/Grok: raw `git diff --cached` is not stable provenance. Rename
+#   detection, diff algorithm, external drivers, colour and context width all
+#   change the bytes without changing the content. Fixed flags, always.
+DIFF_CANON_ARGS = [
+    "git", "-c", "core.abbrev=40", "-c", "diff.algorithm=myers",
+    "-c", "diff.noprefix=false", "-c", "core.autocrlf=false",
+    "diff", "--cached",
+    "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames",
+    # NO --ignore-submodules: it omitted staged gitlink updates from the
+    # attestation while the commit still contained them (Sol, fourth council).
+    # An attestation that silently skips part of the change is the failure this
+    # module exists to prevent.
+    "--unified=3",
+    # ONLY the council's own record is excluded — it is the thing being
+    # written. A claims-registry change is load-bearing and MUST invalidate the
+    # review (Sol: "excluding an entire claims directory is a broad semantic
+    # exception").
+    "--", ".", ":(exclude)out/*/_discipline/*",
+]
+
+
+def canonical_staged_diff() -> str:
+    """The staged CODE, rendered stably and excluding the review record itself."""
+    _code, text = _run(DIFF_CANON_ARGS, timeout=180)
+    return text
+
+
+def review_identity(diff_text: str, *, stage_id: str = "",
+                    twin: str = "") -> dict:
+    """What a panel must carry to prove WHICH work it reviewed.
+
+    Sol also asked for stage/twin identity: a matching diff alone does not show
+    the panel belongs to this stage or this twin.
+    """
+    return {
+        "reviewed_diff_sha256": hashlib.sha256(
+            diff_text.encode("utf-8")).hexdigest(),
+        "reviewed_diff_bytes": len(diff_text.encode("utf-8")),
+        # Derived from the ACTUAL pathspec, never hand-written: the first
+        # version said "_discipline/ and _claims/" and stayed that way after
+        # _claims stopped being excluded, so the provenance string contradicted
+        # the code it described (Sol, Grok).
+        "reviewed_diff_scope": (
+            "staged code, canonical flags, excluding "
+            + ", ".join(a.split(")", 1)[-1] for a in DIFF_CANON_ARGS
+                        if a.startswith(":(exclude)"))),
+        "stage_id": stage_id,
+        "twin": twin,
+    }
+
+
 def call_council(claim: str, body: str, *, output: Path,
-                 mode: str = "live") -> dict:
-    """Run the standing seats. Records the panel whether or not it succeeded."""
+                 mode: str = "live", reviewed_source: str | None = None,
+                 reviewed_stage_id: str = "", reviewed_twin: str = "",
+                 body_was_truncated: bool = False) -> dict:
+    """Run the standing seats. Records the panel whether or not it succeeded.
+
+    `reviewed_source` is the EXACT text the council was reviewing (for a finish
+    council, the staged diff). Its sha256 is stamped into the panel so a later
+    check can prove the panel saw THIS code and not an earlier version.
+    """
     panel = {
         "schema": "forgeos.p_stage_discipline.council/v1",
         "claim": claim,
@@ -305,6 +539,23 @@ def call_council(claim: str, body: str, *, output: Path,
         "advice_rejected": [],
         "council_ok": False,
     }
+    # ⭐⭐ BIND THE PANEL TO WHAT IT REVIEWED (2026-08-02). verify-panel could
+    # establish that a council was real and fully answered, and the hook could
+    # establish that it was newer than the staged code — neither could establish
+    # that it reviewed THAT code. Answering a council requires edits, which
+    # stale the panel that demanded them, so "the panel reviewed an earlier
+    # version" is the NORMAL case, not an edge case. It also closes Sol's
+    # "satisfiable by an unrelated twin": another twin's panel cannot carry this
+    # diff's hash.
+    if reviewed_source is not None:
+        panel.update(review_identity(reviewed_source,
+                                     stage_id=reviewed_stage_id,
+                                     twin=reviewed_twin))
+        # Grok: stamp the FULL digest and record truncation SEPARATELY — a hash
+        # over "whatever the seats happened to see" either blocks legitimate
+        # large commits or falsely certifies a full review.
+        panel["reviewed_body_bytes"] = len(body.encode("utf-8"))
+        panel["reviewed_body_was_truncated"] = bool(body_was_truncated)
     if mode == "offline":
         panel["note"] = ("council NOT called (offline mode) — a stage finished "
                          "under offline council is not reviewed and finish "
@@ -346,6 +597,12 @@ def cmd_start(args) -> int:
         print("[discipline] --plan-ref is REQUIRED: name the open plan item "
               "this stage serves (handover section, DEC id, tracker row). "
               "Work that maps to nothing is the failure this blocks.")
+        return EXIT_DISCIPLINE
+    plan_ok, plan_note = resolve_plan_ref(args.plan_ref)
+    print(f"[discipline] plan ref   -> {plan_note}")
+    if not plan_ok:
+        print("[discipline] the cited plan item does not resolve. Cite one that "
+              "exists, or open a named DEC for this work.")
         return EXIT_DISCIPLINE
     out = discipline_dir(twin)
     failures: list[str] = []
@@ -533,12 +790,30 @@ def cmd_finish(args) -> int:
         panel = json.loads(finish_path.read_text())
         print("[discipline] finish council -> reused existing panel")
     else:
-        diff_code, diff = _run(["git", "diff", "--cached"], timeout=120)
+        # Review the SAME view the digest attests to (Grok: "hash can match the
+        # current index while seats reviewed a differently rendered diff — that
+        # is attestation of index identity, not of the review"). It is also
+        # smaller, because the council's own record no longer crowds out the
+        # code.
+        # ⭐ NO UNSTAGED FALLBACK (Sol, Grok — third council). This used to fall
+        # back to a raw, unpinned `git diff` when the index was empty, while
+        # verify-panel always hashes the CANONICAL STAGED view. That produced an
+        # attestation which could never match anything — a panel certifying a
+        # rendering the gate does not compute. Refuse instead: "stage the change
+        # first" is the documented flow, and an unverifiable attestation is
+        # worse than no attestation.
+        diff = canonical_staged_diff()
         if not diff.strip():
-            diff_code, diff = _run(["git", "diff"], timeout=120)
+            print("[discipline] nothing is staged. `finish` reviews and attests "
+                  "the STAGED change — stage it first, then run finish as the "
+                  "last action before committing.")
+            return EXIT_DISCIPLINE
+        review_body, was_truncated = build_review_body(args.claim, diff)
         panel = call_council(
-            args.claim, build_review_body(args.claim, diff),
-            output=finish_path, mode=args.council_mode)
+            args.claim, review_body,
+            output=finish_path, mode=args.council_mode,
+            reviewed_source=diff, body_was_truncated=was_truncated,
+            reviewed_stage_id=args.stage_id, reviewed_twin=str(twin))
     print(f"[discipline] finish council -> seats "
           f"{panel.get('seats_called') or '(none)'}")
     if not panel.get("council_ok"):
@@ -736,18 +1011,184 @@ def _selftest() -> int:
         big = "x" * 200_000     # must EXCEED the budget below, or nothing drops
         fake_diff = (f"diff --git a/z_filler.py b/z_filler.py\n{big}\n"
                      f"diff --git a/the_point.py b/the_point.py\n+real change\n")
-        body = build_review_body("this change edits the_point.py", fake_diff,
-                                 budget=160_000)
+        body, truncated = build_review_body(
+            "this change edits the_point.py", fake_diff, budget=160_000)
         ck("council.claimed_file_survives_the_budget",
            "+real change" in body,
            "the file the claim names was the one truncated away")
         ck("council.dropped_files_are_declared",
            "THIS DIFF IS INCOMPLETE" in body and "z_filler.py" in body,
            "a dropped file was not declared to the council")
-        whole = build_review_body("anything", fake_diff, budget=10_000_000)
+        # ⭐ The truncation FACT must come from the builder, not from grepping
+        # the body for a marker the body may legitimately contain as source.
+        ck("council.truncation_is_reported_as_a_fact", truncated,
+           "a truncated body did not report itself truncated")
+        whole, whole_trunc = build_review_body("anything", fake_diff,
+                                               budget=10_000_000)
         ck("council.no_warning_when_nothing_is_cut",
-           "THIS DIFF IS INCOMPLETE" not in whole,
+           "THIS DIFF IS INCOMPLETE" not in whole and not whole_trunc,
            "an untruncated diff was labelled incomplete")
+        # ...and a diff that MENTIONS the marker (as this module's own source
+        # does) must not be mistaken for a truncated one.
+        mentions, mentions_trunc = build_review_body(
+            "x", "diff --git a/m.py b/m.py\n+THIS DIFF IS INCOMPLETE\n",
+            budget=10_000_000)
+        ck("council.marker_in_source_is_not_truncation", not mentions_trunc,
+           "a diff quoting the marker was misread as truncated")
+
+        # ⭐⭐ proveCatch for the self-reference Sol and Grok caught before it
+        # shipped: the canonical view must EXCLUDE the review record, or
+        # writing the panel changes the very hash the panel carries and no
+        # commit could ever satisfy its own gate.
+        ck("identity.excludes_the_review_record",
+           any(":(exclude)out/*/_discipline/*" in a for a in DIFF_CANON_ARGS),
+           "the canonical diff includes _discipline/ — the hash is self-referential")
+        ck("identity.diff_flags_are_pinned",
+           all(f in DIFF_CANON_ARGS for f in
+               ("--no-ext-diff", "--no-color", "--no-renames", "--unified=3")),
+           "diff rendering is not pinned; config changes would move the hash")
+        ident = review_identity("abc", stage_id="s1", twin="t")
+        same = review_identity("abc", stage_id="s1", twin="t")
+        other = review_identity("abd", stage_id="s1", twin="t")
+        ck("identity.stable_and_discriminating",
+           ident == same
+           and ident["reviewed_diff_sha256"] != other["reviewed_diff_sha256"],
+           "the identity is unstable or does not discriminate")
+        ck("identity.carries_stage_and_twin",
+           ident["stage_id"] == "s1" and ident["twin"] == "t",
+           "a matching diff alone cannot show the panel belongs to this stage")
+
+        # ⭐ Grok/MiniMax: the exclusion was asserted in prose and the selftest
+        # only checked that a flag STRING was present. Prove the BEHAVIOUR: a
+        # path under _discipline/ must be filtered by the pathspec while an
+        # ordinary source path is not.
+        # ⭐ Grok: fnmatch is NOT git pathspec semantics, so matching sample
+        # strings proved nothing about what git actually filters. Ask GIT.
+        # Skipped (not silently passed) outside a repository.
+        # Drive the ACTUAL command the gate uses, with --name-only, so this
+        # proves what `canonical_staged_diff()` filters rather than what a
+        # different plumbing command happens to filter (Grok, MiniMax). And
+        # scope the assertion to `out/*/_discipline/`, which is what the
+        # pathspec claims — asserting every path containing "_discipline"
+        # anywhere was stronger than the rule and would fail spuriously (Sol).
+        import re as _re  # noqa: PLC0415
+        # `--name-only` must go BEFORE the `--`, or git reads it as a PATHSPEC
+        # and silently returns the whole tree — which is exactly what happened
+        # on the first attempt (1281 "kept" names against 8 staged files).
+        _cut = DIFF_CANON_ARGS.index("--")
+        names_args = (DIFF_CANON_ARGS[:_cut] + ["--name-only"]
+                      + DIFF_CANON_ARGS[_cut:])
+        code, filtered = _run(names_args, timeout=120)
+        code_all, unfiltered = _run(
+            ["git", "diff", "--cached", "--name-only"], timeout=120)
+        if code == 0 and code_all == 0 and unfiltered.strip():
+            kept_names = set(filtered.split())
+            all_names = set(unfiltered.split())
+            in_scope = {f for f in all_names
+                        if _re.match(r"out/[^/]+/_discipline/", f)}
+            if not in_scope:
+                print("  [SKIP] identity.canonical_diff_excludes_the_record "
+                      "(no out/<twin>/_discipline/ paths staged to exclude)")
+            if in_scope:
+                ck("identity.canonical_diff_excludes_the_record",
+                   not (in_scope & kept_names),
+                   f"{len(in_scope & kept_names)} discipline files survived the "
+                   "canonical diff's own pathspec")
+            ck("identity.canonical_diff_keeps_everything_else",
+               (all_names - in_scope) <= kept_names,
+               "the canonical pathspec dropped files it must keep")
+        else:
+            print("  [SKIP] identity.canonical_diff_excludes_the_record "
+                  "(no staged changes to filter)")
+
+        # ⭐ Grok/Sol: stamping stage/twin is not enforcement. Drive verify-panel
+        # with a FOREIGN panel and require refusal.
+        foreign = d / "foreign-council.json"
+        _write(foreign, {"seats_called": ["a", "b"], "council_ok": True,
+                         "blocking_seats": [], "stage_id": "some-other-stage",
+                         "twin": "out/other-twin"})
+        ck("identity.foreign_stage_is_refused",
+           cmd_verify_panel(argparse.Namespace(
+               panel=str(foreign), stage_id="my-stage", twin="out/my-twin",
+               against_staged=False, refuse_truncated=False))
+           == EXIT_DISCIPLINE,
+           "a panel from another stage/twin was accepted")
+        ck("identity.matching_stage_is_accepted",
+           cmd_verify_panel(argparse.Namespace(
+               panel=str(foreign), stage_id="some-other-stage",
+               twin="out/other-twin", against_staged=False,
+               refuse_truncated=False)) == 0,
+           "a correctly-matching panel was refused")
+
+        # ⭐ Sol/Grok: --refuse-truncated must actually refuse.
+        trunc = d / "truncated-council.json"
+        _write(trunc, {"seats_called": ["a", "b"], "council_ok": True,
+                       "blocking_seats": [], "reviewed_body_was_truncated": True})
+        ck("identity.truncated_body_refused_when_asked",
+           cmd_verify_panel(argparse.Namespace(
+               panel=str(trunc), stage_id=None, twin=None,
+               against_staged=False, refuse_truncated=True))
+           == EXIT_DISCIPLINE,
+           "a truncated review passed --refuse-truncated")
+
+        # ⭐ Grok/Sol: resolve_plan_ref had NO selftest at all.
+        ok_ref, _ = resolve_plan_ref(
+            "docs/plans/COMPACT-HANDOVER-FE-FRONT-FPK-2026-08-02.md")
+        bad_abs, _ = resolve_plan_ref("/etc/passwd.md §1")
+        bad_up, _ = resolve_plan_ref("../elsewhere/plan.md §1")
+        bad_missing, _ = resolve_plan_ref("docs/plans/NO-SUCH-PLAN.md §1")
+        # ⭐ proveCatch for the association Sol caught, on CONTROLLED fixtures
+        # (Grok: the first version cited two real plan files with the same
+        # marker, so it could not distinguish "the rule works" from "the repo
+        # happens to lack that section"). A has ONLY §2, B has ONLY §1.
+        fixture_root = d / "planrepo"
+        (fixture_root / "docs" / "plans").mkdir(parents=True)
+        (fixture_root / "docs" / "plans" / "A.md").write_text("## 2\nalpha\n")
+        (fixture_root / "docs" / "plans" / "B.md").write_text("## 1\nbeta\n")
+        crossed, crossed_note = resolve_plan_ref(
+            "docs/plans/A.md §1 and docs/plans/B.md §2", repo=fixture_root)
+        ck("plan_ref.marker_must_be_in_its_own_document", not crossed,
+           f"A(§2 only) satisfied a §1 citation via B: {crossed_note}")
+        aligned, aligned_note = resolve_plan_ref(
+            "docs/plans/A.md §2 and docs/plans/B.md §1", repo=fixture_root)
+        ck("plan_ref.correct_per_document_citation_passes", aligned,
+           f"a correct per-document citation was refused: {aligned_note}")
+        # ...and an external URL must not be probed as a local path.
+        url_ok, url_note = resolve_plan_ref(
+            "see https://example.com/docs/plans/NOPE.md for context",
+            repo=fixture_root)
+        # ⭐ A marker AFTER a URL belongs to the URL, not to the last local
+        # document. Blanking the URL left " §9" behind and charged it to A.md.
+        after_url, after_note = resolve_plan_ref(
+            "docs/plans/A.md §2 and https://example.com/plans/Z.md §9",
+            repo=fixture_root)
+        ck("plan_ref.marker_after_a_url_is_not_reattributed", after_url,
+           f"a URL's own section was charged to a local document: {after_note}")
+
+        # ⭐ A URL's influence must END at a sentence boundary. Without that the
+        # sentinel suppressed every later marker — fail-open in a refusal gate.
+        reopened, reopened_note = resolve_plan_ref(
+            "docs/plans/A.md §2, see https://example.com/x. Also §9",
+            repo=fixture_root)
+        bang, bang_note = resolve_plan_ref(
+            "docs/plans/A.md §2, see https://example.com/x! Also §9",
+            repo=fixture_root)
+        ck("plan_ref.exclamation_also_ends_a_url_clause", not bang,
+           f"! did not release the URL sentinel: {bang_note}")
+        dotted, dotted_note = resolve_plan_ref(
+            "docs/plans/A.md §2. Also relevant", repo=fixture_root)
+        ck("plan_ref.token_does_not_absorb_a_terminal_period", dotted,
+           f"'§2.' was parsed as token '2.' and could not match: {dotted_note}")
+
+        ck("plan_ref.url_influence_ends_at_a_sentence_boundary", not reopened,
+           f"a marker after the URL's sentence went unchecked: {reopened_note}")
+
+        ck("plan_ref.url_is_not_a_local_path", url_ok,
+           f"an external URL was treated as a local plan file: {url_note}")
+
+        ck("plan_ref.repo_confined_and_verified",
+           bool(ok_ref) and not bad_abs and not bad_up and not bad_missing,
+           f"plan-ref resolution is wrong: {ok_ref=} {bad_abs=} {bad_up=} {bad_missing=}")
 
         # An offline council must never read as a passed council.
         panel = call_council("c", "b", output=d / "offline.json",
@@ -778,6 +1219,37 @@ def cmd_verify_panel(args) -> int:
     if not panel.get("council_ok"):
         print(f"[discipline] {Path(args.panel).name}: fewer than two seats "
               "responded — not a council")
+        return EXIT_DISCIPLINE
+    # ⭐ Stamping is not enforcement (Sol, Grok and MiniMax all said so, and my
+    # claim that stage/twin "prevent a foreign panel" was false until now).
+    for field, wanted in (("stage_id", getattr(args, "stage_id", None)),
+                          ("twin", getattr(args, "twin", None))):
+        if wanted and str(panel.get(field) or "") != str(wanted):
+            print(f"[discipline] {Path(args.panel).name}: {field} is "
+                  f"{panel.get(field)!r}, expected {wanted!r} — this panel "
+                  "belongs to different work")
+            return EXIT_DISCIPLINE
+    if getattr(args, "against_staged", False):
+        expected = panel.get("reviewed_diff_sha256")
+        if not expected:
+            print(f"[discipline] {Path(args.panel).name}: no "
+                  "reviewed_diff_sha256 — this panel cannot prove WHICH code it "
+                  "reviewed")
+            return EXIT_DISCIPLINE
+        actual = hashlib.sha256(
+            canonical_staged_diff().encode("utf-8")).hexdigest()
+        if actual != expected:
+            print(f"[discipline] {Path(args.panel).name}: reviewed "
+                  f"{expected[:12]}… but the staged diff is {actual[:12]}… — "
+                  "this council reviewed different code. Re-run "
+                  "`p_stage_discipline.py finish` against what you are "
+                  "committing.")
+            return EXIT_DISCIPLINE
+    if getattr(args, "refuse_truncated", False) \
+            and panel.get("reviewed_body_was_truncated"):
+        print(f"[discipline] {Path(args.panel).name}: the review body was "
+              "TRUNCATED — the seats did not see all of the code this digest "
+              "attests to")
         return EXIT_DISCIPLINE
     short = unanswered_findings(panel)
     if short:
@@ -833,6 +1305,13 @@ def main() -> int:
                        help="exit 0 only if a council panel is a real, fully "
                             "answered review (used by pre-commit)")
     v.add_argument("--panel", required=True)
+    v.add_argument("--stage-id", help="require the panel to be for this stage")
+    v.add_argument("--twin", help="require the panel to be for this twin")
+    v.add_argument("--refuse-truncated", action="store_true",
+                   help="also refuse a panel whose review body was truncated")
+    v.add_argument("--against-staged", action="store_true",
+                   help="also require the panel to have reviewed the CURRENTLY "
+                        "staged diff, by sha256")
 
     args = ap.parse_args()
     if args.selftest:

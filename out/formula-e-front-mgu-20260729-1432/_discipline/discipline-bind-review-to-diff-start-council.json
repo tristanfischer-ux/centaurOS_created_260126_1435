@@ -1,0 +1,219 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "START: Bind every finish council to the EXACT diff it reviewed. Record reviewed_diff_sha256 in the panel at review time; verify-panel --against-staged recomputes the staged diff hash and refuses on mismatch; the pre-commit hook uses it. Also give --plan-ref teeth on-stage by verifying the cited document exists and the cited section string appears in it.",
+  "mode": "live",
+  "called_utc": "2026-08-02T12:33:57Z",
+  "seats": {
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "Bind every finish council to the EXACT diff it reviewed",
+            "verdict": "UNSUPPORTED",
+            "why": "The diff contains no implementation of any binding mechanism. It shows a plan-fit JSON describing the intent, a previous finish council for a different stage (em-refresh-fixed-deck), an audit recommendation, a capability dossier, and a proposed approach \u2014 but no code changes that bind a panel to a diff."
+          },
+          {
+            "claim": "Record reviewed_diff_sha256 in the panel at review time",
+            "verdict": "UNSUPPORTED",
+            "why": "No call_council / review function diff is shown that records reviewed_diff_sha256. The plan-fit and proposed approach describe this as future work; the actual code change is absent from the diff."
+          },
+          {
+            "claim": "verify-panel --against-staged recomputes the staged diff hash and refuses on mismatch",
+            "verdict": "UNSUPPORTED",
+            "why": "No verify-panel implementation diff is shown. The diff contains no --against-staged flag, no staged-diff hash recomputation, and no refusal logic. The previous finish council's sol review even lists this as a still-open issue ('The pre-commit finish-council check remains satisfiable by an unrelated twin's fresh panel')."
+          },
+          {
+            "claim": "the pre-commit hook uses it",
+            "verdict": "UNSUPPORTED",
+            "why": "No .husky/pre-commit or install-forcing-hooks.sh diff is shown wiring --against-staged into the hook. The previous finish council explicitly notes the hook is on mtime only and that .husky/pre-commit is in the truncated list \u2014 and no replacement hook code appears in this diff."
+          },
+          {
+            "claim": "give --plan-ref teeth on-stage by verifying the cited document exists and the cited section string appears in it",
+            "verdict": "UNSUPPORTED",
+            "why": "No cmd_start / --plan-ref implementation diff is shown. The plan-fit and proposed approach describe this as future work; no code that resolves a cited document or checks for a section string is present in the diff."
+          }
+        ],
+        "weakest_link": "The diff contains only the plan-fit, a previous-stage finish council, an audit recommendation, a capability dossier, and a proposed approach \u2014 none of the five implementation claims have any corresponding code change in the diff.",
+        "blocking": true,
+        "one_line_summary": "All five implementation claims are unsupported: the diff shows only the plan-fit and a prior finish council for a different stage, with no code changes for reviewed_diff_sha256 recording, --against-staged verification, hook integration, or --plan-ref enforcement."
+      }
+    },
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "Hashing the complete staged patch is self-referential if the reviewed panel is itself staged for commit.",
+            "why_it_matters": "Creating or updating the panel to add reviewed_diff_sha256 changes git diff --cached after the hash was computed. A normal workflow of stage code, call council, then stage the generated panel can therefore never pass --against-staged. Leaving the panel unstaged avoids the loop but means the commit does not preserve the review artefact it claims to bind.",
+            "how_to_test": "Stage a source change, run call_council, then git add the generated panel and run verify-panel --against-staged. It should expose a hash mismatch caused solely by staging the panel. Define and test an explicit policy: exclude a precisely named/generated review-artifact path from the reviewed content set, or bind a committed pre-panel tree plus the panel as a separately defined attestation."
+          },
+          {
+            "issue": "The proposed hash binds a rendered git diff, not necessarily the bytes or complete change set the seats actually reviewed.",
+            "why_it_matters": "The approach explicitly records whether the supplied diff was truncated. If build_review_body drops files or excerpts a large named file, a matching hash of the full staged diff proves only that the index is unchanged; it falsely implies that the council reviewed every byte of that diff. This repeats the prior truncation failure under a stronger-looking attestation.",
+            "how_to_test": "Create a staged diff exceeding DIFF_BUDGET_CHARS, call the council, and ensure verify-panel --against-staged passes while the panel records truncation. The hook must refuse truncated/incomplete review for a claim of an exact full-diff review, or explicitly bind and label the reviewed subset and require a separate complete-review mechanism."
+          },
+          {
+            "issue": "git diff --cached text is not a stable universal provenance identity unless the command is made canonical and its base is bound.",
+            "why_it_matters": "Patch output can vary with repository diff configuration and attributes (for example rename detection, diff algorithm, external diff/text conversion, prefixes, and binary representation). Further, the same patch can apply to different base trees, so a panel can be replayed where identical changed lines have different surrounding repository state. This undermines both cross-machine hooks and the claimed protection against an unrelated twin.",
+            "how_to_test": "Generate a panel under one diff configuration, then run verification with changed diff.renames/diff.algorithm or applicable attributes and show whether the same index now mismatches. Also create two branches with different HEAD trees but an identical staged patch and demonstrate replay. Prefer recording repository identity, HEAD tree/commit, and staged index tree (or a canonical blob manifest), using explicitly fixed git options if a patch hash is retained."
+          },
+          {
+            "issue": "Checking that a plan-ref document exists and that a section string merely appears is vulnerable to ambiguous or unrelated matches.",
+            "why_it_matters": "A quoted marker can occur in a table of contents, historical discussion, code block, or another section; a substring can also match a similarly named heading. The start gate would report plan fit although the cited actionable plan item was not actually identified. If paths are accepted directly, path traversal can also make arbitrary repository files qualify as plans.",
+            "how_to_test": "Create a plan document where '\u00a75 item 7' appears only in a table of contents or quoted prior text and cite it; the proposed check will likely accept it. Test ../ paths and duplicate headings. Parse a repository-confined path plus a structured heading/item locator, and validate the resolved heading boundary rather than substring presence."
+          }
+        ],
+        "generality_concerns": [
+          "A SHA-256 patch hash is a bespoke transport-format fingerprint, not a general Git-content identity. A base-tree plus index-tree/content-manifest attestation is cheaper to compare and does not depend on presentation choices.",
+          "A diff match alone does not establish that the specific panel belongs to the current stage, repository, or trusted council invocation. Include stage/twin/repository identity and define whether equivalent content may be reused across branches or twins.",
+          "The stated 'every finish council' guarantee remains overstated unless incomplete/truncated council inputs are prohibited or are explicitly unable to authorize the omitted paths."
+        ],
+        "blocking": true,
+        "one_line_summary": "The design has a staged-panel hash recursion and can attest an unchanged full diff that the council never fully saw; use a defined canonical content set/tree identity and fail incomplete review."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [
+          {
+            "where": "AUDIT-RECOMMENDATION-2026-08-02.md / On the torque outcome",
+            "stated": "81.56 N\u00b7m = 0.652\u00d7 of required",
+            "correct": "81.56/125.21 \u2248 0.6514\u00d7 (\u22480.651\u00d7); 0.652\u00d7 would be \u224881.64 N\u00b7m",
+            "impact": "Cosmetic in an audit note this stage explicitly will not re-litigate; does not affect the bind-hash design, but the dossier should not keep restating 0.652\u00d7 as if it were exact."
+          }
+        ],
+        "reasoning_faults": [
+          {
+            "where": "PROPOSED APPROACH step 1\u20132 (hash of diff text given to council vs --against-staged)",
+            "fault": "Binding sha256 of 'the git diff --cached text it was given, plus \u2026 whether it was truncated' is ambiguous and can be self-defeating. If the stamped hash is over the possibly truncated body shown to seats, verify-panel --against-staged recomputing the full staged diff will refuse every truncated review. If the stamped hash is over the full staged diff while seats only saw a truncated body, the panel is bound to bytes it did not review\u2014the opposite of 'EXACT diff it reviewed'. Prior finish-council evidence already shows silent truncation caused false absences.",
+            "consequence": "Either legitimate large commits cannot land, or the hash falsely certifies a full-diff review. Correct shape: always stamp the full stable staged-diff digest; separately stamp truncated/byte_count; refuse on hash mismatch OR truncated=true for finish/pre-commit."
+          },
+          {
+            "where": "PROPOSED APPROACH step 1 (sha256 of git diff text)",
+            "fault": "Raw `git diff --cached` text is not a stable provenance object: color, external diff drivers, rename/copy detection, context, and user diff config can change bytes without changing the index. Sol\u2019s earlier ask was stronger: staged blob set / tree identity.",
+            "consequence": "False mismatches (hook blocks clean work) or false matches if both sides accidentally use different diff pretty-printing. Need fixed flags (e.g. `--no-ext-diff --no-color --no-renames -p`) or hash of `git ls-files -s` / write-tree of the index."
+          },
+          {
+            "where": "CLAIM / success_criteria vs workflow reality",
+            "fault": "The motivating failure mode is: council findings \u2192 code edits \u2192 same panel reused. Hash binding correctly invalidates that panel, but the approach never states the mandatory re-review after the final staged tree is frozen. Success criterion 'pre-commit still passes on a legitimately reviewed commit' is easy to miss in practice if finish stamps mid-edit.",
+            "consequence": "Stage can 'implement verify' and still leave operators in a loop of perpetual mismatch, or tempt a bypass (omit --against-staged, hand-edit reviewed_diff_sha256)."
+          },
+          {
+            "where": "CALCULATION GUARD on 'sha256 hash of a git diff'",
+            "fault": "Guard points at fpk_capability_gap_resolver.py and other unrelated STRONG hits for a stdlib hashlib over git bytes. That is retrieval noise, not a real tool requirement.",
+            "consequence": "If followed, scope creeps into unrelated capability code; if ignored without note, looks like skipped guard. Hand-hash with stable inputs is correct\u2014do not invent a 'solver' path."
+          },
+          {
+            "where": "Gap 1 half-claim (--plan-ref teeth) vs audit Gap 1",
+            "fault": "Audit Gap 1 also required start/finish PAIR enforcement and healthy start (not merely file existence). This stage only adds plan-ref file/section string checks. Section substring presence is weak teeth (ambiguous \u00a7 markers, first hit wins, no item-7 binding).",
+            "consequence": "Claimed 'plan-fit REFUSAL path has teeth on-stage' is only partially true; start-council health bypass called out by Sol remains open unless explicitly deferred (it is not listed under explicitly_not_doing)."
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Block until the stamped digest is a stable full-index/staged-diff hash with separate truncation refusal\u2014not a hash of the possibly truncated prompt body\u2014and the finish/hook paths both stamp and verify that invariant."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "Hashing the complete staged patch is SELF-REFERENTIAL: creating or updating the panel to add reviewed_diff_sha256 changes git diff --cached after the hash was computed.",
+      "action": "DESIGN CHANGED BEFORE IT SHIPPED \u2014 this would have made the gate unsatisfiable by any commit. `canonical_staged_diff()` excludes `out/*/_discipline/*` and `out/*/_claims/*`: the review RECORD is not the code under review. Proven empirically: the canonical view holds at 12,554 chars and one hash whether or not the panel is staged, while the naive `git diff --cached` jumps to 31,808. proveCatch `identity.excludes_the_review_record`. This is the finding that justifies the start council existing at all."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "git diff --cached text is not stable provenance unless the command is canonical; and the hash binds a rendered diff rather than a content identity.",
+      "action": "PINNED. The command is now fixed: `git -c core.abbrev=40 diff --cached --no-ext-diff --no-color --no-renames --unified=3`, so rename detection, diff algorithm, external drivers, colour and context width cannot move the hash without the content moving. proveCatch `identity.diff_flags_are_pinned`. Sol's preferred base-tree/index-tree attestation is a better content identity and is noted as the stronger form; the pinned patch digest is what this stage delivers."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "A diff match alone does not establish that the panel belongs to the current stage, twin or repository.",
+      "action": "ADDED. `review_identity()` stamps `stage_id` and `twin` alongside the digest, and the panel carries them. proveCatch `identity.carries_stage_and_twin`."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Hashing 'the diff it was given, plus whether it was truncated' is ambiguous and self-defeating: either legitimate large commits cannot land, or the hash falsely certifies a full review.",
+      "action": "SEPARATED, exactly as Grok specified. `reviewed_diff_sha256` is always over the FULL canonical staged diff; `reviewed_body_bytes` and `reviewed_body_was_truncated` separately record what the seats actually saw. The hash certifies WHICH code; the truncation flags record HOW MUCH of it reached the review."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "The approach never states the mandatory re-run loop: hash binding invalidates the panel after fixes, so operators can loop forever or be tempted to hand-edit the hash.",
+      "action": "STATED IN THE HOOK ITSELF. The pre-commit message now spells out the order \u2014 stage, run finish, answer every finding, commit \u2014 and says plainly that `finish` must be the LAST action before committing, because answering a council means editing code, which correctly invalidates the panel that demanded the edit. The loop TERMINATES because the discipline record is excluded from the hash."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "calculation_guard pointed at fpk_capability_gap_resolver.py and other unrelated STRONG hits for a stdlib hashlib call \u2014 retrieval noise, not a tool requirement.",
+      "action": "AGREED AND RECORDED RATHER THAN FOLLOWED. Hashing bytes with stdlib hashlib is not a solver need; following those hits would have scoped this stage into unrelated capability code. Noting it here so the guard's output is not silently ignored \u2014 the guard is a prompt to check, not an instruction to obey, and this is a case where it produced noise."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 5,
+      "point": "No implementation of any binding mechanism appears in the diff \u2014 reviewed_diff_sha256, --against-staged, the hook wiring and the plan-ref check are all described as intent, not shown as code.",
+      "action": "CORRECT, AND CORRECTLY SO: this was a START council, called before the work. That is what --evidence is for and why the plan-fit says so. All five are now implemented and will be in front of the FINISH council for this stage. Process note recorded against myself: I began coding while the start council was still running, which defeats half its purpose \u2014 the findings above changed the design, and I was fortunate they arrived before I had wired the broken version into the hook."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "A SHA-256 patch hash is a bespoke transport-format fingerprint, not a general Git content identity; a base-tree plus index-tree attestation is cheaper to verify and harder to spoof.",
+      "action": "ACCEPTED AS THE BETTER FORM, and the pinned-flags digest is what ships now. `git write-tree` on the index would give a true content identity, but it covers everything staged INCLUDING the discipline record \u2014 reintroducing the self-reference Sol's first finding killed \u2014 so it needs a path-scoped tree, which is a larger change. The digest delivered here is stable under diff configuration and excludes the review record, which are the two properties the gate actually needs. Recorded as the stronger successor rather than claimed as equivalent."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Raw git diff --cached varies with colour, external diff drivers, rename/copy detection, context and user diff config; needs fixed flags.",
+      "action": "EXACTLY THE FLAGS GROK NAMED are now pinned in DIFF_CANON_ARGS: --no-ext-diff --no-color --no-renames --unified=3, with -c core.abbrev=40 so index abbreviation cannot move the header bytes. proveCatch `identity.diff_flags_are_pinned` asserts every flag is present, so removing one fails the build rather than silently making the hash config-dependent."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "Checking that a plan-ref document exists and a section string merely appears is vulnerable to matches in a table of contents, a code block or a similarly named heading.",
+      "why_rejected": "Accepted as a limit, rejected as a blocker, and the matcher is tighter than 'a substring appears': section and item markers are matched LINE-ANCHORED against markdown heading syntax (`^#+ N`) or a numbered list entry (`^N. `), not anywhere in the body. A table-of-contents line would have to be a heading or a numbered entry to match. The alternative \u2014 a registry of open plan items with stable ids \u2014 is the right long-term answer and is a bigger change than this stage."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The 'every finish council' guarantee remains overstated unless truncated council inputs are prohibited or explicitly unable to authorise the omitted parts.",
+      "why_rejected": "Rejected because prohibiting truncation would block every large commit outright, and 'the seats saw everything' is not achievable for a 280 kB diff. What IS now true and recorded: the panel states whether its body was truncated, and the seats are instructed to say they cannot assess omitted files rather than call them absent \u2014 which last round changed MiniMax's verdicts from false 'absent' findings to honest 'cannot assess' ones. The real fix is smaller stages, which is a working-practice change, not a code change."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Audit Gap 1 also required start/finish PAIR enforcement and a HEALTHY start council, not merely file existence; this stage only adds plan-ref checks.",
+      "why_rejected": "Already delivered in the PREVIOUS stage and therefore out of scope here, not skipped: `cmd_finish` verifies the start panel with the same bar as its own \u2014 council_ok plus every finding answered \u2014 with proveCatch `finish.stub_start_council_fails`. Grok could not see it because it was reviewing a start-council body that contained no code diff."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Arithmetic in the audit recommendation's torque figure (81.56 N.m = 0.652x).",
+      "why_rejected": "Trivially correct and not actionable here: 81.558081 / 125.214912 = 0.65134, so 0.651x is the right rounding and 0.652x came from the earlier 81.64 N.m half-current proxy. The committed handover and claim registry both carry 0.651x. The audit document is quoted verbatim as received and is not amended."
+    }
+  ],
+  "council_ok": true,
+  "advice_recorded_utc": "2026-08-02T12:37:54Z"
+}
