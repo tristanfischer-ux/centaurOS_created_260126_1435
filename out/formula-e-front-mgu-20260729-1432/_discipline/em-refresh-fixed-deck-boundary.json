@@ -1,0 +1,15 @@
+{
+  "schema": "forgeos.p_stage_discipline.boundary/v1",
+  "stage_id": "em-refresh-fixed-deck",
+  "exit_code": 0,
+  "verdict": "PROCEED",
+  "log": "\u2500\u2500 FINISHED: em-refresh-fixed-deck\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case_REBALANCED.json\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_mtpa_screen_REBALANCED.json\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/oc_flux_linkage_sweep_REBALANCED.json\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_claims/em-claims.json\n\u2500\u2500 NEXT: Handover 5.3 \u2014 the architecture change that closes 0.651x; then stamp a module content hash into every artefact (Sol, two consecutive councils)\n\u2500\u2500 GATES: 7/7 pass\n\u2500\u2500 PROCEED\n",
+  "produced": [
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case_REBALANCED.json",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_mtpa_screen_REBALANCED.json",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/oc_flux_linkage_sweep_REBALANCED.json",
+    "out/formula-e-front-mgu-20260729-1432/_claims/em-claims.json"
+  ],
+  "needs": [],
+  "checked_utc": "2026-08-02T11:12:01Z"
+}

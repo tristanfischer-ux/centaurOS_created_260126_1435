@@ -3,16 +3,16 @@
   "resolvable": true,
   "n_samples": 36,
   "mechanical_span_deg": 45.0,
-  "dc_torque_nm": -47.4158,
+  "dc_torque_nm": -81.6449,
   "harmonics_nm": {
-    "k=1": 0.0083,
-    "k=2": 0.0082,
-    "k=3": 76.7966,
-    "k=4": 0.0056,
-    "k=5": 0.0017,
-    "k=6": 11.5014,
-    "k=7": 0.0005,
-    "k=8": 0.0044
+    "k=1": 0.0023,
+    "k=2": 0.0017,
+    "k=3": 20.0318,
+    "k=4": 0.0028,
+    "k=5": 0.0011,
+    "k=6": 4.7255,
+    "k=7": 0.0031,
+    "k=8": 0.0023
   },
   "legitimate_harmonics": {
     "3": "24-slot cogging",
@@ -22,8 +22,8 @@
     "15": "30x electrical ripple",
     "18": "36x electrical ripple"
   },
-  "async_ratio_k1": 0.0002,
-  "async_ratio_k2": 0.0002,
+  "async_ratio_k1": 0.0,
+  "async_ratio_k2": 0.0,
   "findings": [],
   "ok": true
 }

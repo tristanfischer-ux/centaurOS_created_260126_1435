@@ -1022,6 +1022,44 @@ def summarize_rotor_position_sweep(
     }
 
 
+def fe_phase_currents_from_terminal(
+    terminal_rms_a: float,
+    current_angle_electrical_deg: float,
+    parallel_paths: float,
+    *,
+    announce: bool = False,
+) -> tuple[float, float, float, float, float]:
+    """Terminal rms -> (path rms, path peak, i_a, i_b, i_c) for the FE deck.
+
+    ⭐⭐ THE ONE PLACE THE EXCITATION IS DERIVED (2026-08-02). The conductor
+    carries `I_terminal / Npcp`, because FEMM has no concept of parallel paths
+    and the turns the deck assigns belong to ONE branch. That rule was fixed in
+    `loaded_point_assumptions` on 11928d56c — and the torque-scaling probe then
+    reintroduced the ORIGINAL BUG by overriding `phase_a_current_a` from its own
+    peak current, bypassing the division entirely. A rule that lives in one
+    caller is not a rule; it is a habit that the next caller does not have.
+
+    So every route to an FE excitation goes through this function. Overriding
+    the current means calling it with a different terminal value, never
+    hand-building the three phase currents.
+    """
+    npcp = max(1.0, float(parallel_paths))
+    path_rms_a = float(terminal_rms_a) / npcp
+    path_peak_a = path_rms_a * math.sqrt(2.0)
+    if announce and npcp > 1.0:
+        print(f"[em][current] terminal {float(terminal_rms_a):.1f} A rms over "
+              f"{npcp:g} parallel paths -> FE conductor excited at "
+              f"{path_rms_a:.1f} A rms", flush=True)
+    angle_rad = math.radians(float(current_angle_electrical_deg))
+    return (
+        path_rms_a,
+        path_peak_a,
+        path_peak_a * math.cos(angle_rad),
+        path_peak_a * math.cos(angle_rad - 2.0 * math.pi / 3.0),
+        path_peak_a * math.cos(angle_rad + 2.0 * math.pi / 3.0),
+    )
+
+
 def loaded_point_assumptions(
     duty: DutyCheck,
     inputs: TwinInputs,
@@ -1057,24 +1095,10 @@ def loaded_point_assumptions(
         if 0.5 * phase_rms_a <= design_a <= 2.5 * phase_rms_a:
             phase_rms_a = design_a
     phase_peak_a = phase_rms_a * math.sqrt(2.0)
-    # ⭐ EXCITE THE FE AT THE PATH CURRENT. See LoadedPointAssumptions. The
-    # terminal current splits between winding_parallel_paths branches, and the
-    # turns/slot the deck assigns belong to ONE branch, so the conductor sees
-    # I_terminal / Npcp. Reporting keeps the terminal value; the solve does not.
     npcp_exc = max(1.0, float(inputs.winding_parallel_paths))
-    path_rms_a = phase_rms_a / npcp_exc
-    path_peak_a = path_rms_a * math.sqrt(2.0)
-    if npcp_exc > 1.0:
-        print(f"[em][current] terminal {phase_rms_a:.1f} A rms over "
-              f"{npcp_exc:g} parallel paths -> FE conductor excited at "
-              f"{path_rms_a:.1f} A rms", flush=True)
-    current_angle_rad = math.radians(current_angle_electrical_deg)
-    phase_a_a = path_peak_a * math.cos(current_angle_rad)
-    phase_b_a = path_peak_a * math.cos(
-        current_angle_rad - 2.0 * math.pi / 3.0
-    )
-    phase_c_a = path_peak_a * math.cos(
-        current_angle_rad + 2.0 * math.pi / 3.0
+    path_rms_a, path_peak_a, phase_a_a, phase_b_a, phase_c_a = (
+        fe_phase_currents_from_terminal(
+            phase_rms_a, current_angle_electrical_deg, npcp_exc, announce=True)
     )
     turns = effective_turns_per_slot_from_twin(inputs)
     implied_series = (
@@ -1602,6 +1626,145 @@ def _slot_winding_assignment(
     return layout.get(int(slot_index) % int(stator_slots), ("phase_a", 1))
 
 
+PHASE_CIRCUITS = ("phase_a", "phase_b", "phase_c")
+
+
+def _branch_layout(
+    stator_slots: int,
+    rotor_poles: int,
+    parallel_paths: float,
+) -> tuple[dict[int, tuple[str, int]], dict[str, list[str]]]:
+    """Slot -> (BRANCH circuit, sign), plus phase -> its branch circuit names.
+
+    ⭐⭐ THE SIX-BRANCH MODEL (2026-08-02). FEMM has no concept of parallel paths:
+    `mi_addcircprop` is a SERIES circuit through every block assigned to it. One
+    circuit per phase therefore puts ALL the phase's coils in series, so
+    `mo_getcircuitproperties` reports the flux linkage of `Npcp x` the contract's
+    series turns. Exciting at the PATH current (the earlier source fix) makes the
+    FIELD and the TORQUE right — MMF per slot is identical either way — but it
+    does NOT fix the REPORTED flux linkage, which stays Npcp times too large and
+    feeds back-EMF, the voltage limit and the analytic cross-check.
+
+    The fix is to model what the machine actually is: `Npcp` independent branch
+    circuits per phase, each carrying the path current through its OWN share of
+    the coils. For this contract (Zs=24, 2p=8, Npcp=2) that is six circuits —
+    phase_a_b1/b2, phase_b_b1/b2, phase_c_b1/b2 — each holding 2 coils x 7 turns
+    = the contract's 14 series turns per phase.
+
+    Coils are paired (+ side k with - side k, both sorted) and then dealt
+    round-robin to the branches, so each branch gets an even share of the phase
+    belt — the diametrical arrangement real machines use. A branch is always a
+    whole number of COMPLETE coils; splitting a coil across two branches would
+    make each branch an open circuit.
+
+    UNIVERSAL: derived from whatever layout swat_em solves, for any Zs/2p/Npcp.
+    Refuses to split (falls back to one circuit per phase) whenever the split
+    would be unbalanced — unequal coils per branch, or branch EMF phasors that
+    disagree — because an unbalanced branch set circulates current between paths
+    and FEMM cannot represent that.
+    """
+    import cmath  # noqa: PLC0415
+
+    layout = _winding_layout(stator_slots, rotor_poles)
+    # ⭐ A NON-INTEGRAL PARALLEL-PATH COUNT IS NOT A ROUNDING PROBLEM (Sol,
+    # finish council 2026-08-02). This used int(round(...)), so Npcp=2.5 became
+    # 2 and the deck solved a machine nobody specified. There is no such thing
+    # as two and a half parallel paths; the input is wrong and must say so.
+    requested = max(1.0, float(parallel_paths))
+    if abs(requested - round(requested)) > 1.0e-9:
+        raise FiaFrontKitCaseError(
+            f"winding_parallel_paths={parallel_paths!r} is not a whole number "
+            "of parallel paths — refusing to round it into a machine nobody "
+            "specified")
+    npcp = int(round(requested))
+    single = ({slot: (circ, sgn) for slot, (circ, sgn) in layout.items()},
+              {phase: [phase] for phase in PHASE_CIRCUITS})
+    if npcp <= 1:
+        return single
+
+    pole_pairs = max(1, int(rotor_poles) // 2)
+    branch_of_slot: dict[int, tuple[str, int]] = {}
+    phase_branches: dict[str, list[str]] = {}
+    for phase in PHASE_CIRCUITS:
+        positives = sorted(s for s, (c, g) in layout.items()
+                           if c == phase and g > 0)
+        negatives = sorted(s for s, (c, g) in layout.items()
+                           if c == phase and g < 0)
+        coils = list(zip(positives, negatives))
+        if (not coils or len(positives) != len(negatives)
+                or len(coils) % npcp != 0):
+            # Torque is unaffected (MMF per slot is unchanged), so refusing to
+            # solve at all would block a legitimate machine over a REPORTING
+            # limitation. But the reported flux linkage is then Npcp times the
+            # terminal value, and that must never travel silently — see
+            # `branch_split_applied` in the emitted JSON.
+            print(f"[em][winding] ⚠ cannot split {phase} into {npcp} balanced "
+                  f"branches ({len(positives)}+/{len(negatives)}- sides); "
+                  f"keeping ONE CIRCUIT PER PHASE — torque stays valid but "
+                  f"every reported flux linkage will be {npcp}x the TERMINAL "
+                  f"value", flush=True)
+            return single
+        groups: list[list[tuple[int, int]]] = [[] for _ in range(npcp)]
+        for coil_index, (pos_slot, neg_slot) in enumerate(coils):
+            groups[coil_index % npcp].append((pos_slot, neg_slot))
+        # Every branch must present the same EMF phasor, or the paths fight.
+        phasors = []
+        for group in groups:
+            acc = 0j
+            for pos_slot, neg_slot in group:
+                for slot, sign in ((pos_slot, 1), (neg_slot, -1)):
+                    theta = (2.0 * math.pi * int(slot)) / float(stator_slots)
+                    acc += float(sign) * cmath.exp(1j * pole_pairs * theta)
+            phasors.append(acc)
+        reference = phasors[0]
+        if abs(reference) < 1.0e-9 or any(
+            abs(p - reference) > 1.0e-6 * abs(reference) for p in phasors
+        ):
+            print(f"[em][winding] {phase} branch EMF phasors disagree "
+                  f"({[f'{abs(p):.4g}@{math.degrees(cmath.phase(p)):.2f}deg' for p in phasors]}); "
+                  "keeping one circuit per phase", flush=True)
+            return single
+        names = []
+        for branch_index, group in enumerate(groups):
+            name = f"{phase}_b{branch_index + 1}"
+            names.append(name)
+            for pos_slot, neg_slot in group:
+                branch_of_slot[pos_slot] = (name, 1)
+                branch_of_slot[neg_slot] = (name, -1)
+        phase_branches[phase] = names
+    if len(branch_of_slot) != len(layout):
+        return single
+    return branch_of_slot, phase_branches
+
+
+def _branch_series_turns_ok(
+    geometry: FiaMachineGeometry,
+    loaded: LoadedPointAssumptions,
+    contract_turns_per_phase: float,
+) -> bool:
+    """Does every branch circuit hold the contract's series turns per phase?
+
+    The check the campaign lacked. FEMM integrates flux linkage over whatever
+    blocks share a circuit name, so this arithmetic — coils per branch times
+    turns per coil against the contract's turns_per_phase — is the ONLY thing
+    standing between a correct back-EMF and one Npcp times too large.
+    """
+    branch_of_slot, phase_branches = _branch_layout(
+        geometry.stator_slots, geometry.rotor_poles,
+        loaded.winding_parallel_paths)
+    turns_per_coil = float(loaded.effective_turns_per_slot)
+    for phase in PHASE_CIRCUITS:
+        for name in phase_branches[phase]:
+            sides = sum(1 for _s, (c, _g) in branch_of_slot.items()
+                        if c == name)
+            if sides % 2:
+                return False              # a half coil is not a circuit
+            series_turns = (sides // 2) * turns_per_coil
+            if abs(series_turns - float(contract_turns_per_phase)) > 1.0e-9:
+                return False
+    return True
+
+
 def _build_fia_lua(
     geometry: FiaMachineGeometry,
     *,
@@ -1609,6 +1772,7 @@ def _build_fia_lua(
     fem_name: str,
     loaded: LoadedPointAssumptions | None = None,
     open_circuit_turns_per_slot: int = 1,
+    parallel_paths: float = 1.0,
 ) -> str:
     """Build the FIA-sized interior-PM xfemm model for one magnetic point.
 
@@ -1670,13 +1834,31 @@ def _build_fia_lua(
     # which is exactly the inference that produced this campaign's 5.01x
     # disagreement. Zero-current copper is magnetically identical to
     # unassigned copper, so the OC field itself is unchanged.
-    lua.extend(
-        [
-            f'mi_addcircprop("phase_a",{(loaded.phase_a_current_a if loaded else 0.0):.12g},1)',
-            f'mi_addcircprop("phase_b",{(loaded.phase_b_current_a if loaded else 0.0):.12g},1)',
-            f'mi_addcircprop("phase_c",{(loaded.phase_c_current_a if loaded else 0.0):.12g},1)',
-        ]
-    )
+    #
+    # ⭐⭐ ONE CIRCUIT PER BRANCH, not per phase (2026-08-02). See _branch_layout:
+    # each parallel path is its own series circuit carrying the PATH current, so
+    # the reported flux linkage is the terminal one rather than Npcp times it.
+    _npcp = float(loaded.winding_parallel_paths) if loaded is not None \
+        else float(parallel_paths)
+    _branch_of_slot, _phase_branches = _branch_layout(
+        geometry.stator_slots, geometry.rotor_poles, _npcp)
+    _phase_current_a = {
+        "phase_a": loaded.phase_a_current_a if loaded else 0.0,
+        "phase_b": loaded.phase_b_current_a if loaded else 0.0,
+        "phase_c": loaded.phase_c_current_a if loaded else 0.0,
+    }
+    _all_circuits = [name for phase in PHASE_CIRCUITS
+                     for name in _phase_branches[phase]]
+    for _phase in PHASE_CIRCUITS:
+        for _name in _phase_branches[_phase]:
+            lua.append(
+                f'mi_addcircprop("{_name}",'
+                f'{_phase_current_a[_phase]:.12g},1)'
+            )
+    if len(_all_circuits) > len(PHASE_CIRCUITS):
+        print(f"[em][winding] {len(_all_circuits)} branch circuits "
+              f"({', '.join(_all_circuits)}) — each carries the path current "
+              f"through 1/{_npcp:g} of the phase's coils", flush=True)
     for h_a_m, b_t in material_machine.stator.mat_type.mag.BH_curve.get_data():
         lua.append(f'mi_addbhpoint("m400",{float(b_t):.12g},{float(h_a_m):.12g})')
     # r_gap (mid-airgap) is drawn so the airgap becomes TWO air regions. FEMM's
@@ -1738,8 +1920,11 @@ def _build_fia_lua(
             label_radius * math.cos(center_angle),
             label_radius * math.sin(center_angle),
         )
-        circuit, signed_turn = _slot_winding_assignment(
-            slot_index, geometry.stator_slots, geometry.rotor_poles)
+        circuit, signed_turn = _branch_of_slot.get(
+            slot_index % geometry.stator_slots,
+            _slot_winding_assignment(
+                slot_index, geometry.stator_slots, geometry.rotor_poles),
+        )
         slot_labels.append(
             (
                 slot_point,
@@ -1951,7 +2136,12 @@ def _build_fia_lua(
     #
     # UNIVERSAL: keyed off the circuit NAMES the deck already created, so any
     # machine with named phase circuits gets this for free.
-    for circuit in ("phase_a", "phase_b", "phase_c"):
+    #
+    # With branch circuits the reported quantity is PER BRANCH; the terminal
+    # phase values are recombined in _execute_magnetic_point (linkage is the
+    # branch mean — parallel paths share a terminal voltage; current is the
+    # branch sum — the paths share the terminal current between them).
+    for circuit in _all_circuits:
         lua.extend([
             f'ci_{circuit}, vi_{circuit}, fi_{circuit} = '
             f'mo_getcircuitproperties("{circuit}")',
@@ -2038,9 +2228,14 @@ def _execute_magnetic_point(
     remanence_t: float,
     loaded: LoadedPointAssumptions | None,
     open_circuit_turns_per_slot: int = 1,
+    parallel_paths: float = 1.0,
 ) -> dict[str, float]:
     """Run one native xfemm magnetic point and return its numeric evidence."""
 
+    npcp = (float(loaded.winding_parallel_paths) if loaded is not None
+            else float(parallel_paths))
+    _, phase_branches = _branch_layout(
+        geometry.stator_slots, geometry.rotor_poles, npcp)
     with tempfile.TemporaryDirectory(prefix="forge-fia-front-em-") as temp_dir:
         work_dir = Path(temp_dir)
         script_path = work_dir / "fia_front_kit.lua"
@@ -2051,6 +2246,7 @@ def _execute_magnetic_point(
                 fem_name="fia_front_kit.fem",
                 loaded=loaded,
                 open_circuit_turns_per_slot=open_circuit_turns_per_slot,
+                parallel_paths=npcp,
             ),
             encoding="utf-8",
         )
@@ -2070,9 +2266,10 @@ def _execute_magnetic_point(
         if separator:
             values[key.strip()] = float(raw_value.strip())
     expected = {"peak_t", "rms_t", "mean_t", "minimum_t"}
-    for _c in ("phase_a", "phase_b", "phase_c"):
-        expected.add(f"flux_linkage_{_c}_wb")
-        expected.add(f"circuit_current_{_c}_a")
+    for _phase in PHASE_CIRCUITS:
+        for _c in phase_branches[_phase]:
+            expected.add(f"flux_linkage_{_c}_wb")
+            expected.add(f"circuit_current_{_c}_a")
     for _k in range(3):
         expected.add(f"rotor_frame_b_{_k}_t")
         expected.add(f"tooth_b_{_k}_t")
@@ -2090,6 +2287,25 @@ def _execute_magnetic_point(
         raise FiaFrontKitCaseError(
             "xfemm FIA magnetic point returned a non-finite value"
         )
+    # ⭐ RECOMBINE THE BRANCHES INTO TERMINAL PHASE QUANTITIES. Parallel paths
+    # share a terminal voltage, so the terminal flux linkage IS one branch's
+    # linkage (mean over branches, which also exposes any imbalance); they split
+    # the terminal current, so the terminal current is their SUM. Every existing
+    # consumer keeps reading flux_linkage_phase_a_wb and sees the TERMINAL value.
+    for _phase in PHASE_CIRCUITS:
+        _names = phase_branches[_phase]
+        if _names == [_phase]:
+            continue
+        _links = [values[f"flux_linkage_{_n}_wb"] for _n in _names]
+        _currents = [values[f"circuit_current_{_n}_a"] for _n in _names]
+        _spread = max(_links) - min(_links)
+        if abs(_spread) > 1.0e-3 * max(1.0e-12, max(abs(_l) for _l in _links)):
+            print(f"[em][winding] {_phase} branch flux linkages differ by "
+                  f"{_spread:.4g} Wb ({_links}) — the parallel paths are not "
+                  "magnetically identical; circulating current is possible",
+                  flush=True)
+        values[f"flux_linkage_{_phase}_wb"] = sum(_links) / len(_links)
+        values[f"circuit_current_{_phase}_a"] = sum(_currents)
     return values
 
 
@@ -2098,14 +2314,22 @@ def run_magnetic_point(
     solver: Path,
     *,
     remanence_t: float,
+    parallel_paths: float = 1.0,
 ) -> MagneticResult:
-    """Run the open-circuit native xfemm point and parse air-gap evidence."""
+    """Run the open-circuit native xfemm point and parse air-gap evidence.
+
+    `parallel_paths` does not touch the FIELD (an unloaded winding carries no
+    current) but it does decide how many turns the reported open-circuit flux
+    linkage is measured over — pass the machine's real Npcp to read a TERMINAL
+    lambda_pm rather than one Npcp times too large.
+    """
 
     values = _execute_magnetic_point(
         geometry,
         solver,
         remanence_t=remanence_t,
         loaded=None,
+        parallel_paths=parallel_paths,
     )
     return MagneticResult(
         peak_airgap_flux_density_t=values["peak_t"],
@@ -2272,6 +2496,23 @@ def build_artifact(
             "path_current_rms_a": loaded_assumptions.path_current_rms_a,
             "winding_parallel_paths":
                 loaded_assumptions.winding_parallel_paths,
+            # ⭐ Did the six-branch split actually apply? When it cannot (an
+            # unbalanced winding), torque stays valid but every reported flux
+            # linkage is Npcp times the TERMINAL value. Sol, finish council
+            # 2026-08-02: a silent fallback to the known-wrong reporting
+            # topology must not look like a successful split.
+            "branch_split_applied": bool(
+                len(_branch_layout(
+                    geometry.stator_slots, geometry.rotor_poles,
+                    loaded_assumptions.winding_parallel_paths)[1]["phase_a"])
+                > 1
+                or loaded_assumptions.winding_parallel_paths <= 1.0),
+            "flux_linkage_is_terminal_value": bool(
+                len(_branch_layout(
+                    geometry.stator_slots, geometry.rotor_poles,
+                    loaded_assumptions.winding_parallel_paths)[1]["phase_a"])
+                > 1
+                or loaded_assumptions.winding_parallel_paths <= 1.0),
             "phase_current_peak_a": loaded_assumptions.phase_current_peak_a,
             "phase_instantaneous_current_a": {
                 "a": loaded_assumptions.phase_a_current_a,
@@ -2465,7 +2706,9 @@ def run_selftest() -> int:
     remanence_t = float(
         material_machine.rotor.hole[0].magnet_0.mat_type.mag.Brm20
     )
-    solved = run_magnetic_point(geometry, solver, remanence_t=remanence_t)
+    solved = run_magnetic_point(
+        geometry, solver, remanence_t=remanence_t,
+        parallel_paths=inputs.winding_parallel_paths)
     # ⭐ SCREEN THE ANGLE, do not assume it (2026-08-01). The current angle is
     # referenced to the phase-A BELT AXIS, whose position depends on the SLOT
     # COUNT. The old fixed −45° default was calibrated for a 48-slot belt; once
@@ -2507,6 +2750,7 @@ def run_selftest() -> int:
         geometry,
         solver,
         remanence_t=remanence_t * 1.0e-6,
+        parallel_paths=inputs.winding_parallel_paths,
     )
     # Selftest keeps FE count down: shape-check the position-sweep artefact
     # from the already-solved 0° point; unit tests cover selection/summary.
@@ -2601,6 +2845,13 @@ def run_selftest() -> int:
                 < loaded_assumptions.phase_current_rms_a
             )
         ),
+        # ⭐ proveCatch for the six-branch model (2026-08-02). Exciting at the
+        # path current fixed the FIELD; this fixes the REPORTED LINKAGE. Each
+        # branch circuit must hold exactly the contract's series turns per
+        # phase — coils_per_branch * turns_per_coil == turns_per_phase — or
+        # mo_getcircuitproperties is again integrating over the wrong winding.
+        "branch_circuits_hold_contract_series_turns": _branch_series_turns_ok(
+            geometry, loaded_assumptions, inputs.turns_per_phase),
         "loaded_point_uses_duty_current": (
             loaded_assumptions.phase_current_rms_a
             == duty.estimated_phase_rms_current_a
@@ -2727,6 +2978,7 @@ def run_live_case(twin_dir: Path, output_path: Path | None = None) -> int:
         geometry,
         solver,
         remanence_t=remanence_t,
+        parallel_paths=inputs.winding_parallel_paths,
     )
     loaded_assumptions, loaded_magnetic, angle_sweep = select_best_loaded_point(
         geometry,

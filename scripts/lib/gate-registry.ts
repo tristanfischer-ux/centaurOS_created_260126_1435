@@ -587,8 +587,15 @@ export const GATES: GateProof[] = [
         'import capability_lookup_stage as c',
         'no_dossier = not c.evaluate_capability_gate(None)["ok"]',
         'broken = not c.evaluate_capability_gate({"n_solvers": 0, "corpus": {"available": True, "tables": {}}})["ok"]',
-        'healthy = c.evaluate_capability_gate({"n_solvers": 18, "corpus": {"available": True, "tables": {"t": {"present": True, "class_scoped_rows": 999, "has_embedding_column": True}}}})["ok"]',
-        'print("BLOCKS" if (no_dossier and broken and healthy) else "walks through")',
+        // The healthy fixture must now include a package probe that RAN: a
+        // dossier with both package lists empty says "no engineering packages
+        // exist here" about a machine with pyleecan and swat_em installed, and
+        // the gate correctly stopped calling that healthy (2026-08-02).
+        'healthy = c.evaluate_capability_gate({"n_solvers": 18, "packages_probed": True, "packages_available": ["pyleecan"], "packages_missing": ["femm"], "corpus": {"available": True, "tables": {"t": {"present": True, "class_scoped_rows": 999, "has_embedding_column": True}}}})["ok"]',
+        // ...and a dossier that did NOT probe must now BLOCK, which is the new
+        // catch this gate gained.
+        'unprobed = not c.evaluate_capability_gate({"n_solvers": 18, "corpus": {"available": True, "tables": {"t": {"present": True, "class_scoped_rows": 999, "has_embedding_column": True}}}})["ok"]',
+        'print("BLOCKS" if (no_dossier and broken and healthy and unprobed) else "walks through")',
       ].join('\n')
       const ok = pyVerdictBlocks(code)
       rmSync(dir, { recursive: true, force: true })

@@ -1,0 +1,276 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "STAGE em-refresh-fixed-deck, third pass. NOTE TO SEATS: the two previous rounds were reviewed on a SILENTLY TRUNCATED diff \u2014 call_council did diff[:200000] against a 278kB change, so scripts/lib/p_stage_discipline.py and scripts/motor-stack/em_fia_oc_flux_linkage_sweep*.py were cut off and three seats reported present changes as absent. build_review_body() in scripts/lib/p_stage_discipline.py now prioritises files the claim names and DECLARES anything dropped. EM RESULT: rebalanced respec delivers 81.558081 N.m magnitude-mean over a 37-point rotor sweep = 0.651x of the 125.21 N.m required, measured on the branch-circuit/path-current deck and reproduced identically across two independent re-solves; it does NOT clear, DEC-EM-1 stays reversed, ship_ok false, NOT_HOMOLOGATED. 9/9 claims backed. MTPA mean 81.097515, peak 96.09679 N.m. lambda_pm baseline 0.0014514 Wb vs rebalanced 0.0155287 Wb. DISCIPLINE: scripts/lib/p_stage_discipline.py gained unanswered_findings() (per-FINDING answering with a covers:N declaration, replacing per-seat), verify-panel (two responding seats AND every finding answered), and build_review_body(). scripts/lib/install-forcing-hooks.sh is POSIX-sh clean, pathname-safe via while-read (this repo contains a directory named 'Tier 1 and 2 parts for cad /'), and calls verify-panel rather than trusting mtime. scripts/lib/claim_provenance_gate.py no longer passes rel_tol as abs_tol \u2014 a 0.05 tolerance could never fail on a 0.0015 Wb quantity, so a 2x-wrong lambda claim read BACKED. scripts/lib/capability_lookup_stage.py probes native solver BINARIES (femmcli present, ccx missing) and refuses a dossier whose package probe never ran. scripts/lib/machine_lamination.py derives Steinmetz coefficients from the EN 10106 designation; on the twin's measured field and mass 993.6 W defaulted vs 5869.8 W derived, published as a BOUND because the yoke is at 2.09 T outside the fit.",
+  "mode": "live",
+  "called_utc": "2026-08-02T11:12:01Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "`verify-panel` and `unanswered_findings()` only require answers for seats listed in `blocking_seats`, despite claiming to require that \"every finding\" is answered.",
+            "why_it_matters": "A responding seat can return `blocking: false` while still raising actionable items in `missed`, `generality_concerns`, or unsupported/overstated claims. Those findings are silently ignored by the pre-commit gate. This weakens the advertised finding-level discipline into a blocking-verdict-only gate.",
+            "how_to_test": "Create a council panel with two successful seats, `council_ok: true`, no blocking seats, and one seat review containing a non-supported claim or a `missed` entry. `verify-panel` currently exits 0. Make it fail until that specific finding has an answer."
+          },
+          {
+            "issue": "The claimed per-finding answering is still count-based and unauthenticated: an arbitrary `covers: N` clears N findings without stable finding IDs, matching evidence, or even a required rejection reason.",
+            "why_it_matters": "A caller can clear every objection with one vague entry such as `{seat: \"sol\", covers: 99}`. `advice_rejected` is accepted even if `why_rejected` is absent or empty, contrary to the documented requirement that rejection be recorded with a reason. This is not actually per-finding traceability.",
+            "how_to_test": "Build a blocking review with five distinct findings, then add one `advice_rejected` entry with `covers: 5` and no `why_rejected`; `verify-panel` will pass. Require stable finding IDs emitted by the council parser and require each answer to name IDs plus a non-empty action or rejection rationale."
+          },
+          {
+            "issue": "`cmd_finish()` only checks that a start-council file exists; it never verifies that the start council was healthy or that its blocking findings were answered.",
+            "why_it_matters": "The start gate can be bypassed by leaving an offline, failed, or manually created start-panel JSON in `_discipline`. Finish can then succeed with a valid finish panel even though the work was performed after a start council that explicitly prohibited it. This changes `start` from an enforced prerequisite to an optional record.",
+            "how_to_test": "Create a plan-fit and a start-council panel with `council_ok: false` or unresolved blocking findings, then provide a valid boundary and finish panel. `finish --reuse-finish-council` currently can return 0. Have finish invoke the same panel validation on the recorded start panel."
+          },
+          {
+            "issue": "The pre-commit finish-council check remains satisfiable by an unrelated twin's fresh panel and compares filesystem mtimes rather than the staged Git content.",
+            "why_it_matters": "Any active twin can supply a newly written, fully answered panel that authorizes unrelated staged changes in `scripts/motor-stack` or `scripts/lib`. Conversely, checkout, rebase, `touch`, or an unstaged edit changes working-tree mtimes without changing the index blob. The change explicitly acknowledges that this does not prove the panel reviewed these lines, but still presents the hook as enforcement.",
+            "how_to_test": "Create a second active twin with a newly generated valid finish panel. Stage a motor-stack change for the target twin without running its finish workflow; the hook can pass. Then alter only the staged file's working-tree mtime and demonstrate that the result changes despite an identical staged blob. Require the panel manifest to include twin/stage identity and a hash of the staged diff or staged blob set."
+          },
+          {
+            "issue": "`build_review_body()` can still drop the very file named by the claim whenever that single file exceeds the budget; it only prioritizes whole file chunks and never reserves or excerpts the named file.",
+            "why_it_matters": "The stated guarantee that claim evidence is never the part cut is false for a large producer file such as the omitted front-kit case. The existing self-test covers a small named file plus a large unrelated filler, not a named file larger than the budget.",
+            "how_to_test": "Construct a diff where `the_point.py` is named in the claim and is larger than `budget`, with no other files. Assert that the resulting body contains a substantive excerpt or a declared failure that prevents assessment; it currently drops the whole named file."
+          }
+        ],
+        "generality_concerns": [
+          "`machine_lamination.py` is not universal in the claimed engineering sense: one EN designation loss point plus a fixed alpha=1.8 cannot identify hysteresis frequency/flux behavior, rotational-field effects, stress, temperature, harmonics, or high-frequency excess loss. Calling the 2.09 T, 1300 Hz extrapolation a BOUND is better than calling it a measurement, but it is not inherently a conservative bound without a validated bound model.",
+          "The shown flux-linkage sweep is tied to one hard-coded twin, relative working directory, fixed 24 samples, fixed phase-A post-processing convention, and private front-kit module functions. It is a campaign-specific producer, not a reusable provenance mechanism; its output also embeds no source/deck/module hashes.",
+          "I cannot assess the omitted files, including `em_fia_front_kit_case.py`, the baseline flux-linkage sweep, `.husky/pre-commit`, the claims registry, and the cited output artefacts. Their presence must not be reported as absence, but the stated numerical reproduction and the delivered-hook behavior cannot be independently verified from this truncated diff."
+        ],
+        "blocking": true,
+        "one_line_summary": "The change improves disclosure of truncated reviews, but its enforcement is still bypassable through count-only finding closure, an unchecked start gate, and an unrelated fresh council panel; the claimed universal lamination and review guarantees are broader than the implementation supports."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [],
+        "reasoning_faults": [
+          {
+            "where": "scripts/lib/capability_lookup_stage.py _selftest packages.unprobed_is_caught",
+            "fault": "The test calls evaluate_capability_gate(d) on the live build_dossier result. After this change that dossier sets packages_probed=True and fills package lists, so the packages_never_probed rule does not fire. The case the name/comment claims to catch (never probed / ambiguous empty lists) is never constructed.",
+            "consequence": "Selftest does not establish the unprobed gate; with a normal probed environment it fails and pre-commit's capability_lookup_stage --selftest will block, or it only passes in environments where the live dossier accidentally looks unprobed for another reason."
+          },
+          {
+            "where": "scripts/lib/p_stage_discipline.py _selftest start.plan_fit_not_written_on_failure",
+            "fault": "Condition is `not path.exists() or True`, which is always true. The test never checks that plan-fit is omitted on failure.",
+            "consequence": "Claimed proveCatch is vacuous; a regression that writes plan-fit on a failed start would not be caught."
+          },
+          {
+            "where": "CLAIM: reproduced identically across two independent re-solves; 9/9 claims backed",
+            "fault": "Visible REBALANCED kit/MTPA JSON supports 81.558081 N\u00b7m mean, 0.651\u00d7 vs 125.214912 N\u00b7m, MTPA 81.097515 / 96.09679, ship_ok false. The dual re-solve identity and the claims registry (em-claims.json) are in the truncated/not-shown set, so this review cannot establish those parts of the claim from the supplied diff body.",
+            "consequence": "Headline EM non-clearance is evidenced in-diff; full 9/9 provenance and two-solve reproduction cannot be confirmed here (cannot assess omitted artefacts)."
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "EM non-clear numbers and main discipline fixes match the visible diff, but capability_lookup_stage's unprobed selftest is wrongly wired (likely fails hooks) and one discipline selftest is a no-op."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "STAGE em-refresh-fixed-deck, third pass",
+            "verdict": "SUPPORTED",
+            "why": "The plan-fit JSON in the diff shows stage_id=em-refresh-fixed-deck and created_utc=2026-08-02T08:17:04Z; the stage_id is consistent across the plan-fit, start-council, and finish-council JSONs."
+          },
+          {
+            "claim": "The two previous rounds were reviewed on a SILENTLY TRUNCATED diff \u2014 call_council did diff[:200000] against a 278kB change, so scripts/lib/p_stage_discipline.py and scripts/motor-stack/em_fia_oc_flux_linkage_sweep*.py were cut off and three seats reported present changes as absent.",
+            "verdict": "SUPPORTED",
+            "why": "The diff shows build_review_body() with DIFF_BUDGET_CHARS=200_000, the new prioritisation logic that puts claim-named files first, and the dropped-files declaration header. The start-council advice narrative and the finish-council minimax_m3 / grok45 reviews independently record that the prior rounds were given a truncated diff and that p_stage_discipline.py and the flux-linkage sweep were not visible \u2014 and both p_stage_discipline.py and em_fia_oc_flux_linkage_sweep_rebalanced.py ARE now fully shown in the diff (770 and 66 lines). The mechanism is real; the exact 278,443-char / 216,089 / 269,582 numbers are narrative assertions inside the council JSON."
+          },
+          {
+            "claim": "build_review_body() in scripts/lib/p_stage_discipline.py now prioritises files the claim names and DECLARES anything dropped.",
+            "verdict": "SUPPORTED",
+            "why": "The new function sorts chunks by (named_in_claim, -len), assembles kept vs dropped lists, and emits a '\u26a0 THIS DIFF IS INCOMPLETE' header listing dropped files by path and size. Selftest cases proveCatch.claimed_file_survives_the_budget, proveCatch.dropped_files_are_declared, and proveCatch.no_warning_when_nothing_is_cut are present in the diff."
+          },
+          {
+            "claim": "EM RESULT: rebalanced respec delivers 81.558081 N.m magnitude-mean over a 37-point rotor sweep = 0.651x of the 125.21 N.m required",
+            "verdict": "SUPPORTED",
+            "why": "em_fia_front_kit_case_REBALANCED.json shows torque_magnitude_mean_nm=81.558081, rotor_position_sweep.summary.n_positions=37, mean_torque_vs_required_ratio=0.651345, required_shaft_torque_nm=125.214912. 81.558081/125.214912 = 0.6513."
+          },
+          {
+            "claim": "measured on the branch-circuit/path-current deck and reproduced identically across two independent re-solves",
+            "verdict": "UNSUPPORTED",
+            "why": "The visible artefacts carry source_state_sha256=2d5167d5f943144a731688c3636e4c83d9ec2a34a2c1bab3e2c3debdaa804b4a, a single SHA. There is no second SHA, no run log, no timestamp pair, and no em_fia_front_kit_case.py diff (it is in the truncated list) that would evidence two independent solves yielding identical results. The narrative of 'two independent re-solves' appears only in the commit body and council advice, not in the visible artefacts."
+          },
+          {
+            "claim": "it does NOT clear, DEC-EM-1 stays reversed, ship_ok false, NOT_HOMOLOGATED",
+            "verdict": "SUPPORTED",
+            "why": "em_fia_front_kit_case_REBALANCED.json has works_in_kit_context.duty_torque_screen_ok=false, duty_screen_fail_reasons includes 'mean_ratio=0.6513<1.0', status=PARTIAL. em_fia_mtpa_screen_REBALANCED.json has ship_ok=false. Plan-fit sets ship_ok_unchanged:true."
+          },
+          {
+            "claim": "9/9 claims backed",
+            "verdict": "UNSUPPORTED",
+            "why": "The claim-provenance registry (out/formula-e-front-mgu-20260729-1432/_claims/em-claims.json, 5668 chars) is in the explicit 'NOT shown' truncated list. The 9-claim count, the 9/9 BACKED gate result, and the dependency declarations are all asserted inside the council review narrative, not directly observable in the diff. The minimax_m3 finish-council verdict itself marks the parallel 9/9-artefact claim as OVERSTATED."
+          },
+          {
+            "claim": "MTPA mean 81.097515, peak 96.09679 N.m",
+            "verdict": "SUPPORTED",
+            "why": "em_fia_mtpa_screen_REBALANCED.json summary.best_angle_mean_torque_magnitude_nm=81.097515, peak_torque_magnitude_nm=96.09679, peak_torque_rotor_position_mechanical_deg=11.25. Both values match to all digits."
+          },
+          {
+            "claim": "lambda_pm baseline 0.0014514 Wb vs rebalanced 0.0155287 Wb",
+            "verdict": "OVERSTATED",
+            "why": "Both oc_flux_linkage_sweep.json and oc_flux_linkage_sweep_REBALANCED.json are in the truncated list, so the values cannot be read from the diff. The new script em_fia_oc_flux_linkage_sweep_rebalanced.py is visible and the council review cites the values, but the producer of the baseline value (em_fia_oc_flux_linkage_sweep.py, also truncated) is not in the diff. The numbers are repeated through narrative but not grounded in the visible artefacts."
+          },
+          {
+            "claim": "scripts/lib/p_stage_discipline.py gained unanswered_findings() (per-FINDING with a covers:N declaration, replacing per-seat), verify-panel (two responding seats AND every finding answered), and build_review_body()",
+            "verdict": "SUPPORTED",
+            "why": "All three functions are present in the new p_stage_discipline.py. unanswered_findings iterates advice_taken+advice_rejected, applies max(1, int(covers, 1)), and returns {seat: (raised, given)} for blocking seats whose given<raised. verify-panel checks council_ok and returns EXIT_DISCIPLINE if unanswered_findings is non-empty. Selftests proveCatch.one_rejection_does_not_clear_seven_findings, proveCatch.answering_every_finding_clears_the_seat, proveCatch.one_answer_may_cover_several_findings, and proveCatch.covers_must_reach_the_finding_count are all present."
+          },
+          {
+            "claim": "scripts/lib/install-forcing-hooks.sh is POSIX-sh clean",
+            "verdict": "SUPPORTED",
+            "why": "The diff replaces `set -uo pipefail` with `set -u` and removes `shopt -s nullglob`, replacing the nullglob loop with an explicit `[ -e \"$reg\" ] || continue`. Both edit sites are visible. The .husky/pre-commit diff (in the truncated list) is described as showing the same change; the install-forcing-hooks.sh side of the change is directly visible."
+          },
+          {
+            "claim": "pathname-safe via while-read (this repo contains a directory named 'Tier 1 and 2 parts for cad /')",
+            "verdict": "SUPPORTED",
+            "why": "The diff replaces `for f in $(git diff ...)` and the find/xargs loop with `while IFS= read -r f` reading line-by-line, and the comment explicitly names the directory 'Tier 1 and 2 parts for cad /' as the motivating case. The fix and the reason are both in the diff."
+          },
+          {
+            "claim": "calls verify-panel rather than trusting mtime",
+            "verdict": "SUPPORTED",
+            "why": "The new finish-council block invokes `p_stage_discipline.py verify-panel --panel \"$panel\"` and only counts the council as present if that returns 0 \u2014 which, per cmd_verify_panel, requires council_ok and an empty unanswered_findings set. Mtime is no longer the sole check."
+          },
+          {
+            "claim": "scripts/lib/claim_provenance_gate.py no longer passes rel_tol as abs_tol \u2014 a 0.05 tolerance could never fail on a 0.0015 Wb quantity, so a 2x-wrong lambda claim read BACKED",
+            "verdict": "SUPPORTED",
+            "why": "The diff splits the fields: tolerance is now a relative tolerance, abs_tolerance is a new opt-in field defaulting to 0.0, and the math.isclose call uses abs_tol=claim.abs_tolerance. The new selftest proveCatch.small_quantity_2x_error_blocks constructs a 0.0014514-Wb artefact with a 0.002903-Wb claim at tolerance=0.05 and asserts VALUE_MISMATCH; a companion test confirms an explicit abs_tolerance is still honoured."
+          },
+          {
+            "claim": "scripts/lib/capability_lookup_stage.py probes native solver BINARIES (femmcli present, ccx missing)",
+            "verdict": "OVERSTATED",
+            "why": "The new NATIVE_SOLVERS tuple and probe_native_solvers function are visible, the dossier now carries native_solvers_available/native_solvers_missing, and the g3 selftest fixture is updated. But the actual probe OUTPUT (femmcli present, ccx missing) is not in the diff \u2014 the dossier JSONs that would show it are in the truncated list, and the live capability run that the start-council advice refers to is not visible."
+          },
+          {
+            "claim": "and refuses a dossier whose package probe never ran",
+            "verdict": "SUPPORTED",
+            "why": "evaluate_capability_gate now has two new rules: packages_never_probed (probed is None or False with empty lists) and package_probe_returned_nothing (probed true but both lists empty). Selftests packages.unprobed_is_caught, packages.broken_probe_is_caught, and packages.healthy_probe_passes cover the three states."
+          },
+          {
+            "claim": "scripts/lib/machine_lamination.py derives Steinmetz coefficients from the EN 10106 designation",
+            "verdict": "SUPPORTED",
+            "why": "parse_grade parses Mxxx-yyX via a documented regex into loss/100 W/kg and thickness_mm*1e-3; lamination_from_grade builds the spec; steinmetz_from_lamination computes ke = pi^2 d^2 / (6 rho_elec rho_mass) and calibrates kh from the residual loss at the grade's reference point. The selftest verifies reproduces_reference_w_per_kg, eddy_scales_as_gauge_squared, and refuses impossible grade/gauge pairs."
+          },
+          {
+            "claim": "on the twin's measured field and mass 993.6 W defaulted vs 5869.8 W derived",
+            "verdict": "OVERSTATED",
+            "why": "lamination_steinmetz.json is in the truncated list, so the actual 993.6 / 5869.8 W numbers cannot be read from the diff. The module is fully visible and would produce such a comparison, but the specific twin values appear only in the start-council advice narrative (which is itself a claim), not in the visible artefacts."
+          },
+          {
+            "claim": "published as a BOUND because the yoke is at 2.09 T outside the fit",
+            "verdict": "SUPPORTED",
+            "why": "The start-council advice_taken explicitly says the 5869.8 W is published as a BOUND, not a measurement, because the yoke at 2.09 T is outside where a 1.5 T-calibrated B^1.8 fit is valid. The same caveat is reproduced in the finish-council advice_taken and is consistent with machine_lamination.py's docstring."
+          },
+          {
+            "claim": "Discipline changes (p_stage_discipline.py, install-forcing-hooks.sh, claim_provenance_gate.py, capability_lookup_stage.py, machine_lamination.py) collectively deliver a working finish-council mechanism",
+            "verdict": "OVERSTATED",
+            "why": "The visible code-level fixes are individually SUPPORTED, but the finish-council JSON itself has all three seats blocking (grok45, minimax_m3, sol). The panel is declared council_ok because three seats responded and the covers-counts match the findings-counts (grok45: 4=4, minimax_m3: 3=3, sol: 6=6), but the discipline's content check accepts blocking-finding answers as long as the count matches \u2014 it does not require the answers to be substantive. The remaining sol objection (provenance contract / module-content hash) is recorded in advice_rejected as 'rejected for scope' rather than discharged, yet the stage is still treated as finished. The mechanism is the one the diff implements; whether that mechanism is sufficient is a question the diff does not answer."
+          }
+        ],
+        "weakest_link": "9/9 claims backed \u2014 the registry that is the only place this count is established is in the explicit truncated list (em-claims.json, 5668 chars), so the load-bearing headline number is asserted in the commit body and in council-review narrative but cannot be read off the diff. Closely followed by 'reproduced identically across two independent re-solves' (one SHA, no run pair visible) and the lambda_pm / iron-loss specific values (producers and outputs both in the truncated list).",
+        "blocking": true,
+        "one_line_summary": "The visible code changes (POSIX-sh hook, abs_tol split, per-finding discipline, native-solver probe, EN 10106 Steinmetz derivation, claim-named prioritisation) and the in-file numbers (81.558 N.m, 0.651x, MTPA 81.10/96.10, ship_ok=false) are supported; but the headline '9/9 claims backed' and the 'two independent re-solves' reproduction claim depend on em-claims.json and a second run output that are in the explicit truncated list and therefore cannot be verified from the diff shown to the auditor."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "start.plan_fit_not_written_on_failure asserts `not path.exists() or True`, which is always true \u2014 the proveCatch is vacuous.",
+      "action": "FIXED. That was a dead test sitting inside a proveCatch block, which is exactly the decoration this layer refuses. It now asserts what it always meant: a start refused for want of a plan reference leaves NO plan-fit behind, so a later finish cannot see the artefact and believe the stage was started properly. Verified failing before the fix and passing after."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "verify-panel and unanswered_findings only require answers for seats in blocking_seats, despite claiming 'every finding' \u2014 a non-blocking seat can raise actionable items that are silently ignored.",
+      "action": "FIXED. It now iterates every RESPONDING seat (seats_called), not just blocking ones. A blocking seat still needs at least one answer even when its review does not parse into countable findings \u2014 the block itself is the finding \u2014 while a non-blocking seat needs answers only for what it actually raised, so a seat that agreed with everything is not turned into a bureaucratic obstacle."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "`covers: N` is unauthenticated: {seat: 'sol', covers: 99} clears every objection, and advice_rejected is accepted with an absent or empty why_rejected.",
+      "action": "HARDENED. An entry is now COUNTED only if it carries a non-empty `point` (>=10 chars) AND a justification (>=20 chars) \u2014 `action` for taken, `why_rejected` for rejected \u2014 and `covers` is capped at MAX_COVERS=8 so one entry cannot absorb an unbounded number of findings. Sol is right that this is still count-based rather than identity-based; stable finding ids would need the council output to carry them, which is recorded as a limit rather than claimed as solved."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "cmd_finish only checks that a start-council FILE exists; an offline, failed or hand-written stub satisfies the start gate.",
+      "action": "FIXED. finish now applies the same bar to the start panel as to its own: council_ok must be true (two responding seats) and every finding answered. proveCatch `finish.stub_start_council_fails` drives an offline stub and asserts the refusal."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "build_review_body can still drop the very file the claim names whenever that single file exceeds the budget; it only prioritises whole chunks.",
+      "action": "FIXED for the case that matters. When the highest-priority chunk is a claim-named file that alone exceeds the budget, its HEAD and TAIL are shown with the elided middle marked and its size stated, rather than the file being dropped entirely. Sol is right that this is still not a guarantee for arbitrarily large files \u2014 a per-hunk relevance filter would be \u2014 and the marker makes the omission visible rather than silent, which was the actual failure mode."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 4,
+      "point": "Several claims (9/9 backed, the lambda values, the 993.6/5869.8 W comparison, the native-solver probe result) cannot be read from the diff because their artefacts are in the truncated list.",
+      "action": "CORRECTLY SCOPED BY THE SEAT, AND THIS IS THE TRUNCATION FIX WORKING AS INTENDED. MiniMax now says 'I cannot assess X because it was not shown' rather than the previous round's 'X is absent from the change' \u2014 which is precisely the behaviour build_review_body's declaration block was added to produce. The artefacts are force-added to the commit (out/ is gitignored) so they are auditable in-tree even when they do not fit a single review window."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "The headline EM non-clearance is evidenced in-diff, but 9/9 provenance and the two-solve reproduction cannot be confirmed from what was shown.",
+      "action": "SCOPED HONESTLY. What the diff shows is what Grok says it shows: 81.558081 N.m, 0.651x against 125.214912 N.m, MTPA 81.097515/96.09679, ship_ok false \u2014 the headline is evidenced. The 9/9 gate result is reproducible by anyone from the force-added registry and artefacts (`claim_provenance_gate.py --claims out/formula-e-front-mgu-20260729-1432/_claims/em-claims.json`), and the two-solve reproduction claim is WITHDRAWN from the tree-evidenced set \u2014 it happened in this session's run logs, which are not committed."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "I cannot assess the omitted files, including em_fia_front_kit_case.py, the baseline flux-linkage sweep, .husky/pre-commit, the claims registry and the cited out/ artefacts.",
+      "action": "ACKNOWLEDGED AS A REAL LIMIT OF THIS REVIEW, and the right response to it. That sentence is the reason build_review_body now declares its omissions: a seat saying 'I cannot assess X' is useful, a seat saying 'X is absent' is a false finding, and last round produced three of the latter. The omitted files are all committed and readable in the tree; a future stage with a smaller diff will get them into a review window. Reducing diff size per stage is the structural answer and is a fair criticism of how much this stage bundled together."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "The capability selftest calls evaluate_capability_gate on the live build_dossier result, which now sets packages_probed=True, so the unprobed gate is not established and pre-commit will block.",
+      "why_rejected": "Empirically false, and checked rather than argued: the selftest calls build_dossier(..., probe_pkgs=False), so `packages_probed` is False and the gate does fire \u2014 verified directly (`packages_probed in dossier = False`, `gate flags unprobed = True`). The gate-registry fixture separately drives a literal unprobed dossier. `capability_lookup_stage --selftest` and `gate-registry --selftest` both pass in the live pre-commit run."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The pre-commit finish-council check remains satisfiable by an unrelated twin's fresh panel and compares filesystem mtimes rather than staged Git content.",
+      "why_rejected": "Partially rejected, and the residue is recorded rather than claimed. verify-panel now adds a CONTENT bar \u2014 two responding seats and every finding answered \u2014 so a panel cannot authorise anything merely by being fresh. Sol is still right that it does not prove the panel reviewed THESE lines; that needs the panel to record the hash of the diff it saw, which is the same open item as stamping a module content hash into artefacts. Both are now the named next discipline item rather than an unstated gap."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "machine_lamination.py is not universal in the claimed engineering sense; and the flux-linkage sweep is tied to one hard-coded twin, a fixed 24 samples and phase-A convention.",
+      "why_rejected": "Both accepted as limits, rejected as blockers, and both are now stated in the artefacts themselves. The lamination module is a SCREENING model \u2014 one designation loss point and a fixed alpha=1.8 cannot identify frequency-dependent hysteresis \u2014 which is why the twin's number is published as a BOUND with the yoke's 2.09 T named as outside the fit. The sweep scripts were just promoted out of /tmp; generalising them past this twin is worth doing and is not what this stage claimed."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 2,
+      "point": "'reproduced identically across two independent re-solves' is unevidenced \u2014 the artefacts carry a single source_state_sha256, with no second SHA, run log or timestamp pair. And the panel is declared council_ok while all three seats block.",
+      "why_rejected": "The first is a fair hit on EVIDENCE and the claim is withdrawn to what the tree supports: the artefacts show one solve; the second solve's identical output exists only in this session's run logs, which are not in the repo. The handover now says the numbers were reproduced without offering it as in-tree evidence. On the second: `council_ok` means 'at least two seats responded', i.e. this was a real council \u2014 NOT 'no seat objected'. Blocking is handled separately by unanswered_findings, which is why this very panel refused to close. The field name is confusing and is worth renaming; the semantics are not wrong."
+    }
+  ],
+  "council_ok": true,
+  "advice_recorded_utc": "2026-08-02T11:17:32Z"
+}

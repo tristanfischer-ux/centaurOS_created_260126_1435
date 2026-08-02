@@ -1,0 +1,20 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "em-refresh-fixed-deck",
+  "intent": "Re-solve every EM claim on the branch-circuit / path-current deck. The six-branch confirmation (\u00a75 item 1) is DONE and measured: torque identical to 3.6e-6 N.m, flux linkage was exactly 2.0000x. That makes every EM artefact on the twin stale, and the claim-provenance gate is currently blocking 7 claims.",
+  "maps_to_plan_item": "COMPACT-HANDOVER-FE-FRONT-FPK-2026-08-02.md \u00a75 item 2 \u2014 re-run every EM figure on the source-fixed deck",
+  "why_now": "The deck changed twice today (path current 11928d56c, branch circuits today). Seven claims on the twin describe a machine that no longer exists.",
+  "explicitly_not_doing": [
+    "no architecture respec",
+    "no BoM or drawing changes",
+    "ship_ok stays false"
+  ],
+  "depends_on": [],
+  "success_criteria": [
+    "all 7 claims backed by fresh artefacts",
+    "rebalanced duty ratio measured on the fixed deck"
+  ],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-02T08:17:04Z"
+}

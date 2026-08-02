@@ -4,7 +4,16 @@ motor_loss_point.py — MGU loss breakdown at one (T, ω) operating point.
 
 STAGED → motor:loss-point
 
-Cu (I²R), iron (Steinmetz-ish), magnet eddy (σ·B²·f²), mechanical (windage+bearing).
+Copper loss from phase current and phase resistance (I²R); IRON LOSS from flux
+density, lamination mass and Steinmetz hysteresis/eddy coefficients; magnet eddy
+loss from magnet flux density, volume and electrical frequency (σ·B²·f²);
+mechanical windage and bearing drag from shaft speed. Returns the loss split,
+electrical power and efficiency at that single point.
+
+⭐ The docstring is deliberately explicit about WHAT IS COMPUTED, because
+`calculation_guard.py` indexes this text and this is the tool that guard exists
+to surface — an agent about to hand-derive iron loss must find it here. A thin
+docstring ("loss breakdown") made it rank below tools that merely mention flux.
 """
 from __future__ import annotations
 
@@ -16,6 +25,10 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
+# scripts/lib — where the universal machine modules live (machine_lamination).
+_LIB = os.path.abspath(os.path.join(_HERE, "..", "..", ".."))
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
 from _worked import worked_calc  # noqa: E402
 
 HARD = ["torque_nm", "speed_rpm", "phase_current_rms_a", "phase_resistance_ohm"]
@@ -42,9 +55,53 @@ def solve(inp: dict) -> dict:
     f_hz = float(inp.get("electrical_frequency_hz", (n / 60.0) * float(inp.get("pole_pairs", 4))))
     b_t = float(inp.get("iron_b_t", 1.2))
     mass_fe_kg = float(inp.get("iron_mass_kg", 5.0))
-    kh = float(inp.get("steinmetz_kh", 0.02))
-    ke = float(inp.get("steinmetz_ke", 1e-5))
+    # ⭐⭐ LOSS COEFFICIENTS COME FROM THE LAMINATION, not from a default
+    # (2026-08-02). The eddy term goes as gauge SQUARED and frequency SQUARED,
+    # so at a traction fundamental the defaulted ke=1e-5 understates a real
+    # 0.5 mm M400 lamination by ~12x — the single largest unstated number in
+    # the FE front FPK campaign's loss answer. State `lamination_grade` (an
+    # EN 10106/10107 designation, e.g. "M400-50A") and the coefficients are
+    # DERIVED: classical eddy from the gauge, hysteresis calibrated to the
+    # grade's own guarantee. Explicit kh/ke still win when a caller has
+    # measured them. See scripts/lib/machine_lamination.py.
+    kh_stated = inp.get("steinmetz_kh")
+    ke_stated = inp.get("steinmetz_ke")
     alpha = float(inp.get("steinmetz_alpha", 1.8))
+    lamination_note = None
+    lamination_grade = inp.get("lamination_grade")
+    if (kh_stated is None or ke_stated is None) and lamination_grade:
+        try:
+            from machine_lamination import (  # noqa: PLC0415
+                lamination_from_grade, steinmetz_from_lamination)
+            overrides = {}
+            if inp.get("lamination_resistivity_ohm_m"):
+                overrides["resistivity_ohm_m"] = float(
+                    inp["lamination_resistivity_ohm_m"])
+            if inp.get("lamination_density_kg_m3"):
+                overrides["density_kg_m3"] = float(
+                    inp["lamination_density_kg_m3"])
+            derived = steinmetz_from_lamination(
+                lamination_from_grade(str(lamination_grade), **overrides),
+                alpha=alpha)
+            kh_stated = kh_stated if kh_stated is not None else derived.steinmetz_kh
+            ke_stated = ke_stated if ke_stated is not None else derived.steinmetz_ke
+            lamination_note = (
+                f"Steinmetz coefficients derived from lamination "
+                f"{derived.lamination.grade} "
+                f"({derived.lamination.thickness_m * 1e3:.2f} mm): "
+                f"kh={derived.steinmetz_kh:.5f}, ke={derived.steinmetz_ke:.4e}")
+        except Exception as exc:  # noqa: BLE001 — never block a loss point
+            lamination_note = (
+                f"lamination_grade={lamination_grade!r} could not be used "
+                f"({exc}); loss coefficients DEFAULTED")
+    kh = float(kh_stated) if kh_stated is not None else 0.02
+    ke = float(ke_stated) if ke_stated is not None else 1e-5
+    if kh_stated is None or ke_stated is None:
+        lamination_note = lamination_note or (
+            "no lamination_grade and no measured steinmetz_kh/ke — iron loss "
+            "uses GENERIC defaults (kh=0.02, ke=1e-5) and describes a steel "
+            "nobody chose; eddy loss goes as gauge^2, so this is the largest "
+            "unstated lever in the answer")
     p_fe_w_per_kg = kh * f_hz * (b_t ** alpha) + ke * (f_hz ** 2) * (b_t ** 2)
     p_fe = mass_fe_kg * p_fe_w_per_kg
 
@@ -70,6 +127,8 @@ def solve(inp: dict) -> dict:
         p_elec = p_elec_out
 
     warnings: list[str] = []
+    if lamination_note:
+        warnings.append(lamination_note)
     if eta < 0.7 and t >= 0:
         warnings.append("motoring efficiency <70% at this point — check current density / iron model")
 
@@ -133,6 +192,13 @@ def solve(inp: dict) -> dict:
         "electrical_power_w": p_elec_r,
         "efficiency": eta_r,
         "electrical_frequency_hz": round(f_hz, 2),
+        # The coefficients ACTUALLY used, so an iron-loss figure can never be
+        # read without seeing which steel it describes.
+        "steinmetz_kh_used": kh,
+        "steinmetz_ke_used": ke,
+        "steinmetz_alpha_used": alpha,
+        "iron_loss_coefficients_derived_from_lamination": bool(
+            lamination_grade) and "DEFAULTED" not in (lamination_note or ""),
         "warnings": warnings,
         "worked": worked,
     }

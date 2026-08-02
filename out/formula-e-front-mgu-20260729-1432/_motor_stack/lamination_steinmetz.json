@@ -1,0 +1,25 @@
+{
+  "steinmetz_kh": 0.032222378800803336,
+  "steinmetz_ke": 0.00011686090273147389,
+  "steinmetz_alpha": 1.8,
+  "specific_loss_w_per_kg": 342.5530673481393,
+  "evaluated_at": {
+    "flux_density_t": 1.2,
+    "frequency_hz": 1300.0
+  },
+  "eddy_at_reference_w_per_kg": 0.6573425778645406,
+  "hysteresis_at_reference_w_per_kg": 3.3426574221354595,
+  "reproduces_reference_w_per_kg": 4.0,
+  "lamination": {
+    "grade": "M400-50A",
+    "thickness_m": 0.0005,
+    "resistivity_ohm_m": 4.6e-07,
+    "density_kg_m3": 7650.0,
+    "reference_loss_w_per_kg": 4.0,
+    "reference_flux_density_t": 1.5,
+    "reference_frequency_hz": 50.0,
+    "stacking_factor": 0.95,
+    "grain_oriented": false,
+    "provenance": "pyleecan material 'M400-50A' (grade designation) + stated Wlam"
+  }
+}

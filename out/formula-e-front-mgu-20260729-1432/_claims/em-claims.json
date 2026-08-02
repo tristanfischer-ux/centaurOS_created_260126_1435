@@ -3,7 +3,7 @@
   "claims": [
     {
       "name": "delivered_mean_torque_nm",
-      "value": 41.9045,
+      "value": 18.0758,
       "artefact": "../_motor_stack/em_fia_torque_scaling_probe.json",
       "key_path": "points.4.fe_torque_nm",
       "depends_on": [
@@ -14,14 +14,15 @@
     },
     {
       "name": "excitation_tracking_ok",
-      "value": 0.0002,
+      "value": 0.0,
       "artefact": "../_motor_stack/excitation_tracking.json",
       "key_path": "async_ratio_k2",
       "depends_on": [
         "../../../scripts/motor-stack/em_fia_front_kit_case.py"
       ],
       "tolerance": 0.001,
-      "run_to_fix": ".venv/bin/python scripts/lib/machine_excitation_tracking.py --twin out/formula-e-front-mgu-20260729-1432"
+      "run_to_fix": ".venv/bin/python scripts/lib/machine_excitation_tracking.py --twin out/formula-e-front-mgu-20260729-1432",
+      "abs_tolerance": 0.01
     },
     {
       "name": "magnet_flux_focusing_ratio",
@@ -36,40 +37,42 @@
     },
     {
       "name": "lambda_pm_fundamental_wb",
-      "value": 0.002903,
+      "value": 0.0014514452431030227,
       "artefact": "../_motor_stack/oc_flux_linkage_sweep.json",
       "key_path": "lambda_pm_fundamental_wb",
       "depends_on": [
-        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py",
+        "../../../scripts/motor-stack/em_fia_oc_flux_linkage_sweep.py"
       ],
       "tolerance": 0.05,
-      "run_to_fix": ".venv/bin/python $SCRATCH/lam_sweep.py"
+      "run_to_fix": ".venv/bin/python scripts/motor-stack/em_fia_oc_flux_linkage_sweep.py"
     },
     {
       "name": "lambda_pm_rebalanced_wb",
-      "value": 0.031057,
+      "value": 0.015528672159085264,
       "artefact": "../_motor_stack/oc_flux_linkage_sweep_REBALANCED.json",
       "key_path": "lambda_pm_fundamental_wb",
       "depends_on": [
-        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py",
+        "../../../scripts/motor-stack/em_fia_oc_flux_linkage_sweep_rebalanced.py"
       ],
       "tolerance": 0.05,
-      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python $SCRATCH/lam_sweep_reb.py"
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_oc_flux_linkage_sweep_rebalanced.py"
     },
     {
       "name": "delivered_torque_rebalanced_nm",
-      "value": -145.4425,
+      "value": -81.558081,
       "artefact": "../_motor_stack/em_fia_front_kit_case_REBALANCED.json",
       "key_path": "rotor_position_sweep.summary.torque_mean_nm",
       "depends_on": [
         "../../../scripts/motor-stack/em_fia_front_kit_case.py"
       ],
       "tolerance": 0.02,
-      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_front_kit_case.py --twin out/formula-e-front-mgu-20260729-1432"
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_front_kit_case.py --twin out/formula-e-front-mgu-20260729-1432 && cp out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case_REBALANCED.json"
     },
     {
       "name": "mtpa_mean_torque_rebalanced_nm",
-      "value": 147.539,
+      "value": 81.097515,
       "artefact": "../_motor_stack/em_fia_mtpa_screen_REBALANCED.json",
       "key_path": "summary.best_angle_mean_torque_magnitude_nm",
       "depends_on": [
@@ -77,6 +80,28 @@
       ],
       "tolerance": 0.01,
       "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_mtpa_screen.py --twin out/formula-e-front-mgu-20260729-1432 --output out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_mtpa_screen_REBALANCED.json"
+    },
+    {
+      "name": "mtpa_peak_torque_rebalanced_nm",
+      "value": 96.09679,
+      "artefact": "../_motor_stack/em_fia_mtpa_screen_REBALANCED.json",
+      "key_path": "summary.peak_torque_magnitude_nm",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.001,
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_mtpa_screen.py --twin out/formula-e-front-mgu-20260729-1432 --output out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_mtpa_screen_REBALANCED.json"
+    },
+    {
+      "name": "delivered_torque_rebalanced_magnitude_mean_nm",
+      "value": 81.558081,
+      "artefact": "../_motor_stack/em_fia_front_kit_case_REBALANCED.json",
+      "key_path": "rotor_position_sweep.summary.torque_magnitude_mean_nm",
+      "depends_on": [
+        "../../../scripts/motor-stack/em_fia_front_kit_case.py"
+      ],
+      "tolerance": 0.001,
+      "run_to_fix": "FIA_MAGNET_THICKNESS_MM=6.0 FIA_MAGNET_LENGTH_MM=22.5 .venv/bin/python scripts/motor-stack/em_fia_front_kit_case.py --twin out/formula-e-front-mgu-20260729-1432 && cp out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case.json out/formula-e-front-mgu-20260729-1432/_motor_stack/em_fia_front_kit_case_REBALANCED.json"
     }
   ]
 }

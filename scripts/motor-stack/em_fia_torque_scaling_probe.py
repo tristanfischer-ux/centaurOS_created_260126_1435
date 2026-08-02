@@ -192,18 +192,28 @@ def main() -> int:
                 stator_slots=m.stator_slots_from_twin(inputs),
                 rotor_poles=m.ROTOR_POLES),
             rotor_position_mechanical_deg=position_deg)
-        # Override the current directly; the twin-clamped design current cannot
-        # reach the low values this probe needs.
+        # Override the current; the twin-clamped design current cannot reach the
+        # low values this probe needs. `--currents` are TERMINAL peaks.
+        #
+        # ⭐⭐ (2026-08-02) This block used to build the three phase currents
+        # itself, straight from i_peak — which bypassed the path-current
+        # division and reintroduced the very bug that reversed DEC-EM-1, in a
+        # file nobody was looking at. It now goes through the deck's single
+        # excitation function, so the probe cannot excite differently from the
+        # case it is probing.
+        terminal_rms = i_peak / math.sqrt(2.0)
+        path_rms, path_peak, i_a, i_b, i_c = m.fe_phase_currents_from_terminal(
+            terminal_rms, gamma_deg, assumptions.winding_parallel_paths)
         assumptions = dataclasses.replace(
             assumptions,
             **{
                "phase_current_peak_a": i_peak,
-               "phase_current_rms_a": i_peak / math.sqrt(2.0),
-               "phase_a_current_a": i_peak * math.cos(math.radians(gamma_deg)),
-               "phase_b_current_a": i_peak * math.cos(
-                   math.radians(gamma_deg) - 2.0 * math.pi / 3.0),
-               "phase_c_current_a": i_peak * math.cos(
-                   math.radians(gamma_deg) + 2.0 * math.pi / 3.0)})
+               "phase_current_rms_a": terminal_rms,
+               "path_current_rms_a": path_rms,
+               "path_current_peak_a": path_peak,
+               "phase_a_current_a": i_a,
+               "phase_b_current_a": i_b,
+               "phase_c_current_a": i_c})
         return m.run_loaded_magnetic_point(
             geometry, solver, remanence_t=remanence, assumptions=assumptions)
 

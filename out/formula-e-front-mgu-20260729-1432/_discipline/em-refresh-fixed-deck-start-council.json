@@ -1,0 +1,231 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "START: Re-solve every EM claim on the branch-circuit / path-current deck. The six-branch confirmation (\u00a75 item 1) is DONE and measured: torque identical to 3.6e-6 N.m, flux linkage was exactly 2.0000x. That makes every EM artefact on the twin stale, and the claim-provenance gate is currently blocking 7 claims.",
+  "mode": "live",
+  "called_utc": "2026-08-02T08:17:13Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The approach does not define the current normalization when moving from path-current excitation to explicit branch circuits (phase current vs branch current, RMS vs peak, sign/angle convention, and parallel-path ampere-turn equivalence).",
+            "why_it_matters": "A branch split can preserve reported torque at one point while changing the actual conductor current, copper loss, saturation, inductance, back-EMF voltage, and MTPA locus. Re-running sweeps at the same numeric current without a declared mapping silently compares different electrical loading.",
+            "how_to_test": "For each old-deck operating point, record phase RMS current, branch RMS current, current angle, total ampere-turns, copper loss, and terminal voltage. Reproduce the old reference point on the new deck using matched ampere-turns and separately using matched inverter phase current; require the report to state which basis each claim uses."
+          },
+          {
+            "issue": "Flux linkage being exactly 2.0000x while torque is unchanged is not sufficient confirmation that the fixed deck is physically equivalent; it is a red flag for a changed winding/parallel-path definition or flux-linkage aggregation convention.",
+            "why_it_matters": "The doubled linkage directly changes back-EMF and voltage headroom, and normally affects inductance and field-weakening behavior. A torque-only confirmation cannot validate lambda_pm, MTPA, high-speed capability, or duty ratio claims.",
+            "how_to_test": "At the same rotor position and excitation, compare per-turn, per-coil, per-branch, phase, and line-line linkage definitions; verify turns and parallel paths. Sweep open-circuit back-EMF versus speed and compare with lambda_pm-derived EMF using the same electrical-angle and peak/RMS convention."
+          },
+          {
+            "issue": "The listed punchlist omits an explicit iron-loss refresh despite the request being to re-solve every EM claim and the supplied guard naming lamination-loss calculations.",
+            "why_it_matters": "Changed branch currents and rebalanced duty can alter harmonic content, flux density, and electrical frequency exposure. Reusing old iron-loss values leaves at least one coupled EM/thermal artefact stale and can make the duty-ratio conclusion wrong.",
+            "how_to_test": "Run scripts/lib/machine_lamination.py and scripts/lib/orchestrator/tools/python/motor_loss_point.py on the fixed-deck field/frequency points, with the actual lamination grade, gauge, temperature assumptions, and harmonic treatment recorded in provenance."
+          },
+          {
+            "issue": "A 'rebalanced duty ratio' cannot be measured from an EM deck alone unless the stage fixes the drive-cycle, bus voltage, modulation/current limits, control strategy, cooling/thermal limits, and definition of duty ratio.",
+            "why_it_matters": "Duty ratio is generally constrained by voltage, losses, and thermal transient behavior, not merely torque. Calling a static electromagnetic result 'measured duty ratio' risks replacing the rejected half-current proxy with another ungrounded proxy.",
+            "how_to_test": "Specify the duty-cycle segments and acceptance metric, then calculate voltage margin and loss at each segment and propagate losses through the existing thermal model. Report whether the limiting mechanism is current, voltage, iron loss, copper loss, magnet temperature, or another constraint."
+          },
+          {
+            "issue": "No provenance contract is stated for the seven refreshed claims: solver version, mesh/convergence settings, geometry/material revisions, branch-netlist hash, operating point, and output definitions are not pinned.",
+            "why_it_matters": "The gate may be cleared with seven new files that are mutually inconsistent or that accidentally run against a mixed old/new deck. 'Fresh' timestamps alone do not establish source-fixed provenance.",
+            "how_to_test": "Require each artefact to embed immutable hashes for the branch-circuit deck, geometry, material tables, solver/tool version, input current convention, and post-processing script; reject artefacts whose hashes do not match one stage manifest."
+          }
+        ],
+        "generality_concerns": [
+          "The claim that machine_lamination.py is 'UNIVERSAL' is too broad unless its grade coefficients, temperature dependence, frequency range, waveform/harmonic assumptions, and lamination orientation match this machine. It should be used instead of hand-derived Steinmetz loss, but its applicability must be evidenced for the selected steel and excitation waveform.",
+          "The six-branch confirmation appears to be treated as universal validation of all EM artefacts. A single torque point validates neither the full current-angle plane nor speed-dependent voltage, saturation, losses, demagnetization margin, or branch-current balance.",
+          "The cheapest reliable path is not to blindly regenerate all plots first: establish a canonical old-to-new excitation mapping and run a small regression matrix (zero-current lambda/back-EMF, matched ampere-turn torque, matched phase-current loss, and high-speed voltage point). Only then regenerate all seven claim artefacts on the validated convention.",
+          "pyleecan/swat_em can support electromagnetic comparisons, but neither automatically resolves circuit topology semantics. The branch-network model and post-processing definitions remain the hidden coupling; a solver change or fresh run cannot correct an incorrect current basis."
+        ],
+        "blocking": true,
+        "one_line_summary": "Block start until branch-current normalization, the suspicious 2x linkage convention, and the duty-ratio boundary conditions are pinned; otherwise the refresh can produce internally fresh but physically incomparable EM claims."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "The six-branch confirmation (\u00a75 item 1) is DONE and measured",
+            "verdict": "UNSUPPORTED",
+            "why": "The diff contains only a PLAN FIT JSON, a capability dossier, a calculation guard, and a PROPOSED APPROACH block. No measurement code, no output, no artefact, and no test result is present. The PROPOSED APPROACH itself states 'the work has NOT been done yet', which directly contradicts the 'DONE and measured' assertion."
+          },
+          {
+            "claim": "torque identical to 3.6e-6 N.m",
+            "verdict": "UNSUPPORTED",
+            "why": "No torque value appears anywhere in the diff. There is no solver invocation, no script output, no log line, and no artefact file showing 3.6e-6 N.m. The number is asserted in the intent string only."
+          },
+          {
+            "claim": "flux linkage was exactly 2.0000x",
+            "verdict": "UNSUPPORTED",
+            "why": "No flux linkage value appears anywhere in the diff. No measurement, no script, no artefact, and no reference to a prior commit or file containing this value. The '2.0000x' figure is asserted in the intent string only."
+          },
+          {
+            "claim": "That makes every EM artefact on the twin stale",
+            "verdict": "UNSUPPORTED",
+            "why": "Staleness of twin artefacts is asserted as a consequence of the (un-evidenced) six-branch confirmation. The diff contains no diff against the twin, no freshness check, no timestamp comparison, and no list of stale artefacts."
+          },
+          {
+            "claim": "the claim-provenance gate is currently blocking 7 claims",
+            "verdict": "UNSUPPORTED",
+            "why": "No gate output, no CI log, no claim-provenance report, and no enumeration of the 7 blocked claims is present in the diff. The count '7' is asserted in the intent string only."
+          },
+          {
+            "claim": "The deck changed twice today (path current 11928d56c, branch circuits today)",
+            "verdict": "UNSUPPORTED",
+            "why": "No git log, no commit reference, and no diff of the deck itself is shown. The commit hash 11928d56c is mentioned only in the why_now field with no supporting evidence."
+          }
+        ],
+        "weakest_link": "The 'DONE and measured' assertion with specific numerical values (3.6e-6 N.m, 2.0000x) is the weakest link \u2014 the diff is a planning document that explicitly states the work has not been done, yet claims the work is complete with precise figures.",
+        "blocking": true,
+        "one_line_summary": "The diff is a START-stage plan that explicitly says work has not begun, but the claim asserts the six-branch confirmation is DONE and measured with specific values \u2014 none of which appear anywhere in the diff."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [
+          {
+            "where": "PLAN FIT intent / claim preamble: 'torque identical to 3.6e-6 N.m'",
+            "stated": "torque identical to 3.6e-6 N.m (presented as a measured confirmation result)",
+            "correct": "Wording is dimensionally/scale-incoherent as an absolute MGU torque (elsewhere the same deck uses an ~81.64 N.m half-current proxy, i.e. O(10\u00b2) N\u00b7m). If the intent was agreement within a residual, it must be stated as |\u0394T|\u22483.6e-6 N\u00b7m (or ppm/relative error), not 'torque identical to 3.6e-6 N\u00b7m'.",
+            "impact": "Baseline for 'six-branch confirmation DONE' is ambiguous; every later 'fresh artefact' comparison can inherit the wrong scale or treat a numerical residual as a physical torque."
+          }
+        ],
+        "reasoning_faults": [
+          {
+            "where": "Claim + success_criteria vs diff body",
+            "fault": "Claim announces re-solving every EM claim and clearing 7 blocked claims; the diff is only a START plan_fit plus a proposed punchlist. It explicitly says work has NOT been done. No new artefacts, runs, or duty-ratio measurement are established.",
+            "consequence": "Provenance gate cannot pass on this change; committing it would not unstick the 7 claims it names."
+          },
+          {
+            "where": "'flux linkage was exactly 2.0000x' as measured confirmation",
+            "fault": "Exact 2.0000\u00d7 is asserted as measurement without run output, tolerance, or definition of the ratio (what/what). Reads like a circuit-count identity restated as empirical EM fact.",
+            "consequence": "Over-confident stale-vs-fresh invalidation; may skip checking whether the solver actually re-equilibrated field/current on the fixed deck."
+          },
+          {
+            "where": "Capability dossier vs proposed EM re-solve approach",
+            "fault": "femm, gmsh, meshio, SciDataTool are missing; approach still schedules full EM punchlist (torque probe, \u03bbpm sweeps, front_kit_case, MTPA) as if the prior FE path is available. No substitute solver path is pinned.",
+            "consequence": "Highest-likelihood failure mode is silent fallback, partial replay, or hand-ish post-processing presented as re-solved field results."
+          },
+          {
+            "where": "CALCULATION GUARD vs PROPOSED APPROACH",
+            "fault": "Guard strongly steers iron-loss/lamination tools (machine_lamination.py etc.) for a loss intent that is not on the punchlist; the actual stage is torque/flux/MTPA/duty-ratio refresh.",
+            "consequence": "Tooling attention is misaligned; either loss work is wrongly in scope or the guard is cargo-culted and real EM solver gaps go unchallenged."
+          },
+          {
+            "where": "success_criteria: 'rebalanced duty ratio measured on the fixed deck'",
+            "fault": "Approach says to report duty ratio instead of the 81.64 N\u00b7m half-current proxy but never defines how duty ratio is extracted, what 'rebalanced geometry' is, or which artefact records it. 81.64 is cited with no derivation in-diff.",
+            "consequence": "Stage can 'succeed' by rewriting a narrative number without a reproducible measurement chain."
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "START-only plan asserts unshown 3.6e-6/2.0000\u00d7 confirmations and schedules full EM re-solves despite missing FE packages and no artefacts\u2014does not clear the 7 claims."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "point": "The punchlist omits an iron-loss refresh although the calculation guard named lamination loss.",
+      "action": "ADDED to the punchlist. machine_lamination.py derives kh/ke from the machine's own M400-50A / 0.5 mm lamination (classical eddy 1.169e-4 vs the defaulted 1e-5); motor_loss_point.py takes lamination_grade and warns when it must default. On the twin's OWN measured field and mass (tooth 2.96 kg at 1.746 T, yoke 3.66 kg at 2.094 T, 1300 Hz): 993.6 W defaulted \u2014 which is what the twin's thermal screen ran on, 1020.5 W \u2014 against 5869.8 W derived. The 5.87 kW is a BOUND, not a measurement: the yoke at 2.09 T is outside where a 1.5 T-calibrated B^1.8 fit is valid. CORRECTED at the finish council (Grok): an earlier version of this record said '302 W -> 1713 W', which was illustrative non-twin inputs (5 kg at 1.2 T) and must not be cited."
+    },
+    {
+      "seat": "sol",
+      "point": "'rebalanced duty ratio measured' over-claims: duty is bounded by voltage, losses and thermal, not torque alone.",
+      "action": "ACCEPTED. The success criterion is restated as the TORQUE ratio against the 125.21 N.m required shaft torque. No duty claim will be made from an electromagnetic point. This is the standing 'never clear duty on peak alone' constraint in a new guise."
+    },
+    {
+      "seat": "grok45",
+      "point": "'torque identical to 3.6e-6 N.m' is scale-incoherent as an absolute torque.",
+      "action": "ACCEPTED - my wording was wrong. The measurement is a RESIDUAL: |dT| <= 3.6e-6 N.m between the six-branch and one-circuit solves, on torques of order 50-80 N.m. Corrected in the handover, the memory files and the commit body."
+    },
+    {
+      "seat": "grok45",
+      "point": "The dossier reports femm/gmsh/meshio MISSING while the approach schedules a full FE punchlist - is the FE path actually available?",
+      "action": "REAL GAP, FIXED AT SOURCE. The deck never imports the femm package; it shells out to the native xfemm binary femmcli. capability_lookup_stage.py now probes NATIVE SOLVER BINARIES as well as Python packages: femmcli AVAILABLE at scripts/phantm/bin/femmcli, blender available, ccx (CalculiX) MISSING - which the dossier had never reported.",
+      "covers": 1
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "Every claim in the intent is UNSUPPORTED: no measurement, artefact or log appears in what the council was shown.",
+      "action": "CORRECT ABOUT THE MECHANISM, and the driver was at fault. p_stage_discipline.py start now takes --evidence <paths> and embeds the backing artefacts in the council body. A council that cannot see the evidence audits the prose. The six-branch numbers were real and sit in _motor_stack/em_six_branch_vs_one_circuit_REBALANCED.json, which the council was never given.",
+      "covers": 6
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The approach does not define the current normalisation moving from path-current excitation to explicit branch circuits (phase vs branch current, rms vs peak, ampere-turn equivalence).",
+      "action": "DEFINED AND MEASURED. Every conductor carries the PATH current in both topologies: 477 A rms terminal / Npcp 2 = 238.5 A rms = 337.29 A peak. Ampere-turn identity holds both ways: 14 series turns x 477 A terminal = 6678 AT = 4 coils x 7 turns x 238.5 A path. The A/B at four rotor positions gives a torque residual of 3.6e-6 N.m and a flux-linkage ratio of 2.0000000247, with the branches recombining to the terminal 584.20 A. `fe_phase_currents_from_terminal()` is now the ONE derivation, which also caught the torque-scaling probe rebuilding the currents itself."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "Calling machine_lamination.py 'UNIVERSAL' is too broad unless grade coefficients, temperature dependence and waveform effects are bounded.",
+      "action": "BOUNDED IN THE DOCSTRING AND THE HANDOVER. The module is universal in the sense that matters \u2014 it derives from a designation and measured material properties rather than a per-machine table \u2014 but it is a SCREENING model: classical eddy plus a B^1.8 hysteresis fit calibrated at one point, with no temperature, harmonic, stress or rotational-field terms. The handover publishes 5869.8 W as a BOUND and states the yoke at 2.09 T is outside where the fit is valid."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "A single torque point is not universal validation of all EM artefacts; and the cheapest path is a canonical old->new excitation mapping before regenerating everything.",
+      "action": "BOTH DONE, IN THAT ORDER. The A/B established the mapping first (torque invariant, linkage exactly 2x) on four rotor positions \u2014 that IS the canonical old-to-new mapping \u2014 and only then was the full punchlist re-solved: torque-scaling probe (5 currents x 3 positions), both lambda_pm sweeps (24 samples over a full electrical period each), the full case with a 37-point rotor sweep, and a 35-point MTPA screen. Nine claims are gated against those artefacts, not one point."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "pyleecan/swat_em do not automatically resolve circuit topology semantics.",
+      "action": "AGREED, AND STATED. swat_em solves the LAYOUT (which slot belongs to which phase, with what sign); the branch TOPOLOGY \u2014 how those coils divide into Npcp paths \u2014 is `_branch_layout()`, written here, with its own proveCatch on the contract's series turns and a fail-closed refusal when branches would be unbalanced. No package was credited with that."
+    },
+    {
+      "seat": "grok45",
+      "covers": 2,
+      "point": "'Exact 2.0000x' asserted without run output, tolerance or a definition of the ratio; and duty ratio is never defined.",
+      "action": "BOTH FIXED. The ratio is one-circuit-per-phase flux linkage divided by six-branch flux linkage for the same phase at the same rotor position and current, recorded per point in em_six_branch_vs_one_circuit_REBALANCED.json as mean_flux_linkage_ratio_one_over_six = 2.0000000247 over four positions. 'Duty ratio' is abandoned as over-claiming: the stage reports a TORQUE ratio against the 125.21 N.m required shaft torque, because duty is bounded by voltage, losses and thermal, none of which an electromagnetic point establishes."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "'torque identical to 3.6e-6 N.m' is scale-incoherent as an absolute MGU torque; elsewhere the same deck reports O(10^2) N.m.",
+      "action": "ACCEPTED \u2014 my wording was wrong, not the measurement. 3.6e-6 N.m is the RESIDUAL |dT| between the six-branch and one-circuit solves, on torques of 32-78 N.m across the four rotor positions. Corrected in the handover, both memory files and the commit body; the handover table now labels the row 'torque residual' explicitly."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "The claim announces re-solving every EM claim and clearing 7 blocked claims, but the diff is a START plan-fit and a proposed punchlist that says the work has NOT been done.",
+      "action": "CORRECT AT THE TIME, AND NOW DISCHARGED. That was a START council: the punchlist had not run. It has since run twice \u2014 once, then again after the finish-council fixes re-invalidated the artefacts \u2014 and the claim registry is gated against the results rather than against prose. The underlying process defect (a council asked to judge claims whose evidence it cannot see) is fixed by `start --evidence`."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "point": "Flux linkage exactly 2.0000x with unchanged torque is a red flag for a changed winding definition rather than a confirmation.",
+      "why_rejected": "It is the EXPECTED signature, not a red flag. FEMM integrates flux linkage over the blocks sharing a circuit name, so one circuit per phase reports Npcp series-connected branches; torque depends on MMF per slot, which the split does not change. Both were verified independently: ampere-turns 14 x 477 A (series turns x terminal) = 4 coils x 7 turns x 238.5 A (path) = 6678 AT, and the branches recombine to the correct 584.20 A terminal current. Sol's underlying warning is taken though: back-EMF and voltage headroom DO change, by exactly the factor 2, and every downstream lambda figure is being re-solved."
+    },
+    {
+      "seat": "sol",
+      "point": "No provenance contract (solver version, mesh settings, branch-netlist hash) is pinned for the seven refreshed claims.",
+      "why_rejected": "PARTIALLY rejected for scope, and recorded as open work rather than done. The claim-provenance gate checks artefact-newer-than-inputs, which does NOT catch a run made by a process that imported the pre-fix module - a hole already recorded in MemPalace after killing pid 99933. Stamping a module content hash into every artefact is the right fix and is the next discipline item; it is not in this stage."
+    }
+  ],
+  "council_ok": true,
+  "advice_recorded_utc": "2026-08-02T09:58:41Z"
+}

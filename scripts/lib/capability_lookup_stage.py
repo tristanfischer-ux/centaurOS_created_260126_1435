@@ -74,6 +74,20 @@ ENGINEERING_PACKAGES = (
     "SciDataTool", "matplotlib", "pandas",
 )
 
+# ⭐⭐ NATIVE SOLVER BINARIES — the capability a package probe cannot see
+# (2026-08-02, Grok's start-council finding). The dossier reported `femm` MISSING
+# and the seat correctly asked whether the FE path was available at all. It is:
+# the deck never imports the `femm` package — it shells out to the native xfemm
+# command-line solver `femmcli`. A dossier that probes only Python packages says
+# "no FE available" about a machine with a working FE, which is the same class of
+# error as the empty package lists: a capability answer that is confidently
+# wrong. Each entry is (name, env var, repo-relative candidates).
+NATIVE_SOLVERS = (
+    ("femmcli", "FEMMCLI", ("scripts/phantm/bin/femmcli",)),
+    ("ccx", "CCX", ("scripts/motor-stack/bin/ccx",)),
+    ("blender", "BLENDER", ()),
+)
+
 CORPUS_TABLES = (
     ("fpk_extracted_claims", ("symbol", "expression", "value_text", "claim_kind")),
     ("fpk_component_literature", ("contribution", "component_id", "topic_id")),
@@ -90,6 +104,8 @@ class CapabilityDossier:
     tools: list = field(default_factory=list)
     packages_available: list = field(default_factory=list)
     packages_missing: list = field(default_factory=list)
+    native_solvers_available: list = field(default_factory=list)
+    native_solvers_missing: list = field(default_factory=list)
     notes: list = field(default_factory=list)
 
 
@@ -195,6 +211,25 @@ def probe_packages(names: tuple = ENGINEERING_PACKAGES,
     return avail, missing
 
 
+def probe_native_solvers(entries: tuple = NATIVE_SOLVERS,
+                         repo: Path = REPO_ROOT) -> tuple[list, list]:
+    """Which native solver BINARIES are executable here. Not importable — runnable."""
+    import shutil  # noqa: PLC0415
+    avail, missing = [], []
+    for name, env_var, candidates in entries:
+        found = None
+        for candidate in (os.environ.get(env_var),
+                          *(str(repo / c) for c in candidates),
+                          shutil.which(name)):
+            if candidate and Path(candidate).is_file() \
+                    and os.access(candidate, os.X_OK):
+                found = str(Path(candidate).resolve())
+                break
+        (avail if found else missing).append(
+            {"name": name, "path": found, "env_var": env_var})
+    return ([e for e in avail], [e["name"] for e in missing])
+
+
 def build_dossier(product_class: str, *, repo: Path = REPO_ROOT,
                   db: Path = FORGE_TRUTH, probe_pkgs: bool = True) -> dict:
     d = CapabilityDossier(product_class=product_class)
@@ -203,6 +238,8 @@ def build_dossier(product_class: str, *, repo: Path = REPO_ROOT,
     d.tools = discover_tools(repo)
     if probe_pkgs:
         d.packages_available, d.packages_missing = probe_packages()
+    d.native_solvers_available, d.native_solvers_missing = \
+        probe_native_solvers(repo=repo)
     for t, meta in (d.corpus_hits.get("tables") or {}).items():
         if meta.get("present") and not meta.get("has_embedding_column"):
             d.notes.append(
@@ -216,6 +253,16 @@ def build_dossier(product_class: str, *, repo: Path = REPO_ROOT,
         "tools": d.tools, "n_tools": len(d.tools),
         "packages_available": d.packages_available,
         "packages_missing": d.packages_missing,
+        # ⭐ "I did not probe" and "I probed and found nothing" must never look
+        # the same (2026-08-02). The twin's dossier carried packages_available
+        # = [] and packages_missing = [] — which reads as "no engineering
+        # packages exist here" and is how a session ends up hand-deriving what
+        # pyleecan and swat_em were sitting there ready to do. Both lists empty
+        # is now a DETECTABLE state, not an ambiguous one.
+        "native_solvers_available": d.native_solvers_available,
+        "native_solvers_missing": d.native_solvers_missing,
+        "packages_probed": bool(probe_pkgs),
+        "python_probed": sys.executable if probe_pkgs else None,
         "notes": d.notes,
     }
 
@@ -234,6 +281,25 @@ def evaluate_capability_gate(dossier: dict | None) -> dict:
                        "establishing what solvers, tools, packages and "
                        "literature already exist for this class")})
         return {"ok": False, "findings": findings}
+    # A probe that ran and returned nothing on BOTH sides did not run.
+    probed = dossier.get("packages_probed")
+    n_pkgs = (len(dossier.get("packages_available") or [])
+              + len(dossier.get("packages_missing") or []))
+    if probed and n_pkgs == 0:
+        findings.append({
+            "severity": "HIGH", "rule": "package_probe_returned_nothing",
+            "detail": ("packages_probed is true but both package lists are "
+                       "empty — the probe is broken, and a dossier that says "
+                       "no packages exist is worse than one that says it did "
+                       "not look")})
+    elif probed is False or (probed is None and n_pkgs == 0):
+        findings.append({
+            "severity": "HIGH", "rule": "packages_never_probed",
+            "detail": ("no package probe — the dossier cannot say whether "
+                       "pyleecan, swat_em, CoolProp et al are importable here, "
+                       "which is exactly the question that decides whether a "
+                       "quantity gets solved or hand-derived. Re-run without "
+                       "--no-packages")})
     if dossier.get("n_solvers", 0) == 0:
         findings.append({
             "severity": "HIGH", "rule": "no_solvers_discovered",
@@ -281,7 +347,12 @@ def _selftest() -> int:
     g3 = evaluate_capability_gate({
         "n_solvers": 18, "corpus": {"available": True, "tables": {
             "fpk_extracted_claims": {"present": True, "class_scoped_rows": 32453,
-                                     "has_embedding_column": True}}}})
+                                     "has_embedding_column": True}}},
+        # A healthy dossier now includes a probe that actually ran; without
+        # these the fixture describes a lookup that never asked what is
+        # installed, which is no longer "healthy".
+        "packages_probed": True, "packages_available": ["pyleecan", "numpy"],
+        "packages_missing": ["femm"]})
     ck("proveCatch.healthy_passes", g3["ok"], f"a good dossier blocked: {g3}")
 
     # Discovery must find something real in this repo, and must NOT be a
@@ -320,6 +391,27 @@ def _selftest() -> int:
     d = build_dossier("formula_e_front_mgu", probe_pkgs=False)
     ck("corpus.live_dossier_builds", bool(d.get("corpus", {}).get("tables")),
        "the live corpus scan returned no tables")
+
+    # ⭐ proveCatch (2026-08-02): an unprobed dossier and a BROKEN probe are
+    # both caught, and each names its own cause. The twin shipped with both
+    # package lists empty and nothing said a word.
+    unprobed = evaluate_capability_gate(d)
+    ck("packages.unprobed_is_caught",
+       any(f["rule"] == "packages_never_probed" for f in unprobed["findings"]),
+       "a dossier with no package probe was accepted")
+    broken = evaluate_capability_gate(
+        {**d, "packages_probed": True,
+         "packages_available": [], "packages_missing": []})
+    ck("packages.broken_probe_is_caught",
+       any(f["rule"] == "package_probe_returned_nothing"
+           for f in broken["findings"]),
+       "a probe that ran and found nothing on both sides was accepted")
+    healthy = evaluate_capability_gate(
+        {**d, "packages_probed": True,
+         "packages_available": ["numpy"], "packages_missing": ["femm"]})
+    ck("packages.healthy_probe_passes",
+       not any(f["rule"].startswith("package") for f in healthy["findings"]),
+       "a healthy package probe was flagged")
 
     for f in fails:
         print(f"  FAIL {f}")

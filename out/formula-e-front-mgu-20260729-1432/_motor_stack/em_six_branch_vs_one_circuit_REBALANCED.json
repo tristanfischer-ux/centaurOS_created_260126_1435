@@ -1,0 +1,47 @@
+{
+  "angle_electrical_deg": -30.0,
+  "rows": [
+    {
+      "rotor_position_mechanical_deg": 0.0,
+      "torque_six_branch_nm": -78.43099533972244,
+      "torque_one_circuit_nm": -78.43099532943242,
+      "flux_linkage_a_six_branch_wb": 0.039034992432563115,
+      "flux_linkage_a_one_circuit_wb": 0.0780699848668814,
+      "circuit_current_a_six_branch_a": 584.203303654,
+      "circuit_current_a_one_circuit_a": 292.101651827
+    },
+    {
+      "rotor_position_mechanical_deg": 3.75,
+      "torque_six_branch_nm": -55.73845496868429,
+      "torque_one_circuit_nm": -55.73845854493114,
+      "flux_linkage_a_six_branch_wb": 0.03797857761113403,
+      "flux_linkage_a_one_circuit_wb": 0.07595715891394403,
+      "circuit_current_a_six_branch_a": 584.203303654,
+      "circuit_current_a_one_circuit_a": 292.101651827
+    },
+    {
+      "rotor_position_mechanical_deg": 7.5,
+      "torque_six_branch_nm": -52.40218324112647,
+      "torque_one_circuit_nm": -52.40218324112647,
+      "flux_linkage_a_six_branch_wb": 0.033878678377050775,
+      "flux_linkage_a_one_circuit_wb": 0.06775735675410162,
+      "circuit_current_a_six_branch_a": 584.203303654,
+      "circuit_current_a_one_circuit_a": 292.101651827
+    },
+    {
+      "rotor_position_mechanical_deg": 11.25,
+      "torque_six_branch_nm": -32.40070768540672,
+      "torque_one_circuit_nm": -32.40070807307639,
+      "flux_linkage_a_six_branch_wb": 0.026547352043255208,
+      "flux_linkage_a_one_circuit_wb": 0.05309470413248145,
+      "circuit_current_a_six_branch_a": 584.203303654,
+      "circuit_current_a_one_circuit_a": 292.101651827
+    }
+  ],
+  "mean_abs_torque_six_branch_nm": 54.74308530873498,
+  "mean_abs_torque_one_circuit_nm": 54.7430862971416,
+  "worst_torque_delta_nm": 3.5762468542088754e-06,
+  "mean_flux_linkage_ratio_one_over_six": 2.0000000247451983,
+  "winding_parallel_paths": 2.0,
+  "turns_per_phase_contract": 14.0
+}

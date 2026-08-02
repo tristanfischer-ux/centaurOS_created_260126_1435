@@ -5,17 +5,32 @@
     "winding_parallel_paths": 2.0,
     "note": "FEMM MMF per slot = turns x circuit current. If the circuit current is the PHASE current while the conductors sit in Npcp parallel paths, the applied ampere-turns are Npcp times too large."
   },
-  "lambda_pm_wb_reference": 0.002903,
+  "lambda_pm_wb_reference": 0.001451,
   "lambda_pm_reference_source": "MEASURED open-circuit flux-linkage fundamental (full electrical period)",
-  "back_emf_line_line_rms_v": 324.05577,
+  "lambda_pm_reference_rejected": null,
+  "lambda_pm_wb_from_back_emf": 0.001451,
+  "back_emf_line_line_rms_v": 154.415797,
   "current_angle_electrical_deg": 0.0,
   "points": [
     {
       "phase_current_peak_a": 50.0,
+      "fe_torque_nm": 0.513,
+      "analytic_torque_nm": 0.4354,
+      "ratio_fe_over_analytic": 1.178,
+      "peak_airgap_flux_density_t": 0.4753720045601358,
+      "positions_averaged_mech_deg": [
+        0.0,
+        5.0,
+        10.0
+      ],
+      "single_position_torque_nm": 1.5489
+    },
+    {
+      "phase_current_peak_a": 100.0,
       "fe_torque_nm": 1.3568,
       "analytic_torque_nm": 0.8709,
       "ratio_fe_over_analytic": 1.558,
-      "peak_airgap_flux_density_t": 0.6305609206121202,
+      "peak_airgap_flux_density_t": 0.6305609220526593,
       "positions_averaged_mech_deg": [
         0.0,
         5.0,
@@ -24,11 +39,11 @@
       "single_position_torque_nm": 4.1472
     },
     {
-      "phase_current_peak_a": 100.0,
+      "phase_current_peak_a": 200.0,
       "fe_torque_nm": 3.0496,
       "analytic_torque_nm": 1.7417,
       "ratio_fe_over_analytic": 1.7509,
-      "peak_airgap_flux_density_t": 0.8667006098476459,
+      "peak_airgap_flux_density_t": 0.8667006166550895,
       "positions_averaged_mech_deg": [
         0.0,
         5.0,
@@ -37,11 +52,11 @@
       "single_position_torque_nm": 12.3444
     },
     {
-      "phase_current_peak_a": 200.0,
+      "phase_current_peak_a": 400.0,
       "fe_torque_nm": 7.7699,
       "analytic_torque_nm": 3.4835,
       "ratio_fe_over_analytic": 2.2305,
-      "peak_airgap_flux_density_t": 1.138698283634154,
+      "peak_airgap_flux_density_t": 1.138698283641549,
       "positions_averaged_mech_deg": [
         0.0,
         5.0,
@@ -50,41 +65,28 @@
       "single_position_torque_nm": 33.9626
     },
     {
-      "phase_current_peak_a": 400.0,
-      "fe_torque_nm": 23.2986,
-      "analytic_torque_nm": 6.9669,
-      "ratio_fe_over_analytic": 3.3442,
-      "peak_airgap_flux_density_t": 1.488025942767429,
-      "positions_averaged_mech_deg": [
-        0.0,
-        5.0,
-        10.0
-      ],
-      "single_position_torque_nm": 61.9214
-    },
-    {
       "phase_current_peak_a": 674.58,
-      "fe_torque_nm": 41.9045,
-      "analytic_torque_nm": 11.7494,
-      "ratio_fe_over_analytic": 3.5665,
-      "peak_airgap_flux_density_t": 1.682077661562068,
+      "fe_torque_nm": 18.0758,
+      "analytic_torque_nm": 5.8747,
+      "ratio_fe_over_analytic": 3.0769,
+      "peak_airgap_flux_density_t": 1.410887816665575,
       "positions_averaged_mech_deg": [
         0.0,
         5.0,
         10.0
       ],
-      "single_position_torque_nm": 80.8652
+      "single_position_torque_nm": 55.7476
     }
   ],
-  "ratio_spread": 2.0085,
+  "ratio_spread": 1.8989,
   "ratio_rising_with_current": true,
   "fit_T_equals_a_I_plus_b_I2": {
-    "a_pm_nm_per_a": 0.03882,
-    "b_reluctance_nm_per_a2": "3.5779e-05",
-    "lambda_pm_from_torque_wb": 0.00647,
-    "lambda_pm_from_reference_wb": 0.002903,
-    "disagreement_x": 0.449,
+    "a_pm_nm_per_a": 0.009687,
+    "b_reluctance_nm_per_a2": "2.5273e-05",
+    "lambda_pm_from_torque_wb": 0.001614,
+    "lambda_pm_from_reference_wb": 0.001451,
+    "disagreement_x": 0.899,
     "note": "The reference lambda_pm comes from the voltage/FW screen, which derives back-EMF ANALYTICALLY from the FE's open-circuit airgap RMS B via a 1-D sinusoidal-flux relation. It is NOT an independent FE measurement of back-EMF, so it must not be presented as a second witness agreeing with the analytic design-flux route."
   },
-  "verdict": "PM TORQUE FAR BELOW THE REFERENCE, RELUCTANCE-DOMINATED. The ratio RISES with current, so torque is SUPERLINEAR \u2014 the opposite of saturation. The quadratic (reluctance) term is carrying the machine. The linear fit's PM slope gives the FE's REAL flux linkage; compare it against whatever the reference claimed and treat the difference as the fault to explain."
+  "verdict": "RELUCTANCE-DOMINATED. The ratio RISES with current (1.18 -> 3.08), so torque is SUPERLINEAR \u2014 the OPPOSITE of saturation, which would make it fall. The quadratic reluctance term is carrying the machine while the PM term is weak. PM share is between 33% and 36% of the measured 18.1 N.m (curve fit 6.5 N.m vs measured-lambda 5.9 N.m \u2014 these DISAGREE by 1.11x and the disagreement is unresolved), so reluctance carries 64-67%. Fix the PM circuit (pole arc / flux focusing), not the winding or the integration."
 }

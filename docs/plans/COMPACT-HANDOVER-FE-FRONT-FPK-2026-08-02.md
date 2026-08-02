@@ -54,13 +54,214 @@ parallel paths → FE conductor excited at 238.5 A rms → **25.75 N·m mean |T|
 `duty_torque_screen_ok` **false**, status PARTIAL, `ship_ok` **false**. That
 replaces the ~26.6 N·m estimate with a measurement.
 
-### Outstanding confirmation
-The half-current run is a **proxy** for the correct topology. All three council
-seats prefer Sol's **six explicit branch circuits** (A1/A2, B1/B2, C1/C2), each at
-337.29 A peak. MMF per slot is identical either way so torque should not move —
-but flux-linkage reporting and copper-loss bookkeeping differ. Not yet run.
-Grok's parallel instruction: *"do not scale torque by 1/2 — publish a re-solved
-T–I curve."*
+### CONFIRMED — six branch circuits, measured 2026-08-02
+The half-current run **was** a valid proxy. Six explicit branch circuits
+(`phase_a_b1/b2`, `phase_b_b1/b2`, `phase_c_b1/b2`, each at 337.29 A peak) vs
+one-circuit-per-phase at IDENTICAL currents, rebalanced geometry, −30° elec,
+four rotor positions:
+
+| | result |
+|---|---|
+| torque residual | **\|ΔT\| ≤ 3.6e-6 N·m** — a RESIDUAL, on torques of order 50–80 N·m |
+| flux-linkage ratio one/six | **exactly 2.0000** |
+| terminal current recombination | 584.20 A, as it must be |
+
+So **81.64 N·m = 0.652× stands and DEC-EM-1 stays reversed** — but every
+**flux-linkage** figure in this campaign was **2× the terminal value**, and
+that propagates to back-EMF, the voltage limit and the analytic cross-check.
+It also explains the 1.964 FE/analytic ratio: it was ≈2, i.e. the diagnosis.
+
+`_branch_layout()` pairs coils (+ side k with − side k), deals them round-robin
+to Npcp branches (the diametrical arrangement), and REFUSES to split when the
+branches would be unbalanced. proveCatch
+`branch_circuits_hold_contract_series_turns`.
+
+### The lamination was never missing — it was never CARRIED
+`§5 item 4` said gauge and grade were "established nowhere". Wrong: **M400-50A,
+Wlam 0.5 mm, ρ 4.6e-7 Ω·m, 7650 kg/m³, Kf1 0.95** sit in the pyleecan material
+file the FE deck **already loads for its BH curve**. Nothing passed them to
+`motor:loss-point`, which defaults `ke=1e-5` against a classical **1.169e-4**
+for that lamination — 12× low, and eddy goes as gauge² and frequency².
+
+On the twin's OWN measured field and mass (`stator_iron_b_REBALANCED.json`,
+`stator_iron_mass.json` — tooth 2.96 kg at 1.746 T, yoke 3.66 kg at 2.094 T,
+f = 1300 Hz):
+
+| coefficients | iron loss |
+|---|---|
+| defaulted (kh 0.02, ke 1e-5) | **993.6 W** — and the twin's thermal screen used **1020.5 W**, so that is what it ran on |
+| derived from the M400-50A lamination | **5 869.8 W (5.91×)** |
+
+⚠ **The 5 870 W is a BOUND, not a measurement.** The yoke sits at **2.09 T**,
+deep in saturation and far outside the range where a Steinmetz B^1.8 fit
+calibrated at 1.5 T is valid. The honest statement is that the iron loss is
+several times the 1020 W the thermal screen was sized on, and that the yoke flux
+density is itself a design problem. It is not "5 870 W".
+
+An earlier draft of this note quoted "302 W → 1713 W". That was a like-for-like
+coefficient comparison on ILLUSTRATIVE inputs (5 kg at 1.2 T), not the twin, and
+should not be cited.
+
+`scripts/lib/machine_lamination.py` derives the coefficients rather than tabling
+them: classical eddy from the gauge, hysteresis calibrated to the grade's own
+EN 10106 guarantee (the designation IS the datasheet). Same shape as the
+"3 of 18 solvers in use" audit — the data was on the shelf.
+
+---
+
+## 1b. P-STAGE DISCIPLINE — structural as of 2026-08-02
+
+**Every load-bearing block goes through `scripts/lib/p_stage_discipline.py`.**
+
+    start  --stage-id X --twin <twin> --plan-ref "<open plan item>" --intent … \
+           [--evidence <artefacts backing any number the intent asserts>]
+    finish --stage-id X --claim "<the numbers>" --produced … --next …
+
+`start` = plan fit (REFUSES without `--plan-ref`) + `capability_lookup --enforce`
++ `calculation_guard` + START council **which blocks on unanswered seats**. `finish` = `stage_boundary_check` +
+FINISH council. Exit **49**. Record lands on the twin at `_discipline/`.
+Disagreeing with a seat is allowed; **ignoring one is not** — finish refuses
+while a blocking seat is neither fixed nor recorded in `advice_rejected` with a
+reason. Commit bodies cite all four artefact paths.
+
+**Why it had to be built:** every piece already existed with a selftest and none
+of it was the loop. `core.hooksPath` pointed at a **sibling checkout**, so
+`install-forcing-hooks.sh` had installed the structural block into *that* repo
+and this one's `.husky/pre-commit` was 22 lines of lint + drift. No finish
+council ran after the path-current fix or the baseline measurement; no stage
+boundary artefact existed on the twin at all; the capability dossier was a
+one-shot with both package lists empty. The installer now refuses an out-of-repo
+`hooksPath`; pre-commit requires a finish-council artefact whenever
+`scripts/motor-stack/**` or `scripts/lib/**` is staged.
+
+**The first live start council blocked on all three seats, and was right twice:**
+the capability dossier probed Python packages only — reporting `femm` MISSING
+while the deck runs the native `femmcli` binary — so it now probes solver
+BINARIES too (femmcli ✓, blender ✓, **ccx MISSING**, previously unknown); and
+`start` handed the council no artefacts, so every claim read as UNSUPPORTED,
+which `--evidence` fixes.
+
+**A review harness that silently truncates is worse than none.** The SECOND
+finish council had all three seats report that `p_stage_discipline.py` and the
+promoted flux-linkage sweeps were "not in the diff". They were right about what
+they were given: `call_council` did `diff[:200000]`, the staged diff was 278,443
+characters, and those files start at 216,089 and 269,582. Three independent
+seats produced confident false findings from corrupted input, and it cost a full
+council round to notice. `build_review_body()` now puts files the claim NAMES
+first — so the evidence for a claim is never what gets cut — and lists anything
+dropped by name and size inside the prompt, telling seats to say they cannot
+assess it rather than that it is absent.
+
+**The first live FINISH council found four things that mattered**, and the
+sharpest was aimed at the driver itself:
+
+1. **Sol: `start` recorded blocking seats and did not block on them.** The very
+   first live start council had all three seats blocking and printed "work may
+   begin". I had built a gate and left it advisory — the exact failure this
+   driver exists to replace. `unrejected_blocking()` is now shared by start and
+   finish, so a blocking seat must be answered *before* the work too.
+2. **Sol: the hook was not POSIX sh.** `set -uo pipefail` and `shopt -s nullglob`
+   are bash-only, while the block's own comment acknowledged husky may invoke it
+   under `sh`. On dash it would die before running a single gate. macOS `/bin/sh`
+   is bash, so it worked here and would have silently stopped working on CI.
+3. **Sol: the finish-council check accepted any panel under a day old from any
+   twin.** It now must be newer than the newest staged engine file.
+4. **Grok: "7/7 backed" was not auditable** — `out/` is gitignored, so the
+   backing artefacts were not in the diff, and the MTPA peak was prose. Ten
+   artefacts force-added; the peak is now a registered claim.
+
+Full record with the four reasoned rejections:
+`_discipline/em-refresh-fixed-deck-finish-council.json`.
+
+---
+
+## 1c. MEASURED on the fully fixed deck — stage `em-refresh-fixed-deck`
+
+Every EM claim re-solved with path-current excitation AND six branch circuits.
+The registry holds **9** claims (the MTPA peak and the magnitude mean were added
+after the finish council found them asserted in prose rather than gated).
+
+| claim | was | now | ratio |
+|---|---|---|---|
+| `lambda_pm_fundamental_wb` (baseline) | 0.002903 | **0.0014514** | **0.5000×** |
+| `lambda_pm_rebalanced_wb` | 0.031057 | **0.0155287** | **0.5000×** |
+| `delivered_torque_rebalanced_nm` | −145.44 | **−81.558** | 0.5608× |
+| `mtpa_mean_torque_rebalanced_nm` | 147.539 | **81.098** | 0.5497× |
+| `delivered_mean_torque_nm` (probe, max I) | 41.90 | **18.076** | 0.4314× |
+
+The two flux-linkage claims fell by **0.5000×**. Note what that is and is not:
+the registry before/after is a full re-solve, so it is *consistent with* the
+branch fix rather than proof of it. The controlled evidence is the A/B artefact —
+`mean_flux_linkage_ratio_one_over_six = 2.0000000247` at identical per-conductor
+currents (Grok, finish council: "EXACTLY 0.5000× on registry churn is slightly
+stronger than warranted").
+
+**The rebalanced respec measured on the fully fixed deck: 81.558 N·m mean |T| =
+0.651× of the 125.21 N·m required.** That is the same figure the half-current
+proxy gave, now measured. **DEC-EM-1 stays reversed. `ship_ok` stays false.**
+
+The signed mean (−81.558081) and the magnitude mean (81.558081) coincide **only
+because `torque_sign_consistent` is true** over the 37-point sweep — |mean(T)|
+and mean(|T|) are not generally equal, and both are now registered as separate
+claims against their own keys rather than relying on the coincidence.
+
+`em_fia_torque_scaling_probe.py` was **rebuilding the three phase currents from
+its own peak**, bypassing the path-current division — the DEC-EM-1 bug
+reintroduced the same day in a file nobody was looking at. Both the case and the
+probe now go through one function, `fe_phase_currents_from_terminal()`. A rule
+that lives in one caller is not a rule.
+
+Probe verdict on the fixed deck: **RELUCTANCE-DOMINATED** — the FE/analytic ratio
+RISES with current (0.59 → 1.54), i.e. torque is SUPERLINEAR, the opposite of
+saturation. The PM circuit is the weak part, which is what the pole-arc finding
+in §2 says.
+
+### The central disagreement is closed — with a caveat that matters
+`em_pyleecan_analytic_crosscheck.py` on the rebalanced geometry:
+
+- FE circuit flux linkage (terminal): **0.015529 Wb**
+- λ_pm from back-EMF: **0.015436 Wb** — **agree to 0.6%**
+
+⚠ **These are NOT two independent routes.** `estimated_back_emf_line_line_rms_v`
+is computed from `open_circuit_rms_airgap_flux_density_t`, i.e. from the FE
+airgap probe through a 1-D transform — the same "two routes were one" error
+already on this campaign's record (§6). They share the FIELD. What they do
+**not** share is the WINDING treatment, so their agreement is evidence about the
+**turns**, which is exactly what was broken. It is not evidence about the field.
+
+**Still disagreeing, and now the sharpest analytic gap: 3.03×** between the
+DESIGN flux linkage (0.04678 Wb, from flux-per-pole) and the back-EMF value
+(0.015436 Wb). The tool says so itself: *"the winding/flux model is internally
+inconsistent"*. Open.
+
+The λ sweeps used to print a "1-D airgap transform = 2.09× the measurement"
+line against a hardcoded 0.032393 Wb — a constant computed at 28 series turns,
+stale by exactly the factor this stage fixed. Both sweep scripts have been
+**promoted out of `/tmp` into `scripts/motor-stack/`**
+(`em_fia_oc_flux_linkage_sweep{,_rebalanced}.py`) with those stale constants
+removed, and the two λ claims now declare them as dependencies. They were the
+sole producers of the headline λ artefacts while living unversioned in a
+scratch directory that a reboot would have deleted: force-adding their JSON
+output made the NUMBERS auditable, not the DERIVATION.
+
+### Why the probe moved 0.4314× and the case moved 0.5608×
+Grok asked at the finish council why halving the excitation gave 0.4314× on the
+probe when linear scaling predicts 0.5× — and separately 0.5608× on the case,
+apparently the opposite nonlinearity. Neither is anomalous, and Grok's linear
+predictor is the wrong model:
+
+- Least squares on the probe's five points: **T = 0.00969·I + 2.527e-5·I²**. At
+  674.58 A the PM term is 6.53 N·m and the **reluctance term 11.50 N·m — 64%**,
+  matching the probe's own published 33–36% PM share. Halving the excitation of
+  that mix predicts **0.3406×**, not 0.5×. We measured 0.4314× — above the
+  quadratic bound, below the linear one, which is what a **saturating** mixed
+  machine does, the "before" figure having been depressed by saturation at
+  double the ampere-turns.
+- The case is a **different machine**: λ_pm 0.0155287 Wb rebalanced against
+  0.0014514 Wb baseline — **10.7× more PM flux** — so it is PM-dominated,
+  scales nearer to linear, and saturation carries it past 0.5 to 0.5608×.
+
+Both λ values are registered claims, so this explanation is checkable.
 
 ---
 
@@ -128,22 +329,36 @@ $0.0096). It had no embedding column for the life of the corpus.
 
 ## 5. Open work, in priority order
 
-1. **Six-branch circuit model** (A1/A2, B1/B2, C1/C2 at 337.29 A peak) — confirm
-   the proxy. Sol's preferred fix; all three seats agree.
-2. **Re-run every EM figure** on the source-fixed deck. Baseline is now measured
-   (25.75 N·m mean |T| = 0.206×); the REBALANCED point, the MTPA screen and the
-   flux-linkage sweeps are NOT — the rebalanced 81.64 N·m came from the
-   half-current proxy run, not from the fixed deck.
+1. ~~Six-branch circuit model~~ — **DONE and measured** (see §1). Torque residual
+   ≤3.6e-6 N·m; flux linkage was exactly 2.0000× too high.
+2. **Re-run every EM figure** on the branch-circuit deck. IN FLIGHT as stage
+   `em-refresh-fixed-deck` — the claim-provenance gate is blocking 7 claims.
+   Baseline is measured (25.75 N·m mean |T| = 0.206×); the REBALANCED point, the
+   MTPA screen and the flux-linkage sweeps are NOT — the rebalanced 81.64 N·m
+   came from the half-current proxy, and every λ figure was 2× regardless.
 3. **Re-establish what architecture change closes 0.652×.** Stack is exhausted
-   inside the housing.
-4. **Lamination gauge and grade** — established nowhere in this twin. Eddy loss
-   goes as gauge², so this one unstated number moves the loss answer more than
-   the entire grain-orientation debate. Bigger lever than anything currently open.
+   inside the housing. This is the only item that decides the programme.
+4. ~~Lamination gauge and grade~~ — **DONE** (see §1). Coefficients now derived
+   from the machine's own material file. Iron MASS was already derived on the
+   twin (6.62 kg, tooth 2.96 + yoke 3.66) — `motor:loss-point`'s 5.0 kg default
+   was never the twin's number either. **What remains, and it is now the
+   sharpest open item after §5.3:** the twin's thermal screen was sized on
+   **1020.5 W** of iron loss, which is what the DEFAULTED coefficients give
+   (993.6 W). The real lamination gives several times that, and the yoke is at
+   **2.09 T** — deep saturation, where the Steinmetz fit is an extrapolation and
+   where the machine has a design problem independent of the loss model. The
+   coolant margin needs re-deriving and the yoke needs looking at.
 5. **Magnet respec into BoM and drawings** — the modifier still does not attach to
    pre-existing BoM words. Currently a MODEL-only fix, which is the exact
    band-aid shape the core principle forbids.
 6. `physicsTree` divergences: 4 quantities recorded, none decided
    (turns_per_phase 14 vs 18, conductor area, phase resistance, DC-link C).
+7. **Stamp a module content hash into every artefact.** ⬅ *raised by Sol at TWO
+   consecutive councils; schedule it rather than defer it again.* The claim-provenance
+   gate checks artefact-newer-than-inputs, which does NOT catch a run whose
+   process imported the pre-fix module — the hole that forced killing pid 99933
+   mid-run. Sol raised it again at the `em-refresh-fixed-deck` start council; it
+   is recorded as rejected-for-scope, not as solved.
 
 ---
 

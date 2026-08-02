@@ -57,7 +57,9 @@ class Claim:
     artefact: Path
     key_path: str                      # dotted path to the value in the artefact
     depends_on: list[Path] = field(default_factory=list)
-    tolerance: float = 1e-6
+    tolerance: float = 1e-6             # RELATIVE tolerance
+    abs_tolerance: float = 0.0          # absolute floor; opt-in, NOT the same
+                                        # number as `tolerance` — see compare
     run_to_fix: str = ""                # the command that regenerates it
 
 
@@ -124,8 +126,17 @@ def check(claim: Claim, *, now_mtime: float | None = None) -> dict:
                 "detail": f"'{claim.key_path}' holds {found!r}",
                 "run_to_fix": claim.run_to_fix}
 
+    # ⭐⭐ A RELATIVE TOLERANCE IS NOT AN ABSOLUTE ONE (2026-08-02). This passed
+    # `claim.tolerance` as BOTH rel_tol and abs_tol, so a 0.05 tolerance meant
+    # "within 5% OR within 0.05 in absolute units". For flux linkage — a
+    # quantity of order 0.0015 to 0.03 Wb — the absolute arm could never fail,
+    # and `lambda_pm_fundamental_wb` reported BACKED while the claim (0.002903)
+    # was exactly TWICE the artefact (0.0014514). The gate that exists to catch
+    # hand-carried numbers was, for small quantities, incapable of catching one.
+    # abs_tolerance is now a SEPARATE, opt-in field defaulting to zero, so a
+    # relative tolerance stays relative.
     if not math.isclose(found_f, claim.value, rel_tol=claim.tolerance,
-                        abs_tol=claim.tolerance):
+                        abs_tol=claim.abs_tolerance):
         return {"claim": claim.name, "ok": False, "reason": "VALUE_MISMATCH",
                 "detail": (f"claimed {claim.value}, artefact says {found_f} — a "
                            "hand-carried number, or the artefact moved on"),
@@ -237,6 +248,28 @@ def _selftest() -> int:
         ck("proveCatch.value_mismatch_blocks",
            not r["ok"] and r["reason"] == "VALUE_MISMATCH",
            f"a hand-carried number passed: {r}")
+
+        # ⭐ proveCatch 4b — A RELATIVE TOLERANCE MUST STAY RELATIVE. The gate
+        # used to pass `tolerance` as abs_tol too, so on a SMALL quantity the
+        # absolute arm swallowed everything: a claim of 0.002903 Wb against an
+        # artefact holding 0.0014514 Wb — exactly 2x, the parallel-path error
+        # itself — reported BACKED under tolerance 0.05. A gate that cannot
+        # fail on the very error it was built for is decoration.
+        small = d / "small.json"
+        small.write_text(json.dumps({"works": {"lambda_wb": 0.0014514}}))
+        halved = Claim("lambda", 0.002903, small, "works.lambda_wb",
+                       tolerance=0.05, run_to_fix="python sweep.py")
+        r = check(halved)
+        ck("proveCatch.small_quantity_2x_error_blocks",
+           not r["ok"] and r["reason"] == "VALUE_MISMATCH",
+           f"a 2x error on a small quantity passed: {r}")
+        # ...and an explicitly declared absolute floor must still work, for the
+        # cases where a near-zero quantity genuinely needs one.
+        with_floor = Claim("lambda", 0.002903, small, "works.lambda_wb",
+                           tolerance=0.05, abs_tolerance=0.05,
+                           run_to_fix="python sweep.py")
+        ck("tolerance.explicit_abs_floor_still_honoured", check(with_floor)["ok"],
+           "an explicitly declared absolute tolerance was ignored")
 
         # proveCatch 5 — the key is absent: "I ran a solver" != "this solver
         # produced this number".
