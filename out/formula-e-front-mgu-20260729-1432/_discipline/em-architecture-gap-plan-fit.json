@@ -1,0 +1,13 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "em-architecture-gap",
+  "intent": "Establish what closes the measured x1.5353 residual within the envelope, or that nothing does.",
+  "maps_to_plan_item": "docs/plans/COMPACT-HANDOVER-FE-FRONT-FPK-2026-08-02.md \u00a75 item 3",
+  "why_now": "",
+  "explicitly_not_doing": [],
+  "depends_on": [],
+  "success_criteria": [],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-02T19:17:33Z"
+}

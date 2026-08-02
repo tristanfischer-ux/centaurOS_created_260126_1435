@@ -1,0 +1,236 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "START: Establish what architecture change, if any, closes the measured 1.534x torque residual within the FIA and packaging envelope \u2014 or establish that none does, which is a legitimate finding and must be reported as one rather than dressed up as a tuning problem.",
+  "mode": "live",
+  "called_utc": "2026-08-02T15:54:16Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The stated required motor torque is inconsistent with the stated wheel torque, gear ratio, and efficiency: 907.92 / (8 * 0.97) = 116.999 N\u00b7m, not 125.214912 N\u00b7m.",
+            "why_it_matters": "The entire 1.534x residual and both 'exhausted' single-lever conclusions depend on the denominator. If 125.214912 N\u00b7m is not tied to a different explicitly stated duty point, ratio convention, or additional loss, the claimed gap is overstated and the architecture decision is not traceable.",
+            "how_to_test": "Add a machine-readable requirement derivation that names wheel torque, ratio direction, efficiency placement, duty point, and any extra losses. Assert that recomputing required motor torque from those inputs reproduces 125.214912 N\u00b7m within tolerance; otherwise block the architecture screen."
+          },
+          {
+            "issue": "The baseline compares a 37-position torque-magnitude mean to a required delivered torque without establishing that magnitude-mean is the relevant operating metric.",
+            "why_it_matters": "Taking absolute torque can hide torque reversal, current-angle tracking errors, and excessive ripple. For traction, the relevant quantity is normally signed average torque at controlled current and rotor-synchronous angle, plus a ripple/minimum-torque requirement. The existing MTPA result being lower than the magnitude mean is already evidence that the selected metric is not automatically conservative or equivalent.",
+            "how_to_test": "For each candidate, run `em_fia_front_kit_case.py` and `em_fia_mtpa_screen.py` at the same current convention and report signed mean, minimum instantaneous torque, peak-to-peak ripple, and MTPA torque. Gate closure on a requirement-defined metric rather than `torque_magnitude_mean_nm` alone."
+          },
+          {
+            "issue": "The gear-ratio proposal treats ratio as a free torque lever before preserving the road-speed/top-speed duty point and the 19,500-rpm speed limit.",
+            "why_it_matters": "At fixed vehicle speed, increasing reduction increases motor speed. If 19,500 rpm is already the maximum-speed condition, no ratio increase is feasible; if it is not, the available ratio change must be determined from the actual tyre radius and vehicle speed envelope. Diameter's tip-speed cap is coupled to this same constraint, so independently applying diameter headroom and ratio benefit can double-count feasibility.",
+            "how_to_test": "Use a vehicle/driveline duty calculation to sweep ratio while enforcing maximum road speed, 19,500 rpm, tyre radius, efficiency, and rotor tip speed. Feed only feasible speed/diameter points into `scripts/motor-stack/em_fia_torque_map_screen.py`."
+          },
+          {
+            "issue": "The proposed geometry and pole-count screens risk extrapolating torque scaling through already-saturated iron (reported yoke flux density 2.09 T) and a known-understated iron-loss model.",
+            "why_it_matters": "Torque is not generally proportional to D\u00b2L or pole count once flux paths, slot geometry, current loading, end windings, leakage, inverter voltage, and saturation change. A screen anchored to the existing machine may rank candidates, but cannot substantiate closure for changed pole count or topology without reparameterizing the electromagnetic geometry and loss model.",
+            "how_to_test": "Use `scripts/motor-stack/em_fia_torque_map_screen.py` only for its declared anchored domain. For every changed slot/pole or magnetic circuit, regenerate the machine case and validate selected candidates with `scripts/motor-stack/em_fia_front_kit_case.py`; separately calculate frequency-dependent lamination loss using the actual M400-50A data and reject candidates exceeding thermal limits."
+          },
+          {
+            "issue": "The 477 A design-current limit is not explicitly reconciled with the solver invocation containing 674.58 A, which is approximately 477*sqrt(2).",
+            "why_it_matters": "A silent RMS-versus-peak or phase-versus-line convention mismatch changes copper loss by up to a factor of two and can make an apparent torque closure thermally impossible. It is the most likely source of a confidently precise but invalid torque result.",
+            "how_to_test": "Document the current convention at the requirement, inverter, winding, and solver interfaces. Run paired cases at 477 RMS and 674.58 peak only if the solver explicitly expects peak current, and assert equal physical current loading, copper loss, and torque before accepting any candidate."
+          },
+          {
+            "issue": "Axial flux is listed as a candidate although the cited toolchain is centered on the present radial-flux front-kit geometry and no axial-flux solver/model is identified.",
+            "why_it_matters": "This can turn 'no closure found by the radial-flux screen' into an unjustified universal conclusion that no architecture fits. Conversely, a hand-waved axial-flux claim would evade the fresh-solver-artifact gate.",
+            "how_to_test": "Before screening, identify an existing axial-flux-capable model and its geometry, thermal, structural, inverter, and manufacturability inputs. If none exists in the repository/packages, record axial flux as explicitly unevaluable and limit the verdict to the evaluated radial-flux architecture family."
+          }
+        ],
+        "generality_concerns": [
+          "The claim says it will establish whether any architecture closes the envelope, but the available named tools appear specific to the current radial-flux machine and FEMM-anchored analytical extensions. The defensible scope is only the architectures and geometry changes covered by validated tool domains.",
+          "Housing OD and total housing length are not electromagnetic active-material limits. Real axial budget needs end turns, bearings, seals, resolver, cooling manifolds, busbars, and rotor retention; treating the unused 42.92 mm as candidate stack growth is a hidden packaging-model dependency.",
+          "A torque-only closure is not a system closure. At 19,500 rpm, voltage/back-EMF, inverter current limit, DC-link voltage, copper/iron/magnet losses, cooling, demagnetization, rotor stress, and required duty duration must be evaluated at the same operating point.",
+          "`em_fia_torque_map_screen.py` is the appropriate first tool for diameter/length screening, `em_fia_front_kit_case.py` is required for candidate confirmation, and the CalculiX rotor/magnet-pocket screens must be rerun when diameter, speed, bridges, or magnet geometry changes. Hand D\u00b2L scaling should be used only as a sanity check, not as a verdict."
+        ],
+        "blocking": true,
+        "one_line_summary": "Block the stage until the torque requirement and current conventions are reconciled and the candidate screen is constrained to a coupled road-speed, voltage/thermal, structural, and validated-tool domain; otherwise its 1.534x finding is numerically precise but not decision-grade."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [
+          {
+            "where": "ARCHITECTURE-GAP \u00a7 contract limits + gap residual; plan_fit why_now",
+            "stated": "wheel torque 907.92 N\u00b7m with gear 8 / eff 0.97 and required motor torque 125.214912 N\u00b7m (residual 1.534\u00d7 on 81.558081 N\u00b7m)",
+            "correct": "T_motor = T_wheel/(ratio\u00d7\u03b7) \u21d2 907.92/(8\u00d70.97) = 117.0 N\u00b7m; residual vs measured 81.558081 is 117.0/81.558081 \u2248 1.435\u00d7. Conversely 125.214912\u00d78\u00d70.97 \u2248 971.7 N\u00b7m wheel, not 907.92. The table\u2019s wheel torque and required motor torque cannot both be contract truths under the stated ratio/efficiency.",
+            "impact": "Every closure verdict (length-alone, diameter-alone, gear-ratio trade, \u2018envelope closes 1.534\u00d7\u2019) is anchored to the wrong residual if 907.92 is the duty; gear-ratio lever arithmetic will be systematically biased."
+          },
+          {
+            "where": "Single levers / Diameter alone tip-speed line",
+            "stated": "\u00d71.239 \u2192 172.7 mm airgap, tip speed 154.2 m/s",
+            "correct": "sqrt(125.214912/81.558081)=sqrt(1.5353)\u22481.2391; 139.4\u00d71.2391\u2248172.73 mm; 124.54\u00d71.2391\u2248154.32 m/s (stated 154.2 is fine). If residual is corrected to 1.435\u00d7, sqrt(1.435)\u22481.198, D\u2248166.9 mm, tip\u2248149.1 m/s \u2014 still over 137 m/s, but the stated headroom math changes.",
+            "impact": "Diameter-alone and D+L combination budgets shift once the motor required torque is made consistent with wheel duty."
+          }
+        ],
+        "reasoning_faults": [
+          {
+            "where": "CLAIM / success_criteria vs DIFF content (START)",
+            "fault": "Claim is to establish which architecture change closes 1.534\u00d7 (or that none does). Diff only writes the gap brief, freezes claims, and proposes an approach \u2014 no lever is evaluated, no verdict artefact is produced.",
+            "consequence": "As a finish commit this would be false advertising; as START it is acceptable only if blocking preconditions below are fixed before tools run."
+          },
+          {
+            "where": "Candidate combinations #1\u20132 and PROPOSED APPROACH (D\u00b2L and gear coupling)",
+            "fault": "Approach still treats torque \u221d D\u00b2L\u00d7(load) under tip-speed as the scaling law to close the gap, while the same brief notes yoke already at 2.09 T and iron loss understated at 1300 Hz. Saturated iron breaks linear B and the D\u00b2 shear scaling; raising ratio raises electrical frequency and further loss/thermal binding.",
+            "consequence": "Most likely confidently wrong number: a \u2018closes with D\u00d7L\u00d7ratio\u2019 factor from geometric scaling that FEMM/map screens would not deliver at fixed current/thermal limits."
+          },
+          {
+            "where": "CAPABILITY DOSSIER vs EM evaluation path",
+            "fault": "packages_missing includes femm; calculation guard and kit-case/MTPA/map screens are FEMM-anchored. Brief says evaluate with repo tools, not hand arithmetic, but the dossier shows the primary solver stack may be unavailable.",
+            "consequence": "Stage can silently fall back to hand D\u00b2L/tip-speed arithmetic the guard forbids, or produce stale artefact paths that do not re-run."
+          },
+          {
+            "where": "Single levers \u2018both exhausted\u2019 + length lever",
+            "fault": "Length-alone correctly cannot reach \u00d71.534 (149.7 > 140.5 housing), but \u2018exhausted\u2019 blurs \u2018cannot close alone\u2019 with \u2018no axial growth left\u2019. Current stack 97.58 mm in 140.5 mm housing implies unknown end-winding/bearing budget \u2014 partial length growth is still a real combined lever input.",
+            "consequence": "Without a named tool/result for axial budget before D+L trades, combination studies will assume an illegal stack length or under-use legal growth."
+          },
+          {
+            "where": "Explicit non-goals / magnet rebalance \u2018worth 3.07\u00d7\u2019",
+            "fault": "Diff does not establish 3.07\u00d7; claims show \u03bb_pm 0.001451\u21920.015529 (~10.7\u00d7) and torque 18.08\u219281.56 (~4.5\u00d7). 3.07\u00d7 is asserted, not backed in this change.",
+            "consequence": "Non-goal rationale is numerically unanchored here; harmless if frozen, but must not be reused as a calibrated multiplier later."
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Block until motor required torque, wheel torque, ratio and efficiency are one consistent identity (1.534\u00d7 vs ~1.435\u00d7), axial budget and FEMM/tool availability are fixed, and closure is scored by map/kit screens not saturated-hand D\u00b2L."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "The measured torque residual is 1.534\u00d7 (81.558081 N\u00b7m delivered vs 125.214912 N\u00b7m required)",
+            "verdict": "OVERSTATED",
+            "why": "81.558081 N\u00b7m is backed by em-claims.json (delivered_torque_rebalanced_magnitude_mean_nm, artefact em_fia_front_kit_case_REBALANCED.json). However, 125.214912 N\u00b7m is not derived from the visible contract limits: wheel_torque / (ratio \u00d7 efficiency) = 907.92 / (8 \u00d7 0.97) = 117.0 N\u00b7m, not 125.2 N\u00b7m. The ~7% gap is unexplained (no margin, transient, or duty-cycle derivation shown). The 1.534\u00d7 ratio is arithmetically consistent with the two stated numbers but inherits the unverified required-torque figure."
+          },
+          {
+            "claim": "Single levers are exhausted: length alone needs 149.7 mm stack against 140.5 mm housing; diameter alone needs 172.7 mm airgap at 154.2 m/s against 137 m/s retention limit",
+            "verdict": "CONTRADICTED",
+            "why": "Length arithmetic is correct (97.58 \u00d7 1.534 = 149.7 > 140.5). Diameter arithmetic contains a baseline error: stated tip speed is 124.54 m/s, but \u03c0 \u00d7 0.1394 \u00d7 19500 / 60 = 142.3 m/s. The stated \u00d71.100 headroom (137/124.54) is therefore wrong; actual headroom is 137/142.3 = 0.963, meaning the current design is ALREADY OVER the retention limit by ~3.9%. The 'diameter alone is exhausted' conclusion happens to be correct, but for the wrong reason \u2014 the baseline is non-compliant, not at \u00d71.100 margin. This undermines every downstream lever that assumes tip-speed headroom exists."
+          },
+          {
+            "claim": "Candidate combinations will be evaluated with REPO TOOLS rather than hand arithmetic (per calculation guard recommending em_fia_torque_map_screen.py)",
+            "verdict": "UNSUPPORTED",
+            "why": "This is a forward-looking intent in the proposed approach, not an executed action. Moreover, the document itself hand-derives the single-lever cases (length scaling, D\u00b2L scaling, tip-speed projection) despite the calculation guard explicitly stating 'USE THE TOOL: scripts/motor-stack/em_fia_torque_map_screen.py \u2014 do not hand-derive this'. The single-lever exhaustion section is exactly the kind of derivation the guard prohibits."
+          },
+          {
+            "claim": "9/9 registered EM claims are backed by fresh solver artefacts",
+            "verdict": "SUPPORTED",
+            "why": "em-claims.json lists exactly 9 claims, each with an artefact path, key_path, depends_on scripts, and run_to_fix command. Count and structure match the document's '9/9 backed' assertion."
+          },
+          {
+            "claim": "The finding (closure or no closure) will be reported honestly as a legitimate engineering result rather than dressed up as a tuning problem",
+            "verdict": "UNSUPPORTED",
+            "why": "Intent statement, not a verifiable factual claim about the diff. Cannot be audited until the evaluation is executed and the verdict is recorded."
+          }
+        ],
+        "weakest_link": "The tip-speed baseline error (stated 124.54 m/s vs calculated 142.3 m/s at D=139.4 mm, N=19500 rpm) means the current design is already over the 137 m/s retention limit, not at \u00d71.100 headroom. Every architecture lever that assumes diameter tip-speed margin (including the diameter+length combination, gear-ratio coupling, and pole-count trade) is built on a false baseline. Combined with the unverified 125.214912 N\u00b7m required-torque figure, the setup for the START council is not internally consistent.",
+        "blocking": true,
+        "one_line_summary": "The 1.534\u00d7 gap and 9/9 backed claims are documented, but the baseline arithmetic is broken \u2014 stated tip speed 124.54 m/s contradicts \u03c0DN/60 = 142.3 m/s (design already over retention), and required torque 125.2 N\u00b7m does not match 907.92/(8\u00d70.97) = 117.0 N\u00b7m \u2014 so the single-lever exhaustion and any downstream lever evaluation cannot be trusted until the baseline is corrected and the single-lever cases are re-run through em_fia_torque_map_screen.py per the calculation guard."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The stated required motor torque is inconsistent with the stated wheel torque, gear ratio and efficiency: 907.92/(8*0.97) = 116.999 N.m, not 125.214912. The entire 1.534x residual depends on the denominator.",
+      "action": "SETTLED BY THE CANONICAL RULE, which already exists for exactly this reason. scripts/motor-stack/shaft_torque_identity.py was written by red-team F-EM-2 on 2026-07-31 to stop this drift; the bar is T = P_elec/(eta_combined*omega) with eta 0.9777 = 125.2193 N.m, and its docstring says the eta=1 figure of 122.43 is 'diagnostic only; never the kit duty bar'. The 117.000 N.m is the DRIVELINE demand at the wheel \u2014 a different quantity, covered by a machine meeting 125.22. Sol is right that my brief conflated them; the residual is x1.5353 and the brief now cites the canonical module."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The gear-ratio proposal treats ratio as a free torque lever before preserving the road-speed duty point and the 19,500 rpm limit.",
+      "action": "STRONGER THAN SOL PUT IT: gear ratio is NOT A LEVER AT ALL for this bar. The canonical requirement is set by POWER AT SPEED, T = P/(eta*omega), in which ratio does not appear. Changing the ratio changes the WHEEL torque delivered, not the motor's required torque at its own duty point. I had listed it as 'the lever the EM deck cannot see' \u2014 that was wrong for this duty definition. It is a lever only against the 117 N.m driveline route, which is not the bar the screens use. Removed from the candidate list."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 2,
+      "point": "The diameter arithmetic contains a baseline error: stated tip speed is 124.54 m/s but pi*0.1394*19500/60 = 142.33 m/s; and the tool-based evaluation is forward-looking intent while the document itself hand-derives the single-lever cases.",
+      "action": "BOTH CORRECT, AND THE FIRST IS WORSE THAN AN ARITHMETIC SLIP. Two compounding errors: (a) the stored tip speeds are STALE \u2014 fpk_physics_tree.py:448 falls back to default=122.0 mm and 124.54 m/s is exactly 122.0 mm at 19,500 rpm; the lookup resolves correctly now (139.4 mm -> 142.33 m/s), so the value predates that quantity existing. Same silent-default family as ke=1e-5 and iron_mass_kg=5.0. (b) I MISREAD THE QUANTITY: tip_speed_at_retention_m_s=137 is not a limit \u2014 its condition says 'at 1.10x base speed retention', so 137/124.54=1.100 is the OVERSPEED FACTOR, not headroom against a ceiling. There was never a stated tip-speed limit. On the second point: the hand-derived single-lever cases are retained as envelope arithmetic and explicitly labelled as such, with the tool-based evaluation named as the thing that must produce the verdict."
+    },
+    {
+      "seat": "grok45",
+      "covers": 2,
+      "point": "The tip-speed line and the contract-limits table carry arithmetic errors; and 3.07x is asserted for the magnet respec but not backed by the current claims, which show lambda_pm ~10.7x and torque ~4.5x.",
+      "action": "Tip speed corrected as above. On 3.07x: Grok is right and I have repeated that figure all session without checking it against the re-solved claims. It is now flagged in the brief as UNBACKED, to be retired or re-derived before reuse. The current registered claims are lambda_pm 0.0014514 -> 0.0155287 Wb and probe torque 18.076 -> 81.558 N.m."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "Housing OD and total housing length are not electromagnetic active-material limits \u2014 the real axial budget needs end turns, bearings, seals, resolver; and a torque-only closure is not a system closure (voltage/back-EMF, inverter limit, losses at 19,500 rpm).",
+      "action": "ACCEPTED AND WRITTEN INTO THE BRIEF. The axial row now says '140.5 mm housing, BEFORE end windings/bearings/seals', so the 149.7 mm requirement is understated against the real budget rather than overstated. The radial row is new and is the finding I had missed entirely: stator OD 188.2 mm inside a 198.0 mm housing leaves 4.90 mm of wall, so proportional growth buys only x1.041 on D-squared against the x1.5353 needed. And the system-closure point is recorded as a condition on any candidate: a torque closure that fails voltage or thermal is not a closure."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The geometry and pole-count screens risk extrapolating torque scaling through already-saturated iron (yoke 2.09 T); and torque is not generally proportional to D^2L once flux paths, slot geometry, leakage, voltage and saturation change.",
+      "action": "THE CENTRAL METHODOLOGICAL WARNING AND IT IS ACCEPTED. The brief now states that the scaling arithmetic is ENVELOPE ARITHMETIC ONLY and that the verdict must come from em_fia_torque_map_screen.py plus a candidate re-solve through em_fia_front_kit_case.py. It also records why the arithmetic is OPTIMISTIC rather than neutral: the yoke is at 2.09 T and iron loss is understated, so any D^2L extrapolation overstates what the iron will deliver."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "'Exhausted' blurs 'cannot close alone' with 'no axial growth left'. The current 97.58 mm stack sits in a 140.5 mm housing, so there IS axial growth available even though x1.534 alone is out of reach.",
+      "action": "A REAL DISTINCTION AND THE BRIEF NOW MAKES IT. 'Exhausted' meant 'cannot close the residual ALONE', not 'zero growth remains' \u2014 97.58 mm in a 140.5 mm housing plainly has room, which is precisely why the COMBINATION matters. The corrected brief states the combination arithmetic explicitly: maximum radial growth (x1.041 on D-squared, limited by a 4.90 mm housing wall) still demands a 143.9 mm stack against the 140.5 mm housing, and that is BEFORE end windings, bearings and seals \u2014 so the real axial budget makes it worse, not better. Grok is right that the named tool must establish the legal stack length rather than my assuming it."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "The claim is to establish which architecture change closes 1.534x, but the change only writes the brief, freezes claims and proposes a plan \u2014 acceptable as a START, false as a finish.",
+      "action": "Correct, and it is a START council by construction: the plan-fit says the work has not been done and --evidence carries the envelope rather than a result. The verdict will be produced by em_fia_torque_map_screen.py plus a candidate re-solve, and only then will a finish claim assert one."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 2,
+      "point": "The 1.534x residual and the single-lever exhaustion statements rest on a denominator and a tip-speed baseline that the evidence does not establish.",
+      "action": "Both now established from source rather than asserted: the denominator from the canonical shaft_torque_identity.py (125.2193 N.m, x1.5353 residual), and the tip-speed baseline discarded entirely \u2014 it was stale AND misread, and the real rotor constraint is the CalculiX screen's FoS 2.635, which is not what caps the diameter. The cap is the 4.90 mm radial wall, which MiniMax's challenge is what drove me to examine."
+    },
+    {
+      "seat": "grok45",
+      "covers": 2,
+      "point": "The contract-limits table and the diameter/tip-speed line both carry arithmetic errors (the two arithmetic_errors findings).",
+      "action": "Both traced to one root cause and both corrected at source in the brief. The stored tip speed of 124.54 m/s is computed on a 122.0 mm DEFAULT in fpk_physics_tree.py:448 while the contract's rotor OD is 139.4 mm \u2014 the true figure is 142.33 m/s. And the '137 m/s retention limit' I tabulated is not a limit at all: its condition reads 'at 1.10x base speed retention', making 137/124.54 = 1.100 the overspeed factor rather than headroom. The corrected table drops the tip-speed row as a constraint entirely and replaces it with the two that actually bind \u2014 a 4.90 mm radial wall and the axial housing budget \u2014 plus the CalculiX rotor screen (96.94 MPa vs 355 MPa, FoS 2.635) as the real rotor limit, which is not binding until roughly D = 218-267 mm."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The magnitude-mean is compared to a required delivered torque without establishing it is the relevant metric; and the 477 A design current is not reconciled with the 674.58 A in the solver invocation.",
+      "why_rejected": "Both already settled earlier in this campaign and re-verified rather than re-argued. On the metric: the sweep records BOTH signed mean (-81.558081) and magnitude mean (81.558081) as separate registered claims against their own keys, and torque_sign_consistent is TRUE over the 37 points \u2014 so they coincide here, and the brief says so rather than relying on the coincidence. On the currents: 674.58 A is the TERMINAL PEAK (477 rms x sqrt(2)); the conductor is excited at the PATH current 337.29 A peak / 238.5 A rms because winding_parallel_paths = 2. That was the campaign's largest error, is fixed at source in fe_phase_currents_from_terminal(), and carries a proveCatch. Ampere-turns check both ways: 14 series turns x 477 A = 6678 AT = 4 coils x 7 turns x 238.5 A."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "Axial flux is listed as a candidate although no axial-flux solver is available, which risks turning 'no closure by the radial screen' into an unjustified universal conclusion; and the named tools are specific to the present radial geometry.",
+      "why_rejected": "Correct, and handled by REMOVING the overreach rather than the candidate. The brief no longer claims to establish whether ANY architecture closes the envelope \u2014 it now scopes the verdict to what the radial-flux toolchain can evaluate, and any statement about axial flux would have to be declared unevaluated. Sol's warning cuts both ways and the brief says so: a hand-waved axial closure would be as unfounded as a hand-waved universal impossibility."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "packages_missing includes femm, and the kit-case/MTPA/map screens are FEMM-anchored, so the stage may silently fall back to hand arithmetic the guard forbids.",
+      "why_rejected": "Factually resolved earlier today and now visible in the dossier: the deck does not import the femm PACKAGE \u2014 it shells out to the native xfemm binary femmcli, which the capability probe reports AVAILABLE at scripts/phantm/bin/femmcli. That gap was Grok's own finding at a previous council and the fix (probe_native_solvers) is why the dossier now distinguishes them. The FE path is live; the risk Grok names is real in general and does not apply here."
+    }
+  ],
+  "council_ok": true,
+  "advice_recorded_utc": "2026-08-02T19:17:33Z"
+}

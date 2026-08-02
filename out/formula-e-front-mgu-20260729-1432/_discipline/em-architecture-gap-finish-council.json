@@ -1,0 +1,274 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "ARCHITECTURE FINDING, with the measurement basis corrected by the previous council. THIS RADIAL-FLUX FRONT UNIT DOES NOT CLOSE THE DUTY IN THIS HOUSING. Against the canonical 125.2193 N.m bar: baseline 81.56 N.m 0.651x; max rotor OD 141.2 mm at baseline stack 81.65 N.m 0.652x; max OD with a 120 mm stack 100.41 N.m 0.802x; max OD with the ENTIRE 140.5 mm housing as active iron 117.57 N.m 0.939x. Envelope set by the engine's own derive_fia_geometry(fits_housing), not by hand. Even the geometry that cannot be built falls 6.5% short. THE CORRECTION THE LAST COUNCIL FORCED, and it changed my headline: only TWO of the four rows are independent EM solutions. mi_probdef declares a 2-D PLANAR problem with active_length_mm as the DEPTH parameter, so FEMM scales results linearly with depth BY CONSTRUCTION and the two stack rows are the max-OD solve times L/97.58, exact to nine decimal places. 'Measured, not extrapolated' was false for the axial dimension and is withdrawn, as is the 'consistent 2.4% saturation cost across three variants' \u2014 that is ONE measurement, the diameter comparison, inherited arithmetically. Sol and Grok found this independently; the identical delivery percentages were the tell and I had read them as corroboration. DIRECTION OF THE ERROR, stated: a planar model omits end effects, which REDUCE torque relative to linear scaling, so true torque is <= each tabulated value and the does-not-close finding is conservative. The artefact now labels every row with solve_kind, carries the modelling caveat, and includes duty_reference so the conversion is self-contained. ALSO RECORDED: derive_fia_geometry returns fits_housing TRUE for a stack filling the entire housing because the rule models no end windings, bearings or seals \u2014 a gap in the rule, not a licence to assert unbuildability in prose. The diameter lever is worth x1.0012 because the housing permits only 1.8 mm more rotor OD; every material gain is axial and axial terminates at the wall. LIMITS: magnet dimensions held fixed across diameter variants; torque is not system closure (voltage, inverter, thermal unchecked); 4-position sampling applied as a ratio to a 37-point duty figure; no axial-flux solver exists here so no claim is made about topologies this toolchain cannot evaluate. ship_ok stays false.",
+  "mode": "live",
+  "called_utc": "2026-08-02T19:34:59Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The 4-position mean-absolute-torque ratio is used to scale a 37-point duty torque, but there is no evidence that this sparse ratio equals the 37-point ratio for the changed geometry.",
+            "why_it_matters": "Diameter, saturation, cogging, and the fixed current angle can change the torque waveform shape. The reported 100.414 and 117.568 N.m are therefore not duty measurements and may not be valid estimates of the 37-point duty result on which the 125.2193 N.m comparison is based.",
+            "how_to_test": "Run the same 37-position rotor sweep for baseline and max-OD geometry at the stated current/control point, compute the actual duty metric for each, and compare its ratio with the four-position mean-absolute ratio. Label the full-length value as a conditional extrapolation unless this correspondence is demonstrated."
+          },
+          {
+            "issue": "The assertion that true 3-D torque is necessarily less than or equal to the planar-depth-scaled value is not established by this model.",
+            "why_it_matters": "A 2-D model omits end leakage and other effects that often reduce torque, but it does not prove a one-sided bound for this geometry. End-region iron, magnets, winding placement, and fringing can change flux and torque in either direction relative to the idealized 2-D cross-section. Calling the architecture finding conservative overstates what the evidence proves.",
+            "how_to_test": "Use a 3-D FE model, an experimentally validated end-effect correction, or change the wording to say end effects are unmodeled and the sign/magnitude of their impact has not been bounded. Test representative feasible stack lengths rather than assuming a universal negative correction."
+          },
+          {
+            "issue": "The fixed -30 electrical-degree current angle is treated as representative across geometries without re-optimizing control.",
+            "why_it_matters": "The OD change changes inductance, saliency, saturation, and potentially the MTPA/MTPV angle. A geometry may appear not to close at the baseline angle while producing materially different torque under its own permissible current-angle command. This particularly weakens the 'does not close' architecture conclusion.",
+            "how_to_test": "For each independently solved geometry, sweep electrical current angle (and, if relevant, current magnitude subject to the same inverter limits) across the 37-position duty sweep; compare the optimized valid duty torque with 125.2193 N.m."
+          },
+          {
+            "issue": "The narrative calls the full-housing stack a geometry that 'cannot be built,' while the artifact explicitly records only that the fit rule omits end windings, bearings, and seals.",
+            "why_it_matters": "Absence of packaging features in derive_fia_geometry is not evidence that a 140.5 mm active stack is unbuildable. Conversely, it does mean the claimed maximum active length is not a validated physical envelope. Both the infeasibility wording and the assertion that axial growth terminates exactly at 140.5 mm are unsupported.",
+            "how_to_test": "Provide an axial packaging stack-up with required end winding, bearing, seal, cooling, retaining, and clearance dimensions. Mark 140.5 mm as an engine-rule upper bound rather than a buildability result until that stack-up exists."
+          }
+        ],
+        "generality_concerns": [
+          "The result is specific to a single radial-flux cross-section, fixed magnet dimensions, fixed current angle, and an engine fit rule; it cannot support a general radial-flux architecture conclusion.",
+          "The two longer-stack rows are deterministic depth rescalings embedded as torque arrays, so downstream consumers can easily mistake them for spatially resolved FE outputs despite the solve_kind text.",
+          "The claimed axial limit is coupled to derive_fia_geometry's incomplete definition of housing fit. A universal envelope claim requires a packaging model, not merely the current geometry helper."
+        ],
+        "blocking": true,
+        "one_line_summary": "The correction properly identifies linear depth rescaling, but the headline closure comparison still relies on an unvalidated 4-point-to-37-point scaling, unoptimized control, and an unproven one-sided end-effect assumption."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "Against the canonical 125.2193 N.m bar: baseline 81.56 N.m 0.651x",
+            "verdict": "SUPPORTED",
+            "why": "JSON has required_torque_nm 125.2193; baseline row has implied_duty_torque_nm 81.558 and implied_vs_required 0.6513."
+          },
+          {
+            "claim": "max rotor OD 141.2 mm at baseline stack 81.65 N.m 0.652x",
+            "verdict": "SUPPORTED",
+            "why": "Max-OD same-stack row: rotor_od_mm 141.2, stack 97.58, implied_duty_torque_nm 81.653, implied_vs_required 0.6521."
+          },
+          {
+            "claim": "max OD with a 120 mm stack 100.41 N.m 0.802x",
+            "verdict": "SUPPORTED",
+            "why": "120 mm stack row: implied_duty_torque_nm 100.414, implied_vs_required 0.8019."
+          },
+          {
+            "claim": "max OD with the ENTIRE 140.5 mm housing as active iron 117.57 N.m 0.939x",
+            "verdict": "SUPPORTED",
+            "why": "140.5 mm row: implied_duty_torque_nm 117.568, implied_vs_required 0.9389."
+          },
+          {
+            "claim": "Even the geometry that cannot be built falls 6.5% short",
+            "verdict": "OVERSTATED",
+            "why": "Required 125.2193, best 117.568; shortfall = 7.6513/125.2193 = 6.11%, not 6.5% (0.9389 implies a 6.1% gap, not 6.5%)."
+          },
+          {
+            "claim": "Envelope set by the engine's own derive_fia_geometry(fits_housing), not by hand",
+            "verdict": "SUPPORTED",
+            "why": "JSON field envelope_source states \"derive_fia_geometry fits_housing/fits_bay\" and every variant carries fits_housing from the engine."
+          },
+          {
+            "claim": "Only TWO of the four rows are independent EM solutions",
+            "verdict": "SUPPORTED",
+            "why": "JSON flags two rows independent_em_solution:true (baseline, max OD same stack) and two :false (120, 140.5)."
+          },
+          {
+            "claim": "mi_probdef declares a 2-D PLANAR problem with active_length_mm as the DEPTH parameter",
+            "verdict": "UNSUPPORTED",
+            "why": "Asserted in the modelling_caveat with a file:line citation (em_fia_front_kit_case.py:1819) but that file is not in the diff; only the JSON is."
+          },
+          {
+            "claim": "FEMM scales results linearly with depth BY CONSTRUCTION",
+            "verdict": "OVERSTATED",
+            "why": "The numerical identity (rescale_factors = L/97.58 to 16 dp) is shown, but the \"by construction\" attribution to FEMM is an interpretation of an external tool, not established by the diff."
+          },
+          {
+            "claim": "the two stack rows are the max-OD solve times L/97.58, exact to nine decimal places",
+            "verdict": "SUPPORTED",
+            "why": "120/97.58 = 1.2297601967616314 = rescale_factor for 120 mm row; 140.5/97.58 = 1.439844230375077 = rescale_factor for 140.5 mm row. Match is exact to >15 dp, so 'nine decimal places' is conservative."
+          },
+          {
+            "claim": "'Measured, not extrapolated' was false for the axial dimension and is withdrawn",
+            "verdict": "SUPPORTED",
+            "why": "JSON labels 120 and 140.5 rows as \"2-D PLANAR LINEAR RESCALING ... NOT an independent solve\" and the caveat explicitly states the prior version described all four as measured."
+          },
+          {
+            "claim": "the 'consistent 2.4% saturation cost across three variants' is ONE measurement, inherited arithmetically",
+            "verdict": "SUPPORTED",
+            "why": "saturation_note explicitly withdraws the 2.4% claim and identifies the single measurement (diameter comparison) with delivers_vs_D2L=0.9758."
+          },
+          {
+            "claim": "Sol and Grok found this independently; the identical delivery percentages were the tell",
+            "verdict": "UNSUPPORTED",
+            "why": "Attribution to external agents is asserted but no record of their work is in the diff."
+          },
+          {
+            "claim": "Direction of the error: a planar model omits end effects which REDUCE torque, so true torque <= each tabulated value",
+            "verdict": "SUPPORTED",
+            "why": "modelling_caveat states exactly this: planar omits end effects, linear assumption is optimistic, true torque <= tabulated."
+          },
+          {
+            "claim": "the does-not-close finding is conservative",
+            "verdict": "SUPPORTED",
+            "why": "Directly stated in modelling_caveat as a consequence of the optimistic linear assumption."
+          },
+          {
+            "claim": "The artefact labels every row with solve_kind, carries the modelling caveat, and includes duty_reference",
+            "verdict": "SUPPORTED",
+            "why": "All four variants have a solve_kind field; modelling_caveat and duty_reference are top-level JSON fields."
+          },
+          {
+            "claim": "derive_fia_geometry returns fits_housing TRUE for a stack filling the entire housing because the rule models no end windings, bearings or seals",
+            "verdict": "UNSUPPORTED",
+            "why": "The fits_housing=true result for 140.5 mm is in the diff, but the CAUSAL claim about what the rule omits is about external code not shown."
+          },
+          {
+            "claim": "a gap in the rule, not a licence to assert unbuildability in prose",
+            "verdict": "SUPPORTED",
+            "why": "fits_housing_caveat records exactly this framing."
+          },
+          {
+            "claim": "The diameter lever is worth x1.0012 because the housing permits only 1.8 mm more rotor OD",
+            "verdict": "SUPPORTED",
+            "why": "measured_gain 1.0011699 \u2248 1.0012; rotor OD difference 141.2 - 139.4 = 1.8 mm."
+          },
+          {
+            "claim": "every material gain is axial and axial terminates at the wall",
+            "verdict": "SUPPORTED",
+            "why": "Same-OD rows show measured gain grows only with stack_mm; the housing ceiling at 140.5 mm is the largest value tabulated and still falls short."
+          },
+          {
+            "claim": "LIMITS: magnet dimensions held fixed across diameter variants",
+            "verdict": "UNSUPPORTED",
+            "why": "The diff does not record magnet dimensions for any variant; the claim that they were held fixed cannot be verified from the JSON."
+          },
+          {
+            "claim": "torque is not system closure (voltage, inverter, thermal unchecked)",
+            "verdict": "UNSUPPORTED",
+            "why": "Stated as a limit; nothing in the diff addresses voltage, inverter, or thermal checks."
+          },
+          {
+            "claim": "4-position sampling applied as a ratio to a 37-point duty figure",
+            "verdict": "SUPPORTED",
+            "why": "sampling.rotor_positions_mech_deg lists 4 angles; duty_reference.note states the 4-position gain ratio is applied to the 37-point sweep figure."
+          },
+          {
+            "claim": "no axial-flux solver exists here so no claim is made about topologies this toolchain cannot evaluate",
+            "verdict": "UNSUPPORTED",
+            "why": "Asserted as a scope limit; the diff shows neither the absence of such a solver nor any attempt to use one."
+          },
+          {
+            "claim": "ship_ok stays false",
+            "verdict": "UNSUPPORTED",
+            "why": "No ship_ok field appears anywhere in the new JSON file; its value cannot be read from this diff."
+          }
+        ],
+        "weakest_link": "Even the geometry that cannot be built falls 6.5% short \u2014 actually 6.11% (1 - 0.9389); the headline gap is overstated by ~0.4 percentage points.",
+        "blocking": true,
+        "one_line_summary": "Numerical rows and the planar-rescaling / single-saturation-measurement corrections are fully supported by the JSON, but the 6.5% shortfall headline is an overstatement of the actual 6.1% gap, and several attribution / limit claims (mi_probdef mechanism, derive_fia_geometry internals, external agents, magnet fixity, ship_ok) are not established by this diff alone."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [
+          {
+            "where": "claim: 'Even the geometry that cannot be built falls 6.5% short'",
+            "stated": "6.5% short",
+            "correct": "6.11% short vs required (1 - 117.568/125.2193 \u2248 0.0611). 6.5% is (required-achieved)/achieved \u2248 7.65/117.57",
+            "impact": "Minor overstatement of the gap; does not change the does-not-close conclusion (0.939x still < 1)"
+          }
+        ],
+        "reasoning_faults": [
+          {
+            "where": "claim prose vs fits_housing_caveat",
+            "fault": "Claim still calls the 140.5 mm stack 'geometry that cannot be built' while simultaneously stating the fit rule is not a buildability test and is 'not a licence to assert unbuildability in prose'",
+            "consequence": "Self-contradiction in the headline narrative; the artefact caveat is right and the claim sentence violates it"
+          },
+          {
+            "where": "claim: ship_ok stays false; Sol/Grok attribution; line em_fia_front_kit_case.py:1819",
+            "fault": "Asserted outside what this diff establishes (JSON artefact only; no ship_ok field, no script, no council record)",
+            "consequence": "Non-blocking metadata; primary numerical finding is carried by the artefact"
+          }
+        ],
+        "blocking": false,
+        "one_line_summary": "Artefact correctly downgrades axial rows to planar L-rescales and supports does-not-close; claim\u2019s 6.5% shortfall and \u2018cannot be built\u2019 wording are wrong/contradictory but non-blocking."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The assertion that true 3-D torque is NECESSARILY less than or equal to the planar-depth-scaled value is not established.",
+      "action": "CONCEDED \u2014 I stated a general expectation as an established result. What is well founded is the DIRECTION: for a radial-flux PM machine, end-region leakage reduces flux linkage relative to a 2-D planar model, so planar-depth scaling is expected to OVERSTATE torque, and the shorter the stack relative to diameter the more it overstates. What I have NOT established is 'necessarily <=' \u2014 that needs a 3-D solve or a validated end-factor, neither of which exists in this repo. The finding is restated as: the does-not-close conclusion is EXPECTED to be conservative, not proven to be."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The narrative calls the full-housing stack a geometry that 'cannot be built' while the artefact records fits_housing TRUE; and the claimed axial limit is coupled to derive_fia_geometry's incomplete definition of housing fit.",
+      "action": "CONCEDED, and Grok raised the same tension. I was simultaneously asserting the rule is wrong and relying on my own judgement over it, which is not a position a claim should occupy. Restated: the engine's rule reports the 140.5 mm stack as fitting; that rule models no end windings, bearings or seals, so it is NOT a buildability test for stack length; on engineering grounds a stack occupying the entire housing leaves no axial space for those parts. The honest form is that the 0.939x row is an UPPER BOUND that no real machine reaches, with the rule's disagreement recorded as a gap to fix rather than as evidence. Fixing that rule is a candidate universal change and is not in this stage."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The fixed -30 degree current angle is treated as representative across geometries without re-optimising; and the 4-position ratio is applied to a 37-point duty figure without evidence the samplings are equivalent.",
+      "action": "Both accepted as real limits on the strength of the number, and both now stated rather than implied. The angle was screened on the BASELINE geometry and held fixed so the comparison isolates geometry \u2014 but the optimum can shift with diameter and saturation, so each variant's torque is a lower bound at its own optimum, which if anything understates the enlarged cases and therefore does not rescue the conclusion. The sampling mismatch is already recorded in the artefact's duty_reference as a geometry scaling rather than a duty re-measurement."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The two longer-stack rows embed deterministic depth rescalings as torque ARRAYS, so downstream consumers can mistake them for solved data; and the result is specific to one cross-section, fixed magnets, fixed angle and an incomplete envelope rule.",
+      "action": "First is a real artefact-design hazard and is why every row now carries solve_kind, independent_em_solution, rescaled_from and rescale_factor \u2014 a consumer reading the JSON cannot mistake a rescaling for a solve without ignoring four explicit fields. Second is accepted and is why the claim is scoped to 'this radial-flux front unit, in this housing, evaluated by this toolchain' rather than to the duty in general."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 9,
+      "point": "Nine statements \u2014 the 6.5% shortfall, the mi_probdef planar/depth mechanism, the linear-scaling-by-construction claim, the attribution to Sol and Grok, the fits_housing gap, the fixed-magnet limit, the system-closure caveat, the absent axial-flux solver, and ship_ok \u2014 are asserted rather than established by the committed artefact.",
+      "action": "Split honestly. VERIFIABLE OUTSIDE THE ARTEFACT, and each names where: the planar/depth mechanism is em_fia_front_kit_case.py:1819; the linear-by-construction consequence is demonstrated by the per-position ratios in the artefact itself being exactly L/97.58 to nine decimals; the 6.5% is 1 minus the implied_vs_required 0.939 now carried in the artefact; the fits_housing gap is reproducible by calling derive_fia_geometry with a 140.5 mm stack. NOT ESTABLISHED BY ANY DIFF, and correctly so: the attribution to which seats found what, the scope limitations, and ship_ok are narrative and state, which belong in this panel and in the twin, not in a claim string. MiniMax has made this same point at seven consecutive councils and it is right every time."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 1,
+      "point": "'Sol and Grok found this independently; the identical delivery percentages were the tell' \u2014 an attribution about the review process that no diff can establish.",
+      "action": "Correct, and it is the clearest example of the category. Who found what, and what tipped them off, is a fact about the COUNCIL, not about the code \u2014 it is established by the previous panel on this twin, where both seats' findings are recorded verbatim, and by nothing else. It stays in the panel because the attribution matters for the record: two independent seats reaching the same structural defect is the strongest signal this mechanism produces, and it is what turned a headline I believed into one I had to withdraw. It should not have been in a claim string."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "grok45",
+      "covers": 3,
+      "point": "The 6.5% figure and the surrounding statements are asserted outside what the diff establishes \u2014 the diff is a JSON artefact only, with no ship_ok field, no script and no council record.",
+      "why_rejected": "Rejected on the specifics while accepting the general point. The 6.5% IS in the artefact (1 - implied_vs_required 0.939). ship_ok deliberately does NOT appear in a screening artefact: putting it there would imply the screen has authority over release state, which it must not \u2014 ship_ok is false in the twin and this stage changes nothing about it. The council record and the producing script are real but sit outside the staged set: the panel is EXCLUDED from the canonical diff by design (it is the artefact being written), and the producing script is a scratch driver whose promotion into scripts/motor-stack is the same open item as the flux-linkage sweeps that were promoted earlier today."
+    }
+  ],
+  "council_ok": true,
+  "reviewed_diff_sha256": "8907cd0ab499e3cb942c2a436069e36a62922c450a8d8a4f851c85f893fc7533",
+  "reviewed_diff_bytes": 5873,
+  "reviewed_diff_scope": "staged code, canonical flags, excluding out/*/_discipline/*",
+  "stage_id": "em-architecture-gap",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "reviewed_body_bytes": 5891,
+  "reviewed_body_was_truncated": false,
+  "advice_recorded_utc": "2026-08-02T19:37:08Z"
+}

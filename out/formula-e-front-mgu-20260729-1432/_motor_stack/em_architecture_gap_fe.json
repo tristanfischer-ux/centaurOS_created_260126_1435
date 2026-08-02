@@ -1,0 +1,115 @@
+{
+  "schema": "forgeos.fpk.architecture_gap_fe/v1",
+  "required_torque_nm": 125.2193,
+  "sampling": {
+    "current_angle_electrical_deg": -30.0,
+    "rotor_positions_mech_deg": [
+      0.0,
+      3.75,
+      7.5,
+      11.25
+    ],
+    "note": "identical sampling to em_six_branch_vs_one_circuit_REBALANCED"
+  },
+  "envelope_source": "derive_fia_geometry fits_housing/fits_bay",
+  "variants": [
+    {
+      "label": "baseline",
+      "rotor_od_mm": 139.4,
+      "stack_mm": 97.58,
+      "stator_od_mm": 188.20000000000002,
+      "fits_housing": true,
+      "mean_abs_torque_nm": 54.74308530616248,
+      "torques": [
+        78.43099532943242,
+        55.73845496868429,
+        52.40218324112647,
+        32.40070768540672
+      ],
+      "geometric_D2L_gain": 1.0,
+      "measured_gain": 1.0,
+      "delivers_vs_D2L": 1.0,
+      "solve_kind": "INDEPENDENT FE SOLVE",
+      "independent_em_solution": true,
+      "implied_duty_torque_nm": 81.558,
+      "implied_vs_required": 0.6513
+    },
+    {
+      "label": "max OD, same stack",
+      "rotor_od_mm": 141.2,
+      "stack_mm": 97.58,
+      "stator_od_mm": 190.0,
+      "fits_housing": true,
+      "mean_abs_torque_nm": 54.80712859622507,
+      "torques": [
+        77.12394351481414,
+        53.53307478012243,
+        53.99819738719194,
+        34.57329870277177
+      ],
+      "geometric_D2L_gain": 1.0259916963250986,
+      "measured_gain": 1.0011698882097058,
+      "delivers_vs_D2L": 0.9758070087659582,
+      "solve_kind": "INDEPENDENT FE SOLVE",
+      "independent_em_solution": true,
+      "implied_duty_torque_nm": 81.653,
+      "implied_vs_required": 0.6521
+    },
+    {
+      "label": "max OD, 120 stack",
+      "rotor_od_mm": 141.2,
+      "stack_mm": 120.0,
+      "stator_od_mm": 190.0,
+      "fits_housing": true,
+      "mean_abs_torque_nm": 67.39962524643387,
+      "torques": [
+        94.84395595181057,
+        65.83284457485908,
+        66.40483384364676,
+        42.5168666154191
+      ],
+      "geometric_D2L_gain": 1.2617237503485532,
+      "measured_gain": 1.23119887871659,
+      "delivers_vs_D2L": 0.9758070087659595,
+      "solve_kind": "2-D PLANAR LINEAR RESCALING of the max-OD solve by L/97.58 \u2014 NOT an independent solve",
+      "independent_em_solution": false,
+      "rescaled_from": "max OD, same stack",
+      "rescale_factor": 1.2297601967616314,
+      "implied_duty_torque_nm": 100.414,
+      "implied_vs_required": 0.8019
+    },
+    {
+      "label": "max OD, FULL 140.5",
+      "rotor_od_mm": 141.2,
+      "stack_mm": 140.5,
+      "stator_od_mm": 190.0,
+      "fits_housing": true,
+      "mean_abs_torque_nm": 78.91372789269981,
+      "torques": [
+        111.0464650935785,
+        77.07928885639717,
+        77.74899295860345,
+        49.78016466222011
+      ],
+      "geometric_D2L_gain": 1.4772682243664312,
+      "measured_gain": 1.44152868716401,
+      "delivers_vs_D2L": 0.9758070087659612,
+      "solve_kind": "2-D PLANAR LINEAR RESCALING of the max-OD solve by L/97.58 \u2014 NOT an independent solve",
+      "independent_em_solution": false,
+      "rescaled_from": "max OD, same stack",
+      "rescale_factor": 1.439844230375077,
+      "implied_duty_torque_nm": 117.568,
+      "implied_vs_required": 0.9389
+    }
+  ],
+  "modelling_caveat": "\u2b50 THE AXIAL DIMENSION IS NOT MEASURED. mi_probdef declares a 2-D PLANAR problem with active_length_mm as the DEPTH parameter (em_fia_front_kit_case.py:1819), and FEMM scales planar results linearly with depth by construction. Only the two DIAMETER cases are independent electromagnetic solutions; the 120 mm and 140.5 mm rows are the max-OD solve multiplied by L/97.58, exact to nine decimal places. Found by Sol and Grok at the finish council after the first version of this artefact described all four rows as measured. CONSEQUENCE FOR THE CONCLUSION: a 2-D planar model omits END EFFECTS, which REDUCE torque relative to linear length scaling. The linear assumption is therefore OPTIMISTIC, so the true torque at any of these stack lengths is <= the value tabulated, and the finding that the envelope does not close is if anything conservative. What is NOT supported is the claim that the axial gain was measured.",
+  "saturation_note": "The 97.6% delivery against D^2L is ONE measurement \u2014 the diameter comparison \u2014 not three. The stack rows inherit it arithmetically because they are rescalings. The earlier claim of a 'consistent 2.4% across all three variants' is WITHDRAWN.",
+  "duty_reference": {
+    "required_shaft_torque_nm": 125.2193,
+    "source": "scripts/motor-stack/shaft_torque_identity.py, T = P_elec/(eta_combined*omega), eta=0.9777",
+    "measured_duty_torque_nm": 81.558081,
+    "measured_duty_source": "_claims/em-claims.json delivered_torque_rebalanced_magnitude_mean_nm, 37-point rotor sweep",
+    "note": "The implied-duty column applies a 4-position gain ratio to a 37-point sweep figure. The two samplings are not the same; the ratio is a geometry scaling, not a duty re-measurement."
+  },
+  "fits_housing_caveat": "derive_fia_geometry reports fits_housing=true for the 140.5 mm stack, i.e. the ENTIRE housing length as active iron. The engine's fit rule does not model end windings, bearings or seals, so fits_housing is NOT a buildability test for stack length. That is a gap in the rule, recorded here rather than worked around in prose."
+}

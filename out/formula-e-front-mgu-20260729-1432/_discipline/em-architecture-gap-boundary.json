@@ -1,0 +1,12 @@
+{
+  "schema": "forgeos.p_stage_discipline.boundary/v1",
+  "stage_id": "em-architecture-gap",
+  "exit_code": 0,
+  "verdict": "PROCEED",
+  "log": "\u2500\u2500 FINISHED: em-architecture-gap\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/em_architecture_gap_fe.json\n\u2500\u2500 NEXT: Programme decision: if the duty is fixed, the housing envelope must change or this is the wrong architecture. Not an engineering tuning task.\n\u2500\u2500 GATES: 7/7 pass\n\u2500\u2500 PROCEED\n",
+  "produced": [
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/em_architecture_gap_fe.json"
+  ],
+  "needs": [],
+  "checked_utc": "2026-08-02T19:34:59Z"
+}
