@@ -1,0 +1,74 @@
+{
+  "schema": "forgeos.fpk.combined_case/v1",
+  "question": "does a MODERATE speed rise plus a MODERATE stack rise close 250 kW without a 30,000 rpm rotor or a longer housing",
+  "rotor_fos_context": {
+    "19500": 2.635,
+    "24000": 1.74,
+    "27000": 1.374,
+    "30000": 1.113,
+    "source": "calculix_rotor_speed_sweep.json, solved per speed via run_screen(rpm_override)"
+  },
+  "honesty": "Diameter is an independent FE solve; stack length is a 2-D planar DEPTH rescaling and cannot be independent in this deck. Each row is solved at its own geometry. Torque only: iron loss rises as frequency squared on a budget already understated, the thermal case is NOT closed, and bearings, magnet retention and rotor dynamics at raised speed are unevaluated.",
+  "rows": [
+    {
+      "rpm": 27000,
+      "stack_mm": 110.0,
+      "rotor_od_mm": 141.2,
+      "fits_housing": true,
+      "fits_bay": true,
+      "axial_allowance_mm": 30.5,
+      "mean_abs_torque_nm": 61.783,
+      "gain_vs_baseline": 1.1286,
+      "required_torque_nm": 90.436,
+      "implied_delivered_nm": 92.046,
+      "ratio": 1.0178,
+      "electrical_frequency_hz": 1800,
+      "eddy_loss_multiplier": 1.917
+    },
+    {
+      "rpm": 27000,
+      "stack_mm": 120.0,
+      "rotor_od_mm": 141.2,
+      "fits_housing": true,
+      "fits_bay": true,
+      "axial_allowance_mm": 20.5,
+      "mean_abs_torque_nm": 67.3996,
+      "gain_vs_baseline": 1.2312,
+      "required_torque_nm": 90.436,
+      "implied_delivered_nm": 100.414,
+      "ratio": 1.1103,
+      "electrical_frequency_hz": 1800,
+      "eddy_loss_multiplier": 1.917
+    },
+    {
+      "rpm": 24000,
+      "stack_mm": 120.0,
+      "rotor_od_mm": 141.2,
+      "fits_housing": true,
+      "fits_bay": true,
+      "axial_allowance_mm": 20.5,
+      "mean_abs_torque_nm": 67.3996,
+      "gain_vs_baseline": 1.2312,
+      "required_torque_nm": 101.741,
+      "implied_delivered_nm": 100.414,
+      "ratio": 0.987,
+      "electrical_frequency_hz": 1600,
+      "eddy_loss_multiplier": 1.515
+    },
+    {
+      "rpm": 24000,
+      "stack_mm": 130.0,
+      "rotor_od_mm": 141.2,
+      "fits_housing": true,
+      "fits_bay": true,
+      "axial_allowance_mm": 10.5,
+      "mean_abs_torque_nm": 73.0163,
+      "gain_vs_baseline": 1.3338,
+      "required_torque_nm": 101.741,
+      "implied_delivered_nm": 108.782,
+      "ratio": 1.0692,
+      "electrical_frequency_hz": 1600,
+      "eddy_loss_multiplier": 1.515
+    }
+  ]
+}

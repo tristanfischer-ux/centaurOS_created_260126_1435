@@ -1,0 +1,90 @@
+{
+  "schema": "forgeos.fpk.overcurrent_probe/v1",
+  "question": "does a larger inverter class close the torque gap",
+  "required_torque_nm": 125.2193,
+  "duty_reference_nm": 81.558081,
+  "design_point": {
+    "terminal_rms_a": 477.0,
+    "note": "phase_current_max_a == phase_current_design_a; no headroom inside the 350 kW hardware class"
+  },
+  "sampling": {
+    "current_angle_electrical_deg": -30.0,
+    "rotor_positions_mech_deg": [
+      0.0,
+      3.75,
+      7.5,
+      11.25
+    ]
+  },
+  "caveat": "Torque only. Copper loss rises as current SQUARED and is not evaluated here; the thermal case for any of these points is unproven, and the current angle was screened at the design point rather than re-optimised per current.",
+  "rows": [
+    {
+      "current_multiple": 1.0,
+      "terminal_rms_a": 476.99999999999994,
+      "terminal_peak_a": 674.5798692519663,
+      "mean_abs_torque_nm": 54.74308537213104,
+      "inverter_class_kw": 350.0,
+      "torques": [
+        78.43099559330669,
+        55.73845496868429,
+        52.40218324112647,
+        32.40070768540672
+      ],
+      "torque_gain": 1.0,
+      "linearity": 1.0,
+      "implied_duty_torque_nm": 81.558,
+      "implied_vs_required": 0.6513
+    },
+    {
+      "current_multiple": 1.25,
+      "terminal_rms_a": 596.25,
+      "terminal_peak_a": 843.224836564958,
+      "mean_abs_torque_nm": 70.10036681346254,
+      "inverter_class_kw": 437.5,
+      "torques": [
+        100.3358219871539,
+        72.61566231858423,
+        67.09020748528837,
+        40.35977546282367
+      ],
+      "torque_gain": 1.2805337210523702,
+      "linearity": 1.024426976841896,
+      "implied_duty_torque_nm": 104.438,
+      "implied_vs_required": 0.834
+    },
+    {
+      "current_multiple": 1.5,
+      "terminal_rms_a": 715.4999999999999,
+      "terminal_peak_a": 1011.8698038779495,
+      "mean_abs_torque_nm": 84.21220985957852,
+      "inverter_class_kw": 525.0,
+      "torques": [
+        120.7651215129814,
+        89.03208393238921,
+        79.85171060774356,
+        47.19992338519991
+      ],
+      "torque_gain": 1.5383168355806596,
+      "linearity": 1.0255445570537731,
+      "implied_duty_torque_nm": 125.462,
+      "implied_vs_required": 1.0019
+    },
+    {
+      "current_multiple": 2.0,
+      "terminal_rms_a": 953.9999999999999,
+      "terminal_peak_a": 1349.1597385039327,
+      "mean_abs_torque_nm": 106.92510063980481,
+      "inverter_class_kw": 700.0,
+      "torques": [
+        156.4601144096187,
+        118.6241425440565,
+        100.2967652283632,
+        52.31938037718083
+      ],
+      "torque_gain": 1.9532165553503662,
+      "linearity": 0.9766082776751831,
+      "implied_duty_torque_nm": 159.301,
+      "implied_vs_required": 1.2722
+    }
+  ]
+}

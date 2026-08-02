@@ -1,0 +1,56 @@
+{
+  "schema": "forgeos.fpk.rotor_speed_sweep/v1",
+  "question": "does the rotor survive the speed the 250 kW cap forces, since a bigger inverter is not permitted",
+  "method": "calculix_fia_rotor_screen.run_screen(rpm_override=...) \u2014 the tool own parameter, not hand scaling",
+  "assumed_yield_mpa": 355.0,
+  "machine_torque_nm": 81.558081,
+  "machine_torque_source": "_claims/em-claims.json delivered_torque_rebalanced_magnitude_mean_nm",
+  "source_state_sha256": "2d5167d5f943144a731688c3636e4c83d9ec2a34a2c1bab3e2c3debdaa804b4a",
+  "caveat": "Screening FoS only. release_fos_closed is false on this screen family and a real burst analysis is a different job. Bearings, magnet retention and rotor dynamics at raised speed are NOT evaluated here, nor is the iron loss rise with electrical frequency.",
+  "rows": [
+    {
+      "rpm": 19500,
+      "required_torque_nm": 125.219,
+      "machine_torque_nm": 81.558081,
+      "torque_ratio": 0.6513,
+      "max_principal_stress_mpa": 96.937,
+      "max_von_mises_mpa": 134.724,
+      "screening_fos_vs_yield": 2.635,
+      "below_assumed_yield": true,
+      "assumed_yield_mpa": 355.0
+    },
+    {
+      "rpm": 24000,
+      "required_torque_nm": 101.741,
+      "machine_torque_nm": 81.558081,
+      "torque_ratio": 0.8016,
+      "max_principal_stress_mpa": 146.839,
+      "max_von_mises_mpa": 204.079,
+      "screening_fos_vs_yield": 1.74,
+      "below_assumed_yield": true,
+      "assumed_yield_mpa": 355.0
+    },
+    {
+      "rpm": 27000,
+      "required_torque_nm": 90.436,
+      "machine_torque_nm": 81.558081,
+      "torque_ratio": 0.9018,
+      "max_principal_stress_mpa": 185.843,
+      "max_von_mises_mpa": 258.288,
+      "screening_fos_vs_yield": 1.374,
+      "below_assumed_yield": true,
+      "assumed_yield_mpa": 355.0
+    },
+    {
+      "rpm": 30000,
+      "required_torque_nm": 81.393,
+      "machine_torque_nm": 81.558081,
+      "torque_ratio": 1.002,
+      "max_principal_stress_mpa": 229.436,
+      "max_von_mises_mpa": 318.874,
+      "screening_fos_vs_yield": 1.113,
+      "below_assumed_yield": true,
+      "assumed_yield_mpa": 355.0
+    }
+  ]
+}
