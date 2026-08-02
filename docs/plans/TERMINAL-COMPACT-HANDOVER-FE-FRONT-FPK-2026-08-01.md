@@ -27,6 +27,13 @@
 
 ## 1. Live scoreboard
 
+> ⚠⚠ **HOLD — every torque figure below is provisional.** pyleecan says the FE
+> builds a 28-series-turn machine where the contract specifies 14 (FE λ_pm /
+> analytic = 1.964 on the near-sinusoidal rebalanced field). If that carries to
+> torque, all of it halves and DEC-EM-1 reverses. Measurement in flight. See
+> `DEC-EM-1-DECISION-BRIEF-2026-08-01.md` §HOLD.
+
+
 **DEC-EM-1 is RESOLVED by measurement** — see
 [`DEC-EM-1-DECISION-BRIEF-2026-08-01.md`](./DEC-EM-1-DECISION-BRIEF-2026-08-01.md).
 

@@ -1,5 +1,41 @@
 # DEC-EM-1 — RESOLVED BY MEASUREMENT
 
+> ## ⚠⚠ HOLD — A 2× WINDING DISCREPANCY IS OPEN (2026-08-02)
+>
+> **Do not act on the torque figures below until this closes.**
+>
+> pyleecan's own winding model says the FE deck builds a machine with **28
+> series turns per phase** where the contract specifies **14**:
+>
+> ```
+> Zs=24, 2p=8, Ntcoil=7
+>   Npcp=1  →  Ncspc 4  →  28 series turns/phase   ← what the FE builds
+>   Npcp=2  →  Ncspc 2  →  14 series turns/phase   ← what the contract specifies
+> ```
+>
+> FEMM has no concept of parallel paths — a circuit is one series path — so
+> `mi_addcircprop(674.58)` with 7 turns/slot excites the a=1 machine. Confirmed
+> independently: on the REBALANCED machine, whose field is near-sinusoidal
+> (THD 6.9%) so the 1-D transform is valid, FE λ_pm / analytic = **1.964**.
+> (On the baseline the same ratio is 0.206, but that field is a PULSE at
+> THD 198% and the transform does not apply there.)
+>
+> **If it carries through to torque, every figure below halves and this decision
+> REVERSES** — the magnet respec would no longer clear the 125.21 N·m duty.
+>
+> It may not halve. The machine is **saturated** (tooth 1.799 T, yoke 2.104 T),
+> so reducing MMF de-saturates it and costs *less* than proportionally —
+> MiniMax-M3 corrected an earlier estimate of mine on exactly this point. An FE
+> run at the path current (238.5 A rms) is measuring it rather than arguing it.
+>
+> Raised independently by Grok 4.5 and Sol in the turns council. I had dismissed
+> it earlier after checking only the current MAGNITUDE (477 × √2 = 674.58,
+> correct) and missing that the coupling runs through TURNS.
+>
+> **Settled regardless of the torque outcome:** the FE deck and the contract
+> describe different windings. That needs fixing either way.
+
+
 **Date:** 2026-08-01. `ship_ok` **false** (unchanged). This file previously
 argued for and then against a geometry change on ARITHMETIC. Both arguments are
 superseded: the question was settled by measuring the machine.
