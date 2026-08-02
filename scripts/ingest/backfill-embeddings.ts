@@ -107,6 +107,20 @@ const TABLES: TableSpec[] = [
         .join(' '),
   },
   {
+    // ⭐ ADDED 2026-08-02. This table had NO embedding column at all, so it
+    // searched LEXICAL ONLY while fpk_extracted_claims searched hybrid — a
+    // 24,946-row corpus half-invisible to retrieval. The column was added
+    // (additive ALTER TABLE, matching fpk_extracted_claims: embed_hash TEXT,
+    // embedding BLOB) and the table registered here so this existing tool
+    // backfills it rather than anyone writing a second one.
+    table: 'fpk_component_literature',
+    selectCols: ['contribution', 'component_id', 'topic_id', 'doi'],
+    embedSourceOf: (r) =>
+      [str(r.contribution), str(r.component_id), str(r.topic_id), str(r.doi)]
+        .filter(Boolean)
+        .join(' '),
+  },
+  {
     table: 'pretraining_extracted_standards',
     selectCols: ['standard_name', 'scope', 'raw_excerpt'],
     embedSourceOf: (r) =>
