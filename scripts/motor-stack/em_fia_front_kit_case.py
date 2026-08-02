@@ -216,6 +216,18 @@ class LoadedPointAssumptions:
 
     phase_current_rms_a: float
     phase_current_peak_a: float
+    # ⭐ THE CONDUCTOR carries the PATH current, not the terminal current.
+    # FEMM has no concept of parallel paths: a circuit property is a SERIES
+    # circuit through every turn assigned to it. So exciting the deck at the
+    # terminal current with the full turns/slot builds an Npcp=1 machine —
+    # exactly twice this contract's series turns. Confirmed 2026-08-02 by
+    # pyleecan comp_Ntsp() (28 vs the contract's 14) and independently by an
+    # FE/analytic flux-linkage ratio of 1.964. It inflated every torque figure
+    # in the campaign for a day. These two fields are DIFFERENT numbers and the
+    # FE must use the path one.
+    path_current_rms_a: float
+    path_current_peak_a: float
+    winding_parallel_paths: float
     current_angle_electrical_deg: float
     rotor_position_mechanical_deg: float
     phase_a_current_a: float
@@ -1045,12 +1057,23 @@ def loaded_point_assumptions(
         if 0.5 * phase_rms_a <= design_a <= 2.5 * phase_rms_a:
             phase_rms_a = design_a
     phase_peak_a = phase_rms_a * math.sqrt(2.0)
+    # ⭐ EXCITE THE FE AT THE PATH CURRENT. See LoadedPointAssumptions. The
+    # terminal current splits between winding_parallel_paths branches, and the
+    # turns/slot the deck assigns belong to ONE branch, so the conductor sees
+    # I_terminal / Npcp. Reporting keeps the terminal value; the solve does not.
+    npcp_exc = max(1.0, float(inputs.winding_parallel_paths))
+    path_rms_a = phase_rms_a / npcp_exc
+    path_peak_a = path_rms_a * math.sqrt(2.0)
+    if npcp_exc > 1.0:
+        print(f"[em][current] terminal {phase_rms_a:.1f} A rms over "
+              f"{npcp_exc:g} parallel paths -> FE conductor excited at "
+              f"{path_rms_a:.1f} A rms", flush=True)
     current_angle_rad = math.radians(current_angle_electrical_deg)
-    phase_a_a = phase_peak_a * math.cos(current_angle_rad)
-    phase_b_a = phase_peak_a * math.cos(
+    phase_a_a = path_peak_a * math.cos(current_angle_rad)
+    phase_b_a = path_peak_a * math.cos(
         current_angle_rad - 2.0 * math.pi / 3.0
     )
-    phase_c_a = phase_peak_a * math.cos(
+    phase_c_a = path_peak_a * math.cos(
         current_angle_rad + 2.0 * math.pi / 3.0
     )
     turns = effective_turns_per_slot_from_twin(inputs)
@@ -1061,6 +1084,9 @@ def loaded_point_assumptions(
     return LoadedPointAssumptions(
         phase_current_rms_a=phase_rms_a,
         phase_current_peak_a=phase_peak_a,
+        path_current_rms_a=path_rms_a,
+        path_current_peak_a=path_peak_a,
+        winding_parallel_paths=npcp_exc,
         current_angle_electrical_deg=current_angle_electrical_deg,
         rotor_position_mechanical_deg=float(rotor_position_mechanical_deg),
         phase_a_current_a=phase_a_a,
@@ -2243,6 +2269,9 @@ def build_artifact(
             "kind": "2D nonlinear loaded magnetostatic at one rotor position",
             "duty_basis": "analytical 250 kW continuous electrical duty check",
             "phase_current_rms_a": loaded_assumptions.phase_current_rms_a,
+            "path_current_rms_a": loaded_assumptions.path_current_rms_a,
+            "winding_parallel_paths":
+                loaded_assumptions.winding_parallel_paths,
             "phase_current_peak_a": loaded_assumptions.phase_current_peak_a,
             "phase_instantaneous_current_a": {
                 "a": loaded_assumptions.phase_a_current_a,
@@ -2554,6 +2583,23 @@ def run_selftest() -> int:
             loaded_assumptions.current_angle_electrical_deg
             in LIVE_CURRENT_ANGLE_SWEEP_DEG
             and abs(loaded_solved.torque_nm) > abs(null_solved.torque_nm) * 1.5
+        ),
+        # ⭐ proveCatch for the 2026-08-02 reversal: the FE must excite at the
+        # PATH current. If this ever equals the terminal current on a machine
+        # with parallel paths, the solve is building twice the contract's
+        # series turns and every torque number is inflated.
+        "fe_excites_at_path_not_terminal_current": (
+            loaded_assumptions.winding_parallel_paths <= 1.0
+            or (
+                abs(
+                    loaded_assumptions.path_current_rms_a
+                    * loaded_assumptions.winding_parallel_paths
+                    - loaded_assumptions.phase_current_rms_a
+                )
+                < 1.0e-6 * max(1.0, loaded_assumptions.phase_current_rms_a)
+                and loaded_assumptions.path_current_rms_a
+                < loaded_assumptions.phase_current_rms_a
+            )
         ),
         "loaded_point_uses_duty_current": (
             loaded_assumptions.phase_current_rms_a
