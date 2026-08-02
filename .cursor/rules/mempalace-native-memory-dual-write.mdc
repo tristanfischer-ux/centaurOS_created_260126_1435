@@ -1,0 +1,66 @@
+# MemPalace + Native MEMORY.md Dual-Write (Standing)
+
+**Tristan 2026-08-01:** MemPalace and native `MEMORY.md` are **not** optional one-off dumps. After significant work in this repo, **both** must be updated before the session ends (or at the next natural checkpoint). Neither replaces the other.
+
+## Hierarchy
+
+| Store | Path / access | Role |
+|---|---|---|
+| **Native MEMORY.md** | `~/.claude/projects/-Users-tristanfischer/memory/MEMORY.md` + topic files beside it | Working memory — lean RECENT pointer + topic file for detail |
+| **MemPalace** | `mempalace` CLI / pipx Python `tool_add_drawer` / MCP `mempalace_*` when available | Long-term archive — searchable drawers + KG triples |
+| **Cursor memory-keeper** | MCP `context_save` | Cross-session Cursor mirror (optional third write; do not skip the two above) |
+
+## When you MUST dual-write
+
+Do **both** MemPalace + native MEMORY after any of:
+
+- Completing a significant task / tranche / handoff (ownership change, Bar A/B status shift)
+- Discovering a gotcha or non-obvious failure mode
+- Making an architectural or DEC-* decision (record decision + alternatives)
+- Closing or invalidating a blocker that other agents need to know
+- Handing a subsystem to/from terminal (Blender, PCB, EM, etc.)
+- Shipping a durable plan/catalogue under `docs/plans/` that becomes operational truth
+
+Skip for: typo-only edits, comment-only, pure formatting, trivial one-liners with no status change.
+
+## How to write (Cursor has no mempalace MCP by default)
+
+**MemPalace drawers** — use pipx Python (works without MCP):
+
+```bash
+/Users/tristanfischer/.local/pipx/venvs/mempalace/bin/python -c "
+from mempalace.mcp_server import tool_add_drawer
+print(tool_add_drawer(wing='forgeos', room='decisions', content='...', source_file='...', added_by='cursor'))
+"
+```
+
+- Wing for this repo: `forgeos` (meta for cross-project)
+- Rooms: `decisions` | `gotchas` | `reference` | `fixes` | `architecture`
+- Prefer one focused drawer per concern; include twin path, branch, and doc pointers
+- KG: `tool_kg_add` / `tool_kg_invalidate` when ownership or blockers change
+- Verify: `mempalace search "<keywords>" --wing forgeos`
+
+**Native MEMORY.md**:
+
+1. Write/update a topic file: `~/.claude/projects/-Users-tristanfischer/memory/forgeos-<slug>.md`
+2. Prepend a short RECENT bullet in `MEMORY.md` linking that topic (keep RECENT lean; detail lives in the topic file)
+3. Include MemPalace drawer IDs in the RECENT bullet when filed
+
+## Session end checklist (mandatory when any trigger above fired)
+
+- [ ] MemPalace drawer(s) filed (or explicit "no new durable state" if only noise)
+- [ ] Native topic file + MEMORY.md RECENT updated
+- [ ] Search verify for the new keywords
+- [ ] If a prior KG fact is obsolete (e.g. ownership flip), invalidate + add the new fact
+
+## Anti-patterns
+
+- Updating only the harness inbox or only `docs/plans/` and assuming memory systems know
+- One-off dump at user request, then silence for the rest of the campaign
+- Dumping entire session transcripts into MEMORY.md (bloat) — topic file + pointer only
+- Filing MemPalace without native MEMORY (or the reverse)
+
+## Related
+
+- Claude-side protocol: `~/.claude/docs/mempalace.md` (BOTH get updated)
+- Session memory: `~/.cursor/rules/session-memory.mdc` (daily log) — **in addition to**, not instead of, this dual-write

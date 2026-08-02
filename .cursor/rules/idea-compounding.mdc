@@ -1,0 +1,54 @@
+---
+description: Ideas are currency — compound them; never only shoot them down. Bad + terrible + half-baked can become genius when stacked.
+alwaysApply: true
+---
+
+# Idea Compounding (Build On, Don't Only Kill)
+
+**STANDING DIRECTIVE (Tristan 2026-07-30):** Ideas are the currency. A bad idea, a terrible idea, an awful idea, and a drug-induced idea — brought together — can become a genius idea nobody had alone. Agents must **compound** ideas, not only refute them.
+
+## The bar (pass/fail)
+
+| Must be TRUE | Must be FALSE |
+|---|---|
+| Every serious proposal gets at least one **additive** move: keep the useful fragment + attach something that makes it stronger | Only a kill table / “won’t work because…” with no next construction |
+| Kills name the **failure mode**, then ask “what version survives that mode?” | Treating a kill as the end of the thread |
+| Competing ideas are stacked (A’s constraint + B’s process + C’s geometry) before one is crowned | Demanding each idea be genius in isolation |
+| Half-baked ideas stay on the table long enough to be improved | Politeness-kill or premature elegance filter |
+
+## Protocol (every non-trivial proposal)
+
+When Tony / Tristan / a council / a paper / a patent drops an idea:
+
+1. **Steelman the fragment** — what physical or economic truth is it pointing at? (one sentence)
+2. **Name the real failure mode** — not vibe; the mechanism that breaks (adhesive loss, Ra vs skin depth, pitch growth, cost, …)
+3. **Compound** — add at least one of:
+   - a **constraint from another thread** (actuator pitch, Vlad Floquet, cost/target life)
+   - a **process inversion** (form onto a master instead of free-form)
+   - a **stack** (face / body / backplane; structure metal + RF skin)
+   - a **yield strategy** (tile, bin, reject, calibrate)
+4. **Return a better version** — “X + Y → Z” with the open question that would prove Z
+5. **Only then** rank Live / Research / Parked / Killed — and a Kill must cite the failure mode *and* what fragment to reuse elsewhere
+
+## Anti-patterns
+
+| Anti-pattern | Why it fails Tristan’s philosophy |
+|---|---|
+| Instant kill with no salvage | Burns currency; the fragment dies with the wrapper |
+| “Not our scope” as a thought-stopper | Scope can park work; it must not erase the idea |
+| Demanding a complete solution before allowing the idea | Genius is usually a *stack* of incomplete ideas |
+| Red-team-only posture | Red team finds holes; blue team must fill them with better geometry |
+
+## Relationship to other rules
+
+- **CORE FIX PRINCIPLE** — still fix the SOURCE rule in code; this rule governs *how we treat human/engineering proposals* before and while encoding them.
+- **Gate intent** — a kill without a routed next construction is a walk-through gate on creativity.
+- **Work quality** — compounding is not scope creep; the additive move should be the *smallest* attachment that changes the verdict from dead → live-research.
+
+## Quick checklist
+
+- [ ] Stated the useful fragment
+- [ ] Stated the failure mode
+- [ ] Offered at least one compound (X + Y → Z)
+- [ ] Named the prove-it question
+- [ ] Verdict is Live / Research / Parked / Killed — never “ignored”

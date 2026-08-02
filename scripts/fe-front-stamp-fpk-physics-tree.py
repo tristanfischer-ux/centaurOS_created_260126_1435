@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from typing import Any
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -55,8 +56,45 @@ def main() -> int:
     root = build_fpk_physics_tree(qs)
     cov = coverage_report(root)
     wb = extract_quantity_writeback(root)
+
+    # ⭐⭐ A DERIVED ESTIMATE MUST NOT SILENTLY OVERWRITE THE CONTRACT
+    # (2026-08-01). `for k, v in wb.items(): qs[k] = v` blind-overwrote every
+    # quantity the tree derives. It changed `turns_per_phase` from the
+    # contract's 14 to the tree's own 16 (from N_ph ~ A*pi*D/(3*I) at
+    # J = 10 A/mm^2) — and em_fia_front_kit_case treats turns_per_phase as
+    # AUTHORITATIVE: "it is what the voltage/back-EMF and current ratings are
+    # set from". Every measured number moved as a result:
+    #     lambda_pm      0.002903 -> 0.003318 Wb  (exactly 16/14)
+    #     delivered T    145.44   -> 158.22 N.m
+    #     MTPA mean      147.54   -> 160.66 N.m
+    # A whole day of measurement silently re-based on a different winding.
+    #
+    # The tree's values are DESIGN ESTIMATES. Where the contract already holds a
+    # value, keep the contract's and RECORD the divergence for reconciliation —
+    # a conflict that is visible can be decided; one that is overwritten cannot.
+    divergences: list[dict[str, Any]] = []
     for k, v in wb.items():
+        existing = qs.get(k)
+        if isinstance(existing, dict) and existing.get("value") is not None:
+            try:
+                a, b = float(existing["value"]), float(v.get("value"))
+            except (TypeError, ValueError):
+                a = b = None
+            if a is not None and b is not None and abs(a - b) > 1e-9 * max(1.0, abs(a)):
+                divergences.append({
+                    "quantity": k, "contract_value": a, "tree_value": b,
+                    "contract_basis": existing.get("basis"),
+                    "tree_basis": v.get("basis"),
+                    "resolution": "CONTRACT KEPT — tree value is a design estimate",
+                })
+                continue          # contract wins; do NOT overwrite
         qs[k] = v
+    if divergences:
+        state["fpkPhysicsTreeDivergences"] = divergences
+        for d in divergences:
+            print(f"  [tree] DIVERGENCE {d['quantity']}: contract "
+                  f"{d['contract_value']} kept, tree derived {d['tree_value']} "
+                  f"— recorded, NOT overwritten")
 
     stamped_at = datetime.now(ZoneInfo("Europe/London")).isoformat(timespec="seconds")
     bus_esl, cold_plate_thermal = build_fpk_esl_thermal(qs)
