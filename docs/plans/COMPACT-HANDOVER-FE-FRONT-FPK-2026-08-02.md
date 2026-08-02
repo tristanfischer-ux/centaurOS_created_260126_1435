@@ -14,7 +14,7 @@ The magnet respec **does not clear duty**.
 |---|---|---|
 | rebalanced, **correct** excitation | **81.64 N·m** | **0.652× — does NOT clear** |
 | rebalanced, as modelled all day | 145.73 N·m | 1.164× — the basis of DEC-EM-1 |
-| baseline, correct excitation (est., unmeasured) | ~26.6 N·m | ~0.212× |
+| **baseline, correct excitation (MEASURED)** | **25.75 N·m** mean\|T\| (signed −14.72) | **0.206×** (signed 0.118) |
 
 Cause: **FEMM has no concept of parallel paths.** `mi_addcircprop` is a SERIES
 circuit through every turn assigned to it. Exciting the deck at the terminal
@@ -39,12 +39,20 @@ a **140.5 mm housing**. 120 mm → 0.802×. 110 mm → 0.735×. This is an
 
 `ship_ok` **false**. Homologation **NOT_HOMOLOGATED**.
 
-### SOURCE FIX APPLIED (this session, uncommitted at time of writing)
+### SOURCE FIX APPLIED (committed 11928d56c)
 `em_fia_front_kit_case.py` now excites the FE at the **path** current
 (`I_terminal / Npcp`), not the terminal current, with `path_current_rms_a` +
 `winding_parallel_paths` emitted to JSON and a proveCatch check
-`fe_excites_at_path_not_terminal_current`. **Every EM number in the twin
-predating this commit is void.**
+`fe_excites_at_path_not_terminal_current` in the **selftest** (the twin JSON
+records `path_current_rms_a` + `winding_parallel_paths` as the evidence, but does
+not itself carry the gate). **Every EM number in the twin predating this commit
+is void.**
+
+Baseline re-solved on the fixed deck 2026-08-02: terminal 477.0 A rms over 2
+parallel paths → FE conductor excited at 238.5 A rms → **25.75 N·m mean |T| =
+0.206×**, signed −14.72 N·m = 0.118×. `torque_reliable` **false**,
+`duty_torque_screen_ok` **false**, status PARTIAL, `ship_ok` **false**. That
+replaces the ~26.6 N·m estimate with a measurement.
 
 ### Outstanding confirmation
 The half-current run is a **proxy** for the correct topology. All three council
@@ -122,8 +130,10 @@ $0.0096). It had no embedding column for the life of the corpus.
 
 1. **Six-branch circuit model** (A1/A2, B1/B2, C1/C2 at 337.29 A peak) — confirm
    the proxy. Sol's preferred fix; all three seats agree.
-2. **Re-run every EM figure** on the source-fixed deck. Baseline at correct
-   excitation is estimated ~26.6 N·m and has never been measured.
+2. **Re-run every EM figure** on the source-fixed deck. Baseline is now measured
+   (25.75 N·m mean |T| = 0.206×); the REBALANCED point, the MTPA screen and the
+   flux-linkage sweeps are NOT — the rebalanced 81.64 N·m came from the
+   half-current proxy run, not from the fixed deck.
 3. **Re-establish what architecture change closes 0.652×.** Stack is exhausted
    inside the housing.
 4. **Lamination gauge and grade** — established nowhere in this twin. Eddy loss
