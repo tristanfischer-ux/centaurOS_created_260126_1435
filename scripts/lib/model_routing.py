@@ -102,10 +102,21 @@ DIAGNOSE = Seat(
     "diagnose", "x-ai/grok-4.5", 0.0, 0.0, 2.67,
     "STANDING SECOND OPINION — 3/3 returned, caught the defining fault; "
     "benchmark figures unknown, ranked on the in-anger record")
+# ⭐ TERRA REPLACES SOL 2026-08-02 (Tristan: "massively cheaper and almost as
+# good"). $1.83 blended against Sol's $9.17 — 5x cheaper, and cheaper than the
+# diagnose seat too, which reorders the cost ladder: Terra 1.83 < Grok 2.67.
+# Sol is kept below as the ESCALATION for when Terra is out of its depth.
+# CAVEAT, same as Grok's: Terra has NO CritPt or non-hallucination figure in the
+# benchmark table, so it is seated on price plus judgement and must be validated
+# by its record. Sol's numbers are retained on SOL_ESCALATION for comparison.
 PROPOSE = Seat(
-    "propose", "openai/gpt-5.6-sol", 32.0, 18.0, 9.17,
-    "CODE REVIEW seat — found every pre-commit defect; NEVER accept its "
-    "domain advice unchecked (it produced the slot-opening error)")
+    "propose", "openai/gpt-5.6-terra", 0.0, 0.0, 1.83,
+    "CODE REVIEW seat — replaced Sol 2026-08-02 at 1/5 the cost; benchmark "
+    "figures unknown, seated on price and pending its own record")
+SOL_ESCALATION = Seat(
+    "escalate", "openai/gpt-5.6-sol", 32.0, 18.0, 9.17,
+    "ESCALATION ONLY — top of CritPt but ~18% non-hallucination, and it "
+    "produced this campaign's worst domain advice (the slot-opening error)")
 CORROBORATE = Seat(
     "corroborate", "z-ai/glm-5.2", 21.0, 74.0, 1.03,
     "demoted from standing first call: returned only 2 of 4 times")
@@ -140,7 +151,8 @@ DO_NOT_USE_AS_AUDITOR = {
     "deepseek/deepseek-v4-pro": "~11% non-hallucination",
     "deepseek/deepseek-v4-flash-0731": "same lineage as V4 Pro (~11%) — backup voice only",
     "x-ai/grok-4.5": "no non-hallucination figure exists; unproven as an auditor",
-    "openai/gpt-5.6-sol": "~18% non-hallucination — it is the PROPOSER",
+    "openai/gpt-5.6-sol": "~18% non-hallucination — escalation seat, never the auditor",
+    "openai/gpt-5.6-terra": "no non-hallucination figure exists; unproven as an auditor",
 }
 
 
@@ -192,24 +204,35 @@ def _selftest() -> int:
 
     # The anti-correlation the routing exists to exploit: the code-review seat
     # must be WORSE at honesty than the audit seat, or the split buys nothing.
+    # The anti-correlation is asserted against the ESCALATION seat, which is the
+    # one carrying benchmark figures. Terra and Grok are seated on record, not
+    # on benchmarks, so asserting their honesty numbers would assert zeros.
     check("triad.anticorrelation_holds",
-          PROPOSE.non_hallucination_pct < AUDIT.non_hallucination_pct,
-          "the code-review seat is not less honest than the auditor")
+          SOL_ESCALATION.non_hallucination_pct < AUDIT.non_hallucination_pct,
+          "the escalation seat is not less honest than the auditor")
     check("triad.audit_seat_cannot_do_physics",
           AUDIT.critpt_pct < CORROBORATE.critpt_pct,
           "the auditor scores physics above the corroborator; roles are wrong")
     # A seat ranked on the in-anger record rather than benchmarks must SAY so,
     # or a future reader will assume figures exist that do not.
+    # EVERY seat ranked on record rather than benchmarks must SAY so, or a
+    # future reader assumes figures exist that do not.
+    for seat in (DIAGNOSE, PROPOSE):
+        check(f"seat.{seat.role}_unbenchmarked_is_flagged",
+              seat.critpt_pct != 0.0 or "unknown" in seat.note or "record" in seat.note,
+              f"{seat.model} carries benchmark numbers it does not have")
     check("triad.unbenchmarked_seat_is_flagged",
           DIAGNOSE.critpt_pct == 0.0 and "in-anger" in DIAGNOSE.note,
           "the diagnose seat carries benchmark numbers it does not have")
 
     # Cost discipline: the standing first call must be far cheaper than the
     # escalation, or "escalate only when out of depth" has no bite.
-    check("triad.first_call_is_cheap",
-          DIAGNOSE.blended_usd_per_m * 3 < PROPOSE.blended_usd_per_m,
-          f"diagnose seat {DIAGNOSE.blended_usd_per_m} is not << "
-          f"code-review seat {PROPOSE.blended_usd_per_m}")
+    # Escalation must be materially dearer than the standing seats, or there is
+    # no reason to hold it back.
+    check("triad.escalation_is_the_expensive_one",
+          SOL_ESCALATION.blended_usd_per_m > 3 * PROPOSE.blended_usd_per_m,
+          f"escalation {SOL_ESCALATION.blended_usd_per_m} is not >> "
+          f"code-review {PROPOSE.blended_usd_per_m}")
 
     # A model on the do-not-audit list must never hold the audit seat.
     check("triad.auditor_not_blacklisted",
@@ -220,14 +243,23 @@ def _selftest() -> int:
     check("backup.is_blacklisted_as_auditor",
           BACKUP.model in DO_NOT_USE_AS_AUDITOR,
           "the backup voice is not blacklisted from the auditor role")
-    # The justification for an ALWAYS-ON extra lineage is that it is nearly
-    # free relative to the seats doing the real work. (It is NOT the cheapest
-    # seat outright — the auditor is, at $0.45 — so assert what actually
-    # matters: it must be a small fraction of the expensive seat.)
-    check("backup.is_nearly_free",
-          BACKUP.blended_usd_per_m * 10 < PROPOSE.blended_usd_per_m,
-          f"backup {BACKUP.blended_usd_per_m} is not << code-review seat "
-          f"{PROPOSE.blended_usd_per_m}; an always-on seat must be cheap")
+    # ⭐ ASSERT THE INTENT, NOT A RATIO TO ONE SEAT'S PRICE (2026-08-02). This
+    # was `BACKUP * 10 < PROPOSE`, calibrated when PROPOSE was Sol at $9.17.
+    # Swapping in Terra at $1.83 broke it — not because the backup got dearer,
+    # but because the seat it was compared against got cheaper. Third time this
+    # session an assertion pinned to a moving reference has broken on a change
+    # that was an IMPROVEMENT.
+    #
+    # What actually matters for an ALWAYS-ON seat is that it is cheap in
+    # ABSOLUTE terms and is not the most expensive thing in the triad.
+    check("backup.is_absolutely_cheap", BACKUP.blended_usd_per_m < 1.00,
+          f"backup {BACKUP.blended_usd_per_m}/M is too dear to run on everything")
+    check("backup.cheaper_than_primary_seats",
+          BACKUP.blended_usd_per_m < min(DIAGNOSE.blended_usd_per_m,
+                                         PROPOSE.blended_usd_per_m),
+          f"the always-on backup {BACKUP.blended_usd_per_m} is dearer than a "
+          "PRIMARY seat (diagnose/propose) — reconsider which is always on. "
+          "The auditor may legitimately be cheaper still; that is not the test.")
 
     check("routing.physics_gets_triad",
           seats_for("magnetics excitation review") == TRIAD,

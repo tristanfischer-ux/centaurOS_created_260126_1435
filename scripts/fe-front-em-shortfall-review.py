@@ -33,7 +33,8 @@ SEATS: dict[str, tuple[str, str]] = {
     # seat here VALIDATES anything. Validation belongs to xfemm and the gates.
     # EM_REVIEW_SEATS (comma-separated) selects a subset.
     "glm52": ("z-ai/glm-5.2", "physics"),          # STANDING FIRST CALL
-    "sol": ("openai/gpt-5.6-sol", "physics"),      # escalation, never unchecked
+    "terra": ("openai/gpt-5.6-terra", "physics"),  # code review, 1/5 of Sol
+    "sol": ("openai/gpt-5.6-sol", "physics"),      # ESCALATION only, never unchecked
     "deepseek_v4_flash": ("deepseek/deepseek-v4-flash-0731", "physics"),
     "kimi_k3": ("moonshotai/kimi-k3", "physics"),
     "grok45": ("x-ai/grok-4.5", "physics"),
