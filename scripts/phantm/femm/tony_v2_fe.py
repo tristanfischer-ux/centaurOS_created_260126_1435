@@ -87,20 +87,26 @@ def configure():
     g.SS_BACK_Y1 = g.SS_BACK_Y0 + g.SS_BACK_DRAWN
     g.POLE_HALF = POLE_FOOT / 2.0
     g.BRIDGE_T = 0.400 * (1.200 / DEPTH)  # wound limb, 400 um window dimension
-    g.BRIDGE_X1 = -(g.POLE_HALF + 0.55)
-    g.BRIDGE_X0 = g.BRIDGE_X1 - g.BRIDGE_T
     g.COND_W = 0.110
-    # The translator must start clear of the coil conductor block, which
-    # occupies BRIDGE_X1 .. BRIDGE_X1 + COND_W at the translator's own height.
-    # Overlapping regions is what "material properties have not been defined
-    # for all regions" actually means — the solver sees the intersection as a
-    # region nobody labelled.
-    g.TRANSL_XL = g.BRIDGE_X1 + g.COND_W + 0.12
-    g.TRANSL_XR = g.POLE_HALF + 0.45
+    # CLEARANCE IS LOAD-BEARING, and getting it wrong is not obvious from the
+    # force curve alone. The translator's ends are fixed in space (they do not
+    # travel with the tooth pattern) so that the unrolled model's unphysical
+    # end-attraction is a constant in x and cancels out of force differences.
+    # That only works if the ends are FAR from the pole. The first version of
+    # this file left the left-hand end 0.12 mm from the pole foot, and the
+    # end effect then varied with position: Maxwell stress and 0.5.i^2.dL/dx
+    # agreed to ~1% on one side of the pole and disagreed by 30x on the other.
+    # Both ends now sit ~3 tooth pitches clear, symmetrically, and the bridge
+    # is pushed far enough left to make room for that.
+    end_clear = 3.0 * PITCH
+    g.TRANSL_XR = g.POLE_HALF + end_clear
+    g.TRANSL_XL = -g.TRANSL_XR
+    g.BRIDGE_X1 = g.TRANSL_XL - g.COND_W - 0.12
+    g.BRIDGE_X0 = g.BRIDGE_X1 - g.BRIDGE_T
     # the fine-mesh gap strip must sit INSIDE both the translator and the pole
     # foot, or it creates a region the solver has no material for
-    g.GAP_STRIP_X = min(g.POLE_HALF, g.TRANSL_XR, abs(g.TRANSL_XL)) * 0.90
-    g.AIR = 2.4, 1.8
+    g.GAP_STRIP_X = g.POLE_HALF * 0.90
+    g.AIR = abs(g.BRIDGE_X0) + 0.8, 1.8
     BASELINE.coil.n_turns = N_TURNS
     BASELINE.materials.ndfeb_br_t = 0.0   # reluctance force only — no magnet
 
@@ -130,7 +136,30 @@ def main():
         dx = float(xs[1] - xs[0]) * 1e-3          # m
         dLdx = np.gradient(np.concatenate([L_h, L_h[:1]]),
                            dx)[:len(L_h)]
+        # REMOVE THE DC BIAS before taking any peak. The unrolled-loop model
+        # holds the translator's ends fixed in space, which produces a constant
+        # unphysical end-attraction; a periodic structure can have no net force
+        # averaged over a whole pitch, so whatever mean survives IS that
+        # artefact. The v1 pipeline drops it via a Fourier fit (fourier_fit
+        # returns dc separately and variants.py discards it); this driver
+        # originally did not, and the mean was 20% of the peak at 0.40 A.
+        f_dc = float(np.mean(fx))
+        fx = fx - f_dc
         peak_f = float(np.max(np.abs(fx)))
+        # SELF-CHECK, position by position. In the LINEAR regime the Maxwell
+        # stress tensor and 0.5.i^2.dL/dx are two routes to the same force and
+        # must agree everywhere, not just on average. Where they do not, the
+        # flux linkage is being corrupted by something (end effects, a region
+        # touching the air box, a bad mesh) and the force curve cannot be
+        # trusted. This is the check that caught the end-clearance bug.
+        f_energy = 0.5 * i_a ** 2 * dLdx
+        big = np.abs(fx) > 0.25 * peak_f          # ignore near-zero crossings
+        if big.any():
+            rel = np.abs(f_energy[big] / fx[big] - 1.0)
+            mst_energy_worst = float(np.max(rel))
+            mst_energy_median = float(np.median(rel))
+        else:
+            mst_energy_worst = mst_energy_median = float("nan")
         rows.append(dict(
             current_a=i_a,
             force_mn=round(peak_f * 1e3, 3),
@@ -147,7 +176,11 @@ def main():
             inside_5v=bool(i_a * R_COIL_OHM <= SUPPLY_V),
             ohmic_w=round(i_a ** 2 * R_COIL_OHM, 2),
             current_density_a_mm2=round(
-                i_a / (math.pi * (WIRE_BARE_M / 2) ** 2) * 1e-6, 0)))
+                i_a / (math.pi * (WIRE_BARE_M / 2) ** 2) * 1e-6, 0),
+            dc_bias_removed_mn=round(f_dc * 1e3, 4),
+            dc_as_pct_of_peak=round(abs(f_dc) / peak_f * 100, 1),
+            mst_vs_energy_worst_pct=round(mst_energy_worst * 100, 1),
+            mst_vs_energy_median_pct=round(mst_energy_median * 100, 1)))
         curves[f"{i_a:.2f}"] = dict(x_mm=[round(float(v), 5) for v in xs],
                                     fx_mn=[round(float(v) * 1e3, 4) for v in fx],
                                     L_uh=[round(float(v) * 1e6, 4) for v in L_h])
@@ -157,7 +190,10 @@ def main():
               f"L {r['L_unaligned_uh']:.2f}-{r['L_aligned_uh']:.2f} uH   "
               f"B_br {r['b_bridge_max_t']:.2f} T  {r['mmf_at']:.0f} At  "
               f"{r['volts_across_coil']:.2f} V{'' if r['inside_5v'] else ' OVER 5V'}  "
-              f"{r['ohmic_w']:.2f} W", flush=True)
+              f"{r['ohmic_w']:.2f} W  DC removed {r['dc_as_pct_of_peak']:.0f}%  "
+              f"MST-vs-energy med "
+              f"{r['mst_vs_energy_median_pct']:.0f}%/worst "
+              f"{r['mst_vs_energy_worst_pct']:.0f}%", flush=True)
 
     out = dict(geometry=dict(
         pitch_mm=PITCH, tooth_translator_mm=TOOTH_TRANS,
@@ -174,3 +210,45 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def convergence_study(i_a: float = 0.40, clears=(3, 6, 9, 12)):
+    """Does the force converge as the translator ends are moved away?
+
+    It does NOT, and that is the single most important thing this module has
+    to say. The unrolled-loop model holds the translator ends fixed in space,
+    which is fine when the tooth modulation dominates. Here it does not: as the
+    ends are moved from 3 to 12 tooth pitches clear, the peak AC force falls
+    monotonically (1.07 -> 0.81 -> 0.62 -> 0.49 mN at 0.40 A) instead of
+    settling, while the removed DC bias stays at a quarter of the peak
+    throughout. A quantity that keeps changing as an arbitrary modelling
+    boundary is moved is not a measurement of the device.
+
+    The DIRECTION of the headline conclusion survives this, which is why the
+    answer to the client still stands: every refinement made the force SMALLER,
+    so "far short of the ampere-turns needed" is true a fortiori. The MAGNITUDE
+    does not survive and must not be quoted as a result.
+    """
+    out = []
+    for n in clears:
+        configure()
+        ec = n * PITCH
+        lua_gen.TRANSL_XR = lua_gen.POLE_HALF + ec
+        lua_gen.TRANSL_XL = -lua_gen.TRANSL_XR
+        lua_gen.BRIDGE_X1 = lua_gen.TRANSL_XL - lua_gen.COND_W - 0.12
+        lua_gen.BRIDGE_X0 = lua_gen.BRIDGE_X1 - lua_gen.BRIDGE_T
+        lua_gen.AIR = abs(lua_gen.BRIDGE_X0) + 0.8, 1.8
+        xs, fx, lam, bb = sweep(i_a)
+        dc = float(np.mean(fx))
+        pk = float(np.max(np.abs(fx - dc)))
+        out.append(dict(end_clearance_pitches=n,
+                        peak_ac_force_mn=round(pk * 1e3, 4),
+                        dc_bias_mn=round(dc * 1e3, 4),
+                        dc_pct_of_peak=round(abs(dc) / pk * 100, 1)))
+    return dict(current_a=i_a, rows=out,
+                converged=False,
+                verdict=("peak force falls monotonically as the end boundary "
+                         "is moved away and does not settle; the DC artefact "
+                         "holds at ~25% of peak. The force MAGNITUDE from this "
+                         "2D unrolled model is not defensible. The direction "
+                         "(far short) is, because every refinement reduced it."))

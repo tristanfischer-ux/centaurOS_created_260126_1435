@@ -725,7 +725,32 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
             tb["flake_retry"] = True
             tb["tiebreak_after_nameless"] = {"first_model": model, "verdict": "overruled"
                                              if tb.get("broken") is False else "upheld"}
-            return tb
+            return _attach_structured_defects(tb)
+    return _attach_structured_defects(res)
+
+
+def _attach_structured_defects(res: dict) -> dict:
+    """Attach catalog-routed defects for vision_route_fix (flag-only; no PASS invent).
+
+    INTENT: free-text defects stay; structured_defects + partition enable the
+    presentation knob loop without trusting critic-supplied stage/knob.
+    """
+    if not isinstance(res, dict) or not res.get("ok"):
+        return res
+    try:
+        from vision_route_fix import partition_for_loop, structured_defects
+        structured = structured_defects(res)
+        parts = partition_for_loop(structured)
+        res["structured_defects"] = structured
+        res["defect_partition"] = {
+            "presentation": [d["code"] for d in parts["presentation"]],
+            "presentation_deferred": [d["code"] for d in parts["presentation_deferred"]],
+            "source_stops": [d["code"] for d in parts["source_stops"]],
+            "human": [d["code"] for d in parts["human"]],
+            "may_auto_fix": parts["may_auto_fix"],
+        }
+    except Exception as exc:  # noqa: BLE001
+        res["structured_defects_error"] = f"{type(exc).__name__}: {exc}"
     return res
 
 

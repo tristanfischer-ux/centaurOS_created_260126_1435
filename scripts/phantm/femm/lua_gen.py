@@ -41,6 +41,7 @@ SS_BACK_DRAWN = 0.310 * (1.708 / 1.55)
 SS_BACK_Y0 = SS_TIP_Y + SS_SLOT_D              # back inner face
 SS_BACK_Y1 = SS_BACK_Y0 + SS_BACK_DRAWN        # back outer face
 POLE_HALF = 0.58                               # slot-section axial half-extent
+N_POLE_TEETH = 3                               # lands on the pole foot (3 or 4)
 BRIDGE_T = 0.232 * (1.162 / 1.55)
 BRIDGE_X1 = -1.576                             # bridge right face
 BRIDGE_X0 = BRIDGE_X1 - BRIDGE_T
@@ -48,8 +49,12 @@ TRANSL_XL, TRANSL_XR = -1.16, 1.508            # translator drawn span (pre-offs
 COND_W = 0.126                                 # coil conductor block width
 AIR = 3.2, 2.6                                 # half-box
 DEPTH = 1.55            # out-of-plane depth (mm) — the translator transverse width
+MESH_SCALE = 1.0        # multiplies every meshsize — halve it to test convergence
 GAP_STRIP_X = 0.75      # half-span of the fine-mesh air strip inside each gap
 GAP_STRIP_INSET = 0.006 # clearance from the strip to each tooth face
+# Optional second soft-magnetic curve for mixed MIM-pole / laminated-translator
+# studies. When None, poles use the same "smc" material as the translator.
+POLE_BH_POINTS = None  # list of (B, H) or None
 
 
 def _toothed_outline_top(x0, x1, tip_y, slot_bottom_y, land_centres, side):
@@ -132,10 +137,16 @@ def translator_polygon(xoff):
     return top + bot
 
 
+def pole_tooth_centres():
+    """Axial centres of the N_POLE_TEETH lands, symmetric about x=0."""
+    n = int(N_POLE_TEETH)
+    return [(i - (n - 1) / 2.0) * PITCH for i in range(n)]
+
+
 def slot_section_polygon(top: bool):
     """One slot-section (teeth + back, incl. the stub toward the bridge)."""
     s = 1.0 if top else -1.0
-    centres = [-PITCH, 0.0, PITCH]
+    centres = pole_tooth_centres()
     face = _teeth_face_points(-POLE_HALF, POLE_HALF, s * SS_TIP_Y, s * SS_BACK_Y0, centres)
     if not top:
         face = [(x, y) for x, y in face]
@@ -169,6 +180,8 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     """
     from materials import SmcMaterial
     bh = smc_bh_points or SmcMaterial().femm_bh_points()
+    pole_bh = POLE_BH_POINTS  # None → poles share translator curve
+    pole_mat = "smc" if pole_bh is None else "pole_steel"
     nc = P.coil.n_turns
     hc = P.materials.ndfeb_br_t / (4e-7 * math.pi * P.materials.ndfeb_mu_r)
     freq = float(harmonic["freq_hz"]) if harmonic else 0.0
@@ -185,10 +198,16 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
         mur = float(harmonic["mu_r"])
         L.append(f'mi_addmaterial("smc", {mur:g}, {mur:g}, 0, 0, '
                  f'{float(harmonic["sigma_ms"]):g}, 0, 0, 1, 0, 0, 0)')
+        pole_mat = "smc"
     else:
         L.append('mi_addmaterial("smc", 500, 500, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
         for b, h in bh:
             L.append(f'mi_addbhpoint("smc", {b:.6f}, {h:.3f})')
+        if pole_bh is not None:
+            L.append('mi_addmaterial("pole_steel", 500, 500, 0, 0, 0, 0, 0, '
+                     '1, 0, 0, 0)')
+            for b, h in pole_bh:
+                L.append(f'mi_addbhpoint("pole_steel", {b:.6f}, {h:.3f})')
     L.append(f'mi_addmaterial("ndfeb", {P.materials.ndfeb_mu_r}, '
              f'{P.materials.ndfeb_mu_r}, {hc:.1f}, 0, 0, 0, 0, 1, 0, 0, 0)')
     L.append('mi_addmaterial("copper", 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0)')
@@ -199,21 +218,23 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
     L += _poly_lua(tp)
     L.append("mi_addblocklabel(0.05,0)")
     L.append("mi_selectlabel(0.05,0)")
-    L.append('mi_setblockprop("smc", 0, 0.05, "<None>", 0, 1, 0)')
+    L.append(f'mi_setblockprop("smc", 0, {0.05*MESH_SCALE:.5f}, "<None>", 0, 1, 0)')
     L.append("mi_clearselected()")
 
-    # slot-sections (top/bottom) with stubs
+    # slot-sections (top/bottom) with stubs — may be MIM while translator is strip
     for top in (True, False):
         s = 1.0 if top else -1.0
         L += _poly_lua(slot_section_polygon(top))
         ly = s * (SS_BACK_Y0 + SS_BACK_DRAWN / 2.0)
         L.append(f"mi_addblocklabel(0,{ly:.6f})")
         L.append(f"mi_selectlabel(0,{ly:.6f})")
-        L.append('mi_setblockprop("smc", 0, 0.04, "<None>", 0, 2, 0)')
+        L.append(f'mi_setblockprop("{pole_mat}", 0, {0.04*MESH_SCALE:.5f}, '
+                 f'"<None>", 0, 2, 0)')
         L.append("mi_clearselected()")
 
     # bridge limb: vertical bar spanning between the two stub inner faces,
-    # containing the PM (length pm_mm, centred at y=0)
+    # containing the PM (length pm_mm, centred at y=0). Bridge follows pole
+    # material (same net-shape part family as the horseshoe).
     ph = pm_mm / 2.0
     x0, x1 = BRIDGE_X0, BRIDGE_X1
     for ya, yb in ((-SS_BACK_Y1, -ph), (ph, SS_BACK_Y1)):
@@ -228,13 +249,14 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
         ly = (ya + yb) / 2.0
         L.append(f"mi_addblocklabel({(x0+x1)/2:.6f},{ly:.6f})")
         L.append(f"mi_selectlabel({(x0+x1)/2:.6f},{ly:.6f})")
-        L.append('mi_setblockprop("smc", 0, 0.05, "<None>", 0, 3, 0)')
+        L.append(f'mi_setblockprop("{pole_mat}", 0, {0.05*MESH_SCALE:.5f}, '
+                 f'"<None>", 0, 3, 0)')
         L.append("mi_clearselected()")
     # PM block (magnetised +y → drives flux up the bridge)
     L += _poly_lua([(x0, -ph), (x1, -ph), (x1, ph), (x0, ph)])
     L.append(f"mi_addblocklabel({(x0+x1)/2:.6f},0)")
     L.append(f"mi_selectlabel({(x0+x1)/2:.6f},0)")
-    L.append('mi_setblockprop("ndfeb", 0, 0.03, "<None>", 90, 4, 0)')
+    L.append(f'mi_setblockprop("ndfeb", 0, {0.03*MESH_SCALE:.5f}, "<None>", 90, 4, 0)')
     L.append("mi_clearselected()")
 
     # coil conductors flanking the bridge. Sign convention: POSITIVE circuit
@@ -259,7 +281,7 @@ def actuator_lua(x_mm: float, i_a: float, pm_mm: float, fem_name: str,
         lx_ = 0.93 * gx
         L.append(f"mi_addblocklabel({lx_:.6f},{ (y0_+y1_)/2 :.6f})")
         L.append(f"mi_selectlabel({lx_:.6f},{ (y0_+y1_)/2 :.6f})")
-        L.append('mi_setblockprop("air", 0, 0.015, "<None>", 0, 6, 0)')
+        L.append(f'mi_setblockprop("air", 0, {0.015*MESH_SCALE:.5f}, "<None>", 0, 6, 0)')
         L.append("mi_clearselected()")
 
     # outer air box + A=0

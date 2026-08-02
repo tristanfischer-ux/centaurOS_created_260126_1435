@@ -290,6 +290,29 @@ def main() -> int:
               rv.returncode == 0,
               rv.stdout.strip().splitlines()[-1] if rv.stdout else "no output")
 
+    # multiphase force-claim fairness (overnight Tony pack regression)
+    import subprocess as _sp2
+    rv2 = _sp2.run(
+        [__import__("sys").executable,
+         _os.path.join(_os.path.dirname(__file__), "force_claim_guards.py"),
+         "--selftest"],
+        capture_output=True, text=True)
+    check("force_claim_guards.py --selftest (coil-count + length-norm)",
+          rv2.returncode == 0,
+          (rv2.stdout + rv2.stderr).strip().splitlines()[-1]
+          if (rv2.stdout or rv2.stderr) else "no output")
+
+    # HOBE 2/6 double walls + faceplate-not-former (Tony 30 Jul corrections)
+    rv3 = _sp2.run(
+        [__import__("sys").executable,
+         _os.path.join(_os.path.dirname(__file__), "hobe_geometry.py"),
+         "--selftest"],
+        capture_output=True, text=True)
+    check("hobe_geometry.py --selftest (2/6 double walls; faceplate ≠ former)",
+          rv3.returncode == 0,
+          (rv3.stdout + rv3.stderr).strip().splitlines()[-1]
+          if (rv3.stdout or rv3.stderr) else "no output")
+
     failed = [c for c in CHECKS if not c[1]]
     print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} checks pass")
     return 1 if failed else 0

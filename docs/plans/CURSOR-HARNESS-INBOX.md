@@ -47,6 +47,18 @@
 > - Bar B correctly not closable in software.
 > - Used engines + insights catalogued; unused-but-should via GPT-5.6 Sol + Kimi K3 (GLM 5.2 unavailable in Cursor Task list).
 > - P0 next: EM brief v2 §6 → DEC-EM-1; then KISSsoft/Romax; parallel LTspice DPT + cantools. Avoid 3D EM / NVH / SPH theatre before torque closes.
+> **🧭 Cursor → Terminal 2026-07-29 ~12:15 — VISION ROUTE-FIX SHIPPED (presentation loop). Status: `WAITING_ON_TERMINAL` (advisory).**
+>
+> Sol + GLM 5.2 + Kimi K3 reviewed the draft; DECISIVE holes closed; wired:
+> - `scripts/lib/vision_route_fix/` (schema + knobs + loop; `ship_pass` always false)
+> - `build_universal_scene` reads `VISION_KNOB_*`, forces exposure≤0, writes `vision-studio-knobs.json`
+> - `form_converge_loop` luminance nudge after SOURCE clear → one re-render
+> - `render_vision_critic` attaches `structured_defects` + `defect_partition`
+>
+> Council transcripts: `prototypes/vision-route-fix/out/council-vision-route-fix-*.txt`
+> Synthesis: `scripts/lib/vision_route_fix/COUNCIL-2026-07-29.md`
+>
+> Selftest: `cd scripts/lib && python3 -m vision_route_fix.vision_route_fix_loop --selftest`
 >
 > ---
 >

@@ -196,3 +196,33 @@ class NdFeBMaterial:
 
 def cu_resistivity(temp_c: float, rho20: float = 1.72e-8, alpha: float = 0.00393) -> float:
     return rho20 * (1.0 + alpha * (temp_c - 20.0))
+
+
+# ---------------------------------------------------------------------------
+# Soft-magnetic candidates for mixed translator / pole studies
+# (Tony 29 Jul: poles likely MIM; translator may stay laminated Fe-Co).
+# Tables are representative datasheet-shaped curves — swap for a named
+# vendor grade before tooling. Not Somaloy: that remains SmcMaterial default.
+# ---------------------------------------------------------------------------
+
+
+class FeCoLaminated(SmcMaterial):
+    """Hiperco 50 / VACOFLUX-class laminated Fe-Co strip (high Bsat ~2.3 T)."""
+
+    H_TABLE = np.array([0.0, 40, 80, 160, 300, 500, 1000, 2000, 4000,
+                        8000, 16000, 40000, 80000, 160000])
+    B_TABLE = np.array([0.0, 0.20, 0.55, 1.10, 1.55, 1.85, 2.05, 2.18, 2.25,
+                        2.30, 2.33, 2.35, 2.36, 2.38])
+
+
+class MimFe3Si(SmcMaterial):
+    """Micro-injection-moulded Fe-3%Si soft magnet (typical sintered density).
+
+    Saturation and permeability sit BELOW laminated Fe-Co / electrical steel —
+    that is the comparison Tony recalled — while still above pressed SMC.
+    """
+
+    H_TABLE = np.array([0.0, 50, 100, 200, 400, 800, 1500, 3000, 6000,
+                        12000, 25000, 50000, 100000, 200000])
+    B_TABLE = np.array([0.0, 0.08, 0.22, 0.50, 0.85, 1.15, 1.35, 1.50, 1.60,
+                        1.68, 1.74, 1.78, 1.82, 1.88])

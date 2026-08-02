@@ -36,87 +36,73 @@ Central core 280 thick, slots 280 deep on BOTH faces, so the across-gap
 dimension L_x = 280 + 2*280 = 840. Transverse L_y = 1200. Axial
 L_z = 25*125 + 24*187 = 7613 um. Material Fe-Co, density 8.12 g/cc.
 Stator: 3 pole pieces per actuator, each a horseshoe whose toothed feet face the
-translator across a 60 um gap. Pole teeth 140 wide (140 + 172 = 312, the same
-pitch). Pole slot depth assumed 120 (the drawing does not fully dimension it).
+translator across a 60 um gap (as drawn). Pole teeth 140 wide (140 + 172 = 312).
+Pole slot depth assumed 120 (drawing does not fully dimension it).
 Coil: 70 turns of 40 um bare copper (48 um enamelled) around a limb roughly
 400 x 1200, winding window 1521 long. Supply 5 V. Nominal rate 10 steps/s.
 
-COMPUTED RESULTS.
-1. Translator solid volume = (840*1200*7613) - (2*24*187*280*1200) = 4.658 mm^3,
-   60.7% of the envelope. MASS 37.82 mg. Weight 0.371 mN. The client's own
-   detent target is F_d = 30*M_t*g = 11.13 mN; his stepping target is 1.5-2x
-   that, i.e. 16.69-22.25 mN. Three-phase step = pitch/3 = 104 um.
-2. FINITE ELEMENT: 2D planar nonlinear magnetostatic (xfemm / FEMM solver core),
-   out-of-plane depth 1200 um. The tooth-and-gap region is built exactly from
-   the client's dimensions; the back iron and wound limb are approximate because
-   the drawing does not fix them. The MAGNET IS REMOVED (Br = 0), so this is
-   pure reluctance force from the coil alone. Peak force over one pitch:
-     0.30 A -> 0.889 mN    0.35 -> 1.214    0.40 -> 1.589
-     0.70 A -> 4.878 mN    1.00 -> 9.809    1.20 -> 13.683
-     1.40 A -> 17.375 mN   1.60 -> 20.353   2.00 -> 25.410
-   Peak dL/dx = 0.0167 H/m unsaturated, falling to 0.0084 H/m by 1.6 A.
-   Inductance 29-31 uH. Bridge flux density 0.22 T at 0.3 A -> 1.16 T at 2.0 A.
-   Cross-check at 0.30 A: 1/2 i^2 dL/dx = 0.75 mN against weighted-stress-tensor
-   0.889 mN, i.e. 19% apart.
-3. CONCLUSION DRAWN: at the client's proposed 0.30-0.40 A the actuator makes
-   0.89-1.59 mN against his 11.13 mN detent target -- about 7x short. Attributed
-   entirely to ampere-turns: 70 x 0.40 = 28 At against ~95 At needed. Reading
-   the FE curve back: 1.07 A reaches the detent (3.86 V), 1.36 A reaches 1.5x
-   stepping (4.93 V, just inside the 5 V rail), 1.75 A would be needed for 2x
-   (6.33 V, over the rail).
-4. COIL: mean turn 3776 um (limb 400x1200 plus 144 um winding build), 3 layers
-   of 24 turns, window capacity ~93 turns, wire length 264.3 mm, R = 3.618 ohm,
-   L/R = 8.5 us.
-5. ALGEBRA CLAIM made prominently: V = iR = i(rho*N*l_turn/A_wire)
-   = (N*i)*rho*l_turn/A_wire, so for a REQUIRED ampere-turn figure the turn
-   count CANCELS; supply voltage depends only on mean turn length and wire
-   cross-section. Therefore more turns never helps and thicker wire is the only
-   lever. 40 -> 50 um wire takes the same 95 At from 4.93 V to 3.16 V; 63 um
-   gives 1.99 V.
-6. RESONANCE: using the client's own form k = 2*pi*F_d/(S/2) with S = 104 um,
-   k = 1344.5 N/m and f_res = (1/2pi)*sqrt(k/M_t) = 949 Hz, i.e. 95x above the
-   10 steps/s rate.
-7. STEP/ENERGY: ballistic step time sqrt(2s/(F/m)) = 0.687 ms at 16.69 mN;
-   recommended pulse 1.0-1.6 ms. At 1.36 A and 1.0 ms: ohmic 6.69 mJ, magnetic
-   0.028 mJ, ~6.7 mJ per step, ~67 mW average at 10 steps/s, adiabatic copper
-   rise ~5.8 K per pulse.
-8. MAGNET. The client asked what magnet thickness is required. The answer given
-   REFRAMES his question: the test is not whether the magnet can be made as thin
-   as MMF/H_c suggests (nobody makes it thinner than stock), but what MMF the
-   THINNEST AVAILABLE stock delivers -- because too much is as bad as too
-   little, an over-strong detent being one the coil cannot step out of. Using
-   MMF = H_c * thickness against the ~95 At required:
-     sintered NdFeB  H_c 900 kA/m, 0.30 mm min -> 270 At (2.83x) "too strong"
-     SmCo            800 kA/m, 0.30 mm         -> 240 At (2.52x) "too strong"
-     Alnico 5         50 kA/m, 0.50 mm         ->  25 At (0.26x) "too weak"
-     sintered ferrite 250 kA/m, 0.30 mm        ->  75 At (0.79x) "matches"
-     bonded NdFeB    600 kA/m, 0.20 mm         -> 120 At (1.26x) "matches"
-   Conclusion: ferrite and bonded NdFeB bracket the requirement; the
-   high-energy grades overshoot. Alnico additionally rejected for
-   demagnetisation risk from an adjacent coil's reverse field.
-9. MANUFACTURABILITY (the client's BIG QUESTION: is the translator
-   manufacturable, and the pole pieces, 3 per actuator?).
-   TRANSLATOR -- answered YES. It is PRISMATIC (constant 2D silhouette extruded
-   across 1200 um), so each lamination is a flat pattern. Recommended:
-   photochemical etch of 0.1 mm Fe-Co, 12 laminations to build 1200 um, on the
-   rule of thumb that minimum etchable feature is approximately equal to
-   material thickness (so 125 um teeth need <=125 um foil); etching gives
-   near-zero edge roll, which matters against a 60 um gap. Fine blanking viable
-   (die roll 5-20% of strip thickness = 5-20 um on 100 um strip, i.e. 8-33% of
-   the gap). Micro-MIM in one piece viable (125 um features, 187 x 280 um slots
-   = 1.5:1 aspect, +/-10 um). Fe-Co claimed to be a catalogue item in
-   0.1-0.35 mm strip. Dominant risk claimed to be the ~850 C magnetic anneal
-   distorting a slender 7.6 x 0.84 mm part; mitigation claimed to be annealing
-   laminations flat and stacking afterwards.
-   POLE PIECES -- core easy by the same routes, but the WINDING is named as the
-   real constraint: 70 turns of 40 um wire, 3 layers, 1521 um window, around a
-   400 x 1200 um limb, three per actuator, with no winding-shuttle access
-   through a closed magnetic core. Three routes offered: (i) wind in situ on an
-   open C then close the circuit; (ii) wind on a separate bobbin and assemble
-   the core around it; (iii) a pre-wound self-supporting bonded-wire air coil
-   slipped over a limb. Routes (i) and (ii) are each said to add a flux joint
-   costing roughly 5-15% of the detent. Recommendation: let the winding method
-   drive the pole-piece geometry rather than the reverse.
+COMPUTED RESULTS (re-audited 28 Jul evening; these SUPERSEDE any earlier draft).
+1. MASS. Solid volume = (840*1200*7613) - (2*24*187*280*1200) = 4.658 mm^3.
+   MASS 37.82 mg. Weight 0.371 mN. F_d = 30*M_t*g = 11.13 mN; stepping
+   1.5-2x = 16.69-22.25 mN. Step = pitch/3 = 104 um. Arithmetic reproduces.
+2. FINITE ELEMENT (60 um gap): 2D planar nonlinear magnetostatic (xfemm),
+   depth 1200 um. Tooth/gap exact; back iron and wound limb approximate.
+   Magnet REMOVED (Br=0) — coil reluctance force only. Constant end-attraction
+   of the unrolled model (~25% of peak) is subtracted before peaking.
+   Peak force (Maxwell stress):
+     0.30 A -> 0.598 mN   0.35 -> 0.817   0.40 -> 1.070
+     0.70 A -> 3.262 mN   1.00 -> 6.345   1.20 -> 8.274
+     1.40 A -> 9.540 mN   1.60 -> 10.272  2.00 -> 11.092
+   Peak dL/dx (secant) 0.0152 H/m unsaturated, falling above ~1.2 A.
+   L_aligned ~33.6 uH. Bridge B 0.24 T at 0.3 A -> 1.18 T at 2.0 A.
+   MST vs 1/2 i^2 dL/dx median disagreement ~28% even at 0.40 A (worst >100%).
+   Force is taken from the stress tensor, not the inductance slope.
+   Current density: 318 A/mm^2 at 0.40 A; ~800 A/mm^2 at 1.0 A.
+3. CONVERGENCE. An earlier draft withdrew the force magnitudes after a test
+   that moved the bridge WITH the translator ends looked non-convergent.
+   That test was broken (two variables at once). With the magnetic circuit
+   held fixed, peak force at 0.40 A settles 1.071/1.070/1.067 mN across
+   2/3/5 pitch overhang (0.4%). Magnitudes are REINSTATED with the
+   disclosures above.
+4. GAP x CURRENT MATRIX (same solver; circuit fixed; only gap changed):
+     gap 60 um: F@0.40A=1.07 mN, F@1.20A=8.27 mN, mod=3.2%, ~7% of ideal;
+                F_d=11.13 mN UNREACHABLE inside 5 V rail (max ~8.3 mN at 1.2 A)
+     gap 40 um: F@0.40A=2.15, F@1.20A=15.17, mod=7.1%; I(F_d)=0.95 A,
+                I(1.5 Fd)=1.37 A (over 5 V with 40 um wire)
+     gap 30 um: F@0.40A=3.12, F@1.20A=20.90, mod=10.5%; I(F_d)=0.77 A,
+                I(1.5 Fd)=0.98 A (both inside 5 V)
+     gap 20 um: F@0.40A=4.94, F@1.20A=30.57, mod=16.1%; I(F_d)=0.59 A,
+                I(1.5 Fd)=0.75 A
+   Ideal no-fringing bound at 0.40 A / 60 um ~14.8 mN; FE/ideal ~0.07.
+5. CONCLUSION DRAWN NOW: shortfall at worksheet currents is ~10x in force.
+   Two co-equal causes: (a) 28 A-turns is not many; (b) g/t=0.48 fringing
+   kills modulation. As-drawn 60 um gap cannot meet F_d on a 5 V / 40 um-wire
+   rail. Recommended path: close gap to 40 um (detent) or 30 um (1.5x step),
+   AND thicken wire. Ampere-turns alone cannot rescue the as-drawn geometry.
+6. COIL: mean turn 3776 um, 3 layers x 24 turns, window capacity ~93 turns,
+   wire length 264.3 mm, R = 3.618 ohm (reproduces from rho*l/A), L/R ~9 us.
+   Cold rail ceiling 1.382 A; after a 1 A / 1 ms pulse, warm ceiling 1.365 A.
+7. ALGEBRA: V=(N*i)*rho*l_turn/A_wire so turn count cancels for FIXED mean
+   turn and wire section. Caveat accepted: extra layers lengthen l_turn;
+   short pulses near L/R make volt-seconds N-dependent. Thicker wire remains
+   the voltage lever; gap closure is the force lever.
+8. RESONANCE: client's k=2*pi*F_d/(S/2) gives 949 Hz; sinusoidal-over-pitch
+   form k=2*pi*F_d/pitch gives 387 Hz (factor sqrt(6)). 387 Hz used.
+9. MAGNET screen (H_c * t vs ~95 At of the 40 um-gap stepping path) — EXPLICITLY
+   a screen, not a load-line solve:
+     sintered NdFeB 900 kA/m, 0.30 mm -> 270 At (too strong)
+     SmCo 800 / 0.30 -> 240 At (too strong)
+     Alnico 5 50 / 0.50 -> 25 At (too weak + demag risk)
+     sintered ferrite 250 / 0.30 -> 75 At (brackets)
+     bonded NdFeB 600 / 0.20 -> 120 At (brackets)
+   Load-line solve with magnet present is NOT done. Ferrite demag check open.
+   Quoted min thicknesses are special-order forms, not generic catalogue.
+10. MANUFACTURABILITY. Translator YES, prismatic, photochemical etch of
+    0.1 mm Fe-Co recommended but 125 um tooth is at process edge (+/-10-20 um,
+    taper, root radii). Micro-MIM downgraded to prove-first. Anneal ~850 C is
+    the real risk. Pole CORE easy; WINDING is the constraint — recommended
+    route is pre-wound bonded-wire air coil with split-core assembly (industry
+    practice). Planar/deposited coils rejected for copper cross-section.
 """
 
 SEATS = {
@@ -130,20 +116,23 @@ SEATS = {
                 "attack, say so in one line and move on."),
         ask="""Attack the PHYSICS and the FINITE-ELEMENT reasoning. Hardest on:
 (a) the mass, and the volume subtraction behind it;
-(b) whether a 2D planar model at 1200 um depth is legitimate when the real
-    device wraps flux transversely, and what the 19% co-energy vs stress-tensor
-    disagreement is telling us;
+(b) whether a 2D planar unrolled model at 1200 um depth is legitimate when the
+    real device wraps flux transversely; what the ~28% median MST vs
+    1/2 i^2 dL/dx disagreement (worse at high current) is telling us; and
+    whether reinstating magnitudes after the "fixed-circuit" overhang check
+    is actually earned;
 (c) whether "the turn count cancels" is true AND correctly applied, and where
     it breaks down;
 (d) whether removing the magnet for the force-vs-current table is legitimate --
     does superposition hold well enough for the client to add the detent back
     separately?
-(e) dL/dx FALLS from 0.0167 to 0.0084 as current rises while force keeps
-    rising. Is that self-consistent? Should force be taken from 1/2 i^2 dL/dx
-    at all once saturating?
-(f) anything about the three-phase arrangement, the 104 um step, or the
-    resonance formula that is simply wrong.
-(g) the single biggest thing this analysis has NOT considered."""),
+(e) the gap x current matrix and the claim that fringing at g/t=0.48 is why
+    only ~7% of ideal force is recovered — is the ideal bound the right
+    comparison, and is gap closure ranked correctly vs ampere-turns?
+(f) current density 318-800 A/mm^2 — is the "short pulses survive" hedge
+    engineering or hand-waving?
+(g) three-phase step, 104 um, resonance — anything simply wrong.
+(h) the single biggest thing this analysis has NOT considered."""),
     "kimi": dict(
         model="moonshotai/kimi-k3",
         system=("You are auditing numerical correctness. Recompute everything "
@@ -184,8 +173,8 @@ document invites but does not answer."""),
                 "Correct anything wrong or over-optimistic. Name real "
                 "processes, material forms and realistic tolerances. Confirm "
                 "briefly where a claim is right."),
-        ask="""Fact-check section 9 (manufacturability) and the magnet stock
-assumptions in section 8. Specifically:
+        ask="""Fact-check the manufacturability claims and the magnet stock
+assumptions. Specifically:
 - is the etch rule of thumb (minimum feature ~ material thickness) stated
   correctly, and what is the real limit?
 - is micro-MIM realistic for a 280 um deep, 187 um wide slot?

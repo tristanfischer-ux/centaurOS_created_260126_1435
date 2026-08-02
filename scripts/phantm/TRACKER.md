@@ -165,3 +165,14 @@ pre-commit hook). Use `python -m pip` for installs (relocated-venv shebangs).
 | OPEN: vibration envelope from Tony → hold-force spec (§9.4 row 4) | ⏳ external |
 | ~~push local commits to origin~~ | ✅ done — branch is level with origin/oxccu-efuel |
 | v4.5: D5/D6 CAD + 3D hexcell render + drive PCB power/control + cell tutorial + 14 verified suppliers + Annex E emails | ✅ committed |
+
+## Tony overnight (29 Jul ~00:08–00:22) — CAPTURED
+- Cell foil: individuals + actuators only; arrays need Vlad OK on ⅓-double walls.
+- **KILLED:** etched hex-hole stack (surface flatness); adhesive HOBE (resistive node bonds / residue).
+- **HOBE laser-weld (30 Jul):** live for metal–metal nodes only — still **2/6 = ⅓ double walls** (Tony); does **not** remove Vlad lattice question. Faceplate = gauge/datum, not expansion former. Encoded: `hobe_geometry.py` → `out/hobe-geometry.json`. Reply loop: `TONY-REPLY-LOOP.md` (Anvil-first; no LLM go-between claims).
+- Translator laminations OK if stack → ~1.2 mm; **poles NOT prismatic** → MIM / multi-outline, not single-lam stack.
+- MIM Bs: often lower vs laminated Fe-Co (not vs SMC).
+- 4-phase: +force via wider teeth; +~33% stator cost; longer stator unless 3-tooth poles (−~25% force).
+- Strategy: squeeze E-band with processes viable NOW; 50 GHz (λ×1.5) is known backoff, not the default escape.
+- Reply PDF+Excel: `out/20260729-0628-PHANTM-TONY-OVERNIGHT-REPLY-V7.2.{pdf,xlsx}`
+- **Guard:** `force_claim_guards.py` — proves catch of absolute-only +33% / “not 25%” framing; wired into study JSON, overnight reply, blocks `tony_followup_calcs.py`, hooked in `selftest.py`.
