@@ -136,6 +136,14 @@ class Check:
     # it blesses a quantity another check flagged. The exporter renders a STATIC FAIL
     # (no live formula — the live arithmetic would dishonestly show PASS).
     cross_flagged: bool = False
+    # SOURCE IDENTITY (Bar A 2026-08-03): where ACTUAL and EXPECTED each came from.
+    # Empty when unpopulated. When BOTH are non-empty AND equal the check is a
+    # tautology (both sides read one value) — check_falsifiability_audit catches
+    # that generically. Value equality is NOT the signal (a passing eq always
+    # shows equal values); source identity is. BoM unit×qty vs line_gbp MUST
+    # carry DIFFERENT sources even when the numbers match.
+    actual_source: str = ""
+    expected_source: str = ""
 
     @property
     def delta(self) -> Optional[float]:
@@ -290,13 +298,20 @@ def _checks_consistency(state: dict, run_dir: str) -> List[Check]:
         if line is None or unit_p is None or qty is None or line <= 0:
             continue
         tag = str(row.get("tag") or row.get("part") or "?")
+        # abs floor ~£0.01, magnitude-capped so a £1 line cannot be swallowed
+        # by a £1 floor (unit=0, qty=1, line=1 must FAIL).
+        _bom_tol = _tol_pct(line, 0.005, 0.01)
         out.append(Check(
             name=f"BoM {tag}: unit_gbp x qty == line_gbp",
             category="CONSISTENCY", relation="eq",
-            status=_eq_status(unit_p * qty, line, _tol_pct(line, 0.005, 1.0)),
+            status=_eq_status(unit_p * qty, line, _bom_tol),
             actual=unit_p * qty, expected=line,
-            tol=_tol_pct(line, 0.005, 1.0), unit="GBP",
+            tol=_bom_tol, unit="GBP",
             a_factors=(unit_p, qty), producer=f"bom:{tag}:unit",
+            # DIFFERENT sources even when values match — unit×qty is derived;
+            # line_gbp is the stored line. Same-source would be a tautology.
+            actual_source=f"bom:{tag}:unit*qty",
+            expected_source=f"bom:{tag}:line_gbp",
             detail=(f"{tag}: £{unit_p:,.0f} x {qty:g} must equal the "
                     f"£{line:,.0f} line total."),
         ))
@@ -1425,10 +1440,62 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
 # ============================================================================
 # Status + tolerance primitives
 # ============================================================================
+# Ceiling on any ABSOLUTE tolerance floor, as a fraction of the value being
+# compared. Guarantees every check can fail (>10% error) without letting a fixed
+# floor swallow a small quantity. See _tol_pct for why this is 0.10, not 0.5.
+FLOOR_CAP_FRACTION = 0.10
+
+
 def _tol_pct(base: Optional[float], pct: float, floor: float) -> float:
+    """Relative tolerance with a magnitude-aware absolute floor.
+
+    Pattern: ``max(|base|·pct, min(floor, |base|·FLOOR_CAP))``.
+    The floor is capped at a fraction of |base| so a fixed absolute floor (e.g.
+    £1.0) can never swallow an entire small expected value — unit=0, qty=1,
+    line=1 must still FAIL rather than pass inside a £1 window around a £1 line.
+
+    ⭐ THE CAP WAS 0.5 AND IS NOW 0.10 (2026-08-03). A 0.5 cap GUARANTEES
+    falsifiability — you need >50% error to fail — and that is the floor the
+    falsifiability audit enforces. But it also OVERRIDES the relative term upward
+    for every small quantity: coolant_viscosity_pa_s (0.001375) came out with a
+    0.000687 tolerance, a 50% window, so a tool could be 40% wrong and pass.
+    "Cannot be unfalsifiable" is a floor, not a quality bar. 0.10 keeps the same
+    guarantee (>10% error fails) at five times the tightness, and still protects
+    the small-magnitude case the cap exists for.
+    """
     if base is None:
         return floor
-    return max(floor, abs(base) * pct)
+    ab = abs(base)
+    if ab == 0.0:
+        return floor
+    return max(ab * pct, min(floor, ab * FLOOR_CAP_FRACTION))
+
+
+def _tool_eq_tol(qv: float) -> float:
+    """Magnitude-aware equality tol for tool-output vs contract quantity.
+
+    A flat 0.01 floor swallows mPa·s-scale values (coolant_viscosity_pa_s
+    0.001 vs 0.002 would PASS). Cap the floor at a fraction of |qv| the same way
+    ``_tol_pct`` does — see the note there on why that fraction is 0.10 and not
+    0.5: a 50% window is falsifiable but not a check worth having.
+    """
+    ab = abs(qv)
+    if ab == 0.0:
+        return 0.01
+    return max(ab * 0.02, min(0.01, ab * FLOOR_CAP_FRACTION))
+
+
+def _tool_round(v: Optional[float]) -> Optional[float]:
+    """Round tool/contract values for Check display without erasing small magnitudes.
+
+    ``round(v, 3)`` turns 0.00101 → 0.001 and round(tol, 3) can zero a
+    sub-0.01 tolerance; keep 6 d.p. when |v| < 1e-2.
+    """
+    if v is None:
+        return None
+    if abs(v) < 1e-2 and v != 0.0:
+        return round(v, 6)
+    return round(v, 3)
 
 
 def _eq_status(actual: float, expected: float, tol: float) -> str:
@@ -1725,6 +1792,48 @@ def _is_out_of_scope_perimeter_metric(key: str) -> bool:
     )
 
 
+def _qty_is_brief_only_identity(key: str, qentry: Any) -> bool:
+    """True when a contract quantity is NOT a distinct ACHIEVED design value —
+    it only restates the brief (or is a named assumption / class label / limit).
+
+    SOURCE rule (Bar A 2026-08-03): never treat brief target T as achieved by
+    contract key T when the quantity provenance is only the brief. Name patterns
+    that declare the same thing even without an explicit source tag:
+
+      * assumed_*          — design inputs, not delivered performance
+      * *_power_class_*    — nameplate / class labels, not duty achieved
+      * limit/ceiling/cap  — constraints; achieved lives under a different key
+      * source == 'brief'  — brief-echoed identity (max_rotor_speed_rpm, …)
+
+    A quantity with a tool/calculator source and no limit/assumed/class name is
+    a real design value and may still bind (same-key fast path or candidate).
+    """
+    kl = str(key or "").lower()
+    # Name declares "not an achieved quantity".
+    if kl.startswith("assumed_"):
+        return True
+    # Class labels (front_hardware_power_class_kw) are envelope/nameplate tags,
+    # not delivered shaft or electrical duty. Match power_class specifically —
+    # not every token 'class' (insulation_class etc. are unrelated).
+    if "power_class" in kl:
+        return True
+    if re.search(r"(?:^|_)(?:limit|ceiling|cap|max_allowed|threshold)(?:_|$)", kl):
+        return True
+    if not isinstance(qentry, dict):
+        return False
+    src = str(qentry.get("source") or "").strip().lower()
+    if not src:
+        prov = qentry.get("provenance") if isinstance(qentry.get("provenance"), dict) else {}
+        src = str((prov or {}).get("source") or "").strip().lower()
+    if src == "brief" or src.startswith("brief.") or src.startswith("brief:"):
+        return True
+    # Explicit brief-identity restatements even when source tag is missing/odd.
+    sd = str(qentry.get("source_detail") or "").lower()
+    if "brief" in sd and "identity" in sd:
+        return True
+    return False
+
+
 def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
     """UNIVERSAL: deterministically verify each STRUCTURED brief target metric
     (constraints.target_performance.metrics) against the matching DESIGNED contract quantity —
@@ -1763,20 +1872,22 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         _band = _is_cost_band_center(km)
         _band_tol = abs(tvf) * 0.20
         _lower = _brief_metric_is_lower_better(str(km))
-        # ⭐⭐ A LIMIT RESTATED IS NOT A LIMIT MET (2026-08-03). This fast path takes
-        # the contract quantity of the SAME NAME as the brief metric and treats it
-        # as the DESIGN's achieved value. For a metric whose name declares it a
-        # LIMIT — magnet_temp_limit_c, winding_temp_limit_c — the contract simply
-        # restates the limit, so the row compared 150 against 150 and PASSED. It
-        # could not fail whatever the machine did, and it sat green while the
-        # magnets ran 9.3 K over that very limit.
-        # A limit is a CONSTRAINT, not a delivered performance: the achieved value
-        # always lives under a different key (mgu_magnet_temp_c). Skip the fast
-        # path for limit-named metrics and fall through to the candidate search,
-        # which finds the achieved quantity — or, finding none, now says so.
-        _is_limit_name = bool(re.search(
-            r"(?:^|_)(?:limit|ceiling|cap|max_allowed|threshold)(?:_|$)", str(km), re.I))
-        if km in q and not _is_limit_name:
+        # ⭐⭐ A LIMIT / BRIEF ECHO RESTATED IS NOT A TARGET MET (2026-08-03).
+        # This fast path takes the contract quantity of the SAME NAME as the brief
+        # metric and treats it as the DESIGN's achieved value. That is legitimate
+        # only when the contract holds a DISTINCT achieved quantity under that
+        # name (tool/calculator provenance). It is a tautology when:
+        #   * the name is a LIMIT (magnet_temp_limit_c) — contract restates 150,
+        #     while magnets ran 159 °C under mgu_magnet_temp_c;
+        #   * the name is assumed_* / a class label / source=brief identity
+        #     (front_hardware_power_class_kw, max_rotor_speed_rpm, assumed_vdc_*,
+        #     assumed_coolant_inlet_c) — both sides read the brief.
+        # Skip the fast path for brief-only identities and fall through to the
+        # candidate search, which finds a real achieved quantity — or, finding
+        # none, emits honest UNVERIFIED/FAIL rather than a green identity.
+        _q_same = q.get(km) if km in q else None
+        _skip_same_key = _qty_is_brief_only_identity(str(km), _q_same)
+        if km in q and not _skip_same_key:
             dvc = qval(q, km)
             if dvc is not None:
                 if _band:
@@ -1795,6 +1906,8 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
                     actual=round(dvc, 4), expected=tvf,
                     tol=round(_band_tol if _band else tol, 4), unit=unit,
                     producer=f"brief:{km}",
+                    actual_source=f"contract:{km}",
+                    expected_source=f"brief:{km}",
                     detail=(f"Brief target {km} = {tvf:g} {unit}; design ({km}) = {dvc:g} {unit} — "
                             + ("a cost band-centre: the BoM must land WITHIN the ±20% plausibility band."
                                if _band else
@@ -1828,7 +1941,12 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
             # check is worse than no check, because it occupies the slot where a
             # real one would have failed. The ACHIEVED quantity is a different key
             # (mgu_magnet_temp_c); the limit is the target, not the measurement.
+            # Same rule for any brief-only identity (assumed_*, class labels,
+            # source=brief echoes): binding T → another brief echo of T is still
+            # a green identity, not a design check. Do not invent physics bindings.
             if k.lower() == km.lower():
+                continue
+            if _qty_is_brief_only_identity(k, q.get(k)):
                 continue
             ov = len(mt & kt)
             if ov >= 2 or (mt <= kt and ov >= 1):
@@ -1844,6 +1962,8 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
                 name=f"Brief target met: {km}", category="BRIEF", relation="eq",
                 status=FAIL, actual=None, expected=tvf, tol=0.0, unit=unit,
                 producer=f"brief:{km}",
+                actual_source="",
+                expected_source=f"brief:{km}",
                 detail=(f"UNVERIFIED — the brief sets {km} = {tvf:g} {unit} but the design "
                         f"reports no ACHIEVED quantity to compare it against (only the "
                         f"target itself). Emit the achieved value, or this constraint "
@@ -1877,6 +1997,8 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
             actual=round(dv, 4), expected=tvf,
             tol=round(_band_tol if _band else tol, 4), unit=unit,
             producer=f"brief:{km}",
+            actual_source=f"contract:{best}",
+            expected_source=f"brief:{km}",
             detail=(f"Brief target {km} = {tvf:g} {unit}; design ({best}) = {dv:g} {unit} — "
                     + ("a cost band-centre: the BoM must land WITHIN the ±20% plausibility band."
                        if _band else
@@ -1951,8 +2073,8 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                   next((k for k in qval if k == f or (len(f) >= 6 and (f in k or k in f))), None))
             if qk is not None:
                 qv = num(qval[qk])
-                ok = qv is not None and abs(val - qv) <= max(abs(qv) * 0.02, 0.01)
-                _tol = round(max(abs(qv) * 0.02, 0.01), 3) if qv is not None else 0.01
+                _tol = _tool_eq_tol(qv) if qv is not None else 0.01
+                ok = qv is not None and abs(val - qv) <= _tol
                 # ⭐⭐ SUPERSEDED IS NOT STALE (2026-08-03). A tool output that differs
                 # from the contract is a defect ONLY when nothing explains it. When a
                 # LATER, better-sourced tool deliberately replaced the value — here
@@ -1973,10 +2095,12 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                     if _owner and _owner != tid and len(_reason) > 0:
                         out.append(Check(
                             name=f"Tool output superseded: {field}", category="PROVENANCE",
-                            relation="eq", status=PASS, actual=round(val, 3),
-                            expected=round(qv, 3), tol=_tol, unit="",
+                            relation="eq", status=PASS, actual=_tool_round(val),
+                            expected=_tool_round(qv), tol=_tool_round(_tol), unit="",
                             producer=f"tool:{tid}",
                             quantity_key=next((k for k in q if k.lower() == qk), qk),
+                            actual_source=f"tool:{tid}:{field}",
+                            expected_source=f"contract:{qk}",
                             detail=(f"{tid} computed {field}={val:g}; the design uses "
                                     f"{qv:g} from {_owner} — deliberate supersession, "
                                     f"not drift: {_reason[:180]}")))
@@ -1986,10 +2110,13 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                 qk_orig = next((k for k in q if k.lower() == qk), qk)
                 out.append(Check(
                     name=f"Tool output used: {field}", category="PROVENANCE", relation="eq",
-                    status=PASS if ok else FAIL, actual=round(val, 3),
-                    expected=(round(qv, 3) if qv is not None else val), tol=_tol, unit="",
+                    status=PASS if ok else FAIL, actual=_tool_round(val),
+                    expected=(_tool_round(qv) if qv is not None else val),
+                    tol=_tool_round(_tol), unit="",
                     producer=f"tool:{tid}",
                     quantity_key=qk_orig,
+                    actual_source=f"tool:{tid}:{field}",
+                    expected_source=f"contract:{qk_orig}",
                     detail=(f"{tid} {field}={val:g} matches contract {qk}." if ok else
                             f"STALE: {tid} computed {field}={val:g} but the design uses {qk}="
                             f"{qv:g} — the tool output is NOT the number shown (tool ran at a "
@@ -2000,8 +2127,10 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                 used = _present(val)
                 out.append(Check(
                     name=f"Tool output traced: {field}", category="PROVENANCE", relation="eq",
-                    status=PASS if used else FAIL, actual=round(val, 3), expected=None,
+                    status=PASS if used else FAIL, actual=_tool_round(val), expected=None,
                     tol=0.0, unit="", producer=f"tool:{tid}",
+                    actual_source=f"tool:{tid}:{field}",
+                    expected_source="",
                     detail=(f"{tid} {field}={val:g} is used in the design." if used else
                             f"ORPHANED: {tid} computed {field}={val:g} but this value appears "
                             f"NOWHERE in the design's quantities/BoM/cost — tool ran but its "
@@ -2647,6 +2776,131 @@ def summarise(checks: List[Check]) -> Tuple[int, int, int]:
 # ============================================================================
 def _selftest() -> int:
     import tempfile
+
+    # ⭐⭐ proveCatch (2026-08-03 A-i): brief metric + same-named brief-only contract
+    # quantity must NOT PASS. The five live tautologies (front_hardware_power_class_kw,
+    # max_rotor_speed_rpm, assumed_vdc_min/max_v, assumed_coolant_inlet_c) compared the
+    # brief to itself via the same-key fast path. A synthetic brief-echo of the same
+    # shape must surface as FAIL/UNVERIFIED — never green identity. Limit names still
+    # bind to a DISTINCT achieved key when one exists (magnet_temp_limit → mgu_magnet).
+    _tai_dir = tempfile.mkdtemp(prefix="brief_tautology_")
+    _tai_brief = {"constraints": {"target_performance": {"metrics": [
+        {"key_metric": "assumed_vdc_min_v", "value": 600, "unit": "V"},
+        {"key_metric": "front_hardware_power_class_kw", "value": 350, "unit": "kW"},
+        {"key_metric": "max_rotor_speed_rpm", "value": 19500, "unit": "rpm"},
+        {"key_metric": "magnet_temp_limit_c", "value": 150, "unit": "C"},
+    ]}}}
+    _tai_state = {
+        "orchestratorContract": {"quantities": {
+            "assumed_vdc_min_v": {"value": 600, "unit": "V", "source": "brief"},
+            "front_hardware_power_class_kw": {
+                "value": 350, "unit": "kW", "source": "brief",
+                "source_detail": "HW nameplate class — not continuous duty"},
+            "max_rotor_speed_rpm": {
+                "value": 19500, "unit": "rpm", "source": "brief",
+                "source_detail": "brief max_rotor_speed_rpm identity"},
+            "magnet_temp_limit_c": {"value": 150, "unit": "C", "source": "brief"},
+            "mgu_magnet_temp_c": {
+                "value": 159.35, "unit": "C",
+                "provenance": {"source": "tool:motor:cooling-thermal-screen"}},
+        }},
+        "parsedBrief": _tai_brief,
+        "requirementsBom": [], "partVerifications": [],
+    }
+    for _fn, _blob in (
+        ("state.json", _tai_state),
+        ("1-parsed-brief.json", _tai_brief),
+        ("parts-ledger.json", {"grand_total_gbp": 0, "equipment": []}),
+        ("connection-schedule.json", {"rows": [], "specs": []}),
+    ):
+        with open(os.path.join(_tai_dir, _fn), "w") as _fh:
+            json.dump(_blob, _fh)
+    _tai_cks = _checks_brief_compliance(_tai_state, _tai_dir)
+    def _tai(name_sub: str):
+        return next((c for c in _tai_cks if name_sub in c.name), None)
+    for _km in ("assumed_vdc_min_v", "front_hardware_power_class_kw",
+                "max_rotor_speed_rpm"):
+        _c = _tai(_km)
+        if _c is None or _c.status == PASS:
+            print(f"  FAIL brief-tautology proveCatch: {_km} same-key brief echo "
+                  f"must NOT PASS (got {None if _c is None else _c.status})"); return 1
+        if _c.actual_source and _c.actual_source == _c.expected_source:
+            print(f"  FAIL brief-tautology proveCatch: {_km} still has source-identity "
+                  f"actual_source==expected_source"); return 1
+    _c_mag = _tai("magnet_temp_limit_c")
+    if (_c_mag is None or _c_mag.status != FAIL
+            or _c_mag.actual is None or abs(float(_c_mag.actual) - 159.35) > 0.01
+            or "mgu_magnet_temp_c" not in (_c_mag.actual_source or "")):
+        print("  FAIL brief-tautology proveCatch: magnet_temp_limit_c must FAIL at "
+              f"159.35 via mgu_magnet_temp_c (got {_c_mag})"); return 1
+
+    # ⭐⭐ proveCatch (2026-08-03 A-iii): magnitude-aware floors must catch small
+    # swallowed equality checks that a flat abs floor previously waved through.
+    # BoM I-4: unit=0, qty=1, line=1 must FAIL (old floor=£1 → tol>=expected).
+    _bom_tol = _tol_pct(1.0, 0.005, 0.01)
+    if not (_bom_tol < 1.0 and _eq_status(0.0 * 1.0, 1.0, _bom_tol) == FAIL):
+        print("  FAIL BoM I-4 proveCatch: unit=0, qty=1, line=1 must FAIL "
+              f"(tol={_bom_tol})"); return 1
+    # Large lines still use the relative band (0.5% of £10_000 = £50).
+    if abs(_tol_pct(10000.0, 0.005, 0.01) - 50.0) > 1e-9:
+        print("  FAIL BoM I-4 proveCatch: large-line relative tol regresssed"); return 1
+    # coolant_viscosity_pa_s: 0.001 vs 0.002 must FAIL; 0.001 vs 0.00101 must PASS.
+    _vt = _tool_eq_tol(0.001)
+    if abs(0.002 - 0.001) <= _vt:
+        print(f"  FAIL viscosity proveCatch: 0.001 vs 0.002 must FAIL (tol={_vt})")
+        return 1
+    if abs(0.00101 - 0.001) > _vt:
+        print(f"  FAIL viscosity proveCatch: 0.001 vs 0.00101 must PASS (tol={_vt})")
+        return 1
+    # Rounding must not erase sub-0.01 significance (tol stored on the Check).
+    if _tool_round(0.00101) == _tool_round(0.001) or (_tool_round(_vt) or 0) == 0:
+        print("  FAIL viscosity proveCatch: _tool_round erased sub-1e-2 significance")
+        return 1
+    # End-to-end via _checks_tool_provenance (not just the helpers).
+    _visc_dir = tempfile.mkdtemp(prefix="visc_tol_")
+    with open(os.path.join(_visc_dir, "4-orchestrator-tools-used.json"), "w") as _fh:
+        json.dump({"tools": [{"tool_id": "coolant:visc",
+                              "claims": [{"field": "coolant_viscosity_pa_s",
+                                          "value": 0.002}]}]}, _fh)
+    _visc_fail = _checks_tool_provenance(
+        {"orchestratorContract": {"quantities": {
+            "coolant_viscosity_pa_s": {"value": 0.001}}}}, _visc_dir)
+    if not any("coolant_viscosity_pa_s" in c.name and c.status == FAIL
+               for c in _visc_fail):
+        print("  FAIL viscosity proveCatch e2e: 0.002 vs contract 0.001 must FAIL")
+        return 1
+    _visc_dir2 = tempfile.mkdtemp(prefix="visc_tol_ok_")
+    with open(os.path.join(_visc_dir2, "4-orchestrator-tools-used.json"), "w") as _fh:
+        json.dump({"tools": [{"tool_id": "coolant:visc",
+                              "claims": [{"field": "coolant_viscosity_pa_s",
+                                          "value": 0.00101}]}]}, _fh)
+    _visc_pass = _checks_tool_provenance(
+        {"orchestratorContract": {"quantities": {
+            "coolant_viscosity_pa_s": {"value": 0.001}}}}, _visc_dir2)
+    if not any("coolant_viscosity_pa_s" in c.name and c.status == PASS
+               for c in _visc_pass):
+        print("  FAIL viscosity proveCatch e2e: 0.00101 vs contract 0.001 must PASS")
+        return 1
+    # BoM I-4 end-to-end: unit=0 × qty=1 ≠ line=1 must surface as FAIL.
+    _bom_dir = tempfile.mkdtemp(prefix="bom_i4_")
+    for _fn, _blob in (
+        ("state.json", {
+            "orchestratorContract": {"product_class": "synthetic_bom_i4",
+                                     "quantities": {}},
+            "requirementsBom": [{"tag": "I-4", "part": "tiny", "qty": 1,
+                                 "unit_gbp": 0, "line_gbp": 1,
+                                 "requirement": "proveCatch"}],
+            "partVerifications": [],
+        }),
+        ("parts-ledger.json", {"grand_total_gbp": 1, "equipment": []}),
+        ("connection-schedule.json", {"rows": [], "specs": []}),
+    ):
+        with open(os.path.join(_bom_dir, _fn), "w") as _fh:
+            json.dump(_blob, _fh)
+    _bom_checks = run_all_checks(_bom_dir)
+    if not any("unit_gbp x qty" in c.name and c.status == FAIL for c in _bom_checks):
+        print("  FAIL BoM I-4 proveCatch e2e: unit=0, qty=1, line=1 must FAIL")
+        return 1
 
     # ⭐⭐ proveCatch (2026-08-03): SUPERSEDED must not become a laundering hole.
     # A tool output that differs from the contract is reported as a deliberate

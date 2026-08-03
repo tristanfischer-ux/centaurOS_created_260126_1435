@@ -58,7 +58,7 @@ can give us.
 | Render / GA / SLD coverage | **23/23 · 23/23 · 6/6 = 100%** | A | No |
 | PCB | 2 routed boards, DRC 0 violations, fitness 7.6/10 | A | `NOT_FABRICATION_READY` |
 | Suppliers | 3 archetypes / 7 candidates | A | No |
-| Falsifiability audit | **7 of 169 checks cannot fail** | A | Tracked below |
+| Falsifiability audit | **0 of 169 cannot fail** (was 7) | A | No — closed 2026-08-03 workflow |
 | CAD release coverage | **0%** | B | Partner STEP |
 | Hardware correlation | **B1–B10 all OPEN** | B | Yes |
 
@@ -98,7 +98,7 @@ several were hiding real engineering findings.
 | **4** | DEC-EM-1 | **RECOMMENDATION REVERSED** — see §4 |
 | **5** | Gear-oil | **CLEARED** — the "regression" was a stale artefact; charge-floor source fix shipped |
 | **6** | Suppliers | **POPULATED** — Hewland, Xtrac, Ricardo, Infineon, Helix, Lucid |
-| **7** | Falsifiability | **BUILT** — found 5 more live tautologies |
+| **7** | Falsifiability | **BUILT** then **CLOSED 2026-08-03** — 7→0 unfalsifiable (workflow `bar-a-falsifiability-closeout`) |
 
 ---
 
@@ -132,14 +132,35 @@ sweep) and are not re-solved here. The thermal column is the new information.
 
 ## 5. What remains
 
-### Bar A — software-closable, in priority order
+### Bar A — software-closable residuals
 
-| # | Item | Why it is still open | Est. |
+| # | Item | Status | Evidence |
 |---|---|---|---|
-| A-i | **Five tautological brief checks** — `front_hardware_power_class_kw`, `max_rotor_speed_rpm`, `assumed_vdc_min_v`, `assumed_vdc_max_v`, `assumed_coolant_inlet_c` | Each compares a target to itself and cannot fail — the shape that hid the magnet breach | 1 session |
-| A-ii | **`actual_source` / `expected_source` on `Check`** | The falsifiability audit cannot detect tautology generically without it; today it catches only the brief family | 1 session |
-| A-iii | **Two tolerance-swallowed checks** (`BoM I-4`, `coolant_viscosity_pa_s`) | Tolerance ≥ expected magnitude — unfailable | small |
-| A-iv | **Derived stator thermal chain** | `stator_thermal_chain.py` refuses to publish: a single series chain cannot carry two heat sources. Needs a two-source LPTN with slot fill + impregnation data | Bar B input |
+| A-i | Five tautological brief checks | **CLOSED 2026-08-03** | Same-key brief path skipped for brief-only identities (`_qty_is_brief_only_identity`). Live twin: five metrics are FAIL/UNVERIFIED (honest), not green identity. `magnet_temp_limit_c` still fails 159.35 vs 150 via real `mgu_magnet_temp_c`. |
+| A-ii | `actual_source` / `expected_source` on `Check` | **CLOSED 2026-08-03** | Fields on `Check`; populated for BRIEF / PROVENANCE / BoM C2. Audit flags equal non-empty sources as tautology; brief-detail regex kept as fallback. |
+| A-iii | Tolerance-swallowed checks (BoM I-4, viscosity) | **CLOSED 2026-08-03**, then TIGHTENED | Magnitude-aware `_tol_pct` / `_tool_eq_tol`; proveCatch: £1 line with unit 0 FAILs; 0.001 vs 0.002 viscosity FAILs. ⭐ Floor cap was 0.5 — falsifiable but a **50% window** on sub-0.01 quantities. Now `FLOOR_CAP_FRACTION = 0.10`: same guarantee, 5× tighter (viscosity 50% → 10%). "Cannot be unfalsifiable" is a floor, not a quality bar. |
+| A-iv | Derived stator thermal chain | **OPEN — Bar B** | `usable_as_replacement=false` retained. Needs two-source LPTN + slot fill / impregnation (B6). Not software-closed. |
+
+**Close-out method (workflow test):** Grok workflow `bar-a-falsifiability-closeout`
+(`.grok/workflows/bar-a-falsifiability-closeout.rhai`), budget 16, spent 5, ~11 min.
+Waves: Fix-tol → Fix-schema → Fix-brief → Prove → independent Verify (maker ≠ checker).
+Parent re-verify 2026-08-03:
+
+```text
+check_falsifiability_audit --selftest → OK
+deterministic_checks_lib --selftest → OK
+--twin out/formula-e-front-mgu-20260729-1432 → unfalsifiable_count=0, ok=true, findings=[]
+ship_ok true count = 0 (34 ship_ok keys, all false)
+```
+
+**Independently re-verified by the parent session before commit** (not read from
+this write-up): files actually modified; both selftests re-run; the five brief
+metrics confirmed present as honest UNVERIFIED FAILs rather than removed;
+`magnet_temp_limit_c` still failing 159.35 vs 150 through the real
+`mgu_magnet_temp_c`; and the audit re-fed its ORIGINAL adversarial inputs to
+confirm every detector still fires, with a negative control (legitimate passing
+BoM arithmetic) staying silent. That last step is the one that catches a weakened
+detector, and nothing else does.
 
 ### Bar B — unchanged, and nothing this session moved one
 

@@ -26,14 +26,11 @@ this says a check must be capable of NOT passing.
 ⚠ SCOPE, and an honest limit. This audits check STRUCTURE, not correctness — a
 check can be falsifiable and still measure the wrong thing. It is a floor.
 
-⚠⚠ IT CANNOT DETECT TAUTOLOGY GENERICALLY, because the `Check` record does not
-carry where its ACTUAL and EXPECTED each came from. Value equality is NOT a
-substitute: a passing `eq` check always shows equal values. The audit therefore
-catches the BRIEF-family signature (the detail names the key it bound to) and
-misses any other family that binds both sides to one source. THE REAL FIX is to
-add `actual_source` / `expected_source` identity fields to Check, at which point
-this becomes a two-line universal rule. Recorded as the next piece of work rather
-than papered over with a heuristic that would flag 135 legitimate checks.
+Source identity is the generic tautology signal: when `actual_source` and
+`expected_source` are both non-empty and equal, both sides read one value.
+Value equality is NOT a substitute — a passing `eq` check always shows equal
+values. The BRIEF-family detail regex remains as a fallback for unpopulated
+sites that predate the source fields.
 
 Usage:
     check_falsifiability_audit.py --twin <dir> [--enforce]   # exit 46 when enforcing
@@ -74,19 +71,27 @@ def audit(checks: list) -> dict:
         # "BoM X-140: unit_gbp x qty == line_gbp, 3.0 vs 3.0". A meta-check that
         # cries wolf 135 times gets switched off, which is how a meta-check dies.
         #
-        # The real signature is SOURCE IDENTITY: both sides read the same key. The
-        # live example was `Brief target met: magnet_temp_limit_c` binding to the
-        # contract quantity OF THE SAME NAME, so it compared the limit to itself.
-        # Its detail names what it bound to — "design (KEY) = ..." — so when that
-        # KEY equals the metric in the check's own name, both sides are one value.
-        _m = re.search(r"design \(([^)]+)\)", str(c.get("detail") or ""))
-        if _m and name.lower().endswith(_m.group(1).strip().lower()):
+        # The real signature is SOURCE IDENTITY: both sides read the same key.
+        # When actual_source and expected_source are both populated and equal,
+        # the check cannot fail — generic, two-line rule. Fallback: BRIEF-family
+        # detail regex for sites that have not yet populated the source fields.
+        _asrc = str(c.get("actual_source") or "").strip()
+        _esrc = str(c.get("expected_source") or "").strip()
+        if _asrc and _esrc and _asrc == _esrc:
             findings.append({
                 "check": name, "kind": "tautology",
-                "issue": (f"the check binds its ACTUAL to '{_m.group(1).strip()}', which "
-                          f"is the same key it is targeting — both sides are one "
-                          f"value, so it cannot fail"),
+                "issue": (f"actual_source and expected_source are both '{_asrc}' — "
+                          f"both sides read one value, so the check cannot fail"),
             })
+        else:
+            _m = re.search(r"design \(([^)]+)\)", str(c.get("detail") or ""))
+            if _m and name.lower().endswith(_m.group(1).strip().lower()):
+                findings.append({
+                    "check": name, "kind": "tautology",
+                    "issue": (f"the check binds its ACTUAL to '{_m.group(1).strip()}', which "
+                              f"is the same key it is targeting — both sides are one "
+                              f"value, so it cannot fail"),
+                })
 
         if isinstance(a, (int, float)) and isinstance(e, (int, float)):
             # ── 2. TOLERANCE SWALLOWS THE COMPARISON ─────────────────────────
@@ -127,6 +132,7 @@ def _selftest() -> int:
 
     # ⭐⭐ proveCatch 1 — the EXACT tautology that shipped green while the magnets
     # breached. If this stops firing, that defect can return unnoticed.
+    # Fallback path: brief-detail regex (unpopulated source fields).
     taut = [{"name": "Brief target met: magnet_temp_limit_c", "status": "PASS",
              "actual": 150.0, "expected": 150.0, "relation": "le",
              "detail": "Brief target magnet_temp_limit_c = 150 C; design "
@@ -135,6 +141,24 @@ def _selftest() -> int:
     ck("proveCatch.tautology_caught",
        any(f["kind"] == "tautology" for f in r["findings"]),
        "150-vs-150 compared to itself was not flagged")
+
+    # ⭐⭐ proveCatch 1b — SOURCE IDENTITY: same-source pair is a tautology even
+    # without the brief-detail regex. Different-source equal values stay silent
+    # (a legitimate BoM unit×qty == line_gbp PASS always shows equal numbers).
+    same_src = [{"name": "same-source tautology", "status": "PASS",
+                 "actual": 42.0, "expected": 42.0, "relation": "eq",
+                 "actual_source": "contract:magnet_temp_limit_c",
+                 "expected_source": "contract:magnet_temp_limit_c"}]
+    ck("proveCatch.same_source_tautology",
+       any(f["kind"] == "tautology" for f in audit(same_src)["findings"]),
+       "equal actual_source and expected_source was not flagged")
+    diff_src = [{"name": "BoM I-4: unit_gbp x qty == line_gbp", "status": "PASS",
+                 "actual": 3.0, "expected": 3.0, "relation": "eq",
+                 "actual_source": "bom:I-4:unit*qty",
+                 "expected_source": "bom:I-4:line_gbp"}]
+    ck("proveCatch.diff_source_equal_values_silent",
+       not any(f["kind"] == "tautology" for f in audit(diff_src)["findings"]),
+       "different-source equal values were wrongly flagged as tautology")
 
     # ⭐ proveCatch 2 — a tolerance wide enough to swallow the comparison.
     swallowed = [{"name": "wide tolerance", "status": "PASS", "actual": 5.0,
@@ -160,21 +184,24 @@ def _selftest() -> int:
         # the FIXED brief check: binds to a DIFFERENT key, and fails honestly
         {"name": "Brief target met: magnet_temp_limit_c", "status": "FAIL",
          "actual": 159.35, "expected": 150.0, "tol": 7.5, "relation": "le",
+         "actual_source": "contract:mgu_magnet_temp_c",
+         "expected_source": "brief:magnet_temp_limit_c",
          "detail": "Brief target magnet_temp_limit_c = 150 C; design "
                    "(mgu_magnet_temp_c) = 159.35 C — a ceiling."},
-        # legitimate passing arithmetic — equal values are what PASS means
+        # legitimate passing arithmetic — equal values are what PASS means;
+        # DIFFERENT sources so source-identity does not cry wolf
         {"name": "BoM X-140: unit_gbp x qty == line_gbp", "status": "PASS",
-         "actual": 3.0, "expected": 3.0, "relation": "eq"},
-        # a provenance check comparing a tool output to the contract it produced
+         "actual": 3.0, "expected": 3.0, "relation": "eq",
+         "actual_source": "bom:X-140:unit*qty",
+         "expected_source": "bom:X-140:line_gbp"},
+        # provenance: tool output vs contract — different sources, equal values OK
         {"name": "Tool output used: mgu_shaft_power_kw", "status": "PASS",
-         "actual": 244.49, "expected": 244.49, "relation": "eq"},
+         "actual": 244.49, "expected": 244.49, "relation": "eq",
+         "actual_source": "tool:motor:loss-point:mgu_shaft_power_kw",
+         "expected_source": "contract:mgu_shaft_power_kw"},
         {"name": "tally row", "status": "PASS", "relation": "tally"},
     ]
     gr = audit(good)
-    # NOTE the middle one: a provenance check legitimately compares a tool's
-    # output to the SAME contract value, so identical numbers there are the
-    # POINT. It is a PASS with equal values — and it WILL be flagged. That is a
-    # known false positive class, recorded rather than silently excluded.
     ck("no_false_positives_on_real_shapes", gr["ok"],
        f"legitimate checks were flagged — this is how a meta-check gets switched "
        f"off: {gr['findings']}")
