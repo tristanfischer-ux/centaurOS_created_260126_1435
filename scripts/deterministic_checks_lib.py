@@ -1890,6 +1890,10 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                     return True
         return False
 
+    def qk_orig_probe(qd, lower_key):
+        """Original-case contract key for a lower-cased lookup key."""
+        return next((k for k in qd if k.lower() == lower_key), lower_key)
+
     for t in tools:
         tid = str(t.get("tool_id", "?"))
         for c in (t.get("claims") or []):
@@ -1913,6 +1917,34 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                 qv = num(qval[qk])
                 ok = qv is not None and abs(val - qv) <= max(abs(qv) * 0.02, 0.01)
                 _tol = round(max(abs(qv) * 0.02, 0.01), 3) if qv is not None else 0.01
+                # ⭐⭐ SUPERSEDED IS NOT STALE (2026-08-03). A tool output that differs
+                # from the contract is a defect ONLY when nothing explains it. When a
+                # LATER, better-sourced tool deliberately replaced the value — here
+                # fe:iron-loss-from-lamination superseding motor:loss-point, because
+                # the loss-point run used an invented Steinmetz pair — the difference
+                # IS the provenance, and reporting it as "STALE: the tool output is
+                # NOT the number shown" tells the reader the opposite of the truth.
+                #
+                # The guard against laundering: the contract quantity must name a
+                # DIFFERENT tool_id in its own provenance AND carry a written reason.
+                # A bare mismatch with no provenance still FAILs, exactly as before,
+                # so this cannot be used to wave away a genuine disagreement.
+                if not ok and qv is not None:
+                    _pq = q.get(qk_orig_probe(q, qk)) or {}
+                    _prov = (_pq.get("provenance") or {}) if isinstance(_pq, dict) else {}
+                    _owner = str(_prov.get("tool_id") or "")
+                    _reason = str(_prov.get("detail") or "")
+                    if _owner and _owner != tid and len(_reason) > 0:
+                        out.append(Check(
+                            name=f"Tool output superseded: {field}", category="PROVENANCE",
+                            relation="eq", status=PASS, actual=round(val, 3),
+                            expected=round(qv, 3), tol=_tol, unit="",
+                            producer=f"tool:{tid}",
+                            quantity_key=next((k for k in q if k.lower() == qk), qk),
+                            detail=(f"{tid} computed {field}={val:g}; the design uses "
+                                    f"{qv:g} from {_owner} — deliberate supersession, "
+                                    f"not drift: {_reason[:180]}")))
+                        continue
                 # find the ORIGINAL-CASE contract key (qval dict is lower-cased) so the
                 # cross-check join + headline surfaces can join on the real quantity key.
                 qk_orig = next((k for k in q if k.lower() == qk), qk)
@@ -2579,6 +2611,43 @@ def summarise(checks: List[Check]) -> Tuple[int, int, int]:
 # ============================================================================
 def _selftest() -> int:
     import tempfile
+
+    # ⭐⭐ proveCatch (2026-08-03): SUPERSEDED must not become a laundering hole.
+    # A tool output that differs from the contract is reported as a deliberate
+    # supersession ONLY when the contract quantity names a DIFFERENT tool in its
+    # own provenance AND states a reason. Drive both sides here: with provenance
+    # it PASSES with the reason; with a bare mismatch it must still FAIL, or any
+    # tool could wave away a genuine disagreement by disagreeing louder.
+    _sup_dir = tempfile.mkdtemp(prefix="prov_sup_")
+    with open(os.path.join(_sup_dir, "4-orchestrator-tools-used.json"), "w") as _fh:
+        json.dump({"tools": [{"tool_id": "motor:loss-point",
+                              "claims": [{"field": "mgu_iron_loss_w",
+                                          "value": 135.56}]}]}, _fh)
+    _sup_state = {
+        "orchestratorContract": {"quantities": {"mgu_iron_loss_w": {
+            "value": 6035.1,
+            "provenance": {"tool_id": "fe:iron-loss-from-lamination",
+                           "detail": "M400-50A derived Steinmetz on FE-probed flux"}}}},
+    }
+    _r = _checks_tool_provenance(_sup_state, _sup_dir)
+    if not any("superseded" in c.name.lower() and c.status == PASS for c in _r):
+        print("  FAIL provenance-supersession: a documented supersession was still "
+              "reported as STALE"); return 1
+    _bare_dir = tempfile.mkdtemp(prefix="prov_bare_")
+    with open(os.path.join(_bare_dir, "4-orchestrator-tools-used.json"), "w") as _fh:
+        json.dump({"tools": [{"tool_id": "motor:loss-point",
+                              "claims": [{"field": "mgu_iron_loss_w",
+                                          "value": 135.56}]}]}, _fh)
+    # same disagreement, NO provenance naming a superseding tool
+    _bare = {"orchestratorContract": {"quantities": {
+        "mgu_iron_loss_w": {"value": 6035.1}}}}
+    _rb = _checks_tool_provenance(_bare, _bare_dir)
+    if any("superseded" in c.name.lower() for c in _rb):
+        print("  FAIL provenance-supersession: an UNDOCUMENTED mismatch was laundered "
+              "as a supersession"); return 1
+    if not any(c.status == FAIL for c in _rb):
+        print("  FAIL provenance-supersession: an undocumented mismatch did not FAIL")
+        return 1
 
     def _has(checks: List[Check], name_sub: str, want_status: str) -> bool:
         for c in checks:
