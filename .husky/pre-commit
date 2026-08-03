@@ -47,7 +47,7 @@ for m in machine_excitation_tracking machine_magnet_flux_focusing machine_loss_b
          p_stage_discipline physics_plausibility fe_iron_loss_writeback stator_thermal_chain \
          magnet_margin_sensitivity dec_em1_option_screen \
          check_falsifiability_audit check_bar_b_register_freshness \
-         check_store_divergence \
+         check_duty_torque_identity check_store_divergence \
          check_escalation_stub_freshness check_detached_geometry; do
   if [ -f "scripts/lib/$m.py" ]; then
     if $PY "scripts/lib/$m.py" --selftest >/dev/null 2>&1; then
