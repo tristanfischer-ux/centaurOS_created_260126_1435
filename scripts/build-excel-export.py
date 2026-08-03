@@ -7676,7 +7676,15 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
     _t_req = _qval(state, "mgu_shaft_torque_nm", 0)
     if _t_fe and _t_fe > 0:
         derived.extend([
-            ("T_shaft_FE", "", "Nm",
+            # A CONSTANT formula, not an empty string. Every sibling row in
+            # `derived` carries a formula, and the row's NAME is registered
+            # from it — passing "" left T_shaft_FE_REF undefined, which made
+            # T_gap reference a name that does not exist. The builder then
+            # defanged that formula to inert text with a zero-width space
+            # (CWE-1236 injection guard), Excel could not evaluate it, and the
+            # workbook opened with "Removed Records: Formula from
+            # /xl/worksheets/sheet27.xml". One root cause, three symptoms.
+            ("T_shaft_FE", f"={_t_fe:.6f}", "Nm",
              "MEASURED — finite-element rotor sweep at the same duty point",
              _t_fe),
             ("T_gap", "=IF(T_shaft_FE_REF<=0,\"—\",T_shaft_REF/T_shaft_FE_REF)", "x",
@@ -7721,11 +7729,17 @@ def _render_fpk_power_thermal_trace(ws: Worksheet, state: dict, start_row: int) 
     for label, formula, unit, note, engine in pending:
         row = drows[label]
         f = formula
-        f = f.replace("P_shaft_REF", f"$B${drows['P_shaft']}")
-        f = f.replace("omega_REF", f"$B${drows['omega']}")
-        f = f.replace("Q_loss_REF", f"$B${drows['Q_loss']}")
-        f = f.replace("mdot_REF", f"$B${drows['mdot']}")
-        f = f.replace("I_ph_ideal_REF", f"$B${drows['I_ph_ideal']}")
+        # ⭐⭐ RESOLVE EVERY <label>_REF, not a hardcoded five (2026-08-03).
+        # This was five literal .replace() calls, so a formula referencing any
+        # OTHER row kept its "<label>_REF" text, the CWE-1236 injection guard
+        # then defanged the whole formula to inert text with a zero-width
+        # space, and Excel reported "Removed Records: Formula from
+        # /xl/worksheets/sheetNN.xml" when the file was opened. The failure is
+        # silent at build time and only shows up as a repair dialogue for
+        # whoever opens the workbook. Longest labels first so a shorter name
+        # can never partially match a longer one.
+        for _lbl in sorted(drows, key=len, reverse=True):
+            f = f.replace(f"{_lbl}_REF", f"$B${drows[_lbl]}")
         vc = ws.cell(row, 2, f)
         vc.fill = FILL_RESULT
         vc.border = BORDER

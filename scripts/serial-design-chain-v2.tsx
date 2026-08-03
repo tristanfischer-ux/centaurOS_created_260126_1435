@@ -9877,8 +9877,18 @@ async function main() {
   // ── Investor-fit section (2026-06-03): the Fractional Forge lead-gen appendix.
   // Matches the brief against the Forge Capital investor DB + writes the 5-investor
   // section onto state.investorSection for the renderer's InvestorPage. Fail-soft
-  // (the enrichment + the page both no-op on any miss). Skip via INVESTOR_SECTION=0.
-  if (process.env.INVESTOR_SECTION !== '0') {
+  // (the enrichment + the page both no-op on any miss).
+  //
+  // ⭐⭐ OFF BY DEFAULT (Tristan 2026-08-03). Its ONLY consumer is InvestorPage in
+  // render-minimal-pdf.tsx, and the PDF report has been off by default since
+  // 2026-06-23 ("the Excel spreadsheet IS the product; the react-pdf chain-v2.pdf
+  // is NOT wanted, EVER, by default"). build-excel-export.py reads
+  // state.investorSection ZERO times and there is no investor tab among the 29.
+  // So this was querying the Forge Capital DB, scoring candidates and writing
+  // state for a page that is never rendered — one of the slower stages in the
+  // run, producing nothing. It now follows the PDF it feeds: enable with
+  // INVESTOR_SECTION=1, or implicitly whenever the PDF itself is enabled.
+  if (process.env.INVESTOR_SECTION === '1' || process.env.CHAIN_WANT_PDF === '1') {
     const tInv = Date.now()
     try {
       execFileSync('npx', ['tsx', resolve(__dirname, 'enrich-state-with-investors.tsx'), statePath, '--write'], {
@@ -10759,6 +10769,52 @@ async function main() {
       console.error(`[chain] PCB STAGE threw (non-fatal, shadow): ${(pcbErr as Error).message.slice(0, 200)}`)
       logAction({ step: 'pcb_stage', ok: false, error: String(pcbErr).slice(0, 200) })
     }
+  }
+
+  // ── SOLVER RESULTS INTO THE CONTRACT (2026-08-03). The engine had TWO
+  //    disconnected universes on the same twin: the motor-stack solvers wrote
+  //    finite-element results to _motor_stack/*.json, while the Excel, drawings
+  //    and renders read orchestratorContract.quantities — and NOT ONE contract
+  //    quantity cited a solver artefact. The workbook printed an analytic
+  //    119.7 N·m while a 37-point FE rotor sweep measured 81.558 N·m, and a
+  //    full chain re-run reproduced the analytic figure unchanged, because the
+  //    deliverable was not stale — it was WIRED TO THE WRONG SOURCE.
+  //
+  //    It must run HERE, inside the chain, for the same reason dossier_repair
+  //    does: the contract is REGENERATED from the orchestrator tools on every
+  //    run, so a solver value written by a standalone step is silently erased
+  //    before render time (verified — the promoted quantities and the
+  //    divergence record were both gone after the next run).
+  //
+  //    ADDITIVE by design: solver values land under their own *_fe_* names with
+  //    solver provenance; analytic quantities are NEVER overwritten. A
+  //    requirement and a measured capability that disagree are INFORMATION for
+  //    whoever reads the dossier, and the deliverable shows both with the gap
+  //    stated. This engine has a scar from a physics tree that silently
+  //    re-based four quantities and moved every downstream number.
+  //
+  //    Non-fatal: a twin with no motor-stack artefacts simply gets nothing.
+  try {
+    execFileSync('python3',
+      [resolve(__dirname, 'lib', 'fe_contract_writeback.py'), '--twin', outDir, '--promote'],
+      { stdio: 'inherit', timeout: 120_000 })
+    try {
+      const wState = JSON.parse(readFileSync(resolve(outDir, 'state.json'), 'utf8'))
+      const wb = wState?.feContractWriteback
+      if (wb) {
+        console.error(`[chain] solver→contract: ${wb.found} solver quantit(ies) bound; ` +
+          `${(wb.divergences || []).length} like-for-like divergence(s) vs the analytic values`)
+        for (const d of (wb.divergences || [])) {
+          console.error(`[chain]   ⚠ ${d.analytic_quantity}=${d.analytic_value} vs ` +
+            `${d.solver_quantity}=${d.solver_value} → ${d.ratio}x (${d.basis})`)
+        }
+        logAction({ step: 'fe_contract_writeback', ok: true, found: wb.found,
+                    divergences: (wb.divergences || []).length })
+      }
+    } catch { /* summary read best-effort */ }
+  } catch (werr) {
+    console.error(`[chain] solver→contract writeback failed (non-fatal): ${(werr as Error).message.slice(0, 140)}`)
+    logAction({ step: 'fe_contract_writeback', ok: false, error: String(werr).slice(0, 160) })
   }
 
   // ── SELF-CORRECTING REPAIR (Tristan 2026-06-25: "the engine should look at things, see
