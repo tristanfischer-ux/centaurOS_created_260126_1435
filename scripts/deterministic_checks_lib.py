@@ -1763,7 +1763,20 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         _band = _is_cost_band_center(km)
         _band_tol = abs(tvf) * 0.20
         _lower = _brief_metric_is_lower_better(str(km))
-        if km in q:
+        # ⭐⭐ A LIMIT RESTATED IS NOT A LIMIT MET (2026-08-03). This fast path takes
+        # the contract quantity of the SAME NAME as the brief metric and treats it
+        # as the DESIGN's achieved value. For a metric whose name declares it a
+        # LIMIT — magnet_temp_limit_c, winding_temp_limit_c — the contract simply
+        # restates the limit, so the row compared 150 against 150 and PASSED. It
+        # could not fail whatever the machine did, and it sat green while the
+        # magnets ran 9.3 K over that very limit.
+        # A limit is a CONSTRAINT, not a delivered performance: the achieved value
+        # always lives under a different key (mgu_magnet_temp_c). Skip the fast
+        # path for limit-named metrics and fall through to the candidate search,
+        # which finds the achieved quantity — or, finding none, now says so.
+        _is_limit_name = bool(re.search(
+            r"(?:^|_)(?:limit|ceiling|cap|max_allowed|threshold)(?:_|$)", str(km), re.I))
+        if km in q and not _is_limit_name:
             dvc = qval(q, km)
             if dvc is not None:
                 if _band:
