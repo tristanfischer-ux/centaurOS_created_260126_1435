@@ -177,6 +177,38 @@ def evaluate(state: dict, run_dir: Path | None = None) -> dict:
                  f"({implied:.4f} from {losses:.0f} W over {shaft_kw:.1f} kW)",
                  f"iron={iron} copper={copper} shaft_kw={shaft_kw}")
 
+    # ── 7. A CONTINUOUS RATING CANNOT COEXIST WITH A SUB-UNITY DUTY CYCLE ─────
+    # ⭐⭐ (2026-08-03, DeepSeek side-channel put this first and was right.) The FE
+    # front contract carries BOTH `continuous_power_kw = 250, basis=continuous,
+    # source=brief` AND a duty vignette of `duty_regen_time_s = 24` in a 100 s
+    # window — a 24% duty. Those are mutually exclusive statements about the same
+    # machine, and which one is true decides whether the design has a thermal
+    # problem at all:
+    #     screened as CONTINUOUS -> 8216 W steady -> magnet 159.3 C, BREACH
+    #     the design's own 24% ->  1972 W average -> winding 96.9 C, no breach
+    #                              (single-burst adiabatic bound ~146 C)
+    # The thermal screens took the continuous reading, which is the conservative
+    # one — but conservative against an assumption the contract itself contradicts
+    # is not the same as correct. The front unit's Gen3 role is REGEN ONLY, which
+    # makes a 100% duty physically odd.
+    # This does NOT pick a side: the vignette is labelled "illustrative — replace
+    # with lap logs", so neither figure is authoritative. It refuses to let a
+    # dossier carry both silently.
+    dur_regen = _q(state, "duty_regen_time_s")
+    dur_motor = _q(state, "duty_motoring_time_s")
+    cont_kw = _q(state, "continuous_power_kw")
+    if dur_regen and dur_motor and cont_kw:
+        window = dur_regen + dur_motor
+        duty = dur_regen / window if window > 0 else 1.0
+        if duty < 0.9:
+            flag("duty_basis_contradiction", "high",
+                 f"the contract rates {cont_kw:g} kW as CONTINUOUS while its own duty "
+                 f"vignette runs {dur_regen:g} s in {window:g} s ({duty:.0%} duty) — "
+                 "both cannot describe this machine, and the thermal answer differs "
+                 "by roughly 60 K between them",
+                 f"continuous_power_kw={cont_kw} basis=continuous vs "
+                 f"duty_regen_time_s={dur_regen}/{window} s")
+
     # ── 6. TWO SCREENS MUST NOT DISAGREE ABOUT THE SAME TEMPERATURE ───────────
     # ⭐⭐ (2026-08-03) Re-running the cooling screens on the corrected iron loss
     # made them contradict each other: the LUMPED screen reported winding/magnet
@@ -219,7 +251,7 @@ def evaluate(state: dict, run_dir: Path | None = None) -> dict:
 
     return {"findings": findings,
             "ok": not any(f["severity"] == "high" for f in findings),
-            "checked": 6}
+            "checked": 7}
 
 
 def _selftest() -> int:
@@ -282,6 +314,17 @@ def _selftest() -> int:
     ck("agreeing_screens_stay_silent",
        "screen_temperature_disagreement" not in {f["check"] for f in evaluate({}, _td2)["findings"]},
        "two screens within tolerance were flagged as disagreeing")
+
+    # ⭐ proveCatch: a continuous rating beside a sub-unity duty must be flagged;
+    # a genuinely continuous machine (no vignette, or ~100% duty) must not be.
+    contra = st(continuous_power_kw=250, duty_regen_time_s=24, duty_motoring_time_s=76)
+    ck("proveCatch.duty_basis_contradiction_caught",
+       "duty_basis_contradiction" in {f["check"] for f in evaluate(contra)["findings"]},
+       "a 24% duty beside a CONTINUOUS rating was not flagged")
+    full = st(continuous_power_kw=250, duty_regen_time_s=99, duty_motoring_time_s=1)
+    ck("near_100pct_duty_is_not_flagged",
+       "duty_basis_contradiction" not in {f["check"] for f in evaluate(full)["findings"]},
+       "a ~99% duty was wrongly called a contradiction")
 
     # Determinism: same input, same answer, twice.
     ck("deterministic", json.dumps(evaluate(fe), sort_keys=True)
