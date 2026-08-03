@@ -11162,7 +11162,9 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             target_num=1.0, achieved_num=0.0, compare="ge", tol_frac=0,
         ))
 
-    pcb = state.get("pcb") or {}
+    # Same source as tab_pcb (see _pcb_state_block) — the verification spine
+    # must not report "no PCB" while the PCB tab renders two routed boards.
+    pcb = _pcb_state_block(state, run_dir or "") or {}
     pipe = pcb.get("pipeline") or {}
     if pcb.get("isPcbBearing") or state.get("isInstrumentDevice") or pipe:
         bsz = pcb.get("boardSizeMm") or pipe.get("boardSizeMm") or {}
@@ -20527,6 +20529,41 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     return result
 
 
+def _pcb_state_block(state: dict, run_dir: str):
+    """state.pcb, falling back to the PCB stage's OWN artefact on disk.
+
+    ⭐⭐ THE PRODUCER AND THE CONSUMER USED DIFFERENT STORES (2026-08-03). The PCB
+    stage writes <run_dir>/pcb-stage.json; tab_pcb and _sc_pcb read state.pcb. On
+    the FE front twin state.pcb is ABSENT while pcb-stage.json records TWO fully
+    routed bespoke boards — traction_gate_drive (33 components) and
+    traction_control (29) — authored through atopile 0.2.69 -> KiCad 10.0.4 ->
+    Freerouting, DRC run with 0 violations, 21 Gerber files each, and every one of
+    the seven required channel counts implemented (6 gate-drive, 6 desat, 3 phase
+    current sense, 1 resolver, 1 vehicle CAN, 3 LV buck rails, 1 HV/LV isolation
+    barrier). The workbook printed "PCB — skipped (no source data)" and shipped
+    with no PCB tab at all, so the best-evidenced electronics work in the run was
+    invisible to the reader.
+
+    Same failure shape as the parts-manifest/ontology drift: one store populated,
+    the consumer reading the other, each internally consistent so nothing flagged
+    it. Reading the artefact makes the tab depend on what the stage actually
+    PRODUCED rather than on whether a later stage happened to copy it into state.
+    """
+    pcb = state.get("pcb")
+    if isinstance(pcb, dict) and isinstance(pcb.get("pipeline"), dict):
+        return pcb
+    try:
+        path = os.path.join(run_dir, "pcb-stage.json")
+        if os.path.exists(path):
+            with open(path, "r") as fh:
+                disk = json.load(fh)
+            if isinstance(disk, dict) and isinstance(disk.get("pipeline"), dict):
+                return disk
+    except Exception:  # noqa: BLE001 — never block the build on a bad artefact
+        pass
+    return pcb if isinstance(pcb, dict) else None
+
+
 def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     """PCB-TAB-UX (2026-07-12, extends PCB Phase D): renders the REAL artifacts from
     state.pcb.pipeline as a USABLE fab pack, not a hygiene-only report — a readiness
@@ -20541,7 +20578,7 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     every existing archetype run stays byte-identical. Every number here is read from
     state.pcb.pipeline (the REAL pipeline result) via the shared _pcb_two_axis_assessment
     (the SAME computation _sc_pcb scores from — tab and score can never diverge)."""
-    pcb = state.get("pcb")
+    pcb = _pcb_state_block(state, run_dir)
     if not isinstance(pcb, dict):
         return False
     pipeline = pcb.get("pipeline")
@@ -29376,7 +29413,8 @@ def _sc_pcb(wb, ws, state, run_dir):
     real, fit board). Reads the SAME _pcb_two_axis_assessment tab_pcb() rendered from —
     the tab and its score can never diverge."""
     _ensure_pcb_from_sidecar(state, run_dir)
-    pcb = state.get("pcb") or {}
+    # Same source as tab_pcb — the two must never disagree about what exists.
+    pcb = _pcb_state_block(state, run_dir) or {}
     if not isinstance(pcb.get("pipeline"), dict):
         return {"components": [], "issues": [], "score_cap": None, "mech": "", "fix": ""}
     a = _pcb_two_axis_assessment(pcb, run_dir)
