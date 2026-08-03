@@ -100,13 +100,48 @@ thermal case therefore could not be closed from what I had.
 3. **Is the housing envelope roughly right?** If it's longer than I've assumed,
    the problem largely disappears.
 
+## The thermal result, which changed after I wrote the rest
+
+I flagged in an earlier draft that I'd sized the cooling against an iron-loss
+figure I suspected was understated. I've now derived it properly, and it was
+worse than I thought.
+
+The loss model had been using a generic eddy-current coefficient rather than the
+one for the steel I'd actually specified — M400-50A, 0.5 mm laminations. Deriving
+it from the grade, and applying it to the tooth and yoke flux densities the
+electromagnetic solve had already measured separately (1.80 T and 2.10 T), moves
+stator iron loss from **136 W to about 6.0 kW**.
+
+That changes the cooling answer:
+
+| | as first sized | on the derived loss |
+|---|---|---|
+| Machine losses | 2.3 kW | **8.2 kW** |
+| Total heat to coolant | 6.6 kW | **12.5 kW** |
+| Coolant outlet (60 °C in) | 69 °C | **77 °C** |
+| Winding | 92 °C | 159 °C (limit 180) |
+| **Magnet** | 102 °C | **159 °C against a 150 °C limit** |
+
+**The magnets exceed their temperature limit by about 9 K on the design duty.**
+The 12 L/min at 60 °C I'd assumed does not carry the real loss. This matters
+twice over, because hot magnets lose remanence, and that costs torque on a
+machine that is already short of it.
+
+Two honest caveats. The 6.0 kW is an upper bound rather than a measurement: the
+loss model is fitted below magnetic saturation and this yoke sits above it, where
+the real steel rolls off. And when I re-ran the cooling I found my two thermal
+screens disagreeing with each other by 76 K — the coupled one models only the
+coolant-side film and omits conduction from the winding out to the jacket, so it
+reads far too optimistic. The 159 °C figure is the one I'd trust.
+
+I'd rather tell you the design breaks than tell you it closes on a number I no
+longer believe.
+
 ## What this is not
 
 This is a first-pass concept study. Nothing here is validated against hardware.
-The thermal case is open — I sized cooling against an iron-loss figure I now
-believe is significantly understated. Bearings, magnet retention and rotor
-dynamics at raised speed are unexamined, and I've made no attempt at port
-coordinates or mounting interfaces.
+Bearings, magnet retention and rotor dynamics at raised speed are unexamined, and
+I've made no attempt at port coordinates or mounting interfaces.
 
 I'd rather show you where the analysis is uncertain than present it as more
 finished than it is.

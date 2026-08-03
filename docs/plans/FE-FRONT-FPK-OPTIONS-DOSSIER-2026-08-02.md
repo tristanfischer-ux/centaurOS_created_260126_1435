@@ -3,6 +3,10 @@
 **2026-08-02.** Twin `out/formula-e-front-mgu-20260729-1432`. Branch `oxccu-efuel`.
 `ship_ok` **false**, homologation **NOT_HOMOLOGATED** throughout.
 
+> **Updated 2026-08-03.** §7's thermal item is no longer an open caveat: with the
+> iron loss derived from the real lamination, the **magnets breach their 150 °C
+> limit by 9.3 K** on the design duty. The torque shortfall below is unchanged.
+
 Every number below is a registered claim backed by a solver artefact, or it is
 labelled as an assumption. Nothing here is hand arithmetic presented as a
 measurement — where an estimate is a rescaling rather than a solve, it says so.
@@ -120,10 +124,31 @@ this is a design problem at all.
 
 ## 7. What is NOT covered
 
-- **Thermal.** The screen was sized on **993.6 W** of iron loss, which is what
-  *defaulted* Steinmetz coefficients give. The machine's own M400-50A / 0.5 mm
-  lamination gives several times that. Raising speed makes it worse — eddy loss
-  goes as frequency squared.
+- **Thermal — now a BREACH, not an open item (re-solved 2026-08-03).** The
+  contract carried **135.56 W** of stator iron loss, from a hardcoded eddy
+  coefficient (`steinmetz_ke = 1e-7`) that corresponds to no real electrical
+  steel, a generic 3.0 kg of iron against the measured 6.62 kg, and a single
+  lumped 1.2 T against separately-probed teeth (1.799 T) and yoke (2.104 T).
+  Derived from the machine's own **M400-50A / 0.50 mm** lamination
+  (kh 0.03222, ke 1.1686e-4) on the measured flux and mass: **6035 W** — teeth
+  2249 W, yoke 3786 W, yoke dominant. **45× the figure the cooling was sized on.**
+
+  Machine losses 2.3 → **8.2 kW**; total heat 6.6 → **12.5 kW**; coolant rise
+  9.1 → **17.2 K** (60 → 77.2 °C). Against limits: winding 159.3 °C (limit 180,
+  +20.7 K), module 120.4 °C (limit 175, +54.6 K), **magnet 159.3 °C against a
+  150 °C limit — a 9.3 K BREACH**. `all_temperatures_below_screen_limits` is
+  False. Compounding: hot magnets lose remanence, costing torque on a machine
+  already at 0.651×. Raising speed makes it worse — eddy loss goes as f².
+
+  Two caveats, both load-bearing. The 6035 W is an **upper bound**, not a
+  measurement: the Steinmetz form is fitted below saturation and this yoke sits
+  at 2.10 T, outside it. And the two cooling screens **disagree by 76 K** — the
+  coupled network screen reports 82.9 °C because its thermal path is the
+  convective film alone (R = 0.000378 K/W) with no conduction from winding
+  through slot liner and stator iron to the jacket wall; the lumped screen's
+  0.01 K/W is 23× larger and is the credible value. **Trust the 159.3 °C.** The
+  network screen needs a winding→wall resistance before its output means
+  anything — flagged, deliberately not patched with a fudge factor.
 - **Yoke saturation** at 2.09 T, which is why torque delivers 97.6% of geometric
   scaling rather than 100%.
 - **Bearings, magnet retention and rotor dynamics** at raised speed.
