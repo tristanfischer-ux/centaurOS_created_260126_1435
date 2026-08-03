@@ -5027,6 +5027,17 @@ async function main() {
     logAction({ step: 'derive_headline_early', ok: false, error: String(err) })
   }
 
+  // ⭐⭐ CARRIED FORWARD, NOT WRITTEN HERE (2026-08-03). `state` is declared ~2350
+  // lines BELOW this point, so touching it from the gate-40 block throws a TDZ
+  // ReferenceError — the identical trap the isInstrumentDevice note below already
+  // records. The first version of the ledger wiring did exactly that: every run
+  // would have thrown, been swallowed by the catch, and silently produced no
+  // ledger, while a standalone --write on the twin made it look as though the
+  // chain had done it. The typecheck baseline caught what the twin could not.
+  // The ledger is therefore held in a local and merged into `state` where `state`
+  // actually exists.
+  let derivedHomologationLedger: Record<string, unknown> | null = null
+
   // ── GATE 40 design-closure (Sol+Fable Block 2, 2026-07-27) ─────────────────
   // INTENT: close the demand→multiplicity→dim ledger BEFORE LLM paint. Gate 39
   // (structural admission) fires post-reviewer and cannot stop paint of an
@@ -5053,7 +5064,7 @@ async function main() {
         const ledger = JSON.parse(hh || '{}')
         if (ledger && ledger.open_by_design_count > 0) {
           ;(closureState as Record<string, unknown>).homologationHonesty = ledger
-          state.homologationHonesty = ledger
+          derivedHomologationLedger = ledger
           console.error(`[chain] open-by-design ledger: ${ledger.open_by_design_count} part(s) declared open, verdict ${ledger.verdict}`)
         } else {
           // ⭐ CLEAR A STALE LEDGER (Sol, finish council 2026-08-03). Derivation
@@ -5062,12 +5073,12 @@ async function main() {
           // Leaving an inherited ledger in place would let gate 40 keep granting
           // the honesty exception on a disclosure that no longer holds — a false
           // disclosure, and the worst failure this whole mechanism can produce.
-          if (state.homologationHonesty) {
+          if (derivedHomologationLedger) {
             console.error('[chain] open-by-design ledger CLEARED — derivation no longer '
               + 'emits one (a part is unresolved with no stated reason, or nothing is deferred)')
           }
           delete (closureState as Record<string, unknown>).homologationHonesty
-          delete state.homologationHonesty
+          derivedHomologationLedger = null
         }
       } catch (e) {
         // ⭐ FAIL CLOSED (Sol, finish council 2026-08-03). A timeout, a bad JSON
@@ -5075,7 +5086,7 @@ async function main() {
         // standing — that is precisely when a stale disclosure would slip through,
         // because nobody re-derived it. No fresh derivation, no exception.
         delete (closureState as Record<string, unknown>).homologationHonesty
-        delete state.homologationHonesty
+        derivedHomologationLedger = null
         console.error('[chain] open-by-design ledger FAILED — any inherited ledger cleared '
           + `(gate 40 will refuse the honesty exception): ${(e as Error).message.slice(0, 140)}`)
       }
@@ -7396,6 +7407,10 @@ async function main() {
   const state = {
     projectId: 'chain-v2-' + Date.now(),
     parsedBrief: parsedResult.data,
+    // The open-by-design ledger derived before gate 40 (see the carrier above).
+    // Spread, so a run that derived none leaves the key ABSENT rather than null —
+    // gate 40 and the Excel builder both test for presence.
+    ...(derivedHomologationLedger ? { homologationHonesty: derivedHomologationLedger } : {}),
     decisionHolds,   // brief-adjacent NAMED decisions (disclosure records — see the loader)
     decisionRegister,
     moduleDecomposition: design,
