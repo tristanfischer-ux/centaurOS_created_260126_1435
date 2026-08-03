@@ -43,6 +43,7 @@ echo "━━━ Engine regression guards (deterministic; blocks a regression) �
 run "requirements_bom.py --selftest"          "$PY" scripts/requirements_bom.py --selftest
 run "build-excel-export.py --selftest"        "$PY" scripts/build-excel-export.py --selftest
 run "excel_closure_blocks.py --selftest"      "$PY" scripts/lib/excel_closure_blocks.py --selftest
+run "homologation_honesty.py --selftest"      "$PY" scripts/lib/homologation_honesty.py --selftest
 run "dossier_audit.py --selftest"            "$PY" scripts/lib/dossier_audit.py --selftest
 run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.py --selftest
 run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest

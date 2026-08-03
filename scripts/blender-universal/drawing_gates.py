@@ -1132,10 +1132,37 @@ def run_gates(out_dir: str) -> list:
     # GOTCHA (NinjaPCR 2026-07-15): a benchtop instrument may author one incidental
     # air/coolant fluid edge with a single default material — that is NOT a multi-
     # service fluid plant. G4's ≥2-materials rule is for plants; skip instruments.
-    if fluid_route and not state.get("isInstrumentDevice"):
+    # ⭐⭐ ONE CIRCUIT LEGITIMATELY HAS ONE MATERIAL (2026-08-03). The gate's intent
+    # is a MULTI-SERVICE plant lazily modelling every pipe as one default material.
+    # A sealed traction unit is neither an instrument nor all-electrical, but its
+    # fluid side is a SINGLE coolant loop — inverter → cold plate → motor → gearbox
+    # — so "1 distinct pipe material" is the correct answer, not a defect. Counting
+    # distinct service LABELS does not separate the two cases: this loop is labelled
+    # both "thermal" and "water" for the same physical circuit. Connected components
+    # over the routes' own endpoints do: one component = one circuit = one material
+    # expected; two or more = genuinely separate services that should differ. Pure
+    # geometry/topology from the route manifest — no class table, no per-product rule.
+    _parent: dict = {}
+
+    def _find(a):
+        _parent.setdefault(a, a)
+        while _parent[a] != a:
+            _parent[a] = _parent[_parent[a]]
+            a = _parent[a]
+        return a
+
+    for _r in fluid_route:
+        _a, _b = str(_r.get("from_tag") or ""), str(_r.get("to_tag") or "")
+        if _a and _b and _a != "—" and _b != "—":
+            _ra, _rb = _find(_a), _find(_b)
+            if _ra != _rb:
+                _parent[_ra] = _rb
+    _circuits = len({_find(_x) for _x in _parent}) if _parent else 0
+    if fluid_route and not state.get("isInstrumentDevice") and _circuits >= 2:
         gates.append(Gate("material_diversity", ["line-velocity-schedule", "process-schedules"],
                           "med", len(mats) >= 2,
-                          f"{len(mats)} distinct pipe material(s): {sorted(mats)[:4]}"))
+                          f"{len(mats)} distinct pipe material(s) across {_circuits} "
+                          f"separate fluid circuit(s): {sorted(mats)[:4]}"))
 
     # ── G5 QTY-N COVERAGE — a qty-N principal node is represented N× (not collapsed) ─
     pm_names = [str(p.get("name") or "") for p in parts if isinstance(p, dict)]

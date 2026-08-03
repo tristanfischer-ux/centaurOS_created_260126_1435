@@ -23624,6 +23624,217 @@ def _match_offer_section(excl_text: str, sections: List[dict]) -> Optional[dict]
     return best
 
 
+SUPPLIERS_SHEET = "Suppliers"
+
+
+def _unresolved_pn(part_number) -> bool:
+    """Shared 'not a real part number' test — imported from the ledger module so the
+    Suppliers tab and the open-by-design ledger can never disagree about what
+    counts as sourced (Sol, finish council 2026-08-03). Falls back to a local copy
+    of the same rule if the module cannot be imported, rather than silently
+    treating every placeholder as a genuine part number."""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+        from homologation_honesty import is_unresolved_part_number
+        return is_unresolved_part_number(part_number)
+    except Exception:  # noqa: BLE001
+        pn = str(part_number or "").strip()
+        return (not pn) or bool(re.match(
+            r"^(TBD|TBC|n/?a|unknown|generic|detailed design)", pn, re.I))
+
+
+def _supplier_rows(state: dict) -> dict:
+    """Sourcing status per part, grouped by supplier — DERIVED, never hand-typed.
+
+    ⭐ WHY THIS READS partVerifications AND NOT state.suppliers (2026-08-03):
+    `state.suppliers` exists on the twin and is an EMPTY LIST. A tab bound to it
+    would render a blank supplier register on a dossier that HAS real sourcing
+    evidence — 55 verified parts, 11 with a named manufacturer, 7 priced against a
+    live distributor with a catalogue URL. An empty tab would read as "no supply
+    chain considered" when the truth is "most parts are deliberately open at
+    concept stage and a handful are pinned to real catalogue items".
+
+    So the register is built from the verification records that actually carry
+    evidence, and the parts with NO supplier are shown as an explicit open block
+    rather than omitted — the reader sees the real ratio, not a curated subset.
+    """
+    pvs = state.get("partVerifications") or []
+    ledger = state.get("homologationHonesty") or {}
+    open_reason = {}
+    for item in (ledger.get("items") or []):
+        open_reason[str(item.get("id"))] = str(item.get("reason") or "")
+    by_supplier: dict = {}
+    unassigned: list = []
+    undeclared: list = []
+    for pv in pvs:
+        if not isinstance(pv, dict):
+            continue
+        mfr = str(pv.get("manufacturer") or "").strip()
+        pn = str(pv.get("part_number") or "").strip()
+        price = pv.get("distributor_price_gbp")
+        rec = {
+            "word_id": str(pv.get("word_id") or ""),
+            "part": str(pv.get("word_name") or pv.get("word_id") or ""),
+            "mpn": pn,
+            "module": str(pv.get("module") or ""),
+            "price_gbp": price if isinstance(price, (int, float)) else None,
+            "availability": str(pv.get("distributor_availability") or "").strip(),
+            "url": str(pv.get("source_url") or pv.get("distributor_datasheet_url") or "").strip(),
+            "evidence": str(pv.get("source_title") or "").strip(),
+            "confidence": str(pv.get("confidence") or "").strip(),
+        }
+        # ⭐⭐ CLASSIFY BY THE LEDGER, NOT BY THE FIELDS (Sol + Grok, finish council
+        # 2026-08-03). A first version called a row "open by design" whenever the
+        # manufacturer or part number looked unset, and gave anything unexplained
+        # the fallback reason "Concept stage — supplier not yet selected". That
+        # laundered bare TBDs and malformed records into deliberate holds — the
+        # exact thing the ledger refuses to do — and it produced two surfaces that
+        # disagreed: 45 open in the ledger and 44 here, so 45 + 11 pinned = 56 on a
+        # 55-part bill. One rule now decides both: a part is OPEN only if the
+        # ledger declares it, and anything else without a real part number is
+        # UNDECLARED — shown as a defect, never as a design decision.
+        declared_open = rec["word_id"] in open_reason
+        # ONE predicate, imported from the ledger module — see Sol's drift finding.
+        no_real_pn = _unresolved_pn(pn)
+        # ⭐ EVIDENCE BEATS THE LEDGER (Sol, finish council 2026-08-03). The ledger
+        # is derived from the design words; these rows are derived from the
+        # verification records. Nothing forces the two to agree, so a word the
+        # ledger calls open can arrive here WITH a real manufacturer part number —
+        # the part got sourced and the ledger is stale. Showing it as "open by
+        # design" would then be a false disclosure. The sourced fact wins, and the
+        # disagreement is recorded so the scorer can see the two surfaces drift.
+        if declared_open and not no_real_pn and mfr:
+            rec["ledger_disagreement"] = True
+            by_supplier.setdefault(mfr, []).append(rec)
+        elif declared_open:
+            rec["reason"] = open_reason[rec["word_id"]]
+            unassigned.append(rec)
+        elif no_real_pn or not mfr:
+            undeclared.append(rec)
+        else:
+            by_supplier.setdefault(mfr, []).append(rec)
+    # ⭐ THE LEDGER IS THE SOURCE OF TRUTH FOR "OPEN" (Sol, finish council
+    # 2026-08-03). These rows are built from partVerifications, but the ledger is
+    # built from the design words — so a part declared open with NO verification
+    # record was silently absent from the open block, and the tab could report
+    # zero open parts while gate 40 was consuming a ledger full of them. Every
+    # ledger item now appears, enriched by its verification record where one
+    # exists and standing on the ledger alone where none does.
+    # ⭐ EVERY already-classified word counts as seen (Sol, finish council
+    # 2026-08-03) — not just the open ones. A ledger-open word whose verification
+    # carries a REAL part number is deliberately shown as PINNED ("evidence beats
+    # a stale ledger"); seeding this set from `unassigned` alone re-added it as
+    # OPEN as well, so the part appeared twice with contradictory sourcing status
+    # and broke the tab's own pinned + open + undeclared = total identity.
+    seen_open = ({r["word_id"] for r in unassigned}
+                 | {r["word_id"] for v in by_supplier.values() for r in v}
+                 | {r["word_id"] for r in undeclared})
+    for item in (ledger.get("items") or []):
+        wid = str(item.get("id"))
+        if wid in seen_open:
+            continue
+        unassigned.append({
+            "word_id": wid,
+            "part": str(item.get("name") or wid),
+            "mpn": str(item.get("part_number_state") or ""),
+            "module": "", "price_gbp": None, "availability": "",
+            "url": "", "evidence": "", "confidence": "",
+            "reason": str(item.get("reason") or ""),
+        })
+
+    # ⭐ total = what was actually CLASSIFIED, not len(pvs) (Grok, finish council
+    # 2026-08-03). A malformed non-dict verification is skipped above, so counting
+    # it in the total made the tab's own stated identity — pinned + open +
+    # undeclared = total — quietly false.
+    total = sum(len(v) for v in by_supplier.values()) + len(unassigned) + len(undeclared)
+    return {"by_supplier": by_supplier, "unassigned": unassigned,
+            "undeclared": undeclared, "total": total}
+
+
+def tab_suppliers(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """The supply-chain register: who supplies what, priced against live catalogue
+    evidence, and — equally — which parts have no supplier yet and why.
+
+    Honest by construction: the open block is not an omission but the majority of a
+    concept-stage bill, and the tab says so in its own header rather than showing a
+    short pinned list and letting the reader infer the design is fully sourced."""
+    data = _supplier_rows(state)
+    by_sup, unassigned, total = data["by_supplier"], data["unassigned"], data["total"]
+    undeclared = data["undeclared"]
+    if not by_sup and not unassigned and not undeclared:
+        return False
+    pinned = sum(len(v) for v in by_sup.values())
+    priced = sum(1 for v in by_sup.values() for r in v if r["price_gbp"] is not None)
+    ws = wb.create_sheet(SUPPLIERS_SHEET)
+    set_widths(ws, {"A": 26, "B": 30, "C": 24, "D": 22, "E": 13, "F": 16, "G": 52})
+    title_row(
+        ws, "Suppliers — who supplies what, and what is still open", 7,
+        f"{pinned} pinned + {len(unassigned)} open by design + {len(undeclared)} "
+        f"undeclared = {total} parts. {pinned} are pinned to a named supplier and a "
+        f"real catalogue part number ({priced} with a live distributor price and a "
+        f"source link); {len(unassigned)} are OPEN BY DESIGN — requirements "
+        "specified, exact part confirmed at detailed design or on supplier "
+        f"quotation; {len(undeclared)} have no part number AND no stated reason, "
+        "which is a gap rather than a decision. Every row is derived from the run's "
+        "own verification records; nothing here is hand-entered.")
+    r = 4
+    if by_sup:
+        sub_banner(ws, r, f"PINNED — {len(by_sup)} supplier(s), {pinned} part(s)", 7)
+        r += 1
+        header(ws, r, ["Supplier", "Part", "Manufacturer part number", "Module",
+                       "Unit £", "Availability", "Catalogue evidence"])
+        r += 1
+        for mfr in sorted(by_sup):
+            for rec in sorted(by_sup[mfr], key=lambda x: x["part"]):
+                ws.cell(r, 1, clean_cell(mfr)).font = Font(size=10, bold=True)
+                for ci, k in ((2, "part"), (3, "mpn"), (4, "module")):
+                    c = ws.cell(r, ci, clean_cell(rec[k]))
+                    c.alignment = WRAP_TOP; c.font = Font(size=10); c.border = BORDER
+                pc = ws.cell(r, 5, rec["price_gbp"])
+                pc.border = BORDER
+                if rec["price_gbp"] is not None:
+                    pc.number_format = FMT_GBP
+                for ci, k in ((6, "availability"), (7, "evidence")):
+                    c = ws.cell(r, ci, clean_cell(rec[k] or "—"))
+                    c.alignment = WRAP_TOP; c.font = FONT_NOTE; c.border = BORDER
+                ws.cell(r, 1).border = BORDER
+                r += 1
+        r += 1
+    if unassigned:
+        sub_banner(ws, r, f"OPEN BY DESIGN — {len(unassigned)} part(s), no supplier yet", 7)
+        r += 1
+        header(ws, r, ["Part", "Module", "Part number state", "Why it is open",
+                       "", "", ""])
+        r += 1
+        for rec in sorted(unassigned, key=lambda x: x["part"]):
+            ws.cell(r, 1, clean_cell(rec["part"])).font = Font(size=10, bold=True)
+            ws.cell(r, 1).border = BORDER
+            for ci, v in ((2, rec["module"]), (3, rec["mpn"] or "(none)"),
+                          (4, rec["reason"])):
+                c = ws.cell(r, ci, clean_cell(v))
+                c.alignment = WRAP_TOP; c.font = FONT_NOTE; c.border = BORDER
+            r += 1
+        r += 1
+    if undeclared:
+        sub_banner(ws, r,
+                   f"UNDECLARED — {len(undeclared)} part(s) with no part number and no "
+                   "stated reason (a gap, not a decision)", 7)
+        r += 1
+        header(ws, r, ["Part", "Module", "Part number state", "Why it is open",
+                       "", "", ""])
+        r += 1
+        for rec in sorted(undeclared, key=lambda x: x["part"]):
+            ws.cell(r, 1, clean_cell(rec["part"])).font = Font(size=10, bold=True)
+            ws.cell(r, 1).border = BORDER
+            for ci, v in ((2, rec["module"]), (3, rec["mpn"] or "(none)"),
+                          (4, "NOT DECLARED — this part states no reason for being "
+                              "unresolved; it must be sourced or declared open")):
+                c = ws.cell(r, ci, clean_cell(v))
+                c.alignment = WRAP_TOP; c.font = FONT_NOTE; c.border = BORDER
+            r += 1
+    return True
+
+
 def tab_holds_register(wb: Workbook, state: dict, run_dir: str) -> bool:
     """Fix 6 (reviewers 2026-07-02) — the HOLDS & EXCLUSIONS register: numbered holds
     derived LIVE from the failing checks/column contracts + the brief's own exclusions.
@@ -26473,6 +26684,16 @@ _dt(["Brief metric", "Target", "Unit", "Matched contract quantity", "Achieved", 
      "STATUS", "Note"], "compliance", ["Brief metric", "Target", "STATUS"], unit=["Unit"])
 # Target/Achieved are numeric for compare rows and text for hold/literal rows —
 # do NOT declare them numeric (that invents cell-contract FAILs on OPEN holds).
+# Suppliers. `Unit £` is NOT required: a pinned catalogue part legitimately has no
+# live distributor price (the cascade caches misses), and demanding one would push
+# the builder toward inventing prices. Availability likewise.
+_dt(["Supplier", "Part", "Manufacturer part number", "Module", "Unit £", "Availability",
+     "Catalogue evidence"], "suppliers-pinned",
+    ["Supplier", "Part", "Manufacturer part number"], numeric=["Unit £"])
+# The open block: a part with no supplier MUST still say why — that column is the
+# whole point of showing it rather than hiding it.
+_dt(["Part", "Module", "Part number state", "Why it is open", "", "", ""],
+    "suppliers-open", ["Part", "Why it is open"])
 _dt(["Axis", "Claim", "Target", "Achieved", "Unit", "STATUS", "Hardness", "Provenance"],
     "verification-spine",
     ["Axis", "Claim", "Target", "Achieved", "STATUS", "Hardness", "Provenance"],
@@ -28208,6 +28429,70 @@ def _sc_glossary(wb, ws, state, run_dir):
             "fix": "drop orphan terms / define the missing ones in _GLOSSARY"}
 
 
+def _sc_suppliers(wb, ws, state, run_dir):
+    """Score the supplier register on EVIDENCE, not on completeness of sourcing.
+
+    ⭐ THE TRAP THIS AVOIDS: scoring "% of parts with a supplier" would punish an
+    honest concept dossier for being at concept stage, and reward filling 45 part
+    numbers with invented MPNs — exactly the fabrication the open-by-design ledger
+    exists to prevent. So the components ask instead: does every PINNED row carry a
+    real catalogue part number, and does every OPEN row carry a stated reason?
+    A register that declares its gaps and evidences its pins scores well; one that
+    lists a supplier with no part number, or an open part with no reason, does not.
+    """
+    data = _supplier_rows(state)
+    by_sup, unassigned = data["by_supplier"], data["unassigned"]
+    pinned = [r for v in by_sup.values() for r in v]
+    comps, iss = [], []
+    if pinned:
+        with_mpn = sum(1 for r in pinned if not _unresolved_pn(r["mpn"]))
+        comps.append(("every pinned supplier row carries a real manufacturer part number",
+                      with_mpn, len(pinned)))
+        if with_mpn < len(pinned):
+            iss.append(f"{len(pinned) - with_mpn} pinned row(s) name a supplier without a "
+                       "part number — a supplier name alone is not a sourcing decision")
+        with_ev = sum(1 for r in pinned if r["url"] or r["evidence"])
+        comps.append(("pinned part is backed by a catalogue source (link or listing title)",
+                      with_ev, len(pinned)))
+        drift = [r for r in pinned if r.get("ledger_disagreement")]
+        comps.append(("supplier rows agree with the open-by-design ledger "
+                      "(a sourced part must not still be declared open)",
+                      len(pinned) - len(drift), len(pinned)))
+        if drift:
+            iss.append(f"{len(drift)} part(s) are sourced here but still declared open by "
+                       "the ledger — the two surfaces have drifted; re-derive the ledger")
+        if with_ev < len(pinned):
+            iss.append(f"{len(pinned) - with_ev} pinned part(s) have no catalogue evidence "
+                       "behind the part number")
+    if unassigned:
+        with_reason = sum(1 for r in unassigned if r.get("reason"))
+        comps.append(("every open part states WHY it is open (declared, not silently TBD)",
+                      with_reason, len(unassigned)))
+        if with_reason < len(unassigned):
+            iss.append(f"{len(unassigned) - with_reason} open part(s) carry no stated reason "
+                       "— an undeclared TBD is a gap, not a disclosure")
+        iss.append(f"{len(unassigned)} part(s) remain unsourced at concept stage — never a "
+                   "perfect 10 until each is quoted (does not score: already priced by the "
+                   "never-perfect-10 rule)")
+    undeclared = data["undeclared"]
+    if undeclared or unassigned:
+        # Every unresolved part must be EITHER declared open with a reason OR
+        # sourced. An undeclared one scores against the tab — it is the gap the
+        # ledger's all-or-nothing completeness bar refuses to paper over.
+        unresolved = len(undeclared) + len(unassigned)
+        comps.append(("every unresolved part is DECLARED open with a reason "
+                      "(undeclared = a gap, not a decision)",
+                      unresolved - len(undeclared), unresolved))
+        if undeclared:
+            iss.append(f"{len(undeclared)} part(s) have no part number and no stated "
+                       "reason — source them or declare them open")
+    if not comps:
+        comps.append(("supplier register is honestly empty (no parts to source)", 1, 1))
+    return {"components": comps, "issues": iss,
+            "mech": "live re-derivation from the run's own part-verification records "
+                    "(supplier, MPN, distributor price and catalogue link)"}
+
+
 def _sc_holds(wb, ws, state, run_dir):
     comps = []
     iss = []
@@ -29182,6 +29467,7 @@ _TAB_SCORERS = [
     ("Part names", _sc_partnames),
     ("Glossary", _sc_glossary),
     ("Holds & exclusions", _sc_holds),
+    (SUPPLIERS_SHEET, _sc_suppliers),
     (DECISION_REGISTER_SHEET, _sc_decision_register),
     (QUESTIONS_SHEET, _sc_questions),
     ("PCB", _sc_pcb),
@@ -31202,6 +31488,7 @@ def build(run_dir: str, out_path: str) -> dict:
         skipped.append("Line & velocity (fluid-less instrument — not created)")
     add_tab("Risk & Regulatory", lambda: tab_risk_regulatory(wb, state))
     add_tab("Holds & exclusions", lambda: tab_holds_register(wb, state, run_dir))
+    add_tab(SUPPLIERS_SHEET, lambda: tab_suppliers(wb, state, run_dir))
     # Verification governing spine builds AFTER Holds (so _derive_holds sees live
     # contract results) — _TAB_RANK 5.2 places it immediately after Brief in the strip.
     print("  · Verification")

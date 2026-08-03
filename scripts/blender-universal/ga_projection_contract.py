@@ -55,8 +55,29 @@ def manifest_bbox_mm(row: Mapping) -> Optional[tuple]:
     except (TypeError, ValueError):
         return None
     if "dia" in dims:
-        w = d = float(dims.get("dia") or 0.0)
-        h = float(dims.get("len") or 0.0)
+        # ⭐⭐ HONOUR THE CYLINDER AXIS (2026-08-03). This used to read
+        # `w = d = dia; h = len` unconditionally, which silently assumes every
+        # cylinder stands on its end. A transverse traction motor does not: the FE
+        # front MGU emits `shape: horizontal_cylinder, axis: 'x', len 141.6,
+        # dia 177.9`, so its X span is the LENGTH and its Y/Z spans are the
+        # DIAMETER. With the axis ignored, the contract expected width and height
+        # the other way round and G23 reported all 23 drawn boxes as disagreeing
+        # with the manifest — "w 107.0 vs 134.5; h 134.5 vs 107.0", a transposition
+        # repeated entity by entity. THE DRAWING WAS RIGHT AND THE GATE WAS WRONG;
+        # a gate that misprojects the geometry it audits manufactures defects and
+        # buries the real ones. Default stays 'z' so vertical vessels/tanks — the
+        # overwhelming majority and the only case previously exercised — are
+        # byte-identical.
+        dia = float(dims.get("dia") or 0.0)
+        ln = float(dims.get("len") or 0.0)
+        axis = str(dims.get("axis") or "z").strip().lower()
+        if axis == "x":
+            w, d, h = ln, dia, dia
+        elif axis == "y":
+            w, d, h = dia, ln, dia
+        else:
+            w = d = dia
+            h = ln
     else:
         w = float(dims.get("w") or 0.0)
         d = float(dims.get("d") or 0.0)
@@ -135,3 +156,56 @@ def compare_rect(drawn: tuple, expected: tuple) -> Optional[str]:
     if abs(dh - eh) > PROJECTION_SIZE_TOL_PX:
         bad.append(f"h {dh:.1f} vs {eh:.1f}")
     return "; ".join(bad) if bad else None
+
+
+def _selftest() -> int:
+    """Prove the axis is honoured — and that the default is unchanged."""
+    fails = []
+
+    def ck(name, ok, detail=""):
+        if not ok:
+            fails.append(f"{name}: {detail}")
+
+    # ⭐ proveCatch: a horizontal cylinder along X must span `len` in X and `dia`
+    # in Y and Z. This is the exact FE front MGU traction-motor row that made G23
+    # report 23 false transpositions.
+    row_x = {"pos_mm": [0.0, 5.1, 408.5],
+             "dims_mm": {"dia": 177.9, "len": 141.6, "axis": "x"}}
+    bb = manifest_bbox_mm(row_x)
+    ck("axis_x.spans", bb is not None
+       and abs((bb[1] - bb[0]) - 141.6) < 1e-6
+       and abs((bb[3] - bb[2]) - 177.9) < 1e-6
+       and abs((bb[5] - bb[4]) - 177.9) < 1e-6,
+       f"axis=x cylinder mis-spanned: {bb}")
+
+    row_y = {"pos_mm": [0, 0, 0], "dims_mm": {"dia": 10.0, "len": 40.0, "axis": "y"}}
+    bby = manifest_bbox_mm(row_y)
+    ck("axis_y.spans", bby is not None
+       and abs((bby[1] - bby[0]) - 10.0) < 1e-6
+       and abs((bby[3] - bby[2]) - 40.0) < 1e-6
+       and abs((bby[5] - bby[4]) - 10.0) < 1e-6,
+       f"axis=y cylinder mis-spanned: {bby}")
+
+    # ⭐ REGRESSION: an axis-less cylinder must behave exactly as before (vertical).
+    row_z = {"pos_mm": [0, 0, 0], "dims_mm": {"dia": 10.0, "len": 40.0}}
+    bbz = manifest_bbox_mm(row_z)
+    ck("default_axis_unchanged", bbz is not None
+       and abs((bbz[1] - bbz[0]) - 10.0) < 1e-6
+       and abs((bbz[5] - bbz[4]) - 40.0) < 1e-6,
+       f"axis-less cylinder changed behaviour: {bbz}")
+
+    # A box row must be untouched by any of this.
+    bbb = manifest_bbox_mm({"pos_mm": [0, 0, 0], "dims_mm": {"w": 3, "d": 4, "h": 5}})
+    ck("box_row_untouched", bbb is not None and abs((bbb[1] - bbb[0]) - 3) < 1e-6
+       and abs((bbb[5] - bbb[4]) - 5) < 1e-6, f"box row changed: {bbb}")
+
+    for f in fails:
+        print(f"  FAIL {f}")
+    print("ga_projection_contract selftest: OK" if not fails
+          else f"FAIL ga_projection_contract selftest ({len(fails)} failures)")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    _sys.exit(_selftest())

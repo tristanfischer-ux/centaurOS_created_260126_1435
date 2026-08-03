@@ -5040,6 +5040,45 @@ async function main() {
         orchestratorContract: orchEngineeringContract ?? engineeringContract,
         parsedBrief: parsedResult.data,
       }
+      // OPEN-BY-DESIGN LEDGER — derived, not asserted. Gate 40 floors honesty at
+      // 2 when every critical-role part is TBD and nothing says why. On a concept
+      // dossier that is the normal state, so the choice is: invent part numbers
+      // (fabricating supplier decisions the design explicitly defers) or DECLARE
+      // the deferral. This declares it, reading each part's own lifecycle text —
+      // a part with a bare TBD and no stated reason is NOT laundered into a hold.
+      try {
+        const hh = execFileSync('python3', [
+          resolve(__dirname, 'lib/homologation_honesty.py'), '--stdin',
+        ], { input: JSON.stringify(closureState), encoding: 'utf8', timeout: 60_000 })
+        const ledger = JSON.parse(hh || '{}')
+        if (ledger && ledger.open_by_design_count > 0) {
+          ;(closureState as Record<string, unknown>).homologationHonesty = ledger
+          state.homologationHonesty = ledger
+          console.error(`[chain] open-by-design ledger: ${ledger.open_by_design_count} part(s) declared open, verdict ${ledger.verdict}`)
+        } else {
+          // ⭐ CLEAR A STALE LEDGER (Sol, finish council 2026-08-03). Derivation
+          // returning nothing MEANS something: either nothing is deferred, or an
+          // unresolved part states no reason and the all-or-nothing veto fired.
+          // Leaving an inherited ledger in place would let gate 40 keep granting
+          // the honesty exception on a disclosure that no longer holds — a false
+          // disclosure, and the worst failure this whole mechanism can produce.
+          if (state.homologationHonesty) {
+            console.error('[chain] open-by-design ledger CLEARED — derivation no longer '
+              + 'emits one (a part is unresolved with no stated reason, or nothing is deferred)')
+          }
+          delete (closureState as Record<string, unknown>).homologationHonesty
+          delete state.homologationHonesty
+        }
+      } catch (e) {
+        // ⭐ FAIL CLOSED (Sol, finish council 2026-08-03). A timeout, a bad JSON
+        // parse or a changed module interface must NOT leave an inherited ledger
+        // standing — that is precisely when a stale disclosure would slip through,
+        // because nobody re-derived it. No fresh derivation, no exception.
+        delete (closureState as Record<string, unknown>).homologationHonesty
+        delete state.homologationHonesty
+        console.error('[chain] open-by-design ledger FAILED — any inherited ledger cleared '
+          + `(gate 40 will refuse the honesty exception): ${(e as Error).message.slice(0, 140)}`)
+      }
       const closure = computeDesignClosure(closureState)
       writeFileSync(resolve(outDir, '4-design-closure.json'), JSON.stringify(closure, null, 2))
       console.error(`[chain] GATE 40 design-closure: ${closure.message}`)
