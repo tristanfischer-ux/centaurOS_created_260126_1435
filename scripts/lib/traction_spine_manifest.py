@@ -405,6 +405,21 @@ def _bbox_from_prefix(
     return None
 
 
+def _next_free_isa_tag(used: set) -> str:
+    """Deterministic X-### allocation above every tag already in use.
+
+    Starts at X-200 so it can never collide with the curated X-1xx principals in
+    _PREFERRED_ISA_TAGS, and walks upward until a free number is found."""
+    n = 200
+    for tg in used:
+        m = re.fullmatch(r"X-(\d+)", str(tg or "").strip(), re.I)
+        if m:
+            n = max(n, int(m.group(1)) + 1)
+    while f"X-{n}" in used:
+        n += 1
+    return f"X-{n}"
+
+
 def seat_traction_principals_in_manifest(
     rows: list[dict],
     state: Optional[dict],
@@ -510,6 +525,9 @@ def seat_traction_principals_in_manifest(
             }
         name = str(pick.get("requirement") or pick.get("name") or "").strip()
         tag = _resolve_equipment_tag(pick, name, catalog, ledger_tags)
+        # Same rule as the ontology pass below: a drawing label is never a slug.
+        if _is_slug_tag(tag):
+            tag = _next_free_isa_tag(have_tags)
         if _norm(name) in have_names or (tag and tag in have_tags):
             continue
         x0, x1, y0, y1, z0, z1 = bb
@@ -559,7 +577,7 @@ def seat_traction_principals_in_manifest(
         ONTOLOGY_MESH_MAP = {}  # type: ignore
         print(f"[traction-spine] ontology map unavailable ({_oe}) — hand seats only",
               flush=True)
-    for part_id, spec in (ONTOLOGY_MESH_MAP or {}).items():
+    for part_id, spec in sorted((ONTOLOGY_MESH_MAP or {}).items()):
         display = str(part_id).replace("_", " ").title()
         if _norm(display) in have_names:
             continue
@@ -581,6 +599,18 @@ def seat_traction_principals_in_manifest(
             "module": "energy_conversion_transduction", "qty": 1}
         name = str(pick.get("requirement") or pick.get("name") or "").strip()
         tag = _resolve_equipment_tag(pick, name, catalog, ledger_tags)
+        # ⭐⭐ NEVER LABEL A DRAWING WITH A SLUG (2026-08-03). A seated part with no
+        # ledger or BoM tag fell back to its slug, so the GA printed
+        # "u_permanent_magnet_set" and "u_post_diff_final_drive_helical" as
+        # equipment labels — which reads as unfinished, and whose LENGTH is what
+        # collided in the elevations (a 22-character label cannot be laddered clear
+        # in a 27-label view; G9 flagged 4 pile-ups at 100%). Extending the
+        # hand-written _PREFERRED_ISA_TAGS table by 26 entries would be a
+        # per-product data patch, so allocate deterministically instead: the next
+        # free X-### above the highest tag already in use, assigned in sorted
+        # part_id order so the same design always yields the same tags.
+        if _is_slug_tag(tag):
+            tag = _next_free_isa_tag(have_tags)
         if _norm(name) in have_names or (tag and tag in have_tags):
             continue
         shape, dims_mm = _dims_for_traction_seat(
