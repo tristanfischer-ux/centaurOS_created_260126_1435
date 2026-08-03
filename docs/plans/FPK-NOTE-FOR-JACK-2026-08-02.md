@@ -127,12 +127,25 @@ The 12 L/min at 60 °C I'd assumed does not carry the real loss. This matters
 twice over, because hot magnets lose remanence, and that costs torque on a
 machine that is already short of it.
 
-Two honest caveats. The 6.0 kW is an upper bound rather than a measurement: the
-loss model is fitted below magnetic saturation and this yoke sits above it, where
-the real steel rolls off. And when I re-ran the cooling I found my two thermal
-screens disagreeing with each other by 76 K — the coupled one models only the
-coolant-side film and omits conduction from the winding out to the jacket, so it
-reads far too optimistic. The 159 °C figure is the one I'd trust.
+Two honest caveats, and I've since had to correct one of them.
+
+I first described the 6.0 kW as an upper bound, on the reasoning that the loss
+model is fitted below magnetic saturation and this yoke sits above it, where the
+steel rolls off. That was wrong, or at least only half the story. The model also
+UNDER-counts: my flux figures are peak values from a static solve rather than a
+waveform, so inverter and slotting harmonics are missing and eddy loss grows with
+the square of frequency; the yoke's rotating flux is treated as if it alternated;
+and I've applied no allowance for the loss that stamping and stacking add to
+laminations. Those push the other way. The honest position is that the true figure
+could sit anywhere from roughly two-thirds to about 1.4 times my number — so it is
+a screening estimate, not a bound, and the breach could be worse than I've shown
+rather than better.
+
+The second caveat: when I re-ran the cooling I found my two thermal models
+disagreeing with each other by 76 K. The coupled one models only the coolant-side
+film and omits conduction from the winding out through the slot insulation and
+the iron — that path is roughly fifty times the resistance of the film alone, so
+its answer is far too optimistic. The 159 °C figure is the one I'd trust.
 
 I'd rather tell you the design breaks than tell you it closes on a number I no
 longer believe.

@@ -6,6 +6,8 @@
 > **Updated 2026-08-03.** §7's thermal item is no longer an open caveat: with the
 > iron loss derived from the real lamination, the **magnets breach their 150 °C
 > limit by 9.3 K** on the design duty. The torque shortfall below is unchanged.
+> The iron-loss figure is a **screening estimate, not a bound** — it may be
+> understated as easily as overstated, so the breach is not conservative.
 
 Every number below is a registered claim backed by a solver artefact, or it is
 labelled as an assumption. Nothing here is hand arithmetic presented as a
@@ -140,9 +142,18 @@ this is a design problem at all.
   False. Compounding: hot magnets lose remanence, costing torque on a machine
   already at 0.651×. Raising speed makes it worse — eddy loss goes as f².
 
-  Two caveats, both load-bearing. The 6035 W is an **upper bound**, not a
-  measurement: the Steinmetz form is fitted below saturation and this yoke sits
-  at 2.10 T, outside it. And the two cooling screens **disagree by 76 K** — the
+  Two caveats, both load-bearing. **CORRECTED 2026-08-03: 6035 W is a SCREENING
+  ESTIMATE, not an upper bound** — the error is TWO-SIDED and the earlier "bound"
+  label was the dangerous one, because it invited the reader to treat the breach
+  as conservative. Over-predicting: the Steinmetz form is fitted below saturation
+  and this yoke sits at 2.10 T, outside it (−25 to −40% on hysteresis).
+  UNDER-predicting: B is a **static peak probe, not a waveform**, so PWM and
+  slotting harmonics are uncounted and eddy loss goes as f²B² (+30 to +70%); yoke
+  rotational flux is modelled as alternating (+20 to +50%); and no build factor is
+  applied for punched 0.50 mm at 1300 Hz (×1.4 to ×1.8). The true figure may sit
+  ~0.65× to ~1.4× of 6035 W — i.e. **3.9 kW to 8.5 kW**. Closing it needs
+  transient FE waveforms with Bertotti/iGSE on the Fourier components, plus
+  measured loss data for this grade above 1.8 T. And the two cooling screens **disagree by 76 K** — the
   coupled network screen reports 82.9 °C because its thermal path is the
   convective film alone (R = 0.000378 K/W) with no conduction from winding
   through slot liner and stator iron to the jacket wall; the lumped screen's
