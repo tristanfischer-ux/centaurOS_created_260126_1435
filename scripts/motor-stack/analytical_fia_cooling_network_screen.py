@@ -83,6 +83,9 @@ class LossInputs:
     tim_r_m2k_per_w: float
     magnet_to_winding_k_per_w: float
     module_to_coolant_k_per_w: float
+    # Two-source LPTN screening constants — see the note at the winding node.
+    slot_to_iron_k_per_w: float = 0.006
+    iron_to_jacket_k_per_w: float = 0.0077
 
 
 @dataclass(frozen=True)
@@ -288,6 +291,10 @@ def loss_inputs_from_quantities(quantities: Mapping[str, Any]) -> LossInputs:
             ("thermal_resistance_magnet_to_winding_k_per_w",),
             DEFAULT_MAGNET_TO_WINDING_K_PER_W,
         ),
+        slot_to_iron_k_per_w=_positive_or_default(
+            quantities, ("thermal_resistance_slot_to_iron_k_per_w",), 0.006),
+        iron_to_jacket_k_per_w=_positive_or_default(
+            quantities, ("thermal_resistance_iron_to_jacket_k_per_w",), 0.0077),
         module_to_coolant_k_per_w=_positive_or_default(
             quantities,
             (
@@ -528,9 +535,52 @@ def solve_thermal_network(
         losses.jacket_wall_r_m2k_per_w, jacket_area
     )
     r_tim = _area_normalized_k_per_w(losses.tim_r_m2k_per_w, module_area_m2)
-    r_module_junction = cold_conv.r_conv_k_per_w + r_tim
+    # ⭐ SAME DEFECT, INVERTER SIDE. The junction path was film + TIM only, which
+    # omits everything INSIDE the module — die attach, substrate, baseplate — and
+    # the cold-plate wall. Those dominate a SiC stack exactly as the slot
+    # insulation dominates the stator. It left the module 42.8 K below the lumped
+    # screen after the stator paths were reconciled to 0.1 K.
+    # `module_to_coolant_k_per_w` is the SAME screening constant the lumped screen
+    # already uses, so the two models now share one value rather than each
+    # carrying a different partial chain. Junction-to-coolant for a SiC stack on a
+    # cold plate is a datasheet R_th(j-c) plus the mounting stack — Bar B (B4
+    # supplier data / B6 flow bench) closes it properly.
+    r_module_junction = max(
+        cold_conv.r_conv_k_per_w + r_tim, losses.module_to_coolant_k_per_w)
 
-    winding_t = bulk_jacket + winding_loss * (jacket_conv.r_conv_k_per_w + r_jacket_wall)
+    # ⭐⭐ TWO SOURCES, TWO NODES (2026-08-03). This line used to read
+    #     winding_t = bulk_jacket + winding_loss * (r_conv + r_jacket_wall)
+    # which is wrong twice over:
+    #   (a) it puts the ENTIRE motor loss on the winding node, but iron loss is
+    #       generated IN THE IRON and never crosses the slot insulation; and
+    #   (b) its only resistances are the coolant-side FILM and the jacket wall —
+    #       no slot liner, no impregnation, no stator-iron conduction. Those
+    #       dominate: the film is ~1.6% of the real path (see
+    #       scripts/lib/stator_thermal_chain.py).
+    # The result was a winding temperature 76 K BELOW the lumped screen's, on the
+    # same twin with identical losses, reported as coupled_screen_ok TRUE while
+    # the lumped screen showed the magnets in breach. Two screens of one machine
+    # cannot disagree by 76 K and both be shipped.
+    #
+    # Correct structure: iron loss enters at the IRON node, copper at the WINDING
+    # node one resistance further out.
+    #     T_iron    = T_coolant + (Q_cu + Q_fe) * R_iron_to_coolant
+    #     T_winding = T_iron    +  Q_cu         * R_slot
+    #
+    # ⚠ R_slot and R_iron_to_jacket are SCREENING CONSTANTS, not derived values.
+    # A derived chain needs slot fill fraction, impregnation type and a measured
+    # interface conductance, none of which this twin carries; an attempt to derive
+    # them (stator_thermal_chain.py) lands outside the physical band and REFUSES
+    # to publish a number rather than guess. These defaults are set so the coupled
+    # model reproduces the lumped screen's calibrated total (~0.010 K/W
+    # winding-to-coolant) with the CORRECT structure — they remove a duplicate
+    # wrong model, they do not invent a new answer. Both are overridable from the
+    # contract, and closing them properly is Bar B (flow bench, B6).
+    r_slot = losses.slot_to_iron_k_per_w
+    r_iron_extra = losses.iron_to_jacket_k_per_w
+    r_iron_to_coolant = jacket_conv.r_conv_k_per_w + r_jacket_wall + r_iron_extra
+    iron_t = bulk_jacket + winding_loss * r_iron_to_coolant
+    winding_t = iron_t + losses.copper_loss_w * r_slot
     magnet_t = winding_t + losses.magnet_loss_w * losses.magnet_to_winding_k_per_w
     module_t = bulk_cold + losses.inverter_loss_w * r_module_junction
 
