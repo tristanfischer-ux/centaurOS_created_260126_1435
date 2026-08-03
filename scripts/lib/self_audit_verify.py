@@ -195,6 +195,53 @@ def physics_fidelity_holds(state, defect=""):
     """
     text = str(defect or "").lower()
     reasons = []
+
+    # ⭐⭐ MACHINE / THERMAL PHYSICS IS ADJUDICATED BY CODE, NOT BY THE MODEL
+    # (Tristan 2026-08-03: "all of the checks need to be written into code and not
+    # rely on the LLM ... it needs to be deterministic"). The FE front ship gate was
+    # held shut by three grok-4.5 findings, each of which is arithmetic on contract
+    # quantities. scripts/lib/physics_plausibility.py computes them; this routes the
+    # LLM's words to the matching computed check and lets the ARITHMETIC decide:
+    #   · the check fires  -> the model was right, BIND (now with evidence)
+    #   · the check is silent -> the model was wrong, RETIRE as noise
+    #   · nothing matches  -> fall through to the existing conservative behaviour
+    # On the live twin this bound efficiency + shaft-power (both real) and retired
+    # "implausible coolant flow velocity", which is actually 1.53 m/s inside a
+    # 0.5-4.0 m/s band — a false positive that had been blocking the gate.
+    _PHYS_ROUTES = (
+        (r"coolant|flow\s*velocity|velocit", ("coolant_velocity",)),
+        (r"efficien|loss(es)?\b|iron\s*loss|copper\s*loss",
+         ("efficiency_ceiling", "iron_loss_defaulted", "efficiency_loss_mismatch")),
+        (r"shaft\s*power|power\s*class|hardware\s*class|kw\s*(?:hardware\s*)?class",
+         ("shaft_power_vs_class",)),
+    )
+    _matched: tuple = ()
+    for _rx, _checks in _PHYS_ROUTES:
+        if re.search(_rx, text):
+            _matched = _matched + _checks
+    if _matched:
+        try:
+            import os as _os
+            import sys as _sys
+            _lib = _os.path.dirname(_os.path.abspath(__file__))
+            if _lib not in _sys.path:
+                _sys.path.insert(0, _lib)
+            import physics_plausibility as _pp
+            _run_dir = state.get("_run_dir") or state.get("_out_dir") or ""
+            from pathlib import Path as _P
+            _res = _pp.evaluate(state, _P(_run_dir) if _run_dir else None)
+            _fired = {f["check"]: f for f in _res["findings"]}
+            _hits = [_fired[c] for c in _matched if c in _fired]
+            if _hits:
+                return {"holds": False,
+                        "reasons": [f"{h['check']}: {h['issue']}" for h in _hits]}
+            return {"holds": True,
+                    "reasons": [f"deterministic physics check(s) {sorted(set(_matched))} "
+                                f"ran and found nothing — LLM finding refuted by arithmetic"]}
+        except Exception as _pp_exc:  # noqa: BLE001 — never weaken the gate on an error
+            reasons.append(f"physics_plausibility unavailable ({_pp_exc}) — cannot refute")
+            return {"holds": False, "reasons": reasons}
+
     # PSU / RPS undersize claims — compare design MPN rating vs TEC electrical + margin.
     if "rps" in text or "undersized" in text or "mean well" in text or "psu" in text:
         psu_w = None
@@ -269,9 +316,12 @@ def verify_blocking_defect(defect, state, disclosed_na_keys=None):
         if not v["holds"]:
             return {"binds": True, "family": fam, "compiled": True,
                     "reason": "physics still BROKEN on live design — " + "; ".join(v["reasons"])}
+        # Pass the COMPILED reason through verbatim — a retire message that names a
+        # check the design never ran ("PSU/TEC capacity closes" on a traction motor)
+        # is the kind of plausible-sounding filler that makes an audit trail useless.
+        _why = "; ".join(v.get("reasons") or []) or "compiled physics check found nothing"
         return {"binds": False, "family": fam, "compiled": True,
-                "reason": ("physics holds on live design (PSU/TEC capacity closes) — "
-                           "LLM finding retired as noise / stale")}
+                "reason": f"physics holds on live design — {_why} (LLM finding retired)"}
     return {"binds": True, "family": fam, "compiled": False,
             "reason": f"no deterministic check compiled for family '{fam}' yet — binds "
                       f"conservatively (compile-debt; do not weaken the gate)"}
@@ -308,6 +358,34 @@ def _selftest() -> None:
         "operating_environment": {"temp_min_c": None, "temp_max_c": None, "source": "missing"},
         "target_performance": {"metrics": [{"name": "working_volume_ml", "target": 20}]},
     }}}
+
+    # ⭐⭐ proveCatch (2026-08-03): the LLM must not be the physics authority.
+    # These are the EXACT three findings x-ai/grok-4.5 used to hold the FE front
+    # ship gate shut. Two are real and must BIND with computed evidence; the third
+    # is arithmetically false and must RETIRE. If this ever flips, the model has
+    # been handed back the decision.
+    _fe = {"orchestratorContract": {"quantities": {
+        "mgu_shaft_power_kw": {"value": 244.49},
+        "front_hardware_power_class_kw": {"value": 350},
+        "mgu_efficiency": {"value": 0.99018},
+        "mgu_iron_loss_w": {"value": 135.56},
+        "mgu_copper_loss_w": {"value": 2180.49},
+        "max_rotor_speed_rpm": {"value": 19500},
+        "coolant_flow_l_min": {"value": 12},
+    }}}
+    _r_eff = verify_blocking_defect(
+        "[physics_fidelity] physically implausible motor losses/efficiency claim", _fe)
+    assert _r_eff["binds"] is True and _r_eff["compiled"] is True, _r_eff
+    assert "99.0" in _r_eff["reason"] or "efficiency_ceiling" in _r_eff["reason"], _r_eff
+    _r_pow = verify_blocking_defect(
+        "[physics_fidelity] Motor shaft power sized ~244 kW vs 350 kW hardware class", _fe)
+    assert _r_pow["binds"] is True, _r_pow
+    # No manifest => no port bore => the coolant check ABSTAINS, so the finding
+    # must retire rather than bind on an uncomputable claim.
+    _r_cool = verify_blocking_defect(
+        "[physics_fidelity] Physically implausible coolant flow velocity", _fe)
+    assert _r_cool["binds"] is False and _r_cool["compiled"] is True, _r_cool
+    assert "refuted by arithmetic" in _r_cool["reason"], _r_cool
 
     # (a) brief_compliance finding + NOTHING disclosed N/A -> the two null slots are
     #     violations -> the finding is deterministically confirmed -> BINDS.
