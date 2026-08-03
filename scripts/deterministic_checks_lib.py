@@ -1806,12 +1806,35 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
                 continue
             if bool(mu) != bool(ku):   # one side dimensioned, the other dimensionless → not the same metric
                 continue
+            # ⭐⭐ A CHECK MAY NOT COMPARE THE TARGET TO ITSELF (2026-08-03). The
+            # brief metric `magnet_temp_limit_c` = 150 matched the contract
+            # quantity of the SAME NAME, also 150, so the row read
+            # "Brief target met: magnet_temp_limit_c — 150 vs 150 — PASS" and
+            # could never fail whatever the machine did. It showed green while the
+            # magnets ran 9.3 K over that very limit. A tautology dressed as a
+            # check is worse than no check, because it occupies the slot where a
+            # real one would have failed. The ACHIEVED quantity is a different key
+            # (mgu_magnet_temp_c); the limit is the target, not the measurement.
+            if k.lower() == km.lower():
+                continue
             ov = len(mt & kt)
             if ov >= 2 or (mt <= kt and ov >= 1):
                 dvc = qval(q, k)
                 if dvc is not None:
                     cands.append((abs(dvc - tvf), dvc, k))
         if not cands:
+            # Nothing but the target itself matched → the brief states a target the
+            # design never reports an achieved value for. That is UNVERIFIED, and it
+            # must say so rather than vanish: a silently-dropped target is how a
+            # constraint goes unaudited (the same disease gate 17 exists to catch).
+            out.append(Check(
+                name=f"Brief target met: {km}", category="BRIEF", relation="eq",
+                status=FAIL, actual=None, expected=tvf, tol=0.0, unit=unit,
+                producer=f"brief:{km}",
+                detail=(f"UNVERIFIED — the brief sets {km} = {tvf:g} {unit} but the design "
+                        f"reports no ACHIEVED quantity to compare it against (only the "
+                        f"target itself). Emit the achieved value, or this constraint "
+                        f"ships unaudited.")))
             continue
         # A performance target is MET by MEETING-OR-EXCEEDING it — the design delivering MORE than the
         # brief demand is success, not a failure (v14: irrigation 'per_department' target 45 m³/h with a
