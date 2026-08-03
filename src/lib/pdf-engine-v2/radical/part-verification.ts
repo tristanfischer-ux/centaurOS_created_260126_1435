@@ -129,6 +129,66 @@ export interface PartRecommendation {
  * Skip words tagged "custom fabrication" / "custom PCBA" / "custom machined"
  * — those are honest "no vendor" declarations, no verification needed.
  */
+/** TRUE when a part number is a placeholder rather than a real SKU.
+ *
+ * Kept deliberately in step with scripts/lib/homologation_honesty.py's
+ * `is_unresolved_part_number` — the open-by-design ledger and the verifier must
+ * agree about what counts as "not chosen yet", or one will search for a part the
+ * other has already declared deferred.
+ */
+export function isPlaceholderPartNumber(partNumber: string): boolean {
+  const pn = String(partNumber ?? '').trim()
+  if (!pn) return true
+  return /^(TBD|TBC|n\/?a|unknown|generic|detailed design|to be (?:determined|confirmed))\b/i.test(pn)
+}
+
+/** Mutually-exclusive component families. Two different entries here cannot
+ *  describe the same physical part, so a catalogue listing from one family
+ *  cannot verify a design word from another. */
+const COMPONENT_FAMILIES: Array<[string, RegExp]> = [
+  ['capacitor', /\bcapacitors?\b|\bmlcc\b|\bfilm cap/i],
+  ['busbar', /\bbus[\s-]?bars?\b|\bbusbar link\b/i],
+  ['connector', /\bconnectors?\b|\bheaders?\b|\breceptacles?\b/i],
+  ['fuse', /\bfuses?\b|\bfuse links?\b/i],
+  ['resistor', /\bresistors?\b|\bshunts?\b/i],
+  ['inductor', /\binductors?\b|\bchokes?\b/i],
+  ['relay', /\brelays?\b|\bcontactors?\b/i],
+  ['bearing', /\bbearings?\b/i],
+  ['gear', /\bgears?\b|\bpinions?\b/i],
+  ['cable', /\bcables?\b|\bharness(?:es)?\b|\bwires?\b/i],
+  ['sensor', /\bsensors?\b|\bprobes?\b|\bthermistors?\b/i],
+]
+
+function familyOf(text: string): string | null {
+  for (const [name, rx] of COMPONENT_FAMILIES) if (rx.test(text)) return name
+  return null
+}
+
+/** A verification is INCOHERENT when the catalogue listing that "confirms" the
+ *  part describes a different component family than the design word it was
+ *  matched to.
+ *
+ * ⭐⭐ WHY (2026-08-03). "Hv DC Busbar Link" came back status=verified,
+ * confidence=high, because Mouser really does list MKP1848C66012JY5 — a Vishay
+ * FILM CAPACITOR. Existence was checked; suitability never was. A busbar link is
+ * not a capacitor, and no amount of catalogue confirmation makes it one. The
+ * check is symmetric and only fires when BOTH sides name a family and the two
+ * families differ, so an unclassifiable listing or word abstains rather than
+ * guessing.
+ */
+export function verificationFamilyMismatch(
+  wordName: string, sourceTitle: string,
+): { mismatch: boolean; reason: string } {
+  const wf = familyOf(String(wordName ?? ''))
+  const sf = familyOf(String(sourceTitle ?? ''))
+  if (!wf || !sf || wf === sf) return { mismatch: false, reason: '' }
+  return {
+    mismatch: true,
+    reason: `"${wordName}" is a ${wf}, but the catalogue listing that verified it `
+      + `("${sourceTitle}") is a ${sf} — the part exists, it is just not this part`,
+  }
+}
+
 export function extractPartCandidates(modules: ModuleSpec[]): PartCandidate[] {
   const out: PartCandidate[] = []
   for (const m of modules ?? []) {
@@ -143,6 +203,15 @@ export function extractPartCandidates(modules: ModuleSpec[]): PartCandidate[] {
         if (!mfrV || !pnV) continue
         // Skip honest "no vendor" declarations
         if (/^(custom|in[-_]?house|bespoke|own[-_]?design)/i.test(mfrV)) continue
+        // ⭐⭐ NEVER SEARCH ON A PLACEHOLDER (2026-08-03). A part whose number is
+        // still "TBD (detailed design)" has nothing to verify, but it was being
+        // sent to the verifier anyway — so the web fallback searched the literal
+        // string "TBD", landed on an Italian environmental filing for a Siemens
+        // Gamesa SG 6.0-170, and attributed a 6 MW WIND TURBINE manufacturer to
+        // the stator windings of a Formula E motor. The record even carried
+        // confidence "high". A placeholder is an honest "not chosen yet"
+        // declaration exactly like "custom" above, and must be treated as one.
+        if (isPlaceholderPartNumber(pnV)) continue
         out.push({
           id: `${m.module}::${sm.id}::${w.id ?? '?'}::${pnV}`,
           module: m.module,

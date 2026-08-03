@@ -537,6 +537,74 @@ def seat_traction_principals_in_manifest(
         if tag:
             have_tags.add(tag)
         seated += 1
+    # ⭐⭐ SEAT FROM THE REGISTERED ONTOLOGY, NOT ONLY THE HAND LIST (2026-08-03).
+    # _TRACTION_SEATS carries 11 entries; scripts/lib/fpk_blender_coverage.py's
+    # ONTOLOGY_MESH_MAP carries 48 and is the authority the coverage gate already
+    # scores against. Those two drifted, and the drift was invisible because each
+    # was internally consistent: fpk_blender_coverage reported 48/48 covered and
+    # score 1.0 (the stator ring, winding ends, motor shaft, bearing caps and end
+    # bells ARE modelled — 194 meshes), while the parts-manifest exported 22 rows,
+    # so the GA and the parts-ledger — which read the MANIFEST — scored 47.8% and
+    # the drawing set showed a rotor turning inside no stator.
+    #
+    # Extending the hand list by twelve entries would fix this twin and leave the
+    # duplication in place to drift again. Deriving the remainder from the same
+    # registered map removes the second source. Anything the hand list already
+    # seats keeps its curated noun-matching and richer dims; the ontology only
+    # fills what nothing else claimed.
+    ontology_seated = 0
+    try:
+        from fpk_blender_coverage import ONTOLOGY_MESH_MAP  # type: ignore
+    except Exception as _oe:  # noqa: BLE001
+        ONTOLOGY_MESH_MAP = {}  # type: ignore
+        print(f"[traction-spine] ontology map unavailable ({_oe}) — hand seats only",
+              flush=True)
+    for part_id, spec in (ONTOLOGY_MESH_MAP or {}).items():
+        display = str(part_id).replace("_", " ").title()
+        if _norm(display) in have_names:
+            continue
+        # Union the world bbox of every mesh this part's OWN patterns match. A part
+        # whose meshes are absent is skipped — never invented (same rule as above).
+        pats = [re.compile(p_) for p_ in (spec.get("patterns") or [])]
+        boxes = [bb_ for nm_, bb_ in (mesh_bbox_by_prefix or {}).items()
+                 if bb_ and any(p_.match(str(nm_)) for p_ in pats)]
+        if not boxes:
+            continue
+        x0 = min(b[0] for b in boxes); x1 = max(b[1] for b in boxes)
+        y0 = min(b[2] for b in boxes); y1 = max(b[3] for b in boxes)
+        z0 = min(b[4] for b in boxes); z1 = max(b[5] for b in boxes)
+        cands = [r for r in catalog if r.get("status") != "SUB-COMPONENT"
+                 and _norm(str(r.get("requirement") or r.get("name") or "")) == _norm(display)]
+        pick = _pick_bom_match(cands, display) or {
+            "requirement": display, "name": display,
+            "tag": ledger_tags.get(_norm(display)) or _slug(display),
+            "module": "energy_conversion_transduction", "qty": 1}
+        name = str(pick.get("requirement") or pick.get("name") or "").strip()
+        tag = _resolve_equipment_tag(pick, name, catalog, ledger_tags)
+        if _norm(name) in have_names or (tag and tag in have_tags):
+            continue
+        shape, dims_mm = _dims_for_traction_seat(
+            (spec.get("patterns") or [""])[0].strip("^$"), (x0, x1, y0, y1, z0, z1))
+        rows.append({
+            "tag": tag, "equipment_tag": tag, "name": name,
+            "module": str(pick.get("module") or "energy_conversion_transduction"),
+            "shape": shape, "qty": int(pick.get("qty") or 1), "region_rank": 55,
+            "pos_mm": [round((x0 + x1) / 2.0, 1), round((y0 + y1) / 2.0, 1),
+                       round((z0 + z1) / 2.0, 1)],
+            "dims_mm": dims_mm,
+            "geometry_source": "traction_drive_story_mesh",
+            "signature_family": "traction_pack",
+            "entity_type": "bom_component",
+        })
+        have_names.add(_norm(name))
+        if tag:
+            have_tags.add(tag)
+        ontology_seated += 1
+        seated += 1
+    if ontology_seated:
+        print(f"[traction-spine] ontology seats: {ontology_seated} additional "
+              f"principal(s) from ONTOLOGY_MESH_MAP (stator / shaft / bearings / "
+              f"end bells / ports)", flush=True)
     print(
         f"[traction-spine] seated={seated} meshes={n_mesh} bom={len(bom)} "
         f"parts_fallback={len(part_rows) if not bom else 0} "
@@ -721,6 +789,31 @@ def _selftest() -> None:
     if bad:
         print(f"traction_spine_manifest selftest: {bad} FAIL(s)")
         sys.exit(1)
+    # ⭐⭐ proveCatch (2026-08-03): the motor INTERNALS must seat. This is the exact
+    # gap that made the FE front FPK render a rotor inside no stator — 194 meshes
+    # built and 48/48 ontology coverage, but a 22-row manifest, so GA and the
+    # parts-ledger both scored 47.8%. If this fires, the hand seat list and the
+    # registered ontology have drifted apart again.
+    _internals = {
+        "u_se_td_stator_ring":  (-70.0, 70.0, -89.0, 89.0, 320.0, 498.0),
+        "u_se_td_winding_end_0": (-80.0, -60.0, -70.0, 70.0, 340.0, 480.0),
+        "u_se_td_motor_shaft":  (-90.0, 90.0, -12.0, 12.0, 398.0, 422.0),
+        "u_se_td_bearing_cap_0": (-92.0, -80.0, -30.0, 30.0, 380.0, 440.0),
+        "u_se_td_end_bell_0":   (-95.0, -85.0, -85.0, 85.0, 325.0, 495.0),
+        "u_se_td_motor_housing": (-100.0, 100.0, -92.0, 92.0, 318.0, 502.0),
+    }
+    _rows_i: list = []
+    seat_traction_principals_in_manifest(
+        _rows_i, {"parsedBrief": {"product_class": "formula_e_front_mgu"}},
+        mesh_bbox_by_prefix=_internals)
+    _seated_names = {_norm(str(r.get("name") or "")) for r in _rows_i}
+    for _need in ("stator laminations", "motor shaft", "front bearing", "front end bell"):
+        if _norm(_need) not in _seated_names:
+            print(f"  FAIL internals proveCatch: {_need!r} not seated from its mesh "
+                  f"(got {sorted(_seated_names)})")
+            bad += 1
+    if not bad:
+        print("  PASS internals proveCatch: stator / shaft / bearing / end bell seated")
     print("traction_spine_manifest selftest: OK")
 
 
