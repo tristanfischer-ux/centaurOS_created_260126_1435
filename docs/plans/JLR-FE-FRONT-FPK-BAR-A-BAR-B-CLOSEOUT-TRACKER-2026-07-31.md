@@ -1,140 +1,180 @@
 # Formula E Front FPK — Bar A / Bar B Close-Out Tracker
 
-**Created 2026-07-31 · LIVE-REFRESHED 2026-08-03 against the twin.**
+**Created 2026-07-31 · FORMALLY REWRITTEN 2026-08-03 against the live twin.**
+**Twin:** `out/formula-e-front-mgu-20260729-1432/` · **`ship_ok` false** ·
+**NOT_HOMOLOGATED**
 
-> ⚠ **READ THIS FIRST — three days of work landed after the 07-31 body below.**
-> The 07-31 scoreboard is preserved further down for history, but several of its
-> rows are now WRONG. Four things moved materially: the EM shortfall got WORSE and
-> better-measured (0.948 → **0.651×**, and DEC-EM-1 was decided then REVERSED); the
-> iron loss was found **45× understated** and its correction opened a **magnet
-> temperature BREACH**; the drawing/render surfaces went from ~48% to **100%**; and
-> **A2 gear-oil cornering has REGRESSED to False**. Use §0-NEW below, not §0.
+> The 07-31 body is preserved from §H1 onward as history. Sections 1–5 below are
+> the current position and supersede it. Every number here was read from the twin
+> on 2026-08-03, not carried from a previous note.
 
 ---
 
-## 0-NEW. Live scoreboard — 2026-08-03 (read from the twin, not from memory)
+## 1. Executive position
 
-| Gate | Live | Bar | Δ since 07-31 |
-|---|---|---|---|
-| `ship_ok` | **false** | A+B | unchanged (correct) |
-| Homologation | **NOT_HOMOLOGATED** | B | unchanged |
-| Architecture blockers OPEN | **0** (`architectureBlockers: []`) | A | was 1 — `EM_TORQUE_VS_ROTOR_BORE` cleared as a BLOCKER, but see EM row |
-| **EM duty** | required **125.22 N·m**, delivered **81.558 N·m** = **0.651×** | A→B | **WORSE + properly measured.** 07-31 said 0.948 on a 4-position sweep; now 37 positions with six branch circuits |
-| **DEC-EM-1** | **DECIDED THEN REVERSED** (parallel-path trap) | A | new — see §A1-NEW |
-| **Iron loss** | **135.56 W → 6035 W** (45×), M400-50A derived | A | **NEW FINDING** |
-| **Magnet temperature** | **159.35 °C vs 150 °C limit — BREACH by 9.3 K** | A | **NEW BLOCKER** |
-| Machine efficiency | 0.99018 → **0.96749** (was physically impossible) | A | new |
-| Thermal screens agree? | **NO — 76 K apart**; network screen models film only | A | **NEW DEFECT** |
-| Closure honesty (gate 40) | **10/10** | A | was 2/10 (floor) |
-| Drawing gates | **23/23 PASS** | A | was 2–3 failing |
-| Render / GA / SLD coverage | **23/23 · 23/23 · 6/6 = 100%** | A | was 47.8% / 47.8% / 37.5% |
-| parts-manifest rows | **57** (0 slug tags) | A | was 22, with 26 slug labels |
-| PCB | **2 routed boards, DRC 0 violations, fitness 7.6/10, 0 unresolved** | A | draft → real; tab was MISSING from the workbook, now renders |
-| Excel workbook | **31 tabs**, 0 bare verdict literals | A | +PCB, +Suppliers |
-| **A2 gear-oil cornering** | **CLEARED — `cornering_pickup_ok: True`**, immersion 0.2399 vs 0.08 floor | A | **NOT a regression — the artefact was STALE.** It was written 2 Aug 05:50 against gear_face 14.0 mm; the live twin carries 19.2 mm from `gear_geometry_writeback`. Re-running the screen clears it. |
-| Self-audit blocking defects | **3 raised → 1 binds** (2 retired by deterministic checks) | A | LLM removed from the ship decision |
-| Suppliers register | `state.suppliers` still **empty**; tab reads partVerifications | A | new tab, honest source |
-| CAD release coverage | **0%** | B | unchanged |
-| Hardware correlation holds | **6/6 OPEN** (B1–B10 list intact) | B | unchanged |
+**Bar A engine work is complete. Bar A ENGINEERING is gated on one unanswered
+question, and Bar B is untouched — correctly.**
 
----
+| | |
+|---|---|
+| Deliverable | 31-tab workbook · 23/23 drawing gates · 100% render/GA/SLD coverage |
+| Design verdict | **The machine does not make its duty (0.651×) and may breach its magnet limit** |
+| The one question | **Is 250 kW continuous, or a 24% duty?** It decides the architecture |
+| `ship_ok` | **false** — correct; no Bar B evidence exists |
 
-## 0-NEW.1 What was DONE successfully since 07-31
+### The single decisive fact
 
-**Engine correctness (all universal source fixes, each with proveCatch):**
+The contract states **250 kW `basis=continuous`** and, separately, a duty vignette
+of **24 s regen in every 100 s (24% duty)**. Both describe the same machine; they
+cannot both be true. The consequences are not marginal:
 
-1. **Open-by-design ledger** — closure honesty 2 → 10 by declaring deferred parts with their own stated reasons instead of inventing MPNs.
-2. **Motor internals reached the drawings** — the stator, windings, shaft, bearings and end bells were BUILT (194 meshes, 48/48 ontology) but never exported to `parts-manifest.json`. Two registries had drifted. 22 → 57 rows, coverage 47.8% → 100%.
-3. **GA projection** — 23 false disagreements → 0. `manifest_bbox_mm` assumed every cylinder stands on end; a transverse motor does not. The drawings were right and the gate was wrong.
-4. **Single-line diagram** — was a generic `UTILITY SUPPLY → 400 V AC` stub with none of the design's parts, on a 750 V DC pack. Now the real HV spine. Four defects fixed: mechanical parts drawn as electrical loads (head-noun rule), star topology hiding the inverter, BoM twin naming, enclosures expected on a one-line.
-5. **Cable ampacity** — a 561 A feeder was sized 2×6 mm² Cu and labelled "within spec". Now sized from current; unsized runs report `within_spec: None`.
-6. **PCB tab existed but was invisible** — the stage writes `pcb-stage.json`, four consumers read `state.pcb`. Fixed with a registry + a repo scan that fails the build on an unregistered writer.
-7. **Iron loss from the real lamination** — `steinmetz_ke: 1e-7` (no real steel) + generic 3 kg + lumped 1.2 T → derived M400-50A on measured tooth/yoke flux and mass.
-8. **LLM out of the ship decision** — `physics_plausibility.py` computes what grok-4.5 was being asked to judge. Of its three blockers, two confirmed with numbers, **one refuted** (coolant velocity actually 1.53 m/s, in band).
-9. **Two checks that could never fail** — a limit compared to itself, and a check reading a quantity nobody re-ran.
-
-**Deliverable state:** 31-tab workbook, 23/23 drawing gates, 100% coverage on all three drawing surfaces, both Jack-facing documents rewritten with the quantified breach.
-
----
-
-## 0-NEW.2 Where we are NOW — the honest position
-
-**Bar A is NOT closed, and it is further from closed than the 07-31 tracker implies** — not because work went backwards, but because the engine got honest enough to find three real problems it had been hiding:
-
-| # | Open Bar A item | Why it blocks |
+| | continuous duty | 24% vignette |
 |---|---|---|
-| **A1-NEW** | EM duty **0.651×** (81.558 vs 125.22 N·m) | The machine does not make its duty. DEC-EM-1 still required. |
-| **A10** | **Magnet BREACH 159.35 °C vs 150 °C** | Thermal design fails on the design duty. New. |
-| **A11** | **Two thermal screens disagree by 76 K** | One is wrong; a dossier carrying both is indefensible. |
-| **A2-REGRESSED** | Gear-oil `cornering_pickup_ok: False` | Was cleared 07-31; re-opened by later geometry work. |
-| **A12** | Iron loss is a **screening estimate, range 3.9–8.5 kW** | The breach may be understated, not conservative. |
+| Magnet temperature | **159.3 °C — breach** (limit 150) | 83.8 °C — 66 K margin |
+| DEC-EM-1 speed/stack options | **NONE clears** torque + FoS + thermal | **all four clear** |
 
-Everything else on the Bar A list is DONE or RESULT_UNDER_ASSUMPTIONS.
+So the duty answer is the difference between *"no option exists in this design
+space"* and *"any of four works — pick on rotor factor of safety."* It is a
+brief-reading question, not a solver run, and it is the highest-value thing Jack
+can give us.
 
 ---
 
-## 0-NEW.3 What REMAINS — Bar A
+## 2. Live scoreboard (read from the twin 2026-08-03)
 
-Ordered by what unblocks the most. Grok's council note applies: **fix the thermal network first — the 76 K model disagreement is larger than most of the available levers.**
-
-| # | Action | Owner | Est. |
+| Gate | Live | Bar | Blocks ship? |
 |---|---|---|---|
-| 1 | **Fix `analytical_fia_cooling_network_screen.py`** — add the missing winding→wall conduction. Needs a TWO-SOURCE LPTN: iron loss is generated IN the iron and does not cross the slot liner, so one series chain cannot carry both sources. Needs slot fill + impregnation type, which the twin lacks. `stator_thermal_chain.py` is built and REFUSES to emit a number until this is right. | Thermal | 1–2 sessions |
-| 2 | **Close the iron-loss range** — transient FE waveforms + Bertotti/iGSE on Fourier components; measured M400-50A data above 1.8 T; apply a build factor. Collapses 3.9–8.5 kW to a defensible figure. | EM | 2–3 sessions |
-| 3 | **Resolve the magnet breach.** Council order of effectiveness: magnet segmentation **15–35 K at zero remanence cost** (best — does not worsen the torque shortfall); active rotor cooling 20–40 K; cut stator loss 10–25 K; higher switching frequency 8–20 K. **Grade change makes 159 °C legal but reduces nothing** (N42UH 180 °C / N38EH 200 °C, Br −3 to −6%, cost +25–60%). | EM / thermal | after 1–2 |
-| 4 | **DEC-EM-1 (human)** — still open. Combined-case options measured: **24,000 rpm / 130 mm = 1.069× at FoS 1.740**; 27,000 rpm / 120 mm = 1.110× at FoS 1.374. Both need the thermal answer first, since raising speed raises eddy loss as f². | Tristan + Jack | decision |
-| 5 | **Re-clear A2 gear-oil cornering** — regressed to False (tilt 68.2°, immersion 0.0715, 6 nozzles vs the 8 recorded on 07-31). Re-run the SOURCE screen against current geometry. | Transmission | 1 session |
-| 6 | **`state.suppliers` is empty** — the Suppliers tab reads partVerifications instead. Populate at source or retire the key. | Engine | small |
-| 7 | **Falsifiability meta-check** (recommended new work) — three defects this week were green checks that structurally could not go red. A check that compares a value to itself, or reads a stale quantity, is worse than no check. | Engine | 1 session |
+| `ship_ok` | **false** | A+B | Yes (correct) |
+| Homologation | **NOT_HOMOLOGATED** | B | Yes |
+| Architecture blockers | **0 open** | A | No |
+| **EM duty** | required **125.2193 N·m**, delivered **81.558081** = **0.651×** | A→B | Yes for the duty claim |
+| Shaft power vs class | 244.5 kW against a 350 kW label = 70% | A | Design decision |
+| **Magnet temperature** | **159.35 °C vs 150 °C — CONDITIONAL breach** | A | Gated on duty + loss |
+| Iron loss | **6035 W**, `basis: screening_estimate`, range **3.9–8.5 kW** | A | Two-sided error |
+| Machine efficiency | 0.96749 | A | No |
+| Thermal screens agree | **YES — 0.1 K** (was 76 K apart) | A | No |
+| Closure honesty (gate 40) | **10/10** | A | No |
+| Drawing gates | **23/23 PASS** | A | No |
+| Render / GA / SLD coverage | **23/23 · 23/23 · 6/6 = 100%** | A | No |
+| PCB | 2 routed boards, DRC 0 violations, fitness 7.6/10 | A | `NOT_FABRICATION_READY` |
+| Suppliers | 3 archetypes / 7 candidates | A | No |
+| Falsifiability audit | **7 of 169 checks cannot fail** | A | Tracked below |
+| CAD release coverage | **0%** | B | Partner STEP |
+| Hardware correlation | **B1–B10 all OPEN** | B | Yes |
+
+**A note on the torque denominator.** The contract's `mgu_shaft_torque_nm = 119.7`
+is the torque *at* the 244.49 kW shaft power. The DUTY requirement is
+**125.2193 N·m** — 250 kW electrical through the efficiency chain — which is what
+every solver artefact uses. The correct ratio is **0.651×**; quoting 119.7 would
+flatter it to 0.681×.
 
 ---
 
-## 0-NEW.4 What REMAINS — Bar B
+## 3. Bar A — closed this session
 
-**Unchanged in substance: B1–B10 below all remain OPEN, and none is software-closable.** Nothing this week moved a Bar B hold, correctly.
+Nine engine defects, each fixed at SOURCE with a proveCatch. Listed because
+several were hiding real engineering findings.
 
-Two Bar B asks are now SHARPER because of this week's findings, and should go to Jack in that form:
+| # | Was | Now |
+|---|---|---|
+| Closure honesty | 2/10 (floor) | **10/10** — deferred parts declared with their own stated reasons |
+| Motor internals | Built (194 meshes) but never exported; coverage 47.8% | **100%** — two registries had drifted |
+| GA projection | 23 false disagreements | **0** — the gate assumed every cylinder stands on end |
+| Single-line | Generic 400 V AC utility stub | Real HV spine; mechanical parts no longer drawn as electrical loads |
+| Cable sizing | 561 A on 2×6 mm² labelled "within spec" | Sized from current; unsized reports `within_spec: None` |
+| PCB tab | Missing from the workbook | Renders — 2 routed boards were invisible |
+| **Iron loss** | 135.56 W (invented `ke = 1e-7`) | **6035 W** from the real M400-50A |
+| **Thermal network** | Film only — 76 K optimistic | Two-source LPTN — screens agree to **0.1 K** |
+| LLM in ship decision | 3 blockers bound the gate | Deterministic physics; **1 was refuted** |
 
-- **B1/B2 (dyno map)** — now also needs to settle the iron-loss range (3.9–8.5 kW) and the magnet temperature, not just torque. A calorimetric loss split would close A12 outright.
-- **B6 (flow bench)** — now the tie-breaker between the two thermal screens that disagree by 76 K.
+### Bar A items 0–7 (this session's work order)
+
+| # | Item | Outcome |
+|---|---|---|
+| **0** | Duty basis | **Contradiction found and encoded.** Decides everything below |
+| **1** | Thermal network | **CLOSED** — 76 K → 0.1 K, breach now correctly reported |
+| **2** | Iron-loss range | **Closed as far as software honestly can** — decomposed to corners; closing needs transient FE + measured data ≥1.8 T (**Bar B**) |
+| **3** | Magnet breach | **CONDITIONAL** — needs continuous duty **and** ≥ mid loss; either alone clears |
+| **4** | DEC-EM-1 | **RECOMMENDATION REVERSED** — see §4 |
+| **5** | Gear-oil | **CLEARED** — the "regression" was a stale artefact; charge-floor source fix shipped |
+| **6** | Suppliers | **POPULATED** — Hewland, Xtrac, Ricardo, Infineon, Helix, Lucid |
+| **7** | Falsifiability | **BUILT** — found 5 more live tautologies |
+
+---
+
+## 4. DEC-EM-1 — the recommendation has REVERSED
+
+Re-scored on the corrected M400-50A loss. Iron loss is ~85% eddy, which goes as
+**f²**, so every option that closes the torque gap by raising speed pays for it
+thermally.
+
+| option | Hz | T/T_req | rotor FoS | iron W | magnet °C | margin K | @24% duty |
+|---|---|---|---|---|---|---|---|
+| baseline 19,500 / 98.3 | 1300 | 0.651 | 2.635 | 6,035 | 159.3 | −9.3 | 83.8 |
+| 24,000 / 120 | 1600 | 0.987 | 1.740 | 10,830 | 213.9 | −63.9 | 96.9 |
+| **24,000 / 130** | 1600 | **1.069** | **1.740** | 11,733 | 224.1 | **−74.1** | 99.4 |
+| 27,000 / 110 | 1800 | 1.018 | 1.374 | 12,382 | 231.5 | −81.5 | 101.2 |
+| 27,000 / 120 | 1800 | 1.110 | 1.374 | 13,508 | 244.3 | −94.3 | 104.2 |
+| 30,000 / 97.6 | 2000 | 1.002 | 1.113 | 13,404 | 243.1 | −93.1 | 104.0 |
+
+**On a continuous duty, NO option clears torque + FoS + thermal.** 24,000 / 130 mm
+was the standing recommendation at FoS 1.740; on the corrected loss it trades a
+35% torque shortfall for a **74 K thermal breach**. The previous ranking could not
+see this — it was chosen on a loss model 45× too low.
+
+**On the 24% vignette every option clears comfortably.** DEC-EM-1 is therefore
+entirely gated on §1's question.
+
+Torque ratio and rotor FoS are MEASURED (FE 37-position sweep; CalculiX speed
+sweep) and are not re-solved here. The thermal column is the new information.
+
+---
+
+## 5. What remains
+
+### Bar A — software-closable, in priority order
+
+| # | Item | Why it is still open | Est. |
+|---|---|---|---|
+| A-i | **Five tautological brief checks** — `front_hardware_power_class_kw`, `max_rotor_speed_rpm`, `assumed_vdc_min_v`, `assumed_vdc_max_v`, `assumed_coolant_inlet_c` | Each compares a target to itself and cannot fail — the shape that hid the magnet breach | 1 session |
+| A-ii | **`actual_source` / `expected_source` on `Check`** | The falsifiability audit cannot detect tautology generically without it; today it catches only the brief family | 1 session |
+| A-iii | **Two tolerance-swallowed checks** (`BoM I-4`, `coolant_viscosity_pa_s`) | Tolerance ≥ expected magnitude — unfailable | small |
+| A-iv | **Derived stator thermal chain** | `stator_thermal_chain.py` refuses to publish: a single series chain cannot carry two heat sources. Needs a two-source LPTN with slot fill + impregnation data | Bar B input |
+
+### Bar B — unchanged, and nothing this session moved one
+
+| ID | Hold | Sharpened by this session? |
+|---|---|---|
+| B1 | Dyno torque / loss / demag maps | **Yes** — must also settle the iron-loss range (3.9–8.5 kW) and magnet temperature, not just torque. A calorimetric loss split closes A2 outright |
+| B2 | `torque_reliable=true` | No |
+| B3 | HIL / firmware proof | No — PCB is `forgeDraftOnly` |
+| B4 | Supplier Gerbers + pinout ICD | No |
+| B5 | Chassis port XYZ / mounts | No |
+| B6 | Cold-plate / jacket flow bench | **Yes** — now the calibration source for the two-source LPTN screening constants |
+| B7 | Gear-oil free-surface CFD + clear case | No |
+| B8 | Release CAD (supplier/team STEP) | No |
+| B9 | Overspeed / burst FEA release | **Yes** — FoS 1.740 vs 1.374 decides DEC-EM-1 *if* the duty resolves |
+| B10 | FIA / series energy tool | **Yes** — this is where §1's duty answer comes from |
+
+### The ask to Jack, in order of value
+
+1. **Is 250 kW continuous, or a peak cap on an intermittent duty? If intermittent,
+   what is the duration and repetition?** Worth the whole architecture (§1).
+2. **Real duty/lap logs** to replace the illustrative 24 s / 100 s vignette (B10).
+3. **Dyno loss split** — settles the 3.9–8.5 kW iron-loss range (B1).
+4. **Housing envelope confirmation** — if longer than 140.5 mm assumed, the torque
+   problem eases without touching speed.
 
 **`ship_ok` stays false.** The Bar B list being complete is not homologation.
 
 ---
 
+# HISTORY — the 2026-07-31 tracker body
 
-**Twin:** `out/formula-e-front-mgu-20260729-1432/`  
-**Rule:** Bar A = concept under named assumptions (can close in software). Bar B = race / homologation (hardware or partner artefacts). **`ship_ok` stays false until Bar B closes.**  
-**Live registers:**  
-- Assumption design → `JLR-FE-FRONT-FPK-ASSUMPTION-BASED-DESIGN.{json,md}`  
-- Bar B readiness → `JLR-FE-FRONT-FPK-BAR-B-READINESS.{json,md}`  
-- Quantity lineage → `fpk-quantity-lineage.json`  
-- Multiphysics → `motor-multiphysics.json`  
-- Council digest → `_redteam_digest_v2.json` + `_closeout_council_v1/`
+*Superseded by §1–5 above. Retained because it records what was believed at the
+time and why. Section numbers below are prefixed H.*
 
----
-
-## 0. Executive scoreboard — ⚠ HISTORICAL (2026-07-31). Superseded by §0-NEW above; several rows are now wrong.
-
-| Gate | Live status | Bar | Blocks ship? |
-|---|---|---|---|
-| `ship_ok` | **false** | A+B | Yes (correct) |
-| Homologation | **NOT_HOMOLOGATED** | B | Yes |
-| Architecture blockers OPEN | **1** — `EM_TORQUE_VS_ROTOR_BORE` | A (architecture) | Soft-blocks “architecture cleared” claims |
-| Gear-oil cornering / jet gallery | **CLEARED (screening)** after baffled wet-sump architecture | A | Was OPEN; fixed at SOURCE 2026-07-31 |
-| `duty_torque_screen_ok` | **false** (mean ~118.75 &lt; required ~125.21; `torque_reliable=false`) | A→B | Yes for EM duty claim |
-| Provenance audit | **PASS** (0 sourceless / 0 HIGH divergence) | A | Was FAIL; fixed |
-| Quantity lineage sha | **Present** (`fpk-quantity-lineage.json`) | A | F-PROC-2 partial → module landed |
-| CAD release coverage | **0%** | B | Partner / supplier STEP |
-| Hardware correlation holds | **6/6 OPEN** | B | Dyno / HIL / flow / overspeed / double-pulse / XYZ |
-| PCB Gerbers / HIL | **forgeDraftOnly / OPEN** | B | Supplier |
-| Blender per-part explode | **Rendered**; kept as the ASSEMBLY-story view. Framing bug fixed (ortho_scale now covers both axes — it was cropping parts off all four edges). Inventory moved to `14`. | A | Sphere-proxy residual only |
-| Blender parts-on-paper | **IMPLEMENTED + SIGHT-VERIFIED** — `14-product-parts-catalogue.png`: 97 labelled cells, 188/188 parts reconciled, 336 mm→5.00 mm, captions `Name xN` + true size. 96/97 captions clear (Motor Housing partly behind its own fins). | A | Awaiting Tristan's human gate |
-| Blender cutaway human SIGHT | **ROOT CAUSE FIXED + SIGHT-VERIFIED** — `u_se_td_winding_end_{0,1}` were SOLID full-diameter discs re-sealing the bore behind passing section gates; now annular. `08` shows the planetary nest, shafts and MCU shelf through an open bore. | A | §4.3 checklist 5/7; magnets/planets still sphere proxies |
-
----
-
-## 1. What Bar A and Bar B mean (do not conflate)
+## H1. What Bar A and Bar B mean (do not conflate)
 
 ### Bar A — concept floor (software-closable)
 
