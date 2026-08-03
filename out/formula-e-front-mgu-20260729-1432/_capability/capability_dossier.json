@@ -114,6 +114,10 @@
       "has_selftest": true
     },
     {
+      "path": "scripts/lib/fe_contract_writeback.py",
+      "has_selftest": true
+    },
+    {
       "path": "scripts/lib/fpk_assumption_based_design.py",
       "has_selftest": true
     },
@@ -226,7 +230,7 @@
       "has_selftest": true
     }
   ],
-  "n_solvers": 42,
+  "n_solvers": 43,
   "tools": [
     {
       "path": "scripts/lib/orchestrator/tools/python/absorption_column_htu_ntu.py",
@@ -1319,16 +1323,16 @@
     "CoolProp",
     "ht",
     "ross",
+    "cantools",
+    "pymoo",
+    "meshio",
+    "gmsh",
     "matplotlib",
     "pandas"
   ],
   "packages_missing": [
     "femm",
-    "cantools",
-    "pymoo",
     "openmdao",
-    "meshio",
-    "gmsh",
     "SciDataTool"
   ],
   "native_solvers_available": [

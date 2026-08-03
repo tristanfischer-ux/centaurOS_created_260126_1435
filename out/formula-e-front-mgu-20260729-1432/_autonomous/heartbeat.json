@@ -1,8 +1,8 @@
 {
-  "updated_at": "2026-07-30T13:47:23Z",
-  "updated_at_unix": 1785419243,
-  "phase": "X",
-  "state": "RUNNING",
-  "step": "excel_draft",
-  "note": "Rebuild Excel DRAFT (ship_ok false)"
+  "updated_at": "2026-07-31T09:03:08Z",
+  "updated_at_unix": 1785488588,
+  "phase": "F",
+  "state": "DEGRADED",
+  "step": "overnight_fatal",
+  "note": "Expecting ',' delimiter: line 1 column 18981294 (char 18981293)"
 }

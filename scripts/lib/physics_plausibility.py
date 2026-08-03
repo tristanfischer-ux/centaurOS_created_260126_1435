@@ -60,6 +60,10 @@ SHAFT_POWER_CLASS_FLOOR = 0.85
 # grade. Under-counted core loss inflates efficiency AND under-sizes the coolant.
 IRON_LOSS_MIN_FRACTION_OF_COPPER = 0.15
 IRON_LOSS_FREQ_THRESHOLD_HZ = 400.0
+# Two independent thermal screens of one machine should land within a screening
+# tolerance of each other. 15 K is generous for a screen-vs-screen comparison and
+# still catches a missing resistance term, which shows up as tens of kelvin.
+SCREEN_TEMP_COHERENCE_K = 15.0
 
 
 def _q(state: dict, key: str):
@@ -173,9 +177,49 @@ def evaluate(state: dict, run_dir: Path | None = None) -> dict:
                  f"({implied:.4f} from {losses:.0f} W over {shaft_kw:.1f} kW)",
                  f"iron={iron} copper={copper} shaft_kw={shaft_kw}")
 
+    # ── 6. TWO SCREENS MUST NOT DISAGREE ABOUT THE SAME TEMPERATURE ───────────
+    # ⭐⭐ (2026-08-03) Re-running the cooling screens on the corrected iron loss
+    # made them contradict each other: the LUMPED screen reported winding/magnet
+    # 159.3 °C and a MAGNET BREACH, the NETWORK screen 82.9 °C and coupled_ok
+    # True — 76 K apart on one twin with identical losses. Cause: the network
+    # screen's thermal path is the CONVECTIVE FILM ALONE (h ~38 kW/m²K,
+    # R=0.000378 K/W). It has no conduction term from the winding through slot
+    # liner, impregnation and stator iron to the jacket wall, and those dominate —
+    # the lumped screen's 0.01 K/W is 23x larger and is the credible screening
+    # value. A screen that names a WINDING temperature while modelling only the
+    # coolant film is asserting the winding sits on the jacket wall.
+    # Two artefacts disagreeing this far is always a defect in one of them, and a
+    # dossier carrying both is indefensible whichever is right.
+    if run_dir is not None:
+        _screens = {}
+        for _n, _path in (("lumped", "analytical_fia_cooling_thermal_screen.json"),
+                          ("network", "analytical_fia_cooling_network_screen.json")):
+            try:
+                _d = json.loads((run_dir / "_motor_stack" / _path).read_text())
+                _screens[_n] = (_d.get("screening_results") or {})
+            except Exception:  # noqa: BLE001
+                continue
+        if len(_screens) == 2:
+            for _part in ("winding", "magnet", "module"):
+                _key = f"maximum_{_part}_temperature_c"
+                _a = _screens["lumped"].get(_key)
+                _b = _screens["network"].get(_key)
+                try:
+                    _a, _b = float(_a), float(_b)
+                except (TypeError, ValueError):
+                    continue
+                if abs(_a - _b) > SCREEN_TEMP_COHERENCE_K:
+                    flag("screen_temperature_disagreement", "high",
+                         f"the lumped and network cooling screens disagree about the "
+                         f"{_part} temperature by {abs(_a - _b):.1f} K "
+                         f"({_a:.1f} vs {_b:.1f} °C) — one of them is wrong, and a "
+                         "dossier carrying both is indefensible",
+                         f"lumped={_a:.1f} network={_b:.1f} "
+                         f"(tolerance {SCREEN_TEMP_COHERENCE_K} K)")
+
     return {"findings": findings,
             "ok": not any(f["severity"] == "high" for f in findings),
-            "checked": 5}
+            "checked": 6}
 
 
 def _selftest() -> int:
@@ -215,6 +259,29 @@ def _selftest() -> int:
     # ⭐ proveCatch 4: missing inputs must abstain, never invent a verdict.
     ck("empty_state_abstains", evaluate({})["ok"] and not evaluate({})["findings"],
        "an empty state produced findings out of nothing")
+
+    # ⭐⭐ proveCatch (2026-08-03): the exact contradiction the corrected iron loss
+    # exposed — the lumped screen said 159.3 °C winding, the network screen 82.9 °C,
+    # on ONE twin with identical losses. If this stops firing, a screen with a
+    # missing resistance term is silently agreeing with one that has it.
+    import tempfile as _tf
+    _td = Path(_tf.mkdtemp()); (_td / "_motor_stack").mkdir()
+    (_td / "_motor_stack" / "analytical_fia_cooling_thermal_screen.json").write_text(
+        json.dumps({"screening_results": {"maximum_winding_temperature_c": 159.3}}))
+    (_td / "_motor_stack" / "analytical_fia_cooling_network_screen.json").write_text(
+        json.dumps({"screening_results": {"maximum_winding_temperature_c": 82.9}}))
+    ck("proveCatch.screens_disagreeing_is_caught",
+       "screen_temperature_disagreement" in {f["check"] for f in evaluate({}, _td)["findings"]},
+       "a 76 K disagreement between two thermal screens was not flagged")
+    # …and two screens that AGREE must stay silent.
+    _td2 = Path(_tf.mkdtemp()); (_td2 / "_motor_stack").mkdir()
+    for _f in ("analytical_fia_cooling_thermal_screen.json",
+               "analytical_fia_cooling_network_screen.json"):
+        (_td2 / "_motor_stack" / _f).write_text(
+            json.dumps({"screening_results": {"maximum_winding_temperature_c": 120.0}}))
+    ck("agreeing_screens_stay_silent",
+       "screen_temperature_disagreement" not in {f["check"] for f in evaluate({}, _td2)["findings"]},
+       "two screens within tolerance were flagged as disagreeing")
 
     # Determinism: same input, same answer, twice.
     ck("deterministic", json.dumps(evaluate(fe), sort_keys=True)
