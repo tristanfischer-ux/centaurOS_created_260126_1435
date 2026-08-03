@@ -2061,6 +2061,20 @@ def main() -> int:
         # cable glands / terminal blocks / mounting frames, not a per-tag table.
         if ga_massing.is_ga_non_massing(name):
             expected = expected - {"blender", "general-arrangement", "single-line-diagram", "panel-schedule"}
+        # ⭐⭐ AN ENCLOSURE IS NOT AN ELECTRICAL DEVICE (2026-08-03). A part is typed
+        # `electrical` from its noun, so "Inverter Housing" and "Inverter Cover"
+        # inherited the electrical expectation set and were counted as MISSING from
+        # the single-line — which floored SLD coverage for a category error, not a
+        # drawing gap. A single-line shows the power path: sources, protection,
+        # switching, conductors and loads. The box a device lives in appears on the
+        # GA and the render, never on the one-line, so expecting it there can only
+        # ever be a false gap. Universal noun signal (the same enclosure family the
+        # instrument branch below already trusts), applied to EVERY product class
+        # rather than only instruments — a housing is no more electrical on a
+        # traction pack than on a benchtop device.
+        if re.search(r"\b(?:housing|cover|casing|shell|lid|shroud|enclosure|"
+                     r"end\s*bell|bell\s*housing)\b", name, re.I):
+            expected = expected - {"single-line-diagram", "panel-schedule"}
         # INTENT: a fluid-less handheld instrument has no P&ID / process-schedule home —
         # those tabs are VERIFIED NA in build-excel-export when isInstrumentDevice + zero
         # fluid edges. Leaving pid/process-schedules EXPECTED here inflated not-found

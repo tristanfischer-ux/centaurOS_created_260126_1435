@@ -613,6 +613,28 @@ def _synthesize_traction_device_tree(state: dict, arch: str, schedule: dict,
     return tree
 
 
+def _canonical_twin_name(name: str, all_names) -> str:
+    """Prefer the RICHER of two twin names for the same principal.
+
+    The BoM carries both a bare "Traction Motor" and the canonical "Traction Ipmsm
+    Motor Generator" (likewise "Traction Inverter" / "SiC Traction Inverter"). The
+    schedule wired the bare twin, so the SLD labelled the load "Traction Motor"
+    while the parts ledger looked for "Traction Ipmsm Motor Generator" and scored
+    it MISSING — a naming disagreement reported as a drawing gap. Drawings must
+    name parts as the BoM names them.
+    """
+    n = str(name or "").strip()
+    if re.fullmatch(r"traction\s*motor", n, re.I):
+        for cand in all_names:
+            if re.search(r"\bipmsm\b|motor[-\s]?generator", str(cand), re.I):
+                return str(cand)
+    if re.fullmatch(r"traction\s*inverter", n, re.I):
+        for cand in all_names:
+            if re.search(r"sic\s*traction\s*inverter", str(cand), re.I):
+                return str(cand)
+    return n
+
+
 def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
                                   devices: list[dict]) -> Optional[Tree]:
     """Project a device-scale instrument's electrical_bus rows as a DC/signal rail.
@@ -661,6 +683,24 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
     load_rows = [r for r in rows if str(r.get("from") or "").strip() == rail_node
                  and str(r.get("to") or "").strip()
                  and str(r.get("to") or "").strip() != rail_node]
+    # ⭐⭐ A SEALED PACK HAS ONE BUS, NOT A DISTRIBUTION STAR (2026-08-03). The
+    # schedule's electrical rows are a synthesised star from whichever node happens
+    # to have the highest fan-out — here "AC Phase Busbar Pierce". Everything
+    # UPSTREAM of that node is then invisible, which is why the SiC inverter and the
+    # HV DC connector — the two devices the whole unit exists around — never reached
+    # the one-line while a cooling jacket did. A traction pack's electrical
+    # architecture is a single HV bus feeding its devices, so every electrical
+    # endpoint in the schedule belongs on that bus exactly once, wherever the
+    # fallback star happened to hang it. Only for traction packs; a real plant with
+    # genuine sub-distribution keeps its star.
+    if is_traction:
+        _seen_lr = {str(r.get("to") or "").strip() for r in load_rows}
+        for r in rows:
+            tgt = str(r.get("to") or "").strip()
+            if not tgt or tgt == rail_node or tgt in _seen_lr:
+                continue
+            _seen_lr.add(tgt)
+            load_rows.append(r)
     if not load_rows:
         if is_traction:
             return _synthesize_traction_device_tree(state, arch, schedule, devices)
@@ -681,8 +721,16 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
     )
 
     seen: set[str] = set()
+    # Every name the schedule knows — used to resolve a bare twin to its canonical
+    # BoM name so the drawing and the parts ledger agree on what is shown.
+    _all_names = {str(x.get("to") or "") for x in rows} | {str(x.get("from") or "") for x in rows}
+    _dropped_mech = 0
     for r in load_rows:
         target = str(r.get("to") or "").strip()
+        if _is_non_electrical_load(target):
+            _dropped_mech += 1
+            continue
+        target = _canonical_twin_name(target, _all_names)
         key = _norm_load_name(target)
         if not target or not key or key in seen:
             continue
@@ -702,6 +750,9 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
             role="device_load",
         ))
 
+    if _dropped_mech:
+        print(f"[sld] {_dropped_mech} mechanical/thermal part(s) omitted from the "
+              f"one-line (housings, jackets, shafts, bearings — not electrical loads)")
     if not bus.branches:
         if is_traction:
             return _synthesize_traction_device_tree(state, arch, schedule, devices)
@@ -715,6 +766,18 @@ def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
         h = _humanise(name)
         if h and h not in inbound_clean:
             inbound_clean.append(h)
+    # ⭐ NAME THE HV INPUT CONNECTOR AT THE SOURCE (2026-08-03). `inbound` only
+    # sees what feeds the fallback star's rail node, so on this pack the HV DC
+    # connector — the physical interface the whole unit takes its energy through —
+    # appeared nowhere on the one-line. It is not a LOAD (drawing it as one would
+    # be wrong), it is the incoming connection, and the source block is where a
+    # single-line names that. Taken from the design's own principals, so a pack
+    # without a named connector keeps the generic "vehicle HV DC bus" wording.
+    if is_traction and not any(re.search(r"connector", x, re.I) for x in inbound_clean):
+        for _nm in _traction_principal_names(state):
+            if re.search(r"hv\s*(?:dc\s*)?connector", str(_nm), re.I):
+                inbound_clean.insert(0, _humanise(str(_nm)))
+                break
     source = Source(
         sym=SYM_UTILITY,
         tag="HV BATTERY DC INPUT" if is_traction else "USB / BATTERY INPUT",
@@ -1610,11 +1673,42 @@ def _derive_load_kw(name: str, state: dict, quantities: dict):
     return _type_based_load_kw(base, state, quantities)
 
 
+# ⭐⭐ THE HEAD NOUN DECIDES (2026-08-03). `_POWERED_LOAD_RE` matches `motor`
+# ANYWHERE in a name, so "Motor Cooling Jacket", "Motor Cover", "Motor Shaft" and
+# "Traction Drive Housing" all read as POWERED and were drawn as electrical loads
+# on a 750 V DC one-line. A jacket carries coolant and a shaft carries torque.
+# The bug only became visible once the parts-manifest started exporting the motor
+# internals — before that the SLD had nothing mechanical to mis-classify.
+#
+# In an English compound noun the LAST word is the head: "Motor Cooling Jacket"
+# IS a jacket, "Traction Motor" IS a motor. So a passive head settles the question
+# before the powered-token search runs, and the existing plant behaviour (tank,
+# vessel, pipe, and the 'oxygenation cone is a powered O2 system' carve-out) is
+# untouched because none of those has a passive HEAD that this set names.
+_NON_ELECTRICAL_HEAD_RE = re.compile(
+    r"^(?:housing|cover|casing|shell|lid|shroud|enclosure|jacket|shaft|bearing|"
+    r"bearings|bell|plate|laminations?|magnet|magnets|rotor|barrel|gear|gears|"
+    r"pinion|carrier|flange|gasket|seal|seals|ring|collar|spacer|washer|bolt|"
+    r"screw|nut|bracket|mount|rail|base|cap|body|frame)$", re.I)
+
+
+def _head_noun(name: str) -> str:
+    """Last alphabetic word of a part name — the head of the compound noun."""
+    words = re.findall(r"[A-Za-z]+", str(name or ""))
+    return words[-1] if words else ""
+
+
 def _is_non_electrical_load(name: str) -> bool:
     """True when a way reads as a PASSIVE / non-electrical item (a tank / vessel / pipe /
-    valve body with no drive or powered package) — it must be excluded from the feeder
+    valve body with no drive or powered package, or a mechanical part whose HEAD noun is
+    a housing / jacket / shaft / bearing) — it must be excluded from the feeder
     list, not drawn at 0.0 A. A name that ALSO carries a powered token (pump / UV /
     oxygenation system / filter drive) is electrical and kept."""
+    # A winding or coil is electrical however mechanical its neighbours sound.
+    if re.search(r"winding|coil\b", str(name or ""), re.I):
+        return False
+    if _NON_ELECTRICAL_HEAD_RE.match(_head_noun(name)):
+        return True
     if _POWERED_LOAD_RE.search(name or ""):
         return False
     return bool(_NON_ELECTRICAL_LOAD_RE.search(name or ""))

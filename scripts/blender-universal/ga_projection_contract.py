@@ -54,7 +54,20 @@ def manifest_bbox_mm(row: Mapping) -> Optional[tuple]:
         x, y, z = float(pos[0]), float(pos[1]), float(pos[2])
     except (TypeError, ValueError):
         return None
-    if "dia" in dims:
+    # ⭐⭐ THE MEASURED TRIPLE WINS OVER THE NOMINAL DIAMETER (2026-08-03). Rows can
+    # carry BOTH an explicit w/d/h world bbox AND a dia/len descriptor, and they can
+    # DISAGREE — the FE magnet set reads dia 76.4 but d 6.5, because it is an arc
+    # segment on a 76.4 mm pitch circle, not a solid 76.4 mm cylinder; the final
+    # drive reads dia 240.2 but h 163.1. Reconstructing the bbox from dia/len then
+    # invents a bounding box the renderer never drew, and G23 reports the DRAWING as
+    # wrong when the drawing is right. w/d/h is the bbox Blender actually measured,
+    # so when all three are present and positive they are the answer; dia/len is
+    # only a fallback for rows that carry no triple.
+    _w, _d, _h = (float(dims.get("w") or 0.0), float(dims.get("d") or 0.0),
+                  float(dims.get("h") or 0.0))
+    if _w > 0 and _d > 0 and _h > 0:
+        w, d, h = _w, _d, _h
+    elif "dia" in dims:
         # ⭐⭐ HONOUR THE CYLINDER AXIS (2026-08-03). This used to read
         # `w = d = dia; h = len` unconditionally, which silently assumes every
         # cylinder stands on its end. A transverse traction motor does not: the FE
@@ -193,6 +206,17 @@ def _selftest() -> int:
        and abs((bbz[1] - bbz[0]) - 10.0) < 1e-6
        and abs((bbz[5] - bbz[4]) - 40.0) < 1e-6,
        f"axis-less cylinder changed behaviour: {bbz}")
+
+    # ⭐ proveCatch (2026-08-03): when the measured triple disagrees with dia/len,
+    # the TRIPLE wins — this is the FE magnet-set row (an arc segment on a 76.4 mm
+    # pitch circle, whose real Y extent is 6.5 mm, not 76.4 mm).
+    arc = {"pos_mm": [0.0, 63.0, 408.5],
+           "dims_mm": {"w": 26.8, "d": 6.5, "h": 76.4, "dia": 76.4, "len": 26.8,
+                       "axis": "x"}}
+    bba = manifest_bbox_mm(arc)
+    ck("measured_triple_beats_nominal_dia",
+       bba is not None and abs((bba[3] - bba[2]) - 6.5) < 1e-6,
+       f"nominal dia overrode the measured Y extent: {bba}")
 
     # A box row must be untouched by any of this.
     bbb = manifest_bbox_mm({"pos_mm": [0, 0, 0], "dims_mm": {"w": 3, "d": 4, "h": 5}})
