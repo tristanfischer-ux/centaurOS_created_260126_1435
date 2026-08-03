@@ -23858,6 +23858,43 @@ def tab_suppliers(wb: Workbook, state: dict, run_dir: str) -> bool:
                 c.alignment = WRAP_TOP; c.font = FONT_NOTE; c.border = BORDER
             r += 1
         r += 1
+    # ⭐ THE SHORTLIST IS A DIFFERENT THING FROM THE PINNED PARTS (2026-08-03).
+    # The blocks above answer "what have we actually sourced?" from the run's own
+    # verification records. state.suppliers answers a different question — "who
+    # MAKES this kind of unit?" — an archetype shortlist from the forge-truth
+    # companies table with a Brave fallback. Both belong on a supplier register
+    # and neither substitutes for the other: a shortlist is not a purchase, and a
+    # pinned catalogue part does not tell a reader who else could make it.
+    # Rendered with its confidence and source so a low-confidence web hit cannot
+    # be mistaken for a qualified vendor.
+    _arch = state.get("suppliers") or []
+    if _arch:
+        r += 1
+        _n_cand = sum(len(a.get("candidates") or a.get("suppliers") or []) for a in _arch)
+        sub_banner(ws, r, f"SHORTLIST — who makes this kind of unit "
+                          f"({len(_arch)} role(s), {_n_cand} candidate(s)) — NOT a "
+                          f"sourcing decision", 7)
+        r += 1
+        header(ws, r, ["Role", "Candidate", "Country", "Confidence", "Source", "", ""])
+        r += 1
+        for a in _arch:
+            role = str(a.get("archetype_id") or a.get("id") or "")
+            for c in (a.get("candidates") or a.get("suppliers") or []):
+                if not isinstance(c, dict):
+                    continue
+                ws.cell(r, 1, clean_cell(role)).font = Font(size=10, bold=True)
+                ws.cell(r, 1).border = BORDER
+                for ci, v in ((2, c.get("name") or c.get("company_name") or ""),
+                              (3, c.get("country") or c.get("jurisdiction") or "—"),
+                              (4, c.get("confidence") or "—"),
+                              (5, c.get("source") or "—")):
+                    cell = ws.cell(r, ci, clean_cell(v))
+                    cell.alignment = WRAP_TOP
+                    cell.font = Font(size=10) if ci == 2 else FONT_NOTE
+                    cell.border = BORDER
+                r += 1
+        r += 1
+
     if undeclared:
         sub_banner(ws, r,
                    f"UNDECLARED — {len(undeclared)} part(s) with no part number and no "
@@ -26737,6 +26774,10 @@ _dt(["Supplier", "Part", "Manufacturer part number", "Module", "Unit £", "Avail
 # whole point of showing it rather than hiding it.
 _dt(["Part", "Module", "Part number state", "Why it is open", "", "", ""],
     "suppliers-open", ["Part", "Why it is open"])
+# Shortlist: a candidate must be NAMED and carry its confidence, or a reader
+# cannot tell a qualified vendor from a low-confidence web hit.
+_dt(["Role", "Candidate", "Country", "Confidence", "Source", "", ""],
+    "suppliers-shortlist", ["Role", "Candidate", "Confidence"])
 _dt(["Axis", "Claim", "Target", "Achieved", "Unit", "STATUS", "Hardness", "Provenance"],
     "verification-spine",
     ["Axis", "Claim", "Target", "Achieved", "STATUS", "Hardness", "Provenance"],

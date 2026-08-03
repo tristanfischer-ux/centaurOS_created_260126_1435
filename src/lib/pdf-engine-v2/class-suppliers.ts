@@ -541,6 +541,18 @@ const SUPPLIER_CLASS_ALIASES: Record<string, string> = {
   ev_drive_unit: 'formula_e_rear_mgu',
   rear_mgu: 'formula_e_rear_mgu',
   formula_e_mgu: 'formula_e_rear_mgu',
+  // ⭐ FRONT FPK maps to the REAR MGU archetypes (2026-08-03). The two units are
+  // the same supply families — traction IPMSM OEM, SiC inverter/MCU, reduction
+  // gears, bearings, magnets, cold plates — and the archetype list is about WHO
+  // makes this kind of thing, not about which axle it sits on. Without this the
+  // enricher printed "no archetypes defined for product class
+  // formula_e_front_mgu" and wrote `state.suppliers = []`, so the dossier's
+  // supplier register had no source at all and the Suppliers tab had to fall back
+  // to reading partVerifications.
+  formula_e_front_mgu: 'formula_e_rear_mgu',
+  front_mgu: 'formula_e_rear_mgu',
+  front_powertrain_kit: 'formula_e_rear_mgu',
+  fpk: 'formula_e_rear_mgu',
 }
 
 export function getClassSuppliers(productClass: string): ClassSuppliers | null {
