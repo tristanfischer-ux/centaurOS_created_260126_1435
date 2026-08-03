@@ -1,0 +1,21 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "bar-a-deliverable-truth",
+  "intent": "Make the deliverable quote the numbers its own solvers measured. The workbook states 145.7 and 334 N.m while the FE measures 81.558 and 137.641; no contract quantity cited a solver artefact, so a chain re-run cannot fix it.",
+  "maps_to_plan_item": "docs/plans/FE-FRONT-FPK-OPTIONS-DOSSIER-2026-08-02.md \u00a77",
+  "why_now": "Bar A deliverables are complete but built on the wrong source. The 334 N.m appears on the Verification tab at 2.43x the measured peak, and gear, shaft and bearing sizing derive from it.",
+  "explicitly_not_doing": [
+    "ship_ok stays false",
+    "no re-opening of the EM result or architecture finding",
+    "not resolving the 12 sub-8 tabs"
+  ],
+  "depends_on": [],
+  "success_criteria": [
+    "workbook contains 81.558 and 137.641",
+    "workbook does NOT contain 145.7 or 334",
+    "divergence gate blocks an ungoverned mismatch"
+  ],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-03T03:07:24Z"
+}

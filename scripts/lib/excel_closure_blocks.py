@@ -206,6 +206,18 @@ def assemble_operating_point_rows(state: dict) -> List[dict]:
             "winding_c": wind,
             "magnet_c": mag,
             "margin_status": temp_status(),
+            # ⭐⭐ REQUIREMENT AND CAPABILITY SIDE BY SIDE (Tristan, 2026-08-03).
+            # `torque_nm` above is what the duty IMPLIES the shaft must make.
+            # These two say what a finite-element solve MEASURED at the same
+            # speed and current, and by how much the two differ. Populated only
+            # when a like-for-like FE quantity exists — same basis, same
+            # operating point — so a peak can never be paired against a mean.
+            "torque_nm_measured_fe": _qval(q, "mgu_fe_shaft_torque_nm"),
+            "torque_gap_x": (
+                round(_qval(q, "mgu_shaft_torque_nm")
+                      / _qval(q, "mgu_fe_shaft_torque_nm"), 4)
+                if _qval(q, "mgu_shaft_torque_nm")
+                and _qval(q, "mgu_fe_shaft_torque_nm") else None),
             "source": "contract ← motor:loss-point + inverter:sic-loss + motor:thermal-lumped",
         })
 

@@ -1,0 +1,204 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "START: Make the deliverable quote the numbers its own solvers measured. The workbook states 145.7 and 334 N.m while the FE measures 81.558 and 137.641; no contract quantity cited a solver artefact, so a chain re-run cannot fix it.",
+  "mode": "live",
+  "called_utc": "2026-08-03T03:07:33Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The proposed `--govern` behavior is not present in the diff: the only write path is `--promote`, which deliberately adds `mgu_fe_*` quantities and leaves every renderer-facing analytic quantity unchanged.",
+            "why_it_matters": "A chain re-run will still render 145.7 and 334, so the stated success criteria cannot be met by this implementation. The documentation and CLI also disagree (`--govern` in the plan versus `--promote` in code).",
+            "how_to_test": "Run the actual production render chain after `--promote`, then inspect workbook cell values/formulas and generated drawing/render inputs. Assert that the contract keys consumed by each renderer changed, not merely that `mgu_fe_*` keys were added."
+          },
+          {
+            "issue": "The compared values are not demonstrated to represent the same engineering quantity or operating point. `torque_magnitude_mean_nm` from a 37-point rotor-position sweep is being compared to an inverter current-voltage envelope torque and proposed as a governor for shaft/gear sizing; `peak_torque_magnitude_nm` from an MTPA screen may likewise be at a different current, voltage, speed, temperature, and duty condition than the existing 334 N.m corner calculation.",
+            "why_it_matters": "Replacing a peak design load with a mean electromagnetic torque can confidently under-size the shaft, gear, and bearings. A numerical divergence is not evidence that the analytic quantity is disproved unless quantity definition, sign convention, speed, current limit, thermal state, and required safety/load factors match.",
+            "how_to_test": "Require each binding to carry a machine-readable operating-point and statistic contract: speed, DC voltage, phase-current definition/limit, temperature, torque statistic (mean/instantaneous/peak), load case, and applicable factors. Reject governance when these do not match the target quantity. Independently reproduce the 334-N.m design case in the MTPA/torque-map solver or label it as a distinct requirement rather than overwrite it."
+          },
+          {
+            "issue": "`--enforce` gates any detected divergence, not an 'ungoverned divergence.' Even after a future governance rewrite, `collect()` will continue comparing the retained analytic value and return exit 50; conversely, missing, unreadable, stale, or semantically incompatible solver artefacts are only reported as skipped and do not block.",
+            "why_it_matters": "The proposed pre-commit gate either permanently fails after a governed discrepancy or permits a deliverable to proceed with no valid solver evidence. It cannot implement the claimed policy without an explicit governance/status model.",
+            "how_to_test": "Add cases for: a governed divergence with retained prior value must pass; an ungoverned mapped contract quantity must fail; a required artefact missing/unreadable/stale must fail; and an intentionally non-comparable analytic quantity must not be falsely gated. Test the exact pre-commit invocation and exit status."
+          },
+          {
+            "issue": "The in-place `superseded_analytic` proposal has no compatibility or idempotency contract for existing quantity schemas and consumers. Consumers may expect a scalar-like `{value, unit, provenance}` entry, may serialize only known fields, or may subsequently recalculate and overwrite the preserved evidence.",
+            "why_it_matters": "The audit trail can disappear or downstream tools can silently ignore/misread the new state. More importantly, storing both values in one mutable contract entry does not establish which revision of which solver artefact governed a given workbook build.",
+            "how_to_test": "Run every contract reader/writer, renderer, workbook generator, schema validator, and state merger against a governed fixture. Run governance twice and after a full chain rebuild; assert no nesting/overwrite occurs and that the rendered artefact records the governing value plus solver artefact hash/version and build timestamp."
+          },
+          {
+            "issue": "The plan asserts the workbook must not contain 145.7 or 334 anywhere, although those values may legitimately remain in comparison tables, assumptions, revision history, formula caches, charts, source-data sheets, or the required superseded audit record.",
+            "why_it_matters": "A text-search based acceptance check will either fail honest traceability or encourage removal of evidence. It also does not prove the displayed governing cells, formulas, and dependent gear/shaft/bearing calculations use the solver-backed quantity.",
+            "how_to_test": "Identify the authoritative workbook cells/ranges and downstream formula precedents, then assert their numeric values and formula dependency paths. Separately permit labeled historical/comparison evidence and assert it is not used by deliverable-facing calculations."
+          }
+        ],
+        "generality_concerns": [
+          "The module's 'UNIVERSAL' claim is not supported: it hard-codes `_motor_stack`, six motor/rotor-specific artefact filenames, motor-specific JSON paths, and motor-specific contract keys. A filename/path registry is still bespoke integration, not product-class-independent discovery.",
+          "The one-to-many comparison mapping has no declarative target-governance mapping or dimensional/semantic compatibility model. One mean torque solver result is associated with both envelope and shaft torque, while the proposed peak result is associated with a different target; this cannot safely generalize from names alone.",
+          "A renderer-level selection policy is only safer if it is centralized and provenance-aware. Having each workbook/drawing/render reader prefer `*_fe_*` would create multiple precedence implementations and can leave non-render consumers, sizing calculations, and exports on analytic values. Prefer one explicit, versioned 'governing quantity' resolution layer with immutable solver-result references, compatibility checks, and consumer tests.",
+          "The available motor-stack torque-map and voltage/field-weakening screens should be used to evaluate the same stated design load case rather than hand-classifying the 334 N.m formula as wrong from a differently defined MTPA statistic. The existing calculation guard specifically identifies `scripts/lib/fe_contract_writeback.py` as the integration tool, but it does not validate solver applicability or equivalence of load cases."
+        ],
+        "blocking": true,
+        "one_line_summary": "Do not govern contract sizing quantities until the implementation exists and the FE outputs are proven equivalent to the peak design load cases; otherwise this change either changes nothing or under-sizes hardware with high-confidence numbers."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "Make the deliverable quote the numbers its own solvers measured",
+            "verdict": "CONTRADICTED",
+            "why": "The diff implements only an additive '--promote' mode. The promote() docstring states 'solver values land under their own *_fe_* names... and the analytic quantities are left untouched'. The selftest even asserts `promote.does_not_overwrite_analytic` (value still 145.746 after promotion). Nothing in the diff rewrites the analytic entries or adds a '--govern' mode that would change what the deliverable reads. The proposed '--govern' mode with `superseded_analytic` in place is described only in the repair-plan markdown, not in the code."
+          },
+          {
+            "claim": "The workbook states 145.7 and 334 N.m while the FE measures 81.558 and 137.641",
+            "verdict": "PARTIALLY-SHOWN",
+            "why": "The selftest hardcodes 145.746 (rounds to 145.7) and 81.558081 (rounds to 81.558). The values 334 and 137.641 appear only in the repair-plan narrative, not in the script. The diff shows the FE/solver path reading from em_fia_front_kit_case.json (81.558) and em_fia_mtpa_screen.json (peak_torque_magnitude_nm), but 137.641 is never a literal or fixture in the code."
+          },
+          {
+            "claim": "no contract quantity cited a solver artefact",
+            "verdict": "UNSUPPORTED",
+            "why": "The selftest constructs a synthetic twin where this happens to be true (only `envelope_mgu_torque_nm` is present, with tool_id `inverter:current-voltage-envelope`). The diff does not demonstrate this against the live formula-e-front-mgu-20260729-1432 twin; it is asserted in the repair-plan text and PLAN FIT only."
+          },
+          {
+            "claim": "a chain re-run cannot fix it",
+            "verdict": "UNSUPPORTED",
+            "why": "The diff contains no chain re-run, no before/after twin state, and no demonstration that re-running the orchestrator reproduces 145.746. The claim is made in the repair plan; nothing in the diff establishes it."
+          },
+          {
+            "claim": "Step 1 \u2014 make the solver value AUTHORITATIVE where one exists via a --govern mode that rewrites the ANALYTIC entry with basis:measured, source:solver:<artefact> and retains superseded_analytic in place",
+            "verdict": "UNSUPPORTED",
+            "why": "No `--govern` flag, no `superseded_analytic` field, no in-place rewrite of analytic entries exists anywhere in the diff. The diff only contains the additive promoter, whose docstring and selftest both enshrine the opposite behaviour."
+          },
+          {
+            "claim": "Step 4 \u2014 --enforce exits 50 on an ungoverned divergence; wired into a pre-commit structural block",
+            "verdict": "PARTIALLY-SHOWN",
+            "why": "`--enforce` returning EXIT_DIVERGENCE (50) when divergences exist is present in main(). The pre-commit wiring is described only in the repair plan; no diff to any pre-commit / hook file is shown."
+          },
+          {
+            "claim": "ship_ok stays false; the change makes the DRAFT honest, not shippable",
+            "verdict": "UNSUPPORTED",
+            "why": "The diff touches no `ship_ok` field and does not show it being preserved. It is asserted in the repair plan only."
+          },
+          {
+            "claim": "The script detects and reports solver/analytic divergences, naming both provenances, and gates on a 10% ratio",
+            "verdict": "SUPPORTED",
+            "why": "collect() walks the BINDINGS registry, computes max/min ratio against DIVERGENCE_RATIO=1.10, records `solver_source` and `analytic_source` on every divergence, and the selftest asserts both sources are named and the 1.787x ratio is reported."
+          }
+        ],
+        "weakest_link": "The headline claim 'Make the deliverable quote the numbers its own solvers measured' is contradicted by the diff: the only mutation path is additive promotion, whose own selftest pins the analytic value at 145.746 unchanged. Without the --govern mode the deliverables continue to read 145.7 / 334.",
+        "blocking": true,
+        "one_line_summary": "The diff ships an additive promoter and a divergence detector, but the central claim (deliverable now quotes solver-measured numbers) is contradicted by the code: the analytic entries are explicitly preserved and no --govern rewrite exists in the diff."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [],
+        "reasoning_faults": [
+          {
+            "where": "CLAIM vs fe_contract_writeback.promote + selftest",
+            "fault": "Claim requires deliverables to quote solver values (81.558/137.641) and drop 145.7/334. Code and selftest deliberately keep promotion ADDITIVE (*_fe_* only) and assert analytic quantities stay untouched; --govern from the repair plan is not implemented.",
+            "consequence": "Success criteria (workbook contains FE numbers and does NOT contain 145.7/334) cannot be met by this change; a chain re-run still wires Excel/drawings to analytic sources."
+          },
+          {
+            "where": "BAR-A-REPAIR-PLAN Step 1 vs Step 3",
+            "fault": "Step 1 keeps superseded_analytic values in-contract while Step 3/plan_fit require the workbook not to contain 145.7/334. No renderer/read-path change is specified to prefer governed/FE values or suppress superseded figures.",
+            "consequence": "Even after a future in-place rewrite, verification-by-workbook can fail, or downstream sizing may still see the disproved number depending on which field is rendered."
+          },
+          {
+            "where": "COMPARISONS / 334 N\u00b7m narrative",
+            "fault": "Treats mgu_shaft_torque_max_nm (unattributed constant-power corner ~10k rpm) as the same quantity as MTPA screen peak (137.641) when stating 2.43\u00d7 disproof; mean rotor-sweep torque is likewise equated to envelope/shaft torque without establishing identical definitions.",
+            "consequence": "Governance may overwrite or gate on a category mismatch and produce a confidently wrong 'authoritative' torque for gear/shaft/bearing sizing."
+          },
+          {
+            "where": "PLAN FIT success_criteria vs Explicitly NOT doing",
+            "fault": "Claims deliverable truth via contract rewrite while refusing to re-open EM/architecture and leaving ship_ok false; does not show that readers of orchestratorContract.quantities will switch names or bases.",
+            "consequence": "Stage can record divergences and still ship drafts that quote disproved analytics\u2014the original pathology."
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Plan claims solver-authoritative deliverables, but the diff only documents additive writeback and an unimplemented --govern path, so it cannot make the workbook quote 81.558/137.641 or drop 145.7/334."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The compared values are not demonstrated to represent the same engineering quantity or operating point; and the one-to-many comparison mapping has no dimensional or semantic compatibility model.",
+      "action": "THE FINDING OF THE SESSION, AND IT INVALIDATES TWO OF MY THREE HEADLINE NUMBERS. Verified after the challenge: (1) I compared an inverter-envelope PEAK (145.746) against a 37-point rotor-position MEAN (81.558) and called it a 1.79x divergence \u2014 compared peak-to-peak against the MTPA screen it is 1.06x, i.e. the analytic tools and the FE AGREE. (2) I compared mgu_shaft_torque_max_nm (334 N.m, peak at the constant-power corner near 10,000 rpm) against an MTPA peak measured at 19,500 rpm and called it 2.43x \u2014 350 kW at 10,000 rpm through the efficiency chain is 341.8 N.m, so 334 is CORRECT for what it describes. FIXED: Binding now carries `basis` and `operating_point` as load-bearing fields, COMPARISONS declares the basis and operating point each pairing requires, and a mismatch is reported as INCOMPARABLE with the reason rather than turned into a ratio. Live result is now 1 divergence, 1 agreement, 1 incomparable \u2014 instead of three divergences. Four proveCatch cases encode the exact error."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Treats mgu_shaft_torque_max_nm (unattributed constant-power corner ~10k rpm) as the same quantity as the MTPA screen peak (137.641) when the stated conditions differ.",
+      "action": "Same defect, found independently, and Grok named the mechanism most precisely \u2014 the CONDITION string on the quantity said what it was and I did not read it. Step 2 of my plan ('fix the unattributed 334 N.m at source') is WITHDRAWN: the number is not wrong, my comparison was. It remains true that it carries source=calculator with no tool_id, which is worth attributing, but that is hygiene rather than a defect."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "--enforce gates ANY detected divergence rather than an ungoverned one; and the plan asserts the workbook must not contain 145.7 or 334 anywhere, although those may legitimately remain in comparison tables.",
+      "action": "Both accepted and both follow from the same correction. 145.7 is now a CONFIRMED AGREEMENT with the FE peak, so demanding its removal from the workbook would have deleted a correct number; and 334 is a correct corner figure. The success criteria in the plan were wrong and are withdrawn. The gate must fire on an unresolved LIKE-FOR-LIKE divergence only, which is now the only kind the tool can produce."
+    },
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The --govern behaviour is not present in the diff, only --promote; and superseded_analytic has no compatibility or idempotency contract for existing consumers.",
+      "action": "Correct \u2014 it was a plan, not code, which is what a START council reviews. And the second half is why it stays a plan: with only ONE real divergence remaining, rewriting contract entries in place is a large blast radius for a single quantity. Sol's own alternative (governance in the RENDERER, reading *_fe_* first) is now the preferred route and is recorded as such."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 7,
+      "point": "Seven claims \u2014 the deliverable-quotes-solver-values goal, the 145.7/334 figures, the no-contract-quantity-cites-a-solver finding, the chain-cannot-fix-it conclusion, the --govern design, the exit-50 gate and the ship_ok statement \u2014 are asserted rather than established.",
+      "action": "Two of them were WRONG, not merely unestablished, and the challenge is what made me check: the 145.7 and 334 comparisons do not hold. The rest stand and are checkable on the twin: no contract quantity cites a motor-stack artefact (verified by scanning all 52), and the chain re-run at 23:30 reproduced the analytic figures unchanged. The --govern design and the gate are proposals, correctly identified as such."
+    },
+    {
+      "seat": "grok45",
+      "covers": 2,
+      "point": "The claim requires deliverables to quote 81.558/137.641 and drop 145.7/334, while the code and selftest deliberately keep promotion ADDITIVE; and superseded_analytic would keep those values in-contract, contradicting the success criterion.",
+      "action": "A GENUINE SELF-CONTRADICTION IN MY OWN PLAN, and the correction dissolves it: 145.7 is now a confirmed AGREEMENT with the FE peak (1.06x) and 334 is a correct 10,000 rpm corner figure, so neither should be dropped from anything. The success criteria that demanded their removal are WITHDRAWN. What remains is one real like-for-like divergence (119.7 continuous vs 81.558 measured), and the question is only which of those two the renderer should print \u2014 not whether correct numbers should be deleted."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The motor-stack torque-map and voltage/field-weakening screens should be used to evaluate the same stated design load case rather than comparing heterogeneous summary statistics.",
+      "action": "ACCEPTED AS THE BETTER METHOD and recorded as the next step. em_fia_torque_map_screen.py and em_fia_voltage_fw_screen.py both ran on this twin and are fresh; evaluating the SAME declared load case through them gives a like-for-like comparison by construction, instead of my picking summary statistics out of two artefacts and hoping they mean the same thing. That is what produced the two false divergences."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "covers": 2,
+      "point": "The module's UNIVERSAL claim is not supported \u2014 it hard-codes _motor_stack, six motor-specific artefact filenames and motor-specific quantities; and a renderer-level policy is only safer if centralised and provenance-aware.",
+      "why_rejected": "First accepted as a fair limit on the word rather than the design: the REGISTRY is product-specific by necessity \u2014 a binding says which solver result governs which quantity, and that is inherently domain knowledge \u2014 while the MECHANISM (dotted key paths, basis/operating-point matching, additive promotion, divergence recording) is not. The docstring overclaims and the claim is narrowed rather than the code changed. Second point is ACCEPTED IN FULL and is now the preferred route, so there is nothing to reject: if governance moves to the renderer it must be ONE provenance-aware selection point, not each reader picking for itself."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Claims deliverable truth via contract rewrite while refusing to re-open EM/architecture and leaving ship_ok false; does not show that rewriting changes what renders.",
+      "why_rejected": "The last clause is the substantive one and it is correct \u2014 I had NOT shown that a contract rewrite changes the workbook, and the promote run proved it does not, because the renderer reads the analytic names. That is precisely why the plan is being re-scoped toward the renderer. The first clause is not a defect: making a DRAFT quote its own measurements is orthogonal to whether it ships, and ship_ok stays false either way."
+    }
+  ],
+  "council_ok": true,
+  "advice_recorded_utc": "2026-08-03T03:12:48Z"
+}

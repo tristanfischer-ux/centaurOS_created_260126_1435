@@ -1,0 +1,23 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "bar-a-deliverable-truth-v2",
+  "intent": "v1 of this plan was substantially wrong and is withdrawn: it reported three divergences of which only ONE is real. Two were manufactured by comparing a peak against a mean, and a 10,000 rpm corner against a 19,500 rpm solve. This v2 addresses the single real like-for-like divergence \u2014 continuous shaft torque at 19,500 rpm, 119.7 analytic vs 81.558 measured \u2014 and asks whether the deliverable should prefer either number at all.",
+  "maps_to_plan_item": "docs/plans/FE-FRONT-FPK-OPTIONS-DOSSIER-2026-08-02.md \u00a77",
+  "why_now": "The comparison defect is already fixed at source (basis and operating_point are load-bearing; mismatches report as incomparable; four proveCatch cases). What remains is a decision about what the workbook should print when a requirement and a capability disagree.",
+  "explicitly_not_doing": [
+    "not deleting or altering 145.7 or 334 \u2014 both correct for what they describe",
+    "not rewriting contract quantities in place",
+    "ship_ok stays false",
+    "not re-opening the EM or architecture findings"
+  ],
+  "depends_on": [],
+  "success_criteria": [
+    "one declared load case drives every comparison",
+    "governance decided at a single provenance-aware point",
+    "gate fires only on unresolved like-for-like divergence",
+    "the workbook makes the chosen basis visible"
+  ],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-03T03:14:58Z"
+}

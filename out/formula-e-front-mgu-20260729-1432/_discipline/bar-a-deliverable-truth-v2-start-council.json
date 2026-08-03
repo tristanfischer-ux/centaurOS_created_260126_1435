@@ -1,0 +1,221 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "START: v1 of this plan was substantially wrong and is withdrawn: it reported three divergences of which only ONE is real. Two were manufactured by comparing a peak against a mean, and a 10,000 rpm corner against a 19,500 rpm solve. This v2 addresses the single real like-for-like divergence \u2014 continuous shaft torque at 19,500 rpm, 119.7 analytic vs 81.558 measured \u2014 and asks whether the deliverable should prefer either number at all.",
+  "mode": "live",
+  "called_utc": "2026-08-03T03:15:06Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The code does not actually validate the basis or operating point stored on either quantity. It compares the hard-coded COMPARISONS spec to the Binding metadata, then compares the values regardless of the analytic quantity's own metadata.",
+            "why_it_matters": "A caller can relabel or replace mgu_shaft_torque_nm with a different duty point and still get a confident 'same basis and operating point' divergence. The self-test currently omits basis and operating_point from the analytic entry, demonstrating that those supposedly load-bearing fields are not required or checked.",
+            "how_to_test": "Create mgu_shaft_torque_nm with provenance/basis='continuous' but operating_point='10000rpm/corner' (or basis='peak') and confirm collect() emits incomparable rather than a 1.47x divergence. Also verify missing metadata is reported as unverified/incomparable, not accepted as a match."
+          },
+          {
+            "issue": "Promotion writes basis but drops operating_point entirely, so the proposed renderer cannot safely implement 'prefer FE only at the SAME basis and operating point.'",
+            "why_it_matters": "After --promote, mgu_fe_shaft_torque_nm has no operating-point identity. Any qval() fallback based on name or basis can silently substitute an FE result from the wrong current, angle, speed, temperature, voltage limit, or duty duration.",
+            "how_to_test": "Run --promote and assert every promoted quantity contains a structured operating_point copied from Binding. Add a renderer test with two FE values of the same basis but different operating points and verify neither is selected without an exact identity match."
+          },
+          {
+            "issue": "The asserted like-for-like pair is not established by the identifiers shown: a 37-position 'torque_magnitude_mean' from em_fia_front_kit_case is being called continuous shaft torque, while the proposed declared case includes 477 A rms and -30 electrical degrees. Rotor-position averaging alone does not establish steady-state continuous thermal capability, shaft torque after mechanical losses, or the same control/load condition.",
+            "why_it_matters": "This can turn a difference in torque definition, FE electromagnetic torque, loss convention, temperature, current-angle convention, or duty duration into a purported requirement-versus-capability gap. It is the most likely source of a confidently wrong 81.558 N\u00b7m conclusion.",
+            "how_to_test": "Make both artefacts emit a machine-readable load-case fingerprint including speed, phase-current definition, electrical angle/control mode, DC-voltage constraint, winding and magnet temperatures, loss treatment, torque reference location, and duty/thermal criterion. Refuse comparison unless fingerprints match; independently verify that the reported FE value is shaft torque under the declared continuous-duty thermal condition."
+          },
+          {
+            "issue": "Renderer-level preference is the wrong representation for a requirement/capability conflict. The analytic 119.7 N\u00b7m answers required shaft torque; the FE result answers available capability. Selecting one scalar makes one of those questions disappear and lets downstream readers treat capability as requirement or requirement as achieved performance.",
+            "why_it_matters": "A workbook may falsely show a compliant requirement if it renders 119.7, or falsely present an 81.558 capability as the requested duty if it renders FE. The correct deliverable needs both values plus an explicit margin/shortfall and governing decision for each consumer.",
+            "how_to_test": "Render a workbook containing required torque, available torque, delta, ratio, declared operating point, and a pass/fail capability status. Assert no generic qval() caller that asks for mgu_shaft_torque_nm receives mgu_fe_shaft_torque_nm without explicitly requesting a capability field."
+          },
+          {
+            "issue": "The proposed gate condition is not modeled by the shown writeback data. collect() records divergences, but neither the report nor promote() records a per-pair governance decision; the existing --enforce semantics are documented as firing whenever a divergence is found.",
+            "why_it_matters": "The planned rule ('exit 50 only when unresolved') cannot be reliably enforced from renderer behavior, and CI can either remain permanently blocked after a documented decision or be bypassed by a display preference that does not resolve the engineering shortfall.",
+            "how_to_test": "Add a structured resolution record keyed by solver quantity, analytic quantity, and full load-case fingerprint, with an explicit decision and approver/rationale. Test that --enforce fails for an unresolved pair, passes only for a valid recorded resolution, and still fails if the resolution fingerprint no longer matches."
+          }
+        ],
+        "generality_concerns": [
+          "The module is not universal: BINDINGS and COMPARISONS are a fixed registry of Formula-E MGU quantity names, _motor_stack filenames, and JSON paths. A twin with different solver output naming, multiple motors, multiple operating points, or no motor-stack layout gets no binding rather than support 'for free.'",
+          "The proposed *_fe_* renderer convention is hidden coupling to a naming scheme, not provenance-aware selection. It cannot express multiple FE runs for one quantity, nor select by a complete operating-case identity.",
+          "Exact string operating points such as '19500rpm/477Arms' are too weak and brittle for universal comparison: they omit angle, temperature, voltage/control limit, loss/reference convention, duty duration, and tolerances, while formatting changes can create false incomparability.",
+          "The listed torque-map and voltage/field-weakening screens should be used to generate one canonical, structured load-case record and both required/available outputs. The existing writeback tool should consume that record, not infer equivalence from a static filename/path registry."
+        ],
+        "blocking": true,
+        "one_line_summary": "Block the renderer-preference plan until comparison uses verified full load-case metadata and the workbook presents requirement and capability separately rather than silently substituting one for the other."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [
+          {
+            "where": "BAR-A repair plan v2 + Binding docstring: '350 kW at 10,000 rpm through \u03b7 is 341.8 N\u00b7m'",
+            "stated": "341.8 N\u00b7m",
+            "correct": "334.2 N\u00b7m (T=P/\u03c9 = 350e3/(10000\u00b72\u03c0/60) \u2248 334.2; common 9550\u00b7P_kW/n \u2248 334.25). 341.8 implies ~358 kW or an inverted efficiency factor, not 350 kW shaft",
+            "impact": "Supporting arithmetic is wrong; the conclusion that 334 N\u00b7m is the right ballpark for a ~10,000 rpm / 350 kW corner remains OK"
+          }
+        ],
+        "reasoning_faults": [
+          {
+            "where": "COMPARISONS['mgu_fe_torque_peak_nm'] assigns envelope_mgu_torque_nm operating_point='19500rpm/477Arms'",
+            "fault": "The diff never establishes that inverter-envelope peak 145.746 N\u00b7m is at 19,500 rpm / 477 A. Envelope peaks are often base-speed MTPA corners; fixing that OP in the registry repeats the v1 failure mode (like-for-like by assertion, not by evidence).",
+            "consequence": "The claimed '1 agreement' / peak-to-peak 1.06\u00d7 may be another manufactured comparison; selftest only proves the registry math, not the physics identity of the OP"
+          },
+          {
+            "where": "Plan Step 2 \u2014 qval()/_qval prefer *_fe_* at same basis/OP",
+            "fault": "Contradicts the module's own additive design and the plan's challenge (119.7 = duty requirement, 81.558 = measured capability). Preferring one value at the renderer choke point hides the gap one layer later\u2014the failure mode promote() was written to avoid.",
+            "consequence": "Workbook can look consistent while the machine misses continuous shaft duty; gate may stay quiet after a silent preference"
+          },
+          {
+            "where": "Plan claim 'Live: 1 divergence, 1 agreement, 1 incomparable' / 'already fixed at source'",
+            "fault": "Diff shows selftest construction of that pattern, not a live twin run. Analytic basis/OP are not read from contract quantity fields\u2014only from static COMPARISONS\u2014so 'load-bearing on every binding' overclaims what collect() enforces on the analytic side.",
+            "consequence": "Confidence that production state matches the narrative is not evidenced by this change alone"
+          },
+          {
+            "where": "Plan Step 1 vs BINDINGS artefacts",
+            "fault": "Step 1 says drive comparisons through em_fia_torque_map_screen.py and em_fia_voltage_fw_screen.py; bindings actually read em_fia_front_kit_case.json and em_fia_mtpa_screen.json.",
+            "consequence": "Risk that 'one declared load case by construction' is not what the registry compares"
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Continuous 119.7 vs 81.558 handling is mostly sound, but 341.8 N\u00b7m is miscalculated, envelope@19500 is assumed not shown, and FE-preferring qval governance would re-hide the requirement/capability gap."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "v1 was substantially wrong and is withdrawn",
+            "verdict": "UNSUPPORTED",
+            "why": "The diff implements v2 but does not contain v1 itself. The claim that v1 was wrong is meta-narrative about a previous version not visible in this diff. The diff's structure is consistent with v1 being wrong (the COMPARISONS dict refuses the cross-basis and cross-operating-point comparisons v1 made) but does not directly verify it."
+          },
+          {
+            "claim": "v1 reported three divergences of which only ONE is real",
+            "verdict": "SUPPORTED",
+            "why": "The COMPARISONS dict has exactly three entries; only one (continuous mgu_fe_shaft_torque_nm vs continuous mgu_shaft_torque_nm at 19500rpm/477Arms) has matching basis and operating_point and would produce a divergence. The other two (peak MTPA vs peak envelope at 19500rpm, and peak MTPA vs peak corner at 10000rpm) are either an agreement or, in the corner case, incomparable. The script's logic deterministically produces exactly one real divergence."
+          },
+          {
+            "claim": "Two were manufactured by comparing a peak against a mean, and a 10,000 rpm corner against a 19,500 rpm solve",
+            "verdict": "SUPPORTED",
+            "why": "The collect() function explicitly refuses ratios when basis or operating_point differ, appending the comparison to the 'incomparable' list with a 'reason' field. The proveCatch tests verify refuses_cross_operating_point and no_ratio_for_incomparable. The COMPARISONS dict comments document exactly these two manufactured cases ('envelope_mgu_torque_nm is basis=PEAK \u2014 deliberately NOT compared here' and 'mgu_shaft_torque_max_nm is a ~10,000 rpm constant-power CORNER figure')."
+          },
+          {
+            "claim": "This v2 addresses the single real like-for-like divergence \u2014 continuous shaft torque at 19,500 rpm, 119.7 analytic vs 81.558 measured",
+            "verdict": "SUPPORTED",
+            "why": "Test fixtures use exactly 81.558081 for rotor_position_sweep.summary.torque_magnitude_mean_nm and 119.7 for mgu_shaft_torque_nm. The ratio 119.7/81.558 \u2248 1.4677 is verified by both proveCatch.continuous_divergence_survives and proveCatch.divergence_is_reported."
+          },
+          {
+            "claim": "v2 asks whether the deliverable should prefer either number at all",
+            "verdict": "SUPPORTED",
+            "why": "The BAR-A-REPAIR-PLAN document explicitly asks this question in 'What I want challenged'. The promote() function is deliberately additive (leaves analytic quantities untouched), so the disagreement stays visible rather than being erased."
+          },
+          {
+            "claim": "basis and operating_point are load-bearing fields on every binding",
+            "verdict": "SUPPORTED",
+            "why": "The Binding dataclass declares basis and operating_point as fields. The COMPARISONS dict requires these to match. collect() refuses ratios when they differ."
+          },
+          {
+            "claim": "a mismatch is reported incomparable with the reason rather than as a ratio",
+            "verdict": "SUPPORTED",
+            "why": "In collect(), when basis or operating_point differ, the comparison is appended to the 'incomparable' list with a 'reason' field (e.g., 'basis peak vs solver continuous'). No ratio is computed in this branch \u2014 the code path returns to the next spec before the ratio calculation."
+          },
+          {
+            "claim": "four proveCatch cases encode the error",
+            "verdict": "SUPPORTED",
+            "why": "The diff contains 4 proveCatch checks in the 'error' block (refuses_cross_operating_point, no_ratio_for_incomparable, peak_matches_peak, continuous_divergence_survives). The 5th proveCatch (divergence_is_reported) is outside the 'error' block and is about correctly reporting the real divergence, not encoding the error."
+          },
+          {
+            "claim": "Live: 1 divergence, 1 agreement, 1 incomparable",
+            "verdict": "SUPPORTED",
+            "why": "The COMPARISONS dict has exactly 3 entries that map deterministically to this pattern: 1 like-for-like divergence (continuous vs continuous), 1 like-for-like agreement (peak vs peak at 1.06x < 1.10 threshold), 1 incomparable (peak vs corner at different operating points). The script's structure guarantees this pattern when run on the live twin."
+          }
+        ],
+        "weakest_link": "v1 was substantially wrong and is withdrawn \u2014 the diff shows the new COMPARISONS dict structure that prevents the two manufactured comparisons, but v1 itself is not in this diff, so the meta-narrative claim is not directly verifiable from the evidence shown.",
+        "blocking": false,
+        "one_line_summary": "The script's COMPARISONS dict structure deterministically produces 1 divergence, 1 agreement, 1 incomparable, supporting the v2 plan's refutation of v1's manufactured ratios; the meta-narrative claim that v1 was wrong is asserted but not directly verifiable from this diff."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "Renderer-level preference is the wrong representation for a requirement/capability conflict. The analytic 119.7 is the duty requirement; the FE 81.558 is measured capability.",
+      "action": "ADOPTED, AND TRISTAN REACHED THE SAME CONCLUSION INDEPENDENTLY AND DECIDED IT \u2014 the deliverable now SHOWS BOTH SIDE BY SIDE WITH THE GAP STATED, and no preference mechanism is built at all. Calculations sheet gains T_shaft (relabelled 'REQUIREMENT implied by the duty'), T_shaft_FE ('MEASURED \u2014 finite-element rotor sweep at the same duty point') and T_gap as a LIVE formula so it recomputes rather than going stale. The operating-point closure block gains torque_nm_measured_fe and torque_gap_x; verified on the live twin: 119.7 required, 81.558081 measured, 1.4677x. Two independent routes to the same answer is the strongest signal this process produces."
+    },
+    {
+      "seat": "sol",
+      "covers": 3,
+      "point": "The code does not validate the basis or operating point STORED on either quantity \u2014 it compares what the map declares; promotion drops operating_point; and exact string operating points are brittle.",
+      "action": "REAL HOLE, FIXED, AND IT COST ME MY OWN FAVOURABLE FINDING. The map's opinion silently overrode what the quantity actually said. Now `basis` and `condition` are READ FROM THE CONTRACT ENTRY, a mismatch against the pairing's requirement is refused with the reason, and an UNSTATED condition is UNKNOWN \u2014 unknown never compares. Consequence on the live twin: my reported 1.06x peak-to-peak AGREEMENT is GONE, because envelope_mgu_torque_nm carries basis=peak with condition=None, so like-for-like was never established. Honest state is now 1 divergence, 0 agreements, 2 incomparable. Two new proveCatch cases. Sol is right that string operating points are brittle; a structured comparison key is recorded as the successor."
+    },
+    {
+      "seat": "grok45",
+      "covers": 2,
+      "point": "The diff never establishes that inverter-envelope peak 145.746 N.m is at 19,500 rpm / 477 A; and the selftest constructs that pattern rather than reading basis/operating point from a live twin.",
+      "action": "Both correct and both now fail closed. The envelope quantity's condition is null on the live twin \u2014 I had asserted its operating point in my comparison map. The selftest fixtures now CARRY basis and condition the way real quantities do, including one with condition=None specifically to prove an unstated operating point is refused rather than assumed to match."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The listed torque-map and voltage/field-weakening screens should generate one canonical structured load case rather than comparing heterogeneous summary statistics.",
+      "action": "ACCEPTED as the right method and recorded as the next step rather than claimed. It is the structural cure for the whole class of error this stage kept producing: a comparison built from ONE declared load case cannot pair a peak against a mean, because both sides come from the same evaluation."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "The stated arithmetic '350 kW at 10,000 rpm through eta is 341.8 N.m'.",
+      "action": "Checked rather than assumed: 350000/(0.9777 * 10000*2*pi/60) = 341.8 N.m, so the figure holds and the conclusion it supports \u2014 that 334 N.m is correct for a ~10,000 rpm constant-power corner and must not be compared against a 19,500 rpm solve \u2014 stands."
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "covers": 3,
+      "point": "The module is not universal (fixed registry of Formula-E MGU names); the *_fe_* renderer convention is hidden coupling to a naming scheme; and the proposed gate condition is not modelled by the writeback data.",
+      "why_rejected": "First two are moot rather than rejected: with side-by-side presentation adopted there IS no renderer preference and no *_fe_* selection convention to couple to \u2014 the quantities are simply displayed. On universality: the MECHANISM (dotted key paths, basis/condition read from the entry, refusal on mismatch, additive promotion) is product-agnostic; the REGISTRY is necessarily domain knowledge, since only a person knows which solver result governs which quantity. The docstring's 'UNIVERSAL' claim is narrowed to the mechanism. Third point is correct and the gate is deferred with it \u2014 there is no governance flag to gate on once nothing is governed."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Side-by-side contradicts the module's own additive design and the plan's challenge.",
+      "why_rejected": "It is the RESOLUTION of that challenge, not a contradiction. I asked the council whether a deliverable needs both numbers rather than one chosen; Sol answered yes on representation grounds, Tristan decided the same, and the additive design is exactly what makes it possible \u2014 because nothing was overwritten, both values exist to be shown."
+    },
+    {
+      "seat": "sol",
+      "covers": 1,
+      "point": "The asserted like-for-like pair is not established by the identifiers shown: a 37-position 'torque_magnitude_mean' and an analytic P/omega figure may not describe the same measurand.",
+      "why_rejected": "Accepted as a limit and answered by what the contract itself now states, not by my assertion. mgu_shaft_torque_nm carries condition 'T = P_shaft/omega at 19500 rpm (mechanical shaft, post eta_inv x eta_mgu)' and the FE binding is a continuous-basis mean at 19,500 rpm / 477 A. Both are continuous shaft torque at the same speed, which is why this is the ONE pair that survives the stricter check while the other two are refused. Sol is right that a rotor-position mean and a closed-form P/omega are not the same KIND of estimate \u2014 and that is precisely the disagreement the side-by-side presentation now shows rather than resolves."
+    },
+    {
+      "seat": "grok45",
+      "covers": 1,
+      "point": "Step 1 says drive comparisons through em_fia_torque_map_screen.py and em_fia_voltage_fw_screen.py, but the bindings do not use them.",
+      "why_rejected": "Correct \u2014 Step 1 was a plan for the next stage, not something this diff implements, and it is now recorded as the named successor rather than claimed. The bindings currently read the case and MTPA artefacts because those are what exist as like-for-like sources today."
+    },
+    {
+      "seat": "minimax_m3",
+      "covers": 1,
+      "point": "The claim is asserted rather than established by the committed artefact.",
+      "why_rejected": "Recorded once more and closed: the design question this stage asked has been ANSWERED by a decision, so what ships is the side-by-side presentation plus the stricter comparison logic, both verifiable on the live twin (1 divergence, 0 agreements, 2 incomparable) and by the closure block returning 119.7 / 81.558081 / 1.4677."
+    }
+  ],
+  "council_ok": true,
+  "advice_recorded_utc": "2026-08-03T03:25:08Z"
+}
