@@ -45,7 +45,7 @@ for m in machine_excitation_tracking machine_magnet_flux_focusing machine_loss_b
          machine_geometry_coherence capability_lookup_stage \
          stage_boundary_check calculation_guard machine_lamination \
          p_stage_discipline physics_plausibility fe_iron_loss_writeback stator_thermal_chain \
-         magnet_margin_sensitivity; do
+         magnet_margin_sensitivity dec_em1_option_screen; do
   if [ -f "scripts/lib/$m.py" ]; then
     if $PY "scripts/lib/$m.py" --selftest >/dev/null 2>&1; then
       say "$m --selftest" "ok"

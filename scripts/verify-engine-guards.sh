@@ -48,6 +48,7 @@ run "physics_plausibility.py --selftest"      "$PY" scripts/lib/physics_plausibi
 run "fe_iron_loss_writeback.py --selftest"    "$PY" scripts/lib/fe_iron_loss_writeback.py --selftest
 run "stator_thermal_chain.py --selftest"      "$PY" scripts/lib/stator_thermal_chain.py --selftest
 run "magnet_margin_sensitivity --selftest"    "$PY" scripts/lib/magnet_margin_sensitivity.py --selftest
+run "dec_em1_option_screen --selftest"        "$PY" scripts/lib/dec_em1_option_screen.py --selftest
 run "dossier_audit.py --selftest"            "$PY" scripts/lib/dossier_audit.py --selftest
 run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.py --selftest
 run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest
