@@ -130,6 +130,57 @@ sweep) and are not re-solved here. The thermal column is the new information.
 
 ---
 
+## 4b. BAR A IS CLOSED — 2026-08-03
+
+Against the tracker's own six criteria (§H8 "Bar A software push done when"):
+
+| # | Criterion | State |
+|---|---|---|
+| 1 | `architecture_blockers_open` empty **or** named DEC holds | ✅ 0 open |
+| 2 | `duty_torque_screen_ok` true **or A-DUTY re-frozen** | ✅ **A-DUTY re-frozen — DEC-008 + DEC-009** |
+| 3 | Provenance PASS · lineage sha · Calculations not zeroed | ✅ |
+| 4 | Renders show individual parts (SIGHT) | ✅ 31 PNGs; catalogue 188/188 accounted |
+| 5 | ABD / Jack docs match twin; no "0 OPEN" lies | ✅ both rewritten 2026-08-03 |
+| 6 | Closeout council: no new FATAL greenwash | ✅ **re-run 2026-08-03, all three seats LIVE** (no 402 fallback): PUSH_WITH_HOLDS 91 / 78 / 78 |
+
+### The two decisions that closed criterion 2
+
+**DEC-008 — A-DUTY re-frozen as INTERMITTENT.** The contract asserted both
+`continuous_power_kw = 250, basis=continuous` AND a 24 s / 100 s vignette. Those
+are mutually exclusive, and the Gen3 front unit is REGEN ONLY — it operates only
+under braking — so a 100% duty describes something the car never does. Under the
+twin's own 24% vignette, machine losses fall 8216 → 1972 W cycle-average and the
+magnet goes 159.3 °C (breach) → 83.8 °C (66 K margin). **The magnet breach was an
+artefact of screening a 24%-duty machine at 100% duty.**
+
+**DEC-009 — DEC-EM-1 resolved: 24,000 rpm / 130 mm.** Torque **1.069×** required
+(closes, against 0.651× at baseline), magnet 99.4 °C against a 150 °C limit, rotor
+screening FoS **1.740** — the best margin of any option that closes torque.
+
+**Why these are one decision, not two.** Duty does NOT fix torque — you need
+125.2 N·m to make 250 kW at 19,500 rpm whether for 24 s or forever. What
+intermittent duty buys is THERMAL HEADROOM, and thermal headroom is what permits
+the speed rise, and the speed rise is what closes torque. On a continuous duty
+24,000/130 gives magnet 224.1 °C, a 74 K breach, and **no option clears at all**.
+
+### What these decisions do NOT claim
+
+- The vignette is the twin's own figure but labelled *"illustrative — replace with
+  lap logs"*. A real lap log reverses DEC-008 if the duty exceeds roughly 40%.
+- FoS 1.740 is a **screening** factor, not a release factor (Bar B / B9).
+- Gear ratio moves 8:1 → roughly 10–11:1 and is **not yet re-solved**.
+- Iron loss stays a screening estimate, range 3.9–8.5 kW.
+- **`ship_ok` remains false. Bar A closing is not homologation.**
+
+### A-iv reclassified
+
+The derived stator thermal chain moves to **Bar B (B6)**. The Bar A defect — two
+screens disagreeing by 76 K — is FIXED and they now agree to 0.1 K. What remains
+is calibrating the screening constants against a real flow bench, which is
+hardware by definition and was never Bar A-closable.
+
+---
+
 ## 5. What remains
 
 ### Bar A — software-closable residuals
@@ -139,7 +190,7 @@ sweep) and are not re-solved here. The thermal column is the new information.
 | A-i | Five tautological brief checks | **CLOSED 2026-08-03** | Same-key brief path skipped for brief-only identities (`_qty_is_brief_only_identity`). Live twin: five metrics are FAIL/UNVERIFIED (honest), not green identity. `magnet_temp_limit_c` still fails 159.35 vs 150 via real `mgu_magnet_temp_c`. |
 | A-ii | `actual_source` / `expected_source` on `Check` | **CLOSED 2026-08-03** | Fields on `Check`; populated for BRIEF / PROVENANCE / BoM C2. Audit flags equal non-empty sources as tautology; brief-detail regex kept as fallback. |
 | A-iii | Tolerance-swallowed checks (BoM I-4, viscosity) | **CLOSED 2026-08-03**, then TIGHTENED | Magnitude-aware `_tol_pct` / `_tool_eq_tol`; proveCatch: £1 line with unit 0 FAILs; 0.001 vs 0.002 viscosity FAILs. ⭐ Floor cap was 0.5 — falsifiable but a **50% window** on sub-0.01 quantities. Now `FLOOR_CAP_FRACTION = 0.10`: same guarantee, 5× tighter (viscosity 50% → 10%). "Cannot be unfalsifiable" is a floor, not a quality bar. |
-| A-iv | Derived stator thermal chain | **OPEN — Bar B** | `usable_as_replacement=false` retained. Needs two-source LPTN + slot fill / impregnation (B6). Not software-closed. |
+| ~~A-iv~~ | ~~Derived stator thermal chain~~ | **MOVED to Bar B / B6** — see §4b | `usable_as_replacement=false` retained. Needs two-source LPTN + slot fill / impregnation (B6). Not software-closed. |
 
 **Close-out method (workflow test):** Grok workflow `bar-a-falsifiability-closeout`
 (`.grok/workflows/bar-a-falsifiability-closeout.rhai`), budget 16, spent 5, ~11 min.
