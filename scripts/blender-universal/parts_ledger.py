@@ -1077,6 +1077,56 @@ def _is_non_fluid_boundary_noun(name: str) -> bool:
     return False
 
 
+# ⭐⭐ AMPACITY — a conductor size printed next to a current is an ENGINEERING
+# CLAIM (2026-08-03). The compact fallback below emitted a fixed "2×6 mm² Cu" on
+# EVERY electrical run regardless of load, and hardcoded `within_spec: True`. On
+# the FE front pack that shipped a 561.3 A feeder on 2×6 mm² copper — roughly a
+# 14× ampacity violation — labelled within spec, alongside fifteen runs rated
+# "0.4 A" which is a placeholder describing nothing. A reader cannot tell an
+# unsized default from a sized conductor, and the one that mattered was dangerous.
+#
+# Two rules follow: size FROM the current when a current is known, and never
+# assert within_spec for a size nobody derived. BS 7671 Table 4D1A-ish single-core
+# copper, 70 °C thermoplastic, free air — deliberately conservative and used only
+# to pick a plausible default and to catch gross violations, not to replace a real
+# cable calculation.
+_CU_AMPACITY_A: tuple = (
+    (1.0, 15.5), (1.5, 19.5), (2.5, 27.0), (4.0, 36.0), (6.0, 46.0),
+    (10.0, 63.0), (16.0, 85.0), (25.0, 112.0), (35.0, 138.0), (50.0, 168.0),
+    (70.0, 213.0), (95.0, 258.0), (120.0, 299.0), (150.0, 344.0),
+    (185.0, 392.0), (240.0, 461.0), (300.0, 530.0), (400.0, 634.0),
+)
+
+
+def _csa_for_current(amps: float) -> tuple:
+    """(csa_mm2, ampacity_A) — smallest conductor carrying `amps`, or the largest
+    tabulated size when the current exceeds the table (the caller then knows the
+    single-conductor answer is insufficient and must say so)."""
+    for csa, cap in _CU_AMPACITY_A:
+        if cap >= amps:
+            return (csa, cap)
+    return _CU_AMPACITY_A[-1]
+
+
+def _sized_cable_label(amps, fallback_label: str) -> tuple:
+    """(size_label, within_spec) for a run carrying `amps`.
+
+    within_spec is None — NOT True — when no current is known: an unsized default
+    has not been checked against anything, and claiming otherwise is the defect."""
+    try:
+        a = float(amps)
+    except (TypeError, ValueError):
+        return (fallback_label, None)
+    if a <= 0:
+        return (fallback_label, None)
+    csa, cap = _csa_for_current(a)
+    if cap < a:
+        # Beyond a single tabulated conductor — say so rather than print a size
+        # that cannot carry the load.
+        return (f"≥2×{csa:g} mm² Cu in parallel (>{cap:g} A single-core)", False)
+    return (f"{csa:g} mm² Cu", True)
+
+
 def _synthesize_traction_hv_spine(
     equipment: list,
     connections: list,
@@ -1442,8 +1492,18 @@ def _synthesize_compact_connection_artifacts(
         install_gbp = round(length_m * unit_cost * 1.4, 2)
         line_gbp = round(length_m * unit_cost + install_gbp, 2)
         rating = "fallback logical trace"
+        _amps = None
         if r.get("required_value") is not None and r.get("required_unit"):
             rating = f"{r.get('required_value')} {r.get('required_unit')}"
+            if str(r.get("required_unit") or "").strip().upper().startswith("A"):
+                _amps = r.get("required_value")
+        # Size the conductor from the load it carries, and refuse to claim a spec
+        # check that never ran (see the ampacity note above).
+        _within = True
+        if kind == "cable":
+            size, _within = _sized_cable_label(_amps, size)
+            if _amps is not None:
+                spec_limit = f"BS 7671 ampacity check at {_amps} A"
         rows.append({
             "mechanism": mech,
             "from": fn,
@@ -1452,7 +1512,7 @@ def _synthesize_compact_connection_artifacts(
             "length_m": length_m,
             "size": size,
             "drop": "fallback compact trace",
-            "within_spec": True,
+            "within_spec": _within,
             "qty": f"{size}, {length_m:.2f} m",
             "line_total_gbp": line_gbp,
             "unit_cost_gbp": unit_cost,
