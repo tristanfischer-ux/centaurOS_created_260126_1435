@@ -2860,7 +2860,12 @@ def compute_ship_axes(state: dict, run_dir: str, v: Optional[dict]) -> List[dict
     # boards — fab-ready is N/A (never demand a bespoke KiCad pack for OEM MCU boards).
     # GOTCHA (2026-07-29 JLR): Forge draft Gerbers with supplierGerbers=false /
     # hilPresent=false must NOT pass as fab-ready — that greenwashed homologation.
-    _pcb = st.get("pcb") or {}
+    # FOURTH consumer of the PCB block — same source as tab_pcb / _sc_pcb / the
+    # verification spine (see _pcb_state_block). Reading state.pcb directly made the
+    # SHIP GATE report "no PCB in this design" while the PCB tab rendered two routed
+    # boards from the stage artefact: the gate and the tab contradicting each other
+    # in the same workbook.
+    _pcb = _pcb_state_block(st, run_dir or "") or {}
     _pcb_disp = str(_pcb.get("disposition") or "").lower()
     _supplier_gbr = _pcb.get("supplierGerbers") is True
     _hil_ok = _pcb.get("hilPresent") is True
@@ -20552,15 +20557,16 @@ def _pcb_state_block(state: dict, run_dir: str):
     pcb = state.get("pcb")
     if isinstance(pcb, dict) and isinstance(pcb.get("pipeline"), dict):
         return pcb
-    try:
-        path = os.path.join(run_dir, "pcb-stage.json")
-        if os.path.exists(path):
-            with open(path, "r") as fh:
-                disk = json.load(fh)
-            if isinstance(disk, dict) and isinstance(disk.get("pipeline"), dict):
-                return disk
-    except Exception:  # noqa: BLE001 — never block the build on a bad artefact
-        pass
+    for _fn in PCB_SIDECAR_FILENAMES:
+        try:
+            path = os.path.join(run_dir or "", _fn)
+            if os.path.exists(path):
+                with open(path, "r") as fh:
+                    disk = json.load(fh)
+                if isinstance(disk, dict) and isinstance(disk.get("pipeline"), dict):
+                    return disk
+        except Exception:  # noqa: BLE001 — never block the build on a bad artefact
+            continue
     return pcb if isinstance(pcb, dict) else None
 
 
@@ -28862,6 +28868,24 @@ def _sc_schedules(wb, ws, state, run_dir):
                    "resolve any diverging item-count reconciliation at its source"}
 
 
+# ⭐⭐ EVERY FILENAME THE PCB STAGE MAY WRITE ITS RESULT UNDER (2026-08-03).
+# THE DEFECT THIS EXISTS TO PREVENT: `_ensure_pcb_from_sidecar` — a rehydration
+# guard written precisely for "the chain raced and state.pcb is null but the board
+# artefacts survive" — looked ONLY for `pcb-stage-result.json`, while
+# scripts/fe-front-run-pcb-pipeline.ts writes `pcb-stage.json`. Two filenames for
+# one artefact. The guard was correct in intent and never fired, so the FE front
+# workbook shipped 30 tabs with NO PCB sheet and a ship gate reading "no PCB in
+# this design", while two fully routed boards with clean DRC sat on disk.
+#
+# The rule that makes it not recur: a writer filename is only real if it is in
+# THIS list, and `_selftest` PROVES rehydration from every entry. Adding a writer
+# without registering it here fails the build (see the sidecar proveCatch), so the
+# two halves cannot drift apart again silently.
+PCB_SIDECAR_FILENAMES: tuple = (
+    "pcb-stage-result.json",   # chain + repair-pcb-verified-identities.ts
+    "pcb-stage.json",          # scripts/fe-front-run-pcb-pipeline.ts
+)
+
 def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
     """INTENT (P6 / cell-cycler cold-v17): nested chain races null state.pcb while
     pcb/ Gerbers+positions remain. Restore from pcb-stage-result.json (durable
@@ -28875,19 +28899,22 @@ def _ensure_pcb_from_sidecar(state: dict, run_dir: str) -> bool:
     pcb = state.get("pcb")
     if isinstance(pcb, dict) and isinstance(pcb.get("pipeline"), dict):
         return False
-    side = os.path.join(run_dir or "", "pcb-stage-result.json")
-    if not os.path.isfile(side):
-        return False
-    try:
-        with open(side, encoding="utf-8") as fh:
-            restored = json.load(fh)
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"  ! pcb sidecar read failed ({exc})")
-        return False
-    if not isinstance(restored, dict) or not isinstance(restored.get("pipeline"), dict):
-        return False
-    state["pcb"] = restored
-    return True
+    for _fn in PCB_SIDECAR_FILENAMES:
+        side = os.path.join(run_dir or "", _fn)
+        if not os.path.isfile(side):
+            continue
+        try:
+            with open(side, encoding="utf-8") as fh:
+                restored = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"  ! pcb sidecar read failed ({_fn}: {exc})")
+            continue
+        if not isinstance(restored, dict) or not isinstance(restored.get("pipeline"), dict):
+            continue
+        state["pcb"] = restored
+        print(f"  · state.pcb rehydrated from {_fn}")
+        return True
+    return False
 
 
 def _motor_assembly_revision_mismatch(
@@ -39403,6 +39430,52 @@ def _selftest() -> int:
         os.makedirs(_noside, exist_ok=True)
         if _ensure_pcb_from_sidecar(_st_empty, _noside):
             print("  FAIL pcb-sidecar: missing sidecar must not invent a board"); bad += 1
+
+        # ⭐⭐ EVERY REGISTERED FILENAME MUST REHYDRATE (2026-08-03). The original
+        # guard tested ONLY "pcb-stage-result.json" and passed for a year while
+        # fe-front-run-pcb-pipeline.ts wrote "pcb-stage.json" — so the rehydration
+        # never fired on FE runs and the workbook shipped with no PCB tab beside
+        # two routed boards. A guard that proves one filename proves nothing about
+        # the others; this walks the whole canonical list.
+        for _fn in PCB_SIDECAR_FILENAMES:
+            _fn_td = os.path.join(_side_td, f"fn_{_fn.replace('.', '_')}")
+            os.makedirs(_fn_td, exist_ok=True)
+            with open(os.path.join(_fn_td, _fn), "w", encoding="utf-8") as _sf2:
+                json.dump(_side_pcb, _sf2)
+            _st_fn = {"pcb": None}
+            if not _ensure_pcb_from_sidecar(_st_fn, _fn_td):
+                print(f"  FAIL pcb-sidecar: registered filename {_fn!r} did not rehydrate "
+                      f"— a writer and its reader have drifted apart"); bad += 1
+            if _pcb_state_block({}, _fn_td) is None:
+                print(f"  FAIL pcb-sidecar: _pcb_state_block cannot read {_fn!r} "
+                      f"— the tab and the rehydrator disagree about what exists"); bad += 1
+
+        # ⭐⭐ NO UNREGISTERED WRITER (the "never again" half). Scan the repo for any
+        # pcb-stage*.json filename literal; each must be in PCB_SIDECAR_FILENAMES.
+        # Adding a new writer without registering it fails HERE rather than silently
+        # producing a dossier with no PCB tab.
+        try:
+            import re as _re_sc
+            _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            _seen_fns: set = set()
+            for _dirpath, _dirnames, _filenames in os.walk(os.path.join(_root, "scripts")):
+                _dirnames[:] = [d for d in _dirnames if d not in ("node_modules", "__pycache__")]
+                for _f in _filenames:
+                    if not _f.endswith((".ts", ".tsx", ".py", ".sh")):
+                        continue
+                    try:
+                        _src = open(os.path.join(_dirpath, _f), encoding="utf-8",
+                                    errors="replace").read()
+                    except OSError:
+                        continue
+                    _seen_fns.update(_re_sc.findall(r"['\"](pcb-stage[\w-]*\.json)['\"]", _src))
+            _unregistered = sorted(_seen_fns - set(PCB_SIDECAR_FILENAMES))
+            if _unregistered:
+                print(f"  FAIL pcb-sidecar: filename(s) {_unregistered} are written or read "
+                      f"somewhere in scripts/ but are NOT in PCB_SIDECAR_FILENAMES — register "
+                      f"them or the PCB tab will silently vanish on those runs"); bad += 1
+        except Exception as _scan_exc:  # noqa: BLE001
+            print(f"  FAIL pcb-sidecar repo scan raised: {_scan_exc!r}"); bad += 1
     except Exception as _side_exc:
         print(f"  FAIL pcb-sidecar proveCatch raised: {_side_exc!r}"); bad += 1
     finally:
