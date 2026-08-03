@@ -33,6 +33,14 @@ function qv(c: ContractInProgress, key: string, fallback: number): number {
   return Number.isFinite(v) && v !== 0 ? v : fallback
 }
 
+/** A STRING contract quantity (grades, designations) — qv only reads numbers. */
+function qstr(c: ContractInProgress, key: string, fallback: string): string {
+  const raw = (c.quantities as any)?.[key]
+  const v = typeof raw === 'object' && raw !== null ? raw.value : raw
+  const s = typeof v === 'string' ? v.trim() : ''
+  return s.length > 0 ? s : fallback
+}
+
 function prov(toolId: string, field: string) {
   return {
     source: `tool:${toolId}` as const,
@@ -260,9 +268,31 @@ const stepMotorLoss: ToolStep = {
     phase_current_rms_a: qv(c, 'ac_rms_current_a', qv(c, 'phase_current_max_a', 450) * 0.7),
     phase_resistance_ohm: 0.005,
     pole_pairs: Math.round(qv(c, 'pole_pairs', 2)),
-    iron_mass_kg: 3.0,
-    steinmetz_kh: 0.05,
-    steinmetz_ke: 1e-7,
+    // ⭐⭐ IRON LOSS FROM THE REAL LAMINATION, NOT A HARDCODED GUESS (2026-08-03).
+    // These three literals produced the campaign's single most misleading number.
+    // `steinmetz_ke: 1e-7` corresponds to NO REAL STEEL — the machine's own deck
+    // records its material as Pyleecan IPMSM_B **M400-50A**, whose eddy
+    // coefficient derives to 1.169e-4 W/(kg·Hz²·T²) from the grade's 0.50 mm
+    // gauge (the "50" in M400-50A), its resistivity and its density. The plan was
+    // therefore understating eddy loss by ~1000x, and `iron_mass_kg: 3.0` described
+    // a generic 3 kg against the twin's measured 6.62 kg of stator iron.
+    //
+    // Result: iron loss came out 135.56 W — 6.2% of the 2180 W copper loss at
+    // 1300 Hz, which is not physical — which in turn inflated machine efficiency
+    // to 99.018% (above any vehicle IPMSM) AND under-sized the coolant, because
+    // the thermal screen sizes on this number. One hardcoded constant, three
+    // wrong answers downstream.
+    //
+    // motor_loss_point.py ALREADY derives kh/ke from `lamination_grade` via
+    // scripts/lib/machine_lamination.py whenever explicit coefficients are absent.
+    // So the fix is to STOP stating them and state the STEEL instead. An explicit
+    // measured kh/ke still wins if a caller ever has one — the tool prefers stated
+    // coefficients over the derived pair.
+    iron_mass_kg: qv(c, 'stator_iron_mass_kg', qv(c, 'iron_mass_kg', 3.0)),
+    // FE-probed tooth flux when the deck measured it (teeth + yoke are probed
+    // separately; the tooth is the fundamental-driven region the tool models).
+    iron_b_t: qv(c, 'stator_tooth_flux_t', qv(c, 'iron_b_t', 1.2)),
+    lamination_grade: qstr(c, 'lamination_grade', 'M400-50A'),
     magnet_eddy_coeff: 5.0,
     windage_coeff: 1e-10,
     bearing_coeff: 0.001,
