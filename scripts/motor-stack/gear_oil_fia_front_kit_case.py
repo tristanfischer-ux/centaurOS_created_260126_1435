@@ -18,7 +18,7 @@ import hashlib
 import json
 import math
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -117,6 +117,10 @@ class TwinInputs:
     geometry_source: str
     jet_nozzle_diameter_mm: float = JET_NOZZLE_DIAMETER_MM
     slosh_length_mm: float = SLOSH_LENGTH_MM
+    # True when the TWIN stated a charge; False when it fell back to the frozen
+    # seed. A defaulted charge may be raised to the derived cornering floor; a
+    # stated one is the team's number and is never silently overridden.
+    gear_oil_volume_stated: bool = False
 
 
 @dataclass(frozen=True)
@@ -313,6 +317,8 @@ def inputs_from_sections(
             ("gear_oil_volume_ml", "oil_charge_ml"),
             default=DEFAULT_GEAR_OIL_VOLUME_ML,
         ),
+        gear_oil_volume_stated=any(
+            k in quantities for k in ("gear_oil_volume_ml", "oil_charge_ml")),
         gear_efficiency=_number(quantities, ("gear_efficiency",), default=0.97),
         max_rotor_speed_rpm=max_rpm,
         continuous_electrical_power_kw=_number(
@@ -496,6 +502,38 @@ def compute_geometry_screen(inputs: TwinInputs) -> GeometryScreen:
     annulus_area_mm2 = math.pi * (housing_r_mm**2 - ring_r_mm**2)
     sump_axial_mm = inputs.gear_face_mm * SUMP_AXIAL_FRACTION_OF_FACE
     active_sump_ml = annulus_area_mm2 * sump_axial_mm / 1000.0
+    # ⭐⭐ THE CHARGE MUST FOLLOW THE GEOMETRY (2026-08-03). This screen CLEARED on
+    # 2026-07-31 and has since REGRESSED to cornering_pickup_ok=False. Nothing about
+    # the oil design changed — baffle still 30 mm, nozzle still Ø1.8 mm. What changed
+    # is the GEAR: the ISO 6336 strength resize narrowed the face, and
+    # sump_axial = gear_face x 0.42, so the sump shrank to 123 ml and the oil level
+    # to 16.67 mm. A 2.5 g corner drops the surface 13.93 mm, leaving 2.74 mm and an
+    # immersion of 0.0715 against the 0.08 floor. It misses by a hair.
+    #
+    # `minimum_oil_charge_ml_for_screens()` already computes exactly the charge that
+    # clears cornering for the CURRENT geometry — the module docstring even promises
+    # "live nests with large annular sumps raise this via
+    # minimum_oil_charge_ml_for_screens()" — but nothing called it, so the screen used
+    # the frozen 350 ml seed. On this geometry the helper asks for 374.7 ml: a 24.7 ml
+    # shortfall, and the whole regression.
+    #
+    # A charge the TWIN states is the team's number and is never overridden. Only a
+    # DEFAULTED charge is raised to the derived floor, and the raise is reported. This
+    # is the source fix: the seed follows the geometry instead of freezing while the
+    # geometry moves underneath it.
+    if not inputs.gear_oil_volume_stated:
+        _floor_ml = minimum_oil_charge_ml_for_screens(
+            slosh_length_mm=inputs.slosh_length_mm,
+            planet_od_mm=inputs.planet_od_mm,
+            sump_annulus_area_mm2=annulus_area_mm2,
+            active_sump_volume_ml=active_sump_ml,
+        )
+        if _floor_ml > inputs.gear_oil_volume_ml:
+            print(f"[gear-oil] defaulted charge {inputs.gear_oil_volume_ml:.1f} ml "
+                  f"raised to the derived cornering floor {_floor_ml:.1f} ml "
+                  f"(sump {active_sump_ml:.1f} ml, slosh {inputs.slosh_length_mm:.0f} mm)")
+            inputs = replace(inputs, gear_oil_volume_ml=round(_floor_ml, 1))
+
     oil_level_mm = (
         inputs.gear_oil_volume_ml * 1000.0 / max(annulus_area_mm2, 1.0)
     )

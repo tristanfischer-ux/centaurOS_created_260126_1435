@@ -31,7 +31,7 @@
 | parts-manifest rows | **57** (0 slug tags) | A | was 22, with 26 slug labels |
 | PCB | **2 routed boards, DRC 0 violations, fitness 7.6/10, 0 unresolved** | A | draft → real; tab was MISSING from the workbook, now renders |
 | Excel workbook | **31 tabs**, 0 bare verdict literals | A | +PCB, +Suppliers |
-| **A2 gear-oil cornering** | **`cornering_pickup_ok: False`** (tilt 68.2°, immersion 0.0715, 6 nozzles) | A | **REGRESSED** — 07-31 recorded True with 8 nozzles |
+| **A2 gear-oil cornering** | **CLEARED — `cornering_pickup_ok: True`**, immersion 0.2399 vs 0.08 floor | A | **NOT a regression — the artefact was STALE.** It was written 2 Aug 05:50 against gear_face 14.0 mm; the live twin carries 19.2 mm from `gear_geometry_writeback`. Re-running the screen clears it. |
 | Self-audit blocking defects | **3 raised → 1 binds** (2 retired by deterministic checks) | A | LLM removed from the ship decision |
 | Suppliers register | `state.suppliers` still **empty**; tab reads partVerifications | A | new tab, honest source |
 | CAD release coverage | **0%** | B | unchanged |
@@ -197,14 +197,29 @@ eddy loss as f², and the magnets already breach.**
 
 ---
 
-### A2. Gear oil architecture — ⚠ **REGRESSED — RE-OPENED 2026-08-03**
+### A2. Gear oil architecture — **CLEARED (screening). The "regression" was a STALE ARTEFACT.**
 
-Live artefact (`_motor_stack/gear_oil_fia_front_kit_case.json`, 2 Aug 05:50):
-`cornering_pickup_ok: **False**`, free-surface tilt **68.2°**, immersion fraction
-**0.0715**, `oil_delivery_screen_ok: False`, **6** nozzles (07-31 recorded 8).
-Baffle 30 mm and Ø1.8 mm are unchanged, so the regression came from later geometry
-work, not from the oil design. **Re-run the SOURCE screen against current geometry.**
-The 07-31 record below is retained for history.
+I reported this as a live regression when I refreshed the tracker earlier today.
+That was wrong, and the correction is worth recording because it is a repeat of a
+failure mode this campaign has hit four times: **reading a stale artefact and
+believing it describes the current design.**
+
+The artefact on disk (2 Aug 05:50) held `cornering_pickup_ok: false`, immersion
+0.0715, gear_face **14.0 mm**, sump 123.44 ml. The LIVE twin carries gear_face
+**19.2 mm** from `gear_geometry_writeback`. Re-running the screen against current
+state gives sump_axial 8.064 mm, oil level 23.14 mm, cornering immersion
+**0.2399** against the 0.08 floor — `cornering_pickup_ok: **True**`,
+`oil_delivery_screen_ok: **True**`.
+
+**A2 is CLEARED at screening.** Free-surface CFD + clear-case bench remain OPEN
+(Bar B, B7).
+
+**Source fix shipped anyway** (`minimum_oil_charge_ml_for_screens` is now wired to
+the DEFAULT path): the frozen 350 ml seed no longer stands while the geometry moves
+underneath it. On the stale 14.0 mm geometry the helper asks 374.7 ml — a 24.7 ml
+shortfall that was the entire difference between pass and fail. A charge the TWIN
+states is the team's number and is never overridden; only a defaulted charge is
+raised to the derived floor, and the raise is printed.
 
 ---
 
