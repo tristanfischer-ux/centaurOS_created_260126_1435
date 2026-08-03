@@ -121,7 +121,24 @@ def compute(twin: Path, grade: str = DEFAULT_GRADE, freq_hz: float | None = None
         steinmetz_kh=co.steinmetz_kh, steinmetz_ke=co.steinmetz_ke,
         steinmetz_alpha=co.steinmetz_alpha)
 
-    # Honest bound flag: the Steinmetz fit does not extend into saturation.
+    # ⭐⭐ NOT A BOUND — A SCREENING ESTIMATE (council, 2026-08-03). I originally
+    # labelled this `basis: bound` reasoning that the Steinmetz fit over-predicts
+    # above saturation, so the answer could only be high. Both council seats
+    # rejected that. Sol: "Do not call 6.04 kW an upper bound. It is an
+    # extrapolated screening estimate" — a bound requires the waveform to be
+    # sinusoidal, the peak to be the true local dynamic peak, the flux purely
+    # alternating, and the sheet unstressed. In a traction IPMSM several of those
+    # fail, and each failure pushes loss UP:
+    #   · saturation extrapolation  over-predicts hysteresis   -25 to -40%
+    #   · PWM + slotting harmonics  UNDER-counted (B is a STATIC PEAK probe,
+    #     not a waveform; eddy loss goes as f^2 B^2)           +30 to +70%
+    #   · rotational flux in the yoke, modelled as alternating +20 to +50%
+    #   · build factor, punched 0.5 mm, edge damage at 1300 Hz  x1.4 to x1.8
+    # Grok's net: the true figure can sit anywhere from ~0.65x to ~1.4x of this.
+    # So the error is TWO-SIDED and the low label was the dangerous one — it
+    # invited the reader to treat the thermal breach as conservative when it may
+    # be understated. `basis` is now `screening_estimate` and the caveat states
+    # the direction of each term rather than implying a single-sided margin.
     above_fit = max(tooth_t, yoke_t) > 1.8
     return {
         "schema": "forgeos.fe.iron_loss_from_lamination/v1",
@@ -129,7 +146,7 @@ def compute(twin: Path, grade: str = DEFAULT_GRADE, freq_hz: float | None = None
         "tooth_loss_w": loss["tooth_loss_w"],
         "yoke_loss_w": loss["yoke_loss_w"],
         "dominant_region": loss["dominant_region"],
-        "basis": "bound" if above_fit else "modelled",
+        "basis": "screening_estimate",
         "lamination_grade": grade,
         "steinmetz_kh": round(co.steinmetz_kh, 6),
         "steinmetz_ke": co.steinmetz_ke,
@@ -139,10 +156,18 @@ def compute(twin: Path, grade: str = DEFAULT_GRADE, freq_hz: float | None = None
         "tooth_mass_kg": round(tooth_kg, 4), "yoke_mass_kg": round(yoke_kg, 4),
         "flux_source": flux_src,
         "caveat": (
-            "UPPER BOUND, not a measurement. The Steinmetz form is fitted below "
-            f"saturation; the yoke sits at {yoke_t:.2f} T, outside that fit, where "
-            "the real material curve rolls off. FLUX is FE-measured; LOSS is "
-            "modelled from it through the grade's derived coefficients."
+            "SCREENING ESTIMATE, not a bound and not a measurement — the error is "
+            "TWO-SIDED. Over-predicting: the Steinmetz form is fitted below "
+            f"saturation and the yoke sits at {yoke_t:.2f} T, outside that fit "
+            "(-25 to -40% on hysteresis). UNDER-predicting: B is a STATIC PEAK "
+            "probe, not a waveform, so PWM and slotting harmonics are uncounted "
+            "and eddy loss goes as f^2*B^2 (+30 to +70%); yoke rotational flux is "
+            "modelled as alternating (+20 to +50%); no build factor is applied "
+            "(x1.4 to x1.8 for punched 0.5 mm at this frequency). The true figure "
+            "may sit roughly 0.65x to 1.4x this value. What is MEASURED is the "
+            "FLUX; the LOSS is modelled from it. Closing it needs transient FE "
+            "waveforms plus Bertotti/iGSE on the Fourier components, and measured "
+            "loss data for this grade above 1.8 T."
         ) if above_fit else (
             "Modelled from FE-measured flux through coefficients derived from the "
             "stated lamination grade."
