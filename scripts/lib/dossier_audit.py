@@ -4106,7 +4106,25 @@ def _selftest() -> int:
             "quantities": {
                 # exact-unit match -> compliance verifies, no matcher-gap flag.
                 # source='brief' -> traceable, so check_provenance stays silent on the clean fixture.
-                "throughput_units": {"value": 1000, "unit": "units", "family": "count", "source": "brief"},
+                "throughput_units": {"value": 1000, "unit": "units", "family": "count",
+                                     "source": "brief"},
+                # ⭐ THE DESIGN MUST DELIVER THE NUMBER, NOT ECHO IT (2026-08-03).
+                # `throughput_units` above is the brief's own figure with source='brief'.
+                # `_qty_is_brief_only_identity` correctly refuses to accept a brief-echoed
+                # quantity as the ACHIEVED value — a design that restates the requirement
+                # has demonstrated nothing — so the brief target had nothing to bind to,
+                # reported UNVERIFIED, and failed this "clean" fixture. The fixture was
+                # UNDER-SPECIFIED, not the rule wrong: it used one key as both the target
+                # and the achievement, which only ever passed because the old same-key
+                # fast path accepted it unconditionally.
+                # A clean design reports a DELIVERED quantity under its own key, with a
+                # tool source and a recorded tool_id so calc_coverage counts it as shown
+                # working rather than a bare value.
+                "achieved_throughput_units": {
+                    "value": 1000, "unit": "units", "family": "count",
+                    "source": "tool:process:throughput",
+                    "provenance": {"tool_id": "process:throughput"},
+                },
             },
         },
         "parsedBrief": {
