@@ -32,6 +32,11 @@ OUTPUT = "_motor_stack/stabilize_fe_front_honesty.json"
 BINDING_DUTY_NM_FALLBACK = 125.2193
 COHERENT_FE_MEAN_NM = 81.558081
 REBALANCED_NAME = "em_fia_front_kit_case_REBALANCED.json"
+PATH_B_NAME = "em_fia_front_kit_case_PATH_B_DEC009.json"
+# DEC-009 architecture freeze dimensions (Path B)
+DEC009_ACTIVE_MM = 130.0
+DEC009_MAG_T_MM = 6.0
+DEC009_MAG_L_MM = 22.5
 
 
 def _iso() -> str:
@@ -61,24 +66,20 @@ def _qmap(state: dict) -> dict:
     return q
 
 
-def _read_rebalanced(twin: Path) -> dict[str, Any]:
-    path = twin / "_motor_stack" / REBALANCED_NAME
-    if not path.is_file():
-        path = twin / "_motor_stack" / "em_fia_front_kit_case.json"
-    if not path.is_file():
-        raise FileNotFoundError(f"no kit-case artefact under {twin}/_motor_stack")
+def _kit_case_summary(path: Path, twin: Path) -> dict[str, Any]:
+    """Extract torque / geometry summary from a kit-case artefact."""
     j = _load(path)
     mg = j.get("machine_geometry") if isinstance(j.get("machine_geometry"), dict) else {}
     wic = j.get("works_in_kit_context") if isinstance(j.get("works_in_kit_context"), dict) else {}
     lp = j.get("loaded_point") if isinstance(j.get("loaded_point"), dict) else {}
     adc = j.get("analytical_duty_check") if isinstance(j.get("analytical_duty_check"), dict) else {}
+    iq = j.get("input_quantities") if isinstance(j.get("input_quantities"), dict) else {}
     sweep = ((j.get("rotor_position_sweep") or {}).get("summary") or {})
-    # Prefer works_in_kit_context, then loaded_point, then analytical_duty_check,
-    # then sweep summary — fail closed to fallback only when none publish the bar.
     mean = (
         wic.get("torque_magnitude_mean_nm")
         or lp.get("torque_magnitude_mean_nm")
         or sweep.get("torque_magnitude_mean_nm")
+        or sweep.get("delivered_mean_torque_nm")
     )
     required = None
     for src in (wic, lp, adc):
@@ -99,12 +100,18 @@ def _read_rebalanced(twin: Path) -> dict[str, Any]:
         ratio = lp.get("mean_torque_vs_required_ratio") or sweep.get(
             "torque_vs_required_ratio_mean"
         )
+    try:
+        rel = str(path.relative_to(twin)) if path.is_relative_to(twin) else str(path)
+    except (TypeError, ValueError):
+        rel = str(path)
     return {
-        "path": str(path.relative_to(twin)) if path.is_relative_to(twin) else str(path),
+        "path": rel,
         "active_length_mm": mg.get("active_length_mm"),
         "magnet_thickness_mm": mg.get("magnet_thickness_mm"),
         "magnet_length_mm": mg.get("magnet_length_mm"),
-        "torque_magnitude_mean_nm": float(mean) if mean is not None else COHERENT_FE_MEAN_NM,
+        "max_rotor_speed_rpm": iq.get("max_rotor_speed_rpm"),
+        "phase_current_design_a": iq.get("phase_current_design_a"),
+        "torque_magnitude_mean_nm": float(mean) if mean is not None else None,
         "required_shaft_torque_nm": required,
         "torque_reliable": reliable,
         "duty_torque_screen_ok": duty_ok,
@@ -113,13 +120,54 @@ def _read_rebalanced(twin: Path) -> dict[str, Any]:
         "torque_sign_consistent": sweep.get("torque_sign_consistent"),
         "torque_magnitude_min_nm": sweep.get("torque_magnitude_min_nm"),
         "torque_magnitude_max_nm": sweep.get("torque_magnitude_max_nm"),
-        "schema_paths_tried": [
-            "works_in_kit_context",
-            "loaded_point",
-            "analytical_duty_check",
-            "rotor_position_sweep.summary",
-        ],
+        "fail_reasons": wic.get("fail_reasons"),
     }
+
+
+def _read_rebalanced(twin: Path) -> dict[str, Any]:
+    path = twin / "_motor_stack" / REBALANCED_NAME
+    if not path.is_file():
+        path = twin / "_motor_stack" / "em_fia_front_kit_case.json"
+    if not path.is_file():
+        raise FileNotFoundError(f"no kit-case artefact under {twin}/_motor_stack")
+    out = _kit_case_summary(path, twin)
+    if out.get("torque_magnitude_mean_nm") is None:
+        out["torque_magnitude_mean_nm"] = COHERENT_FE_MEAN_NM
+    out["schema_paths_tried"] = [
+        "works_in_kit_context",
+        "loaded_point",
+        "analytical_duty_check",
+        "rotor_position_sweep.summary",
+    ]
+    return out
+
+
+def _read_path_b_if_coherent(twin: Path) -> Optional[dict[str, Any]]:
+    """Return Path B summary only if sign-stable DEC-009 geometry freeze holds."""
+    path = twin / "_motor_stack" / PATH_B_NAME
+    if not path.is_file():
+        return None
+    pb = _kit_case_summary(path, twin)
+    try:
+        mean = pb.get("torque_magnitude_mean_nm")
+        active = float(pb.get("active_length_mm") or 0)
+        mag_t = float(pb.get("magnet_thickness_mm") or 0)
+        mag_l = float(pb.get("magnet_length_mm") or 0)
+        sign_ok = pb.get("torque_sign_consistent") is True
+        rev = pb.get("sign_reversals")
+        rev_ok = rev is not None and int(rev) == 0
+        geom_ok = (
+            abs(active - DEC009_ACTIVE_MM) < 0.05
+            and abs(mag_t - DEC009_MAG_T_MM) < 0.01
+            and abs(mag_l - DEC009_MAG_L_MM) < 0.01
+        )
+        mean_ok = mean is not None and float(mean) > 0
+    except (TypeError, ValueError):
+        return None
+    if not (sign_ok and rev_ok and geom_ok and mean_ok):
+        return None
+    pb["coherent"] = True
+    return pb
 
 
 def _set_qty(
@@ -163,9 +211,11 @@ def stabilize(twin: Path) -> dict[str, Any]:
     state = _load(state_path)
     q = _qmap(state)
     reb = _read_rebalanced(twin)
+    path_b = _read_path_b_if_coherent(twin)
     actions: list[str] = []
 
-    # ── S3 binding duty bar (one number — from REBALANCED when present) ────
+    # ── S3 dual torque bars ────────────────────────────────────────────────
+    # Conservative binding = REBALANCED analytical required (pre-24k ledger).
     binding = reb.get("required_shaft_torque_nm")
     if binding is None:
         binding = BINDING_DUTY_NM_FALLBACK
@@ -176,13 +226,13 @@ def stabilize(twin: Path) -> dict[str, Any]:
         )
     else:
         binding = float(binding)
-        binding_basis = "rebalanced_required_shaft_torque_nm"
+        binding_basis = "conservative_rebalanced_reference_not_architecture_power_bar"
         binding_detail = (
-            f"Binding Bar A duty bar taken from {reb['path']} "
-            f"works_in_kit_context.required_shaft_torque_nm={binding} "
-            "(analytical duty check on the last sign-consistent kit-case). "
-            "Not P_shaft/ω delivered (~119.7). Not a silent 24k easier bar — "
-            "re-derive at 24k is a separate register decision."
+            f"CONSERVATIVE ledger bar from {reb['path']} "
+            f"required_shaft_torque_nm={binding} (≈19.5k REBALANCED analytical). "
+            "Not the DEC-009 architecture power bar at 24k — see "
+            "architecture_duty_shaft_torque_nm when Path B is present. "
+            "Not P_shaft/ω delivered (~119.7)."
         )
     _set_qty(
         q,
@@ -195,81 +245,141 @@ def stabilize(twin: Path) -> dict[str, Any]:
         provenance={
             "source": f"artefact:{reb['path']}+stabilize_fe_front_honesty",
             "detail": binding_detail,
-            "identity": "T = P_elec / (η · ω) as published on the kit-case analytical check",
-            "not": "mgu_shaft_torque_nm delivered P_shaft/ω (~119.7)",
+            "identity": "T = P_elec / (η · ω) on REBALANCED analytical check",
+            "not": "architecture_duty at 24k; mgu_shaft_torque_nm delivered P_shaft/ω",
             "campaign_rounded_alias_nm": BINDING_DUTY_NM_FALLBACK,
             "note_on_alias": (
                 "125.2193 appears in older campaign prose; delta vs REBALANCED "
-                f"{binding} is rounding/η-literal only (~0.004 N·m). Binding is the artefact."
+                f"{binding} is rounding/η-literal only (~0.004 N·m)."
             ),
         },
-        condition="Bar A clearance bar until a DEC names the 24k identity",
+        condition="Conservative ledger bar; architecture bar is separate when Path B exists",
         scope="module",
     )
-    actions.append(f"binding_duty_shaft_torque_nm={binding}")
+    actions.append(f"binding_duty_shaft_torque_nm={binding} ({binding_basis})")
 
-    # ── S2 last sign-consistent kit-case FE mean (NOT duty-clear SIGHT) ────
-    mean_fe = float(reb["torque_magnitude_mean_nm"])
-    fe_caveat = (
-        "SIGN-CONSISTENT mean only (sign_reversals=0). "
-        f"torque_reliable={reb.get('torque_reliable')}; "
-        f"duty_torque_screen_ok={reb.get('duty_torque_screen_ok')}; "
-        f"mean_ratio={reb.get('mean_torque_vs_required_ratio')}. "
-        "Does NOT clear the binding duty bar. NOT Bar A FE SIGHT. "
-        f"Sweep |T| range "
-        f"{reb.get('torque_magnitude_min_nm')}–{reb.get('torque_magnitude_max_nm')} N·m."
+    arch_duty = None
+    if path_b and path_b.get("required_shaft_torque_nm") is not None:
+        arch_duty = float(path_b["required_shaft_torque_nm"])
+        _set_qty(
+            q,
+            "architecture_duty_shaft_torque_nm",
+            arch_duty,
+            unit="N·m",
+            family="torque",
+            basis="path_b_dec009_analytical_required_at_24k",
+            source="tool:em_fia_front_kit_case+PATH_B",
+            provenance={
+                "source": f"artefact:{path_b['path']}",
+                "detail": (
+                    f"Analytical shaft torque at DEC-009 freeze (24k rpm / 250 kW / twin η) "
+                    f"from Path B kit-case = {arch_duty} N·m. This is the architecture "
+                    "power bar. Path B mean clears this; conservative binding may not."
+                ),
+                "max_rotor_speed_rpm": path_b.get("max_rotor_speed_rpm"),
+                "active_length_mm": path_b.get("active_length_mm"),
+            },
+            condition="DEC-009 architecture power bar from Path B analytical duty",
+            scope="module",
+        )
+        actions.append(f"architecture_duty_shaft_torque_nm={arch_duty}")
+
+    # ── S2 last sign-consistent kit-case FE mean (NOT duty-clear) ─────────
+    # Prefer coherent Path B (DEC-009 freeze) over REBALANCED (pre-DEC-009).
+    if path_b is not None:
+        mean_fe = float(path_b["torque_magnitude_mean_nm"])
+        fe_src = path_b
+        fe_epoch = "DEC-009 Path B (24k/130, magnets 6×22.5)"
+        fe_condition = (
+            "Path B sign-consistent kit-case mean at DEC-009 freeze; "
+            "duty_screen FAIL while torque_reliable=false by design"
+        )
+        geometry_note = (
+            "PATH_B_DEC009: active≈130 mm, 24,000 rpm, magnets 6.0×22.5 mm. "
+            "Failed em_fia_front_kit_case_DEC009.json (8.85×14.58 magnets) is NOT this."
+        )
+    else:
+        mean_fe = float(reb["torque_magnitude_mean_nm"])
+        fe_src = reb
+        fe_epoch = "pre-DEC-009 REBALANCED (≈97.58 mm / 19.5k)"
+        fe_condition = "pre-DEC-009 sign-consistent FE mean (REBALANCED); duty screen FAIL"
+        geometry_note = (
+            "REBALANCED is pre-DEC-009 geometry (active_length≈97.58 mm, "
+            "~19,500 rpm class) — not the 24k/130 freeze. Path B artefact absent "
+            "or not coherent."
+        )
+
+    ratio_vs_binding = mean_fe / float(binding) if binding else None
+    ratio_vs_arch = (
+        mean_fe / float(arch_duty) if arch_duty and arch_duty > 0 else None
     )
+    fe_caveat = (
+        f"SIGN-CONSISTENT mean only ({fe_epoch}). "
+        f"torque_reliable={fe_src.get('torque_reliable')}; "
+        f"duty_torque_screen_ok={fe_src.get('duty_torque_screen_ok')}; "
+        f"fail_reasons={fe_src.get('fail_reasons')}; "
+        f"mean_vs_architecture_ratio={ratio_vs_arch}; "
+        f"mean_vs_conservative_binding_ratio={ratio_vs_binding}. "
+        "duty_torque_screen_ok requires torque_reliable=True (dyno/map) by kit-case "
+        "design — false here is NOT proof of short torque vs architecture bar. "
+        "NOT ship_ok. NOT automatic Bar A close. "
+        f"Sweep |T| range "
+        f"{fe_src.get('torque_magnitude_min_nm')}–{fe_src.get('torque_magnitude_max_nm')} N·m."
+    )
+    fe_basis = "kit_case_sign_consistent_mean_not_duty_clear"
     _set_qty(
         q,
         "last_coherent_kit_case_fe_mean_nm",
         mean_fe,
         unit="N·m",
         family="torque",
-        basis="kit_case_sign_consistent_mean_not_duty_clear",
+        basis=fe_basis,
         source="tool:em_fia_front_kit_case",
         provenance={
-            "source": f"artefact:{reb['path']}",
+            "source": f"artefact:{fe_src['path']}",
             "detail": (
                 "Kit-case position-sweep mean with torque_sign_consistent and no "
-                "sign-reversal thrash. Name retains historical key; basis makes "
-                "explicit this is NOT duty-clear / NOT torque_reliable SIGHT."
+                "sign-reversal thrash. NOT duty-clear / NOT torque_reliable SIGHT."
             ),
             "caveat": fe_caveat,
-            "sign_reversals": reb.get("sign_reversals"),
-            "torque_sign_consistent": reb.get("torque_sign_consistent"),
-            "torque_reliable": reb.get("torque_reliable"),
-            "duty_torque_screen_ok": reb.get("duty_torque_screen_ok"),
-            "mean_torque_vs_required_ratio": reb.get("mean_torque_vs_required_ratio"),
-            "torque_magnitude_min_nm": reb.get("torque_magnitude_min_nm"),
-            "torque_magnitude_max_nm": reb.get("torque_magnitude_max_nm"),
-            "active_length_mm": reb.get("active_length_mm"),
-            "geometry_note": (
-                "REBALANCED is pre-DEC-009 geometry (active_length≈97.58 mm, "
-                "~19,500 rpm class) — not the 24k/130 freeze."
-            ),
+            "sign_reversals": fe_src.get("sign_reversals"),
+            "torque_sign_consistent": fe_src.get("torque_sign_consistent"),
+            "torque_reliable": fe_src.get("torque_reliable"),
+            "duty_torque_screen_ok": fe_src.get("duty_torque_screen_ok"),
+            "mean_torque_vs_required_ratio": fe_src.get("mean_torque_vs_required_ratio"),
+            "torque_magnitude_min_nm": fe_src.get("torque_magnitude_min_nm"),
+            "torque_magnitude_max_nm": fe_src.get("torque_magnitude_max_nm"),
+            "active_length_mm": fe_src.get("active_length_mm"),
+            "magnet_thickness_mm": fe_src.get("magnet_thickness_mm"),
+            "magnet_length_mm": fe_src.get("magnet_length_mm"),
+            "geometry_note": geometry_note,
+            "ratio_vs_architecture_duty": ratio_vs_arch,
+            "ratio_vs_conservative_binding": ratio_vs_binding,
         },
-        condition="pre-DEC-009 sign-consistent FE mean (REBALANCED); duty screen FAIL",
+        condition=fe_condition,
         scope="module",
     )
-    # Alias with an honest name for new consumers
     _set_qty(
         q,
         "last_sign_consistent_kit_case_fe_mean_nm",
         mean_fe,
         unit="N·m",
         family="torque",
-        basis="kit_case_sign_consistent_mean_not_duty_clear",
+        basis=fe_basis,
         source="tool:em_fia_front_kit_case",
         provenance={
-            "source": f"artefact:{reb['path']}",
+            "source": f"artefact:{fe_src['path']}",
             "detail": "Preferred key; same value as last_coherent_kit_case_fe_mean_nm.",
             "caveat": fe_caveat,
             "alias_of": "last_coherent_kit_case_fe_mean_nm",
         },
-        condition="pre-DEC-009 sign-consistent FE mean (REBALANCED); duty screen FAIL",
+        condition=fe_condition,
         scope="module",
     )
-    actions.append(f"last_sign_consistent_kit_case_fe_mean_nm={mean_fe} (duty_clear=false)")
+    actions.append(
+        f"last_sign_consistent_kit_case_fe_mean_nm={mean_fe} "
+        f"from {fe_src['path']} (duty_clear=false)"
+    )
 
     # ── S1 relabel option-screen product torque ────────────────────────────
     ratio_row = q.get("dec_009_adopted_torque_ratio")
@@ -291,18 +401,19 @@ def stabilize(twin: Path) -> dict[str, Any]:
             "detail": (
                 f"ARITHMETIC PRODUCT: binding_duty_shaft_torque_nm ({binding}) × "
                 f"dec_009_adopted_torque_ratio ({ratio}) = {product}. "
-                "This is NOT a kit-case FEMM mean at the DEC-009 freeze. "
+                "This is NOT a kit-case FEMM mean. "
                 f"Last sign-consistent kit-case mean is {mean_fe} N·m "
-                f"(see last_sign_consistent_kit_case_fe_mean_nm / {reb['path']}; "
+                f"(see last_sign_consistent_kit_case_fe_mean_nm / {fe_src['path']}; "
                 f"duty_clear=false)."
             ),
             "caveat": (
                 "Do not use this field as FE SIGHT for Bar A close. "
-                "DEC-009 option-screen ratio is a prior campaign measurement; "
-                "live kit-case at 24k/130 is open / unreliable until re-solved."
+                "Option-screen product remains until a DEC sets product = kit-case FE. "
+                f"Path B kit-case mean ({mean_fe} N·m) is on last_sign_consistent_* only."
             ),
             "formula": "binding_duty_shaft_torque_nm * dec_009_adopted_torque_ratio",
             "binding_duty_shaft_torque_nm": binding,
+            "architecture_duty_shaft_torque_nm": arch_duty,
             "torque_ratio": ratio,
             "last_sign_consistent_kit_case_fe_mean_nm": mean_fe,
         },
@@ -340,7 +451,8 @@ def stabilize(twin: Path) -> dict[str, Any]:
         base["magnet_thickness_mm"] = reb["magnet_thickness_mm"]
     if reb.get("magnet_length_mm") is not None:
         base["magnet_length_mm"] = reb["magnet_length_mm"]
-    base["mgu_fe_shaft_torque_nm"] = mean_fe
+    # Baseline FE mean is always REBALANCED epoch — never Path B / DEC-009.
+    base["mgu_fe_shaft_torque_nm"] = float(reb["torque_magnitude_mean_nm"])
     base["geometry_epoch"] = "pre_DEC_009_REBALANCED"
     # magnet temp continuous reference if still missing
     if base.get("mgu_magnet_temp_c") is None:
@@ -385,30 +497,52 @@ def stabilize(twin: Path) -> dict[str, Any]:
     )
 
     # ── S5 decision register residual ──────────────────────────────────────
-    residual = (
-        "ARCHITECTURE freeze (24,000 rpm / 130 mm) stands under assumption. "
-        "FE kit-case SIGHT is NOT closed: last coherent kit-case mean is "
-        f"{mean_fe:.3f} N·m at ~97.58 mm / 19,500 rpm (REBALANCED); "
-        "DEC-009 hybrid/option kit-case artefact is unreliable "
-        "(sign reversals / torque_reliable=false). "
-        f"Contract field mgu_fe_shaft_torque_nm={product} is an option-screen "
-        "ARITHMETIC PRODUCT (binding duty × ratio), not kit-case FE. "
-        "Bar A FE clearance remains OPEN until a provenance-frozen kit-case "
-        "solve at the freeze geometry clears the binding duty bar. "
-        "Reverses if DEC-008 reverses or release FoS fails (Bar B / B9)."
-    )
+    if path_b is not None:
+        residual = (
+            "ARCHITECTURE freeze (24,000 rpm / 130 mm) stands. "
+            f"Path B kit-case FE (sign-consistent) mean = {mean_fe:.3f} N·m at "
+            "130 mm / 24k / magnets 6×22.5 (em_fia_front_kit_case_PATH_B_DEC009). "
+            f"Architecture power bar = {arch_duty} N·m; mean ratio ≈ "
+            f"{ratio_vs_arch:.3f}× (clears architecture bar numerically). "
+            f"Conservative binding bar = {binding} N·m; mean ratio ≈ "
+            f"{(ratio_vs_binding or 0):.3f}× (does NOT clear conservative binding). "
+            "duty_torque_screen_ok remains false because kit-case keeps "
+            "torque_reliable=false until dyno/map — fail reason is reliability gate, "
+            "not short mean vs architecture bar. "
+            f"mgu_fe_shaft_torque_nm={product} is still option-screen PRODUCT, not kit-case FE. "
+            "Bar A / ship_ok remain OPEN. Failed DEC009 (8.85 mm magnets) is not SIGHT. "
+            "Reverses if DEC-008 reverses or release FoS fails (Bar B / B9)."
+        )
+        reg_notes = (
+            "2026-08-04 Path B: sign-stable kit-case FE at freeze geometry. "
+            "Dual bars published (architecture vs conservative binding). "
+            "FE mean label = Path B; duty_screen still open (torque_reliable). "
+            "Do not mint ship_ok."
+        )
+    else:
+        residual = (
+            "ARCHITECTURE freeze (24,000 rpm / 130 mm) stands under assumption. "
+            "FE kit-case SIGHT is NOT closed: last coherent kit-case mean is "
+            f"{mean_fe:.3f} N·m at ~97.58 mm / 19,500 rpm (REBALANCED); "
+            "DEC-009 Path B artefact absent or not coherent. "
+            f"Contract field mgu_fe_shaft_torque_nm={product} is an option-screen "
+            "ARITHMETIC PRODUCT (binding duty × ratio), not kit-case FE. "
+            "Bar A FE clearance remains OPEN. "
+            "Reverses if DEC-008 reverses or release FoS fails (Bar B / B9)."
+        )
+        reg_notes = (
+            "2026-08-04 stabilise: status remains FROZEN_UNDER_ASSUMPTION "
+            "(architecture). FE SIGHT open — see residual_risk. "
+            "Do not read BAR A CLOSED as kit-case FE pass."
+        )
     if reg_path.is_file():
         reg = _load(reg_path)
         if isinstance(reg, list):
             for d in reg:
                 if isinstance(d, dict) and d.get("id") == "DEC-009":
                     d["residual_risk"] = residual
-                    d["notes"] = (
-                        "2026-08-04 stabilise: status remains FROZEN_UNDER_ASSUMPTION "
-                        "(architecture). FE SIGHT open — see residual_risk. "
-                        "Do not read BAR A CLOSED as kit-case FE pass."
-                    )
-                    actions.append("DEC-009 residual_risk updated (FE SIGHT open)")
+                    d["notes"] = reg_notes
+                    actions.append("DEC-009 residual_risk updated (FE SIGHT dual-bar)")
             _atomic_write(reg_path, json.dumps(reg, indent=2, ensure_ascii=False) + "\n")
             # S6 sync into state
             state["decisionRegister"] = reg
@@ -428,18 +562,25 @@ def stabilize(twin: Path) -> dict[str, Any]:
         "twin": str(twin),
         "actions": actions,
         "binding_duty_shaft_torque_nm": binding,
+        "architecture_duty_shaft_torque_nm": arch_duty,
         "option_screen_product_nm": product,
         "last_sign_consistent_kit_case_fe_mean_nm": mean_fe,
-        "last_coherent_kit_case_fe_mean_nm": mean_fe,  # historical key; same value
+        "last_coherent_kit_case_fe_mean_nm": mean_fe,
+        "fe_mean_source": fe_src.get("path"),
         "fe_mean_duty_clear": False,
-        "fe_mean_torque_reliable": reb.get("torque_reliable"),
+        "fe_mean_torque_reliable": fe_src.get("torque_reliable"),
+        "ratio_vs_architecture_duty": ratio_vs_arch,
+        "ratio_vs_conservative_binding": ratio_vs_binding,
+        "path_b_adopted": path_b is not None,
         "rebalanced": reb,
+        "path_b": path_b,
         "ship_ok": False,
         "not_done": [
-            "em_fia_front_kit_case re-solve",
-            "Bar A FE close",
+            "torque_reliable / dyno-map close",
+            "Bar A FE close / ship_ok",
             "MemPalace rewrite",
-            "edit em_fia_front_kit_case.py",
+            "edit em_fia_front_kit_case.py to force torque_reliable",
+            "retire conservative binding 125.2 without DEC",
         ],
     }
     _atomic_write(
@@ -553,6 +694,7 @@ def _selftest() -> int:
             "alias_fe",
             abs(float(q["last_sign_consistent_kit_case_fe_mean_nm"]["value"]) - 81.558081) < 1e-6,
         )
+        ck("no_arch_without_path_b", "architecture_duty_shaft_torque_nm" not in q)
         base = q["dec_009_baseline_reference"]
         ck("base_rpm", base.get("max_rotor_speed_rpm") == 19500, str(base))
         ck("base_stack", float(base.get("stack_length_mm")) == 98.33, str(base))
@@ -562,11 +704,57 @@ def _selftest() -> int:
         ck("base_fe_not_product", abs(float(base.get("mgu_fe_shaft_torque_nm")) - 81.558081) < 1e-6)
         ck("ship_ok_false", st.get("ship_ok") is False)
         reg = _load(twin / "10-decision-register.json")
-        ck("residual", "FE kit-case SIGHT" in (reg[0].get("residual_risk") or ""))
+        ck("residual", "FE kit-case SIGHT" in (reg[0].get("residual_risk") or "") or "Path B" in (reg[0].get("residual_risk") or ""))
         ck("report", (twin / OUTPUT).is_file())
         # idempotent
         r2 = stabilize(twin)
         ck("idempotent_actions", len(r2.get("actions") or []) >= 1)
+
+        # Path B present → adopt mean + architecture bar
+        (ms / PATH_B_NAME).write_text(
+            json.dumps(
+                {
+                    "machine_geometry": {
+                        "active_length_mm": 130.0,
+                        "magnet_thickness_mm": 6.0,
+                        "magnet_length_mm": 22.5,
+                    },
+                    "input_quantities": {
+                        "max_rotor_speed_rpm": 24000.0,
+                        "phase_current_design_a": 535.0,
+                    },
+                    "works_in_kit_context": {
+                        "torque_magnitude_mean_nm": 122.099939,
+                        "required_shaft_torque_nm": 104.098914,
+                        "torque_reliable": False,
+                        "duty_torque_screen_ok": False,
+                        "mean_torque_vs_required_ratio": 1.172922,
+                        "fail_reasons": ["torque_reliable=false"],
+                    },
+                    "rotor_position_sweep": {
+                        "summary": {
+                            "delivered_mean_torque_nm": 122.099939,
+                            "torque_magnitude_mean_nm": 122.099939,
+                            "sign_reversals": 0,
+                            "torque_sign_consistent": True,
+                            "torque_magnitude_min_nm": 84.967,
+                            "torque_magnitude_max_nm": 145.231,
+                        }
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        r3 = stabilize(twin)
+        st3 = _load(twin / "state.json")
+        q3 = st3["orchestratorContract"]["quantities"]
+        ck("path_b_mean", abs(float(q3["last_sign_consistent_kit_case_fe_mean_nm"]["value"]) - 122.099939) < 1e-6)
+        ck("path_b_arch", abs(float(q3["architecture_duty_shaft_torque_nm"]["value"]) - 104.098914) < 1e-6)
+        ck("path_b_binding_kept", abs(float(q3["binding_duty_shaft_torque_nm"]["value"]) - 125.214912) < 1e-6)
+        ck("path_b_product_still", q3["mgu_fe_shaft_torque_nm"]["basis"] == "option_screen_product_not_kit_case_fe")
+        ck("path_b_adopted_flag", r3.get("path_b_adopted") is True)
+        ck("path_b_ship_false", st3.get("ship_ok") is False)
 
     if fails:
         print("stabilize_fe_front_honesty selftest FAIL:")
