@@ -40544,6 +40544,127 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 continue
             _cp(_rp, f"renders/{_rn}")
 
+    # ── 5c. EM HONESTY PACK (Path B kit-case maths for Jack) ───────────────────
+    # INTENT (2026-08-04 Tristan): dual-bar / torque-sweep / air-gap / geometry /
+    # hero-callout figures must land in the design-pack zip automatically, not
+    # only under _motor_stack/jack_em_pack/. Source of truth is Path B JSON;
+    # renderer is scripts/motor-stack/render_path_b_jack_em_pack.py.
+    _EM_HONESTY_CAPTIONS = {
+        "01-dual-torque-bars.png": (
+            "EM honesty — dual torque bars (architecture duty vs Path B mean vs "
+            "conservative binding vs REBALANCED legacy)"
+        ),
+        "02-torque-vs-rotor-angle.png": (
+            "EM honesty — kit-case |T| vs rotor position (sign-stable sweep; "
+            "not full MTPA)"
+        ),
+        "03-airgap-flux-vs-angle.png": (
+            "EM honesty — air-gap flux density vs rotor position (scalar samples)"
+        ),
+        "04-geometry-identity-card.png": (
+            "EM honesty — DEC-009 machine identity card (stack / magnets / topology)"
+        ),
+        "05-product-hero-em-callouts.jpg": (
+            "EM honesty — product hero with Path B callouts (ship_ok false)"
+        ),
+        "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf": (
+            "EM honesty — full Path B pack (PDF multi-page)"
+        ),
+        "manifest.json": "EM honesty — pack manifest (claims / non-claims)",
+        "README.txt": "EM honesty — how to read these figures",
+    }
+    _jack_dir = os.path.join(run_dir, "_motor_stack", "jack_em_pack")
+    _path_b_art = os.path.join(
+        run_dir, "_motor_stack", "em_fia_front_kit_case_PATH_B_DEC009.json"
+    )
+    _render_jack = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "motor-stack",
+        "render_path_b_jack_em_pack.py",
+    )
+    # Auto-build if Path B exists and pack is missing or older than the artefact
+    if os.path.isfile(_path_b_art) and os.path.isfile(_render_jack):
+        _need_render = not os.path.isdir(_jack_dir)
+        if not _need_render:
+            try:
+                _pb_m = os.path.getmtime(_path_b_art)
+                _pdf = os.path.join(_jack_dir, "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf")
+                if not os.path.isfile(_pdf) or os.path.getmtime(_pdf) + 1.0 < _pb_m:
+                    _need_render = True
+            except OSError:
+                _need_render = True
+        if _need_render:
+            try:
+                import subprocess as _sp_jack
+                _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                _jr = _sp_jack.run(
+                    [sys.executable, _render_jack, "--twin", run_dir],
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                    cwd=_repo_root,
+                )
+                if _jr.returncode != 0:
+                    skipped.append(
+                        f"em-honesty/ (renderer exit {_jr.returncode}: "
+                        f"{(_jr.stderr or _jr.stdout or '')[:200]})"
+                    )
+                else:
+                    print("[bundle] rendered jack_em_pack from Path B artefact", flush=True)
+            except Exception as _jack_exc:  # noqa: BLE001
+                skipped.append(f"em-honesty/ (renderer failed: {_jack_exc})")
+    if os.path.isdir(_jack_dir):
+        _em_any = False
+        for _jn in sorted(os.listdir(_jack_dir)):
+            if _jn.startswith("."):
+                continue
+            _jp = os.path.join(_jack_dir, _jn)
+            if not os.path.isfile(_jp):
+                continue
+            # Ship under em-honesty/ (customer-facing name) not _motor_stack/
+            if _cp(_jp, f"em-honesty/{_jn}"):
+                _em_any = True
+        if _em_any:
+            _em_readme = (
+                "EM HONESTY PACK (Path B kit-case)\n"
+                "================================\n\n"
+                "These figures are generated from the Path B finite-element kit-case\n"
+                "artefact (em_fia_front_kit_case_PATH_B_DEC009.json). They visualise\n"
+                "numbers already on the twin — they do not re-solve the machine.\n\n"
+                "How to read them\n"
+                "---------------\n"
+                "01  Dual torque bars — architecture duty at 24k rpm vs Path B mean\n"
+                "    vs conservative binding ledger vs pre-DEC-009 REBALANCED mean.\n"
+                "02  |Torque| vs rotor position — sign-stable sweep; not a full MTPA map.\n"
+                "03  Air-gap flux density scalars from the same sweep.\n"
+                "04  Machine identity (stack, magnets 6×22.5, topology).\n"
+                "05  Product hero with EM callouts.\n"
+                "PDF Multi-page pack of the above.\n\n"
+                "Honest status (do not over-read)\n"
+                "--------------------------------\n"
+                "- Path B mean clears the architecture power bar at 24k numerically.\n"
+                "- Path B mean does NOT clear the conservative binding ledger bar.\n"
+                "- duty_torque_screen_ok remains false (torque_reliable gate / dyno).\n"
+                "- ship_ok is false. This is not a Bar A close.\n"
+                "- Do not quote failed DEC009 artefacts that re-derived magnets to 8.85 mm.\n\n"
+                "Source renderer: scripts/motor-stack/render_path_b_jack_em_pack.py\n"
+            )
+            _em_readme_path = os.path.join(bundle_dir, "em-honesty", "README.txt")
+            os.makedirs(os.path.dirname(_em_readme_path), exist_ok=True)
+            try:
+                with open(_em_readme_path, "w", encoding="utf-8") as _erf:
+                    _erf.write(_em_readme)
+                included.append("em-honesty/README.txt")
+            except Exception as _ere:  # noqa: BLE001
+                skipped.append(f"em-honesty/README.txt ({_ere})")
+        else:
+            skipped.append("em-honesty/ (jack_em_pack dir empty)")
+    else:
+        skipped.append(
+            "em-honesty/ (absent — no _motor_stack/jack_em_pack; "
+            "run render_path_b_jack_em_pack.py after Path B)"
+        )
+
     # ── 6. ENGINEERING DRAWINGS ────────────────────────────────────────────────
     # INTENT (2026-07-31 Tristan): pack was shipping 20h-old ga-A1.pdf while Blender
     # heroes refreshed hourly — because (a) ad-hoc re-renders never rewrote GA and
@@ -40612,6 +40733,10 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         if not _desc:
             if _rel.startswith("renders/"):
                 _desc = _RENDER_CAPTIONS.get(_base, "Product render (Blender)")
+            elif _rel.startswith("em-honesty/"):
+                _desc = _EM_HONESTY_CAPTIONS.get(
+                    _base, "EM honesty figure (Path B kit-case maths)"
+                )
             elif _rel.startswith("drawings/"):
                 _desc = "Engineering drawing A1 print sheet (PDF)"
             elif _rel.startswith("pcb/") and "/gerbers/" in _rel:
