@@ -1,0 +1,36 @@
+{
+  "schema": "forgeos.motor_stack.em_metric_dictionary/v1",
+  "ran_at": "2026-08-04T19:10:05Z",
+  "ship_ok": false,
+  "metrics": [
+    {
+      "id": "kit_case_position_sweep_mean_abs_T",
+      "definition": "Mean of |weighted-stress torque| over a dense mechanical rotor-position sweep at one fixed commanded current angle, with FOC excitation tracking the rotor.",
+      "is_headline": true,
+      "typical_source": "em_fia_front_kit_case_PATH_B_DEC009 rotor_position_sweep"
+    },
+    {
+      "id": "dense_grid_peak_abs_T",
+      "definition": "Maximum |torque| among all dense MTPA screen points (all commanded angles \u00d7 all sampled rotor positions).",
+      "is_headline": false,
+      "typical_source": "em_fia_mtpa_screen_PATH_B_DENSE summary.peak_torque_magnitude_nm"
+    },
+    {
+      "id": "dense_best_angle_mean_abs_T",
+      "definition": "For each commanded current angle, mean |T| over that angle's rotor positions; then take the angle with the largest mean.",
+      "is_headline": false,
+      "note": "Not comparable 1:1 to kit-case mean if position grids differ."
+    },
+    {
+      "id": "architecture_duty_bar",
+      "definition": "Analytical shaft torque for 250 kW @ 24k rpm (twin \u03b7).",
+      "is_headline": false
+    },
+    {
+      "id": "binding_ledger_bar",
+      "definition": "Conservative binding torque from REBALANCED ledger class (~125.2 N\u00b7m). Separate from architecture duty.",
+      "is_headline": false
+    }
+  ],
+  "rule": "Publish at most ONE headline torque number on partner covers. Secondary metrics must be labelled with their metric id."
+}

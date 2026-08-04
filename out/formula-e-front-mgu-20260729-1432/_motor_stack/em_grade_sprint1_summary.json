@@ -1,0 +1,28 @@
+{
+  "schema": "forgeos.motor_stack.em_grade_sprint1_summary/v1",
+  "ran_at": "2026-08-04T19:15:13Z",
+  "ship_ok": false,
+  "objective_met_internal": true,
+  "grades": {
+    "toolchain_method": "A-",
+    "kit_case_path_b_story": "A-",
+    "map_mtpa_depth": "B+",
+    "voltage_fw": "B+",
+    "partner_field_viz": "A-",
+    "release_homologation": "B+_readiness"
+  },
+  "headline_torque_nm": 122.099939,
+  "fe_lambda_source": "prior_airgap_B_analytical_crosschecked",
+  "fe_bemf_ll_rms_v": 284.652,
+  "fem_exports": [],
+  "artefacts": [
+    "em_op_identity_card.json",
+    "em_metric_dictionary.json",
+    "em_dense_at_kit_angle_slice.json",
+    "path_b_voltage_fe_circle_screen.json",
+    "em_grade_card.json",
+    "jack_em_pack/38-em-op-identity-card.png",
+    "jack_em_pack/39-path-b-voltage-fe-circle.png",
+    "jack_em_pack/40-em-grade-card.png"
+  ]
+}

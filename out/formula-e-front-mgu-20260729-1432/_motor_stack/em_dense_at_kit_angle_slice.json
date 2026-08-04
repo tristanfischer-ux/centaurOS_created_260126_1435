@@ -1,0 +1,12 @@
+{
+  "schema": "forgeos.motor_stack.em_dense_at_kit_angle_slice/v1",
+  "ran_at": "2026-08-04T19:10:05Z",
+  "ship_ok": false,
+  "kit_angle_electrical_deg": -30.0,
+  "kit_case_headline_mean_nm": 122.099939,
+  "dense_at_kit_angle_mean_nm": 53.23611752928102,
+  "dense_at_kit_angle_n_positions": 9,
+  "ratio_dense_mean_over_kit_mean": 0.436,
+  "explanation": "Kit-case Path B uses a 37-point / 1.25\u00b0 mechanical rotor sweep at fixed commanded current angle -30\u00b0 elec. with FOC-style excitation that tracks the rotor (see em_fia_front_kit_case.run_rotor_position_sweep). Mean |T| = 122.10 N\u00b7m over that sweep. Dense MTPA samples only 9 positions over 0\u201345\u00b0 mech at the same commanded angle label, with phase excitation angle = command + pole-pairs\u00d7\u03b8_mech (em_fia_mtpa_screen excitation_tracking). At -30\u00b0 the dense mean |T| = 53.24 N\u00b7m (min 20.54, max 92.71). These are NOT interchangeable headlines. The HEADLINE torque story is the kit-case position-sweep mean. Dense peak on the full grid (106.87 N\u00b7m) and dense best-angle mean (55.71 N\u00b7m @ -20\u00b0) are secondary map metrics.",
+  "rule": "Do not replace headline kit-case mean with dense@angle mean."
+}

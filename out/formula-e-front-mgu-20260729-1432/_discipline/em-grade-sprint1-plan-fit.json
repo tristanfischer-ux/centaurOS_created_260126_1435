@@ -1,0 +1,13 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "em-grade-sprint1",
+  "intent": "EM grade Sprint 1",
+  "maps_to_plan_item": "EM-GRADE-UPLIFT-PLAN-BPLUS-2026-08-04 Sprint 1",
+  "why_now": "",
+  "explicitly_not_doing": [],
+  "depends_on": [],
+  "success_criteria": [],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-04T19:22:07Z"
+}

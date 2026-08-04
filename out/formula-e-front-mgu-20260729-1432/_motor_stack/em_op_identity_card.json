@@ -1,0 +1,70 @@
+{
+  "schema": "forgeos.motor_stack.em_op_identity_card/v1",
+  "ran_at": "2026-08-04T19:10:05Z",
+  "ship_ok": false,
+  "status": "HEADLINE_FROZEN_UNDER_SEEDS",
+  "headline": {
+    "name": "Path B kit-case position-sweep mean |T|",
+    "value_nm": 122.099939,
+    "unit": "N\u00b7m",
+    "current_angle_electrical_deg": -30.0,
+    "phase_current_rms_a": 535.0,
+    "n_rotor_positions": 37,
+    "position_step_mech_deg": 1.25,
+    "sign_consistent": true,
+    "source": "em_fia_front_kit_case_PATH_B_DEC009.json#rotor_position_sweep.summary"
+  },
+  "dual_bars": {
+    "architecture_duty_nm": 104.098914,
+    "architecture_clear_ratio": 1.1729,
+    "architecture_clears": true,
+    "binding_ledger_nm": 125.2,
+    "binding_clear_ratio": 0.9752,
+    "binding_clears": false,
+    "note": "Never collapse architecture and binding into one green tick."
+  },
+  "ripple_at_headline_op": {
+    "torque_magnitude_min_nm": 84.967287,
+    "torque_magnitude_mean_nm": 122.099939,
+    "torque_magnitude_max_nm": 145.231484,
+    "peak_to_peak_nm": 60.264197,
+    "ripple_pkpk_over_mean": 0.4936
+  },
+  "secondary_map_metrics_not_headlines": {
+    "dense_grid_peak_abs_T_nm": 106.865172,
+    "dense_best_angle_mean_abs_T_nm": 55.714801,
+    "dense_best_angle_electrical_deg": -20.0,
+    "dense_at_kit_angle_mean_abs_T_nm": 53.23611752928102,
+    "dense_at_kit_angle_n_positions": 9,
+    "hybrid_map_peak_nm": 106.865172,
+    "hybrid_map_total_screen_points": 1488
+  },
+  "machine": {
+    "active_length_mm": 130.0,
+    "bay_depth_mm": 259.0,
+    "bay_height_mm": 267.0,
+    "bay_width_mm": 343.0,
+    "estimated_active_material_mass_kg": 17.4345,
+    "fits_bay": true,
+    "fits_housing": true,
+    "housing_length_mm": 140.5,
+    "housing_outer_diameter_mm": 198.0,
+    "magnet_length_mm": 22.5,
+    "magnet_regions": 16,
+    "magnet_thickness_mm": 6.0,
+    "radial_airgap_mm": 0.7000000000000028,
+    "rotor_inner_diameter_mm": 105.9,
+    "rotor_outer_diameter_mm": 139.4,
+    "rotor_poles": 8,
+    "slot_depth_mm": 15.0,
+    "stator_inner_diameter_mm": 140.8,
+    "stator_outer_diameter_mm": 188.2,
+    "stator_slots": 24,
+    "topology": "24-slot / 8-pole twin-V interior permanent-magnet synchronous machine"
+  },
+  "loaded_point_single_shot_nm": 118.8716131172735,
+  "torque_reliable": false,
+  "duty_torque_screen_ok": false,
+  "metric_tension_explanation": "Kit-case Path B uses a 37-point / 1.25\u00b0 mechanical rotor sweep at fixed commanded current angle -30\u00b0 elec. with FOC-style excitation that tracks the rotor (see em_fia_front_kit_case.run_rotor_position_sweep). Mean |T| = 122.10 N\u00b7m over that sweep. Dense MTPA samples only 9 positions over 0\u201345\u00b0 mech at the same commanded angle label, with phase excitation angle = command + pole-pairs\u00d7\u03b8_mech (em_fia_mtpa_screen excitation_tracking). At -30\u00b0 the dense mean |T| = 53.24 N\u00b7m (min 20.54, max 92.71). These are NOT interchangeable headlines. The HEADLINE torque story is the kit-case position-sweep mean. Dense peak on the full grid (106.87 N\u00b7m) and dense best-angle mean (55.71 N\u00b7m @ -20\u00b0) are secondary map metrics.",
+  "release_statement": "Headline OP identity under provisional seeds. ship_ok false. Dyno still required for torque_reliable."
+}

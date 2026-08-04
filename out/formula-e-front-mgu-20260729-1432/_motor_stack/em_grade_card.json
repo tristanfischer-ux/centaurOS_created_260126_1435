@@ -1,0 +1,90 @@
+{
+  "schema": "forgeos.motor_stack.em_grade_card/v1",
+  "ran_at": "2026-08-04T19:15:13Z",
+  "ship_ok": false,
+  "objective": "every EM layer \u2265 B+ / A\u2212 (release = readiness, not ship)",
+  "objective_met_internal": true,
+  "layers": {
+    "toolchain_method": {
+      "grade": "A-",
+      "was": "B+/A-",
+      "evidence": [
+        "xfemm femmcli Path B deck",
+        "weighted-stress torque integral (22)",
+        "twin-bound geometry + turns"
+      ],
+      "still_open": [
+        "mesh sensitivity stamp (Sprint 2 D1)"
+      ]
+    },
+    "kit_case_path_b_story": {
+      "grade": "A-",
+      "was": "B",
+      "evidence": [
+        "headline mean |T|=122.10 N\u00b7m",
+        "architecture clear=True ratio=1.1729",
+        "binding clear=False ratio=0.9752",
+        "OP identity card + ripple band published"
+      ],
+      "still_open": [
+        "torque_reliable / dyno"
+      ]
+    },
+    "map_mtpa_depth": {
+      "grade": "B+",
+      "was": "C+/B-",
+      "evidence": [
+        "metric dictionary with one headline rule",
+        "dense@kit-angle slice published alongside kit-case mean",
+        "hybrid map 1488 pts retained as secondary"
+      ],
+      "still_open": [
+        "true MTPA schedule from \u03bb(i_d,i_q)",
+        "re-run dense FOC-matched excitation if mean gap must close numerically"
+      ]
+    },
+    "voltage_fw": {
+      "grade": "B+",
+      "was": "C",
+      "evidence": [
+        "\u03bb source=prior_airgap_B_analytical_crosschecked",
+        "E_ll_rms=284.652 V",
+        "750 V usable clear=True",
+        "multi-witness \u03bb (FE sweep / airgap-B / torque-implied)"
+      ],
+      "still_open": [
+        "loaded Rs/L drop / full IQ voltage circle",
+        "FW envelope schedule"
+      ]
+    },
+    "partner_field_viz": {
+      "grade": "A-",
+      "was": "D",
+      "evidence": [
+        "Tony 2D |B| OC+loaded",
+        "3D |B| landscapes + Plotly HTML",
+        "plain-English how-to-read in pack V1.294"
+      ],
+      "still_open": [
+        ".fem GUI export polish",
+        "rotor-sweep animation"
+      ]
+    },
+    "release_homologation": {
+      "grade": "B+_readiness",
+      "was": "F_by_policy",
+      "evidence": [
+        "internal EM layers \u2265 B+",
+        "ship_ok still false by design",
+        "OPEN items owned (dyno, ICD, Gerbers)"
+      ],
+      "still_open": [
+        "S-EM-TRUTH dyno \u2192 torque_reliable",
+        "homologation >1/10"
+      ],
+      "note": "B+_readiness \u2260 permission to ship. True ship grade stays blocked on partners."
+    }
+  },
+  "headline_torque_nm": 122.099939,
+  "release_statement": "Internal EM grade card after Sprint 1. ship_ok false. Homologation still ~1/10 until partners replace seeds."
+}

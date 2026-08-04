@@ -1,0 +1,14 @@
+{
+  "schema": "forgeos.p_stage_discipline.boundary/v1",
+  "stage_id": "em-grade-sprint1",
+  "exit_code": 0,
+  "verdict": "PROCEED",
+  "log": "\u2500\u2500 FINISHED: em-grade-sprint1\n   [ok ] PRESENT    scripts/motor-stack/em_grade_sprint1.py\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/em_grade_card.json\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/em_op_identity_card.json\n\u2500\u2500 NEXT: Sprint 2\n\u2500\u2500 GATES: 7/7 pass\n\u2500\u2500 PROCEED\n",
+  "produced": [
+    "scripts/motor-stack/em_grade_sprint1.py",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/em_grade_card.json",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/em_op_identity_card.json"
+  ],
+  "needs": [],
+  "checked_utc": "2026-08-04T19:29:45Z"
+}

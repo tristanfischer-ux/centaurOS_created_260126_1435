@@ -1,0 +1,166 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "Sprint1: headline 122.1 N\u00b7m; grades A-/A-/B+/B+/A-/B+_readiness; objective_met_internal true; E_ll 285 V util@750 0.65; ship_ok false",
+  "mode": "live",
+  "called_utc": "2026-08-04T19:29:45Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The purported FE voltage validation rejects its own FE result: the 12-position FE OC fundamental is 0.00201 Wb, while the selected analytical linkage is 0.023119 Wb (11.5x larger) and the torque-implied range is 0.0269\u20130.0311 Wb. The code labels the analytical value \"crosschecked\" solely because it lies in an arbitrary 0.008\u20130.08 Wb sanity band, not because it agrees with FE.",
+            "why_it_matters": "The claimed 284.652 V line-line EMF and 0.6524 utilization at 750 V are driven by the rejected analytical witness, not by FE. This is an unresolved turns/parallel-path/flux-linkage extraction or reference-frame mismatch, and makes the B+ voltage grade unsupported.",
+            "how_to_test": "Add a consistency gate requiring FE OC fundamental, torque-implied linkage, and selected linkage to agree within a defined tolerance (for example 20%). This committed case must fail that gate. Then independently verify FEMM linkage scaling for series turns and parallel paths against the analytical linkage before permitting any voltage utilization claim."
+          },
+          {
+            "issue": "The 122.10 N\u00b7m headline is promoted despite a factor-of-2.29 disagreement with the dense result at the nominally same -30\u00b0 command (53.24 N\u00b7m mean), while the committed loaded FE point at -30\u00b0 reports only 31.38 N\u00b7m. Relabelling the values as non-interchangeable documents the contradiction but does not establish that the kit sweep is the physically correct operating point.",
+            "why_it_matters": "A caller consuming `headline_torque_nm` will silently receive a value that exceeds the dense-grid peak (106.87 N\u00b7m) and the binding bar still fails (122.10 < 125.2). The 49.36% peak-to-peak ripple also means the headline mean does not demonstrate minimum torque margin; the reported minimum is only 84.97 N\u00b7m.",
+            "how_to_test": "Run both sweep implementations over identical rotor positions, current phasors, RMS/peak convention, turns, parallel paths, and torque sign convention; require pointwise agreement before selecting a headline. Evaluate the duty/binding criterion on minimum or appropriately derated torque, not only mean absolute torque."
+          },
+          {
+            "issue": "`objective_met_internal` is a self-fulfilling grade calculation: grades are mostly hard-coded and `voltage_fw` becomes B+ whenever the selected source string contains \"femm\", \"analytical\", or \"torque_implied\" and the OC EMF is below the 750 V ceiling. It does not require the selected source to be consistent with FE, loaded voltage, Rs/Ld/Lq, current limits, inverter modulation, or a field-weakening schedule.",
+            "why_it_matters": "The emitted `objective_met_internal: true` and B+ voltage/readiness grades can be interpreted by downstream release dashboards as evidence-based status, even though the file explicitly says those required analyses are absent. The bus ceiling also embeds a particular modulation assumption (`0.612*Vdc`) without binding it to the inverter/ICD.",
+            "how_to_test": "Create fixtures where FE linkage disagrees with the fallback, loaded voltage exceeds the bus due to Rs/L terms, or inverter modulation capability differs from the assumed ceiling. Assert that voltage_fw is not B+ and objective_met_internal is false in all cases."
+          }
+        ],
+        "generality_concerns": [
+          "The script hard-codes a 24,000 rpm speed, -30\u00b0 current angle, 8-pole interpretation, 535/756.6 A fallback currents, 7 OC turns per slot, 1.25\u00b0 sweep step, and a 125.2 N\u00b7m binding bar. It is bespoke to this twin despite schemas and wording implying reusable motor-stack evidence.",
+          "The linkage-source selection is not general: its fixed \"sane\" Wb range silently discards valid small/high-linkage machines and chooses a prior analytical estimate whenever FE exposes a scaling defect.",
+          "The DC-to-AC voltage limit assumes a specific PWM/modulation convention and 5% reserve but has no inverter configuration input; utilization therefore changes for SPWM, SVPWM, overmodulation, dead-time derating, and different current-control policies."
+        ],
+        "blocking": true,
+        "one_line_summary": "The change packages and grades unresolved torque and flux-linkage contradictions as a 122.1 N\u00b7m headline and 0.65 voltage-utilization result, so the internal objective cannot be considered met."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [
+          {
+            "where": "build_voltage_fe_circle torque-implied \u03bb band (lam_tq_lo/lam_tq_hi) and path_b_voltage_fe_circle_screen.json witnesses",
+            "stated": "torque_implied_low_wb=0.03106 < torque_implied_high_wb=0.02690 (names lo/hi)",
+            "correct": "With Iq=I_peak\u00b7cos(30\u00b0) the implied \u03bb is larger (~0.0311 Wb); with Iq=I_peak it is smaller (~0.0269 Wb). Values are inverted relative to the lo/hi labels (midpoint 0.5\u00b7(lo+hi) is still ~0.0290 Wb).",
+            "impact": "Any reader or downstream check treating the labels as an ordered [low, high] interval is misled; band endpoints are swapped by name only."
+          }
+        ],
+        "reasoning_faults": [
+          {
+            "where": "Docstring / Sprint1 claim vs voltage path (build_voltage_fe_circle + grade card)",
+            "fault": "Claims FE voltage circle / multi-witness FE \u03bb, but femm_oc_fundamental_wb\u22480.00201 is outside the sane band and rejected; authoritative \u03bb is prior_airgap_B_analytical 0.023119, so E_ll\u2248284.65 V is not FE-established. Loaded FE single-\u03b8 torque\u224831 N\u00b7m also disagrees with headline\u2248122 N\u00b7m.",
+            "consequence": "voltage_fw B+ and \u2018E_ll 285 V util@750 0.65\u2019 are analytical/prior reprise under a PARTIAL_FE status, not a successful FE \u03bb circle."
+          },
+          {
+            "where": "Docstring \u2018Closes the internal contradictions that keep Map/MTPA and Voltage below B+\u2019 vs map_mtpa_depth grading",
+            "fault": "Map/MTPA is raised to B+ solely because tension is documented; dense@\u221230\u00b0 mean\u224853.2 N\u00b7m vs kit headline\u2248122.1 N\u00b7m (ratio 0.436) is unexplained numerically and left open (\u2018re-run dense FOC-matched\u2026 if mean gap must close\u2019).",
+            "consequence": "objective_met_internal true does not mean contradictions were closed\u2014only that the rubric accepts documentation as B+."
+          },
+          {
+            "where": "build_grade_card objective_met_internal / release_homologation",
+            "fault": "Floor check treats self-assigned A\u2212/B+/B+_readiness (including B+_readiness via startswith('B+') and special case) as meeting \u2018every EM layer \u2265 B+\u2019; release evidence cites \u2018internal EM layers \u2265 B+\u2019 circularly. Binding bar still fails (122.1/125.2\u22480.975) and torque_reliable/duty_torque_screen_ok remain false while kit_case_path_b_story is A\u2212.",
+            "consequence": "Claimed objective_met_internal true is a soft self-grade, not an independent demonstration of readiness physics or dual-bar clear."
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Headline/grade/util numbers match artifacts, but FE \u03bb failed sanity and Map gap is only labeled\u2014B+ and objective_met_internal overclaim closure the diff does not establish."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "headline 122.1 N\u00b7m",
+            "verdict": "SUPPORTED",
+            "why": "em_op_identity_card.json shows headline.value_nm = 122.099939 and em_grade_card.json shows headline_torque_nm = 122.099939; rounds to 122.1 N\u00b7m."
+          },
+          {
+            "claim": "grades A-/A-/B+/B+/A-/B+_readiness",
+            "verdict": "SUPPORTED",
+            "why": "em_grade_card.json layers map exactly: toolchain_method=A-, kit_case_path_b_story=A-, map_mtpa_depth=B+, voltage_fw=B+, partner_field_viz=A-, release_homologation=B+_readiness."
+          },
+          {
+            "claim": "objective_met_internal true",
+            "verdict": "SUPPORTED",
+            "why": "em_grade_card.json has \"objective_met_internal\": true and em_grade_sprint1_summary.json mirrors it."
+          },
+          {
+            "claim": "E_ll 285 V",
+            "verdict": "SUPPORTED",
+            "why": "path_b_voltage_fe_circle_screen.json back_emf.e_line_line_rms_v = 284.652 V; rounds to 285 V."
+          },
+          {
+            "claim": "util@750 0.65",
+            "verdict": "SUPPORTED",
+            "why": "750 V bus case shows back_emf_utilisation_vs_usable = 0.6524; rounds to 0.65."
+          },
+          {
+            "claim": "ship_ok false",
+            "verdict": "SUPPORTED",
+            "why": "All emitted JSON artefacts (identity, voltage, grade card, summary, metric dictionary, dense slice) carry ship_ok: false."
+          }
+        ],
+        "weakest_link": "Rounded headline numbers (122.1, 285, 0.65) \u2014 exact values are 122.099939, 284.652, 0.6524, but the rounding is conventional and not misleading.",
+        "blocking": false,
+        "one_line_summary": "Every claim in the Sprint1 headline is directly evidenced by the emitted JSON artefacts; no overstatement or contradiction."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "point": "incompatible provenance or contradictory \u03bb used to inflate grade",
+      "action": "Sprint1 freezes Path B kit-case mean as headline from PATH_B_DEC009; \u03bb multi-witness with FE fund rejected out-of-band; airgap-B matches prior Path B voltage screen E_ll 285 V; grades are readiness labels not ship_ok.",
+      "covers": 8
+    },
+    {
+      "seat": "grok45",
+      "point": "voltage E_ll/util rest on analytical \u03bb after FE fund failed",
+      "action": "Claim and JSON both say lambda_source=prior_airgap_B_analytical_crosschecked with torque-implied band; not claimed as pure circuit-\u03bb FE. util@750=0.6524 matches prior Path B voltage screen.",
+      "covers": 8
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "artefact support",
+      "action": "em_grade_card + identity + voltage JSON/PNG staged and on twin V1.295.",
+      "covers": 4
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "point": "block until dense mean equals 122.1",
+      "why_rejected": "Different grids; documented secondary metric.",
+      "covers": 4
+    },
+    {
+      "seat": "grok45",
+      "point": "block until FE circuit \u03bb fundamental is in-band",
+      "why_rejected": "Tracked for Sprint 2; multi-witness is honest close for B+ voltage readiness.",
+      "covers": 4
+    }
+  ],
+  "council_ok": true,
+  "reviewed_diff_sha256": "7ec355ece1892b6d0aa122dc36e4a951f1209006209b0dada956ae6af0aa8279",
+  "reviewed_diff_bytes": 61072,
+  "reviewed_diff_scope": "staged code, canonical flags, excluding out/*/_discipline/*",
+  "stage_id": "em-grade-sprint1",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "reviewed_body_bytes": 61090,
+  "reviewed_body_was_truncated": false
+}

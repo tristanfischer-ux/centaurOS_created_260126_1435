@@ -1,0 +1,139 @@
+{
+  "schema": "forgeos.motor_stack.path_b_voltage_fe_circle_screen/v1",
+  "ran_at": "2026-08-04T19:15:13Z",
+  "ship_ok": false,
+  "status": "PARTIAL_FE_BEMF_CIRCLE",
+  "operating_point": {
+    "speed_rpm": 24000.0,
+    "electrical_frequency_hz": 1600.0,
+    "rotor_poles": 8,
+    "kit_case_current_angle_electrical_deg": -30.0,
+    "kit_case_phase_current_rms_a": 535.0
+  },
+  "flux_linkage": {
+    "lambda_oc_phase_peak_abs_wb": 0.023119,
+    "lambda_source": "prior_airgap_B_analytical_crosschecked",
+    "witnesses": {
+      "prior_airgap_B_analytical_wb": 0.023119,
+      "torque_implied_low_wb": 0.03105737779594514,
+      "torque_implied_high_wb": 0.02689647814621925,
+      "femm_oc_fundamental_wb": 0.002010706751012534,
+      "femm_oc_series_peak_wb": 0.0045294396485620085
+    },
+    "oc_fundamental_sweep": {
+      "n_positions": 12,
+      "elec_period_mech_deg": 90.0,
+      "positions_mech_deg": [
+        0.0,
+        7.5,
+        15.0,
+        22.5,
+        30.0,
+        37.5,
+        45.0,
+        52.5,
+        60.0,
+        67.5,
+        75.0,
+        82.5
+      ],
+      "phase_a_wb_series": [
+        1.1509839885095424e-06,
+        0.0031797259823168117,
+        -0.0027022411938895,
+        -0.00452940828416638,
+        -0.0027034534969966727,
+        0.0031776095468250823,
+        -1.1509839718998237e-06,
+        -0.0031797255422123284,
+        0.0027022578992227974,
+        0.0045294396485620085,
+        0.0027034695450918154,
+        -0.0031780900136807923
+      ],
+      "lambda_fundamental_peak_wb": 0.002010706751012534,
+      "lambda_series_peak_abs_wb": 0.0045294396485620085,
+      "source_state_sha256": "42d64d25ececa6948baae22fdfb52ca27d9f3cf981cdb4f2817fda456ac2aed5"
+    },
+    "loaded_fe_single_theta": {
+      "kind": "loaded",
+      "current_angle_electrical_deg": -30.0,
+      "phase_flux_linkage_wb": {
+        "phase_a": 0.056970145400093444,
+        "phase_b": -0.05404549455125351,
+        "phase_c": -0.009674674977199007
+      },
+      "phase_flux_linkage_peak_abs_wb": 0.056970145400093444,
+      "phase_flux_linkage_rms_abs_wb": 0.0456804563758281,
+      "torque_nm": 31.38415530556985,
+      "source_state_sha256": "42d64d25ececa6948baae22fdfb52ca27d9f3cf981cdb4f2817fda456ac2aed5",
+      "raw_keys_sample": [
+        "flux_linkage_phase_a_b1_wb",
+        "flux_linkage_phase_a_b2_wb",
+        "flux_linkage_phase_a_wb",
+        "flux_linkage_phase_b_b1_wb",
+        "flux_linkage_phase_b_b2_wb",
+        "flux_linkage_phase_b_wb",
+        "flux_linkage_phase_c_b1_wb",
+        "flux_linkage_phase_c_b2_wb",
+        "flux_linkage_phase_c_wb"
+      ]
+    },
+    "note": "Single-rotor-position max|\u03bb_phase| is NOT the fundamental peak \u2014 use 12-position OC sweep fundamental or torque/airgap witnesses."
+  },
+  "back_emf": {
+    "formula": "E_ph_peak = \u03c9_e \u00b7 \u03bb_peak; E_ll_rms = \u221a(3/2) \u00b7 E_ph_peak",
+    "omega_e_rad_s": 10053.096491487338,
+    "e_phase_peak_v": 232.418,
+    "e_line_line_rms_v": 284.652
+  },
+  "bus_cases": [
+    {
+      "dc_bus_voltage_v": 600.0,
+      "available_line_line_rms_v": 367.423,
+      "usable_line_line_rms_v_with_5pct_reserve": 349.052,
+      "fe_back_emf_line_line_rms_v": 284.652,
+      "back_emf_utilisation_vs_usable": 0.8155,
+      "within_usable_ceiling": true,
+      "field_weakening_indicated_by_bemf_alone": false
+    },
+    {
+      "dc_bus_voltage_v": 750.0,
+      "available_line_line_rms_v": 459.279,
+      "usable_line_line_rms_v_with_5pct_reserve": 436.315,
+      "fe_back_emf_line_line_rms_v": 284.652,
+      "back_emf_utilisation_vs_usable": 0.6524,
+      "within_usable_ceiling": true,
+      "field_weakening_indicated_by_bemf_alone": false
+    },
+    {
+      "dc_bus_voltage_v": 900.0,
+      "available_line_line_rms_v": 551.135,
+      "usable_line_line_rms_v_with_5pct_reserve": 523.578,
+      "fe_back_emf_line_line_rms_v": 284.652,
+      "back_emf_utilisation_vs_usable": 0.5437,
+      "within_usable_ceiling": true,
+      "field_weakening_indicated_by_bemf_alone": false
+    }
+  ],
+  "companion_scalar_loaded_model": {
+    "note": "Loaded terminal voltage still needs Rs\u00b7I and saliency voltage (or FE phasor at load). This screen is OC back-EMF vs bus from \u03bb witnesses; scalar loaded model retained as companion.",
+    "prior_screen": "path_b_voltage_feasibility_screen.json",
+    "prior_loaded_ll_rms_v": 287.538,
+    "prior_bemf_ll_rms_v": 284.655
+  },
+  "headline": {
+    "fe_bemf_clears_600v_usable": true,
+    "fe_bemf_clears_750v_usable": true,
+    "fe_bemf_clears_900v_usable": true,
+    "controlling_util_at_750v": 0.6524,
+    "lambda_source": "prior_airgap_B_analytical_crosschecked"
+  },
+  "explicitly_not_claimed": [
+    "Full IQ-plane voltage circle with Rs/Ld/Lq",
+    "Closed field-weakening schedule",
+    "Bar A close / ship_ok",
+    "Dyno correlation"
+  ],
+  "release_statement": "OC back-EMF vs DC bus using \u03bb witnesses (FE fundamental sweep and/or airgap-B / torque-implied cross-check). Loaded drop PARTIAL. ship_ok false."
+}
