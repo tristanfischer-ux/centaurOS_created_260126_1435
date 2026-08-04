@@ -59,6 +59,9 @@ def main() -> int:
         "00c-how-to-read-pack.png",
         "01-dual-torque-bars.png",
         "06-thermal-duty-storyboard.png",
+        "07-pcb-honesty-sheet.png",
+        "08-system-block-diagram.png",
+        "09-inverter-mass-budget.png",
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
     ):
         ck(f"jack_{name}", (jack / name).is_file(), str(jack / name))
