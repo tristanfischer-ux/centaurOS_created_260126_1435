@@ -1,0 +1,479 @@
+{
+  "schema": "forgeos.fpk.fe_front_uplift_council/v1",
+  "plan": "docs/plans/FE-FRONT-UPLIFT-PLAN-EASY-TO-HARD-2026-08-04.md",
+  "seats_called": [
+    "grok45",
+    "sol",
+    "minimax_m3",
+    "qwen38"
+  ],
+  "results": {
+    "sol": {
+      "model": "openai/gpt-5.6-terra",
+      "review": {
+        "seat": "Sol \u2014 structure, sequencing, engineering completeness and real FE front-kit readiness",
+        "verdict": "PROCEED_WITH_CHANGES",
+        "confidence_0_to_100": 94,
+        "one_line_summary": "Proceed with W0 truth repair and a constrained W1 spine, but make the analytical kit screens traceable to explicit assumptions and bring a lightweight Blender envelope/assembly pass forward only after capacitor and inverter envelopes are bounded; `duty_screen=false`, `ship_ok=false`, and Bar B remains wholly open.",
+        "must_do_first": [
+          "W0.1",
+          "W0.2",
+          "W0.3",
+          "W0.4",
+          "W1.1",
+          "W1.2",
+          "W1.4",
+          "W2.1"
+        ],
+        "cut_if_only_5_days": [
+          "W2.9",
+          "W2.10",
+          "W2.12",
+          "W2.13",
+          "W3.3",
+          "W4.1",
+          "W4.2",
+          "W4.3",
+          "W4.4",
+          "W4.5"
+        ],
+        "highest_overclaim_risk": "A polished verdict page, capacitor screen and Blender assembly being read as a validated, package-feasible FE front kit when Path B is only a SIGHT-candidate, `torque_reliable=false`, duty capability is unproven, interfaces are absent, and all Bar B evidence remains open.",
+        "blender_earlier_than_w2": {
+          "bool": true,
+          "why": "Move only W3.1 plus a deliberately non-release W3.2-lite forward in parallel with W2.1/W2.2: establish an envelope-controlled assembly hierarchy, interface placeholders and labelled unknown volumes. Do not create final hero renders, detailed cooling/HV routing, or claim packaging closure before the capacitor volume, inverter class, DC-link/busbar topology and cold-plate land assumptions are published. This improves Jack comprehension without letting aesthetics outrun engineering."
+        },
+        "capacitors_first_kit_wedge": {
+          "bool": true,
+          "why": "Yes. The DC-link is the most consequential missing power-electronics artefact because it connects DC voltage, current, PWM assumption, ripple-current capability, ESR/ESL, laminated-busbar loop inductance, cooling, volume, mass and inverter packaging. It creates useful constraints without pretending to select a supplier or close Bar B. Its output must be a bounded design-space screen with sensitivity cases, not a single pseudo-design point."
+        },
+        "homologation_must_stay_low": true,
+        "missing_workstreams": [
+          "Requirements and operating-point control: establish a versioned requirements basis covering DC-link voltage range, current limits, PWM/switching-frequency range, ambient/coolant boundaries, duty-cycle definition, front-axle torque/speed request, regen limits and failure states. Every W2 calculation needs a source, status and validity range.",
+          "Interface-control-document workstream: publish provisional ICDs for HV, LV, coolant, mechanical mounts, shaft/spline or reducer output, sensors/CAN, service access, isolation clearances and bay-envelope datums. Mark unavailable partner dimensions as OPEN rather than substituting geometry.",
+          "Protection and functional-safety concept: HVIL, pre-charge/discharge, contactor ownership, insulation monitoring boundary, DC-link discharge time, over-current/over-voltage/over-temperature handling, fault containment and degraded-mode assumptions. A control-PCB honesty sheet alone is insufficient for a real front kit.",
+          "Electrical insulation and creepage/clearance screen: state voltage class, pollution/environment assumptions, connector and busbar separation targets, dielectric/hipot evidence needed, and all unknowns. This is necessary before visuals imply credible HV packaging.",
+          "Power-electronics loss and thermal budget integration: tie inverter switching/conduction losses, capacitor ESR loss, busbar loss and motor/gear losses to one transient heat-rejection budget. W2.2 should not be a disconnected \u2018loss seed\u2019.",
+          "Mass-properties and centre-of-gravity budget: allocate the stated 32 kg explicitly across motor, reducer, inverter, capacitor bank, cold plate, housings, connectors and fasteners, with reserve and uncertainty. A box volume alone does not establish kit feasibility.",
+          "Manufacturability, assembly and serviceability screen: casing split, sealing strategy, access to HV and coolant connections, capacitor retention, lifting/handling, tolerance stack, fastener strategy, potting/conformal-coating status and assembly sequence.",
+          "Rotordynamics and bearing-life boundary definition: the ripple-load sheet is useful, but bearing reactions need radial/axial loads, gear mesh loads, preload, lubrication, duty spectrum and speed range. Keep life prediction OPEN until these are available.",
+          "Driveline architecture closure: W2.12 is too late and too conditional. Gear ratio, torque/speed transformation, wheel-side load case, reduction-stage assumption, gear mesh force and lubrication concept are fundamental system constraints, not optional writeback.",
+          "Verification and validation plan: map each requirement and each Bar B item to analysis, bench test, dyno test, vehicle/lap evidence, acceptance criterion, owner, input required and closure authority. Partner asks should be generated from this matrix.",
+          "Configuration and provenance control: record the exact Path B input deck, solver/version, mesh/model status, assumptions, artefact hashes, restamp policy and consumer list. W0.4 coherence cannot prove technical validity; it only proves document consistency.",
+          "Regulatory and competition-rule basis: do not raise homologation, but record which Formula E/series rules, HV safety requirements and team/partner specifications are applicable, unknown or out of scope. \u2018Homologation 1/10\u2019 needs an evidence-plan basis, not merely a warning label."
+        ],
+        "phase_a_edits": [
+          "Insert a Phase A gate immediately after W0.4: no W1/W2 artefact may be released until every numerical consumer of FE mean torque, required torque, Path B identity, dual-bar values, `torque_reliable`, `duty_screen` and `ship_ok` passes a machine-readable consistency check. Include figures, PNG captions, PDFs, workbook summaries and MANIFEST entries, not only the register.",
+          "Change W1.1 from a static verdict image to a versioned one-page evidence card with: artefact revision/hash; evaluated operating point; Path B mean 122.1 Nm at 24k/130; dual bars 104.1 Nm arch and 125.2 Nm bind; `torque_reliable=false`; `duty_screen=false`; `ship_ok=false`; model-validity statement; and an explicit statement that this is not a duty-capability or release claim.",
+          "Make W1.2 a closure-oriented open register rather than only a list: for B1\u2013B10 and DEC-001\u2026007 include evidence required, current status, owner, external dependency, acceptance criterion, and whether software can reduce risk but cannot close the item.",
+          "Expand W1.4 to include energy and control boundaries: HV source/contactors and pre-charge ownership, DC-link, inverter, motor, reducer/output, cold plate and coolant circuit, LV/CAN/control, sensors, safety/interlock boundary and all interfaces marked assumed/open/partner-owned.",
+          "Move W3.1 and a new W3.2-lite into Phase A, limited to an envelope box, named assemblies and conspicuous \u2018concept volume / interface TBD\u2019 tagging. Retain W3.3 hero, exploded and catalogue re-renders in Phase B after W2.1 and W2.2 review.",
+          "Rewrite W2.1 completion criteria to require an assumption table and sensitivity sweep over DC voltage, design current, PWM frequency, ripple model, allowable voltage ripple, capacitor temperature and derating. Report C_min, RMS ripple, ESR loss, ESL target, volume and mass as ranges; cite equations and input provenance; state that no lifetime, supplier part, mounting or qualification claim is made.",
+          "Combine W2.1 and W2.3 into a single DC-link-and-commutation-loop screen or require a shared topology diagram. Capacitor sizing without explicit commutation-loop inductance, switching-current path and module placement can produce an internally inconsistent kit story.",
+          "Make W2.2 include an allocated mass/volume/heat budget and a reconciliation against the 32 kg kit figure, bay envelope 343\u00d7259\u00d7267, cold-plate land and service clearances. If the budget cannot close, publish the shortfall as an OPEN rather than preserving the 32 kg assertion unexamined.",
+          "Add a Phase A \u2018requirements and assumptions ledger\u2019 task before W2.1, with IDs for each assumption and a link from every calculation/chart to those IDs. Distinguish partner-provided inputs, engineering targets, arbitrary placeholders and model outputs.",
+          "Move W2.12 into Phase A as a decision-framing task, not a full mesh check: document the presently assumed ratio, its provenance, resulting output speed/torque implication at 24k, and the missing wheel/vehicle requirements. The full ratio and mesh validation remains Phase B/partner-gated.",
+          "Add W2.14 in Phase A: provisional HV safety and protection boundary sheet covering pre-charge, discharge, contactor/HVIL/IMD ownership, fault paths and the statement \u2018architecture unresolved\u2019. This is more fundamental to a front-kit concept than the rotor FoS graphic.",
+          "Require W2.5 thermal storyboard to separate modelled/intermittent results from continuous-duty inference, show inputs and boundary conditions, and state that 159 versus 99 is not a validated operational temperature limit absent thermal hardware and test evidence.",
+          "Change success metric \u2018Kit completeness 5.5/10\u2019 to \u2018analytical-definition completeness\u2019 and separately report \u2018hardware/partner closure remains 1\u20132/10\u2019. Avoid a single rising kit score that Jack could interpret as physical readiness.",
+          "Bring W5 partner asks forward as draft requests during Phase A, immediately after each relevant screen. W2.1 should create B4/B6 ask fields; W2.6 creates B6; W2.12 creates drivetrain/vehicle requirement asks. Do not wait for a finished software pack to discover missing inputs."
+        ],
+        "blocking_findings": [
+          {
+            "id": "BF-01",
+            "severity": "high",
+            "issue": "The plan correctly updates stale 81.56 Nm references, but W0 coherence is described as a document freshness check rather than a complete claim-control gate. Conflicting torque, duty, status or caption claims can survive in images, spreadsheets, exported PDFs and Blender annotations.",
+            "fix": "Create a canonical machine-readable claim ledger and require every released artefact to consume it or declare an exception. Search/render-check all numerical and status consumers before release; fail the gate on any stale Path B, dual-bar, `torque_reliable`, `duty_screen` or `ship_ok` value."
+          },
+          {
+            "id": "BF-02",
+            "severity": "high",
+            "issue": "W2.1 risks becoming false precision because DC-link capacitance, RMS ripple, ESL and volume cannot be responsibly represented by one result without defined DC voltage range, modulation/PWM strategy, phase current waveform, switching frequency, allowable ripple, temperature, derating and topology.",
+            "fix": "Publish W2.1 as a bounded parametric design-space calculation with input provenance, equations, sensitivity ranges and an explicit topology. Label all outputs \u2018screening targets\u2019; prohibit lifetime, part-number, qualification and package-closure claims."
+          },
+          {
+            "id": "BF-03",
+            "severity": "high",
+            "issue": "The plan lacks a controlled requirements and interface baseline. The bay envelope alone cannot support credible mass, cooling, connector, protection, mount, output-shaft or serviceability assertions.",
+            "fix": "Add a requirements-and-ICD workstream before or alongside W2. Define knowns, assumptions, owners, datum status and acceptance evidence for mechanical, HV, LV/CAN, coolant, shaft/driveline and service interfaces."
+          },
+          {
+            "id": "BF-04",
+            "severity": "high",
+            "issue": "`duty_screen=false` is treated as a banner, but there is no explicit rule preventing W2 thermal, loss and capacitor screens from being reinterpreted as continuous-duty validation.",
+            "fix": "Add a claim taxonomy to every analysis: \u2018screening\u2019, \u2018sign-consistent candidate\u2019, \u2018validated by test\u2019, and \u2018release\u2019. Forbid continuous-duty, lap-duty, endurance, efficiency and thermal-capability claims unless their required evidence rows are closed."
+          },
+          {
+            "id": "BF-05",
+            "severity": "medium",
+            "issue": "Gear-ratio writeback is placed after several packaging tasks despite being a first-order determinant of output speed, output torque, gear forces, bearing loads, lubrication and vehicle relevance.",
+            "fix": "Advance a minimal ratio/provenance/output-implication note to Phase A. Keep detailed gear mesh, oil and life calculations open until vehicle and partner inputs are available."
+          },
+          {
+            "id": "BF-06",
+            "severity": "medium",
+            "issue": "The 32 kg figure and 343\u00d7259\u00d7267 envelope are used as design constraints but no allocation, reserve, centre-of-gravity or feasibility reconciliation is planned.",
+            "fix": "Add a mass-volume-CG ledger with component allocations, uncertainty and reserve. If the capacitor/inverter/cold-plate estimates exceed budget, flag a feasibility conflict rather than resizing Blender geometry to fit."
+          },
+          {
+            "id": "BF-07",
+            "severity": "medium",
+            "issue": "A real front HV kit needs an architecture-level safety boundary, while the plan only calls for a gate-drive/control PCB honesty sheet.",
+            "fix": "Add a provisional protection and HV safety sheet covering pre-charge/discharge, contactors, HVIL, IMD boundary, fusing, isolation, fault response and ownership. Keep each unprovided partner decision OPEN."
+          },
+          {
+            "id": "BF-08",
+            "severity": "medium",
+            "issue": "W3\u2019s final renders can create packaging and manufacturability implications before topology, interfaces and cooling routing are sufficiently bounded.",
+            "fix": "Use a two-stage visual policy: Phase A concept-volume render with uncertainty labels; Phase B assembly render only after reviewed W2.1/W2.2/DC-loop outputs and a mass-volume reconciliation. Embed the same status legend in every hero image."
+          },
+          {
+            "id": "BF-09",
+            "severity": "medium",
+            "issue": "The partner-gated tasks are asks but not a verification plan with acceptance criteria, owners and closure authority; this makes Bar B likely to remain an unprioritised list.",
+            "fix": "Convert W5 into a verification and evidence matrix. For B1\u2013B10 define test/request, fixture or data format, operating points, pass criterion, responsible partner, due date, evidence artefact and the authority permitted to close it."
+          },
+          {
+            "id": "BF-10",
+            "severity": "low",
+            "issue": "The plan\u2019s score targets could be read as advancement towards a buildable or homologation-ready kit despite the absence of hardware evidence.",
+            "fix": "Rename score outputs to \u2018documentation/screening completeness\u2019 and report a separate immutable partner-evidence status. Keep homologation at 1/10 and `ship_ok=false` in all phase summaries until qualified external evidence is returned."
+          }
+        ]
+      }
+    },
+    "grok45": {
+      "model": "x-ai/grok-4.5",
+      "review": {
+        "seat": "diagnose",
+        "verdict": "PROCEED_WITH_CHANGES",
+        "confidence_0_to_100": 82,
+        "one_line_summary": "Doctrine is sound and honesty gates are right, but Phase A drops W0.4, over-scores kit lift while Bar B stays open, and dual-bar arithmetic must show Path B clears arch yet misses bind.",
+        "must_do_first": [
+          "W0.1",
+          "W0.2",
+          "W0.3",
+          "W0.4"
+        ],
+        "cut_if_only_5_days": [
+          "W3.2",
+          "W3.3",
+          "W3.4",
+          "W3.5",
+          "W4.1",
+          "W4.2",
+          "W4.3",
+          "W4.4",
+          "W2.9",
+          "W2.12",
+          "W2.3",
+          "W1.5"
+        ],
+        "highest_overclaim_risk": "Phase B kit completeness 6.5\u20137/10 and FE visual 7+/10 from analytical screens plus Blender while duty_screen=false, ship_ok=false and Bar B B1\u2013B10 all open \u2014 reads as readiness inflation, not screen maturity.",
+        "blender_earlier_than_w2": false,
+        "blender_earlier_than_w2_why": "W3.1 brief may run in parallel, but kit hierarchy and hero renders should follow W2.1\u2013W2.2 volume/mass envelopes; early Blender without PE boxes recreates the generic industrial look and invites pretty-picture overclaim before Jack spine and OPEN register exist.",
+        "capacitors_first_kit_wedge": true,
+        "capacitors_first_kit_wedge_why": "Largest Jack-visible PE hole closable from bus ripple/RMS/ESL physics without chassis XYZ, Gerbers or MPNs; correct first wedge ahead of inverter class tighten and any modal/NVH work.",
+        "homologation_must_stay_low": true,
+        "missing_workstreams": [
+          "Explicit dual-bar gap arithmetic on verdict (122.1 vs arch 104.1 vs bind 125.2, margin and shortfall)",
+          "W0.4 coherence enforce in Phase A commit series (listed in W0, omitted from \u00a78)",
+          "Kit-completeness scorecard rubric (what 4\u21925.5 actually evidences per inv/caps/NVH/IF)",
+          "EMC/EMI and HV creepage/clearance OPEN rows (not only PE packaging)",
+          "Dyno correlation plan linking Path B operating point to B1/B2 torque_reliable gate",
+          "Mass/budget roll-up single source (32 kg share vs bay 343\u00d7259\u00d7267) before Blender box freeze",
+          "Controls/torque-command path honesty (what is modelled vs NOT_FAB)"
+        ],
+        "phase_a_edits": [
+          "Insert W0.4 immediately after W0.3 and before any W1 artefact publish",
+          "Verdict one-pager must state Path B mean 122.1 Nm @ 24k/130, arch 104.1 cleared, bind 125.2 missed by ~3.1 Nm, duty_screen false, ship_ok false, SIGHT-candidate only",
+          "Add W1.5 (how to read pack: concept vs homologation) into Phase A before W2 screens",
+          "Downgrade success targets: Phase A kit ~5/10 not 5.5; Phase B kit ~5.5\u20136/10 not 6.5\u20137; FE visual ~6\u20136.5 not 7+ until partners return",
+          "Keep W3.1 parallel only; gate W3.2+ on W2.1/W2.2 envelope stamps",
+          "W2.10 FoS 1.74 card must say screening-not-release in the same title block as the number",
+          "Forbid any prose that implies dual bars both cleared or live freeze still 81.56/0.65\u00d7",
+          "Phase A order: W0.1\u2013W0.4 \u2192 W1.1\u2013W1.3 \u2192 W1.5 \u2192 W2.5 \u2192 W2.1 \u2192 W2.4 \u2192 W1.4"
+        ],
+        "blocking_findings": [
+          {
+            "id": "BF-01",
+            "severity": "high",
+            "issue": "\u00a78 Phase A executes W0.1\u2013W0.3 then jumps to W1; W0.4 coherence re-run is mandatory in \u00a72 but absent from the week plan, so lagging 81.56 consumers can survive under new pretty pages.",
+            "fix": "Make W0.1\u2013W0.4 one commit series with check_bar_b_register_freshness and check_deliverable_coherence --enforce green before W1.1."
+          },
+          {
+            "id": "BF-02",
+            "severity": "high",
+            "issue": "Kit completeness and FE visual targets after Phase B over-claim relative to Bar B all open and homologation locked at 1/10.",
+            "fix": "Recast lifts as screen-maturity scores; cap kit \u22646/10 and visual \u22646.5/10 until dyno/ICD/Gerber evidence exists; never move homologation."
+          },
+          {
+            "id": "BF-03",
+            "severity": "high",
+            "issue": "Dual-bar physics story hole: 104.1 < 122.1 < 125.2 means architecture bar only; bind bar and duty_screen remain failed \u2014 easy to mis-caption as meeting FE torque case.",
+            "fix": "Every Jack-facing figure captions three numbers plus explicit fail flags on bind, duty_screen, ship_ok."
+          },
+          {
+            "id": "BF-04",
+            "severity": "medium",
+            "issue": "W2.12 gear ratio writeback at 24k is M\u2013H and interface-coupled; parked in Phase B \u2018if unblocked\u2019 without a hard blocker owner, risks silent mesh/ratio drift versus Path B freeze.",
+            "fix": "Either pre-declare ratio OPEN with no twin writeback until mesh owner signs, or pull a named residual into W1.2 open-by-design before any ratio stamp."
+          },
+          {
+            "id": "BF-05",
+            "severity": "medium",
+            "issue": "W4.1 denser FE map while torque_reliable=false can mint a second torque narrative that competes with Path B 122.1 if not strictly labelled non-closing.",
+            "fix": "Defer W4.1 until after Phase B; any map inherits torque_reliable=false and cannot update mean freeze without DEC."
+          },
+          {
+            "id": "BF-06",
+            "severity": "low",
+            "issue": "Council Q1 tension (Jack spine before truth) is already correctly answered in doctrine but \u00a712 only names W0.1, not full W0.",
+            "fix": "Immediate next action = full W0 block, not sole W0.1."
+          }
+        ]
+      }
+    },
+    "minimax_m3": {
+      "model": "minimax/minimax-m3",
+      "review": {
+        "seat": "MiniMax-M3 audit",
+        "verdict": "PROCEED_WITH_CHANGES",
+        "confidence_0_to_100": 78,
+        "one_line_summary": "Plan respects the W0\u2192W1\u2192W2\u2192W3\u2192W4\u2192W5 doctrine, refuses to mint ship_ok, and correctly holds homologation at 1/10; lift claims are supportable, but Phase A needs caption-level tightening on thermal storyboard, capacitor envelope, inverter mass share, and Path B = dual bars framing.",
+        "must_do_first": [
+          "W0.1",
+          "W0.2",
+          "W0.3",
+          "W0.4",
+          "W1.1",
+          "W1.2"
+        ],
+        "cut_if_only_5_days": [
+          "W1.5",
+          "W1.4",
+          "W2.2",
+          "W2.7",
+          "W2.9",
+          "W2.11",
+          "W2.12",
+          "W2.13",
+          "W3.2",
+          "W3.3",
+          "W3.4",
+          "W3.5",
+          "W4.1",
+          "W4.2",
+          "W4.3",
+          "W4.4",
+          "W4.5"
+        ],
+        "highest_overclaim_risk": "W2.1 DC-link capacitor concept screen \u2014 a 'screen' producing C_min, RMS ripple and a volume envelope is the single most overclaim-prone output in Phase A because (a) it is described as the 'first real kit-completeness lift', (b) the W3.2 Blender kit hierarchy explicitly depends on it for cap box sizing, and (c) Jack will read any drawn volume as a part, not a screen. Mitigation row mentions 'no MPN' but is silent on 'no committed volume / no binding envelope'.",
+        "blender_earlier_than_w2": {
+          "bool": false,
+          "why": "W3.1 visual brief is launched in parallel with W2.1 (during W2, not before), and W3.2/W3.3 are correctly gated behind W2.1\u2013W2.2 outputs for cap/inverter box sizing. The critical path keeps W0\u2192W1\u2192W2 ahead of W3."
+        },
+        "capacitors_first_kit_wedge": {
+          "bool": true,
+          "why": "W2.1 needs only bus voltage, design current and PWM class \u2014 no chassis XYZ, no Gerbers, no mount points. It is the largest visible gap in the 4/10 kit score and is the dependency that unblocks the Blender kit hierarchy (W3.2). Correctly sequenced before W2.2/W2.3."
+        },
+        "homologation_must_stay_low": true,
+        "missing_workstreams": [
+          "No explicit captioning rule for the 'Path B = dual bars' coupling \u2014 122.1 Nm is the dual-bar mean and dual-bar spread is 104.1/125.2; plan phrases this loosely as 'Path B + dual bars' which can read as two separate attributes.",
+          "No operating-point definition for '24k/130' in the artefact lineage (rpm is clear; 130 unit / meaning is not). Required before W0.1 restamp so restated numbers are auditable.",
+          "No provenance / corner-definition note for the iron-loss '3.9\u20138.5 kW class' band in W2.7 \u2014 speed/torque corners and solver basis not stated.",
+          "No 'no continuous 250 kW thermal clearance' caption doctrine for W2.5 \u2014 the 159/99 \u00b0C numbers will be read as magnet insulation clearance unless explicitly disclaimed.",
+          "No reverse-rationalisation test (per lift, ask: 'if duty_screen were true, would this lift still be valid?') \u2014 useful gate against cosmetic uplifts dressed as engineering.",
+          "No driving-cycle / race-stint anchor underpinning the 250 kW claim used in the scorecard \u2014 duty_screen false means the operating envelope is asserted, not measured.",
+          "No double-pulse ICD sketch referenced even though W2.3 flags it as Bar B \u2014 partner ask sheet would benefit from a one-line test definition now.",
+          "No 'screen envelope \u2260 committed volume' rule stated anywhere as a hard ban \u2014 only in the risk table as a soft mitigation."
+        ],
+        "phase_a_edits": [
+          "W0.1 \u2014 caption: 'Path B IS dual bars; 122.1 Nm is dual-bar mean; 104.1/125.2 are arch/bind.' Remove 'Path B + dual bars' phrasing that reads as two attributes.",
+          "W0.1 \u2014 add a one-line glossary entry for '24k/130' (rpm and second quantity) so the restated numbers are auditable.",
+          "W0.2 \u2014 lead sentence on ABD/Jack: 'Path B 122.1 Nm mean, dual bars 104.1 arch / 125.2 bind; 81.56 is pre-DEC-009 lineage, not the live story.'",
+          "W0.3 \u2014 add explicit statement: 'Path B is SIGHT-candidate; duty_screen remains false; ship_ok remains false; no thermal, NVH or release-FoS claim is made by this addendum.'",
+          "W0.4 \u2014 extend doctrine: re-run `check_deliverable_coherence --enforce` after W1.1/W1.2/W1.3 ship, not only after W0.",
+          "W1.1 \u2014 verdict one-pager caption row: 'SIGHT-candidate / not duty_screen / not ship_ok / not 250 kW continuous thermal clearance.'",
+          "W1.2 \u2014 open-by-design page must list all Bar B B1\u2013B10 plus DEC-001\u2026007 with the actual DEC identifiers, not a generic 'OPEN' label.",
+          "W1.4 \u2014 system block diagram: every box annotated as 'class-level, not part-level; no MPN.'",
+          "W2.1 \u2014 caption: 'Screen envelope only; not a committed volume; class-level only; no MPN; no ESL number is a release spec; double-pulse remains Bar B.'",
+          "W2.1 \u2014 define C_min, RMS ripple and ESL budget inputs explicitly (Vbus, Idesign, fsw class) so the screen is reproducible.",
+          "W2.2 \u2014 caption: '32 kg mass share is a target assumption, not an achieved mass; SiC class per DEC-001, not a part.'",
+          "W2.4 \u2014 gate-drive/control PCB sheet must state 'NOT_FAB; no Gerbers; no MPN' on the first line, not only in body text.",
+          "W2.5 \u2014 caption: 'Magnet temps 159 \u00b0C continuous-path / 99 \u00b0C intermittent are Path B operating-point values, not magnet-class clearance and not 250 kW continuous clearance.' Add DEC-008 decision graphic with explicit 'decision pending' state.",
+          "W2.7 \u2014 add provenance note: solver, speed/torque corners, magnet class assumption that produced 3.9\u20138.5 kW.",
+          "W2.10 \u2014 caption: '1.74 = screening FoS at Path B mean only; not at peak transient; not release; Bar B inputs required to release.'",
+          "W2.11 \u2014 single-line NVH/modal OPEN rather than a full register row in W2; defer full modal work to W4.3 with explicit skip if no mount points.",
+          "Add an explicit 'if duty_screen were true, would this lift still hold?' line to W2.1, W2.2, W2.5, W2.10 as a discipline check.",
+          "W3.1 \u2014 visual brief must open with 'No Bar B-closed geometry; renderings are class-level, not part-level; no MPN silhouettes.'"
+        ],
+        "blocking_findings": [
+          {
+            "id": "F-1",
+            "severity": "MED",
+            "issue": "W2.1 capacitor screen is the highest overclaim vector in Phase A: a 'screen' with a volume envelope feeds the W3.2 Blender kit hierarchy, and the only mitigation is 'no MPN' \u2014 silent on 'no committed volume'.",
+            "fix": "Add hard caption 'screen envelope \u2260 committed volume' on W2.1 outputs; require any W3.2 box driven by W2.1 to be marked 'class-level envelope, not part' in the render."
+          },
+          {
+            "id": "F-2",
+            "severity": "MED",
+            "issue": "W2.5 thermal storyboard will be read as thermal clearance. 159/99 \u00b0C are operating-point values; plan does not disclaim 250 kW continuous clearance or magnet insulation class.",
+            "fix": "Add explicit caption that these are Path B operating-point values, not clearance, not insulation class, and not 250 kW continuous clearance. Mark DEC-008 graphic as 'decision pending'."
+          },
+          {
+            "id": "F-3",
+            "severity": "LOW",
+            "issue": "W0.1 phrase 'Path B + dual bars' is ambiguous: 122.1 Nm is the dual-bar mean; 104.1/125.2 are dual-bar arch/bind. Restamp could mis-cite.",
+            "fix": "Caption as 'Path B = dual bars; mean 122.1; arch 104.1; bind 125.2.' Add glossary line for '24k/130'."
+          },
+          {
+            "id": "F-4",
+            "severity": "LOW",
+            "issue": "W2.2 'mass share of 32 kg' is a target assumption but is not captioned as such. Risk of being read as achieved mass and feeding Blender as a fact.",
+            "fix": "Caption: '32 kg = target mass share assumption, not achieved; SiC class per DEC-001.'"
+          },
+          {
+            "id": "F-5",
+            "severity": "LOW",
+            "issue": "Iron-loss 3.9\u20138.5 kW band in W2.7 has no provenance note (solver, corners, magnet class).",
+            "fix": "Add one-line provenance box: solver, speed/torque corners, magnet class assumption."
+          },
+          {
+            "id": "F-6",
+            "severity": "LOW",
+            "issue": "No reverse-rationalisation discipline check on Phase A lifts. Cosmetic uplifts can pass the coherence gate without being engineering-valid under duty_screen=false.",
+            "fix": "Add a one-line test per W2.x: 'If duty_screen were true, would this lift still hold?' If no, the lift is cosmetic and must defer to W5."
+          }
+        ]
+      }
+    },
+    "qwen38": {
+      "model": "qwen/qwen3.8-max",
+      "review": {
+        "seat": "Qwen 3.8 Max",
+        "verdict": "PROCEED_WITH_CHANGES",
+        "confidence_0_to_100": 87,
+        "one_line_summary": "Proceed, but only after W0 truth gates and explicit non-sign-off captions; keep Blender and homologation behind W0/W1/W2, and treat capacitors as an analytical wedge rather than a closed BOM.",
+        "must_do_first": [
+          "W0.1",
+          "W0.2",
+          "W0.3",
+          "W0.4",
+          "W1.1",
+          "W1.2",
+          "W1.3",
+          "W1.5",
+          "W2.5",
+          "W2.1"
+        ],
+        "cut_if_only_5_days": [
+          "W1.4",
+          "W2.3",
+          "W2.6",
+          "W2.7",
+          "W2.8",
+          "W2.9",
+          "W2.10",
+          "W2.11",
+          "W2.12",
+          "W2.13",
+          "W3.1",
+          "W3.2",
+          "W3.3",
+          "W3.4",
+          "W3.5",
+          "W4.1",
+          "W4.2",
+          "W4.3",
+          "W4.4",
+          "W4.5",
+          "W5.1",
+          "W5.2",
+          "W5.3",
+          "W5.4",
+          "W5.5",
+          "W5.6"
+        ],
+        "highest_overclaim_risk": "A polished verdict or capacitor/inverter visual could be read as a closed front FPK kit when duty_screen=false, torque_reliable is open, ship_ok=false and all Bar B items remain open.",
+        "blender_earlier_than_w2": {
+          "bool": false,
+          "why": "Only W3.1 reference brief may run in parallel; W3.2 and W3.3 must wait for W2.1/W2.2 stamped visual-only envelopes, otherwise Blender freezes false packaging and creates Jack optics ahead of engineering depth."
+        },
+        "capacitors_first_kit_wedge": {
+          "bool": true,
+          "why": "DC-link capacitors are the most visible kit-completeness gap and can be screened from bus voltage, ripple, PWM class, ESL, temperature and volume without chassis XYZ or invented MPNs; they also define a clean Bar B ask and a realistic FE/China supply-chain class discussion."
+        },
+        "homologation_must_stay_low": true,
+        "missing_workstreams": [
+          "Evidence traceability register mapping Path B 122.1 Nm at 24k/130, dual-bar arch 104.1 Nm versus bind 125.2 Nm, and Bar B opens to every Jack-facing artefact.",
+          "HV concept screen for creepage, clearance, interlock, insulation and pressure relief, kept analytical and explicitly open.",
+          "EMC/EMI proximity screen for busbar, capacitor, gate-drive and sensor harness routing, without inventing layout or supplier parts.",
+          "Mass and CG roll-up with uncertainty bands, rather than relying on a single inverter mass share.",
+          "Visual-versus-engineering geometry control, so Blender envelopes are tagged non-authoritative until real interfaces exist.",
+          "FE/China supply-chain realism screen for capacitor and inverter classes, covering voltage/current/temperature class, lead-time and qualification route, with no invented MPNs or supplier claims.",
+          "Test-to-model correlation plan for dyno, flow bench, gear-oil and lap-log data before W5 asks are sent.",
+          "Pack rebuild acceptance checklist with manifest hash, stale-number grep and scorecard gates."
+        ],
+        "phase_a_edits": [
+          "Edit W0.1: add a repo-wide stale-number sweep for 81.56, 0.65\u00d7, baseline torque and any FE mean not equal to Path B 122.1 Nm at 24k/130.",
+          "Edit W0.4: make the coherence gate fail if any Jack-facing artefact lacks duty_screen=false, ship_ok=false, torque_reliable-open and Bar B-open labels.",
+          "Edit W1.1: require the one-pager to show Path B 122.1 Nm, dual bars arch 104.1 Nm and bind 125.2 Nm, duty_screen=false, torque_reliable gate open, ship_ok=false and B1-B10 open.",
+          "Edit W1.2: replace top 8 opens with either the full B1-B10/DEC list or a roll-up explicitly stating that all Bar B is open.",
+          "Edit W1.5: add a red-line that homologation remains 1/10 until partner, dyno or bench data returns.",
+          "Edit W2.1: split into W2.1a analytical capacitor class screen and W2.1b OPEN residual; forbid MPN, supplier Gerbers, final volume, final capacitance selection and procurement claims.",
+          "Edit W2.1: require the capacitor screen to state FE/China supply-chain class assumptions only, such as voltage class, ripple class, ESL budget, temperature class and volume band.",
+          "Edit W2.2: require inverter class outputs to be labelled packaging/visual input only until Bar B partner data exists.",
+          "Edit W2.12: move before W1.1, or add a change-control note that any ratio writeback altering Path B restamps W0/W1 before Jack sees the verdict.",
+          "Edit W3.1: allow only the reference brief in parallel; block W3.2/W3.3 until W2.1/W2.2 are versioned and marked visual_input_only.",
+          "Add W2.14, W2.15 and W2.16 as explicit OPEN screens for HV concept, EMC proximity and supply-chain class realism before claiming kit completeness above 5.5/10.",
+          "Edit success metrics: add zero stale baseline numbers and no artefact implies duty_screen or ship_ok as Phase A gates."
+        ],
+        "blocking_findings": [
+          {
+            "id": "BF-1",
+            "severity": "high",
+            "issue": "W0.1 refreshes the bar-B register but does not prove stale 81.56/0.65\u00d7 baseline numbers are absent from Jack-facing artefacts.",
+            "fix": "Add a repo-wide grep/sweep for stale baseline torque and misleading lineage, and make W0.4 coherence fail if any such number remains."
+          },
+          {
+            "id": "BF-2",
+            "severity": "high",
+            "issue": "W1.1 verdict one-pager could be read as sign-off if it only shows Path B mean torque without the full open-state context.",
+            "fix": "Mandate captions for duty_screen=false, torque_reliable gate open, ship_ok=false, Bar B B1-B10 open, and dual-bar arch/bind numbers."
+          },
+          {
+            "id": "BF-3",
+            "severity": "high",
+            "issue": "W2.1 could drift into an invented capacitor BOM or fake supply-chain closure, especially under FE/China sourcing pressure.",
+            "fix": "Keep W2.1 to capacitor class, voltage/ripple/ESL/temperature envelope, volume band and OPEN residual; forbid MPNs, supplier names, datasheets and procurement claims."
+          },
+          {
+            "id": "BF-4",
+            "severity": "high",
+            "issue": "W3.2/W3.3 may freeze Blender kit geometry before capacitor and inverter volumes are analytically bounded, creating pretty but false packaging.",
+            "fix": "Block W3.2/W3.3 until W2.1/W2.2 outputs are versioned and labelled visual_input_only; all renders must carry concept visual, not engineering interface."
+          },
+          {
+            "id": "BF-5",
+            "severity": "high",
+            "issue": "W2.12 gear-ratio writeback after W1.1 could invalidate the Jack verdict if the ratio changes Path B FE mean or dual-bar interpretation.",
+            "fix": "Move W2.12 before W1.1, or require automatic restamp of W0/W1 if any ratio writeback changes Path B numbers."
+          },
+          {
+            "id": "BF-6",
+            "severity": "medium",
+            "issue": "W4.1 denser FE torque map could be misread as closing torque_reliable or duty_screen even though the gate remains false.",
+            "fix": "Stamp W4.1 outputs with torque_reliable=false and prohibit feeding them into duty_screen, ship_ok or homologation scoring."
+          },
+          {
+            "id": "BF-7",
+            "severity": "medium",
+            "issue": "The proposed kit-completeness lift concentrates on power electronics, thermal and mechanical screens while omitting HV, EMC and supply-chain realism, risking an inflated 6.5-7/10 score.",
+            "fix": "Add explicit HV concept, EMC proximity and supply-chain class OPEN screens before raising the kit completeness target beyond Phase A."
+          }
+        ]
+      }
+    }
+  },
+  "errors": {}
+}
