@@ -762,6 +762,7 @@ def rebuild_pdf(out: Path) -> Path:
         "18-nvh-modal-open-register.png",
         "19-gear-oil-status.png",
         "20-gear-ratio-writeback-blocked.png",
+        "21-path-b-voltage-feasibility.png",
     ]
     pngs = [out / n for n in preferred if (out / n).is_file()]
     pdf_path = out / "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf"

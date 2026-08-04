@@ -72,6 +72,7 @@ def main() -> int:
         "18-nvh-modal-open-register.png",
         "19-gear-oil-status.png",
         "20-gear-ratio-writeback-blocked.png",
+        "21-path-b-voltage-feasibility.png",
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf",
     ):
         ck(f"jack_{name}", (jack / name).is_file(), str(jack / name))
@@ -185,6 +186,22 @@ def main() -> int:
     if fos.is_file():
         fd = json.loads(fos.read_text())
         ck("fos_release_not_closed", (fd.get("honesty") or {}).get("release_fos_closed") is False)
+
+    # Path B voltage feasibility (Sol residual — 24k vs 600–900 V)
+    vfe = ms / "path_b_voltage_feasibility_screen.json"
+    ck("path_b_voltage_screen", vfe.is_file(), str(vfe))
+    if vfe.is_file():
+        vd = json.loads(vfe.read_text())
+        ck("voltage_ship_ok_false", vd.get("ship_ok") is False)
+        ck("voltage_does_not_close_bar_a", (vd.get("bar_a_implication") or {}).get("closes_bar_a") is False)
+        op = vd.get("operating_point") or {}
+        ck(
+            "voltage_speed_ratio_1231",
+            abs(float(op.get("speed_ratio_vs_legacy_19500") or 0) - 1.2308) < 0.002,
+            str(op.get("speed_ratio_vs_legacy_19500")),
+        )
+        hl = vd.get("headline") or {}
+        ck("voltage_has_bus_util", hl.get("controlling_utilisation_at_nominal") is not None)
 
     # tracker addendum
     tr = (REPO / "docs/plans/JLR-FE-FRONT-FPK-BAR-A-BAR-B-CLOSEOUT-TRACKER-2026-07-31.md").read_text()

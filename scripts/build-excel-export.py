@@ -40621,6 +40621,10 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         "20-gear-ratio-writeback-blocked.png": (
             "EM honesty — W2.12 gear ratio writeback BLOCKED (architecture hold)"
         ),
+        "21-path-b-voltage-feasibility.png": (
+            "EM honesty — Path B 24k/−30° voltage feasibility vs 600–900 V bus "
+            "(analytical; Bar A still open)"
+        ),
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf": (
             "EM honesty — full Path B pack (PDF multi-page)"
         ),
@@ -40817,6 +40821,7 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             "nvh_modal_open_register.json",
             "gear_oil_status_one_pager.json",
             "gear_ratio_writeback_status.json",
+            "path_b_voltage_feasibility_screen.json",
         ):
             _sjp = os.path.join(run_dir, "_motor_stack", _sj)
             if os.path.isfile(_sjp):
