@@ -57,6 +57,7 @@ EM_CASE_FILENAME = "em_fia_front_kit_case.json"
 EM_CASE_PATH_B_FILENAME = "em_fia_front_kit_case_PATH_B_DEC009.json"
 MTPA_FILENAME = "em_fia_mtpa_screen.json"
 MTPA_DEC009_FILENAME = "em_fia_mtpa_screen_DEC009.json"
+MTPA_DENSE_FILENAME = "em_fia_mtpa_screen_PATH_B_DENSE.json"
 VOLTAGE_FW_FILENAME = "em_fia_voltage_fw_screen.json"
 VOLTAGE_PATH_B_FILENAME = "path_b_voltage_feasibility_screen.json"
 POLE_PAIRS = ROTOR_POLES // 2
@@ -734,7 +735,7 @@ def _validate_upstream_artefacts(
         )
 
     em_name, em_case = _prefer(EM_CASE_PATH_B_FILENAME, EM_CASE_FILENAME)
-    mtpa_name, mtpa = _prefer(MTPA_DEC009_FILENAME, MTPA_FILENAME)
+    mtpa_name, mtpa = _prefer(MTPA_DENSE_FILENAME, MTPA_DEC009_FILENAME, MTPA_FILENAME)
     # Voltage FW may be legacy; Path B voltage screen is optional companion
     try:
         vf_name, voltage_fw = _prefer(VOLTAGE_FW_FILENAME)

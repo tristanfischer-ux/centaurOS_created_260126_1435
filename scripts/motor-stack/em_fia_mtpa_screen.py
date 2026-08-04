@@ -75,6 +75,31 @@ DEFAULT_CURRENT_ANGLES_ELECTRICAL_DEG = (
 DEFAULT_ROTOR_POSITIONS_MECHANICAL_DEG = (0.0, 11.25, 22.5, 33.75, 45.0)
 FAST_CURRENT_ANGLES_ELECTRICAL_DEG = (-40.0, -50.0)
 FAST_ROTOR_POSITIONS_MECHANICAL_DEG = (0.0, 22.5)
+# Dense Path B campaign (W4.1): 11 × 9 = 99 loaded FEMM points
+DENSE_CURRENT_ANGLES_ELECTRICAL_DEG = (
+    -20.0,
+    -25.0,
+    -30.0,
+    -35.0,
+    -40.0,
+    -45.0,
+    -50.0,
+    -55.0,
+    -60.0,
+    -65.0,
+    -70.0,
+)
+DENSE_ROTOR_POSITIONS_MECHANICAL_DEG = (
+    0.0,
+    5.625,
+    11.25,
+    16.875,
+    22.5,
+    28.125,
+    33.75,
+    39.375,
+    45.0,
+)
 
 
 class FiaMtpaScreenError(RuntimeError):
@@ -102,15 +127,25 @@ SolvePoint = Callable[[LoadedPointAssumptions], LoadedMagneticResult]
 ProgressCallback = Callable[[int, int, Mapping[str, float]], None]
 
 
-def select_grid(*, fast: bool) -> ScreenGrid:
-    """Select the documented default or reduced live/selftest grid.
+def select_grid(*, fast: bool = False, dense: bool = False) -> ScreenGrid:
+    """Select the documented default, dense, or reduced live/selftest grid.
 
-    @description The default is 7 × 5 (35 points); ``--fast`` is 2 × 2
-        (four points). Both are Cartesian screens at one current magnitude.
+    @description The default is 7 × 5 (35 points); ``--dense`` is 11 × 9
+        (99 points); ``--fast`` is 2 × 2 (four points). Cartesian screens at
+        one current magnitude.
     @param fast Whether to select the reduced four-point campaign.
+    @param dense Whether to select the denser Path B campaign.
     @returns Immutable screen-axis definition.
     """
 
+    if fast and dense:
+        raise FiaMtpaScreenError("select_grid: fast and dense are mutually exclusive")
+    if dense:
+        return ScreenGrid(
+            current_angles_electrical_deg=DENSE_CURRENT_ANGLES_ELECTRICAL_DEG,
+            rotor_positions_mechanical_deg=DENSE_ROTOR_POSITIONS_MECHANICAL_DEG,
+            mode="dense",
+        )
     if fast:
         return ScreenGrid(
             current_angles_electrical_deg=FAST_CURRENT_ANGLES_ELECTRICAL_DEG,
@@ -588,7 +623,8 @@ def run_selftest() -> int:
 def run_live_case(
     twin_dir: Path,
     *,
-    fast: bool,
+    fast: bool = False,
+    dense: bool = False,
     output_path: Path | None = None,
 ) -> int:
     """Run and persist the live denser screen against one twin."""
@@ -604,7 +640,7 @@ def run_live_case(
     remanence_t = float(
         material_machine.rotor.hole[0].magnet_0.mat_type.mag.Brm20
     )
-    grid = select_grid(fast=fast)
+    grid = select_grid(fast=fast, dense=dense)
 
     def report_progress(
         completed: int,
@@ -690,6 +726,11 @@ def main() -> int:
         help="use reduced 2×2 grid instead of default 7×5 campaign",
     )
     parser.add_argument(
+        "--dense",
+        action="store_true",
+        help="use dense 11×9 (99-point) Path B campaign instead of default 7×5",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         help="optional artefact path; defaults under twin _motor_stack",
@@ -699,9 +740,12 @@ def main() -> int:
         if args.output is not None:
             parser.error("--output is only valid with --twin")
         return run_selftest()
+    if args.fast and args.dense:
+        parser.error("--fast and --dense are mutually exclusive")
     return run_live_case(
         args.twin.resolve(),
         fast=bool(args.fast),
+        dense=bool(args.dense),
         output_path=args.output,
     )
 
