@@ -40836,11 +40836,30 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
             if _jn.startswith("."):
                 continue
             _jp = os.path.join(_jack_dir, _jn)
-            if not os.path.isfile(_jp):
-                continue
-            # Ship under em-honesty/ (customer-facing name) not _motor_stack/
-            if _cp(_jp, f"em-honesty/{_jn}"):
-                _em_any = True
+            if os.path.isfile(_jp):
+                # Ship under em-honesty/ (customer-facing name) not _motor_stack/
+                if _cp(_jp, f"em-honesty/{_jn}"):
+                    _em_any = True
+            elif os.path.isdir(_jp) and _jn == "fieldplot":
+                # Full FEMM field-plot pack (Tony |B| maps + 3D landscapes + HTML)
+                for _root, _dirs, _files in os.walk(_jp):
+                    for _fn in _files:
+                        if _fn.startswith("."):
+                            continue
+                        _src = os.path.join(_root, _fn)
+                        _rel = os.path.relpath(_src, _jack_dir).replace("\\", "/")
+                        if _cp(_src, f"em-honesty/{_rel}"):
+                            _em_any = True
+        # Also pull fieldplot_pack/ if present beside jack_em_pack (source of truth)
+        _fp_src = os.path.join(run_dir, "_motor_stack", "fieldplot_pack")
+        if os.path.isdir(_fp_src):
+            for _fn in sorted(os.listdir(_fp_src)):
+                if _fn.startswith("."):
+                    continue
+                _src = os.path.join(_fp_src, _fn)
+                if os.path.isfile(_src):
+                    if _cp(_src, f"em-honesty/fieldplot/{_fn}"):
+                        _em_any = True
         # companion JSON screens used by phase-C/D figures
         for _sj in (
             "coolant_loop_one_pager.json",
@@ -40879,7 +40898,18 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 "11–13  Phase C: coolant, ripple load, W3.2-lite envelopes.\n"
                 "14–20  Phase D: ESL budget, iron corners, bearing OoM, rotor FoS,\n"
                 "       NVH OPEN, gear-oil status, gear-ratio BLOCKED.\n"
-                "PDF Multi-page pack of the above.\n\n"
+                "30–37  FEMM field plots: how-to-read, OC vs loaded, Tony |B| maps,\n"
+                "       3D |B| landscapes, pole zoom, air-gap ring, interactive HTML.\n"
+                "fieldplot/  Full field-plot pack (PNG + HTML + grids).\n"
+                "PDF Multi-page pack of the spine figures.\n\n"
+                "How to read the field plots (if you are not an EM specialist)\n"
+                "------------------------------------------------------------\n"
+                "Start at 30-fieldplot-how-to-read.png — plain English.\n"
+                "Colour = magnetic field strength (|B| in tesla). Red = stronger.\n"
+                "Black lines = flux paths (magnets → air-gap → stator teeth).\n"
+                "Left/right compare = magnets alone vs magnets + copper current.\n"
+                "3D landscapes = same |B| with height = strength (2D FE presented in 3D).\n"
+                "These are real FEMM solves on the Path B deck — not decoration.\n\n"
                 "Honest status (do not over-read)\n"
                 "--------------------------------\n"
                 "- Path B mean clears the architecture power bar at 24k numerically.\n"
@@ -40889,12 +40919,14 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
                 "- Homologation stays ~1/10 until partners return data.\n"
                 "- Gear ratio writeback is BLOCKED (PLANETARY_STRENGTH_VS_ROTOR_BORE).\n"
                 "- NVH/modal is explicitly OPEN — no fake eigenmodes.\n"
+                "- Field plots are 2D planar FEMM, not 3D end-winding FE or dyno proof.\n"
                 "- Do not quote failed DEC009 artefacts that re-derived magnets to 8.85 mm.\n\n"
                 "Source renderers:\n"
                 "  scripts/motor-stack/render_path_b_jack_em_pack.py\n"
                 "  scripts/motor-stack/render_phase_b_kit_screens.py\n"
                 "  scripts/motor-stack/render_phase_c_kit_screens.py\n"
                 "  scripts/motor-stack/render_phase_d_kit_screens.py\n"
+                "  scripts/motor-stack/em_fia_fieldplot_pack.py\n"
             )
             _em_readme_path = os.path.join(bundle_dir, "em-honesty", "README.txt")
             os.makedirs(os.path.dirname(_em_readme_path), exist_ok=True)
