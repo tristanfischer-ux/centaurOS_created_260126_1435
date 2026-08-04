@@ -591,3 +591,27 @@ Send / refresh Jack xlsx asks for: dyno map, chassis XYZ, Gerbers, oil CFD/bench
 - Invent XYZ / Gerbers / dyno CSV  
 - Claim oil CFD closed because analytical cornering_ok  
 - Claim Bar A done while exploded SIGHT still shows sphere clutter
+
+
+---
+
+## ADDENDUM 2026-08-04 — Path B FE SIGHT-candidate (council uplift plan)
+
+**Does not reopen Bar A software close under DEC-008/009.** Clarifies FE honesty after Path A/B.
+
+| Item | Live 2026-08-04 |
+|---|---|
+| Architecture | 24,000 rpm / 130 mm (DEC-009) |
+| Kit-case FE source | `em_fia_front_kit_case_PATH_B_DEC009.json` |
+| Mean \|T\| | **122.100 N·m**, sign_reversals=0, magnets 6.0×22.5 mm |
+| Architecture duty bar | **104.099 N·m** → mean **1.173×** (clears numerically) |
+| Conservative binding bar | **125.215 N·m** → mean **0.975×** (does not clear) |
+| `duty_torque_screen_ok` | **false** — fail reason `torque_reliable=false` (by design until dyno) |
+| Product torque field | still option-screen product **133.855** — not kit-case FE |
+| `ship_ok` | **false** |
+| Bar A process (A-DUTY re-freeze) | Stands under DEC-008/009 assumptions |
+| Bar A FE SIGHT | **Path B is SIGHT-candidate only** — not duty-screen green, not homologation |
+| Bar B | All B1–B10 OPEN (correct) |
+
+Reader rule: do not quote pre-DEC-009 REBALANCED mean 81.56 N·m as the live freeze FE. That is lineage only (Path A proved code innocence on that geometry).
+

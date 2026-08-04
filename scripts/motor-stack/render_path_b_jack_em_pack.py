@@ -449,6 +449,202 @@ def _find_hero(twin: Path) -> Path | None:
     return candidates[0] if candidates else None
 
 
+def fig_verdict_one_pager(path_b: dict, twin: Path, out: Path) -> Path:
+    """W1.1 — council-required dual-bar arithmetic + non-claims."""
+    wic = path_b.get("works_in_kit_context") or {}
+    g = path_b.get("machine_geometry") or {}
+    iq = path_b.get("input_quantities") or {}
+    mean = float(wic.get("torque_magnitude_mean_nm") or 0)
+    arch = float(wic.get("required_shaft_torque_nm") or 0)
+    bind = 125.214912
+    qpath = twin / "state.json"
+    if qpath.is_file():
+        q = (_load(qpath).get("orchestratorContract") or {}).get("quantities") or {}
+        if isinstance(q.get("binding_duty_shaft_torque_nm"), dict):
+            bind = float(q["binding_duty_shaft_torque_nm"]["value"])
+        if isinstance(q.get("architecture_duty_shaft_torque_nm"), dict):
+            arch = float(q["architecture_duty_shaft_torque_nm"]["value"])
+    gap_arch = mean - arch
+    gap_bind = mean - bind
+    fig = plt.figure(figsize=(11.0, 7.8), facecolor=C_BG)
+    fig.text(0.06, 0.92, "FE Front MGU — Jack verdict (one page)", fontsize=18, fontweight="bold", color=C_INK)
+    fig.text(0.06, 0.875, "Concept pack under named assumptions · not homologation · ship_ok = false", fontsize=11, color=C_MUTED)
+    body = [
+        f"Architecture freeze (DEC-009):  {iq.get('max_rotor_speed_rpm')} rpm  ·  {g.get('active_length_mm')} mm stack  ·  magnets {g.get('magnet_thickness_mm')}×{g.get('magnet_length_mm')} mm",
+        f"Duty assumption (DEC-008):      intermittent peak (vignette ~24 s regen / 100 s) — not continuous 250 kW thermal",
+        "",
+        f"Path B kit-case FE mean |T|     {mean:.3f} N·m   (sign-consistent; sign_reversals=0; SIGHT-candidate only)",
+        f"Architecture duty bar (24k)     {arch:.3f} N·m   →  mean/arch = {mean/arch:.3f}×   gap = {gap_arch:+.1f} N·m   CLEARS",
+        f"Conservative binding (ledger)   {bind:.3f} N·m   →  mean/bind = {mean/bind:.3f}×   gap = {gap_bind:+.1f} N·m   DOES NOT CLEAR",
+        "",
+        f"duty_torque_screen_ok = {wic.get('duty_torque_screen_ok')}     torque_reliable = {wic.get('torque_reliable')}",
+        "Fail reason is the reliability gate (dyno/map), not short torque vs architecture bar.",
+        "",
+        "Product field mgu_fe_shaft_torque_nm remains option-screen PRODUCT (not kit-case FE).",
+        "Do not quote failed DEC009 artefacts (re-derived magnets 8.85×14.58 mm).",
+        "Do not quote pre-DEC-009 REBALANCED mean 81.56 N·m as the live freeze FE (lineage / Path A only).",
+        "",
+        "Bar A process: A-DUTY re-freeze under DEC-008/009 stands as concept close under assumptions.",
+        "Bar A FE: Path B is SIGHT-candidate — not duty-screen green, not ship.",
+        "Bar B: B1–B10 all OPEN (dyno, Gerbers, XYZ, flow bench, HIL, …) — correctly.",
+        "",
+        f"Artefact: {PATH_B_NAME}   rendered {_iso()}",
+    ]
+    fig.text(0.06, 0.82, "\n".join(body), fontsize=10.5, color=C_INK, va="top", family="monospace", linespacing=1.45)
+    # mini bars
+    ax = fig.add_axes([0.55, 0.12, 0.38, 0.35])
+    ax.set_facecolor(C_BG)
+    labels = ["Arch\n104", "Path B\nmean", "Bind\n125"]
+    vals = [arch, mean, bind]
+    cols = [C_ARCH, C_PATHB, C_BIND]
+    ax.bar([0, 1, 2], vals, color=cols, width=0.65)
+    ax.set_xticks([0, 1, 2])
+    ax.set_xticklabels(labels, fontsize=8)
+    ax.set_ylabel("N·m", fontsize=8)
+    ax.tick_params(labelsize=8)
+    for spine in ax.spines.values():
+        spine.set_color(C_GRID)
+    ax.set_title("Dual bars (honest)", fontsize=9, color=C_INK)
+    path = out / "00-verdict-one-pager.png"
+    fig.savefig(path, dpi=160, facecolor=C_BG)
+    plt.close(fig)
+    return path
+
+
+def fig_open_by_design(twin: Path, out: Path) -> Path:
+    """W1.2 — Bar B / DEC opens with closure columns."""
+    md = twin / "JLR-FE-FRONT-FPK-BAR-B-READINESS.md"
+    rows = []
+    if md.is_file():
+        for line in md.read_text(encoding="utf-8").splitlines():
+            if line.startswith("|") and "BARB-" in line:
+                parts = [c.strip() for c in line.strip("|").split("|")]
+                if len(parts) >= 6 and parts[1].startswith("`BARB"):
+                    rows.append(parts)
+    fig = plt.figure(figsize=(12.0, 8.0), facecolor=C_BG)
+    fig.text(0.04, 0.94, "Open by design — Bar B & partner holds", fontsize=16, fontweight="bold", color=C_INK)
+    fig.text(
+        0.04,
+        0.90,
+        "Software can define and ask. Software cannot close these. ship_ok stays false.",
+        fontsize=10,
+        color=C_MUTED,
+    )
+    y = 0.84
+    fig.text(0.04, y, f"{'Pri':<4} {'ID':<22} {'Item':<42} {'Class':<18} Status", fontsize=8, fontweight="bold", family="monospace", color=C_INK)
+    y -= 0.03
+    for parts in rows[:12]:
+        pri, bid, item, cls = parts[0], parts[1].replace("`", ""), parts[2][:40], parts[3].replace("**", "")[:16]
+        line = f"{pri:<4} {bid:<22} {item:<42} {cls:<18} OPEN"
+        fig.text(0.04, y, line, fontsize=7.5, family="monospace", color=C_INK)
+        y -= 0.028
+        if y < 0.12:
+            break
+    fig.text(
+        0.04,
+        0.08,
+        "Full executable asks (artefact / format / conditions): JLR-FE-FRONT-FPK-BAR-B-READINESS.md\n"
+        f"Rendered {_iso()} · Path B EM live; dyno still required for torque_reliable",
+        fontsize=8,
+        color=C_MUTED,
+    )
+    path = out / "00b-open-by-design.png"
+    fig.savefig(path, dpi=150, facecolor=C_BG)
+    plt.close(fig)
+    return path
+
+
+def fig_how_to_read(out: Path) -> Path:
+    """W1.5 — concept vs homologation."""
+    fig = plt.figure(figsize=(11.0, 7.5), facecolor=C_BG)
+    fig.text(0.06, 0.90, "How to read this pack", fontsize=18, fontweight="bold", color=C_INK)
+    left = [
+        "CONCEPT (software-closed under assumptions)",
+        "• DEC-008 intermittent duty + DEC-009 24k/130",
+        "• Path B sign-stable kit-case FE mean",
+        "• Dual torque bars (architecture vs conservative)",
+        "• Cooling / oil / rotor screens (screening class)",
+        "• Draft PCB topology (NOT_FAB)",
+        "• Blender morphology + EM honesty figures",
+        "",
+        "You may treat this as a serious concept FPK.",
+    ]
+    right = [
+        "HOMOLOGATION / RACE (partner + hardware)",
+        "• Dyno map → torque_reliable",
+        "• Lap CSV → duty authority",
+        "• Supplier Gerbers + SiC MPN",
+        "• Chassis XYZ mounts",
+        "• Flow bench / oil CFD + clear case",
+        "• Release FEA + material certs",
+        "• HIL on populated inverter",
+        "",
+        "ship_ok stays false until these exist.",
+    ]
+    fig.text(0.06, 0.78, "\n".join(left), fontsize=11, color=C_INK, va="top", linespacing=1.5)
+    fig.text(0.52, 0.78, "\n".join(right), fontsize=11, color=C_INK, va="top", linespacing=1.5)
+    fig.text(
+        0.06,
+        0.18,
+        "If a figure looks green, read the caption. Green architecture bar ≠ green duty screen ≠ ship.",
+        fontsize=11,
+        color=C_WARN,
+        fontweight="bold",
+    )
+    fig.text(0.06, 0.08, f"Rendered {_iso()}", fontsize=8, color=C_MUTED)
+    path = out / "00c-how-to-read-pack.png"
+    fig.savefig(path, dpi=150, facecolor=C_BG)
+    plt.close(fig)
+    return path
+
+
+def fig_thermal_storyboard(twin: Path, out: Path) -> Path:
+    """W2.5 — continuous vs intermittent magnet temp."""
+    q = {}
+    sp = twin / "state.json"
+    if sp.is_file():
+        q = (_load(sp).get("orchestratorContract") or {}).get("quantities") or {}
+    cont = float((q.get("magnet_temperature_screen_c") or {}).get("value") or 159.35)
+    inter = float((q.get("mgu_magnet_temp_c") or {}).get("value") or 99.4)
+    limit = float((q.get("magnet_temp_limit_c") or {}).get("value") or 150.0)
+    fig, ax = plt.subplots(figsize=(9.5, 5.6), facecolor=C_BG)
+    _style_axes(ax, "Thermal storyboard — magnet temperature under duty assumption")
+    labs = ["Continuous\nscreen (wrong\nfor this FPK)", "DEC-008\nintermittent\n(DEC-009 case)", "Limit"]
+    vals = [cont, inter, limit]
+    cols = [C_WARN, C_ARCH, C_MUTED]
+    bars = ax.bar([0, 1, 2], vals, color=cols, width=0.55)
+    ax.axhline(limit, color=C_MUTED, linestyle="--", linewidth=1.2)
+    ax.set_xticks([0, 1, 2])
+    ax.set_xticklabels(labs, fontsize=9)
+    ax.set_ylabel("Magnet temperature (°C)")
+    for b, v in zip(bars, vals):
+        ax.text(b.get_x() + b.get_width() / 2, v + 2, f"{v:.1f} °C", ha="center", fontsize=10, fontweight="bold")
+    ax.text(
+        0.98,
+        0.95,
+        "Continuous 250 kW thermal is rejected by DEC-008\n"
+        "(front unit is regen-only; vignette ~24%).\n"
+        "99.4 °C is a SCREEN under assumptions — not dyno.",
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=8.5,
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor=C_GRID),
+    )
+    _caption(
+        fig,
+        [
+            "DEC-008 makes intermittent duty the design basis; continuous magnet 159 °C was an artefact of screening 24% duty at 100% load.",
+            f"Sources: state quantities magnet_temperature_screen_c / mgu_magnet_temp_c  ·  {_iso()}",
+        ],
+    )
+    fig.tight_layout(rect=(0.03, 0.10, 0.97, 0.96))
+    path = out / "06-thermal-duty-storyboard.png"
+    fig.savefig(path, dpi=160, facecolor=C_BG)
+    plt.close(fig)
+    return path
+
+
 def build_pdf(pngs: list[Path], out: Path) -> Path:
     pdf_path = out / "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf"
     with PdfPages(pdf_path) as pdf:
@@ -509,10 +705,15 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     pngs: list[Path] = []
+    # Jack spine first (council Phase A)
+    pngs.append(fig_verdict_one_pager(path_b, twin, out))
+    pngs.append(fig_open_by_design(twin, out))
+    pngs.append(fig_how_to_read(out))
     pngs.append(fig_dual_bars(path_b, reb, out))
     pngs.append(fig_torque_sweep(path_b, out))
     pngs.append(fig_airgap_b(path_b, out))
     pngs.append(fig_geometry_card(path_b, out))
+    pngs.append(fig_thermal_storyboard(twin, out))
     hero = fig_hero_callout(path_b, _find_hero(twin), out)
     if hero:
         pngs.append(hero)

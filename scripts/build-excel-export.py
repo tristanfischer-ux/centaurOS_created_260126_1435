@@ -40550,6 +40550,15 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
     # only under _motor_stack/jack_em_pack/. Source of truth is Path B JSON;
     # renderer is scripts/motor-stack/render_path_b_jack_em_pack.py.
     _EM_HONESTY_CAPTIONS = {
+        "00-verdict-one-pager.png": (
+            "EM honesty — Jack verdict one-pager (dual-bar arithmetic; ship_ok false)"
+        ),
+        "00b-open-by-design.png": (
+            "EM honesty — Bar B / partner opens (closure-oriented; all OPEN)"
+        ),
+        "00c-how-to-read-pack.png": (
+            "EM honesty — how to read this pack (concept vs homologation)"
+        ),
         "01-dual-torque-bars.png": (
             "EM honesty — dual torque bars (architecture duty vs Path B mean vs "
             "conservative binding vs REBALANCED legacy)"
@@ -40566,6 +40575,9 @@ def _write_deliverable_bundle(run_dir: str, slug: str) -> Optional[dict]:
         ),
         "05-product-hero-em-callouts.jpg": (
             "EM honesty — product hero with Path B callouts (ship_ok false)"
+        ),
+        "06-thermal-duty-storyboard.png": (
+            "EM honesty — magnet temperature continuous vs DEC-008 intermittent"
         ),
         "FE-FRONT-PATH-B-EM-HONESTY-PACK.pdf": (
             "EM honesty — full Path B pack (PDF multi-page)"

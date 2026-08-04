@@ -153,10 +153,52 @@ def _tol_for(key: str) -> float:
     return ABS_TOL
 
 
+def _prefer_kit_case_em(motor_stack: Path) -> tuple[dict[str, Any], str]:
+    """Prefer coherent Path B DEC-009 kit-case over baseline REBALANCED file.
+
+    Path B is the live freeze FE (24k/130, magnets 6×22.5). The un-suffixed
+    em_fia_front_kit_case.json often still holds pre-DEC-009 REBALANCED numbers
+    (81.56 N·m) — quoting those as live_artefacts misleads Bar B freshness.
+    """
+    path_b = motor_stack / "em_fia_front_kit_case_PATH_B_DEC009.json"
+    baseline = motor_stack / "em_fia_front_kit_case.json"
+    for path, label in ((path_b, "PATH_B_DEC009"), (baseline, "kit_case")):
+        em = _load(path) or {}
+        if not em:
+            continue
+        g = em.get("machine_geometry") if isinstance(em.get("machine_geometry"), Mapping) else {}
+        w = (
+            em.get("works_in_kit_context")
+            if isinstance(em.get("works_in_kit_context"), Mapping)
+            else {}
+        )
+        sw = ((em.get("rotor_position_sweep") or {}).get("summary") or {})
+        if path == path_b:
+            try:
+                active = float(g.get("active_length_mm") or 0)
+                mag_t = float(g.get("magnet_thickness_mm") or 0)
+                mag_l = float(g.get("magnet_length_mm") or 0)
+                mean = w.get("torque_magnitude_mean_nm") or sw.get("torque_magnitude_mean_nm")
+                sign_ok = sw.get("torque_sign_consistent") is True
+                rev_ok = sw.get("sign_reversals") is not None and int(sw.get("sign_reversals")) == 0
+                geom_ok = (
+                    abs(active - 130.0) < 0.05
+                    and abs(mag_t - 6.0) < 0.01
+                    and abs(mag_l - 22.5) < 0.01
+                )
+                if mean is not None and float(mean) > 0 and sign_ok and rev_ok and geom_ok:
+                    return em, label
+            except (TypeError, ValueError):
+                continue
+        else:
+            return em, label
+    return {}, "none"
+
+
 def live_artefact_snapshot(twin_dir: Path) -> dict[str, Any]:
     """Read the same twin screens build_bar_b uses — no invented numbers."""
     motor_stack = twin_dir / "_motor_stack"
-    em = _load(motor_stack / "em_fia_front_kit_case.json") or {}
+    em, em_source = _prefer_kit_case_em(motor_stack)
     cool = _load(motor_stack / "analytical_fia_cooling_network_screen.json") or {}
     rotor = _load(motor_stack / "calculix_fia_rotor_screen.json") or {}
     state = _load(twin_dir / "state.json") or {}
@@ -200,6 +242,35 @@ def live_artefact_snapshot(twin_dir: Path) -> dict[str, Any]:
         "loaded_torque_magnitude_nm"
     )
     required_tq = em_works.get("required_shaft_torque_nm")
+    # Twin dual-bar stamps (stabilize) — architecture bar may differ from kit-case required
+    q = (
+        ((state.get("orchestratorContract") or {}).get("quantities"))
+        if isinstance(state.get("orchestratorContract"), Mapping)
+        else {}
+    )
+    if not isinstance(q, Mapping):
+        q = {}
+    arch_row = q.get("architecture_duty_shaft_torque_nm")
+    bind_row = q.get("binding_duty_shaft_torque_nm")
+    fe_row = q.get("last_sign_consistent_kit_case_fe_mean_nm")
+    arch_duty = (
+        arch_row.get("value") if isinstance(arch_row, Mapping) else None
+    )
+    bind_duty = (
+        bind_row.get("value") if isinstance(bind_row, Mapping) else None
+    )
+    fe_mean_twin = fe_row.get("value") if isinstance(fe_row, Mapping) else None
+    # Prefer twin FE label when Path B was adopted there
+    if fe_mean_twin is not None and em_source == "PATH_B_DEC009":
+        try:
+            mean_tq = float(fe_mean_twin)
+        except (TypeError, ValueError):
+            pass
+    if arch_duty is not None and em_source == "PATH_B_DEC009":
+        try:
+            required_tq = float(arch_duty)  # architecture power bar at freeze
+        except (TypeError, ValueError):
+            pass
 
     pcb_boards: list[Any] = []
     arch = pcb.get("architecture") if isinstance(pcb.get("architecture"), Mapping) else {}
@@ -225,7 +296,11 @@ def live_artefact_snapshot(twin_dir: Path) -> dict[str, Any]:
     return {
         "mean_tq": mean_tq,
         "required_tq": required_tq,
+        "architecture_duty_tq": arch_duty,
+        "binding_duty_tq": bind_duty,
+        "em_source": em_source,
         "duty_torque_screen_ok": em_works.get("duty_torque_screen_ok"),
+        "torque_reliable": em_works.get("torque_reliable"),
         "t_module": cool_scr.get("maximum_module_temperature_c"),
         "coupled_ok": cool_scr.get("coupled_screen_ok"),
         "delta_p": cool_scr.get("total_delta_p_kpa"),

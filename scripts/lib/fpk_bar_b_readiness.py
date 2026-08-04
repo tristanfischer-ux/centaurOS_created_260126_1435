@@ -91,6 +91,42 @@ def _executable_ask(
     }
 
 
+def _prefer_kit_case_em(motor_stack: Path) -> tuple[dict[str, Any], str]:
+    """Prefer coherent Path B DEC-009 kit-case over baseline REBALANCED file."""
+    path_b = motor_stack / "em_fia_front_kit_case_PATH_B_DEC009.json"
+    baseline = motor_stack / "em_fia_front_kit_case.json"
+    for path, label in ((path_b, "PATH_B_DEC009"), (baseline, "kit_case")):
+        em = _load(path) or {}
+        if not em:
+            continue
+        if path != path_b:
+            return em, label
+        g = em.get("machine_geometry") if isinstance(em.get("machine_geometry"), Mapping) else {}
+        w = (
+            em.get("works_in_kit_context")
+            if isinstance(em.get("works_in_kit_context"), Mapping)
+            else {}
+        )
+        sw = ((em.get("rotor_position_sweep") or {}).get("summary") or {})
+        try:
+            active = float(g.get("active_length_mm") or 0)
+            mag_t = float(g.get("magnet_thickness_mm") or 0)
+            mag_l = float(g.get("magnet_length_mm") or 0)
+            mean = w.get("torque_magnitude_mean_nm") or sw.get("torque_magnitude_mean_nm")
+            sign_ok = sw.get("torque_sign_consistent") is True
+            rev_ok = sw.get("sign_reversals") is not None and int(sw.get("sign_reversals")) == 0
+            geom_ok = (
+                abs(active - 130.0) < 0.05
+                and abs(mag_t - 6.0) < 0.01
+                and abs(mag_l - 22.5) < 0.01
+            )
+            if mean is not None and float(mean) > 0 and sign_ok and rev_ok and geom_ok:
+                return em, label
+        except (TypeError, ValueError):
+            continue
+    return {}, "none"
+
+
 def build_bar_b(twin_dir: Path) -> dict[str, Any]:
     """Build Bar B readiness rows from twin screens + decisions.
 
@@ -108,7 +144,7 @@ def build_bar_b(twin_dir: Path) -> dict[str, Any]:
     if not isinstance(quantities, Mapping):
         quantities = {}
     motor_stack = twin_dir / "_motor_stack"
-    em = _load(motor_stack / "em_fia_front_kit_case.json") or {}
+    em, em_source = _prefer_kit_case_em(motor_stack)
     cool = _load(motor_stack / "analytical_fia_cooling_network_screen.json") or {}
     rotor = _load(motor_stack / "calculix_fia_rotor_screen.json") or {}
     pocket = _load(motor_stack / "calculix_fia_magnet_pocket_screen.json") or {}
@@ -161,8 +197,18 @@ def build_bar_b(twin_dir: Path) -> dict[str, Any]:
     inv_kw = inv_scr.get("inverter_dissipated_kw") or _qty(quantities, "inverter_dissipated_kw", 4.318)
     t_module = cool_scr.get("maximum_module_temperature_c")
     delta_p = cool_scr.get("total_delta_p_kpa")
+    # Dual bars: architecture power bar from twin stamp when Path B adopted
+    arch_q = quantities.get("architecture_duty_shaft_torque_nm")
+    bind_q = quantities.get("binding_duty_shaft_torque_nm")
+    fe_q = quantities.get("last_sign_consistent_kit_case_fe_mean_nm")
     required_tq = em_works.get("required_shaft_torque_nm") or 125.2193
     mean_tq = em_works.get("torque_magnitude_mean_nm") or em_works.get("loaded_torque_magnitude_nm")
+    if em_source == "PATH_B_DEC009":
+        if isinstance(arch_q, Mapping) and arch_q.get("value") is not None:
+            required_tq = arch_q.get("value")
+        if isinstance(fe_q, Mapping) and fe_q.get("value") is not None:
+            mean_tq = fe_q.get("value")
+    bind_tq = bind_q.get("value") if isinstance(bind_q, Mapping) else None
     duty_regen_s = _qty(quantities, "duty_regen_time_s", 24)
     duty_motor_s = _qty(quantities, "duty_motoring_time_s", 76)
     cycle_s = None
@@ -345,12 +391,16 @@ def build_bar_b(twin_dir: Path) -> dict[str, Any]:
                 f"tools as placeholder spectrum"
             ),
             "result_under_assumption": (
-                f"EM duty screen ok={em_works.get('duty_torque_screen_ok')}; "
-                f"mean |T|≈{_fmt(mean_tq, 2)} N·m vs required≈{_fmt(required_tq, 2)} N·m; "
+                f"EM source={em_source}; duty screen ok={em_works.get('duty_torque_screen_ok')} "
+                f"(torque_reliable={em_works.get('torque_reliable')}); "
+                f"mean |T|≈{_fmt(mean_tq, 2)} N·m vs architecture duty≈{_fmt(required_tq, 2)} N·m"
+                f"{f' (conservative binding≈{_fmt(bind_tq, 2)} N·m)' if bind_tq is not None else ''}; "
                 f"DEC-008 vignette {_fmt(duty_regen_s, 0)}s/{_fmt(cycle_s, 0)}s"
             ),
             "evidence": [
-                "_motor_stack/em_fia_front_kit_case.json",
+                "_motor_stack/em_fia_front_kit_case_PATH_B_DEC009.json"
+                if em_source == "PATH_B_DEC009"
+                else "_motor_stack/em_fia_front_kit_case.json",
                 "_motor_stack/em_fia_torque_map_screen.json",
             ],
             "blocks_ship_ok": True,
