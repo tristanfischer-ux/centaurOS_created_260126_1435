@@ -1,0 +1,13 @@
+{
+  "schema": "forgeos.p_stage_discipline.plan_fit/v1",
+  "stage_id": "fe-front-fieldplot-pack",
+  "intent": "FE Front FEMM Field Plot Pack",
+  "maps_to_plan_item": "FE Front lean-in EM visualisation / fieldplot pack (Tony bar)",
+  "why_now": "",
+  "explicitly_not_doing": [],
+  "depends_on": [],
+  "success_criteria": [],
+  "ship_ok_unchanged": true,
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "created_utc": "2026-08-04T18:46:50Z"
+}

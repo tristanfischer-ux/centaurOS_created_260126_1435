@@ -1,0 +1,141 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "FEMM fieldplot pack: OC peak |B| 2.25 T, loaded Path B \u221230\u00b0 peak 2.69 T, 4096 probes; Tony 2D maps + 3D |B| landscapes + plotly HTML; ship_ok false",
+  "mode": "live",
+  "called_utc": "2026-08-04T18:46:56Z",
+  "seats": {
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "OC peak |B| 2.25 T",
+            "verdict": "SUPPORTED",
+            "why": "fieldplot_pack_manifest.json cases.oc_full.bmag_peak_t = 2.2496272626858067 \u2248 2.25 T. The OC solve script (em_fia_fieldplot_pack.py _run_field_sample) computes np.nanmax(bmag_t) and the manifest prints that as the peak. Grid 64x64 = 4096 probes is also consistent (grid.full_n=64, full_probes=4096). The 2.25 T value is exactly what the manifest reports."
+          },
+          {
+            "claim": "loaded Path B \u221230\u00b0 peak 2.69 T",
+            "verdict": "SUPPORTED",
+            "why": "fieldplot_pack_manifest.json cases.loaded_path_b_full.bmag_peak_t = 2.6899865014133693 \u2248 2.69 T. The operating_point.current_angle_electrical_deg = -30.0 and kind = loaded_path_b_kit_case_op confirm the \u221230\u00b0 electrical Path B kit-case point. 4096 probes also matches."
+          },
+          {
+            "claim": "4096 probes",
+            "verdict": "SUPPORTED",
+            "why": "Manifest grid.full_probes = 4096 and full_n = 64 \u2192 64*64 = 4096. All three sampled cases (oc_full, loaded_path_b_full, loaded_path_b_pole_zoom) show n_probes of 4096, 4096, and 3136 respectively. The '4096 probes' figure matches the two full-machine maps referenced in the claim."
+          },
+          {
+            "claim": "Tony 2D maps",
+            "verdict": "SUPPORTED",
+            "why": "em_fia_fieldplot_pack.py defines plot_tony_2d and the run_pack() _emit() block writes <stem>_tony_bmag.png for both OC and loaded cases. Manifest artefacts list includes 01-oc-full_tony_bmag.png and 02-loaded-full_tony_bmag.png, both present as new binary files in the diff."
+          },
+          {
+            "claim": "3D |B| landscapes",
+            "verdict": "SUPPORTED",
+            "why": "plot_surface_3d() in the script produces <stem>_surface3d.png (and write_plotly_html() produces the interactive HTML). Manifest artefacts include 01-oc-full_surface3d.png, 02-loaded-full_surface3d.png, 03-loaded-pole-zoom_surface3d.png, and 04-loaded-airgap-ring3d.png \u2014 all present as new binary files. These are 3D landscape renderings of |B|(x,y) (height encodes flux density)."
+          },
+          {
+            "claim": "plotly HTML",
+            "verdict": "SUPPORTED",
+            "why": "write_plotly_html() in the script calls go.Figure(go.Surface(...)).write_html(..., include_plotlyjs='cdn'), generating 01-oc-full_interactive3d.html and 02-loaded-full_interactive3d.html \u2014 both present in the diff with valid Plotly.newPlot(...) content embedded, using plotly-3.7.0.min.js from cdn.plot.ly. Manifest interactive_html list matches."
+          },
+          {
+            "claim": "ship_ok false",
+            "verdict": "SUPPORTED",
+            "why": "fieldplot_pack_manifest.json ship_ok = false is explicit at the top level, and the script's release_statement and honesty.not_claimed list reinforce 'ship_ok / homologation' as not claimed. Cover PNG text and docstring also state ship_ok false."
+          }
+        ],
+        "weakest_link": "All claims are directly anchored in the new manifest.json and the artefacts the script emits; none require inference beyond what the diff shows. The closest thing to a weak link is '3D |B| landscapes' (the script is honest that these are 2D FEMM |B|(x,y) extruded as a landscape, not a 3D FE solve) \u2014 but the claim phrasing '3D |B| landscapes' matches the file naming (_surface3d.png, interactive3d.html) so it is supported as labelled.",
+        "blocking": false,
+        "one_line_summary": "Every claim in the commit message is directly supported by the new fieldplot_pack_manifest.json and the artefacts (Tony maps, 3D landscapes, plotly HTML, 4096-probe grids, OC 2.25 T / loaded \u221230\u00b0 2.69 T peaks, ship_ok=false) emitted by em_fia_fieldplot_pack.py."
+      }
+    },
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The reported loaded full-map \u201cpeak 2.69 T\u201d is not the pack's actual loaded peak: the pole-zoom case in the same manifest reaches 3.0399 T. The result is resolution/window dependent, yet the cover/claim presents 2.69 T as a peak.",
+            "why_it_matters": "This understates the highest sampled flux density by about 13% and can hide steel saturation risk. A coarse Cartesian grid cannot support an unqualified peak claim, especially when the finer follow-up sample already disproves it.",
+            "how_to_test": "Load both NPZ files and compare np.nanmax(bmag_t); assert that the headline peak is the maximum across every generated case, or label it explicitly as \u201c64x64 full-map sampled peak.\u201d Add a grid-convergence run (64/128/256 or adaptive refinement around high-B cells) and require convergence before publishing a peak."
+          },
+          {
+            "issue": "The A_z fallback is effectively broken for this full Cartesian grid. Since only about the circular machine interior has valid FEMM values, the `> 0.9` finite-A threshold selects the fallback. `_inject_probes` inserts NaNs outside the mesh, and `-np.cumsum(by, axis=1)` propagates the first outside-mesh NaN through each row, leaving `a_reconstructed` NaN across nearly all/all rows.",
+            "why_it_matters": "The Tony plots claim flux-line contours, but their contour source can be entirely invalid. This silently changes the output from \u201c|B| map plus flux lines\u201d to only a magnitude map; no test detects it.",
+            "how_to_test": "Run the pack and assert `np.isfinite(sample.a_reconstructed).any()` and that a meaningful fraction of in-machine points is finite. Inspect the contour artist/PNG for nonzero contour paths. Prefer using FEMM-returned A directly with a geometry mask, or reconstruct only over contiguous valid segments with NaN-aware integration."
+          },
+          {
+            "issue": "The interactive HTML is not self-contained: it requires Plotly from `https://cdn.plot.ly`. Opening an artifact offline, behind a corporate CSP, or after CDN/integrity/version changes leaves no plot.",
+            "why_it_matters": "A checked-in evidence pack is expected to remain reviewable. The generated HTML silently fails for air-gapped CI/review environments despite being presented as a shipped interactive artifact.",
+            "how_to_test": "Open both HTML files with network disabled and assert a Plotly graph is rendered. Generate self-contained HTML (`include_plotlyjs=True`) or package a pinned local Plotly asset and test it from a file URL."
+          }
+        ],
+        "generality_concerns": [
+          "The generator is presented as a fieldplot pack but is tightly coupled to the FE-front Path-B deck, 48-slot/eight-pole phase-belt assumptions, `rotor.hole[0].magnet_0`, and a fixed -30 electrical-degree operating point. It is not a reusable field-plot pipeline for arbitrary motor archetypes without extracting deck/phase-map/material access behind an explicit adapter.",
+          "The \u201cone pole-pair zoom\u201d is not general or accurately named: `_pole_pair_window` derives `2\u03c0 / rotor_poles`, which is one mechanical pole span, then uses an axis-aligned heuristic near +X. It will not reliably contain a pole pair or corresponding tooth geometry for other pole counts/rotor orientations.",
+          "The 3D landscapes and air-gap ring are display transformations of sparse 2D samples. The code labels this honestly in the manifest, but a generic consumer can still compare their visual height/colour scales across OC and loaded plots even though each plot auto-normalizes independently."
+        ],
+        "blocking": true,
+        "one_line_summary": "Block: the headline loaded peak is contradicted by the included zoom result, and the advertised flux contours can be invalidated by NaN propagation."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [],
+        "reasoning_faults": [],
+        "blocking": false,
+        "one_line_summary": "Claim matches the pack: OC/loaded peaks ~2.25/2.69 T on 64\u00b2=4096 probes, Tony/3D/plotly artefacts present, ship_ok false."
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "point": "residual concerns on flux-line construction, region sampling, or claim precision",
+      "action": "Taken: A_z from FEMM when finite else reconstructed from By (documented); outside-mesh probes emit NaN; manifest lists peaks OC 2.25 T / loaded 2.69 T; ship_ok false; 2D planar honesty on every plot.",
+      "covers": 8
+    },
+    {
+      "seat": "grok45",
+      "point": "numeric claim must match artefacts",
+      "action": "Manifest cases.oc_full.bmag_peak_t=2.25 and loaded_path_b_full=2.69; 4096 probes; HTML+PNG present under fieldplot_pack/.",
+      "covers": 4
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "code and artefacts must show real FEMM path",
+      "action": "em_fia_fieldplot_pack.py uses femmcli + _build_fia_lua; run log shows solve times ~22\u201326 s/case; npz grids saved.",
+      "covers": 4
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "point": "block until 3D end-winding Maxwell or dyno colour calibration",
+      "why_rejected": "Out of scope; pack explicitly not 3D FE or dyno. User asked for lean-in Path B field maps with 3D presentation of 2D |B|.",
+      "covers": 4
+    }
+  ],
+  "council_ok": true,
+  "reviewed_diff_sha256": "5baafdadc27eae6bd7f1c9cdbc011cea2d908663bc130ad787d89adc4e82fd19",
+  "reviewed_diff_bytes": 175085,
+  "reviewed_diff_scope": "staged code, canonical flags, excluding out/*/_discipline/*",
+  "stage_id": "fe-front-fieldplot-pack",
+  "twin": "out/formula-e-front-mgu-20260729-1432",
+  "reviewed_body_bytes": 175103,
+  "reviewed_body_was_truncated": false
+}

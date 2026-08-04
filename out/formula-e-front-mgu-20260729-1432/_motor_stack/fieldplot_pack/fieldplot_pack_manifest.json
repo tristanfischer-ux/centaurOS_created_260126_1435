@@ -1,0 +1,141 @@
+{
+  "schema": "forgeos.motor_stack.em_fia_fieldplot_pack/v1",
+  "ran_at": "2026-08-04T18:44:47Z",
+  "ship_ok": false,
+  "status": "SCREEN_FIELD_MAPS",
+  "source_twin": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/formula-e-front-mgu-20260729-1432",
+  "source_state_sha256": "42d64d25ececa6948baae22fdfb52ca27d9f3cf981cdb4f2817fda456ac2aed5",
+  "solver": {
+    "name": "xfemm femmcli",
+    "path": "/Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/scripts/phantm/bin/femmcli",
+    "deck": "em_fia_front_kit_case._build_fia_lua (Path B geometry)"
+  },
+  "grid": {
+    "full_n": 64,
+    "zoom_n": 56,
+    "full_probes": 4096
+  },
+  "cases": {
+    "oc_full": {
+      "label": "oc_full",
+      "n_probes": 4096,
+      "solve_seconds": 25.8,
+      "bmag_peak_t": 2.2496272626858067,
+      "bmag_p99_t": 1.9541833604289405,
+      "bmag_mean_t": 0.3213217956385821,
+      "operating_point": {
+        "kind": "open_circuit"
+      },
+      "geometry_mm": {
+        "r_ri_mm": 52.95,
+        "r_ro_mm": 69.7,
+        "r_si_mm": 70.4,
+        "r_so_mm": 94.1,
+        "r_gap_mm": 70.05000000000001,
+        "active_length_mm": 130.0,
+        "stator_slots": 24.0,
+        "rotor_poles": 8.0
+      }
+    },
+    "loaded_path_b_full": {
+      "label": "loaded_path_b_full",
+      "n_probes": 4096,
+      "solve_seconds": 21.57,
+      "bmag_peak_t": 2.6899865014133693,
+      "bmag_p99_t": 2.2475953366662424,
+      "bmag_mean_t": 0.7530938712182255,
+      "operating_point": {
+        "kind": "loaded_path_b_kit_case_op",
+        "current_angle_electrical_deg": -30.0,
+        "rotor_position_mechanical_deg": 0.0,
+        "phase_current_rms_a": 535.0,
+        "phase_current_peak_a": 756.6042558696059,
+        "path_current_rms_a": 267.5,
+        "effective_turns_per_slot": 7,
+        "winding_parallel_paths": 2.0
+      },
+      "geometry_mm": {
+        "r_ri_mm": 52.95,
+        "r_ro_mm": 69.7,
+        "r_si_mm": 70.4,
+        "r_so_mm": 94.1,
+        "r_gap_mm": 70.05000000000001,
+        "active_length_mm": 130.0,
+        "stator_slots": 24.0,
+        "rotor_poles": 8.0
+      }
+    },
+    "loaded_path_b_pole_zoom": {
+      "label": "loaded_path_b_pole_zoom",
+      "n_probes": 3136,
+      "solve_seconds": 20.68,
+      "bmag_peak_t": 3.039907178747512,
+      "bmag_p99_t": 2.3361375800204796,
+      "bmag_mean_t": 0.9228878407755939,
+      "operating_point": {
+        "kind": "loaded_path_b_kit_case_op",
+        "current_angle_electrical_deg": -30.0,
+        "rotor_position_mechanical_deg": 0.0,
+        "phase_current_rms_a": 535.0,
+        "phase_current_peak_a": 756.6042558696059,
+        "path_current_rms_a": 267.5,
+        "effective_turns_per_slot": 7,
+        "winding_parallel_paths": 2.0
+      },
+      "geometry_mm": {
+        "r_ri_mm": 52.95,
+        "r_ro_mm": 69.7,
+        "r_si_mm": 70.4,
+        "r_so_mm": 94.1,
+        "r_gap_mm": 70.05000000000001,
+        "active_length_mm": 130.0,
+        "stator_slots": 24.0,
+        "rotor_poles": 8.0
+      }
+    }
+  },
+  "artefacts": [
+    "01-oc-full_tony_bmag.png",
+    "01-oc-full_quiver.png",
+    "01-oc-full_surface3d.png",
+    "01-oc-full_interactive3d.html",
+    "02-loaded-full_tony_bmag.png",
+    "02-loaded-full_quiver.png",
+    "02-loaded-full_surface3d.png",
+    "02-loaded-full_interactive3d.html",
+    "03-loaded-pole-zoom_tony_bmag.png",
+    "03-loaded-pole-zoom_surface3d.png",
+    "04-loaded-airgap-ring3d.png",
+    "05-oc-vs-loaded-compare.png"
+  ],
+  "interactive_html": [
+    "01-oc-full_interactive3d.html",
+    "02-loaded-full_interactive3d.html"
+  ],
+  "honesty": {
+    "dimensionality": "2D planar magnetostatic FEMM; 3D plots are presentation of the 2D |B| field (height/colour), not a 3D FE solve",
+    "flux_lines": "contours of A_z (FEMM A or reconstructed from By)",
+    "not_claimed": [
+      "3D end-winding field",
+      "dyno correlation",
+      "closed MTPA / demag map",
+      "ship_ok / homologation"
+    ]
+  },
+  "release_statement": "Field-plot SCREEN only. Same Path B kit-case deck as the torque campaign. ship_ok false. Lean-in visualisation of magnets \u2194 copper, not race evidence.",
+  "remanence_t": 1.24,
+  "loaded_path_b_op": {
+    "phase_current_rms_a": 535.0,
+    "phase_current_peak_a": 756.6042558696059,
+    "path_current_rms_a": 267.5,
+    "path_current_peak_a": 378.30212793480297,
+    "winding_parallel_paths": 2.0,
+    "current_angle_electrical_deg": -30.0,
+    "rotor_position_mechanical_deg": 0.0,
+    "phase_a_current_a": 327.6192530972501,
+    "phase_b_current_a": -327.61925309725007,
+    "phase_c_current_a": 2.316432450429945e-14,
+    "effective_turns_per_slot": 7,
+    "winding_model": "48-slot/eight-pole integral-slot phase belts A+, C-, B+, A-, C+, B-; 7 conductors/slot from twin turns_per_coil=4 (twin turns_per_phase=14, parallel_paths=2, twin_stator_slots=24; implied series turns\u224814.0 on this 48-slot map). Current angle -30\u00b0 elec (not the \u221290\u00b0 torque-null; d-axis alignment still provisional); rotor 0\u00b0 mech. Not a frozen hairpin schedule."
+  }
+}

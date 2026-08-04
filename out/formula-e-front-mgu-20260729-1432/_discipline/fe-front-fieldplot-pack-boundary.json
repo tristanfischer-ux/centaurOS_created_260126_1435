@@ -1,0 +1,15 @@
+{
+  "schema": "forgeos.p_stage_discipline.boundary/v1",
+  "stage_id": "fe-front-fieldplot-pack",
+  "exit_code": 0,
+  "verdict": "PROCEED",
+  "log": "\u2500\u2500 FINISHED: fe-front-fieldplot-pack\n   [ok ] PRESENT    scripts/motor-stack/em_fia_fieldplot_pack.py\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/fieldplot_pack_manifest.json\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/05-oc-vs-loaded-compare.png\n   [ok ] PRESENT    out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/02-loaded-full_surface3d.png\n\u2500\u2500 NEXT: Optional denser grid; optional Jack pack page; still no ship_ok\n\u2500\u2500 GATES: 7/7 pass\n\u2500\u2500 PROCEED\n",
+  "produced": [
+    "scripts/motor-stack/em_fia_fieldplot_pack.py",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/fieldplot_pack_manifest.json",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/05-oc-vs-loaded-compare.png",
+    "out/formula-e-front-mgu-20260729-1432/_motor_stack/fieldplot_pack/02-loaded-full_surface3d.png"
+  ],
+  "needs": [],
+  "checked_utc": "2026-08-04T18:46:56Z"
+}

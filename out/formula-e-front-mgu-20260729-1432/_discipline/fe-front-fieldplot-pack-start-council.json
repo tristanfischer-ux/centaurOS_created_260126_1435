@@ -1,0 +1,211 @@
+{
+  "schema": "forgeos.p_stage_discipline.council/v1",
+  "claim": "START: FE Front FEMM Field Plot Pack \u2014 Tony-style |B| maps + 3D |B| landscapes from Path B kit-case deck so partners can lean in on magnets\u2194copper",
+  "mode": "live",
+  "called_utc": "2026-08-04T18:45:43Z",
+  "seats": {
+    "sol": {
+      "seat": "sol",
+      "role": "propose",
+      "ok": true,
+      "review": {
+        "missed": [
+          {
+            "issue": "The proposed 3D |B| landscape is only a surface rendering of a 2D FEMM planar solution, not 3D magnetic FE. It must be labelled as an extruded/visualised 2D section and not imply end effects, axial leakage, skew, or end-winding fields.",
+            "why_it_matters": "The plan explicitly excludes 3D end-winding FE. A visually persuasive 3D plot can silently overstate what the underlying model resolves, especially for partners interpreting magnet-to-copper coupling.",
+            "how_to_test": "Require plot titles, HTML metadata, and captions to state the FEMM problem type and axial assumption. Compare against a deliberately changed stack length/end condition: if the landscape does not change, it must not be presented as a 3D field solution."
+          },
+          {
+            "issue": "`mo_getpointvalues` on a rectangular grid will sample outside the solved magnetic region and across material boundaries. Interpolated values in air, conductor slots, magnets, and near corners can create false peaks or contour artefacts unless the grid is masked by region and invalid values are handled explicitly.",
+            "why_it_matters": "The most likely confidently wrong reported value is the apparent peak |B|, caused by sampling/interpolation at a sharp material interface, mesh feature, or unintended region rather than a physically meaningful material-region maximum.",
+            "how_to_test": "Export region IDs/material masks with the sample grid; produce separate air-gap, tooth, yoke, magnet, and copper-region extrema; verify each reported maximum against FEMM's mesh/element field display and repeat with a refined mesh and shifted sampling grid."
+          },
+          {
+            "issue": "Flux lines should be derived from the magnetic vector potential/flux function, not from contours of |B|. Contours of magnitude are not magnetic field lines and can make the map physically misleading.",
+            "why_it_matters": "The stated purpose is to help readers understand magnets\u2194copper. Incorrect 'flux lines' produce a persuasive but false causal interpretation of flux paths.",
+            "how_to_test": "Generate field lines from A contours (or integrate the B vector field) and verify that they follow the FEMM field display. Add a regression fixture where a known two-pole solution distinguishes A contours from |B| contours."
+          },
+          {
+            "issue": "'OC versus loaded' is under-specified: rotor electrical angle, phase-current convention, current amplitude basis (peak/RMS), dq sign convention, current angle, and reference frame must be inherited exactly from the Path B operating point rather than selected for visual appeal.",
+            "why_it_matters": "A loaded plot can look credible while representing the wrong torque-producing or demagnetising state. This is particularly easy if `_build_fia_lua` uses a different current/angle convention than the Path B kit-case deck.",
+            "how_to_test": "Read the operating-point inputs directly from the Path B source artifact, emit them into plot metadata, and add an assertion that the loaded FEMM circuit currents and rotor position equal the deck values after all unit and phase conversions. Validate resulting torque/flux linkage against the existing EM case within an agreed tolerance."
+          },
+          {
+            "issue": "The capability dossier says the Python `femm` package is unavailable. Reusing Lua may still work through a native FEMM executable, but that executable, version, headless invocation, and postprocessor export path are not evidenced.",
+            "why_it_matters": "The stage success criterion says 'from real FEMM'; a fallback synthetic field or an unexecuted Lua deck would meet the visual deliverable while violating the core claim.",
+            "how_to_test": "Before implementation, add a preflight that locates FEMM, records executable/version, runs a minimal Lua solve in CI or the target environment, and fails rather than generating plots if `mi_analyze`/`mo_open` or point queries fail."
+          }
+        ],
+        "generality_concerns": [
+          "The approach is bespoke if it hard-codes the Path B geometry, coil labels, circuit names, and rotor position inside `_build_fia_lua`. Define an operating-point/geometry adapter so OC and loaded cases, region masks, and plot annotations come from the solved deck rather than fixed assumptions.",
+          "Use the existing `scripts/motor-stack/em_fia_fieldplot_pack.py` as directed by the calculation guard rather than re-deriving FEMM extraction, excitation handling, or plot conventions. Also use `em_pyleecan_fia_front_kit_case.py` as the authoritative Path B operating-point/geometry source where applicable.",
+          "Do not use the missing Python `femm` package as a reason to approximate fields with NumPy/analytical equations. The only acceptable fallback for this stated scope is a clearly failed/unavailable real-FEMM run, not a surrogate labelled FEMM.",
+          "The corpus tables are not a substitute for solver output here: they may support labels/material context, but cannot establish the OC/loaded field maps or their extrema."
+        ],
+        "blocking": true,
+        "one_line_summary": "Block until real FEMM execution, Path-B excitation/rotor-state traceability, correct flux-line construction, and region-aware field sampling are specified; otherwise the pack can produce attractive but physically mislabelled maps."
+      }
+    },
+    "grok45": {
+      "seat": "grok45",
+      "role": "corroborate",
+      "ok": true,
+      "review": {
+        "arithmetic_errors": [],
+        "reasoning_faults": [
+          {
+            "where": "success_criteria vs capability dossier",
+            "fault": "Criteria require 'OC and loaded |B| maps from real FEMM', but dossier lists femm under packages_missing; approach ( _build_fia_lua / mo_getpointvalues ) depends on FEMM anyway",
+            "consequence": "Stage cannot honestly deliver 'real FEMM' maps without a FEMM runtime; risk of silent fallback, synthetic fields, or a blocked run misread as success"
+          },
+          {
+            "where": "proposed approach: plotly HTML",
+            "fault": "Interactive HTML via plotly is planned but plotly is not in packages_available (only matplotlib/numpy/scipy/etc.)",
+            "consequence": "HTML deliverable likely fails or is hand-rolled without the stated stack; success_criteria 'interactive HTML' is not established by the environment"
+          },
+          {
+            "where": "EVIDENCE FOR CLAIMS / CALCULATION GUARD",
+            "fault": "No evidence supplied and work is START/not done, yet guard already STRONG-matches scripts/motor-stack/em_fia_fieldplot_pack.py as the tool to use; intent reads like a greenfield pack",
+            "consequence": "May re-derive or fork behavior that already exists, or claim a new pack without proving it differs from the existing script"
+          },
+          {
+            "where": "CLAIM / twin Path B kit-case deck",
+            "fault": "Claim says maps/landscapes 'from Path B kit-case deck' but diff does not establish that the Lua/build path or twin out/formula-e-front-mgu-20260729-1432 is wired in\u2014only asserted in plan_fit",
+            "consequence": "Plots may not be from the kit-case deck partners think they are reviewing (wrong geometry/excitation)"
+          }
+        ],
+        "blocking": true,
+        "one_line_summary": "Block: real-FEMM |B| pack is planned while femm (and plotly) are missing, so stated FEMM maps/HTML cannot be established as claimed."
+      }
+    },
+    "minimax_m3": {
+      "seat": "minimax_m3",
+      "role": "audit",
+      "ok": true,
+      "review": {
+        "claims": [
+          {
+            "claim": "FE Front FEMM Field Plot Pack \u2014 Tony-style |B| maps + 3D |B| landscapes from Path B kit-case deck so partners can lean in on magnets\u2194copper",
+            "verdict": "UNSUPPORTED",
+            "why": "This is a START council with no diff and no evidence supplied. The intent asserts deliverables that have not been produced. The 'Path B kit-case deck' reference is unsupported \u2014 the EVIDENCE section explicitly states '(none supplied \u2014 the intent must therefore assert no measured numbers)'."
+          },
+          {
+            "claim": "OC and loaded |B| maps from real FEMM",
+            "verdict": "CONTRADICTED",
+            "why": "The capability dossier lists 'femm' under packages_missing. The proposed approach calls 'mo_getpointvalues grid' (a FEMM API function) and 'Reuse _build_fia_lua' (a FEMM LUA builder). FEMM is not installed in the environment, so 'real FEMM' results cannot be produced as stated."
+          },
+          {
+            "claim": "3D |B| landscape PNG",
+            "verdict": "UNSUPPORTED",
+            "why": "No code has been written. The success criterion asserts a deliverable that does not yet exist. The approach mentions '3D surface' but without FEMM available, the surface cannot be sourced from real field solutions."
+          },
+          {
+            "claim": "interactive HTML",
+            "verdict": "UNSUPPORTED",
+            "why": "No code has been written. The approach mentions 'plotly HTML' but this is a forward-looking plan, not an established result."
+          },
+          {
+            "claim": "ship_ok false",
+            "verdict": "UNSUPPORTED",
+            "why": "No work has been done; ship_ok status is not yet determined by any artifact in the diff."
+          },
+          {
+            "claim": "ship_ok_unchanged: true",
+            "verdict": "UNSUPPORTED",
+            "why": "Asserted in the plan fit but no diff or artifact demonstrates that ship_ok remains unchanged. This is a self-assertion with no evidence."
+          },
+          {
+            "claim": "partners can lean in on magnets\u2194copper",
+            "verdict": "UNSUPPORTED",
+            "why": "Vague usability claim with no measurable basis. No partner-facing artifact has been produced or validated."
+          }
+        ],
+        "weakest_link": "The plan asserts 'real FEMM' field maps and calls FEMM-specific functions (mo_getpointvalues, _build_fia_lua), but the capability dossier explicitly lists 'femm' as a missing package. The entire deliverable rests on a tool that is not available in the environment.",
+        "blocking": true,
+        "one_line_summary": "Plan requires FEMM for |B| maps but FEMM is missing from the environment; the approach must pivot to pyleecan or swat_em before any field plot can be sourced from a real solver.",
+        "missed": [
+          {
+            "issue": "FEMM dependency not addressed",
+            "detail": "The capability dossier lists 'femm' under packages_missing. The approach calls mo_getpointvalues and _build_fia_lua, both FEMM-specific. No fallback or alternative solver is specified. The plan will fail at runtime or silently degrade to hand-derived plots."
+          },
+          {
+            "issue": "No source data supplied",
+            "detail": "The EVIDENCE section states '(none supplied \u2014 the intent must therefore assert no measured numbers)'. The 'Path B kit-case deck' is referenced but no geometry, excitation, or material data is provided. The plan cannot produce 'OC and loaded' maps without defining what 'loaded' means (current vector, torque angle, etc.)."
+          },
+          {
+            "issue": "Existing FEMM-based infrastructure may not be reusable",
+            "detail": "The calculation guard references em_fia_fieldplot_pack.py with a description matching the intent, but this is a START council \u2014 the script may be a placeholder or may itself depend on the missing FEMM package. The guard's strong match score (85.08) does not guarantee the script is functional."
+          },
+          {
+            "issue": "Alternative solvers available but not named in approach",
+            "detail": "pyleecan is listed as available and has been used previously (em_pyleecan_fia_front_kit_case.py scored 23.45 in the guard). swat_em is also available. The approach does not specify which solver to use if FEMM is unavailable, leaving the implementation to guess."
+          },
+          {
+            "issue": "3D |B| landscape source unclear",
+            "detail": "The plan claims a 3D surface but FEMM is a 2D solver. A 3D landscape would require either extrusion assumptions, a different solver (pyleecan, swat_em), or hand-derived stacking. The approach does not state which."
+          },
+          {
+            "issue": "No validation or cross-check specified",
+            "detail": "The success criteria list deliverables but no acceptance test. How will the |B| maps be verified against the kit-case spec or against an independent solver? Without a cross-check, a confidently wrong number is the most likely failure mode."
+          }
+        ],
+        "challenge_answers": {
+          "(a) approach_wrong": "The approach assumes FEMM is available and callable. It is not. The plan must either install FEMM, pivot to pyleecan (which has MagFEMM coupling and is already proven in the corpus), or pivot to swat_em. Additionally, 'OC vs loaded' is undefined \u2014 what excitation current, what power factor, what torque angle? Without these, the loaded map is arbitrary.",
+          "(b) tools_to_use_instead": "pyleecan (available, previously used for FIA front-kit EM in em_pyleecan_fia_front_kit_case.py) should replace FEMM for the field solution. swat_em is also available as an alternative. meshio and gmsh are available for geometry/mesh handling. matplotlib and plotly are available for the 2D contourf and 3D surface / interactive HTML deliverables. The corpus table fpk_component_literature and fpk_extracted_claims should be consulted for kit-case geometry and excitation specs rather than hand-deriving them.",
+          "(c) most_likely_wrong_number": "The single most likely failure mode is producing a |B| map from a hand-derived or fallback analytic approximation (e.g., simple air-gap flux density formula) and presenting it as if it came from FEMM. Without FEMM installed, the code may silently fall back to an analytic estimate that ignores saturation, slotting, and magnet geometry \u2014 producing a number that looks plausible but is wrong by tens of percent. The mitigation is to hard-fail if FEMM is unavailable, or to route through pyleecan which is installed and validated."
+        }
+      }
+    }
+  },
+  "seats_called": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "blocking_seats": [
+    "grok45",
+    "minimax_m3",
+    "sol"
+  ],
+  "advice_taken": [
+    {
+      "seat": "sol",
+      "point": "field plots must come from the same Path B kit-case FEMM deck as torque, not a decorative mesh",
+      "action": "Implemented: em_fia_fieldplot_pack.py calls _build_fia_lua from em_fia_front_kit_case; probes mo_getpointvalues on the solved field; OC + loaded \u221230\u00b0 kit-case OP; ship_ok false; honesty block states 2D planar not 3D end-winding FE.",
+      "covers": 8
+    },
+    {
+      "seat": "grok45",
+      "point": "3D presentation must not be mistaken for 3D FE proof",
+      "action": "Manifest honesty.dimensionality and every plot footer state height/colour is presentation of 2D |B|; interactive HTML same; release_statement says screen only.",
+      "covers": 4
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "council believed FEMM missing from environment so maps cannot be real",
+      "action": "FEMM is present as scripts/phantm/bin/femmcli (xfemm) \u2014 same solver as Path B kit-case. Pack already ran: OC peak |B| 2.25 T, loaded 2.69 T, 4096 probes/case, artefacts under _motor_stack/fieldplot_pack/. plotly 6.9 is installed for HTML.",
+      "covers": 8
+    }
+  ],
+  "advice_rejected": [
+    {
+      "seat": "sol",
+      "point": "block until full 3D Maxwell end-winding solve exists",
+      "why_rejected": "Out of scope for this lean-in pack; user asked for field plots with 3D presentation of magnetism from the existing Path B deck. True 3D FE is a later campaign.",
+      "covers": 4
+    },
+    {
+      "seat": "grok45",
+      "point": "block until dyno correlates the colour maps",
+      "why_rejected": "Explicitly not-doing dyno; ship_ok false; maps are FEMM screens under provisional seeds.",
+      "covers": 2
+    },
+    {
+      "seat": "minimax_m3",
+      "point": "pivot to pyleecan/swat_em before any field plot",
+      "why_rejected": "Unnecessary: native femmcli already solves the Path B deck. Pyleecan MagFEMM is an alternate path; this pack intentionally shares _build_fia_lua with the torque campaign so colours match the numbers partners already saw.",
+      "covers": 8
+    }
+  ],
+  "council_ok": true
+}
